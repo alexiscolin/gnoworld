@@ -114,6 +114,16 @@
       padding-block-start: 27px;
     }
 
+    /* The kicker is the crumbs' row in the world's page: 24 px tall, its words centred in it (frame 26), so the title keeps its place. */
+    .panel[data-look="plate"] .content p:has(+ h1) {
+      /* layout: the kicker's words centred in the crumbs' row */
+      display: flex;
+      /* layout: centred in the row */
+      align-items: center;
+      /* raw: the crumbs' row */
+      min-block-size: 24px;
+    }
+
     /* The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
        step the longest name the 474 px column holds at 0.58 em a letter. */
     .panel[data-look="plate"] h1 {

@@ -169,10 +169,10 @@ describe("a universe's index", () => {
 });
 
 describe("a world of another universe", () => {
-  test("is at its universe's path, its trail leading to that universe", async () => {
+  test("is at its universe's path, its kicker naming that universe", async () => {
     const html = await page("world", "/net/gnoland/w/other");
     expect(html).toContain("<h1>Other</h1>");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Earth<\/a>/);
+    expect(html).toMatch(/<p class="label[^"]*">gno\.land<\/p><h1>Other<\/h1>/);
   });
 
   test.each(["/net/gnoland/w/bubble", "/w/other", "/net/nowhere/w/other", "/net/onyx/w/other"])(

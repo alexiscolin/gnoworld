@@ -1,6 +1,7 @@
 // What the components do in a browser, which jsdom cannot show: the dialog and the popover in the
 // top layer, the tooltip, the skeleton's wait, a figure's count, a chart's colours and the dock's
 // magnification.
+import AxeBuilder from "@axe-core/playwright";
 import type { Locator } from "@playwright/test";
 import type { Page } from "../e2e/fixtures.ts";
 import { contrast, expect, open, RING, test } from "./storybook.ts";
@@ -540,6 +541,46 @@ test("a chart's bars hold 3:1 against the page, the current one unlike the past,
   const rgb = (colour: string) => (colour.match(/\d+/g) ?? []).slice(0, 3).map(Number);
   expect(past).not.toBe(now);
   for (const bar of [past, now]) expect(contrast(rgb(bar), rgb(ground))).toBeGreaterThanOrEqual(3);
+});
+
+// F304 in a real browser: the words over a bar stay inside the viewport, the pointer and the arrows change them, and the focusable
+// group is read by axe (the stories' axe sweep walks the same story).
+test.describe("a chart's tooltip", () => {
+  const words = (page: Page) =>
+    page.locator("[aria-hidden='true']").filter({ hasText: /^\d+ · (This hour|\d+ hours? ago)$/ });
+  const inside = async (locator: Locator, page: Page) => {
+    const found = await box(locator);
+    const view = page.viewportSize();
+    expect(found.x).toBeGreaterThanOrEqual(0);
+    expect(found.y).toBeGreaterThanOrEqual(0);
+    expect(found.x + found.width).toBeLessThanOrEqual(view?.width ?? 0);
+  };
+
+  test("shows the count and the hour over the bar under the pointer, inside the viewport, at both ends", async ({
+    page,
+  }) => {
+    await open(page, "activitychart--day");
+    for (const hour of [0, 18, 23]) {
+      await page.locator(`[data-hour='${String(hour)}']`).hover();
+      await expect(words(page)).toHaveCount(1);
+      await inside(words(page), page);
+    }
+    await expect(words(page)).toHaveText(/^\d+ · This hour$/);
+  });
+
+  test("is reached with Tab, the arrows change the words, and axe finds nothing on the group", async ({ page }) => {
+    await open(page, "activitychart--day");
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("group", { name: "Calls per hour, today" })).toBeFocused();
+    await expect(words(page)).toHaveText(/This hour$/);
+    await page.keyboard.press("ArrowLeft");
+    await expect(words(page)).toHaveText(/^\d+ · 1 hour ago$/);
+    await inside(words(page), page);
+    await page.keyboard.press("Escape");
+    await expect(words(page)).toHaveCount(0);
+    const found = (await new AxeBuilder({ page }).include("#storybook-root").analyze()).violations;
+    expect(found.map((v) => v.id)).toEqual([]);
+  });
 });
 
 test.describe("a planet's thumb", () => {

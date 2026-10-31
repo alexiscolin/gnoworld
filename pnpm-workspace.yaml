@@ -18,8 +18,14 @@ trustPolicyExclude:
 engineStrict: true
 # qs below 6.16.0 has three denial-of-service advisories (docs/review/findings.md, F025); it
 # comes only through StrykerJS's typed-rest-client.
+# follow-redirects 1.16.1 (GHSA-mrwp-f3q8-3g9p, high) comes through @gnolang/tm2-js-client's axios; glob 13
+# (GHSA-3g3m-2fjr-6pw4, moderate) through Storybook's docgen; minimatch 10 (GHSA-g3hv-75wg-m249, moderate) through
+# ESLint, typescript-eslint, StrykerJS and glob. Read by scripts/audit.py on 2026-10-31.
 overrides:
   qs: "^6.16.0"
+  follow-redirects: "^1.16.2"
+  glob: "^14.0.3"
+  minimatch: "^11.0.3"
 allowBuilds:
   esbuild: false # its postinstall only re-fetches the binary optionalDependencies already install
   unrs-resolver: false # its postinstall only re-fetches the native binding, which optionalDependencies already install

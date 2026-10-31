@@ -1,0 +1,7 @@
+/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26). */
+@layer components {
+  .chat {
+    /* layout: the chat takes the dock's height */
+    block-size: 100%;
+  }
+}

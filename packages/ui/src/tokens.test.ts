@@ -227,3 +227,11 @@ describe("the New mark's colours", () => {
     expect(contrast(over("--color-new-line", "space"), BASE["space"] ?? "")).toBeGreaterThanOrEqual(3);
   });
 });
+
+// docs/DESIGN-SYSTEM.md, "Type" (Alexis, 2026-10-31): the instrument figures, the board "Instrument" of the counter-proposal: Geist
+// Mono 500, 44 px (the video's figure on a plate); the Stat takes it (worldPage.spec.ts reads what it draws).
+describe("the instrument figure", () => {
+  it("is Geist Mono 500 at 44 px, in a token of its own", () => {
+    expect(value("--font-figure")).toBe("500 2.75rem/1 var(--family-mono)");
+  });
+});

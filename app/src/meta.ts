@@ -4,7 +4,7 @@
 import type { MetaDescriptor } from "react-router";
 import type { Ecosystem, UniverseView, World } from "./places.ts";
 
-const ORIGIN = "https://gno.world";
+export const ORIGIN = "https://gno.world";
 
 const HUB = "gno.world, the social, on-chain hub of gno.land";
 

@@ -1,11 +1,13 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
-import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
-import { failedWorldMeta, worldMeta } from "../meta.ts";
+import { Kicker, Panel, Stack } from "@gnoworld/ui";
+import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
+import { Actions, Activity, Here } from "../features/world/index.ts";
+import styles from "./world.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -37,28 +39,32 @@ function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): Cha
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
+  // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
+  // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
+  // at the left (Panel.Layout).
   return (
     <Panel.Layout
       plate={
         <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">
           <Panel.Body>
             <Stack>
-              <Breadcrumb
-                label="You are here"
-                items={[
-                  { label: universe.name, href: universe.home.path },
-                  { label: "Earth", href: universe.earth.path },
-                  { label: world.name },
-                ]}
-              />
+              {/* The kind of place ("UNIVERSE > DAO") is not in the data yet: the universe alone says where this is. */}
+              <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
               <p>{world.description}</p>
+              {/* Who is here comes from the chat once it has connected; no source gives the rate, nor a link to another world (Connected: a component test only). */}
+              <Here />
+              {/* No source yet for the history: the block says so. */}
+              <Activity />
+              <Actions address={ORIGIN + world.canonical} />
             </Stack>
           </Panel.Body>
         </Panel>
       }
     >
-      <Chat world={world.slug} place={placeOf(world, universe)} />
+      <div id="chat" className={styles["chat"]}>
+        <Chat world={world.slug} place={placeOf(world, universe)} />
+      </div>
     </Panel.Layout>
   );
 }

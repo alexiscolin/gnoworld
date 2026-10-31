@@ -2,27 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { box, near } from "./geometry.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
 // held to 2 px of the frame's, for anti-aliasing and compression; the pictures' own numbers are read off the frames' pixels.
-const NEAR = 2;
-interface Box {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-const box = async (page: Page, selector: string): Promise<Box> => {
-  const found = await page.locator(selector).first().boundingBox();
-  expect(found, `${selector} is not on the page`).not.toBeNull();
-  return found ?? { x: 0, y: 0, width: 0, height: 0 };
-};
-const near = (actual: number, wanted: number, what: string) => {
-  expect(Math.abs(actual - wanted), `${what}: ${String(actual)}, the frame's ${String(wanted)}`).toBeLessThanOrEqual(
-    NEAR,
-  );
-};
 const style = (page: Page, selector: string, property: string) =>
   page
     .locator(selector)

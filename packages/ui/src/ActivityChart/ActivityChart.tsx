@@ -1,5 +1,9 @@
 import { Cluster, Stack } from "../compositions/index.ts";
 import { grouped } from "../format.ts";
+import { useLayoutEffect, useRef, type RefObject } from "react";
+import { surface, usePlaced } from "../Popover/floating.ts";
+import tooltip from "../Tooltip/Tooltip.module.css";
+import { useReading } from "./useReading.ts";
 import styles from "./ActivityChart.module.css";
 
 export interface ActivityChartProps {
@@ -29,8 +33,117 @@ function when(back: number, unit: "hour" | "day") {
   return `${String(back)} ${unit}${back === 1 ? "" : "s"} ago`;
 }
 
+interface Point {
+  count: number;
+  at: number;
+  high: number;
+}
+
+// Over the bar, placed in script as the tooltip's words are: above it, below when there is no room above, a step inside the
+// screen's edges (a chart at the top of the page, or at the edge of a phone's screen, keeps its words whole).
+function Tip({
+  point,
+  last,
+  unit,
+  plot,
+}: {
+  point: Point;
+  last: number;
+  unit: "hour" | "day";
+  plot: RefObject<Element | null>;
+}) {
+  const anchorRef = useRef<Element | null>(null);
+  const wordsRef = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    anchorRef.current = plot.current?.querySelector(`[data-hour="${String(point.at)}"]`) ?? null;
+  }, [plot, point.at]);
+  usePlaced(anchorRef, wordsRef, { open: true, side: "above", align: "center", again: point.at });
+  return (
+    <span
+      ref={wordsRef}
+      className={surface([tooltip["tip"], styles["tip"]].join(" "))}
+      aria-hidden="true"
+      data-tip=""
+      style={{ visibility: "hidden" }}
+    >
+      {grouped(point.count)} · {when(last - point.at, unit)}
+    </span>
+  );
+}
+
+// The bars or the line, in the drawing's own units.
+function Drawing({ points, sparkline, width }: { points: Point[]; sparkline: boolean; width: number }) {
+  const last = points.length - 1;
+  // A line of one value is level across one step.
+  const line = points.length === 1 ? points.flatMap((point) => [point, { ...point, at: 1 }]) : points;
+  return (
+    <svg
+      className={styles["chart"]}
+      viewBox={`0 0 ${String(width)} ${String(HEIGHT)}`}
+      height={HEIGHT}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      {sparkline ? (
+        <polyline
+          className={styles["line"]}
+          points={line.map(({ at, high }) => `${String(at * STEP)},${String(lineY(high))}`).join(" ")}
+        />
+      ) : (
+        points.map(({ at, high }) => (
+          <rect
+            key={at}
+            className={styles["bar"]}
+            data-hour={at}
+            data-current={at === last ? "true" : undefined}
+            x={at * (BAR + GAP)}
+            y={HEIGHT - high}
+            width={BAR}
+            height={high}
+          />
+        ))
+      )}
+    </svg>
+  );
+}
+
+// The drawing, its tooltip, and the polite status that says the focused bar aloud. Bars have the tooltip and the
+// keyboard's group; a sparkline and a chart with no value have neither: no focus stop with nothing to walk.
+function Plot({
+  points,
+  sparkline,
+  unit,
+  label,
+}: {
+  points: Point[];
+  sparkline: boolean;
+  unit: "hour" | "day";
+  label: string;
+}) {
+  const last = points.length - 1;
+  const bars = !sparkline && points.length > 0;
+  const reading = useReading(bars ? points.length : 0);
+  const width = sparkline ? Math.max(1, last) * STEP : Math.max(0, points.length * (BAR + GAP) - GAP);
+  const shown = points[reading.shown ?? -1];
+  const focused = points[reading.focusAt ?? -1];
+  const plotRef = useRef<HTMLDivElement>(null);
+  const group = bars ? { role: "group", "aria-label": label, tabIndex: 0, ...reading.group, ...reading.plot } : {};
+  return (
+    <div ref={plotRef} className={styles["plot"]} {...group}>
+      <Drawing points={points} sparkline={sparkline} width={width} />
+      {shown === undefined ? null : <Tip point={shown} last={last} unit={unit} plot={plotRef} />}
+      {bars ? (
+        <span role="status" className="visually-hidden">
+          {focused === undefined ? null : `${when(last - focused.at, unit)}, ${grouped(focused.count)}`}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** Activity over time, in SVG for the eye: past bars muted, the current one in text; the peak and the
- * current value written beside it, and every value in a table for assistive technology. */
+ * current value written beside it, and every value in a table for assistive technology. The bars have a
+ * tooltip (F304), by the pointer and by the keyboard: the chart is one group whose arrows walk them. */
 export function ActivityChart({ label, values, sparkline = false, unit = "hour" }: ActivityChartProps) {
   const counts = values.map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
   const peak = Math.max(0, ...counts);
@@ -42,38 +155,9 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
     at,
     high: count === 0 ? 0 : Math.max(1, Math.round((count / peak) * HEIGHT)),
   }));
-  // A line of one value is level across one step.
-  const line = points.length === 1 ? points.flatMap((point) => [point, { ...point, at: 1 }]) : points;
-  const width = sparkline ? Math.max(1, last) * STEP : Math.max(0, counts.length * (BAR + GAP) - GAP);
   return (
     <Stack space="2xs">
-      <svg
-        className={styles["chart"]}
-        viewBox={`0 0 ${String(width)} ${String(HEIGHT)}`}
-        height={HEIGHT}
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        {sparkline ? (
-          <polyline
-            className={styles["line"]}
-            points={line.map(({ at, high }) => `${String(at * STEP)},${String(lineY(high))}`).join(" ")}
-          />
-        ) : (
-          points.map(({ at, high }) => (
-            <rect
-              key={at}
-              className={styles["bar"]}
-              data-hour={at}
-              data-current={at === last ? "true" : undefined}
-              x={at * (BAR + GAP)}
-              y={HEIGHT - high}
-              width={BAR}
-              height={high}
-            />
-          ))
-        )}
-      </svg>
+      <Plot points={points} sparkline={sparkline} unit={unit} label={label} />
       <Cluster space="s">
         <p className={styles["figure"]}>Peak {grouped(peak)}</p>
         <p className={styles["figure"]}>Now {grouped(counts.at(-1) ?? 0)}</p>
