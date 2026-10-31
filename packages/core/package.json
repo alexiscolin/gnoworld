@@ -4,6 +4,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./bubbles": "./src/bubbles/index.ts"
   }
 }

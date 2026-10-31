@@ -38,7 +38,7 @@ export interface Bubble {
   readonly own: boolean;
 }
 
-interface Count {
+export interface Count {
   readonly country: string;
   readonly count: number;
   readonly far: boolean;
