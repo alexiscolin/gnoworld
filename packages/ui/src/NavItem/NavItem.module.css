@@ -40,6 +40,11 @@
     text-decoration: none;
   }
 
+  /* The item in view says so on its link too, a half step heavier, as a Row's current link does. */
+  .main[aria-current="true"] {
+    font-weight: 500;
+  }
+
   .lead {
     /* layout: the lead keeps its size beside the words */
     flex: none;

@@ -113,6 +113,11 @@ test.describe("the chat at the video's size", () => {
     ]);
     if (row === null || bar === null) throw new Error("not drawn");
     near(bar.width, row.width);
+    // The format bar's buttons are the smallest control, 24 px square (the video's 24 high).
+    const tool = await page.getByRole("group", { name: "Format" }).getByRole("button").first().boundingBox();
+    if (tool === null) throw new Error("not drawn");
+    near(tool.height, 24);
+    near(tool.width, 24);
   });
 
   test("looks as the video's frame does", async ({ page }) => {
