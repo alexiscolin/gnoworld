@@ -193,11 +193,8 @@ function settle(run: Run): void {
     if (visible(run, s)) run.screen.push(s);
     else end(run, s);
   }
-  while (run.screen.length > run.max) {
-    const oldest = oldestOfOthers(run.screen) ?? run.screen[0];
-    if (oldest === undefined) break;
-    end(run, oldest);
-  }
+  const next = (): Bubble | undefined => oldestOfOthers(run.screen) ?? run.screen[0];
+  for (let s = next(); s !== undefined && run.screen.length > run.max; s = next()) end(run, s);
 }
 
 export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs): Picked {
