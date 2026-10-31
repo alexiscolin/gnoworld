@@ -455,8 +455,8 @@ test.describe("a line's actions", () => {
 
   // /code-review: the list stays where the reader left it as lines come, whichever line holds the focus.
   test("keep the list where the reader left it as a line comes while a line holds the focus", async ({ page }) => {
-    // The video's header (96 px) and the plate above the room (its activity and actions too) leave a 720-high screen too little for the lines.
-    await page.setViewportSize({ width: 1280, height: 1020 });
+    // The room is the full chat (?chat=full), which covers the plate: the page's own height does not matter.
+    await page.setViewportSize({ width: 1280, height: 800 });
     const ergo = await room(page, { history: SIXTY });
     await lines(page).first().focus();
     await expect(lines(page).first()).toBeInViewport();
