@@ -58,6 +58,7 @@
     --font-title-room: 300 1.375rem/1 var(--family-sans);
     --font-title-m: 300 1.75rem/1 var(--family-sans);
     --font-title-l: 300 2.25rem/1 var(--family-sans);
+    --font-figure: 500 2.75rem/1 var(--family-mono);
     --tracking-caps: 0.14em;
     --tracking-tight: -0.03em;
 

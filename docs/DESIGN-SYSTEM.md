@@ -148,6 +148,7 @@ the brightest planet behind the header's pills.
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
 | `--font-title-m` | 28 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
+| `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
 | `--font-display` | `clamp(4.5rem, 8vw, 7rem)`, -0.04em, leading 0.9 | Geist 600 | A world's name on its plate |
 | `--font-hero` | `clamp(5.5rem, 11vw, 11rem)`, -0.06em, leading 0.9 | Geist Mono 400, tabular | The hero number |
 

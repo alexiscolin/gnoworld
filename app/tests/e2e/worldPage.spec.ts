@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, hydrated, test } from "./fixtures.ts";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { open } from "./chatScreenOpen.ts";
 import { logIn } from "./irc.ts";
 import { box, near } from "./geometry.ts";
@@ -95,16 +95,43 @@ test.describe("Say hi in the chat", () => {
 test.describe("who is here right now", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
-    page,
-  }) => {
+  // The plate of Bubble once its chat has connected and the fact is drawn.
+  const connected = async (page: Page) => {
     await page.goto("/w/bubble");
     await hydrated(page);
     const plate = page.locator("[data-look='plate']");
     await expect(plate.getByText("right now", { exact: true })).toBeVisible();
+    return plate;
+  };
+
+  test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
+    page,
+  }) => {
+    const plate = await connected(page);
     const people = Number(await plate.locator("[data-value]").first().getAttribute("data-value"));
     expect(people).toBeGreaterThan(0);
     await expect(plate.getByText("messages now")).toHaveCount(0);
+  });
+
+  // The instrument figures (Alexis, 2026-10-31; the board "Instrument"): the figure in Geist Mono 500, tabular and tracked -0.04em, its
+  // caption the label in mono capitals.
+  test("sets the figure in Geist Mono 500, tabular, and its caption in mono capitals", async ({ page }) => {
+    const plate = await connected(page);
+    const figure = await plate
+      .locator("[data-value]")
+      .first()
+      .evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [style.fontFamily, style.fontWeight, style.fontVariantNumeric, style.fontSize, style.letterSpacing];
+      });
+    expect(figure[0]).toContain("Geist Mono");
+    expect(figure.slice(1)).toEqual(["500", "tabular-nums", "44px", "-1.76px"]);
+    const caption = await plate.getByText("right now", { exact: true }).evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.fontFamily, style.textTransform];
+    });
+    expect(caption[0]).toContain("Geist Mono");
+    expect(caption[1]).toBe("uppercase");
   });
 });
 
