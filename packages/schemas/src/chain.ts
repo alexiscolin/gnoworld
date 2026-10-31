@@ -20,20 +20,6 @@ export const QueryAnswer = z.object({
 });
 export type QueryAnswer = z.infer<typeof QueryAnswer>;
 
-const Variable = z.object({ Name: z.string(), Type: z.string() });
-
-/** The text of `vm/qfuncs`: null (the text `null`) for a realm with no exported function; a nil Go list is null (json_encode.go:262). */
-export const FunctionList = z.nullable(
-  z.array(
-    z.object({
-      FuncName: z.string(),
-      Params: z.optional(z.nullable(z.array(Variable))),
-      Results: z.optional(z.nullable(z.array(Variable))),
-    }),
-  ),
-);
-export type FunctionList = z.infer<typeof FunctionList>;
-
 /** The node's `/status`: the latest block's height (an int64 is a string) and its own time. */
 export const StatusAnswer = z.object({
   result: z.object({
