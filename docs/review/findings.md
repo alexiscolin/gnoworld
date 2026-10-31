@@ -1962,3 +1962,5 @@ checks each row.
 | F2923 | 2026-10-31 | Claude (slice-5h fix pass) | `app/tests/chain/chainFixture.ts` | R-F15, low: v1.7.0 is not in the module cache, said in the commits | claimed | — |
 | F2924 | 2026-10-31 | Claude (slice-5h fix pass) | `app/src/features/realms/RealmCard.test.tsx` | R-F16, low: the cap sentence asserted whole | fixed | `6a8ae03d` |
 | F2925 | 2026-10-31 | Claude (slice-5h fix pass) | `app/src/features/chat/index.ts` | Medium, real: the lazy wrapper's export put a world page's first screen 88 B over budget (177,240 against 177,152); the route's module is its own chunk, the wrapper went | fixed | `cd601576` |
+| F3000 | 2026-10-31 | Claude (slice-5i merge check) | `server/src/main.test.ts` | Unsteady under load 35.4 on 16 cores (vitest, 2026-10-31T05:54Z): the muted-roles-file test failed once, passed on rerun | claimed | — |
+| F3001 | 2026-10-31 | Claude (slice-5i merge check) | `scripts/check.sh` (vitest step) | Unsteady: the fast gate took 86 s against its 30 s budget under load 54.8-57.3 on 16 cores; vitest alone took 85.9 s | claimed | — |
