@@ -27,6 +27,25 @@ test.describe("a world's page at the video's size", () => {
     await expect(page.getByRole("navigation", { name: "You are here" })).toHaveCount(0);
   });
 
+  // F2871: the kicker's row (24 px, flex) is the paragraph right before the title, not any first paragraph of a block of the plate: the
+  // activity's own title, which a history draws, stays a plain label. The probe stands where Activity's title would.
+  test("sets the kicker's row on the paragraph before the title and on no other first paragraph", async ({ page }) => {
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    const rows = await page.evaluate(() => {
+      const kicker = document.querySelector("[data-look='plate'] h1")?.previousElementSibling;
+      const block = document.createElement("div");
+      const probe = document.createElement("p");
+      probe.className = "label";
+      probe.textContent = "Activity · last 24 h";
+      block.append(probe);
+      document.querySelector("[data-look='plate'] h1 + p")?.after(block);
+      const row = (node: Element | null | undefined) => (node ? getComputedStyle(node) : undefined);
+      return [row(kicker)?.display, row(kicker)?.minHeight, row(probe)?.display, row(probe)?.minHeight];
+    });
+    expect(rows).toEqual(["flex", "24px", "block", "0px"]);
+  });
+
   // F2869: each block at its place. Frame 26's description line stands at y 316 (its centre); Bubble's has two lines, the first at
   // the frame's place. The frame's facts, chart (479) and actions (574) have the data Bubble lacks (no source for who is here, no
   // history), so below the description the page is pinned at what it lays: the words of no history, then the actions under them.

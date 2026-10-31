@@ -115,7 +115,7 @@
     }
 
     /* The kicker is the crumbs' row in the world's page: 24 px tall, its words centred in it (frame 26), so the title keeps its place. */
-    .panel[data-look="plate"] .content p:first-child {
+    .panel[data-look="plate"] .content p:has(+ h1) {
       /* layout: the kicker's words centred in the crumbs' row */
       display: flex;
       /* layout: centred in the row */
