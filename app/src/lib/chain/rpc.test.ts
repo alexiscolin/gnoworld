@@ -236,6 +236,16 @@ describe.each(READS)("$name, the read and its failures", ({ good, run, onRpcErro
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("asks with a GET for JSON, from no cache", async () => {
+    const fetcher = answering(good());
+    await run(RPC_OK, options(fetcher));
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+      method: "GET",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+  });
+
   it("is down when fetch rejects, and asks once", async () => {
     const fetcher = vi.fn<ChainFetch>(() => Promise.reject(new TypeError("Failed to fetch")));
     expect(failureOf(await run(RPC_OK, options(fetcher))).kind).toBe("down");
@@ -263,9 +273,11 @@ describe.each(READS)("$name, the read and its failures", ({ good, run, onRpcErro
     expect(failureOf(await pending).kind).toBe("timeout");
   });
 
-  it("is too big past the default cap", async () => {
+  it("is too big past the default cap, a failure with no status when nothing refused it", async () => {
     const huge = answering(JSON.stringify({ ...good(), pad: "a".repeat(1_100_000) }));
-    expect(failureOf(await run(RPC_OK, options(huge))).kind).toBe("too-big");
+    const failure = failureOf(await run(RPC_OK, options(huge)));
+    expect(failure.kind).toBe("too-big");
+    expect(failure).not.toHaveProperty("status");
   });
 
   it("is too big past a cap it is given", async () => {
@@ -297,10 +309,31 @@ describe.each(READS)("$name, the read and its failures", ({ good, run, onRpcErro
     expect(JSON.stringify(result)).not.toContain("bad parameter");
   });
 
+  // read.ts's promise: a result, good or not, names where it was read and when.
+  it.each([
+    ["a rejected fetch", () => vi.fn<ChainFetch>(() => Promise.reject(new TypeError("Failed to fetch")))],
+    ["HTTP 503", () => answering("busy", { status: 503 })],
+    ["an answer past the cap", () => answering(JSON.stringify({ ...good(), pad: "a".repeat(1_100_000) }))],
+    ["something that is no JSON", () => answering("<html>busy</html>")],
+    ["a wrong shape", () => answering({ jsonrpc: "2.0", id: "", result: { hello: 1 } })],
+    ["a JSON-RPC error", () => answering(rpcErrorEnvelope("bad parameter"))],
+  ])("names the address it asked and the time, on %s", async (_name, fetcherOf) => {
+    const fetcher = fetcherOf();
+    const result = await run(RPC_OK, options(fetcher));
+    expect(result.ok).toBe(false);
+    expect(askedOf(fetcher)).toHaveLength(1);
+    expect(result.source).toEqual({ url: askedOf(fetcher)[0], at: NOW.toISOString() });
+  });
+
   it("is refused, without a request, when the RPC is not https", async () => {
     const fetcher = answering(good());
     expect(failureOf(await run("http://rpc.gno.land:443", options(fetcher))).kind).toBe("refused");
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("names the address it refused and the time", async () => {
+    const result = await run("http://rpc.gno.land:443", options(answering(good())));
+    expect(result.source).toEqual({ url: "http://rpc.gno.land:443", at: NOW.toISOString() });
   });
 
   it("drops a trailing slash of the RPC address", async () => {
@@ -311,14 +344,19 @@ describe.each(READS)("$name, the read and its failures", ({ good, run, onRpcErro
     expect(askedOf(fetcher)[0]).toMatch(/^https:\/\/rpc\.gno\.land:443\/(status|abci_query\?)/);
   });
 
-  it.each(["", "not a url", "https://", "ftp://x", "https://user:pw@rpc.example.org"])(
-    "never throws, and asks nothing, for the RPC address %j",
-    async (rpc) => {
-      const fetcher = answering(good());
-      expect((await run(rpc, options(fetcher))).ok).toBe(false);
-      expect(fetcher).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "",
+    "not a url",
+    "https://",
+    "ftp://x",
+    "https://user:pw@rpc.example.org",
+    "https://user@rpc.example.org",
+    "https://:pw@rpc.example.org",
+  ])("never throws, and asks nothing, for the RPC address %j", async (rpc) => {
+    const fetcher = answering(good());
+    expect((await run(rpc, options(fetcher))).ok).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
 
 describe.each(ABCI)("$name, the answer inside the envelope", ({ run }) => {
@@ -358,7 +396,25 @@ describe.each(ABCI)("$name, the answer inside the envelope", ({ run }) => {
     const body = queryEnvelope({ data: "[]", log: HOSTILE });
     body.result.response.ResponseBase.Info = HOSTILE;
     const result = await run(RPC_OK, options(answering(body)));
-    expect(JSON.stringify(result.ok ? result.value : null)).not.toContain("HOSTILE");
+    expect(result.ok).toBe(true);
+    expect(JSON.stringify(result)).not.toContain("HOSTILE");
+  });
+
+  it.each([
+    ["a refusal", queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } })],
+    ["no Data", queryEnvelope({ data: null })],
+  ])("names the address it asked and the time, on %s inside the envelope", async (_name, body) => {
+    const fetcher = answering(body);
+    const result = await run(RPC_OK, options(fetcher));
+    expect(result.ok).toBe(false);
+    expect(askedOf(fetcher)).toHaveLength(1);
+    expect(result.source).toEqual({ url: askedOf(fetcher)[0], at: NOW.toISOString() });
+  });
+
+  it("is a good answer with no Error key, and a wrong shape with neither key", async () => {
+    const body = (ResponseBase: object) => ({ result: { response: { ResponseBase } } });
+    expect((await run(RPC_OK, options(answering(body({ Data: btoa("[]") }))))).ok).toBe(true);
+    expect(failureOf(await run(RPC_OK, options(answering(body({}))))).kind).toBe("wrong-shape");
   });
 
   it("is chain-refused, not a value, when Data is null with an Error", async () => {
@@ -373,6 +429,45 @@ describe.each(ABCI)("$name, the answer inside the envelope", ({ run }) => {
   it("is chain-refused, not a value, when Data is present together with an Error", async () => {
     const body = queryEnvelope({ data: "# hello", error: { "@type": "/abci.StringError", value: "boom" } });
     expect(failureOf(await run(RPC_OK, options(answering(body)))).kind).toBe("chain-refused");
+  });
+});
+
+// No recording exercises a GET (gno's clients POST), so these are spelled by hand from handlers.go:432-484, no copy of rpc.ts.
+describe("the request, spelled out", () => {
+  const demo = "gno.land/r/demo";
+  const abci = `${RPC_OK}/abci_query`;
+
+  it.each([
+    [
+      `${abci}?path=%22vm%2Fqrender%22&data=0x676e6f2e6c616e642f722f64656d6f3a78`,
+      (o: ReadOptions) => readPage(RPC_OK, { realm: demo, path: "x" }, o),
+    ],
+    [
+      `${abci}?path=%22vm%2Fqeval%22&data=0x676e6f2e6c616e642f722f64656d6f2e412829`,
+      (o: ReadOptions) => readEval(RPC_OK, { realm: demo, name: "A" }, o),
+    ],
+    [
+      `${abci}?path=%22vm%2Fqfuncs%22&data=0x676e6f2e6c616e642f722f64656d6f`,
+      (o: ReadOptions) => readFunctions(RPC_OK, demo, o),
+    ],
+  ])("asks %s", async (url, run) => {
+    const fetcher = answering(queryEnvelope({ data: "null" }));
+    expect((await run(options(fetcher))).ok).toBe(true);
+    expect(askedOf(fetcher)).toEqual([url]);
+  });
+});
+
+describe("a read that asked nothing", () => {
+  const LATER = new Date("2026-10-31T07:00:00.000Z");
+
+  it.each([
+    ["readPage", (o: ReadOptions) => readPage(RPC_OK, { realm: "not a realm" }, o)],
+    ["readFunctions", (o: ReadOptions) => readFunctions(RPC_OK, "not a realm", o)],
+    ["readEval", (o: ReadOptions) => readEval(RPC_OK, { realm: WUGNOT, name: "not a name" }, o)],
+  ])("%s still names the RPC and the time, of its clock or the system's", async (_name, run) => {
+    expect((await run({ now: () => NOW })).source).toEqual({ url: RPC_OK, at: NOW.toISOString() });
+    vi.setSystemTime(LATER);
+    expect((await run({})).source).toEqual({ url: RPC_OK, at: LATER.toISOString() });
   });
 });
 
@@ -402,8 +497,8 @@ describe("readPage", () => {
     expect(askedOf(fetcher)).toEqual([queryUrl(RPC_OK, "vm/qrender", `${WUGNOT}:`)]);
   });
 
-  it.each(["post/123", "a:b", "p/mainnet-upgrade", "é/🌍", "a b?c=d&e=f"])(
-    "asks %s after the first colon, in hex",
+  it.each(["post/123", "a:b", "p/mainnet-upgrade", "é/🌍", "a b?c=d&e=f", "a\tb"])(
+    "asks %j after the first colon, in hex, each byte in two digits",
     async (path) => {
       const { fetcher, result } = page("x", path);
       await result;
@@ -521,6 +616,11 @@ describe("readHeight, the traps", () => {
 
   it("is a wrong shape when the time is not a time", async () => {
     expect(failureOf(await at("12", "yesterday")).kind).toBe("wrong-shape");
+  });
+
+  it("names the address it asked and the time when the height is past a safe integer", async () => {
+    const result = await at(String(Number.MAX_SAFE_INTEGER) + "0");
+    expect(result.source).toEqual({ url: `${RPC_OK}/status`, at: NOW.toISOString() });
   });
 
   it("asks /status, not an abci_query: vm sets no Height, a page's height is its own read", async () => {
