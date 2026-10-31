@@ -180,8 +180,10 @@ describe("ActivityChart's tooltip (F304)", () => {
   const words = (count: number, when: string) => screen.queryByText(new RegExp(`^${String(count)}\\s*·\\s*${when}$`));
   const anyWords = () => screen.queryByText(/^\d+\s*·\s*(This hour|Today|\d+ (hours?|days?) ago)$/);
   const group = () => screen.getByRole("group", { name: "Calls per hour, today" });
+  // The focus the keyboard brings: Tab first, as jsdom's :focus-visible reads the events before the focus.
   const focus = () => {
     const chart = group();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Tab" });
     act(() => {
       chart.focus();
     });
