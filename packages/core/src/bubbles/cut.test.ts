@@ -77,6 +77,13 @@ describe("cutText: the cut", () => {
         ).toBe(`${"a".repeat(pad % 70)}end`);
   });
 
+  it("keeps the grapheme after a long stack that ends exactly where a window ends (F3367)", () => {
+    expect(cutText(`${"\u200b".repeat(991)}${stack(CLUSTER)}zq`, MAX)).toBe("zq");
+    for (let pad = 900; pad < 1100; pad++)
+      for (const marks of [CLUSTER, CLUSTER + 1, 1100])
+        expect(cutText(`${"\u200b".repeat(pad)}${stack(marks)}zq`, MAX), `${String(pad)} ${String(marks)}`).toBe("zq");
+  });
+
   it("is a prefix of the text's own graphemes, without the clusters over the limit, whatever the text (property)", () => {
     const unit = fc.oneof(
       fc.string({ unit: "grapheme", maxLength: 3 }),
