@@ -121,7 +121,9 @@ class PageLines implements Grammar<PageExtra> {
   inline = (line: string): Inline[] => inline(line, this.#options);
 
   // A word, as ```go: anything else after the backticks would be dropped from view, so the line is text.
-  fence = (language: string): boolean => /^\s*[\w+#.-]*\s*$/.test(language);
+  // The blanks go first, with `trim`, then a pattern with one run: two `\s*` round an optional middle took half a minute
+  // on a line of blanks and a mark (R-F1).
+  fence = (language: string): boolean => /^[\w+#.-]*$/.test(language.trim());
 
   extra(at: number): (() => Read<PageExtra>) | undefined {
     const body = (this.#lines[at] ?? "").trim();

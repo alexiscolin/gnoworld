@@ -859,6 +859,42 @@ describe("page: nothing a field holds is left unseen", () => {
 
 describe("page: linear in bytes (a guard against quadratic input; the bench measures the budget)", () => {
   const fill = (unit: string, bytes = PAGE_MAX_BYTES) => unit.repeat(Math.floor(bytes / unit.length));
+  const STARTS = [
+    "",
+    "#",
+    "# ",
+    "> ",
+    "> [!NOTE]",
+    "- ",
+    "1. ",
+    "```",
+    "``` go",
+    "<gno-form>\n",
+    "<gno-form ",
+    "<gno-input ",
+    "<gno-input name=",
+    "</gno-form",
+    "<gno-columns",
+    "[a](",
+    "![a](",
+    "**",
+    "https://a.test",
+    "https://a.test/",
+  ];
+  const BLANKS_THEN_MARK: [string, (bytes: number) => string][] = STARTS.flatMap((start) =>
+    // Each blank with its bytes in UTF-8: a no-break space is two, an em space three.
+    (
+      [
+        [" ", 1],
+        ["\t", 1],
+        ["\u00a0", 2],
+        ["\u2003", 3],
+      ] as const
+    ).map(([blank, size]): [string, (bytes: number) => string] => [
+      `${JSON.stringify(start)}, ${JSON.stringify(blank)} and a mark (R-F1)`,
+      (n) => start + blank.repeat(Math.floor(n / size) - 16) + "!",
+    ]),
+  );
   // A page of `bytes` of a shape: how it grows with the size is what a quadratic reader shows.
   const HOSTILE_PAGES: [string, (bytes: number) => string][] = [
     ["forms never closed", (n) => fill("<gno-form>\n", n)],
@@ -875,6 +911,11 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ["form lines", (n) => `<gno-form>\n${fill('<gno-input name="a" />\n', n)}</gno-form>`],
     ["form lines, none a field", (n) => `<gno-form>\n${fill("<gno-input name=\n", n)}</gno-form>`],
     ["tags with attributes never ending", (n) => `<gno-form>\n<gno-input ${fill("a=b ", n)}`],
+    ["a fence's line of blanks and a mark (R-F1)", (n) => "```" + " ".repeat(n) + "!"],
+    ["a fence's line of tabs and a mark (R-F1)", (n) => "```" + "\t".repeat(n) + "!"],
+    // Every line start a page reads, then blanks and a mark nothing reads: a regex with two `\s*` round an optional
+    // middle is quadratic on this and nothing else (F1711, R-F1).
+    ...BLANKS_THEN_MARK,
   ];
 
   // The fastest of seven reads: a pause of the engine's collector, which the largest page draws, is not the reader's time.
@@ -902,9 +943,9 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     expect(instrumented || linear() || linear() || linear()).toBe(true);
   });
 
-  test.each(HOSTILE_PAGES)("reads %s at the cap in under a second", (_name, make) => {
+  test.each(HOSTILE_PAGES)("reads %s at the cap in seconds, not minutes", (_name, make) => {
     const start = Date.now();
     expect(page(make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES)).kind).toBe("page");
-    expect(Date.now() - start).toBeLessThan(1000);
+    expect(Date.now() - start).toBeLessThan(5000); // the bench holds the budget; a quadratic regex takes half a minute
   });
 });

@@ -39,6 +39,9 @@ const OPENERS = "<gno-form>\n<gno-columns>\n> [!NOTE]\n```\n"
   .repeat(Math.ceil(PAGE_MAX_BYTES / 38))
   .slice(0, PAGE_MAX_BYTES);
 
+// A fence's line of blanks and a mark, the shape a regex with two runs of blanks pays half a minute for (R-F1).
+const BLANKS = ("```" + " ".repeat(PAGE_MAX_BYTES - 8) + "!").slice(0, PAGE_MAX_BYTES);
+
 /** One read timed; a page the reader calls too big, or any answer but a page, throws: the bench then has no sample. */
 const timed = (source: string) => () => {
   if (page(source).kind !== "page") throw new Error("the bench's page is not read as a page");
@@ -53,6 +56,7 @@ describe("a realm page", () => {
   bench("page, 64 KB of every block [15 ms]", timed(middle));
   bench("page, 256 KB of every block [50 ms]", timed(big));
   bench("page, 256 KB of openers nothing closes [50 ms]", timed(OPENERS));
+  bench("page, 256 KB of a fence's line of blanks and a mark [50 ms]", timed(BLANKS));
 });
 
 // The tree is drawn too: 256 KB of one-character headings is some 65,000 blocks of elements, which the reader's 50 ms does not
