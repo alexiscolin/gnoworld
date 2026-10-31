@@ -14,7 +14,7 @@ import { RealmFunctions } from "./RealmFunctions.tsx";
 const CHAIN = { name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const SUPPLY = EVALS.find((row) => row.chain === "onyx-1" && row.expr === "TotalSupply()")?.body ?? "";
 const NON_ORIGIN = REFUSALS.find((row) => row.chain === "onyx-1" && row.data.endsWith(".Deposit()"));
-const GNOWEB = "https://onyx.testnets.gno.land/r/gnoland/wugnot";
+const GNOWEB = "https://onyx.testnets.gno.land/r/gnoland/wugnot$help";
 const LABEL = "read on chain, free, no signature";
 
 const dataOf = (url: string): string => {
@@ -62,11 +62,13 @@ const asked = (fetcher: ReturnType<typeof chain>, query: string): string[] =>
   fetcher.mock.calls.map(([url]) => url).filter((url) => queryOf(url) === query);
 
 async function settle(box: HTMLElement, until: () => boolean = () => box.querySelector("[aria-busy]") === null) {
-  for (let turn = 0; turn < 40 && !until(); turn += 1) {
+  for (let turn = 0; turn < 200 && !until(); turn += 1) {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     });
   }
+  // Out of turns is a failure to say so, not a silent return that lets the next line fail for another reason (review of 5i, row 8).
+  if (!until()) throw new Error("settle: the page did not reach the state asked for");
 }
 async function panel(fetcher: ChainFetch, realm = WUGNOT, extra: { maxBytes?: number; chain?: typeof CHAIN } = {}) {
   const { chain: where = CHAIN, ...options } = extra;
@@ -82,16 +84,39 @@ function type(input: HTMLElement, text: string) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+// The functions listed, by name: each has a "Read" button labelled "Read <name>".
+const listed = (box: HTMLElement): string[] =>
+  all(region(box), "button").flatMap((b) => {
+    const label = b.textContent;
+    return label.startsWith("Read ") ? [label.slice(5)] : [];
+  });
 const hrefs = (box: HTMLElement) => all(region(box), "a").map((a) => a.getAttribute("href"));
 const region = (box: HTMLElement) => one(box, '[aria-label="Read functions"]');
 const answered = (list: unknown) =>
   Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: JSON.stringify(list) }))));
 const urlsOf = (fetcher: ReturnType<typeof chain>): string[] => fetcher.mock.calls.map(([url]) => url);
 
+// A chain whose height waits: each /status asked is held in `heights`, block 1001 then 1002, and sent when its entry is called.
+function slowHeight() {
+  const heights: (() => void)[] = [];
+  const inner = chain();
+  const fetcher = vi.fn<ChainFetch>((url, init) =>
+    url.includes("/status")
+      ? new Promise<Response>((resolve) => {
+          const at = 1001 + heights.length;
+          heights.push(() => {
+            resolve(new Response(JSON.stringify(statusEnvelope(at, "2026-10-30T23:43:10Z"))));
+          });
+        })
+      : inner(url, init),
+  );
+  return { fetcher, heights };
+}
+
 describe("a realm's read functions", () => {
   test("lists the functions that take nothing and give something, each a button, and no write function", async () => {
     const box = await panel(chain());
-    const names = all(region(box), "button").map((b) => b.textContent);
+    const names = listed(box);
     expect(names).toEqual(["TotalSupply"]);
     // Deposit, Withdraw and the others are not run from here: a write is gnoweb's, with its link.
     expect(region(box).textContent).not.toContain("Withdraw");
@@ -120,7 +145,7 @@ describe("a realm's read functions", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(50);
     });
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
@@ -140,7 +165,7 @@ describe("a realm's read functions", () => {
     const fetcher = chain();
     const box = await panel(fetcher);
     for (const times of [1, 2, 3]) {
-      click(button(box, "TotalSupply"));
+      click(button(box, "Read TotalSupply"));
       await settle(box, () => asked(fetcher, "vm/qeval").length >= times && box.querySelector("[aria-busy]") === null);
       expect(asked(fetcher, "vm/qeval")).toHaveLength(times);
       // A click is a read and its height: the list is never asked again.
@@ -162,7 +187,7 @@ describe("a realm's read functions", () => {
     Object.defineProperty(window, "adena", { value: adena, configurable: true });
     try {
       const box = await panel(chain());
-      click(button(box, "TotalSupply"));
+      click(button(box, "Read TotalSupply"));
       await settle(box, () => region(box).textContent.includes(LABEL));
       expect(touched).toEqual([]);
       expect(box.textContent.toLowerCase()).not.toMatch(/adena|sign in|connect wallet/);
@@ -175,7 +200,7 @@ describe("a realm's read functions", () => {
   test("shows the result as text, whatever the realm answers", async () => {
     const hostile = '<script>window.hacked=1</script><img src=x onerror="window.hacked=2">';
     const box = await panel(chain({ evals: { TotalSupply: hostile } }));
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => region(box).textContent.includes(LABEL));
     expect(region(box).textContent).toContain(hostile);
     expect(all(box, "script, img")).toHaveLength(0);
@@ -183,10 +208,63 @@ describe("a realm's read functions", () => {
 
   test("shows the height's failure beside the result, which still stands", async () => {
     const box = await panel(chain({ status: false }));
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => region(box).textContent.includes(LABEL));
     expect(region(box).textContent).toContain(SUPPLY);
     expect(region(box).textContent).toContain("block height could not be read");
+  });
+
+  test("draws each function as a row: its name as the title, a Read button after it", async () => {
+    const box = await panel(chain());
+    const item = one(region(box), "li");
+    const control = one(item, "button");
+    // Its visible word is "Read"; the function's name, hidden from the eye, completes the name a screen reader says.
+    expect(control.textContent).toBe("Read TotalSupply");
+    expect(one(control, ".visually-hidden").textContent).toBe(" TotalSupply");
+    expect(item.textContent).toContain("TotalSupply");
+    expect(item.textContent.startsWith("TotalSupply")).toBe(true);
+  });
+
+  test("keeps a long result reachable by keyboard: a focusable region with a name", async () => {
+    const long = Array.from({ length: 200 }, (_, i) => `line ${String(i)}`).join("\n");
+    const box = await panel(chain({ evals: { TotalSupply: long } }));
+    click(button(box, "Read TotalSupply"));
+    await settle(box, () => region(box).textContent.includes(LABEL));
+    const result = one(region(box), "pre");
+    expect(result.getAttribute("tabindex")).toBe("0");
+    expect(result.getAttribute("role")).toBe("region");
+    expect(result.getAttribute("aria-label")).toBe("Result of TotalSupply");
+  });
+
+  test("shows the text at once and the height after, when the height is slow", async () => {
+    const { fetcher } = slowHeight();
+    const box = await panel(fetcher);
+    click(button(box, "Read TotalSupply"));
+    await settle(box, () => region(box).textContent.includes(SUPPLY));
+    expect(region(box).textContent).toContain(SUPPLY);
+    expect(region(box).textContent).toContain(LABEL);
+    expect(region(box).textContent).not.toContain("block");
+    expect(button(box, "Read TotalSupply")?.getAttribute("aria-busy")).not.toBe("true");
+  });
+
+  test("a height that comes after a second click does not stamp the second read", async () => {
+    const { fetcher, heights } = slowHeight();
+    const box = await panel(fetcher);
+    click(button(box, "Read TotalSupply"));
+    await settle(box, () => region(box).textContent.includes(SUPPLY));
+    click(button(box, "Read TotalSupply"));
+    await settle(box, () => heights.length === 2 && region(box).textContent.includes(SUPPLY));
+    await act(async () => {
+      heights[0]?.();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    expect(region(box).textContent).not.toContain("block 1,002");
+    expect(region(box).textContent).not.toContain("block 1,001");
+    await act(async () => {
+      heights[1]?.();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+    expect(region(box).textContent).toContain("block 1,002");
   });
 });
 
@@ -208,7 +286,7 @@ describe("a read that fails", () => {
           ),
       }),
     );
-    click(button(box, "Deposit"));
+    click(button(box, "Read Deposit"));
     await settle(box, () => region(box).querySelector('[role="status"]') !== null);
     const state = one(region(box), '[role="status"]');
     expect(state.textContent).toContain("The chain refused this read");
@@ -216,12 +294,12 @@ describe("a read that fails", () => {
     expect(region(box).textContent).not.toContain(LABEL);
     expect(hrefs(box)).toContain(GNOWEB);
     // The other functions stay usable: the button is still there to try again.
-    expect(button(box, "Deposit")?.hasAttribute("disabled")).toBe(false);
+    expect(button(box, "Read Deposit")?.hasAttribute("disabled")).toBe(false);
   });
 
   test("shows a huge answer as too large, without any part of it", async () => {
     const box = await panel(chain({ evals: { TotalSupply: `SECRET${"x".repeat(2_000_000)}` } }));
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => region(box).querySelector('[role="status"]') !== null);
     expect(region(box).textContent).toContain("larger than this page reads");
     expect(region(box).textContent).not.toContain("SECRET");
@@ -273,7 +351,7 @@ describe("a name from qfuncs", () => {
   test("is kept only as one exported identifier: the rest is never listed and never asked", async () => {
     const fetcher = chain({ functions: [...HOSTILE, "TotalSupply", "IsEnabled"].map(reader) });
     const box = await panel(fetcher);
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["TotalSupply", "IsEnabled"]);
+    expect(listed(box)).toEqual(["TotalSupply", "IsEnabled"]);
     for (const b of all(region(box), "button")) click(b);
     await settle(box, () => asked(fetcher, "vm/qeval").length === 2);
     expect(asked(fetcher, "vm/qeval").map(dataOf).sort()).toEqual([`${WUGNOT}.IsEnabled()`, `${WUGNOT}.TotalSupply()`]);
@@ -283,7 +361,7 @@ describe("a name from qfuncs", () => {
   // identifier in Go and `Ａ` is cut by gno's byte test; evalCall.isExportedName keeps to ASCII, which the chain cannot read otherwise.
   test("keeps to ASCII, narrower than Go's identifiers, on purpose", async () => {
     const box = await panel(chain({ functions: ["Foé", "Ａ", "Total\u0131", "TotalSupply"].map(reader) }));
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["TotalSupply"]);
+    expect(listed(box)).toEqual(["TotalSupply"]);
   });
 
   test("keeps a name up to 128 characters and refuses a longer one, which would be a request of its own size", async () => {
@@ -291,7 +369,7 @@ describe("a name from qfuncs", () => {
     const box = await panel(
       chain({ functions: [edge, `${edge}c`, `A${"b".repeat(10_000)}`, "TotalSupply"].map(reader) }),
     );
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual([edge, "TotalSupply"]);
+    expect(listed(box)).toEqual([edge, "TotalSupply"]);
   });
 
   test("shows a hostile name's absence, not its text", async () => {
@@ -323,7 +401,7 @@ describe("a name from qfuncs", () => {
         const box = await panel(fetcher);
         const buttons = all(region(box), "button");
         for (const b of buttons) {
-          expect(b.textContent).toMatch(/^[A-Z][A-Za-z0-9_]*$/);
+          expect(b.textContent).toMatch(/^Read [A-Z][A-Za-z0-9_]*$/);
           click(b);
         }
         await settle(box, () => asked(fetcher, "vm/qeval").length >= buttons.length);
@@ -368,7 +446,7 @@ describe("a long list", () => {
   test("finds a fragment from the middle of a name, not only its start", async () => {
     const box = await panel(chain({ functions: MANY, evals }));
     type(field(box), "et07V");
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["Get07Value"]);
+    expect(listed(box)).toEqual(["Get07Value"]);
     type(field(box), "Value");
     expect(all(region(box), "button")).toHaveLength(30);
   });
@@ -383,7 +461,7 @@ describe("a long list", () => {
   test("keeps the functions that match, any case, and says so when none does", async () => {
     const box = await panel(chain({ functions: MANY, evals }));
     type(field(box), "get07");
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["Get07Value"]);
+    expect(listed(box)).toEqual(["Get07Value"]);
     type(field(box), "nothing like it");
     expect(all(region(box), "button")).toHaveLength(0);
     expect(region(box).textContent).toContain("No function matches");
@@ -406,16 +484,16 @@ describe("a result belongs to its function", () => {
   const TWO = ["TotalSupply", "IsEnabled"].map(reader);
   const evals = { TotalSupply: "(111 int64)", IsEnabled: "(true bool)" };
   const row = (box: HTMLElement, name: string): HTMLElement => {
-    const item = button(region(box), name)?.closest("li");
+    const item = button(region(box), `Read ${name}`)?.closest("li");
     if (item === null || item === undefined) throw new Error(`no list item for ${name}`);
     return item;
   };
 
   test("sits in its own list item, with its label, and no other row holds it", async () => {
     const box = await panel(chain({ functions: TWO, evals }));
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => row(box, "TotalSupply").textContent.includes(LABEL));
-    click(button(box, "IsEnabled"));
+    click(button(box, "Read IsEnabled"));
     await settle(box, () => row(box, "IsEnabled").textContent.includes(LABEL));
     expect(row(box, "TotalSupply").textContent).toContain("(111 int64)");
     expect(row(box, "TotalSupply").textContent).not.toContain("(true bool)");
@@ -425,9 +503,9 @@ describe("a result belongs to its function", () => {
 
   test("a refusal sits under its own function only, with no label, and the other row stands", async () => {
     const box = await panel(chain({ functions: TWO, evals: { IsEnabled: "(true bool)" } }));
-    click(button(box, "IsEnabled"));
+    click(button(box, "Read IsEnabled"));
     await settle(box, () => row(box, "IsEnabled").textContent.includes(LABEL));
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => row(box, "TotalSupply").querySelector('[role="status"]') !== null);
     expect(row(box, "TotalSupply").textContent).not.toContain(LABEL);
     expect(row(box, "IsEnabled").querySelector('[role="status"]')).toBeNull();
@@ -450,15 +528,15 @@ describe("a result belongs to its function", () => {
         ),
     });
     const box = await panel(fetcher);
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => row(box, "TotalSupply").querySelector('[role="status"]') !== null);
     answers.TotalSupply = "(222 int64)";
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => row(box, "TotalSupply").textContent.includes(LABEL));
     expect(row(box, "TotalSupply").querySelector('[role="status"]')).toBeNull();
     expect(row(box, "TotalSupply").textContent).toContain("(222 int64)");
     answers.TotalSupply = undefined;
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     await settle(box, () => row(box, "TotalSupply").querySelector('[role="status"]') !== null);
     expect(row(box, "TotalSupply").textContent).not.toContain("(222 int64)");
     expect(row(box, "TotalSupply").textContent).not.toContain(LABEL);
@@ -467,41 +545,47 @@ describe("a result belongs to its function", () => {
 
 describe("another realm or another chain", () => {
   const OTHER = "gno.land/r/demo/other";
+  const MOVES = {
+    other: { realm: OTHER, where: CHAIN },
+    chain: { realm: WUGNOT, where: { ...CHAIN, chainId: "nowhere-1" } },
+    rpc: { realm: WUGNOT, where: { ...CHAIN, rpc: "https://rpc2.onyx.testnets.gno.land:443" } },
+  };
+  // `options` is stable, as a page's is: an inline object re-runs the list's effect and hides a missing key (review of 5i, row 2).
   function Swap({ fetcher }: { fetcher: ChainFetch }) {
     const [at, setAt] = useState({ realm: WUGNOT, where: CHAIN });
+    const [options] = useState({ fetch: fetcher });
     return (
       <>
-        <button
-          type="button"
-          onClick={() => {
-            setAt({ realm: OTHER, where: CHAIN });
-          }}
-        >
-          to other
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAt({ realm: WUGNOT, where: { ...CHAIN, chainId: "nowhere-1" } });
-          }}
-        >
-          to chain
-        </button>
-        <RealmFunctions realm={at.realm} chain={at.where} options={{ fetch: fetcher }} />
+        {(["other", "chain", "rpc"] as const).map((move) => (
+          <button
+            key={move}
+            type="button"
+            onClick={() => {
+              setAt(MOVES[move]);
+            }}
+          >
+            {`to ${move}`}
+          </button>
+        ))}
+        <RealmFunctions realm={at.realm} chain={at.where} options={options} />
       </>
     );
   }
+  // One read of TotalSupply, done: its result and label are on the page.
+  const readSupply = async (box: HTMLElement) => {
+    click(button(box, "Read TotalSupply"));
+    await settle(box, () => region(box).textContent.includes(LABEL));
+  };
   const lists = (realm: string) => answered([reader(realm === WUGNOT ? "TotalSupply" : "OtherName")]);
 
   test("lists the new realm's functions, asks again, and keeps nothing of the old realm", async () => {
     const fetcher = chain({ list: lists, evals: { TotalSupply: SUPPLY, OtherName: "(other string)" } });
     const box = mount(<Swap fetcher={fetcher} />);
     await settle(box);
-    click(button(box, "TotalSupply"));
-    await settle(box, () => region(box).textContent.includes(LABEL));
+    await readSupply(box);
     click(button(box, "to other"));
     await settle(box);
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["OtherName"]);
+    expect(listed(box)).toEqual(["OtherName"]);
     expect(region(box).textContent).not.toContain(SUPPLY);
     expect(region(box).textContent).not.toContain(LABEL);
     expect(region(box).textContent).not.toContain("block 786,661");
@@ -521,7 +605,7 @@ describe("another realm or another chain", () => {
     });
     const box = mount(<Swap fetcher={fetcher} />);
     await settle(box);
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
     click(button(box, "to other"));
     await settle(box);
     await act(async () => {
@@ -551,14 +635,31 @@ describe("another realm or another chain", () => {
       slow.done();
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["OtherName"]);
+    expect(listed(box)).toEqual(["OtherName"]);
   });
 
   test("another chain's gnoweb is not linked: a chain with no gnoweb gives no link, the functions stay", async () => {
     const box = await panel(chain(), WUGNOT, { chain: { ...CHAIN, chainId: "nowhere-1" } });
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["TotalSupply"]);
+    expect(listed(box)).toEqual(["TotalSupply"]);
     expect(all(region(box), "a")).toHaveLength(0);
   });
+
+  // The same function in both places, so only a new panel can clear its result: one test for each field of the key.
+  for (const move of ["other", "chain", "rpc"] as const) {
+    test(`a changed ${move} drops the old result, which the same function name would keep`, async () => {
+      const fetcher = chain({ list: () => answered([reader("TotalSupply")]) });
+      const box = mount(<Swap fetcher={fetcher} />);
+      await settle(box);
+      await readSupply(box);
+      expect(region(box).textContent).toContain(SUPPLY);
+      click(button(box, `to ${move}`));
+      await settle(box);
+      expect(region(box).textContent).not.toContain(SUPPLY);
+      expect(region(box).textContent).not.toContain(LABEL);
+      expect(listed(box)).toEqual(["TotalSupply"]);
+      expect(asked(fetcher, "vm/qfuncs")).toHaveLength(2);
+    });
+  }
 
   test("a chain id changed under the panel asks the list again and drops the old link", async () => {
     const fetcher = chain();
@@ -594,15 +695,19 @@ describe("while it reads", () => {
         }),
     });
     const box = await panel(fetcher);
-    click(button(box, "TotalSupply"));
-    expect(button(box, "TotalSupply")?.getAttribute("aria-busy")).toBe("true");
-    click(button(box, "TotalSupply"));
+    click(button(box, "Read TotalSupply"));
+    expect(button(box, "Read TotalSupply")?.getAttribute("aria-busy")).toBe("true");
+    click(button(box, "Read TotalSupply"));
     expect(asked(fetcher, "vm/qeval")).toHaveLength(1);
+    // Meanwhile no result is drawn, and no label.
+    expect(all(region(box), "pre")).toHaveLength(0);
+    expect(region(box).textContent).not.toContain(LABEL);
     await act(async () => {
       finish();
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(region(box).textContent).toContain(LABEL);
+    expect(one(region(box), "pre").getAttribute("dir")).toBe("ltr");
   });
 });
 
@@ -611,7 +716,7 @@ describe("a list that grows with the universe", () => {
 
   test("draws a bounded number of buttons, a hundred, and shows more on request", async () => {
     const box = await panel(chain({ functions: MANY }));
-    const names = () => all(region(box), "button").filter((b) => b.textContent.startsWith("Get"));
+    const names = () => all(region(box), "button").filter((b) => b.textContent.startsWith("Read Get"));
     expect(names()).toHaveLength(100);
     click(button(region(box), "Show more"));
     expect(names()).toHaveLength(200);
@@ -622,7 +727,26 @@ describe("a list that grows with the universe", () => {
     const box = await panel(chain({ functions: MANY, evals: { Get5999Value: "(last string)" } }));
     const field = one(region(box), 'input[type="search"]');
     type(field, "5999");
-    expect(all(region(box), "button").map((b) => b.textContent)).toEqual(["Get5999Value"]);
+    expect(listed(box)).toEqual(["Get5999Value"]);
+  });
+
+  test("offers no more at exactly a hundred, and one more at a hundred and one", async () => {
+    const at = async (count: number) => {
+      const box = await panel(chain({ functions: MANY.slice(0, count) }));
+      return button(region(box), "Show more");
+    };
+    expect(await at(100)).toBeUndefined();
+    expect(await at(101)).toBeDefined();
+  });
+
+  test("a search starts again from a hundred, and ignores the spaces around it", async () => {
+    const box = await panel(chain({ functions: MANY }));
+    click(button(region(box), "Show more"));
+    expect(listed(box)).toHaveLength(200);
+    type(one(region(box), 'input[type="search"]'), " Get ");
+    expect(listed(box)).toHaveLength(100);
+    type(one(region(box), 'input[type="search"]'), " 5999 ");
+    expect(listed(box)).toEqual(["Get5999Value"]);
   });
 
   test("a list past what the page reads is a state with its next step and the link to gnoweb, no part of it drawn", async () => {

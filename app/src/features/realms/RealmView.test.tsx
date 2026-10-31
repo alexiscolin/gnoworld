@@ -49,9 +49,12 @@ describe("a realm's view", () => {
     expect(one(box, "#realm-title").textContent).toBe("gno.land/r/gnoland/wugnot");
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(box.textContent).toContain("Total supply");
-    expect(box.textContent).toMatch(
-      /Read at block 786,661, 2026-10-30T23:43:10Z, from rpc\.onyx\.testnets\.gno\.land$/,
-    );
+    // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
+    expect(
+      all(box, "p").some((p) =>
+        /^Read at block 786,661, 2026-10-30T23:43:10Z, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
+      ),
+    ).toBe(true);
     // 5i: the read functions' panel carries the link too, in every state; the page's own is the one outside it.
     const links = all(box, "a").filter(
       (a) =>
@@ -136,11 +139,14 @@ describe("a realm's view", () => {
     const box = await view(chain(WUGNOT?.body ?? null));
     const functions = one(box, '[aria-label="Read functions"]');
     expect(follows(one(box, "#realm-title"), functions)).toBe(true);
+    // After "Read at block", which stays beside the page it dates, not parted from it by up to a hundred buttons.
+    const read = all(box, "p").find((p) => p.textContent.startsWith("Read at block"));
+    expect(read !== undefined && follows(read, functions)).toBe(true);
     // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page and the link stand.
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(functions.querySelector('[role="status"]')).not.toBeNull();
     expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot",
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
     );
   });
 
@@ -150,7 +156,7 @@ describe("a realm's view", () => {
     const functions = one(box, '[aria-label="Read functions"]');
     expect(one(functions, '[role="status"]').textContent).toMatch(/\S/);
     expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot",
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
     );
   });
 

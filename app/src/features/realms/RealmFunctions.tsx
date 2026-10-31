@@ -1,16 +1,16 @@
 // A realm's read functions (5i, ADR-0002 §4): the ones that take nothing and give something, listed once from `vm/qfuncs`,
-// each a button that reads its result once through `vm/qeval` when clicked. A read is free and signs nothing: the label says
+// each a row with a Read button that reads its result once through `vm/qeval` when clicked. A read is free and signs nothing: the label says
 // so, with the block height it was read at, and no wallet is ever asked. One request a view for the list, two a click (the
-// call and the height); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a
+// call, shown first, and the height, which follows it); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
-import { Button, Cluster, Field, Skeleton, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Field, Row, Skeleton, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
-import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
+import type { ReadOptions } from "../../lib/chain/read.ts";
 import edge from "./frame.module.css";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";
-import type { Height } from "./useRealm.ts";
+import { isHeight } from "./useRealm.ts";
 
 export interface RealmFunctionsProps {
   /** The realm, `gno.land/r/demo/dao`. */
@@ -26,28 +26,35 @@ const PAGE = 100;
 /** The search shows from this many functions on: a short list is read at a glance. */
 const SEARCH_FROM = 11;
 
-const isHeight = (at: Height | Failure): at is Height => "height" in at;
-
-function Outcome({ result }: { result: Result | undefined }) {
+function Outcome({ name, result }: { name: string; result: Result | undefined }) {
   if (result === undefined || result.state === "busy") return null;
   if (result.state === "failed") return <p role="status">{result.next}</p>;
   const { height } = result;
   return (
     <>
-      <pre className={[edge["frame"], styles["result"]].join(" ")} dir="ltr">
+      {/* A result taller than its frame scrolls: the frame takes focus and has a name, so a keyboard reaches the rest. */}
+      <pre
+        className={[edge["frame"], styles["result"]].join(" ")}
+        dir="ltr"
+        tabIndex={0}
+        role="region"
+        aria-label={`Result of ${name}`}
+      >
         {result.text}
       </pre>
       <p className={styles["meta"]}>
         read on chain, free, no signature
-        {isHeight(height)
-          ? `, at block ${new Intl.NumberFormat("en-US").format(height.height)}`
-          : `. The block height could not be read. ${height.next}`}
+        {height === undefined
+          ? null
+          : isHeight(height)
+            ? `, at block ${new Intl.NumberFormat("en-US").format(height.height)}`
+            : `. The block height could not be read. ${height.next}`}
       </p>
     </>
   );
 }
 
-// The functions as buttons, searchable from SEARCH_FROM on and drawn PAGE at a time.
+// The functions as rows, searchable from SEARCH_FROM on and drawn PAGE at a time.
 function Items({ names, results, read }: { names: string[]; results: Functions["results"]; read: Functions["read"] }) {
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(PAGE);
@@ -71,16 +78,21 @@ function Items({ names, results, read }: { names: string[]; results: Functions["
       <ul className={styles["list"]}>
         {found.slice(0, shown).map((name) => (
           <li key={name} className={styles["item"]}>
-            <Button
-              emphasis="quiet"
-              {...(results[name]?.state === "busy" ? { busy: true } : {})}
-              onClick={() => {
-                read(name);
-              }}
-            >
-              {name}
-            </Button>
-            <Outcome result={results[name]} />
+            <Row
+              title={name}
+              trail={
+                <Button
+                  emphasis="quiet"
+                  {...(results[name]?.state === "busy" ? { busy: true } : {})}
+                  onClick={() => {
+                    read(name);
+                  }}
+                >
+                  Read<span className="visually-hidden"> {name}</span>
+                </Button>
+              }
+            />
+            <Outcome name={name} result={results[name]} />
           </li>
         ))}
       </ul>
@@ -119,7 +131,9 @@ function Body({ functions }: { functions: Functions }) {
 function Panel({ realm, chain, options }: RealmFunctionsProps) {
   const functions = useFunctions(chain.rpc, realm, options);
   const origin = gnowebOrigin(chain.chainId);
-  const link = origin === undefined ? undefined : gnowebLink(origin, realm);
+  const page = origin === undefined ? undefined : gnowebLink(origin, realm);
+  // gnoweb's actions page for the realm (`$help`, v1.5.0), where the functions that take arguments or write are called.
+  const link = page === undefined ? undefined : `${page}$help`;
   return (
     <section aria-label="Read functions">
       <Stack space="xs">
