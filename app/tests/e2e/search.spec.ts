@@ -64,7 +64,7 @@ test.describe("⌘K", () => {
 
   test("Escape on a palette the chord opened puts the focus back where it was", async ({ page }) => {
     await ready(page);
-    const home = page.getByRole("link", { name: "gno.world" });
+    const home = page.getByRole("link", { name: "gnoworld" });
     await home.focus();
     await page.keyboard.press("Control+k");
     await expect(field(page)).toBeFocused();

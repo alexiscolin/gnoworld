@@ -1,0 +1,3 @@
+/* The design system's layers, in their order of strength: the one place the order is written. The app links this sheet first
+   on every page, so no chunk the bundler meets first can change it (app/src/root.tsx). */
+@layer reset, tokens, base, compositions, components, utilities;

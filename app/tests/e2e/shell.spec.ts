@@ -68,14 +68,16 @@ for (const width of WIDTHS) {
         const account = page.getByTitle(address);
         // The shortening the chat's names get: the first six characters, an ellipsis, the last five.
         await expect(account).toHaveText(`${address.slice(0, 6)}…${address.slice(-5)}`);
-        // One row means the boxes share a middle: each one's centre lies inside the others' height.
+        // One row means the boxes share a middle: each one's centre lies inside the others' height. On a phone the search is the
+        // views' bar's, at the screen's foot (the prototype's #hnav .views), not of this row.
+        const row = [
+          page.getByRole("link", { name: "gnoworld" }),
+          ...(width < 900 ? [] : [page.getByRole("button", { name: /^Search/ })]),
+          account,
+          page.getByRole("button", { name: "Log out" }),
+        ];
         const boxes = await Promise.all(
-          [
-            page.getByRole("link", { name: "gno.world" }),
-            page.getByRole("button", { name: /^Search/ }),
-            account,
-            page.getByRole("button", { name: "Log out" }),
-          ].map(async (item) => {
+          row.map(async (item) => {
             await expect(item).toBeVisible();
             return item.evaluate((element) => {
               const { top, bottom } = element.getBoundingClientRect();

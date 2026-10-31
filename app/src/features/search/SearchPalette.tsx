@@ -45,6 +45,7 @@ export function SearchPalette() {
       <IconButton
         icon="search"
         label="Search"
+        emphasis="plain"
         onClick={() => {
           setOpen(true);
         }}

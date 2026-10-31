@@ -1,0 +1,161 @@
+/* The panel: a surface with a line and rounded corners; floating, a shadow over the scene; the plate, the world's tinted dot
+   grid at the left of its frame, which fades into space over its last 64 px. On a wide screen the plate is fixed at the left,
+   98 px from the top (under the header's 96) and 24 from the left and the bottom, inside one outline (frames 20, 37, 90). */
+@layer components {
+  .panel {
+    --_fill: var(--color-surface);
+
+    position: relative;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-l);
+    background: var(--_fill);
+  }
+
+  .panel[data-look="floating"] {
+    box-shadow: var(--shadow-float);
+  }
+
+  .content {
+    padding: var(--space-m);
+  }
+
+  .panel[data-look="plate"] {
+    /* raw: the world's tint over the night, 16% (the prototype's #fPlate); amber when the data has none */
+    --_fill: color-mix(in oklab, var(--world) 16%, var(--color-surface));
+
+    /* raw: the dot grid, white at 7% on a 14 px pitch (the prototype's #fPlate) */
+    background:
+      radial-gradient(color-mix(in oklab, var(--color-text) 7%, transparent) 1px, transparent 1.3px) 0 0 / 14px 14px,
+      var(--_fill);
+  }
+
+  /* Seen only on the wide plate: a block in the page keeps its height to its words (the room under it needs the screen). */
+  .caption {
+    display: none;
+    position: absolute;
+    /* The atlas caption: 0.32em apart, 10.5 px, at 45% (the prototype's #fVertical), set through the label style's own values. */
+    --tracking-caps: 0.32em;
+    --font-label: 500 10.5px/1 var(--family-mono);
+    --color-text-muted: color-mix(in oklab, var(--color-text) 45%, transparent);
+
+    /* raw: the caption's ink stands at x 49 to 59 and ends 55 px over the plate's foot (frame 20) */
+    inset-inline-start: 24px;
+    /* raw: the prototype's and the frames' own value */
+    inset-block-end: 54px;
+    white-space: nowrap;
+  }
+
+  .frame {
+    display: none;
+  }
+
+  /* The one breakpoint of the plate beside a page: the video's width, where its frames draw the plate. The room's message list is
+     then 414 px (the width less 1313: its rooms and people eat the rest), and 400 at least from here; slice 5q puts the dock at the right. */
+  /* raw: the video's width */
+  @media (min-width: 1728px) {
+    .layout {
+      /* raw: the plate's 24 px of margin, its width, and 24 px between it and the page's content (frame 20) */
+      padding-inline-start: calc(var(--plate-w) + 2 * var(--space-m));
+    }
+
+    .place {
+      position: fixed;
+      /* raw: the header's clearance of 96 and the 2 px the frame keeps under it (frame 20) */
+      inset-block-start: 98px;
+      inset-block-end: var(--space-m);
+      inset-inline-start: var(--space-m);
+      inline-size: var(--plate-w);
+    }
+
+    /* The one outline around plate, scene and dock, the same colour all round: the plates inside it draw none. */
+    .frame {
+      display: block;
+      position: fixed;
+      /* raw: the prototype's and the frames' own value */
+      inset-block: 98px var(--space-m);
+      inset-inline: var(--space-m);
+      /* raw: the prototype's and the frames' own value */
+      border: var(--line-width) solid #2c313c;
+      border-radius: var(--radius-l);
+      pointer-events: none;
+    }
+
+    .caption {
+      display: block;
+    }
+
+    .panel[data-look="plate"] {
+      block-size: 100%;
+      border: 0;
+      border-start-end-radius: 0;
+      border-end-end-radius: 0;
+      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area */
+      mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+    }
+
+    .panel[data-look="plate"] .content {
+      block-size: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+      /* raw: the text column starts 76 px into the plate, at x 100, and is 484 px wide (frame 20) */
+      padding-inline: 76px calc(var(--plate-w) - 76px - 484px);
+      /* raw: the crumbs' 24 px row centred at y 137, 27 px under the plate's top (frame 20) */
+      padding-block-start: 27px;
+    }
+
+    /* The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
+       step the longest name the 474 px column holds at 0.58 em a letter. */
+    .panel[data-look="plate"] h1 {
+      /* raw: 7 px off the crumbs, which sets the title's ink at y 183 (frame 37) */
+      /* layout: the arrangement the prototype and the frames draw */
+      margin-block-start: 7px;
+      /* raw: the prototype's and the frames' own value */
+      font-size: max(36px, min(10.93vb, 136px));
+      font-weight: 500;
+      letter-spacing: -0.05em;
+      line-height: 0.9;
+    }
+
+    .panel[data-look="plate"] h1 + p {
+      /* raw: 11 px more under the title, which sets the description's ink at y 310 (frame 26) */
+      /* layout: the arrangement the prototype and the frames draw */
+      margin-block-start: 11px;
+      /* raw: the prototype's and the frames' own value */
+      max-inline-size: 46ch;
+      /* raw: the prototype's and the frames' own value */
+      color: #c8d0de;
+      /* raw: the description is 16 px on 1.55, in its own grey (the prototype's #fText) */
+      font: 400 16px/1.55 var(--family-sans);
+    }
+
+    .panel[data-look="plate"][data-fit="8"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: max(36px, min(10.93vb, 102px));
+    }
+
+    .panel[data-look="plate"][data-fit="10"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: 81.7px;
+    }
+
+    .panel[data-look="plate"][data-fit="12"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: 68px;
+    }
+
+    .panel[data-look="plate"][data-fit="16"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: 51px;
+    }
+
+    .panel[data-look="plate"][data-fit="20"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: 40.9px;
+    }
+
+    .panel[data-look="plate"][data-fit="more"] h1 {
+      /* raw: the prototype's and the frames' own value */
+      font-size: 36px;
+    }
+  }
+}

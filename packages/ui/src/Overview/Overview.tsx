@@ -20,6 +20,7 @@ import {
   Stats,
   TabRows,
 } from "./Interface.tsx";
+import { Frames } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
 
 function Buttons() {
@@ -135,6 +136,7 @@ export function Overview() {
           <Kicker dot="signal">An uncharted signal</Kicker>
         </Cluster>
       </Region>
+      <Frames />
       <Region name="Flashes">
         <Flashes />
       </Region>

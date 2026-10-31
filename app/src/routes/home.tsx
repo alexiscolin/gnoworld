@@ -1,6 +1,7 @@
 // A universe's cosmos: the home for the default one (/), its own page for another (/net/<id>/).
-import { Link, type MetaArgs, useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
+import { Hero, Worlds } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
@@ -23,11 +24,10 @@ export default function Home() {
   const universe = useLoaderData<typeof loader>();
   return (
     <>
-      <h1>{universe.isDefault ? "gno.world" : universe.name}</h1>
-      <p>
-        <Link to={universe.earth.path}>Earth</Link> · <Link to="/list">Places</Link>
-      </p>
-      <PlaceLinks places={universe.worlds} />
+      <Hero universe={universe} />
+      <Worlds>
+        <PlaceLinks places={universe.worlds} />
+      </Worlds>
     </>
   );
 }

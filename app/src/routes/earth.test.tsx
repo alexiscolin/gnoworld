@@ -71,3 +71,26 @@ describe("the Earth's page", () => {
 test("the browser's loader gives each pre-rendered earth what the build's does", () => {
   expectClientAsBuild("earth", clientLoader, loader);
 });
+
+// Slice 5r (frames 37 to 42): the Earth's page is a plate, with no 3D.
+describe("the Earth's plate", () => {
+  test("is a plate named Earth, holding the one heading and the worlds' links", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    const plate = /<section [^>]*data-look="plate"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(plate).toContain('aria-label="Earth"');
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toMatch(/<a [^>]*href="\/w\/bubble"/);
+  });
+
+  test("shows its vertical atlas caption to the eye only, and no figure the data does not hold", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    expect(html).toContain("gnoworld");
+    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
+    expect(html).not.toMatch(/<(canvas|img|video|picture|figure)\b/i);
+  });
+
+  test("offers neither Follow nor Share: nothing behind them yet", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    expect(html).not.toMatch(/>Follow<|>Share</);
+  });
+});

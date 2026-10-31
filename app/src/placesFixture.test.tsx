@@ -136,14 +136,21 @@ describe("the Earth of a universe that holds worlds", () => {
 describe("a universe's index", () => {
   test("is the cosmos of the universe at /net/<id>/: its name, its worlds, a way to its Earth", async () => {
     const html = await page("home", "/net/gnoland/");
-    expect(html).toContain("<h1>gno.land</h1>");
+    // F3267: the hero's kicker names the universe, and the heading is its line, what the page holds.
+    expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land<\/p>/);
+    expect(html).toMatch(/<h1\b[^>]*>1 world in gno\.land<\/h1>/);
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"[^>]*>Other<\/a>/);
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Earth<\/a>/);
+    // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Go explore/);
     expect(html).not.toContain("Bubble");
   });
 
   test("is the home itself for the default universe, at / and at /net/onyx/", async () => {
-    for (const path of ["/", "/net/onyx/"]) expect(await page("home", path), path).toContain("<h1>gno.world</h1>");
+    for (const path of ["/", "/net/onyx/"]) {
+      const html = await page("home", path);
+      expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
+      expect(html, path).toMatch(/<h1\b[^>]*>2 worlds in Onyx<\/h1>/);
+    }
   });
 
   test.each(["/net/nowhere/", "/net/Onyx/", "/net/constructor/"])(

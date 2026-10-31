@@ -194,7 +194,7 @@ test.describe("the composer", () => {
     await expect(heading("#bubble")).toBeVisible();
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#games")).toBeVisible();
-    await page.getByRole("link", { name: "gno.world" }).click();
+    await page.getByRole("link", { name: "gnoworld" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.keyboard.press("Alt+ArrowDown");
     await expect(page).toHaveURL(/\/$/);

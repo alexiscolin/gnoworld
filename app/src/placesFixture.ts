@@ -20,3 +20,23 @@ export const FIXTURE = {
     { slug: "tool", name: "Tool" },
   ],
 };
+
+// A second planted site, for the pages that show a count or a label of the universe: two worlds in its default universe,
+// which is no testnet, and one in a universe that is not the default and is a testnet.
+const planted = (slug: string, universe: string, name: string) => ({
+  slug,
+  name,
+  description: `${name}, a place of the planted site, described at more than fifty characters, as the schema asks.`,
+  universe,
+});
+
+export const PLANTED = {
+  universes: [
+    { id: "main", name: "Mainland", default: true as const },
+    { id: "lab", name: "Lab", testnet: true as const },
+  ],
+  hubs: [planted("alpha", "main", "Alpha"), planted("beta", "main", "Beta"), planted("gamma", "lab", "Gamma")],
+  ecosystems: [],
+  stations: [],
+  genres: [],
+};
