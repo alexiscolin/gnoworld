@@ -278,7 +278,6 @@ def base_tests(base):
         return test_names(tree)
 
 
-TOUCHES_NO_NAMES = re.compile(r"\.(gno|go|md)$")  # a test of these kinds is read from the files; they list no Vitest or Playwright name
 VITEST_FILE = re.compile(r"\.test\.tsx?$")
 SPEC_FILE = re.compile(r"\.spec\.ts$")
 

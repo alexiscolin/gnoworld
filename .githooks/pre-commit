@@ -57,16 +57,6 @@ if [ -n "$differ" ]; then
 	echo "pre-commit: staged harness files differ from the working tree's; stage them as they are on disk: $differ" >&2
 	exit 1
 fi
-# A tree a gate already passed is not gated again (speed audit, row 1: a commit refused by commit-msg after a green gate re-gated the
-# identical tree): check.sh records the code it passed in this worktree's .claude/tmp/green-fast, as this hook does after its own gate,
-# and the outside-the-sandbox branch above reads the same record. Only the secret scan and the staged-against-disk check above come first.
-# A record is a line of a file a sandboxed session can write: one forged here skips this gate, which the merge check (--merge) and the
-# pre-push hook, outside the sandbox, still judge on the pushed code.
-if green "$(git write-tree)" fast; then
-	echo "pre-commit: the gate already passed on exactly this code; not run again" >&2
-	finished=1
-	exit 0
-fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # What the commit changes, one path a line, so check.sh checks those areas alone: the copy has no
 # repository to ask. A list git cannot give is empty, and check.sh then checks everything.

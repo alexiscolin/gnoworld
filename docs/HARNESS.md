@@ -151,9 +151,9 @@ declare it first, on an empty commit if need be. The staged copy has no git, so 
 `check_regressions.py` in the repository (it reads the working tree, not the index: a test staged in part is judged as it is
 on disk), and `check.sh` runs it in a repository only. Neither runs in a merge commit, whose full gate follows.
 Both pass `--quick` (F2579): the base's listing of Vitest tests and journeys is kept in the tools' cache
-(`~/.cache/gnoworld-tools/regressions/`, one file per base commit, which never changes), and a change of nothing but Vitest
-files, gno or Go sources, approved pictures and prose lists only the Vitest files it touches (about 3 s for one file, against
-33 s for all 6,944 tests, measured by the reviewer); any other change lists the tree whole. The merge check runs without
+(`~/.cache/gnoworld-tools/regressions/`, one file per base commit, which never changes), and whatever the change is, it lists
+only the Vitest files it touches (about 3 s for one file, against 33 s for all 6,944 tests, measured by the reviewer); a change
+that touches a Playwright spec lists the tree whole, as no listing of the touched files gives a journey's names. The merge check runs without
 `--quick`, whole and with no cache. A picture is judged on the tree, not on `base..HEAD` (F2574): its own commit's message does not
 exist yet, so its `Updated-baseline:` line goes on an earlier commit too.
 
@@ -170,7 +170,7 @@ refusing it made agents run it again and again): it says so and is written, with
 machine's loads (`scripts/load.py`), to `.claude/tmp/unsteady.log`, which `/pre-merge` reads in its
 first step and the dream reads (F2070); a log it cannot write fails it. The budget is a measure, not a wall.
 
-A Vitest file or a journey that fails in the fast gate runs once more, alone
+A Vitest file that fails in the fast gate (a journey fails only at the merge check) runs once more, alone
 (`scripts/unsteady.py`, F1700): the gate passes if it passes, and logs the file, its failed
 tests and the machine's load to `.claude/tmp/unsteady.log`. It refuses, with nothing run again,
 when the report names no failed file or is missing, and when the run had anything a second run
