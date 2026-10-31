@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { FUNCTIONS, PAGES } from "../chain/chainFixture.ts";
 import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
+import { indexer } from "../chain/indexerRoute.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // 5h's journey (plan §1): a realm page holding a script, an image with onerror, a javascript: link and a hidden form field
@@ -13,6 +14,7 @@ const TIME = "2026-10-30T23:43:10Z";
 // Page of the realm the browser asks: `pages` by realm path, the rest "no page".
 async function chain(page: Page, pages: Record<string, string>): Promise<{ asked: string[] }> {
   const asked: string[] = [];
+  await indexer(page);
   await page.route(RPC, async (route) => {
     const url = new URL(route.request().url());
     // A request is told by its query (vm/qrender, vm/qfuncs, vm/qeval) when it has one, by its path otherwise (/status).
@@ -86,6 +88,34 @@ test.describe("a realm's view", () => {
     expect(asked.filter((path) => path === "vm/qrender")).toHaveLength(1);
     expect(asked.filter((path) => path === "vm/qfuncs")).toHaveLength(1);
     expect(asked.filter((path) => path === "vm/qeval")).toHaveLength(0);
+  });
+
+  test("shows the realm's facts from the indexer with their source, once, and its failure as a state beside the page", async ({
+    page,
+  }) => {
+    await chain(page, { "gno.land/r/demo/dao": "# DAO" });
+    const { asked } = await indexer(page);
+    await page.goto("/r/demo/dao");
+    await hydrated(page);
+    const facts = page.getByRole("main").getByRole("region", { name: "Facts from the indexer" });
+    await expect(facts).toContainText("12,345");
+    await expect(facts).toContainText("96");
+    await expect(facts).toContainText("Read from indexer.onyx.testnets.gno.land at ");
+    expect(await violations(page)).toEqual([]);
+    await page.waitForTimeout(1000);
+    expect(asked).toHaveLength(1);
+    expect(decodeURIComponent(asked[0] ?? "")).toContain('"path":"gno.land/r/demo/dao"');
+
+    await page.unroute("https://indexer.onyx.testnets.gno.land/**");
+    await indexer(page, { down: true });
+    await page.reload();
+    await hydrated(page);
+    const main = page.getByRole("main");
+    await expect(
+      main.getByRole("status").filter({ hasText: "Read from indexer.onyx.testnets.gno.land" }),
+    ).toContainText("did not answer");
+    await expect(main).toContainText("DAO");
+    expect(await violations(page)).toEqual([]);
   });
 
   test("puts a link off gnoweb behind a warning that names the real host", async ({ page }) => {

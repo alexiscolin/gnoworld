@@ -42,3 +42,26 @@ describe("gnowebLink: a realm's address on gnoweb", () => {
     },
   );
 });
+
+describe("gnowebLink with a page of the realm: `realm:15`", () => {
+  it("adds the page after the realm's path, on either origin", () => {
+    expect(gnowebLink("https://gno.land", "gno.land/r/gov/dao", 15)).toBe("https://gno.land/r/gov/dao:15");
+    expect(gnowebLink("https://onyx.testnets.gno.land", "/r/gov/dao", 0)).toBe(
+      "https://onyx.testnets.gno.land/r/gov/dao:0",
+    );
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    "leads nowhere for the page %j",
+    (page) => {
+      expect(gnowebLink("https://gno.land", "/r/gov/dao", page)).toBeUndefined();
+    },
+  );
+
+  it("still leads nowhere for a path that leaves the realm's, with a page or without", () => {
+    for (const path of ["/r/../../evil", "/r/a/./b", "/r/a/.."]) {
+      expect(gnowebLink("https://gno.land", path, 1)).toBeUndefined();
+      expect(gnowebLink("https://gno.land", path)).toBeUndefined();
+    }
+  });
+});

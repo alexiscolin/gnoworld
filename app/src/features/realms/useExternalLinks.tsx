@@ -3,6 +3,7 @@
 // a dialog that names the host the address really goes to and shows the whole address. Only the dialog's own link leaves.
 import { Button, Dialog, Stack } from "@gnoworld/ui";
 import { useState, type ReactNode } from "react";
+import { hostOf } from "../../lib/chain/read.ts";
 import styles from "./RealmBlocks.module.css";
 
 /** Whether an address of a page is on gnoweb's own origin: the same scheme, host and port, never one that only starts alike. */
@@ -12,15 +13,6 @@ function isOwn(href: string, origin: string | undefined): boolean {
     return new URL(href).origin === new URL(origin).origin;
   } catch {
     return false;
-  }
-}
-
-// The host an address goes to, as the browser reads it; the address itself when it has none.
-function hostOf(href: string): string {
-  try {
-    return new URL(href).host;
-  } catch {
-    return href;
   }
 }
 

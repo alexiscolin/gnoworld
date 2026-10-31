@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { EVALS, FUNCTIONS } from "../chain/chainFixture.ts";
 import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
+import { indexer } from "../chain/indexerRoute.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // 5i's journey (plan §1, ADR-0002 §4): a realm's read functions are buttons; a click reads one call through vm/qeval, free, and
@@ -48,6 +49,7 @@ async function chain(
   { functions = FUNCTIONS, evals = { TotalSupply: SUPPLY }, fail = false }: Answers = {},
 ) {
   const seen: Seen = { evals: [], funcs: 0, all: [] };
+  await indexer(page);
   await page.route(RPC, async (route) => {
     const url = new URL(route.request().url());
     const headers = { "access-control-allow-origin": "*", "content-type": "application/json" };

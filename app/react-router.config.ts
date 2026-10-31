@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Config } from "@react-router/dev/config";
 import { outputs, pagePolicies } from "./src/csp.ts";
-import { connectSrc, rpcOrigins } from "./src/cspOrigins.ts";
+import { connectOrigins, connectSrc } from "./src/cspOrigins.ts";
 import { loadData } from "./src/dataFiles.ts";
 import { placesFrom } from "./src/dataPlaces.ts";
 import { prerenderPaths } from "./src/prerender.ts";
@@ -13,9 +13,9 @@ import { robotsTxt, sitemapXml } from "./src/sitemap.ts";
 // and the field (slice 5's 5c). GNOWORLD_DATA names another directory, for the tests.
 const data = loadData(process.env["GNOWORLD_DATA"] ?? fileURLToPath(new URL("./data", import.meta.url)));
 
-// The origins connect-src names beside 'self' (5g): the universes' https RPC, from the data. Read here, before anything
-// builds, so an http:, wildcard or odd RPC stops the build before any page is written.
-const origins = rpcOrigins(data.universes);
+// The origins connect-src names beside 'self' (5g, 5k): the universes' https RPC and their chains' public indexers, from the data.
+// Read here, before anything builds, so an http:, wildcard or odd RPC stops the build before any page is written.
+const origins = connectOrigins(data.universes);
 
 // No rendering server in production (ADR-0002 §2): one HTML file per place, built ahead.
 export default {

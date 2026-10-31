@@ -24,7 +24,13 @@ const focusComposer = (event: MouseEvent) => {
   composer.focus();
 };
 
-export function Actions({ address }: { address: string }) {
+// A path of this site, made of plain segments and nothing else: a value from a world's data is untrusted, so a scheme, a host,
+// a backslash, a space, a control character, a dot segment, a query or a fragment is no link (the browser reads `/\\host` and
+// `/<tab>/host` as another host).
+const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+$/.test(path);
+
+export function Actions({ address, proposals }: { address: string; proposals?: string }) {
+  const reading = proposals !== undefined && isSitePath(proposals);
   // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
   const copying = useSyncExternalStore(unchanging, canCopy, cannotKnow);
   // An object, so each answer is a new value: the timer starts again with each click, even when the words are the same.
@@ -47,8 +53,14 @@ export function Actions({ address }: { address: string }) {
   }, []);
   return (
     <Cluster space="2xs">
-      {/* The world's chat sits on the page: the one thing to do here is to say hi in it. */}
-      <Button href="#chat" emphasis="solid" size="l" icon="arrow">
+      {/* A world with a proposals realm leads with reading them (frames 22 and 27); the chat stays one click away. */}
+      {reading ? (
+        <Button href={proposals} emphasis="solid" size="l" icon="arrow">
+          Read the proposals
+        </Button>
+      ) : null}
+      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead. */}
+      <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
         Say hi in the chat
       </Button>
       {copying ? (

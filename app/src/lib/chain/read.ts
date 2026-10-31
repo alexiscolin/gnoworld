@@ -30,6 +30,20 @@ export interface Source {
   readonly at: string;
 }
 
+/** Where a read that never reached the network was to be asked, and when: the clock is `options.now`. */
+export function sourceOf(url: string, options: ReadOptions): Source {
+  return { url, at: (options.now ?? (() => new Date()))().toISOString() };
+}
+
+/** The host an address goes to, as the browser reads it; the address itself when it has none or is no address. */
+export function hostOf(href: string): string {
+  try {
+    return new URL(href).host || href;
+  } catch {
+    return href;
+  }
+}
+
 export interface Failure {
   readonly kind: FailureKind;
   /** What the reader may do now, in a sentence of ours; never a word of the answer. */

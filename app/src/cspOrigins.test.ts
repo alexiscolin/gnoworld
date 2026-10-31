@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectSrc, originsOf, rpcOrigins } from "./cspOrigins.ts";
+import { connectOrigins, connectSrc, originsOf, rpcOrigins } from "./cspOrigins.ts";
 
 // Slice 5 part 2, 5g: the origins connect-src names beside 'self', from the data and nothing else (the plan's §3: "a data
 // file's rpc naming a host that reads visitors" shows in the CSP, an http: one stops the build).
@@ -71,5 +71,36 @@ describe("connectSrc and originsOf", () => {
     ]);
     expect(originsOf("connect-src 'self'")).toEqual([]);
     expect(originsOf("")).toEqual([]);
+  });
+});
+
+// 5k: the public indexers a chain has are named by lib/chain/indexerOf.ts, and a universe of the data brings its indexer's origin
+// to connect-src with its RPC's, none for a chain with no known indexer (F2952, F2973).
+describe("connectOrigins", () => {
+  const onyx = { rpc: "https://rpc.onyx.testnets.gno.land:443", chainId: "onyx-1" };
+  const gnoland = { rpc: "https://rpc.gno.land:443", chainId: "gnoland-1" };
+
+  it("gives each universe's RPC origin and its indexer's, once, in code-unit order", () => {
+    expect(connectOrigins([onyx, gnoland, onyx])).toEqual([
+      "https://indexer.gno.land",
+      "https://indexer.onyx.testnets.gno.land",
+      GNOLAND,
+      ONYX,
+    ]);
+  });
+
+  it("gives the indexer of a universe only when the data holds it", () => {
+    expect(connectOrigins([onyx])).toEqual(["https://indexer.onyx.testnets.gno.land", ONYX]);
+    expect(connectOrigins([])).toEqual([]);
+  });
+
+  it("gives the RPC alone for a chain with no known indexer", () => {
+    expect(connectOrigins([{ rpc: "https://rpc.extra.example:8443", chainId: "extra-1" }])).toEqual([
+      "https://rpc.extra.example:8443",
+    ]);
+  });
+
+  it("refuses a bad RPC as rpcOrigins does, before anything", () => {
+    expect(() => connectOrigins([{ rpc: "http://rpc.gno.land", chainId: "gnoland-1" }])).toThrow(/csp: .*rpc/);
   });
 });
