@@ -11,8 +11,8 @@
   }
 
   .name {
-    /* raw: the video's panel title, 32 px at 400 (the prototype's #chatSide h3) */
-    font: 400 32px/1.1 var(--family-sans);
+    /* raw: the video's panel title, 32 px; its stems are 1.3 px against 1.8 px at 400 (frame 66), so 300, not the prototype's 400 */
+    font: 300 32px/1.1 var(--family-sans);
     /* raw: the prototype's -0.03em */
     letter-spacing: -0.03em;
   }

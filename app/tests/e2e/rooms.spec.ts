@@ -87,7 +87,7 @@ test.describe("a world's rooms", () => {
     const nicks = guestNicks(page);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
-    await expect(roomsNav(page).getByRole("heading")).toHaveText(["Talk", "Other rooms"]);
+    await expect(roomsNav(page).getByRole("heading")).toHaveText(["Talk", "Rooms"]);
     await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
     await expect(roomsNav(page).getByRole("link", { name: "#games" })).toHaveAttribute("aria-current", "true");
     await expect(heading(page, "#games")).toBeVisible();

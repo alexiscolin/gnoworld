@@ -32,7 +32,7 @@ describe("RoomsView", () => {
         dms: { world: "bubble", partners: [], current: undefined, onlyKnown: false, onOnlyKnown: () => undefined },
       }),
     ).toMatch(/^<nav[^>]*aria-label="Rooms and direct messages"/);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
     expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
   });
@@ -118,11 +118,7 @@ describe("RoomsView: direct messages", () => {
   it("lists each conversation by its partner's short address, a link to its page, after the rooms", () => {
     // A conversation in view: no room is.
     const html = view({ current: undefined, dms: dms({ current: CAROL }) });
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
-      "Talk",
-      "Other rooms",
-      "Direct messages",
-    ]);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms", "Direct messages"]);
     // 4e's UX review (U6), 5q: the rows are the partner's nebula and short address; that they are not encrypted is said once,
     // in the small grey note under the list, as the video's note is.
     expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
@@ -254,7 +250,7 @@ describe("RoomsView: notifications", () => {
       });
       expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1]).toSorted()).toEqual([
         "Notifications",
-        "Other rooms",
+        "Rooms",
         "Talk",
       ]);
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
@@ -265,7 +261,7 @@ describe("RoomsView: notifications", () => {
       const html = view({ dms, notices: notices({ list: [note("mention", "#bubble")] }) });
       expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
         "Talk",
-        "Other rooms",
+        "Rooms",
         "Direct messages",
         "Notifications",
       ]);
@@ -278,7 +274,7 @@ describe("RoomsView: notifications", () => {
     });
 
     it("draws no list for a guest, none being given, and none while the list is empty", () => {
-      expect([...view().matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+      expect([...view().matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
       expect(view({ notices: notices() })).not.toContain("Notifications");
     });
 

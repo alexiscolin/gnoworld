@@ -43,7 +43,7 @@ export function RoomSections({ sections, current, failed, badge }: RoomSectionsP
     <Stack space="m">
       {shown.map(({ name, rooms }) => (
         <Stack key={name ?? ""} space="2xs" as="section">
-          <h2 className={styles["section"]}>{name ?? (shown.length === 1 ? "Rooms" : "Other rooms")}</h2>
+          <h2 className={styles["section"]}>{name ?? "Rooms"}</h2>
           <ul className={[shared["plain"], shared["items"]].join(" ")}>
             {rooms.map(({ room }) => (
               <li key={room}>

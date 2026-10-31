@@ -18,7 +18,7 @@ const said = (html: string) =>
 describe("RoomSections", () => {
   it("lists each section that has a room, its name over its links, as a visitor's page does: no count", () => {
     const html = renderToStaticMarkup(<RoomSections sections={SECTIONS} current="#bubble" />);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
     expect([...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual([
       "/w/bubble",
       "/w/bubble?room=games",
