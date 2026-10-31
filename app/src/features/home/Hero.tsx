@@ -30,7 +30,7 @@ export function Hero({ universe }: { universe: UniverseView }) {
           </Link>
         </div>
       </div>
-      <Live rpc={universe.rpc} />
+      <Live withBlock={universe.isDefault} />
     </div>
   );
 }

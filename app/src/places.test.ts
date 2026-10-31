@@ -194,14 +194,14 @@ describe("the site's universe and view of a path", () => {
   });
 });
 
-// Slice 5m: the home reads the block height of its universe's own chain, so each universe's view carries the RPC the data names.
+// The home's block height comes from markets.json, which the server's timer writes (decision of 2026-10-31): the page reads no
+// chain, so a universe's view carries no RPC for it to ask.
 describe("a universe's view", () => {
-  test("carries the RPC its row of universes.json names, which the home asks for its block height", () => {
+  test("carries no RPC: the home asks no chain", () => {
     for (const universe of universes) {
       const view = site.universes.find((each) => each.id === universe.id);
-      expect(view?.rpc, universe.id).toBe(universe.rpc);
+      expect(view, universe.id).toBeDefined();
+      expect(Object.keys(view ?? {}), universe.id).not.toContain("rpc");
     }
-    expect(site.universeAt("/").rpc).toBe("https://rpc.onyx.testnets.gno.land:443");
-    expect(site.universeAt("/net/gnoland/").rpc).toBe("https://rpc.gno.land:443");
   });
 });

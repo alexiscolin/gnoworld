@@ -2,7 +2,6 @@
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
-import { statusEnvelope } from "../chain/chainEnvelopes.ts";
 import { site } from "../../src/places.ts";
 
 export { expect, type Answer, type Page };
@@ -67,28 +66,30 @@ async function flushWorker(page: Page, worker: Worker): Promise<void> {
 
 // Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
 // The directives a page's documents reported, written to its console, which outlives a navigation.
-/** The chains the home reads the block height from (app/data/universes.json): the journeys have no network. */
-export const CHAIN_READS = ["https://rpc.onyx.testnets.gno.land/", "https://rpc.gno.land/"];
-
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
   planted: boolean;
   violations: string[];
   homeReads: undefined;
 }>({
   planted: [false, { option: true }],
-  // The home's two reads, answered as a settled site would: a file with no price and a block three minutes old, so no
-  // page fails a request it did not mean to and the age words stay still. A journey that asks otherwise routes its own.
+  // The home's one read, answered as a settled site would: a file with no price and a block three minutes old (the server's timer
+  // writes both), so no page fails a request it did not mean to and the age words stay still. The home asks no chain: a journey
+  // that reads one routes its own. A journey that asks otherwise routes its own file.
   homeReads: [
     async ({ context }, use) => {
       const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
       const ago = () => new Date(Date.now() - 3 * 60_000).toISOString();
       await context.route("**/markets.json", (route) =>
-        route.fulfill({ headers: cors, body: JSON.stringify({ source: "CoinGecko", updated: ago(), tokens: [] }) }),
+        route.fulfill({
+          headers: cors,
+          body: JSON.stringify({
+            source: "CoinGecko",
+            updated: ago(),
+            tokens: [],
+            block: { height: 1203885, time: ago(), host: "rpc.onyx.testnets.gno.land" },
+          }),
+        }),
       );
-      for (const origin of CHAIN_READS)
-        await context.route(`${origin}**`, (route) =>
-          route.fulfill({ headers: cors, body: JSON.stringify(statusEnvelope(1203885, ago())) }),
-        );
       await use(undefined);
     },
     { auto: true },

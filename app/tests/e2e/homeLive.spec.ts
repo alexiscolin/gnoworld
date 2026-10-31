@@ -1,11 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
-import { statusEnvelope } from "../chain/chainEnvelopes.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, near } from "./geometry.ts";
 
 // Slice 5m, overlays on frames 1 and 6 (docs/design/video-screens.md), at 1728 by 1080: the actions at 876 to 928, the live
 // line's rule at 950 and its box ending at 1016, the ticker 34 px high at the foot, its pause a 34 px square. No "people online".
-const RPC = "https://rpc.onyx.testnets.gno.land/**";
 const MARKETS = {
   source: "CoinGecko",
   updated: new Date(Date.now() - 4 * 60_000).toISOString(),
@@ -14,6 +12,8 @@ const MARKETS = {
     { symbol: "ATONE", usd: 0.4321, change24h: -2.4 },
     { symbol: "BTC", usd: 67123.456, change24h: 4.2 },
   ],
+  // The default universe's latest block, as the server's timer writes it with the prices (decision of 2026-10-31).
+  block: { height: 1203885, time: new Date(Date.now() - 3 * 60_000).toISOString(), host: "rpc.onyx.testnets.gno.land" },
 };
 const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
 
@@ -22,19 +22,13 @@ interface Options {
   markets?: unknown;
   /** The file's answer as it is sent, whatever its content (a status and a body). */
   raw?: { status: number; body: string };
-  /** The chain's answer: a block, or a 503. */
-  chain?: "ok" | "down" | "wrong";
-  /** The instant the block was made 3 minutes before, as an ISO time; the real clock when none. */
-  at?: string;
-  /** The RPC host asked, by its pattern: the universe's own. */
-  rpc?: string;
-  /** Both answers wait for it, as a slow network would. */
+  /** The answer waits for it, as a slow network would. */
   gate?: Promise<void>;
 }
 
-/** The two reads of the home, answered as a browser would get them; counted. */
+/** The one read of the home, markets.json, answered as a browser would get it; counted. */
 async function answers(page: Page, options: Options = {}) {
-  const asked = { markets: 0, status: 0 };
+  const asked = { markets: 0 };
   await page.route("**/markets.json", async (route) => {
     asked.markets += 1;
     await options.gate;
@@ -42,25 +36,9 @@ async function answers(page: Page, options: Options = {}) {
     else if (options.markets === undefined) await route.fulfill({ status: 404, body: "not found" });
     else await route.fulfill({ headers: cors, body: JSON.stringify(options.markets) });
   });
-  await page.route(options.rpc ?? RPC, async (route) => {
-    asked.status += 1;
-    await options.gate;
-    if (options.chain === "down") await route.fulfill({ status: 503, headers: cors, body: "{}" });
-    else if (options.chain === "wrong") await route.fulfill({ headers: cors, body: '{"result":{"unexpected":true}}' });
-    else
-      await route.fulfill({
-        headers: cors,
-        body: JSON.stringify(
-          statusEnvelope(
-            1203885,
-            new Date(Date.parse(options.at ?? new Date().toISOString()) - 3 * 60_000).toISOString(),
-          ),
-        ),
-      });
-  });
   return asked;
 }
-/** The home with its two reads answered, hydrated. */
+/** The home with its read answered, hydrated. */
 async function openHome(page: Page, options: Options = { markets: MARKETS }, path = "/") {
   const asked = await answers(page, options);
   await page.goto(path);
@@ -134,11 +112,11 @@ test.describe("the home at the video's size", () => {
     near(first.y, 876, "the actions' top with the file missing: the line is there as a state, not a gap");
   });
 
-  test("reads the file and the block height once a load, and nothing more as time passes", async ({ page }) => {
+  test("reads the file once a load, the block height in it, and nothing more as time passes", async ({ page }) => {
     const asked = await openHome(page);
     await expect(page.locator("[data-height]")).toBeVisible();
     await page.waitForTimeout(3000);
-    expect(asked).toEqual({ markets: 1, status: 1 });
+    expect(asked).toEqual({ markets: 1 });
   });
 
   test("draws the ticker 34 px high across the foot of the page, its pause a 34 px square at the left (frame 6)", async ({
@@ -287,22 +265,38 @@ test.describe("on a phone", () => {
 const MAINNET = "https://rpc.gno.land/**";
 const ONYX = "https://rpc.onyx.testnets.gno.land/**";
 
+/** Every chain read of the home aborted and counted: the home asks none, the file holds the height. */
+async function chainReads(page: Page) {
+  const counted = { reads: 0 };
+  for (const host of [MAINNET, ONYX]) {
+    await page.route(host, async (route) => {
+      counted.reads += 1;
+      await route.abort();
+    });
+  }
+  return counted;
+}
+
 test.describe("the home's live line at every stage and in every universe", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  test("under /net/gnoland the block is read from the mainnet's chain, and Onyx's is never asked", async ({ page }) => {
-    const asked = await answers(page, { markets: MARKETS, rpc: MAINNET });
-    let onyx = 0;
-    await page.route(ONYX, async (route) => {
-      onyx += 1;
-      await route.abort();
+  // The file's height is the default universe's: the home of another universe draws no block, and none asks a chain.
+  for (const [path, drawn] of [
+    ["/net/gnoland", false],
+    ["/", true],
+  ] as const) {
+    test(`on ${path} the block is ${drawn ? "the file's" : "not drawn"}, and no chain is asked`, async ({ page }) => {
+      const asked = await answers(page, { markets: MARKETS });
+      const chain = await chainReads(page);
+      await page.goto(path);
+      await hydrated(page);
+      await expect(page.locator("[data-token]")).toHaveCount(3);
+      await expect(page.locator("[data-block]")).toHaveCount(drawn ? 1 : 0);
+      if (drawn) await expect(page.locator("[data-height]")).toHaveText("1,203,885");
+      expect(asked.markets).toBe(1);
+      expect(chain.reads).toBe(0);
     });
-    await page.goto("/net/gnoland");
-    await hydrated(page);
-    await expect(page.locator("[data-height]")).toHaveText("1,203,885");
-    expect(asked.status).toBe(1);
-    expect(onyx).toBe(0);
-  });
+  }
 
   test("frame 1: while the reads are on their way, the ticker is at the foot and the actions are where they stay", async ({
     page,
@@ -327,7 +321,7 @@ test.describe("the home's live line at every stage and in every universe", () =>
     ["the file missing", {}],
     ["the file failing (500)", { raw: { status: 500, body: "" } }],
     ["the file malformed", { raw: { status: 200, body: "{" } }],
-    ["the chain failing", { markets: MARKETS, chain: "down" }],
+    ["a file with no height", { markets: { ...MARKETS, block: undefined } }],
   ];
   for (const [name, options] of STATES) {
     test(`keeps the live line's box and the actions still from loading to ${name}`, async ({ page }) => {
@@ -350,12 +344,10 @@ test.describe("the home's live line at every stage and in every universe", () =>
     });
   }
 
-  test("a wrong-shape chain and a missing file stay inside the live line's box, at 900 px as at 1728", async ({
-    page,
-  }) => {
+  test("a missing file stays inside the live line's box, at 900 px as at 1728", async ({ page }) => {
     await page.setViewportSize({ width: 900, height: 700 });
-    await openHome(page, { chain: "wrong" });
-    await expect(page.locator("[data-block]")).toContainText(/try again|report it/i);
+    await openHome(page, {});
+    await expect(page.locator("[data-block]")).toContainText(/not available/i);
     await expect(page.locator("[data-markets='missing']")).toBeVisible();
     const inside = await page.locator("[data-hero='markets']").evaluate((live) => {
       const frame = live.getBoundingClientRect();
@@ -371,7 +363,13 @@ test.describe("the home's live line at every stage and in every universe", () =>
     // The clock is held, so the times' words are the same each run, and the masks as wide.
     const at = "2026-10-31T06:07:00.000Z";
     await page.clock.install({ time: new Date(at) });
-    await openHome(page, { markets: { ...MARKETS, updated: "2026-10-31T06:03:00.000Z" }, at });
+    await openHome(page, {
+      markets: {
+        ...MARKETS,
+        updated: "2026-10-31T06:03:00.000Z",
+        block: { ...MARKETS.block, time: "2026-10-31T06:04:00.000Z" },
+      },
+    });
     await expect(page.locator("[data-height]")).toBeVisible();
     await expect(page.locator("[data-hero='markets']")).toHaveScreenshot("home-live-line.png", {
       mask: [page.locator("[data-hero='markets'] time")],

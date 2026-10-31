@@ -24,6 +24,8 @@ export interface Config {
   ergoData: { dir: string; maxBytes: number } | undefined;
   // The file the prices timer writes (5l): absolute, none by default, so no timer.
   markets: string | undefined;
+  // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
+  universes: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;
     thresholds: Thresholds;
@@ -83,10 +85,7 @@ const Env = z.object({
     .pipe(z.number().max(65_535))
     .default(8080),
   DATABASE: z.string().min(1).max(1024),
-  TRUSTED_PROXY: z
-    .string()
-    .refine((address) => isIP(address) !== 0)
-    .optional(),
+  TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
   LOG_PEPPER_FILE: z.string().min(1),
   // The roles file the server ships (server/roles.json), unless a deployment names another.
   ROLES_FILE: z
@@ -131,6 +130,7 @@ const Env = z.object({
   ERGO_DATA_MB: whole(1_048_576, 1024),
   // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
   MARKETS_FILE: absolute.optional(),
+  UNIVERSES_FILE: absolute.optional(),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
   // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
   MODERATION_THRESHOLDS: z
@@ -184,6 +184,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
     markets: parsed.data.MARKETS_FILE,
+    universes: parsed.data.UNIVERSES_FILE,
     moderation: {
       openaiKey:
         OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),

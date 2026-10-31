@@ -34,6 +34,50 @@ describe("Markets", () => {
     expect(Markets.safeParse({ ...GOOD, tokens: [] }).success).toBe(true);
   });
 
+  // The home's block height (decision of 2026-10-31, "je valide tes reco"): the server reads it with the prices, so a visitor's
+  // browser asks no RPC. It is optional (a failed height leaves it out), a bounded integer with its block's time and its host.
+  describe("the block", () => {
+    const BLOCK = { height: 786661, time: "2026-10-31T11:59:10.123456789Z", host: "rpc.onyx.testnets.gno.land" };
+    const withBlock = (block: Record<string, unknown>) => ({ ...GOOD, block: { ...BLOCK, ...block } });
+
+    it("is the latest block's height, its time and the host it was read from, and may be left out", () => {
+      expect(Markets.parse({ ...GOOD, block: BLOCK })).toEqual({ ...GOOD, block: BLOCK });
+      expect(Markets.safeParse(GOOD).success).toBe(true);
+    });
+
+    it.each([
+      ["height 1", withBlock({ height: 1 })],
+      ["a height of a trillion", withBlock({ height: 1e12 })],
+      ["a host with a port's dots and hyphens", withBlock({ host: "rpc-2.example.org" })],
+    ])("accepts %s, the bound itself", (_, value) => {
+      expect(Markets.safeParse(value).success).toBe(true);
+    });
+
+    it.each([
+      ["a height of zero", withBlock({ height: 0 })],
+      ["a negative height", withBlock({ height: -1 })],
+      ["a height past a trillion", withBlock({ height: 1e12 + 1 })],
+      ["a fractional height", withBlock({ height: 1.5 })],
+      ["a height as text", withBlock({ height: "786661" })],
+      ["a height of NaN", withBlock({ height: Number.NaN })],
+      ["an infinite height", withBlock({ height: Number.POSITIVE_INFINITY })],
+      ["a time as text", withBlock({ time: "yesterday" })],
+      ["a time without its zone", withBlock({ time: "2026-10-31T12:00:00" })],
+      ["no time", { ...GOOD, block: { height: 1, host: BLOCK.host } }],
+      ["no host", { ...GOOD, block: { height: 1, time: BLOCK.time } }],
+      ["no height", { ...GOOD, block: { time: BLOCK.time, host: BLOCK.host } }],
+      ["a host with a path", withBlock({ host: "rpc.example.org/x" })],
+      ["a host with markup", withBlock({ host: "<script>" })],
+      ["a host in capitals", withBlock({ host: "RPC.example.org" })],
+      ["an empty host", withBlock({ host: "" })],
+      ["a host past 253 characters", withBlock({ host: "a".repeat(254) })],
+      ["a field nobody asked for", withBlock({ url: "https://evil.test/" })],
+      ["a null block", { ...GOOD, block: null }],
+    ])("refuses %s", (_, value) => {
+      expect(Markets.safeParse(value).success).toBe(false);
+    });
+  });
+
   it("is exported by the package", () => {
     expect(schemas.Markets).toBe(Markets);
   });

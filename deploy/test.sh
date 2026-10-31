@@ -450,11 +450,17 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
-	mutant "a host added to the way out" "the way out lets two hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	mutant "a host added to the way out" "the way out lets three hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
 	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
-	mutant "CoinGecko's whole domain let out" "the way out lets two hosts out" \
+	mutant "CoinGecko's whole domain let out" "the way out lets three hosts out" \
 		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
+	# The default universe's RPC (decision of 2026-10-31): its line gone, another universe's RPC let out beside it, its whole domain
+	# let out. A server with no data file fails closed at boot (main.test.ts), which the stack's start shows, no mutant needed.
+	mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC" acl sed '/- rpc\.onyx\./d'
+	mutant "another universe's RPC let out" "the way out lets three hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.gno.land" }'
+	mutant "the default RPC's whole domain let out" "the way out lets three hosts out" \
+		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
@@ -1315,13 +1321,22 @@ setTimeout(() => {
 	result=$(via https://api.openai.com/v1/models)
 	case $result in "200 "[1-5]*) pass "OpenAI's API answers through the way out" ;; *) fail "OpenAI's API does not answer through the way out: [$result]" ;; esac
 	docker cp "$egress:/etc/smokescreen/acl.yaml" - | tar -xO >"$tmp/acl.yaml"
-	expect "the way out lets two hosts out: CoinGecko's API and OpenAI's" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" "api.coingecko.com api.openai.com "
+	# The default universe's RPC host and another universe's, from the data the server reads (app/data/universes.json): the list holds
+	# the first, and the second stays refused.
+	rpc_host=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["rpc"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	other_rpc=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	expect "the way out lets three hosts out: CoinGecko's API, OpenAI's and the default universe's RPC" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
+		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" | sort | tr '\n' ' ')"
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
 	refuses() {
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
-	for target in https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
+	for target in "https://$other_rpc/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
 	done
@@ -1335,6 +1350,10 @@ setTimeout(() => {
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
 	# The prices timer's host (5l): CoinGecko's keyless price endpoint, asked as the timer asks it.
 	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
+	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
+	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
+	# The server read the data it names (UNIVERSES_FILE) at boot, or it would not be up: its default RPC is the list's third host.
+	expect "the server's data holds the default universe's RPC" "$(docker exec "$server" /nodejs/bin/node -e "const rows = JSON.parse(require('fs').readFileSync(process.env.UNIVERSES_FILE, 'utf8')); console.log(new URL(rows.find((row) => row.default).rpc).hostname)" 2>&1 || true)" "$rpc_host"
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused

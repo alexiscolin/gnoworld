@@ -3,15 +3,19 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import { all, mount, one } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
 import { Hero } from "./Hero.tsx";
 import { Live } from "./Live.tsx";
 
-// Slice 5m: the hero's live line, the markets row and the block height, each read once a load, each answering for itself: the
-// file missing leaves the height alone, a chain that does not answer leaves the prices alone.
-const RPC = "https://rpc.onyx.testnets.gno.land:443";
+// Slice 5m, and the decision of 2026-10-31 ("je valide tes reco", morning.md point 17): the hero's live line reads ONE file,
+// markets.json, once a load: the prices and the default universe's block height the server's timer wrote there. A visitor's
+// browser asks no chain. The file missing leaves the height a state; a file with no height leaves the prices alone.
+const BLOCK = {
+  height: 786661,
+  time: new Date(Date.now() - 3 * 60_000).toISOString(),
+  host: "rpc.onyx.testnets.gno.land",
+};
 const MARKETS = {
   source: "CoinGecko",
   updated: new Date(Date.now() - 4 * 60_000).toISOString(),
@@ -19,6 +23,7 @@ const MARKETS = {
     { symbol: "GNOT", usd: 1.23, change24h: 2.5 },
     { symbol: "BTC", usd: 67000.5, change24h: -0.4 },
   ],
+  block: BLOCK,
 };
 const urlOf = (input: RequestInfo | URL) =>
   typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -32,8 +37,7 @@ function serve(answer: Answer) {
   return fetcher;
 }
 const asked = (fetcher: ReturnType<typeof serve>) => fetcher.mock.calls.map(([url]) => urlOf(url));
-const both: Answer = (url) =>
-  url.endsWith("/markets.json") ? json(MARKETS) : json(statusEnvelope(786661, new Date().toISOString()));
+const file: Answer = () => json(MARKETS);
 const settle = () => act(() => vi.advanceTimersByTimeAsync(50));
 
 beforeEach(() => {
@@ -45,56 +49,72 @@ afterEach(() => {
 });
 
 describe("the hero's live line", () => {
-  it("reads markets.json and the block height once each, and shows both", async () => {
-    const fetcher = serve(both);
-    const host = mount(<Live rpc={RPC} />);
+  it("reads markets.json once, nothing else, and shows the prices and the block from it", async () => {
+    const fetcher = serve(file);
+    const host = mount(<Live withBlock />);
     await settle();
-    expect(asked(fetcher).filter((url) => url === "/markets.json")).toHaveLength(1);
-    expect(asked(fetcher).filter((url) => url === `${RPC}/status`)).toHaveLength(1);
-    expect(asked(fetcher)).toHaveLength(2);
+    expect(asked(fetcher)).toEqual(["/markets.json"]);
     expect(all(host, "[data-token]").map((each) => each.getAttribute("data-token"))).toEqual(["GNOT", "BTC"]);
     expect(one(host, "[data-height]").textContent).toBe("786,661");
   });
 
+  it("asks no chain, whatever the file holds: no request leaves the site", async () => {
+    const fetcher = serve(file);
+    mount(<Live withBlock />);
+    await settle();
+    expect(asked(fetcher).filter((url) => /^(https?:)?\/\//.test(url) || url.endsWith("/status"))).toEqual([]);
+  });
+
   it("asks nothing more as the minutes pass: a load, not a poll", async () => {
-    const fetcher = serve(both);
-    mount(<Live rpc={RPC} />);
+    const fetcher = serve(file);
+    mount(<Live withBlock />);
     await settle();
     await act(() => vi.advanceTimersByTimeAsync(30 * 60_000));
-    expect(asked(fetcher)).toHaveLength(2);
+    expect(asked(fetcher)).toHaveLength(1);
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("shows the file missing as a state and still shows the height", async () => {
-    serve((url) => (url.endsWith("/markets.json") ? json("nothing", 404) : both(url)));
-    const host = mount(<Live rpc={RPC} />);
+  it("shows the file missing as a state for both, and no number", async () => {
+    serve(() => json("nothing", 404));
+    const host = mount(<Live withBlock />);
     await settle();
     expect(one(host, "[data-markets]").getAttribute("data-markets")).toBe("missing");
     expect(all(host, "[data-token]")).toHaveLength(0);
-    expect(one(host, "[data-height]").textContent).toBe("786,661");
+    expect(all(host, "[data-height]")).toHaveLength(0);
+    expect(one(host, "[data-block]").textContent).toMatch(/not available/i);
   });
 
-  it("shows a chain that does not answer as no number and still shows the prices", async () => {
-    serve((url) => (url.endsWith("/status") ? json({}, 503) : both(url)));
-    const host = mount(<Live rpc={RPC} />);
+  it("shows a file with no height as no number for the block, and still shows the prices", async () => {
+    const without = { source: MARKETS.source, updated: MARKETS.updated, tokens: MARKETS.tokens };
+    serve(() => json(without));
+    const host = mount(<Live withBlock />);
     await settle();
     expect(all(host, "[data-height]")).toHaveLength(0);
+    expect(one(host, "[data-block]").textContent).toMatch(/not available/i);
     expect(all(host, "[data-token]")).toHaveLength(2);
   });
 
-  it("shows a state for each while the answers are on their way, and no number", () => {
+  it("shows a file of another shape (a height as text) as no number, whole", async () => {
+    serve(() => json({ ...MARKETS, block: { ...BLOCK, height: "786661" } }));
+    const host = mount(<Live withBlock />);
+    await settle();
+    expect(all(host, "[data-height]")).toHaveLength(0);
+    expect(all(host, "[data-token]")).toHaveLength(0);
+  });
+
+  it("shows a state for each while the answer is on its way, and no number", () => {
     serve(() => new Promise<Response>(() => undefined));
-    const host = mount(<Live rpc={RPC} />);
+    const host = mount(<Live withBlock />);
     expect(one(host, "[data-markets]").getAttribute("data-markets")).toBe("loading");
     expect(all(host, "[data-height]")).toHaveLength(0);
     expect(host.textContent).not.toMatch(/\d/);
   });
 
-  it("asks the chain only over https: an http RPC is refused with no request, and the prices still show", async () => {
-    const fetcher = serve(both);
-    const host = mount(<Live rpc="http://rpc.example.test" />);
+  it("draws no block at all for a universe that is not the default: the file's height is the default's", async () => {
+    serve(file);
+    const host = mount(<Live withBlock={false} />);
     await settle();
-    expect(asked(fetcher)).toEqual(["/markets.json"]);
+    expect(all(host, "[data-block]")).toHaveLength(0);
     expect(all(host, "[data-height]")).toHaveLength(0);
     expect(all(host, "[data-token]")).toHaveLength(2);
   });
@@ -118,17 +138,16 @@ function hanging() {
   vi.stubGlobal("fetch", fetcher);
   return { fetcher, signals };
 }
-const OTHER = "https://rpc.other.example.test:443";
 
 describe("the live line's teardown", () => {
-  it("ends both requests and leaves no timer when the page leaves while they are pending", async () => {
+  it("ends the request and leaves no timer when the page leaves while it is pending", async () => {
     const { signals } = hanging();
     const host = document.createElement("div");
     const root = createRoot(host);
     act(() => {
-      root.render(<Live rpc={RPC} />);
+      root.render(<Live withBlock />);
     });
-    expect(signals).toHaveLength(2);
+    expect(signals).toHaveLength(1);
     expect(signals.every((signal) => !signal.aborted)).toBe(true);
     act(() => {
       root.unmount();
@@ -137,75 +156,22 @@ describe("the live line's teardown", () => {
     await settle();
     expect(vi.getTimerCount()).toBe(0);
   });
-
-  it("never shows the old chain's height when the RPC changes while its answer is late", async () => {
-    const late: Record<string, (response: Response) => void> = {};
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        (input: RequestInfo | URL) =>
-          new Promise<Response>((resolve) => {
-            late[urlOf(input)] = resolve;
-          }),
-      ),
-    );
-    const host = document.createElement("div");
-    const root = createRoot(host);
-    act(() => {
-      root.render(<Live rpc={RPC} />);
-    });
-    act(() => {
-      root.render(<Live rpc={OTHER} />);
-    });
-    await act(async () => {
-      late[`${OTHER}/status`]?.(await json(statusEnvelope(2000, new Date().toISOString())));
-    });
-    await act(async () => {
-      late[`${RPC}/status`]?.(await json(statusEnvelope(1000, new Date().toISOString())));
-    });
-    expect(one(host, "[data-height]").textContent).toBe("2,000");
-    expect(host.textContent).not.toContain("1,000");
-    act(() => {
-      root.unmount();
-    });
-  });
-
-  it("shows the new chain as loading, not the old height, while the new answer is on its way", async () => {
-    serve((url) =>
-      url.endsWith("/markets.json") ? json(MARKETS) : json(statusEnvelope(1000, new Date().toISOString())),
-    );
-    const host = document.createElement("div");
-    const root = createRoot(host);
-    act(() => {
-      root.render(<Live rpc={RPC} />);
-    });
-    await settle();
-    expect(one(host, "[data-height]").textContent).toBe("1,000");
-    vi.stubGlobal("fetch", () => new Promise<Response>(() => undefined));
-    act(() => {
-      root.render(<Live rpc={OTHER} />);
-    });
-    expect(all(host, "[data-height]")).toHaveLength(0);
-    act(() => {
-      root.unmount();
-    });
-  });
 });
 
 describe("the hero's live line, by universe", () => {
   it.each([
-    ["/net/gnoland", "https://rpc.gno.land:443"],
-    ["/", RPC],
-  ])("asks the RPC of the universe %s alone, and shows its height", async (path, rpc) => {
-    const fetcher = serve(both);
+    ["/", true],
+    ["/net/gnoland", false],
+  ])("on %s asks the one file and draws the block only for the default universe (%s)", async (path, drawn) => {
+    const fetcher = serve(file);
     const host = mount(
       <MemoryRouter>
         <Hero universe={site.universeAt(path)} />
       </MemoryRouter>,
     );
     await settle();
-    expect(asked(fetcher).filter((url) => url.endsWith("/status"))).toEqual([`${rpc}/status`]);
-    expect(one(host, "[data-height]").textContent).toBe("786,661");
+    expect(asked(fetcher)).toEqual(["/markets.json"]);
+    expect(all(host, "[data-height]")).toHaveLength(drawn ? 1 : 0);
   });
 });
 
@@ -232,7 +198,7 @@ function screen(matchesPhone: boolean) {
 function plant() {
   const root = createRoot(document.createElement("div"));
   act(() => {
-    root.render(<Live rpc={RPC} />);
+    root.render(<Live withBlock />);
   });
   return {
     leave: () => {
@@ -244,26 +210,26 @@ function plant() {
 }
 
 describe("the live line on a phone", () => {
-  it("asks nothing under 900 px, and asks both reads once the window widens", async () => {
+  it("asks nothing under 900 px, and asks the file once the window widens", async () => {
     const window900 = screen(true);
-    const fetcher = serve(both);
-    const host = mount(<Live rpc={RPC} />);
+    const fetcher = serve(file);
+    const host = mount(<Live withBlock />);
     await settle();
     expect(fetcher).not.toHaveBeenCalled();
     await act(async () => {
       window900.widen();
       await vi.advanceTimersByTimeAsync(50);
     });
-    expect(asked(fetcher).toSorted()).toEqual(["/markets.json", `${RPC}/status`].toSorted());
+    expect(asked(fetcher)).toEqual(["/markets.json"]);
     expect(all(host, "[data-token]")).toHaveLength(2);
   });
 
-  it("asks both reads at once on a wide window, and leaves no listener on the media query when it leaves", async () => {
+  it("asks at once on a wide window, and leaves no listener on the media query when it leaves", async () => {
     const window900 = screen(false);
-    const fetcher = serve(both);
+    const fetcher = serve(file);
     const planted = plant();
     await settle();
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(window900.listeners.size).toBe(1);
     planted.leave();
     expect(window900.listeners.size).toBe(0);
@@ -272,8 +238,8 @@ describe("the live line on a phone", () => {
 
 describe("the live line's words", () => {
   it("says when the prices were read as a clock time, not an age, and keeps it as the minutes pass", async () => {
-    serve(both);
-    const host = mount(<Live rpc={RPC} />);
+    serve(file);
+    const host = mount(<Live withBlock />);
     await settle();
     const credit = one(host, "[data-markets] time").parentElement?.textContent;
     expect(credit).toMatch(/^CoinGecko · (\d{1,2} \w{3} )?\d\d:\d\d UTC$/);

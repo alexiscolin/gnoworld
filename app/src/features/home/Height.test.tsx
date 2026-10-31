@@ -1,21 +1,16 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import type { ChainRead } from "../../lib/chain/read.ts";
+import type { MarketsRead } from "../../lib/api/markets.ts";
 import { markup } from "../../../tests/mount.tsx";
 import { Height } from "./Height.tsx";
 
-// Slice 5m (frame 6, "BLOCK 1,203,885"): the latest block's height from lib/chain's readHeight, with where it was read and how
-// old the block is. A page never shows a number without its source (lib/chain/read.ts); a failed read shows no number at all.
+// Slice 5m (frame 6, "BLOCK 1,203,885"), from markets.json (decision of 2026-10-31): the latest block's height the server read, the
+// host it read it from and when the block was made. A page never shows a number without its source; no height, no number.
 const NOW = new Date("2026-10-30T23:43:40.000Z");
-const SOURCE = { url: "https://rpc.onyx.testnets.gno.land:443/status", at: "2026-10-30T23:43:39.000Z" };
-const ok: ChainRead<{ height: number; time: string }> = {
-  ok: true,
-  value: { height: 786661, time: "2026-10-30T23:43:10Z" },
-  source: SOURCE,
-};
-const draw = (read: ChainRead<{ height: number; time: string }> | undefined) => {
-  return markup(<Height read={read} now={NOW} />);
-};
+const MARKETS = { source: "CoinGecko" as const, updated: "2026-10-30T23:40:00.000Z", tokens: [] };
+const BLOCK = { height: 786661, time: "2026-10-30T23:43:10Z", host: "rpc.onyx.testnets.gno.land" };
+const ok: MarketsRead = { ok: true, markets: { ...MARKETS, block: BLOCK } };
+const draw = (read: MarketsRead | undefined) => markup(<Height read={read} now={NOW} />);
 
 describe("the block height", () => {
   it("shows the height, grouped, under the word Block", () => {
@@ -26,7 +21,6 @@ describe("the block height", () => {
 
   it("names the host it was read from, and when the block was made", () => {
     const host = draw(ok);
-    expect(host.textContent).toContain("rpc.onyx.testnets.gno.land");
     expect(host.textContent).toContain("rpc.onyx.testnets.gno.land · 23:43 UTC");
     expect(host.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-30T23:43:10Z");
   });
@@ -37,16 +31,17 @@ describe("the block height", () => {
     expect(host.textContent).not.toMatch(/\d|NaN|undefined/);
   });
 
-  it("shows no number, and the failure's own next step, when the read failed", () => {
-    const next = "The chain's service did not answer. Try again in a moment.";
-    const host = draw({
-      ok: false,
-      failure: { kind: "down", next, status: 503 },
-      source: SOURCE,
-    });
+  it.each([
+    ["the file missing", { ok: false, reason: "missing" }],
+    ["the file unavailable", { ok: false, reason: "unavailable" }],
+    ["the network down", { ok: false, reason: "network" }],
+    ["the file malformed", { ok: false, reason: "malformed" }],
+    ["a file with no height (the server could not read it)", { ok: true, markets: MARKETS }],
+  ] satisfies [string, MarketsRead][])("shows no number, and says so in words, for %s", (_, read) => {
+    const host = draw(read);
     expect(host.querySelector("[data-height]")).toBeNull();
-    expect(host.textContent).toContain(next);
-    expect(host.textContent).not.toMatch(/503|NaN|undefined/);
+    expect(host.textContent).toMatch(/not available/i);
+    expect(host.textContent).not.toMatch(/\d|NaN|undefined/);
   });
 
   it.each([
@@ -55,7 +50,7 @@ describe("the block height", () => {
     ["stamped a few minutes ahead of our clock", "2026-10-30T23:50:00Z", "23:50 UTC"],
     ["stamped in 2099", "2099-01-01T00:00:00Z", "time unknown"],
   ])("words a block that is %s", (_what, time, wanted) => {
-    const host = draw({ ...ok, value: { height: 786661, time } });
+    const host = draw({ ok: true, markets: { ...MARKETS, block: { ...BLOCK, time } } });
     expect(host.querySelector("time")?.textContent).toBe(wanted);
     expect(host.textContent).not.toMatch(/NaN|-\d/);
   });

@@ -137,6 +137,25 @@ describe("loadConfig", () => {
     }
   });
 
+  // The home's block height (2026-10-31): the universes' data names the RPC the prices timer reads it from.
+  it("reads the universes' data file the height's RPC comes from: absolute, none by default", () => {
+    expect(loadConfig(ENV).universes).toBeUndefined();
+    expect(loadConfig({ ...ENV, UNIVERSES_FILE: "/app/app/data/universes.json" }).universes).toBe(
+      "/app/app/data/universes.json",
+    );
+    for (const value of [
+      "",
+      "universes.json",
+      "./universes.json",
+      "/",
+      "/srv/../universes.json",
+      "/srv//u.json",
+      "/srv/",
+    ]) {
+      expect(failure({ ...ENV, UNIVERSES_FILE: value })).toMatch(/setting UNIVERSES_FILE: /);
+    }
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);

@@ -419,6 +419,54 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  // The home's block height (2026-10-31): the timer also tunnels to the default universe's RPC, named by UNIVERSES_FILE, and to
+  // no other universe's.
+  it("reads the default universe's RPC beside CoinGecko when UNIVERSES_FILE names the data, and no other universe's", async () => {
+    const way = await tunnels();
+    try {
+      const dir = folder("gnoworld-universes-");
+      const base = {
+        name: "U",
+        gnoweb: "https://gnoweb.example",
+        indexer: "https://indexer.example/graphql/query",
+        testnet: true,
+      };
+      const universes = join(dir, "universes.json");
+      writeFileSync(
+        universes,
+        JSON.stringify([
+          { ...base, id: "a", chainId: "a-1", rpc: "https://rpc.not-default.example:443" },
+          { ...base, id: "b", chainId: "b-1", rpc: "https://rpc.the-default.example:443", default: true },
+        ]),
+      );
+      const server = start({
+        ...settings(),
+        MARKETS_FILE: join(dir, "markets.json"),
+        UNIVERSES_FILE: universes,
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => way.seen.length > 1);
+      expect([...way.seen].sort()).toEqual(["api.coingecko.com:443", "rpc.the-default.example:443"]);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      expect(server.out.stdout).toContain('"event":"prices_failed"');
+      expect(way.seen.some((host) => host.includes("not-default"))).toBe(false);
+    } finally {
+      way.close();
+    }
+  });
+
+  it("does not start with a UNIVERSES_FILE that holds no default universe: it fails closed, naming the file", async () => {
+    const dir = folder("gnoworld-universes-");
+    const universes = join(dir, "universes.json");
+    writeFileSync(universes, "[]");
+    const server = start({ ...settings(), MARKETS_FILE: join(dir, "markets.json"), UNIVERSES_FILE: universes });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(universes);
+  });
+
   it("exits on SIGTERM within a bound even with a price read still open on a proxy that never answers (F2758)", async () => {
     const way = await tunnels(true);
     try {

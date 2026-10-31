@@ -33,8 +33,8 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and
 - `web` holds a fixed address on `inside` (`WEB_ADDRESS`, in `INSIDE_SUBNET`), the only one Ergo
   (`proxy-allowed-from`) and `server` (`TRUSTED_PROXY`) believe about a visitor's address; it sends
   the PROXY protocol's address on, overwriting the client's, and never the demo's password.
-- `egress` (smokescreen) lets the server reach `api.openai.com` (`deploy/egress/acl.yaml`, one
-  file the test reads too) and refuses an address that resolves to a private one; it sits in
+- `egress` (smokescreen) lets the server reach `api.openai.com` and the default universe's RPC host (`deploy/egress/acl.yaml`, one
+  file the test reads too; the RPC's host is `app/data/universes.json`'s default, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`.
 
@@ -339,6 +339,10 @@ Slice 3, the server's retention (3n):
   (a 429: the free tier's limit is per IP and shared, so a run of them means another user of the address),
   `status`, `timeout`, `request`, `too_large`, `not_json`, `shape`, `no_price` or `write` (the volume): never the answer.
   A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
+  With `UNIVERSES_FILE` (`/app/app/data/universes.json`, copied into the image) the same read also asks the default universe's RPC
+  for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
+  chain. A failed height leaves `block` out and logs `{"event":"height_failed","error":"<kind>"}`, never what the answer held; a data
+  file that is bad stops the server at boot, naming the file. Changing the default universe's RPC means changing `acl.yaml` with it.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room

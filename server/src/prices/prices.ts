@@ -1,10 +1,11 @@
 // The prices timer (slice 5 part 2, 5l; decision 151): every five minutes, the price and 24 hour change of GNOT, ATONE and
 // BTC from CoinGecko's keyless /simple/price, through the server's one way out (net.ts, then the egress proxy), written
-// to markets.json for the home page's markets row. What comes back is data: capped, parsed, checked field by field, and
-// only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
+// to markets.json for the home page's markets row. With an RPC it also reads the default universe's latest block height
+// there, the same way out and the same five minutes, so no visitor's browser asks a chain (decision of 2026-10-31). What
+// comes back is data: capped, parsed, checked field by field, and only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { Markets, MARKET_SYMBOLS } from "@gnoworld/schemas";
+import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
 import { send as netSend } from "../net.ts";
 
@@ -14,6 +15,8 @@ interface Options {
   file: string;
   log: Log;
   send?: Send;
+  /** The default universe's RPC (its data's `rpc`): where the latest block's height is read each tick; none, no height. */
+  rpc?: string;
   now?: () => number;
   // The wait after a read ends, whatever came of it; five minutes.
   everyMs?: number;
@@ -89,19 +92,30 @@ function tokensOf(answer: unknown): Markets["tokens"] {
   return tokens;
 }
 
+// The RPC the height is read from, or a refusal at start: https alone, no user, no path, query or fragment.
+function checkedRpc(rpc: string): URL {
+  const url = URL.parse(rpc);
+  const bare = url?.pathname === "/" && url.search === "" && url.hash === "";
+  if (url?.protocol !== "https:" || url.username !== "" || url.password !== "" || !bare)
+    throw new RangeError("prices: the rpc is no bare https address");
+  return url;
+}
+
 const named = (error: unknown): boolean =>
   error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
+  const rpc = options.rpc === undefined ? undefined : checkedRpc(options.rpc);
   const temp = `${file}.tmp`;
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
 
-  async function read(): Promise<void> {
+  // One GET through the way out: the JSON of the body, capped, or the kind of failure.
+  async function get(url: string): Promise<unknown> {
     let text: string;
     try {
-      const response = await send(URL_ASKED, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
+      const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
       if (response.status === 429) throw new Failure("rate_limited");
       if (!response.ok) throw new Failure("status");
       text = await readCapped(response);
@@ -109,17 +123,40 @@ export function startPrices(options: Options): Prices {
       if (error instanceof Failure) throw error;
       throw new Failure(named(error) ? "timeout" : "request");
     }
-    if (stopped) return;
-    let answer: unknown;
     try {
-      answer = JSON.parse(text);
+      return JSON.parse(text);
     } catch {
       throw new Failure("not_json");
     }
+  }
+
+  // The default universe's latest block through its RPC's /status: through Zod, then the file's own bounds.
+  async function readBlock(from: URL): Promise<MarketBlock> {
+    const status = StatusAnswer.safeParse(await get(`${from.origin}/status`));
+    if (!status.success) throw new Failure("shape");
+    const { latest_block_height: height, latest_block_time: time } = status.data.result.sync_info;
+    const block = MarketBlock.safeParse({ height: Number(height), time, host: from.hostname });
+    if (!block.success) throw new Failure("shape");
+    return block.data;
+  }
+
+  async function read(): Promise<void> {
+    // Both asked at once, each its own failure: the prices' ends the read (the last file stays), the height's only leaves it out.
+    const [priced, blocked] = await Promise.allSettled([
+      get(URL_ASKED),
+      rpc === undefined ? Promise.resolve(undefined) : readBlock(rpc),
+    ]);
+    if (stopped) return;
+    if (priced.status === "rejected") throw priced.reason;
+    const tokens = tokensOf(priced.value);
+    let block: MarketBlock | undefined;
+    if (blocked.status === "fulfilled") block = blocked.value;
+    else log("height_failed", { error: blocked.reason instanceof Failure ? blocked.reason.kind : "shape" });
     const markets = Markets.parse({
       source: "CoinGecko",
       updated: new Date(now()).toISOString(),
-      tokens: tokensOf(answer),
+      tokens,
+      ...(block === undefined ? {} : { block }),
     });
     try {
       // Written beside the file and renamed over it: a reader sees the old file or the new one, never half of one.

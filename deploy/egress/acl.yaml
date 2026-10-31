@@ -1,5 +1,7 @@
-# The hosts the stack may reach (decision 151): OpenAI's API, which the server's check asks (3i), and CoinGecko's, which
-# the prices timer asks (5l), each by its full name, never its domain. One file,
+# The hosts the stack may reach (decision 151): OpenAI's API, which the server's check asks (3i), CoinGecko's, which
+# the prices timer asks (5l), and the RPC of the default universe, where the same timer reads the block height (decision of
+# 2026-10-31), each by its full name, never its domain. The RPC's host is the one of app/data/universes.json's default
+# universe, and only that: server/src/prices/universes.test.ts fails when the two differ. One file,
 # read by the proxy and by deploy/test.sh. A host is matched as the request names it, then resolved and
 # refused if its address is private (config.yaml).
 version: v1
@@ -10,3 +12,4 @@ default:
   allowed_domains:
     - api.coingecko.com
     - api.openai.com
+    - rpc.onyx.testnets.gno.land

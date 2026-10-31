@@ -17,9 +17,18 @@ export const MarketToken = z.strictObject({
 });
 export type MarketToken = z.infer<typeof MarketToken>;
 
-/** markets.json: the source, the time of the read, and the tokens that have a price (none, one to three), never twice. */
+/** The default universe's latest block as its RPC gave it (the server reads it with the prices): its height (1 to a trillion, a whole number), its own time and the host it was read from. */
+export const MarketBlock = z.strictObject({
+  height: z.number().check(z.int(), z.gte(1), z.lte(1e12)),
+  time: z.iso.datetime({ offset: true }),
+  host: z.string().check(z.maxLength(253), z.regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/)),
+});
+export type MarketBlock = z.infer<typeof MarketBlock>;
+
+/** markets.json: the source, the time of the read, the tokens that have a price (none, one to three), never twice, and the block height when it could be read. */
 export const Markets = z.strictObject({
   source: z.literal("CoinGecko"),
+  block: z.optional(MarketBlock),
   updated: z.iso.datetime({ offset: true }),
   tokens: z.array(MarketToken).check(
     z.maxLength(MARKET_SYMBOLS.length),

@@ -13,6 +13,7 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
+import { defaultRpc } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
@@ -26,8 +27,16 @@ const log = logger(config.pepper, (line) => process.stdout.write(line));
 const db = openDatabase(config.database, migrations);
 // The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
 const retention = startRetention(db, { log, ergoData: config.ergoData });
-// CoinGecko's prices every five minutes into the file MARKETS_FILE names (5l); without it, no timer.
-const prices = config.markets === undefined ? undefined : startPrices({ file: config.markets, log });
+// CoinGecko's prices every five minutes into the file MARKETS_FILE names (5l); without it, no timer. With UNIVERSES_FILE the
+// same read takes the default universe's block height from its RPC, so a visitor's browser asks no chain.
+const prices =
+  config.markets === undefined
+    ? undefined
+    : startPrices({
+        file: config.markets,
+        log,
+        ...(config.universes === undefined ? {} : { rpc: defaultRpc(config.universes) }),
+      });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
