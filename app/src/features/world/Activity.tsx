@@ -17,10 +17,11 @@ export function Activity({ hours }: { hours?: number[] | undefined }) {
   const counts = hours.map(counted);
   return (
     <Stack space="2xs">
-      <p className="label">Activity · last 24 h</p>
+      <p className="label">Activity · last {counts.length} h</p>
       <Suspense fallback={<p className="label">Loading the chart</p>}>
         <Bars values={counts} />
       </Suspense>
+      {/* The frame writes "24 H AGO" at the left edge, where the first bar begins; the tooltip names that bar by its own hour, 23 h ago. */}
       <p className="label">{counts.length} h ago</p>
     </Stack>
   );

@@ -54,6 +54,16 @@ describe("a world's activity", () => {
     expect(el.textContent).not.toMatch(/24 h ago/);
   });
 
+  it("titles the chart and its label with the hours it holds, as it says them under the bars (F2872)", async () => {
+    const el = await draw([1, 2, 3, 4, 5]);
+    expect(el.textContent).toMatch(/activity\s*·\s*last 5 h/i);
+    expect(el.textContent).not.toMatch(/last 24 h/i);
+    expect(
+      el.querySelector("svg")?.getAttribute("aria-label") ??
+        el.querySelector("[aria-label]")?.getAttribute("aria-label"),
+    ).toMatch(/last 5 hours/i);
+  });
+
   it("writes a peak of 0 for a history of none, and no NaN or negative for a value that is no count", async () => {
     expect((await draw(Array.from({ length: 24 }, () => 0))).textContent).toMatch(/peak 0/i);
     host?.remove();

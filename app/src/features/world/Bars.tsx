@@ -2,5 +2,5 @@
 import { ActivityChart } from "@gnoworld/ui";
 
 export default function Bars({ values }: { values: number[] }) {
-  return <ActivityChart label="Messages per hour, the last 24 hours" values={values} />;
+  return <ActivityChart label={`Messages per hour, the last ${String(values.length)} hours`} values={values} />;
 }
