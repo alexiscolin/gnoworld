@@ -92,13 +92,14 @@ const GATE = {
     passed: { type: "boolean" },
     failingLane: { type: "string" },
     tail: { type: "string" },
+    lastLine: { type: "string" },
     survivors: { type: "array", items: { type: "string" } },
     files: { type: "array", items: { type: "string" } },
     relaxations: { type: "array", items: { type: "string" } },
     seconds: { type: "number" },
     branch: BRANCH,
   },
-  required: ["passed", "failingLane", "tail", "survivors", "files", "relaxations", "seconds", "branch"],
+  required: ["passed", "failingLane", "tail", "lastLine", "survivors", "files", "relaxations", "seconds", "branch"],
 };
 // The verifier answers for the ids it is given, and only those.
 const verdictsFor = (ids) => ({
@@ -185,17 +186,32 @@ const where = (step, writes) =>
       `When you finish, append one line to ${A.shared}/${A.branch}.state.md (the step, what it did, its commits) and save your report to ${A.shared}/reports/${A.branch}-${step}.md.`
     : "You are read-only: report, write nothing.");
 
-const gateCheck = () =>
-  write(
-    `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Report whether it passed, the failing lane and the ` +
-      "tail of its output, the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
-      `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
-      `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
-      `the chief and Alexis read. Write the diff since ${BASE} ` +
-      "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
-      `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
-    // An agent that runs a command and waits for it: the cheaper model, little reasoning.
-    { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
+// A merge check passed only when check.sh printed its pass line as the last line of its output. The agent's word is not the proof (reviewer-1-2,
+// F2617: a run killed before its probe lane was declared PASSED): the script reads `lastLine` itself, and a run killed, timed out or left in
+// the background has none.
+const PASS_LINE = /^all checks passed in \d+ s/;
+const proven = (g) => {
+  if (!g || !g.passed || PASS_LINE.test(g.lastLine || "")) return g;
+  return {
+    ...g,
+    passed: false,
+    failingLane: g.failingLane || "unproven",
+    tail: `the agent said passed, but the last line of check.sh's output was '${g.lastLine || ""}', not 'all checks passed in N s': a run killed, timed out or left in the background is no pass. Run it again to its end.\n${g.tail || ""}`,
+  };
+};
+const gateCheck = async () =>
+  proven(
+    await write(
+      `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Wait for it to end: a run killed, timed out or left in the background is not a pass. Report whether it passed, the failing lane, the ` +
+        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; anything else is a failure whatever you think, and the script reads this line itself), the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
+        `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
+        `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
+        `the chief and Alexis read. Write the diff since ${BASE} ` +
+        "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
+        `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
+      // An agent that runs a command and waits for it: the cheaper model, little reasoning.
+      { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
+    ),
   );
 
 phase("Tests");

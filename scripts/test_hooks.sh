@@ -4714,7 +4714,7 @@ async function run(answer, extra = {}) {
   const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
@@ -4727,6 +4727,19 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   let t = await run(base(["app/src/a.ts"]));
   ok(t.r.status === "ready for the chief", `a clean branch is not ready: ${t.r.status}`);
   ok(!t.labels.includes("security") && !t.labels.some((l) => (l || "").startsWith("fix")), `a clean product branch ran ${t.labels}`);
+  // A merge check's verdict is the script's, not the agent's word (reviewer-1-2, F2617): a run killed, timed out or left in the background has
+  // no `all checks passed in N s` last line, and an agent saying `passed: true` over any other last line does not pass the step.
+  for (const last of ["", "check.sh: lane probe failed at nginx", "py:check_nginx failed", "all checks passed", "all checks passed in s", "  all checks passed in 5 s", "ok all checks passed in 5 s", "killed\nall checks passed in 5 s"]) {
+    t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: last } : base(["app/src/a.ts"])(l, p)));
+    ok(t.r.status.startsWith("blocked at the merge check") && !t.labels.includes("reviewer"), `a merge check whose last line was '${last}' passed on the agent's word: ${t.r.status} ${t.labels}`);
+    ok(t.calls.some((c) => (c.label || "").startsWith("gate fix") && c.prompt.includes("last line")), `a merge check with no pass line was not sent to a fixer with the reason: ${t.labels}`);
+  }
+  // A real last line, with the run's own time in it, passes; so does the same line of a run past its budget.
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status === "ready for the chief", `a merge check ending in its pass line did not pass: ${t.r.status}`);
+  // A failure stays a failure whatever the line says.
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), passed: false, failingLane: "probe", lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status.startsWith("blocked"), `a merge check the agent called failed passed on its line: ${t.r.status}`);
   t = await run((l, p) => (l === "red pass" ? null : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status.startsWith("blocked") && !t.labels.includes("build"), `a dead red pass let the build run: ${t.r.status} ${t.labels}`);
   t = await run((l, p) => (l === "reviewer" ? null : base(["app/src/a.ts"])(l, p)));

@@ -1213,6 +1213,10 @@ def design_mutants():
         ("gate.files.some(screen)", "false", "starts the design-reviewer for a screen"),
         ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),
         ('lenses[i][1] === "design-reviewer" && r.framesMissing', "false", "fails the step on missing frames"),
+        ("  if (!g || !g.passed || PASS_LINE.test(g.lastLine || \"\")) return g;", "  if (true) return g;", "reads a merge check's last line itself (F2617)"),
+        ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /all checks passed/;", "wants the pass line as the last line, with its time"),
+        ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /^all checks passed in \\d+ s/m;", "reads only the last line"),
+        ("    passed: false,\n    failingLane: g.failingLane", "    passed: true,\n    failingLane: g.failingLane", "fails a merge check whose last line is no pass line"),
     ))
 
 
