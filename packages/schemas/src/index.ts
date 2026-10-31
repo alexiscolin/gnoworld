@@ -17,6 +17,7 @@ export {
   Universes,
 } from "./data.ts";
 export { FunctionList, QueryAnswer, StatusAnswer } from "./chain.ts";
+export { REALM_FACTS_CAPS, RealmFactsAnswer, type RealmFactsValue } from "./indexer.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
