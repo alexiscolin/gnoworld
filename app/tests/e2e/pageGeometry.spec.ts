@@ -159,6 +159,31 @@ test.describe("at the video's size", () => {
     expect(await style(page, "[data-look='plate']", "border-right-width")).toBe("0px");
   });
 
+  // The picture of a plate is compared with a colour threshold that let amber-brown pass as navy (dock-1728 kept the old plate after
+  // 647ffb79): the plate's computed fill is read here, and must be the frames' navy, #182033 (frame 37), within 4 a channel.
+  test("a world's plate is the frames' navy, not amber: its computed fill, read as pixels (frame 37)", async ({
+    page,
+  }) => {
+    await plateAt(page, "/w/bubble");
+    const fill = await page.locator("[data-look='plate']").evaluate((el) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext("2d");
+      if (context === null) throw new Error("no canvas context");
+      context.fillStyle = getComputedStyle(el).backgroundColor;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    });
+    const navy = [0x18, 0x20, 0x33];
+    fill.forEach((channel, index) => {
+      const wanted = navy[index] ?? 0;
+      expect(
+        Math.abs(channel - wanted),
+        `the plate's fill, channel ${String(index)}: ${String(channel)}, not ${String(wanted)}`,
+      ).toBeLessThanOrEqual(4);
+    });
+  });
+
   test("one outline runs round plate, scene and dock: 24 px from the sides, 98 from the top, 24 from the foot (frames 20, 37)", async ({
     page,
   }) => {

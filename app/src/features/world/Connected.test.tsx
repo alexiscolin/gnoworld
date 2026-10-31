@@ -30,6 +30,12 @@ describe("a world's connected worlds", () => {
     }
   });
 
+  it("takes another heading for another list, as the Earth's plate says Worlds", () => {
+    const html = renderToStaticMarkup(<Connected heading="Worlds" worlds={worlds} />);
+    expect(html).toContain("Worlds");
+    expect(html).not.toMatch(/connected worlds/i);
+  });
+
   it("draws nothing, not even the heading, with no connected world", () => {
     expect(renderToStaticMarkup(<Connected worlds={[]} />)).toBe("");
   });

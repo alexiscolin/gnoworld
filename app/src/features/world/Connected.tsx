@@ -8,11 +8,18 @@ export interface ConnectedWorld {
   line: string;
 }
 
-export function Connected({ worlds }: { worlds: ConnectedWorld[] }) {
+/** `heading` is the kicker over the rows: "Connected worlds" on a world's page, the list's own name (the Earth's "Worlds") elsewhere. */
+export function Connected({
+  worlds,
+  heading = "Connected worlds",
+}: {
+  worlds: readonly ConnectedWorld[];
+  heading?: string;
+}) {
   if (worlds.length === 0) return null;
   return (
     <Stack space="2xs">
-      <Kicker>Connected worlds</Kicker>
+      <Kicker>{heading}</Kicker>
       <div>
         {worlds.map(({ name, path, line }) => (
           <Row
