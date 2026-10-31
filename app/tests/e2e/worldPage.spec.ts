@@ -24,6 +24,26 @@ test.describe("a world's page at the video's size", () => {
     await expect(page.getByRole("navigation", { name: "You are here" })).toHaveCount(0);
   });
 
+  // F2869: each block at its place. Frame 26's description line stands at y 316 (its centre); Bubble's has two lines, the first at
+  // the frame's place. The frame's facts, chart (479) and actions (574) have the data Bubble lacks (no source for who is here, no
+  // history), so below the description the page is pinned at what it lays: the words of no history, then the actions under them.
+  test("the title, the line, the activity's words and the actions stand at their y (frames 26, 90)", async ({
+    page,
+  }) => {
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    const title = await box(page, "[data-look='plate'] h1");
+    const line = await box(page, "[data-look='plate'] h1 + p");
+    const activity = await box(page, "[data-look='plate'] h1 + p + p");
+    const main = await box(page, "[data-look='plate'] a[href='#chat']");
+    near(title.y, 172, "the title's top");
+    near(line.y + 12.4, 316, "the line's first line's middle");
+    near(line.x, 100, "the line's left");
+    near(activity.y, 371, "the activity words' top");
+    near(main.y, 398, "the actions' top");
+    expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
+  });
+
   test("the actions are 56 px tall from the column's left, Share 10 px after the main one, and no Follow (frames 26, 92)", async ({
     page,
   }) => {

@@ -40,7 +40,7 @@ export default function World() {
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
               <p>{world.description}</p>
-              {/* No source yet for the history: the block says so. The facts and the connected worlds have none either, so the page holds neither (Facts, Connected: component tests only). */}
+              {/* No source yet for the history: the block says so. The connected worlds have none either (Connected: a component test only). Who is here has one, the chat's members in the store, but its block costs the first screen 240 bytes more than ADR-0001's 170 KiB (budgets.spec.ts): parked for a decision (F2868). */}
               <Activity />
               <Actions address={ORIGIN + world.canonical} />
             </Stack>
