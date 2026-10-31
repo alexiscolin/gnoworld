@@ -159,11 +159,20 @@ for (const width of WIDTHS) {
       });
     }
 
+    // The home's live line says the clock time of each read, and its row's layout follows the words' width (F2975). Both
+    // times come after hydration (later on a loaded machine) and are set to one time; a phone's page has no line (900 px).
+    const fixTimes = async (page: Page) => {
+      await expect(page.locator("time")).toHaveCount(width >= 900 ? 2 : 0);
+      await page.locator("time").evaluateAll((times) => {
+        for (const time of times) time.textContent = "06:07 UTC";
+      });
+    };
     // The test wallet is drawn at each server's start: its address, as wide as its letters, is
     // replaced by one of the same length in letters of about the same width, so the header's row is one, as with the real one.
     test("the shell as it looks, logged out and logged in", async ({ page }) => {
       await page.goto("/");
       await hydrated(page);
+      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-out-${String(width)}.png`);
       const address = await logInAt(page);
       await page.goto("/");
@@ -171,6 +180,7 @@ for (const width of WIDTHS) {
       await page.getByTitle(address).evaluate((element) => {
         element.textContent = "g1xxxx…xxxxx";
       });
+      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`);
     });
   });
