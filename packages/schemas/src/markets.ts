@@ -19,7 +19,8 @@ export type MarketToken = z.infer<typeof MarketToken>;
 
 /** The default universe's latest block as its RPC gave it (the server reads it with the prices): its height (1 to a trillion, a whole number), its own time and the host it was read from. */
 export const MarketBlock = z.strictObject({
-  height: z.number().check(z.int(), z.gte(1), z.lte(1e12)),
+  // Not z.int(): its class would sit in the store's chunk, which the first screen loads (F2976; indexer.ts).
+  height: z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(1e12)),
   time: z.iso.datetime({ offset: true }),
   host: z.string().check(z.maxLength(253), z.regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/)),
 });
