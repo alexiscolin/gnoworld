@@ -147,7 +147,7 @@ test.describe("a realm's read functions", () => {
     await expect(reads(page).getByRole("status")).toContainText("The chain refused this read");
     await expect(reads(page).getByRole("link", { name: /gnoweb/ })).toHaveAttribute(
       "href",
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot",
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
     );
     await expect(page.getByRole("main")).toContainText("wrapped GNOT");
   });
@@ -192,6 +192,24 @@ test.describe("a realm's read functions", () => {
       await chain(page);
       await reads(page).getByRole("button", { name: "TotalSupply" }).click();
       await expect(reads(page)).toContainText(LABEL);
+      expect(await violations(page)).toEqual([]);
+      await fits(page);
+    });
+
+    test(`has no accessibility violation on ${name} with a result taller than its frame, which takes focus`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      const long = Array.from({ length: 200 }, (_, i) => `line ${String(i)} of a long answer`).join("\n");
+      await chain(page, { evals: { TotalSupply: long } });
+      await page.goto("/r/gnoland/wugnot");
+      await hydrated(page);
+      await reads(page).getByRole("button", { name: "Read TotalSupply" }).click();
+      const result = reads(page).getByRole("region", { name: "Result of TotalSupply" });
+      await expect(result).toContainText("line 199 of a long answer");
+      expect(await result.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+      await result.focus();
+      await expect(result).toBeFocused();
       expect(await violations(page)).toEqual([]);
       await fits(page);
     });
