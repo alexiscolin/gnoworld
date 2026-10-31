@@ -4,14 +4,14 @@ import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
-  { path: "/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  { path: "/", title: "gno.world", heading: "1 world in Onyx", canonical: "https://gno.world/net/onyx/" },
   {
     path: "/w/bubble",
     title: "Bubble · gno.world",
     heading: "Bubble",
     canonical: "https://gno.world/net/onyx/w/bubble",
   },
-  { path: "/net/onyx/", title: "gno.world", heading: "gno.world", canonical: "https://gno.world/net/onyx/" },
+  { path: "/net/onyx/", title: "gno.world", heading: "1 world in Onyx", canonical: "https://gno.world/net/onyx/" },
   {
     path: "/net/onyx/w/bubble",
     title: "Bubble · gno.world",
@@ -309,6 +309,24 @@ test("a page meets the design system's six layers in their order", async ({ page
     return [...new Set(names)];
   });
   expect(met).toEqual(["reset", "tokens", "base", "compositions", "components", "utilities"]);
+});
+
+// F3260: layers rank by their first mention, and the order must not hang on which chunk the bundler meets first (a chunk of
+// components' CSS ahead of the statement made `a { color: inherit }` beat the components). The first sheet of every page is
+// the one statement, so no chunking can change the order.
+test.describe("the layers' order is the first sheet of every page", () => {
+  for (const path of ["/", "/earth", "/list", "/w/bubble", "/net/onyx/", "/net/onyx/earth", "/net/onyx/w/bubble"]) {
+    test(`${path}: the first stylesheet holds the one @layer statement and nothing else`, async ({ page, request }) => {
+      await page.goto(path);
+      await hydrated(page);
+      const first = await page.evaluate(
+        () => document.head.querySelector<HTMLLinkElement>("link[rel='stylesheet']")?.getAttribute("href") ?? "",
+      );
+      expect(first).not.toBe("");
+      const css = (await (await request.get(first)).text()).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s/g, "");
+      expect(css).toBe("@layerreset,tokens,base,compositions,components,utilities;");
+    });
+  }
 });
 
 // Slice 5p: no world has a capture yet (the capture job is slice 7), so a world's page shows no preview of it, whether

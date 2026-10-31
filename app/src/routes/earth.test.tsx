@@ -1,7 +1,6 @@
 import { isRouteErrorResponse, type MetaArgs, type RouteObject } from "react-router";
 import { describe, expect, test } from "vitest";
 import { expectClientAsBuild, render, routeError } from "../../tests/render.tsx";
-import { readableText } from "../readableText.ts";
 import Earth, { clientLoader, ErrorBoundary, loader, meta } from "./earth.tsx";
 
 const route = (path: string): RouteObject => ({ path, Component: Earth, loader, ErrorBoundary });
@@ -86,7 +85,7 @@ describe("the Earth's plate", () => {
   test("shows its vertical atlas caption to the eye only, and no figure the data does not hold", async () => {
     const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
     expect(html).toContain("gnoworld");
-    expect(readableText(html)).not.toContain("gnoworld");
+    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
     expect(html).not.toMatch(/<(canvas|img|video|picture|figure)\b/i);
   });
 

@@ -1,1 +1,1 @@
-export { Hero } from "./Hero.tsx";
+export { Hero, Worlds } from "./Hero.tsx";

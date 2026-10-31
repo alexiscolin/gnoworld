@@ -4,7 +4,9 @@ import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
-  expect(html).toContain("<h1>gno.world</h1>");
+  // F3267: the kicker says gno.world, and the one heading is the hero's line.
+  expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
+  expect(html).toMatch(/<h1\b[^>]*>1 world in Onyx<\/h1>/);
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
 });

@@ -600,12 +600,12 @@ test.describe("a planet's thumb", () => {
     }
   });
 
-  test("is 32, 48 or 64 px by its size", async ({ page }) => {
+  test("is 32, 52 or 64 px by its size", async ({ page }) => {
     await open(page, "planetthumb--sizes");
     const widths = await page
       .locator("[data-size]")
       .evaluateAll((all) => all.map((t) => [t.getAttribute("data-size"), t.getBoundingClientRect().width]));
-    expect(Object.fromEntries(widths)).toEqual({ s: 32, m: 48, l: 64 });
+    expect(Object.fromEntries(widths)).toEqual({ s: 32, m: 52, l: 64 });
   });
 });
 

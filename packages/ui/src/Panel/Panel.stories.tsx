@@ -26,7 +26,6 @@ export const Plate: Story = {
   args: {
     label: "Bubble",
     look: "plate",
-    tint: "#5cf2c8",
     caption: "gnoworld · hub atlas",
     children: (
       <Panel.Body>
@@ -35,7 +34,4 @@ export const Plate: Story = {
       </Panel.Body>
     ),
   },
-};
-export const PlateWithoutColour: Story = {
-  args: { label: "Earth", look: "plate", children: <Panel.Body>x</Panel.Body> },
 };

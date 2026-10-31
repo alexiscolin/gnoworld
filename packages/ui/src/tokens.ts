@@ -28,6 +28,7 @@ export function groups() {
         "--switch-",
         "--dialog-",
         "--popover-",
+        "--plate-",
         "--thumb-",
         "--avatar-",
       ],

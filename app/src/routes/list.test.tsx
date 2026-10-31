@@ -27,10 +27,10 @@ describe("the places' list page", () => {
 });
 
 describe("the list's page as a view", () => {
-  test("shows the list as rows under the one heading, with no plate: the list is the whole page (frame 20's plate is for a place)", async () => {
+  test("shows the list as cards under the one heading, with no plate: the list is the whole page (frame 20's plate is for a place)", async () => {
     const html = await render(route, "/list");
     expect(html).not.toContain('data-look="plate"');
     expect(html).toMatch(/<h1\b[^>]*>Places<\/h1>/);
-    expect(html).toMatch(/<[a-z]+ [^>]*data-look="[a-z]+"[^>]*>[\s\S]*Bubble/);
+    expect(html).toMatch(/<ul [^>]*aria-label="Places"[^>]*>[\s\S]*<a [^>]*href="\/w\/bubble"[^>]*>[\s\S]*Bubble/);
   });
 });

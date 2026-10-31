@@ -2,7 +2,6 @@ import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } 
 import { describe, expect, test } from "vitest";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { readableText } from "../readableText.ts";
 import { site } from "../places.ts";
 import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
@@ -178,7 +177,7 @@ describe("a world's plate", () => {
   test("says its kind in its vertical caption, to the eye only", async () => {
     const { html } = await plateOf();
     expect(html).toMatch(/gnoworld[^<]*hub/i);
-    expect(readableText(html)).not.toMatch(/gnoworld/i);
+    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
   });
 
   test("shows no figure, chart or planet the data does not hold: no sample numbers, no 3D", async () => {

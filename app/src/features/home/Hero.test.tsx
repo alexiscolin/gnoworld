@@ -33,3 +33,24 @@ describe("the hero's big number, on a planted site", () => {
     expect([...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1])).toEqual(["/net/lab/earth", "/list"]);
   });
 });
+
+// F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
+describe("the hero's parts", () => {
+  test("opens with the kicker and its warm dot, the universe's name in the one label style", async () => {
+    const html = await heroOf("main");
+    expect(html).toMatch(
+      /<p class="label [^"]*"><span class="[^"]*" data-tone="warm" aria-hidden="true"><\/span>gno\.world<\/p>/,
+    );
+    expect(html.indexOf("gno.world")).toBeLessThan(html.indexOf('data-hero="number"'));
+  });
+
+  test("names a universe that is not the default by its own name", async () => {
+    expect(await heroOf("lab")).toMatch(/data-tone="warm"[^>]*><\/span>Lab<\/p>/);
+  });
+
+  test("makes the line the page's one heading, and sets it beside the actions, in one row", async () => {
+    const html = await heroOf("main");
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toMatch(/<h1[^>]*>2 worlds in Mainland<\/h1><div[^>]*data-hero="actions">/);
+  });
+});

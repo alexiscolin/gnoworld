@@ -95,8 +95,34 @@ export function siteOf(source: Source) {
     universe: (request: Request, kind: "cosmos" | "earth"): UniverseView => get().universe(request, kind),
     /** The universe a world or an ecosystem of the list belongs to. */
     home: (each: Listed): UniverseView => get().home(each),
+    /** The universe a path belongs to: /net/<id> names it, any other path (a page not found, an error) is the default's. */
+    universeAt: (pathname: string): UniverseView => get().universeAt(pathname),
+    /** Which of the three views a path is of a universe, at its path or at its canonical address, or none. */
+    viewAt: (universe: UniverseView, pathname: string): View | undefined => viewAt(universe, pathname),
   };
 }
+
+/** The header's views: a universe's Earth and cosmos, and the one list of the site. */
+export type View = "earth" | "cosmos" | "list";
+
+function universeAt(views: UniverseView[], pathname: string): UniverseView {
+  const id = /^\/net\/([^/]+)/.exec(pathname)?.[1];
+  const found = views.find((each) => each.id === id) ?? views.find((each) => each.isDefault);
+  if (found === undefined) throw new RangeError("the data holds no default universe");
+  return found;
+}
+
+function viewAt(universe: UniverseView, pathname: string): View | undefined {
+  const here = trimmed(pathname);
+  const is = (at: { path: string; canonical: string }) =>
+    [at.path, at.canonical].some((each) => trimmed(each) === here);
+  if (is(universe.earth)) return "earth";
+  if (is(universe.home)) return "cosmos";
+  return here === "/list" ? "list" : undefined;
+}
+
+// A path as the data spells it: a trailing slash is no part of the address.
+const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname);
 
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
   return { slug: row.slug, name: row.name, description: row.description, universe: row.universe, testnet, ...at };
@@ -136,8 +162,7 @@ function build(source: Source) {
 
   /** The place a path names, exactly as written but for a trailing slash, when it is of the kind the route serves. */
   function placeOf(pathname: string, kind: PlaceKind): Place | undefined {
-    const trimmed = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
-    for (const path of [pathname, trimmed, `${pathname}/`]) {
+    for (const path of [pathname, trimmed(pathname), `${pathname}/`]) {
       const place = placeAt(places, path);
       if (place?.kind === kind) return place;
     }
@@ -179,6 +204,7 @@ function build(source: Source) {
     universe: (request: Request, kind: "cosmos" | "earth"): UniverseView => universeOf(find(request, kind).universe),
     /** The universe a world or an ecosystem of the list belongs to. */
     home: (each: Listed): UniverseView => universeOf(each.universe),
+    universeAt: (pathname: string): UniverseView => universeAt(views, pathname),
   };
 }
 

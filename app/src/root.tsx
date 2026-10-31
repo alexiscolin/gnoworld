@@ -2,6 +2,7 @@
 // First: no schema may be built before Zod is told not to compile (lib/jitless.ts).
 import "./lib/jitless.ts";
 import "@gnoworld/ui/styles.css";
+import layers from "@gnoworld/ui/layers.css?url";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { PageError } from "./features/errors/index.ts";
@@ -16,6 +17,8 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* With credentials: the demo asks for a password, and Chromium sends none for a manifest otherwise. */}
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+        {/* First of the sheets: the layers rank by first mention, so the order is never left to the chunks (F3260). */}
+        <link rel="stylesheet" href={layers} />
         <Meta />
         <Links />
       </head>
