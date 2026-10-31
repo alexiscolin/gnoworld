@@ -2360,11 +2360,12 @@ git -C "$g" rm -q packages/schemas/src/a.ts && printf 'y\n' >>"$g/server/src/a.t
 gate >/dev/null || fail "check.sh failed on a deleted schema"
 everything "a deleted schema beside a server change"
 reset
-# A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code.
-ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
+# A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code. The fixture's own folder
+# is moved away: `ln -s` would put the link inside it, git would see nothing, and the case would prove nothing.
+mv "$g/node_modules" "$g.node_modules" && ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed beside a linked node_modules"
 scoped "a server change beside a linked node_modules" typecheck - build:app sh:test_hooks
-rm "$g/node_modules" && reset
+rm "$g/node_modules" && mv "$g.node_modules" "$g/node_modules" && reset
 # A git that cannot list the change fails the gate, rather than scoping it to nothing.
 real_git=$(command -v git)
 mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" diff --no-renames "*) exit 3 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/badgit/git" && chmod +x "$t/badgit/git"
@@ -3544,24 +3545,37 @@ printf '%s\n' "$out" | grep -q "^py:check_nginx failed here" || fail "check.sh -
 [ ! -e "$lockdir" ] || fail "check.sh --merge left its lock behind after a failure"
 gate >/dev/null || fail "check.sh failed (fast)"
 ran py:check_nginx && fail "check.sh's fast gate ran the nginx check, which needs a pinned binary and a build"
-# A holder that died: no wait, the lock taken over.
-sh -c 'exit 0' & dead=$!
-wait "$dead" || :
-hold "$dead" "/dead/worktree"
-out=$(gate --merge) || fail "check.sh --merge failed beside a lock whose holder died: $out"
-printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited for a holder that died: $out"
-[ ! -e "$lockdir" ] || fail "check.sh --merge kept a dead holder's lock"
-# A folder with no pid (a run killed between making it and writing the pid) is nobody's: the next merge check takes it, after a short wait.
-mkdir -p "$lockdir"
-: >"$lockdir/pid"
-out=$(gate --merge) || fail "check.sh --merge failed beside a lock folder with no pid: $out"
-[ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
 # rawrun execs check.sh in the job itself, so its pid is the job's.
 rawrun() { # $1: a launcher or nothing; $2: the run's tag; then check.sh's arguments (the log is not truncated: runs share it)
 	launch=$1 tag=$2
 	shift 2
 	cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" RUN_TAG="$tag" LOCKPEEK=1 SLOW_STEP="${SLOW:-}" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" $launch sh scripts/check.sh "$@"
 }
+# Taking the lock over is the way out of check.sh's wait, so one that does not take it never ends: this run has a limit, and a
+# kill reaches check.sh itself. Without it the suite hung, and that ended two full gates at harness_mutate's 600 s (2026-11-01).
+limited() { # $1: what holds the lock; its status is check.sh's, its output in $t/limited.out
+	rawrun "" L --merge >"$t/limited.out" 2>&1 &
+	job=$!
+	tries=0
+	while kill -0 "$job" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 1200 ] || { kill "$job" 2>/dev/null; fail "check.sh --merge never ended beside $1: $(cat "$t/limited.out")"; }
+		sleep 0.1
+	done
+	wait "$job"
+}
+# A holder that died: no wait, the lock taken over.
+sh -c 'exit 0' & dead=$!
+wait "$dead" || :
+hold "$dead" "/dead/worktree"
+limited "a lock whose holder died" || fail "check.sh --merge failed beside a lock whose holder died: $(cat "$t/limited.out")"
+grep -qi "waiting" "$t/limited.out" && fail "check.sh --merge waited for a holder that died: $(cat "$t/limited.out")"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a dead holder's lock"
+# A folder with no pid (a run killed between making it and writing the pid) is nobody's: the next merge check takes it, after a short wait.
+mkdir -p "$lockdir"
+: >"$lockdir/pid"
+limited "a lock folder with no pid" || fail "check.sh --merge failed beside a lock folder with no pid: $(cat "$t/limited.out")"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
 # A holder another sandbox owns: a signal to it is refused (EPERM), which is a live process, not a dead one (F2616: each session runs its
 # merge check in a Bash call of its own, and `kill -0` failing for either reason read the holder as dead). pid 1 is alive for every user
 # and refuses the signal to any but root; the waiter must wait, say so, and leave the lock alone.
@@ -3624,6 +3638,7 @@ done
 # --merge waits: it says which worktree holds the lock and since when, runs no step meanwhile, and starts when the holder dies;
 # its time in the log and on screen leaves the wait out.
 : >"$t/waiter.out"
+began=$(date +%s)
 gate --merge >"$t/waiter.out" 2>&1 &
 waiter=$!
 tries=0
@@ -3636,6 +3651,7 @@ grep -qi "waiting" "$t/waiter.out" && grep -q "since" "$t/waiter.out" || { kill 
 sleep 5
 kill -0 "$waiter" 2>/dev/null || { kill "$holder" 2>/dev/null; fail "check.sh --merge gave up waiting for a live holder: $(cat "$t/waiter.out")"; }
 [ ! -s "$log" ] || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge ran a step while another merge check held the lock: $(head -3 "$log")"; }
+freed=$(date +%s)
 kill "$holder"
 wait "$holder" 2>/dev/null || :
 tries=0
@@ -3645,8 +3661,9 @@ while kill -0 "$waiter" 2>/dev/null; do
 	sleep 0.1
 done
 wait "$waiter" || fail "check.sh --merge failed after its wait: $(cat "$t/waiter.out")"
+# Measured against this run's own clock: against the first run's time, a load that slowed that run hid the 5 s (a mutant survived).
 waited=$(took "$(cat "$t/waiter.out")")
-[ -n "$waited" ] && [ "$waited" -le $((solo + 2)) ] || fail "check.sh --merge counted its 5 s wait in its time: $waited s against $solo s alone"
+[ -n "$waited" ] && [ "$waited" -le $(($(date +%s) - freed + 1)) ] || fail "check.sh --merge counted its $((freed - began)) s wait in its time: $waited s"
 [ ! -e "$lockdir" ] || fail "check.sh --merge kept the lock after its pass"
 # Two real merge checks side by side, one machine's cache: the second says it waits and runs no step until the first has ended.
 rm -f "$log" "$log.tags" "$log.lockpeek"
