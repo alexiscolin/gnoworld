@@ -8,7 +8,7 @@ export const MARKET_SYMBOLS = ["GNOT", "ATONE", "BTC"] as const;
 /** A token's price in dollars (above zero, finite) and its 24 hour change in percent, null when the source has none. */
 export const MarketToken = z.strictObject({
   symbol: z.enum(MARKET_SYMBOLS),
-  usd: z.number().check(z.positive()),
+  usd: z.number().check(z.refine((usd) => usd > 0, { message: "above zero" })),
   change24h: z.nullable(z.number()),
 });
 export type MarketToken = z.infer<typeof MarketToken>;

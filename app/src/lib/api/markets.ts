@@ -2,7 +2,7 @@
 // (slice 5 part 2, 5l and 5m). A state, never an exception: the file missing is not the file broken, and nothing the file
 // held is kept when its shape is refused. One GET, a time limit over the body too, a size cap, no timer left behind.
 import { Markets } from "@gnoworld/schemas";
-import { TIMEOUT_MS, type Fetcher } from "./http.ts";
+import { TIMEOUT_MS, type Fetcher } from "./login.ts";
 
 /** The most bytes the file may weigh; it holds three tokens, about 300 B. */
 export const MARKETS_MAX_BYTES = 16 * 1024;
