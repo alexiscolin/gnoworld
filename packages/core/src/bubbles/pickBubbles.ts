@@ -1,5 +1,6 @@
 // Which messages the Earth shows as bubbles (ADR-0001 §7, docs/plans/slice-6.md): a pure function of the messages, the
 // time, the viewer, the rules and what is already on screen. No clock, no chance, nothing it is given is changed.
+import { fold } from "../chat/room.ts";
 import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
@@ -31,8 +32,6 @@ interface Run {
   screen: Bubble[];
 }
 
-/** An account as Ergo folds it: ASCII case alone. */
-const fold = (account: string): string => account.replace(/[A-Z]/g, (c) => c.toLowerCase());
 const newestFirst = (a: BubbleMessage, b: BubbleMessage): number =>
   b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
