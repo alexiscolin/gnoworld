@@ -221,7 +221,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | coverage | under 85% anywhere, under 100% (95% branches) in `core` |
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test |
 | `scripts/batch_size.py` | a merge's own product code past 600 lines (400 with a tier-1 file) with no `Batch-size:` line |
-| `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs |
+| `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs, unless it says why (`No-test: <why>`) or a later commit of the range does (`No-test: <short sha> - <why>`) |
 | StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` | a migration `main` has, edited, moved or removed (F466) |

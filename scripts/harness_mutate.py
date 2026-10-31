@@ -924,6 +924,8 @@ def mutants():
     yield from each("scripts/prove_fix.py", "took = max(took, n)", "took = RUNS", "hooks", "prove_fix says how many runs it took")
     yield from each("scripts/prove_fix.py", 're.search(r"^No-test: \\S", message, re.M)', "True", "hooks", "prove_fix wants a reason for no test")
     yield from each("scripts/prove_fix.py", r"|\.spec\.ts", "", "hooks", "prove_fix takes a journey for a fix's test (F126)")
+    yield from each("scripts/prove_fix.py", "any(commit.startswith(sha) for sha in excuses)", "bool(excuses)", "hooks", "prove_fix excuses a fix by its own sha, not any")
+    yield from each("scripts/prove_fix.py", ' - \\S", re.M)\n\n\ndef excused', '", re.M)\n\n\ndef excused', "hooks", "prove_fix wants a reason with a sha's excuse")
     yield from each("scripts/prove_fix.py", """    out += [(".", f"{PLAYWRIGHT} --pass-with-no-tests -c {config} {' '.join(files)}") for config, files in journeys.items()]\n""", "", "hooks", "prove_fix runs a fix's journeys before it (F126)")
     yield from each("scripts/prove_fix.py", "TEST.search(f) or f.startswith(JOURNEYS) for f in product", "TEST.search(f) for f in product", "hooks", "prove_fix counts the journeys' helpers as tests")
     yield from each("scripts/prove_fix.py", "--pass-with-no-tests ", "", "hooks", "prove_fix counts no journey found as passing")

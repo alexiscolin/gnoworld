@@ -3293,6 +3293,15 @@ base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => 2 * n;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/packages/x/src/b.test.ts"
 fix "fix(x): a test that passed already"
 prove "$base" && fail "prove_fix accepted a fix whose test passed before it"
+# A later commit of the range excuses that one fix, by its short sha (cf67ea7: a CSS fix whose Vitest test, beside its journey,
+# could not fail before it, and a merged message cannot change). Another sha, or no reason, excuses nothing.
+bad=$(git -C "$pf" rev-parse --short=7 HEAD)
+git -C "$pf" commit -q --allow-empty -m "chore: a wrong sha" -m "No-test: 0000000 - not this fix"
+prove "$base" && fail "prove_fix excused a fix by a sha that is not its"
+git -C "$pf" commit -q --allow-empty -m "chore: no reason" -m "No-test: $bad"
+prove "$base" && fail "prove_fix excused a fix by a sha with no reason"
+git -C "$pf" commit -q --allow-empty -m "chore: the excuse" -m "No-test: $bad - its journey proves it, its unit test is beside the point"
+prove "$base" || fail "prove_fix refused a fix a later commit excuses by its sha"
 base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => n + n;\n' >"$pf/packages/x/src/a.ts"
 fix "fix(x): no test"
