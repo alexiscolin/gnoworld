@@ -648,7 +648,14 @@ describe("it is a function", () => {
   });
 
   it("reads maxOnScreen, showSeconds, speakerDelaySeconds and readLast from the rules it is given", () => {
-    const rules: Rules = { maxOnScreen: 2, showSeconds: 2, speakerDelaySeconds: 3, maxChars: 40, readLast: 3 };
+    const rules: Rules = {
+      ...RULES,
+      maxOnScreen: 2,
+      showSeconds: 2,
+      speakerDelaySeconds: 3,
+      maxChars: 40,
+      readLast: 3,
+    };
     const messages = many(10);
     const out = pickBubbles(messages, NOW, ME, rules, []);
     expect(ids(out.bubbles)).toEqual(["m0", "m1"]);
