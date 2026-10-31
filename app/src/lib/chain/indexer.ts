@@ -4,7 +4,7 @@
 // call it (CORS) are unknown until a gnomcp session records one; a service that cannot be called is a `down` with its next step.
 import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas";
 import { isRealmPath } from "./evalCall.ts";
-import { failedRead, readChain, type ChainRead, type ReadOptions } from "./read.ts";
+import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
 const FACTS_QUERY = "query($path: String!) { realmFacts(path: $path) { path deployer firstBlock callsPerDay } }";
 
@@ -14,11 +14,10 @@ export async function readRealmFacts(
   path: string,
   options: ReadOptions = {},
 ): Promise<ChainRead<RealmFactsValue>> {
+  // A bad name is refused before anything is asked.
+  if (!isRealmPath(path) || path.length > REALM_FACTS_CAPS.path)
+    return failedRead("bad-name", sourceOf(indexer, options));
   const asked = `${indexer}?query=${encodeURIComponent(FACTS_QUERY)}&variables=${encodeURIComponent(JSON.stringify({ path }))}`;
-  // A bad name is refused before anything is built from it or asked.
-  if (!isRealmPath(path) || path.length > REALM_FACTS_CAPS.path) {
-    return failedRead("bad-name", { url: indexer, at: (options.now ?? (() => new Date()))().toISOString() });
-  }
   const answer = await readChain(asked, RealmFactsAnswer, options);
   if (!answer.ok) return answer;
   const facts = answer.value.data.realmFacts;

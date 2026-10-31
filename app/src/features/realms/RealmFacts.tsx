@@ -9,10 +9,6 @@ export type { RealmFactsValue };
 
 const grouped = (n: number): string => n.toLocaleString("en-US");
 
-// A count is a finite whole number of 0 or more; anything else is no fact.
-const count = (given: number | undefined): number | undefined =>
-  given !== undefined && Number.isSafeInteger(given) && given >= 0 ? given : undefined;
-
 function Fact({ label, children, ltr = false }: { label: string; children: string; ltr?: boolean }) {
   return (
     <div>
@@ -24,9 +20,7 @@ function Fact({ label, children, ltr = false }: { label: string; children: strin
 
 export function RealmFacts({ read }: { read: ChainRead<RealmFactsValue> }) {
   if (!read.ok) return <ReadFailed failure={read.failure} source={read.source} />;
-  const { path, deployer } = read.value;
-  const firstBlock = count(read.value.firstBlock);
-  const calls = count(read.value.callsPerDay);
+  const { path, deployer, firstBlock, callsPerDay } = read.value;
   return (
     <section aria-label="Facts from the indexer">
       <dl>
@@ -41,7 +35,7 @@ export function RealmFacts({ read }: { read: ChainRead<RealmFactsValue> }) {
           </Fact>
         )}
         {firstBlock === undefined ? null : <Fact label="First block">{grouped(firstBlock)}</Fact>}
-        {calls === undefined ? null : <Fact label="Calls in 24 h">{grouped(calls)}</Fact>}
+        {callsPerDay === undefined ? null : <Fact label="Calls in 24 h">{grouped(callsPerDay)}</Fact>}
       </dl>
       <ReadSource source={read.source} />
     </section>

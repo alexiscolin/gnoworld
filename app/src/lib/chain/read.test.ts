@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as z from "zod/mini";
-import { readChain, type ChainFetch, type ChainRead, type Failure } from "./read.ts";
+import { hostOf, readChain, sourceOf, type ChainFetch, type ChainRead, type Failure } from "./read.ts";
 
 // 5g, the failure paths of what the browser reads from the chain (the plan's §3 row on the RPC's answers). A small schema stands
 // in: these paths do not depend on what an answer holds. The answers' own shapes (qrender, qeval, qfuncs, the block height)
@@ -419,5 +419,37 @@ describe("readChain, the defaults production uses", () => {
     expect(await readChain(URL_OK, Answer)).toMatchObject({ ok: true });
     vi.stubGlobal("fetch", () => Promise.resolve(new Response(jsonOf(1_048_577))));
     expect(await readChain(URL_OK, Answer)).toMatchObject({ ok: false, failure: { kind: "too-big" } });
+  });
+});
+
+// 5k: the two helpers the views and the readers share (F2967, F2968).
+describe("sourceOf", () => {
+  it("gives the address and the time of the options' clock", () => {
+    expect(sourceOf("https://rpc.example", { now: () => new Date("2026-10-31T06:00:00.000Z") })).toStrictEqual({
+      url: "https://rpc.example",
+      at: "2026-10-31T06:00:00.000Z",
+    });
+  });
+
+  it("reads the real clock when none is given", () => {
+    const before = Date.now();
+    const { url, at } = sourceOf("https://rpc.example", {});
+    expect(url).toBe("https://rpc.example");
+    expect(new Date(at).getTime()).toBeGreaterThanOrEqual(before);
+    expect(new Date(at).getTime()).toBeLessThanOrEqual(Date.now());
+  });
+});
+
+describe("hostOf", () => {
+  it("gives the host with its port as the browser reads it, whatever the address is dressed in", () => {
+    expect(hostOf("https://rpc.example:8443/path?q=1#x")).toBe("rpc.example:8443");
+    expect(hostOf("https://user:pass@evil.example/x")).toBe("evil.example");
+    expect(hostOf("HTTPS://GNO.land")).toBe("gno.land");
+  });
+
+  it("gives the address itself when it has no host or is no address", () => {
+    expect(hostOf("javascript:alert(1)")).toBe("javascript:alert(1)");
+    expect(hostOf("not an address")).toBe("not an address");
+    expect(hostOf("")).toBe("");
   });
 });

@@ -4,7 +4,7 @@
 import { cutGraphemes } from "@gnoworld/core";
 import { Card } from "@gnoworld/ui";
 import { isGnowebAddress } from "../../lib/chain/gnoweb.ts";
-import { isProposalId, tallyOf, type Proposal } from "../../lib/chain/proposal.ts";
+import { tallyOf, type Proposal } from "../../lib/chain/proposal.ts";
 import type { ChainRead, Source } from "../../lib/chain/read.ts";
 import { ReadFailed, ReadSource } from "./ReadSource.tsx";
 
@@ -19,15 +19,13 @@ export interface ProposalCardProps {
 }
 
 export function ProposalCard({ proposal, source, href }: ProposalCardProps) {
-  const number = isProposalId(proposal.id) ? `Proposal ${String(proposal.id)}` : undefined;
-  const title = cutGraphemes(proposal.title, CARD_TITLE);
   const tally = tallyOf(proposal);
   return (
     <Card compact>
-      <Card.Header title={title === "" ? (number ?? "Proposal") : title} kicker="Proposal" />
+      <Card.Header title={cutGraphemes(proposal.title, CARD_TITLE)} kicker="Proposal" />
       <Card.Body>
-        {number === undefined ? null : <p data-field="number">{number}</p>}
-        <p data-field="state">{proposal.state}</p>
+        <p data-field="number">{`Proposal ${String(proposal.id)}`}</p>
+        {proposal.state === "" ? null : <p data-field="state">{proposal.state}</p>}
         {tally === undefined ? null : <p data-field="tally">{tally}</p>}
         <ReadSource source={source} />
         {isGnowebAddress(href) ? (

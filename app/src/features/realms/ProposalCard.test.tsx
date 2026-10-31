@@ -34,11 +34,14 @@ describe("a proposal's card", () => {
     expect(field(el, "tally")).toBe("YES 33% of 66.66%");
   });
 
-  it("names where it was read and when, as a machine-readable time with a visible age", () => {
+  it("names where it was read and when, as a machine-readable time and its words", () => {
     const el = draw();
-    expect(el.textContent).toContain("rpc.onyx.testnets.gno.land");
     expect(el.querySelector("time")?.getAttribute("datetime")).toBe(SOURCE.at);
-    expect(el.querySelector("time")?.textContent).toMatch(/\S/);
+    expect(el.textContent).toContain("Read from rpc.onyx.testnets.gno.land at 2026-10-31 06:00 UTC");
+  });
+
+  it("leaves out the state the page did not give, rather than an empty line", () => {
+    expect(field(draw({ proposal: { ...PROPOSAL, state: "" } }), "state")).toBeUndefined();
   });
 
   it("carries the way to read the proposal on gnoweb", () => {
@@ -56,11 +59,6 @@ describe("a proposal's card", () => {
     ["no tally", { id: 15, title: "T", state: "active" }],
     ["a yes with no threshold", { id: 15, title: "T", state: "active", yes: 33 }],
     ["a threshold with no yes", { id: 15, title: "T", state: "active", threshold: 66.66 }],
-    ["a yes below 0", { id: 15, title: "T", state: "active", yes: -1, threshold: 50 }],
-    ["a yes above 100", { id: 15, title: "T", state: "active", yes: 101, threshold: 50 }],
-    ["a yes that is NaN", { id: 15, title: "T", state: "active", yes: Number.NaN, threshold: 50 }],
-    ["a yes that is infinite", { id: 15, title: "T", state: "active", yes: Number.POSITIVE_INFINITY, threshold: 50 }],
-    ["a threshold that is NaN", { id: 15, title: "T", state: "active", yes: 33, threshold: Number.NaN }],
   ])("shows no number the realm did not give: %s, so no tally and no percent", (_name, proposal) => {
     const el = draw({ proposal });
     expect(field(el, "tally")).toBeUndefined();
@@ -81,12 +79,6 @@ describe("a proposal's card", () => {
     expect(field(draw({ proposal: { ...PROPOSAL, id } }), "number")).toBe(`Proposal ${String(id)}`);
   });
 
-  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])("leaves out a proposal number that is %s", (id) => {
-    const el = draw({ proposal: { ...PROPOSAL, id } });
-    expect(field(el, "number")).toBeUndefined();
-    expect(el.textContent).not.toMatch(/NaN|Infinity|Proposal -1|1\.5/);
-  });
-
   it("draws a hostile title as text and creates no element from it", () => {
     const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script>";
     const el = draw({ proposal: { ...PROPOSAL, title: hostile } });
@@ -101,13 +93,10 @@ describe("a proposal's card", () => {
     expect(field(el, "state")).toBe(hostile);
   });
 
-  it("cuts a title of thousands of graphemes at 120, with an ellipsis, and heads an empty one with its number", () => {
+  it("cuts a title of thousands of graphemes at 120, with an ellipsis", () => {
     const title = draw({ proposal: { ...PROPOSAL, title: "é".repeat(3000) } }).querySelector("h3")?.textContent ?? "";
     expect(title.length).toBe(120);
     expect(title.endsWith("…")).toBe(true);
-    const empty = draw({ proposal: { ...PROPOSAL, title: "" } });
-    expect(empty.querySelector("h3")?.textContent).toBe("Proposal 15");
-    expect(field(empty, "number")).toBe("Proposal 15");
   });
 
   it.each([

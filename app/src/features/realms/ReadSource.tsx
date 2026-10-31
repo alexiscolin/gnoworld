@@ -1,7 +1,6 @@
 // Where a read came from and when (5k): the source's host and its time, on every fact and every failure, so the page never shows
 // a number without its source and age. A failed read is a state with its next step (our sentence, never the answer's words).
-import type { Failure, Source } from "../../lib/chain/read.ts";
-import { hostOf } from "./useExternalLinks.tsx";
+import { hostOf, type Failure, type Source } from "../../lib/chain/read.ts";
 import styles from "./RealmView.module.css";
 
 /** The age of a read as it is shown: the minute it was asked, in UTC, as the time element's text. */

@@ -11,7 +11,7 @@ import {
   type ChainRead,
   type FailureKind,
   type ReadOptions,
-  type Source,
+  sourceOf,
 } from "./read.ts";
 
 type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
@@ -37,10 +37,6 @@ function kindOf(type: string): FailureKind {
 }
 
 const withoutSlash = (rpc: string): string => (rpc.endsWith("/") ? rpc.slice(0, -1) : rpc);
-
-function sourceOf(url: string, options: ReadOptions): Source {
-  return { url, at: (options.now ?? (() => new Date()))().toISOString() };
-}
 
 // What an answer's body gives: its text, or the kind of failure it is.
 function bodyText(answer: QueryAnswer): { text: string } | { kind: FailureKind } {

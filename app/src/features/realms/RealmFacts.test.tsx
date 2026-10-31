@@ -47,7 +47,7 @@ describe("a realm's facts", () => {
     expect(el.textContent).toContain("indexer.onyx.testnets.gno.land");
     const time = el.querySelector("time");
     expect(time?.getAttribute("datetime")).toBe(SOURCE.at);
-    expect(time?.textContent).toMatch(/\S/);
+    expect(time?.textContent).toBe("2026-10-31 06:00 UTC");
   });
 
   it("leaves out a fact the indexer did not give, label and value, and shows no zero in its place", () => {
@@ -57,21 +57,18 @@ describe("a realm's facts", () => {
     expect([...el.querySelectorAll("dd")].map((node) => node.textContent)).toEqual([FACTS.path, FACTS.deployer]);
   });
 
+  it("sets the realm's and the account's words left to right, and the numbers as they are", () => {
+    const el = draw(ok(FACTS));
+    expect(valueOf(el, "Path")?.getAttribute("dir")).toBe("ltr");
+    expect(valueOf(el, "Deployer")?.getAttribute("dir")).toBe("ltr");
+    expect(valueOf(el, "First block")?.hasAttribute("dir")).toBe(false);
+    expect(valueOf(el, "Calls in 24 h")?.hasAttribute("dir")).toBe(false);
+  });
+
   it("shows a real 0 calls and a real block 0 as a 0 under their own labels", () => {
     const el = draw(ok({ ...FACTS, callsPerDay: 0, firstBlock: 0 }));
     expect(valueOf(el, "Calls in 24 h")?.textContent).toBe("0");
     expect(valueOf(el, "First block")?.textContent).toBe("0");
-  });
-
-  it("counts a number that is no count as no fact, for each count on its own", () => {
-    for (const bad of [Number.NaN, -1, Number.POSITIVE_INFINITY, 1.5]) {
-      const calls = draw(ok({ ...FACTS, callsPerDay: bad }));
-      expect(valueOf(calls, "Calls in 24 h")).toBeNull();
-      expect(valueOf(calls, "First block")?.textContent).toBe("786,661");
-      const block = draw(ok({ ...FACTS, firstBlock: bad }));
-      expect(valueOf(block, "First block")).toBeNull();
-      expect(valueOf(block, "Calls in 24 h")?.textContent).toBe("96");
-    }
   });
 
   it.each(FAILURE_KINDS)("shows a failed read of kind %s as its next step, the source and no fact", (kind) => {

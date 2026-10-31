@@ -5,7 +5,7 @@
 import { Button, Center, Cluster, Kicker, Skeleton, Stack } from "@gnoworld/ui";
 import { useLocation, useNavigate } from "react-router";
 import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
-import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
+import { hostOf, type Failure, type ReadOptions } from "../../lib/chain/read.ts";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
@@ -29,7 +29,7 @@ function Read({ height, rpc }: { height: Height | Failure; rpc: string }) {
   return (
     <p className={styles["meta"]}>
       Read at block {new Intl.NumberFormat("en-US").format(height.height)}, {height.time}, from{" "}
-      <span dir="ltr">{new URL(rpc).host}</span>
+      <span dir="ltr">{hostOf(rpc)}</span>
     </p>
   );
 }

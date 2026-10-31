@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
+import { REALM_FACTS_CAPS } from "@gnoworld/schemas";
 import { readRealmFacts } from "./indexer.ts";
 
 // 5k, the indexer reader's FAULT tests: a fake fetch and a synthetic body, as rpc.test.ts does, so none needs a recording.
@@ -93,6 +94,29 @@ describe("readRealmFacts", () => {
     const result = await readRealmFacts(INDEXER, REALM, options(answering(body)));
     expect(failureOf(result).kind).toBe("wrong-shape");
     expect(JSON.stringify(result)).not.toContain("HOSTILE");
+  });
+
+  // Each cap at its bound: the last length is read, the next is refused (the answer's two texts, and the path asked).
+  it("takes a path and a deployer of exactly their caps, and refuses one character more", async () => {
+    const at = (path: string, deployer: string) =>
+      readRealmFacts(INDEXER, REALM, options(answering(withFacts({ path, deployer }))));
+    expect((await at("p".repeat(REALM_FACTS_CAPS.path), "d")).ok).toBe(true);
+    expect((await at("p".repeat(REALM_FACTS_CAPS.path + 1), "d")).ok).toBe(false);
+    expect((await at("p", "d".repeat(REALM_FACTS_CAPS.deployer))).ok).toBe(true);
+    expect((await at("p", "d".repeat(REALM_FACTS_CAPS.deployer + 1))).ok).toBe(false);
+  });
+
+  it("asks a realm path of exactly the cap and refuses one character more as a bad name, asking nothing", async () => {
+    const path = (length: number) => `gno.land/r/${"a".repeat(length - "gno.land/r/".length)}`;
+    const fetcher = answering(withFacts(null));
+    expect(failureOf(await readRealmFacts(INDEXER, path(REALM_FACTS_CAPS.path), options(fetcher))).kind).toBe(
+      "no-realm",
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(failureOf(await readRealmFacts(INDEXER, path(REALM_FACTS_CAPS.path + 1), options(fetcher))).kind).toBe(
+      "bad-name",
+    );
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("says down for a 500, with its status and none of its body", async () => {

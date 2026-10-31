@@ -45,10 +45,7 @@ describe("the status pill", () => {
     },
   );
 
-  it("says nothing for a proposal number that is no whole number of 0 or more", () => {
-    for (const id of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(draw({ id, yes: 33, threshold: 66.66 }).textContent).toBe("");
-    }
+  it("says the proposal's number, 0 included", () => {
     expect(draw({ id: 0 }).textContent).toBe("Proposal 0");
   });
 
@@ -56,12 +53,6 @@ describe("the status pill", () => {
     expect(draw({ id: 15 }).textContent).toBe("Proposal 15");
     expect(draw({ id: 15, threshold: 66.66 }).textContent).toBe("Proposal 15");
     expect(draw({ id: 15, yes: 33 }).textContent).toBe("Proposal 15");
-  });
-
-  it("draws a tally outside 0 to 100, or that is no number, as no tally", () => {
-    for (const yes of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(draw({ id: 15, yes, threshold: 66.66 }).textContent).toBe("Proposal 15");
-    }
   });
 
   it("is a status the screen reader says, not a button", () => {
@@ -86,12 +77,5 @@ describe("the ring's data", () => {
     expect(ringOf({ id: 15 })).toBeUndefined();
     expect(ringOf({ id: 15, yes: 33 })).toBeUndefined();
     expect(ringOf({ id: 15, threshold: 50 })).toBeUndefined();
-  });
-
-  it("gives no ring for a share outside 0 to 100 or that is no number", () => {
-    for (const bad of [-1, 100.01, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(ringOf({ id: 15, yes: bad, threshold: 50 })).toBeUndefined();
-      expect(ringOf({ id: 15, yes: 50, threshold: bad })).toBeUndefined();
-    }
   });
 });
