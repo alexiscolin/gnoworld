@@ -673,6 +673,20 @@ const heightLogged = (lines: string[]): string[] =>
     .map((line) => line.error ?? "");
 
 describe("the prices timer: the block height", () => {
+  // A valid RFC 3339 time may carry any number of fractional digits: 20,000 of them make markets.json past the browser's 16 KB, and
+  // every visitor would lose the prices and the height with no log. The block is dropped, the prices kept, and the page reads the file.
+  it("drops a block whose time is 20,000 digits long and keeps the prices, in a file the page's read still takes", async () => {
+    const long = `2026-10-31T11:59:10.${"1".repeat(20_000)}Z`;
+    const { file, lines } = withRpc({ height: json(status(786661, long)) });
+    await wrote(file);
+    expect(heightLogged(lines)).toEqual(["shape"]);
+    // The page's read refuses a file past 16 KB (app/src/lib/api/markets.ts, MARKETS_MAX_BYTES: the server may not import the app).
+    expect(Buffer.byteLength(written(file))).toBeLessThan(16 * 1024);
+    const markets = Markets.parse(JSON.parse(written(file)));
+    expect(markets.tokens).toEqual(TOKENS);
+    expect(markets.block).toBeUndefined();
+  });
+
   it("asks the RPC's /status once beside the prices, by GET, with a time limit, and nothing else of it", async () => {
     const { calls, file } = withRpc({});
     await wrote(file);

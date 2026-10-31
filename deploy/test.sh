@@ -1329,6 +1329,9 @@ print(u.urlparse(next(row["rpc"] for row in rows if row.get("default"))).hostnam
 	other_rpc=$(python3 -I -c 'import json, sys, urllib.parse as u
 rows = json.load(open(sys.argv[1]))
 print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	gnoweb_host=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
 	expect "the way out lets three hosts out: CoinGecko's API, OpenAI's and the default universe's RPC" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
 		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" | sort | tr '\n' ' ')"
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
@@ -1336,7 +1339,7 @@ print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hos
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
-	for target in "https://$other_rpc/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
+	for target in "https://$other_rpc/" "https://$rpc_host.evil.test/" "https://$gnoweb_host/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
 	done
@@ -1354,6 +1357,15 @@ print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hos
 	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
 	# The server read the data it names (UNIVERSES_FILE) at boot, or it would not be up: its default RPC is the list's third host.
 	expect "the server's data holds the default universe's RPC" "$(docker exec "$server" /nodejs/bin/node -e "const rows = JSON.parse(require('fs').readFileSync(process.env.UNIVERSES_FILE, 'utf8')); console.log(new URL(rows.find((row) => row.default).rpc).hostname)" 2>&1 || true)" "$rpc_host"
+	# The running timer itself writes the block (not a planted file): its first tick asks CoinGecko and the default RPC through the way
+	# out. A 429 from CoinGecko writes no file at all (the prices fail first), so this waits a minute and says what it saw.
+	timer_block=none
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+		timer_block=$(docker exec "$server" /nodejs/bin/node -e "try { const m = JSON.parse(require('fs').readFileSync('/markets/markets.json', 'utf8')); console.log(Number.isSafeInteger(m.block?.height) && m.block.host === process.argv[1] ? 'block' : 'none') } catch { console.log('none') }" "$rpc_host" 2>/dev/null || true)
+		[ "$timer_block" = block ] && break
+		sleep 5
+	done
+	expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused

@@ -21,7 +21,8 @@ export type MarketToken = z.infer<typeof MarketToken>;
 export const MarketBlock = z.strictObject({
   // Not z.int(): its class would sit in the store's chunk, which the first screen loads (F2976; indexer.ts).
   height: z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(1e12)),
-  time: z.iso.datetime({ offset: true }),
+  // At most 40 characters: RFC 3339 allows any run of fractional digits, and 20 KB of them would put the file past the browser's 16 KB.
+  time: z.iso.datetime({ offset: true }).check(z.maxLength(40)),
   host: z.string().check(z.maxLength(253), z.regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/)),
 });
 export type MarketBlock = z.infer<typeof MarketBlock>;

@@ -48,6 +48,7 @@ describe("Markets", () => {
     it.each([
       ["height 1", withBlock({ height: 1 })],
       ["a height of a trillion", withBlock({ height: 1e12 })],
+      ["a time of exactly 40 characters", withBlock({ time: `2026-10-31T11:59:10.${"1".repeat(19)}Z` })],
       ["a host with a port's dots and hyphens", withBlock({ host: "rpc-2.example.org" })],
     ])("accepts %s, the bound itself", (_, value) => {
       expect(Markets.safeParse(value).success).toBe(true);
@@ -71,6 +72,11 @@ describe("Markets", () => {
       ["a host in capitals", withBlock({ host: "RPC.example.org" })],
       ["an empty host", withBlock({ host: "" })],
       ["a host past 253 characters", withBlock({ host: "a".repeat(254) })],
+      ["a time of 41 characters", withBlock({ time: `2026-10-31T11:59:10.${"1".repeat(19)}1Z` })],
+      [
+        "a time of 20,000 fractional digits, which makes the file past the browser's 16 KB",
+        withBlock({ time: `2026-10-31T11:59:10.${"1".repeat(20_000)}Z` }),
+      ],
       ["a field nobody asked for", withBlock({ url: "https://evil.test/" })],
       ["a null block", { ...GOOD, block: null }],
     ])("refuses %s", (_, value) => {

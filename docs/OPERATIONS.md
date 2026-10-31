@@ -33,7 +33,7 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and
 - `web` holds a fixed address on `inside` (`WEB_ADDRESS`, in `INSIDE_SUBNET`), the only one Ergo
   (`proxy-allowed-from`) and `server` (`TRUSTED_PROXY`) believe about a visitor's address; it sends
   the PROXY protocol's address on, overwriting the client's, and never the demo's password.
-- `egress` (smokescreen) lets the server reach `api.openai.com` and the default universe's RPC host (`deploy/egress/acl.yaml`, one
+- `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and the default universe's RPC host (`deploy/egress/acl.yaml`, one
   file the test reads too; the RPC's host is `app/data/universes.json`'s default, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`.

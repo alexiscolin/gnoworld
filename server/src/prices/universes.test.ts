@@ -116,6 +116,12 @@ describe("deploy/test.sh", () => {
     expect(script).toMatch(/"https:\/\/\$other_rpc\/"/);
   });
 
+  it("refuses a look-alike of the default RPC's host and its sibling gnoweb host, as CoinGecko's have, and sees the timer write a block", () => {
+    expect(script).toMatch(/"https:\/\/\$rpc_host\.evil\.test\/"/);
+    expect(script).toMatch(/"https:\/\/\$gnoweb_host\/"/);
+    expect(script).toMatch(/the running timer writes the block height itself/);
+  });
+
   it("holds the faults of this host in `--mutants`: its line gone, another RPC let out, its whole domain let out", () => {
     expect(script).toMatch(
       /mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC"/,
