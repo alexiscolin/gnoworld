@@ -51,7 +51,12 @@ describe("a world's page", () => {
   // must come with its capture, and with this test changed in its own commit.
   test("a world with no capture shows no preview: no picture on its page, no og:image in its tags", async () => {
     const html = await render(route(), "/w/bubble");
-    expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed|svg)\b|data-preview/i);
+    expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed)\b|data-preview/i);
+    // The one icon of the main action (frame 26) is a decorative glyph of the design system: no other drawing.
+    const drawings = html.match(/<svg\b[^>]*>/gi) ?? [];
+    expect(drawings.length).toBeGreaterThan(0);
+    for (const drawing of drawings)
+      expect(drawing).toMatch(/aria-hidden="true"[^>]*data-icon=|data-icon=[^>]*aria-hidden="true"/);
     const tags = JSON.stringify(meta(metaArgs(bubbleOf())));
     expect(tags).not.toMatch(/og:image|twitter:image|"image"/i);
   });
@@ -146,12 +151,20 @@ describe("a world's page, by the case of its path (F376)", () => {
   });
 });
 
-describe("a world's page, its breadcrumb", () => {
-  test("is a navigation to the home and the Earth, ending on the world as the current page", async () => {
+// Slice 5j (frames 26 and 92): the kicker above the title says where the world is; it replaces the breadcrumb (one way to
+// say where you are). The data holds no kind of place (a schema in use, parked), so a world shows its universe alone.
+describe("a world's page, its kicker", () => {
+  test("names the universe alone, in the one label style, as the plate's first line", async () => {
     const html = await render(route(), "/w/bubble");
-    expect(html).toMatch(/<nav [^>]*aria-label="[^"]+"[^>]*>/);
-    expect(html).toMatch(/<a [^>]*href="\/earth"[^>]*>Earth<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Bubble</);
+    const plate = html.slice(html.indexOf('data-look="plate"'));
+    expect(plate).toMatch(/<p class="label[^"]*"[^>]*>(?:<span[^>]*><\/span>)?Onyx<\/p>/);
+    expect(plate.indexOf("Onyx")).toBeLessThan(plate.indexOf("<h1"));
+  });
+
+  test("replaces the breadcrumb: no trail, no link to the Earth", async () => {
+    const html = await render(route(), "/w/bubble");
+    expect(html).not.toMatch(/aria-label="You are here"/);
+    expect(html).not.toMatch(/<a [^>]*href="\/earth"[^>]*>Earth<\/a>/);
   });
 });
 
@@ -162,16 +175,16 @@ describe("a world's plate", () => {
     return { html, tag: /<section [^>]*data-look="plate"[^>]*>/.exec(html)?.[0] ?? "" };
   };
 
-  test("is a plate named for the world, holding the one heading, the description and the breadcrumb", async () => {
+  test("is a plate named for the world, holding the one heading, the description and the kicker", async () => {
     const { html, tag } = await plateOf();
     expect(tag).toContain('aria-label="Bubble"');
     const inside = html.slice(html.indexOf(tag));
     expect(inside.indexOf("<h1")).toBeGreaterThan(0);
     expect(inside.indexOf("the BUBBLE token, its governance")).toBeGreaterThan(inside.indexOf("<h1"));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    // The trail is part of the plate: it opens before the plate closes.
+    // The kicker is part of the plate: it opens before the plate closes.
     const plate = inside.slice(0, inside.indexOf("</section>"));
-    expect(plate).toMatch(/<nav [^>]*aria-label="You are here"/);
+    expect(plate).toMatch(/class="label[^"]*"[^>]*>(?:<span[^>]*><\/span>)?Onyx</);
   });
 
   test("says its kind in its vertical caption, to the eye only", async () => {
@@ -185,13 +198,37 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/here now|messages now|<canvas\b|data-value=|data-hour=/i);
   });
 
-  test("offers no Follow and no Share while neither works", async () => {
+  // Share needs the browser's clipboard, unknown to the build: the page it writes has no Share, and never a Follow (no
+  // account's store to follow into). The connected worlds and the chart's words follow what the data holds: no link, no block.
+  test("offers no Follow, and no Share in the page the build writes", async () => {
     const { html } = await plateOf();
     expect(html).not.toMatch(/>Follow<|>Share</);
   });
 
-  test("keeps the chat's slot in the page, after the plate opens", async () => {
+  test("has no connected worlds block: Bubble links to no world", async () => {
     const { html } = await plateOf();
-    expect(html).toMatch(/<section [^>]*data-look="plate"[\s\S]*Loading the chat/);
+    expect(html).not.toMatch(/connected worlds/i);
+  });
+
+  test("says in words that no activity is known, with no chart, until the chat has history", async () => {
+    const { html } = await plateOf();
+    expect(html).toMatch(/no activity (recorded|known) yet/i);
+  });
+
+  // The main action is the link to the world's chat, named for what it does: it fails while the plate's only link is a trail.
+  test("has a main action: a link in the plate to the chat on the page, which the page holds", async () => {
+    const { tag, html } = await plateOf();
+    const plate = html.slice(html.indexOf(tag), html.indexOf("</section>", html.indexOf(tag)));
+    const links = [...plate.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
+    expect(links.map(([, href]) => href)).toEqual(["#chat"]);
+    expect(links[0]?.[2]).toMatch(/Say hi in the chat/);
+    expect(html).toMatch(/<div id="chat">/);
+  });
+
+  // Slice 5j (DESIGN-SYSTEM.md, Breakpoints): the chat's slot comes before the plate in the page, so a phone shows it first and a
+  // screen reader reads it first; the computer's layout places the plate first by CSS (worldPage.spec.ts).
+  test("keeps the chat's slot in the page, before the plate opens", async () => {
+    const { html } = await plateOf();
+    expect(html).toMatch(/<div id="chat">[\s\S]*Loading the chat[\s\S]*<section [^>]*data-look="plate"/);
   });
 });

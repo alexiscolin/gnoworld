@@ -113,7 +113,7 @@ describe("Panel", () => {
 
   // F3259: the page's layout round a plate: the plate in its place, one outline no reader meets, and what stands beside it.
   describe("Panel.Layout", () => {
-    it("holds the plate in its place, then what stands beside it, after an outline no reader meets", () => {
+    it("holds what stands beside the plate first, then the plate in its place, after an outline no reader meets", () => {
       const { container } = render(
         <Panel.Layout
           plate={
@@ -130,8 +130,8 @@ describe("Panel", () => {
       expect(parts).toHaveLength(3);
       expect(parts[0]?.getAttribute("aria-hidden")).toBe("true");
       expect(parts[0]?.childElementCount).toBe(0);
-      expect(parts[1]?.querySelector("section")?.getAttribute("aria-label")).toBe("Bubble");
-      expect(parts[2]?.textContent).toBe("beside");
+      expect(parts[1]?.textContent).toBe("beside");
+      expect(parts[2]?.querySelector("section")?.getAttribute("aria-label")).toBe("Bubble");
     });
 
     it("is the plate and its outline alone when nothing stands beside it", () => {

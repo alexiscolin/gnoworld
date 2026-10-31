@@ -45,11 +45,11 @@ test.describe("the pages added in 5d", () => {
     await expect(page.getByText(/no world yet/i)).toBeVisible();
   });
 
-  test("a world's page has a breadcrumb ending on the world, current", async ({ page }) => {
+  // Slice 5j: the kicker over the title says where the world is, in place of the trail (frame 26): one way to say it.
+  test("a world's page names its universe in a kicker over its title, with no trail", async ({ page }) => {
     await page.goto("/w/bubble");
-    const trail = page.getByRole("navigation", { name: /breadcrumb|you are here/i });
-    await expect(trail.getByRole("link", { name: "Earth" })).toHaveAttribute("href", "/earth");
-    await expect(trail.locator('[aria-current="page"]')).toHaveText("Bubble");
+    await expect(page.locator("[data-look='plate'] p.label:not([data-orientation])").first()).toHaveText("Onyx");
+    await expect(page.getByRole("navigation", { name: /breadcrumb|you are here/i })).toHaveCount(0);
   });
 
   test("a link from the Earth to a world changes the page without a reload", async ({ page }) => {

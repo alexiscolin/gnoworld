@@ -66,14 +66,15 @@ interface LayoutProps {
   children?: ReactNode;
 }
 
-/** A world's page: the plate and what stands beside it. On a wide screen the plate is fixed at the left, inside one outline
+/** A world's page: the plate and what stands beside it. What stands beside it comes first in the page, so a phone shows it first and a
+ * screen reader reads it first (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first); from 900 px the plate is drawn before it. On a wide screen the plate is fixed at the left, inside one outline
  * the scene and the dock will share; under that width it is a block in the page. The width is this sheet's alone. */
 function Layout({ plate, children }: LayoutProps) {
   return (
     <div className={styles["layout"]}>
       <div className={styles["frame"]} aria-hidden="true" />
-      <div className={styles["place"]}>{plate}</div>
       {children}
+      <div className={styles["place"]}>{plate}</div>
     </div>
   );
 }
