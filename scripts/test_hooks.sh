@@ -3533,11 +3533,20 @@ mkdir -p "$lockdir"
 : >"$lockdir/pid"
 out=$(gate --merge) || fail "check.sh --merge failed beside a lock folder with no pid: $out"
 [ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
+# rawrun execs check.sh in the job itself, so its pid is the job's.
+rawrun() { # $1: a launcher or nothing; $2: the run's tag; then check.sh's arguments (the log is not truncated: runs share it)
+	launch=$1 tag=$2
+	shift 2
+	cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" RUN_TAG="$tag" LOCKPEEK=1 SLOW_STEP="${SLOW:-}" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" $launch sh scripts/check.sh "$@"
+}
 # A holder another sandbox owns: a signal to it is refused (EPERM), which is a live process, not a dead one (F2616: each session runs its
 # merge check in a Bash call of its own, and `kill -0` failing for either reason read the holder as dead). pid 1 is alive for every user
 # and refuses the signal to any but root; the waiter must wait, say so, and leave the lock alone.
 hold 1 "/other/sandbox"
-gate --merge >"$t/eperm.out" 2>&1 &
+# The waiter is the check.sh process itself (rawrun execs it): `gate` runs it in a subshell, whose pid a kill reaches alone, and the waiter
+# lived on, took the lock the section removed next and held it through the sections after, a merge check waiting for a holder that was
+# never killed (F2639: "waited for a holder killed by KILL", twice under load).
+rawrun "" E --merge >"$t/eperm.out" 2>&1 &
 eperm=$!
 tries=0
 until grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null; do
@@ -3548,7 +3557,9 @@ until grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null; do
 done
 grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null && kill -0 "$eperm" 2>/dev/null || fail "check.sh --merge took the lock of a live holder it was not allowed to signal (F2616): $(cat "$t/eperm.out")"
 kill "$eperm" 2>/dev/null
-wait "$eperm" 2>/dev/null || :
+wait "$eperm" 2>/dev/null && st=0 || st=$?
+# check.sh answers TERM with its trap, exit 1; a subshell around it dies of the signal (143) and leaves check.sh waiting on.
+[ "$st" = 1 ] || fail "the waiter that was killed ended with status $st, not check.sh's own 1: its pid is a wrapper's, and a kill leaves the waiter alive (F2639)"
 [ "$(cat "$lockdir/pid" 2>/dev/null)" = 1 ] || fail "check.sh --merge dropped the lock of a holder it could not signal (F2616)"
 rm -rf "${lockdir:?}"
 # A live holder: the fast gate and --full go on, untouched; the lock stays the holder's.
@@ -3563,11 +3574,6 @@ printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --full waited for th
 # holder's, and no step ran. A Ctrl+C reaches a background job of a script with its signal ignored, so the INT case starts through a
 # launcher that restores it. rawrun execs check.sh in the job itself, so its pid is the job's.
 printf 'import os, signal, sys\nsignal.signal(signal.SIGINT, signal.SIG_DFL)\nos.execvp(sys.argv[1], sys.argv[1:])\n' >"$t/unign.py"
-rawrun() { # $1: a launcher or nothing; $2: the run's tag; then check.sh's arguments (the log is not truncated: runs share it)
-	launch=$1 tag=$2
-	shift 2
-	cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" RUN_TAG="$tag" LOCKPEEK=1 SLOW_STEP="${SLOW:-}" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" $launch sh scripts/check.sh "$@"
-}
 for sig in TERM HUP INT; do
 	launch=
 	[ "$sig" != INT ] || launch="python3 -I $t/unign.py"
