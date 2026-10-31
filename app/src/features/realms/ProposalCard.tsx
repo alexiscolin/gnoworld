@@ -3,7 +3,8 @@
 // are text; the link is drawn only when it is one of gnoweb's own addresses. No vote button.
 import { cutGraphemes } from "@gnoworld/core";
 import { Card } from "@gnoworld/ui";
-import { tallyOf, type Proposal } from "../../lib/chain/proposal.ts";
+import type { Proposal } from "../../lib/chain/proposal.ts";
+import { tallyOf } from "../../lib/chain/tally.ts";
 import type { ChainRead, Source } from "../../lib/chain/read.ts";
 import { ReadFailed, ReadSource } from "./ReadSource.tsx";
 

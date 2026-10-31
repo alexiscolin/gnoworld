@@ -1,7 +1,7 @@
 // A realm's facts from the public indexer (5k), read once when a realm's view first draws and again only if the realm or the indexer
 // change: one request, no timer, nothing polls. A read that fails is a state of its own, never a blank, and does not touch the
 // page's read (RealmView): each is read on its own.
-import type { RealmFactsValue } from "@gnoworld/schemas";
+import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
 import { readRealmFacts } from "../../lib/chain/indexer.ts";
 import type { ChainRead, ReadOptions } from "../../lib/chain/read.ts";

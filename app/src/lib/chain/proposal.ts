@@ -4,7 +4,7 @@
 // fields come only from whole lines of that block, from none when two claim it. Limit: a page with no realm Stats block still
 // reads a proposer's. Every pattern is linear, the page is read to a bound, nothing throws, the Zod schema has the last word.
 import { cutGraphemes } from "@gnoworld/core";
-import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas";
+import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 import { readPage } from "./rpc.ts";
 
@@ -100,14 +100,6 @@ export function proposalsOf(text: string): Proposal[] {
     if (proposal !== undefined) listed.push(proposal);
   });
   return listed;
-}
-
-/** The words of a proposal's tally, `YES 33% of 66.66%`: the yes to a whole percent, the threshold to two decimals with no
- * trailing zero; none unless the page gave both. The pill and the card say the same words from here. */
-export function tallyOf(proposal: Pick<Proposal, "yes" | "threshold">): string | undefined {
-  const { yes, threshold } = proposal;
-  if (yes === undefined || threshold === undefined) return undefined;
-  return `YES ${String(Math.round(yes))}% of ${String(Number(threshold.toFixed(2)))}%`;
 }
 
 /** One proposal of a realm, read from its page of that number: one request, or a typed failure. */

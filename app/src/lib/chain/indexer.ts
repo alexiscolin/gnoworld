@@ -2,7 +2,7 @@
 // GET of an https address with the limits of read.ts, a source and a time on every result, no polling. THE WIRE IS A GUESS (F2950):
 // gnomcp shows no raw GraphQL, gnoland-1's indexer timed out, and both indexers have no time field (recorded/indexer-errors.txt).
 // So every fact from it must carry its age as a block height, and no chart by date may stand on it (the calls in 24 h wait on an indexer with dates: F2974).
-import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas";
+import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { isRealmPath } from "./evalCall.ts";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 

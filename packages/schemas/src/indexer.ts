@@ -8,7 +8,8 @@ import { z } from "./zod.ts";
 /** The most characters of the two texts a realm's facts hold; a realm path and a bech32 address are far shorter. */
 export const REALM_FACTS_CAPS = { path: 256, deployer: 128 } as const;
 
-const count = z.int().check(z.nonnegative(), z.maximum(Number.MAX_SAFE_INTEGER));
+// Not z.int(): its class would sit in the store's chunk, which the first screen loads, for a schema only a realm's page uses (F2976).
+const count = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative());
 
 /** The facts of one realm; a fact the indexer did not give is absent, never a zero. */
 const RealmFacts = z.object({

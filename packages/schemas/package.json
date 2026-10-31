@@ -7,7 +7,9 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./functions": "./src/functions.ts"
+    "./functions": "./src/functions.ts",
+    "./indexer": "./src/indexer.ts",
+    "./proposal": "./src/proposal.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

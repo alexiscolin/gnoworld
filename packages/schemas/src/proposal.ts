@@ -9,7 +9,8 @@ export const PROPOSAL_CAPS = { title: 200, state: 40 } as const;
 const share = z.number().check(z.gte(0), z.lte(100));
 
 export const Proposal = z.object({
-  id: z.int().check(z.nonnegative(), z.maximum(Number.MAX_SAFE_INTEGER)),
+  // Not z.int(): see indexer.ts (F2976).
+  id: z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative()),
   title: z.string().check(z.minLength(1), z.maxLength(PROPOSAL_CAPS.title)),
   /** The realm's word for the state; empty when the page named none or named two. */
   state: z.string().check(z.maxLength(PROPOSAL_CAPS.state)),

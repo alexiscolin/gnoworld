@@ -1,7 +1,7 @@
 // A realm's facts from the public indexer (5k, ADR-0002 §4): its path, its deployer, its first block, each
 // one drawn only when the indexer gave it (never a zero in its place), with the source and the time of the read. Everything the
 // indexer returns is text, in left-to-right, in an element of its own.
-import type { RealmFactsValue } from "@gnoworld/schemas";
+import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
 import type { ChainRead } from "../../lib/chain/read.ts";
 import { ReadFailed, ReadSource } from "./ReadSource.tsx";
 

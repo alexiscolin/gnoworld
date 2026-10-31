@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import type { ChainFetch, ChainRead, ReadOptions } from "./read.ts";
-import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas";
+import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
 import { proposalOf, proposalsOf, readProposal } from "./proposal.ts";
 
 // 5k2, a GovDAO page to a Proposal, against pages RECORDED through gnomcp (F2951): app/tests/chain/recorded/, each file's first

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
-import { REALM_FACTS_CAPS, RealmFactsAnswer } from "@gnoworld/schemas";
+import { REALM_FACTS_CAPS, RealmFactsAnswer } from "@gnoworld/schemas/indexer";
 import { readRealmFacts } from "./indexer.ts";
 
 // 5k, the indexer reader's FAULT tests: a fake fetch and a synthetic body, as rpc.test.ts does, so none needs a recording.
