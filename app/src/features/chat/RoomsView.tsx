@@ -4,11 +4,11 @@
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
-import { Avatar, Button, Cluster, NavItem, Row, Stack, type NavItemProps } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, NavItem, Row, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
 import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
-import { countWords } from "./unread.ts";
+import { badged } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
@@ -51,13 +51,6 @@ export interface DmsProps {
   /** Whether the device failed to keep that choice and those written to (CR5). */
   notKept?: boolean | undefined;
 }
-
-// What an item says it holds unseen: its count, 99+ past 99, after the link so the link is named by the room alone; read as
-// "N unread". A direct message's is a dot.
-const badged = (count: number | undefined, dot = false): NavItemProps["badge"] =>
-  count === undefined || count < 1
-    ? undefined
-    : { said: `${countWords(count)} unread`, ...(dot ? {} : { count: countWords(count) }) };
 
 const WORDS = {
   mention: "mentioned you",

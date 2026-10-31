@@ -2,6 +2,8 @@ import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
+import { MEMBER } from "./scripted.ts";
+import { threadOf } from "./thread.ts";
 
 // 5q, pixel perfect to the video: the chat at its frames' size (1728 by 1080, scale 1), each region's box measured against
 // the frame (`.claude/tmp/slice-5/video-frames`, f0060) and the prototype's CSS (docs/prototype/source/index.html:133-700).
@@ -200,6 +202,83 @@ test.describe("the chat at the video's size", () => {
     if (tool === null) throw new Error("not drawn");
     near(tool.height, 24);
     near(tool.width, 24);
+  });
+
+  // 5q2, the differences 5q left (frames f0060, f0066, f0080 and the prototype's CSS): each held by what the frame shows.
+  test("draws the worlds' planets at 44 px, the format bar's two rules, the thread at 13.5 px", async ({ page }) => {
+    await logIn(page, "geometry-last");
+    await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
+    // The planet: 44 px, the first 23 px under the region's top (frame 66: 76 - 53). Onyx holds one world, so no step is measured.
+    const first = await page.locator('[data-region="worlds"] a > span').first().boundingBox();
+    if (first === null) throw new Error("no planet");
+    near(first.width, 44);
+    near(first.height, 44);
+    const worlds = await page.locator('[data-region="worlds"]').boundingBox();
+    if (worlds === null) throw new Error("no worlds");
+    near(first.y - worlds.y, 23, 2);
+    // The ring of the world in view stands 4 px off its planet, a line wide (frame 66: 54 px round a 44 px planet).
+    const ring = await page.locator('[data-region="worlds"] a[aria-current="page"]').evaluate((link) => {
+      const css = getComputedStyle(link);
+      return { width: css.outlineWidth, offset: css.outlineOffset, style: css.outlineStyle };
+    });
+    expect(ring).toEqual({ width: "1px", offset: "4px", style: "solid" });
+    // The format bar: three groups, two rules of 1 px by 12 px between them (prototype #fmtBar .sep).
+    const rules = page.getByRole("group", { name: "Format" }).getByRole("separator");
+    await expect(rules).toHaveCount(2);
+    for (const rule of await rules.all()) {
+      const box = await rule.boundingBox();
+      if (box === null) throw new Error("no rule");
+      near(box.width, 1, 0.5);
+      near(box.height, 12, 0.5);
+    }
+    // The thread: the title and the lines at the video's 13.5 px (prototype #threadPane .ttl2 b, #threadList li).
+    await threadOf(lines(page).first());
+    const panel = page.getByRole("complementary", { name: "Thread" });
+    await expect(panel).toBeVisible();
+    const sizes = await panel.evaluate((element) => ({
+      title: getComputedStyle(element.querySelector("h3") ?? element).fontSize,
+      text: getComputedStyle(element.querySelector("[data-line-text]") ?? element).fontSize,
+    }));
+    expect(sizes).toEqual({ title: "13.5px", text: "13.5px" });
+  });
+
+  test("names a direct message's header 'Direct message', the room's keeps its place", async ({ page }) => {
+    await logIn(page, "geometry-dm");
+    await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
+    const header = page.locator('[data-region="header"]');
+    await expect(header.getByText("Direct message", { exact: true })).toHaveCount(0);
+    await page.goto(`/w/bubble?dm=${MEMBER}&chat=full`);
+    await expect(header.getByText("Direct message", { exact: true })).toBeVisible();
+  });
+
+  test("draws the rooms as chips in the dock, a row under the header, none in the full chat", async ({ page }) => {
+    await logIn(page, "geometry-chips");
+    await open(page, { width: 1728, as: ACCOUNT, height: 1080, full: false });
+    const dock = await page.locator("[data-chat-layout]").boundingBox();
+    if (dock === null) throw new Error("no dock");
+    const chips = page.getByRole("navigation", { name: "Room shortcuts" });
+    await expect(chips).toBeVisible();
+    const chip = chips.getByRole("link", { name: "#games" });
+    await expect(chip).toHaveAttribute("aria-current", "true");
+    const [row, mine, header, line] = await Promise.all([
+      chips.boundingBox(),
+      chip.boundingBox(),
+      page.locator('[data-region="header"]').boundingBox(),
+      lines(page).first().boundingBox(),
+    ]);
+    if (row === null || mine === null || header === null || line === null) throw new Error("not drawn");
+    // Frame 26: a row of pills under the header's rule, 27 px high, 24 px in from the dock's edge, the lines under them.
+    expect(row.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
+    expect(row.y + row.height).toBeLessThanOrEqual(line.y);
+    near(mine.x - dock.x, 24, 2);
+    near(mine.height, 27, 2);
+    const look = await chip.evaluate((element) => {
+      const css = getComputedStyle(element);
+      return { size: css.fontSize, radius: css.borderTopLeftRadius };
+    });
+    expect(look).toEqual({ size: "12px", radius: "999px" });
+    await page.goto("/w/bubble?room=games&chat=full");
+    await expect(chips).toHaveCount(0);
   });
 
   test("looks as the video's frame does", async ({ page }) => {

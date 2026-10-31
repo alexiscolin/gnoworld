@@ -1,0 +1,37 @@
+/* The dock's rooms as a row of pills (frame 26: 27 px high, 12 px words, the one in view cream, a count in muted words). */
+@layer components {
+  .row {
+    /* layout: kept to its own height above the lines, at the lines' inset */
+    flex: none;
+    padding: var(--space-xs) var(--chat-inset) 0;
+  }
+
+  .chip {
+    /* layout: a pill the width of its words, a line 25 px high inside its 1 px edges: the video's 27 px */
+    display: inline-block;
+    /* raw: the video's pill is 27 px high, its edges 1 px each */
+    line-height: 25px;
+    padding-inline: var(--space-xs);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-pill);
+    font-family: var(--family-sans);
+    /* raw: the video's 12 px words */
+    font-size: 12px;
+    text-decoration: none;
+    color: var(--color-text);
+  }
+
+  .chip[aria-current="true"] {
+    border-color: transparent;
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .chip span[aria-hidden] {
+    /* layout: a step from the name */
+    margin-inline-start: var(--space-3xs);
+    color: var(--color-text-muted);
+    /* raw: the count a step under the name, as the video's rooms' */
+    font-size: 10px;
+  }
+}

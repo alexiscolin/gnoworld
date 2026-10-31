@@ -6,7 +6,7 @@ import { useRef, useState, type ReactElement, type ReactNode, type RefObject } f
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
-import { asksFull, FullProvider, withFull } from "./full.ts";
+import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
 import { PlaceInfo } from "./PlaceInfo.tsx";
 import { QuickActions } from "./QuickActions.tsx";
 import { useCompact } from "./useCompact.ts";
@@ -101,6 +101,11 @@ function usePeople({
   };
 }
 
+/** What the dock draws and the full chat does not (it has its column, a phone its drawer). */
+function Docked({ children }: { children: ReactNode }) {
+  return useFull() ? null : children;
+}
+
 /** What goes under a room's lines: the quick actions over what writes (the composer, or a visitor's word). */
 export function Dock({ onWhoIsHere, children }: { onWhoIsHere: () => void; children: ReactNode }) {
   return (
@@ -118,6 +123,10 @@ export interface ChatScreenProps {
   /** What the name opens, and the mark after it (ChatHeader's). */
   menu?: ChatHeaderProps["menu"];
   mark?: ChatHeaderProps["mark"];
+  /** The header's kicker when it is not the place's: a direct message's "Direct message". */
+  kicker?: string | undefined;
+  /** The rooms as chips under the header, drawn in the dock only: the full chat has its column, a phone its drawer. */
+  chips?: ReactNode;
   /** The rooms' column; on a phone it sits behind the header's control instead. */
   rail: ReactElement;
   /** What the account has not seen in the rooms, on that control. */
@@ -144,6 +153,8 @@ const threadAside = (threads: ChatScreenProps["threads"]) =>
 export function ChatScreen({
   place,
   title,
+  kicker,
+  chips,
   menu,
   mark,
   rail,
@@ -173,7 +184,7 @@ export function ChatScreen({
         <ChatLayout
           header={
             <ChatHeader
-              kicker={place.kicker}
+              kicker={kicker ?? place.kicker}
               title={title}
               menu={menu}
               mark={mark}
@@ -210,6 +221,7 @@ export function ChatScreen({
           }
           infoFirst={thread !== undefined}
         >
+          <Docked>{chips}</Docked>
           {children(here.ask)}
         </ChatLayout>
       </div>

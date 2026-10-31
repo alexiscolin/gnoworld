@@ -41,6 +41,15 @@
     block-size: 13px;
   }
 
+  /* A rule between the groups of tools: 1 px by 12 px, a step either side (prototype #fmtBar .sep). */
+  .rule {
+    /* raw: the video's rule, 1 px wide and 12 px high */
+    inline-size: 1px;
+    /* raw: the video's rule is 12 px high */
+    block-size: 12px;
+    background: var(--color-line);
+  }
+
   /* The field's wrapper and the field's own column dissolve, so its box and its words are the grid's. */
   .field,
   .field > div {

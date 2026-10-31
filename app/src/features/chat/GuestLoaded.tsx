@@ -12,6 +12,7 @@ import { roomActs } from "./roomActs.ts";
 import { visitorMenu } from "./RoomMenu.tsx";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown, type Shown } from "./roomShown.ts";
+import { RoomChips } from "./RoomChips.tsx";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import type { PeopleProps } from "./People.tsx";
 import { RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
@@ -119,6 +120,7 @@ export function GuestLoaded({
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
+      chips={<RoomChips sections={sections} current={room} />}
       menu={visitorMenu(shown?.note)}
       rail={rail}
       unread={0}
