@@ -21,6 +21,8 @@ const universe = {
   name: "Onyx",
   chainId: "onyx-1",
   rpc: "https://rpc.onyx.testnets.gno.land:443",
+  gnoweb: "https://onyx.testnets.gno.land",
+  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
   testnet: true,
 };
 const hub = { slug: "bubble", name: "Bubble", description: "d".repeat(60), universe: "onyx" };
@@ -294,7 +296,14 @@ describe("a news item's embed", () => {
 
 describe("Universes", () => {
   const one = { ...universe, default: true };
-  const second = { ...universe, id: "gnoland", chainId: "gnoland-1", testnet: false };
+  const second = {
+    ...universe,
+    id: "gnoland",
+    chainId: "gnoland-1",
+    gnoweb: "https://gno.land",
+    indexer: "https://indexer.gno.land/graphql/query",
+    testnet: false,
+  };
 
   it("takes one default universe, and refuses none, two, or two of one id", () => {
     expect(Universes.safeParse([one]).success).toBe(true);
@@ -327,12 +336,15 @@ describe("Universes", () => {
     expect(Universes.safeParse([{ ...universe, default: "true" }]).success).toBe(false);
   });
 
-  it.each(["id", "name", "chainId", "rpc", "testnet"])("refuses a universe with no %s", (field) => {
-    const rest = Object.fromEntries(Object.entries(one).filter(([key]) => key !== field));
-    expect(Universes.safeParse([rest]).success).toBe(false);
-  });
+  it.each(["id", "name", "chainId", "rpc", "gnoweb", "indexer", "testnet"])(
+    "refuses a universe with no %s",
+    (field) => {
+      const rest = Object.fromEntries(Object.entries(one).filter(([key]) => key !== field));
+      expect(Universes.safeParse([rest]).success).toBe(false);
+    },
+  );
 
-  it.each(["id", "name", "chainId", "rpc", "testnet", "default"])(
+  it.each(["id", "name", "chainId", "rpc", "gnoweb", "indexer", "testnet", "default"])(
     "refuses a universe whose %s is a number",
     (field) => {
       expect(Universes.safeParse([{ ...one, [field]: 7 }]).success).toBe(false);
@@ -341,6 +353,42 @@ describe("Universes", () => {
 
   it.each([["true"], ["false"], [1], [0], [null]])("refuses testnet as %j: a flag, never a word", (testnet) => {
     expect(Universes.safeParse([{ ...one, testnet }]).success).toBe(false);
+  });
+
+  // R-F3, F2952 (Alexis, 2026-10-31): a chain's gnoweb and indexer are data, https only, each its own kind of address.
+  describe("gnoweb and indexer", () => {
+    const fits = (field: string, value: string) => Universes.safeParse([{ ...one, [field]: value }]).success;
+
+    it("takes https addresses: gnoweb's origin, the indexer's GraphQL endpoint", () => {
+      expect(fits("gnoweb", "https://gno.land")).toBe(true);
+      expect(fits("gnoweb", "https://gno.example:8443")).toBe(true);
+      expect(fits("indexer", "https://indexer.gno.land/graphql/query")).toBe(true);
+    });
+
+    it.each(["gnoweb", "indexer"])("refuses an %s that is not https, has a user, or holds a space", (field) => {
+      for (const value of [
+        "http://gno.land",
+        "ws://gno.land",
+        "//gno.land",
+        "gno.land",
+        "javascript:alert(1)",
+        "https://u@gno.land",
+        "https://gno.land and more",
+        "",
+      ])
+        expect(fits(field, value), value).toBe(false);
+    });
+
+    // gnoweb is an origin: a realm's path is put under it (gnowebLink), so a path, query or fragment would lead off it.
+    it.each([
+      "https://gno.land/",
+      "https://gno.land/r",
+      "https://gno.land?x=1",
+      "https://gno.land#a",
+      "https://GNO.land",
+    ])("refuses a gnoweb that is not a bare lower-case origin: %s", (value) => {
+      expect(fits("gnoweb", value)).toBe(false);
+    });
   });
 
   it("refuses a field it does not know", () => {

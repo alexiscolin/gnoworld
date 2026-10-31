@@ -4,8 +4,7 @@
 // the height it was read at, the cap's state or the failed read's state and its next step.
 import { Button, Center, Cluster, Kicker, Skeleton, Stack } from "@gnoworld/ui";
 import { useLocation, useNavigate } from "react-router";
-import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
-import { indexerOf } from "../../lib/chain/indexerOf.ts";
+import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { hostOf, type Failure, type ReadOptions } from "../../lib/chain/read.ts";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
@@ -19,7 +18,7 @@ export interface RealmViewProps {
   /** The realm, `gno.land/r/demo/dao`. */
   realm: string;
   /** The universe it is read from. */
-  chain: { name: string; chainId: string; rpc: string };
+  chain: { name: string; chainId: string; rpc: string; gnoweb: string; indexer: string };
   /** Where Back goes when the view was opened by its address, with nowhere in the site behind it. */
   home: string;
   /** lib/chain's options, for a test's fetch. */
@@ -89,9 +88,8 @@ function Facts({ indexer, realm, options }: { indexer: string; realm: string; op
 }
 
 export function RealmView({ realm, chain, home, options }: RealmViewProps) {
-  const origin = gnowebOrigin(chain.chainId);
-  const link = origin === undefined ? undefined : gnowebLink(origin, realm);
-  const indexer = indexerOf(chain.chainId);
+  const origin = chain.gnoweb;
+  const link = gnowebLink(origin, realm);
   const state = useRealm({ rpc: chain.rpc, realm, origin }, options);
   const navigate = useNavigate();
   const { key } = useLocation();
@@ -123,7 +121,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
           <Body state={state} origin={origin} link={link} />
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
           <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
-          {indexer === undefined ? null : <Facts indexer={indexer} realm={realm} options={options} />}
+          <Facts indexer={chain.indexer} realm={realm} options={options} />
         </Stack>
       </Center>
     </section>

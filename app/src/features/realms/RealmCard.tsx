@@ -13,7 +13,7 @@ export const CARD_PARAGRAPH = 200;
 export interface RealmCardProps {
   /** The realm's path, `/r/demo/dao`. */
   path: string;
-  /** gnoweb's https origin (lib/chain's gnowebOrigin). */
+  /** gnoweb's https origin (the universe's `gnoweb` in the data). */
   gnoweb: string;
   /** The block height the page was read at. */
   height: number;

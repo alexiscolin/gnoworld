@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gnowebLink, gnowebOrigin } from "./gnoweb.ts";
-
-describe("gnowebOrigin: where a chain's gnoweb is", () => {
-  it("names the two hosts of the recorded answers", () => {
-    expect(gnowebOrigin("gnoland-1")).toBe("https://gno.land");
-    expect(gnowebOrigin("onyx-1")).toBe("https://onyx.testnets.gno.land");
-  });
-
-  it("names none for any other chain, an object's key included", () => {
-    for (const id of ["", "gnoland-2", "constructor", "toString", "__proto__"])
-      expect(gnowebOrigin(id)).toBeUndefined();
-  });
-});
+import { gnowebLink } from "./gnoweb.ts";
 
 describe("gnowebLink: a realm's address on gnoweb", () => {
   it("puts the realm's path under the origin, whether it is written with its domain or without", () => {

@@ -9,7 +9,7 @@ import { site } from "./places.ts";
 export interface RealmAt {
   /** `gno.land/r/demo/dao`. */
   realm: string;
-  chain: { name: string; chainId: string; rpc: string };
+  chain: { name: string; chainId: string; rpc: string; gnoweb: string; indexer: string };
   /** The universe's home: where Back goes with nothing in the site behind the view. */
   home: string;
 }
@@ -24,5 +24,9 @@ export function realmAt(pathname: string): RealmAt | undefined {
   const realm = `gno.land/r/${rest}`;
   if (row === undefined || (found[1] !== undefined && found[1] !== universe.id) || !isRealmPath(realm))
     return undefined;
-  return { realm, chain: { name: row.name, chainId: row.chainId, rpc: row.rpc }, home: universe.home.path };
+  return {
+    realm,
+    chain: { name: row.name, chainId: row.chainId, rpc: row.rpc, gnoweb: row.gnoweb, indexer: row.indexer },
+    home: universe.home.path,
+  };
 }

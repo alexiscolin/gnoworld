@@ -5,7 +5,7 @@
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
 import { Button, Cluster, Field, Row, Skeleton, Stack } from "@gnoworld/ui";
 import { useState } from "react";
-import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
+import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import type { ReadOptions } from "../../lib/chain/read.ts";
 import edge from "./frame.module.css";
 import styles from "./RealmFunctions.module.css";
@@ -16,7 +16,7 @@ export interface RealmFunctionsProps {
   /** The realm, `gno.land/r/demo/dao`. */
   realm: string;
   /** The universe it is read from. */
-  chain: { name: string; chainId: string; rpc: string };
+  chain: { name: string; chainId: string; rpc: string; gnoweb: string };
   /** lib/chain's options, for a test's fetch. */
   options?: ReadOptions;
 }
@@ -130,8 +130,7 @@ function Body({ functions }: { functions: Functions }) {
 
 function Panel({ realm, chain, options }: RealmFunctionsProps) {
   const functions = useFunctions(chain.rpc, realm, options);
-  const origin = gnowebOrigin(chain.chainId);
-  const page = origin === undefined ? undefined : gnowebLink(origin, realm);
+  const page = gnowebLink(chain.gnoweb, realm);
   // gnoweb's actions page for the realm (`$help`, v1.5.0), where the functions that take arguments or write are called.
   const link = page === undefined ? undefined : `${page}$help`;
   return (

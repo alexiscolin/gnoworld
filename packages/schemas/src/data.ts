@@ -23,6 +23,11 @@ const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(D
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
 const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
 
+/** An origin: https, a lower-case host and an optional port, no path, query, fragment or credentials (what a page's address is put under). */
+const Origin = z
+  .string()
+  .check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?$/));
+
 /** The players a news item may embed, each by its own path (F885: csp.ts's frame-src names the same prefixes). */
 export const EMBED_PREFIXES = [
   "https://www.youtube-nocookie.com/embed/",
@@ -115,6 +120,10 @@ const Universe = z.strictObject({
   name: text(DATA_CAPS.name),
   chainId: text(DATA_CAPS.key),
   rpc: Link,
+  /** The chain's gnoweb, the source of truth a realm's card and view link to (ADR-0002 §4): its origin. */
+  gnoweb: Origin,
+  /** The chain's public indexer: the address of its GraphQL endpoint. */
+  indexer: Link,
   testnet: z.boolean(),
   default: z.optional(z.literal(true)),
 });

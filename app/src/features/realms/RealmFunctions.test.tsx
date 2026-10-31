@@ -11,7 +11,13 @@ import { RealmFunctions } from "./RealmFunctions.tsx";
 // 5i, tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
 // its result once through `vm/qeval`. Free: the label says so, the block height says when, and Adena is never asked.
 // The answers are chainFixture.ts's: EVALS recorded through gnomcp, FUNCTIONS written from wugnot's source (not recorded).
-const CHAIN = { name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" };
+const CHAIN = {
+  name: "Onyx",
+  chainId: "onyx-1",
+  rpc: "https://rpc.onyx.testnets.gno.land:443",
+  gnoweb: "https://onyx.testnets.gno.land",
+  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+};
 const SUPPLY = EVALS.find((row) => row.chain === "onyx-1" && row.expr === "TotalSupply()")?.body ?? "";
 const NON_ORIGIN = REFUSALS.find((row) => row.chain === "onyx-1" && row.data.endsWith(".Deposit()"));
 const GNOWEB = "https://onyx.testnets.gno.land/r/gnoland/wugnot$help";
@@ -547,7 +553,7 @@ describe("another realm or another chain", () => {
   const OTHER = "gno.land/r/demo/other";
   const MOVES = {
     other: { realm: OTHER, where: CHAIN },
-    chain: { realm: WUGNOT, where: { ...CHAIN, chainId: "nowhere-1" } },
+    chain: { realm: WUGNOT, where: { ...CHAIN, chainId: "nowhere-1", gnoweb: "https://gnoweb.nowhere.example" } },
     rpc: { realm: WUGNOT, where: { ...CHAIN, rpc: "https://rpc2.onyx.testnets.gno.land:443" } },
   };
   // `options` is stable, as a page's is: an inline object re-runs the list's effect and hides a missing key (review of 5i, row 2).
@@ -638,8 +644,8 @@ describe("another realm or another chain", () => {
     expect(listed(box)).toEqual(["OtherName"]);
   });
 
-  test("another chain's gnoweb is not linked: a chain with no gnoweb gives no link, the functions stay", async () => {
-    const box = await panel(chain(), WUGNOT, { chain: { ...CHAIN, chainId: "nowhere-1" } });
+  test("a gnoweb that is no https origin is not linked: the functions stay", async () => {
+    const box = await panel(chain(), WUGNOT, { chain: { ...CHAIN, gnoweb: "http://gnoweb.other.example" } });
     expect(listed(box)).toEqual(["TotalSupply"]);
     expect(all(region(box), "a")).toHaveLength(0);
   });
@@ -661,14 +667,15 @@ describe("another realm or another chain", () => {
     });
   }
 
-  test("a chain id changed under the panel asks the list again and drops the old link", async () => {
+  test("a chain changed under the panel asks the list again, drops the old link and links its own gnoweb", async () => {
     const fetcher = chain();
     const box = mount(<Swap fetcher={fetcher} />);
     await settle(box);
     expect(hrefs(box)).toContain(GNOWEB);
     click(button(box, "to chain"));
     await settle(box);
-    expect(all(region(box), "a")).toHaveLength(0);
+    expect(hrefs(box)).not.toContain(GNOWEB);
+    expect(hrefs(box)).toContain("https://gnoweb.nowhere.example/r/gnoland/wugnot$help");
     expect(asked(fetcher, "vm/qfuncs")).toHaveLength(2);
   });
 });

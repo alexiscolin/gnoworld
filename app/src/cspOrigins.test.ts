@@ -74,11 +74,14 @@ describe("connectSrc and originsOf", () => {
   });
 });
 
-// 5k: the public indexers a chain has are named by lib/chain/indexerOf.ts, and a universe of the data brings its indexer's origin
-// to connect-src with its RPC's, none for a chain with no known indexer (F2952, F2973).
+// R-F3, F2952 (Alexis, 2026-10-31): a universe of the data brings its indexer's origin to connect-src with its RPC's; no table
+// by chain id names one any more, and an indexer that is no bare https origin stops the build as an RPC does.
 describe("connectOrigins", () => {
-  const onyx = { rpc: "https://rpc.onyx.testnets.gno.land:443", chainId: "onyx-1" };
-  const gnoland = { rpc: "https://rpc.gno.land:443", chainId: "gnoland-1" };
+  const onyx = {
+    rpc: "https://rpc.onyx.testnets.gno.land:443",
+    indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+  };
+  const gnoland = { rpc: "https://rpc.gno.land:443", indexer: "https://indexer.gno.land/graphql/query" };
 
   it("gives each universe's RPC origin and its indexer's, once, in code-unit order", () => {
     expect(connectOrigins([onyx, gnoland, onyx])).toEqual([
@@ -89,18 +92,28 @@ describe("connectOrigins", () => {
     ]);
   });
 
-  it("gives the indexer of a universe only when the data holds it", () => {
+  it("gives what the data holds and nothing of its own", () => {
     expect(connectOrigins([onyx])).toEqual(["https://indexer.onyx.testnets.gno.land", ONYX]);
     expect(connectOrigins([])).toEqual([]);
-  });
-
-  it("gives the RPC alone for a chain with no known indexer", () => {
-    expect(connectOrigins([{ rpc: "https://rpc.extra.example:8443", chainId: "extra-1" }])).toEqual([
-      "https://rpc.extra.example:8443",
-    ]);
+    expect(
+      connectOrigins([{ rpc: "https://rpc.extra.example:8443", indexer: "https://idx.extra.example/graphql/query" }]),
+    ).toEqual(["https://idx.extra.example", "https://rpc.extra.example:8443"]);
   });
 
   it("refuses a bad RPC as rpcOrigins does, before anything", () => {
-    expect(() => connectOrigins([{ rpc: "http://rpc.gno.land", chainId: "gnoland-1" }])).toThrow(/csp: .*rpc/);
+    expect(() => connectOrigins([{ ...gnoland, rpc: "http://rpc.gno.land" }])).toThrow(/csp: .*rpc/);
+  });
+
+  it.each([
+    ["an http: indexer", "http://indexer.gno.land/graphql/query"],
+    ["no URL", "indexer.gno.land"],
+    ["a user in the URL", "https://indexer.gno.land@evil.example/graphql"],
+    ["a wildcard host", "https://*.indexer.example/graphql"],
+    ["a directive after the host", "https://indexer.example;script-src/graphql"],
+    ["a quote", "https://indexer.example'/graphql"],
+    ["a comma", "https://indexer.example,evil.example/graphql"],
+  ])("refuses %s, naming it", (_name, indexer) => {
+    expect(() => connectOrigins([{ ...gnoland, indexer }])).toThrow(RangeError);
+    expect(() => connectOrigins([{ ...gnoland, indexer }])).toThrow(/csp: .*indexer/);
   });
 });

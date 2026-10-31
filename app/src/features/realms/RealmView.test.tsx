@@ -12,7 +12,13 @@ import { RealmView } from "./RealmView.tsx";
 // failed read's state, each with the link to the realm on gnoweb. The answers are the recorded ones (chainFixture.ts: PAGES).
 const COINS = PAGES.find((row) => row.realm === "gno.land/r/gnoland/coins");
 const WUGNOT = PAGES[1];
-const CHAIN = { name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" };
+const CHAIN = {
+  name: "Onyx",
+  chainId: "onyx-1",
+  rpc: "https://rpc.onyx.testnets.gno.land:443",
+  gnoweb: "https://onyx.testnets.gno.land",
+  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+};
 
 // 5k: the facts the indexer gives for the realm, in the shape the schema takes (synthetic: nothing is recorded, F2950).
 const FACTS = {
@@ -215,14 +221,30 @@ describe("a realm's view", () => {
     expect(box.textContent).toContain("The block height could not be read.");
   });
 
-  test("names no gnoweb link for a chain whose gnoweb is not known, and still shows the page", async () => {
+  // R-F3 (F2906, F2952): the two addresses are the chain's own, read from the data it is given, never from a table by chain id.
+  test("links gnoweb and asks the indexer where the chain's data says, whatever the chain's id", async () => {
     const fetcher = chain(WUGNOT?.body ?? null);
-    const box = await view(fetcher, "gno.land/r/gnoland/wugnot", { ...CHAIN, chainId: "other-1" });
+    const other = {
+      ...CHAIN,
+      chainId: "other-1",
+      gnoweb: "https://gnoweb.other.example",
+      indexer: "https://indexer.other.example/graphql/query",
+    };
+    const box = await view(fetcher, "gno.land/r/gnoland/wugnot", other);
+    expect(all(box, "a").map((link) => link.getAttribute("href"))).toContain(
+      "https://gnoweb.other.example/r/gnoland/wugnot",
+    );
+    expect(fetcher.mock.calls.some(([url]) => url.startsWith("https://indexer.other.example/graphql/query?"))).toBe(
+      true,
+    );
+    expect(fetcher.mock.calls.some(([url]) => url.includes("onyx.testnets.gno.land/graphql"))).toBe(false);
+  });
+
+  test("names no gnoweb link when the data's gnoweb is no https origin, and still shows the page", async () => {
+    const fetcher = chain(WUGNOT?.body ?? null);
+    const box = await view(fetcher, "gno.land/r/gnoland/wugnot", { ...CHAIN, gnoweb: "http://gnoweb.other.example" });
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(all(box, "a")).toHaveLength(0);
-    // A chain with no known indexer asks none, and draws no facts.
-    expect(fetcher.mock.calls.filter(([url]) => url.startsWith("https://indexer."))).toHaveLength(0);
-    expect(box.querySelector('[aria-label="Facts from the indexer"]')).toBeNull();
   });
 
   // Back goes where the reader came from; opened by its address, with nothing behind it, to the universe's home.

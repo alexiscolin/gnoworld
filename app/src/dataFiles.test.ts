@@ -20,7 +20,7 @@ import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
 
 // 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
-// 5k: and of their chains' public indexers (lib/chain/indexerOf.ts), named by the data's chain ids.
+// R-F3: and of their chains' public indexers, which the data names too (`indexer`).
 const INDEXER_ORIGINS = ["https://indexer.gno.land", "https://indexer.onyx.testnets.gno.land"];
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
@@ -338,13 +338,20 @@ describe("react-router build", () => {
         name: "Extra",
         chainId: "extra-1",
         rpc: "https://rpc.extra.example:8443",
+        gnoweb: "https://gnoweb.extra.example",
+        indexer: "https://indexer.extra.example:8443/graphql/query",
         testnet: true,
       });
     });
     try {
       const run = build(dir);
       expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
-      const want = ["https://rpc.extra.example:8443", ...RPC_ORIGINS, ...INDEXER_ORIGINS].sort();
+      const want = [
+        "https://rpc.extra.example:8443",
+        "https://indexer.extra.example:8443",
+        ...RPC_ORIGINS,
+        ...INDEXER_ORIGINS,
+      ].sort();
       const directive = `connect-src 'self' ${want.join(" ")}`;
       expect(run.stdout).toContain(`csp: ${directive}`);
       const client = join(copy, "build", "client");
@@ -373,6 +380,8 @@ describe("react-router build", () => {
         name: "Plain",
         chainId: "plain-1",
         rpc: "http://rpc.plain.example:26657",
+        gnoweb: "https://gnoweb.plain.example",
+        indexer: "https://indexer.plain.example/graphql/query",
         testnet: true,
       });
     });
@@ -387,6 +396,35 @@ describe("react-router build", () => {
     }
   });
 
+  // R-F3 (F2952): an indexer in the data is a source of connect-src like an RPC: http: stops the build at the schema, an odd host at csp.
+  it.each([
+    ["an http: indexer", "http://indexer.plain.example/graphql/query", /universes\.json/],
+    ["a wildcard host", "https://*.indexer.example/graphql/query", /csp: .*indexer/],
+    ["a directive after the host", "https://indexer.example;script-src/graphql/query", /csp: .*indexer/],
+  ])("stops on %s, naming it, before any page is written", { timeout: 120_000 }, (_name, indexer, message) => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "odd",
+        name: "Odd",
+        chainId: "odd-1",
+        rpc: "https://rpc.odd.example",
+        gnoweb: "https://gnoweb.odd.example",
+        indexer,
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status).not.toBe(0);
+      expect(output).toMatch(message);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
   // The schema's Link lets a wildcard or a directive in a host through: only rpcOrigins stops it, before any page is written.
   it.each([
     ["a wildcard host", "https://*.rpc.example"],
@@ -394,7 +432,15 @@ describe("react-router build", () => {
   ])("stops on an RPC with %s, naming it, before any page is written", { timeout: 120_000 }, (_name, rpc) => {
     const dir = plant((files) => {
       const universes = files["universes.json"] as Record<string, unknown>[];
-      universes.push({ id: "odd", name: "Odd", chainId: "odd-1", rpc, testnet: true });
+      universes.push({
+        id: "odd",
+        name: "Odd",
+        chainId: "odd-1",
+        rpc,
+        gnoweb: "https://gnoweb.odd.example",
+        indexer: "https://indexer.odd.example/graphql/query",
+        testnet: true,
+      });
     });
     try {
       const run = build(dir);

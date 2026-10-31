@@ -5,7 +5,13 @@ describe("realmAt: the realm a path names", () => {
   test("reads /r/<path> in the default universe, Onyx, with its chain and its home", () => {
     expect(realmAt("/r/gnoland/coins")).toStrictEqual({
       realm: "gno.land/r/gnoland/coins",
-      chain: { name: "Onyx", chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" },
+      chain: {
+        name: "Onyx",
+        chainId: "onyx-1",
+        rpc: "https://rpc.onyx.testnets.gno.land:443",
+        gnoweb: "https://onyx.testnets.gno.land",
+        indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+      },
       home: "/",
     });
   });
@@ -13,7 +19,13 @@ describe("realmAt: the realm a path names", () => {
   test("reads /net/<id>/r/<path> in that universe, with its own chain", () => {
     const found = realmAt("/net/gnoland/r/gnoland/wugnot");
     expect(found?.realm).toBe("gno.land/r/gnoland/wugnot");
-    expect(found?.chain).toStrictEqual({ name: "gno.land", chainId: "gnoland-1", rpc: "https://rpc.gno.land:443" });
+    expect(found?.chain).toStrictEqual({
+      name: "gno.land",
+      chainId: "gnoland-1",
+      rpc: "https://rpc.gno.land:443",
+      gnoweb: "https://gno.land",
+      indexer: "https://indexer.gno.land/graphql/query",
+    });
     expect(found?.home).toBe("/net/gnoland/");
   });
 
