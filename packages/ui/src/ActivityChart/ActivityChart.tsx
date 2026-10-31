@@ -63,6 +63,7 @@ function Tip({
       ref={wordsRef}
       className={surface([tooltip["tip"], styles["tip"]].join(" "))}
       aria-hidden="true"
+      data-tip=""
       style={{ visibility: "hidden" }}
     >
       {grouped(point.count)} · {when(last - point.at, unit)}
@@ -70,18 +71,8 @@ function Tip({
   );
 }
 
-// The bars or the line, in the drawing's own units; each bar tells the pointer's visit to the tooltip.
-function Drawing({
-  points,
-  sparkline,
-  width,
-  bar,
-}: {
-  points: Point[];
-  sparkline: boolean;
-  width: number;
-  bar: (at: number) => object;
-}) {
+// The bars or the line, in the drawing's own units.
+function Drawing({ points, sparkline, width }: { points: Point[]; sparkline: boolean; width: number }) {
   const last = points.length - 1;
   // A line of one value is level across one step.
   const line = points.length === 1 ? points.flatMap((point) => [point, { ...point, at: 1 }]) : points;
@@ -105,7 +96,6 @@ function Drawing({
             className={styles["bar"]}
             data-hour={at}
             data-current={at === last ? "true" : undefined}
-            {...bar(at)}
             x={at * (BAR + GAP)}
             y={HEIGHT - high}
             width={BAR}
@@ -137,10 +127,10 @@ function Plot({
   const shown = points[reading.shown ?? -1];
   const focused = points[reading.focusAt ?? -1];
   const plotRef = useRef<HTMLDivElement>(null);
-  const group = bars ? { role: "group", "aria-label": label, tabIndex: 0, ...reading.group } : {};
+  const group = bars ? { role: "group", "aria-label": label, tabIndex: 0, ...reading.group, ...reading.plot } : {};
   return (
     <div ref={plotRef} className={styles["plot"]} {...group}>
-      <Drawing points={points} sparkline={sparkline} width={width} bar={reading.bar} />
+      <Drawing points={points} sparkline={sparkline} width={width} />
       {shown === undefined ? null : <Tip point={shown} last={last} unit={unit} plot={plotRef} />}
       {bars ? (
         <span role="status" className="visually-hidden">

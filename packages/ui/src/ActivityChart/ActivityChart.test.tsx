@@ -177,6 +177,19 @@ describe("ActivityChart's tooltip (F304)", () => {
     if (found === null) throw new Error(`no bar ${String(hour)}`);
     return found;
   };
+  // The pointer in an hour's column: a 24-slot plot 192 px wide (8 px an hour), as the drawing's own units stretch to the box.
+  const plotAt = (container: HTMLElement, slots = 24) => {
+    const plot = container.querySelector("[role='group']");
+    if (!(plot instanceof HTMLElement)) throw new Error("no plot");
+    plot.getBoundingClientRect = () => new DOMRect(0, 0, slots * 8, 48);
+    return plot;
+  };
+  const over = (container: HTMLElement, hour: number, slots = 24) => {
+    fireEvent.pointerMove(plotAt(container, slots), { clientX: hour * 8 + 4, clientY: 10 });
+  };
+  const away = (container: HTMLElement) => {
+    fireEvent.pointerLeave(plotAt(container));
+  };
   const words = (count: number, when: string) => screen.queryByText(new RegExp(`^${String(count)}\\s*·\\s*${when}$`));
   const anyWords = () => screen.queryByText(/^\d+\s*·\s*(This hour|Today|\d+ (hours?|days?) ago)$/);
   const group = () => screen.getByRole("group", { name: "Calls per hour, today" });
@@ -193,18 +206,17 @@ describe("ActivityChart's tooltip (F304)", () => {
   it("shows the count and the hour of the bar under the pointer, and no words before", () => {
     const { container } = draw();
     expect(anyWords()).toBeNull();
-    fireEvent.pointerEnter(bar(container, 18));
-    fireEvent.pointerMove(bar(container, 18));
+    over(container, 18);
     expect(words(96, "5 hours ago")).not.toBeNull();
   });
 
   it("follows the pointer to another bar and leaves with it", () => {
     const { container } = draw();
-    fireEvent.pointerEnter(bar(container, 18));
-    fireEvent.pointerEnter(bar(container, 23));
+    over(container, 18);
+    over(container, 23);
     expect(words(96, "5 hours ago")).toBeNull();
     expect(words(23, "This hour")).not.toBeNull();
-    fireEvent.pointerLeave(bar(container, 23));
+    away(container);
     expect(anyWords()).toBeNull();
   });
 
@@ -249,11 +261,11 @@ describe("ActivityChart's tooltip (F304)", () => {
   it("keeps the focus's words when the pointer leaves, and the pointer's when the focus does (F334's class)", () => {
     const { container } = draw();
     focus();
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     expect(words(96, "5 hours ago")).not.toBeNull();
-    fireEvent.pointerLeave(bar(container, 18));
+    away(container);
     expect(words(23, "This hour")).not.toBeNull();
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     act(() => {
       group().blur();
     });
@@ -271,29 +283,57 @@ describe("ActivityChart's tooltip (F304)", () => {
 
   it("holds no words after a mouse click on a bar once the pointer has left it (F2862)", () => {
     const { container } = draw();
-    fireEvent.pointerEnter(bar(container, 5));
+    over(container, 5);
     clickFocus(bar(container, 5));
-    fireEvent.pointerLeave(bar(container, 5));
+    away(container);
     expect(anyWords()).toBeNull();
   });
 
   it("shows a tapped bar's own count while the finger is on it, never the last bar's (F2862)", () => {
     const { container } = draw();
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     clickFocus(bar(container, 18));
     expect(words(96, "5 hours ago")).not.toBeNull();
     expect(words(23, "This hour")).toBeNull();
-    fireEvent.pointerLeave(bar(container, 18));
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("shows the hour of the column the pointer is in, over a zero hour, a short bar's column or the gap, not only the ink (F2863)", () => {
+    const { container } = render(<ActivityChart label="Calls per hour, today" values={day} />);
+    // Hour 0 is a zero: a bar of no height, never under a pointer before.
+    over(container, 0);
+    expect(words(0, "23 hours ago")).not.toBeNull();
+    // The gap after a bar still belongs to its hour's slot.
+    fireEvent.pointerMove(plotAt(container), { clientX: 18 * 8 + 7, clientY: 1 });
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    // The plot's edges give the first and the last hour, never one past them.
+    fireEvent.pointerMove(plotAt(container), { clientX: -5 });
+    expect(words(0, "23 hours ago")).not.toBeNull();
+    fireEvent.pointerMove(plotAt(container), { clientX: 400 });
+    expect(words(23, "This hour")).not.toBeNull();
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("keeps the words while the pointer moves onto them, and hides them when it leaves the plot (F2863, WCAG 1.4.13)", () => {
+    const { container } = draw();
+    over(container, 18);
+    const tip = screen.getByText(/^96\s*·\s*5 hours ago$/);
+    // The words are inside the plot and take the pointer: moving onto them keeps the bar.
+    fireEvent.pointerMove(tip, { clientX: 200, clientY: -20 });
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    away(container);
     expect(anyWords()).toBeNull();
   });
 
   it("shows the words again when the pointer or the focus comes after Escape", () => {
     const { container } = draw();
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(anyWords()).toBeNull();
-    fireEvent.pointerLeave(bar(container, 18));
-    fireEvent.pointerEnter(bar(container, 5));
+    away(container);
+    over(container, 5);
     expect(words(5, "18 hours ago")).not.toBeNull();
   });
 
@@ -304,7 +344,7 @@ describe("ActivityChart's tooltip (F304)", () => {
         <ActivityChart label="Calls per hour, today" values={day} />
       </div>,
     );
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     const first = createEvent.keyDown(document.body, { key: "Escape" });
     fireEvent(document.body, first);
     expect(first.defaultPrevented).toBe(true);
@@ -318,7 +358,7 @@ describe("ActivityChart's tooltip (F304)", () => {
 
   it("keeps the table as the one reading for assistive technology: the words are hidden from it", () => {
     const { container } = draw();
-    fireEvent.pointerEnter(bar(container, 18));
+    over(container, 18);
     const shown = words(96, "5 hours ago");
     expect(shown).not.toBeNull();
     expect(shown?.closest("[aria-hidden='true']")).not.toBeNull();
@@ -338,9 +378,9 @@ describe("ActivityChart's tooltip (F304)", () => {
 
   it("writes a day chart's words as the table does: Today, and 3 days ago", () => {
     const { container } = render(<ActivityChart label="Calls this week" values={[3, 1, 2, 0]} unit="day" />);
-    fireEvent.pointerEnter(bar(container, 3));
+    over(container, 3, 4);
     expect(screen.queryByText(/^0\s*·\s*Today$/)).not.toBeNull();
-    fireEvent.pointerEnter(bar(container, 0));
+    over(container, 0, 4);
     expect(screen.queryByText(/^3\s*·\s*3 days ago$/)).not.toBeNull();
   });
 

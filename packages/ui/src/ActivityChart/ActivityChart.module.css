@@ -8,11 +8,10 @@
     max-inline-size: var(--column-l);
   }
 
-  /* The words over a bar: the tooltip's look (its class too, in the component), placed in script (Popover/floating.ts) in the screen's coordinates. */
+  /* The words over a bar, which the pointer can move onto and keep (WCAG 1.4.13): the tooltip's look (its class too, in the component), placed in script (Popover/floating.ts) in the screen's coordinates. */
   .tip {
     position: fixed;
     white-space: nowrap;
-    pointer-events: none;
   }
 
   /* Thin bars: a day's 24 fill a column at most, whatever the room. */

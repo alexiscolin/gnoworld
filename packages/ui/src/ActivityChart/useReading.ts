@@ -1,4 +1,4 @@
-import { useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useState, type FocusEvent, type KeyboardEvent, type PointerEvent } from "react";
 import { keyboardFocus, useFirstEscape } from "../Tooltip/hold.ts";
 
 // The bar under the pointer, and the one the keyboard rests on when the chart has the focus: each its own, so one
@@ -44,14 +44,22 @@ export function useReading(bars: number) {
       },
       onKeyDown: walk,
     },
-    bar: (at: number) => ({
-      onPointerEnter: () => {
+    // One handler for the plot, not one per bar: the hour is read from where the pointer is, so a zero hour, a short bar's column
+    // and the gap between two bars all answer (F2863). O(1) a move.
+    plot: {
+      onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
+        // The words themselves sit inside the plot: the pointer on them keeps the bar it came from (WCAG 1.4.13).
+        if (event.target instanceof Element && event.target.closest("[data-tip]") !== null) return;
+        const { left, width } = event.currentTarget.getBoundingClientRect();
+        if (width <= 0) return;
+        const at = Math.min(last, Math.max(0, Math.floor(((event.clientX - left) / width) * bars)));
+        if (at === pointerAt) return;
         setPointerAt(at);
         setDismissed(false);
       },
       onPointerLeave: () => {
         setPointerAt(null);
       },
-    }),
+    },
   };
 }
