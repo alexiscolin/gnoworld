@@ -168,6 +168,43 @@ describe("readChain, a caller that leaves", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("keeps its time limit when a caller's signal is given and never aborts", async () => {
+    const deaf: ChainFetch = () => new Promise(() => undefined);
+    const pending = read(deaf, { timeoutMs: 1000, signal: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(failureOf(await pending).kind).toBe("timeout");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not need AbortSignal.any: a browser without it reads, and the caller still ends the read", async () => {
+    vi.spyOn(AbortSignal, "any").mockImplementation(() => {
+      throw new TypeError("AbortSignal.any is not a function");
+    });
+    const deaf: ChainFetch = () => new Promise(() => undefined);
+    const caller = new AbortController();
+    expect((await read(respond(GOOD), { signal: caller.signal })).ok).toBe(true);
+    const pending = read(deaf, { signal: caller.signal });
+    caller.abort();
+    expect(failureOf(await pending).kind).toBe("down");
+    vi.restoreAllMocks();
+  });
+
+  it("leaves no listener on the caller's signal when the read is done", async () => {
+    const caller = new AbortController();
+    const added = vi.spyOn(caller.signal, "addEventListener");
+    const removed = vi.spyOn(caller.signal, "removeEventListener");
+    await read(respond(GOOD), { signal: caller.signal });
+    expect(added).toHaveBeenCalledTimes(1);
+    expect(removed).toHaveBeenCalledTimes(1);
+    expect(removed.mock.calls[0]?.[0]).toBe(added.mock.calls[0]?.[0]);
+  });
+
+  it("asks nothing when the caller's signal is already aborted", async () => {
+    const fetcher = respond(GOOD);
+    expect(failureOf(await read(fetcher, { signal: AbortSignal.abort() })).kind).toBe("down");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("asks as before with no signal given", async () => {
     expect((await read(respond(GOOD))).ok).toBe(true);
   });

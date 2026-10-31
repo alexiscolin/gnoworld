@@ -33,6 +33,36 @@ describe("readMarkets", () => {
     expect(url).toBe("/markets.json");
     expect(init?.method ?? "GET").toBe("GET");
     expect(init?.redirect).toBe("error");
+    expect(init?.credentials).toBe("same-origin");
+  });
+
+  it("refuses at once on a declared length past the cap, reading no body", async () => {
+    const pulls = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ pull: pulls }, { highWaterMark: 0 });
+    const big = vi.fn<Fetcher>(() =>
+      Promise.resolve(new Response(body, { headers: { "content-length": String(MARKETS_MAX_BYTES + 1) } })),
+    );
+    expect(await readMarkets(big)).toEqual({ ok: false, reason: "malformed" });
+    expect(pulls).not.toHaveBeenCalled();
+  });
+
+  it("frees the connection of an answer it does not read", async () => {
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const down = vi.fn<Fetcher>(() => Promise.resolve(new Response(body, { status: 502 })));
+    expect(await readMarkets(down)).toEqual({ ok: false, reason: "unavailable" });
+    expect(cancelled).toBe(true);
+  });
+
+  it("says unavailable on any 2xx that is not a 200: the file is not what the timer writes", async () => {
+    expect(await readMarkets(answering(JSON.stringify(GOOD), { status: 206 }))).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
   });
 
   it("gives the file's markets when it holds the schema's shape, tokens that have a price only", async () => {

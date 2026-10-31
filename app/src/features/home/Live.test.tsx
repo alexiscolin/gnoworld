@@ -208,3 +208,79 @@ describe("the hero's live line, by universe", () => {
     expect(one(host, "[data-height]").textContent).toBe("786,661");
   });
 });
+
+// A phone shows nothing of the line (Live.module.css hides it under 900 px), so it asks nothing; a window that widens asks then.
+function screen(matchesPhone: boolean) {
+  let phone = matchesPhone;
+  const listeners = new Set<() => void>();
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      return query === "(max-width: 899px)" && phone;
+    },
+    addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+  }));
+  return {
+    widen: () => {
+      phone = false;
+      for (const listener of listeners) listener();
+    },
+    listeners,
+  };
+}
+
+function plant() {
+  const root = createRoot(document.createElement("div"));
+  act(() => {
+    root.render(<Live rpc={RPC} />);
+  });
+  return {
+    leave: () => {
+      act(() => {
+        root.unmount();
+      });
+    },
+  };
+}
+
+describe("the live line on a phone", () => {
+  it("asks nothing under 900 px, and asks both reads once the window widens", async () => {
+    const window900 = screen(true);
+    const fetcher = serve(both);
+    const host = mount(<Live rpc={RPC} />);
+    await settle();
+    expect(fetcher).not.toHaveBeenCalled();
+    await act(async () => {
+      window900.widen();
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(asked(fetcher).toSorted()).toEqual(["/markets.json", `${RPC}/status`].toSorted());
+    expect(all(host, "[data-token]")).toHaveLength(2);
+  });
+
+  it("asks both reads at once on a wide window, and leaves no listener on the media query when it leaves", async () => {
+    const window900 = screen(false);
+    const fetcher = serve(both);
+    const planted = plant();
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(window900.listeners.size).toBe(1);
+    planted.leave();
+    expect(window900.listeners.size).toBe(0);
+  });
+});
+
+describe("the live line's words", () => {
+  it("says when the prices were read as a clock time, not an age, and keeps it as the minutes pass", async () => {
+    serve(both);
+    const host = mount(<Live rpc={RPC} />);
+    await settle();
+    const credit = one(host, "[data-markets] time").parentElement?.textContent;
+    expect(credit).toMatch(/^CoinGecko · (\d{1,2} \w{3} )?\d\d:\d\d UTC$/);
+    await act(() => vi.advanceTimersByTimeAsync(3 * 3_600_000));
+    expect(one(host, "[data-markets] time").parentElement?.textContent).toBe(credit);
+    expect(one(host, "[data-block] time").parentElement?.textContent).toMatch(
+      /^rpc\.onyx\.testnets\.gno\.land · .*UTC$/,
+    );
+  });
+});
