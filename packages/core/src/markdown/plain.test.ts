@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
-import { excerpt, firstGraphemes, plain } from "./plain.ts";
+import { isBlank } from "./nodes.ts";
+import { cutGraphemes, excerpt, firstGraphemes, plain } from "./plain.ts";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 
@@ -122,5 +123,28 @@ describe("firstGraphemes: the first graphemes of a text, the rest never segmente
       for (const count of [1, 2, 20, 69, 70, 81, 500])
         expect(firstGraphemes(text, count), `${text.slice(0, 8)} ${String(count)}`).toEqual(whole(text, count));
     }
+  });
+});
+
+describe("cutGraphemes: a text cut to a length", () => {
+  test("keeps a text that fits, and ends a longer one with an ellipsis at the length", () => {
+    expect(cutGraphemes("abcd", 4)).toBe("abcd");
+    expect(cutGraphemes("abcde", 4)).toBe("abc…");
+  });
+
+  test("never cuts a grapheme in two, a flag and a family included", () => {
+    expect(cutGraphemes("🇫🇷🇫🇷🇫🇷🇫🇷", 3)).toBe("🇫🇷🇫🇷…");
+    expect(cutGraphemes("a👨‍👩‍👧b", 2)).toBe("a…");
+  });
+
+  test("refuses a length that is not a whole number of 2 or more", () => {
+    for (const length of [1, 0, -1, 2.5, Number.NaN]) expect(() => cutGraphemes("abc", length)).toThrow(RangeError);
+  });
+});
+
+describe("isBlank: whether a text draws nothing", () => {
+  test("is true for spaces, format characters and the braille blank, and false for any letter", () => {
+    for (const blank of ["", " \t", "\u200b", "\u3164", "\u2800", "\u202e"]) expect(isBlank(blank)).toBe(true);
+    for (const shown of ["a", " a ", "\u2800a", "."]) expect(isBlank(shown)).toBe(false);
   });
 });

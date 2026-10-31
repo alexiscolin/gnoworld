@@ -1,0 +1,85 @@
+/* A realm's page (5h): the chat's marks and blocks in a column of the page's own, headings in the type scale, a form drawn
+   as a read-only list. */
+@layer components {
+  .page {
+    /* layout: blocks one under the other, in the page's own step; the blocks are the reader's, not compositions */
+    display: grid;
+    /* layout: the step between those lines */
+    gap: var(--space-s);
+    overflow-wrap: anywhere;
+  }
+
+  .page h1 {
+    font: var(--font-title-l);
+  }
+
+  .page h2 {
+    font: var(--font-title-m);
+  }
+
+  .page h3,
+  .page h4,
+  .page h5,
+  .page h6 {
+    font: var(--font-title-s);
+  }
+
+  /* The chat's quote (RoomView.module.css, `.text blockquote`) on a page's measure: the same rule and colour, one step more
+     padding, a page's column being wider than a chat line. Two rules on purpose: they differ by that token. */
+  .page blockquote {
+    padding-inline-start: var(--space-s);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    color: var(--color-text-muted);
+  }
+
+  .page pre {
+    overflow: auto;
+    padding: var(--space-xs);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+    font: var(--font-data);
+  }
+
+  /* A link that leaves gnoweb: a button that reads as the page's own links do (inherited colour), underlined to say it is one. */
+  .external {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .cut {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .form {
+    /* layout: a description list of fields, one under the other */
+    display: grid;
+    /* layout: the step between those lines */
+    gap: var(--space-2xs);
+  }
+
+  .form dt {
+    font: var(--font-label);
+  }
+
+  .form dd {
+    /* layout: a field's lines one under the other */
+    display: grid;
+    padding-inline-start: var(--space-xs);
+    font: var(--font-meta);
+  }
+
+  .kind {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .detail code {
+    font: var(--font-data);
+  }
+}

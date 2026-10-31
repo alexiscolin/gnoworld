@@ -50,14 +50,25 @@ function parens(source: string): Int32Array {
 
 const count = (source: string, char: string): number => source.split(char).length - 1;
 
-/** A line's addresses, its tables made once and only when an address is asked. */
+/** An https origin as a page's links may resolve against: `https://host[:port]` and at most a closing `/`, nothing else
+ * (no user, path, query or look-alike letter); the origin without the `/`, or none. */
+export function originOf(origin: string): string | undefined {
+  const end = authority(origin, 0);
+  const bare = origin.endsWith("/") ? origin.slice(0, -1) : origin;
+  return end === bare.length ? bare : undefined;
+}
+
+/** A line's addresses, its tables made once and only when an address is asked. With an origin (originOf's), a link to a
+ * path of that origin is one too. */
 export class Addresses {
   readonly #source: string;
+  readonly #origin: string | undefined;
   #stops: Int32Array | undefined;
   #parens: Int32Array | undefined;
 
-  constructor(source: string) {
+  constructor(source: string, origin?: string) {
     this.#source = source;
+    this.#origin = origin;
   }
 
   /** The `)` that ends a link's address opening at `at` with `(`, the address a plain https one; or -1 (any place but
@@ -66,7 +77,20 @@ export class Addresses {
     this.#parens ??= parens(this.#source);
     const end = this.#parens[at] ?? -1;
     const path = authority(this.#source, at + 1);
-    return path === end || (PATH.test(this.#source.charAt(path)) && this.#stop(path) >= end) ? end : -1;
+    if (path === end || (PATH.test(this.#source.charAt(path)) && this.#stop(path) >= end)) return end;
+    return this.#local(at + 1) && this.#stop(at + 1) >= end ? end : -1;
+  }
+
+  /** The address of a link whose `(` is at `at` and `)` at `end`, as `destination` accepted it: the path, under the origin. */
+  href(at: number, end: number): string {
+    const address = this.#source.slice(at + 1, end);
+    return this.#origin !== undefined && address.startsWith("/") ? this.#origin + address : address;
+  }
+
+  // Whether a path of the origin starts at `at`: one slash, then neither a second (a host of its own) nor a backslash
+  // (which a browser reads as one).
+  #local(at: number): boolean {
+    return this.#origin !== undefined && this.#source.charAt(at) === "/" && !/[/\\]/.test(this.#source.charAt(at + 1));
   }
 
   /**

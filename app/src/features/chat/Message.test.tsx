@@ -1,7 +1,8 @@
 import fc from "fast-check";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Message } from "./Message.tsx";
+import { markdown } from "@gnoworld/core";
+import { ANONYMOUS, block, Message } from "./Message.tsx";
 
 const html = (text: string) => renderToStaticMarkup(<Message text={text} />);
 // The elements a message may hold, and the attributes each may carry.
@@ -229,6 +230,36 @@ describe("Message", () => {
         },
       ),
       { seed: 20261017, numRuns: 300 },
+    );
+  });
+});
+
+describe("a reader's own link", () => {
+  const draw = (link: NonNullable<(typeof ANONYMOUS)["link"]>) =>
+    markdown("[a **b**](https://a.example) and [c](https://c.example)").map((node) =>
+      renderToStaticMarkup(<>{block(node, { ...ANONYMOUS, link })}</>),
+    );
+
+  it("hands each link's address and its drawn label to the reader, and draws what it gives", () => {
+    const seen: string[] = [];
+    const [out] = draw((href, label) => {
+      seen.push(href);
+      return (
+        <button type="button" data-to={href}>
+          {label}
+        </button>
+      );
+    });
+    expect(seen).toStrictEqual(["https://a.example", "https://c.example"]);
+    expect(out).toBe(
+      '<p><button type="button" data-to="https://a.example">a <strong>b</strong></button> and <button type="button" data-to="https://c.example">c</button></p>',
+    );
+  });
+
+  it("draws the usual anchor for the link the reader gives nothing for", () => {
+    const [out] = draw((href) => (href.includes("a.example") ? undefined : <i>{href}</i>));
+    expect(out).toMatch(
+      /^<p><a href="https:\/\/a\.example" title="https:\/\/a\.example" dir="ltr" target="_blank" rel="noopener noreferrer">a <strong>b<\/strong><\/a> and <i>https:\/\/c\.example<\/i><\/p>$/,
     );
   });
 });

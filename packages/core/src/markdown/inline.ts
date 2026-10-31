@@ -5,7 +5,7 @@
 // linear time.
 import { Addresses } from "./address.ts";
 import { mentionAt } from "./mentions.ts";
-import { append, invisible, unmentioned, wrap } from "./nodes.ts";
+import { append, invisible, labelOf, wrap } from "./nodes.ts";
 import { after, before, Runs, runOf } from "./scan.ts";
 import type { Inline } from "./types.ts";
 
@@ -33,25 +33,38 @@ const weight = (size: number) => (size === 3 ? 2 : 1);
 // it holds so far, and, for a label, whether it may still be a link (not once a link closed inside it).
 interface Frame {
   readonly mark: string;
+  /** A label opened by `![`: a page's image, which becomes a link to it. */
+  readonly image: boolean;
   size: number;
   children: Inline[];
   active: boolean;
 }
 
+// Where the reader stops to look: an escape, a mark, a label's bracket (a page's image, `![`, too), an address or a
+// mention's `@g1` (any other `@` stays in the text it is in).
+const MARKS = /[\\`*_~[\]]|https:\/\/|@g1/g;
+const IMAGES = /[\\`*_~[\]]|!\[|https:\/\/|@g1/g;
+
+/** What a page's lines add to the chat's: its images, read as links to them, and the origin its path links resolve against
+ * (an https origin, already checked: address.ts's `originOf`). */
+export interface Options {
+  readonly images?: boolean;
+  readonly origin?: string | undefined;
+}
+
 class Reader {
   readonly #source: string;
   readonly #addresses: Addresses;
-  // Where the reader stops to look: an escape, a mark, a label's bracket, an address or a mention's `@g1` (any other
-  // `@` stays in the text it is in).
-  readonly #special = /[\\`*_~[\]]|https:\/\/|@g1/g;
+  readonly #special: RegExp;
   readonly #root: Inline[] = [];
   readonly #frames: Frame[] = [];
   #runs: Runs | undefined;
   #at = 0;
 
-  constructor(source: string) {
+  constructor(source: string, options: Options) {
     this.#source = source;
-    this.#addresses = new Addresses(source);
+    this.#addresses = new Addresses(source, options.origin);
+    this.#special = options.images ? IMAGES : MARKS;
   }
 
   read(): Inline[] {
@@ -71,7 +84,7 @@ class Reader {
     const char = this.#source.charAt(this.#at);
     if (char === "\\") this.#escape();
     else if (char === "`") this.#code();
-    else if (char === "[") this.#bracket();
+    else if (char === "[" || char === "!") this.#bracket();
     else if (char === "]") this.#close();
     else if (char === "h") this.#bare();
     else if (char === "@") this.#mention();
@@ -102,9 +115,11 @@ class Reader {
     }
   }
 
+  // `[`, or `![` for a page's image.
   #bracket(): void {
-    this.#at += 1;
-    if (!this.#open("[", 1)) this.#add("[");
+    const image = this.#source.charAt(this.#at) === "!";
+    this.#at += image ? 2 : 1;
+    if (!this.#open("[", 1, image)) this.#add(image ? "![" : "[");
   }
 
   // `]`: a link, if a label is open and `(`, an https address and `)` follow; else text, its label's `[` too.
@@ -112,23 +127,24 @@ class Reader {
     const at = this.#at;
     this.#at += 1;
     const label = this.#frames.findLast((frame) => frame.mark === "[");
-    if (label === undefined) {
-      this.#add("]");
-      return;
-    }
-    const end = label.active ? this.#addresses.destination(at + 1) : -1;
-    if (end === -1 || (this.#frames.at(-1) === label && invisible(label.children))) {
-      this.#splice(label);
+    const end = label?.active === true ? this.#addresses.destination(at + 1) : -1;
+    if (label === undefined || end === -1 || this.#blank(label)) {
+      if (label !== undefined) this.#splice(label);
       this.#add("]");
       return;
     }
     this.#dropAbove(label);
     this.#frames.pop();
-    // A link's label names no account: its mentions are text again.
-    this.#push({ type: "link", href: this.#source.slice(at + 2, end), children: unmentioned(label.children) });
+    const href = this.#addresses.href(at + 1, end);
+    this.#push({ type: "link", href, children: labelOf(label.children, href, label.image) });
     // No link inside a link: the labels around this one stay text.
     for (const frame of this.#frames) frame.active &&= frame.mark !== "[";
     this.#at = end + 1;
+  }
+
+  // Whether a link's label shows nothing, so its address is a link no one sees: an image's does not, naming the address.
+  #blank(label: Frame): boolean {
+    return !label.image && this.#frames.at(-1) === label && invisible(label.children);
   }
 
   // An https address at a word's start, outside a label: a link to itself; else the letter.
@@ -208,9 +224,9 @@ class Reader {
     return used;
   }
 
-  #open(mark: string, size: number): boolean {
+  #open(mark: string, size: number, image = false): boolean {
     if (this.#depth() + weight(size) > MAX_INLINE_DEPTH) return false;
-    this.#frames.push({ mark, size, children: [], active: true });
+    this.#frames.push({ mark, image, size, children: [], active: true });
     return true;
   }
 
@@ -231,7 +247,7 @@ class Reader {
     const index = this.#frames.indexOf(frame);
     this.#frames.splice(index, 1);
     const into = this.#frames[index - 1]?.children ?? this.#root;
-    append(into, { type: "text", text: frame.mark.repeat(frame.size) });
+    append(into, { type: "text", text: (frame.image ? "!" : "") + frame.mark.repeat(frame.size) });
     for (const child of frame.children) append(into, child);
   }
 
@@ -245,6 +261,6 @@ class Reader {
 }
 
 /** A line's marks, as the tree's inline nodes. */
-export function inline(line: string): Inline[] {
-  return new Reader(line).read();
+export function inline(line: string, options: Options = {}): Inline[] {
+  return new Reader(line, options).read();
 }
