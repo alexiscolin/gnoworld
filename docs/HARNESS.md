@@ -107,7 +107,7 @@ untracked files included.
 
 ```
 fast gate                                              full gate (--full, --merge), after it
-  ts     format, knip, jscpd, CSS, comments ─▶ app       probe     probe.py ─▶ the benches, alone
+  ts     format, knip, jscpd, CSS, comments ─▶ build    probe     probe.py ─▶ the benches, alone
   types  tsc ─▶ ESLint                                   ─▶ stories   core in Chromium ─▶ the stories' journeys
   tests  Ergo's build ─▶ Vitest                             history   the batch's size ─▶ prove_fix
   gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ regressions ─▶ migrations ─▶ gitleaks ─▶ audit
@@ -123,34 +123,22 @@ gate fails, run the failing lane alone before running the whole gate again.
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
 | `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
-| the TypeScript of `app/src`, `app/tests`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the journeys the change can reach (below) | 60 s when some journeys run, 120 s when all do (F2162; the measure below) |
-| `packages/core/src`, or any other file of those folders (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, every journey | 120 s (the app's build and journeys, F2162) |
+| the TypeScript of `app/src`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's build (below) | 120 s |
+| a test of the app (`app/src/*.test.ts(x)`), a journey or its helper (`app/tests/`) | tsc, ESLint, Vitest's tests related to the change; no build | 30 s |
+| `packages/core/src`, or any other file of `app/src` and `packages/ui/src` (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's build | 120 s |
 | `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
 
-**The journeys a change can reach** (`scripts/journeys.py`, Alexis 2026-10-29 and 2026-10-30; harness-b): a fast
-run of a change in `app/src` gives Playwright only the journeys whose pages load a changed file, as filters after
-its options. A journey's pages are the routes of `app/src/routes.ts` that its `page.goto()` paths match, and a
-route loads what it imports, followed through every `import`, `import()`, re-export, type import and stylesheet.
-A journey's own spec, or the approved pictures beside it, run that journey alone. What the scoping cannot place
-runs every journey: a path outside `app/src` and the journeys' specs (a config, a helper the journeys share, `serve.mjs`,
-`server/src`, which the journeys start), the routes' list, a file no route loads, one every page loads (`root.tsx`),
-a file deleted, a `routes.ts` with a `layout()`. A journey whose `goto`, or `request.get()`/`location.href =` in its own spec file (F2575), is not a literal path
-(a variable, a helper's argument) cannot be placed and runs on every change of the app; a template's `${...}` in the path means any one segment,
-and one at its start stands for the site's origin only when it is named `site`, `origin`, `base` or `host`. A test of
-the app (`.test.ts(x)`, `.bench`, `.stories`) is no change of the pages: a change of those and prose alone builds
-and walks nothing of the app (budget 30 s, F2578). What a journey reaches by a click, a link or
-a redirect after its first page is not followed, and a `journeys.py` that fails fails the gate. `--full`, `--merge`
-and any change of the harness run every journey. Playwright reads a filter as a regular expression: a name's own
-characters are escaped; its dots are not (they match more, never less).
-
-The measure (slice-5 harness-b, 2026-10-30, the same change run by the old `check.sh` and the new, one after the other on a
-machine at load 11 to 43 on 16 cores, so the times are an order of magnitude, not a benchmark): a comment added to
-`routes/earth.tsx` (8 journeys of 43) took 122 s before (the `app` step 116 s) and 30 s after (23 s); one added to a
-spec (1 journey) took 224 s before (153 s, load 23 then 43) and 46 s after (17 s); one added to `routes/world.tsx`
-(39 journeys) took 88 s before (83 s) and 110 s after (96 s), no gain: nearly every journey goes to a world page. That is
-why a run of half the journeys or fewer has 60 s, and a run of more than half, all included, 120 s (F2577).
+**A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
+journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
+harness-b) still ran 40 of 44 files for 74 % of the app's commits, the app being one import graph. The fast gate now
+runs `pnpm run build:app` (React Router's build, 2 to 5 s) for a change a page can load, which still fails on a route or an
+import the types do not see, and starts no browser for it; the tokens story's pictures (above) are the one browser run
+left at a commit, as they guard a fault that only the merge check found (F1190). `--full` and `--merge` run every journey,
+unfiltered, and build the app through Playwright. A journey that fails is therefore found at the merge check: **a session
+that writes or changes a journey runs that spec itself before it commits** (`node app/node_modules/@playwright/test/cli.js
+test -c app/playwright.config.ts <spec>`), as it runs a test it writes. The measure is in `.claude/tmp/slice-5/reports/slice-5-harness-c-speed.md`.
 
 **Two checks the fast gate runs on a trigger** (harness-b): a commit that touches a test, a bench or an approved picture
 (`*.test.ts(x)`, `*.bench.ts(x)`, `*.spec.ts`, gno and Go test files, `*-snapshots/*.png`, `*__screenshots__/*.png`;
@@ -203,12 +191,20 @@ refuses another Node (F816).
 | jscpd | copies, renamed ones and near ones |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |
 | `scripts/check_comments.mjs` | long comments, to-do markers, banners, numbered steps, emoji, escape hatches |
-| the app, in Playwright | a page that fails to build, pre-render or hydrate, with the wrong tags, or with an accessibility violation (axe) |
+| the app's build, at a commit | a route or an import the types do not see; it walks no page |
+| the app, in Playwright (the merge check and `--full`) | a page that fails to build, pre-render or hydrate, with the wrong tags, or with an accessibility violation (axe) |
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
 | `scripts/mutate.py` | a realm guard no test notices when removed |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
 | `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad ledger row or one citing a missing commit; a known limit the runbook no longer says; a review agent's file missing or without its sentence `Never run a git command that writes the index or the work tree`; CLAUDE.md without the review card's item 8 |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
+
+**One merge check at a time.** `check.sh --merge` takes the lock `~/.cache/gnoworld-tools/merge.lock`, a folder holding `pid`,
+`worktree` and `since`, shared by every worktree of the machine: five side by side at a load of 25 to 40 on 16 cores failed by load
+alone (2026-10-30). It waits for a live holder, printing which worktree holds it and since when, and never refuses; a holder whose pid is
+gone (a crash, `kill -9`) leaves no wait, its lock taken over; a waiter that is interrupted frees nothing of another's. The fast gate and
+`--full` take none, and the time a run prints leaves the wait out. `check.sh` also sets the soft limit (up or down) of open files to 10240 for its
+steps (F2543), saying so when it cannot.
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
@@ -218,7 +214,8 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | Step | What it catches |
 |---|---|
 | `scripts/probe.py` | a lint rule, selector or check that no longer catches its planted fault |
-| the benches (`scripts/bench.py`, `app/tests/bench/`) | a bench over its budget, or one a source names that the report lacks |
+| the benches (`scripts/bench.py`, `app/tests/bench/`) | a bench over its budget, or one a source names that the report lacks; it first waits, up to 10 minutes, for the 1-minute load to fall under the machine's cores, prints the load it measured at, and refuses (no verdict) when the load stays up or cannot be read |
+| `scripts/check_nginx.py` (`--merge` only) | nginx refusing the image's config with the build's table (F2459), or a served page answering the bare or another page's policy at its slashed, bare or `index.html` address (F2460); a pinned nginx 1.30.6 from the tools' cache, its checksum checked (`scripts/nginx.sha256`, DEVELOPMENT.md, "The pinned nginx"); a missing binary or build fails, never skips |
 | `core_chromium`, the stories' journeys | core's tests on Chromium's engine; the design system's stories |
 | `test:compiled` | the compiled project's render counts, run alone |
 | coverage | under 85% anywhere, under 100% (95% branches) in `core` |
@@ -346,7 +343,7 @@ costs context in every session.
 |---|---|
 | `CLAUDE.md`, `.claude/rules/` | the rules Claude reads; each area's file loads when its files are touched |
 | `.claude/settings.json` | permissions, the sandbox, the hooks, the plugins |
-| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier`, `dreamer` |
+| `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `finding-verifier`, `design-reviewer`, `dreamer` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
 | `.claude/workflows/` | `branch`, a branch's loop |
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |
@@ -365,5 +362,6 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
+| `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

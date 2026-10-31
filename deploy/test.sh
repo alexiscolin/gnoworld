@@ -43,13 +43,23 @@ engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
 lock_dir=$HOME/.cache/gnoworld-tools
 lock=$lock_dir/deploy-test-$project.lock
 locked=
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616).
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
 release() { if [ -n "$locked" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "${lock:?}"; fi; }
 if [ "${1:-}" != --demo ]; then
 	mkdir -p "$lock_dir"
 	if ! mkdir "$lock" 2>/dev/null; then
 		holder=$(cat "$lock/pid" 2>/dev/null || true)
 		if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
-		if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+		if [ -n "$holder" ] && pid_alive "$holder"; then
 			missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
 		fi
 		rm -rf "${lock:?}"

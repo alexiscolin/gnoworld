@@ -37,7 +37,7 @@ LIMITS = [
 # Every review agent never writes a worktree's git index (2026-10-26: one staged old files into wt-4dm's and failed the
 # next commit's gate); CLAUDE.md's review card ends with the change's risk and undo.
 AGENT_RULE = "Never run a git command that writes the index or the work tree"
-AGENTS = ("finding-verifier", "reviewer", "security-reviewer", "test-auditor")  # each must exist (CR2)
+AGENTS = ("design-reviewer", "finding-verifier", "reviewer", "security-reviewer", "test-auditor")  # each must exist (CR2)
 CARD_ITEM = re.compile(r"^8\. Risk and undo:", re.M)
 
 

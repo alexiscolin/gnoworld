@@ -18,6 +18,13 @@ set -eu
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
+unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
+# The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
+# to 10240 for every step, up or down, and a limit that cannot be set is said, never hidden.
+open_files=$(ulimit -S -n)
+if [ "$open_files" != 10240 ]; then
+	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not set the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
+fi
 full=false merge=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
@@ -35,8 +42,62 @@ started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
-trap 'status=$?; rm -rf "$logs" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
+lock_held=
+# Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
+release_lock() {
+	[ -n "$lock_held" ] || return 0
+	holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+	if [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm -rf "${merge_lock:?}"; fi
+}
+trap 'status=$?; rm -rf "$logs" || :; release_lock; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616), so
+# only ESRCH counts as dead. Python reads the errno, not the shell's wording.
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
+# One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five side by side at a load of 25 to 40 on 16 cores failed by load
+# alone). `--merge` takes a lock shared by every worktree, a folder in the tools' cache holding its pid, its worktree and its start (seconds),
+# and WAITS for a live holder, never refuses; a holder whose pid is gone (a crash, a kill -9) leaves no wait and its lock is taken over.
+# mkdir is the atomic step. Only the run that took the lock frees it, by its pid, so a waiter that is interrupted drops nothing of another's.
+# The fast gate and --full take none. The run's time starts after the wait.
+if $merge; then
+	mkdir -p "${merge_lock%/*}"
+	announced= unread=0
+	until mkdir "$merge_lock" 2>/dev/null; do
+		holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+		if [ -z "$holder" ]; then
+			# The run that made the folder is writing its pid; a folder that stays empty (a run killed in between) is nobody's.
+			unread=$((unread + 1))
+			[ "$unread" -lt 6 ] || { rm -rf "${merge_lock:?}"; unread=0; continue; }
+			sleep 1
+			continue
+		fi
+		unread=0
+		if ! pid_alive "$holder"; then # gone (ESRCH): its lock is taken over. A refused signal (EPERM) is a live process of another sandbox (F2616)
+			rm -rf "${merge_lock:?}"
+			continue
+		fi
+		if [ -z "$announced" ]; then
+			since=$(cat "$merge_lock/since" 2>/dev/null || :)
+			echo "check.sh --merge: waiting for the merge check of $(cat "$merge_lock/worktree" 2>/dev/null || echo "another worktree") (pid $holder), running since $(date -r "${since:-0}" '+%H:%M:%S' 2>/dev/null || echo "${since:-an unknown time}"): one merge check at a time on this machine" >&2
+			announced=1
+		fi
+		sleep 1
+	done
+	lock_held=1
+	printf '%s\n' "$$" >"$merge_lock/pid"
+	pwd >"$merge_lock/worktree"
+	date +%s >"$merge_lock/since"
+	started=$(date +%s) # the wait is not the run's time
+fi
 # The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
 tested=
 # A merge being committed has no time budget (Alexis, 2026-10-28): the full gate follows every merge. In a repository, git says
@@ -120,9 +181,12 @@ if [ -n "$changed" ]; then
 		esac
 		case $path in
 		server/src/*) ts=true related=false ;;
-		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
+		app/tests/*.ts) ts=true ;; # the journeys and their helpers run in the merge check and --full alone
+		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
 		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
-		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		app/tests/*) ts=true related=false ;;
+		app/src/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
 		esac
@@ -142,20 +206,9 @@ if $regressions; then
 	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
 	[ -n "$regr_base" ] || regressions=false
 fi
-# The journeys the change can reach (scripts/journeys.py): `all`, `none` (tests of the app alone: no build, no journey), or their paths one a line. The full gate and a change it cannot
-# place run every journey. A journeys.py that fails fails the run: a change scoped to nothing would pass unseen.
-scope=all
-if ! $full && ! $all && $app; then scope=$(printf '%s\n' "$changed" | python3 -I scripts/journeys.py); fi
-[ "$scope" != none ] || app=false # a change of tests of the app alone: no page loads them (F2578)
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
-# A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
+# A run that builds the app has the build to wait for, and the lint and types of a whole project: the budget of a run of everything. A commit's gate walks no journey (Alexis, 2026-10-31): the merge check and --full do.
 $all || $app || budget=30
-if [ "$scope" != all ] && [ "$scope" != none ]; then
-	# Half of the journeys or fewer: 17 to 23 s of them for 1 and 8 of 43. More: 110 s for 39 of 43 (harness-b, measured), the budget of all (F2577).
-	journeys_due=$(printf '%s\n' "$scope" | grep -c . || :)
-	journeys_all=$(find app/tests/e2e -type f | grep -cE '\.(spec|test)\.[cm]?[jt]sx?$' || :)
-	[ $((journeys_due * 2)) -gt "$journeys_all" ] || budget=60
-fi
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
 $related && tests_scope="--changed --passWithNoTests"
@@ -267,7 +320,11 @@ else:
 
 lane_ts() {
 	step format
-	run format:check
+	# Prettier's cache is keyed by a file's path and content: in a repository it lives in the worktree's own .claude/tmp and makes a rerun of
+	# an unchanged tree 0.9 s of 7.5 (speed-audit.md, row 6); pre-commit's staged copy is a new folder each time, so it keeps none.
+	format_cache=
+	[ -z "$tested" ] || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
+	run format:check "$format_cache"
 	step unused
 	run unused
 	step copies
@@ -282,24 +339,22 @@ lane_ts() {
 	# A build never installs: React Router's default server entry adds isbot and runs the package
 	# manager, with whatever access the build has (finding F080).
 	step app
+	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
+	installed=$(packages)
+	if ! $full; then
+		# A commit's gate builds the app and walks no journey (Alexis, 2026-10-31: 487 and 505 CPU s of journeys against 67 to 91 for the
+		# rest of a commit's gate, speed-audit.md): the build still fails on a route or an import the types do not see. The merge check
+		# and --full walk every journey, which build the app themselves.
+		run build:app
+		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
+		return 0
+	fi
 	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
 	# a port taken between this and the build fails the run, never another's.
 	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
-	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
-	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	# The journeys are given to Playwright as filters, which it reads as regular expressions: a name's own characters
-	# escaped, its dots left (they match more, never less).
-	set --
-	if [ "$scope" != all ]; then
-		while IFS= read -r journey; do
-			set -- "$@" "$(printf '%s' "$journey" | sed 's/[][+(){}^$|?*\\]/\\&/g')"
-		done <<EOF
-$scope
-EOF
-	fi
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json "$@" >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
@@ -430,6 +485,10 @@ EOF
 		python3 -I scripts/probe.py
 		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
 		python3 -I scripts/bench.py
+		if $merge; then
+			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
+			python3 -I scripts/check_nginx.py
+		fi
 	}
 	lane_stories() {
 		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)

@@ -9,8 +9,8 @@ so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
 - an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py [--quick] <base>, from the repository root; --self-test checks the rules.
 --quick (the hook and the fast gate, per commit: F2579) keeps the base's listing of tests in the tools' cache, one per base
-commit, and lists only the Vitest files the change touches when the change is nothing but those, gno or Go sources, pictures
-and prose; any other change lists the tree whole. The merge check runs without it, whole and with no cache."""
+commit, and lists only the Vitest files the change touches, whatever else it changes, unless it touches a Playwright spec (then
+it lists the tree whole). A source file that renames a generated test is seen by the whole run only. The merge check runs without it, whole and with no cache."""
 import ast
 import hashlib
 import json
@@ -62,7 +62,7 @@ def lowered_floors(before, after, excused):
 
 def weakened(before, after, excused, kind):
     """Entries added to a list that loosens a check (a gap, an ignore), less those named `<kind> <entry>`."""
-    return sorted(e for e in after - before if f"{kind} {e}" not in excused)
+    return sorted(e for e in after - before if f"{kind} {e}" not in excused and f"{kind} {e.split(SEP)[0]}" not in excused)
 
 
 def looser_benches(before, after, excused):
@@ -103,8 +103,63 @@ def changed_settings(before, after, excused):
                   for name, old in before.items() if after.get(name) != old and f"setting {name}" not in excused)
 
 
+LIST_START = re.compile(r"(?:globalIgnores\(\s*|(?:ignores|exclude)[\"']?\s*:\s*|SKIP = new Set\(\s*)")
+SHORTHAND = re.compile(r"[{,]\s*(exclude|ignores)\s*(?=[,}])")  # `{ exclude }`: the list is the const of that name
+CONST = re.compile(r"\b(?:const|let|var)\s+(\w+)\s*(?::[^=\n]+)?=\s*")
+# Comments first, so an apostrophe or a bracket in one is no string and no end of the list; a quoted string holds no newline.
+TOKEN = re.compile(r"\s*(?:(//[^\n]*|/\*.*?\*/)|(\"[^\"\n]*\")|('[^'\n]*')|(`[^`]*`)|(\.\.\.[\w$.]+)|([\w$.]+)|(.))", re.S)
+OWN_DEFAULTS = re.compile(r"\.\.\.configDefaults\.exclude")  # the spread of the tool's own defaults: its entries are the tool's, not a change
+SEP = " := "  # `<name> := <value>`: what a name held, an entry of its own; a line naming the name excuses it
+
+
+def list_entries(text, at, consts=None):
+    """The entries of the list that starts at text[at]: a quoted string is read; a name, a template, a spread of anything but the tool's
+    own defaults, or what follows the list (`.concat(...)`) is an entry that cannot be read, named as written (F2523). A name or spread
+    of a const the file holds is also read as its value, `<name> := <value>`, so a changed value shows (F2622). Comments are skipped (F2623)."""
+    entries, pos = [], at
+    consts = consts or {}
+    if text[at] != "[":  # a list passed by name, or an expression: unread
+        m = re.match(r"[^,;})\n]+", text[at:])
+        return ([m.group(0).strip()] if m and m.group(0).strip() else []), at
+    pos += 1
+    while pos < len(text):
+        m = TOKEN.match(text, pos)
+        pos = m.end()
+        comment, double, single, template, spread, name, other = m.groups()
+        if comment:
+            continue
+        if double or single:
+            entries.append((double or single)[1:-1])
+        elif template:
+            entries.append(template)
+        elif spread or name:
+            ref = spread or name
+            if not (spread and OWN_DEFAULTS.fullmatch(spread)):
+                entries.append(ref)
+                entries += [f"{ref}{SEP}{value}" for value in consts.get(ref.removeprefix("..."), [])]
+        elif other == "]":
+            tail = re.match(r"\s*(\.\w+\([^)]*\)|\+[^,;}\n]*)", text[pos:])  # `].concat(X)`, `] + X`
+            return entries + ([tail.group(1).strip()] if tail else []), pos
+        elif other not in ",":
+            entries.append(other)
+    return entries, pos
+
+
+def constants(text):
+    """The consts of a file whose value is a string or a list of strings, by name: what a name in an ignore list stands for."""
+    out = {}
+    for m in CONST.finditer(text):
+        if m.end() >= len(text):
+            continue
+        if text[m.end()] == "[":
+            out[m.group(1)] = list_entries(text, m.end())[0]
+        elif (t := TOKEN.match(text, m.end())) and (t.group(2) or t.group(3)):
+            out[m.group(1)] = [(t.group(2) or t.group(3))[1:-1]]
+    return out
+
+
 def ignores(read):
-    """Each entry of the lists that keep files from a check, as `<file> <entry>`."""
+    """Each entry of the lists that keep files from a check, as `<file> <entry>`; an entry written with a name is its name, and its value."""
     out = set()
     for name in IGNORE_FILES:
         text = read(name) or ""
@@ -123,8 +178,12 @@ def ignores(read):
         elif name in (".prettierignore", "scripts/.gitleaksignore"):
             out |= {f"{name} {line.strip()}" for line in text.splitlines() if line.strip() and not line.startswith("#")}
         else:
-            for m in re.finditer(r"(?:globalIgnores\(|ignores:\s*|exclude:\s*|SKIP = new Set\()\[([^\]]*)\]", text):
-                out |= {f"{name} {entry}" for entry in re.findall(r'"([^"]*)"', m.group(1))}
+            consts = constants(text)
+            for m in LIST_START.finditer(text):
+                if m.end() < len(text):
+                    out |= {f"{name} {entry}" for entry in list_entries(text, m.end(), consts)[0]}
+            for m in SHORTHAND.finditer(text):
+                out |= {f"{name} {entry}" for entry in [m.group(1), *(f"{m.group(1)}{SEP}{v}" for v in consts.get(m.group(1), []))]}
     return out
 
 
@@ -221,6 +280,7 @@ def base_tests(base):
 
 TOUCHES_NO_NAMES = re.compile(r"\.(gno|go|md)$")  # a test of these kinds is read from the files; they list no Vitest or Playwright name
 VITEST_FILE = re.compile(r"\.test\.tsx?$")
+SPEC_FILE = re.compile(r"\.spec\.ts$")
 
 
 def cached_base_tests(base):
@@ -246,10 +306,11 @@ def cached_base_tests(base):
 
 
 def quick_tests(base, before):
-    """The Vitest and Playwright names the tree holds, from the base's (`before`) and a listing of the files the change touches,
-    or None when the change is more than those Vitest files, gno or Go sources, approved pictures and prose."""
+    """The Vitest and Playwright names the tree holds, from the base's (`before`) and a listing of the Vitest files the change
+    touches, whatever else it changes (a source file that renames a generated test is seen by the whole run, not this one), or
+    None when it touches a Playwright spec, whose names no listing of the touched files gives."""
     paths = [p for p in git("diff", "--no-renames", "--name-only", base).splitlines() + git("ls-files", "--others", "--exclude-standard").splitlines() if p]
-    if not os.path.exists("vitest.config.ts") or not all(VITEST_FILE.search(p) or TOUCHES_NO_NAMES.search(p) or SHOT.search(p) for p in paths):
+    if not os.path.exists("vitest.config.ts") or any(SPEC_FILE.search(p) for p in paths):
         return None
     touched = {p for p in paths if VITEST_FILE.search(p)}
     kept = {n for n in before if n.split(" > ", 1)[0] not in touched}
@@ -292,6 +353,22 @@ def self_test():
     assert weakened(ignores(stryker.get), ignores(unmutated.get), set(), "ignore") == ["stryker.config.json !packages/core/src/x.ts"]
     leaks = {"scripts/.gitleaksignore": "# a reason\n"}
     hidden = {"scripts/.gitleaksignore": "# a reason\nabc:docs/a.md:home-folder-path:4\n"}
+    named = {"vitest.config.ts": "export default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, 'c/**', \"a,b/**\"] } };\n"}
+    assert ignores(named.get) == {"vitest.config.ts STRYKER_TMP", "vitest.config.ts c/**", "vitest.config.ts a,b/**"}, "a name is an entry, a spread of the defaults is not, quotes either way"
+    assert ignores({"vitest.config.ts": "exclude: LIST,\n"}.get) == {"vitest.config.ts LIST"}, "a list passed by name"
+    assert ignores({"vitest.config.ts": 'exclude: ["a"].concat(X)'}.get) == {"vitest.config.ts a", "vitest.config.ts .concat(X)"}, "a list with a method"
+    # A name stands for its value (F2622), a comment is no entry (F2623), and the other forms of the key are read (F2627).
+    held = 'const T = "x/**";\nconst L = ["l/**"];\nexport default { test: { exclude: [...configDefaults.exclude, T, ...L] } };\n'
+    assert ignores({"vitest.config.ts": held}.get) == {"vitest.config.ts T", "vitest.config.ts T := x/**", "vitest.config.ts ...L", "vitest.config.ts ...L := l/**"}
+    wider = held.replace("x/**", "**/*.test.ts")
+    assert weakened(ignores({"vitest.config.ts": held}.get), ignores({"vitest.config.ts": wider}.get), set(), "ignore") == ["vitest.config.ts T := **/*.test.ts"]
+    assert weakened(ignores({"vitest.config.ts": held}.get), ignores({"vitest.config.ts": wider}.get), {"ignore vitest.config.ts T"}, "ignore") == [], "a name did not excuse its value"
+    assert ignores({"vitest.config.ts": "exclude: [...myConfigDefaults.exclude]"}.get) == {"vitest.config.ts ...myConfigDefaults.exclude"}, "a lookalike of the tool's defaults"
+    commented = "exclude: [\n  \"a/**\",\n  // The server's entry, see [1]\n  /* it's [ too */\n  \"b/**\",\n]\n"
+    assert ignores({"vitest.config.ts": commented}.get) == {"vitest.config.ts a/**", "vitest.config.ts b/**"}, "a comment in a list was read"
+    assert ignores({"vitest.config.ts": "x = { exclude }\n"}.get) == {"vitest.config.ts exclude"}, "the shorthand { exclude }"
+    assert ignores({"vitest.config.ts": '{ "exclude": ["a"] }'}.get) == {"vitest.config.ts a"}, "a quoted key"
+    assert ignores({"eslint.config.ts": 'globalIgnores(\n  ["a/"],\n  "n",\n)'}.get) == {"eslint.config.ts a/"}, "a list on the next line"
     assert weakened(ignores(leaks.get), ignores(hidden.get), set(), "ignore") == ["scripts/.gitleaksignore abc:docs/a.md:home-folder-path:4"]
     # pnpm's supply-chain file: any change outside its packages list is read in review, whatever
     # its form (F079, F088): quoted or spaced keys, a pnpmfile, builds, overrides, a lower age.
@@ -369,6 +446,7 @@ problems += [f"a check's setting changed: {s}" for s in changed_settings(setting
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"
-          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:):", *problems, sep="\n  ", file=sys.stderr)
+          " (Removed-test:, Lowered-floor: [gap |ignore |bench ]<item>, Updated-baseline:). An ignore written with a name is read as the name, "
+          "not its value: write the glob quoted:", *problems, sep="\n  ", file=sys.stderr)
     sys.exit(1)
 print("check_regressions: no test gone or switched off, no floor lower, no bench gone or looser, no gap or ignore added, no approved screenshot changed")
