@@ -207,11 +207,14 @@ describe("cutText: plain text", () => {
 });
 
 describe("cutText: its cost", () => {
+  // "é" is not printable ASCII, so it reaches the segmenter: the check proves a bound, not an empty list of calls (F3369).
   it("segments a head of the text, never a megabyte of it", () => {
     const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
-    const out = cutText("a".repeat(1024 * 1024), MAX);
-    expect(out).toBe("a".repeat(MAX));
-    const longest = Math.max(0, ...segment.mock.calls.map(([input]) => input.length));
+    const out = cutText("é".repeat(1024 * 1024), MAX);
+    expect(out).toBe("é".repeat(MAX));
+    expect(segment.mock.calls.length).toBeGreaterThan(0);
+    expect(segment.mock.calls.length).toBeLessThanOrEqual(2);
+    const longest = Math.max(...segment.mock.calls.map(([input]) => input.length));
     expect(longest).toBeLessThanOrEqual(4096);
   });
 
