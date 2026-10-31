@@ -7,7 +7,7 @@ export function isMissing(error: unknown): boolean {
 }
 
 /** A place's route boundary: not found for a name the data lacks, could-not-load for anything else. */
-export function PlaceError({ what }: { what: "universe" | "ecosystem" | "page" }) {
+export function PlaceError({ what }: { what: "universe" | "ecosystem" | "page" | "realm" }) {
   return isMissing(useRouteError()) ? (
     <PageError title={`No ${what} here`} line={`No ${what} of gno.world goes by that name.`} />
   ) : (

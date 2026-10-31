@@ -72,6 +72,11 @@ export function failedWorldMeta(): MetaDescriptor[] {
   return unindexed("This world could not load");
 }
 
+/** A realm's view: titled by the realm's path, never indexed (its page is the chain's and gnoweb's), or, with none, not found. */
+export function realmMeta(realm: string | undefined): MetaDescriptor[] {
+  return unindexed(realm ?? "No realm here");
+}
+
 /** A path no route matches. */
 export function notFoundMeta(): MetaDescriptor[] {
   return unindexed("No page here");

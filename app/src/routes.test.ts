@@ -21,6 +21,8 @@ test("each path of the site is drawn by its own file: home, the Earth, the list,
     ["net/:network/earth", "routes/earth.tsx"],
     ["net/:network/w/:world", "routes/world.tsx"],
     ["net/:network/e/:ecosystem", "routes/ecosystem.tsx"],
+    ["r/*", "routes/realm.tsx"],
+    ["net/:network/r/*", "routes/realm.tsx"],
   ])
     expect(pairs, pair[0]).toContainEqual(pair);
   expect(routes[0]).toEqual(expect.objectContaining({ index: true, file: "routes/home.tsx" }));
