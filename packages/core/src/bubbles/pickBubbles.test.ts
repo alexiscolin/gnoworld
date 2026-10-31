@@ -734,6 +734,16 @@ describe("a bubble in the state at every call", () => {
     expect(pick([line], facing(BRAZIL), { shown: two.shown, now: NOW + SHOW }).bubbles).toEqual([]);
   });
 
+  it("keeps a bubble for its whole time when its line has left the list and the delay is shorter than the show (F3373)", () => {
+    const rules: Rules = { ...RULES, showSeconds: 15, speakerDelaySeconds: 1 };
+    const first = pickBubbles([msg(1)], NOW, ME, rules, []);
+    const at = (seconds: number) => pickBubbles([], NOW + seconds * 1000, ME, rules, first.shown);
+    expect(ids(at(2).bubbles)).toEqual(["m1"]);
+    expect(ids(at(14).bubbles)).toEqual(["m1"]);
+    expect(at(15).bubbles).toEqual([]);
+    expect(at(15).shown).toEqual([]);
+  });
+
   it("takes the oldest bubbles off when maxOnScreen is smaller than the screen it was given", () => {
     const full = pick(many(RULES.maxOnScreen, (n) => ({ country: CODES[n] ?? "JP" })));
     const rules: Rules = { ...RULES, maxOnScreen: 2 };

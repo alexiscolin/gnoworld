@@ -46,7 +46,7 @@ function readWindow(messages: readonly BubbleMessage[], limit: number): Map<stri
   return window;
 }
 
-/** What was shown, with a clock that stepped back brought back to now; kept inside the delay or while still listed. */
+/** What was shown, with a clock that stepped back brought back to now; kept while it shows, inside the delay or while still listed. */
 function remembered(
   shown: readonly Bubble[],
   window: ReadonlyMap<string, BubbleMessage>,
@@ -55,8 +55,8 @@ function remembered(
   const state = new Map<string, Bubble>();
   for (const s of shown) {
     const since = Math.min(s.since, run.now);
-    if (run.now - since < run.delay || window.has(s.id))
-      state.set(s.id, { ...s, since, until: Math.min(s.until, since + run.show) });
+    const until = Math.min(s.until, since + run.show);
+    if (until > run.now || run.now - since < run.delay || window.has(s.id)) state.set(s.id, { ...s, since, until });
   }
   return state;
 }
