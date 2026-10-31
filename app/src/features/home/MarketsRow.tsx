@@ -4,13 +4,14 @@
 import type { MarketToken } from "@gnoworld/schemas";
 import { Cluster } from "@gnoworld/ui";
 import type { MarketsRead } from "../../lib/api/markets.ts";
-import { ageOf } from "./age.ts";
+import { stampOf } from "./stamp.ts";
 import styles from "./Live.module.css";
 
+// To the cent from a cent up; below it, three significant digits, so a fraction of a cent never reads as zero.
 const dollars = (usd: number): string =>
   usd >= 0.01
     ? usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : usd.toFixed(Math.min(8, 1 - Math.floor(Math.log10(usd))));
+    : usd.toLocaleString("en-US", { maximumSignificantDigits: 3, maximumFractionDigits: 20 });
 
 function Change({ percent }: { percent: number | null }) {
   if (percent === null) return null;
@@ -47,15 +48,15 @@ export function MarketsRow({ read, now }: { read: MarketsRead | undefined; now: 
   if (read === undefined) return <State state="loading" words="Reading the prices" />;
   if (!read.ok) {
     return read.reason === "missing" ? (
-      <State state="missing" words="Prices are not available yet" />
+      <State state="missing" words="Prices are not available yet. Check back in a few minutes." />
     ) : (
-      <State state="failed" words="The prices could not be read" />
+      <State state="failed" words="The prices could not be read. Reload the page to try again." />
     );
   }
   const { source, updated, tokens } = read.markets;
   const credit = (
     <small className={styles["credit"]}>
-      {source} · <time dateTime={updated}>{ageOf(updated, now)}</time>
+      {source} · <time dateTime={updated}>{stampOf(updated, now)}</time>
     </small>
   );
   if (tokens.length === 0) {

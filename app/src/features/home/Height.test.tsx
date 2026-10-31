@@ -24,10 +24,10 @@ describe("the block height", () => {
     expect(host.querySelector("[data-height]")?.textContent).toBe("786,661");
   });
 
-  it("names the host it was read from, and how old the block is", () => {
+  it("names the host it was read from, and when the block was made", () => {
     const host = draw(ok);
     expect(host.textContent).toContain("rpc.onyx.testnets.gno.land");
-    expect(host.textContent).toMatch(/\b30 s ago\b/);
+    expect(host.textContent).toContain("rpc.onyx.testnets.gno.land · 23:43 UTC");
     expect(host.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-30T23:43:10Z");
   });
 
@@ -50,8 +50,10 @@ describe("the block height", () => {
   });
 
   it.each([
-    ["3 h old (a halted chain)", "2026-10-30T20:43:10Z", "3 h ago"],
-    ["a block stamped ahead of our clock", "2026-10-30T23:50:00Z", "just now"],
+    ["3 h old (a halted chain)", "2026-10-30T20:43:10Z", "20:43 UTC"],
+    ["from yesterday", "2026-10-29T20:43:10Z", "29 Oct 20:43 UTC"],
+    ["stamped a few minutes ahead of our clock", "2026-10-30T23:50:00Z", "23:50 UTC"],
+    ["stamped in 2099", "2099-01-01T00:00:00Z", "time unknown"],
   ])("words a block that is %s", (_what, time, wanted) => {
     const host = draw({ ...ok, value: { height: 786661, time } });
     expect(host.querySelector("time")?.textContent).toBe(wanted);

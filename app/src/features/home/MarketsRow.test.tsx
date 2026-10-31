@@ -52,6 +52,15 @@ describe("the markets row with a file", () => {
     expect(tokenOf(host, "ATONE")?.textContent).not.toMatch(/\$0\.00(?!\d)/);
   });
 
+  it.each([
+    ["a cent", 0.01, "$0.01"],
+    ["a hair under a cent", 0.0099, "$0.0099"],
+  ])("writes %s as %s: the cents' threshold", (_what, usd, wanted) => {
+    expect(tokenOf(draw(file({ tokens: [{ symbol: "GNOT", usd, change24h: null }] })), "GNOT")?.textContent).toContain(
+      wanted,
+    );
+  });
+
   it("marks a rise and a fall by their sign and a data attribute, and says nothing of a change the source did not give", () => {
     const host = draw(file());
     expect(tokenOf(host, "GNOT")?.textContent).toMatch(/\+2\.5%/);
@@ -63,34 +72,35 @@ describe("the markets row with a file", () => {
     expect(none?.textContent).not.toMatch(/%|0\.0|NaN|null/);
   });
 
-  it("names its source and the age of the read, with the time itself for a reader who wants it", () => {
+  it("names its source and when the file was read, with the time itself for a reader who wants it", () => {
     const host = draw(file());
-    expect(host.textContent).toMatch(/CoinGecko/);
-    expect(host.textContent).toMatch(/\b7 min ago\b/);
+    expect(host.textContent).toMatch(/CoinGecko · 06:00 UTC/);
+    expect(host.textContent).not.toMatch(/ago/);
     expect(host.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-31T06:00:00.000Z");
   });
 
   it.each([
-    ["30 s", "2026-10-31T06:06:30.000Z", /\b30 s ago\b/],
-    ["3 h", "2026-10-31T03:07:00.000Z", /\b3 h ago\b/],
-    ["2 days", "2026-10-29T06:07:00.000Z", /\b2 d ago\b/],
-    ["a clock ahead of ours", "2026-10-31T06:09:00.000Z", /just now/],
-  ])("words an age of %s", (_what, updated, wanted) => {
-    expect(draw(file({ updated })).textContent).toMatch(wanted);
-    expect(draw(file({ updated })).textContent).not.toMatch(/-\d|NaN|ago ago/);
+    ["the same minute", "2026-10-31T06:07:00.000Z", "06:07 UTC"],
+    ["earlier today", "2026-10-31T03:07:00.000Z", "03:07 UTC"],
+    ["yesterday", "2026-10-30T23:59:00.000Z", "30 Oct 23:59 UTC"],
+    ["a day in January", "2026-01-05T08:09:00.000Z", "5 Jan 08:09 UTC"],
+    ["a few minutes ahead of our clock", "2026-10-31T06:09:00.000Z", "06:09 UTC"],
+    ["exactly ten minutes ahead of our clock", "2026-10-31T06:17:00.000Z", "06:17 UTC"],
+    ["more than ten minutes ahead of our clock", "2026-10-31T06:17:01.000Z", "time unknown"],
+    ["the year 2099", "2099-01-01T00:00:00.000Z", "time unknown"],
+  ])("writes a time %s as %s", (_what, updated, wanted) => {
+    expect(draw(file({ updated })).querySelector("time")?.textContent).toBe(wanted);
   });
 
-  it.each([
-    ["4 s", "2026-10-31T06:06:56.000Z", "just now"],
-    ["5 s", "2026-10-31T06:06:55.000Z", "5 s ago"],
-    ["59 s", "2026-10-31T06:06:01.000Z", "59 s ago"],
-    ["60 s", "2026-10-31T06:06:00.000Z", "1 min ago"],
-    ["59 min", "2026-10-31T05:08:00.000Z", "59 min ago"],
-    ["60 min", "2026-10-31T05:07:00.000Z", "1 h ago"],
-    ["23 h", "2026-10-30T07:07:00.000Z", "23 h ago"],
-    ["24 h", "2026-10-30T06:07:00.000Z", "1 d ago"],
-  ])("words the unit boundary at %s as exactly %s", (_what, updated, wanted) => {
-    expect(draw(file({ updated })).querySelector("time")?.textContent).toBe(wanted);
+  it("writes the same words however long the page stays open: the time of the read, not an age", () => {
+    const later = new Date(NOW.getTime() + 3 * 3_600_000);
+    expect(draw(file(), later).querySelector("time")?.textContent).toBe("06:00 UTC");
+  });
+
+  it("shows a price of a billionth of a dollar by its digits, and the largest change the schema allows", () => {
+    const host = draw(file({ tokens: [{ symbol: "GNOT", usd: 1.234e-9, change24h: 1_000_000 }] }));
+    expect(tokenOf(host, "GNOT")?.textContent).toContain("$0.00000000123");
+    expect(tokenOf(host, "GNOT")?.textContent).toContain("+1000000.0%");
   });
 
   it.each([
@@ -147,7 +157,7 @@ describe("the markets row without a file", () => {
   it("shows markets.json missing as a state that says so, with no price", () => {
     const host = draw({ ok: false, reason: "missing" });
     expect(host.querySelector("[data-markets]")?.getAttribute("data-markets")).toBe("missing");
-    expect(host.textContent).toMatch(/prices are not (available|published) yet/i);
+    expect(host.textContent).toMatch(/prices are not (available|published) yet\. \S/i);
     expect(host.querySelectorAll("[data-token]")).toHaveLength(0);
     expect(host.textContent).not.toMatch(/\$|NaN|undefined/);
   });
@@ -157,7 +167,7 @@ describe("the markets row without a file", () => {
     (reason) => {
       const host = draw({ ok: false, reason });
       expect(host.querySelector("[data-markets]")?.getAttribute("data-markets")).toBe("failed");
-      expect(host.textContent).toMatch(/could not be read/i);
+      expect(host.textContent).toMatch(/could not be read\. Reload/i);
       expect(host.textContent).not.toMatch(/\$|NaN|undefined|unavailable|malformed|network/);
     },
   );

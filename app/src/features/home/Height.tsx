@@ -1,7 +1,7 @@
 // The latest block of the hero's live line (frame 6, "BLOCK 1,203,885"): its height from lib/chain's readHeight, the host it
 // was read from and how old the block is. No number without its source, and none at all while the read is on its way or failed.
 import type { ChainRead } from "../../lib/chain/read.ts";
-import { ageOf } from "./age.ts";
+import { stampOf } from "./stamp.ts";
 import styles from "./Live.module.css";
 
 export function Height({ read, now }: { read: ChainRead<{ height: number; time: string }> | undefined; now: Date }) {
@@ -15,7 +15,7 @@ export function Height({ read, now }: { read: ChainRead<{ height: number; time: 
           {height.toLocaleString("en-US")}
         </span>
         <small className={styles["credit"]}>
-          {new URL(read.source.url).hostname} · <time dateTime={time}>{ageOf(time, now)}</time>
+          {new URL(read.source.url).hostname} · <time dateTime={time}>{stampOf(time, now)}</time>
         </small>
       </>
     );
