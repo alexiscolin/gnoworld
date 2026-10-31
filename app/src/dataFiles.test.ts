@@ -591,6 +591,20 @@ describe("the ticker's placeholders", () => {
     expect(events.map((row) => row.id)).toEqual(SAMPLE_EVENTS);
   });
 
+  it("are counted across every data file's text, not only the two lists: five ids, no sixth hidden in another file", () => {
+    const files = readdirSync(DIR.pathname, { recursive: true }).filter(
+      (file) => !file.includes("/") && file.endsWith(".json"),
+    );
+    const found = files.flatMap((file) =>
+      [...readFileSync(new URL(file, DIR), "utf8").matchAll(/"id":\s*"(sample-[^"]*)"/g)].map((match) => match[1]),
+    );
+    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS].toSorted());
+  });
+
+  it("do not name a session of the product that no document has announced", () => {
+    expect(events.map((row) => row.title).join(" | ")).not.toMatch(/gno\.world/i);
+  });
+
   it("each begin with sample-, so they can be found and removed", () => {
     for (const row of [...news, ...events]) expect(row.id).toMatch(/^sample-/);
   });

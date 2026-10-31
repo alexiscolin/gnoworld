@@ -172,6 +172,9 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | The "first words" arrival banner | 9 |
 | The AI Ring and Harbor station bodies | Once their content exists (slice 5, question 6) |
 | The composer's emoji picker | Waits for Alexis: it needs `emojibase-data` |
+| One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
+| The ticker's five `sample-` rows (`app/data/news.json`, `events.json`) leave before a public deploy, with a refusal at deploy that counts them (5m's review, row 11) | The slice that deploys in public |
+| The home's sparklines and the frame's spacing of the live line (decisions, 2026-10-31) | The markets' history, once the file holds one |
 
 ## Phase 1: social on chain
 
