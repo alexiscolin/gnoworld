@@ -16,7 +16,7 @@ function isOwn(href: string, origin: string | undefined): boolean {
 }
 
 // The host an address goes to, as the browser reads it; the address itself when it has none.
-function hostOf(href: string): string {
+export function hostOf(href: string): string {
   try {
     return new URL(href).host;
   } catch {

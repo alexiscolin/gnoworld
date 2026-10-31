@@ -4,13 +4,22 @@
 // slice-5-part-2.md, question to Alexis, F2906) replaces GNOWEB with one line.
 import { originOf } from "@gnoworld/core";
 
+const GNOWEB: ReadonlyMap<string, string> = new Map([
+  ["gnoland-1", "https://gno.land"],
+  ["onyx-1", "https://onyx.testnets.gno.land"],
+]);
+
 /** A chain's gnoweb origin by its chain id: the two the data names today. */
 export function gnowebOrigin(chainId: string): string | undefined {
-  const GNOWEB: ReadonlyMap<string, string> = new Map([
-    ["gnoland-1", "https://gno.land"],
-    ["onyx-1", "https://onyx.testnets.gno.land"],
-  ]);
   return GNOWEB.get(chainId);
+}
+
+/** Whether an address is a realm's page on one of those gnoweb origins, written out as `https://host/r/...`: nothing that
+ * parses to another host gets through (credentials, a port, a scheme in capitals, a space or a control character). */
+export function isGnowebAddress(href: string): boolean {
+  return [...GNOWEB.values()].some(
+    (origin) => href.startsWith(`${origin}/r/`) && /^\/r\/[A-Za-z0-9_/:.-]+$/.test(href.slice(origin.length)),
+  );
 }
 
 /** A realm's address on gnoweb: its path (`gno.land/r/demo/dao` or `/r/demo/dao`) under gnoweb's own origin, or none when the

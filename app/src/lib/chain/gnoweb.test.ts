@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gnowebLink, gnowebOrigin } from "./gnoweb.ts";
+import { gnowebLink, gnowebOrigin, isGnowebAddress } from "./gnoweb.ts";
 
 describe("gnowebOrigin: where a chain's gnoweb is", () => {
   it("names the two hosts of the recorded answers", () => {
@@ -41,4 +41,27 @@ describe("gnowebLink: a realm's address on gnoweb", () => {
       expect(gnowebLink(origin, "/r/demo/dao")).toBeUndefined();
     },
   );
+});
+
+describe("isGnowebAddress: a realm's page on one of the two gnoweb origins, written out", () => {
+  it.each(["https://gno.land/r/gov/dao:15", "https://onyx.testnets.gno.land/r/gov/dao"])("accepts %s", (href) => {
+    expect(isGnowebAddress(href)).toBe(true);
+  });
+
+  it.each([
+    "http://gno.land/r/gov/dao",
+    "https://gno.land.evil.example/r/gov/dao",
+    "https://gno.land@evil.example/r/gov/dao",
+    "https://gno.land:8443/r/gov/dao",
+    "https://evil.example/r/gov/dao",
+    "HTTPS://gno.land/r/gov/dao",
+    "https://gno.land/r/",
+    "https://gno.land/r/gov/dao?x=1",
+    "https://gno.land/r/gov/dao#x",
+    "https://gno.land/r/gov dao",
+    "https://gno.land/p/demo/avl",
+    "",
+  ])("refuses %j", (href) => {
+    expect(isGnowebAddress(href)).toBe(false);
+  });
 });
