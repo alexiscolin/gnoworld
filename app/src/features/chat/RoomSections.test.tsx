@@ -32,9 +32,9 @@ describe("RoomSections", () => {
     expect(html).toContain('aria-current="true"');
   });
 
-  it("puts what the page gives after a room's link, and says so when there is no room", () => {
+  it("puts what the page gives after a room's link, as its badge, and says so when there is no room", () => {
     const html = renderToStaticMarkup(
-      <RoomSections sections={SECTIONS} current={undefined} trail={(room) => <i>{`after ${room}`}</i>} />,
+      <RoomSections sections={SECTIONS} current={undefined} badge={(room) => ({ said: `after ${room}` })} />,
     );
     expect(said(html)).toContain("after #bubble");
     expect(said(html)).toContain("after #bubble/games");

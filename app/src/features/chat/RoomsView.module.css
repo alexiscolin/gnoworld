@@ -1,5 +1,10 @@
-/* The rooms' sections: each named as a label is. */
+/* The rooms' sections: each named as a label is, and the small grey note under the direct messages. */
 @layer components {
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-hint);
+  }
+
   .section {
     font: var(--font-label);
     letter-spacing: var(--tracking-caps);

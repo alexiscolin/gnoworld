@@ -7,6 +7,16 @@
     list-style: none;
   }
 
+  /* The rooms' and the direct messages' items, a step apart as the video sets them. */
+  .items {
+    /* layout: the items one under the other, the video's step between them */
+    display: flex;
+    /* layout: one under the other */
+    flex-direction: column;
+    /* layout: the video's step between the items */
+    gap: var(--chat-item-gap);
+  }
+
   /* A pin and a saved line, each set apart on its own card (4d). */
   .card {
     border-radius: var(--radius-m);

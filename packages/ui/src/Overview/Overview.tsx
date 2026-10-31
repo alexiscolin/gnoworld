@@ -19,6 +19,7 @@ import {
   Stats,
   TabRows,
 } from "./Interface.tsx";
+import { NavItems } from "./NavItems.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Kickers, Layout } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
@@ -165,6 +166,7 @@ export function Overview() {
       </Region>
       <Region name="Rows">
         <Rows />
+        <NavItems />
       </Region>
       <Region name="Fields">
         <Fields />

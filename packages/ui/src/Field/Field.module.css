@@ -20,6 +20,10 @@
     font: var(--font-field);
   }
 
+  .box::placeholder {
+    color: var(--color-text-muted);
+  }
+
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls (F1722, F1729); a
      browser without field-sizing keeps the two rows of the markup. The handle moves its height alone. */
   textarea.box {

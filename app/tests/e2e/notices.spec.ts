@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { lineOf, noticeStatus, roomsNav, word } from "./chat.ts";
+import { closeMenu, lineOf, menu, noticeStatus, roomsNav, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, hiddenTab, HISTORY, live, OTHER, room, tab, T } from "./scriptedRoom.ts";
@@ -81,7 +81,7 @@ test.describe("notifications", () => {
     page,
   }) => {
     const { address, ergo } = await account(page);
-    const modes = page.getByRole("group", { name: "Notifications for #games" });
+    const modes = (await menu(page)).getByRole("group", { name: "Notifications for #games" });
     await modes.getByRole("button", { name: "Nothing" }).click();
     ergo().send(live("n1", T(31), { text: mentioned(address, "muted") }));
     ergo().send(live("n2", T(32), { room: "#bubble", text: "a barrier" }));
@@ -89,10 +89,11 @@ test.describe("notifications", () => {
     await expect(noticeStatus(page)).toHaveText("");
   });
 
-  const modes = (page: Page, name: string) => page.getByRole("group", { name: `Notifications for ${name}` });
-  const pressed = (page: Page, room: string, mode: string) => modes(page, room).getByRole("button", { name: mode });
+  const pressed = async (page: Page, room: string, mode: string) =>
+    (await menu(page)).getByRole("group", { name: `Notifications for ${room}` }).getByRole("button", { name: mode });
   // Opens a room and waits for it to be the one in view: a line sent before would arrive in the room in view.
   async function open(page: Page, room: string) {
+    await closeMenu(page);
     await rowOf(page, room).getByRole("link", { name: room, exact: true }).click();
     await expect(page.getByRole("heading", { name: room, level: 2 })).toBeVisible();
   }
@@ -105,7 +106,7 @@ test.describe("notifications", () => {
     await expect(rowOf(page, "#bubble")).not.toContainText("unread");
     await expect(rowOf(page, "#news")).toContainText("1 unread");
     await open(page, "#bubble");
-    await expect(pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "true");
+    await expect(await pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "true");
   });
 
   test("counts every plain line of a room set to All messages, and again only the mentions once Mentions is pressed", async ({
@@ -113,15 +114,15 @@ test.describe("notifications", () => {
   }) => {
     const { ergo } = await account(page);
     await open(page, "#bubble");
-    await pressed(page, "#bubble", "All messages").click();
-    await expect(pressed(page, "#bubble", "All messages")).toHaveAttribute("aria-pressed", "true");
-    await expect(pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "false");
+    await (await pressed(page, "#bubble", "All messages")).click();
+    await expect(await pressed(page, "#bubble", "All messages")).toHaveAttribute("aria-pressed", "true");
+    await expect(await pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "false");
     await open(page, "#games");
     ergo().send(live("p3", T(33), { room: "#bubble", text: "more talk" }));
     await expect(rowOf(page, "#bubble")).toContainText("1 unread");
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     await open(page, "#bubble");
-    await pressed(page, "#bubble", "Mentions").click();
+    await (await pressed(page, "#bubble", "Mentions")).click();
     await open(page, "#games");
     ergo().send(live("p4", T(34), { room: "#bubble", text: "still talking" }));
     ergo().send(live("p5", T(35), { room: NEWS, text: "a barrier, in a room still on Mentions" }));
@@ -131,8 +132,8 @@ test.describe("notifications", () => {
 
   test("counts nothing in a room set to Nothing, a mention included, and the others as before", async ({ page }) => {
     const { address, ergo } = await account(page);
-    await pressed(page, "#games", "Nothing").click();
-    await expect(pressed(page, "#games", "Nothing")).toHaveAttribute("aria-pressed", "true");
+    await (await pressed(page, "#games", "Nothing")).click();
+    await expect(await pressed(page, "#games", "Nothing")).toHaveAttribute("aria-pressed", "true");
     await open(page, "#bubble");
     ergo().send(live("p4", T(34), { room: "#bubble/games", text: mentioned(address, "muted") }));
     ergo().send(live("p5", T(35), { room: NEWS, text: mentioned(address, "again") }));
@@ -143,9 +144,9 @@ test.describe("notifications", () => {
 
   test("keeps a room's mode on the device, which a reload reads again", async ({ page }) => {
     await account(page);
-    await page.getByRole("button", { name: "Nothing" }).click();
+    await (await menu(page)).getByRole("button", { name: "Nothing" }).click();
     await page.reload();
-    await expect(page.getByRole("button", { name: "Nothing" })).toHaveAttribute("aria-pressed", "true");
+    await expect((await menu(page)).getByRole("button", { name: "Nothing" })).toHaveAttribute("aria-pressed", "true");
   });
 
   test("counts a direct message on its conversation's row and in the title, and opening it clears them", async ({
@@ -153,7 +154,7 @@ test.describe("notifications", () => {
   }) => {
     const { address, ergo } = await account(page);
     ergo().send(`@msgid=d1;time=${T(31)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${address} :hello there`);
-    const row = rowOf(page, `${OTHER_SHORT} Not encrypted`);
+    const row = rowOf(page, OTHER_SHORT);
     await expect(row).toContainText("1 unread");
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     await expect(
@@ -178,7 +179,7 @@ test.describe("notifications", () => {
     ergo().send(`@msgid=d2;time=${T(32)};account=${OTHER} :${OTHER}!u@h PRIVMSG ${address} :a barrier`);
     await expect(page.getByText("a barrier")).toBeVisible();
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, `${OTHER_SHORT} Not encrypted`)).not.toContainText("unread");
+    await expect(rowOf(page, OTHER_SHORT)).not.toContainText("unread");
   });
 
   test("sees a direct message once Ergo's reading place of its partner passes it, a read on another device", async ({
@@ -189,7 +190,7 @@ test.describe("notifications", () => {
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     ergo().send(`:ergo MARKREAD ${OTHER} timestamp=${T(31)}`);
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, `${OTHER_SHORT} Not encrypted`)).not.toContainText("unread");
+    await expect(rowOf(page, OTHER_SHORT)).not.toContainText("unread");
   });
 
   // 4d's replies: a reply to a line of the account's is a notice, said by who and what.

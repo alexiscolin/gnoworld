@@ -1,4 +1,4 @@
-/* A room: its description and the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
+/* A room: the link's state muted, its lines wrapping anywhere, an /me, a notice, a quote and a
    line that mentions the reader apart. */
 @layer components {
   /* The conversation: a column that fills its region, the list in it scrolling alone (.fill) over the composer. */
@@ -13,21 +13,10 @@
     min-block-size: 0;
   }
 
-  /* What stands above the lines, at the lines' own inset. */
+  /* What stands above the lines, at the lines' own inset: the link's state, and a room's word while it holds no line. */
   .lead {
-    /* layout: a column at the lines' inset, a step apart; a composition takes no padding of its own, and the markup holds
-       the note first in the one element */
-    display: flex;
-    /* layout: one under the other */
-    flex-direction: column;
-    /* layout: a step apart */
-    gap: var(--space-2xs);
     padding-block-start: var(--space-s);
     padding-inline: var(--space-l);
-  }
-
-  .topic {
-    color: var(--color-text-muted);
   }
 
   .status:empty {
@@ -57,6 +46,8 @@
     overflow: auto;
     padding-block: var(--space-m);
     padding-inline: calc(var(--space-l) - var(--focus-width) - var(--focus-offset));
+    /* the video's chat text, a half point under the body's */
+    font: var(--font-chat);
   }
 
   .lines > li {

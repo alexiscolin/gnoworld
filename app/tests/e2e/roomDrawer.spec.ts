@@ -21,9 +21,7 @@ const strip = (page: Page, words: string | RegExp) =>
 // The conversation with OTHER, chosen in the drawer, which closes as it opens.
 async function chooseDm(page: Page) {
   await control(page).click();
-  await drawer(page)
-    .getByRole("link", { name: `${OTHER_SHORT} Not encrypted` })
-    .click();
+  await drawer(page).getByRole("link", { name: OTHER_SHORT, exact: true }).click();
   await expect(page.getByRole("heading", { name: `Direct message with ${OTHER_SHORT}` })).toBeVisible();
 }
 const control = (page: Page) => page.getByRole("button", { name: /^Rooms\b/ });

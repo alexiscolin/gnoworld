@@ -16,6 +16,17 @@
     color: var(--color-text-muted);
   }
 
+  /* The figures between two rules, as the video's panel sets them. */
+  .stats {
+    padding-block: var(--space-xs);
+    border-block: var(--line-width) solid var(--color-line);
+  }
+
+  .figure {
+    font: var(--font-title-m);
+    font-variant-numeric: tabular-nums;
+  }
+
   .here {
     padding-block-start: var(--space-s);
   }

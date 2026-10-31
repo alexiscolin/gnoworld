@@ -93,3 +93,7 @@ export const mentionable = (members: readonly string[], lines: readonly Line[]):
 
 /** The server's moderation bot (server/src/irc/lines.ts), in every room, never listed. */
 export const BOT = "gnoworld";
+
+/** How many are talking here: those in the room, the bot left out, once connected; none before (a count of none says nothing). */
+export const talkingOf = (members: readonly string[] | undefined, connected: boolean): number | undefined =>
+  connected && members !== undefined ? members.filter((nick) => nick !== BOT).length : undefined;

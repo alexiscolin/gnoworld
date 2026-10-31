@@ -13,6 +13,8 @@ export interface FieldProps {
   enterAddsLine?: boolean | undefined;
   help?: string;
   error?: string;
+  /** What the empty box says it is for, muted in the box: the chat's "Message #general". */
+  placeholder?: string | undefined;
   /** Words before the box, outside its value: "@" before a name. */
   prefix?: string;
   /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
@@ -32,7 +34,7 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boo
   event.currentTarget.form?.requestSubmit();
 }
 
-interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine"> {
+interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine" | "placeholder"> {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
   invalid: boolean;
@@ -40,12 +42,13 @@ interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLin
 }
 
 // The box itself: a line of text, or the lines of a message.
-function Box({ kind, id, value, invalid, described, enterAddsLine, onChange }: BoxProps) {
+function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, onChange }: BoxProps) {
   const composingRef = useRef(false);
   const shared = {
     id,
     className: styles["box"],
     value,
+    placeholder,
     "aria-invalid": invalid ? true : undefined,
     "aria-describedby": described,
   };
@@ -88,6 +91,7 @@ export function Field({
   prefix,
   describedBy,
   enterAddsLine,
+  placeholder,
 }: FieldProps) {
   const id = useId();
   const helpId = `${id}-help`;
@@ -103,6 +107,7 @@ export function Field({
       invalid={error !== undefined}
       described={described.join(" ") || undefined}
       enterAddsLine={enterAddsLine}
+      placeholder={placeholder}
       onChange={onChange}
     />
   );

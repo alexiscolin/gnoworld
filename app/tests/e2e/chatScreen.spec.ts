@@ -44,8 +44,25 @@ test.describe("the chat as the video shows it", () => {
     expect(talk.x + talk.width).toBeLessThanOrEqual(i.x + 1);
     expect(h.y + h.height).toBeLessThanOrEqual(w.y + 1);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toHaveAttribute("aria-current", "page");
-    // Expand and Close do nothing on a world's page before the dock (slice 7): the header draws neither.
-    await expect(page.getByRole("button", { name: /^(Expand|Shrink|Close) the chat$/ })).toHaveCount(0);
+    // Shrink has no dock to shrink to before slice 7: the header draws none; Close leaves the chat, which works today.
+    await expect(page.getByRole("button", { name: /^(Expand|Shrink) the chat$/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Close the chat" })).toBeVisible();
+  });
+
+  test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
+    await logIn(page, "screen-close");
+    await open(page, { width: 1280, as: ACCOUNT });
+    const home = await page
+      .getByRole("navigation", { name: "You are here" })
+      .getByRole("link")
+      .first()
+      .getAttribute("href");
+    const close = page.getByRole("button", { name: "Close the chat" });
+    const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(close)]);
+    expect(bar.x + bar.width - (shut.x + shut.width)).toBeLessThanOrEqual(24);
+    await close.click();
+    await expect(page).toHaveURL(new RegExp(`${String(home).replaceAll("/", "\\/")}$`));
+    await expect(page.locator("[data-chat-layout]")).toHaveCount(0);
   });
 
   test("draws each line with its nebula, its name, its time at the right edge and its text below", async ({ page }) => {

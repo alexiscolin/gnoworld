@@ -39,7 +39,6 @@ const members = [ALICE, BOB, ...Array.from({ length: 98 }, (_, n) => `guest-${St
 const room = (
   <RoomView
     room="#bubble/games"
-    note="Games"
     state={{ lines, members }}
     chat="connected"
     me={BOB}
@@ -70,7 +69,6 @@ describe("a room", () => {
           <RoomsView sections={sections} current={rooms[42]} />
           <RoomView
             room="#bubble/room-042"
-            note="Games"
             state={{ lines, members }}
             chat="connected"
             me={BOB}

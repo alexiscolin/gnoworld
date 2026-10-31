@@ -87,6 +87,34 @@ test.describe("the chat at the video's size", () => {
     expect(radius).toBe("16px");
   });
 
+  test("draws the quick actions as the video's pills: an edge, 12 px words centred, the row's whole width shared", async ({
+    page,
+  }) => {
+    await logIn(page, "geometry-pills");
+    await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
+    const pill = page.locator('[role="toolbar"][aria-label="Quick actions"] button').first();
+    const look = await pill.evaluate((e) => {
+      const css = getComputedStyle(e);
+      const text = document.createRange();
+      text.selectNodeContents(e);
+      const [at, around] = [text.getBoundingClientRect(), e.getBoundingClientRect()];
+      return {
+        edge: css.borderTopWidth,
+        // Drawn: an edge of a colour, not the transparent one.
+        seen: !/^rgba\(.*, 0\)$/.test(css.borderTopColor) && css.borderTopColor !== "transparent",
+        size: css.fontSize,
+        offCentre: Math.round(Math.abs(at.left + at.width / 2 - (around.left + around.width / 2))),
+      };
+    });
+    expect(look).toEqual({ edge: "1px", seen: true, size: "12px", offCentre: 0 });
+    const [row, bar] = await Promise.all([
+      page.locator('[role="toolbar"][aria-label="Quick actions"]').boundingBox(),
+      pill.boundingBox(),
+    ]);
+    if (row === null || bar === null) throw new Error("not drawn");
+    near(bar.width, row.width);
+  });
+
   test("looks as the video's frame does", async ({ page }) => {
     await logIn(page, "geometry-look");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });

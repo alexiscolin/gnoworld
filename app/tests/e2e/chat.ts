@@ -22,3 +22,19 @@ export async function inGames(page: Page): Promise<string> {
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
   return address;
 }
+
+/** The menu behind the room's name (the chevron), opened if it is not, a modal dialog: the room's note, an account's
+ * notification modes and its choice of whom it hears direct messages from. Close it before the page is used again. */
+export async function menu(page: Page): Promise<ReturnType<Page["locator"]>> {
+  const panel = page.getByRole("dialog", { name: /^(Room|Conversation)$/ });
+  if (!(await panel.isVisible())) await page.locator('[data-region="header"] button[aria-haspopup="dialog"]').click();
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** Shuts the menu if it is open (Escape), so the page behind it can be used. */
+export async function closeMenu(page: Page): Promise<void> {
+  const panel = page.getByRole("dialog", { name: /^(Room|Conversation)$/ });
+  if (await panel.isVisible()) await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+}

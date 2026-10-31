@@ -7,6 +7,13 @@ import { Field } from "./Field.tsx";
 import * as stories from "./Field.stories.tsx";
 
 describe("Field", () => {
+  it("shows the placeholder it is given in its empty box, and none when it has none", () => {
+    const { rerender } = render(<Field label="Message" placeholder="Message #general" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("placeholder")).toBe("Message #general");
+    rerender(<Field label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("placeholder")).toBe(false);
+  });
+
   it("is a text box named by its label, described by its help", () => {
     render(<Field label="Room name" help="Up to 32 letters" value="" onChange={vi.fn()} />);
     const box = screen.getByRole("textbox", { name: "Room name" });

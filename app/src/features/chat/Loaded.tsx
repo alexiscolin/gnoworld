@@ -11,8 +11,10 @@ import type { ChatLink } from "./link.ts";
 import { useComposing } from "./composing.ts";
 import { dmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
-import { dmParams, groupsAt, roomIds } from "./names.ts";
+import { dmParams, groupsAt, roomIds, talkingOf } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
+import { OnlyKnown } from "./OnlyKnown.tsx";
+import { RoomMenu } from "./RoomMenu.tsx";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
@@ -178,12 +180,22 @@ export function Loaded(props: LoadedProps) {
         {...composing.writer}
       />
     );
+  // An account's menu always holds the choice of whom it hears from, so it is always there.
+  const menu = (
+    <RoomMenu note={shown?.note} noteId={noteId}>
+      {modesOf(room, noticing.notify)}
+      {dms.nav === undefined ? null : <OnlyKnown {...dms.nav} />}
+    </RoomMenu>
+  );
   return (
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
+      menu={{ label: shown?.kind === "dm" ? "Conversation" : "Room", content: menu }}
+      mark={shown?.mark}
       rail={rail}
       unread={unreadOf(noticing.badges)}
+      talking={talkingOf(props.state?.members, chat === "connected")}
       people={people}
       threads={threads}
       status={<NoticeStatus notices={noticing.list} />}
@@ -199,9 +211,7 @@ export function Loaded(props: LoadedProps) {
             pins,
             chat,
             me,
-            noteId,
             ...composing.view,
-            modes: modesOf(room, noticing.notify),
             ...threads.view,
           }}
           composer={room === undefined ? writer : <Dock onWhoIsHere={ask}>{writer}</Dock>}

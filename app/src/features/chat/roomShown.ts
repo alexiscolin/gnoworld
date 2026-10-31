@@ -15,10 +15,11 @@ export interface Shown {
   key: string;
   /** Its name, in the chat's header: a room's label, a direct message's partner. */
   title: ReactNode;
-  view: Pick<
-    RoomViewProps,
-    "room" | "partner" | "note" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact"
-  >;
+  /** What the room's menu says of it, behind its name: a room's description (its IRC topic), a conversation's "not encrypted". */
+  note?: ReactNode;
+  /** A short mark after the name, always in view: a direct message's "Not encrypted". */
+  mark?: ReactNode;
+  view: Pick<RoomViewProps, "room" | "partner" | "state" | "empty" | "onDelete" | "onDismiss" | "onRead" | "onReact">;
   /** Says what the composer composed in the conversation, an answer to a line (`reply`) or a correction of one (`edit`);
    * `draft` is what its writer typed; whether it went. */
   say: (composed: Composed, draft: string, tags?: { reply?: string; edit?: string }) => boolean;
@@ -41,9 +42,9 @@ export function roomShown(room: string, state: Room["state"], acts: RoomActs): S
     kind: "room",
     key: `room:${room}`,
     title: roomLabel(room),
+    note: state?.topic,
     view: {
       room,
-      note: state?.topic,
       state,
       onDelete: acts.onDelete,
       onDismiss: acts.onDismiss,

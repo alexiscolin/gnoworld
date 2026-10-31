@@ -1,4 +1,4 @@
-// A room (slice 4's 4b): its name, its description (its IRC topic), its newest lines as the store holds them
+// A room (slice 4's 4b): its newest lines as the store holds them
 // (the window), held at the newest while the reader is there, who is here, and the state of the link. A line's
 // text is Markdown (4c), built into elements from an allowlist (Message.tsx); one that mentions the reader says so
 // (4d); the composer, given, goes below.
@@ -57,10 +57,6 @@ export interface RoomViewProps {
   room?: string | undefined;
   /** The partner of the direct message in view: its lines have bars too (4d's DM bar), with no link and no player. */
   partner?: string | undefined;
-  /** What it says of itself above its lines: a room's description, its IRC topic; a conversation's "not encrypted". */
-  note?: ReactNode;
-  /** The note's id, which the composer points at (4e's U6). */
-  noteId?: string | undefined;
   state:
     | {
         lines: readonly Line[];
@@ -104,38 +100,18 @@ export interface RoomViewProps {
   onReact?: ((reaction: Reacting) => boolean) | undefined;
   /** Makes a line, by its msgid, the one the composer's next answers (4d's replies). */
   onReply?: ((id: string) => void) | undefined;
-  /** The room's notification modes, under its name: an account's alone, which its code draws (4f-n). */
-  modes?: ReactNode;
   /** Opens a line's thread, by the msgid of its root (4d's threads); none for a direct message's lines. */
   onThread?: ((id: string) => void) | undefined;
   /** Puts a line's words in the composer to correct them, the reader's own (a direct message's). */
   onEdit?: ((id: string) => void) | undefined;
 }
 
-// Above the lines: the room's description, its notification modes and the link's state, said in a status.
-function Lead({
-  note,
-  noteId,
-  modes,
-  status,
-}: {
-  note: ReactNode;
-  noteId: string | undefined;
-  modes: ReactNode;
-  status: ReactNode;
-}) {
+// Above the lines: the link's state, said in a status.
+function Lead({ status }: { status: ReactNode }) {
   return (
-    <div className={styles["lead"]}>
-      {note === undefined ? null : (
-        <p id={noteId} className={styles["topic"]}>
-          {note}
-        </p>
-      )}
-      {modes}
-      <p role="status" className={styles["status"]}>
-        {status}
-      </p>
-    </div>
+    <p role="status" className={[styles["lead"], styles["status"]].join(" ")}>
+      {status}
+    </p>
   );
 }
 
@@ -143,15 +119,15 @@ function Lead({
 export type RoomViewOver = Pick<RoomViewProps, "chat"> & Partial<Omit<RoomViewProps, "room" | "composer" | "chat">>;
 
 export function RoomView(props: RoomViewProps) {
-  const { room, note, noteId, state, chat, composer, me, onDelete, onDismiss, onRead } = props;
-  const { onReact, onReply, modes, onThread, onEdit, partner } = props;
+  const { room, state, chat, composer, me, onDelete, onDismiss, onRead } = props;
+  const { onReact, onReply, onThread, onEdit, partner } = props;
   const { verdicts, saving = false, keeping, pins } = props;
   const { empty = "No messages yet." } = props;
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
     <div className={styles["main"]}>
-      <Lead note={note} noteId={noteId} modes={modes} status={connected ? null : NOTICES[chat]} />
+      <Lead status={connected ? null : NOTICES[chat]} />
       <PinsAbove key={`${String(room)} pins`} pins={pins} />
       <RoomLines
         key={room}

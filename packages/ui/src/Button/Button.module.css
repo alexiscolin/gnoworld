@@ -17,6 +17,10 @@
       box-shadow var(--motion-fast) var(--ease-standard);
   }
 
+  .button[data-size="xs"] {
+    --_h: var(--control-xs);
+  }
+
   .button[data-size="s"] {
     --_h: var(--control-s);
   }

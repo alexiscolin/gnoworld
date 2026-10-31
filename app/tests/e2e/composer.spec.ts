@@ -137,7 +137,12 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveAccessibleDescription("Tab completes #news.");
     // The caret elsewhere than the end: Tab moves on, the draft as it was; and Tab on Send completes nothing.
     await caretAt(page, "Home", 0);
+    // Past the field come the box's marks (@ and /), then Send (5q: the video's box foot).
     await field(page).press("Tab");
+    await expect(page.getByRole("button", { name: "Mention someone" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: "Start a command" })).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(send(page)).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(field(page)).toHaveValue("see #ne");

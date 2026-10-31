@@ -6,7 +6,7 @@
   }
 
   .rail {
-    padding: var(--space-s);
+    padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
   }
 

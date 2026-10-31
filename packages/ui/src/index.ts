@@ -21,6 +21,7 @@ export { Kicker, type KickerProps } from "./Kicker/Kicker.tsx";
 export { LinkProvider, type PageLinkProps } from "./link.tsx";
 export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.tsx";
 export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
+export { NavItem, type NavItemProps } from "./NavItem/NavItem.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";
 export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
 export { Stat, type StatProps } from "./Stat/Stat.tsx";

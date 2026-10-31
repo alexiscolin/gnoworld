@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { inGames, lines, whoIsHere, word } from "./chat.ts";
+import { closeMenu, inGames, lines, menu, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 
@@ -8,9 +8,11 @@ import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 // writes over a raw socket: its login, then its message.
 const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
 const dmsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
-// A conversation's row, by its own subtitle: the Notifications list above it links to the same page (4f-n).
-const rowOf = (page: Page, address: string) =>
-  dmsNav(page).getByRole("link", { name: `${short(address)} Not encrypted` });
+// The choice of whom it hears from, in the menu behind the conversation's name (5q).
+const onlyKnown = async (page: Page) => (await menu(page)).getByRole("button", { name: "Only people I wrote to" });
+// A conversation's row, by its link's own name, the address alone: the Notifications list above it links to the same page, its
+// link named by who did what (4f-n).
+const rowOf = (page: Page, address: string) => dmsNav(page).getByRole("link", { name: short(address), exact: true });
 
 // A direct message from that account, over its own socket with a ticket of its own (one a connection), once it is
 // registered; every line Ergo answered.
@@ -50,8 +52,9 @@ test.describe("direct messages", () => {
     await dmFrom(bob, me, text);
     const link = rowOf(page, bob.address);
     await expect(link).toBeVisible();
-    // U6: the row says it is not encrypted; U7: the page says it is a direct message, the address whole in its title.
-    await expect(link).toHaveAccessibleName(`${short(bob.address)} Not encrypted`);
+    // U6, 5q: the list's note says they are not encrypted; U7: the page says it is a direct message, the address whole in its title.
+    await expect(link).toHaveAccessibleName(short(bob.address));
+    await expect(dmsNav(page).getByText(NOT_ENCRYPTED)).toBeVisible();
     await link.click();
     const heading = page.getByRole("heading", { name: `Direct message with ${short(bob.address)}` });
     await expect(heading).toBeVisible();
@@ -59,9 +62,13 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("form", { name: `Write to ${short(bob.address)}` })).toHaveAccessibleDescription(
       `${NOT_ENCRYPTED} Kept only while this page is open.`,
     );
-    await expect(page.getByText(NOT_ENCRYPTED)).toBeVisible();
-    // Decision C (U2): Ergo keeps no direct message; the page says so beside "Not encrypted".
-    await expect(page.getByText("Kept only while this page is open.")).toBeVisible();
+    // The header says it at once, in a word; the menu behind the name says it whole, and Decision C (U2): Ergo keeps no
+    // direct message, so the page says so beside "Not encrypted".
+    await expect(page.locator('[data-region="header"]').getByText("Not encrypted", { exact: true })).toBeVisible();
+    const about = await menu(page);
+    await expect(about.getByText(NOT_ENCRYPTED)).toBeVisible();
+    await expect(about.getByText("Kept only while this page is open.")).toBeVisible();
+    await closeMenu(page);
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await bob.close();
@@ -106,7 +113,7 @@ test.describe("direct messages", () => {
     await whoIsHere(page)
       .getByRole("button", { name: `Message ${short(bob.address)}` })
       .click();
-    await expect(page.getByText(NOT_ENCRYPTED)).toBeVisible();
+    await expect(page.locator('[data-region="header"]').getByText("Not encrypted", { exact: true })).toBeVisible();
     const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
     // U12: the button goes with who is here; the field takes the focus, not the page.
     await expect(field).toBeFocused();
@@ -170,21 +177,15 @@ test.describe("direct messages", () => {
     await field.fill("hi bob");
     await field.press("Enter");
     await expect(lines(page).filter({ hasText: "hi bob" })).toHaveCount(1);
-    await dmsNav(page).getByRole("button", { name: "Only people I wrote to" }).click();
-    await expect(dmsNav(page).getByRole("button", { name: "Only people I wrote to" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await (await onlyKnown(page)).click();
+    await expect(await onlyKnown(page)).toHaveAttribute("aria-pressed", "true");
     await dmFrom(carol, me, word("stranger"));
     await dmFrom(bob, me, word("known"));
     await expect(lines(page).filter({ hasText: "known" })).toHaveCount(1);
     await expect(rowOf(page, carol.address)).toHaveCount(0);
     // Refused means discarded (decision B): hearing everyone again shows nothing that came while it was on.
-    await dmsNav(page).getByRole("button", { name: "Only people I wrote to" }).click();
-    await expect(dmsNav(page).getByRole("button", { name: "Only people I wrote to" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    await (await onlyKnown(page)).click();
+    await expect(await onlyKnown(page)).toHaveAttribute("aria-pressed", "false");
     await expect(rowOf(page, carol.address)).toHaveCount(0);
     await Promise.all([bob.close(), carol.close()]);
   });

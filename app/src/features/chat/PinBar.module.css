@@ -16,10 +16,8 @@
     align-items: center;
     inline-size: 100%;
     padding-block: var(--space-2xs);
-    border: 0;
-    background: none;
     color: var(--color-text);
-    font: var(--font-body);
+    font: var(--font-chat);
     cursor: pointer;
   }
 

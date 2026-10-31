@@ -1,7 +1,18 @@
+/* Who is here, as the video's info panel draws it: a row a rule under each, the person at its start, the country at its end. */
 @layer components {
-  .count {
-    font: var(--font-label);
-    color: var(--color-text-muted);
+  .row {
+    padding-block: var(--space-xs);
+    border-block-end: var(--line-width) solid var(--color-line);
+  }
+
+  /* A person the reader may write to: face and name in one button, plain as the row's words are. */
+  .person {
+    border-radius: var(--radius-s);
+    cursor: pointer;
+  }
+
+  .person:hover {
+    background: var(--color-fill);
   }
 
   /* The country in words at the end of a person's row: the video's mono, muted. */

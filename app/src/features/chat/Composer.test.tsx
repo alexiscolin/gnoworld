@@ -756,8 +756,8 @@ describe("Composer: an edit", () => {
     expect(words(markup)).toContain("Editing a message");
     expect(names(markup)).toContain("Cancel the edit");
     expect(markup).toMatch(/<textarea[^>]*>the first words<\/textarea>/);
-    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>Save<\/button>/);
-    expect(markup).not.toMatch(/>Send<\/button>/);
+    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>.*>Save<\/span><\/button>/);
+    expect(markup).not.toMatch(/>Send<\/span><\/button>/);
   });
 
   it("describes its field by the bar that says what is edited", () => {
@@ -772,12 +772,12 @@ describe("Composer: an edit", () => {
     const markup = draw({ draft: "/me waves" });
     expect(words(markup)).toContain("An edit cannot be an action.");
     expect(markup).toMatch(
-      /<button[^>]*disabled=""[^>]*type="submit"[^>]*>Save<\/button>|<button[^>]*type="submit"[^>]*disabled=""[^>]*>Save<\/button>/,
+      /<button[^>]*disabled=""[^>]*type="submit"[^>]*>.*>Save<\/span><\/button>|<button[^>]*type="submit"[^>]*disabled=""[^>]*>.*>Save<\/span><\/button>/,
     );
   });
 
   it("lets a plain edit save, and an action go as a new message", () => {
-    const enabled = (markup: string) => !/<button[^>]*disabled=""[^>]*>(Save|Send)<\/button>/.test(markup);
+    const enabled = (markup: string) => !/<button[^>]*disabled=""[^>]*>.*>(Save|Send)<\/span><\/button>/.test(markup);
     const edit = draw({ draft: "the new words" });
     const action = draw({ draft: "/me waves", editing: undefined, onCancelEdit: undefined });
     expect(words(edit)).not.toContain("An edit cannot be an action.");
@@ -796,7 +796,7 @@ describe("Composer: an edit", () => {
     const markup = draw({ editing: undefined, onCancelEdit: undefined });
     expect(words(markup)).not.toContain("Editing a message");
     expect(names(markup)).not.toContain("Cancel the edit");
-    expect(markup).toMatch(/>Send<\/button>/);
+    expect(markup).toMatch(/>Send<\/span><\/button>/);
   });
 });
 

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { all, faceOf, follows, mount, nth, one, staysText } from "../../../tests/mount.tsx";
+import { describe, expect, it, vi } from "vitest";
+import { all, click, faceOf, follows, mount, nth, one, staysText } from "../../../tests/mount.tsx";
 import { People } from "./People.tsx";
 
 // 5q: "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, their country at
-// the end of the row when they opted in. The list, its name and its Message buttons stay (4e).
+// the end of the row when they opted in, a rule under each row. The list and the way to write to a person stay (4e): the
+// whole face and name is one button, named "Message" and the address, which opens the conversation.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const people = (over: Partial<Parameters<typeof People>[0]> = {}) =>
@@ -57,9 +58,22 @@ describe("who is here, as the info panel shows it", () => {
     ));
   });
 
-  it("keeps the count, the bot left out, and each other account's Message button", () => {
+  it("keeps the count for a screen reader, the bot left out, and a button to write to each other account", () => {
     const box = people({ members: ["gnoworld", ALICE, BOB], me: BOB, onMessage: () => undefined });
     expect(one(box, "h3").textContent).toBe("2 here");
+    expect(one(box, "h3").className).toBe("visually-hidden");
     expect(all(box, "button")).toHaveLength(1);
+  });
+
+  it("makes a person's face and name one button, named by its word and the address, which opens the conversation", () => {
+    const onMessage = vi.fn();
+    const box = people({ me: BOB, onMessage });
+    const row = nth(all(box, "li"), 0);
+    const writes = one(row, "button");
+    expect(writes.textContent).toBe("Message g10gh7…3y5tv");
+    expect(all(writes, "[data-kind='person']")).toHaveLength(1);
+    click(writes);
+    expect(onMessage).toHaveBeenCalledWith(ALICE);
+    expect(all(nth(all(box, "li"), 1), "button")).toHaveLength(0);
   });
 });

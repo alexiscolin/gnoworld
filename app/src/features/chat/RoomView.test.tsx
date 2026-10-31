@@ -2,7 +2,6 @@ import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
-import { NoticeModes } from "./NoticeModes.tsx";
 import { MEMBERS_SHOWN, People, type PeopleProps } from "./People.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -19,9 +18,9 @@ const line = (over: Partial<Line> = {}): Line => ({
   ...over,
 });
 const GUEST_LINE: Line = { id: "g", time: T0, from: "guest-ab12cd", text: "hello", kind: "message" };
-const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"], topic: "Bubbles here" };
-// A room as the page draws one: its description above its lines, and who is here, which the info panel holds (5q).
-type Room = (NonNullable<RoomViewProps["state"]> & { topic?: string | undefined }) | undefined;
+const ROOM = { lines: [line()], members: [ALICE, "guest-ab12cd"] };
+// A room as the page draws one: and who is here, which the info panel holds (5q).
+type Room = NonNullable<RoomViewProps["state"]> | undefined;
 type Over = Omit<Partial<RoomViewProps>, "state"> & {
   state?: Room;
   onMessage?: PeopleProps["onMessage"];
@@ -38,7 +37,6 @@ const view = ({ onMessage, people = true, ...over }: Over = {}) => {
     <>
       <RoomView
         room="#bubble/games"
-        note={state?.topic}
         chat="connected"
         onDelete={() => false}
         onDismiss={() => undefined}
@@ -63,7 +61,6 @@ const part = (html: string, label: string) => {
 // Each list item's words: a line that is a list holds items of its own, so a test of one counts the Messages
 // list's own children instead (F814's class).
 const items = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((m) => said(m[1] ?? ""));
-const paragraphs = (html: string) => (html.match(/<p[ >]/g) ?? []).length;
 
 // The lines view loads lazily, after the page is drawn (docs/decisions.md, 2026-10-26): drawn once and waited for, it
 // is held, and every view below draws it at once, as a room switch does once the page has it.
@@ -100,14 +97,6 @@ describe("RoomView", () => {
     expect(hidden).not.toContain("Waiting");
     expect(waiting).toContain("Waiting for the moderation check");
     expect(waiting).not.toContain("Play the");
-  });
-
-  it("says the room's description, its topic, above its lines", () => {
-    expect(view()).toMatch(/^<div[^>]*><div[^>]*><p[^>]*>Bubbles here<\/p>/);
-  });
-
-  it("gives no description when the room has none", () => {
-    expect(paragraphs(view({ state: { ...ROOM, topic: undefined } }))).toBe(paragraphs(view()) - 1);
   });
 
   it("shows a line with its time of day, its author by account, shortened, and its text, and no mark", () => {
@@ -283,18 +272,17 @@ describe("RoomView", () => {
     }
   });
 
-  it("shows a line, a topic, a nick, a member and an account as text, never as markup or a link", () => {
+  it("shows a line, a nick, a member and an account as text, never as markup or a link", () => {
     const hostile = "<img src=x onerror=alert(1)>";
     const lines = [
       line({ text: "<script>alert(1)</script> javascript:alert(1)" }),
       { ...GUEST_LINE, id: "b", from: hostile },
       line({ id: "c", account: `"><img src=x onerror=alert(1)>` }),
     ];
-    const html = view({ state: { lines, members: [hostile], topic: "<b>bold</b>" } });
+    const html = view({ state: { lines, members: [hostile] } });
     expect(html).not.toMatch(/<script|<img|<b>|<a |href=/);
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
-    expect(html).toContain("&lt;b&gt;bold&lt;/b&gt;");
   });
 
   // 4c's message menu (docs/decisions.md, 2026-10-26): the Messages list is one stop of the tab order, its newest
@@ -367,11 +355,13 @@ describe("RoomView", () => {
     const opened: string[] = [];
     const members = [ALICE, BOB, "guest-ab12cd", "gnoworld"];
     const html = part(view({ me: BOB, state: { ...ROOM, members }, onMessage: (a) => opened.push(a) }), "Who's here");
-    // Decision D (U8): a visible "Message", the address after it for a screen reader, which lists many.
+    // Decision D (U8), 5q: the person's name is the button, the word "Message" before it for a screen reader alone.
     expect([...html.matchAll(/<button[^>]*>(.*?)<\/button>/gs)].map((m) => said(m[1] ?? ""))).toEqual([
       "Message g10gh7…3y5tv",
     ]);
-    expect(html).toMatch(/<button[^>]*>.*Message<span class="visually-hidden"> g10gh7…3y5tv<\/span><\/button>/s);
+    expect(html).toMatch(
+      /<button[^>]*>.*<span class="visually-hidden">Message <\/span><span title="[^"]*">g10gh7…3y5tv<\/span>/s,
+    );
     expect(items(part(view({ state: { ...ROOM, members }, onMessage: () => undefined }), "Who's here"))).toEqual([
       "g10gh7…3y5tv",
       "g1jg8m…vsqf5",
@@ -379,15 +369,8 @@ describe("RoomView", () => {
     ]);
     expect(
       items(part(view({ me: BOB, state: { ...ROOM, members: [ALICE] }, onMessage: () => undefined }), "Who's here")),
-    ).toEqual(["g10gh7…3y5tv Message g10gh7…3y5tv"]);
+    ).toEqual(["Message g10gh7…3y5tv"]);
     expect(part(view({ me: BOB, state: { ...ROOM, members } }), "Who's here")).not.toContain("<button");
-  });
-
-  // 4e: a direct message's page names its partner, and says it is not encrypted, as every DM does.
-  it("puts a conversation's note above its lines, which the header's title, the chat's, no longer holds", () => {
-    const html = view({ note: "Not encrypted: the server can read these." });
-    expect(html).toMatch(/^<div[^>]*><div[^>]*><p[^>]*>Not encrypted: the server can read these.<\/p>/);
-    expect(html).not.toContain("<h2");
   });
 
   // 4e's own review: a conversation has its two people, never a room's "who is here".
@@ -455,7 +438,7 @@ describe("RoomView", () => {
   });
 
   it("claims no empty room while it is not connected", () => {
-    const html = view({ chat: "waiting", state: { lines: [], members: [], topic: undefined } });
+    const html = view({ chat: "waiting", state: { lines: [], members: [] } });
     expect(said(html)).not.toContain("No messages yet.");
   });
 
@@ -498,11 +481,6 @@ describe("RoomView", () => {
     ]);
     expect(html.match(/data-mine=""/g)).toHaveLength(1);
     expect(items(part(view({ state: { ...ROOM, lines } }), "Messages")).join(" ")).not.toMatch(/\byou\b/);
-  });
-
-  // 4e's UX review (U6): the composer reads the note, a direct message's "not encrypted", as its description.
-  it("gives its note the id it is given, for the composer to point at", () => {
-    expect(view({ note: "Not encrypted.", noteId: "n1" })).toMatch(/<p id="n1"[^>]*>Not encrypted.<\/p>/);
   });
 
   // 4e: a conversation says why it is empty in words of its own (decisions B, C).
@@ -901,24 +879,5 @@ describe("RoomView: edits", () => {
       expect.stringMatching(/\d{2}:\d{2}here$/),
       expect.stringMatching(/\d{2}:\d{2}fixed$/),
     ]);
-  });
-});
-
-// 4f-n: a room's notification modes are an account's, drawn by its code (NoticeModes) and given to the room's view,
-// which keeps their place under the room's name.
-describe("RoomView: the room's notification modes", () => {
-  const modes = <NoticeModes room="#bubble/games" mode="mentions" onMode={() => undefined} />;
-  const group = (html: string) => /role="group"[^>]*aria-label="Notifications for #games"/.test(html);
-
-  it("draws the modes it is given under the room's name, before its status", () => {
-    const html = view({ me: ALICE, modes });
-    expect(group(html)).toBe(true);
-    expect(html.indexOf("Bubbles here")).toBeLessThan(html.indexOf('role="group"'));
-    expect(html.indexOf('role="group"')).toBeLessThan(html.indexOf('role="status"'));
-  });
-
-  it("draws none when given none, a guest's whom no one can mention, or a direct message's", () => {
-    expect(group(view({ me: undefined }))).toBe(false);
-    expect(view({ me: ALICE, room: undefined })).not.toContain("Notifications for");
   });
 });

@@ -32,6 +32,7 @@ function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): Cha
     name: world.name,
     description: world.description,
     kicker: `${universe.name} · ${world.name}`,
+    home: universe.home.path,
     worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path, src: PLANET })),
   };
 }

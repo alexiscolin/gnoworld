@@ -7,8 +7,9 @@ import { useAppStore } from "../../storeContext.tsx";
 import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
 import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
-import { BOT, roomIds } from "./names.ts";
+import { BOT, roomIds, talkingOf } from "./names.ts";
 import { roomActs } from "./roomActs.ts";
+import { visitorMenu } from "./RoomMenu.tsx";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown, type Shown } from "./roomShown.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
@@ -121,8 +122,10 @@ export function GuestLoaded({
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
+      menu={visitorMenu(shown?.note)}
       rail={rail}
       unread={0}
+      talking={talkingOf(state?.members, chat === "connected")}
       people={people}
       threads={threads}
     >
