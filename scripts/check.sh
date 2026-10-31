@@ -15,6 +15,27 @@
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
 # shell's own differs.
 set -eu
+started=$(date +%s)
+logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
+# bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
+# on the last line, tells a run that reached its end from one that died on the way.
+merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
+lock_held=
+# Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
+release_lock() {
+	[ -n "$lock_held" ] || return 0
+	holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+	if [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm -rf "${merge_lock:?}"; fi
+}
+# A failing run ends on its own last line, after any tail it showed (a nested fixture's log ended one on `all checks passed`, and a reader
+# of the last line took the run for a pass): `check.sh: FAILED at <lane>:<step>`, on every exit path, signals included.
+failed_at=
+say_failed() { # $status is the exit code the shell had; a run that never reached its last line failed too, whatever the code
+	[ "$status" != 0 ] || [ "${finished:-}" != 1 ] || return 0
+	echo "check.sh: FAILED at ${failed_at:-main:${step_name:-start}}" >&2
+}
+trap 'status=$?; rm -rf "${logs:?}" || :; release_lock; say_failed; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
@@ -38,20 +59,6 @@ if [ "${2:-}" = "--base" ]; then
 	[ -n "$base_ref" ] || { echo "check.sh: --base wants a ref to compare with" >&2; exit 1; }
 fi
 changed_list= # the paths this branch changed since its base, one a line, once a full run has computed them
-started=$(date +%s)
-logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
-# bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
-# on the last line, tells a run that reached its end from one that died on the way.
-merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
-lock_held=
-# Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
-release_lock() {
-	[ -n "$lock_held" ] || return 0
-	holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
-	if [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm -rf "${merge_lock:?}"; fi
-}
-trap 'status=$?; rm -rf "$logs" || :; release_lock; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
-trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 # Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616), so
 # only ESRCH counts as dead. Python reads the errno, not the shell's wording.
 pid_alive() {
@@ -292,6 +299,7 @@ finish() {
 		survivors "$logs/$l.log"
 	done
 	for l in $failed; do
+		[ -n "$failed_at" ] || failed_at="$l:$(cat "$logs/$l.at" 2>/dev/null || echo start)"
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
 		cat "$logs/$l.log" >&2
 	done

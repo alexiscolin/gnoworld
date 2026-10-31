@@ -411,6 +411,8 @@ def mutants():
     yield from each(".claude/workflows/branch.js", "if (notGits(gate.files))", "if (false)", "hooks", "the branch loop takes no list of files but git's")
     yield from each(".claude/workflows/branch.js", "every Bash command begins with", "a Bash command may begin with", "hooks", "the branch loop has every command cd into its worktree")
     yield from each(".claude/workflows/branch.js", "Number them within this branch's range, ${A.ids}, never past it. ", "", "hooks", "the branch loop numbers its findings in its own range")
+    yield from each(".claude/workflows/branch.js", '(g.exit === 0 && PASS_LINE.test(g.lastLine || ""))', 'PASS_LINE.test(g.lastLine || "")', "hooks", "the branch loop passes a merge check only on the gate's exit code 0 (F2638)")
+    yield from each(".claude/workflows/branch.js", '    "lastLine",\n    "exit",\n', '    "lastLine",\n', "hooks", "the branch loop requires the gate's exit code in its report (F2638)")
     yield from each(".claude/workflows/branch.js", "if (!reviews.every(Boolean)) return", "if (false) return", "hooks", "the branch loop stops on a lens that gave no report")
     yield from each(".claude/workflows/branch.js", "if (open.length)\n", "if (false)\n", "hooks", "the branch loop stops on a finding its fixer left open")
     yield from each(".claude/workflows/branch.js", "if (round === 4)\n", "if (false)\n", "hooks", "the branch loop stops after three rounds")
@@ -1105,6 +1107,9 @@ def merge_lock_mutants():
         ('if [ -z "$announced" ]; then', "if false; then", "--merge says which worktree it waits for"),
         ("except PermissionError:\n    pass", "except PermissionError:\n    sys.exit(1)", "reads a signal another sandbox refuses as a live holder (F2616)"),
         ('if ! pid_alive "$holder"; then', "if false; then", "takes over the lock of a holder that is gone"),
+        ('[ "$status" != 0 ] || [ "${finished:-}" != 1 ] || return 0\n\techo "check.sh: FAILED at', '[ "$status" != 0 ] || [ "${finished:-}" != 1 ] || return 0\n\t: "check.sh: FAILED at', "a failing run ends on its FAILED line (F2638)"),
+        ('[ -n "$failed_at" ] || failed_at="$l:', '[ -n "$failed_at" ] || : "$l:', "the FAILED line names the lane and step that failed (F2638)"),
+        ("release_lock; say_failed;", "release_lock;", "the FAILED line is printed on every exit path (F2638)"),
         ("ulimit -S -n 10240 2>/dev/null ||", ": ||", "sets the limit of open files"),
         ('[ "$open_files" != 10240 ]', '[ "$open_files" -lt 10240 ]', "lowers a limit of open files above 10240"),
         ('|| echo "check.sh: could not set the limit', '|| : "check.sh: could not set the limit', "says a limit of open files it cannot set"),
@@ -1178,7 +1183,7 @@ def design_mutants():
         ("gate.files.some(screen)", "false", "starts the design-reviewer for a screen"),
         ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),
         ('lenses[i][1] === "design-reviewer" && r.framesMissing', "false", "fails the step on missing frames"),
-        ("  if (!g || !g.passed || PASS_LINE.test(g.lastLine || \"\")) return g;", "  if (true) return g;", "reads a merge check's last line itself (F2617)"),
+        ("  if (!g || !g.passed || (g.exit === 0 && PASS_LINE.test(g.lastLine || \"\"))) return g;", "  if (true) return g;", "reads a merge check's last line itself (F2617)"),
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /all checks passed/;", "wants the pass line as the last line, with its time"),
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /^all checks passed in \\d+ s/m;", "reads only the last line"),
         ("    passed: false,\n    failingLane: g.failingLane", "    passed: true,\n    failingLane: g.failingLane", "fails a merge check whose last line is no pass line"),

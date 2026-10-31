@@ -68,7 +68,8 @@ const CHUNKS = [
   { name: "store", test: /\/app\/src\/store\// },
   // The activity chart is no part of it: a world's page loads the bars apart, once it has a history (F304, slice 5j).
   // The stat is none of it either: the figure of who is here comes once the chat has someone to count (F2868).
-  { name: "ui", test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat)\/)/ },
+  // Nor are Avatar, Popover, Card and Skeleton: no first screen draws them, and in the group they cost every page 3 KB (F2926).
+  { name: "ui", test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton)\/)/ },
   { name: "vendor", test: /node_modules/, minShareCount: 2 },
 ];
 

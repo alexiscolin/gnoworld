@@ -53,16 +53,13 @@ test.describe("the chat as the video shows it", () => {
   test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
     await logIn(page, "screen-close");
     await open(page, { width: 1280, as: ACCOUNT });
-    const home = await page
-      .getByRole("navigation", { name: "You are here" })
-      .getByRole("link")
-      .first()
-      .getAttribute("href");
+    // 5j took the breadcrumb off a world's page (its kicker names the universe, worldPage.spec.ts), so the test no longer reads the
+    // home from it: /w/bubble is the default universe's, whose home is the site's root.
     const close = page.getByRole("button", { name: "Close the chat" });
     const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(close)]);
     expect(bar.x + bar.width - (shut.x + shut.width)).toBeLessThanOrEqual(24);
     await close.click();
-    await expect(page).toHaveURL(new RegExp(`${String(home).replaceAll("/", "\\/")}$`));
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/");
     await expect(page.locator("[data-chat-layout]")).toHaveCount(0);
   });
 
