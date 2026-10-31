@@ -1,7 +1,8 @@
 // What the browser reads from the public indexer for a realm's facts (slice 5 part 2, 5k). THE SHAPE IS OURS, NOT RECORDED: no
 // indexer answer has been read through gnomcp yet (ledger F2950), so this is the shape the reader asks for and refuses anything
-// else by; the day a recording differs, this file and its test are what change. Every text is capped, every count is a whole
-// number: what an account or a realm wrote reaches the page as bounded text or not at all.
+// else by; the day a recording differs, this file and its test are what change. The indexer has no time field (F2950), so no fact
+// here may be a count by date (`callsPerDay` waits on F2974). Every text is capped, every count is a whole number: what an account
+// or a realm wrote reaches the page as bounded text or not at all.
 import { z } from "./zod.ts";
 
 /** The most characters of the two texts a realm's facts hold; a realm path and a bech32 address are far shorter. */

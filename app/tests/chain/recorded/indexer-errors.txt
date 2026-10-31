@@ -1,0 +1,12 @@
+# chains gnoland-1 (height 1208146 to 1208159) and onyx-1 (height 796366 to 796379), 2026-10-31T09:46Z. The indexer calls that gave an error, each error verbatim from gnomcp.
+
+## gnoland-1: every indexer call timed out; NO answer of the mainnet indexer is recorded.
+gno_history realm=gno.land/r/gnoland/coins profile=mainnet (twice):
+gno_history: error_unavailable: indexer unreachable: Post "https://indexer.gno.land/graphql/query": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (retry later)
+
+gno_activity realm=gno.land/r/gov/dao profile=mainnet, and realm=gno.land/r/gnoland/wugnot profile=mainnet:
+gno_activity: error_unavailable: indexer unreachable: Post "https://indexer.gno.land/graphql/query": context deadline exceeded (Client.Timeout exceeded while awaiting headers) (retry later)
+
+## Both chains: a time bound is refused.
+gno_activity realm=gno.land/r/gov/dao since=2026-10-20T00:00:00Z, profile=mainnet and profile=testnet:
+gno_activity: error_unavailable: time filtering not supported by current indexer schema (no time field on Transaction)

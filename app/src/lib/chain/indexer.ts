@@ -1,7 +1,7 @@
-// The browser's one read of the public indexer (slice 5 part 2, 5k): a realm's facts, through `readChain` and a Zod schema, nothing
-// else. One GET of an https address, a time limit and a size cap from read.ts, a source and a time on every result, and no
-// polling. THE WIRE IS A GUESS (ledger F2950): the GraphQL query text, whether the indexer takes a GET, and whether a browser may
-// call it (CORS) are unknown until a gnomcp session records one; a service that cannot be called is a `down` with its next step.
+// The browser's one read of the public indexer (slice 5 part 2, 5k): a realm's facts, through `readChain` and a Zod schema, one
+// GET of an https address with the limits of read.ts, a source and a time on every result, no polling. THE WIRE IS A GUESS (F2950):
+// gnomcp shows no raw GraphQL, gnoland-1's indexer timed out, and both indexers have no time field (recorded/indexer-errors.txt).
+// So every fact from it must carry its age as a block height, and no chart by date may stand on it (`callsPerDay`: F2974).
 import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas";
 import { isRealmPath } from "./evalCall.ts";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
