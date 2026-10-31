@@ -1,10 +1,11 @@
 // A realm page's tree as elements (5h): core's allowlisted blocks, each an element of the list, every text React's text,
 // so nothing from a realm reaches HTML. Marks, paragraphs, code and lists are drawn by the chat's own drawing (one
-// place), a heading at its level, a form read only (RealmForm). A link opens its address in a new tab, no opener and no
-// referrer, as the chat's does.
+// place), a heading at its level, a form read only (RealmForm). A link on gnoweb's own origin opens there in a new tab, no
+// opener and no referrer; any other is a button that asks first, naming the host it goes to (ExternalLink).
 import type { Inline, PageBlock } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import type { Drawing } from "../chat/index.ts";
+import { useExternalLinks } from "./useExternalLinks.tsx";
 import styles from "./RealmBlocks.module.css";
 import { RealmForm } from "./RealmForm.tsx";
 
@@ -19,7 +20,8 @@ export const INLINE_LIMIT = 10_000;
 const weigh = (nodes: readonly Inline[]): number =>
   nodes.reduce((sum, node) => sum + 1 + ("children" in node ? weigh(node.children) : 0), 0);
 
-// What is left to draw, and whether something was left out.
+// What is left to draw, and whether something was left out: once one thing was, nothing after it is drawn, so a page never
+// has a hole with its later text below it.
 class Budget {
   #blocks = DRAW_LIMIT;
   #nodes = INLINE_LIMIT;
@@ -27,7 +29,7 @@ class Budget {
 
   /** Whether one more unit, holding `nodes` inline nodes, fits; if so, it is spent. */
   spend(nodes: number): boolean {
-    const fits = this.#blocks >= 1 && this.#nodes >= nodes;
+    const fits = !this.cut && this.#blocks >= 1 && this.#nodes >= nodes;
     if (fits) {
       this.#blocks -= 1;
       this.#nodes -= nodes;
@@ -46,39 +48,71 @@ class Budget {
   }
 }
 
+/** What drawing a page needs besides its blocks: the budget, the chat's drawing with this page's reader. */
+interface Drawn {
+  readonly budget: Budget;
+  readonly via: Drawing;
+  readonly reader: Drawing["reader"];
+}
+
 const inlinesOf = (block: PageBlock): readonly Inline[] =>
   block.type === "paragraph" || block.type === "heading" ? block.children : [];
 
-function drawAll(blocks: readonly PageBlock[], budget: Budget, via: Drawing): ReactNode[] {
+function drawAll(blocks: readonly PageBlock[], on: Drawn): ReactNode[] {
   const drawn: ReactNode[] = [];
   for (const block of blocks) {
-    if (!budget.spend(weigh(inlinesOf(block)))) break;
-    drawn.push(draw(block, budget, via));
+    if (!on.budget.spend(weigh(inlinesOf(block)))) break;
+    const node = draw(block, on);
+    if (node !== undefined) drawn.push(node);
   }
   return drawn;
 }
 
-function draw(block: PageBlock, budget: Budget, via: Drawing): ReactNode {
+// A block as an element; none for a list or a quote left empty, which would be a hole in the page.
+function draw(block: PageBlock, { budget, via, reader }: Drawn): ReactNode {
   switch (block.type) {
     case "heading":
-      return createElement(HEADINGS[block.level], null, ...via.inlines(block.children, via.reader));
-    case "form":
-      return createElement(RealmForm, { exec: block.exec, fields: budget.fit(block.fields, () => 0) });
-    case "quote":
-      return createElement("blockquote", null, ...drawAll(block.children, budget, via));
-    case "list":
-      return via.block({ ...block, items: budget.fit(block.items, weigh) }, via.reader);
+      return createElement(HEADINGS[block.level], null, ...via.inlines(block.children, reader));
+    case "form": {
+      const fields = budget.fit(block.fields, () => 0);
+      return createElement(RealmForm, {
+        exec: block.exec,
+        path: block.path,
+        fields,
+        left: block.fields.length - fields.length,
+      });
+    }
+    case "quote": {
+      const inside = drawAll(block.children, { budget, via, reader });
+      return inside.length === 0 ? undefined : createElement("blockquote", null, ...inside);
+    }
+    case "list": {
+      const items = budget.fit(block.items, weigh);
+      return items.length === 0 ? undefined : via.block({ ...block, items }, reader);
+    }
     case "paragraph":
     case "codeBlock":
-      return via.block(block, via.reader);
+      return via.block(block, reader);
   }
 }
 
-/** A page's blocks, in order, in the page's own column; `more` is the address of the page on gnoweb, which a page cut at
- * the limit links to. */
-export function RealmBlocks({ blocks, more, via }: { blocks: readonly PageBlock[]; more?: string; via: Drawing }) {
+/** A page's blocks, in order, in the page's own column. `origin` is gnoweb's, which a link stays an anchor on; `more` is the
+ * address of the page on gnoweb, which a page cut at the limit links to. */
+export function RealmBlocks({
+  blocks,
+  origin,
+  more,
+  via,
+}: {
+  blocks: readonly PageBlock[];
+  origin?: string;
+  more?: string;
+  via: Drawing;
+}) {
+  const warning = useExternalLinks(origin);
   const budget = new Budget();
-  const drawn = drawAll(blocks, budget, via);
+  const reader = { ...via.reader, link: warning.link };
+  const drawn = drawAll(blocks, { budget, via, reader });
   const notice = budget.cut
     ? createElement(
         "p",
@@ -89,5 +123,5 @@ export function RealmBlocks({ blocks, more, via }: { blocks: readonly PageBlock[
           : createElement("a", { href: more, target: "_blank", rel: "noopener noreferrer" }, " Read it on gnoweb"),
       )
     : undefined;
-  return createElement("div", { className: styles["page"] }, ...drawn, notice);
+  return createElement("div", { className: styles["page"] }, ...drawn, notice, warning.dialog);
 }

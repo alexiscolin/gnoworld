@@ -1,15 +1,18 @@
+// @vitest-environment jsdom
 import { page, type Page } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
+import { button, click, mount, one } from "../../../tests/mount.tsx";
 import { drawing } from "../chat/index.ts";
 import { DRAW_LIMIT, INLINE_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
 const via = await drawing();
+const GNOWEB = "https://gno.land";
 
 function draw(source: string): string {
-  const read: Page = page(source, { origin: "https://gno.land" });
+  const read: Page = page(source, { origin: GNOWEB });
   if (read.kind !== "page") throw new Error("too big");
-  return renderToStaticMarkup(<RealmBlocks via={via} blocks={read.blocks} />);
+  return renderToStaticMarkup(<RealmBlocks via={via} origin={GNOWEB} blocks={read.blocks} />);
 }
 
 const textOf = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -91,6 +94,25 @@ describe("RealmBlocks: a realm page drawn from its tree", () => {
     expect(textOf(html)).toContain("Form");
   });
 
+  test("draws a form's path, and a field's flags, in view (R-F7)", () => {
+    const html = draw(
+      '<gno-form path="balances">\n<gno-input name="a" required="true" readonly="true" />\n<gno-textarea name="b" rows="6" />\n</gno-form>',
+    );
+    expect(textOf(html)).toContain("path: balances");
+    expect(textOf(html)).toContain("flags: required, readonly");
+    expect(textOf(html)).toContain("flags: rows 6");
+  });
+
+  test("draws a name that is only blanks as no name, and every name, value and function left to right (S-F5)", () => {
+    const html = draw(
+      '<gno-form exec="\u202eSend">\n<gno-input name="\u3164" value="\u202ev" />\n<gno-input name="\u202eot" />\n</gno-form>',
+    );
+    expect(textOf(html)).toContain("(no name)");
+    expect(html).toMatch(/<figcaption[^>]*dir="ltr"/);
+    expect(html).toMatch(/<dt[^>]*dir="ltr"[^>]*>\u202eot/);
+    expect(html).toMatch(/<code[^>]*dir="ltr"[^>]*>\u202ev<\/code>/);
+  });
+
   test("draws marks, a break, a mention, every heading level, an ordered list from its number and a quote's blocks", () => {
     const html = draw(
       [
@@ -118,7 +140,7 @@ describe("RealmBlocks: a realm page drawn from its tree", () => {
     expect(html).toMatch(/<blockquote[^>]*><h1[^>]*>in a quote<\/h1><ul/);
   });
 
-  test("draws a link with no referrer and no opener, and its address as the tree holds it", () => {
+  test("draws a link on gnoweb's own origin with no referrer and no opener, and its address as the tree holds it", () => {
     const html = draw("[docs](https://gno.land/docs) and [vote](/r/demo/dao:vote)");
     const anchors = [...html.matchAll(/<a\s[^>]*>/g)].map((m) => m[0]);
     expect(anchors).toHaveLength(2);
@@ -197,5 +219,84 @@ describe("RealmBlocks: a page too long to draw", () => {
     const html = drawn("*a* ".repeat(60_000));
     expect(count(html, "em")).toBe(0);
     expect(html).toMatch(/not shown here/);
+  });
+});
+
+describe("RealmBlocks: a link that leaves gnoweb is behind a warning (R-F4, S-F2)", () => {
+  const SOURCE =
+    "[https://gno.land/r/demo](https://evil.example/x?a=1) [home](https://gno.land/r/demo) [path](/r/demo:vote)";
+
+  test("draws a link off gnoweb's origin as a button, never as an anchor that goes there", () => {
+    const html = draw(SOURCE);
+    expect(html).not.toMatch(/<a\s[^>]*href="https:\/\/evil\.example/);
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>https:\/\/gno\.land\/r\/demo<\/button>/);
+  });
+
+  test("keeps a link on gnoweb's own origin, one written as a path included, an anchor", () => {
+    const anchors = [...draw(SOURCE).matchAll(/<a\s[^>]*>/g)].map((m) => m[0]);
+    expect(anchors).toHaveLength(2);
+    expect(anchors[0]).toContain('href="https://gno.land/r/demo"');
+    expect(anchors[1]).toContain('href="https://gno.land/r/demo:vote"');
+  });
+
+  test("draws every link as a button when it is given no origin", () => {
+    const read = page("[a](https://gno.land/x)");
+    if (read.kind !== "page") throw new Error("too big");
+    const html = renderToStaticMarkup(<RealmBlocks via={via} blocks={read.blocks} />);
+    expect(html).not.toMatch(/<a\s/);
+    expect(html).toMatch(/<button/);
+  });
+
+  test("draws a lookalike origin as external: gno.land.evil.example is not gno.land", () => {
+    const html = draw("[a](https://gno.land.evil.example/r/x) [b](https://gno.land:8443/r/x)");
+    expect(html).not.toMatch(/<a\s/);
+  });
+
+  test("opens a dialog naming the real host and the whole address when the button is pressed", () => {
+    // jsdom has no showModal: a stand-in opens the dialog, as ui's tests do.
+    Object.assign(HTMLDialogElement.prototype, {
+      showModal(this: HTMLDialogElement) {
+        this.open = true;
+      },
+    });
+    const read = page(SOURCE);
+    if (read.kind !== "page") throw new Error("too big");
+    const box = mount(<RealmBlocks via={via} origin={GNOWEB} blocks={read.blocks} />);
+    expect(box.querySelector("dialog")).toBeNull();
+    click(button(box, "https://gno.land/r/demo"));
+    const dialog = one(box, "dialog");
+    expect(dialog.hasAttribute("open")).toBe(true);
+    expect(dialog.textContent).toContain("evil.example");
+    expect(dialog.textContent).toContain("https://evil.example/x?a=1");
+    expect(one(dialog, "a").getAttribute("href")).toBe("https://evil.example/x?a=1");
+  });
+});
+
+describe("RealmBlocks: once the budget is spent, nothing more is drawn (R-F5, S-F4)", () => {
+  const drawn = (source: string) => {
+    const read = page(source);
+    if (read.kind !== "page") throw new Error("too big");
+    return renderToStaticMarkup(<RealmBlocks via={via} origin={GNOWEB} blocks={read.blocks} />);
+  };
+  const HEAVY = "`a` ".repeat(INLINE_LIMIT);
+
+  test("draws no block after a list item too heavy to draw, and no empty list", () => {
+    const html = drawn(`before\n\n- ${HEAVY}\n\nAFTER-THE-LIST\n\n# AFTER-HEADING`);
+    expect(html).toContain("before");
+    expect(html).not.toContain("AFTER");
+    expect(html).not.toMatch(/<ul[^>]*><\/ul>/);
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("draws no block after a quoted paragraph too heavy to draw, and no empty quote", () => {
+    const html = drawn(`before\n\n> ${HEAVY}\n\nAFTER-THE-QUOTE\n\n# AFTER-HEADING`);
+    expect(html).toContain("before");
+    expect(html).not.toContain("AFTER");
+    expect(html).not.toMatch(/<blockquote[^>]*><\/blockquote>/);
+  });
+
+  test("says how many fields of a form are left out, inside the form (S-F5)", () => {
+    const html = drawn("<gno-form>\n" + '<gno-input name="a" />\n'.repeat(DRAW_LIMIT + 10) + "</gno-form>");
+    expect(textOf(html)).toMatch(/11 more fields are not shown here/);
   });
 });

@@ -1,7 +1,7 @@
-import { page } from "@gnoworld/core";
+import { PAGE_MAX_BYTES, page } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
-import { CARD_HEADING, CARD_PARAGRAPH, RealmCard } from "./RealmCard.tsx";
+import { bigLine, CARD_HEADING, CARD_PARAGRAPH, RealmCard } from "./RealmCard.tsx";
 
 const GNOWEB = "https://gno.land";
 const draw = (source: string, height = 1_187_469, path = "/r/demo/dao") =>
@@ -78,11 +78,18 @@ describe("RealmCard: a realm in the chat", () => {
     expect(opened).not.toContain("quoted");
   });
 
+  test("is the design system's compact card, named by its title (R-F11)", () => {
+    const html = draw("# The DAO\n\nWords.");
+    expect(html).toMatch(/<article[^>]*aria-labelledby="[^"]+"[^>]*data-density="compact"/);
+    expect(html).toMatch(/<h3 id="[^"]+"[^>]*>The DAO<\/h3>/);
+  });
+
   test("shows the path and the link, and no text of the page, for an empty page", () => {
     const html = draw("");
     expect(textOf(html)).toContain("/r/demo/dao");
     expect(html).toContain('href="https://gno.land/r/demo/dao"');
-    expect(html).not.toMatch(/<h3|<p>\s*<\/p>/);
+    expect(html).toMatch(/<h3[^>]*>\/r\/demo\/dao<\/h3>/);
+    expect(html).not.toMatch(/<p>\s*<\/p>/);
   });
 
   test("falls back to the realm's path when the page has no heading", () => {
@@ -101,7 +108,8 @@ describe("RealmCard: a realm in the chat", () => {
     );
     const text = textOf(html);
     expect(text).not.toContain("Big");
-    expect(text).toMatch(/too (big|large)|256 ?KB/i);
+    expect(text).toContain("This page is too large to show here (over 256 KB).");
+    expect(bigLine(PAGE_MAX_BYTES)).toBe("This page is too large to show here (over 256 KB).");
     expect(html).toContain('href="https://gno.land/r/demo/dao"');
   });
 });

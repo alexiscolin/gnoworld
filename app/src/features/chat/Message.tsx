@@ -17,6 +17,9 @@ export interface Reader {
   me: string | undefined;
   members: ReadonlySet<string> | undefined;
   tabbable: boolean;
+  /** Draws a link itself (a realm's page puts a warning before one that leaves gnoweb); none, or `undefined` from it, draws
+   * the usual anchor. Its label is the link's own, already drawn. */
+  link?: ((href: string, label: ReactNode[]) => ReactNode) | undefined;
 }
 
 /** A reader with no account, outside any room: every mention whole, every link a Tab stop. What a realm's page is drawn
@@ -40,6 +43,19 @@ function mentionOf(address: string, { me, members }: Reader): ReactNode {
 export const drawInlines = (nodes: readonly Inline[], reader: Reader) => nodes.map((node) => inline(node, reader));
 const drawBlocks = (nodes: readonly Block[], reader: Reader) => nodes.map((node) => block(node, reader));
 
+// A link: the reader's own drawing of it, or the usual anchor.
+function linkOf(node: Extract<Inline, { type: "link" }>, reader: Reader): ReactNode {
+  const label = drawInlines(node.children, reader);
+  return (
+    reader.link?.(node.href, label) ??
+    createElement(
+      "a",
+      { href: node.href, title: node.href, ...LINK, tabIndex: reader.tabbable ? undefined : -1 },
+      ...label,
+    )
+  );
+}
+
 function inline(node: Inline, reader: Reader): ReactNode {
   switch (node.type) {
     case "text":
@@ -49,11 +65,7 @@ function inline(node: Inline, reader: Reader): ReactNode {
     case "break":
       return createElement("br");
     case "link":
-      return createElement(
-        "a",
-        { href: node.href, title: node.href, ...LINK, tabIndex: reader.tabbable ? undefined : -1 },
-        ...drawInlines(node.children, reader),
-      );
+      return linkOf(node, reader);
     case "mention":
       return mentionOf(node.address, reader);
     case "strong":
