@@ -2691,6 +2691,7 @@ printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
 for s in $full_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
 nocache "--full with a server change"
+[ -z "$(sed -n 's/^format:check //p' "$log")" ] || fail "check.sh --full gave Prettier a cache, which the merge check must not read: '$(sed -n 's/^format:check //p' "$log")'"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
 reset
 printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
