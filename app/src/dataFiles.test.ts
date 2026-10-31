@@ -14,26 +14,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
-import { inlineScripts, sha256 } from "./csp.ts";
+import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
+import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
+
+// 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
+const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
 const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
 /** The text of each JSON-LD script of a page, as the browser reads it. */
 const ldScripts = (html: string): string[] =>
   [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
-
-/** Each page's policy in `_headers`: the address of its rule, then the policy. */
-function headerPolicies(headers: string): Map<string, string> {
-  const found = new Map<string, string>();
-  let rule = "";
-  for (const line of headers.split("\n")) {
-    if (/^\S/.test(line)) rule = line;
-    const policy = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
-    if (policy !== undefined) found.set(rule, policy);
-  }
-  return found;
-}
 
 /** The pages of a build: the address each is served at and its html. */
 function pagesOf(client: string): [string, string][] {
@@ -73,13 +65,8 @@ function lookups(
  * data block, has none), each line under `cap` characters, the longest page named when one is not.
  */
 async function expectPolicies(client: string, conf: string, cap: number): Promise<void> {
-  const headers = headerPolicies(readFileSync(join(client, "_headers"), "utf8"));
-  const table = new Map(
-    [...readFileSync(conf, "utf8").matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [
-      match[1] ?? "",
-      match[2] ?? "",
-    ]),
-  );
+  const headers = headerRules(readFileSync(join(client, "_headers"), "utf8"));
+  const table = nginxTable(readFileSync(conf, "utf8"));
   const pages = pagesOf(client);
   expect(pages.length).toBeGreaterThan(1);
   let longest = ["", 0] as [string, number];
@@ -318,11 +305,98 @@ describe("react-router build", () => {
         // 5f: each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
         // nginx's table.
         await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
+        // F2458: buildEnd looked for sw.js before Vite's post hook wrote it, so a real build's _headers never held the worker's
+        // rule (decisions, 2026-10-30) and the worker shipped with the catch-all's policy on a _headers host. One rule, the bare
+        // policy, with the catch-all detached.
+        expect(existsSync(join(client, "sw.js"))).toBe(true);
+        const headers = readFileSync(join(client, "_headers"), "utf8");
+        const rule = `\n/sw.js\n  ! Content-Security-Policy\n  Content-Security-Policy: ${policy([])}\n`;
+        expect(headers.split(rule)).toHaveLength(2);
       } finally {
         rmSync(dir, { recursive: true });
       }
     },
   );
+
+  // Slice 5 part 2, 5g: connect-src is 'self' and the data's https RPC origins, in every policy a build writes, printed at
+  // build; a data file adding a host shows in the CSP, an http: one stops the build.
+  it("writes connect-src as the data's RPC origins in every policy, and prints it", { timeout: 120_000 }, () => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "extra",
+        name: "Extra",
+        chainId: "extra-1",
+        rpc: "https://rpc.extra.example:8443",
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+      const want = ["https://rpc.extra.example:8443", ...RPC_ORIGINS];
+      const directive = `connect-src 'self' ${want.join(" ")}`;
+      expect(run.stdout).toContain(`csp: ${directive}`);
+      const client = join(copy, "build", "client");
+      const rules = headerRules(readFileSync(join(client, "_headers"), "utf8"));
+      const table = nginxTable(readFileSync(join(copy, "build", "csp.conf"), "utf8"));
+      expect(rules.size).toBeGreaterThan(2);
+      // The worker's script and nginx's default answer no page: 'self' alone (docs/decisions.md, 2026-10-31).
+      const pages = [...rules, ...table].filter(([where]) => where !== "/sw.js" && where !== "default");
+      expect(pages.length).toBeGreaterThan(2);
+      for (const [where, csp] of pages)
+        expect(
+          csp.split("; ").filter((d) => d.startsWith("connect-src")),
+          where,
+        ).toEqual([directive]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // The schema's Link refuses http: before the csp code is reached: this guards the schema, the next test the csp code.
+  it("stops on an http: RPC (the schema's guard), naming it, before any page is written", { timeout: 120_000 }, () => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "plain",
+        name: "Plain",
+        chainId: "plain-1",
+        rpc: "http://rpc.plain.example:26657",
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status).not.toBe(0);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/universes\.json/);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/rpc/);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // The schema's Link lets a wildcard or a directive in a host through: only rpcOrigins stops it, before any page is written.
+  it.each([
+    ["a wildcard host", "https://*.rpc.example"],
+    ["a directive after the host", "https://rpc.example;script-src"],
+  ])("stops on an RPC with %s, naming it, before any page is written", { timeout: 120_000 }, (_name, rpc) => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({ id: "odd", name: "Odd", chainId: "odd-1", rpc, testnet: true });
+    });
+    try {
+      const run = build(dir);
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status).not.toBe(0);
+      expect(output).toMatch(/csp: .*rpc/);
+      expect(output).toContain(rpc);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
 
   // Slice 5's 5e: the build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
   // naming it, and the pages' tags (a testnet's page noindex, a card and a JSON-LD on each).

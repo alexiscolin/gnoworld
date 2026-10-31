@@ -120,6 +120,23 @@ describe("loadConfig", () => {
     expect(failure({ ...ENV, ERGO_DATA_MB: "100" })).toMatch(/setting ERGO_DATA: required/);
   });
 
+  it("reads the file the prices timer writes: absolute, none by default, so no timer (5l)", () => {
+    expect(loadConfig(ENV).markets).toBeUndefined();
+    expect(loadConfig({ ...ENV, MARKETS_FILE: "/srv/markets/markets.json" }).markets).toBe("/srv/markets/markets.json");
+    for (const value of [
+      "",
+      "markets.json",
+      "./markets.json",
+      "/",
+      "/srv/../markets.json",
+      "/srv//markets.json",
+      "/srv/",
+      "/.",
+    ]) {
+      expect(failure({ ...ENV, MARKETS_FILE: value })).toMatch(/setting MARKETS_FILE: /);
+    }
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);

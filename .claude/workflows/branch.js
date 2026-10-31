@@ -11,7 +11,8 @@ export const meta = {
     { title: "Merge check", detail: "check.sh --merge, the failing lane alone until it passes" },
     {
       title: "Review",
-      detail: "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm",
+      detail:
+        "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm; the design-reviewer for a screen",
     },
     { title: "Verify", detail: "the finding-verifier on findings in tier-1 files" },
     {
@@ -47,6 +48,12 @@ const FINDINGS = {
     },
   },
   required: ["findings"],
+};
+// The design-reviewer's answer: findings like the others', and whether the video's frames were missing (which fails the step).
+const DESIGN = {
+  ...FINDINGS,
+  properties: { ...FINDINGS.properties, framesMissing: { type: "boolean" } },
+  required: ["findings", "framesMissing"],
 };
 const TESTS = {
   type: "object",
@@ -85,13 +92,14 @@ const GATE = {
     passed: { type: "boolean" },
     failingLane: { type: "string" },
     tail: { type: "string" },
+    lastLine: { type: "string" },
     survivors: { type: "array", items: { type: "string" } },
     files: { type: "array", items: { type: "string" } },
     relaxations: { type: "array", items: { type: "string" } },
     seconds: { type: "number" },
     branch: BRANCH,
   },
-  required: ["passed", "failingLane", "tail", "survivors", "files", "relaxations", "seconds", "branch"],
+  required: ["passed", "failingLane", "tail", "lastLine", "survivors", "files", "relaxations", "seconds", "branch"],
 };
 // The verifier answers for the ids it is given, and only those.
 const verdictsFor = (ids) => ({
@@ -129,6 +137,9 @@ const TIER1 = [
   "gno/",
   "server/src/ergo/",
   "app/src/csp.ts",
+  "app/src/cspOrigins.ts",
+  "app/src/cspForms.ts",
+  "app/src/lib/chain/evalCall.ts",
   "deploy/",
   "packages/core/src/markdown/",
   "app/src/lib/adena/",
@@ -144,6 +155,8 @@ const TIER1 = [
 const BASE = A.base || "main";
 const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
 const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
+// A screen: the app's own source and the design system's (Alexis, 2026-10-31); the design-reviewer compares it with the video's frames.
+const screen = (file) => file.startsWith("app/src/") || file.startsWith("packages/ui/src/");
 // A writer that committed on another branch than its own (slice-5a's commit on main) counts as no report, and the loop
 // stops there, its status naming the branch; so does a list of files holding the agent's own rather than git's.
 const strays = [];
@@ -176,17 +189,32 @@ const where = (step, writes) =>
       `When you finish, append one line to ${A.shared}/${A.branch}.state.md (the step, what it did, its commits) and save your report to ${A.shared}/reports/${A.branch}-${step}.md.`
     : "You are read-only: report, write nothing.");
 
-const gateCheck = () =>
-  write(
-    `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Report whether it passed, the failing lane and the ` +
-      "tail of its output, the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
-      `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
-      `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
-      `the chief and Alexis read. Write the diff since ${BASE} ` +
-      "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
-      `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
-    // An agent that runs a command and waits for it: the cheaper model, little reasoning.
-    { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
+// A merge check passed only when check.sh printed its pass line as the last line of its output. The agent's word is not the proof (reviewer-1-2,
+// F2617: a run killed before its probe lane was declared PASSED): the script reads `lastLine` itself, and a run killed, timed out or left in
+// the background has none.
+const PASS_LINE = /^all checks passed in \d+ s/;
+const proven = (g) => {
+  if (!g || !g.passed || PASS_LINE.test(g.lastLine || "")) return g;
+  return {
+    ...g,
+    passed: false,
+    failingLane: g.failingLane || "unproven",
+    tail: `the agent said passed, but the last line of check.sh's output was '${g.lastLine || ""}', not 'all checks passed in N s': a run killed, timed out or left in the background is no pass. Run it again to its end.\n${g.tail || ""}`,
+  };
+};
+const gateCheck = async () =>
+  proven(
+    await write(
+      `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Wait for it to end: a run killed, timed out or left in the background is not a pass. Report whether it passed, the failing lane, the ` +
+        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; anything else is a failure whatever you think, and the script reads this line itself), the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
+        `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
+        `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
+        `the chief and Alexis read. Write the diff since ${BASE} ` +
+        "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
+        `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
+      // An agent that runs a command and waits for it: the cheaper model, little reasoning.
+      { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
+    ),
   );
 
 phase("Tests");
@@ -255,15 +283,34 @@ for (let round = 1; ; round += 1) {
     ...(gate.files.some(realm)
       ? [["gnomcp:gno-auditor", "gno-auditor", `Audit every realm the branch changes, since ${since}.`]]
       : []),
+    ...(gate.files.some(screen)
+      ? [
+          [
+            "design-reviewer",
+            "design-reviewer",
+            `Compare every screen the branch changes since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}) with the video's frames: ` +
+              "render each at 1728 by 1080, open the frames docs/design/video-screens.md gives for it in ~/.cache/gnoworld-tools/video-frames/, " +
+              "and report each difference as a finding naming both pictures. Frames missing: set framesMissing, the step fails.",
+          ],
+        ]
+      : []),
   ].filter(([, label]) => !lensesDue || lensesDue.has(label));
   const ask = ([agentType, label, question]) =>
-    agent(`${where(`${label}-${round}`, false)}. ${question}`, { agentType, phase: "Review", label, schema: FINDINGS });
+    agent(`${where(`${label}-${round}`, false)}. ${question}`, {
+      agentType,
+      phase: "Review",
+      label,
+      schema: label === "design-reviewer" ? DESIGN : FINDINGS,
+    });
   // Four agents at most at once on the machine (CLAUDE.md): with two branches in review, three lenses run one after another.
   const reviews =
     lenses.length > 2
       ? await lenses.reduce(async (done, lens) => [...(await done), await ask(lens)], Promise.resolve([]))
       : await parallel(lenses.map((lens) => () => ask(lens)));
   if (!reviews.every(Boolean)) return result(`blocked at review round ${round}: a lens gave no report`, { gate });
+  // Frames missing fail the step, never skip it: a comparison nobody made is not a clean review.
+  if (reviews.some((r, i) => lenses[i][1] === "design-reviewer" && r.framesMissing))
+    return result(`blocked at review round ${round}: the design-reviewer found the video's frames missing`, { gate });
   // Numbered here, by lens and order: each lens counts from 1, and a verdict must name one finding alone.
   const found = reviews.flatMap((r, i) =>
     r.findings.map((f, n) => ({ ...f, id: `${lenses[i][1]}-${round}-${n + 1}`, lens: lenses[i][1] })),

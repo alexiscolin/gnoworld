@@ -7,7 +7,7 @@ Review by risk, not line by line everywhere.
 | Tier | What | Written by | How it is reviewed |
 |---|---|---|---|
 | 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization (`server/src/ergo/`) | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
-| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`) | Alexis for the core, Claude elsewhere | Alexis reads every line |
+| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builder (`app/src/lib/chain/evalCall.ts`, the one place an expression sent to a chain is built) | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
 | 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop, Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
 | 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
@@ -60,7 +60,9 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
    size each input reaches, and simplification. A tier-1 file or the harness adds the
-   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`. Each finding names its
+   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`, a changed screen (`app/src/`,
+   `packages/ui/src/`) the `design-reviewer`, which compares it with the video's frames in the branch loop
+   (`docs/design/video-screens.md`; frames missing fail the step). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).

@@ -43,13 +43,23 @@ engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
 lock_dir=$HOME/.cache/gnoworld-tools
 lock=$lock_dir/deploy-test-$project.lock
 locked=
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616).
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
 release() { if [ -n "$locked" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "${lock:?}"; fi; }
 if [ "${1:-}" != --demo ]; then
 	mkdir -p "$lock_dir"
 	if ! mkdir "$lock" 2>/dev/null; then
 		holder=$(cat "$lock/pid" 2>/dev/null || true)
 		if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
-		if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then
+		if [ -n "$holder" ] && pid_alive "$holder"; then
 			missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
 		fi
 		rm -rf "${lock:?}"
@@ -432,7 +442,11 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
-	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	mutant "a host added to the way out" "the way out lets two hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
+	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
+	mutant "CoinGecko's whole domain let out" "the way out lets two hosts out" \
+		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
@@ -1293,13 +1307,13 @@ setTimeout(() => {
 	result=$(via https://api.openai.com/v1/models)
 	case $result in "200 "[1-5]*) pass "OpenAI's API answers through the way out" ;; *) fail "OpenAI's API does not answer through the way out: [$result]" ;; esac
 	docker cp "$egress:/etc/smokescreen/acl.yaml" - | tar -xO >"$tmp/acl.yaml"
-	expect "the way out lets one host out: OpenAI's API" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" "api.openai.com "
+	expect "the way out lets two hosts out: CoinGecko's API and OpenAI's" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" "api.coingecko.com api.openai.com "
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
 	refuses() {
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
-	for target in https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://1.1.1.1/ \
+	for target in https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
 	done
@@ -1311,6 +1325,10 @@ setTimeout(() => {
 	# The server's own requests take the way out: Node's proxy from its settings (NODE_USE_ENV_PROXY, Node 24).
 	fetched() { docker exec "$server" /nodejs/bin/node -e "fetch('$1').then((r) => console.log(r.status), (e) => console.log('refused'))" 2>&1 || true; }
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
+	# The prices timer's host (5l): CoinGecko's keyless price endpoint, asked as the timer asks it.
+	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
+	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
+	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
 	# whatever its list says. An ad hoc proxy of the same image and the live settings, its list its own, in the
