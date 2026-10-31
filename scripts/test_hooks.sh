@@ -4335,12 +4335,15 @@ for d, ds, fs in os.walk("."):
     for f in fs:
         p = os.path.join(d, f)
         if f.endswith(".test.ts") and (not files or any(x in p for x in files)):
-            found += [{"file": os.path.abspath(p), "name": n} for n in re.findall(r'test\("([^"]+)"', open(p).read())]
+            names = re.findall(r'test\("([^"]+)"', open(p).read())
+            if os.path.exists(p[:-len(".test.ts")] + ".data"):  # names a test file generates from data, which a source file's change can rename
+                names += open(p[:-len(".test.ts")] + ".data").read().split()
+            found += [{"file": os.path.abspath(p), "name": n} for n in names]
 json.dump(found, open(out, "w") if out else sys.stdout)
 EOF
 chmod +x "$rq/node_modules/.bin/vitest"
 git -C "$rq" init -q && printf 'node_modules/\n' >"$rq/.gitignore" && : >"$rq/vitest.config.ts"
-printf 'test("a one", f);\ntest("a two", f);\n' >"$rq/app/src/a.test.ts" && printf 'test("b one", f);\n' >"$rq/app/src/b.test.ts" && printf 'x\n' >"$rq/app/src/c.ts"
+printf 'test("a one", f);\ntest("a two", f);\n' >"$rq/app/src/a.test.ts" && printf 'test("b one", f);\n' >"$rq/app/src/b.test.ts" && printf 'x\n' >"$rq/app/src/c.ts" && printf 'gen1 gen2\n' >"$rq/app/src/a.data"
 git -C "$rq" add -A && git -C "$rq" commit -qm base && qbase=$(git -C "$rq" rev-parse HEAD)
 reqq() { : >"$t/vt.log" && (cd "$rq" && VT_LOG="$t/vt.log" GNOWORLD_TOOLS="$t/rtools" python3 -I scripts/check_regressions.py "$@" 2>&1); }
 wholes() { grep -c ' $' "$t/vt.log" || :; }
@@ -4364,7 +4367,20 @@ printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > a one" || fail "check_regre
 back
 printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts" && printf 'y\n' >>"$rq/app/src/c.ts"
 out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone beside a change of another file: $out"
-[ "$(wholes)" = 1 ] || fail "check_regressions --quick did not list the tree whole for a change beside the test files ($(wholes) whole listings): $(cat "$t/vt.log")"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone beside a change of another file: $out"
+[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the tree whole for a change beside the test files, not the touched file alone ($(wholes) whole listings): $(cat "$t/vt.log")"
+grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the touched test file alone beside a change of another file: $(cat "$t/vt.log")"
+back
+# A non-test file that renames what a test generates: the quick run, which lists the touched test files alone, does not see it; the whole run does.
+printf 'gen1 genX\n' >"$rq/app/src/a.data"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a rename its touched-files listing cannot see: $out"
+out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test renamed by a non-test file: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > gen2" || fail "check_regressions without --quick did not name the test a non-test file renamed: $out"
+back
+# A Playwright spec is no Vitest file: its names are not listed from the touched files, so the tree is listed whole.
+mkdir -p "$rq/app/tests" && printf 'y\n' >"$rq/app/tests/a.spec.ts"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new Playwright spec: $out"
+[ "$(wholes)" = 1 ] || fail "check_regressions --quick did not list the tree whole for a change of a Playwright spec ($(wholes) whole listings): $(cat "$t/vt.log")"
 back
 printf 'test("new", f);\n' >"$rq/app/src/d.test.ts"
 out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new test file: $out"

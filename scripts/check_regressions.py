@@ -9,8 +9,8 @@ so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
 - an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py [--quick] <base>, from the repository root; --self-test checks the rules.
 --quick (the hook and the fast gate, per commit: F2579) keeps the base's listing of tests in the tools' cache, one per base
-commit, and lists only the Vitest files the change touches when the change is nothing but those, gno or Go sources, pictures
-and prose; any other change lists the tree whole. The merge check runs without it, whole and with no cache."""
+commit, and lists only the Vitest files the change touches, whatever else it changes, unless it touches a Playwright spec (then
+it lists the tree whole). A source file that renames a generated test is seen by the whole run only. The merge check runs without it, whole and with no cache."""
 import ast
 import hashlib
 import json
@@ -280,6 +280,7 @@ def base_tests(base):
 
 TOUCHES_NO_NAMES = re.compile(r"\.(gno|go|md)$")  # a test of these kinds is read from the files; they list no Vitest or Playwright name
 VITEST_FILE = re.compile(r"\.test\.tsx?$")
+SPEC_FILE = re.compile(r"\.spec\.ts$")
 
 
 def cached_base_tests(base):
@@ -305,10 +306,11 @@ def cached_base_tests(base):
 
 
 def quick_tests(base, before):
-    """The Vitest and Playwright names the tree holds, from the base's (`before`) and a listing of the files the change touches,
-    or None when the change is more than those Vitest files, gno or Go sources, approved pictures and prose."""
+    """The Vitest and Playwright names the tree holds, from the base's (`before`) and a listing of the Vitest files the change
+    touches, whatever else it changes (a source file that renames a generated test is seen by the whole run, not this one), or
+    None when it touches a Playwright spec, whose names no listing of the touched files gives."""
     paths = [p for p in git("diff", "--no-renames", "--name-only", base).splitlines() + git("ls-files", "--others", "--exclude-standard").splitlines() if p]
-    if not os.path.exists("vitest.config.ts") or not all(VITEST_FILE.search(p) or TOUCHES_NO_NAMES.search(p) or SHOT.search(p) for p in paths):
+    if not os.path.exists("vitest.config.ts") or any(SPEC_FILE.search(p) for p in paths):
         return None
     touched = {p for p in paths if VITEST_FILE.search(p)}
     kept = {n for n in before if n.split(" > ", 1)[0] not in touched}
