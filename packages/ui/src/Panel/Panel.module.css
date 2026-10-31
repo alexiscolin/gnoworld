@@ -49,7 +49,7 @@
     display: none;
   }
 
-  /* What stands beside the plate comes first in the page, so it is the first thing a phone shows. */
+  /* The plate is first in the page, as it is drawn from 900 px; what stands beside it is drawn first on a phone, the first thing it shows. */
   .layout {
     /* layout: the order of the page's parts is the screen's, not the reader's */
     display: flex;
@@ -57,9 +57,10 @@
     flex-direction: column;
   }
 
-  /* raw: the phone layout's width, 900 px (DESIGN-SYSTEM.md, Breakpoints) */
-  @media (min-width: 900px) {
-    .place {
+  /* raw: the phone layout's width less a pixel: 900 px is the computer's (DESIGN-SYSTEM.md, Breakpoints) */
+  @media (max-width: 899.98px) {
+    .layout > :not(.place, .frame) {
+      /* layout: the chat above the plate */
       order: -1;
     }
   }

@@ -225,10 +225,10 @@ describe("a world's plate", () => {
     expect(html).toMatch(/<div id="chat"[^>]*>/);
   });
 
-  // Slice 5j (DESIGN-SYSTEM.md, Breakpoints): the chat's slot comes before the plate in the page, so a phone shows it first and a
-  // screen reader reads it first; the computer's layout places the plate first by CSS (worldPage.spec.ts).
-  test("keeps the chat's slot in the page, before the plate opens", async () => {
+  // F2865: the page reads and tabs in the order it is drawn on a computer, the plate first; a phone draws the chat above it by CSS
+  // alone (worldPage.spec.ts).
+  test("keeps the plate before the chat's slot in the page, so a reader meets the title first (F2865)", async () => {
     const { html } = await plateOf();
-    expect(html).toMatch(/<div id="chat"[^>]*>[\s\S]*Loading the chat[\s\S]*<section [^>]*data-look="plate"/);
+    expect(html).toMatch(/<section [^>]*data-look="plate"[\s\S]*<div id="chat"[^>]*>[\s\S]*Loading the chat/);
   });
 });

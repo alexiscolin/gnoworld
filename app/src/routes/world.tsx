@@ -27,8 +27,9 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
-  // The chat comes first in the page, so a phone shows it first and a screen reader reads it first (DESIGN-SYSTEM.md,
-  // Breakpoints: 900 px, chat first); from 900 px the plate is drawn before it, and from 1728 px it stands fixed at the left (Panel.Layout).
+  // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
+  // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
+  // at the left (Panel.Layout).
   return (
     <Panel.Layout
       plate={

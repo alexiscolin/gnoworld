@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test } from "./fixtures.ts";
+import { roomsNav } from "./chat.ts";
 import { box, near } from "./geometry.ts";
 
 // Slice 5j: a world's page as frames 20 to 35 and 90 to 97 show it, at the video's size (1728 by 1080, scale 1; a box to
@@ -101,23 +102,52 @@ test.describe("Share where the browser cannot copy", () => {
 // "900 px: phone layout, chat first" (docs/DESIGN-SYSTEM.md, Breakpoints): the chat above the plate under 900 px, the plate before it
 // from 900 px, and from 1360 px the plate fixed at the left with the chat beside it.
 test.describe("the page's order", () => {
-  test("on a phone, the chat comes before the plate, in the sight and in the reading order", async ({ page }) => {
+  // F2865: the reading and the tab order are the plate's first at every width, and equal to the sight's on a computer; a phone
+  // alone draws the chat above, by CSS (the order of a computer's page is the brief's, the phone's is DESIGN-SYSTEM.md's).
+  test("on a phone, the chat is drawn above the plate, which stays first in the reading order", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/w/bubble");
     await hydrated(page);
     const slot = await box(page, "#chat");
     const plate = await box(page, "[data-look='plate']");
     expect(slot.y).toBeLessThan(plate.y);
-    const chatFirst = await page.evaluate(() => {
+    const plateFirst = await page.evaluate(() => {
       const plateEl = document.querySelector("[data-look='plate']");
       const slotEl = document.querySelector("#chat");
       return (
         plateEl !== null &&
         slotEl !== null &&
-        !!(slotEl.compareDocumentPosition(plateEl) & Node.DOCUMENT_POSITION_FOLLOWING)
+        !!(plateEl.compareDocumentPosition(slotEl) & Node.DOCUMENT_POSITION_FOLLOWING)
       );
     });
-    expect(chatFirst).toBe(true);
+    expect(plateFirst).toBe(true);
+  });
+
+  test("on a computer, Tab meets the plate's actions before any control of the chat, as the page is drawn (F2865)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    // The chat has loaded: its rooms are links to tab through.
+    await expect(roomsNav(page)).toBeVisible();
+    const places: string[] = [];
+    for (let step = 0; step < 40; step += 1) {
+      await page.keyboard.press("Tab");
+      places.push(
+        await page.evaluate(() => {
+          const now = document.activeElement;
+          if (now?.closest("#chat")) return "chat";
+          if (now?.closest("[data-look='plate']")) return "plate";
+          return "other";
+        }),
+      );
+    }
+    expect(places, "the plate's controls are reached").toContain("plate");
+    expect(places, "the chat's controls are reached").toContain("chat");
+    expect(places.indexOf("plate"), "the plate comes before the first control of the chat").toBeLessThan(
+      places.indexOf("chat"),
+    );
   });
 
   // The switch is at 900: 899 is a phone's, 900 and the widths up to 1359 draw the plate first.
