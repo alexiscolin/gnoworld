@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
-import { REALM_FACTS_CAPS } from "@gnoworld/schemas";
+import { REALM_FACTS_CAPS, RealmFactsAnswer } from "@gnoworld/schemas";
 import { readRealmFacts } from "./indexer.ts";
 
 // 5k, the indexer reader's FAULT tests: a fake fetch and a synthetic body, as rpc.test.ts does, so none needs a recording.
@@ -59,13 +59,13 @@ describe("readRealmFacts", () => {
     expect(result.ok && result.value).toEqual({ path: REALM });
   });
 
-  it("gives a path and a deployer of hostile text as the same text: reading never interprets it", async () => {
+  it("gives a deployer of hostile text as the same text: reading never interprets it", async () => {
     const result = await readRealmFacts(
       INDEXER,
       REALM,
-      options(answering(withFacts({ path: HOSTILE, deployer: HOSTILE }))),
+      options(answering(withFacts({ path: REALM, deployer: HOSTILE }))),
     );
-    expect(result.ok && result.value).toEqual({ path: HOSTILE, deployer: HOSTILE });
+    expect(result.ok && result.value).toEqual({ path: REALM, deployer: HOSTILE });
   });
 
   it("says no-realm for a realm the indexer does not know", async () => {
@@ -98,12 +98,14 @@ describe("readRealmFacts", () => {
 
   // Each cap at its bound: the last length is read, the next is refused (the answer's two texts, and the path asked).
   it("takes a path and a deployer of exactly their caps, and refuses one character more", async () => {
-    const at = (path: string, deployer: string) =>
-      readRealmFacts(INDEXER, REALM, options(answering(withFacts({ path, deployer }))));
-    expect((await at("p".repeat(REALM_FACTS_CAPS.path), "d")).ok).toBe(true);
-    expect((await at("p".repeat(REALM_FACTS_CAPS.path + 1), "d")).ok).toBe(false);
-    expect((await at("p", "d".repeat(REALM_FACTS_CAPS.deployer))).ok).toBe(true);
-    expect((await at("p", "d".repeat(REALM_FACTS_CAPS.deployer + 1))).ok).toBe(false);
+    const answer = (path: string, deployer: string) =>
+      RealmFactsAnswer.safeParse(withFacts({ path, deployer })).success;
+    expect(answer("p".repeat(REALM_FACTS_CAPS.path), "d")).toBe(true);
+    expect(answer("p".repeat(REALM_FACTS_CAPS.path + 1), "d")).toBe(false);
+    const read = (deployer: string) =>
+      readRealmFacts(INDEXER, REALM, options(answering(withFacts({ path: REALM, deployer }))));
+    expect((await read("d".repeat(REALM_FACTS_CAPS.deployer))).ok).toBe(true);
+    expect((await read("d".repeat(REALM_FACTS_CAPS.deployer + 1))).ok).toBe(false);
   });
 
   it("asks a realm path of exactly the cap and refuses one character more as a bad name, asking nothing", async () => {

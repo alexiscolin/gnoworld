@@ -182,11 +182,12 @@ describe("a world's actions, with proposals", () => {
     expect(hi?.getAttribute("href")).toBe("#chat");
     expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");
     expect(proposals?.getAttribute("data-emphasis")).toBe("solid");
-    expect(hi?.getAttribute("data-emphasis")).not.toBe("solid");
+    expect(hi?.getAttribute("data-emphasis")).toBe("outline");
   });
 
   it("draws no 'Read the proposals' when the world has none, and 'Say hi' stays the solid action", () => {
     expect(draw().textContent).not.toMatch(/read the proposals/i);
+    expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");
   });
 
   it.each(["/net/onyx/r/gov/dao", "/r/gov/dao", "/net/gnoland/r/gov/dao-2"])("draws %j as the link", (proposals) => {
