@@ -24,13 +24,20 @@ export function invisible(nodes: readonly Inline[]): boolean {
 }
 
 /** Nodes with each mention in them, however deep, made text again: `@` and the address. */
-export function unmentioned(nodes: readonly Inline[]): Inline[] {
+function unmentioned(nodes: readonly Inline[]): Inline[] {
   const plain: Inline[] = [];
   for (const node of nodes) {
     if (node.type === "mention") append(plain, { type: "text", text: `@${node.address}` });
     else append(plain, "children" in node ? { ...node, children: unmentioned(node.children) } : node);
   }
   return plain;
+}
+
+/** A link's label from what it holds: no account is named in it, its mentions are text again; an image with no alt text
+ * names its address. */
+export function labelOf(nodes: readonly Inline[], href: string, image: boolean): Inline[] {
+  const named = unmentioned(nodes);
+  return image && invisible(named) ? [{ type: "text", text: href }] : named;
 }
 
 /** A node after the last: a text joins the text before it, and an empty one adds nothing. */

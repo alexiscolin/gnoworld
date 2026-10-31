@@ -5,7 +5,8 @@ import { firstGraphemes } from "./graphemes.ts";
 import { markdown } from "./markdown.ts";
 import type { Block, Inline } from "./types.ts";
 
-const words = (nodes: readonly Inline[]): string =>
+/** The words of inline nodes, their marks gone: code and mentions as they read. */
+export const words = (nodes: readonly Inline[]): string =>
   nodes
     .map((node) => {
       if (node.type === "text" || node.type === "code") return node.text;

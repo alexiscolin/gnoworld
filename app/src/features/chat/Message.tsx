@@ -13,11 +13,15 @@ const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
 const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
 
 // Who reads: the reader's address, none for a guest, and the room's members; whether the links take the Tab key.
-interface Reader {
+export interface Reader {
   me: string | undefined;
   members: ReadonlySet<string> | undefined;
   tabbable: boolean;
 }
+
+/** A reader with no account, outside any room: every mention whole, every link a Tab stop. What a realm's page is drawn
+ * for (features/realms), which shares this file's drawing of marks, paragraphs, code and lists. */
+export const ANONYMOUS: Reader = { me: undefined, members: undefined, tabbable: true };
 
 // A mention: its address whole in its title, the design system's look (data-mention), the reader's own "me";
 // shortened for the reader and members alone, since a ground lookalike holds no key so joins no room (F812). An
@@ -33,7 +37,7 @@ function mentionOf(address: string, { me, members }: Reader): ReactNode {
 }
 
 // Nodes as elements, who reads carried down to the mentions.
-const drawInlines = (nodes: readonly Inline[], reader: Reader) => nodes.map((node) => inline(node, reader));
+export const drawInlines = (nodes: readonly Inline[], reader: Reader) => nodes.map((node) => inline(node, reader));
 const drawBlocks = (nodes: readonly Block[], reader: Reader) => nodes.map((node) => block(node, reader));
 
 function inline(node: Inline, reader: Reader): ReactNode {
@@ -59,7 +63,7 @@ function inline(node: Inline, reader: Reader): ReactNode {
   }
 }
 
-function block(node: Block, reader: Reader): ReactNode {
+export function block(node: Block, reader: Reader): ReactNode {
   switch (node.type) {
     case "paragraph":
       return createElement("p", null, ...drawInlines(node.children, reader));

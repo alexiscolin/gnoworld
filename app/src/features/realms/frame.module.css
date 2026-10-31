@@ -1,0 +1,8 @@
+/* The frame a realm's form and its card share (5h). */
+@layer components {
+  .frame {
+    padding: var(--space-xs);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-m);
+  }
+}
