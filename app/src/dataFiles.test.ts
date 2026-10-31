@@ -87,7 +87,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the nine files into their schemas' shapes", () => {
+  it("reads the ten files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -95,6 +95,7 @@ describe("loadData", () => {
       expect(data.hubs[0]?.slug).toBe("bubble");
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
+        "bubbles",
         "ecosystems",
         "events",
         "expedition",
@@ -215,6 +216,93 @@ describe("loadData", () => {
       expect(() => loadData(dir)).toThrow(/universes\.json: \(file\)/);
     } finally {
       rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+// Slice 6's 6a: the bubbles' rules (ADR-0001 §7), one object in app/data/bubbles.json, checked when the app builds.
+describe("bubbles.json", () => {
+  const planted = (change: (rules: Record<string, unknown>) => void) =>
+    plant((f) => {
+      change(f["bubbles.json"] as Record<string, unknown>);
+    });
+  const message = (dir: string): string => {
+    try {
+      loadData(dir);
+    } catch (error) {
+      return error instanceof Error ? error.message : "";
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+    return "";
+  };
+
+  it("is read as the rules, and the repository ships ADR-0001 section 7's starting values", () => {
+    const data = loadData(new URL("../data", import.meta.url).pathname);
+    expect(data.bubbles).toEqual({
+      maxOnScreen: 6,
+      showSeconds: 5,
+      speakerDelaySeconds: 30,
+      maxChars: 80,
+      readLast: 500,
+      maxAgeSeconds: 300,
+    });
+  });
+
+  it.each([
+    ["maxOnScreen", 13],
+    ["showSeconds", 16],
+    ["speakerDelaySeconds", 121],
+    ["maxChars", 19],
+    ["maxChars", 161],
+    ["readLast", 2001],
+    ["maxAgeSeconds", 29],
+    ["maxAgeSeconds", 86_401],
+    ["maxOnScreen", 0],
+  ])("stops the build on %s of %d, naming the file and the field", (field, value) => {
+    expect(
+      message(
+        planted((r) => {
+          r[field] = value;
+        }),
+      ),
+    ).toMatch(new RegExp(`^bubbles\\.json: ${field}\\b`));
+  });
+
+  it("stops the build on a missing rule, a wrong type, a list and an unknown rule, naming the file", () => {
+    const fault = (change: (r: Record<string, unknown>) => void) => message(planted(change));
+    expect(fault((r) => Reflect.deleteProperty(r, "maxChars"))).toMatch(/^bubbles\.json: maxChars\b/);
+    expect(fault((r) => Reflect.set(r, "showSeconds", "5"))).toMatch(/^bubbles\.json: showSeconds\b/);
+    expect(fault((r) => Reflect.set(r, "extra", 1))).toMatch(/^bubbles\.json: /);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", [])))).toMatch(/^bubbles\.json: \(file\)/);
+  });
+
+  it("stops the build when the file is missing or is no JSON", () => {
+    expect(message(plant((f) => Reflect.deleteProperty(f, "bubbles.json")))).toMatch(/bubbles\.json/);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", "{")))).toMatch(/bubbles\.json/);
+  });
+
+  // 6b: the centres come from a public-domain source read, named in the header (the plan's question 3).
+  it("names, in the header of the country table, a public-domain source and where it was read", () => {
+    const table = new URL("../../packages/core/src/bubbles/countries.ts", import.meta.url).pathname;
+    const header = readFileSync(table, "utf8").split("\n").slice(0, 6).join("\n");
+    expect(header).toMatch(/public domain|CC0/i);
+    expect(header).toMatch(/https:\/\/\S+/);
+    expect(header).toMatch(/source/i);
+  });
+
+  // ADR-0001 §7's numbers live in the data file alone: the plan's "no number of §7 is written in code".
+  it("leaves the rules' numbers out of the code of packages/core/src/bubbles", () => {
+    const dir = new URL("../../packages/core/src/bubbles/", import.meta.url).pathname;
+    const sources = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "countries.ts");
+    expect(sources).toEqual(expect.arrayContaining(["pickBubbles.ts", "cut.ts", "rules.ts"]));
+    for (const file of sources) {
+      const code = readFileSync(join(dir, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code.match(/(?<![\w.])(?:5|6|30|80|500|5000|30000)(?![\w.])/g) ?? [], file).toEqual([]);
     }
   });
 });

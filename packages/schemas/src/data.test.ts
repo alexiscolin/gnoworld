@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  BubbleRules,
   DATA_CAPS,
   Ecosystems,
   EMBED_PREFIXES,
@@ -416,5 +417,84 @@ describe("Universes", () => {
       }));
     expect(Universes.safeParse(universes(DATA_CAPS.universes)).success).toBe(true);
     expect(Universes.safeParse(universes(DATA_CAPS.universes + 1)).success).toBe(false);
+  });
+});
+
+// Slice 6's 6a: the rules of the Earth's bubbles (ADR-0001 §7), one object, checked when the app builds. The bounds are
+// the plan's proposal (docs/plans/slice-6.md §3): each is tested at the bound and one past it.
+describe("BubbleRules", () => {
+  const rules = {
+    maxOnScreen: 6,
+    showSeconds: 5,
+    speakerDelaySeconds: 30,
+    maxChars: 80,
+    readLast: 500,
+    maxAgeSeconds: 300,
+  };
+  const BOUNDS = [
+    ["maxOnScreen", 1, 12],
+    ["showSeconds", 1, 15],
+    ["speakerDelaySeconds", 1, 120],
+    ["maxChars", 20, 160],
+    ["readLast", 1, 2000],
+    ["maxAgeSeconds", 30, 86_400],
+  ] as const;
+
+  it("takes the rules ADR-0001 §7 starts with", () => {
+    expect(BubbleRules.safeParse(rules).success).toBe(true);
+  });
+
+  it.each(BOUNDS)("takes %s from %d to %d, and refuses one past either end", (field, low, high) => {
+    const ok = (value: number) => BubbleRules.safeParse({ ...rules, [field]: value }).success;
+    expect([ok(low), ok(high), ok(low - 1), ok(high + 1)]).toEqual([true, true, false, false]);
+  });
+
+  it.each(BOUNDS)("refuses a %s that is zero, negative, fractional, a string, null, NaN or infinite", (field, low) => {
+    const bad = (value: unknown) => BubbleRules.safeParse({ ...rules, [field]: value }).success;
+    expect([bad(-1), bad(low + 0.5), bad(String(low)), bad(null), bad(Number.NaN), bad(Infinity)]).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    if (low > 0) expect(bad(0)).toBe(false);
+  });
+
+  it.each(BOUNDS)("refuses rules with no %s, and names it", (field) => {
+    const rest = Object.fromEntries(Object.entries(rules).filter(([name]) => name !== field));
+    const result = BubbleRules.safeParse(rest);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((i) => i.path)).toEqual([[field]]);
+  });
+
+  it("refuses a field it does not know, a list and a null", () => {
+    expect(BubbleRules.safeParse({ ...rules, maxBubbles: 7 }).success).toBe(false);
+    expect(BubbleRules.safeParse([rules]).success).toBe(false);
+    expect(BubbleRules.safeParse(null).success).toBe(false);
+  });
+
+  it("names the field and what is wrong when a cap is drowned", () => {
+    const result = BubbleRules.safeParse({ ...rules, maxOnScreen: 10_000 });
+    expect(result.error?.issues.map((i) => i.path)).toEqual([["maxOnScreen"]]);
+  });
+
+  it("takes any integers inside the bounds", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          maxOnScreen: fc.integer({ min: 1, max: 12 }),
+          showSeconds: fc.integer({ min: 1, max: 15 }),
+          speakerDelaySeconds: fc.integer({ min: 1, max: 120 }),
+          maxChars: fc.integer({ min: 20, max: 160 }),
+          readLast: fc.integer({ min: 1, max: 2000 }),
+          maxAgeSeconds: fc.integer({ min: 30, max: 86_400 }),
+        }),
+        (row) => {
+          expect(BubbleRules.safeParse(row).success).toBe(true);
+        },
+      ),
+    );
   });
 });

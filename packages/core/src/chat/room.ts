@@ -23,7 +23,7 @@ export interface Line {
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl), its names being ASCII alone
 // (irc/i18n/common.go:74, v2.19.1).
-const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+export const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
 /** Whether two names, of rooms or nicks, are one name to Ergo. */
 export const sameName = (one: string, other: string): boolean => fold(one) === fold(other);
 /** The nick of a source: nick!user@host, nick@host, or a nick alone. */
