@@ -5,6 +5,7 @@ import { Button, Cluster, Dialog, IconButton, Stack } from "@gnoworld/ui";
 import type { SavedLine } from "../../lib/keep/keep.ts";
 import { roomHref, roomLabel, shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
+import { useFull } from "./full.ts";
 import shared from "./lists.module.css";
 import styles from "./SavedView.module.css";
 
@@ -19,6 +20,7 @@ export interface SavedViewProps {
 }
 
 export function SavedView({ saved, open, onClose, onRemove, notKept = false }: SavedViewProps) {
+  const full = useFull();
   return (
     <Dialog title="Saved messages" description="Saved on this device only." open={open} onClose={onClose}>
       {notKept ? <p role="status">This device could not keep your saved messages.</p> : null}
@@ -39,7 +41,7 @@ export function SavedView({ saved, open, onClose, onRemove, notKept = false }: S
                   </span>
                   <span>{line.text}</span>
                   <Cluster space="2xs" justify="end">
-                    <Button href={roomHref(line.room)} emphasis="quiet" size="s">
+                    <Button href={roomHref(line.room, full)} emphasis="quiet" size="s">
                       Open in room
                     </Button>
                     <IconButton

@@ -1,0 +1,98 @@
+/* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none (the video's frame
+   23.58.01). The widths are the video's, measured at 1728 px. */
+@layer components {
+  /* The box the chat is given: its width, not the window's, says which regions are drawn (a dock beside a scene is narrow
+     inside a wide window). */
+  .root {
+    container-type: inline-size;
+    block-size: 100%;
+    min-block-size: 0;
+  }
+
+  .frame {
+    /* layout: the header over the body, filling the height its place gives it; no composition fills a height */
+    display: flex;
+    /* layout: the header over the body */
+    flex-flow: column;
+    block-size: 100%;
+    min-block-size: 0;
+    background: var(--color-surface);
+  }
+
+  .header {
+    /* layout: the header's row centred in its band, which a composition (a row from the top) does not do */
+    display: grid;
+    /* layout: centred in the band */
+    align-content: center;
+    min-block-size: var(--chat-head);
+    padding-inline: var(--space-m);
+    /* layout: the header keeps its own height */
+    flex: none;
+    border-block-end: var(--line-width) solid var(--color-line);
+  }
+
+  .body {
+    /* layout: the regions side by side, each holding its own scroll, the page none */
+    display: flex;
+    /* layout: takes what the header leaves */
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .worlds,
+  .rooms,
+  .info {
+    /* layout: a region keeps its measure */
+    flex: none;
+    overflow: auto;
+    border-inline-end: var(--line-width) solid var(--color-line);
+  }
+
+  .worlds {
+    inline-size: var(--chat-worlds);
+  }
+
+  .rooms {
+    inline-size: var(--chat-rooms);
+  }
+
+  .info {
+    inline-size: var(--chat-info);
+    border-inline-end: 0;
+    border-inline-start: var(--line-width) solid var(--color-line);
+  }
+
+  .conversation {
+    /* layout: the conversation takes the width the other regions leave; a column of its own parts */
+    display: flex;
+    /* layout: takes the rest of the row */
+    flex: 1;
+    /* layout: its parts one under the other */
+    flex-flow: column;
+    /* layout: a flex item shrinks below its content only with this, so the regions scroll and the page does not */
+    min-inline-size: 0;
+    min-block-size: 0;
+  }
+
+  /* raw: the design system's one breakpoint for the chat, a phone's layout (docs/DESIGN-SYSTEM.md), read from the box's
+     width: the conversation alone, the rooms behind a control */
+  @container (inline-size <= 900px) {
+    .worlds,
+    .info {
+      display: none;
+    }
+
+    /* A thread, which the info slot holds, takes the whole width. */
+    [data-info-first] .info {
+      display: block;
+      /* layout: the thread takes the whole width */
+      flex: 1;
+      inline-size: auto;
+      border-inline-start: 0;
+    }
+
+    [data-info-first] .conversation {
+      display: none;
+    }
+  }
+}

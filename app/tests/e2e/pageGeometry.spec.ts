@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { inGames } from "./chat.ts";
+import { lines } from "./chat.ts";
+import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
@@ -484,28 +485,26 @@ test.describe("the views' bar on a phone", () => {
   }
 });
 
-// The bug: the fixed plate pushed the chat's slot to 612 px at 1280, under the 40rem the room needs to sit beside a thread's
-// panel, so opening a thread hid the room (16 threads journeys failed). F3258: and at 1366 the message list fell to 242 px wide,
-// which the slot's own width does not show; so the list is measured, at the width where the plate stands beside it.
-test.describe("the chat's slot beside the plate", () => {
-  for (const width of [900, 1280, 1366, 1727, 1728, 1900] as const) {
-    test(`/w/bubble at ${String(width)} px: the plate stands above the room, or beside it with the message list 400 px wide or more`, async ({
+// The bug: the fixed plate pushed the chat's slot to 612 px at 1280, so opening a thread hid the room (F3258: and at 1366 the
+// message list fell to 242 px wide). 5q's fix pass (review 1): the chat is the plate's dock at the right from 1280 px, 320 px
+// wide under 1400 and 360 from it, its lines 300 px wide or more; under 1280 px the plate is a block and the chat the page.
+test.describe("the chat's dock beside the plate", () => {
+  for (const width of [900, 1279, 1280, 1366, 1399, 1400, 1728, 1900] as const) {
+    test(`/w/bubble at ${String(width)} px: the plate and the dock stand side by side from 1280 px, the lines 300 px wide or more`, async ({
       page,
     }) => {
-      await page.setViewportSize({ width, height: 1080 });
-      await inGames(page);
+      await open(page, { width, as: "guest-geometry", height: 1080, full: false });
       const beside = await page
         .locator("[data-look='plate']")
         .evaluate((el) => getComputedStyle(el.parentElement ?? el).position === "fixed");
-      expect(beside, "the plate is beside the room from 1728 px, not under it").toBe(width >= 1728);
+      expect(beside, "the plate is beside the dock from 1280 px, not under it").toBe(width >= 1280);
+      const line = await lines(page).first().boundingBox();
+      if (line === null) throw new Error("no line");
+      expect(line.width, "the line's width").toBeGreaterThanOrEqual(width >= 1280 ? 300 : 600);
       if (!beside) return;
-      const rooms = await box(page, "nav[aria-label='Rooms and direct messages']");
-      const people = await box(page, 'aside[aria-label="Who\'s here"]');
-      expect(people.x + people.width - rooms.x, "the slot").toBeGreaterThanOrEqual(640);
-      const list = page.getByRole("list", { name: "Messages" });
-      await expect
-        .poll(() => list.evaluate((el) => el.getBoundingClientRect().width), { message: "the message list's width" })
-        .toBeGreaterThanOrEqual(400);
+      const [plate, dock] = await Promise.all([box(page, "[data-look='plate']"), box(page, "[data-chat-layout]")]);
+      expect(plate.x + plate.width, "the plate ends before the dock").toBeLessThanOrEqual(dock.x);
+      expect(Math.abs(dock.width + 2 - (width >= 1400 ? 360 : 320)), "the dock's width").toBeLessThanOrEqual(1);
     });
   }
 });

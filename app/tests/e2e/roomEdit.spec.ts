@@ -61,7 +61,7 @@ test.describe("a room's lines: Edit", () => {
     await expect(field(page)).toBeFocused();
     await saveAs(page, "my first words, fixed");
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
-    await expect(lines(page).nth(0)).toContainText(/^\d{2}:\d{2} Edited /);
+    await expect(lines(page).nth(0)).toContainText(/^\S+( you)? Edited \d{2}:\d{2}/);
     await expect(lines(page)).toHaveCount(2);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveValue("");
@@ -343,13 +343,13 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     const bob = await another({ playwright, launchOptions }, word("bob"));
     const me = await logIn(page, word("as"));
     // Each page in the room, then each seeing the other there.
-    await bob.page.goto("/w/bubble?room=games");
-    await page.goto("/w/bubble?room=games");
+    await bob.page.goto("/w/bubble?room=games&chat=full");
+    await page.goto("/w/bubble?room=games&chat=full");
     for (const [each, who] of [
       [bob.page, me],
       [page, bob.address],
     ] as const)
-      await expect(each.getByRole("complementary", { name: "Who's here" }).getByTitle(who)).toBeVisible();
+      await expect(each.getByRole("region", { name: "Who's here" }).getByTitle(who)).toBeVisible();
     const text = word("hello");
     await field(page).fill(text);
     await field(page).press("Enter");

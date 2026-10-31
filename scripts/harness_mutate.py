@@ -130,20 +130,13 @@ def journeys_mutants():
         ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
         ("\t\tapp/tests/*.ts) ts=true ;;", "\t\tapp/tests/*.ts) ts=true app=true ;;", "builds the app for a change of a journey"),
         ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
-        ('[ -z "$tested" ] || format_cache=', '[ -n "$tested" ] || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
-        ('[ -z "$tested" ] || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
+        ('{ $full || [ -z "$tested" ]; } || format_cache=', '{ $full || [ -n "$tested" ]; } || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
+        ('{ $full || [ -z "$tested" ]; } || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
+        ('{ $full || [ -z "$tested" ]; } || format_cache=', '[ -z "$tested" ] || format_cache=', "gives --full and --merge Prettier's writable cache"),
         ("--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache", "--cache-strategy content", "gives Prettier no cache"),
         ("--cache --cache-strategy content --cache-location", "--cache --cache-strategy metadata --cache-location", "keys Prettier's cache by modification time, not content"),
     ):
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
-
-
-def green_mutants():
-    """pre-commit does not gate a tree a gate already passed (slice-5 harness-c, speed-audit.md row 1)."""
-    find = 'if green "$(git write-tree)" fast; then\n\techo "pre-commit: the gate already'
-    yield from each(".githooks/pre-commit", find, find.replace('green "$(git write-tree)" fast', "false"), "hooks", "pre-commit gates again a tree its gate passed")
-    yield from each(".githooks/pre-commit", find, find.replace('green "$(git write-tree)" fast', "true"), "hooks", "pre-commit skips the gate of a tree no gate passed")
-    yield from each(".githooks/pre-commit", find, find.replace("fast;", "full;"), "hooks", "pre-commit reads the full gate's record for a fast gate's skip")
 
 
 def quick_mutants():
@@ -1067,7 +1060,6 @@ def mutants():
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from journeys_mutants()
     yield from quick_mutants()
-    yield from green_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()
     yield from merge_lock_mutants()

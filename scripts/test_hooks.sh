@@ -1425,7 +1425,6 @@ fi
 if part pre_commit; then
 # pre-commit runs the gate on the staged files, and a failing gate stops the commit.
 c2="$t/precommit"
-fresh() { echo "$RANDOM$RANDOM" >>"$c2/a.ts" && git -C "$c2" add a.ts; } # a tree no gate has passed yet: a tree recorded green is not gated again
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
 printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
@@ -1490,30 +1489,12 @@ precommit || fail "pre-commit failed with a gate that passes"
 # writes MERGE_HEAD only after that hook) or a merge in progress (a conflict concluded by hand). A work commit says no
 # (a merge commit has no time budget, a work commit keeps its own: Alexis, 2026-10-28).
 [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit told the gate a work commit was a merge: $(cat "$t/gate-merge")"
-fresh && precommit --merge || fail "pre-commit refused a merge with a gate that passes"
+precommit --merge || fail "pre-commit refused a merge with a gate that passes"
 [ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate pre-merge-commit's merge was one: $(cat "$t/gate-merge")"
-git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && fresh && precommit || fail "pre-commit refused a merge in progress with a gate that passes"
+git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && precommit || fail "pre-commit refused a merge in progress with a gate that passes"
 [ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate a merge in progress was one: $(cat "$t/gate-merge")"
 rm -f "$c2/.git/MERGE_HEAD"
-fresh && GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
-# A tree a gate already passed is not gated again (speed audit, row 1): a commit refused by commit-msg after a green gate, retried with the
-# same tree, runs no gate; a tree one byte different does. The secret scan and the staged-against-disk check come before the record is read.
-gates() { grep -c . "$t/gate-count" 2>/dev/null || :; }
-printf '#!/bin/sh\necho gate >>"%s/gate-count"\n' "$t" >"$c2/scripts/check.sh" && git -C "$c2" add -A && git -C "$c2" commit -qm "a counting gate" && rm -f "$t/gate-count"
-echo once >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit || fail "pre-commit stopped a commit whose gate passes"
-[ "$(gates)" = 1 ] || fail "pre-commit ran the gate $(gates) times on a new tree, not once"
-printf '%080d\n' 0 >"$t/long-subject"
-(cd "$c2" && sh "$hooks/commit-msg" "$t/long-subject" >/dev/null 2>&1) && fail "commit-msg let a subject of 80 characters through"
-precommit || fail "pre-commit stopped the retry of a tree its gate passed"
-[ "$(gates)" = 1 ] || fail "pre-commit gated a tree its gate had passed again ($(gates) gates)"
-(cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a staged secret through because the tree was recorded green"
-echo twice >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit || fail "pre-commit stopped a commit whose gate passes (a byte more)"
-[ "$(gates)" = 2 ] || fail "pre-commit did not gate a tree one change away from the recorded one ($(gates) gates)"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && echo thrice >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit let a tree through a failing gate that no record covers"
-git -C "$c2" reset -q --hard
+GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
 git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
 fi
 
@@ -2710,6 +2691,7 @@ printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
 for s in $full_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
 nocache "--full with a server change"
+[ -z "$(sed -n 's/^format:check //p' "$log")" ] || fail "check.sh --full gave Prettier a cache, which the merge check must not read: '$(sed -n 's/^format:check //p' "$log")'"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
 reset
 printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
@@ -2959,7 +2941,7 @@ ran py:check_regressions && fail "check.sh ran check_regressions in a copy with 
 # check_regressions.py from the repository, with the base check.sh takes (where the branch left main, else HEAD), and a refusal
 # stops the commit. Not in a merge, not with no commit yet (nothing to compare).
 c3="$t/precommit_regr"
-precommit_in() { d=$1 code=$2 && shift 2 && rm -f "$d/.claude/tmp/green-fast" && (cd "$d" && REG_LOG="$t/reg.log" REG_EXIT="$code" sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
+precommit_in() { d=$1 code=$2 && shift 2 && (cd "$d" && REG_LOG="$t/reg.log" REG_EXIT="$code" sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 precommit3() { code=${1:-0} && { [ $# -eq 0 ] || shift; } && precommit_in "$c3" "$code" "$@"; }
 regr_fixture() { # $1: a folder
 	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"

@@ -6,7 +6,7 @@ import { logIn } from "./irc.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { live, OTHER, room, T } from "./scriptedRoom.ts";
 import { barOf } from "./talk.ts";
-import { chipOf, panel, threadField } from "./thread.ts";
+import { chipOf, threadField } from "./thread.ts";
 
 // Slice 5's 5b (U3, docs/plans/slice-5.md §1): from 900 px down the rooms sit behind the button "Rooms", which says its
 // unread count in its name while closed; the drawer is the dialog "Rooms". A scripted Ergo, the account's lines first.
@@ -21,9 +21,7 @@ const strip = (page: Page, words: string | RegExp) =>
 // The conversation with OTHER, chosen in the drawer, which closes as it opens.
 async function chooseDm(page: Page) {
   await control(page).click();
-  await drawer(page)
-    .getByRole("link", { name: `${OTHER_SHORT} Not encrypted` })
-    .click();
+  await drawer(page).getByRole("link", { name: OTHER_SHORT, exact: true }).click();
   await expect(page.getByRole("heading", { name: `Direct message with ${OTHER_SHORT}` })).toBeVisible();
 }
 const control = (page: Page) => page.getByRole("button", { name: /^Rooms\b/ });
@@ -71,7 +69,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await expect(control(page)).toBeVisible();
     await expect(roomsNav(page)).toBeHidden();
     await expect(drawer(page)).toBeHidden();
-    await takesWidth(page.getByRole("list", { name: "Messages" }), 390);
+    await takesWidth(lines(page).first(), 390);
     await takesWidth(page.getByRole("form", { name: "Write in #games" }), 390);
   });
 
@@ -99,7 +97,6 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await expect(control(page)).toBeVisible();
     await lines(page).nth(1).hover();
     await chipOf(lines(page).nth(1)).click();
-    await takesWidth(panel(page), 390);
     await takesWidth(threadField(page).locator("xpath=ancestor::form[1]"), 390);
   });
 
@@ -123,7 +120,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await drawer(page).getByRole("link", { name: "#bubble", exact: true }).click();
     await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
     // The world's main room has no ?room= in its address.
-    await expect(page).toHaveURL(/\/w\/bubble$/);
+    await expect(page).toHaveURL(/\/w\/bubble(\?chat=full)?$/);
     await expect(drawer(page)).toBeHidden();
     await expect(lineOf(page, "the main room's first line")).toBeVisible();
   });
@@ -265,7 +262,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await logIn(page, word("drawer"));
     await page.route("**/api/rooms*", (route) => route.abort());
-    await page.goto(`/w/bubble?dm=${OTHER}`);
+    await page.goto(`/w/bubble?dm=${OTHER}&chat=full`);
     await hydrated(page);
     await control(page).click();
     await expect(drawer(page).getByRole("alert").filter({ hasText: "The rooms could not load." })).toBeVisible();

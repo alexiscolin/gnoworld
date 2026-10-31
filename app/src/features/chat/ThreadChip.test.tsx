@@ -26,7 +26,6 @@ const view = (over: Partial<RoomViewProps> = {}, lines: readonly Line[] = LINES)
   renderToStaticMarkup(
     <RoomView
       room="#bubble/games"
-      title="#games"
       state={{ lines, members: [ALICE] }}
       chat="connected"
       me={ALICE}
@@ -50,7 +49,6 @@ beforeAll(async () => {
   await prerender(
     <RoomView
       room="#bubble/games"
-      title="#games"
       state={{ lines: LINES, members: [ALICE] }}
       chat="connected"
       onDelete={() => false}

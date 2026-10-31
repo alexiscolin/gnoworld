@@ -118,6 +118,19 @@ function useNewestInView(
       atEndRef.current = atEnd(box);
     } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
   }, [lines, fresh, reactions]);
+  // The list shrinks as the composer grows (a six-line draft): no scroll event comes, so a reader at the end is kept there by
+  // the new size, else the newest lines are lost under the composer (review 6 of 5q).
+  useEffect(() => {
+    const box = listRef.current;
+    if (box === null || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => {
+      if (atEndRef.current) box.scrollTop = box.scrollHeight;
+    });
+    watch.observe(box);
+    return () => {
+      watch.disconnect();
+    };
+  }, []);
   const onScroll = () => {
     if (listRef.current !== null) atEndRef.current = atEnd(listRef.current);
   };

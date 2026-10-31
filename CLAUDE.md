@@ -18,7 +18,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 
 ## How we work
 
-- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security; once per branch, never on a fixer's tests) and fix its findings; the commit that brings those tests and their code says so in a line `Red-pass: <findings fixed>` (a red commit fails the gate), the mark the `reviewer`'s green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
+- Test first: write the failing tests, run them, see them fail, then launch the `test-auditor` for its red pass (complete, relevant, impact first, security; once per branch, never on a fixer's tests) and fix its findings; the commit that brings those tests and their code says so in a line `Red-pass: <findings fixed>` (a red commit fails the gate; a red journey fails only the merge check, as a commit's gate walks no journey), the mark the `reviewer`'s green pass measures drift from. Only then write the code. The mutation check finds every guard; one no test can catch yet goes into `GAPS` in `scripts/mutate.py`, with the reason.
 - `scripts/check.sh` must pass before every commit that changes code (the pre-commit hook runs it). Never commit with `--no-verify`.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.

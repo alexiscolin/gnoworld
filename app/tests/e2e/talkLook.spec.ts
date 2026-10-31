@@ -15,17 +15,10 @@ const LOOK = (address: string): Scripted => ({
   ],
 });
 
-// Who's here holds the account's address, a new one each run (the test wallet draws its key): its width set here,
-// through the element's style, which the CSP allows, so the room's width is the same each run.
-const steady = (page: Page) =>
-  page.getByRole("complementary", { name: "Who's here" }).evaluate((aside) => {
-    aside.style.flex = "0 0 8rem";
-  });
 // The look's room on a computer's screen, the pointer on its first line, whose bar shows.
 async function pointedFirst(page: Page) {
   await page.setViewportSize({ width: 1280, height: 900 });
   await asAccount(page, LOOK, 3);
-  await steady(page);
   await lines(page).first().hover();
   await expect(barOf(page, 0)).toBeVisible();
 }
@@ -97,7 +90,6 @@ test.describe("reactions, replies and edits, as they look", () => {
         }),
         3,
       );
-      await steady(page);
       await lines(page).first().hover();
       await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
       await page.getByRole("menuitem", { name: "Edit" }).click();
@@ -139,7 +131,6 @@ test.describe("reactions, replies and edits, as they look", () => {
     expect(await list.evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
-    await steady(page);
     await expect(list).toHaveScreenshot("talk-phone.png");
   });
 });

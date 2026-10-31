@@ -8,3 +8,4 @@ export async function drawing() {
   return { reader: ANONYMOUS, block, inlines: drawInlines };
 }
 export type Drawing = Awaited<ReturnType<typeof drawing>>;
+export type { ChatPlace } from "./ChatScreen.tsx";

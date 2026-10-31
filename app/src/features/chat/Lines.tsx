@@ -23,10 +23,9 @@ import { LineView } from "./LineView.tsx";
 import { mentionable } from "./names.ts";
 import { chipsOf } from "./Reactions.tsx";
 import { useListRead } from "./reading.ts";
-import shared from "./lists.module.css";
 import styles from "./RoomView.module.css";
 
-const LINES = [shared["plain"], shared["scrolls"], styles["lines"]].join(" ");
+const LINES = [styles["lines"], styles["fill"]].join(" ");
 
 export interface LinesProps {
   /** The room, whose lines have bars; none for a direct message's. */

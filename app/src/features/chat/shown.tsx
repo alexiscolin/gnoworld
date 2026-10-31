@@ -1,6 +1,6 @@
 // The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
-import { Icon } from "@gnoworld/ui";
+import { Chip, Icon } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
 import type { DmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
@@ -34,7 +34,7 @@ const stateOf = (dms: Dms): NonNullable<RoomViewProps["state"]> => ({
 });
 
 // A direct message's (4e): said to be one, its partner named, the address whole in its title (U7); not encrypted, by a
-// lock and a word in amber, caution's colour (U6); no one beside it; a line Ergo refused said so.
+// lock and a word in amber, caution's colour (U6); a line Ergo refused said so.
 function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }: DmPage): Shown {
   const short = shortAddress(partner);
   const { refused } = dms;
@@ -54,12 +54,13 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }
   return {
     kind: "dm",
     key: `dm:${partner}`,
+    title,
+    note,
+    mark: <Chip tone="warm">Not encrypted</Chip>,
     // Its lines have the bar (4d's DM bar): a reaction, a reply, an edit and a delete of one's own; no link, no player.
     view: {
       room: undefined,
       partner,
-      title,
-      note,
       // Its page is the one it holds, so its reader's reach of the end counts as a read (4f-n).
       state: stateOf(dms),
       empty: dms.empty,
