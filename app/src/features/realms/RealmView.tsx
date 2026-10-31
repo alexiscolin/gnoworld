@@ -8,6 +8,7 @@ import { gnowebLink, gnowebOrigin } from "../../lib/chain/gnoweb.ts";
 import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
+import { RealmFunctions } from "./RealmFunctions.tsx";
 import styles from "./RealmView.module.css";
 import { useRealm, type Height, type Realm } from "./useRealm.ts";
 
@@ -105,6 +106,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
             </Cluster>
           )}
           <Body state={state} origin={origin} link={link} />
+          <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
         </Stack>
       </Center>
