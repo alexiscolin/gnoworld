@@ -60,12 +60,18 @@
     padding-block: 0;
     /* raw: the line starts at the right edge of its clip (the prototype's padding-left: 100%) */
     padding-inline-start: 100%;
+    /* layout: the track is as wide as its line, so one pass carries the whole line past the pause (the prototype's flex .tclip) */
+    inline-size: max-content;
     list-style-type: none;
     white-space: nowrap;
     /* raw: a full pass in 60 s (the prototype's tick) */
     animation: tick 60s linear infinite;
   }
 
+  /* The prototype's #ticker:hover: a link does not move while it is aimed at, by pointer or by keyboard. A click on the pause
+     button is not keyboard focus, so playing again is not held back by the button's own focus. */
+  .ticker:hover .track,
+  .ticker:has(:focus-visible) .track,
   .ticker[data-paused="true"] .track {
     animation-play-state: paused;
   }

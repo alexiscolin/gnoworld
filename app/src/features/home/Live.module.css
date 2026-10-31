@@ -59,6 +59,14 @@
     /* layout: a paragraph with no margin of its own */
     margin-block: 0;
     font: var(--font-meta);
+    /* layout: a long next step stops at two lines, so the box keeps its 66 px */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .state {
     color: var(--color-text-muted);
   }
 

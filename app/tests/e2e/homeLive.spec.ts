@@ -23,7 +23,9 @@ interface Options {
   /** The file's answer as it is sent, whatever its content (a status and a body). */
   raw?: { status: number; body: string };
   /** The chain's answer: a block, or a 503. */
-  chain?: "ok" | "down";
+  chain?: "ok" | "down" | "wrong";
+  /** The instant the block was made 3 minutes before, as an ISO time; the real clock when none. */
+  at?: string;
   /** The RPC host asked, by its pattern: the universe's own. */
   rpc?: string;
   /** Both answers wait for it, as a slow network would. */
@@ -44,10 +46,16 @@ async function answers(page: Page, options: Options = {}) {
     asked.status += 1;
     await options.gate;
     if (options.chain === "down") await route.fulfill({ status: 503, headers: cors, body: "{}" });
+    else if (options.chain === "wrong") await route.fulfill({ headers: cors, body: '{"result":{"unexpected":true}}' });
     else
       await route.fulfill({
         headers: cors,
-        body: JSON.stringify(statusEnvelope(1203885, new Date(Date.now() - 3 * 60_000).toISOString())),
+        body: JSON.stringify(
+          statusEnvelope(
+            1203885,
+            new Date(Date.parse(options.at ?? new Date().toISOString()) - 3 * 60_000).toISOString(),
+          ),
+        ),
       });
   });
   return asked;
@@ -153,6 +161,47 @@ test.describe("the home at the video's size", () => {
     expect(await style(page, "[data-ticker] a", "font-family")).toMatch(/mono/i);
   });
 
+  test("scrolls every title past the pause: at the end of a pass the whole line has left, the last link included", async ({
+    page,
+  }) => {
+    await openHome(page);
+    await expect(page.locator("[data-ticker]")).toBeVisible();
+    const links = page.locator("[data-ticker] a");
+    expect(await links.count()).toBeGreaterThan(3);
+    // A pass takes 60 s: the animation is put 10 ms from its end, and held there.
+    await page.locator("[data-ticker-track]").evaluate((track) => {
+      for (const each of track.getAnimations()) {
+        each.pause();
+        each.currentTime = 59_990;
+      }
+    });
+    const clip = await box(page, "[data-ticker] button");
+    const last = await box(page, "[data-ticker] a >> nth=-1");
+    expect(last.x + last.width, "the last title's right edge, against the pause's right edge").toBeLessThanOrEqual(
+      clip.x + clip.width + 1,
+    );
+    const first = await box(page, "[data-ticker] a >> nth=0");
+    expect(first.x + first.width).toBeLessThanOrEqual(clip.x + clip.width + 1);
+  });
+
+  test("stands still under the pointer and under keyboard focus, so a link does not move while it is aimed at", async ({
+    page,
+  }) => {
+    await openHome(page);
+    await expect(page.locator("[data-ticker]")).toBeVisible();
+    const state = () => style(page, "[data-ticker-track]", "animation-play-state");
+    expect(await state()).toBe("running");
+    // The line moves, so the pointer goes to the strip's middle rather than to a link, which Playwright would wait on.
+    await page.mouse.move(864, 1080 - 17);
+    expect(await state()).toBe("paused");
+    await page.mouse.move(5, 5);
+    expect(await state()).toBe("running");
+    await page.locator("[data-ticker] a").first().focus();
+    expect(await state()).toBe("paused");
+    await page.locator("[data-ticker] a").first().blur();
+    expect(await state()).toBe("running");
+  });
+
   test("pauses the strip with its button, and plays it again", async ({ page }) => {
     await openHome(page);
     const track = "[data-ticker-track]";
@@ -162,6 +211,8 @@ test.describe("the home at the video's size", () => {
     expect(await style(page, track, "animation-play-state")).toBe("paused");
     await expect(page.getByRole("button", { name: "Play the ticker" })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Play the ticker" }).click();
+    // The pointer stays over the strip, which stands still under it (the prototype's #ticker:hover): it plays once the pointer leaves.
+    await page.mouse.move(864, 400);
     expect(await style(page, track, "animation-play-state")).toBe("running");
   });
 
@@ -299,8 +350,28 @@ test.describe("the home's live line at every stage and in every universe", () =>
     });
   }
 
+  test("a wrong-shape chain and a missing file stay inside the live line's box, at 900 px as at 1728", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 900, height: 700 });
+    await openHome(page, { chain: "wrong" });
+    await expect(page.locator("[data-block]")).toContainText(/try again|report it/i);
+    await expect(page.locator("[data-markets='missing']")).toBeVisible();
+    const inside = await page.locator("[data-hero='markets']").evaluate((live) => {
+      const frame = live.getBoundingClientRect();
+      const out = [...live.querySelectorAll("*")].filter(
+        (el) => el.getBoundingClientRect().bottom > frame.bottom + 0.5,
+      );
+      return { fits: live.scrollHeight <= live.clientHeight, out: out.map((el) => el.tagName) };
+    });
+    expect(inside).toEqual({ fits: true, out: [] });
+  });
+
   test("the live line looks as approved, the moving words masked", async ({ page }) => {
-    await openHome(page);
+    // The clock is held, so the times' words are the same each run, and the masks as wide.
+    const at = "2026-10-31T06:07:00.000Z";
+    await page.clock.install({ time: new Date(at) });
+    await openHome(page, { markets: { ...MARKETS, updated: "2026-10-31T06:03:00.000Z" }, at });
     await expect(page.locator("[data-height]")).toBeVisible();
     await expect(page.locator("[data-hero='markets']")).toHaveScreenshot("home-live-line.png", {
       mask: [page.locator("[data-hero='markets'] time")],

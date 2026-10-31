@@ -22,6 +22,11 @@ const event = (id: string, start: string, title = `Event ${id}`) => ({
 });
 
 describe("tickerItems", () => {
+  it("drops an event that starts exactly now, and keeps one a millisecond ahead", () => {
+    const items = tickerItems([], [event("now", NOW.toISOString()), event("soon", "2026-10-31T12:00:00.001Z")], NOW);
+    expect(items.map((item) => item.id)).toEqual(["soon"]);
+  });
+
   it("is empty with no news and no event", () => {
     expect(tickerItems([], [], NOW)).toEqual([]);
   });
