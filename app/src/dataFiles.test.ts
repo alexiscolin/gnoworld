@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
@@ -196,7 +196,8 @@ describe("loadData", () => {
         universe: "onyx",
       },
     ]);
-    for (const empty of ["ecosystems", "stations", "genres", "events", "expedition", "quests", "news"] as const)
+    // events and news hold the ticker's placeholders, listed below.
+    for (const empty of ["ecosystems", "stations", "genres", "expedition", "quests"] as const)
       expect(data[empty]).toEqual([]);
   });
 
@@ -559,5 +560,119 @@ describe("react-router build", () => {
       writeFileSync(root, original);
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// The ticker's placeholders (Alexis, 2026-10-31): named here, so none reaches a public deploy unnoticed; removing them is
+// deleting these ids from the two files and the lines below. No sample world, number or activity.
+const DIR = new URL("../data/", import.meta.url);
+const read = (file: string): unknown => JSON.parse(readFileSync(new URL(file, DIR), "utf8"));
+
+interface Row {
+  id: string;
+  title: string;
+  link: string;
+  date?: string;
+  start?: string;
+  embed?: string;
+}
+const news = read("news.json") as Row[];
+const events = read("events.json") as Row[];
+
+/** The placeholders of the ticker, by id: three news and two events. Change this list only with the files. */
+const SAMPLE_NEWS = ["sample-news-bubble-onyx", "sample-news-demo", "sample-news-testnet"];
+const SAMPLE_EVENTS = ["sample-event-community-call", "sample-event-demo-session"];
+
+describe("the ticker's placeholders", () => {
+  beforeEach(() => {
+    expect(news.length + events.length, "the files hold the five placeholders").toBe(5);
+  });
+
+  it("are the three news and the two events this list names, and nothing else", () => {
+    expect(news.map((row) => row.id)).toEqual(SAMPLE_NEWS);
+    expect(events.map((row) => row.id)).toEqual(SAMPLE_EVENTS);
+  });
+
+  it("are counted across every data file's text, not only the two lists: five ids, no sixth hidden in another file", () => {
+    const files = readdirSync(DIR.pathname, { recursive: true }).filter(
+      (file) => !file.includes("/") && file.endsWith(".json"),
+    );
+    const found = files.flatMap((file) =>
+      [...readFileSync(new URL(file, DIR), "utf8").matchAll(/"id":\s*"(sample-[^"]*)"/g)].map((match) => match[1]),
+    );
+    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS].toSorted());
+  });
+
+  it("do not name a session of the product that no document has announced", () => {
+    expect(events.map((row) => row.title).join(" | ")).not.toMatch(/gno\.world/i);
+  });
+
+  it("each begin with sample-, so they can be found and removed", () => {
+    for (const row of [...news, ...events]) expect(row.id).toMatch(/^sample-/);
+  });
+
+  it("are the only sample- rows of the data: no sample world, ecosystem, station or number", () => {
+    const files = readdirSync(DIR.pathname, { recursive: true }).filter(
+      (file) => !file.includes("/") && file.endsWith(".json") && file !== "news.json" && file !== "events.json",
+    );
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) expect(readFileSync(new URL(file, DIR), "utf8"), file).not.toMatch(/sample/i);
+  });
+
+  it("pass the data files' own checks, as the build runs them", () => {
+    const data = loadData(DIR.pathname);
+    expect(data.news).toHaveLength(3);
+    expect(data.events).toHaveLength(2);
+  });
+
+  it("are in English, short, and hold no digit, no markup and no address in their words: no number is made up", () => {
+    for (const row of [...news, ...events]) {
+      expect(row.title, row.id).toMatch(/^[A-Za-z][A-Za-z ',.:;()-]*$/);
+      expect(row.title.length, row.id).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it("link to gno.land's own pages and to nothing else, over https", () => {
+    for (const row of [...news, ...events]) {
+      const url = new URL(row.link);
+      expect(url.protocol, row.id).toBe("https:");
+      expect(url.hostname === "gno.land" || url.hostname.endsWith(".gno.land"), `${row.id}: ${url.hostname}`).toBe(
+        true,
+      );
+      expect(url.username + url.password, row.id).toBe("");
+    }
+  });
+
+  it("embed nothing: no player, so no request before a click", () => {
+    for (const row of news) expect(row.embed, row.id).toBeUndefined();
+  });
+
+  it("say what is true of this product: Bubble's rooms on Onyx, the demo and the testnet are named", () => {
+    const text = news.map((row) => row.title).join(" | ");
+    expect(text).toMatch(/bubble/i);
+    expect(text).toMatch(/onyx/i);
+    expect(text).toMatch(/demo/i);
+    expect(text).toMatch(/testnet/i);
+  });
+
+  it("show a community call whose date is to be confirmed, in its own words", () => {
+    const call = events.find((row) => row.id === "sample-event-community-call");
+    expect(call?.title).toMatch(/community call/i);
+    expect(call?.title).toMatch(/date to be confirmed/i);
+  });
+
+  it("hold no date that was made up: an event waiting for its date starts at the one far-off sentinel, which the ticker never shows", () => {
+    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the event in the strip and
+    // the gate off the calendar. A real start replaces it with the content; this test then lists the event's id out.
+    for (const row of events) {
+      expect(row.title, row.id).toMatch(/date to be confirmed/i);
+      expect(row.start ?? "", row.id).toMatch(/^2099-12-\d\dT00:00:00Z$/);
+    }
+  });
+
+  it("date no news from a day that has not come", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const row of news) expect(row.date ?? "", row.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    for (const row of news) expect((row.date ?? "") <= today, `${row.id}: ${row.date ?? ""}`).toBe(true);
   });
 });

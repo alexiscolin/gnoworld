@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "id": "sample-news-bubble-onyx",
+    "title": "Bubble, the first world, has its rooms on Onyx",
+    "date": "2026-10-30",
+    "link": "https://onyx.testnets.gno.land/"
+  },
+  {
+    "id": "sample-news-demo",
+    "title": "This demo is a preview: what you see here is not final",
+    "date": "2026-10-29",
+    "link": "https://gno.land/"
+  },
+  {
+    "id": "sample-news-testnet",
+    "title": "Onyx is a testnet: its tokens have no value",
+    "date": "2026-10-28",
+    "link": "https://onyx.testnets.gno.land/"
+  }
+]

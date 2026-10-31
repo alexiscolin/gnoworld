@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import universes from "../data/universes.json" with { type: "json" };
 import { site, siteOf } from "./places.ts";
 import { FIXTURE } from "./placesFixture.ts";
 
@@ -180,5 +181,17 @@ describe("the site's universe and view of a path", () => {
     expect(viewAt(onyx(), "/w/bubble")).toBeUndefined();
     expect(viewAt(onyx(), "/earthly")).toBeUndefined();
     expect(viewAt(onyx(), "/net/gnoland/earth")).toBeUndefined();
+  });
+});
+
+// Slice 5m: the home reads the block height of its universe's own chain, so each universe's view carries the RPC the data names.
+describe("a universe's view", () => {
+  test("carries the RPC its row of universes.json names, which the home asks for its block height", () => {
+    for (const universe of universes) {
+      const view = site.universes.find((each) => each.id === universe.id);
+      expect(view?.rpc, universe.id).toBe(universe.rpc);
+    }
+    expect(site.universeAt("/").rpc).toBe("https://rpc.onyx.testnets.gno.land:443");
+    expect(site.universeAt("/net/gnoland/").rpc).toBe("https://rpc.gno.land:443");
   });
 });

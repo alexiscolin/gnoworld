@@ -21,6 +21,7 @@ const other: UniverseView = {
   name: "gno.land",
   isDefault: false,
   testnet: false,
+  rpc: "https://rpc.example.test",
   home: { path: "/net/gnoland/", canonical: "/net/gnoland/" },
   earth: { path: "/net/gnoland/earth", canonical: "/net/gnoland/earth" },
   worlds: [],
@@ -146,6 +147,7 @@ const fixture = (defaultId: string) =>
     universes: FIXTURE.universes.map((universe) => ({
       id: universe.id,
       name: universe.name,
+      rpc: universe.rpc,
       testnet: universe.id === "onyx",
       ...(universe.id === defaultId ? { default: true as const } : {}),
     })),

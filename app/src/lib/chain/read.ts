@@ -3,25 +3,9 @@
 // every result, good or not, names where it was read and when: the page never shows a number without its source.
 // One request a call: no retry, no timer left behind, so nothing polls. Unlike lib/api/http.ts it caps the answer's size.
 import type * as z from "zod/mini";
+import { fetchBytes, type ChainFetch, type FailureKind } from "./transport.ts";
 
-/** The time an answer has, its body read included. */
-const CHAIN_TIMEOUT_MS = 8_000;
-/** The most bytes an answer may weigh; past it the read stops and the rest is not kept. */
-const CHAIN_MAX_BYTES = 1024 * 1024;
-
-export type ChainFetch = (url: string, init?: RequestInit) => Promise<Response>;
-
-export type FailureKind =
-  | "refused"
-  | "down"
-  | "timeout"
-  | "too-big"
-  | "not-json"
-  | "wrong-shape"
-  | "no-realm"
-  | "no-page"
-  | "chain-refused"
-  | "bad-name";
+export type { ChainFetch, FailureKind };
 
 export interface Source {
   /** The address that was asked. */
@@ -62,6 +46,8 @@ export interface ReadOptions {
   maxBytes?: number;
   /** The clock, for the source's time. */
   now?: () => Date;
+  /** Ends the request early: a page that left. */
+  signal?: AbortSignal;
 }
 
 const NEXT: Record<FailureKind, string> = {
@@ -82,8 +68,6 @@ export function failedRead<T>(kind: FailureKind, source: Source, status?: number
   return { ok: false, failure: { kind, next: NEXT[kind], ...(status === undefined ? {} : { status }) }, source };
 }
 
-type Outcome = { kind: FailureKind; status?: number } | { value: unknown };
-
 /** Whether an address is https with no credentials in it: the only kind a read asks. */
 export function isHttps(url: string): boolean {
   try {
@@ -94,118 +78,24 @@ export function isHttps(url: string): boolean {
   }
 }
 
-// A stream not read to its end is cancelled, so its connection is freed; one already closed or broken has nothing to free.
-async function drop(stream: { cancel(): Promise<void> } | null | undefined): Promise<void> {
-  try {
-    await stream?.cancel();
-  } catch {
-    return;
-  }
-}
-
-// The chunks of a body, or why not; the reader is cancelled the moment the total passes the cap.
-async function chunksOf(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  maxBytes: number,
-): Promise<Uint8Array[] | "too-big" | "down"> {
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) return chunks;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await drop(reader);
-        return "too-big";
-      }
-      chunks.push(value);
-    }
-  } catch {
-    return "down";
-  }
-}
-
-// The body's bytes, or why not.
-async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array | "too-big" | "down"> {
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes) {
-    await drop(response.body);
-    return "too-big";
-  }
-  const reader = response.body?.getReader();
-  const chunks = reader === undefined ? [] : await chunksOf(reader, maxBytes);
-  if (typeof chunks === "string") return chunks;
-  const whole = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
-  let at = 0;
-  for (const chunk of chunks) {
-    whole.set(chunk, at);
-    at += chunk.byteLength;
-  }
-  return whole;
-}
-
-interface Attempt {
-  url: string;
-  fetcher: ChainFetch;
-  signal: AbortSignal;
-  maxBytes: number;
-}
-
-// The attempt, which never throws: whatever goes wrong is a kind.
-async function attempt({ url, fetcher, signal, maxBytes }: Attempt): Promise<Outcome> {
-  let response: Response;
-  try {
-    response = await fetcher(url, {
-      method: "GET",
-      credentials: "omit",
-      redirect: "error",
-      cache: "no-store",
-      headers: { accept: "application/json" },
-      signal,
-    });
-  } catch {
-    return { kind: "down" };
-  }
-  if (!response.ok) {
-    await drop(response.body);
-    return { kind: "down", status: response.status };
-  }
-  const bytes = await bodyOf(response, maxBytes);
-  if (typeof bytes === "string") return { kind: bytes };
-  try {
-    return { value: JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) };
-  } catch {
-    return { kind: "not-json" };
-  }
-}
-
 /** One read of an https address through a schema: the value with its source, or a typed failure with its next step. */
 export async function readChain<T>(
   url: string,
   schema: z.ZodMiniType<T>,
   options: ReadOptions = {},
 ): Promise<ChainRead<T>> {
-  const { fetch: fetcher = (address, init) => fetch(address, init), timeoutMs = CHAIN_TIMEOUT_MS } = options;
-  const { maxBytes = CHAIN_MAX_BYTES, now = () => new Date() } = options;
+  const { now = () => new Date(), ...transport } = options;
   const source: Source = { url, at: now().toISOString() };
   const failed = (kind: FailureKind, status?: number): ChainRead<T> => failedRead(kind, source, status);
   if (!isHttps(url)) return failed("refused");
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  // The limit does not rely on fetch honouring its signal: it wins the race by itself.
-  const late = new Promise<Outcome>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort(new DOMException("the chain took too long", "TimeoutError"));
-      resolve({ kind: "timeout" });
-    }, timeoutMs);
-  });
+  const fetched = await fetchBytes(url, { ...transport, credentials: "omit", cache: "no-store" });
+  if ("kind" in fetched) return failed(fetched.kind, fetched.status);
+  let value: unknown;
   try {
-    const outcome = await Promise.race([attempt({ url, fetcher, signal: controller.signal, maxBytes }), late]);
-    if ("kind" in outcome) return failed(outcome.kind, outcome.status);
-    const parsed = schema.safeParse(outcome.value);
-    return parsed.success ? { ok: true, value: parsed.data, source } : failed("wrong-shape");
-  } finally {
-    clearTimeout(timer);
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fetched.bytes));
+  } catch {
+    return failed("not-json");
   }
+  const parsed = schema.safeParse(value);
+  return parsed.success ? { ok: true, value: parsed.data, source } : failed("wrong-shape");
 }

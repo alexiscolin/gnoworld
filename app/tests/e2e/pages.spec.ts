@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Locator } from "@playwright/test";
-import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
+import { CHAIN_READS, expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
 const pages = [
@@ -170,7 +170,7 @@ test.describe("once the client takes over", () => {
   });
 
   test("a link to a world changes the page and its tags without a reload", async ({ page }) => {
-    await followInPlace(page.getByRole("link", { name: "Bubble" }), "/", {
+    await followInPlace(page.getByRole("link", { name: "Bubble", exact: true }), "/", {
       url: "/w/bubble",
       title: "Bubble · gno.world",
     });
@@ -209,7 +209,8 @@ test.describe("once the client takes over", () => {
       const site = new URL(baseURL ?? "http://unset").origin;
       const elsewhere: string[] = [];
       page.on("request", (request) => {
-        if (new URL(request.url()).origin !== site) elsewhere.push(request.url());
+        if (new URL(request.url()).origin !== site && !CHAIN_READS.some((read) => request.url().startsWith(read)))
+          elsewhere.push(request.url());
       });
       await page.goto(path);
       await hydrated(page);

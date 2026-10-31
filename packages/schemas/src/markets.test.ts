@@ -21,6 +21,15 @@ describe("Markets", () => {
     expect(Markets.parse(GOOD)).toEqual(GOOD);
   });
 
+  it.each([
+    ["a price of a billion", withToken({ usd: 1e9 })],
+    ["a price of a trillionth", withToken({ usd: 1e-12 })],
+    ["a fall of exactly 100 percent", withToken({ change24h: -100 })],
+    ["a rise of a million percent", withToken({ change24h: 1_000_000 })],
+  ])("accepts %s, the bound itself", (_, value) => {
+    expect(Markets.safeParse(value).success).toBe(true);
+  });
+
   it("holds no token at all as a file with nothing to show", () => {
     expect(Markets.safeParse({ ...GOOD, tokens: [] }).success).toBe(true);
   });
@@ -55,6 +64,11 @@ describe("Markets", () => {
     ["a null price beside good ones", { ...GOOD, tokens: [GOOD.tokens[0], { ...GOOD.tokens[1], usd: null }] }],
     ["a token twice", { ...GOOD, tokens: [GOOD.tokens[0], GOOD.tokens[0]] }],
     ["four tokens", { ...GOOD, tokens: [...GOOD.tokens, GOOD.tokens[0]] }],
+    ["a price past a billion dollars", withToken({ usd: 1.0000001e9 })],
+    ["a price below a trillionth of a dollar", withToken({ usd: 9e-13 })],
+    ["a change of 1e308", withToken({ change24h: 1e308 })],
+    ["a change past a million percent", withToken({ change24h: 1_000_001 })],
+    ["a fall of more than 100 percent", withToken({ change24h: -100.1 })],
     ["a list as an object", { ...GOOD, tokens: { GNOT: 1 } }],
   ])("refuses %s", (_, value) => {
     expect(Markets.safeParse(value).success).toBe(false);

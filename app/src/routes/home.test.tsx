@@ -1,4 +1,6 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import events from "../../data/events.json" with { type: "json" };
+import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
@@ -78,4 +80,65 @@ describe("home's hero", () => {
       "/list",
     ]);
   });
+});
+
+// Slice 5m (frames 1 to 8): the live line under the actions, and the ticker from the data's news and events. The page the build
+// writes holds states, never a price or a block height: those are read in the browser.
+const escaped = (text: string) =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+const sample = (file: "news.json" | "events.json"): { title: string; link: string }[] =>
+  file === "news.json" ? news : events;
+
+describe("home's live line", () => {
+  test("follows the actions inside the hero, as a loading state with no price and no height written into the page", async () => {
+    const html = await render({ path: "/", Component: Home, loader }, "/");
+    const after = html.split('data-hero="actions"')[1] ?? "";
+    expect(after).toContain('data-hero="markets"');
+    const line = after.split('data-hero="markets"')[1] ?? "";
+    expect(line).toContain('data-markets="loading"');
+    expect(html).not.toMatch(/data-token=|data-height=/);
+    expect(html).not.toMatch(/\$\d/);
+  });
+
+  test("still claims nobody online, with the live line in", async () => {
+    const html = await render({ path: "/", Component: Home, loader }, "/");
+    expect(html).not.toMatch(/online|here now|talking/i);
+  });
+});
+
+describe("home's ticker", () => {
+  test("holds each placeholder news and event of the data as a link to its address", async () => {
+    const html = await render({ path: "/", Component: Home, loader }, "/");
+    expect(html).toContain("data-ticker");
+    for (const { title, link } of [...sample("news.json"), ...sample("events.json")]) {
+      expect(html, title).toContain(escaped(title));
+      expect(html, link).toContain(`href="${link}"`);
+    }
+  });
+
+  test("is drawn under /net/gnoland too: the lists are the site's, not a universe's", async () => {
+    const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
+    expect(html).toContain("data-ticker");
+  });
+
+  test("is written the same whatever the time of the build: no event is dropped from the markup by the clock", async () => {
+    const written = async (time: string) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(time));
+      return render({ path: "/", Component: Home, loader }, "/");
+    };
+    const before = await written("2026-10-31T12:00:00Z");
+    const after = await written("2100-01-01T00:00:00Z");
+    expect(after).toBe(before);
+    for (const { title } of sample("events.json")) expect(after, title).toContain(escaped(title));
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });

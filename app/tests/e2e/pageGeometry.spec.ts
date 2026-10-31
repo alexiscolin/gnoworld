@@ -312,8 +312,12 @@ test.describe("at the video's size", () => {
     near(hero.y - (label.y + label.height), 22, "the kicker's gap above the number");
     near(first.y - (hero.y + hero.height), 22, "the number's gap above the row");
     await expect(page.locator("main p.label [data-tone='warm']")).toBeVisible();
-    // The hero stands 64 px from the bottom (prototype 514): the gap under the whole hero.
-    near(1080 - (first.y + first.height), 64, "the hero's bottom gap");
+    // The hero stands 64 px from the bottom (prototype 514): the gap under the whole hero. Since 5m the live line (markets and
+    // block, here a state for want of a file) ends it, and the actions stand above it, 22 px (frame 6).
+    await expect(page.locator("[data-hero='markets']")).toBeVisible();
+    const live = await box(page, "[data-hero='markets']");
+    near(1080 - (live.y + live.height), 64, "the hero's bottom gap");
+    near(live.y - (first.y + first.height), 22, "the actions' gap above the live line");
   });
 
   test("the hero's own box takes no click from the page behind it (prototype 514)", async ({ page }) => {
@@ -357,7 +361,7 @@ test.describe("at the video's size", () => {
       .evaluate((el) => el.parentElement?.getBoundingClientRect().bottom ?? 0);
     expect(where.y, "the list starts under the whole hero").toBeGreaterThanOrEqual(hero);
     expect(await style(page, "[data-hero='number']", "position")).toBe("static");
-    const bubble = page.getByRole("link", { name: "Bubble" });
+    const bubble = page.getByRole("link", { name: "Bubble", exact: true });
     await bubble.click();
     await expect(page).toHaveURL(/\/w\/bubble$/);
   });

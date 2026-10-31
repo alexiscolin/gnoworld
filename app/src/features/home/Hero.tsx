@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import styles from "./Hero.module.css";
+import { Live } from "./Live.tsx";
 
 export function Hero({ universe }: { universe: UniverseView }) {
   const count = universe.worlds.length;
@@ -29,6 +30,7 @@ export function Hero({ universe }: { universe: UniverseView }) {
           </Link>
         </div>
       </div>
+      <Live rpc={universe.rpc} />
     </div>
   );
 }

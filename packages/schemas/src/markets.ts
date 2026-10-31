@@ -5,11 +5,15 @@ import { z } from "./zod.ts";
 /** The tokens the markets row shows, in the video's order. */
 export const MARKET_SYMBOLS = ["GNOT", "ATONE", "BTC"] as const;
 
-/** A token's price in dollars (above zero, finite) and its 24 hour change in percent, null when the source has none. */
+/** A token's price in dollars (a trillionth to a billion) and its 24 hour change in percent (a fall of at most 100, a rise of a million), null when the source has none. */
 export const MarketToken = z.strictObject({
   symbol: z.enum(MARKET_SYMBOLS),
-  usd: z.number().check(z.positive()),
-  change24h: z.nullable(z.number()),
+  usd: z.number().check(
+    z.refine((usd) => usd > 0, { message: "above zero" }),
+    z.gte(1e-12),
+    z.lte(1e9),
+  ),
+  change24h: z.nullable(z.number().check(z.gte(-100), z.lte(1e6))),
 });
 export type MarketToken = z.infer<typeof MarketToken>;
 
