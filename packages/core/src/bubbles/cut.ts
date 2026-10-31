@@ -59,6 +59,9 @@ function take(reading: Reading, raw: string, last: boolean): void {
 
 /** The first `max` graphemes of `text`, cleaned; a cluster over the limit is skipped and does not count. */
 export function cutText(text: string, max: number): string {
+  const head = text.slice(0, max + 1);
+  // Printable ASCII is one grapheme a character and nothing to clean: the usual chat line needs no segmenter.
+  if (/^[\x20-\x7e]*$/.test(head)) return head.slice(0, max);
   const reading: Reading = { max, kept: [], pending: "", carry: "", skipping: false };
   let from = 0;
   while (from < text.length && reading.kept.length < max) {

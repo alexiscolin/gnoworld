@@ -278,6 +278,30 @@ describe("bubbles.json", () => {
     expect(message(plant((f) => Reflect.deleteProperty(f, "bubbles.json")))).toMatch(/bubbles\.json/);
     expect(message(plant((f) => Reflect.set(f, "bubbles.json", "{")))).toMatch(/bubbles\.json/);
   });
+
+  // 6b: the centres come from a public-domain source read, named in the header (the plan's question 3).
+  it("names, in the header of the country table, a public-domain source and where it was read", () => {
+    const table = new URL("../../packages/core/src/bubbles/countries.ts", import.meta.url).pathname;
+    const header = readFileSync(table, "utf8").split("\n").slice(0, 6).join("\n");
+    expect(header).toMatch(/public domain|CC0/i);
+    expect(header).toMatch(/https:\/\/\S+/);
+    expect(header).toMatch(/source/i);
+  });
+
+  // ADR-0001 §7's numbers live in the data file alone: the plan's "no number of §7 is written in code".
+  it("leaves the rules' numbers out of the code of packages/core/src/bubbles", () => {
+    const dir = new URL("../../packages/core/src/bubbles/", import.meta.url).pathname;
+    const sources = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "countries.ts");
+    expect(sources).toEqual(expect.arrayContaining(["pickBubbles.ts", "cut.ts", "rules.ts"]));
+    for (const file of sources) {
+      const code = readFileSync(join(dir, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code.match(/(?<![\w.])(?:5|6|30|80|500|5000|30000)(?![\w.])/g) ?? [], file).toEqual([]);
+    }
+  });
 });
 
 // Slice 5's 5c: a fault planted in a data file stops `react-router build`, naming the file and the field; good data builds
