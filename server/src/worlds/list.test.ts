@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, RPC } from "../testing/fakeWorldsChain.ts";
-import { LIST_MAX_BYTES, LIST_MAX_PATHS, LIST_MAX_QUERIES, readRealmPaths } from "./list.ts";
+import { LIST_MAX_BYTES, LIST_MAX_PATHS, LIST_MAX_QUERIES, LIST_MAX_TOTAL, readRealmPaths } from "./list.ts";
 
 // vm/qpaths answers the paths joined by a newline, sorted, with no metadata (handler.go:233 at v1.5.0; 7c-notes.md). Its limit
 // is 1,000 by default and 10,000 at most, and a limit over the cap is lowered, not refused.
@@ -103,6 +103,22 @@ describe("readRealmPaths", () => {
       expect(result.ok && result.partial).toBe(true);
       expect(result.ok && result.paths.length).toBeGreaterThan(0);
     });
+
+    it("stops at a total of paths, marked partial, before a hostile chain fills the heap (F3538)", async () => {
+      // The root is full, and each part it splits into answers one page short of the limit, all of it new and all of it kept.
+      let page = 0;
+      const { chain, read } = ask((prefix) => {
+        if (prefix === "gno.land/r/") return "x\n".repeat(LIST_MAX_PATHS);
+        page += 1;
+        const path = (i: number): string => `gno.land/r/p${String(page)}/r${String(i)}`;
+        return Array.from({ length: LIST_MAX_PATHS - 1 }, (_, i) => path(i)).join("\n");
+      });
+      const result = await read();
+      expect(result.ok && result.partial).toBe(true);
+      expect(result.ok && result.paths.length).toBeGreaterThanOrEqual(LIST_MAX_TOTAL);
+      expect(result.ok && result.paths.length).toBeLessThan(LIST_MAX_TOTAL + LIST_MAX_PATHS);
+      expect(chain.asked.length).toBeLessThan(LIST_MAX_QUERIES);
+    }, 60_000);
   });
 
   it("holds a full page of the longest legal paths: 256 bytes a path, 10,000 paths (F3538)", async () => {

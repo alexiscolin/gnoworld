@@ -11,6 +11,8 @@ export const LIST_MAX_PATHS = 10_000;
 export const LIST_MAX_BYTES = 257 * LIST_MAX_PATHS;
 /** The most requests one list may take: 38 parts of the first split, and their splits after it, far past a chain of 10^5 realms. */
 export const LIST_MAX_QUERIES = 2_000;
+/** The most paths one list holds: about 30 MB of heap at 300 bytes a path, past what the file's 4 MiB can name. */
+export const LIST_MAX_TOTAL = 100_000;
 const LIST_MS = 30_000;
 const ROOT = "gno.land/r/";
 // What may follow a prefix in a realm path: a segment's letters and digits, `_` and `-` inside it, and `/` between two.
@@ -63,6 +65,9 @@ function keptFrom(lines: readonly string[], prefix: string, cut: boolean): strin
   return lines.filter((line) => (!cut || line === prefix) && RealmPath.safeParse(line).success);
 }
 
+// Whether the walk stops with what it has: its requests or its total of paths are used up.
+const spent = (asked: number, paths: number): boolean => asked >= LIST_MAX_QUERIES || paths >= LIST_MAX_TOTAL;
+
 export async function readRealmPaths(reader: {
   send: Send;
   rpc: string;
@@ -76,7 +81,7 @@ export async function readRealmPaths(reader: {
     const prefixes = [ROOT];
     let partial = false;
     for (let asked = 0; prefixes.length > 0; asked += 1) {
-      if (asked >= LIST_MAX_QUERIES) {
+      if (spent(asked, found.size)) {
         partial = true;
         break;
       }
