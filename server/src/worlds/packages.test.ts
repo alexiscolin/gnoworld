@@ -153,6 +153,22 @@ describe("readPackages", () => {
     expect((await read([WUGNOT], { file: () => file }).done).get(WUGNOT)?.deployer).toBeNull();
   });
 
+  // gno's field is `json:"imports,omitempty"` (json_doc.go:22 at v1.5.0), and a slice with nothing in it is left out of the JSON.
+  it.each([
+    ["no imports key", () => JSON.stringify({ package_path: WUGNOT, funcs: [{ type: "", name: "Transfer" }] })],
+    ["no funcs key", () => JSON.stringify({ package_path: WUGNOT, imports: ["gno.land/p/nt/ufmt"] })],
+    ["a null funcs", () => JSON.stringify({ package_path: WUGNOT, imports: [], funcs: null })],
+  ])("reads a doc with %s (omitted when empty), and keeps the package read", async (_name, make) => {
+    const { done } = read([WUGNOT], { doc: make });
+    const facts = (await done).get(WUGNOT);
+    expect(facts?.deployer).toBe(CREATOR);
+  });
+
+  it("reads the functions of a doc with no imports key", async () => {
+    const bare = JSON.stringify({ funcs: [{ type: "", name: "Transfer" }] });
+    expect((await read([WUGNOT], { doc: () => bare }).done).get(WUGNOT)?.functions).toEqual(["Transfer"]);
+  });
+
   describe("hostile answers", () => {
     it.each([
       ["not JSON", "<html>"],

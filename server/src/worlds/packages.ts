@@ -18,9 +18,10 @@ const DOC_MAX_BYTES = 1024 * 1024;
 const FILE_MAX_BYTES = 16 * 1024;
 const CALL_MS = 15_000;
 
+// gno leaves an empty `imports` or `funcs` out of the JSON (`omitempty`, json_doc.go:22 at v1.5.0), so each may be absent or null.
 const Doc = z.object({
-  imports: z.array(z.string()),
-  funcs: z.array(z.object({ type: z.optional(z.string()), name: z.string() })),
+  imports: z.optional(z.nullable(z.array(z.string()))),
+  funcs: z.optional(z.nullable(z.array(z.object({ type: z.optional(z.string()), name: z.string() })))),
 });
 
 // The first `creator = "..."` of the [addpkg] table, if it is an address.
@@ -51,13 +52,13 @@ function factsOf(text: string): Omit<PackageFacts, "deployer"> | null {
   if (!doc.success) return null;
   return {
     functions: listed(
-      doc.data.funcs.flatMap(({ type, name }) =>
+      (doc.data.funcs ?? []).flatMap(({ type, name }) =>
         (type ?? "") === "" && ExportedName.safeParse(name).success ? [name] : [],
       ),
       WORLDS_CAPS.functions,
     ),
     imports: listed(
-      doc.data.imports.filter((path) => ImportPath.safeParse(path).success),
+      (doc.data.imports ?? []).filter((path) => ImportPath.safeParse(path).success),
       WORLDS_CAPS.imports,
     ),
   };
