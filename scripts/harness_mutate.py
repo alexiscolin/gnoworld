@@ -245,6 +245,24 @@ def mutants():
     yield from each("lint/shared.config.ts", "/^(${KEPT})$/", "/${KEPT}/", "probe", "eslint keeps a module's state by whole names")
     yield from each("lint/shared.config.ts", ":not(:function NewExpression)", "", "probe", "eslint lets a function make a Map")
     yield from each("lint/shared.config.ts", "/^(Weak)?(Map|Set)$/", "/^(Map|Set)$/", "probe", "eslint refuses a WeakMap at a module's top")
+    # What runs on a frame makes nothing: each name that holds it, each way of making, each list the rule stands in. A name read from the
+    # rule's own list, so a new one has no row in the probe and this mutant lives until it does.
+    names = re.search(r'FRAME_NAMES =\s*"([^"]+)"', read("lint/shared.config.ts")).group(1)
+    for name in names.split("|"):
+        yield from each("lint/shared.config.ts", names, "|".join(n for n in names.split("|") if n != name), "probe", f"eslint holds {name} to a frame's rule")
+    for made in ("NewExpression", "ArrayExpression", "ObjectExpression", "TemplateLiteral", "SpreadElement", "RestElement", "ArrayPattern", "ClassExpression", "ForOfStatement"):
+        yield from each("lint/shared.config.ts", f"{made}, ", "", "probe", f"eslint refuses a {made} on a frame")
+    calls = re.search(r"callee\.property\.name=/\^\(([^)]+)\)\$/\]\)\"", read("lint/shared.config.ts")).group(1)
+    for call in calls.split("|"):
+        yield from each("lint/shared.config.ts", calls, "|".join(c for c in calls.split("|") if c != call), "probe", f"eslint refuses {call} on a frame")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "...SWALLOWED, CLASS_AT_END]", "probe", "eslint's scene block holds a frame's rule")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "CLASS_AT_END, ON_A_FRAME]", "probe", "eslint's scene block keeps the swallowed errors refused")
+    yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "...SWALLOWED, ON_A_FRAME]", "probe", "eslint's scene block refuses a u class right before $")
+    yield from each("lint/core.config.ts", "[...PURE, ON_A_FRAME]", "[...PURE]", "probe", "eslint core's frame and space folders hold a frame's rule")
+    yield from each("lint/core.config.ts", "[...PURE, ON_A_FRAME]", '["error", ON_A_FRAME]', "probe", "eslint core's frame and space folders keep core's own list")
+    for folder in ("frame", "space"):
+        yield from each("lint/core.config.ts", '"packages/core/src/{frame,space}/**/*.ts"', f'"packages/core/src/{folder}/**/*.ts"', "probe", f"eslint a frame's rule reaches {folder} in core")
+    yield from each("lint/core.config.ts", '"packages/core/src/{frame,space}/**/*.ts"', '"packages/core/src/**/*.ts"', "probe", "eslint a frame's rule leaves the rest of core alone")
     yield from each("server/tsconfig.json", '"types": ["node"]', '"types": []', "probe", "the server compiles with Node's types")
     # The Ergo the tests start (slice 3b): each refusal of the pin, each check of the cache, each refusal of a build.
     yield from lines("scripts/ergo.sh", r"^case .*refuse .*$", ":", "hooks", "ergo.sh checks the pin")
