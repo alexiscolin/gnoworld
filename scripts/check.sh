@@ -58,6 +58,7 @@ if [ "${2:-}" = "--base" ]; then
 	base_ref=${3:-}
 	[ -n "$base_ref" ] || { echo "check.sh: --base wants a ref to compare with" >&2; exit 1; }
 fi
+all_failed= # every lane that failed, as lane:step, in the order it came: a merge check goes on after one and says them all at its end
 changed_list= # the paths this branch changed since its base, one a line, once a full run has computed them
 # Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616), so
 # only ESRCH counts as dead. Python reads the errno, not the shell's wording.
@@ -77,7 +78,7 @@ except PermissionError:
 # The fast gate and --full take none. The run's time starts after the wait.
 if $merge; then
 	mkdir -p "${merge_lock%/*}"
-	announced= unread=0
+	announced= unread=0 held_by= lock_try=$(date +%s)
 	until mkdir "$merge_lock" 2>/dev/null; do
 		holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
 		if [ -z "$holder" ]; then
@@ -93,6 +94,7 @@ if $merge; then
 			continue
 		fi
 		if [ -z "$announced" ]; then
+			held_by=$(cat "$merge_lock/worktree" 2>/dev/null || echo "another worktree")
 			since=$(cat "$merge_lock/since" 2>/dev/null || :)
 			echo "check.sh --merge: waiting for the merge check of $(cat "$merge_lock/worktree" 2>/dev/null || echo "another worktree") (pid $holder), running since $(date -r "${since:-0}" '+%H:%M:%S' 2>/dev/null || echo "${since:-an unknown time}"): one merge check at a time on this machine" >&2
 			announced=1
@@ -103,6 +105,12 @@ if $merge; then
 	printf '%s\n' "$$" >"$merge_lock/pid"
 	pwd >"$merge_lock/worktree"
 	date +%s >"$merge_lock/since"
+	# The measure of the lock's cost (the dream of 2026-11-01, 4), before anything is built on it: one line a merge check, tab-separated, the
+	# UTC time, this worktree, the seconds waited (0 when the lock was free: a clock read twice a few milliseconds apart can cross a second, a
+	# wait that never began cannot), and the worktree whose check made it wait ("-" for none). A log that cannot be written costs the measure, never the run.
+	waited=0
+	[ -z "$held_by" ] || waited=$(($(date +%s) - lock_try))
+	printf '%s\t%s\twaited %s s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(pwd -P)" "$waited" "${held_by:--}" >>"${merge_lock%/*}/merge-waits.log" 2>/dev/null || :
 	started=$(date +%s) # the wait is not the run's time
 fi
 # The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
@@ -300,6 +308,7 @@ finish() {
 	done
 	for l in $failed; do
 		[ -n "$failed_at" ] || failed_at="$l:$(cat "$logs/$l.at" 2>/dev/null || echo start)"
+		all_failed="$all_failed $l:$(cat "$logs/$l.at" 2>/dev/null || echo start)"
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
 		cat "$logs/$l.log" >&2
 	done
@@ -355,6 +364,11 @@ lane_ts() {
 		# and --full walk every journey, which build the app themselves.
 		run build:app
 		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
+		# And the first screen's budget, read with the budget spec's own measure, the browser's gzip, and nothing else of the journeys: the build
+		# alone let a broken budget through to the merge check, 30 minutes later (the dream of 2026-11-01, 6).
+		E2E_PORT=$(free_ports 3)
+		export E2E_PORT
+		node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts
 		return 0
 	fi
 	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
@@ -486,6 +500,15 @@ $changes
 EOF
 		$product || echo "check.sh --merge: no product code since $base: the stories, the coverage lane and prove_fix do not run"
 	fi
+	# The merge check's two speeds (slice 7, question 21; scripts/speeds.py reads docs/REVIEW.md's tiers): a change of interface alone runs no
+	# StrykerJS, and any other, or any doubt, runs the whole control. Only the word `interface`, as the one line the script prints, lowers it.
+	# --full, which main requires, stays whole.
+	speed=full
+	if $merge && $product; then
+		speed=$(printf '%s\n' "$changes" | python3 -I scripts/speeds.py "$PWD" 2>/dev/null) || speed=full
+		[ "$speed" = interface ] || speed=full
+		[ "$speed" = full ] || echo "check.sh --merge: a change of interface alone (docs/REVIEW.md, tier 3): StrykerJS does not run; the coverage, the patch's coverage and the rest do"
+	fi
 	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
 	# check_regressions' list, StrykerJS, the stories' build) would read its files as they come and go.
 	lane_probe() {
@@ -512,9 +535,16 @@ EOF
 	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
 	lane_coverage() {
 		step coverage # 85% everywhere, core 100%
-		run coverage "--maxWorkers=$half"
+		# A test that fails once under the coverage's load runs again, as in the fast gate (F3384: one failure cost an hour of a gate that was
+		# not retried). The second run is the WHOLE coverage, not the failed file alone: the thresholds (85%, core 100%) are measured on
+		# every file, and one file alone cannot meet them; unsteady.py's file arguments are left unread. R1's refusals hold as in the fast gate.
+		run coverage "--maxWorkers=$half --reporter=default --reporter=json --outputFile.json=$logs/coverage.json" >"$logs/coverage.out" 2>&1 ||
+			retry vitest "$logs/coverage.json" "$logs/coverage.out" sh -c "$(node -p "require('./package.json').scripts.coverage") --maxWorkers=$half" sh
+	}
+	lane_mutation() {
 		step patch_coverage # 85% of the lines this branch changed
 		python3 -I scripts/patch_coverage.py "$base"
+		[ "$speed" = full ] || return 0 # a change of interface alone runs no StrykerJS
 		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
 		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
@@ -556,20 +586,40 @@ EOF
 		fi
 		python3 -I scripts/harness_mutate.py
 	}
+	# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
+	# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
+	# the survivors), and the end of it fails, saying every failure.
+	carried=
+	phase() {
+		finish "$@" || {
+			$merge || {
+				echo "check.sh: the lanes after $* did not run: $* failed first" >&2
+				exit 1
+			}
+			carried=1
+		}
+	}
 	start probe
-	finish probe
-	# The stories' journeys run beside the history lane alone: under the coverage's Vitest and StrykerJS and
-	# the harness's worktrees, a Dialog's teardown in the browser outlasted its test (F815). A failure there stops
-	# the gate before the two after them, whose fifteen to twenty minutes would fix nothing of it (C.5, F823).
+	phase probe
+	# The coverage after the probe, which plants its faults in the tree, and never beside it (F3384); before prove_fix, whose 40 minutes a
+	# failure of the coverage need not wait for. It runs alone: beside it, the stories' journeys timed out (F815).
+	if $product; then
+		start coverage
+		phase coverage
+	fi
+	# The stories' journeys run beside the history lane alone: under the patch's coverage, StrykerJS and the harness's worktrees, a
+	# Dialog's teardown in the browser outlasted its test (F815). A failure there stops --full before the two after them, whose
+	# fifteen to twenty minutes would fix nothing of it (C.5, F823).
 	! $product || start stories
 	start history
-	finish $($product && echo stories) history || {
-		echo "check.sh: the coverage and harness lanes did not run: the stories' or the history lane failed first" >&2
+	phase $($product && echo stories) history
+	! $product || start mutation
+	start harness
+	phase $($product && echo mutation) harness
+	[ -z "$carried" ] || {
+		echo "check.sh --merge: every failure above, in the order they came:$all_failed" >&2
 		exit 1
 	}
-	! $product || start coverage
-	start harness
-	finish $($product && echo coverage) harness
 fi
 
 if [ -n "$tested" ]; then

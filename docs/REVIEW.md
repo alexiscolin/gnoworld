@@ -13,7 +13,12 @@ Review by risk, not line by line everywhere.
 | 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
-| 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |
+| 3 | Interface, 3D, motion (`app/src/features/`, `packages/ui/src/`) | Either | Run it; read the budgets the gate prints |
+
+The backticked paths of this table are read by machines: the tier-1 ones by `.claude/workflows/branch.js` (its security lens) and by
+`scripts/speeds.py`, the tier-3 ones by `scripts/speeds.py` alone. A merge check whose every path is a tier-3 folder's, and none a tier-1
+path (`app/src/features/login/` is under `app/src/features/`), runs no StrykerJS; any other path, or a table it cannot read, runs the
+whole control. A folder is written with its slash. Add a security path here and both follow.
 
 ## Order
 
