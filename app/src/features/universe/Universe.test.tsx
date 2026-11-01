@@ -73,7 +73,7 @@ const started = (at = 0) =>
   scene.start.mock.calls[at]?.[0] as {
     canvas: HTMLCanvasElement;
     remembered: "low" | undefined;
-    remember: (tier: "low") => void;
+    remember: () => void;
     onLost: (lost: boolean) => void;
   };
 
@@ -464,7 +464,7 @@ describe("the tier", () => {
   it("keeps on the device what the scene finds", async () => {
     mount(<Universe shown />);
     await settle();
-    started().remember("low");
+    started().remember();
     expect(localStorage.getItem("gnoworld:scene:tier")).toBe("low");
   });
 });

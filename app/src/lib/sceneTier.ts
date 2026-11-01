@@ -17,10 +17,10 @@ export function rememberedTier(storage: () => Pick<TierStorage, "getItem"> = () 
   }
 }
 
-/** Keeps `tier` on this device, if it lets us. */
-export function rememberTier(tier: Tier, storage: () => Pick<TierStorage, "setItem"> = () => localStorage): void {
+/** Keeps Low on this device, if it lets us. */
+export function rememberLow(storage: () => Pick<TierStorage, "setItem"> = () => localStorage): void {
   try {
-    storage().setItem(KEY, tier);
+    storage().setItem(KEY, "low");
   } catch {
     // Full or blocked: the probe runs again on the next visit.
   }

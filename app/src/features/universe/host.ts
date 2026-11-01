@@ -2,7 +2,7 @@
 // component only reads its status (docs/ARCHITECTURE.md, "Effects only synchronize").
 import { PHONE_QUERY, sceneOffer } from "@gnoworld/core";
 import { savesData } from "../../lib/saveData.ts";
-import { rememberedTier, rememberTier } from "../../lib/sceneTier.ts";
+import { rememberedTier, rememberLow } from "../../lib/sceneTier.ts";
 import type { Scene } from "../../scene/scene.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
@@ -75,7 +75,7 @@ export class SceneHost {
           startScene({
             canvas: this.#canvas,
             remembered: rememberedTier(),
-            remember: rememberTier,
+            remember: rememberLow,
             onLost: (lost) => {
               this.#say(lost ? "failed" : "on");
             },

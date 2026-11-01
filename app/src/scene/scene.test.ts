@@ -267,7 +267,7 @@ describe("the Auto probe", () => {
     clock.run(2200);
     expect(scene.stats().tier).toBe("low");
     expect(three.renderer.setPixelRatio).toHaveBeenLastCalledWith(1);
-    expect(remember).toHaveBeenCalledExactlyOnceWith("low");
+    expect(remember).toHaveBeenCalledTimes(1);
     scene.dispose();
   });
 

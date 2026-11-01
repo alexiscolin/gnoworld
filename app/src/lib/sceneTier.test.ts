@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { rememberedTier, rememberTier } from "./sceneTier.ts";
+import { rememberedTier, rememberLow } from "./sceneTier.ts";
 
 const device = (kept: string | null = null) => ({
   getItem: vi.fn<(key: string) => string | null>().mockReturnValue(kept),
@@ -36,10 +36,10 @@ describe("rememberedTier", () => {
   });
 });
 
-describe("rememberTier", () => {
+describe("rememberLow", () => {
   it("writes what rememberedTier reads", () => {
     const kept = device();
-    rememberTier("low", () => kept);
+    rememberLow(() => kept);
     const [key, value] = kept.setItem.mock.calls[0] ?? [];
     expect(rememberedTier(() => device(value ?? null))).toBe("low");
     expect(key).toBe("gnoworld:scene:tier");
@@ -47,7 +47,7 @@ describe("rememberTier", () => {
 
   it("does not fail on a device that refuses", () => {
     expect(() => {
-      rememberTier("low", refused);
+      rememberLow(refused);
     }).not.toThrow();
   });
 
@@ -57,7 +57,7 @@ describe("rememberTier", () => {
       throw new DOMException("full", "QuotaExceededError");
     });
     expect(() => {
-      rememberTier("low", () => full);
+      rememberLow(() => full);
     }).not.toThrow();
   });
 });

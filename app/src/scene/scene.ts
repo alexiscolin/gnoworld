@@ -18,7 +18,7 @@ export interface SceneOptions {
   readonly canvas: HTMLCanvasElement;
   /** The tier this device was found at before, if any. */
   readonly remembered: Tier | undefined;
-  readonly remember: (tier: Tier) => void;
+  readonly remember: () => void;
   /** The context went (true), or came back (false). */
   readonly onLost: (lost: boolean) => void;
 }
@@ -122,7 +122,7 @@ class LiveScene implements Scene {
     if (verdict === "keep") return;
     this.#tier = "low";
     this.#viewportChanged();
-    if (verdict === "low") this.#options.remember("low");
+    if (verdict === "low") this.#options.remember();
   }
 
   // Both clear the buffer, so they wait for the frame that draws it, and never fall between two frames.
