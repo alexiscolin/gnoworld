@@ -47,16 +47,18 @@ export const makeKit: MakeKit = ({ store, ergo, key, out, inside }) => {
   const sent = outbox(store);
   const notices = new Noticer(store, inside, () => key() !== "guest");
   const places = new Places((room) => store.getState().chat.rooms[room]?.read, out);
+  const speaking = new Speaking({ ergo, key, inside, outbox: sent, typing, store });
   return {
     places,
     outbox: sent,
-    speaking: new Speaking({ ergo, key, inside, outbox: sent, typing, store }),
+    speaking,
     groups: (rooms) => {
       notices.groups = rooms;
     },
     // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (link.ts).
     heard: (message) => {
       sent.answered(message.tags, [message]);
+      speaking.heard(message);
       notices.live(message);
       const refused = refusedIn(message);
       if (refused !== undefined) store.getState().chatActions.reactionRefused(refused);

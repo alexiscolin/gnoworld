@@ -129,6 +129,20 @@ describe("a line and the country its speaker declares", () => {
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
   });
 
+  // The list is what the page asked as it opened; the reconciler moves a room's modes every 60 s (docs/decisions.md, 3m): +R is an account's
+  // room, +i a member's. An open tab hears them, and no new list comes.
+  it.each(["+i", "+R", "+Mi", "+MR", "+m+i", "+b-m+i", "-m+R"])(
+    "carries none once the room is heard closing, by %s, while the list still says open",
+    (flags) => {
+      keepCountry(ME, "JP");
+      const { sent, speaking, heard } = setup();
+      speaking.say(ROOM, said("one"));
+      heard(`:gnoworld!bot@h MODE ${ROOM} ${flags}`);
+      speaking.say(ROOM, said("two"));
+      expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
+    },
+  );
+
   it.each([
     ["a voice", "+v g1abci"],
     ["a mute's mask", "+b m:g1abcR"],
