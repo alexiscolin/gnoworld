@@ -1,0 +1,11 @@
+/* The list: at the small control's height, beside the chips it is chosen among, on the resting fill. */
+@layer components {
+  .select {
+    min-block-size: var(--control-s);
+    padding-inline: var(--space-2xs);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+    font: var(--font-ui);
+  }
+}
