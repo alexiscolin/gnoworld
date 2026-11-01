@@ -3,6 +3,7 @@
 import { PHONE_QUERY, sceneOffer } from "@gnoworld/core";
 import { savesData } from "../../lib/saveData.ts";
 import { rememberedTier, rememberLow } from "../../lib/sceneTier.ts";
+import type { EarthState } from "../../scene/earth/view.ts";
 import type { Scene } from "../../scene/scene.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
@@ -10,7 +11,16 @@ import { loadScene } from "./loadScene.ts";
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
+/** Whether the page shows space, and the Earth in it. */
+export type Shown = boolean | "earth";
+
 const nothing = () => undefined;
+
+// The circle the page keeps for the globe, on the page and not on the window: a page scrolled away keeps its globe.
+function circleOf(globe: HTMLElement) {
+  const { left, top, width } = globe.getBoundingClientRect();
+  return width > 0 ? { x: left + width / 2, y: top + scrollY + width / 2, radius: width / 2 } : undefined;
+}
 
 export class SceneHost {
   readonly #listeners = new Set<() => void>();
@@ -18,6 +28,10 @@ export class SceneHost {
   #canvas: HTMLCanvasElement | undefined;
   #scene: Scene | undefined;
   #shown = false;
+  #wantsEarth = false;
+  #earth: EarthState = "gone";
+  #watching: AbortController | undefined;
+  #globe: HTMLElement | undefined;
   #decided = false;
 
   readonly subscribe = (listener: () => void) => {
@@ -29,25 +43,85 @@ export class SceneHost {
 
   readonly status = () => this.#status;
 
+  readonly earth = () => this.#earth;
+
+  #tell(): void {
+    this.#markPage();
+    for (const listener of this.#listeners) listener();
+  }
+
   #say(status: SceneStatus): void {
     this.#status = status;
-    for (const listener of this.#listeners) listener();
+    this.#tell();
+  }
+
+  // The page's stylesheet keeps the globe's room and opens the plate from this: a lost context takes both away.
+  #markPage(): void {
+    if (this.#globe === undefined) return;
+    const shows = this.#status === "on" && (this.#earth === "loading" || this.#earth === "drawn");
+    this.#globe.dataset["earth"] = shows ? this.#earth : "none";
+  }
+
+  readonly #earthSaid = (state: EarthState): void => {
+    this.#earth = state;
+    this.#tell();
+  };
+
+  // The circle has no size until the page keeps its room: the mark comes first.
+  #watchGlobe(scene: Scene): void {
+    const globe = document.querySelector<HTMLElement>("[data-globe]");
+    if (globe === null) return;
+    const watching = new AbortController();
+    this.#watching = watching;
+    this.#globe = globe;
+    this.#earthSaid("loading");
+    const place = () => {
+      const circle = circleOf(globe);
+      if (circle !== undefined) scene.earth(circle, this.#earthSaid);
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(globe);
+    watching.signal.addEventListener("abort", () => {
+      observer.disconnect();
+    });
+    window.addEventListener("resize", place, { signal: watching.signal });
+    place();
+  }
+
+  #stopWatching(): void {
+    this.#watching?.abort();
+    this.#watching = undefined;
+  }
+
+  #syncEarth(): void {
+    const scene = this.#scene;
+    if (scene === undefined) return;
+    if (this.#wantsEarth && this.#watching === undefined) this.#watchGlobe(scene);
+    else if (!this.#wantsEarth && this.#watching !== undefined) {
+      this.#stopWatching();
+      scene.earth(undefined, this.#earthSaid);
+      this.#earthSaid("gone");
+      this.#globe = undefined;
+    }
   }
 
   /** The canvas is on the page; what this returns takes the scene away with it. */
   attach(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     return () => {
+      this.#stopWatching();
       this.#scene?.dispose();
       this.#canvas = undefined;
     };
   }
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
-  show(shown: boolean): void {
-    this.#shown = shown;
-    this.#scene?.cover(!shown);
-    if (shown && !this.#decided) this.#decide();
+  show(shown: Shown): void {
+    this.#shown = shown !== false;
+    this.#wantsEarth = shown === "earth";
+    this.#scene?.cover(!this.#shown);
+    this.#syncEarth();
+    if (this.#shown && !this.#decided) this.#decide();
   }
 
   #decide(): void {
@@ -90,5 +164,6 @@ export class SceneHost {
     scene.cover(!this.#shown);
     showJourneys(scene);
     this.#say("on");
+    this.#syncEarth();
   }
 }

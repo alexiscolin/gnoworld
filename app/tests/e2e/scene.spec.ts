@@ -144,13 +144,13 @@ test.describe("a computer", () => {
 test.describe("which pages show space", () => {
   test.use({ viewport: COMPUTER });
 
-  for (const path of ["/", "/net/onyx", "/net/gnoland"])
+  for (const path of ["/", "/net/onyx", "/net/gnoland", "/earth", "/net/gnoland/earth"])
     test(`${path} does`, async ({ page }) => {
       await page.goto(`${path}?test-gpu`);
       await running(page);
     });
 
-  for (const path of ["/list", "/w/bubble", "/net/onyx/w/bubble", "/earth", "/net/gnoland/earth", "/nowhere"])
+  for (const path of ["/list", "/w/bubble", "/net/onyx/w/bubble", "/nowhere"])
     test(`${path} does not`, async ({ page }) => {
       const asked = asks(page, DOOR);
       await page.goto(`${path}?test-gpu`);

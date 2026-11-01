@@ -100,8 +100,16 @@
       border: 0;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
-      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area */
-      mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area; a page that draws a globe over the plate's
+         right side opens a circle for it, for the canvas lies under the plate */
+      mask-image:
+        linear-gradient(to right, #000 calc(100% - 64px), transparent),
+        radial-gradient(
+          circle var(--globe-hole) at calc(var(--globe-x) - var(--space-m)) calc(var(--globe-y) - 98px),
+          transparent 94%,
+          #000
+        );
+      mask-composite: intersect;
     }
 
     .panel[data-look="plate"] .content {

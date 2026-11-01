@@ -1,0 +1,66 @@
+/* The globe's place, which the scene fills: the page lays it out, so a breakpoint moves the planet with what is around it. The page lays it
+   out only once space is on: until then the plate stands whole and no room is kept. */
+@layer components {
+  .globe {
+    display: none;
+  }
+
+  .globe:not([data-earth="none"]) {
+    display: block;
+    /* raw: the ring reaches 1.106 radii of the globe (frame 39), and keeps a step of space from the window's edge */
+    inline-size: min(calc((100vi - 2 * var(--space-s)) / 1.106), 56vb);
+    aspect-ratio: 1;
+    /* layout: over the plate, clear of the header */
+    margin-block: var(--space-xl) var(--space-l);
+    /* layout: centred in the page, over the plate */
+    margin-inline: auto;
+    pointer-events: none;
+  }
+
+  /* Beside the plate, between its words and the dock (frame 39): the ring keeps 28 px off each, and the globe stands 16 px over the frame's
+     middle, which leaves the pill's row under it. The window's height caps it. */
+  @media (min-width: 1280px) {
+    .globe,
+    .globe + * {
+      /* raw: 320 under 1400 px (DESIGN-SYSTEM.md, Layout) */
+      --_dock: 320px;
+      /* raw: the plate's words end here */
+      --_start: 578px;
+      /* raw: the dock's left, from the window's width */
+      --_end: calc(100vi - var(--space-m) - var(--_dock));
+      /* raw: the outline's top, 98 px */
+      --_top: 98px;
+      /* raw: the window's foot, a step of space off, and 16 px over the frame's middle */
+      --_middle: calc((var(--_top) + 100vb - var(--space-m)) / 2 - 16px);
+      /* raw: the ring keeps 28 px off the words and the dock, and 24 px off the outline's top */
+      --_reach: min(calc((var(--_end) - var(--_start)) / 2 - 28px), calc(var(--_middle) - var(--_top) - 24px));
+      --_x: calc((var(--_start) + var(--_end)) / 2);
+      /* raw: the ring reaches 1.106 radii of the globe */
+      --_radius: calc(var(--_reach) / 1.106);
+    }
+
+    .globe:not([data-earth="none"]) {
+      position: fixed;
+      inset-block-start: calc(var(--_middle) - var(--_radius));
+      inset-inline-start: calc(var(--_x) - var(--_radius));
+      inline-size: calc(2 * var(--_radius));
+      /* layout: fixed in the free area, it keeps no margin of its own */
+      margin: 0;
+    }
+
+    /* The canvas lies under the plate: what the plate shows of the globe is a circle cut out of it, a little wider than the ring. */
+    .globe[data-earth="drawn"] + * {
+      --globe-x: var(--_x);
+      --globe-y: var(--_middle);
+      --globe-hole: calc(var(--_reach) + 40px);
+    }
+  }
+
+  /* raw: the dock widens at 1400 px (DESIGN-SYSTEM.md, Layout), and the globe's span with it */
+  @media (min-width: 1400px) {
+    .globe,
+    .globe + * {
+      --_dock: var(--chat-dock);
+    }
+  }
+}

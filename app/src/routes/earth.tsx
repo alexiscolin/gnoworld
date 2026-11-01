@@ -4,8 +4,10 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Connected } from "../features/world/Connected.tsx";
 import { PlaceLinks } from "../features/list/index.ts";
+import { useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
+import styles from "./earth.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "earth");
@@ -21,40 +23,45 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 
 export default function Earth() {
   const universe = useLoaderData<typeof loader>();
+  useSpace("earth");
   return (
-    <Panel.Layout
-      plate={
-        <Panel label="Earth" look="plate" caption="gnoworld · hub atlas">
-          <Panel.Body>
-            <Stack>
-              <Breadcrumb
-                label="You are here"
-                items={[{ label: universe.name, href: universe.home.path }, { label: "Earth" }]}
-              />
-              <h1>Earth</h1>
-              <p>{universe.name}</p>
-              {universe.worlds.length === 0 ? (
-                <>
-                  <h2>Worlds</h2>
-                  <p>No world yet in {universe.name}.</p>
-                </>
-              ) : (
-                <Connected
-                  heading="Worlds"
-                  worlds={universe.worlds.map(({ name, path, description }) => ({ name, path, line: description }))}
+    <>
+      {/* The globe's place: the page lays it out, the scene draws in it, and the universe says how far it came. */}
+      <div className={styles["globe"]} data-globe data-earth="none" />
+      <Panel.Layout
+        plate={
+          <Panel label="Earth" look="plate" caption="gnoworld · hub atlas">
+            <Panel.Body>
+              <Stack>
+                <Breadcrumb
+                  label="You are here"
+                  items={[{ label: universe.name, href: universe.home.path }, { label: "Earth" }]}
                 />
-              )}
-              {universe.ecosystems.length === 0 ? null : (
-                <>
-                  <h2>Ecosystems</h2>
-                  <PlaceLinks places={universe.ecosystems} />
-                </>
-              )}
-            </Stack>
-          </Panel.Body>
-        </Panel>
-      }
-    />
+                <h1>Earth</h1>
+                <p>{universe.name}</p>
+                {universe.worlds.length === 0 ? (
+                  <>
+                    <h2>Worlds</h2>
+                    <p>No world yet in {universe.name}.</p>
+                  </>
+                ) : (
+                  <Connected
+                    heading="Worlds"
+                    worlds={universe.worlds.map(({ name, path, description }) => ({ name, path, line: description }))}
+                  />
+                )}
+                {universe.ecosystems.length === 0 ? null : (
+                  <>
+                    <h2>Ecosystems</h2>
+                    <PlaceLinks places={universe.ecosystems} />
+                  </>
+                )}
+              </Stack>
+            </Panel.Body>
+          </Panel>
+        }
+      />
+    </>
   );
 }
 

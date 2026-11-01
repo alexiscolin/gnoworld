@@ -108,6 +108,10 @@
     --chat-inset: var(--space-l);
     /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
     --flash-room: 0px;
+    /* The circle a plate opens for a globe drawn under it, in the window's pixels: none until a page sets it. */
+    --globe-x: 0px;
+    --globe-y: 0px;
+    --globe-hole: 0px;
 
     --radius-s: 8px;
     --radius-item: 10px;

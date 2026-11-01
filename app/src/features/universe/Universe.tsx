@@ -2,7 +2,8 @@
 // mounted once it came, so a page that does not show it only covers it. The places' links stay in the page, with or without the 3D.
 import { Button } from "@gnoworld/ui";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { SceneHost } from "./host.ts";
+import { Credits } from "./Credits.tsx";
+import { SceneHost, type Shown } from "./host.ts";
 import styles from "./Universe.module.css";
 
 // The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
@@ -11,9 +12,19 @@ function handOver(button: HTMLElement) {
   if (held === button || held === document.body) document.querySelector("h1")?.focus({ preventScroll: true });
 }
 
-export function Universe({ shown }: { shown: boolean }) {
+const SORRY = "Space is not available here. Every place is in the list.";
+const NO_MAPS = "The Earth's maps did not come. Every place is in the list.";
+
+// What the live region says, on a page that shows space.
+function lineOf(failed: boolean, earthFailed: boolean) {
+  if (failed) return SORRY;
+  return earthFailed ? NO_MAPS : null;
+}
+
+export function Universe({ shown }: { shown: Shown }) {
   const [host] = useState(() => new SceneHost());
   const status = useSyncExternalStore(host.subscribe, host.status);
+  const earth = useSyncExternalStore(host.subscribe, host.earth);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => (canvasRef.current === null ? undefined : host.attach(canvasRef.current)), [host]);
   useEffect(() => {
@@ -43,8 +54,9 @@ export function Universe({ shown }: { shown: boolean }) {
         </div>
       ) : null}
       <p role="status" className={styles["status"]}>
-        {shown && status === "failed" ? "Space is not available here. Every place is in the list." : null}
+        {shown ? lineOf(status === "failed", earth === "failed") : null}
       </p>
+      {status === "on" && earth === "drawn" ? <Credits /> : null}
     </>
   );
 }

@@ -255,6 +255,9 @@ Rules:
   text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the
   `scene` chunk, which the worker does not precache: a phone fetches it on "View in space". A test build (`VITE_GNOWORLD_TEST_GPU`, the
   journeys') lets `?test-gpu` pass the software GPU the gate has; a production build holds no trace of it.
+- A page asks for the Earth with `useSpace("earth")` and keeps an empty `[data-globe]` box, laid out by its own stylesheet: the host
+  measures it and the scene stands the globe in that circle, so a breakpoint moves the planet with what is around it. The box's
+  `data-earth` says how far it came: `loading` keeps the box's room, `drawn` opens the plate's mask round it, for the opaque canvas lies under the plate.
 - `?debug` shows fps, draw calls and `renderer.info.memory`.
 
 ## Memory: the checklist

@@ -1,0 +1,336 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { box, brightness, near } from "./geometry.ts";
+import { loseContext, restoreContext, stats } from "./sceneStage.ts";
+
+// The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
+// Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
+// pixel-compared (the plan, section 6): these hold where things stand, which side is lit, and what is freed.
+const EARTH = "/earth?test-gpu";
+const COMPUTER = { width: 1728, height: 1080 };
+const PHONE = { width: 390, height: 844 };
+const MAP = /\/textures\/(?:earth-day|earth-night|clouds|moon)\.webp$/;
+const NIGHT = /\/textures\/earth-night\.webp$/;
+const SORRY = "The Earth's maps did not come. Every place is in the list.";
+const SLOW = { timeout: 90_000 };
+
+// A software GPU decodes and uploads four maps, and draws a frame, in tens of seconds at the worst.
+test.describe.configure({ timeout: 180_000 });
+
+interface EarthStats {
+  state: string;
+  x: number;
+  y: number;
+  radius: number;
+  turn: number;
+  orbit: { left: number; right: number; top: number; bottom: number };
+  moon: { x: number; y: number; front: boolean };
+  mapWidth: number;
+}
+const earthOf = async (page: Page) => ((await stats(page)) as unknown as { earth?: EarthStats }).earth;
+const earth = async (page: Page): Promise<EarthStats> => {
+  const found = await earthOf(page);
+  if (found === undefined) throw new Error("no Earth");
+  return found;
+};
+
+// The Earth's maps the page asks for, as it asks for them, from now on.
+function mapsAsked(page: Page): string[] {
+  const asked: string[] = [];
+  page.on("request", (request) => {
+    if (MAP.test(request.url())) asked.push(new URL(request.url()).pathname);
+  });
+  return asked;
+}
+
+const drawn = (page: Page) => expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
+// The globe's room is kept, or the plate is open.
+const kept = (page: Page) => page.locator("[data-earth='loading'], [data-earth='drawn']");
+const credits = (page: Page) => page.getByRole("button", { name: "Credits", exact: true });
+
+// A frame drawn after the Earth reached the stage: the page says drawn as it goes on stage.
+const painted = async (page: Page) => {
+  await drawn(page);
+  const before = (await stats(page)).frames;
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThanOrEqual(before);
+};
+
+async function opened(page: Page, path = EARTH) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(path);
+  await hydrated(page);
+  await painted(page);
+}
+
+test.describe("a computer", () => {
+  test.use({ viewport: COMPUTER });
+
+  test("draws the Earth on its page, its maps from the site, with no CSP violation", async ({ page }) => {
+    const asked = mapsAsked(page);
+    await opened(page);
+    expect(asked.sort()).toEqual([
+      "/textures/clouds.webp",
+      "/textures/earth-day.webp",
+      "/textures/earth-night.webp",
+      "/textures/moon.webp",
+    ]);
+    expect(await earth(page)).toMatchObject({ state: "drawn" });
+  });
+
+  test("lights the side towards the dock and leaves the side towards the plate to the cities: day and night from the terminator", async ({
+    page,
+  }) => {
+    await opened(page);
+    const { x, y, radius } = await earth(page);
+    const side = Math.round(radius / 6);
+    const patch = (at: number): [number, number, number, number] => [
+      Math.round(at - side),
+      Math.round(y - side),
+      Math.round(at + side),
+      Math.round(y + side),
+    ];
+    const [day, night] = await brightness(page, await page.screenshot(), [
+      patch(x + radius * 0.55),
+      patch(x - radius * 0.8),
+    ]);
+    expect(day ?? 0).toBeGreaterThan(20);
+    expect(night ?? 255).toBeLessThan((day ?? 0) / 3);
+  });
+
+  test("shows the cities on the night side, as points of light over the dark", async ({ page }) => {
+    await opened(page);
+    const { x, y, radius } = await earth(page);
+    const cell = 8;
+    const cells: [number, number, number, number][] = [];
+    for (let across = -0.8; across < -0.2; across += 0.03)
+      for (let down = -0.55; down < 0.55; down += 0.03) {
+        const left = Math.round(x + across * radius);
+        const top = Math.round(y + down * radius);
+        cells.push([left, top, left + cell, top + cell]);
+      }
+    const lights = await brightness(page, await page.screenshot(), cells);
+    expect(Math.max(...lights)).toBeGreaterThan(Math.min(...lights) * 4 + 10);
+  });
+
+  test("stands as frame 39 stands: the globe between the plate's words and the dock, the ring around it", async ({
+    page,
+  }) => {
+    await opened(page);
+    const { x, y, radius, orbit } = await earth(page);
+    near(x, 961, "the globe's centre, across");
+    near(y, 561, "the globe's centre, down");
+    near(radius, 321, "the globe's radius");
+    // A tilted orbit, by the decision of 2026-10-31, so not to the flat ring's pixel: its reach within 8 px of it.
+    expect(Math.abs(orbit.left - 605)).toBeLessThanOrEqual(8);
+    expect(Math.abs(orbit.right - 1315)).toBeLessThanOrEqual(8);
+  });
+
+  test("keeps the plate's words clear of the ring", async ({ page }) => {
+    await opened(page);
+    const { orbit } = await earth(page);
+    const heading = await box(page, "h1");
+    expect(heading.x + heading.width).toBeLessThanOrEqual(orbit.left);
+  });
+
+  test("opens the plate around the globe: the night side stands over it, dark, as in frame 39", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Held back, so the plate is read whole before the globe opens it.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((done) => {
+      release = done;
+    });
+    await page.route(NIGHT, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto(EARTH);
+    await hydrated(page);
+    const { width } = await box(page, "section[aria-label='Earth']");
+    const spot: [number, number, number, number] = [700, 555, 712, 567];
+    const before = await brightness(page, await page.screenshot(), [spot]);
+    release();
+    expect(width).toBeGreaterThan(spot[2] - 24);
+    await painted(page);
+    const after = await brightness(page, await page.screenshot(), [spot]);
+    expect(after[0] ?? 255).toBeLessThan((before[0] ?? 0) / 2);
+  });
+
+  test("rests the Moon on the front of its orbit, off the plate's words", async ({ page }) => {
+    await opened(page);
+    const { moon, orbit } = await earth(page);
+    expect(moon.front).toBe(true);
+    expect(moon.x).toBeGreaterThan(orbit.left);
+    expect(moon.x).toBeLessThan(orbit.right);
+    expect(moon.y).toBeGreaterThanOrEqual(orbit.top);
+    expect(moon.y).toBeLessThanOrEqual(orbit.bottom);
+  });
+
+  test("the Credits link sits in a corner, in the muted grey at 11 px, and opens the attributions", async ({
+    page,
+  }) => {
+    await opened(page);
+    const link = credits(page);
+    await expect(link).toBeVisible();
+    const place = await link.boundingBox();
+    if (place === null) throw new Error("no link");
+    expect(place.x + place.width).toBeGreaterThan(COMPUTER.width - 100);
+    expect(place.y + place.height).toBeGreaterThan(COMPUTER.height - 26);
+    expect(await link.evaluate((button) => getComputedStyle(button).fontSize)).toBe("11px");
+    await link.click();
+    const dialog = page.getByRole("dialog", { name: "Credits" });
+    await expect(dialog).toContainText("Solar System Scope");
+    await expect(dialog).toContainText("CC BY 4.0");
+    await expect(dialog).toContainText("NASA");
+    await expect(dialog.getByRole("link", { name: /solarsystemscope\.com/ }).first()).toHaveAttribute(
+      "href",
+      "https://www.solarsystemscope.com/textures/",
+    );
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(link).toBeFocused();
+  });
+
+  test("the keyboard reaches the Credits link", async ({ page }) => {
+    await opened(page);
+    await credits(page).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: "Credits" })).toBeVisible();
+  });
+
+  test("passes axe with the Earth drawn", async ({ page }) => {
+    await opened(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  });
+
+  test("gives every map back when the reader leaves, and draws again on the way back", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/?test-gpu");
+    await expect(page.locator("canvas[data-scene='on']")).toBeAttached(SLOW);
+    await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(0);
+    const before = await stats(page);
+    const views = page.getByRole("navigation", { name: "Views" });
+    await views.getByRole("link", { name: "Earth" }).click();
+    await painted(page);
+    await expect.poll(async () => (await stats(page)).textures, SLOW).toBeGreaterThan(before.textures);
+    await views.getByRole("link", { name: "Cosmos" }).click();
+    await expect(kept(page)).toHaveCount(0);
+    await expect.poll(async () => (await stats(page)).textures, SLOW).toBe(before.textures);
+    await expect.poll(async () => (await stats(page)).geometries, SLOW).toBe(before.geometries);
+    await expect(credits(page)).toHaveCount(0);
+    await views.getByRole("link", { name: "Earth" }).click();
+    await painted(page);
+    await expect.poll(async () => (await stats(page)).textures, SLOW).toBeGreaterThan(before.textures);
+  });
+
+  test("a lost context shows the list, and the Earth comes back with its maps", async ({ page }) => {
+    await opened(page);
+    const asked = mapsAsked(page);
+    await loseContext(page);
+    await expect(page.getByRole("status").filter({ hasText: "Space is not available here" })).toBeVisible();
+    await expect(kept(page)).toHaveCount(0);
+    await expect(credits(page)).toHaveCount(0);
+    await restoreContext(page);
+    await painted(page);
+    await expect(credits(page)).toBeVisible();
+    await expect.poll(() => asked.length, SLOW).toBe(4);
+    expect(await earth(page)).toMatchObject({ state: "drawn" });
+  });
+});
+
+test.describe("the pages that hold no Earth", () => {
+  test.use({ viewport: COMPUTER });
+
+  for (const path of ["/?test-gpu", "/list?test-gpu", "/w/bubble?test-gpu"])
+    test(`${path} asks for none of its maps`, async ({ page }) => {
+      const asked = mapsAsked(page);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.goto(path);
+      await hydrated(page);
+      await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
+      expect(asked).toEqual([]);
+      await expect(kept(page)).toHaveCount(0);
+    });
+});
+
+// The worker would answer these requests itself, past `page.route`: with it off, the fault is the one planted.
+test.describe("a texture that does not come", () => {
+  test.use({ viewport: COMPUTER, serviceWorkers: "block" });
+
+  test("leaves the page whole, says so, keeps the plate shut, and shows no credit", async ({ page }) => {
+    await page.route(NIGHT, (route) => route.fulfill({ status: 404, body: "" }));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(EARTH);
+    await hydrated(page);
+    await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
+    await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Bubble" }).first()).toBeVisible();
+    await expect(kept(page)).toHaveCount(0);
+    await expect(credits(page)).toHaveCount(0);
+    expect(await earthOf(page)).toMatchObject({ state: "failed" });
+  });
+
+  test("tries again on the next visit, and draws", async ({ page }) => {
+    let refused = false;
+    await page.route(NIGHT, async (route) => {
+      if (refused) return route.continue();
+      refused = true;
+      return route.fulfill({ status: 404, body: "" });
+    });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(EARTH);
+    await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
+    const views = page.getByRole("navigation", { name: "Views" });
+    await views.getByRole("link", { name: "Cosmos" }).click();
+    await views.getByRole("link", { name: "Earth" }).click();
+    await painted(page);
+    await expect(page.getByRole("status").filter({ hasText: SORRY })).toHaveCount(0);
+  });
+
+  test("a map's answer that is no picture counts as one that did not come", async ({ page }) => {
+    await page.route(NIGHT, (route) => route.fulfill({ status: 200, contentType: "image/webp", body: "<html>" }));
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(EARTH);
+    await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
+  });
+});
+
+test.describe("a touch screen", () => {
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
+
+  test("holds the Earth at half the size each way, for the memory a phone has", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(EARTH);
+    await hydrated(page);
+    await page.getByRole("button", { name: "View in space" }).click();
+    await painted(page);
+    expect((await earth(page)).mapWidth).toBe(2048);
+  });
+});
+
+test.describe("a phone", () => {
+  test.use({ viewport: PHONE });
+
+  test("loads no map before View in space, and then the plate goes below the planet", async ({ page }) => {
+    const asked = mapsAsked(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto(EARTH);
+    await hydrated(page);
+    const view = page.getByRole("button", { name: "View in space" });
+    await expect(view).toBeVisible();
+    expect(asked).toEqual([]);
+    await expect(page.locator("[data-globe]")).toBeHidden();
+    await view.click();
+    await painted(page);
+    expect(asked.length).toBe(4);
+    const { x, y, radius, orbit } = await earth(page);
+    expect(x).toBeCloseTo(PHONE.width / 2, 0);
+    expect(orbit.left).toBeGreaterThanOrEqual(0);
+    expect(orbit.right).toBeLessThanOrEqual(PHONE.width);
+    const heading = await box(page, "h1");
+    expect(heading.y).toBeGreaterThanOrEqual(y + radius);
+    await expect(credits(page)).toBeVisible();
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  });
+});

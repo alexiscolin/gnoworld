@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const universe = vi.hoisted(() => ({ draw: vi.fn<(shown: boolean) => void>(), mount: vi.fn() }));
+const universe = vi.hoisted(() => ({ draw: vi.fn<(shown: boolean | "earth") => void>(), mount: vi.fn() }));
 
 vi.mock("./mountUniverse.tsx", () => ({ mountUniverse: universe.mount }));
 
@@ -14,6 +14,16 @@ async function door() {
   const { useSpace } = await import("./useSpace.ts");
   return function Cosmos() {
     useSpace();
+    return null;
+  };
+}
+
+// The Earth's page: the same door, and the Earth to draw.
+async function earthDoor() {
+  vi.resetModules();
+  const { useSpace } = await import("./useSpace.ts");
+  return function Earth() {
+    useSpace("earth");
     return null;
   };
 }
@@ -138,6 +148,24 @@ describe("useSpace", () => {
     const Cosmos = await door();
     await expect(visit(Cosmos)).resolves.toBeDefined();
     expect(universe.mount).not.toHaveBeenCalled();
+  });
+
+  it("tells the universe the Earth is wanted", async () => {
+    await visit(await earthDoor());
+    expect(universe.draw).toHaveBeenLastCalledWith("earth");
+  });
+
+  it("covers the Earth when its page leaves", async () => {
+    const { leave } = await visit(await earthDoor());
+    expect(universe.draw).toHaveBeenLastCalledWith("earth");
+    leave();
+    expect(universe.draw).toHaveBeenLastCalledWith(false);
+  });
+
+  it("remembers the Earth was wanted while the chunk came", async () => {
+    open(await earthDoor());
+    await arrived();
+    expect(universe.draw).toHaveBeenCalledExactlyOnceWith("earth");
   });
 
   it("asks again on the next page after a failure", async () => {
