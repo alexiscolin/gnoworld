@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
-import { evalCall, isRealmPath } from "./evalCall.ts";
+import { evalCall, evalNameOf, isAddress, isRealmPath } from "./evalCall.ts";
 
 // 5g-reads, tier 1: the one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent (ANY_EXPRESSION_RUNS,
 // recorded on onyx-1), so the only defence is that this builder gives one `<realm>.<Name>()` or nothing.
@@ -233,5 +233,84 @@ describe("evalCall, for any strings", () => {
       }),
       { numRuns: 1000 },
     );
+  });
+});
+
+// 7c, tier 1 (the plan's §3, question 9): the one widening of the builder. The address alone is added, checked against a strict
+// g1 bech32 pattern and composed by code. The expression is the one a name read needs (chain-feasibility.md, item 9).
+describe("evalNameOf, the name registered for one address", () => {
+  const ADDRESS = "g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx";
+
+  it("builds the one expression, in the exact shape the data of vm/qeval is cut by", () => {
+    const data = evalNameOf(ADDRESS);
+    expect(data).toBe(`gno.land/r/sys/users.ResolveAddress(address("${ADDRESS}")).Name()`);
+    expect(parseQueryEvalData(data ?? "")).toEqual({
+      pkgPath: "gno.land/r/sys/users",
+      expr: `ResolveAddress(address("${ADDRESS}")).Name()`,
+    });
+  });
+
+  it("takes an address of 40 characters in bech32's alphabet after g1, and nothing else", () => {
+    expect(isAddress(ADDRESS)).toBe(true);
+    expect(isAddress(`g1${"q".repeat(38)}`)).toBe(true);
+  });
+
+  it.each([
+    ["empty", ""],
+    ["39 characters", ADDRESS.slice(1)],
+    ["41 characters", `${ADDRESS}q`],
+    ["upper case", ADDRESS.toUpperCase()],
+    ["another prefix", `cosmos1${ADDRESS.slice(2)}`.slice(0, 40)],
+    ["a character bech32 leaves out: b", `${ADDRESS.slice(0, 39)}b`],
+    ["a character bech32 leaves out: i", `${ADDRESS.slice(0, 39)}i`],
+    ["a character bech32 leaves out: o", `${ADDRESS.slice(0, 39)}o`],
+    ["a character bech32 leaves out: 1", `${ADDRESS.slice(0, 39)}1`],
+    ["a trailing newline", `${ADDRESS}\n`],
+    ["a leading space", ` ${ADDRESS}`],
+    ["a full-width digit", `${ADDRESS.slice(0, 39)}\uff10`],
+    ["a call after the address", `${ADDRESS}).Foo(`],
+    ["a path", "gno.land/r/sys/users"],
+  ])("builds nothing for an address that is %s", (_name, address) => {
+    expect(isAddress(address)).toBe(false);
+    expect(evalNameOf(address)).toBeNull();
+  });
+
+  // One character of a valid address replaced, so the length stays 40: the pattern, not the length, must refuse it (a quote closing
+  // the string, a parenthesis, a backslash, a line break, a NUL, a full-width letter, a letter outside bech32's alphabet).
+  it.each(['"', ")", "\\", "\n", "\u0000", "ａ", "b", "B", " "])(
+    "refuses a %j at any one of the 38 places after g1, the length kept at 40",
+    (bad) => {
+      for (let place = 2; place < 40; place += 1) {
+        const address = `${ADDRESS.slice(0, place)}${bad}${ADDRESS.slice(place + 1)}`;
+        expect(address).toHaveLength(40);
+        expect(evalNameOf(address), `place ${String(place)}`).toBeNull();
+      }
+    },
+  );
+
+  it("builds, for any valid address with places replaced by anything, either nothing or the template around a valid address", () => {
+    let built = 0;
+    fc.assert(
+      fc.property(
+        fc.array(fc.tuple(fc.integer({ min: 0, max: 41 }), fc.string({ maxLength: 2 })), { maxLength: 3 }),
+        (edits) => {
+          const text = edits.reduce(
+            (address, [place, char]) => `${address.slice(0, place)}${char}${address.slice(place + 1)}`,
+            ADDRESS,
+          );
+          const data = evalNameOf(text);
+          if (data === null) return;
+          built += 1;
+          expect(data).toBe(`gno.land/r/sys/users.ResolveAddress(address("${text}")).Name()`);
+          expect(text).toMatch(/^g1[023456789acdefghjklmnpqrstuvwxyz]{38}$/);
+        },
+      ),
+    );
+    expect(built).toBeGreaterThan(0);
+  });
+
+  it("leaves evalCall as it was: still one name, no argument", () => {
+    expect(evalCall("gno.land/r/sys/users", "ResolveAddress")).toBe("gno.land/r/sys/users.ResolveAddress()");
+    expect(evalCall("gno.land/r/sys/users", `ResolveAddress(address("${ADDRESS}"))`)).toBeNull();
   });
 });

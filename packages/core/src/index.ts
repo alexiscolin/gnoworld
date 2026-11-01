@@ -15,6 +15,7 @@ export {
   topicAfter,
 } from "./chat/room.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
+export { evalNameOf, isAddress } from "./chain/evalName.ts";
 export { dmOf } from "./chat/dm.ts";
 export { dmNotice, roomNotice, type Notice, type NoticeKind, type NoticeLine, type RoomAt } from "./chat/notice.ts";
 export { DEFAULT_MODE, NOTICE_MODES, type NoticeMode } from "./chat/noticeModes.ts";
