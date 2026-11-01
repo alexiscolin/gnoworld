@@ -309,6 +309,10 @@ test.describe("a phone", () => {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 
+  test("View in space looks as approved", async ({ page }) => {
+    await expect(await offered(page)).toHaveScreenshot("view-in-space-390.png");
+  });
+
   test("the keyboard reaches View in space after the page's links", async ({ page }) => {
     const view = await offered(page);
     const order = await page.evaluate(() => {
