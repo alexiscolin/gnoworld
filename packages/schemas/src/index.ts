@@ -6,6 +6,7 @@ export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export {
   BubbleRules,
+  EarthRooms,
   Ecosystems,
   EMBED_PREFIXES,
   Events,
