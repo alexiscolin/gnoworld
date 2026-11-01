@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
+import { absolute, whole } from "./settingTypes.ts";
 
 export interface Config {
   host: string;
@@ -60,21 +61,6 @@ function isOrigin(text: string): boolean {
   const url = URL.parse(text);
   return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
 }
-
-// A whole number from 1 to `max`, written plainly: no sign, no leading zero, no point.
-const whole = (max: number, otherwise: number) =>
-  z
-    .string()
-    .regex(/^[1-9]\d*$/)
-    .transform(Number)
-    .pipe(z.number().max(max))
-    .default(otherwise);
-
-// An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole (F636).
-const absolute = z.string().refine((path) => {
-  const [root, ...parts] = path.split("/");
-  return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));
-});
 
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
