@@ -5,9 +5,11 @@
 // file; a silent indexer leaves a world at rest (null counts) and the rest of the file whole. Nothing a chain or an indexer wrote
 // reaches a log: a fault is logged by its kind. The file keeps every realm it has seen, for a chain only adds realms.
 import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas";
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";
+import { repeat } from "../repeat.ts";
+import { replaceFile } from "../replaceFile.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists } from "./compare.ts";
 import { readHistory, type History } from "./history.ts";
@@ -130,23 +132,6 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   return { lastWorlds, lastRealms, paths, news, facts, earlierNames, names, histories };
 }
 
-// Written beside the file and renamed over it: a reader sees the old file or the new one, never half of one.
-function persist(file: string, text: string): boolean {
-  const temp = `${file}.tmp`;
-  try {
-    writeFileSync(temp, text, { mode: 0o644 });
-    renameSync(temp, file);
-    return true;
-  } catch {
-    try {
-      unlinkSync(temp);
-    } catch {
-      // Nothing was written, or it is gone already.
-    }
-    return false;
-  }
-}
-
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */
 export async function runWorlds(options: RunOptions): Promise<Outcome> {
   const settings = settingsOf(options);
@@ -168,7 +153,7 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     if (!file.success) return fail("shape");
     const text = `${JSON.stringify(file.data)}\n`;
     if (Buffer.byteLength(text, "utf8") > settings.maxBytes) return fail("too_large");
-    return persist(settings.file, text) ? { wrote: true } : fail("write");
+    return replaceFile(settings.file, text) ? { wrote: true } : fail("write");
   } catch (error) {
     return fail(kindOf(error));
   }
@@ -189,22 +174,11 @@ function checked(universe: Universe): void {
 export function startWorlds(options: RunOptions & { everyMs?: number }): WorldsJob {
   checked(options.universe);
   const everyMs = options.everyMs ?? EVERY_MS;
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
-  const next = (): void => {
-    if (!stopped) timer = setTimeout(tick, everyMs);
-  };
-  function tick(): void {
-    runWorlds({ ...options, isStopped: () => stopped }).then(next, () => {
-      if (!stopped) options.log("worlds_failed", { error: "internal" });
-      next();
-    });
-  }
-  tick();
-  return {
-    stop: () => {
-      stopped = true;
-      if (timer !== undefined) clearTimeout(timer);
+  return repeat({
+    pass: (isStopped) => runWorlds({ ...options, isStopped }),
+    failed: () => {
+      options.log("worlds_failed", { error: "internal" });
     },
-  };
+    waitMs: () => everyMs,
+  });
 }

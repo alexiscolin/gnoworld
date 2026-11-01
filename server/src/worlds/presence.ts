@@ -1,8 +1,9 @@
 // The presence history (slice 7, 7c): the people present in each world, sampled by a caller, kept as the busiest sample of each hour
 // for 14 days, so a world can be compared with its own past ("rising", plan §9 question 6). It holds a world's id, an hour and a
 // count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store.
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { replaceFile } from "../replaceFile.ts";
 
 export const PRESENCE_DAYS = 14;
 /** At most 500 worlds: a full 14 days of hours for all of them is about 5 MB of file. */
@@ -74,20 +75,8 @@ export function makePresence(options: { file: string; now: () => number }): Pres
     history,
     size: () => ({ worlds: worlds.size }),
     save() {
-      const temp = `${file}.tmp`;
-      try {
-        const body = Object.fromEntries([...worlds.keys()].map((id) => [id, history(id)] as const));
-        writeFileSync(temp, JSON.stringify(body), { mode: 0o644 });
-        renameSync(temp, file);
-        return true;
-      } catch {
-        try {
-          unlinkSync(temp);
-        } catch {
-          // Nothing was written, or it is gone already.
-        }
-        return false;
-      }
+      const body = Object.fromEntries([...worlds.keys()].map((id) => [id, history(id)] as const));
+      return replaceFile(file, JSON.stringify(body));
     },
   };
 }

@@ -4,10 +4,11 @@
 // there, the same way out and the same five minutes, so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is data: capped, parsed, checked field by field, and only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
 import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, type Send } from "../net.ts";
+import { repeat } from "../repeat.ts";
+import { replaceFile } from "../replaceFile.ts";
 
 interface Options {
   file: string;
@@ -71,9 +72,6 @@ const reachedNothing = (error: unknown): boolean => error instanceof Failure && 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const rpc = options.rpc === undefined ? undefined : checkedRpc(options.rpc);
-  const temp = `${file}.tmp`;
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
   async function get(url: string): Promise<unknown> {
@@ -92,13 +90,13 @@ export function startPrices(options: Options): Prices {
     return block.data;
   }
 
-  async function read(): Promise<void> {
+  async function read(isStopped: () => boolean): Promise<void> {
     // Both asked at once, each its own failure: the prices' ends the read (the last file stays), the height's only leaves it out.
     const [priced, blocked] = await Promise.allSettled([
       get(URL_ASKED),
       rpc === undefined ? Promise.resolve(undefined) : readBlock(rpc),
     ]);
-    if (stopped) return;
+    if (isStopped()) return;
     if (priced.status === "rejected") throw priced.reason;
     const tokens = tokensOf(priced.value);
     let block: MarketBlock | undefined;
@@ -110,36 +108,15 @@ export function startPrices(options: Options): Prices {
       tokens,
       ...(block === undefined ? {} : { block }),
     });
-    try {
-      // Written beside the file and renamed over it: a reader sees the old file or the new one, never half of one.
-      writeFileSync(temp, `${JSON.stringify(markets)}\n`, { mode: 0o644 });
-      renameSync(temp, file);
-    } catch {
-      try {
-        unlinkSync(temp);
-      } catch {
-        // Nothing was written, or it is gone already.
-      }
-      throw new Failure("write");
-    }
+    if (!replaceFile(file, `${JSON.stringify(markets)}\n`)) throw new Failure("write");
   }
 
   // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
-  const next = (error?: unknown): void => {
-    if (!stopped) timer = setTimeout(tick, reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs);
-  };
-  function tick(): void {
-    read().then(next, (error: unknown) => {
-      if (!stopped) log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
-      next(error);
-    });
-  }
-
-  tick();
-  return {
-    stop: () => {
-      stopped = true;
-      if (timer !== undefined) clearTimeout(timer);
+  return repeat({
+    pass: read,
+    failed: (error) => {
+      log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
-  };
+    waitMs: (error) => (reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs),
+  });
 }
