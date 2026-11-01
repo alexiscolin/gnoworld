@@ -2,13 +2,14 @@
 // The real instant sets the sun's latitude and turns the ground under it; the sun's place on screen is the composition's, day towards the
 // dock, night towards the plate. Then the globe turns east at a planet's rate, as the video's does, so the hour is true on arrival.
 import { subSolarPoint } from "@gnoworld/core";
-import { Vector3 } from "three";
+import { Euler, Vector3 } from "three";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { MOTION } from "../watch.ts";
 import type { Circle, EarthDevice, EarthState } from "./device.ts";
 import { buildGlobe, type Globe } from "./globe.ts";
 import { EARTH } from "./look.ts";
-import { eased, EyeTurn, GroundMarks, type Ground, type GroundMark, type LatLon, type Pose } from "./marks.ts";
+import { eased, EyeTurn, GroundMarks } from "./marks.ts";
+import type { Ground, GroundMark, LatLon, Pose, Screen } from "./marks.ts";
 import { MOON_REST } from "./orbit.ts";
 import { earthStats, type EarthStats } from "./stats.ts";
 
@@ -38,8 +39,8 @@ export class EarthView implements Ground {
   #circle: Circle | undefined;
   #globe: Globe | undefined;
   #asked = 0;
-  #width = 1;
-  #height = 1;
+  readonly #screen: Screen;
+  readonly #posed: Pose = { turn: 0, lean: new Euler(), centre: this.#rest, scale: 1 };
   #ratio = 1;
   #born: number | undefined;
   #age = 0;
@@ -52,6 +53,7 @@ export class EarthView implements Ground {
 
   constructor(device: EarthDevice) {
     this.#device = device;
+    this.#screen = { width: 1, height: 1, camera: device.camera };
   }
 
   /** Whether the sun is still coming round, or the eye is on its way to a place: the scene holds the full rate for them. */
@@ -119,14 +121,14 @@ export class EarthView implements Ground {
 
   /** The buffer's size, in the page's pixels, and its pixels to one of the page's. */
   resize(width: number, height: number, ratio: number): void {
-    this.#width = width;
-    this.#height = height;
+    this.#screen.width = width;
+    this.#screen.height = height;
     this.#ratio = ratio;
     this.#place();
   }
 
   #focal(): number {
-    return this.#height / 2 / Math.tan((this.#device.camera.fov * Math.PI) / 360);
+    return this.#screen.height / 2 / Math.tan((this.#device.camera.fov * Math.PI) / 360);
   }
 
   // A lens shift and not a moved sphere: off the axis, a sphere's picture is no circle, and stands away from the one the page keeps.
@@ -135,17 +137,11 @@ export class EarthView implements Ground {
     const circle = this.#circle;
     if (globe === undefined || circle === undefined) return;
     const { camera, moved } = this.#device;
-    camera.setViewOffset(
-      this.#width,
-      this.#height,
-      this.#width / 2 - circle.x,
-      this.#height / 2 - circle.y,
-      this.#width,
-      this.#height,
-    );
+    const { width, height } = this.#screen;
+    camera.setViewOffset(width, height, width / 2 - circle.x, height / 2 - circle.y, width, height);
     this.#rest.set(0, 0, -Math.hypot(this.#focal() / circle.radius, 1));
     globe.ground.show(circle.plate);
-    globe.ground.resize(this.#height, this.#ratio);
+    globe.ground.resize(height, this.#ratio);
     this.#pose(this.#age, this.#motion.matches ? ARRIVAL : this.#arrived);
     moved();
   }
@@ -165,11 +161,11 @@ export class EarthView implements Ground {
     this.#leaned = leaned;
     const settling = 1 - eased(arrived / SETTLING);
     this.#turned = this.#turn + gone - SPIN * age;
-    globe.setTurn(this.#turned);
+    globe.setTurn(this.#turned, this.#turned - gone);
     globe.setMoon(MOON_REST + left * MOON_SWEEP - MOON_RATE * age);
     globe.group.position.copy(this.#rest).setX(-SETTLE_LEFT * settling);
     globe.group.scale.setScalar(1 + SETTLE_NEARER * settling);
-    this.#marks.place(this.#where(globe), { width: this.#width, height: this.#height, camera: this.#device.camera });
+    this.#marks.place(this.#where(globe), this.#screen);
   }
 
   #poseNow(): void {
@@ -178,8 +174,11 @@ export class EarthView implements Ground {
   }
 
   #where(globe: Globe): Pose {
-    const { position, scale } = globe.group;
-    return { turn: this.#turned, lean: globe.lean, centre: position, scale: scale.x };
+    this.#posed.turn = this.#turned;
+    this.#posed.lean = globe.lean;
+    this.#posed.centre = globe.group.position;
+    this.#posed.scale = globe.group.scale.x;
+    return this.#posed;
   }
 
   setMarks(marks: readonly GroundMark[]): void {
@@ -192,10 +191,16 @@ export class EarthView implements Ground {
     return this.#globe === undefined ? undefined : this.#marks.facing(this.#where(this.#globe));
   }
 
+  // The way round is read under the lean it ends at: the Earth's roll moves a high latitude's meridian across the disc.
   face({ lat, lon }: LatLon): void {
-    const here = this.facing();
-    if (here === undefined) return;
-    this.#eye.to({ degrees: lon - here.lon, lat }, this.#age, this.#motion.matches);
+    const globe = this.#globe;
+    if (globe === undefined) return;
+    const lean = this.#eye.leanFor(lat);
+    const held = globe.lean.x;
+    globe.setLean(lean);
+    const under = this.#marks.facing(this.#where(globe)).lon;
+    globe.setLean(held);
+    this.#eye.to({ degrees: lon - under, lean }, this.#age, this.#motion.matches);
     this.#poseNow();
   }
 
@@ -228,8 +233,7 @@ export class EarthView implements Ground {
 
   /** Where it all stands, for the journeys. */
   stats(): EarthStats | undefined {
-    const { camera } = this.#device;
     const status = { state: this.#state, turn: this.#turned, drawn: this.#drawn };
-    return earthStats(this.#globe, status, { width: this.#width, height: this.#height, camera });
+    return earthStats(this.#globe, status, this.#screen);
   }
 }

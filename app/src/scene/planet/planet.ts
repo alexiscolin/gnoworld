@@ -53,7 +53,8 @@ export interface Planet {
   /** Where its star is, as a unit vector: one light a system. */
   setSun(direction: Vector3): void;
   /** Turns the world and its clouds. The caller owns the clock. */
-  setTime(seconds: number): void;
+  /** Turns the ground to `seconds`, and the clouds over it to `clouds`, which the eye's own moves leave out. */
+  setTime(seconds: number, clouds?: number): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
   dispose(): void;
@@ -96,6 +97,7 @@ function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
     time: { value: 0 },
+    cloudTime: { value: 0 },
     warpAmount: { value: warp.amount },
     warpFrequency: { value: warp.frequency },
     warpOffset: { value: new Vector3(...warp.offset) },
@@ -198,9 +200,11 @@ class LivePlanet implements Planet {
     for (const part of this.#parts) (part.uniforms["sun"]?.value as Vector3).copy(direction);
   }
 
-  setTime(seconds: number): void {
+  setTime(seconds: number, clouds = seconds): void {
     const time = this.surface.uniforms["time"];
     if (time !== undefined) time.value = seconds;
+    const drift = this.surface.uniforms["cloudTime"];
+    if (drift !== undefined) drift.value = clouds;
   }
 
   setLimb(light: number): void {

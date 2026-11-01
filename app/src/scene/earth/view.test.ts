@@ -747,7 +747,7 @@ describe("marks on the ground", () => {
     const { view } = await ready();
     const here = view.facing();
     if (here === undefined) throw new Error("no facing");
-    const rim = mark(0, here.lon + 86);
+    const rim = mark(here.lat, here.lon + 70);
     const clear = mark(here.lat, here.lon + 60);
     view.setMarks([rim, clear]);
     expect(last(rim).front).toBe(false);
@@ -836,7 +836,7 @@ describe("marks on the ground", () => {
       view.setMarks([paris]);
       view.face({ lat: 48.9, lon: 2.4 });
       expect(last(paris).front).toBe(true);
-      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.25);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
     });
 
     it("brings it to the disc's height too, as frames 43 to 55 hold Europe: the Earth leans to it", async () => {
@@ -876,6 +876,87 @@ describe("marks on the ground", () => {
       const done = last(paris).y;
       expect(Math.abs(done - PLACE.y)).toBeLessThan(PLACE.radius * 0.2);
       expect(Math.abs(midway - done)).toBeGreaterThan(1);
+    });
+
+    const settledIn = (view: EarthView) => {
+      for (let at = 0.05; at < 4; at += 0.05) view.tick(at);
+    };
+    const wrapped = (degrees: number) => ((degrees + 540) % 360) - 180;
+    const lonOf = (view: EarthView) => {
+      const here = view.facing();
+      if (here === undefined) throw new Error("no facing");
+      return here.lon;
+    };
+
+    it.each([
+      ["east", 170, 1],
+      ["west", -170, -1],
+    ])("takes the short way round to a place %s of the eye, past the antimeridian too", async (_side, by, sign) => {
+      motion(true);
+      const { view } = await ready();
+      settledIn(view);
+      const from = lonOf(view);
+      view.face({ lat: 0, lon: wrapped(from + by) });
+      view.tick(4.2);
+      const gone = wrapped(lonOf(view) - from);
+      expect(Math.sign(gone)).toBe(sign);
+      expect(Math.abs(gone)).toBeLessThan(170);
+    });
+
+    it("starts a new turn from where the eye is, in mid-turn: nothing jumps", async () => {
+      motion(true);
+      const { view } = await ready();
+      settledIn(view);
+      view.face({ lat: 40, lon: wrapped(lonOf(view) + 90) });
+      view.tick(4.4);
+      const here = view.facing();
+      view.face({ lat: -20, lon: wrapped(lonOf(view) - 60) });
+      view.tick(4.4);
+      expect(view.facing()?.lon).toBeCloseTo(here?.lon ?? 0, 3);
+      expect(view.facing()?.lat).toBeCloseTo(here?.lat ?? 0, 3);
+    });
+
+    it("holds the full rate for 1.4 s of a turn, and no longer", async () => {
+      motion(true);
+      const { view } = await ready();
+      settledIn(view);
+      view.face({ lat: 0, lon: wrapped(lonOf(view) + 40) });
+      view.tick(5.3);
+      expect(view.arriving).toBe(true);
+      view.tick(5.5);
+      expect(view.arriving).toBe(false);
+    });
+
+    it("sets the sun again when only the lean moves: the same meridian at another latitude", async () => {
+      const { stage, camera, view } = await ready();
+      const noon = subSolarPoint(NOON);
+      const [lat, lon] = [noon.latitude / DEGREE, noon.longitude / DEGREE];
+      const under = mark(lat, lon);
+      view.setMarks([under]);
+      view.face({ lat: 60, lon: lonOf(view) });
+      view.tick(1);
+      expect(lit(stage, camera, last(under))).toBeCloseTo(1, 3);
+    });
+
+    it("leaves the clouds on their ground: a turn of the eye is no wind", async () => {
+      const { stage, view } = await ready();
+      const surface = surfacesOf(stage)[0]?.material;
+      const clouds = () => surface?.uniforms["cloudTime"]?.value as number;
+      const [time, drift] = [surface?.uniforms["time"]?.value as number, clouds()];
+      view.face({ lat: 0, lon: wrapped(lonOf(view) + 120) });
+      expect(surface?.uniforms["time"]?.value).not.toBeCloseTo(time, 1);
+      expect(clouds()).toBeCloseTo(drift, 6);
+    });
+
+    it("comes back at rest in its lean too: a new visit faces what it faced", async () => {
+      const { view } = await ready();
+      const first = view.facing();
+      view.face({ lat: 60, lon: 10 });
+      view.show(undefined, () => undefined);
+      view.show(PLACE, () => undefined);
+      await settled();
+      view.tick(0);
+      expect(view.facing()?.lat).toBeCloseTo(first?.lat ?? 0, 3);
     });
 
     it("owes the frame that shows the turn", async () => {
@@ -947,7 +1028,7 @@ describe("marks on the ground", () => {
       view.tick(22);
       expect(view.arriving).toBe(false);
       expect(last(paris).front).toBe(true);
-      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.25);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
     });
 
     it("keeps the arrival's own sweep apart: a turn asked on arrival ends at the place", async () => {
@@ -958,7 +1039,7 @@ describe("marks on the ground", () => {
       view.face({ lat: 48.9, lon: 2.4 });
       for (let at = 0.05; at < 4; at += 0.05) view.tick(at);
       expect(last(paris).front).toBe(true);
-      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.25);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
     });
 
     it("turns nothing before the Earth stands", () => {

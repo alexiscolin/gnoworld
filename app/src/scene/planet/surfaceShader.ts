@@ -45,6 +45,7 @@ uniform float recolour;
 uniform float contrast;
 uniform float relief;
 uniform float limb;
+uniform float cloudTime;
 uniform float caps;
 uniform float cloudCover;
 uniform float rifts;
@@ -188,7 +189,7 @@ void main() {
 
   float overcast = 0.0;
   if (cloudCover > 0.0) {
-    vec3 high = spin * normalize(turned(axis, time * 0.006) + 0.09 * flow.yzx);
+    vec3 high = spin * normalize(turned(axis, cloudTime * 0.006) + 0.09 * flow.yzx);
     float low = 1.0 - cloudCover * 1.25;
     float cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
     float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);

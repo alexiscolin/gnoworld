@@ -21,16 +21,17 @@ export interface Ground {
   face(place: LatLon): void;
 }
 
+/** Where the ground stands now: one object, written again on each frame. */
 export interface Pose {
-  readonly turn: number;
-  readonly lean: Euler;
-  readonly centre: Vector3;
-  readonly scale: number;
+  turn: number;
+  lean: Euler;
+  centre: Vector3;
+  scale: number;
 }
 
 export interface Screen {
-  readonly width: number;
-  readonly height: number;
+  width: number;
+  height: number;
   readonly camera: PerspectiveCamera;
 }
 
@@ -39,8 +40,8 @@ const POLE = new Vector3(0, 1, 0);
 // A sign this close to the limb would slide off the edge: the cosine of the eye's angle over the ground.
 const CLEAR = 0.15;
 const TURNING = 1.4;
-// A little under the place's latitude, for the eye looks a bit above what it faces.
-const LEAN_TO_PLACE = 0.85;
+// A little past the place's latitude, for the eye looks a bit above what it faces: frame 47 holds France 18 px under the disc's middle.
+const LEAN_TO_PLACE = 1.08;
 
 /** The cubic ease out of the Earth's moves. */
 export const eased = (share: number): number => 1 - (1 - Math.min(share, 1)) ** 3;
@@ -121,12 +122,15 @@ export class EyeTurn {
     return age - this.#began < TURNING;
   }
 
-  /** Goes `degrees` further round from where the eye is now, the short way, and leans the Earth to the place's `lat`. */
-  to({ degrees, lat }: { degrees: number; lat: number }, age: number, still: boolean): void {
+  /** The lean that holds a place of latitude `lat` at the disc's middle. */
+  leanFor = (lat: number): number => lat * DEGREE * LEAN_TO_PLACE;
+
+  /** Goes `degrees` further round from where the eye is now, the short way, to the lean `leanFor` gave. */
+  to({ degrees, lean }: { degrees: number; lean: number }, age: number, still: boolean): void {
     this.#from = this.gone(age, still);
     this.#leanFrom = this.lean(age, still);
     this.#to = this.#from + within(degrees * DEGREE);
-    this.#leanTo = lat * DEGREE * LEAN_TO_PLACE;
+    this.#leanTo = lean;
     this.#began = age;
   }
 }

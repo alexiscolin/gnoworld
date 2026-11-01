@@ -77,9 +77,9 @@ export class Globe {
     this.moon.setSun(this.#sun);
   }
 
-  /** Turns the ground by `turn` radians. */
-  setTurn(turn: number): void {
-    this.#earth.setTime(turn / SPIN);
+  /** Turns the ground by `turn` radians, the clouds drifting over it by `drift`: the eye's turn is no wind. */
+  setTurn(turn: number, drift: number): void {
+    this.#earth.setTime(turn / SPIN, drift / SPIN);
   }
 
   /** Puts the Moon at `angle` on its orbit, and the ring's wake behind it. */
