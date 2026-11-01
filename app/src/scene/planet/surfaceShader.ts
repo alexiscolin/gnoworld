@@ -1,6 +1,7 @@
 // A world's surface, one program for every world: a look is uniforms, never shader text (ADR-0002 §3, "a class is data"). The real map is
 // warped at low frequency, recoloured through a ramp, flooded, frozen or cracked, then lit: dusty on airless worlds, soft on cloudy ones.
 import { FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { PARTS, UNIFORMS } from "./surfaceParts.ts";
 
 /** How fast a world turns, in radians a second of its `time`. */
 export const SPIN = 0.012;
@@ -18,106 +19,6 @@ void main() {
   vWorld = world.xyz;
   vSun = normalize(transpose(mat3(modelMatrix)) * sun);
   gl_Position = projectionMatrix * viewMatrix * world;
-}
-`;
-
-const UNIFORMS = /* glsl */ `
-uniform mat4 modelMatrix;
-uniform sampler2D surface;
-uniform sampler2D second;
-uniform sampler2D cloudMap;
-uniform sampler2D ringMap;
-uniform sampler2D nightMap;
-uniform mat3 spin;
-uniform vec3 sun;
-uniform vec3 warpOffset;
-uniform vec3 rampLow;
-uniform vec3 rampMid;
-uniform vec3 rampHigh;
-uniform vec3 seaShallow;
-uniform vec3 seaDeep;
-uniform vec3 glowColour;
-uniform float time;
-uniform float warpAmount;
-uniform float warpFrequency;
-uniform float secondShare;
-uniform float recolour;
-uniform float contrast;
-uniform float relief;
-uniform float limb;
-uniform float caps;
-uniform float cloudCover;
-uniform float rifts;
-uniform float cracks;
-uniform float locked;
-uniform float air;
-uniform float seaLevel;
-uniform float glowLevel;
-uniform float ringInner;
-uniform float ringOuter;
-uniform float ringOpacity;
-uniform float nightLights;
-varying vec3 vLocal;
-varying vec3 vNormal;
-varying vec3 vWorld;
-varying vec3 vSun;
-`;
-
-const PARTS = /* glsl */ `
-const float SUN = 1.0;
-const float TEXEL = 0.0032;
-const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-// The frames' sea and the haze towards their limb, in the working space.
-const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
-const vec3 HAZE = vec3(0.2, 0.34, 0.6);
-
-vec3 turned(vec3 v, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return vec3(c * v.x + s * v.z, v.y, c * v.z - s * v.x);
-}
-
-float toneOf(vec3 colour) {
-  return sqrt(dot(colour, LUMA));
-}
-
-vec3 ramped(vec3 colour, float tone) {
-  vec3 stop = tone < 0.5 ? mix(rampLow, rampMid, tone * 2.0) : mix(rampMid, rampHigh, tone * 2.0 - 1.0);
-  float light = max(dot(colour, LUMA), 0.001);
-  return mix(colour, stop * mix(vec3(1.0), colour / light, 0.22), recolour);
-}
-
-// A slope read from the map beside each point: screen derivatives step in blocks of two pixels, plain along a terminator.
-vec3 bumped(vec3 axis, vec3 flow, float height, float angle) {
-  vec3 normal = normalize(vNormal);
-  if (relief < 0.004) return normal;
-  vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), axis));
-  vec3 north = cross(axis, east);
-  float toEast = toneOf(read(surface, lookupOf(spin * normalize(axis + east * TEXEL + warpAmount * flow))).rgb);
-  float toNorth = toneOf(read(surface, lookupOf(spin * normalize(axis + north * TEXEL + warpAmount * flow))).rgb);
-  vec3 slope = (east * (toEast - height) + north * (toNorth - height)) / TEXEL;
-  return normalize(normal - relief * mat3(modelMatrix) * turned(slope, -angle) / length(modelMatrix[0].xyz));
-}
-
-float ringShade() {
-  if (ringOuter <= 0.0 || abs(vSun.y) < 0.001) return 1.0;
-  float along = -vLocal.y / vSun.y;
-  if (along <= 0.0) return 1.0;
-  float reach = (length((vLocal + along * vSun).xz) - ringInner) / (ringOuter - ringInner);
-  if (reach <= 0.0 || reach >= 1.0) return 1.0;
-  return 1.0 - 0.85 * ringOpacity * textureLod(ringMap, vec2(reach, 0.5), 0.0).r;
-}
-
-float lines(vec3 at, float width) {
-  return 1.0 - smoothstep(0.0, width, min(seams(at), seams(at * 2.3 + 11.0) * 2.0));
-}
-
-// One side always faces its star: scorched glass at the centre, desert, a thin belt of life, then ice to the far side.
-vec3 eyeball(vec3 albedo, float tone, float day) {
-  vec3 ice = mix(vec3(0.46, 0.58, 0.74), vec3(0.93, 0.96, 0.99), tone);
-  vec3 cold = mix(ice, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.1, 0.3, day));
-  vec3 warm = mix(cold, albedo, smoothstep(0.3, 0.48, day));
-  return mix(warm, albedo * vec3(0.3, 0.2, 0.16), smoothstep(0.78, 0.97, day));
 }
 `;
 
@@ -182,8 +83,8 @@ void main() {
   vec3 colour = albedo * shine * sunlight + albedo * 0.002;
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
-  float ripple = 0.55 + 0.45 * field(direction * 90.0).x;
-  float glitter = nightLights > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 900.0) * 0.9 + pow(gleam, 90.0) * 0.05) * ripple;
+  float ripple = 0.8 + 0.2 * field(direction * 14.0).x;
+  float glitter = nightLights > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 260.0) * 1.1 + pow(gleam, 40.0) * 0.1) * ripple;
   colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
 
   float overcast = 0.0;

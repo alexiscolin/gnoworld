@@ -180,6 +180,17 @@ describe("createPlanet", () => {
       for (const axis of ["dFdx", "dFdy"]) expect(SURFACE_FRAGMENT).toContain(`${axis}(${name})`);
   });
 
+  // The shimmer: detail finer than a pixel aliases as the world turns. Each kind is held to the pixel's own size.
+  it("shades relief a pixel away, never a texel, and soft-clips its slope", () => {
+    expect(SURFACE_FRAGMENT).toContain("length(fwidth(axis))");
+    expect(SURFACE_FRAGMENT).toMatch(/slope \/= 1\.0 \+/);
+  });
+
+  it("keeps a crack or a rift at least a pixel wide, and the sea's glint off a field finer than a pixel", () => {
+    expect(SURFACE_FRAGMENT).toContain("fwidth(away)");
+    expect(SURFACE_FRAGMENT).not.toContain("direction * 90.0");
+  });
+
   it("casts no ring's shadow on a world with no rings", () => {
     const surface = createPlanet(lookWith("gas giant", false), fixed().set, sphere).surface;
     expect(read(surface, "ringOuter")).toBe(0);
