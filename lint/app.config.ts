@@ -32,6 +32,7 @@ const LIB =
   "lib is the boundaries: core, Zod, the schemas; never React, the design system, the store, a feature, the scene or a route.";
 const STORE =
   "The store holds the state: core, lib, zustand/vanilla; never React, the design system, a feature, the scene or a route.";
+const SCENE = "The scene is three, core and the store: never React, the design system, a feature, a route or lib.";
 // The packages that bring React or the design system, by their names: a zone sees only paths inside the repository.
 const REACTS = "^(react|react-dom|react-router|@gnoworld/ui)(/|$)";
 // The rules that ban these names, bare or through their owners, with the browser's other doors.
@@ -90,6 +91,11 @@ export default defineConfig(
               from: [`${SRC}/features`, `${SRC}/scene`, `${SRC}/routes`, "./packages/ui"],
               message: STORE,
             },
+            {
+              target: `${SRC}/scene`,
+              from: [`${SRC}/features`, `${SRC}/routes`, `${SRC}/lib`, "./packages/ui"],
+              message: SCENE,
+            },
           ],
         },
       ],
@@ -134,6 +140,21 @@ export default defineConfig(
           patterns: [
             { regex: REACTS, message: STORE },
             { regex: "^zustand(/react)?$", message: STORE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [`${SRC}/scene/**`],
+    ignores: TESTS,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { regex: REACTS, message: SCENE },
+            { regex: "^zustand(/react)?$", message: SCENE },
           ],
         },
       ],
