@@ -4,6 +4,7 @@ import { createRenderer } from "./renderer.ts";
 const made = vi.hoisted(() => ({ parameters: [] as unknown[] }));
 
 vi.mock("three", () => ({
+  ACESFilmicToneMapping: 4,
   WebGLRenderer: vi.fn(function construct(parameters: unknown) {
     made.parameters.push(parameters);
   }),
@@ -25,4 +26,11 @@ it("asks for the low-power adapter, an opaque buffer and no stencil, on the canv
 it("takes its anti-aliasing from the caller", () => {
   createRenderer(canvas, true);
   expect(made.parameters).toEqual([expect.objectContaining({ antialias: true })]);
+});
+
+it("sets the one image grade before anything compiles, for everything drawn after it", () => {
+  const renderer = createRenderer(canvas, false);
+  expect(renderer.toneMapping).toBe(4);
+  expect(renderer.toneMappingExposure).toBeGreaterThan(0);
+  expect(renderer.toneMappingExposure).toBeLessThanOrEqual(1);
 });
