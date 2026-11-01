@@ -39,6 +39,8 @@ const POLE = new Vector3(0, 1, 0);
 // A sign this close to the limb would slide off the edge: the cosine of the eye's angle over the ground.
 const CLEAR = 0.15;
 const TURNING = 1.4;
+// A little under the place's latitude, for the eye looks a bit above what it faces.
+const LEAN_TO_PLACE = 0.85;
 
 /** The cubic ease out of the Earth's moves. */
 export const eased = (share: number): number => 1 - (1 - Math.min(share, 1)) ** 3;
@@ -80,31 +82,51 @@ export class GroundMarks {
   }
 }
 
-/** How far round the Earth the eye has gone, in radians. */
+/** Where the eye has gone over the Earth: how far round it, and how far the pole leans to it, in radians. */
 export class EyeTurn {
+  readonly #restLean: number;
   #from = 0;
   #to = 0;
+  #leanFrom: number;
+  #leanTo: number;
   #began = Number.NEGATIVE_INFINITY;
+
+  constructor(restLean: number) {
+    this.#restLean = restLean;
+    this.#leanFrom = restLean;
+    this.#leanTo = restLean;
+  }
 
   reset(): void {
     this.#from = 0;
     this.#to = 0;
+    this.#leanFrom = this.#restLean;
+    this.#leanTo = this.#restLean;
     this.#began = Number.NEGATIVE_INFINITY;
   }
 
-  at(age: number, still: boolean): number {
-    if (still) return this.#to;
-    return this.#from + (this.#to - this.#from) * eased((age - this.#began) / TURNING);
+  #share(age: number, still: boolean): number {
+    return still ? 1 : eased((age - this.#began) / TURNING);
+  }
+
+  gone(age: number, still: boolean): number {
+    return this.#from + (this.#to - this.#from) * this.#share(age, still);
+  }
+
+  lean(age: number, still: boolean): number {
+    return this.#leanFrom + (this.#leanTo - this.#leanFrom) * this.#share(age, still);
   }
 
   busy(age: number): boolean {
     return age - this.#began < TURNING;
   }
 
-  /** Goes `degrees` further from where the eye is now, the short way round. */
-  by(degrees: number, age: number): void {
-    this.#from = this.at(age, false);
+  /** Goes `degrees` further round from where the eye is now, the short way, and leans the Earth to the place's `lat`. */
+  to({ degrees, lat }: { degrees: number; lat: number }, age: number, still: boolean): void {
+    this.#from = this.gone(age, still);
+    this.#leanFrom = this.lean(age, still);
     this.#to = this.#from + within(degrees * DEGREE);
+    this.#leanTo = lat * DEGREE * LEAN_TO_PLACE;
     this.#began = age;
   }
 }

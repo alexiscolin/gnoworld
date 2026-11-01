@@ -5,23 +5,14 @@ import { subSolarPoint } from "@gnoworld/core";
 import { Vector3 } from "three";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { MOTION } from "../watch.ts";
-import type { EarthDevice } from "./device.ts";
+import type { Circle, EarthDevice, EarthState } from "./device.ts";
 import { buildGlobe, type Globe } from "./globe.ts";
-import type { PlateGround } from "./ground.ts";
+import { EARTH } from "./look.ts";
 import { eased, EyeTurn, GroundMarks, type Ground, type GroundMark, type LatLon, type Pose } from "./marks.ts";
 import { MOON_REST } from "./orbit.ts";
 import { earthStats, type EarthStats } from "./stats.ts";
 
-/** "loading", "drawn" and "failed" while a page shows the Earth; "gone" once it left. */
-export type EarthState = "loading" | "drawn" | "failed" | "gone";
-
-/** In the page's pixels, with the plate beside it, where the page fixes one. */
-export interface Circle {
-  readonly x: number;
-  readonly y: number;
-  readonly radius: number;
-  readonly plate?: PlateGround;
-}
+export type { Circle, EarthState } from "./device.ts";
 
 /** How far round the sun stands from the ground's x: 69° right of the eye at rest, as frame 39. */
 export const SUN_REST = -0.37;
@@ -41,7 +32,7 @@ export class EarthView implements Ground {
   readonly #motion = matchMedia(MOTION);
   readonly #rest = new Vector3();
   readonly #marks = new GroundMarks();
-  readonly #eye = new EyeTurn();
+  readonly #eye = new EyeTurn(EARTH.lean);
   #said: (state: EarthState) => void = () => undefined;
   #state: EarthState = "gone";
   #circle: Circle | undefined;
@@ -54,6 +45,7 @@ export class EarthView implements Ground {
   #age = 0;
   #arrived = 0;
   #sunAt = Number.NaN;
+  #leaned = Number.NaN;
   #turn = 0;
   #turned = 0;
   #drawn = 0;
@@ -96,6 +88,7 @@ export class EarthView implements Ground {
     this.#age = 0;
     this.#arrived = 0;
     this.#sunAt = Number.NaN;
+    this.#leaned = Number.NaN;
     this.#drawn = 0;
     this.#eye.reset();
   }
@@ -162,10 +155,14 @@ export class EarthView implements Ground {
     const globe = this.#globe;
     if (globe === undefined) return;
     const left = 1 - eased(arrived / ARRIVAL);
-    const gone = this.#eye.at(age, this.#motion.matches);
+    const still = this.#motion.matches;
+    const gone = this.#eye.gone(age, still);
+    const leaned = this.#eye.lean(age, still);
     const sunAt = SUN_REST + left * SUN_SWEEP - gone;
-    if (sunAt !== this.#sunAt) globe.setSun(sunAt);
+    if (leaned !== this.#leaned) globe.setLean(leaned);
+    if (sunAt !== this.#sunAt || leaned !== this.#leaned) globe.setSun(sunAt);
     this.#sunAt = sunAt;
+    this.#leaned = leaned;
     const settling = 1 - eased(arrived / SETTLING);
     this.#turned = this.#turn + gone - SPIN * age;
     globe.setTurn(this.#turned);
@@ -195,10 +192,10 @@ export class EarthView implements Ground {
     return this.#globe === undefined ? undefined : this.#marks.facing(this.#where(this.#globe));
   }
 
-  face({ lon }: LatLon): void {
+  face({ lat, lon }: LatLon): void {
     const here = this.facing();
     if (here === undefined) return;
-    this.#eye.by(lon - here.lon, this.#age);
+    this.#eye.to({ degrees: lon - here.lon, lat }, this.#age, this.#motion.matches);
     this.#poseNow();
   }
 

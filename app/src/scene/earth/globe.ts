@@ -60,6 +60,11 @@ export class Globe {
     return this.#earth.group.rotation;
   }
 
+  /** Leans the pole towards the eye by `lean` radians, for the next `setSun`. */
+  setLean(lean: number): void {
+    this.#earth.group.rotation.x = lean;
+  }
+
   /** The real sun's height over the equator, in radians, kept for every `setSun`. */
   aim(latitude: number): void {
     this.#noon.set(Math.cos(latitude), Math.sin(latitude), 0);
