@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, RPC } from "../testing/fakeWorldsChain.ts";
-import { LIST_MAX_BYTES, LIST_MAX_PATHS, readRealmPaths } from "./list.ts";
+import { LIST_MAX_BYTES, LIST_MAX_PATHS, LIST_MAX_QUERIES, readRealmPaths } from "./list.ts";
 
 // vm/qpaths answers the paths joined by a newline, sorted, with no metadata (handler.go:233 at v1.5.0; 7c-notes.md). Its limit
 // is 1,000 by default and 10,000 at most, and a limit over the cap is lowered, not refused.
@@ -46,16 +46,60 @@ describe("readRealmPaths", () => {
     expect(await ask(() => huge).read()).toEqual({ ok: false, kind: "too_large" });
   });
 
-  it("refuses more paths than the cap, though under the byte cap", async () => {
-    const paths = Array.from({ length: LIST_MAX_PATHS + 1 }, (_, i) => `gno.land/r/a/p${i.toString(36)}`);
-    expect(await ask(() => paths.join("\n")).read()).toEqual({ ok: false, kind: "too_many" });
-  });
+  // A chain as vm/qpaths answers: the paths that start with the prefix, sorted, at most `limit` of them.
+  const chainOf = (all: string[], limit: number) => {
+    const sorted = [...all].sort();
+    return (prefix: string): string =>
+      sorted
+        .filter((path) => path.startsWith(prefix))
+        .slice(0, limit)
+        .join("\n");
+  };
+  const pagedRead = (all: string[], limit: number, answer = chainOf(all, limit)) => {
+    const chain = fakeChain({ paths: answer });
+    return { chain, read: () => readRealmPaths({ send: chain.send, rpc: RPC, limit }) };
+  };
+  const spread = Array.from(
+    { length: 60 },
+    (_, i) => `gno.land/r/${"abcdef"[i % 6] ?? "a"}${String(i % 7)}/app${String(i)}`,
+  );
 
-  it("refuses a list of exactly the cap, which the chain may have cut, and takes one path fewer", async () => {
-    const paths = (count: number) => Array.from({ length: count }, (_, i) => `gno.land/r/a/p${i.toString(36)}`);
-    expect(await ask(() => paths(LIST_MAX_PATHS).join("\n")).read()).toEqual({ ok: false, kind: "too_many" });
-    const result = await ask(() => paths(LIST_MAX_PATHS - 1).join("\n")).read();
-    expect(result.ok && result.paths.length).toBe(LIST_MAX_PATHS - 1);
+  describe("a list the chain cuts at its limit", () => {
+    it("is read by prefix: the prefix splits on the next character, and every path comes back once", async () => {
+      const { chain, read } = pagedRead(spread, 10);
+      const result = await read();
+      expect(result.ok && [...result.paths].sort()).toEqual([...spread].sort());
+      expect(chain.asked.length).toBeGreaterThan(1);
+      expect(chain.asked.every(({ data }) => data.startsWith("gno.land/r/"))).toBe(true);
+      expect(chain.asked.every(({ url }) => decodeURIComponent(url).includes("limit=10"))).toBe(true);
+    });
+
+    it("reads a list of exactly the limit as a whole list, not as a refusal", async () => {
+      const exact = spread.slice(0, 10);
+      const result = await pagedRead(exact, 10).read();
+      expect(result.ok && [...result.paths].sort()).toEqual([...exact].sort());
+    });
+
+    it("keeps a path that is itself the prefix it was split on", async () => {
+      const all = ["gno.land/r/ab", ...Array.from({ length: 12 }, (_, i) => `gno.land/r/ab/x${i.toString(36)}`)];
+      const result = await pagedRead(all, 5).read();
+      expect(result.ok && [...result.paths].sort()).toEqual([...all].sort());
+    });
+
+    it("goes through the pace before each of its requests", async () => {
+      let paced = 0;
+      const chain = fakeChain({ paths: chainOf(spread, 10) });
+      await readRealmPaths({ send: chain.send, rpc: RPC, limit: 10, pace: () => Promise.resolve(void (paced += 1)) });
+      expect(paced).toBe(chain.asked.length);
+    });
+
+    it("gives up as too_many, after a bounded number of requests, on a chain that fills every prefix", async () => {
+      const hostile = (prefix: string): string =>
+        Array.from({ length: 10 }, (_, i) => `${prefix}${i.toString(36)}`).join("\n");
+      const { chain, read } = pagedRead([], 10, hostile);
+      expect(await read()).toEqual({ ok: false, kind: "too_many" });
+      expect(chain.asked.length).toBeLessThanOrEqual(LIST_MAX_QUERIES);
+    });
   });
 
   it("takes an answer of exactly the byte cap and refuses one byte over", async () => {

@@ -418,6 +418,23 @@ describe("runWorlds", () => {
       expect(readFileSync(file).byteLength).toBeLessThan(WORLDS_MAX_BYTES / 4);
     });
 
+    it("writes the plan's 10,000 worlds (12,000 realms, past the chain's 10,000 per answer) under the default cap", async () => {
+      const all = Array.from({ length: 12_000 }, (_, i) => `gno.land/r/ns${i.toString(36)}/app${String(i % 10_000)}`);
+      const sortedAll = [...all].sort();
+      const { file, outcome } = await run(
+        chainRoutes(all, {
+          paths: (prefix) =>
+            sortedAll
+              .filter((path) => path.startsWith(prefix))
+              .slice(0, 10_000)
+              .join("\n"),
+        }),
+      );
+      expect(outcome).toEqual({ wrote: true });
+      expect(written(file).worlds.length).toBeGreaterThanOrEqual(10_000);
+      expect(readFileSync(file).byteLength).toBeLessThanOrEqual(WORLDS_MAX_BYTES);
+    }, 60_000);
+
     it("takes a file of exactly the byte cap whole, and sheds the lists for one byte under", async () => {
       const probe = await run(chainRoutes([POOL, ROUTER]));
       const size = readFileSync(probe.file).byteLength;
