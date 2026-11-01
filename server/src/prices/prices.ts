@@ -4,6 +4,7 @@
 // there, the same way out and the same five minutes, so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is data: capped, parsed, checked field by field, and only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
+import { isPublicOrigin } from "@gnoworld/core";
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
@@ -98,7 +99,7 @@ function tokensOf(answer: unknown): Markets["tokens"] {
 function checkedRpc(rpc: string): URL {
   const url = URL.parse(rpc);
   const bare = url?.pathname === "/" && url.search === "" && url.hash === "";
-  if (url?.protocol !== "https:" || url.username !== "" || url.password !== "" || !bare)
+  if (url?.protocol !== "https:" || url.username !== "" || url.password !== "" || !bare || !isPublicOrigin(url.origin))
     throw new RangeError("prices: the rpc is no bare https address");
   return url;
 }
