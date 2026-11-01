@@ -406,7 +406,12 @@ describe("runWorlds", () => {
       });
       const evil = (n: number, world: (i: number) => string): string[] =>
         Array.from({ length: n }, (_, i) => `gno.land/r/evil/${world(i)}`);
-      const routes = (paths: string[]) => chainRoutes(paths, { doc: (path) => (path.includes("evil") ? fat : doc()) });
+      // The stranger's realms are never called, the router is: the least active world is shed first.
+      const routes = (paths: string[]) =>
+        chainRoutes(paths, {
+          doc: (path) => (path.includes("evil") ? fat : doc()),
+          indexer: ({ variables }) => history(pathOf(variables).includes("evil") ? 0 : 2, pathOf(variables)),
+        });
 
       it("is shed to fit and not refused: its lists go, the other worlds stay whole", async () => {
         const paths = [ROUTER, ...evil(6, (i) => `fat_${String(i)}`)];
@@ -433,7 +438,7 @@ describe("runWorlds", () => {
 
     it("logs a list cut at the request cap once by a kind, and still writes what it found (F3538)", async () => {
       // Every prefix answers a full page (10,000 lines); a prefix that is a realm path itself is among its lines.
-      const filler = Array.from({ length: 9_999 }, (_, i) => `gno.land/r/zz/p${String(i)}`).join("\n");
+      const filler = "x\n".repeat(9_999).trim();
       const { file, outcome, logged } = await run(chainRoutes([], { paths: (prefix) => `${filler}\n${prefix}` }));
       expect(outcome).toEqual({ wrote: true });
       expect(written(file).worlds.length).toBeGreaterThan(0);
