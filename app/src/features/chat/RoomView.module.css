@@ -113,6 +113,8 @@
     line-height: 1.2;
     /* raw: the frames' tracking, a tighter one than the labels' */
     letter-spacing: 0.06em;
+    /* raw: the frames set it on the name's baseline, a pixel under the row's centre */
+    translate: 0 1px;
   }
 
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the

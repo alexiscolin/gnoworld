@@ -134,8 +134,7 @@ test.describe("the country tag", () => {
       if (face === undefined || code === undefined || name === undefined) throw new Error("three boxes");
       expect(code.x).toBeGreaterThanOrEqual(face.x + face.width);
       expect(name.x).toBeGreaterThanOrEqual(code.x + code.width);
-      const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
-      expect(Math.abs(middle(code) - middle(face))).toBeLessThanOrEqual(1);
+      expect(Math.round(code.y - face.y)).toBe(4);
       expect(Math.round(code.width)).toBe(22);
       expect(Math.round(code.height)).toBe(15);
       expect((await new AxeBuilder({ page }).include("ol[aria-label='Messages']").analyze()).violations).toEqual([]);
@@ -184,6 +183,7 @@ test.describe("the country tag, between two accounts on the real Ergo", () => {
 
     await bob.page.reload();
     await expect(lineOf(bob.page, one).getByTitle("Japan")).toBeVisible();
+    await expect(lineOf(bob.page, first).getByTitle("Japan")).toBeVisible();
     await expect(lineOf(bob.page, plain).locator("[data-line-country]")).toHaveCount(0);
     await bob.close();
   });
