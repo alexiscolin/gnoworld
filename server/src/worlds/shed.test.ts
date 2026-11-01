@@ -1,4 +1,4 @@
-import { Worlds } from "@gnoworld/schemas";
+import { Worlds, WORLDS_CAPS } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { fitted } from "./shed.ts";
 
@@ -59,5 +59,12 @@ describe("fitted", () => {
     const limit = sizeOf([wide]);
     expect(fitted(head, [wide], limit)?.dropped).toBe(0);
     expect(fitted(head, [wide], limit - 1)?.stripped).toBe(1);
+  });
+
+  it("keeps at most the schema's count of worlds, however small they are (F3539)", () => {
+    const many = Array.from({ length: WORLDS_CAPS.worlds + 1 }, (_, i) => row(`w${String(i).padStart(5, "0")}`, 1, 0));
+    const result = fitted(head, many, 100 * 1024 * 1024);
+    expect(result?.worlds).toHaveLength(WORLDS_CAPS.worlds);
+    expect(result?.dropped).toBe(1);
   });
 });
