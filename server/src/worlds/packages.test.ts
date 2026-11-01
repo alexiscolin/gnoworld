@@ -137,6 +137,13 @@ describe("readPackages", () => {
     expect(facts?.functions).toEqual(["BalanceOf", "Transfer"]);
   });
 
+  it("keeps a package whose gnomod.toml is not there (InvalidFileError, keeper.go:1937), with a null deployer and its doc (F3540)", async () => {
+    const { done } = read([WUGNOT], { file: () => abciRefused("/vm.InvalidFileError") });
+    const facts = (await done).get(WUGNOT);
+    expect(facts?.deployer).toBeNull();
+    expect(facts?.functions).toEqual(["BalanceOf", "Transfer"]);
+  });
+
   it.each([
     ["a gateway's html", () => new Response("<html>gateway")],
     ["a refusal that is no absence", () => abciRefused("/std.UnauthorizedError")],

@@ -6,7 +6,7 @@ import { Failure, fetchCapped, kindOf, type Kind, type Limits, type Send } from 
 
 export { Failure, kindOf, type Kind, type Send };
 
-/** The chain's answer that a package or file is not there (`InvalidPkgPathError`): a fact to keep, not a fault to retry. */
+/** The chain's answer that a package or file is not there (`InvalidPkgPathError`, `InvalidFileError`): a fact to keep, not a fault to retry. */
 export class Absent extends Failure {
   constructor() {
     super("chain_refused");
@@ -48,7 +48,9 @@ const refusedBy = (answer: QueryAnswer): boolean =>
 // The fault of a refused query: the chain's "not there" is Absent, any other refusal a plain chain_refused.
 function refusalOf(answer: QueryAnswer): Failure {
   const type = answer.result?.response.ResponseBase.Error?.["@type"] ?? "";
-  return type.endsWith("InvalidPkgPathError") ? new Absent() : new Failure("chain_refused");
+  return type.endsWith("InvalidPkgPathError") || type.endsWith("InvalidFileError")
+    ? new Absent()
+    : new Failure("chain_refused");
 }
 
 // The text an abci_query's envelope carries: its Data decoded, or a Failure.
