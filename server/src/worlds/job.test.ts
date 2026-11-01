@@ -154,6 +154,30 @@ describe("runWorlds", () => {
     expect(names).toEqual([null, "bob"]);
   });
 
+  it("cancels a name's answer that never ends, without reading it to its end, and leaves the name out", async () => {
+    let pulled = 0;
+    const endless = () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          pull(controller) {
+            pulled += 1;
+            controller.enqueue(new Uint8Array(64 * 1024));
+          },
+        }),
+      );
+    const { file } = await run(chainRoutes([POOL], { eval: endless }));
+    expect(pulled).toBeLessThan(100);
+    expect(written(file).worlds[0]?.realms[0]?.deployerName).toBeNull();
+  });
+
+  // Recorded through gnomcp on onyx-1, 2026-11-01: ResolveAddress of an address with no name, then .Name(), is refused by the chain
+  // ("value method ...UserData.Name called using nil *UserData pointer"), an error of the query and no typed value.
+  it("takes the chain's refusal for an address with no registered name as no name", async () => {
+    const { file, outcome } = await run(chainRoutes([POOL], { eval: () => abciRefused("/std.UnauthorizedError") }));
+    expect(outcome).toEqual({ wrote: true });
+    expect(written(file).worlds[0]?.realms[0]?.deployerName).toBeNull();
+  });
+
   it("leaves a name out when the chain refuses the query, and keeps the rest", async () => {
     const { file, logged } = await run(chainRoutes([POOL], { eval: () => new TypeError("fetch failed") }));
     const realm = written(file).worlds[0]?.realms[0];
