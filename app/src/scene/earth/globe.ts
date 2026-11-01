@@ -10,7 +10,7 @@ import { createOrbit, type Orbit } from "./orbit.ts";
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
-const LIMB = 0.7;
+const LIMB = 1.05;
 
 export class Globe {
   readonly #owner = new Disposer();

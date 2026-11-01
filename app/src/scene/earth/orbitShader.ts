@@ -23,8 +23,8 @@ const float TAU = 6.28318530718;
 void main() {
   float centred = max(dot(normalize(vNormal), normalize(vToEye)), 0.0);
   float wake = exp(-fract(vAlong - head / TAU) * 2.2);
-  vec3 amber = vec3(1.0, 0.5, 0.14) * pow(centred, 4.0) * (0.22 + 0.5 * wake);
-  vec3 core = vec3(1.0, 0.84, 0.58) * pow(centred, 60.0) * (0.5 + 3.5 * wake);
+  vec3 amber = vec3(1.0, 0.6, 0.24) * pow(centred, 3.0) * (0.24 + 0.46 * wake);
+  vec3 core = vec3(1.0, 0.88, 0.68) * pow(centred, 38.0) * (0.55 + 4.0 * wake);
   gl_FragColor = vec4(amber + core, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

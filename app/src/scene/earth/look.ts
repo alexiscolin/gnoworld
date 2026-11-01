@@ -36,7 +36,7 @@ export const EARTH: PlanetLook = {
   relief: 0.003,
   limb: 1,
   clouds: 0.62,
-  rim: { colour: [0.2, 0.34, 0.62], thickness: 0.05 },
+  rim: { colour: [0.2, 0.32, 0.54], thickness: 0.05 },
 };
 
 export const MOON: PlanetLook = {

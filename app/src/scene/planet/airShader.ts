@@ -71,7 +71,7 @@ void main() {
     float along = -dot(eye, ray);
     vec3 nearest = eye + ray * along;
     float over = length(nearest) - 1.0;
-    float band = smoothstep(-0.004, 0.006, over) * exp(-max(over, 0.0) / (scale * 0.62));
+    float band = smoothstep(-0.004, 0.006, over) * exp(-max(over, 0.0) / (rimThickness * 0.34));
     light += vec3(0.62, 0.8, 1.0) * band * limbLight * smoothstep(-0.1, 0.5, dot(normalize(nearest), sun));
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
