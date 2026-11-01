@@ -1,4 +1,5 @@
-// Tier 1 (docs/REVIEW.md). The only place a `vm/qeval` expression is built. The chain runs ANY expression it is sent, so the
+// Tier 1 (docs/REVIEW.md). One of the two places a `vm/qeval` expression is built (the other, a name for an address, is
+// packages/core/src/chain/evalName.ts). The chain runs ANY expression it is sent, so the
 // defence is here: one `<realm>.<Name>()` or nothing. Each pattern is built inside its function (typescript.md, F412).
 
 export { evalNameOf, isAddress } from "@gnoworld/core";
