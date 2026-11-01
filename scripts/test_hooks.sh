@@ -5988,6 +5988,29 @@ printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = for-each-ref ] && exit 1; done\nex
 chmod +x "$t/dreambin/git"
 out=$(PATH="$t/dreambin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$dds" </dev/null 2>&1)
 printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell with branches it cannot list: $out"
+# A session writes branches, and this hook starts every session, so what a branch holds bounds its time (round 1 of its review, a 256 MiB log held
+# one for minutes, 1,000 branches 265 s): a log past 4 MB is not read, and only the 20 newest branches are, by date, never by name.
+git -C "$r" branch -qD eight nine
+m4=$(git -C "$r" rev-parse HEAD)
+git -C "$r" checkout -q -b big
+{ head -c 4194400 /dev/zero | tr '\0' x | fold -w 1000; echo; printf '| 2026-11-07 | The dream of %s (past the cap) | x |\n' "$(git -C "$r" rev-parse --short=8 "$m4")"; } >>"$r/docs/review-log.md"
+git -C "$r" commit -qam "a log past the cap" && git -C "$r" checkout -q main
+ask
+printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read a log past 4 MB, which a session could make hold it for minutes: $out"
+git -C "$r" branch -qD big
+stamped() { # $1: a date, $2: a message; a commit of main's tree on a branch of its own, checked out
+	GIT_COMMITTER_DATE="$1" git -C "$r" commit -q --allow-empty -m "$2"
+}
+git -C "$r" checkout -q -b old-stamp && stamped 2001-01-01T00:00:00Z "older than every branch below"
+for n in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20; do git -C "$r" branch "a$n"; done
+git -C "$r" checkout -q main && git -C "$r" checkout -q -b zz-row && recorded "$m4" && git -C "$r" checkout -q main
+ask
+[ -z "$out" ] || fail "dream_due.sh read branches by name, not the newest by date: $out"
+git -C "$r" checkout -q -b new-stamp && stamped 2031-01-01T00:00:00Z "newer than the row's branch"
+for n in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20; do git -C "$r" branch "b$n"; done
+git -C "$r" checkout -q main
+ask
+printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read past the 20 newest branches, so a session's branches could hold it for minutes: $out"
 # What it may run: git read-only and text tools, nothing of the repository, no gate.
 body=$(grep -v '^[[:space:]]*#' "$dds")
 printf '%s\n' "$body" | grep -qE '(^|[^a-z_.-])(check\.sh|node|pnpm|npm|npx|python3?|ruby|perl|make|curl|wget)([^a-z_-]|$)' && fail "dream_due.sh runs a tool that is neither git nor a text tool"

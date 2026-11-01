@@ -17,15 +17,21 @@ cannot() { # $1: why
 }
 git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || cannot "not a repository"
 git -C "$dir" rev-parse --verify --quiet "refs/heads/main^{commit}" >/dev/null 2>&1 || cannot "no branch main"
-log=$(git -C "$dir" show "refs/heads/main:docs/review-log.md" 2>/dev/null) || cannot "no docs/review-log.md on main"
-refs=$(git -C "$dir" for-each-ref --no-merged=refs/heads/main --format='%(refname)' refs/heads 2>/dev/null) || cannot "git could not list the branches"
+read_log() { # $1: a ref. Its committed log as a plain blob, no text driver; a session writes branches, so one past 4 MB, which would hold every session's start for minutes, is not read.
+	size=$(git -C "$dir" cat-file -s "$1:docs/review-log.md" 2>/dev/null) || return 1
+	[ "$size" -le 4194304 ] 2>/dev/null || return 1
+	git -C "$dir" cat-file blob "$1:docs/review-log.md" 2>/dev/null
+}
+log=$(read_log refs/heads/main) || cannot "no docs/review-log.md it can read on main"
+# The 20 newest alone, as a session can make branches by the thousand: past them a reminder is said, the safe side.
+refs=$(git -C "$dir" for-each-ref --no-merged=refs/heads/main --sort=-committerdate --count=20 --format='%(refname)' refs/heads 2>/dev/null) || cannot "git could not list the branches"
 
 # The shas of the last rows (the last 20), the newest row's first: a row older than an earlier one covers nothing more.
 rows=$(printf '%s\n' "$log" | sed -n 's/.*The dream of \([^ ]*\).*/\1/p' | tail -n 20)
 # A branch's last rows, read as committed. With no ref, `:docs/review-log.md` would be the index's file.
 others=$(printf '%s\n' "$refs" | while IFS= read -r ref; do
 	[ -n "$ref" ] || continue
-	git -C "$dir" show "$ref:docs/review-log.md" 2>/dev/null | sed -n 's/.*The dream of \([^ ]*\).*/\1/p' | tail -n 20
+	read_log "$ref" | sed -n 's/.*The dream of \([^ ]*\).*/\1/p' | tail -n 20
 done | sort -u)
 # Read a line at a time, never split by the shell (a word with a * in it would name the files of the folder), and through a pipe: no temporary file.
 known=$(printf '%s\n%s\n' "$rows" "$others" | while IFS= read -r sha; do

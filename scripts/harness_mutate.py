@@ -1146,7 +1146,10 @@ def seven_mutants():
     yield from swaps(u, "dream_due.sh", (
         ("|| cannot \"the last dream's commit is not on main\"", "|| :", "says it could not tell for a commit main does not contain"),
         ("[ \"$count\" -gt 0 ]", "[ \"$count\" -ge 0 ]", "says a dream is due only after a merge"),
-        ("log=$(git -C \"$dir\" show \"refs/heads/main:docs/review-log.md\" 2>/dev/null)", "log=$(cat \"$dir/docs/review-log.md\" 2>/dev/null)", "reads main's log, never the work tree's"),
+        ("log=$(read_log refs/heads/main)", "log=$(cat \"$dir/docs/review-log.md\" 2>/dev/null)", "reads main's log, never the work tree's"),
+        ("\t[ \"$size\" -le 4194304 ] 2>/dev/null || return 1\n", "", "reads no log past 4 MB"),
+        ("--count=20 ", "", "reads the 20 newest branches, no more"),
+        ("--sort=-committerdate ", "", "reads the newest branches by date, not by name"),
         ("--not $known", "--not $oid", "counts the merges after the newest dream, whatever the order of its rows"),
         ("\tprintf '%s\\n' \"$sha\" | grep -Eqx '[0-9a-f]{7,40}' || continue\n", "", "reads an older row's word as a commit only when it is hexadecimal"),
         ("\tgit -C \"$dir\" merge-base --is-ancestor \"$oid\" \"refs/heads/main\" 2>/dev/null || continue\n", "", "lets an older row cover only a commit main contains"),
