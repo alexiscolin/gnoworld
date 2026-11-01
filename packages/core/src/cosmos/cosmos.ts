@@ -1,7 +1,9 @@
 // core/cosmos (slice 7, 7c; ADR-0002 §3 and §10): where each system sits. A thick disc with constant density, clusters above and
 // below it from a smooth field of position (no list of clusters), and a curated ecosystem's namespaces placed together.
 // Placing one system depends on no other: the set enters only through its size (a power-of-two step) and an ecosystem's size.
-// Only integer arithmetic, + - * / and floor are used, so every engine gives the same bytes (no sin, cos or pow).
+// The hash and the field use only integer arithmetic (+ - * / and floor), so every engine gives the same bytes (no sin, cos or pow).
+// The disc's radius takes one sqrt (exactly rounded by IEEE-754). Placement is a random point in the disc, not ADR-0002 §3's
+// ring-by-ring cell ladder: that deviation is Alexis's to decide (F3520).
 
 /** The unit of spacing, in scene units. */
 export const CELL = 10;
