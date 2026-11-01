@@ -225,6 +225,32 @@ describe("cutText: its cost", () => {
     expect(longest).toBeLessThanOrEqual(4096);
   });
 
+  // F3368: the relay takes 4096 bytes a line (deploy/ergo/ircd.yaml.tmpl, MULTILINE_BYTES), so a text is one head, and a text
+  // past it is not a line: a megabyte of anything costs what the head costs.
+  it("reads one head of a megabyte that is one cluster, and keeps none of it", () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    expect(cutText(stack(1024 * 1024), MAX)).toBe("");
+    expect(segment.mock.calls.length).toBe(1);
+    expect(Math.max(...segment.mock.calls.map(([input]) => input.length))).toBeLessThanOrEqual(4096);
+  });
+
+  it("reads a megabyte that is all hidden as one head, not a window after a window", () => {
+    const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
+    expect(cutText("\u200b".repeat(1024 * 1024), MAX)).toBe("");
+    expect(segment.mock.calls.length).toBeLessThanOrEqual(1);
+  });
+
+  it("leaves nothing of what lies past the relay's 4096 units: no line of the relay reaches it", () => {
+    expect(cutText(`${"\u200b".repeat(4096)}visible`, MAX)).toBe("");
+    expect(cutText(`${"\u200b".repeat(4095)}visible`, MAX)).toBe("v");
+  });
+
+  it("never returns half a pair where the head ends", () => {
+    const out = cutText(`${"\u200b".repeat(4095)}😀`, MAX);
+    expect(out).toBe("");
+    expect(out.isWellFormed()).toBe(true);
+  });
+
   it("still finds its max graphemes behind a long run of hidden characters", () => {
     const text = `${"​".repeat(4000)}${"a".repeat(MAX + 5)}`;
     const out = cutText(text, MAX);
