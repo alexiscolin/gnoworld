@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, near } from "./geometry.ts";
-import { loseContext, restoreContext, stats } from "./sceneStage.ts";
+import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
@@ -26,6 +26,7 @@ interface EarthStats {
   orbit: { left: number; right: number; top: number; bottom: number };
   moon: { x: number; y: number; front: boolean };
   mapWidth: number;
+  drawn: number;
 }
 const earthOf = async (page: Page) => ((await stats(page)) as unknown as { earth?: EarthStats }).earth;
 const earth = async (page: Page): Promise<EarthStats> => {
@@ -48,12 +49,11 @@ const drawn = (page: Page) => expect(page.locator("[data-earth='drawn']")).toBeA
 const kept = (page: Page) => page.locator("[data-earth='loading'], [data-earth='drawn']");
 const credits = (page: Page) => page.getByRole("button", { name: "Credits", exact: true });
 
-// A frame drawn after the Earth reached the stage: the page says drawn as it goes on stage.
+// A frame drawn after the Earth reached the stage: the page says drawn as it goes on stage, before any frame shows it.
 const painted = async (page: Page) => {
   await drawn(page);
-  const before = (await stats(page)).frames;
+  await expect.poll(async () => (await earth(page)).drawn, SLOW).toBeGreaterThan(0);
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
-  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThanOrEqual(before);
 };
 
 async function opened(page: Page, path = EARTH) {
@@ -66,9 +66,16 @@ async function opened(page: Page, path = EARTH) {
 test.describe("a computer", () => {
   test.use({ viewport: COMPUTER });
 
-  test("draws the Earth on its page, its maps from the site, with no CSP violation", async ({ page }) => {
+  test("draws the Earth on its page, its maps from the site, with no CSP violation and no shader refused", async ({
+    page,
+  }) => {
+    const refused: string[] = [];
+    page.on("console", (message) => {
+      if (message.text().includes("THREE.WebGLProgram")) refused.push(message.text());
+    });
     const asked = mapsAsked(page);
     await opened(page);
+    expect(refused).toEqual([]);
     expect(asked.sort()).toEqual([
       "/textures/clouds.webp",
       "/textures/earth-day.webp",
@@ -158,11 +165,14 @@ test.describe("a computer", () => {
 
   test("rests the Moon on the front of its orbit, off the plate's words", async ({ page }) => {
     await opened(page);
-    const { moon, orbit } = await earth(page);
+    const { moon, orbit, x } = await earth(page);
     expect(moon.front).toBe(true);
+    // Frame 39's bead stands over the globe's middle, at the top of the ring.
+    expect(Math.abs(moon.x - x)).toBeLessThan(16);
     expect(moon.x).toBeGreaterThan(orbit.left);
     expect(moon.x).toBeLessThan(orbit.right);
-    expect(moon.y).toBeGreaterThanOrEqual(orbit.top);
+    // It rests at the top of the ring, which the orbit's samples may just miss.
+    expect(moon.y).toBeGreaterThanOrEqual(orbit.top - 2);
     expect(moon.y).toBeLessThanOrEqual(orbit.bottom);
   });
 
@@ -192,9 +202,14 @@ test.describe("a computer", () => {
     await expect(link).toBeFocused();
   });
 
-  test("the keyboard reaches the Credits link", async ({ page }) => {
+  test("the keyboard reaches the Credits link, by Tab", async ({ page }) => {
     await opened(page);
-    await credits(page).focus();
+    let reached = false;
+    for (let press = 0; press < 40 && !reached; press += 1) {
+      await page.keyboard.press("Tab");
+      reached = await page.evaluate(() => document.activeElement?.textContent === "Credits");
+    }
+    expect(reached).toBe(true);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog", { name: "Credits" })).toBeVisible();
   });
@@ -248,7 +263,10 @@ test.describe("the pages that hold no Earth", () => {
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(path);
       await hydrated(page);
-      await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
+      if (path.startsWith("/?")) {
+        await running(page);
+        await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(0);
+      } else await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));
       expect(asked).toEqual([]);
       await expect(kept(page)).toHaveCount(0);
     });
@@ -296,6 +314,30 @@ test.describe("a texture that does not come", () => {
   });
 });
 
+test.describe("a window that loads the scene by itself, under the plate's breakpoint", () => {
+  test.use({ viewport: { width: 1100, height: 800 } });
+
+  test("keeps the globe's room from the first paint: the plate does not jump", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(() => {
+      Reflect.set(globalThis, "__shift", 0);
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const { value, hadRecentInput } = entry as unknown as { value: number; hadRecentInput: boolean };
+          if (!hadRecentInput) Reflect.set(globalThis, "__shift", Number(Reflect.get(globalThis, "__shift")) + value);
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    });
+    await page.goto(EARTH);
+    await hydrated(page);
+    const before = await box(page, "h1");
+    await painted(page);
+    const after = await box(page, "h1");
+    expect(after.y).toBe(before.y);
+    expect(await page.evaluate(() => Number(Reflect.get(globalThis, "__shift")))).toBeLessThan(0.1);
+  });
+});
+
 test.describe("a touch screen", () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
 
@@ -331,6 +373,9 @@ test.describe("a phone", () => {
     const heading = await box(page, "h1");
     expect(heading.y).toBeGreaterThanOrEqual(y + radius);
     await expect(credits(page)).toBeVisible();
+    await credits(page).click();
+    await expect(page.getByRole("dialog", { name: "Credits" })).toBeVisible();
+    await page.keyboard.press("Escape");
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 });

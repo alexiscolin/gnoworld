@@ -50,6 +50,7 @@ describe("the credits", () => {
     for (const link of all(one(opened(), "dialog"), "a")) {
       expect(link.getAttribute("rel")).toContain("noopener");
       expect(link.getAttribute("rel")).toContain("noreferrer");
+      expect(link.getAttribute("target")).toBe("_blank");
     }
   });
 

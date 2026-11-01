@@ -74,6 +74,17 @@
     color: var(--color-text-muted);
     /* raw: the design system's 11 px Credits */
     font: 400 11px/1 var(--family-sans);
+    cursor: pointer;
+  }
+
+  /* Under the plate's breakpoint no margin holds it: it lies over the page's words, and over a phone's views. */
+  @media (max-width: 1279px) {
+    .credits {
+      inset-block-end: var(--space-3xs);
+      padding-block: var(--space-3xs);
+      border-radius: var(--radius-s);
+      background: var(--color-surface);
+    }
   }
 
   .credits:hover {

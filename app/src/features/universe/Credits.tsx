@@ -11,7 +11,7 @@ export function Credits() {
     <>
       <button
         type="button"
-        className={["bare-button", styles["credits"]].join(" ")}
+        className={styles["credits"]}
         onClick={() => {
           setOpen(true);
         }}

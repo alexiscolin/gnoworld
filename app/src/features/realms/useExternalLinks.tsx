@@ -32,7 +32,7 @@ export function useExternalLinks(origin: string | undefined) {
       isOwn(href, origin) ? undefined : (
         <button
           type="button"
-          className={["bare-button", styles["external"]].join(" ")}
+          className={styles["external"]}
           title={href}
           dir="ltr"
           onClick={() => {

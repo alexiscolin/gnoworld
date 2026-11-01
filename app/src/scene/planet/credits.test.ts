@@ -23,6 +23,17 @@ function sizeOf(path: string) {
 }
 
 describe("the textures' credits", () => {
+  it("holds each row's source and the changes it notes, word for word, as CC BY 4.0 §3(a)(1)(B) asks", () => {
+    expect(CREDITS.map(({ source }) => source)).toEqual([
+      "https://www.solarsystemscope.com/textures/",
+      "https://www.solarsystemscope.com/textures/",
+      "https://esahubble.org/images/heic0707a/",
+    ]);
+    expect(CREDITS[0]?.line).toContain("warped and recoloured");
+    expect(CREDITS[1]?.line).toContain("scaled to 4096 by 2048");
+    expect(CREDITS[2]?.line).toContain("cropped, stars removed, recoloured and warped");
+  });
+
   it("names every file in the folder, and no file that is not there", () => {
     expect(
       CREDITS.flatMap((credit) => credit.files)

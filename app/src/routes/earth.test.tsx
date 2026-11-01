@@ -22,7 +22,7 @@ describe("the Earth's page", () => {
 
   test("keeps the globe's place in the page, which only the scene fills", async () => {
     const html = await render(route("/earth"), "/earth");
-    expect(html).toMatch(/<div[^>]*data-globe[^>]*data-earth="none"[^>]*><\/div>/);
+    expect(html).toMatch(/<div[^>]*data-globe[^>]*data-earth="waiting"[^>]*><\/div>/);
   });
 
   test("lists the worlds of its universe, and only those", async () => {

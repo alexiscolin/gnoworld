@@ -33,13 +33,6 @@
     white-space: nowrap;
   }
 
-  /* A button that draws nothing of its own: a link's look, or a word's, is the caller's. */
-  .bare-button {
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
-
   /* Words for assistive technology alone: a figure's value while its digits count, a chart's table. */
   .visually-hidden {
     position: absolute;

@@ -58,6 +58,25 @@ describe("subSolarPoint", () => {
   });
 });
 
+// Worked out apart from this code: Kepler's equation on JPL's mean elements, with the true pole (the review's script, 2026-11-02). The code's
+// longitude stands 0.34° east of it, by design: that is the precession between the Earth Rotation Angle and the sidereal time in 2026.
+const PRECESSION = 0.34;
+const NEAR = 0.02;
+
+describe("subSolarPoint, against a reckoning of another kind", () => {
+  it.each([
+    ["2026-02-11T12:00:00Z", -13.9245, 3.5479],
+    ["2026-03-20T14:46:00Z", 0.0014, -39.6453],
+    ["2026-06-21T08:24:00Z", 23.4358, 54.4474],
+    ["2026-11-03T12:00:00Z", -15.149, -4.1121],
+    ["2026-12-21T20:50:00Z", -23.4358, -132.9397],
+  ])("agrees at %s to a fiftieth of a degree", (iso, latitude, longitude) => {
+    const point = subSolarPoint(instant(iso));
+    expect(Math.abs(degrees(point.latitude) - latitude)).toBeLessThan(NEAR);
+    expect(Math.abs(degrees(point.longitude) - PRECESSION - longitude)).toBeLessThan(NEAR);
+  });
+});
+
 describe("day and night from the terminator", () => {
   it("lights Paris and leaves Sydney dark at noon on Greenwich", () => {
     expect(sunlight(PARIS, "2026-06-21T12:00:00Z")).toBeGreaterThan(0.5);

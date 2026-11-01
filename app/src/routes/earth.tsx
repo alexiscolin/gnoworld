@@ -27,7 +27,7 @@ export default function Earth() {
   return (
     <>
       {/* The globe's place: the page lays it out, the scene draws in it, and the universe says how far it came. */}
-      <div className={styles["globe"]} data-globe data-earth="none" />
+      <div className={styles["globe"]} data-globe data-earth="waiting" />
       <Panel.Layout
         plate={
           <Panel label="Earth" look="plate" caption="gnoworld · hub atlas">
