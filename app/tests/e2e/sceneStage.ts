@@ -19,6 +19,20 @@ export const stats = (page: Page) =>
     return (scene as { stats: () => Stats }).stats();
   });
 
+// Every layout shift the page makes, from before its first paint, kept for `shifted`.
+export const countShifts = (page: Page) =>
+  page.addInitScript(() => {
+    Reflect.set(globalThis, "__shift", 0);
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const { value, hadRecentInput } = entry as unknown as { value: number; hadRecentInput: boolean };
+        if (!hadRecentInput) Reflect.set(globalThis, "__shift", Number(Reflect.get(globalThis, "__shift")) + value);
+      }
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+
+export const shifted = (page: Page) => page.evaluate(() => Number(Reflect.get(globalThis, "__shift")));
+
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
 export const loseContext = (page: Page) =>

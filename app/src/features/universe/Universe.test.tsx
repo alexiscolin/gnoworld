@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { createAppStore } from "../../store/index.ts";
 import { Universe } from "./Universe.tsx";
 
 const scene = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const scene = vi.hoisted(() => ({
 }));
 
 vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
+vi.mock("./EarthSigns.tsx", () => ({ PageSigns: () => <div data-signs="" /> }));
 
 const STRONG = "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)";
 const SOFTWARE = "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)";
@@ -550,6 +552,7 @@ describe("on the Earth's page", () => {
       cover: scene.cover,
       dispose: scene.dispose,
       earth: scene.earth,
+      ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
       stats: () => ({}),
     }));
     // As the scene does: the page's leaving is said back to it.
@@ -701,6 +704,28 @@ describe("on the Earth's page", () => {
     say("drawn");
     expect(space()).toBe("drawn");
     expect(button(box, "Credits")).toBeDefined();
+  });
+
+  it("shows the signs on the globe only while the Earth shows, and only for a page that gave its store", async () => {
+    const page = { store: createAppStore(), open: vi.fn() };
+    const earthPage = () => document.querySelector("[data-signs]");
+    mount(<Universe shown="earth" page={page} />);
+    await settle();
+    expect(earthPage()).toBeNull();
+    say("drawn");
+    await settle();
+    expect(earthPage()).not.toBeNull();
+    say("failed");
+    await settle();
+    expect(earthPage()).toBeNull();
+  });
+
+  it("draws no sign for a universe with no page behind it", async () => {
+    mount(<Universe shown="earth" />);
+    await settle();
+    say("drawn");
+    await settle();
+    expect(document.querySelector("[data-signs]")).toBeNull();
   });
 
   it("shows the Credits only while the textures show", async () => {

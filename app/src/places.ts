@@ -224,7 +224,7 @@ export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
 
 /** What the chat's header, its column of worlds and its info panel say of a place in `universe`: `kicker` says where it is. */
 export const chatPlace = (
-  place: Pick<ChatPlace, "slug" | "name" | "description">,
+  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage">,
   universe: UniverseView,
   kicker = `${universe.name} · ${place.name}`,
 ): ChatPlace => ({

@@ -8,7 +8,7 @@ export type { LatLon };
 
 export interface GroundMark extends LatLon {
   /** Where it stands in the page's pixels, and whether the eye sees it clear of the limb. */
-  place(x: number, y: number, front: boolean): void;
+  readonly place: (x: number, y: number, front: boolean) => void;
 }
 
 /** What the page has of the Earth under it. */

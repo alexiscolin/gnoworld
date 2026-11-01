@@ -35,6 +35,8 @@ export interface ChatPlace {
   home: string;
   /** The universe's worlds, in order. */
   worlds: readonly { slug: string; name: string; href: string }[];
+  /** Under the dock's width the chat stays a block of the page, and never takes it: the Earth's globe is what its page shows. */
+  inPage?: boolean | undefined;
 }
 
 /** What Who's here does: where the chat has an info panel it takes the reader to the people in it, closing the thread that
@@ -150,6 +152,9 @@ const DOCKABLE = "(min-width: 1280px)";
 const threadAside = (threads: ChatScreenProps["threads"]) =>
   "threaded" in threads.view && threads.view.threaded ? <>{threads.aside}</> : undefined;
 
+// Under the dock's width the chat takes the page, unless the place keeps it a block of its own.
+const takesPage = (dockable: boolean, { inPage }: ChatPlace) => !dockable && inPage !== true;
+
 export function ChatScreen({
   place,
   title,
@@ -167,7 +172,7 @@ export function ChatScreen({
 }: ChatScreenProps) {
   const dockable = useMedia(DOCKABLE);
   const [params, setParams] = useSearchParams();
-  const full = !dockable || asksFull(params);
+  const full = takesPage(dockable, place) || asksFull(params);
   const screenRef = useRef<HTMLDivElement>(null);
   const compact = useCompact(screenRef, NARROW);
   const navigate = useNavigate();

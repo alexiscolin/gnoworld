@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, near } from "./geometry.ts";
-import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
+import { countShifts, loseContext, restoreContext, running, shifted, stats } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
@@ -319,22 +319,14 @@ test.describe("a window that loads the scene by itself, under the plate's breakp
 
   test("keeps the globe's room from the first paint: the plate does not jump", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.addInitScript(() => {
-      Reflect.set(globalThis, "__shift", 0);
-      new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const { value, hadRecentInput } = entry as unknown as { value: number; hadRecentInput: boolean };
-          if (!hadRecentInput) Reflect.set(globalThis, "__shift", Number(Reflect.get(globalThis, "__shift")) + value);
-        }
-      }).observe({ type: "layout-shift", buffered: true });
-    });
+    await countShifts(page);
     await page.goto(EARTH);
     await hydrated(page);
     const before = await box(page, "h1");
     await painted(page);
     const after = await box(page, "h1");
     expect(after.y).toBe(before.y);
-    expect(await page.evaluate(() => Number(Reflect.get(globalThis, "__shift")))).toBeLessThan(0.1);
+    expect(await shifted(page)).toBeLessThan(0.1);
   });
 });
 
