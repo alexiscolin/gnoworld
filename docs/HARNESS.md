@@ -371,7 +371,7 @@ costs context in every session.
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
-| `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the last `The dream of <sha>` row of `docs/review-log.md`; it reads `main` with read-only git and blocks nothing) |
+| `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
 | `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |

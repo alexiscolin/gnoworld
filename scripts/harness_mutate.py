@@ -1151,6 +1151,9 @@ def seven_mutants():
         ("\tprintf '%s\\n' \"$sha\" | grep -Eqx '[0-9a-f]{7,40}' || continue\n", "", "reads an older row's word as a commit only when it is hexadecimal"),
         ("\tgit -C \"$dir\" merge-base --is-ancestor \"$oid\" \"refs/heads/main\" 2>/dev/null || continue\n", "", "lets an older row cover only a commit main contains"),
         (" | tail -n 20)", ")", "reads the last twenty rows of the log, no more"),
+        ("known=$(printf '%s\\n%s\\n' \"$rows\" \"$others\" |", "known=$(printf '%s\\n' \"$rows\" |", "counts the rows of a branch main has not got (F4063)"),
+        ("\t[ -n \"$ref\" ] || continue\n", "", "reads no index for want of a branch"),
+        ("|| cannot \"git could not list the branches\"", "|| :", "says it could not tell with branches it cannot list"),
     ))
     t = "deploy/test.sh"
     yield from swaps(t, "deploy/test.sh", (

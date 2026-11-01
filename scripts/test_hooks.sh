@@ -5843,9 +5843,9 @@ fi
 if part dream_due; then
 # scripts/dream_due.sh: the SessionStart hook that says a dream is due when a slice was merged with no dream recorded (the dream of 2026-11-01,
 # item 15 of slice 7's answers). It runs outside the sandbox as stop_gate.sh does: git, read-only, and text tools, no gate and no repository
-# code; it blocks no session (exit 0 always), and a read that fails says it could not tell. It reads `main`, never the worktree:
-# `git show main:docs/review-log.md`, the last row `The dream of <sha>` (dream.md's step 5 writes it), and a dream is due when main has a
-# merge after that sha. Its wiring in .claude/settings.json is Alexis's (apply-7s.sh); no test here reads it.
+# code; it blocks no session (exit 0 always), and a read that fails says it could not tell. It reads committed rows alone, never the worktree:
+# main's docs/review-log.md, the last row `The dream of <sha>` (dream.md's step 5 writes it), and the rows of the branches main has not got
+# (F4063); a dream is due when main has a merge after those shas. Its wiring in .claude/settings.json is Alexis's (apply-7s.sh); no test here reads it.
 dds="$here"/dream_due.sh
 [ -f "$dds" ] || fail "scripts/dream_due.sh does not exist: nothing says a dream is due"
 r="$t/dream"
@@ -5879,12 +5879,12 @@ merge_slice two
 m2=$(git -C "$r" rev-parse HEAD)
 ask
 printf '%s\n' "$out" | grep -qi "dream" && printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh did not say a dream is due after a merge past the last dream: $out"
-# Main, never the worktree: another branch holds the row of the second merge, and so does the file on disk.
-git -C "$r" checkout -q -b other && recorded "$m2" && git -C "$r" checkout -q main
+# Committed rows alone: the row of the second merge on the disk, and staged, covers nothing.
 printf '| 2026-11-02 | The dream of %s (uncommitted) | x |\n' "$(git -C "$r" rev-parse --short=8 "$m2")" >>"$r/docs/review-log.md"
+git -C "$r" add docs/review-log.md
 ask
-printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh read the row of another branch or of the work tree, not main's: $out"
-git -C "$r" checkout -q docs/review-log.md
+printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh read a row of the work tree or the index, not a committed one: $out"
+git -C "$r" reset -q && git -C "$r" checkout -q docs/review-log.md
 # Read-only: the index and the work tree are as they were.
 touch "$t/dream.mark"
 before_index=$(cksum <"$r/.git/index") && before_status=$(git -C "$r" status --porcelain)
@@ -5927,6 +5927,7 @@ ask
 printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell for a commit main does not contain: $out"
 printf '%s\n' "$out" | grep -qi "is due" && fail "dream_due.sh counted merges from a commit main does not contain: $out"
 git -C "$r" reset -q --hard "$keep"
+git -C "$r" branch -qD unmerged # its log holds main's rows, which a branch main has not got would keep covering in the cases below
 printf 'note\n' >"$r/note.md" && git -C "$r" add note.md && git -C "$r" commit -qm "a plain commit after the last merge" && recorded "$(git -C "$r" rev-parse HEAD)"
 ask
 [ -z "$out" ] || fail "dream_due.sh said a dream is due though the plain commit after main's last merge has its dream: $out"
@@ -5965,6 +5966,28 @@ printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not s
 mkdir -p "$t/norepo"
 ask "$t/norepo"
 printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell outside a repository: $out"
+# A dream's row lands on the next slice's branch and reaches main only with the next merge, itself past the sha, so main alone said a dream was
+# due in every session (F4063): a committed row of a branch main has not got counts, when main contains its sha, and covers no later merge.
+merge_slice three
+m3=$(git -C "$r" rev-parse HEAD)
+git -C "$r" checkout -q -b eight && recorded "$m3" && git -C "$r" checkout -q main
+ask
+[ -z "$out" ] || fail "dream_due.sh said a dream is due though a branch main has not got holds the row of main's last merge (F4063): $out"
+merge_slice four
+ask
+printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let a branch's row cover a merge after its sha: $out"
+# Such a row is read as hostile as main's own: a word git reads as a name, and a commit main does not contain, cover nothing.
+git -C "$r" checkout -q -b nine
+printf '| 2026-11-06 | The dream of main (hostile) | x |\n| 2026-11-06 | The dream of %s (never merged) | x |\n' "$(git -C "$r" rev-parse --short=8 "$um")" >>"$r/docs/review-log.md"
+git -C "$r" commit -qam "hostile rows on a branch" && git -C "$r" checkout -q main
+ask
+printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let a hostile row of a branch cover main's merges: $out"
+# Branches it cannot list: it could not tell.
+mkdir -p "$t/dreambin"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = for-each-ref ] && exit 1; done\nexec "%s" "$@"\n' "$(command -v git)" >"$t/dreambin/git"
+chmod +x "$t/dreambin/git"
+out=$(PATH="$t/dreambin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$dds" </dev/null 2>&1)
+printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell with branches it cannot list: $out"
 # What it may run: git read-only and text tools, nothing of the repository, no gate.
 body=$(grep -v '^[[:space:]]*#' "$dds")
 printf '%s\n' "$body" | grep -qE '(^|[^a-z_.-])(check\.sh|node|pnpm|npm|npx|python3?|ruby|perl|make|curl|wget)([^a-z_-]|$)' && fail "dream_due.sh runs a tool that is neither git nor a text tool"
