@@ -63,7 +63,7 @@ nothing about a person.
 
 A social app that is on chain and decentralized, highly graphical, and integrated with
 gno.land in a way that serves gno.land. It is a place for work and community, with fluid,
-"interplanetary" navigation. Explicitly not a game.
+"interplanetary" navigation. Explicitly not a game: no money to win and no competition, with mechanics of discovery (ADR-0002 §10, 2026-11-01).
 
 ### gno.world today
 

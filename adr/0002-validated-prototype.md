@@ -284,6 +284,8 @@ archives are not indexed pages (question 17).
 
 ### 3. The universe at scale
 
+Amended by §10.
+
 The chain may hold millions of realms. The map must stay readable and light. Realms nobody
 uses must not crowd it. Good ones must stand out, and every realm must stay reachable. The
 rules come from seedfall's sky, adapted: they are seedfall's ADR-002 §2.2 and §2.6, and its
@@ -1402,6 +1404,22 @@ Its findings are fixed before any other lens runs.
 - slice 12: `posthog-js`.
 
 k6 runs as a binary or an image, not as a package.
+
+### 10. What slice 7's validation changes (Alexis, 2026-11-01)
+
+This section overrides the text above where they differ. The reasons and the numbers are in `docs/decisions.md`.
+
+- **A world is a product, not a realm.** One planet and one room for `gnogolf`; its realms and versions sit under it, shown as you zoom in, with no room of their own. A namespace is a star. A hub with no realm is a world. The grouping reads paths, and a hub's `realms` list corrects it. This replaces "every realm is a world" (Summary, "A word on words", §3).
+- **A world evolves with its use, little by little.** Two gauges: a vitality that remembers and moves a few percent a day, and the people present. Its stages run from seed through rest, living, inhabited and busy to beacon. Each class shows a stage its own way: a sign keeps its meaning, where it shows and how it grows, and varies its form.
+- **Dust comes after a year.** A world turns to dust after one year with no transaction, no message and no import, coming apart over the last three months, and it becomes a planet again at the first sign of life, with the same look. A hub never does. This replaces "realms without signals are dust" (§3).
+- **New realms.** A new family is a seed until its first visit, or 7 days; a new version wakes its planet instead. Nothing is sorted or hidden by its name.
+- **Two layers.** Signs always mean real data. The scenery is generative art from a cell's position, unbounded, tied to no data, and never imitates a sign.
+- **Rising worlds.** A world is rising against its own last 14 days, so a small world can stand out. The order is the Earth, trends, rising, seeds.
+- **Auroras** mean a run of calls, then fade; they are never always on.
+- **The Earth** stays one place, the general chat, with one Moon; its side rooms are points on the globe.
+- **Dependencies are not positions.** A world stays with its namespace's star; its dependencies show as lines on hover.
+- **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
+- **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
 
 ## Consequences
 
