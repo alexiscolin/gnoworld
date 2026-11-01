@@ -651,6 +651,22 @@ try:
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
             ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
+            # The scene: core, the store and three; never React, the design system, a feature or a route (docs/ARCHITECTURE.md).
+            ("scene/__probe__/scene_three.ts", uses(name="Color", path="three"), None),
+            ("scene/__probe__/scene_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("scene/__probe__/scene_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), None),
+            ("scene/__probe__/scene_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
+            ("scene/__probe__/scene_react_dom.ts", uses(name="flushSync", path="react-dom"), "no-restricted-imports"),
+            ("scene/__probe__/scene_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
+            ("scene/__probe__/scene_zustand_react.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
+            ("scene/__probe__/scene_zustand.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
+            ("scene/__probe__/scene_lib.ts", uses(name="savesData", path="../../lib/saveData.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("scene/__probe__/scene_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
+            ("scene/__probe__/scene_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
+            ("scene/__probe__/scene_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
         ]
         lint_cases(app, src, "app folders")
         os.remove(f"{src}/probe_root_fetch.ts")

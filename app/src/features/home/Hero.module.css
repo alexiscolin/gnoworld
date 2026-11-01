@@ -98,8 +98,8 @@
   .worlds {
     /* layout: the list stands off the hero above it when the page holds them in a column */
     margin-block-start: var(--space-s);
-    /* The ticker is fixed over the foot of the page: the last link scrolls above it. */
-    padding-block-end: var(--space-xl);
+    /* The ticker is fixed over the foot of the page, and "View in space" over a phone's: the last link scrolls above them. */
+    padding-block-end: calc(var(--space-xl) + var(--control-m) + var(--space-s));
   }
 
   /* The cosmos' worlds as plain links: no bullet, no link colour, the design system's type. */

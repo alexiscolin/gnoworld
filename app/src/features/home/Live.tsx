@@ -1,6 +1,7 @@
 // The hero's live line (frames 1 to 8): the prices and the latest block, both from markets.json, read once as the page loads in
 // the browser, never in the build, so the page written holds states and no number. The block is the default universe's, read by the
 // server's timer: the browser asks no chain. No poll and no timer left; a page that leaves ends the read.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Cluster } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
 import { readMarkets, type MarketsRead } from "../../lib/api/markets.ts";
@@ -9,9 +10,8 @@ import styles from "./Live.module.css";
 import { MarketsRow } from "./MarketsRow.tsx";
 
 // The line is hidden under 900 px (Live.module.css), where a read would show nothing; a window that widens reads then.
-const PHONE = "(max-width: 899px)";
 const phone = (): MediaQueryList | undefined =>
-  typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(PHONE) : undefined;
+  typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(PHONE_QUERY) : undefined;
 function useWide(): boolean {
   // Not wide only where the browser says so: the build, which has no window, and a browser without matchMedia, read.
   const [wide, setWide] = useState(() => phone()?.matches !== true);

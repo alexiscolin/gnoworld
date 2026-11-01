@@ -50,3 +50,7 @@ export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
 export { placeAt, placesOf, type Place, type PlaceKind, type PlaceSource } from "./places/places.ts";
+export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState } from "./frame/rate.ts";
+export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
+export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
+export { PHONE_QUERY } from "./frame/phone.ts";

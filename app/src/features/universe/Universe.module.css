@@ -1,0 +1,76 @@
+/* The canvas lies under the page, the body's own colour around it until the space opens, and it fills the window. */
+@layer components {
+  .canvas {
+    position: fixed;
+    inset: 0;
+    /* raw: under the page's text, over the body's colour */
+    z-index: -1;
+    inline-size: 100%;
+    block-size: 100%;
+    visibility: hidden;
+  }
+
+  .canvas[data-scene="on"] {
+    visibility: visible;
+  }
+
+  /* The space opens like an iris (ADR-0002, "Loader"; frames 1 and 2). On the canvas alone: the text comes first. An animation and not
+     a kept clip, which would cost the compositor a mask at every frame. */
+  .canvas[data-opened] {
+    /* raw: 1.5 s, from the frames; the curve is the design system's --ease-emphasized, which tokens.css does not hold yet */
+    animation: iris 1.5s cubic-bezier(0.7, 0, 0.2, 1);
+  }
+
+  @keyframes iris {
+    from {
+      /* raw: nothing yet, in the unit of the end */
+      clip-path: circle(0vmax at 50% 50%);
+    }
+
+    to {
+      /* raw: half a window's diagonal is 71vmax at most, so this passes the corners */
+      clip-path: circle(72vmax at 50% 50%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .canvas[data-opened] {
+      animation: none;
+    }
+  }
+
+  /* Above the views' bar and the ticker on a phone (Ticker.module.css), in the gutter, within reach. */
+  .offer,
+  .status {
+    position: fixed;
+    /* raw: the bar's 44 px, the ticker's 34 px and three steps of space */
+    inset-block-end: calc(78px + 3 * var(--space-s));
+    inset-inline-end: var(--space-s);
+  }
+
+  /* The live region stands empty on the page, so a reader hears it fill. */
+  .status {
+    /* layout: a paragraph with no margin of its own */
+    margin-block: 0;
+    /* raw: two short lines, so it stays clear of the hero's markets at 900 px */
+    max-inline-size: 24ch;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .status:not(:empty) {
+    padding: var(--space-3xs) var(--space-2xs);
+    border-radius: var(--radius-s);
+    background: var(--color-surface);
+  }
+
+  /* Level with the hero's foot, left of the rail's column (frames 4 and 17: 118 px wide, 25 from the edge). */
+  @media (min-width: 900px) {
+    .offer,
+    .status {
+      inset-block-end: var(--space-2xl);
+      /* raw: the rail's 143 px and a step of space */
+      inset-inline-end: calc(143px + var(--space-m));
+    }
+  }
+}

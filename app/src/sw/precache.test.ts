@@ -35,6 +35,18 @@ test("the precache list holds the build's hashed files and its shell, as the sit
   ]);
 });
 
+// ADR-0002 §8, row 10: nothing of three loads on a phone before "View in space", and the worker runs on a phone too.
+test("the scene's chunk stays out of the list: the worker would fetch it for a phone that never asked", () => {
+  expect(precacheList(["assets/scene-Bx3f9a1Q.js", "assets/scene-CwX_9-a2.js"])).toEqual([]);
+});
+
+test("only the scene's own chunk stays out: a name that holds the word is precached", () => {
+  expect(precacheList(["assets/sceneries-Bx3f9a1Q.js", "assets/Hero-scene-CwX_9-a2.js"])).toEqual([
+    "/assets/Hero-scene-CwX_9-a2.js",
+    "/assets/sceneries-Bx3f9a1Q.js",
+  ]);
+});
+
 test("a page is its folder's index.html at the folder's path; the home is the root", () => {
   expect(precacheList(["index.html", "w/bubble/index.html", "a/b/c/index.html"])).toEqual(["/", "/a/b/c", "/w/bubble"]);
 });
