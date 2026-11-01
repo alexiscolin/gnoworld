@@ -52,7 +52,7 @@ const without = (page: Page, urls: readonly string[], skip: string) =>
       const imported = new Set([...edges.values()].flat());
       const kept = new Set<string>();
       const walk = (url: string) => {
-        if (kept.has(url) || !edges.has(url)) return;
+        if (kept.has(url) || !edges.has(url) || url === skipped) return;
         kept.add(url);
         for (const next of edges.get(url) ?? []) walk(next);
       };
