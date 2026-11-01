@@ -28,9 +28,9 @@ export interface Shell {
 
 /** Far to near. The eye is always inside the last, so its motes pass by. */
 export const SHELLS: readonly Shell[] = [
-  { salt: 11, side: 6, size: 1600, perCell: 90, steep: 6, near: 0.05, far: 2.5, point: 3, flare: 0.6, wind: 0 },
-  { salt: 12, side: 6, size: 260, perCell: 90, steep: 5, near: 0.1, far: 2.5, point: 3, flare: 0.8, wind: 0 },
-  { salt: 13, side: 6, size: 60, perCell: 22, steep: 4, near: 0.3, far: 2.5, point: 3.2, flare: 1, wind: 0 },
+  { salt: 11, side: 6, size: 1600, perCell: 90, steep: 7, near: 0.05, far: 2.5, point: 3, flare: 0.6, wind: 0 },
+  { salt: 12, side: 6, size: 260, perCell: 90, steep: 6, near: 0.1, far: 2.5, point: 3, flare: 0.8, wind: 0 },
+  { salt: 13, side: 6, size: 60, perCell: 22, steep: 5, near: 0.3, far: 2.5, point: 3.2, flare: 1, wind: 0 },
 ];
 export const MOTES: Shell = {
   salt: 14,

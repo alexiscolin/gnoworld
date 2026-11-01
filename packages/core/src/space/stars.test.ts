@@ -109,6 +109,11 @@ describe("StarCells", () => {
     expect(seen.high.lit / seen.high.all).toBeGreaterThan((seen.low.lit / seen.low.all) * 1.3);
   });
 
+  it("draws no spike and no glow on its brightest: those are a namespace's", () => {
+    expect(MOTES.flare).toBeLessThanOrEqual(1);
+    for (const shell of SHELLS) expect(shell.flare).toBeLessThanOrEqual(1);
+  });
+
   it("makes bright stars rare: the steep law's many faint and few bright", () => {
     const all = Array.from({ length: 64 }, (_, at) => [...lights(written(cellOf(at, 0, 0)).tints)])
       .flat()

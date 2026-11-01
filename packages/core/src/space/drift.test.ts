@@ -80,20 +80,21 @@ describe("turnAt", () => {
     expect(turn(47.5)).toEqual(turn(47.5));
   });
 
-  it("looks about 10 degrees each way, a quarter of its 150 s out", () => {
-    expect(turn(37.5).yaw).toBeCloseTo(0.175, 6);
-    expect(turn(112.5).yaw).toBeCloseTo(-0.175, 6);
+  it("goes round a circle from straight ahead, a quarter of its 150 s to the side", () => {
+    expect(turn(37.5).yaw).toBeCloseTo(0.26, 6);
+    expect(turn(37.5).pitch).toBeCloseTo(0.26, 6);
+    expect(turn(75).yaw).toBeCloseTo(0, 6);
+    expect(turn(75).pitch).toBeCloseTo(0.52, 6);
+    expect(turn(150).pitch).toBeCloseTo(0, 6);
   });
 
-  it("looks up and down less, on a period that never meets the other", () => {
-    expect(turn(27.5).pitch).toBeCloseTo(0.044, 6);
-    expect(Math.max(...Array.from({ length: 600 }, (_, at) => Math.abs(turn(at).pitch)))).toBeLessThanOrEqual(0.044);
-  });
-
-  it("pans about as the video does, half a degree a second at most, and never jumps", () => {
+  it("never stops: about the video's pan at every second of its way round", () => {
     fc.assert(
       fc.property(fc.double({ min: 0, max: 86_400, noNaN: true }), (seconds) => {
-        expect(Math.abs(turn(seconds + 1).yaw - turn(seconds).yaw)).toBeLessThanOrEqual(0.5 * DEGREE);
+        const [here, next] = [turn(seconds), turn(seconds + 1)];
+        const moved = Math.hypot(next.yaw - here.yaw, next.pitch - here.pitch);
+        expect(moved).toBeGreaterThan(0.55 * DEGREE);
+        expect(moved).toBeLessThan(0.7 * DEGREE);
       }),
     );
   });

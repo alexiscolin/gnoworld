@@ -3,17 +3,16 @@
 // same second is the same place.
 import type { Point } from "./cell.ts";
 
-/** Where the eye rests on arrival: of the spots tried, amber wisps up the middle of the view, and near-black under the hero. */
-export const HOME: Point = { x: 2900, y: 4400, z: -1800 };
+/** Where the eye rests on arrival: of the spots tried, an amber cloud right of the middle, and near-black under the hero. */
+export const HOME: Point = { x: 3300, y: 4100, z: -2200 };
 
 const GLIDE = 14;
 const SETTLE_SECONDS = 2.5;
 const CRUISE = 0.6;
-// A slow look to each side and a smaller one up and down, in radians and seconds: 0.4° a second at most, about the video's pan.
-const YAW = 0.175;
-const YAW_SECONDS = 150;
-const PITCH = 0.044;
-const PITCH_SECONDS = 110;
+// The look about, a slow circle from straight ahead, so its speed never falls to nothing: about 15 px a second at 1728 px wide, the
+// video's pan.
+const TURN = 0.26;
+const TURN_SECONDS = 150;
 // A unit, a little off the view's axis: straight ahead nothing crosses the frame.
 const HEADING = { x: 0.31, y: 0.09, z: -0.9463 };
 
@@ -27,6 +26,7 @@ export function driftAt(out: { x: number; y: number; z: number }, seconds: numbe
 
 /** The way the view looks, `seconds` after it arrived, into `out`, in radians. */
 export function turnAt(out: { yaw: number; pitch: number }, seconds: number): void {
-  out.yaw = YAW * Math.sin((2 * Math.PI * seconds) / YAW_SECONDS);
-  out.pitch = PITCH * Math.sin((2 * Math.PI * seconds) / PITCH_SECONDS);
+  const angle = (2 * Math.PI * seconds) / TURN_SECONDS;
+  out.yaw = TURN * Math.sin(angle);
+  out.pitch = TURN * (1 - Math.cos(angle));
 }

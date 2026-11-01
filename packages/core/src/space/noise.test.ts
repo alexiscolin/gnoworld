@@ -22,6 +22,13 @@ describe("tilingNoise", () => {
     expect(cube.reduce((sum, level) => sum + level, 0)).toBe(522268);
   });
 
+  // At 24 a period of 16 would leave under two voxels a wave: a magnified read would show the voxels, in straight lines.
+  it("stops at two voxels a wave", () => {
+    const cube = tilingNoise(24);
+    expect([...cube.slice(0, 8)]).toEqual([128, 140, 143, 136, 128, 124, 128, 128]);
+    expect(cube.reduce((sum, level) => sum + level, 0)).toBe(1762618);
+  });
+
   it("uses most of its range, around a middle grey", () => {
     const noise = tilingNoise(SIDE);
     const levels = new Set(noise);

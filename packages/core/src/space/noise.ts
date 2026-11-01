@@ -84,9 +84,10 @@ function addScale(cube: Float32Array, side: number, period: number): void {
   }
 }
 
-/** A `side`³ cube of levels, x first; its opposite faces meet. The same cube each time. */
+/** A `side`³ cube of levels, x first; its opposite faces meet. The same cube each time. Its finest scale stays two voxels a wave and
+ * more: finer, and a magnified read shows the voxels themselves, in straight lines. */
 export function tilingNoise(side: number): Uint8Array {
   const cube = new Float32Array(side ** 3);
-  for (let period = COARSEST; period < side; period *= 2) addScale(cube, side, period);
+  for (let period = COARSEST; period * 2 <= side; period *= 2) addScale(cube, side, period);
   return Uint8Array.from(cube, (level) => Math.round(clamp01(level * CONTRAST + 0.5) * 255));
 }
