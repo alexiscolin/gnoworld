@@ -16,7 +16,34 @@ const three = vi.hoisted(() => ({
   create: vi.fn<(canvas: unknown, antialias: boolean) => unknown>(),
 }));
 
+const earth = vi.hoisted(() => ({
+  made: [] as { halved: () => boolean; moved: () => void }[],
+  show: vi.fn<(place: unknown, said: () => void) => void>(),
+  resize: vi.fn<(width: number, height: number) => void>(),
+  tick: vi.fn<(seconds: number) => void>(),
+  restored: vi.fn<() => void>(),
+  dispose: vi.fn<() => void>(),
+  stats: vi.fn<() => unknown>(),
+  arriving: false,
+}));
+
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
+vi.mock("./earth/view.ts", () => ({
+  EarthView: class {
+    constructor(device: { halved: () => boolean; moved: () => void }) {
+      earth.made.push(device);
+    }
+    get arriving() {
+      return earth.arriving;
+    }
+    show = earth.show;
+    resize = earth.resize;
+    tick = earth.tick;
+    restored = earth.restored;
+    dispose = earth.dispose;
+    stats = earth.stats;
+  },
+}));
 
 const media = new Map<string, EventTarget & { matches: boolean; media: string }>();
 const query = (text: string) => {
@@ -71,6 +98,8 @@ beforeEach(() => {
   observed = undefined;
   observers = 0;
   clock = new FakeClock(60);
+  earth.made.length = 0;
+  earth.arriving = false;
   three.create.mockReturnValue(three.renderer);
   canvas = document.createElement("canvas");
   sized(canvas, 1280, 800);
@@ -502,4 +531,103 @@ it("reads three's own counters for the journeys", () => {
   expect(scene.stats()).toMatchObject({ calls: 3, geometries: 4, textures: 5, tier: "low", probing: false });
   expect(scene.stats().frames).toBeGreaterThan(0);
   scene.dispose();
+});
+
+describe("the Earth", () => {
+  const PLACE = { x: 960, y: 561, radius: 321 };
+  const said = () => undefined;
+
+  it("goes where the page says, and tells the page how it went", () => {
+    const scene = startScene(options(), clock);
+    scene.earth(PLACE, said);
+    expect(earth.show).toHaveBeenCalledWith(PLACE, said);
+    scene.dispose();
+  });
+
+  it("takes its maps at full size on a computer at High", () => {
+    startScene(options(), clock).dispose();
+    expect(earth.made[0]?.halved()).toBe(false);
+  });
+
+  it("takes them halved where memory is short: a touch screen, or a device found slow", () => {
+    query(TOUCH).matches = true;
+    startScene(options(), clock).dispose();
+    query(TOUCH).matches = false;
+    startScene(options({ remembered: "low" }), clock).dispose();
+    expect(earth.made.map(({ halved }) => halved())).toEqual([true, true]);
+  });
+
+  it("takes them halved once the probe has found the device slow", () => {
+    clock = new FakeClock(40);
+    const scene = startScene(options(), clock);
+    expect(earth.made[0]?.halved()).toBe(false);
+    clock.run(2100);
+    expect(scene.stats().tier).toBe("low");
+    expect(earth.made[0]?.halved()).toBe(true);
+    scene.dispose();
+  });
+
+  it("is told the buffer's size before its first frame", () => {
+    const scene = startScene(options(), clock);
+    expect(earth.resize).toHaveBeenLastCalledWith(1280, 800);
+    scene.dispose();
+  });
+
+  it("moves with the frames, in seconds since the scene began", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    frames(4, 100);
+    const [first, last] = [earth.tick.mock.calls[0]?.[0] ?? 0, earth.tick.mock.lastCall?.[0] ?? 0];
+    expect(last - first).toBeGreaterThan(0.2);
+    expect(last - first).toBeLessThan(0.5);
+    scene.dispose();
+  });
+
+  it("owes a frame when it moved between frames: a page at rest still draws it", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    query(MOTION).matches = true;
+    query(MOTION).dispatchEvent(new Event("change"));
+    frames(3, 16);
+    three.renderer.render.mockClear();
+    earth.made[0]?.moved();
+    frames(2, 16);
+    expect(three.renderer.render).toHaveBeenCalledTimes(1);
+    scene.dispose();
+  });
+
+  it("holds the full rate while it arrives, then lets it go", () => {
+    earth.arriving = true;
+    const scene = startScene(options({ remembered: "low" }), clock);
+    earth.made[0]?.moved();
+    frames(3, 16);
+    three.renderer.render.mockClear();
+    frames(6, 16);
+    expect(three.renderer.render.mock.calls.length).toBeGreaterThanOrEqual(5);
+    earth.arriving = false;
+    frames(2, 16);
+    three.renderer.render.mockClear();
+    frames(6, 16);
+    expect(three.renderer.render.mock.calls.length).toBeLessThanOrEqual(4);
+    scene.dispose();
+  });
+
+  it("loads its maps again with a restored context", () => {
+    const scene = startScene(options(), clock);
+    canvas.dispatchEvent(new Event("webglcontextlost"));
+    expect(earth.restored).not.toHaveBeenCalled();
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(earth.restored).toHaveBeenCalledTimes(1);
+    scene.dispose();
+  });
+
+  it("goes with the scene", () => {
+    startScene(options(), clock).dispose();
+    expect(earth.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports itself to the journeys", () => {
+    earth.stats.mockReturnValue({ radius: 321 });
+    const scene = startScene(options(), clock);
+    expect(scene.stats().earth).toEqual({ radius: 321 });
+    scene.dispose();
+  });
 });

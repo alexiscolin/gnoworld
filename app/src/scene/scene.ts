@@ -3,6 +3,7 @@
 import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
+import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { createRenderer } from "./renderer.ts";
 import { MOTION, watchPage, watchScreen } from "./watch.ts";
@@ -25,6 +26,8 @@ export interface SceneOptions {
 
 export interface Scene {
   cover(covered: boolean): void;
+  /** Stands the Earth in `place`, or takes it away, and says how it goes. */
+  earth(place: Circle | undefined, said: (state: EarthState) => void): void;
   dispose(): void;
   stats(): SceneStats;
 }
@@ -37,6 +40,7 @@ interface SceneStats {
   readonly calls: number;
   readonly geometries: number;
   readonly textures: number;
+  readonly earth: ReturnType<EarthView["stats"]>;
 }
 
 class LiveScene implements Scene {
@@ -47,6 +51,7 @@ class LiveScene implements Scene {
   readonly #stage = new Stage();
   readonly #camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR, FAR);
   readonly #loop: FrameLoop;
+  readonly #earth: EarthView;
   readonly #samples = new Float32Array(PROBE_FRAMES);
   #sampled = 0;
   #tier: Tier;
@@ -54,6 +59,8 @@ class LiveScene implements Scene {
   #covered = false;
   #lost = false;
   #frames = 0;
+  #seconds = 0;
+  #arriving = false;
   #width = 0;
   #height = 0;
   #viewportStale = false;
@@ -71,6 +78,18 @@ class LiveScene implements Scene {
         this.#renderer.dispose();
       },
     });
+    this.#earth = this.#owner.add(
+      new EarthView({
+        renderer: this.#renderer,
+        stage: this.#stage,
+        camera: this.#camera,
+        halved: () => this.#touch || this.#tier === "low",
+        base: import.meta.env.BASE_URL,
+        moved: () => {
+          this.#loop.redraw();
+        },
+      }),
+    );
     this.#applyViewport();
     this.#loop = new FrameLoop(clock, this.#draw);
     this.#owner.add({
@@ -97,6 +116,7 @@ class LiveScene implements Scene {
       this.#lost = now;
       this.#options.onLost(now);
       this.#stopOrGo();
+      if (!now) this.#earth.restored();
     };
     canvas.addEventListener("webglcontextlost", lost(true), { signal });
     canvas.addEventListener("webglcontextrestored", lost(false), { signal });
@@ -104,10 +124,21 @@ class LiveScene implements Scene {
 
   readonly #draw = (delta: number): void => {
     if (this.#viewportStale) this.#applyViewport();
+    this.#seconds += delta / 1000;
+    this.#earth.tick(this.#seconds);
     this.#renderer.render(this.#stage, this.#camera);
     this.#frames += 1;
     if (this.#probing && delta > 0) this.#sample(delta);
+    this.#holdRate();
   };
+
+  // A rate of its own while the Earth arrives: the first seconds are the ones that count.
+  #holdRate(): void {
+    const { arriving } = this.#earth;
+    if (arriving === this.#arriving) return;
+    this.#arriving = arriving;
+    this.#loop.set({ busy: this.#probing || arriving });
+  }
 
   #sample(delta: number): void {
     this.#samples[this.#sampled] = delta;
@@ -118,7 +149,7 @@ class LiveScene implements Scene {
 
   #judged(verdict: Exclude<ProbeVerdict, "pending">): void {
     this.#probing = false;
-    this.#loop.set({ busy: false });
+    this.#loop.set({ busy: this.#arriving });
     if (verdict === "keep") return;
     this.#tier = "low";
     this.#viewportChanged();
@@ -136,6 +167,7 @@ class LiveScene implements Scene {
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
+    this.#earth.resize(width, height);
   }
 
   readonly #viewportChanged = (): void => {
@@ -158,6 +190,10 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
+  earth(place: Circle | undefined, said: (state: EarthState) => void): void {
+    this.#earth.show(place, said);
+  }
+
   dispose(): void {
     this.#owner.dispose();
   }
@@ -172,6 +208,7 @@ class LiveScene implements Scene {
       calls: render.calls,
       geometries: memory.geometries,
       textures: memory.textures,
+      earth: this.#earth.stats(),
     };
   }
 }
