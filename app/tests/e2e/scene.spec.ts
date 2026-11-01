@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
+import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -9,24 +10,6 @@ const DOOR = /\/assets\/(?:mountUniverse|scene)-/;
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
-
-interface Stats {
-  frames: number;
-  tier: "high" | "low";
-  ratio: number;
-  probing: boolean;
-  calls: number;
-  geometries: number;
-  textures: number;
-}
-
-const stats = (page: Page) =>
-  page.evaluate(() => {
-    const scene: unknown = Reflect.get(globalThis, "__gnoworldScene");
-    return (scene as { stats: () => Stats }).stats();
-  });
-
-const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
 // Frames served by the screen to anyone at all, counted before any of the page's code runs: a second loop hidden in a library
 // shows here, where the scene's own count would not see it.
@@ -143,17 +126,11 @@ test.describe("a computer", () => {
   test("a lost context shows the list, and the scene comes back with its context", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
-    await page.evaluate(() => {
-      const context = document.querySelector("canvas")?.getContext("webgl2");
-      Reflect.set(globalThis, "__lose", context?.getExtension("WEBGL_lose_context"));
-      (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).loseContext();
-    });
+    await loseContext(page);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: "Space is not available here" })).toBeVisible();
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
-    await page.evaluate(() => {
-      (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
-    });
+    await restoreContext(page);
     await running(page);
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
