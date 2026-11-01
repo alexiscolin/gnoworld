@@ -40,12 +40,13 @@ const doc = (imports: string[] = ["gno.land/p/nt/avl/v0"]): string =>
     types: [],
     funcs: [{ type: "", name: "Swap", crossing: true, signature: "", doc: "", params: [], results: [] }],
   });
-const history = (calls: number): string =>
+const pathOf = (variables: Record<string, unknown>): string => String(variables["path"]);
+const history = (calls: number, path: string): string =>
   JSON.stringify({
     data: {
       getTransactions: Array.from({ length: calls }, (_, i) => ({
         block_height: 100 + i,
-        messages: [{ value: { __typename: "MsgCall", caller: i % 2 === 0 ? A : B } }],
+        messages: [{ value: { __typename: "MsgCall", pkg_path: path, caller: i % 2 === 0 ? A : B } }],
       })),
     },
   });
@@ -56,7 +57,7 @@ const chainRoutes = (paths: string[], over: Routes = {}): Routes => ({
   paths: () => paths.join("\n"),
   doc: () => doc(),
   file: () => `[addpkg]\n  creator = "${A}"\n  height = 5\n`,
-  indexer: () => history(2),
+  indexer: ({ variables }) => history(2, pathOf(variables)),
   eval: (expression) => named(expression === evalNameOf(A) ? "alexis" : null),
   ...over,
 });
@@ -325,10 +326,11 @@ describe("runWorlds", () => {
 
     it("keeps the earlier counts of a realm the indexer cannot answer now, and updates the others", async () => {
       const file = fresh();
-      await run(chainRoutes([POOL, ROUTER], { indexer: () => history(4) }), { file });
+      await run(chainRoutes([POOL, ROUTER], { indexer: ({ variables }) => history(4, pathOf(variables)) }), { file });
       await run(
         chainRoutes([POOL, ROUTER], {
-          indexer: ({ variables }) => (Object.values(variables).includes(POOL) ? history(7) : new TypeError("down")),
+          indexer: ({ variables }) =>
+            Object.values(variables).includes(POOL) ? history(7, POOL) : new TypeError("down"),
         }),
         { file },
       );

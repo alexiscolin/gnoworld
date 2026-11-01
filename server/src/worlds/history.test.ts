@@ -11,7 +11,7 @@ const CALLER_B = "g1kfj7rq3cjqkael8rslpw4y6rlelhev4h0fswcx";
 
 const call = (height: number, caller: string) => ({
   block_height: height,
-  messages: [{ value: { __typename: "MsgCall", caller } }],
+  messages: [{ value: { __typename: "MsgCall", pkg_path: PATH, caller } }],
 });
 const deploy = (height: number, caller: string) => ({
   block_height: height,
@@ -44,8 +44,8 @@ describe("readHistory", () => {
       {
         block_height: 10,
         messages: [
-          { value: { __typename: "MsgCall", caller: CALLER_A } },
-          { value: { __typename: "MsgCall", caller: CALLER_A } },
+          { value: { __typename: "MsgCall", pkg_path: PATH, caller: CALLER_A } },
+          { value: { __typename: "MsgCall", pkg_path: PATH, caller: CALLER_A } },
           { value: { __typename: "MsgRun", caller: CALLER_B } },
           { value: { __typename: "MsgSend" } },
         ],
