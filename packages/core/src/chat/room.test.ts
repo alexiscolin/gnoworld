@@ -73,6 +73,33 @@ describe("concerns: the room a message is about", () => {
   });
 });
 
+// 7f2: the speaker's declared country, a client's tag of our own beside +gnoworld/edit. 7j sends it, with the opt-in; a line only reads it,
+// and a page's other client may write anything there.
+describe("lineOf: the country a line declares", () => {
+  const withCountry = (value: string) =>
+    read(`@msgid=a1;time=${T0};account=${ALICE};+gnoworld/country=${value} :${ALICE}!u@h PRIVMSG #bubble :hi`);
+
+  test("reads two capitals", () => {
+    expect(lineOf(withCountry("FR"), "#bubble")).toMatchObject({ country: "FR" });
+  });
+
+  test("carries none when the line declares none", () => {
+    expect(lineOf(said("a1", T0, "hi"), "#bubble")).not.toHaveProperty("country");
+  });
+
+  test("reads only our own client tag: a server tag of that name is another's", () => {
+    const line = read(`@msgid=a1;time=${T0};account=${ALICE};country=FR :${ALICE}!u@h PRIVMSG #bubble :hi`);
+    expect(lineOf(line, "#bubble")).not.toHaveProperty("country");
+  });
+
+  test.each(["fr", "F", "FRA", "F1", "<b>", "FR\\s", "\\:", "", "ЕР"])(
+    "keeps none for the hostile value %j",
+    (value) => {
+      expect(lineOf(withCountry(value), "#bubble")).not.toHaveProperty("country");
+    },
+  );
+});
+
 describe("lineOf: a room's line from Ergo's message", () => {
   test("takes a PRIVMSG to the room, with its id, time, author and account", () => {
     expect(lineOf(said("a1", T0, "hello world"), "#bubble")).toStrictEqual(line("a1", T0, "hello world"));
