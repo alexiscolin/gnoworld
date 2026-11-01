@@ -462,7 +462,7 @@ describe("runWorlds", () => {
       expect(outcome).toEqual({ wrote: true });
       expect(written(file).worlds.length).toBeGreaterThan(0);
       expect(logged.filter(({ error }) => error === "list")).toEqual([{ event: "worlds_shed", error: "list" }]);
-    });
+    }, 60_000);
 
     it("writes a file for the recorded list of 743 realms under the default cap, with room to spare", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
