@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Failure, kindOf, pacer } from "./remote.ts";
+import { abciQuery, Failure, isDown, kindOf, pacer, type Send } from "./remote.ts";
 
 // The shared parts of the worlds job's reads; the reads themselves are tested through each reader.
 describe("kindOf", () => {
@@ -21,5 +21,87 @@ describe("pacer", () => {
     await pace();
     await pace();
     expect(waits).toEqual([250, 250]);
+  });
+});
+
+// The envelope of an abci_query, with hostile bodies: every fault has its own kind, and none lets text out.
+const RPC_URL = "https://rpc.example.org";
+const envelope = (Data: unknown, extra: Record<string, unknown> = {}): Response =>
+  Response.json({ result: { response: { ResponseBase: { Error: null, Data } } }, ...extra });
+const asks = (given: Response | Error, maxBytes = 1024) => {
+  const seen: { url: string; init: RequestInit }[] = [];
+  const send: Send = (url, init) => {
+    seen.push({ url, init });
+    return given instanceof Error ? Promise.reject(given) : Promise.resolve(given);
+  };
+  return { seen, done: abciQuery({ send, rpc: RPC_URL }, { path: "vm/qdoc", data: "x" }, { ms: 1000, maxBytes }) };
+};
+const b64 = (text: string | Uint8Array): string => Buffer.from(text).toString("base64");
+
+describe("abciQuery", () => {
+  it("gives the decoded text of a good answer, asking with a GET and a JSON accept header", async () => {
+    const { seen, done } = asks(envelope(b64("hello")));
+    expect(await done).toBe("hello");
+    expect(seen[0]?.init.method).toBe("GET");
+    expect(new Headers(seen[0]?.init.headers).get("accept")).toBe("application/json");
+    expect(seen[0]?.url.startsWith(`${RPC_URL}/abci_query?`)).toBe(true);
+  });
+
+  it.each([
+    ["a body that is no UTF-8", new Response(new Uint8Array([0xff, 0xfe, 0xfd])), "shape"],
+    ["a body that is no JSON", new Response("<html>bad gateway</html>"), "shape"],
+    ["a body that is a JSON string", Response.json("text"), "shape"],
+    ["a Data that is UTF-8 invalid once decoded", envelope(b64(new Uint8Array([0xff, 0xfe]))), "shape"],
+    ["a Data whose length is no multiple of 4", envelope("abc"), "shape"],
+    ["a Data with a character outside base64", envelope("ab!="), "shape"],
+    ["a Data with a bad character before good ones", envelope("!!AAAAAA"), "shape"],
+    ["a Data with a bad character after good ones", envelope("AAAAAA!!"), "shape"],
+    ["a Data with three padding characters", envelope("A==="), "shape"],
+    ["a Data of the wrong type", envelope(12), "shape"],
+    ["no result", Response.json({}), "shape"],
+    ["a JSON-RPC error", Response.json({ error: { code: -32600, message: "bad" } }), "chain_refused"],
+    ["an error beside a result", envelope(b64("late"), { error: {} }), "chain_refused"],
+    [
+      "a refusal in the response",
+      Response.json({ result: { response: { ResponseBase: { Error: { "@type": "/std.Oops" }, Data: null } } } }),
+      "chain_refused",
+    ],
+    ["a text past the cap", envelope(b64("x".repeat(2000))), "too_large"],
+  ])("gives %s the kind %s", async (_name, given, kind) => {
+    await expect(asks(given).done).rejects.toMatchObject({ kind });
+  });
+
+  it("takes a text of exactly the cap and refuses one byte over", async () => {
+    expect(await asks(envelope(b64("x".repeat(100))), 100).done).toHaveLength(100);
+    await expect(asks(envelope(b64("x".repeat(101))), 100).done).rejects.toMatchObject({ kind: "too_large" });
+  });
+
+  it("takes a Data of one, two or no padding character", async () => {
+    expect(await asks(envelope(b64("a"))).done).toBe("a");
+    expect(await asks(envelope(b64("ab"))).done).toBe("ab");
+    expect(await asks(envelope(b64("abc"))).done).toBe("abc");
+    expect(await asks(envelope(null)).done).toBe("");
+  });
+});
+
+describe("isDown", () => {
+  it.each(["request", "timeout", "status", "rate_limited"] as const)(
+    "says %s is the network or the chain not answering",
+    (kind) => {
+      expect(isDown(kind)).toBe(true);
+    },
+  );
+  it.each([
+    "too_large",
+    "too_many",
+    "not_json",
+    "shape",
+    "chain_refused",
+    "path",
+    "empty",
+    "write",
+    "stopped",
+  ] as const)("says %s is about one read", (kind) => {
+    expect(isDown(kind)).toBe(false);
   });
 });
