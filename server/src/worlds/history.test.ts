@@ -57,6 +57,31 @@ describe("readHistory", () => {
     });
   });
 
+  it("counts only the messages aimed at the realm asked: a transaction bundling calls to two realms adds one call to each", async () => {
+    const rows = [
+      {
+        block_height: 9,
+        messages: [
+          { value: { __typename: "MsgCall", pkg_path: PATH, caller: CALLER_A } },
+          { value: { __typename: "MsgCall", pkg_path: "gno.land/r/b/other", caller: CALLER_B } },
+        ],
+      },
+      {
+        block_height: 12,
+        messages: [{ value: { __typename: "MsgCall", pkg_path: "gno.land/r/b/other", caller: CALLER_B } }],
+      },
+    ];
+    expect(await ask(() => answer(rows)).read()).toEqual({
+      ok: true,
+      history: { calls: 1, callers: 1, lastHeight: 9 },
+    });
+  });
+
+  it("refuses a call message that names no path, for it cannot be tied to the realm asked", async () => {
+    const rows = [{ block_height: 9, messages: [{ value: { __typename: "MsgCall", caller: CALLER_A } }] }];
+    expect(await ask(() => answer(rows)).read()).toEqual({ ok: false, kind: "shape" });
+  });
+
   it("counts a busy realm: 5,000 calls from 300 callers are an answer, not a refusal", async () => {
     const alphabet = "023456789acdefghjklmnpqrstuvwxyz";
     const callers = Array.from(

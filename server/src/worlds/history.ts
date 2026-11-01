@@ -14,7 +14,7 @@ export const HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 const HISTORY_MS = 20_000;
 
 const QUERY =
-  "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { caller } ... on MsgAddPackage { creator } } } } }";
+  "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }";
 
 export interface History {
   /** Calls made to the realm, failed ones included. */
@@ -35,6 +35,7 @@ const Answer = z.object({
           z.object({
             value: z.object({
               __typename: z.string(),
+              pkg_path: z.optional(z.string()),
               caller: z.optional(z.string().check(z.refine(isAddress, { message: "an address" }))),
             }),
           }),
@@ -64,10 +65,13 @@ export async function readHistory(
     );
     const answer = Answer.safeParse(jsonOf(text));
     if (!answer.success) throw new Failure("shape");
+    // A transaction may bundle calls to several realms: only the messages aimed at this path count.
     const calls = answer.data.data.getTransactions.flatMap((row) =>
-      row.messages.flatMap(({ value }) =>
-        value.__typename === "MsgCall" ? [{ height: row.block_height, caller: value.caller }] : [],
-      ),
+      row.messages.flatMap(({ value }) => {
+        if (value.__typename !== "MsgCall") return [];
+        if (value.pkg_path === undefined) throw new Failure("shape");
+        return value.pkg_path === path ? [{ height: row.block_height, caller: value.caller }] : [];
+      }),
     );
     const callers = new Set(calls.flatMap(({ caller }) => (caller === undefined ? [] : [caller])));
     return {
