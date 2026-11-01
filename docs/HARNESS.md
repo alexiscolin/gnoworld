@@ -209,14 +209,16 @@ of 2026-11-01, 4). `check.sh` also sets the soft limit (up or down) of open file
 steps (F2543), saying so when it cannot.
 
 **Two speeds, a merge check only** (`scripts/speeds.py`, slice 7). A change whose every path is on docs/REVIEW.md's tier-3 list (the
-backticked folders of that row: `app/src/features/`, `packages/ui/src/`) runs no StrykerJS; the coverage, the patch's coverage, `prove_fix`
+backticked folders of that row, named one by one: six feature folders and the design system's component folders; a new folder, `chat/`,
+`realms/` and the root files of `packages/ui/src/` are not on it) runs no StrykerJS; the coverage, the patch's coverage, `prove_fix`
 and the stories still run. Any path outside that list, any path of a tier-1 row (login, the CSP, chain reads, roles, the worker, realms,
 the deploy folder, the harness), a table or a list the script cannot read, a path it cannot place (quoted, absolute, rewritten, a link, not
 UTF-8), and a script that fails or prints anything but the word `interface`, run the whole control. `--full`, which `main` requires, is
 always whole.
 
 **A failing merge check goes on** (the dream of 2026-11-01, 5): a failed lane, or a bench refused for the load, no longer stops the
-coverage and StrykerJS in `--merge`; it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
+coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, which fails
+the mutation lane only after StrykerJS has run beside it (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's

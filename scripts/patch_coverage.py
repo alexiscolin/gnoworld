@@ -30,8 +30,11 @@ for line in diff.splitlines():
             start, count = int(m.group(1)), int(m.group(2) or 1)
             changed.setdefault(current, set()).update(range(start, start + count))
 
-with open("coverage/coverage-final.json") as f:
-    report = {os.path.realpath(k): v for k, v in json.load(f).items()}
+try:
+    with open("coverage/coverage-final.json") as f:
+        report = {os.path.realpath(k): v for k, v in json.load(f).items()}
+except OSError as e:  # a coverage run that failed leaves none: Vitest deletes coverage/ and writes no report on failure
+    sys.exit(f"patch_coverage: no coverage report (coverage/coverage-final.json): {e.strerror}; the coverage run failed or did not run")
 
 total = run = 0
 # Tests and configs are never measured (Storybook's config and the tests' setup are of those); nor

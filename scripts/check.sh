@@ -453,6 +453,10 @@ lane_docs() {
 	sh scripts/test_hooks.sh
 }
 
+# A merge check's first phase carries its failure like the others: a journey, a lint or a type error stopped the check before the survivors'
+# run (round 1, reviewer-1-1). The fast gate and --full stop here.
+carried=
+
 # The machine's 1-minute load and its cores, in tenths (scripts/load.py), read as the lanes start, before any of them loads it
 # (and again at the end, if the run is over budget).
 load_start=$(python3 -I scripts/load.py)
@@ -462,7 +466,7 @@ start tests
 start gno
 start docs
 start pictures
-finish ts types tests gno docs pictures
+finish ts types tests gno docs pictures || { $merge || exit 1; carried=1; }
 
 took=$(($(date +%s) - started))
 if ! $full && [ "$took" -gt "$budget" ]; then
@@ -543,8 +547,12 @@ EOF
 	}
 	lane_mutation() {
 		step patch_coverage # 85% of the lines this branch changed
-		python3 -I scripts/patch_coverage.py "$base"
-		[ "$speed" = full ] || return 0 # a change of interface alone runs no StrykerJS
+		# Its failure, or a coverage run that left no report, never stops StrykerJS beside it: the merge check goes on and says every failure
+		# (round 1, reviewer-1-2); the lane still fails, naming this step.
+		patched=0
+		python3 -I scripts/patch_coverage.py "$base" || patched=$?
+		[ "$patched" = 0 ] || $merge || return "$patched" # --full stops here, as before
+		[ "$speed" = full ] || return "$patched" # a change of interface alone runs no StrykerJS
 		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
 		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
@@ -558,6 +566,7 @@ EOF
 		stryker=0
 		run mutate "--concurrency $half --incrementalFile $own" || stryker=$?
 		! parses "$own" || { cp "$own" "$cache.$$" && mv -f "$cache.$$" "$cache"; }
+		[ "$patched" = 0 ] || { echo patch_coverage >"$logs/$lane.at"; return 1; }
 		[ "$stryker" = 0 ]
 	}
 	lane_history() {
@@ -589,7 +598,6 @@ EOF
 	# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
 	# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
 	# the survivors), and the end of it fails, saying every failure.
-	carried=
 	phase() {
 		finish "$@" || {
 			$merge || {

@@ -688,7 +688,7 @@ hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
 printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { case ",$ONLY," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }' \
-	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
+	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || kill -$CINTR "$PPID"; sleep 30; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
 	'	[ -n "${CUT:-}" ] && [ -n "$ONLY" ] && ! grep -q KEEP3 g.txt && kill -9 "$PPID"' \
@@ -703,7 +703,7 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt" && grep -q LINE1 m.txt && grep -q LINE2 m.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
-printf 'import os, sys\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
+printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt" && ac=$(printf '\303\251').txt && printf 'KEEP8\n' >"$hs/src/$ac"
 printf 'LINE1\nLINE2\n' >"$hs/src/m.txt"
 cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
@@ -956,7 +956,7 @@ printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" || fail "har
 # The codes a shell gives a suite it ends by a signal are no verdict either (INT, KILL, TERM).
 for c in 130 137 143; do
 	out=$(INTR=$c shards 1) && fail "harness_mutate passed after a suite ended with $c: $out"
-	printf '%s\n' "$out" | grep -q "no verdict of this mutant is kept" || fail "harness_mutate took the end of a suite with $c for a verdict: $out"
+	printf '%s\n' "$out" | grep -q "no verdict is kept" || fail "harness_mutate took the end of a suite with $c for a verdict: $out"
 	printf '%s\n' "$out" | grep -q "killed: planted spare #1" && fail "harness_mutate read $c as a kill: $out"
 done
 # A Ctrl+C that reaches the run alone, its suites unharmed: the shard stops at once, starting no mutant and keeping no
@@ -975,6 +975,24 @@ for sig in ppidlong termlong; do
 	[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a suite running after a $sig signal"; }; done
 done
+# The same in the controls, run two at a time before any mutant (round 1, reviewer-1-3): the run waited for the two in flight to end by
+# themselves, up to the limit of 600 s, with check.sh gone and its merge lock free. An INT or a TERM stops them; so does a control that fails
+# or hangs, for the one beside it.
+for sig in INT TERM; do
+	rm -rf "$hs/suite.pid" "$hs/sig.lock"
+	began=$(date +%s)
+	out=$(CINTR=$sig GROUPED=1 shards 2) && fail "harness_mutate passed after a $sig signal in its controls: $out"
+	[ "$(count suite.pid)" -ge 1 ] || fail "no control was in flight at the $sig signal: $out"
+	[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for its controls to end by themselves after a $sig signal ($(($(date +%s) - began)) s): $out"
+	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after a $sig signal"; }; done
+done
+rm -rf "$hs/suite.pid" "$hs/sig.lock"
+began=$(date +%s)
+out=$(CFAIL=1 CSLEEP=1 PROBED=1 shards 2) && fail "harness_mutate passed with a control failing: $out"
+[ -s "$hs/suite.pid" ] || fail "no control was in flight beside the failing one: $out"
+printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not say which control failed: $out"
+[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the control beside a failed one to end by itself ($(($(date +%s) - began)) s): $out"
+for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after another failed"; }; done
 fi
 
 if part harness_shards_text; then
@@ -1364,6 +1382,11 @@ git -C "$c" rm -q --cached src/a.test.ts vitest.config.ts && rm "$c/src/a.test.t
 printf 'one\ntwo\nTHREE\nfour\n' >"$c/src/a.ts"
 printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2},"end":{"line":4}}},"s":{"0":0}}}' "$c" >"$c/coverage/coverage-final.json"
 (cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1) && fail "patch_coverage passed an untested statement whose inner line changed"
+# A coverage run that failed leaves no report (Vitest deletes coverage/ and writes none): said plainly, with no traceback.
+rm -f "$c/coverage/coverage-final.json"
+out=$(cd "$c" && python3 -I "$patch" HEAD 85 2>&1) && fail "patch_coverage passed with no coverage report"
+printf '%s\n' "$out" | grep -q "no coverage report" || fail "patch_coverage did not say that the coverage left no report: $out"
+printf '%s\n' "$out" | grep -q Traceback && fail "patch_coverage ended on a traceback with no coverage report: $out"
 fi
 
 if part review_pass; then
@@ -2047,6 +2070,8 @@ if [ -n "${LOCKPEEK:-}" ]; then
 fi
 [ -z "${RUN_TAG:-}" ] || echo "$RUN_TAG $n" >>"$GATE_LOG.tags"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+# The patch's coverage reads the report of a coverage run that passed (or passed on its retry); a failed one leaves none, and the real script fails.
+[ "$n" != py:patch_coverage ] || grep -qx "done coverage" "$GATE_LOG" || { echo "patch_coverage: no coverage report" >&2; exit 1; }
 [ "$n" != build:app ] || [ -z "${PW_EDIT:-}" ] || printf '\n' >>app/package.json # a build that installs edits a package file
 if [ "$n" = py:load ]; then
 	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
@@ -5384,6 +5409,31 @@ for p in app/src/features-evil/x.ts app/src/featuresx/x.ts app/src/featuresX/x.t
 	is full "$p"
 	[ "$(speed "app/src/features/chat/Bubble.tsx" "$p")" = full ] || fail "speeds.py: $p beside an interface file did not run the full control"
 done
+# A tier-3 row is itself read as hostile (round 1, reviewer-1-4): an entry that is a whole top folder (`app/`), has no slash, or is not a plain path
+# (padding, `..`) allows nothing, so the answer stays the full control; and a line that is no table row is no row, whatever its first cell says.
+tier3() { # $1: the tier-3 row's cell; then the tier-1 row `deploy/`, the table's other lines in $2 if any
+	printf '# Review\n\n| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | Deploy (`deploy/`) | Claude | Alexis |\n| 3 | Interface (%s) | Either | Run it |\n%b' "$1" "${2:-}" >"$r/docs/REVIEW.md"
+}
+tier3 '`app/src/features/`'
+is interface "app/src/features/chat/Bubble.tsx" # the control: this table allows it
+tier3 '`app/`'
+is full "app/src/lib/other.ts"
+tier3 '`app/src/features`'
+is full "app/src/features-evil/x.ts"
+is full "app/src/features/chat/Bubble.tsx"
+tier3 '`app/src/features /`'
+is full "app/src/features /x.ts"
+tier3 '`..//x/`'
+is full "..//x/y.ts"
+is full "x/y.ts"
+tier3 '`app/src/features/`' '1 | Chat (`app/src/features/chat/`) | Claude | Alexis\n'
+is interface "app/src/features/chat/Bubble.tsx" # a line that does not open with a pipe is no tier-1 row
+tier3 '' '3 | Everything (`app/src/`) | Either | Run it\n'
+is full "app/src/lib/other.ts" # nor a tier-3 one
+cp "$t/speeds.review" "$r/docs/REVIEW.md"
+# One argument, the root: another count is a doubt, whatever the path.
+[ "$(printf 'app/src/features/chat/Bubble.tsx\n' | python3 -I "$sp" 2>&1)" = full ] || fail "speeds.py: no root argument was not the full control"
+[ "$(printf 'app/src/features/chat/Bubble.tsx\n' | python3 -I "$sp" "$r" extra 2>&1)" = full ] || fail "speeds.py: two arguments were not the full control"
 # The same letters spelled otherwise (a decomposed accent, which a Mac's disk reads as the composed one): a security folder whose name has an
 # accent is still found, and an interface file with one is interface.
 printf '# Review\n\n| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The cafe (`app/src/features/caf\303\251/`) | Claude | Alexis |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
@@ -5411,6 +5461,13 @@ done <"$t/speeds.paths"
 [ "$(printf 'packages/ui/src/Button/Button.tsx\n' | python3 -I "$sp" "$here/.." 2>&1)" = interface ] || fail "docs/REVIEW.md's tier-3 row names no interface path speeds.py can read (packages/ui/src/ is one)"
 [ "$(printf 'app/src/features/world/World.tsx\n' | python3 -I "$sp" "$here/.." 2>&1)" = interface ] || fail "docs/REVIEW.md's tier-3 row does not name app/src/features/ as interface"
 [ "$(printf 'app/src/features/login/Form.tsx\n' | python3 -I "$sp" "$here/.." 2>&1)" = full ] || fail "the repository's login folder, under app/src/features/, was interface"
+# Tier 3 fails closed folder by folder (round 1, security-1-1): the guards that sit in a feature or the design system's root (the embed host
+# list and its iframe's sandbox, the exit warning for a realm page's links, the link that stops //host), a feature folder that does not exist
+# yet (Jarvis's tool loop, the passport's signing) and a folder added tomorrow are the full control until the table names them one by one.
+for p in app/src/features/chat/embeds.ts app/src/features/chat/Embed.tsx app/src/features/realms/useExternalLinks.tsx app/src/features/realms/useFunctions.ts \
+	packages/ui/src/link.tsx packages/ui/src/roving.ts app/src/features/jarvis/toolLoop.ts app/src/features/passport/sign.ts app/src/features/newthing/Panel.tsx packages/ui/src/NewThing/NewThing.tsx; do
+	[ "$(printf '%s\n' "$p" | python3 -I "$sp" "$here/.." 2>&1)" = full ] || fail "speeds.py: the repository's table let $p take the interface speed"
+done
 fi
 
 if part gate_speeds; then
@@ -5531,23 +5588,29 @@ if part gate_merge_continues; then
 full_fixture gate_merge_continues
 # --merge reports every failure of the run, and the coverage and StrykerJS run whatever failed beside them (the dream of 2026-11-01, 5): a
 # failed lane, or a bench refused for the load, no longer stops the 20 minutes that find the survivors; --full keeps stopping (C.5, F823).
-printf '\n' >>"$g/scripts/check_css.py" && printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code and harness"
-for f in py:bench stories core_chromium py:prove_fix py:audit py:batch_size; do
+printf '\n' >>"$g/scripts/check_css.py" && printf 'z\n' >>"$g/server/src/a.ts" && printf 'x\n' >"$g/app/src/b.tsx" && git -C "$g" add app/src/b.tsx && git -C "$g" commit -qam "product code and harness"
+# The first phase (lint, types, tests, the build and its budget) carries its failure too (round 1, reviewer-1-1): a journey, a lint error or
+# a type error ended the check before the survivors' run. py:patch_coverage, beside a Vitest that wrote no report, is the next case.
+for f in py:bench stories core_chromium py:prove_fix py:audit py:batch_size playwright lint typecheck py:patch_coverage; do
 	out=$(FAIL=$f gate --merge) && fail "check.sh --merge passed with $f failing"
 	printf '%s\n' "$out" | grep -q "^$f failed here" || fail "check.sh --merge hid $f's failure: $out"
 	for s in coverage mutate; do ran "$s" || fail "check.sh --merge did not run $s after $f failed: a failure beside it stops nothing"; done
 	printf '%s\n' "$out" | grep -q "lanes did not run" && fail "check.sh --merge said lanes did not run after $f failed: $out"
 	printf '%s\n' "$out" | tail -1 | grep -q "^check.sh: FAILED at " || fail "check.sh --merge did not end on its failure after $f failed: $(printf '%s\n' "$out" | tail -1)"
 done
+out=$(FAIL=py:patch_coverage gate --merge) && fail "check.sh --merge passed with the patch's coverage failing"
+printf '%s\n' "$out" | tail -1 | grep -q "FAILED at mutation:patch_coverage$" || fail "check.sh --merge named another step than the patch's coverage when StrykerJS went on beside it: $(printf '%s\n' "$out" | tail -1)"
 out=$(FAIL=py:bench,stories,coverage,py:audit gate --merge) && fail "check.sh --merge passed with four steps failing"
 for s in py:bench stories coverage py:audit; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh --merge hid the failure of $s among four: $out"; done
 ran mutate || fail "check.sh --merge did not run StrykerJS beside a failed coverage and bench"
-printf '%s\n' "$out" | grep -q "every failure above, in the order they came: probe:bench coverage:coverage stories:stories history:audit$" || fail "check.sh --merge did not say, at its end, every lane that failed and where: $(printf '%s\n' "$out" | tail -3)"
+printf '%s\n' "$out" | grep -q "every failure above, in the order they came: probe:bench coverage:coverage stories:stories history:audit mutation:patch_coverage$" || fail "check.sh --merge did not say, at its end, every lane that failed and where: $(printf '%s\n' "$out" | tail -3)"
 out=$(FAIL=mutate gate --merge) && fail "check.sh --merge passed with StrykerJS failing"
 ran py:harness_mutate || fail "check.sh --merge did not run the harness's mutants after StrykerJS failed"
 # --full is unchanged: a failure in the first phase stops it there.
 out=$(FAIL=stories gate --full) && fail "check.sh --full passed with the stories failing"
 ran mutate && fail "check.sh --full went on to StrykerJS after the stories failed"
+out=$(FAIL=py:patch_coverage gate --full) && fail "check.sh --full passed with the patch's coverage failing"
+ran mutate && fail "check.sh --full went on to StrykerJS after the patch's coverage failed"
 fi
 
 if part merge_waits; then
@@ -5871,6 +5934,26 @@ git -C "$r" reset -q --hard "$keep"
 recorded "$m1"
 ask
 [ -z "$out" ] || fail "dream_due.sh read the older dream's row, listed last, as the newest: $out"
+git -C "$r" reset -q --hard "$keep"
+# An older row is read as hostile as the last (round 1, reviewer-1-4): a word git reads as a name (main, HEAD), a commit main does not contain,
+# and a row past the last twenty each cover nothing; here the merge of m2 stays uncovered beside a valid last row naming m1.
+log_with() { # rows (hostile or older) first, then the valid last row for m1
+	printf '| Date | Review |\n|---|---|\n' >"$r/docs/review-log.md"
+	for w in "$@"; do printf '| 2026-11-05 | The dream of %s (older) | x |\n' "$w" >>"$r/docs/review-log.md"; done
+	recorded "$m1"
+}
+for older in main HEAD "$(git -C "$r" rev-parse --short=8 "$um")"; do
+	log_with "$older"
+	ask
+	printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let the older row '$older' cover merges it does not name: $out"
+	git -C "$r" reset -q --hard "$keep"
+done
+many=
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do many="$many $(git -C "$r" rev-parse --short=8 "$m1")"; done
+# shellcheck disable=SC2086 # the shas, one word each
+log_with "$(git -C "$r" rev-parse --short=8 "$m2")" $many
+ask
+printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read a row past the last twenty, which a newer dream has overtaken: $out"
 git -C "$r" reset -q --hard "$keep"
 git -C "$r" branch -m main trunk
 ask

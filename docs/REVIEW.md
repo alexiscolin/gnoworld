@@ -13,12 +13,16 @@ Review by risk, not line by line everywhere.
 | 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
-| 3 | Interface, 3D, motion (`app/src/features/`, `packages/ui/src/`) | Either | Run it; read the budgets the gate prints |
+| 3 | Interface, 3D, motion: `app/src/features/errors/`, `app/src/features/home/`, `app/src/features/list/`, `app/src/features/search/`, `app/src/features/update/`, `app/src/features/world/`, and the design system's folders `packages/ui/src/ActivityChart/`, `packages/ui/src/Avatar/`, `packages/ui/src/Breadcrumb/`, `packages/ui/src/Button/`, `packages/ui/src/Card/`, `packages/ui/src/ChatLayout/`, `packages/ui/src/Chip/`, `packages/ui/src/Combobox/`, `packages/ui/src/compositions/`, `packages/ui/src/Dialog/`, `packages/ui/src/EmptyState/`, `packages/ui/src/Field/`, `packages/ui/src/Flash/`, `packages/ui/src/icons/`, `packages/ui/src/Kicker/`, `packages/ui/src/Logo/`, `packages/ui/src/NavItem/`, `packages/ui/src/Overview/`, `packages/ui/src/Panel/`, `packages/ui/src/PlanetThumb/`, `packages/ui/src/Popover/`, `packages/ui/src/Row/`, `packages/ui/src/Skeleton/`, `packages/ui/src/Stat/`, `packages/ui/src/Tabs/`, `packages/ui/src/TokensPage/`, `packages/ui/src/Tooltip/`, each named one by one | Either | Run it; read the budgets the gate prints |
 
 The backticked paths of this table are read by machines: the tier-1 ones by `.claude/workflows/branch.js` (its security lens) and by
-`scripts/speeds.py`, the tier-3 ones by `scripts/speeds.py` alone. A merge check whose every path is a tier-3 folder's, and none a tier-1
-path (`app/src/features/login/` is under `app/src/features/`), runs no StrykerJS; any other path, or a table it cannot read, runs the
-whole control. A folder is written with its slash. Add a security path here and both follow.
+`scripts/speeds.py`, the tier-3 ones by `scripts/speeds.py` alone. A merge check whose every path is under a tier-3 folder, and none a tier-1
+path, runs no StrykerJS; any other path, or a table it cannot read, runs the whole control. Tier 3 fails closed, folder by folder: a feature
+or design-system folder is interface only once this row names it, so a folder added tomorrow, and the files in `packages/ui/src/`'s own root,
+take the whole control. The `chat` and `realms` features are not listed: they hold guards that are not in a tier-1 row (the embed host list
+and its iframe's sandbox, the exit warning for a realm page's links, the link that stops `//host`), and they are read as tier 2 (state,
+queries, views) with the rest of the TypeScript this row does not list. A state or query file in a listed folder is tier 3 for the
+mutation check and is still read by its tests first. A folder is written with its slash. Add a security path here and both follow.
 
 ## Order
 
