@@ -6,7 +6,7 @@
 import { isAddress } from "@gnoworld/core";
 import { ExportedName, ImportPath, WORLDS_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { abciQuery, isDown, kindOf, type Send } from "./remote.ts";
+import { abciQuery, Absent, isDown, kindOf, type Send } from "./remote.ts";
 
 export interface PackageFacts {
   readonly deployer: string | null;
@@ -64,8 +64,9 @@ function factsOf(text: string): Omit<PackageFacts, "deployer"> | null {
   };
 }
 
-// One package's facts: its doc, then its file for the deployer. A fault of the network is thrown, to end the pass; a doc that is
-// refused or wrong gives null, and a file that is, no deployer.
+// One package's facts: its doc, then its file for the deployer. A doc that is refused or wrong gives null; a fault of the file
+// other than the chain's "not there" is thrown, so the package is left out and asked again (readPackages ends the pass on a
+// fault of the network).
 async function readOne(
   reader: { send: Send; rpc: string; pace?: () => Promise<void> },
   path: string,
@@ -75,8 +76,8 @@ async function readOne(
   const doc = factsOf(text);
   if (doc === null) return null;
   let deployer: string | null = null;
+  await reader.pace?.();
   try {
-    await reader.pace?.();
     const file = await abciQuery(
       reader,
       { path: "vm/qfile", data: `${path}/gnomod.toml` },
@@ -84,14 +85,15 @@ async function readOne(
     );
     deployer = creatorOf(file);
   } catch (error) {
-    if (isDown(kindOf(error))) throw error;
+    // Only the chain's word that the file is not there is a fact; any other fault leaves the package out to be asked again.
+    if (!(error instanceof Absent)) throw error;
   }
   return { deployer, ...doc };
 }
 
 /**
  * The facts of the packages not yet known, one call at a time. A package whose doc is refused or wrong is left out (the next pass
- * asks it again); one whose file is refused has no deployer. A network fault ends the pass with what was read. The known facts
+ * asks it again), and so is one whose file failed for any reason but absence. A network fault ends the pass with what was read. The known facts
  * of the paths asked are returned beside the new ones.
  */
 export async function readPackages(

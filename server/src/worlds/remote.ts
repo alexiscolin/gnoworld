@@ -6,6 +6,13 @@ import { Failure, fetchCapped, kindOf, type Kind, type Limits, type Send } from 
 
 export { Failure, kindOf, type Kind, type Send };
 
+/** The chain's answer that a package or file is not there (`InvalidPkgPathError`): a fact to keep, not a fault to retry. */
+export class Absent extends Failure {
+  constructor() {
+    super("chain_refused");
+  }
+}
+
 /** A fault that says the chain or the network is not answering, which ends a pass; any other is about one read. */
 export const isDown = (kind: Kind): boolean =>
   kind === "request" || kind === "timeout" || kind === "status" || kind === "rate_limited";
@@ -38,11 +45,17 @@ function textOf(base64: string): string | null {
 const refusedBy = (answer: QueryAnswer): boolean =>
   answer.error !== undefined || (answer.result?.response.ResponseBase.Error ?? null) !== null;
 
+// The fault of a refused query: the chain's "not there" is Absent, any other refusal a plain chain_refused.
+function refusalOf(answer: QueryAnswer): Failure {
+  const type = answer.result?.response.ResponseBase.Error?.["@type"] ?? "";
+  return type.endsWith("InvalidPkgPathError") ? new Absent() : new Failure("chain_refused");
+}
+
 // The text an abci_query's envelope carries: its Data decoded, or a Failure.
 function envelopeText(json: unknown, maxBytes: number): string {
   const answer = QueryAnswer.safeParse(json);
   if (!answer.success) throw new Failure("shape");
-  if (refusedBy(answer.data)) throw new Failure("chain_refused");
+  if (refusedBy(answer.data)) throw refusalOf(answer.data);
   const body = answer.data.result?.response.ResponseBase;
   if (body === undefined) throw new Failure("shape");
   const decoded = textOf(body.Data ?? "");

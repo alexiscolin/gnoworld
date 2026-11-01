@@ -137,6 +137,21 @@ describe("readPackages", () => {
     expect(facts?.functions).toEqual(["BalanceOf", "Transfer"]);
   });
 
+  it.each([
+    ["a gateway's html", () => new Response("<html>gateway")],
+    ["a refusal that is no absence", () => abciRefused("/std.UnauthorizedError")],
+    ["a network fault", () => new TypeError("fetch failed")],
+    ["a status fault", () => new Response("no", { status: 502 })],
+  ])("leaves a package out when its vm/qfile fails with %s, so the next pass asks again", async (_name, fault) => {
+    const { chain, done } = read([WUGNOT], { file: fault });
+    const first = await done;
+    expect(first.has(WUGNOT)).toBe(false);
+    const again = fakeChain(routes());
+    const second = await readPackages({ send: again.send, rpc: RPC, known: new Map() }, [WUGNOT]);
+    expect(second.get(WUGNOT)?.deployer).toBe(CREATOR);
+    expect(chain.asked.map(({ kind }) => kind)).toContain("vm/qfile");
+  });
+
   it("leaves a package out when its vm/qdoc is refused, so the next pass asks it again", async () => {
     const { done } = read([WUGNOT, ARENA], { doc: (path) => (path === WUGNOT ? abciRefused() : doc()) });
     const result = await done;
