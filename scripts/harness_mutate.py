@@ -259,6 +259,12 @@ def mutants():
     yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "CLASS_AT_END, ON_A_FRAME]", "probe", "eslint's scene block keeps the swallowed errors refused")
     yield from each("lint/app.config.ts", "...SWALLOWED, CLASS_AT_END, ON_A_FRAME]", "...SWALLOWED, ON_A_FRAME]", "probe", "eslint's scene block refuses a u class right before $")
     yield from each("lint/core.config.ts", "[...PURE, ON_A_FRAME]", "[...PURE]", "probe", "eslint core's frame and space folders hold a frame's rule")
+    yield from each("lint/core.config.ts", 'const PURE = ["error",', 'const PURE = ["off",', "probe", "eslint core's own list is on")
+    yield from each("lint/core.config.ts", 'ignores: ["**/*.test.ts"],\n    rules: {\n      "no-restricted-syntax": [...PURE', 'rules: {\n      "no-restricted-syntax": [...PURE', "probe", "eslint a test in core's frame and space stays under the tests' list")
+    yield from each("lint/shared.config.ts", "MethodDefinition, PropertyDefinition, Property)", "MethodDefinition, PropertyDefinition)", "probe", "eslint holds an object's method to a frame's rule")
+    yield from each("lint/shared.config.ts", 'const NAME = `/^(${FRAME_NAMES})$/`', 'const NAME = `/${FRAME_NAMES}/`', "probe", "eslint reads a frame's names whole")
+    yield from each("lint/app.config.ts", '"@typescript-eslint/prefer-for-of": "off"', '"@typescript-eslint/prefer-for-of": "error"', "probe", "eslint lets the scene walk an array by index")
+    yield from each("lint/core.config.ts", '"@typescript-eslint/prefer-for-of": "off"', '"@typescript-eslint/prefer-for-of": "error"', "probe", "eslint lets core's frame and space walk an array by index")
     yield from each("lint/core.config.ts", "[...PURE, ON_A_FRAME]", '["error", ON_A_FRAME]', "probe", "eslint core's frame and space folders keep core's own list")
     for folder in ("frame", "space"):
         yield from each("lint/core.config.ts", '"packages/core/src/{frame,space}/**/*.ts"', f'"packages/core/src/{folder}/**/*.ts"', "probe", f"eslint a frame's rule reaches {folder} in core")

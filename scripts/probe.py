@@ -37,13 +37,18 @@ FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
 
 # What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
-FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "cellIn", "write", "light", "unit", "moodAt", "lattice", "field", "ringAt", "driftAt", "wrapTo", "nearestCell", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "smoothstep", "smootherstep", "frameRate", "isDue", "carryOver", "frameWait", "judgeFrames"]
+FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "cellIn", "write", "light", "unit", "moodAt", "lattice", "field", "side", "ringAt", "tintOf", "densityAt", "driftAt", "turnAt", "wrapTo", "nearestCell", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep", "frameRate", "isDue", "carryOver", "frameWait", "judgeFrames"]
 FRAME_CORE = [
     *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
     ("frame_arrow.ts", "export const wrapTo = (): number[] => {\n  return [1];\n};\n", FRAME),
     ("frame_closure.ts", "export function driftAt(): () => number {\n  return () => 1;\n}\n", FRAME),
     ("frame_arrow_closure.ts", "export const wrapTo = (): (() => number) => () => 1;\n", FRAME),
     ("frame_method.ts", "export class Torus {\n  follow(): number[] {\n    return [1];\n  }\n}\n", FRAME),
+    ("frame_property.ts", "export const cells = {\n  follow(): number[] {\n    return [1];\n  },\n};\n", FRAME),
+    # By whole names; an index walks an array, where for...of is refused; a test stays under the tests' list.
+    ("frame_longer.ts", "export function drawing(): number[] {\n  return [1];\n}\n", None),
+    ("frame_index.ts", "export function moodAt(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
+    ("frame_off.test.ts", 'import { expect, test } from "vitest";\n\ntest.skip("x", () => {\n  expect(1).toBe(1);\n});\n', "no-restricted-syntax: A test is never switched off"),
     ("frame_plain.ts", "export function moodAt(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
     ("frame_setup.ts", "export function newMood(): number[] {\n  return [0, 0];\n}\n", None),
     # The block replaces core's list: what that list holds still holds here.
@@ -728,6 +733,8 @@ try:
             ("scene/__probe__/frame_field.ts", "export class Loop {\n  readonly #draw = (): number[] => {\n    return [1];\n  };\n\n  run(): number[] {\n    return this.#draw();\n  }\n}\n", FRAME),
             ("scene/__probe__/frame_field_closure.ts", "export class Loop {\n  readonly #draw = () => () => 1;\n\n  run(): () => number {\n    return this.#draw();\n  }\n}\n", FRAME),
             ("scene/__probe__/frame_plain.ts", onframe("this.seen = list.length * 2;"), None),
+            ("scene/__probe__/frame_index.ts", onframe("for (let at = 0; at < list.length; at += 1) this.seen += list[at] ?? 0;"), None),
+            ("scene/__probe__/frame_longer.ts", "export class Loop {\n  drawing(): number[] {\n    return [1];\n  }\n}\n", None),
             ("scene/__probe__/frame_setup.ts", "export class Loop {\n  readonly kept = [1];\n\n  build(): number[] {\n    return [...this.kept];\n  }\n}\n", None),
             ("scene/__probe__/frame_tested.test.ts", 'import { expect, test } from "vitest";\n\nconst draw = () => [1];\n\ntest("x", () => {\n  expect(draw()).toEqual([1]);\n});\n', None),
             # A page's own `draw` is no frame of the scene.
@@ -993,6 +1000,8 @@ finally:
     shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(FIELD, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
+    shutil.rmtree("packages/core/src/space/__probe__", ignore_errors=True)
+    shutil.rmtree("packages/core/src/frame/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

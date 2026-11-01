@@ -50,6 +50,10 @@ export default defineConfig(
     // What the scene's loop reaches in core: elsewhere a `field` or a `sample` is nobody's frame.
     files: ["packages/core/src/{frame,space}/**/*.ts"],
     ignores: ["**/*.test.ts"],
-    rules: { "no-restricted-syntax": [...PURE, ON_A_FRAME] },
+    rules: {
+      "no-restricted-syntax": [...PURE, ON_A_FRAME],
+      // An index walks an array with no iterator, where a frame runs.
+      "@typescript-eslint/prefer-for-of": "off",
+    },
   },
 );

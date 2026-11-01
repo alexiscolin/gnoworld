@@ -56,9 +56,9 @@ export const MODULE_STATE = {
 // What runs on a frame makes nothing (ADR-0002 §9, backlog row 7): a collector's pause is a dropped frame. By name, the loop's and what
 // it calls, in the scene and in core; a function a frame reaches joins this list as it is written. Three's own render is not held here.
 const FRAME_NAMES =
-  "tick|wake|reschedule|cancel|readRate|draw|sample|advance|follow|march|visit|cellIn|write|light|unit|moodAt|lattice|field|ringAt|driftAt|wrapTo|nearestCell|cellHash|salted|mix|settle|nextState|unitOf|smoothstep|smootherstep|frameRate|isDue|carryOver|frameWait|judgeFrames";
+  "tick|wake|reschedule|cancel|readRate|draw|sample|advance|follow|march|visit|cellIn|write|light|unit|moodAt|lattice|field|side|ringAt|tintOf|densityAt|driftAt|turnAt|wrapTo|nearestCell|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|frameRate|isDue|carryOver|frameWait|judgeFrames";
 const NAME = `/^(${FRAME_NAMES})$/`;
-const MEMBER = `:matches(MethodDefinition, PropertyDefinition)[key.name=${NAME}]`;
+const MEMBER = `:matches(MethodDefinition, PropertyDefinition, Property)[key.name=${NAME}]`;
 const MADE_HERE =
   ":matches(NewExpression, ArrayExpression, ObjectExpression, TemplateLiteral, SpreadElement, RestElement, ArrayPattern, ClassExpression, ForOfStatement, CallExpression[callee.property.name=/^(map|filter|slice|concat|flatMap|reduce|forEach|sort|toSorted|join|split|bind|clone|from|assign|keys|values|entries|stringify)$/])";
 export const ON_A_FRAME = {
