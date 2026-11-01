@@ -5,6 +5,10 @@ import { Person } from "./Person.tsx";
 import styles from "./RoomView.module.css";
 
 const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const REGIONS = new Intl.DisplayNames("en", { type: "region", fallback: "none" });
+// What the browser names and the table of countries does not: old codes, unions, test regions. The table stays out of these lines' chunk, every
+// reader's, 3.8 KB for a title; LineView.test.tsx holds the two together, code by code.
+const NOT_COUNTRIES = "AC AN BU CP CQ CS DD DG DY EA EU EZ FX HV IC NH QO RH SU TA TP UK UN VD XA XB YD YU ZR ZZ";
 
 // A line's author: its account's address shortened or its guest's nick, then "you" if it is mine.
 function Author({ line, mine }: { line: Line; mine: boolean }) {
@@ -12,6 +16,19 @@ function Author({ line, mine }: { line: Line; mine: boolean }) {
     <span className={styles["author"]}>
       <Person name={line.account ?? line.from} guest={line.account === undefined} />
       {mine ? " you" : null}
+    </span>
+  );
+}
+
+// The country a line declares (+gnoworld/country): its code to the eye, as the video's frames 40 and 60 draw it, its name to a reader and a
+// screen reader. Any client may write anything there: what is no country draws nothing.
+function Country({ code }: { code: string | undefined }) {
+  const name = code === undefined || NOT_COUNTRIES.includes(code) ? undefined : REGIONS.of(code);
+  if (name === undefined) return null;
+  return (
+    <span className={styles["country"]} title={name} data-line-country="">
+      <span aria-hidden="true">{code}</span>
+      <span className="visually-hidden">{name}</span>
     </span>
   );
 }
@@ -68,6 +85,7 @@ export function Head({ line, mine, mentioned, saved, pinned }: HeadProps) {
     <div className={styles["head"]} data-line-head="">
       <Cluster space="2xs">
         <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
+        <Country code={line.country} />
         {line.kind === "action" ? "* " : null}
         <Author line={line} mine={mine} />{" "}
         <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
