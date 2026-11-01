@@ -5601,6 +5601,12 @@ out=$(gate) || fail "check.sh failed on a new app file: $out"
 [ "$(grep -c '^playwright ' "$log")" = 1 ] || fail "check.sh did not run one Playwright command on a build: $(grep '^playwright' "$log")"
 grep '^playwright ' "$log" | grep -q "app/tests/e2e/budgets.spec.ts" || fail "check.sh's fast gate did not run the budget spec after its build: $(grep '^playwright' "$log")"
 before build:app playwright || fail "check.sh ran the budget spec before the build it measures"
+# The budget spec gets a free port of its own (not the config's fixed 4173, another gate's), and a free_ports that fails stops it before it starts.
+port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
+[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh gave the budget spec no free port of its own: $(grep '^playwright' "$log")"
+out=$(PORTS_FAIL=1 gate) && fail "check.sh passed with no free port for the budget spec: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not fail the ts lane at its app step when free_ports failed for the budget spec: $out"
+ran playwright && fail "check.sh started the budget spec with no free port"
 out=$(FAIL=playwright gate) && fail "check.sh passed with the first screen's budget failing"
 printf '%s\n' "$out" | grep -q "^playwright failed here" || fail "check.sh hid the budget's failure: $out"
 reset
