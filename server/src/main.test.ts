@@ -458,6 +458,69 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  // The worlds job (7c) tunnels to the default universe's RPC alone: the other universe's is not on the way out.
+  it("starts the worlds job when WORLDS_FILE and UNIVERSES_FILE are set: it asks the default universe's RPC, and stops on SIGTERM", async () => {
+    const way = await tunnels();
+    try {
+      const dir = folder("gnoworld-worlds-");
+      const base = { name: "U", gnoweb: "https://gnoweb.example", testnet: true };
+      const universes = join(dir, "universes.json");
+      writeFileSync(
+        universes,
+        JSON.stringify([
+          {
+            ...base,
+            id: "a",
+            chainId: "a-1",
+            rpc: "https://rpc.not-default.example:443",
+            indexer: "https://indexer.not-default.example/graphql",
+          },
+          {
+            ...base,
+            id: "b",
+            chainId: "b-1",
+            rpc: "https://rpc.the-default.example:443",
+            indexer: "https://indexer.the-default.example/graphql",
+            default: true,
+          },
+        ]),
+      );
+      const server = start({
+        ...settings(),
+        WORLDS_FILE: join(dir, "worlds.json"),
+        UNIVERSES_FILE: universes,
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => server.out.stdout.includes('"event":"worlds_failed"'));
+      expect(way.seen).toEqual(["rpc.the-default.example:443"]);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+    } finally {
+      way.close();
+    }
+  });
+
+  it("does not start with a WORLDS_FILE and no UNIVERSES_FILE: it fails closed, naming the setting", async () => {
+    const server = start({ ...settings(), WORLDS_FILE: join(folder("gnoworld-worlds-"), "worlds.json") });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain("setting UNIVERSES_FILE: required");
+  });
+
+  it("starts no worlds job without WORLDS_FILE: nothing is asked of a chain", async () => {
+    const way = await tunnels();
+    try {
+      const server = start({ ...settings(), HTTPS_PROXY: way.proxy, NODE_USE_ENV_PROXY: "1" });
+      await listening(server);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(way.seen).toEqual([]);
+      expect(server.out.stdout).not.toContain("worlds");
+    } finally {
+      way.close();
+    }
+  });
+
   it("does not start with a UNIVERSES_FILE that holds no default universe: it fails closed, naming the file", async () => {
     const dir = folder("gnoworld-universes-");
     const universes = join(dir, "universes.json");

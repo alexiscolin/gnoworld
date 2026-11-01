@@ -25,6 +25,8 @@ export interface Config {
   ergoData: { dir: string; maxBytes: number } | undefined;
   // The file the prices timer writes (5l): absolute, none by default, so no timer.
   markets: string | undefined;
+  // The file the worlds job writes (7c): absolute, none by default, so no job; it needs `universes`.
+  worlds: string | undefined;
   // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
   universes: string | undefined;
   moderation: {
@@ -116,6 +118,8 @@ const Env = z.object({
   ERGO_DATA_MB: whole(1_048_576, 1024),
   // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
   MARKETS_FILE: absolute.optional(),
+  // The worlds job's file (7c), written like MARKETS_FILE; the job reads the chain UNIVERSES_FILE names as default.
+  WORLDS_FILE: absolute.optional(),
   UNIVERSES_FILE: absolute.optional(),
   OPENAI_API_KEY_FILE: z.string().min(1).optional(),
   // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
@@ -170,6 +174,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
     markets: parsed.data.MARKETS_FILE,
+    worlds: parsed.data.WORLDS_FILE,
     universes: parsed.data.UNIVERSES_FILE,
     moderation: {
       openaiKey:

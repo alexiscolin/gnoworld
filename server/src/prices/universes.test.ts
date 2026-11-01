@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc } from "./universes.ts";
+import { defaultRpc, defaultUniverse } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -60,6 +60,31 @@ describe("defaultRpc", () => {
   it("refuses a file that is not there, naming it", () => {
     const file = join(dir, "missing.json");
     expect(() => defaultRpc(file)).toThrow(file);
+  });
+});
+
+describe("defaultUniverse", () => {
+  it("gives the id, RPC and indexer of the universe marked default, never another's", () => {
+    const expected = {
+      id: "onyx",
+      rpc: "https://rpc.default.example:443",
+      indexer: "https://indexer.default.example/graphql/query",
+    };
+    expect(defaultUniverse(planted(JSON.stringify([OTHER, ONYX])))).toEqual(expected);
+    expect(defaultUniverse(planted(JSON.stringify([ONYX, OTHER])))).toEqual(expected);
+  });
+
+  it("reads the data the app ships: Onyx, with its indexer", () => {
+    expect(defaultUniverse(DATA)).toEqual({
+      id: "onyx",
+      rpc: "https://rpc.onyx.testnets.gno.land:443",
+      indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+    });
+  });
+
+  it("refuses a file with no default universe, naming the file and none of its content", () => {
+    const file = planted(JSON.stringify([OTHER]));
+    expect(() => defaultUniverse(file)).toThrow(file);
   });
 });
 
