@@ -40,6 +40,6 @@ export function zoneCountry<T extends { code: string }>(
   countries: readonly T[],
   zone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 ): T | undefined {
-  // ponytail: a locale a country, 250 at most, once each time a person asks for the list.
+  // ponytail: a locale a country, 250 at most, about 40 ms, once as the list opens with nothing chosen.
   return countries.find(({ code }) => zonesOf(code).includes(zone));
 }

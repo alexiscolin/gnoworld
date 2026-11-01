@@ -2,9 +2,27 @@
 // only once they ask, a suggestion they confirm. An account's, so the table of countries is never a visitor's first screen.
 import { COUNTRIES, countryName } from "@gnoworld/core/bubbles";
 import type { Address } from "@gnoworld/schemas";
-import { Chip, Select, Stack } from "@gnoworld/ui";
+import { Chip, Cluster, Select, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState } from "react";
 import { keepCountry, keptCountry, zoneCountry } from "./accountKit.ts";
+
+// What the time zone suggests, its own part: the menu is drawn, closed, at each chat's load, and a choice already made reads no zone.
+function Suggestion({ onUse }: { onUse: (code: string) => void }) {
+  const [suggested] = useState(() => zoneCountry(COUNTRIES));
+  if (suggested === undefined) return null;
+  return (
+    <Stack space="3xs">
+      <Cluster space="2xs">
+        <Chip
+          onClick={() => {
+            onUse(suggested.code);
+          }}
+        >{`Use ${suggested.name}`}</Chip>
+      </Cluster>
+      <p>From your time zone. Nothing shows until you choose it.</p>
+    </Stack>
+  );
+}
 
 interface ListProps {
   country: string | undefined;
@@ -13,7 +31,7 @@ interface ListProps {
   asked: boolean;
 }
 
-// The list by name, and what the time zone suggests while nothing is chosen.
+// The list by name, and the suggestion while nothing is chosen; a control that goes hands the focus to the list.
 function CountryList({ country, onChoose, asked }: ListProps) {
   const listRef = useRef<HTMLSelectElement>(null);
   const [options] = useState(() => [
@@ -23,12 +41,11 @@ function CountryList({ country, onChoose, asked }: ListProps) {
       label: name,
     })),
   ]);
-  const [suggested] = useState(() => zoneCountry(COUNTRIES));
   useEffect(() => {
     if (asked) listRef.current?.focus();
   }, [asked]);
   return (
-    <>
+    <Stack space="2xs">
       <Select
         ref={listRef}
         label="Your country"
@@ -38,17 +55,15 @@ function CountryList({ country, onChoose, asked }: ListProps) {
           onChoose(code === "" ? undefined : code);
         }}
       />
-      {country === undefined && suggested !== undefined ? (
-        <>
-          <Chip
-            onClick={() => {
-              onChoose(suggested.code);
-            }}
-          >{`Use ${suggested.name}`}</Chip>
-          <p>From your time zone. Nothing shows until you choose it.</p>
-        </>
+      {country === undefined ? (
+        <Suggestion
+          onUse={(code) => {
+            onChoose(code);
+            listRef.current?.focus();
+          }}
+        />
       ) : null}
-    </>
+    </Stack>
   );
 }
 
@@ -74,13 +89,15 @@ function Choice({ account }: { account: Address }) {
       {chosen || asked ? (
         <CountryList country={country} onChoose={choose} asked={asked} />
       ) : (
-        <Chip
-          onClick={() => {
-            setAsked(true);
-          }}
-        >
-          Choose a country
-        </Chip>
+        <Cluster space="2xs">
+          <Chip
+            onClick={() => {
+              setAsked(true);
+            }}
+          >
+            Choose a country
+          </Chip>
+        </Cluster>
       )}
       <p role="status">{wordsOf(countryName(country))}</p>
       {notKept ? <p>Not kept on this device</p> : null}

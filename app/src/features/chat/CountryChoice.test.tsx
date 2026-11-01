@@ -79,6 +79,14 @@ describe("the choice of a country", () => {
     expect(document.activeElement).not.toBe(list(box));
   });
 
+  it("reads no time zone on a choice already made: the menu is drawn, closed, at each chat's load", () => {
+    keepCountry(ME, "JP");
+    const zone = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions");
+    zone.mockClear();
+    mount(<CountryChoice account={ME} />);
+    expect(zone).not.toHaveBeenCalled();
+  });
+
   it("suggests again once a choice is taken back", () => {
     keepCountry(ME, "JP");
     const box = mount(<CountryChoice account={ME} />);
@@ -93,6 +101,16 @@ describe("the choice of a country", () => {
     expect(keptCountry(ME)).toBe("JP");
     expect(list(box).value).toBe("JP");
     expect(button(box, "Use Japan")).toBeUndefined();
+  });
+
+  it("leaves the focus on the list when the suggestion goes: the control it was on is gone", () => {
+    const box = mount(<CountryChoice account={ME} />);
+    opened(box);
+    const use = button(box, "Use Japan");
+    use?.focus();
+    expect(document.activeElement).toBe(use);
+    click(use);
+    expect(document.activeElement).toBe(list(box));
   });
 
   it("offers no suggestion for a time zone no country holds", () => {
