@@ -353,7 +353,7 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
-	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=160#burst=60#'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=320#burst=60#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
 	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
@@ -776,12 +776,12 @@ PY
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-400]')" 200
-	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-400]')" 200
-	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-400]')" 200
+	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-800]')" 200
+	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-800]')" 200
+	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-800]')" 200
 	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-400]" || true)
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-800]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"
@@ -797,7 +797,7 @@ PY
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-400]"
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-800]"
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
@@ -868,10 +868,11 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	esac
 	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
 	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
-	oper_render() { # printf's arguments: the file's text
-		printf "$@" >"$tmp/shaped_oper_password"
-		chmod 644 "$tmp/shaped_oper_password"
-		ERGO_OPER_PASSWORD_FILE=$tmp/shaped_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
+	oper_render() { # printf's arguments: the file's text, in a new file each time, as `nginx` above (a run is a subshell: no counter)
+		shaped=$(mktemp "$tmp/shaped_oper_password.XXXXXX")
+		printf "$@" >"$shaped"
+		chmod 644 "$shaped"
+		ERGO_OPER_PASSWORD_FILE=$shaped docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
 	}
 	oper_refused() { # what it is, then printf's arguments
 		what=$1
@@ -1365,7 +1366,12 @@ print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).host
 		[ "$timer_block" = block ] && break
 		sleep 5
 	done
-	expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
+	# CoinGecko's 429 is its answer to this address, and the prices fail first: said, and not judged (F3378). Nothing else excuses it.
+	if [ "$timer_block" != block ] && docker logs "$server" 2>&1 | grep -q '"error":"rate_limited"'; then
+		printf 'waived the running timer writes the block height: CoinGecko answered 429\n'
+	else
+		expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
+	fi
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
