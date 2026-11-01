@@ -58,11 +58,15 @@ async function offered(page: Page) {
   return view;
 }
 
-// A patch of the window's right edge, where the page holds no word.
-const patch = async (page: Page) => {
-  const clip = { x: COMPUTER.width - 40, y: 400, width: 8, height: 8 };
-  const [light] = await brightness(page, await page.screenshot({ clip }), [[0, 0, clip.width, clip.height]]);
-  return light ?? Infinity;
+// The darkest patch of the window's right half, where the page holds no word: the scenery lights the rest.
+const darkest = async (page: Page) => {
+  const patches = Array.from({ length: 12 }, (_, row) =>
+    Array.from({ length: 16 }, (_, column): [number, number, number, number] => {
+      const [x, y] = [COMPUTER.width / 2 + column * 20, 120 + row * 50];
+      return [x, y, x + 8, y + 8];
+    }),
+  ).flat();
+  return Math.min(...(await brightness(page, await page.screenshot(), patches)));
 };
 
 test.describe("a computer", () => {
@@ -72,11 +76,11 @@ test.describe("a computer", () => {
     await page.goto("/");
     await hydrated(page);
     // The page's #05070d reads 6.8; the frames' rgb(1, 1, 1) reads 1.
-    expect(await patch(page), "the page's own colour before the scene").toBeGreaterThan(5);
+    expect(await darkest(page), "the page's own colour before the scene").toBeGreaterThan(5);
     await page.goto(HOME);
     await running(page);
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
-    await expect.poll(() => patch(page)).toBeLessThan(1.5);
+    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
   });
 
   test("keeps every place reachable over the scene, and passes axe", async ({ page }) => {
@@ -135,8 +139,8 @@ test.describe("a computer", () => {
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
     // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background.
-    await expect.poll(() => patch(page)).toBeGreaterThan(0.5);
-    await expect.poll(() => patch(page)).toBeLessThan(1.5);
+    await expect.poll(() => darkest(page)).toBeGreaterThan(0.5);
+    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
   });
 });
 

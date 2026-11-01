@@ -1,11 +1,13 @@
 // The scene (docs/ARCHITECTURE.md, "The scene"), behind its lazy chunk: the renderer, its one loop, the Auto probe and what stops them.
 // It draws through one owner, and imports no React: the universe feature mounts it.
-import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type ProbeVerdict, type Tier } from "@gnoworld/core";
+import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
+import { Eye } from "./eye.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { createRenderer } from "./renderer.ts";
-import { MOTION, watchPage, watchScreen } from "./watch.ts";
+import { Space } from "./space.ts";
+import { MOTION, watchAim, watchPage, watchScreen } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
@@ -25,6 +27,8 @@ export interface SceneOptions {
 
 export interface Scene {
   cover(covered: boolean): void;
+  /** Where the view rests, in world units of any size. */
+  moveTo(to: Point): void;
   dispose(): void;
   stats(): SceneStats;
 }
@@ -35,8 +39,10 @@ interface SceneStats {
   readonly ratio: number;
   readonly probing: boolean;
   readonly calls: number;
+  readonly points: number;
   readonly geometries: number;
   readonly textures: number;
+  readonly eye: Point;
 }
 
 class LiveScene implements Scene {
@@ -46,6 +52,9 @@ class LiveScene implements Scene {
   readonly #renderer: WebGLRenderer;
   readonly #stage = new Stage();
   readonly #camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR, FAR);
+  readonly #motion = matchMedia(MOTION);
+  readonly #eye = new Eye();
+  readonly #space: Space;
   readonly #loop: FrameLoop;
   readonly #samples = new Float32Array(PROBE_FRAMES);
   #sampled = 0;
@@ -62,7 +71,7 @@ class LiveScene implements Scene {
     const { canvas, remembered } = options;
     this.#options = options;
     this.#tier = remembered ?? "high";
-    this.#probing = remembered === undefined && !matchMedia(MOTION).matches;
+    this.#probing = remembered === undefined && !this.#motion.matches;
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
     this.#stage.background = new Color(DEEP_BLACK);
     this.#owner.add({
@@ -71,6 +80,7 @@ class LiveScene implements Scene {
         this.#renderer.dispose();
       },
     });
+    this.#space = new Space(this.#stage, this.#owner);
     this.#applyViewport();
     this.#loop = new FrameLoop(clock, this.#draw);
     this.#owner.add({
@@ -86,6 +96,9 @@ class LiveScene implements Scene {
     const { signal } = this.#owner;
     watchPage(this.#loop, signal);
     watchScreen(this.#viewportChanged, signal);
+    watchAim((x, y) => {
+      this.#eye.aim(x, y);
+    }, signal);
     const observer = new ResizeObserver(this.#resized);
     observer.observe(canvas);
     this.#owner.add({
@@ -104,6 +117,10 @@ class LiveScene implements Scene {
 
   readonly #draw = (delta: number): void => {
     if (this.#viewportStale) this.#applyViewport();
+    this.#eye.advance(delta, this.#motion.matches);
+    this.#space.follow(this.#eye.at, this.#eye.seconds);
+    this.#renderer.info.reset();
+    this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);
     this.#frames += 1;
     if (this.#probing && delta > 0) this.#sample(delta);
@@ -128,12 +145,15 @@ class LiveScene implements Scene {
   // Both clear the buffer, so they wait for the frame that draws it, and never fall between two frames.
   #applyViewport(): void {
     this.#viewportStale = false;
-    this.#renderer.setPixelRatio(pixelRatioFor(devicePixelRatio, this.#touch, this.#tier));
+    const ratio = pixelRatioFor(devicePixelRatio, this.#touch, this.#tier);
+    this.#renderer.setPixelRatio(ratio);
+    this.#space.detail(this.#tier);
     const { clientWidth: width, clientHeight: height } = this.#options.canvas;
     if (width === 0 || height === 0) return;
     this.#width = width;
     this.#height = height;
     this.#renderer.setSize(width, height, false);
+    this.#space.resize(width, height, ratio);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
   }
@@ -158,6 +178,11 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
+  moveTo(to: Point): void {
+    this.#eye.moveTo(to);
+    this.#loop.redraw();
+  }
+
   dispose(): void {
     this.#owner.dispose();
   }
@@ -170,8 +195,10 @@ class LiveScene implements Scene {
       ratio: this.#renderer.getPixelRatio(),
       probing: this.#probing,
       calls: render.calls,
+      points: render.points,
       geometries: memory.geometries,
       textures: memory.textures,
+      eye: { ...this.#eye.at },
     };
   }
 }

@@ -8,15 +8,29 @@ const three = vi.hoisted(() => ({
     setPixelRatio: vi.fn<(ratio: number) => void>(),
     getPixelRatio: () => 1,
     setSize: vi.fn<(width: number, height: number, style: boolean) => void>(),
-    render: vi.fn<(stage: unknown, camera: { aspect: number }) => void>(),
+    render:
+      vi.fn<(stage: unknown, camera: { aspect: number; position: { x: number; y: number; z: number } }) => void>(),
     forceContextLoss: vi.fn<() => void>(),
     dispose: vi.fn<() => void>(),
-    info: { render: { calls: 3 }, memory: { geometries: 4, textures: 5 } },
+    info: { render: { calls: 3, points: 7 }, memory: { geometries: 4, textures: 5 }, reset: vi.fn<() => void>() },
   },
   create: vi.fn<(canvas: unknown, antialias: boolean) => unknown>(),
+  space: {
+    follow: vi.fn<(eye: { x: number; y: number; z: number }, seconds: number) => void>(),
+    detail: vi.fn<(tier: string) => void>(),
+    march: vi.fn<() => void>(),
+    resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
+  },
+  owner: { current: undefined as { signal: AbortSignal } | undefined },
 }));
 
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
+vi.mock("./space.ts", () => ({
+  Space: vi.fn(function construct(_stage: unknown, owner: { signal: AbortSignal }) {
+    three.owner.current = owner;
+    return three.space;
+  }),
+}));
 
 const media = new Map<string, EventTarget & { matches: boolean; media: string }>();
 const query = (text: string) => {
@@ -502,4 +516,222 @@ it("reads three's own counters for the journeys", () => {
   expect(scene.stats()).toMatchObject({ calls: 3, geometries: 4, textures: 5, tier: "low", probing: false });
   expect(scene.stats().frames).toBeGreaterThan(0);
   scene.dispose();
+});
+
+describe("the eye", () => {
+  const lastEye = () => three.space.follow.mock.lastCall?.[0];
+
+  // Where the eye is after `ms` from a pointer event, on a screen of its own, the drift the same in every run.
+  function eyeAfter(events: readonly Record<string, unknown>[], ms: number) {
+    clock = new FakeClock(60);
+    three.space.follow.mockClear();
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(200);
+    for (const event of events) window.dispatchEvent(Object.assign(new Event("pointermove"), event));
+    clock.run(ms);
+    const eye = { x: NaN, y: NaN, z: NaN, ...lastEye() };
+    scene.dispose();
+    return eye;
+  }
+  const mouse = (clientX: number, clientY: number) => ({ pointerType: "mouse", clientX, clientY });
+
+  it("keeps the camera at the origin however far the eye goes: the scene is recentred on it", () => {
+    query(MOTION).matches = true;
+    const scene = startScene(options({ remembered: "low" }), clock);
+    const far = { x: 2 ** 40, y: -(2 ** 40), z: 7 };
+    scene.moveTo(far);
+    clock.run(100);
+    expect(lastEye()).toEqual(far);
+    const position = three.renderer.render.mock.lastCall?.[1].position;
+    expect([position?.x, position?.y, position?.z]).toEqual([0, 0, 0]);
+    scene.dispose();
+  });
+
+  it("follows, then marches, then draws, so a frame shows where the eye is", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    const [followed] = three.space.follow.mock.invocationCallOrder;
+    const [marched] = three.space.march.mock.invocationCallOrder;
+    const [drawn] = three.renderer.render.mock.invocationCallOrder;
+    expect(followed).toBeLessThan(marched ?? 0);
+    expect(marched).toBeLessThan(drawn ?? 0);
+    scene.dispose();
+  });
+
+  it("resets the draw count once a frame, before its first pass", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    three.renderer.info.reset.mockClear();
+    frames(1, 34);
+    expect(three.renderer.info.reset).toHaveBeenCalledTimes(three.space.march.mock.calls.length);
+    const [reset] = three.renderer.info.reset.mock.invocationCallOrder;
+    const marches = three.space.march.mock.invocationCallOrder;
+    expect(reset).toBeLessThan(marches.at(-1) ?? 0);
+    scene.dispose();
+  });
+
+  it("sizes the sky with the buffer", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    expect(three.space.resize).toHaveBeenLastCalledWith(1280, 800, 1);
+    scene.dispose();
+  });
+
+  it("reports where it is", () => {
+    query(MOTION).matches = true;
+    const scene = startScene(options({ remembered: "low" }), clock);
+    scene.moveTo({ x: 1, y: 2, z: 3 });
+    clock.run(100);
+    expect(scene.stats().eye).toEqual({ x: 1, y: 2, z: 3 });
+    scene.dispose();
+  });
+
+  it("owes a frame for a move, even at rest", () => {
+    query(MOTION).matches = true;
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    three.renderer.render.mockClear();
+    clock.run(100);
+    expect(three.renderer.render).not.toHaveBeenCalled();
+    scene.moveTo({ x: 1, y: 2, z: 3 });
+    clock.run(100);
+    expect(three.renderer.render).toHaveBeenCalledTimes(1);
+    scene.dispose();
+  });
+
+  it("drifts while motion is allowed", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    const first = { ...lastEye() };
+    frames(30, 34);
+    expect(lastEye()).not.toEqual(first);
+    scene.dispose();
+  });
+
+  it("counts its time in seconds that passed, not in frames, at 10 fps too", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(61_000);
+    three.space.follow.mockClear();
+    clock.run(10_000);
+    expect(three.space.follow.mock.calls.length).toBeLessThanOrEqual(101);
+    expect(three.space.follow.mock.lastCall?.[1]).toBeCloseTo(71, 0);
+    scene.dispose();
+  });
+
+  it("stops its time while the tab is hidden, and takes up where it was", () => {
+    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(1000);
+    const before = three.space.follow.mock.lastCall?.[1] ?? NaN;
+    hidden.mockReturnValue(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+    clock.run(30_000);
+    hidden.mockReturnValue(false);
+    document.dispatchEvent(new Event("visibilitychange"));
+    clock.run(200);
+    expect(three.space.follow.mock.lastCall?.[1]).toBeLessThan(before + 1);
+    scene.dispose();
+    hidden.mockRestore();
+  });
+
+  it("stays put under reduced motion, its motes with it", () => {
+    query(MOTION).matches = true;
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    const first = { ...lastEye() };
+    scene.moveTo(first as { x: number; y: number; z: number });
+    frames(30, 34);
+    expect(lastEye()).toEqual(first);
+    expect(three.space.follow.mock.lastCall?.[1]).toBe(0);
+    scene.dispose();
+  });
+
+  it("freezes in place when reduced motion comes on in a session: nothing jumps back", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(2000);
+    query(MOTION).matches = true;
+    query(MOTION).dispatchEvent(new Event("change"));
+    clock.run(100);
+    const eye = { ...lastEye() };
+    const seconds = three.space.follow.mock.lastCall?.[1];
+    expect(seconds).toBeGreaterThan(1);
+    scene.moveTo({ x: 0, y: 0, z: 0 });
+    scene.moveTo(eye as { x: number; y: number; z: number });
+    clock.run(100);
+    expect(three.space.follow.mock.lastCall?.[1]).toBe(seconds);
+    scene.dispose();
+  });
+
+  it("leans with a mouse, a little, with no jump", () => {
+    const still = eyeAfter([], 34);
+    const started = eyeAfter([mouse(1024, 384)], 34);
+    expect(Math.abs(started.x - still.x)).toBeLessThan(0.5);
+    const rested = eyeAfter([], 3000);
+    const leaned = eyeAfter([mouse(1024, 0)], 3000);
+    expect(leaned.x - rested.x).toBeGreaterThan(0.5);
+    expect(leaned.x - rested.x).toBeLessThan(6);
+    expect(leaned.y - rested.y).toBeGreaterThan(0.5);
+  });
+
+  it("comes back when the mouse does", () => {
+    const rested = eyeAfter([], 6000);
+    const back = eyeAfter([mouse(1024, 0), mouse(512, 384)], 6000);
+    expect(Math.abs(back.x - rested.x)).toBeLessThan(0.01);
+    expect(Math.abs(back.y - rested.y)).toBeLessThan(0.01);
+  });
+
+  it("takes no lean from a finger: a touch is no aim", () => {
+    expect(eyeAfter([{ pointerType: "touch", clientX: 1024, clientY: 0 }], 3000)).toEqual(eyeAfter([], 3000));
+  });
+
+  it("takes no lean under reduced motion", () => {
+    query(MOTION).matches = true;
+    expect(eyeAfter([mouse(1024, 0)], 3000)).toEqual(eyeAfter([], 3000));
+  });
+});
+
+describe("the sky's detail", () => {
+  const verdictOn = (hz: number) => {
+    clock = new FakeClock(hz);
+    const scene = startScene(options(), clock);
+    clock.run(4000);
+    const { tier } = scene.stats();
+    scene.dispose();
+    return tier;
+  };
+
+  it("starts thin on a device known slow", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    expect(three.space.detail).toHaveBeenLastCalledWith("low");
+    scene.dispose();
+  });
+
+  it("starts whole on any other, and stays whole when the probe keeps it", () => {
+    expect(verdictOn(60)).toBe("high");
+    expect(three.space.detail).toHaveBeenCalledWith("high");
+    expect(three.space.detail).not.toHaveBeenCalledWith("low");
+  });
+
+  it("thins on the probe's Low", () => {
+    expect(verdictOn(40)).toBe("low");
+    expect(three.space.detail).toHaveBeenLastCalledWith("low");
+  });
+
+  it("thins on a battery saver's Low too", () => {
+    expect(verdictOn(30)).toBe("low");
+    expect(three.space.detail).toHaveBeenLastCalledWith("low");
+  });
+});
+
+describe("leaving", () => {
+  it("hands the space the scene's own owner, so it goes with the scene", () => {
+    const scene = startScene(options(), clock);
+    expect(three.owner.current?.signal.aborted).toBe(false);
+    scene.dispose();
+    expect(three.owner.current?.signal.aborted).toBe(true);
+  });
+
+  it("reports the points drawn", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    expect(scene.stats().points).toBe(7);
+    scene.dispose();
+  });
 });
