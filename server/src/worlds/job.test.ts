@@ -554,6 +554,11 @@ describe("startWorlds", () => {
     ["an http: indexer", { ...universe, indexer: "http://indexer.onyx.testnets.gno.land/graphql/query" }],
     ["a user in the indexer's address", { ...universe, indexer: "https://u:p@indexer.gno.land/graphql/query" }],
     ["a universe id with markup", { ...universe, id: "<b>" }],
+    ["a universe id with markup after a name", { ...universe, id: "onyx<b>" }],
+    ["a universe id with markup before a name", { ...universe, id: "<b>onyx" }],
+    ["a universe id in upper case", { ...universe, id: "Onyx" }],
+    ["a universe id of 33 characters", { ...universe, id: "a".repeat(33) }],
+    ["an empty universe id", { ...universe, id: "" }],
   ])("refuses to start with %s, naming the worlds job", (_name, bad) => {
     expect(() => startWorlds({ ...base, file: fresh(), universe: bad })).toThrow(/worlds/);
   });
@@ -635,5 +640,92 @@ describe("startWorlds", () => {
     job.stop();
     expect(logged[0]).toBe("worlds_failed internal");
     expect(logged[1]).toBe("worlds_failed request");
+  });
+});
+
+describe("the behaviours the pass states", () => {
+  const C = `g1${"q".repeat(38)}`;
+  const THREE = [POOL, ROUTER, "gno.land/r/zeta/dex"];
+  const creators: Record<string, string> = { [POOL]: A, [ROUTER]: B, "gno.land/r/zeta/dex": C };
+  const byCreator = (path: string): string =>
+    `[addpkg]\n  creator = "${creators[path.replace("/gnomod.toml", "")] ?? A}"\n`;
+  const timeout = Object.assign(new Error("t"), { name: "TimeoutError" });
+  const faults: [string, () => Response | Error][] = [
+    ["a network fault", () => new TypeError("fetch failed")],
+    ["a timeout", () => timeout],
+    ["a status fault", () => new Response("down", { status: 502 })],
+    ["a 429", () => new Response("slow down", { status: 429 })],
+  ];
+
+  it("leaves a realm whose indexer answer is odd and goes on to the next, keeping its counts", async () => {
+    const { file, chain } = await run(
+      chainRoutes([POOL, ROUTER], {
+        indexer: ({ variables }) => (pathOf(variables) === POOL ? "{}" : history(2, ROUTER)),
+      }),
+    );
+    expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(2);
+    const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
+    expect(calls).toEqual({ "gnoswap/pool": null, "gnoswap/router": 2 });
+  });
+
+  it.each(faults)("ends the package reads of the pass at %s, by the calls asked", async (_name, fault) => {
+    const { chain, outcome } = await run(chainRoutes(THREE, { doc: fault }));
+    expect(outcome).toEqual({ wrote: true });
+    expect(chain.asked.filter(({ kind }) => kind === "vm/qdoc")).toHaveLength(1);
+  });
+
+  it.each(faults)("ends the name reads of the pass at %s, by the calls asked", async (_name, fault) => {
+    const { chain, outcome } = await run(chainRoutes(THREE, { file: byCreator, eval: fault }));
+    expect(outcome).toEqual({ wrote: true });
+    expect(chain.asked.filter(({ kind }) => kind === "vm/qeval")).toHaveLength(1);
+  });
+
+  it("goes on to the next deployer's name when one name is refused", async () => {
+    const { chain } = await run(
+      chainRoutes(THREE, {
+        file: byCreator,
+        eval: (expression) => (expression === evalNameOf(A) ? abciRefused() : named("x")),
+      }),
+    );
+    expect(chain.asked.filter(({ kind }) => kind === "vm/qeval")).toHaveLength(3);
+  });
+
+  it("does not ask the name of a deployer the last file already named", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    const second = await run(chainRoutes([POOL, ROUTER]), { file });
+    expect(second.chain.asked.filter(({ kind }) => kind === "vm/qeval")).toHaveLength(0);
+    expect(written(file).worlds.flatMap((world) => world.realms.map((realm) => realm.deployerName))).toEqual([
+      "alexis",
+      "alexis",
+    ]);
+  });
+
+  it("writes an empty file for an empty first list", async () => {
+    const { file, outcome } = await run(chainRoutes([]));
+    expect(outcome).toEqual({ wrote: true });
+    expect(written(file).worlds).toEqual([]);
+  });
+
+  it.each([
+    ["the list", (asked: { kind: string }[]) => asked.length > 0],
+    ["the packages", (asked: { kind: string }[]) => asked.some(({ kind }) => kind === "vm/qdoc")],
+    ["the indexer", (asked: { kind: string }[]) => asked.some(({ kind }) => kind === "indexer")],
+    ["the last read", (asked: { kind: string }[]) => asked.filter(({ kind }) => kind === "indexer").length === 2],
+  ])("writes nothing when it is stopped after %s", async (_name, stopped) => {
+    const file = fresh();
+    const chain = fakeChain(chainRoutes([POOL, ROUTER]));
+    const logged: string[] = [];
+    const outcome = await runWorlds({
+      file,
+      log: (event) => void logged.push(event),
+      send: chain.send,
+      universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
+      wait: () => Promise.resolve(),
+      isStopped: () => stopped(chain.asked),
+    });
+    expect(outcome).toEqual({ wrote: false, kind: "stopped" });
+    expect(existsSync(file)).toBe(false);
+    expect(logged).toEqual(["worlds_failed"]);
   });
 });
