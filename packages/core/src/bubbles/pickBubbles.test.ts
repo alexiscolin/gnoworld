@@ -885,6 +885,21 @@ describe("a bubble leaves with its line (F3366)", () => {
     expect(out.counts).toEqual([{ country: "FR", count: 1, far: false }]);
   });
 
+  it("takes the bubble off when its author corrects the line: words taken back stop being read (7f2's review)", () => {
+    const first = pick([line({ text: "my phone is 555-1234" })]);
+    const out = pick([line({ text: "sorry, wrong room" })], ME, { shown: first.shown, now: later });
+    expect(out.bubbles).toEqual([]);
+    expect(pick([line({ text: "sorry, wrong room" })], ME, { shown: out.shown, now: later + 1000 }).bubbles).toEqual(
+      [],
+    );
+  });
+
+  it("keeps a bubble whose line kept its words, cut as it was cut", () => {
+    const text = "a".repeat(RULES.maxChars + 20);
+    const first = pick([line({ text })]);
+    expect(ids(pick([line({ text })], ME, { shown: first.shown, now: later }).bubbles)).toEqual(["m1"]);
+  });
+
   it("uses one rule for a new bubble and a kept one: what cannot be picked cannot stay", () => {
     const first = pick([line({ account: "ann" }), msg(2, { country: "FR", account: "bob" })]);
     expect(first.bubbles).toHaveLength(2);

@@ -5,7 +5,7 @@ import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
 import { isFarSide } from "./farSide.ts";
-import { newestFirst, readWindow } from "./window.ts";
+import { isOpen, newestFirst, readWindow } from "./window.ts";
 import type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 
 export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
@@ -56,20 +56,19 @@ function far(run: Run, country: string): boolean {
 
 /** The one rule of what a bubble may be made of, for a new one and one on screen (F3366): a bubble stands for its line. */
 function allowed(run: Run, m: BubbleMessage): boolean {
-  return (
-    m.visibility === "public" &&
-    m.joined &&
-    m.hidden !== true &&
-    centreOf(m.country) !== undefined &&
-    !run.blocked.has(fold(m.account))
-  );
+  return isOpen(m) && !run.blocked.has(fold(m.account));
 }
 
-/** Whether a bubble of the state may stay on screen: its line is still listed and allowed; yours shows whatever the far
- * side (§1, question 4), the rest not. */
+/** Whether a bubble of the state may stay on screen: its line is still listed, allowed and says what it said (a correction
+ * takes the old words back); yours shows whatever the far side (§1, question 4), the rest not. */
 function visible(run: Run, s: Bubble): boolean {
   const line = run.window.get(s.id);
-  return s.until > run.now && line !== undefined && allowed(run, line) && (s.own || !far(run, s.country));
+  return (
+    line !== undefined &&
+    allowed(run, line) &&
+    cutText(line.text, run.chars) === s.text &&
+    (s.own || !far(run, s.country))
+  );
 }
 
 function rankOf(run: Run, m: BubbleMessage): number {
