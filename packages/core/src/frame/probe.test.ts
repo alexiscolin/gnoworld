@@ -23,6 +23,17 @@ describe("judgeFrames", () => {
     expect(judgeFrames(steady(50, 40), 40)).toBe("low");
   });
 
+  it("waits for ten frames, whatever they took: the tenth cuts nothing out of fewer", () => {
+    expect(judgeFrames(steady(2100, 1), 1)).toBe("pending");
+    expect(judgeFrames(mixed([16, 8], [2100, 1]), 9)).toBe("pending");
+    expect(judgeFrames(steady(300, 9), 9)).toBe("pending");
+    expect(judgeFrames(steady(300, 10), 10)).toBe("low");
+  });
+
+  it("forgives one long first frame, a shader's compile, at ten frames", () => {
+    expect(judgeFrames(mixed([2100, 1], [16, 9]), 10)).toBe("keep");
+  });
+
   it("drops to Low above 20 ms a frame, not at 20", () => {
     expect(judgeFrames(steady(20, 90), 90)).toBe("keep");
     expect(judgeFrames(steady(20.1, 90), 90)).toBe("low");

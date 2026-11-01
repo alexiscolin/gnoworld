@@ -3,6 +3,8 @@
 
 export const PROBE_FRAMES = 90;
 const PROBE_MS = 2000;
+// Under ten frames the slowest tenth is none: one stall would be the verdict, and remembered for good.
+const FEWEST_FRAMES = 10;
 const LOW_ABOVE_MS = 20;
 const SAVER_MS = 33.3;
 const SAVER_WITHIN_MS = 3;
@@ -13,7 +15,7 @@ export type ProbeVerdict = "pending" | "keep" | "low" | "low-for-now";
 export function judgeFrames(frames: ArrayLike<number>, count: number): ProbeVerdict {
   let spent = 0;
   for (let at = 0; at < count; at += 1) spent += frames[at] ?? 0;
-  if (count === 0 || (count < PROBE_FRAMES && spent < PROBE_MS)) return "pending";
+  if (count < FEWEST_FRAMES || (count < PROBE_FRAMES && spent < PROBE_MS)) return "pending";
   const kept = Array.from({ length: count }, (_, at) => frames[at] ?? 0)
     .sort((a, b) => a - b)
     .slice(0, count - Math.floor(count / 10));
