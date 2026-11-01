@@ -35,7 +35,16 @@ const following = () => {
 
 describe("the store's chat slice", () => {
   it("starts with no room and no nick", () => {
-    expect(createAppStore().getState().chat).toEqual({ me: undefined, rooms: {} });
+    expect(createAppStore().getState().chat).toEqual({ me: undefined, rooms: {}, listed: undefined });
+  });
+
+  it("keeps the rooms the server lists, and none of a list that could not come", () => {
+    const store = createAppStore();
+    const list = [{ name: null, rooms: [{ room: "#earth", type: "open" as const }] }];
+    store.getState().chatActions.listed(list);
+    expect(store.getState().chat.listed).toBe(list);
+    store.getState().chatActions.listed(undefined);
+    expect(store.getState().chat.listed).toBeUndefined();
   });
 
   it("follows the rooms it is given, each empty, and drops the ones it no longer is", () => {

@@ -22,6 +22,7 @@ import {
   type Reaction,
   type Where,
 } from "@gnoworld/core";
+import type { RoomList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { own } from "./record.ts";
 
@@ -56,6 +57,8 @@ interface ChatState {
   me: string | undefined;
   /** The rooms followed, by id, in the order given. */
   rooms: Readonly<Record<string, RoomState>>;
+  /** The rooms the server lists to this reader; none until the list comes, and none of a list that failed. */
+  listed: RoomList["sections"] | undefined;
 }
 
 export interface ChatSlice {
@@ -63,6 +66,8 @@ export interface ChatSlice {
   chatActions: {
     /** The rooms to follow: the ones kept keep what they hold, the new ones start empty, the others go. */
     follow: (rooms: readonly string[]) => void;
+    /** The list of rooms as the server gave it to this reader; none when it could not. */
+    listed: (sections: RoomList["sections"] | undefined) => void;
     connected: (me: string) => void;
     /** One live line from Ergo, read by every room it concerns. */
     heard: (message: IrcMessage) => void;
@@ -143,8 +148,11 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
     set({ chat: { ...chat, ...next } });
   };
   return {
-    chat: { me: undefined, rooms: {} },
+    chat: { me: undefined, rooms: {}, listed: undefined },
     chatActions: {
+      listed: (listed) => {
+        change({ listed });
+      },
       follow: (ids) => {
         const { rooms } = get().chat;
         const wanted = [...new Set(ids)];
