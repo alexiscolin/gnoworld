@@ -22,8 +22,13 @@ function shellUrl(name: string): string | undefined {
   return /^(?!assets\/).+\.data$/.test(name) ? `/${name}` : undefined;
 }
 
+// The scene's chunk holds three: the worker runs on a phone too, where nothing of the 3D loads before "View in space" (ADR-0002 §8,
+// row 10). It is fetched when asked, and offline the page has its list.
+const onRequest = (name: string) => /^assets\/scene-[\w-]{8}\.js$/.test(name);
+
 function entries(fileNames: Iterable<string>): { url: string; file: string }[] {
   return [...fileNames]
+    .filter((file) => !onRequest(file))
     .flatMap((file) => {
       const url = isHashed(file) ? `/${file}` : shellUrl(file);
       return url === undefined ? [] : [{ url, file }];
