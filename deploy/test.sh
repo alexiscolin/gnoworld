@@ -1373,7 +1373,8 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
 	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
 	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
-	# The worlds job's indexers (slice 7, 7c): each universe's, asked as the job asks; any answer is a way through.
+	# The worlds job's indexers (slice 7, 7c): each universe's host, a GET of `/` (the job POSTs to `/graphql/query`: its answer is read
+	# below, from a real pass); any answer is a way through.
 	for indexer_host in $indexer_hosts; do
 		case $(fetched "https://$indexer_host/") in [1-5][0-9][0-9]) pass "the server reaches the universe's indexer $indexer_host through the way out" ;; *) fail "the server does not reach the universe's indexer $indexer_host through the way out" ;; esac
 	done
@@ -1393,6 +1394,16 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	else
 		expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
 	fi
+	# The worlds job's first real pass (7c), not a planted file: the running job reads the list, each package, each realm's calls from the
+	# indexer and the names, one call at a time. This proves vm/qdoc, vm/qfile and the indexer's GraphQL filter against the real chain
+	# (F3516): the file must hold a realm with a deployer, functions and counts read. A first pass takes minutes: it waits up to twenty.
+	worlds_real=none
+	for _ in $(seq 1 120); do
+		worlds_real=$(docker exec "$server" /nodejs/bin/node -e "try { const w = JSON.parse(require('fs').readFileSync('/markets/worlds.json', 'utf8')); console.log(w.worlds.some((x) => x.realms.some((r) => r.deployer !== null && r.functions.length > 0 && r.calls !== null)) ? 'read' : 'empty') } catch { console.log('none') }" 2>/dev/null || true)
+		[ "$worlds_real" = read ] && break
+		sleep 10
+	done
+	expect "the running worlds job reads a realm's deployer, functions and calls from the chain and its indexer" "$worlds_real" read
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused

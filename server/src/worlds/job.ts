@@ -82,8 +82,15 @@ function loadLast(file: string, universe: string): Worlds | undefined {
   }
 }
 
-// The history of each realm in turn. A fault of the network ends the asking for the pass; one that is about a realm only
-// (an answer too big or of the wrong shape) leaves that realm with its earlier counts.
+/** The answers of the wrong shape in a row that end the asking: the indexer does not speak the schema we ask in. */
+const SHAPE_STRIKES = 3;
+
+// Whether a fault is about one realm's answer (too big, or of the wrong shape) and not about the indexer or the network.
+const aboutRealm = (kind: Kind): boolean => kind === "shape" || kind === "too_large";
+
+// The history of each realm in turn. A network fault, or SHAPE_STRIKES wrong-shape answers in a row, ends the asking; a fault about one
+// realm only leaves it with its earlier counts. ponytail: one request per realm per pass, about 3 minutes at 743 realms and 42 at
+// 9,999; a pass ends before the next is counted (repeat.ts), so it lengthens the cycle. A chain-wide read waits for the schema.
 async function readHistories(
   reader: { send: Send; indexer: string; pace: () => Promise<void> },
   paths: readonly string[],
@@ -91,14 +98,18 @@ async function readHistories(
 ): Promise<Map<string, History>> {
   const histories = new Map<string, History>();
   let skipped: Kind | undefined;
+  let strikes = 0;
   for (const path of paths) {
     if (hooks.isStopped()) throw new Failure("stopped");
     const read = await readHistory(reader, path);
     if (read.ok) {
       histories.set(path, read.history);
-    } else if (read.kind === "shape" || read.kind === "too_large") {
-      skipped ??= read.kind;
-    } else {
+      strikes = 0;
+      continue;
+    }
+    strikes = read.kind === "shape" ? strikes + 1 : 0;
+    if (aboutRealm(read.kind)) skipped ??= read.kind;
+    if (!aboutRealm(read.kind) || strikes >= SHAPE_STRIKES) {
       hooks.log("worlds_indexer_failed", { error: read.kind });
       break;
     }

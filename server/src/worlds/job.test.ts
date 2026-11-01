@@ -324,6 +324,29 @@ describe("runWorlds", () => {
       expect(chain.asked.filter(({ kind }) => kind === "indexer").length).toBeLessThanOrEqual(3);
     });
 
+    it("ends the indexer reads after three shape answers in a row and logs the indexer as failed, not once a realm", async () => {
+      const paths = Array.from({ length: 40 }, (_, i) => `gno.land/r/ns/app${String(i)}`);
+      const wrong = JSON.stringify({ errors: [{ message: "unknown field" }], data: null });
+      const { chain, logged, outcome } = await run(chainRoutes(paths, { indexer: () => wrong }));
+      expect(outcome).toEqual({ wrote: true });
+      expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(3);
+      expect(logged).toContainEqual({ event: "worlds_indexer_failed", error: "shape" });
+    });
+
+    it("keeps asking after a shape answer that is not followed by two more, for one realm may be the odd one", async () => {
+      const paths = Array.from({ length: 10 }, (_, i) => `gno.land/r/ns/app${String(i)}`);
+      let n = 0;
+      const { chain } = await run(
+        chainRoutes(paths, {
+          indexer: ({ variables }) => {
+            n += 1;
+            return n % 3 === 0 ? "{}" : history(1, pathOf(variables));
+          },
+        }),
+      );
+      expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(10);
+    });
+
     it("keeps the earlier counts of a realm the indexer cannot answer now, and updates the others", async () => {
       const file = fresh();
       await run(chainRoutes([POOL, ROUTER], { indexer: ({ variables }) => history(4, pathOf(variables)) }), { file });

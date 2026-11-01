@@ -347,10 +347,16 @@ Slice 3, the server's retention (3n):
   the end of the last pass the server reads the default universe's realm list (`vm/qpaths`), each new package once (`vm/qdoc`,
   `vm/qfile`), each realm's calls from the universe's indexer and each new deployer's name, one call at a time with a quarter-second
   pause, and writes the worlds by renaming a temporary file, at most 4 MiB. A failed list keeps the last file and logs
-  `{"event":"worlds_failed","error":"<kind>"}`; a silent indexer logs `worlds_indexer_failed` and leaves the counts null; the kinds
+  `{"event":"worlds_failed","error":"<kind>"}`; a list the chain cuts at its limit is read by prefix, up to 2,000 requests. A world
+  keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
+  `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of the network on the indexer, or three answers of the wrong
+  shape in a row, logs `worlds_indexer_failed` and ends the indexer reads of the pass, and a realm without a fresh answer keeps its
+  earlier counts (null on a first pass); one answer too big or odd logs `worlds_history_skipped` once. The kinds
   are `request`, `timeout`, `status`, `rate_limited`, `too_large`, `too_many`, `not_json`, `shape`, `chain_refused`, `empty`,
   `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
-  of the realm list's, `vm/qdoc`'s and the indexer's answers is `deploy/test.sh`, which Alexis runs.
+  of the realm list's, `vm/qdoc`'s and the indexer's answers is `deploy/test.sh`, which Alexis runs: it waits for the running job's
+  own first pass and asks for a realm with a deployer, functions and counts. The indexer's GraphQL filter (`messages.value.pkg_path`)
+  is ours, not recorded: until that run, an indexer that refuses it shows as `worlds_indexer_failed` with `shape`.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
