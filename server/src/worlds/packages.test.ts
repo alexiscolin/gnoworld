@@ -28,7 +28,11 @@ const doc = (over: Record<string, unknown> = {}): string =>
 const gnomod = (creator = CREATOR, height = 298006): string =>
   `module = "x"\ngno = "0.9"\n\n[addpkg]\n  creator = "${creator}"\n  height = ${String(height)}\n`;
 
-const routes = (over: Routes = {}): Routes => ({ doc: () => doc(), file: () => gnomod(), ...over });
+const routes = (over: Routes = {}): Routes => ({
+  doc: (path) => doc({ package_path: path }),
+  file: () => gnomod(),
+  ...over,
+});
 const read = (paths: string[], over: Routes = {}, known: Map<string, PackageFacts> = new Map()) => {
   const chain = fakeChain(routes(over));
   return { chain, done: readPackages({ send: chain.send, rpc: RPC, known }, paths) };
@@ -160,7 +164,9 @@ describe("readPackages", () => {
   });
 
   it("leaves a package out when its vm/qdoc is refused, so the next pass asks it again", async () => {
-    const { done } = read([WUGNOT, ARENA], { doc: (path) => (path === WUGNOT ? abciRefused() : doc()) });
+    const { done } = read([WUGNOT, ARENA], {
+      doc: (path) => (path === WUGNOT ? abciRefused() : doc({ package_path: path })),
+    });
     const result = await done;
     expect(result.has(WUGNOT)).toBe(false);
     expect(result.has(ARENA)).toBe(true);
@@ -175,19 +181,32 @@ describe("readPackages", () => {
     expect((await read([WUGNOT], { file: () => file }).done).get(WUGNOT)?.deployer).toBeNull();
   });
 
-  // gno's field is `json:"imports,omitempty"` (json_doc.go:22 at v1.5.0), and a slice with nothing in it is left out of the JSON.
+  // gno's `imports` is `json:"imports,omitempty"` (json_doc.go:22 at v1.5.0), so it is left out when empty; `funcs` and
+  // `package_path` have no omitempty (a nil slice is null), so they are always there.
   it.each([
     ["no imports key", () => JSON.stringify({ package_path: WUGNOT, funcs: [{ type: "", name: "Transfer" }] })],
-    ["no funcs key", () => JSON.stringify({ package_path: WUGNOT, imports: ["gno.land/p/nt/ufmt"] })],
+    ["a null imports", () => JSON.stringify({ package_path: WUGNOT, imports: null, funcs: [] })],
     ["a null funcs", () => JSON.stringify({ package_path: WUGNOT, imports: [], funcs: null })],
-  ])("reads a doc with %s (omitted when empty), and keeps the package read", async (_name, make) => {
+  ])("reads a doc with %s, and keeps the package read", async (_name, make) => {
     const { done } = read([WUGNOT], { doc: make });
     const facts = (await done).get(WUGNOT);
     expect(facts?.deployer).toBe(CREATOR);
   });
 
+  // An answer that is no doc of the package asked (a bad RPC's `{}`, another package's doc) must not become "no functions".
+  it.each([
+    ["an empty object", () => "{}"],
+    ["one without package_path", () => JSON.stringify({ imports: [], funcs: [] })],
+    ["one without a funcs key", () => JSON.stringify({ package_path: WUGNOT, imports: ["gno.land/p/nt/ufmt"] })],
+    ["one of another package", () => JSON.stringify({ package_path: ARENA, imports: [], funcs: [] })],
+    ["one whose package_path is no string", () => JSON.stringify({ package_path: 12, imports: [], funcs: [] })],
+  ])("leaves a package out when its doc is %s, so the next pass asks again (F3544)", async (_name, make) => {
+    const { done } = read([WUGNOT], { doc: make });
+    expect((await done).has(WUGNOT)).toBe(false);
+  });
+
   it("reads the functions of a doc with no imports key", async () => {
-    const bare = JSON.stringify({ funcs: [{ type: "", name: "Transfer" }] });
+    const bare = JSON.stringify({ package_path: WUGNOT, funcs: [{ type: "", name: "Transfer" }] });
     expect((await read([WUGNOT], { doc: () => bare }).done).get(WUGNOT)?.functions).toEqual(["Transfer"]);
   });
 

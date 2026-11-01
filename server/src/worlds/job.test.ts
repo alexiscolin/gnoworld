@@ -29,9 +29,9 @@ const fresh = (): string => {
   return join(folder, "worlds.json");
 };
 
-const doc = (imports: string[] = ["gno.land/p/nt/avl/v0"]): string =>
+const doc = (path: string, imports: string[] = ["gno.land/p/nt/avl/v0"]): string =>
   JSON.stringify({
-    package_path: "x",
+    package_path: path,
     package_line: "",
     package_doc: "",
     imports,
@@ -55,7 +55,7 @@ const named = (name: string | null): string =>
 
 const chainRoutes = (paths: string[], over: Routes = {}): Routes => ({
   paths: () => paths.join("\n"),
-  doc: () => doc(),
+  doc: (path) => doc(path),
   file: () => `[addpkg]\n  creator = "${A}"\n  height = 5\n`,
   indexer: ({ variables }) => history(2, pathOf(variables)),
   eval: (expression) => named(expression === evalNameOf(A) ? "alexis" : null),
@@ -400,16 +400,18 @@ describe("runWorlds", () => {
     });
 
     describe("a world that breaks the byte cap", () => {
-      const fat = JSON.stringify({
-        imports: [],
-        funcs: Array.from({ length: 200 }, (_, i) => ({ type: "", name: `Fn${String(i)}` })),
-      });
+      const fat = (path: string): string =>
+        JSON.stringify({
+          package_path: path,
+          imports: [],
+          funcs: Array.from({ length: 200 }, (_, i) => ({ type: "", name: `Fn${String(i)}` })),
+        });
       const evil = (n: number, world: (i: number) => string): string[] =>
         Array.from({ length: n }, (_, i) => `gno.land/r/evil/${world(i)}`);
       // The stranger's realms are never called, the router is: the least active world is shed first.
       const routes = (paths: string[]) =>
         chainRoutes(paths, {
-          doc: (path) => (path.includes("evil") ? fat : doc()),
+          doc: (path) => (path.includes("evil") ? fat(path) : doc(path)),
           indexer: ({ variables }) => history(pathOf(variables).includes("evil") ? 0 : 2, pathOf(variables)),
         });
 

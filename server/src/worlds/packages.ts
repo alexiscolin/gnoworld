@@ -18,10 +18,12 @@ const DOC_MAX_BYTES = 1024 * 1024;
 const FILE_MAX_BYTES = 16 * 1024;
 const CALL_MS = 15_000;
 
-// gno leaves an empty `imports` or `funcs` out of the JSON (`omitempty`, json_doc.go:22 at v1.5.0), so each may be absent or null.
+// gno leaves an empty `imports` out of the JSON (`omitempty`, json_doc.go:22 at v1.5.0); `package_path` and `funcs` have no omitempty
+// (a nil slice is null), so they are always there, and an answer without them is no doc.
 const Doc = z.object({
+  package_path: z.string(),
   imports: z.optional(z.nullable(z.array(z.string()))),
-  funcs: z.optional(z.nullable(z.array(z.object({ type: z.optional(z.string()), name: z.string() })))),
+  funcs: z.nullable(z.array(z.object({ type: z.optional(z.string()), name: z.string() }))),
 });
 
 // The first `creator = "..."` of the [addpkg] table, if it is an address.
@@ -40,8 +42,8 @@ function creatorOf(gnomod: string): string | null {
 // Sorted, once each, at most `max`.
 const listed = (names: Iterable<string>, max: number): string[] => [...new Set(names)].sort().slice(0, max);
 
-// The facts of a doc's JSON, or null for an answer that is no doc.
-function factsOf(text: string): Omit<PackageFacts, "deployer"> | null {
+// The facts of a doc's JSON, or null for an answer that is no doc of the package asked.
+function factsOf(text: string, path: string): Omit<PackageFacts, "deployer"> | null {
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -49,7 +51,7 @@ function factsOf(text: string): Omit<PackageFacts, "deployer"> | null {
     return null;
   }
   const doc = Doc.safeParse(json);
-  if (!doc.success) return null;
+  if (!doc.success || doc.data.package_path !== path) return null;
   return {
     functions: listed(
       (doc.data.funcs ?? []).flatMap(({ type, name }) =>
@@ -73,7 +75,7 @@ async function readOne(
 ): Promise<PackageFacts | null> {
   await reader.pace?.();
   const text = await abciQuery(reader, { path: "vm/qdoc", data: path }, { ms: CALL_MS, maxBytes: DOC_MAX_BYTES });
-  const doc = factsOf(text);
+  const doc = factsOf(text, path);
   if (doc === null) return null;
   let deployer: string | null = null;
   await reader.pace?.();
