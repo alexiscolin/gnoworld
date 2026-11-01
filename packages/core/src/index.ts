@@ -25,6 +25,7 @@ export {
   type SystemPlace,
   type SystemRef,
 } from "./cosmos/cosmos.ts";
+export { ANCHORS, MAPS, planetLook, planetSeed, type Anchor, type MapName, type PlanetLook } from "./planet/look.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
