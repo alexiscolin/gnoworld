@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { EMBED_PREFIXES } from "@gnoworld/schemas";
 import { inlineScripts, outputs, pagePolicies, policy, sha256 } from "./csp.ts";
+import { headerBlocks, headerRules, isDetach, nginxTable, policyLine } from "../tests/e2e/cspFiles.mjs";
 import { CLOSE, CONTEXT, ENQUEUE, MODULE, MODULE_LIST, page, SCROLL } from "./cspFixture.ts";
 
 // The loader data of the list page: other bytes than a world's.
@@ -76,6 +77,7 @@ describe("inlineScripts", () => {
     ["an attribute that only ends in src", '<script data-src="x">a()</script>', ["a()"]],
     ["src as an attribute's value", '<script id="src">a()</script>', ["a()"]],
     ["SRC in capitals", '<script SRC="/x.js"></script>', []],
+    ["a bare src, with no value", "<script src>x</script>", []],
     ["a > in a quoted attribute", '<script data-x="a>b">a()</script>', ["a()"]],
     ["a single-quoted attribute", "<script id='ab'>a()</script>", ["a()"]],
     ["a > in a single-quoted attribute", "<script data-x='a>b'>a()</script>", ["a()"]],
@@ -150,6 +152,20 @@ describe("inlineScripts", () => {
 
   it("ends a script at its first closing tag, as the browser does", () => {
     expect(inlineScripts("<script>x = '</script>';</script>")).toEqual(["x = '"]);
+  });
+
+  // F2455: the shapes a tag's attributes take, as the HTML parser reads them: an empty quoted value is a value.
+  it.each([
+    ["an empty double-quoted attribute", `<script data-a="">x</script>`, ["x"]],
+    ["an empty single-quoted attribute", `<script data-a=''>x</script>`, ["x"]],
+    ["a > in a single-quoted attribute", `<script data-a='>'>x</script>`, ["x"]],
+    // A name does not run on into a tag opener: `a<src` reads as `a` and `src`, so the script has a source and is not hashed,
+    // the side that stays shut (the browser, which hashes nothing here, runs it under no hash and blocks it).
+    ["a name that holds a <, which names a src after it", `<script a<src=x>alert(1)</script>`, []],
+    ["a tag whose name only starts like script", `<scripty>x</script>`, []],
+    ["a tag named script2", `<script2>x</script>`, []],
+  ])("reads %s", (_, html, expected) => {
+    expect(inlineScripts(html)).toEqual(expected);
   });
 });
 
@@ -357,10 +373,20 @@ describe("pagePolicies", () => {
     ["a handler after a > in a quoted value", ['<img alt="a>b" onerror=x()>']],
     ["a style after a > in a quoted value", ['<p title="x>" style="color:red">t</p>']],
     ["a javascript: link", ['<a href="javascript:alert(1)">x</a>']],
-    [
-      "a javascript: link in capitals, after spaces, unquoted",
-      ["<a href= JavaScript:x>x</a>", "<form action=javascript:x>"],
-    ],
+    // One tag a page: the build stops at the first it refuses, so two in a page would each hide the other.
+    ["a javascript: link in capitals", ["<a href=JAVASCRIPT:x>x</a>"]],
+    ["a javascript: link with spaces around its =", ["<a href = javascript:x>x</a>"]],
+    ["a javascript: link unquoted after a space", ["<a href= JavaScript:x>x</a>"]],
+    ["a javascript: link with a space after its quote", ['<a href=" javascript:x">x</a>']],
+    ["a javascript: link in single quotes", ["<a href='javascript:x'>x</a>"]],
+    ["a javascript: form action", ["<form action=javascript:x>"]],
+    ["a javascript: button formaction", ["<button formaction=javascript:x>x</button>"]],
+    ["a javascript: frame source", ["<iframe src=javascript:x></iframe>"]],
+    // The tag scan and the checks are blind to case, in every tag.
+    ["a style element in capitals", ["<STYLE>p{}</STYLE>"]],
+    ["a style attribute in capitals", ['<P STYLE="x">x</P>']],
+    ["a javascript: link in capitals, in a tag in capitals", ['<A HREF="javascript:x">x</A>']],
+    ["an inline handler in a tag with capitals", ["<Img OnError=a()>"]],
   ])("fails the build on %s, which the policy would refuse in the browser", async (_, markup) => {
     // The second page is good: one bad page stops the build.
     await expect(pagePolicies({ "good/index.html": page(), "bad/index.html": markup.join("") })).rejects.toThrow(
@@ -385,6 +411,100 @@ describe("pagePolicies", () => {
     await expect(good('<p stylex="1">x</p>')).resolves.toBeDefined();
     await expect(good('<p title="<style>">x</p>')).resolves.toBeDefined();
     await expect(good('<a href="/javascript:x">x</a>')).resolves.toBeDefined();
+    // A comment is no tag: the scan starts at a letter, not at a bang.
+    await expect(good("<!-- the style=bold rule -->")).resolves.toBeDefined();
+  });
+
+  // F2455: the pages are read in code-unit order, so the tag named in the error is the same on every machine.
+  it("stops on the first bad page in code-unit order, whatever order the pages came in", async () => {
+    const bad = (mark: string) => page().replace("</body>", `<p style="${mark}">x</p></body>`);
+    const first = { "z/index.html": bad("z"), "a/index.html": bad("a") };
+    await expect(pagePolicies(first)).rejects.toThrow(/<p style="a">/);
+    const second = { "a/index.html": bad("a"), "z/index.html": bad("z") };
+    await expect(pagePolicies(second)).rejects.toThrow(/<p style="a">/);
+  });
+
+  // F2455: what a module script may hold: a route id with a $ (`routes/w.$slug`), a route of several files, and at least one
+  // import before the routes' table.
+  it.each([
+    ["a route id with a dollar", MODULE.replace('"routes/world"', '"routes/w.$slug"')],
+    [
+      "a route of three files",
+      MODULE.replace(
+        "{...route1_clientLoader,...route1_main}",
+        "{...route1_clientLoader,...route1_main,...route1_action}",
+      ),
+    ],
+  ])("builds a page whose module script has %s", async (_, module) => {
+    expect(module).not.toBe(MODULE);
+    await expect(one(page(module))).resolves.toBeDefined();
+  });
+
+  it.each([
+    ["no import before its table", MODULE.slice(MODULE.indexOf("  \n  window"))],
+    ["a route made of no file", MODULE.replace("{...route1_clientLoader,...route1_main}", "{}")],
+    ["a route id with a space", MODULE.replace('"routes/world"', '"routes/a b"')],
+  ])("fails the build on a module script with %s", async (_, module) => {
+    expect(module).not.toBe(MODULE);
+    await expect(one(page(module))).rejects.toThrow(/^csp: index\.html holds a script that is none of React Router's/);
+  });
+
+  // F2455: the context's JSON is an object; a string, a number, null or a boolean is none of React Router's.
+  it.each([['"text"'], ["5"], ["null"], ["true"]])(
+    "fails the build on a context script whose JSON is %s, not an object",
+    async (json) => {
+      const planted = CONTEXT.replace(
+        /^(window\.__reactRouterContext = ).*?(;window\.__reactRouterContext\.stream = )/s,
+        `$1${json}$2`,
+      );
+      expect(planted).not.toBe(CONTEXT);
+      await expect(one(page().replace(CONTEXT, planted))).rejects.toThrow(
+        /^csp: index\.html holds a script that is none of React Router's/,
+      );
+    },
+  );
+
+  // F2455: the loader data is a string literal of JSON, handed to the stream, and nothing else.
+  it.each([
+    ["a JSON object", 'window.__reactRouterContext.streamController.enqueue({"a":1});'],
+    ["a number", "window.__reactRouterContext.streamController.enqueue(5);"],
+    ["a string joined to code", 'window.__reactRouterContext.streamController.enqueue("a"+alert(1)+"b");'],
+    ["a string with a raw line break", 'window.__reactRouterContext.streamController.enqueue("a\nb");'],
+    ["a string left open", 'window.__reactRouterContext.streamController.enqueue("a);'],
+  ])("fails the build on loader data that is %s, not a string literal", async (_, text) => {
+    await expect(one(page(MODULE, text))).rejects.toThrow(
+      /^csp: index\.html holds a script that is none of React Router's/,
+    );
+  });
+
+  // F2455: the message cuts the script's text at 40 characters, not 39 or 41, and says whether it is none of React Router's or a second.
+  it("names a planted script cut at 40 characters, and a second form likewise", async () => {
+    const text = `alert(${"1".repeat(60)})`;
+    await expect(one(`<script>${text}</script>`)).rejects.toThrow(
+      new Error(`csp: index.html holds a script that is none of React Router's: ${JSON.stringify(text.slice(0, 40))}`),
+    );
+    const twice = CLOSE;
+    await expect(one(`<script>${twice}</script><script>${twice}</script>`)).rejects.toThrow(
+      new Error(
+        `csp: index.html holds a React Router script twice or out of order: ${JSON.stringify(twice.slice(0, 40))}`,
+      ),
+    );
+  });
+
+  // F2455: a data block's text is no markup, whatever the case of its tag and however many blocks there are: the markup check
+  // strips every script, in capitals too, before it reads a tag.
+  it.each([
+    ["one JSON-LD block", [`<script type="application/ld+json">{"a":"<a onclick=x>"}</script>`]],
+    [
+      "two JSON-LD blocks",
+      [
+        `<script type="application/ld+json">{"a":"<a onclick=x>"}</script>`,
+        `<script type="application/ld+json">{"b":"<p style=x>"}</script>`,
+      ],
+    ],
+    ["a JSON-LD block in capitals", [`<SCRIPT TYPE="APPLICATION/LD+JSON">{"a":"<a onclick=x>"}</SCRIPT>`]],
+  ])("builds a page whose %s holds text that reads like a handler", async (_, blocks) => {
+    await expect(one(`${blocks.join("")}<script>${CLOSE}</script>`)).resolves.toBeDefined();
   });
 });
 
@@ -446,15 +566,8 @@ describe("outputs", () => {
     expect(() => outputs({ "net/onyx/w/a-b_c.d9/index.html": ok })).not.toThrow();
   });
 
-  // _headers: a block is a path, then its indented headers.
-  const blocks = (headers: string): [string, string[]][] =>
-    headers
-      .split(/\n(?=\S)/)
-      .filter((block) => block.trim() !== "")
-      .map((block) => {
-        const [path = "", ...lines] = block.split("\n");
-        return [path, lines.filter((line) => line.trim() !== "")];
-      });
+  // _headers: a block is a path, then its indented headers (the build's one reader, tests/e2e/cspFiles.mjs).
+  const blocks = headerBlocks;
   const matches = (rule: string, path: string): boolean =>
     new RegExp(`^${rule.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(path);
   // The policy a host sends for a path: every rule that matches adds its line, and a rule's `! Content-Security-Policy` first
@@ -463,10 +576,11 @@ describe("outputs", () => {
     let found: string[] = [];
     for (const [rule, lines] of blocks(headers)) {
       if (!matches(rule, path)) continue;
-      if (lines.includes("  ! Content-Security-Policy")) found = [];
-      for (const line of lines)
-        if (line.startsWith("  Content-Security-Policy: "))
-          found.push(line.slice("  Content-Security-Policy: ".length));
+      if (lines.some(isDetach)) found = [];
+      for (const line of lines) {
+        const set = policyLine(line);
+        if (set !== undefined) found.push(set);
+      }
     }
     return found;
   };
@@ -544,6 +658,15 @@ describe("outputs", () => {
       );
   });
 
+  // F2705: the catch-all `/*` names the scripts of both documents, so it can pass the cap where each page does; its error names it.
+  it("names /* when the catch-all's header, made of both documents' hashes, passes in each page but not together", () => {
+    const hashes = (letter: string, count: number) =>
+      Array.from({ length: count }, (_, n) => `'sha256-${letter.repeat(42)}${String.fromCharCode(65 + n)}='`);
+    const page = (letter: string) => `script-src 'self' ${hashes(letter, 20).join(" ")}`;
+    const pages = { "index.html": page("a"), "__spa-fallback.html": page("b") };
+    expect(() => outputs(pages)).toThrow(/^csp: the policy of \/\* makes a header of \d+ characters/);
+  });
+
   // F2452: Cloudflare Pages takes at most 100 header rules (developers.cloudflare.com/pages/configuration/headers). The
   // catch-all is one; a file that is no directory index is one rule.
   it.each([
@@ -581,10 +704,7 @@ describe("outputs", () => {
   // nginx: a map of the decoded path, which the server's add_header reads ($csp). Each page is keyed at the paths a visitor
   // asks (a 401 answers before try_files) and at the $uri try_files leaves: its file, and for a slashed address the file
   // joined without merging slashes (F2460).
-  const table = (nginx: string): Map<string, string> =>
-    new Map(
-      [...nginx.matchAll(/^\s*("?)([^"\s]+)\1\s+"([^"]*)";$/gm)].map((match) => [match[2] ?? "", match[3] ?? ""]),
-    );
+  const table = nginxTable;
 
   it("writes an nginx map from each address of a page to its policy, and a bare default", () => {
     const { ok, other, fallback, policies } = sample();
@@ -650,6 +770,207 @@ describe("outputs", () => {
     // nginx rounds a bucket to a cache line: a power of two stays whole.
     expect(Math.log2(bucket) % 1).toBe(0);
     if (slug === 40) expect(longest).toBeGreaterThanOrEqual(99);
+  });
+
+  // F2454: a bucket of one element leaves no size free of collisions past a few dozen keys, so nginx warned 'could not build
+  // optimal map_hash' at every start (48 worlds). The port is ngx_hash_init of nginx 1.30 (ngx_hash.c); until harness-c's `nginx -t`, it judges.
+  describe("nginx's hash for the table (ngx_hash_init)", () => {
+    const POINTER = 8;
+    const MASK = (1n << 64n) - 1n;
+    // ngx_hash_key_lc: key = key * 31 + c over the lower-cased bytes, in a 64-bit unsigned.
+    const hashOf = (key: string): bigint => {
+      let hash = 0n;
+      for (const char of key.toLowerCase()) hash = (hash * 31n + BigInt(char.charCodeAt(0))) & MASK;
+      return hash;
+    };
+    // NGX_HASH_ELT_SIZE: a pointer and the key and its length, rounded up to a pointer.
+    const eltSize = (key: string): number => POINTER + Math.ceil((key.length + 2) / POINTER) * POINTER;
+
+    interface Hashed {
+      keys: string[];
+      hashes: (readonly [number, number])[];
+      room: number;
+      maxSize: number;
+    }
+    // The table and the two sizes as nginx reads them, or undefined when it stops on them (a size of 0, a bucket under a key).
+    function hashed(nginx: string): Hashed | undefined {
+      const keys = [...table(nginx).keys()].filter((key) => key !== "default");
+      const maxSize = Number(/^map_hash_max_size (\d+);$/m.exec(nginx)?.[1]);
+      const bucketSize = Number(/^map_hash_bucket_size (\d+);$/m.exec(nginx)?.[1]);
+      if (!(maxSize > 0) || !(bucketSize > 0)) return undefined;
+      if (keys.some((key) => bucketSize < eltSize(key) + POINTER)) return undefined;
+      const hashes = keys.map((key) => {
+        const hash = hashOf(key);
+        return [Number(hash >> 32n), Number(hash & 0xffffffffn)] as const;
+      });
+      return { keys, hashes, room: bucketSize - POINTER, maxSize };
+    }
+
+    // Whether the keys fit the buckets at this table size, as ngx_hash_init tests it.
+    const fits = ({ keys, hashes, room }: Hashed, size: number): boolean => {
+      const used = new Uint32Array(size);
+      const high = 2 ** 32 % size;
+      return keys.every((key, n) => {
+        const [hi = 0, lo = 0] = hashes[n] ?? [];
+        // (hi * 2^32 + lo) % size, kept under 2^53.
+        const slot = ((((hi % size) * high) % size) + (lo % size)) % size;
+        used[slot] = (used[slot] ?? 0) + eltSize(key);
+        return (used[slot] ?? 0) <= room;
+      });
+    };
+
+    // The size nginx starts its search at.
+    const startOf = ({ keys, room, maxSize }: Hashed): number => {
+      if (maxSize > 10000 && keys.length > 0 && Math.floor(maxSize / keys.length) < 100) return maxSize - 1000;
+      return Math.floor(keys.length / Math.floor(room / (2 * POINTER))) || 1;
+    };
+
+    // What nginx does with the table at start: "fine", "warns" (the EMERG-free 'could not build optimal map_hash') or "stops".
+    function nginxVerdict(nginx: string): "fine" | "warns" | "stops" {
+      const read = hashed(nginx);
+      if (read === undefined) return "stops";
+      for (let size = startOf(read); size <= read.maxSize; size += 1) if (fits(read, size)) return "fine";
+      return "warns";
+    }
+
+    // The pages of a build of `worlds` worlds: each at /w/ and at its canonical address, the way slice 5's 5d writes them.
+    const build = (worlds: number, width: number) => {
+      const { ok } = sample();
+      const pages: Record<string, string> = { "index.html": ok, "__spa-fallback.html": ok, "net/onyx/index.html": ok };
+      for (let n = 0; n < worlds; n += 1) {
+        const slug = String(n).padStart(width, "s");
+        pages[`w/${slug}/index.html`] = ok;
+        pages[`net/onyx/w/${slug}/index.html`] = ok;
+      }
+      return outputs(pages, ["sw.js"], Number.POSITIVE_INFINITY).nginx;
+    };
+
+    it("judges a table it cannot hold: a bucket under its longest key stops nginx, a lone bucket for many keys warns", () => {
+      const keys = (count: number) => Array.from({ length: count }, (_, n) => `    "/k${String(n)}" "x";\n`).join("");
+      const conf = (size: number, bucket: number, count: number) =>
+        `map_hash_max_size ${String(size)};\nmap_hash_bucket_size ${String(bucket)};\nmap $uri $csp {\n    default "x";\n${keys(count)}}\n`;
+      expect(nginxVerdict(conf(2048, 64, 3))).toBe("fine");
+      expect(nginxVerdict(conf(2048, 16, 3))).toBe("stops");
+      // Five keys of one hash bucket's worth cannot all fit when only one bucket exists.
+      expect(nginxVerdict(conf(1, 64, 40))).toBe("warns");
+    });
+
+    it.each([
+      [48, 3],
+      [48, 40],
+      [1000, 3],
+      [1000, 40],
+    ])(
+      "starts with no 'could not build optimal map_hash' warning at %i worlds named by %i characters",
+      (worlds, width) => {
+        expect(nginxVerdict(build(worlds, width))).toBe("fine");
+      },
+    );
+
+    // A build of `pages` worlds' pages, plus the home (3 keys), the fallback (1) and `files` other files of 1 key each: the number of keys
+    // is counted here, so a row at the edge of a size sits on it.
+    const keysOf = (pages: number, width: number, files = 0) => {
+      const { ok } = sample();
+      const built: Record<string, string> = { "index.html": ok, "__spa-fallback.html": ok };
+      for (let n = 0; n < pages; n += 1) built[`w/${String(n).padStart(width, "s")}/index.html`] = ok;
+      for (let n = 0; n < files; n += 1) built[`f${String(n)}.html`] = ok;
+      return outputs(built, [], Number.POSITIVE_INFINITY).nginx;
+    };
+    const sizesOf = (nginx: string) => ({
+      size: Number(/^map_hash_max_size (\d+);$/m.exec(nginx)?.[1]),
+      bucket: Number(/^map_hash_bucket_size (\d+);$/m.exec(nginx)?.[1]),
+    });
+
+    it.each([
+      // 4 slots a key, from 2,048 (512 keys), doubling: the edge of a size is a key count of exactly a quarter of it.
+      { pages: 127, files: 0, keys: 512, slots: 2048 },
+      { pages: 127, files: 1, keys: 513, slots: 4096 },
+      { pages: 255, files: 0, keys: 1024, slots: 4096 },
+      { pages: 255, files: 1, keys: 1025, slots: 8192 },
+      { pages: 511, files: 0, keys: 2048, slots: 8192 },
+      { pages: 511, files: 1, keys: 2049, slots: 16384 },
+      // Under the floor.
+      { pages: 0, files: 0, keys: 4, slots: 2048 },
+      { pages: 10, files: 0, keys: 44, slots: 2048 },
+    ])("sizes the table for four slots a key: $pages pages and $files files make $keys keys, $slots slots", (row) => {
+      const nginx = keysOf(row.pages, 3, row.files);
+      expect([...table(nginx).keys()].filter((key) => key !== "default")).toHaveLength(row.keys);
+      expect(sizesOf(nginx).size).toBe(row.slots);
+    });
+
+    it.each([
+      // The longest key is /w/<name>//index.html: 31 characters of name make 46 of key and 232 bytes of bucket; 32 make 512.
+      [3, 31, 256],
+      [3, 32, 512],
+      [3, 1, 256],
+    ])("sizes a bucket of four keys: %i pages named by %i characters make a bucket of %i", (pages, width, bucket) => {
+      const nginx = keysOf(pages, width);
+      const longest = Math.max(...[...table(nginx).keys()].map((key) => eltSize(key)));
+      expect(longest * 4 + POINTER).toBeLessThanOrEqual(bucket);
+      expect(longest * 4 + POINTER).toBeGreaterThan(bucket / 2);
+      expect(sizesOf(nginx).bucket).toBe(bucket);
+    });
+
+    // Names that differ in their letters, not only in a number: the hash spreads them otherwise.
+    it("starts with no warning at 48 and at 1,000 worlds whose names differ in their letters", () => {
+      const { ok } = sample();
+      for (const worlds of [48, 1000]) {
+        const built: Record<string, string> = { "index.html": ok, "__spa-fallback.html": ok };
+        for (let n = 0; n < worlds; n += 1) {
+          const name = `${(n * 7919).toString(36)}-${(n * 104729 + 13).toString(36)}`;
+          built[`w/${name}/index.html`] = ok;
+          built[`net/onyx/w/${name}/index.html`] = ok;
+        }
+        expect(nginxVerdict(outputs(built, ["sw.js"], Number.POSITIVE_INFINITY).nginx), String(worlds)).toBe("fine");
+      }
+    });
+  });
+
+  // F2455: the cases the mutants of csp.ts left alive.
+  it("writes nginx's csp.conf whole: the two sizes, the default, then each key in code-unit order", () => {
+    const { ok, other, fallback, policies } = sample();
+    const bare = policy([]);
+    expect(outputs(policies, ["sw.js"]).nginx).toBe(
+      [
+        "map_hash_max_size 2048;\nmap_hash_bucket_size 256;\nmap $uri $csp {\n",
+        `    default "${bare}";\n`,
+        `    "/" "${ok}";\n`,
+        `    "//index.html" "${ok}";\n`,
+        `    "/__spa-fallback.html" "${fallback}";\n`,
+        `    "/index.html" "${ok}";\n`,
+        `    "/w/bubble" "${other}";\n`,
+        `    "/w/bubble/" "${other}";\n`,
+        `    "/w/bubble//index.html" "${other}";\n`,
+        `    "/w/bubble/index.html" "${other}";\n`,
+        "}\n",
+      ].join(""),
+    );
+  });
+
+  it("names every hash of the home's and the fallback's scripts in the catch-all, not the first of each", () => {
+    const five = (mark: string) =>
+      policy(Array.from({ length: 5 }, (_, n) => `'sha256-${mark}${String(n).repeat(42)}='`));
+    const home = five("H");
+    const fallback = five("F");
+    const hashes = [...home.matchAll(/'sha256-[^']+'/g), ...fallback.matchAll(/'sha256-[^']+'/g)].map(([hash]) => hash);
+    expect(hashes).toHaveLength(10);
+    const { headers } = outputs({ "index.html": home, "__spa-fallback.html": fallback });
+    expect(csp(headers, "/nowhere")).toEqual([policy(hashes)]);
+  });
+
+  it("writes _headers whole: the catch-all, then each rule in code-unit order, each with its detach", () => {
+    const { ok, other, fallback, any, policies } = sample();
+    const bare = policy([]);
+    expect(outputs(policies, ["sw.js"]).headers).toBe(
+      [
+        `/*\n  Content-Security-Policy: ${any}\n`,
+        `/\n  ! Content-Security-Policy\n  Content-Security-Policy: ${ok}\n`,
+        `/__spa-fallback.html\n  ! Content-Security-Policy\n  Content-Security-Policy: ${fallback}\n`,
+        `/sw.js\n  ! Content-Security-Policy\n  Content-Security-Policy: ${bare}\n`,
+        `/w/bubble\n  ! Content-Security-Policy\n  Content-Security-Policy: ${other}\n`,
+        `/w/bubble/\n  ! Content-Security-Policy\n  Content-Security-Policy: ${other}\n`,
+      ].join(""),
+    );
   });
 });
 
@@ -736,5 +1057,287 @@ describe("the web image's nginx", () => {
     ] as const) {
       expect(nginx, address).toContain(`    "${served(address)}" "${expected}";\n`);
     }
+  });
+});
+
+describe("headerBlocks, policyLine and isDetach", () => {
+  it("cut a file into its rules, each with its indented lines, and tell a policy from a detach", () => {
+    const text = "/*\n  Content-Security-Policy: a\n/w\n  ! Content-Security-Policy\n  Content-Security-Policy: b\n\n";
+    expect(headerBlocks(text)).toEqual([
+      ["/*", ["  Content-Security-Policy: a"]],
+      ["/w", ["  ! Content-Security-Policy", "  Content-Security-Policy: b"]],
+    ]);
+    expect(policyLine("  Content-Security-Policy: b")).toBe("b");
+    expect(policyLine("  ! Content-Security-Policy")).toBeUndefined();
+    expect(policyLine("/w")).toBeUndefined();
+    expect(policyLine("  X-Other: c")).toBeUndefined();
+    expect(isDetach("  ! Content-Security-Policy")).toBe(true);
+    expect(isDetach("  Content-Security-Policy: b")).toBe(false);
+  });
+});
+
+describe("headerRules", () => {
+  it("reads each rule's address and its Content-Security-Policy line, and none of a detach", () => {
+    const text = [
+      "/*",
+      "  Content-Security-Policy: catch all; script-src 'self'",
+      "/w/bubble",
+      "  ! Content-Security-Policy",
+      "  Content-Security-Policy: bubble's",
+      "/sw.js",
+      "  ! Content-Security-Policy",
+      "  X-Other: not a policy",
+      "",
+    ].join("\n");
+    expect(headerRules(text)).toEqual(
+      new Map([
+        ["/*", "catch all; script-src 'self'"],
+        ["/w/bubble", "bubble's"],
+      ]),
+    );
+  });
+
+  it("reads what the build writes: each address of a page to its policy, the worker's to the bare one", () => {
+    const ok = policy([`'sha256-${"A".repeat(43)}='`]);
+    const other = policy([`'sha256-${"B".repeat(43)}='`]);
+    const rules = headerRules(outputs({ "index.html": ok, "w/bubble/index.html": other }, ["sw.js"]).headers);
+    expect([...rules.keys()].sort()).toEqual(["/", "/*", "/sw.js", "/w/bubble", "/w/bubble/"]);
+    expect(rules.get("/")).toBe(ok);
+    expect(rules.get("/w/bubble/")).toBe(other);
+    expect(rules.get("/sw.js")).toBe(policy([]));
+  });
+});
+
+describe("nginxTable", () => {
+  it("reads each key, quoted or not, to its value, the default included, and no directive", () => {
+    const text = [
+      "map_hash_max_size 2048;",
+      "map_hash_bucket_size 64;",
+      "map $uri $csp {",
+      '    default "bare";',
+      '    "/" "home";',
+      '    "/w/bubble//index.html" "a; b";',
+      "}",
+      "",
+    ].join("\n");
+    expect(nginxTable(text)).toEqual(
+      new Map([
+        ["default", "bare"],
+        ["/", "home"],
+        ["/w/bubble//index.html", "a; b"],
+      ]),
+    );
+  });
+
+  it("reads what the build writes", () => {
+    const ok = policy([`'sha256-${"A".repeat(43)}='`]);
+    const table = nginxTable(outputs({ "index.html": ok }).nginx);
+    expect([...table.keys()].sort()).toEqual(["//index.html", "/", "/index.html", "default"].sort());
+    expect(table.get("/")).toBe(ok);
+    expect(table.get("default")).toBe(policy([]));
+  });
+});
+
+// StrykerJS runs the tests in a sandbox whose sources it has instrumented (every string reads as a mutant switch): a test that
+// reads a source file reads the real one, outside the sandbox (F2703).
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/")), "utf8");
+
+// F2457, DRY (Alexis's explicit rule): nothing is written twice. The parsers are read in one file (tests/e2e/cspFiles.mjs);
+// the files that read the build's output import them, and hold no reading of their own, in any shape.
+describe("the readers of the build's output", () => {
+  const OWN_READERS = [
+    // A policy line or a rule's address cut out by hand.
+    /Content-Security-Policy: \(\.\+\)/,
+    /startsWith\("\s*Content-Security-Policy: "\)/,
+    /split\(\/\\n\(\?=\\S\)\/\)/,
+    // A key and its value cut out of nginx's table, quoted or not.
+    /\(\[\^"\\s\]\+\)/,
+  ];
+  it.each([
+    ["app/tests/e2e/serve.mjs", "../tests/e2e/serve.mjs"],
+    ["app/tests/e2e/csp.spec.ts", "../tests/e2e/csp.spec.ts"],
+    ["app/src/dataFiles.test.ts", "./dataFiles.test.ts"],
+    ["app/src/csp.test.ts", "./csp.test.ts"],
+  ])("%s imports them and holds no reader of _headers or of nginx's table of its own", (_, path) => {
+    const source = read(path);
+    for (const reader of OWN_READERS) expect(source).not.toMatch(reader);
+    // An import line of the shared file, not a mention of it.
+    expect(source).toMatch(/^import \{[^}]*\} from "[^"]*cspFiles\.mjs";$/m);
+  });
+});
+
+// F2457: serve.mjs rewrote the inline scripts of a release with a looser rule (/ld\+json/i): a script whose data-type said
+// application/ld+json went unhashed there, and ran in the journeys where the build's policy refuses it (F2360's class). It
+// also wrote the policy a second time (`script-src 'self'`): it takes both from csp.ts.
+describe("serve.mjs's policy of a release", () => {
+  const source = read("../tests/e2e/serve.mjs");
+  it("takes the scripts to hash, their hashes and the policy from csp.ts: inlineScripts, sha256 and policy", () => {
+    expect(source).toMatch(
+      /^import \{(?=[^}]*\binlineScripts\b)(?=[^}]*\bsha256\b)(?=[^}]*\bpolicy\b)[^}]*\} from "\.\.\/\.\.\/src\/csp\.ts";$/m,
+    );
+    expect(source).toMatch(/inlineScripts\(/);
+    expect(source).toMatch(/sha256\b/);
+    expect(source).toMatch(/\bpolicy\(/);
+  });
+  it("holds no rule of its own on a script's type or source, and no policy text", () => {
+    expect(source).not.toMatch(/ld\\\+json/i);
+    expect(source).not.toMatch(/<script\\b/i);
+    expect(source).not.toContain("script-src");
+    expect(source).not.toContain("sha256-");
+  });
+});
+
+// F2456: StrykerJS never mutates a module-level constant (ignoreStatic), so a guard built at the top of csp.ts is a guard no
+// test is measured against (.claude/rules/typescript.md, F412). Each is built inside the function that applies it: a top-level
+// constant is one string, one number, a list of strings or a function, nothing else (a pattern, however it is written, a joined text too).
+describe("csp.ts's guards", () => {
+  // The policy's guards live in three files (the forms' constants in cspForms.ts, the origins' in cspOrigins.ts): the guard reads all three.
+  const source = `${read("./csp.ts")}\n${read("./cspForms.ts")}\n${read("./cspOrigins.ts")}`;
+  const constants = source
+    .split(/\n(?=(?:export )?(?:const|let|var|function|async function|class|type|interface)\b)/)
+    .filter((chunk) => /^(?:export )?(?:const|let|var)\b/.test(chunk))
+    .map((chunk) => {
+      const [head = "", ...rest] = chunk.split(/ =(?!>)\s*/);
+      const name = /(?:const|let|var) ([A-Za-z_]+)/.exec(head)?.[1] ?? head;
+      // The comment lines that precede the next statement are no part of the value.
+      const value = rest.join(" = ").replace(/^\s*\/\/.*$/gm, "");
+      return [name, value.trim()] as const;
+    });
+  // A list of strings, or of the names of the constants that are (the policy's directives name SCRIPT_SRC).
+  const listOfStrings = /^\[\s*(?:(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|[A-Z_]+)\s*,\s*)*\]/;
+  const simple = (value: string): boolean =>
+    /^(?:"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|\d[\d_]*)\s*;/.test(value) ||
+    /^(?:async\s*)?(?:\([^)]*\)\s*(?::[^=>]+)?=>|function\b)/.test(value) ||
+    listOfStrings.test(value);
+
+  it("reads the constants it checks: the policy's words, the forms' texts and the caps", () => {
+    const names = constants.map(([name]) => name);
+    for (const name of ["SCRIPT_SRC", "DIRECTIVES", "SCROLL_RESTORATION", "HEADER_CAP", "RULE_CAP"])
+      expect(names).toContain(name);
+    expect(names.length).toBeGreaterThan(8);
+  });
+
+  it("are built inside their functions: a module-level constant is a string, a number, a list of strings or a function", () => {
+    expect(constants.filter(([, value]) => !simple(value)).map(([name]) => name)).toEqual([]);
+  });
+});
+
+// Slice 5 part 2, 5g: the browser reads the chain, so connect-src names the universes' RPC origins, from the data and
+// nothing else (the plan's §3: "a data file's rpc naming a host that reads visitors" shows in the CSP, an http: one stops the build).
+const ONYX = "https://rpc.onyx.testnets.gno.land";
+const GNOLAND = "https://rpc.gno.land";
+const connectOf = (csp: string): string =>
+  csp.split("; ").find((directive) => directive.startsWith("connect-src")) ?? "";
+
+describe("policy's connect-src", () => {
+  it("is 'self' alone when no origin is given", () => {
+    expect(connectOf(policy([]))).toBe("connect-src 'self'");
+    expect(connectOf(policy([], []))).toBe("connect-src 'self'");
+  });
+
+  it("names 'self' then each origin, once, in code-unit order whatever order they came in", () => {
+    expect(connectOf(policy([], [ONYX, GNOLAND, ONYX]))).toBe(`connect-src 'self' ${GNOLAND} ${ONYX}`);
+  });
+
+  it("orders by code unit, not by locale", () => {
+    const dot = "https://a.example.b";
+    const port = "https://a.example:8443";
+    expect(connectOf(policy([], [port, dot]))).toBe(`connect-src 'self' ${dot} ${port}`);
+  });
+
+  it("accepts an origin with a port", () => {
+    expect(connectOf(policy([], ["https://rpc.example.org:8443"]))).toBe(
+      "connect-src 'self' https://rpc.example.org:8443",
+    );
+  });
+
+  it("changes no other directive", () => {
+    const strip = (csp: string) => csp.split("; ").filter((directive) => !directive.startsWith("connect-src"));
+    expect(strip(policy([], [ONYX, GNOLAND]))).toEqual(strip(policy([])));
+  });
+
+  it("keeps the script hashes beside the origins", () => {
+    const hash = `'sha256-${"A".repeat(43)}='`;
+    const csp = policy([hash], [ONYX]);
+    expect(csp).toContain(`script-src 'self' ${hash}`);
+    expect(connectOf(csp)).toBe(`connect-src 'self' ${ONYX}`);
+  });
+
+  // An origin written into a directive that is no bare https origin would widen the policy or add a directive.
+  it.each([
+    ["an http: origin", "http://rpc.gno.land"],
+    ["a wildcard", "*"],
+    ["a wildcard host", "https://*.gno.land"],
+    ["a scheme alone", "https:"],
+    ["a path", "https://rpc.gno.land/rpc"],
+    ["a trailing slash", "https://rpc.gno.land/"],
+    ["a directive", "https://rpc.gno.land; script-src *"],
+    ["a space", "https://rpc.gno.land https://evil.example"],
+    ["a quote", "https://rpc.gno.land'"],
+    ["a user", "https://a@rpc.gno.land"],
+    ["a keyword", "'unsafe-eval'"],
+    ["an empty string", ""],
+    ["a wildcard port", "https://rpc.gno.land:*"],
+    ["a trailing line break", "https://rpc.gno.land\n"],
+    ["a wss: origin", "wss://rpc.gno.land"],
+    ["a ws: origin", "ws://rpc.gno.land"],
+    ["a host with no scheme", "rpc.gno.land"],
+    ["an upper-case scheme", "HTTPS://rpc.gno.land"],
+    ["an upper-case host", "https://RPC.gno.land"],
+  ])("refuses %s as an origin", (_name, origin) => {
+    expect(() => policy([], [origin])).toThrow(RangeError);
+    expect(() => policy([], [origin])).toThrow(/csp:/);
+  });
+});
+
+describe("pagePolicies' and outputs' connect-src", () => {
+  it("gives each page's policy the origins", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "w/bubble/index.html": page() }, [ONYX, GNOLAND]);
+    expect(Object.keys(policies).length).toBe(2);
+    for (const csp of Object.values(policies)) expect(connectOf(csp)).toBe(`connect-src 'self' ${GNOLAND} ${ONYX}`);
+  });
+
+  it("gives a page no origin when none is given, as before", async () => {
+    const policies = await pagePolicies({ "index.html": page() });
+    expect(connectOf(policies["index.html"] ?? "")).toBe("connect-src 'self'");
+  });
+
+  it("gives every rule of _headers and every row of nginx's table the origins: the catch-all, the worker, the default", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "w/bubble/index.html": page() }, [ONYX, GNOLAND]);
+    const out = outputs(policies, ["sw.js"]);
+    const want = `connect-src 'self' ${GNOLAND} ${ONYX}`;
+    const headers = headerRules(out.headers);
+    // The catch-all `/*`, `/`, `/w/bubble` and its slash, `/sw.js`.
+    expect(headers.size).toBeGreaterThanOrEqual(5);
+    // The worker's script is the one exception: it fetches no RPC (page code does), so its rule keeps 'self' alone
+    // (docs/decisions.md, 2026-10-31).
+    for (const [path, csp] of headers)
+      expect(connectOf(csp), path).toBe(path === "/sw.js" ? "connect-src 'self'" : want);
+    const table = nginxTable(out.nginx);
+    expect(table.size).toBeGreaterThan(1);
+    for (const [path, csp] of table) if (path !== "default") expect(connectOf(csp), path).toBe(want);
+    // nginx's default answers a path no row names (no page): the bare policy, 'self' alone.
+    const fallback = /default "([^"]*)";/.exec(out.nginx)?.[1] ?? "";
+    expect(fallback).toBe(policy([]));
+    expect(headers.get("/sw.js")).toBe(policy([]));
+  });
+
+  it("writes the same bytes when the origins come in another order", async () => {
+    const policies = await pagePolicies({ "index.html": page() }, [ONYX, GNOLAND]);
+    expect(outputs(policies, [])).toEqual(outputs(await pagePolicies({ "index.html": page() }, [GNOLAND, ONYX]), []));
+  });
+
+  it("gives the catch-all the origins of the home's and the fallback's policies, and no other", async () => {
+    const policies = await pagePolicies({ "index.html": page(), "__spa-fallback.html": page() }, [ONYX]);
+    const out = outputs({ ...policies, "w/odd/index.html": policy([], [GNOLAND]) }, []);
+    expect(connectOf(headerRules(out.headers).get("/*") ?? "")).toBe(`connect-src 'self' ${ONYX}`);
+  });
+
+  // A header past a host's 2,000 characters is cut, so the build stops rather than write one: the origins count in it.
+  it("stops, naming the page, when the origins make a header past 2,000 characters", async () => {
+    const many = Array.from({ length: 80 }, (_, index) => `https://rpc${String(index)}.example.org`);
+    const policies = await pagePolicies({ "index.html": page() }, many);
+    expect(() => outputs(policies, [])).toThrow(/csp: the policy of .* makes a header of \d+ characters/);
   });
 });

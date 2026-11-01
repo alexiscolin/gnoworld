@@ -32,7 +32,7 @@ describe("RoomsView", () => {
         dms: { world: "bubble", partners: [], current: undefined, onlyKnown: false, onOnlyKnown: () => undefined },
       }),
     ).toMatch(/^<nav[^>]*aria-label="Rooms and direct messages"/);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
     expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
   });
@@ -118,17 +118,28 @@ describe("RoomsView: direct messages", () => {
   it("lists each conversation by its partner's short address, a link to its page, after the rooms", () => {
     // A conversation in view: no room is.
     const html = view({ current: undefined, dms: dms({ current: CAROL }) });
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
-      "Talk",
-      "Other rooms",
-      "Direct messages",
-    ]);
-    // 4e's UX review (U6): a conversation's row says it is not encrypted, by a lock and a word (DESIGN-SYSTEM.md).
-    expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv Not encrypted", "g1l6m6…kkanc Not encrypted"]);
-    expect(html.match(/data-icon="lock"/g)).toHaveLength(2);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms", "Direct messages"]);
+    // 4e's UX review (U6), 5q: the rows are the partner's nebula and short address; that they are not encrypted is said once,
+    // in the small grey note under the list, as the video's note is.
+    expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
+    expect(html.match(/data-kind="person"/g)).toHaveLength(2);
+    expect(said(html)).toContain("Not encrypted: the server can read these.");
     expect(hrefs(html).slice(-2)).toEqual([`/w/bubble?dm=${ALICE}`, `/w/bubble?dm=${CAROL}`]);
     expect(html).toMatch(new RegExp(`<a [^>]*href="/w/bubble\\?dm=${CAROL}"[^>]*aria-current="true"`));
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+  });
+
+  // Review 8 of 5q: both words sat behind the room menu's chevron, where nobody reads them before writing.
+  it("says in view that these lines are kept only while the page is open, beside that they are not encrypted", () => {
+    expect(said(view({ current: undefined, dms: dms() }))).toContain(
+      "Not encrypted: the server can read these. Kept only while this page is open.",
+    );
+  });
+
+  it("says in view, under the list, when the device did not keep the choices, and not otherwise", () => {
+    expect(said(view({ dms: dms({ notKept: true }) }))).toContain("Not kept on this device");
+    expect(said(view({ dms: dms({ notKept: true, partners: [] }) }))).toContain("Not kept on this device");
+    expect(said(view({ dms: dms() }))).not.toContain("Not kept on this device");
   });
 
   it("says when there is none yet, and has no section for a guest", () => {
@@ -137,19 +148,6 @@ describe("RoomsView: direct messages", () => {
       "No direct message yet. Start one in Who's here.",
     );
     expect(view()).not.toContain("Direct messages");
-  });
-
-  // /code-review on 4e (CR5): a device that refused the choices said so to nobody.
-  it("says beside the choice when the device does not keep it, and only then", () => {
-    expect(said(view({ dms: dms({ notKept: true }) }))).toContain("Only people I wrote to Not kept on this device");
-    expect(view({ dms: dms() })).not.toContain("Not kept on this device");
-  });
-
-  it("offers to hear from those the account talked with alone, a pressed toggle", () => {
-    expect(view({ dms: dms() })).toMatch(/<button[^>]*aria-pressed="false"[^>]*>Only people I wrote to<\/button>/);
-    expect(view({ dms: dms({ onlyKnown: true }) })).toMatch(
-      /<button[^>]*aria-pressed="true"[^>]*>Only people I wrote to<\/button>/,
-    );
   });
 });
 
@@ -187,20 +185,20 @@ describe("RoomsView: notifications", () => {
   describe("the badges", () => {
     it("shows a room's unseen count on its row, said as unseen, and nothing on a row that has none", () => {
       const html = view({ badges: { "#bubble/games": 3, "#bubble": 0 } });
-      expect(rowAt(html, "/w/bubble?room=games")).toBe("#games 3 unread");
+      expect(rowAt(html, "/w/bubble?room=games")).toBe("#games 3 3 unread");
       expect(rowAt(html, "/w/bubble")).toBe("#bubble");
       expect(rowAt(html, "/w/bubble?room=news")).toBe("#news");
     });
 
     it("shows a conversation's unseen count on its row, the room's rows apart", () => {
       const html = view({ dms: dms, badges: { [ALICE]: 2, "#bubble": 1 } });
-      expect(rowAt(html, `/w/bubble?dm=${ALICE}`)).toBe("g10gh7…3y5tv Not encrypted 2 unread");
-      expect(rowAt(html, "/w/bubble")).toBe("#bubble 1 unread");
+      expect(rowAt(html, `/w/bubble?dm=${ALICE}`)).toBe("g10gh7…3y5tv 2 unread");
+      expect(rowAt(html, "/w/bubble")).toBe("#bubble 1 1 unread");
     });
 
     it("says 99+ past 99", () => {
-      expect(rowAt(view({ badges: { "#bubble": 100 } }), "/w/bubble")).toBe("#bubble 99+ unread");
-      expect(rowAt(view({ badges: { "#bubble": 99 } }), "/w/bubble")).toBe("#bubble 99 unread");
+      expect(rowAt(view({ badges: { "#bubble": 100 } }), "/w/bubble")).toBe("#bubble 99+ 99+ unread");
+      expect(rowAt(view({ badges: { "#bubble": 99 } }), "/w/bubble")).toBe("#bubble 99 99 unread");
     });
 
     it("draws no badge for a room not listed, a negative count or none", () => {
@@ -252,7 +250,7 @@ describe("RoomsView: notifications", () => {
       });
       expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1]).toSorted()).toEqual([
         "Notifications",
-        "Other rooms",
+        "Rooms",
         "Talk",
       ]);
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
@@ -263,7 +261,7 @@ describe("RoomsView: notifications", () => {
       const html = view({ dms, notices: notices({ list: [note("mention", "#bubble")] }) });
       expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
         "Talk",
-        "Other rooms",
+        "Rooms",
         "Direct messages",
         "Notifications",
       ]);
@@ -276,7 +274,7 @@ describe("RoomsView: notifications", () => {
     });
 
     it("draws no list for a guest, none being given, and none while the list is empty", () => {
-      expect([...view().matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+      expect([...view().matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
       expect(view({ notices: notices() })).not.toContain("Notifications");
     });
 

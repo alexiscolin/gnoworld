@@ -4,9 +4,11 @@
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
-import { Button, Chip, Cluster, Icon, Row, Stack } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, NavItem, Row, Stack } from "@gnoworld/ui";
+import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
+import { useFull } from "./full.ts";
 import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
-import { countWords } from "./unread.ts";
+import { badged } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
 import styles from "./RoomsView.module.css";
@@ -22,6 +24,8 @@ export interface RoomsViewProps {
   badges?: Readonly<Record<string, number>> | undefined;
   /** What the account was told: none for a guest (4f-n). */
   notices?: NoticesProps | undefined;
+  /** What stands between the rooms and the direct messages: an account's saved messages (4d). */
+  saved?: ReactNode;
 }
 
 interface NoticesProps {
@@ -48,10 +52,6 @@ export interface DmsProps {
   notKept?: boolean | undefined;
 }
 
-// What a row says it holds unseen: its count, 99+ past 99, as a mark after the link, so the link is named by the room alone.
-const badged = (count: number | undefined) =>
-  count === undefined || count < 1 ? undefined : <Chip tone="signal">{`${countWords(count)} unread`}</Chip>;
-
 const WORDS = {
   mention: "mentioned you",
   group: "mentioned the room",
@@ -73,6 +73,7 @@ function Notices({
   onClear,
   navRef,
 }: Omit<NoticesProps, "said" | "saidId"> & { navRef: { current: HTMLElement | null } }) {
+  const full = useFull();
   return (
     <Stack space="2xs" as="section">
       <Cluster space="xs" justify="between">
@@ -99,7 +100,7 @@ function Notices({
             <Row
               title={`${whoIs(notice.by)} ${WORDS[notice.kind]}`}
               subtitle={notice.kind === "dm" ? "Direct message" : roomLabel(notice.where)}
-              href={notice.kind === "dm" ? dmHref(world, notice.where) : roomHref(notice.where)}
+              href={notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full)}
             />
           </li>
         ))}
@@ -112,46 +113,40 @@ function Dms({
   world,
   partners,
   current,
-  onlyKnown,
-  onOnlyKnown,
-  notKept,
   badges,
-}: DmsProps & { badges: RoomsViewProps["badges"] }) {
+  notKept,
+}: Pick<DmsProps, "world" | "partners" | "current" | "notKept"> & { badges: RoomsViewProps["badges"] }) {
+  const full = useFull();
   return (
     <Stack space="2xs" as="section">
       <h2 className={styles["section"]}>Direct messages</h2>
       {partners.length === 0 ? (
         // How to start one, in lines as short as the list's own (U4).
-        <div>
-          <p>No direct message yet.</p>
-          <p>Start one in Who&apos;s here.</p>
-        </div>
+        <p className={styles["note"]}>No direct message yet. Start one in Who&apos;s here.</p>
       ) : (
-        <ul className={shared["plain"]}>
-          {partners.map((partner) => (
-            <li key={partner}>
-              {/* Its trust in a lock and a word, as a conversation's header says it (DESIGN-SYSTEM.md; U6). */}
-              <Row
-                title={shortAddress(partner)}
-                subtitle="Not encrypted"
-                lead={<Icon name="lock" />}
-                href={dmHref(world, partner)}
-                current={partner === current}
-                trail={badged(badges?.[partner])}
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className={[shared["plain"], shared["items"]].join(" ")}>
+            {partners.map((partner) => (
+              <li key={partner}>
+                <NavItem
+                  href={dmHref(world, partner, full)}
+                  current={partner === current}
+                  lead={<Avatar address={partner} name={partner} size="s" decorative />}
+                  badge={badged(badges?.[partner], true)}
+                >
+                  {shortAddress(partner)}
+                </NavItem>
+              </li>
+            ))}
+          </ul>
+          {/* What every direct message says of itself, in the video's small grey note under the list. */}
+          <p className={styles["note"]}>
+            {NOT_ENCRYPTED} {PAGE_ONLY}
+          </p>
+        </>
       )}
-      <Chip
-        selected={onlyKnown}
-        onClick={() => {
-          onOnlyKnown(!onlyKnown);
-        }}
-      >
-        Only people I wrote to
-      </Chip>
-      {notKept === true ? <p>Not kept on this device</p> : null}
+      {/* Said in view, not behind the menu: a device that kept none of the choices is a risk the reader must not miss (CR5). */}
+      {notKept === true ? <p className={styles["note"]}>Not kept on this device</p> : null}
     </Stack>
   );
 }
@@ -167,10 +162,10 @@ export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" |
   );
 }
 
-export function RoomsView({ sections, current, dms, failed, badges, notices }: RoomsViewProps) {
+export function RoomsView({ sections, current, dms, failed, badges, notices, saved }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
   const listed = (
-    <RoomSections sections={sections} current={current} failed={failed} trail={(room) => badged(badges?.[room])} />
+    <RoomSections sections={sections} current={current} failed={failed} badge={(room) => badged(badges?.[room])} />
   );
   const body =
     dms === undefined ? (
@@ -178,6 +173,8 @@ export function RoomsView({ sections, current, dms, failed, badges, notices }: R
     ) : (
       <Stack space="l">
         {listed}
+        {/* Between the rooms and the conversations, under a rule, as the video's column has it. */}
+        {saved === undefined ? null : <div className={styles["saved"]}>{saved}</div>}
         <Dms {...dms} badges={badges} />
       </Stack>
     );

@@ -373,7 +373,7 @@ describe("sections of a world's rooms (4b)", () => {
 
   it("keeps the file the server ships, with no section, loading as it did", () => {
     const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
-    expect([...shipped.worlds.values()].map(({ sections }) => sections)).toEqual([[], []]);
+    expect([...shipped.worlds.values()].map(({ sections }) => sections)).toEqual([[], [], []]);
   });
 
   it("takes a section of 1 and of 64 characters, 50 sections, 500 rooms a section and a room that no list types", () => {

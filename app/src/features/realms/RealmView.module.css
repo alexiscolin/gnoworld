@@ -1,0 +1,7 @@
+/* A realm's view (5h): where the page was read, in the page's own small type. */
+@layer components {
+  .meta {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

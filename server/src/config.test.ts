@@ -120,6 +120,42 @@ describe("loadConfig", () => {
     expect(failure({ ...ENV, ERGO_DATA_MB: "100" })).toMatch(/setting ERGO_DATA: required/);
   });
 
+  it("reads the file the prices timer writes: absolute, none by default, so no timer (5l)", () => {
+    expect(loadConfig(ENV).markets).toBeUndefined();
+    expect(loadConfig({ ...ENV, MARKETS_FILE: "/srv/markets/markets.json" }).markets).toBe("/srv/markets/markets.json");
+    for (const value of [
+      "",
+      "markets.json",
+      "./markets.json",
+      "/",
+      "/srv/../markets.json",
+      "/srv//markets.json",
+      "/srv/",
+      "/.",
+    ]) {
+      expect(failure({ ...ENV, MARKETS_FILE: value })).toMatch(/setting MARKETS_FILE: /);
+    }
+  });
+
+  // The home's block height (2026-10-31): the universes' data names the RPC the prices timer reads it from.
+  it("reads the universes' data file the height's RPC comes from: absolute, none by default", () => {
+    expect(loadConfig(ENV).universes).toBeUndefined();
+    expect(loadConfig({ ...ENV, UNIVERSES_FILE: "/app/app/data/universes.json" }).universes).toBe(
+      "/app/app/data/universes.json",
+    );
+    for (const value of [
+      "",
+      "universes.json",
+      "./universes.json",
+      "/",
+      "/srv/../universes.json",
+      "/srv//u.json",
+      "/srv/",
+    ]) {
+      expect(failure({ ...ENV, UNIVERSES_FILE: value })).toMatch(/setting UNIVERSES_FILE: /);
+    }
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);

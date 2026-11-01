@@ -18,3 +18,7 @@ export type Block =
   | { type: "quote"; children: Block[] }
   | { type: "list"; ordered: false; items: Inline[][] }
   | { type: "list"; ordered: true; start: number; items: Inline[][] };
+
+/** A tree of blocks that may also hold `Extra` ones, a page's headings and forms (page.ts), in quotes too. Chat's `Block`
+ * is `Tree<never>`: the reader is one, the dialect only adds blocks. */
+export type Tree<Extra> = Exclude<Block, { type: "quote" }> | { type: "quote"; children: Tree<Extra>[] } | Extra;

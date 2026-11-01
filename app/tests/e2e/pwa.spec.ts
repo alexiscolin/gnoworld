@@ -27,8 +27,12 @@ const SHELL = [
   "/net/onyx/earth.data",
   "/net/onyx/w/bubble",
   "/net/onyx/w/bubble.data",
+  "/net/onyx/w/govdao",
+  "/net/onyx/w/govdao.data",
   "/w/bubble",
   "/w/bubble.data",
+  "/w/govdao",
+  "/w/govdao.data",
 ];
 const VERSION = /^gnoworld-precache-[A-Za-z0-9]{16}$/;
 const RECORD = /^gnoworld-precache-active-[A-Za-z0-9]{16}-(?:none|[A-Za-z0-9]{16})$/;
@@ -352,9 +356,9 @@ test("the app opens with no network: the home, a world, a reload on it, and a pa
   });
   await page.reload();
   await hydrated(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("gno.world");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
   // The router's own move to a world needs its route files and data, which are the cache's too.
-  await page.getByRole("link", { name: "Bubble" }).click();
+  await page.getByRole("link", { name: "Bubble", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.reload();
@@ -497,7 +501,7 @@ test.describe("updates", () => {
       return second?.url ?? "";
     });
     // The region the prompt fills is there, empty, before it: a screen reader announces the change.
-    await page.getByRole("status").evaluate((region) => {
+    await page.locator("div[role='status']").evaluate((region) => {
       region.id = "there-before";
     });
     await bump(page, request, { site });
@@ -515,7 +519,7 @@ test.describe("updates", () => {
     await open(page);
     await bump(page, request, { site });
     await expect(noticeOf(page)).toBeVisible();
-    await page.getByRole("status").evaluate((region) => {
+    await page.locator("div[role='status']").evaluate((region) => {
       region.id = "kept";
     });
     await promptOf(page).getByRole("button", { name: "Close" }).click();
@@ -626,7 +630,7 @@ test.describe("updates", () => {
         if (new URL(response.url()).pathname.includes("/assets/world-"))
           routeFiles.push({ status: response.status(), fromWorker: response.fromServiceWorker() });
       });
-      await other.getByRole("link", { name: "Bubble" }).click();
+      await other.getByRole("link", { name: "Bubble", exact: true }).click();
       await expect(other.getByRole("heading", { level: 1 })).toHaveText("Bubble");
       await expect(other.getByRole("alert")).toHaveCount(0);
       expect(routeFiles.length, "the world's route files were fetched").toBeGreaterThan(0);
@@ -711,5 +715,5 @@ test("a worker that cannot register reports its error, and the page still works"
   await page.goto("/");
   await hydrated(page);
   await expect.poll(() => errors.some((message) => message.includes("ServiceWorker"))).toBe(true);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("gno.world");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
 });

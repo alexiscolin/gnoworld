@@ -23,6 +23,11 @@ const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(D
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
 const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
 
+/** An origin: https, a lower-case host and an optional port, no path, query, fragment or credentials (what a page's address is put under). */
+const Origin = z
+  .string()
+  .check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?$/));
+
 /** The players a news item may embed, each by its own path (F885: csp.ts's frame-src names the same prefixes). */
 export const EMBED_PREFIXES = [
   "https://www.youtube-nocookie.com/embed/",
@@ -66,11 +71,18 @@ const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r
 const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
 
+/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters. */
+const RealmPath = z
+  .string()
+  .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
+
 const World = z.strictObject({
   slug: Slug,
   name: text(DATA_CAPS.name),
   description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
   universe: Slug,
+  /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
+  realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
 });
 
 export const Hubs = inUniverse(World);
@@ -93,6 +105,19 @@ export const Expedition = byId(
 export const Quests = byId(
   z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), description: text(DATA_CAPS.description) }),
 );
+
+const rule = (low: number, high: number) => z.int().check(z.gte(low), z.lte(high));
+
+/** The rules of the Earth's bubbles (ADR-0001 §7), one object; each bound keeps a rule from drowning the globe. */
+export const BubbleRules = z.strictObject({
+  maxOnScreen: rule(1, 12),
+  showSeconds: rule(1, 15),
+  speakerDelaySeconds: rule(1, 120),
+  maxChars: rule(20, 160),
+  readLast: rule(1, 2000),
+  maxAgeSeconds: rule(30, 86_400),
+});
+
 export const News = byId(
   z.strictObject({
     id: text(DATA_CAPS.key),
@@ -108,6 +133,10 @@ const Universe = z.strictObject({
   name: text(DATA_CAPS.name),
   chainId: text(DATA_CAPS.key),
   rpc: Link,
+  /** The chain's gnoweb, the source of truth a realm's card and view link to (ADR-0002 §4): its origin. */
+  gnoweb: Origin,
+  /** The chain's public indexer: the address of its GraphQL endpoint. */
+  indexer: Link,
   testnet: z.boolean(),
   default: z.optional(z.literal(true)),
 });

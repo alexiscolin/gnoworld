@@ -21,17 +21,19 @@ const edgesOf = (page: Page) =>
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
-      if (text === "" || parent?.closest("script, style, [hidden]") !== null) continue;
+      if (text === "" || parent?.closest("script, style, [hidden], [data-ticker]") !== null) continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
     }
+    // The ticker is a strip across the foot of the screen, edge to edge by design: homeLive.spec measures it.
     for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      take(
-        `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
-        control.getBoundingClientRect(),
-      );
+      if (control.closest("[data-ticker]") === null)
+        take(
+          `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
+          control.getBoundingClientRect(),
+        );
     return found;
   });
 
@@ -68,14 +70,16 @@ for (const width of WIDTHS) {
         const account = page.getByTitle(address);
         // The shortening the chat's names get: the first six characters, an ellipsis, the last five.
         await expect(account).toHaveText(`${address.slice(0, 6)}…${address.slice(-5)}`);
-        // One row means the boxes share a middle: each one's centre lies inside the others' height.
+        // One row means the boxes share a middle: each one's centre lies inside the others' height. On a phone the search is the
+        // views' bar's, at the screen's foot (the prototype's #hnav .views), not of this row.
+        const row = [
+          page.getByRole("link", { name: "gnoworld" }),
+          ...(width < 900 ? [] : [page.getByRole("button", { name: /^Search/ })]),
+          account,
+          page.getByRole("button", { name: "Log out" }),
+        ];
         const boxes = await Promise.all(
-          [
-            page.getByRole("link", { name: "gno.world" }),
-            page.getByRole("button", { name: /^Search/ }),
-            account,
-            page.getByRole("button", { name: "Log out" }),
-          ].map(async (item) => {
+          row.map(async (item) => {
             await expect(item).toBeVisible();
             return item.evaluate((element) => {
               const { top, bottom } = element.getBoundingClientRect();
@@ -155,11 +159,20 @@ for (const width of WIDTHS) {
       });
     }
 
+    // The home's live line says the clock time of each read, and its row's layout follows the words' width (F2975). Both
+    // times come after hydration (later on a loaded machine) and are set to one time; a phone's page has no line (900 px).
+    const fixTimes = async (page: Page) => {
+      await expect(page.locator("time")).toHaveCount(width >= 900 ? 2 : 0);
+      await page.locator("time").evaluateAll((times) => {
+        for (const time of times) time.textContent = "06:07 UTC";
+      });
+    };
     // The test wallet is drawn at each server's start: its address, as wide as its letters, is
     // replaced by one of the same length in letters of about the same width, so the header's row is one, as with the real one.
     test("the shell as it looks, logged out and logged in", async ({ page }) => {
       await page.goto("/");
       await hydrated(page);
+      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-out-${String(width)}.png`);
       const address = await logInAt(page);
       await page.goto("/");
@@ -167,6 +180,7 @@ for (const width of WIDTHS) {
       await page.getByTitle(address).evaluate((element) => {
         element.textContent = "g1xxxx…xxxxx";
       });
+      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`);
     });
   });

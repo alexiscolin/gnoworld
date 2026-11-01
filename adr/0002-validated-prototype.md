@@ -47,7 +47,7 @@ This ADR records:
 - **station:** a world the team builds, not a realm.
 - **moon:** one of a world's busiest rooms. The Earth's Moon, and Broadcast Moon (a
   station), keep their names.
-- **status ring:** the arc a realm's state draws. **Rings:** a planet's own. AI Ring is a
+- **status ring:** the tilted orbit a realm's state draws. **Rings:** a planet's own. AI Ring is a
   station.
 - **signal:** a new realm not yet charted.
 - **satellite:** a sponsored slot (§1); people are not drawn as satellites (§8). People are
@@ -120,13 +120,13 @@ Phases are ADR-0001's:
 | Embassies | A room shared by two worlds, drawn as a small station between them | 0 | One Ergo channel listed by two worlds | — |
 | Focus view | The plate: name, two facts, activity chart, one main action, connected worlds, a real capture of the world's page, links. The planet sits on the plate's edge; the chat is docked. A connected world is one of three rows: a realm it calls or that calls it, with calls a day; a shared room; "N people from X are here now · say hi". Each row flies there or sends a comet (phase 1) | 0 | — | Read |
 | Flight panel | During a flight: "In transit", the target, distance, speed, arrival and a progress bar; "Course plotted" on leaving, "Entering orbit" on arrival | 0 | Scene | — |
-| Status ring | A thin arc around a world for what the realm itself reports: a proposal's tally, a deadline the realm defines. gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
+| Status ring | A tilted orbit around a world, passing behind it and in front of it, for what the realm itself reports: a proposal's tally, a deadline the realm defines. A small moon on its front half marks the state, the arc up to the moon is lit, a mark stands at the threshold, the orbit's shadow falls on the planet, and a pill under the planet carries the numbers, so the state never rests on the ring alone (Alexis, 2026-10-31: the flat ring was a third party's concept's, ADR-0001). gnoworld invents no timer (§8, row 2). Activity trends belong to the heat badge, never the ring | 0 | Realm reads | Read |
 | Rooms as moons | The busiest rooms orbit as moons, four at most, and the room you are in is always one: a moon's size follows the people present, it flares when someone speaks (the activity API, near a world), a click joins the room. A "+96" chip beside them opens the room switcher. The Earth keeps one moon, the real Moon, for its busiest room after the general one (§3) | 0 | Ergo counts | — |
 | Storms | A conversation speeding up forms a storm's eye on the planet, growing with the pace of messages; a click joins that room. Shown near a world or a system, never from afar | 0 | The activity API (§7) | — |
 | Auroras | The poles light with calls to the realm, stronger with calls per minute | 1 | The signals at scale (§7) | Read |
 | Comets in space | A message sent to another world's room crosses space as a comet (Chat, comets) | 1 | The comets bot | — |
 | Talk box | With the chat closed, the last lines of the world's room on its plate | 0 | — | — |
-| Realm facts | Path, deployer, first block, calls in 24 h | 0 | The public indexer | Read |
+| Realm facts | Path, deployer, first block; the calls in 24 h wait for an indexer with dates (F2974: it has no time field) | 0 | The public indexer | Read |
 | Latest post on X | — | Cut, unless a source is decided | — | — |
 | The Earth | Bubbles where people speak from, with counts for the far side ("Japan · 12, far side"); hotspots per country with the last hour's trend ("+15% · 1 h", from the activity API); the globe turns to show your own message; "N realms deployed in 24 h" from the indexer | 0 | `pickBubbles` and its rules file (ADR-0001 §7) | — |
 | Bubbles on other worlds | The prototype pops messages on any planet | Cut: bubbles are the Earth's, by country (ADR-0001 §7). Moons, storms, auroras and heat carry activity elsewhere (§3) | — | — |
@@ -283,6 +283,8 @@ archives are not indexed pages (question 17).
 | INP | 200 ms | In the field (§6). Lighthouse does not report INP on a page load |
 
 ### 3. The universe at scale
+
+Amended by §10.
 
 The chain may hold millions of realms. The map must stay readable and light. Realms nobody
 uses must not crowd it. Good ones must stand out, and every realm must stay reachable. The
@@ -1402,6 +1404,22 @@ Its findings are fixed before any other lens runs.
 - slice 12: `posthog-js`.
 
 k6 runs as a binary or an image, not as a package.
+
+### 10. What slice 7's validation changes (Alexis, 2026-11-01)
+
+This section overrides the text above where they differ. The reasons and the numbers are in `docs/decisions.md`.
+
+- **A world is a product, not a realm.** One planet and one room for `gnogolf`; its realms and versions sit under it, shown as you zoom in, with no room of their own. A namespace is a star. A hub with no realm is a world. The grouping reads paths, and a hub's `realms` list corrects it. This replaces "every realm is a world" (Summary, "A word on words", §3).
+- **A world evolves with its use, little by little.** Two gauges: a vitality that remembers and moves a few percent a day, and the people present. Its stages run from seed through rest, living, inhabited and busy to beacon. Each class shows a stage its own way: a sign keeps its meaning, where it shows and how it grows, and varies its form.
+- **Dust comes after a year.** A world turns to dust after one year with no transaction, no message and no import, coming apart over the last three months, and it becomes a planet again at the first sign of life, with the same look. A hub never does. This replaces "realms without signals are dust" (§3).
+- **New realms.** A new family is a seed until its first visit, or 7 days; a new version wakes its planet instead. Nothing is sorted or hidden by its name.
+- **Two layers.** Signs always mean real data. The scenery is generative art from a cell's position, unbounded, tied to no data, and never imitates a sign.
+- **Rising worlds.** A world is rising against its own last 14 days, so a small world can stand out. The order is the Earth, trends, rising, seeds.
+- **Auroras** mean a run of calls, then fade; they are never always on.
+- **The Earth** stays one place, the general chat, with one Moon; its side rooms are points on the globe.
+- **Dependencies are not positions.** A world stays with its namespace's star; its dependencies show as lines on hover.
+- **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
+- **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
 
 ## Consequences
 

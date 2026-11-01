@@ -1,5 +1,6 @@
 // What the server's IRC link remembers of one connection to Ergo, and the lines it reads to keep it (slice 3's
 // plan, 3h, 3j, 3l, 3m).
+import { makeRedacts, type Redacts } from "./redacts.ts";
 import { freshHistory, type HistoryState } from "./history.ts";
 import { several, type Several } from "./several.ts";
 import { roomStates, type States } from "./state.ts";
@@ -20,6 +21,8 @@ export interface State extends HistoryState {
   states: States;
   // Its nick refused in a row, connection after connection: the third raises the alert (slice 3's max review).
   nickTaken: number;
+  // The hides sent and not yet taken, asked again when Ergo does not know the line yet (F2462).
+  redacts: Redacts;
 }
 
 export const fresh = (stateMs: number, lineMs: number): State => ({
@@ -32,6 +35,7 @@ export const fresh = (stateMs: number, lineMs: number): State => ({
   channels: undefined,
   states: roomStates(stateMs),
   nickTaken: 0,
+  redacts: makeRedacts(),
 });
 
 /** A connection's end: what it held is forgotten, each question still waiting answered with nothing. */
@@ -45,4 +49,11 @@ export function forget(state: State): void {
   state.channels = undefined;
   state.states.drop();
   state.lines.drop();
+  state.redacts.clear();
+}
+
+/** A command just sent: a JOIN is taken as joined once Ergo says so (3l), a REDACT waits for Ergo's word (F2462). */
+export function sentOn(state: State, command: string, params: readonly string[]): void {
+  if (command === "JOIN") state.asked.add(params[0] ?? "");
+  else if (command === "REDACT") state.redacts.sent(params);
 }

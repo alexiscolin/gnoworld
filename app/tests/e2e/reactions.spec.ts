@@ -123,7 +123,7 @@ test.describe("reactions", () => {
       if (sockets.length === 0) scriptedErgo(ergo, address, { history: HISTORY, heard: (line) => sent.push(line) });
       sockets.push(ergo);
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(lines(page)).toHaveCount(2);
     await sockets[0]?.close();

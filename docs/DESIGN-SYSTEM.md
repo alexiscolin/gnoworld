@@ -73,6 +73,7 @@ The theme is dark only (`color-scheme: dark`). Nine base colours:
 | amber | `#FFC46B` | Heat, the sun, live moments, what is about me; caution |
 | violet | `#B79CFF` | What a machine says: uncharted signals, and the assistant (Jarvis's orb and the card of its answers) |
 | coral | `#FF8A7A` | Errors, danger, a falling trend; what is new (`--color-new`) |
+| dusk | `#6885D9` | `--world` until a world has its own colour: its plate's tint, 16 % over the night. Nothing else |
 
 Semantic roles, all computed from them:
 
@@ -86,7 +87,7 @@ Semantic roles, all computed from them:
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
 | `--color-new`, `--color-new-line` | coral; coral at 60% | What is new in a list: the "New" divider's word and its rule, the 60% holding 3:1 against the page (WCAG 1.4.11). Its own token, so what is new can change hue without touching danger |
-| `--world` | a world's own colour, set from its data | The plate over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))`; the dock keeps the plain panel colour |
+| `--world` | a world's own colour, set from its data; a cool blue until the scene gives one (slice 7) | The plate over a world is `color-mix(in oklab, var(--world) 12%, var(--color-panel))`; the dock keeps the plain panel colour |
 | `--texture-grid` | text at 6%, a 14 px dot grid | The plate's surface, from the prototype |
 
 **Three meanings, three colours, never colour alone:**
@@ -148,6 +149,7 @@ the brightest planet behind the header's pills.
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
 | `--font-title-m` | 28 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
+| `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
 | `--font-display` | `clamp(4.5rem, 8vw, 7rem)`, -0.04em, leading 0.9 | Geist 600 | A world's name on its plate |
 | `--font-hero` | `clamp(5.5rem, 11vw, 11rem)`, -0.06em, leading 0.9 | Geist Mono 400, tabular | The hero number |
 
@@ -343,7 +345,7 @@ component with its CSS Module, documented by its props.
 | `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's nebula is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; three clouds of colour on night and the address's constellation over them (five stars, one per fifth of the disc so the shape stays open, joined in one of three orders, one bright), the same at every size, readable at 20 px. Never an NFT: the face is computed from the address, which only its key controls (ADR-0001 §11). Where the clouds and stars sit always comes from the address; the palette is chosen in phase 1. A face tells people apart at a glance, never who they are: anyone can try addresses until a face looks like yours, so the name, and the short address where a person matters, identify; my own messages are marked by my name in mint and the word "you", never by the face. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
-| `Stat` | number, unit, caption; the heat badge; delta | Tabular numbers that count up on arrival. Under reduced motion, effects become `Stat` counts |
+| `Stat` | number, unit, caption; the heat badge; delta | Geist Mono 500, tabular, the "instrument" figures (Alexis, 2026-10-31), that count up on arrival. Under reduced motion, effects become `Stat` counts |
 | `ActivityChart` | 24 h bars, a hover tooltip, sparkline | SVG, no chart library; Data graphics, above |
 | `Progress` | bar, steps, spinner, wave, arc | The flight, a quest, the signing wait, a speaker, the passport's gauge |
 | `Kicker` | with a dot; vertical (the plate's atlas caption) | `--font-label` |

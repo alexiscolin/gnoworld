@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  BubbleRules,
   DATA_CAPS,
   Ecosystems,
   EMBED_PREFIXES,
@@ -21,6 +22,8 @@ const universe = {
   name: "Onyx",
   chainId: "onyx-1",
   rpc: "https://rpc.onyx.testnets.gno.land:443",
+  gnoweb: "https://onyx.testnets.gno.land",
+  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
   testnet: true,
 };
 const hub = { slug: "bubble", name: "Bubble", description: "d".repeat(60), universe: "onyx" };
@@ -294,7 +297,14 @@ describe("a news item's embed", () => {
 
 describe("Universes", () => {
   const one = { ...universe, default: true };
-  const second = { ...universe, id: "gnoland", chainId: "gnoland-1", testnet: false };
+  const second = {
+    ...universe,
+    id: "gnoland",
+    chainId: "gnoland-1",
+    gnoweb: "https://gno.land",
+    indexer: "https://indexer.gno.land/graphql/query",
+    testnet: false,
+  };
 
   it("takes one default universe, and refuses none, two, or two of one id", () => {
     expect(Universes.safeParse([one]).success).toBe(true);
@@ -327,12 +337,15 @@ describe("Universes", () => {
     expect(Universes.safeParse([{ ...universe, default: "true" }]).success).toBe(false);
   });
 
-  it.each(["id", "name", "chainId", "rpc", "testnet"])("refuses a universe with no %s", (field) => {
-    const rest = Object.fromEntries(Object.entries(one).filter(([key]) => key !== field));
-    expect(Universes.safeParse([rest]).success).toBe(false);
-  });
+  it.each(["id", "name", "chainId", "rpc", "gnoweb", "indexer", "testnet"])(
+    "refuses a universe with no %s",
+    (field) => {
+      const rest = Object.fromEntries(Object.entries(one).filter(([key]) => key !== field));
+      expect(Universes.safeParse([rest]).success).toBe(false);
+    },
+  );
 
-  it.each(["id", "name", "chainId", "rpc", "testnet", "default"])(
+  it.each(["id", "name", "chainId", "rpc", "gnoweb", "indexer", "testnet", "default"])(
     "refuses a universe whose %s is a number",
     (field) => {
       expect(Universes.safeParse([{ ...one, [field]: 7 }]).success).toBe(false);
@@ -341,6 +354,42 @@ describe("Universes", () => {
 
   it.each([["true"], ["false"], [1], [0], [null]])("refuses testnet as %j: a flag, never a word", (testnet) => {
     expect(Universes.safeParse([{ ...one, testnet }]).success).toBe(false);
+  });
+
+  // R-F3, F2952 (Alexis, 2026-10-31): a chain's gnoweb and indexer are data, https only, each its own kind of address.
+  describe("gnoweb and indexer", () => {
+    const fits = (field: string, value: string) => Universes.safeParse([{ ...one, [field]: value }]).success;
+
+    it("takes https addresses: gnoweb's origin, the indexer's GraphQL endpoint", () => {
+      expect(fits("gnoweb", "https://gno.land")).toBe(true);
+      expect(fits("gnoweb", "https://gno.example:8443")).toBe(true);
+      expect(fits("indexer", "https://indexer.gno.land/graphql/query")).toBe(true);
+    });
+
+    it.each(["gnoweb", "indexer"])("refuses an %s that is not https, has a user, or holds a space", (field) => {
+      for (const value of [
+        "http://gno.land",
+        "ws://gno.land",
+        "//gno.land",
+        "gno.land",
+        "javascript:alert(1)",
+        "https://u@gno.land",
+        "https://gno.land and more",
+        "",
+      ])
+        expect(fits(field, value), value).toBe(false);
+    });
+
+    // gnoweb is an origin: a realm's path is put under it (gnowebLink), so a path, query or fragment would lead off it.
+    it.each([
+      "https://gno.land/",
+      "https://gno.land/r",
+      "https://gno.land?x=1",
+      "https://gno.land#a",
+      "https://GNO.land",
+    ])("refuses a gnoweb that is not a bare lower-case origin: %s", (value) => {
+      expect(fits("gnoweb", value)).toBe(false);
+    });
   });
 
   it("refuses a field it does not know", () => {
@@ -368,5 +417,84 @@ describe("Universes", () => {
       }));
     expect(Universes.safeParse(universes(DATA_CAPS.universes)).success).toBe(true);
     expect(Universes.safeParse(universes(DATA_CAPS.universes + 1)).success).toBe(false);
+  });
+});
+
+// Slice 6's 6a: the rules of the Earth's bubbles (ADR-0001 §7), one object, checked when the app builds. The bounds are
+// the plan's proposal (docs/plans/slice-6.md §3): each is tested at the bound and one past it.
+describe("BubbleRules", () => {
+  const rules = {
+    maxOnScreen: 6,
+    showSeconds: 5,
+    speakerDelaySeconds: 30,
+    maxChars: 80,
+    readLast: 500,
+    maxAgeSeconds: 300,
+  };
+  const BOUNDS = [
+    ["maxOnScreen", 1, 12],
+    ["showSeconds", 1, 15],
+    ["speakerDelaySeconds", 1, 120],
+    ["maxChars", 20, 160],
+    ["readLast", 1, 2000],
+    ["maxAgeSeconds", 30, 86_400],
+  ] as const;
+
+  it("takes the rules ADR-0001 §7 starts with", () => {
+    expect(BubbleRules.safeParse(rules).success).toBe(true);
+  });
+
+  it.each(BOUNDS)("takes %s from %d to %d, and refuses one past either end", (field, low, high) => {
+    const ok = (value: number) => BubbleRules.safeParse({ ...rules, [field]: value }).success;
+    expect([ok(low), ok(high), ok(low - 1), ok(high + 1)]).toEqual([true, true, false, false]);
+  });
+
+  it.each(BOUNDS)("refuses a %s that is zero, negative, fractional, a string, null, NaN or infinite", (field, low) => {
+    const bad = (value: unknown) => BubbleRules.safeParse({ ...rules, [field]: value }).success;
+    expect([bad(-1), bad(low + 0.5), bad(String(low)), bad(null), bad(Number.NaN), bad(Infinity)]).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    if (low > 0) expect(bad(0)).toBe(false);
+  });
+
+  it.each(BOUNDS)("refuses rules with no %s, and names it", (field) => {
+    const rest = Object.fromEntries(Object.entries(rules).filter(([name]) => name !== field));
+    const result = BubbleRules.safeParse(rest);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((i) => i.path)).toEqual([[field]]);
+  });
+
+  it("refuses a field it does not know, a list and a null", () => {
+    expect(BubbleRules.safeParse({ ...rules, maxBubbles: 7 }).success).toBe(false);
+    expect(BubbleRules.safeParse([rules]).success).toBe(false);
+    expect(BubbleRules.safeParse(null).success).toBe(false);
+  });
+
+  it("names the field and what is wrong when a cap is drowned", () => {
+    const result = BubbleRules.safeParse({ ...rules, maxOnScreen: 10_000 });
+    expect(result.error?.issues.map((i) => i.path)).toEqual([["maxOnScreen"]]);
+  });
+
+  it("takes any integers inside the bounds", () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          maxOnScreen: fc.integer({ min: 1, max: 12 }),
+          showSeconds: fc.integer({ min: 1, max: 15 }),
+          speakerDelaySeconds: fc.integer({ min: 1, max: 120 }),
+          maxChars: fc.integer({ min: 20, max: 160 }),
+          readLast: fc.integer({ min: 1, max: 2000 }),
+          maxAgeSeconds: fc.integer({ min: 30, max: 86_400 }),
+        }),
+        (row) => {
+          expect(BubbleRules.safeParse(row).success).toBe(true);
+        },
+      ),
+    );
   });
 });

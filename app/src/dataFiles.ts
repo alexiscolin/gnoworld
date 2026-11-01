@@ -4,7 +4,18 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { output } from "zod/mini";
-import { Ecosystems, Events, Expedition, Genres, Hubs, News, Quests, Stations, Universes } from "@gnoworld/schemas";
+import {
+  BubbleRules,
+  Ecosystems,
+  Events,
+  Expedition,
+  Genres,
+  Hubs,
+  News,
+  Quests,
+  Stations,
+  Universes,
+} from "@gnoworld/schemas";
 
 const SCHEMAS = {
   universes: Universes,
@@ -15,6 +26,7 @@ const SCHEMAS = {
   events: Events,
   expedition: Expedition,
   quests: Quests,
+  bubbles: BubbleRules,
   news: News,
 };
 
@@ -23,7 +35,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The nine files of a directory, checked; throws every fault found in the first file that has one. */
+/** The ten files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {

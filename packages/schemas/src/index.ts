@@ -5,6 +5,7 @@ import { z } from "./zod.ts";
 export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, toAddress, type AddressProblem } from "./address.ts";
 export {
+  BubbleRules,
   Ecosystems,
   EMBED_PREFIXES,
   Events,
@@ -16,7 +17,9 @@ export {
   Stations,
   Universes,
 } from "./data.ts";
+export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
+export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";

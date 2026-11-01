@@ -101,7 +101,8 @@ describe("an ecosystem's page", () => {
 describe("the Earth of a universe that holds worlds", () => {
   test("links a world of another universe at that universe's path", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"[^>]*>Other<\/a>/);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
+    expect(html).toContain("Other");
     expect(html).not.toContain("Bubble");
     expect(html).not.toMatch(/no world yet/i);
   });
@@ -136,14 +137,24 @@ describe("the Earth of a universe that holds worlds", () => {
 describe("a universe's index", () => {
   test("is the cosmos of the universe at /net/<id>/: its name, its worlds, a way to its Earth", async () => {
     const html = await page("home", "/net/gnoland/");
-    expect(html).toContain("<h1>gno.land</h1>");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"[^>]*>Other<\/a>/);
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Earth<\/a>/);
-    expect(html).not.toContain("Bubble");
+    // F3267: the hero's kicker names the universe, and the heading is its line, what the page holds.
+    expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land<\/p>/);
+    expect(html).toMatch(/<h1\b[^>]*>1 world in gno\.land<\/h1>/);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
+    expect(html).toContain("Other");
+    // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Go explore/);
+    // Onyx's world is not listed here; the ticker's placeholder news names it, and is the site's, not a universe's.
+    expect(html).not.toContain("/w/bubble");
+    expect(html).not.toMatch(/>Bubble<\/a>/);
   });
 
   test("is the home itself for the default universe, at / and at /net/onyx/", async () => {
-    for (const path of ["/", "/net/onyx/"]) expect(await page("home", path), path).toContain("<h1>gno.world</h1>");
+    for (const path of ["/", "/net/onyx/"]) {
+      const html = await page("home", path);
+      expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
+      expect(html, path).toMatch(/<h1\b[^>]*>2 worlds in Onyx<\/h1>/);
+    }
   });
 
   test.each(["/net/nowhere/", "/net/Onyx/", "/net/constructor/"])(
@@ -162,10 +173,10 @@ describe("a universe's index", () => {
 });
 
 describe("a world of another universe", () => {
-  test("is at its universe's path, its trail leading to that universe", async () => {
+  test("is at its universe's path, its kicker naming that universe", async () => {
     const html = await page("world", "/net/gnoland/w/other");
     expect(html).toContain("<h1>Other</h1>");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/earth"[^>]*>Earth<\/a>/);
+    expect(html).toMatch(/<p class="label[^"]*">gno\.land<\/p><h1>Other<\/h1>/);
   });
 
   test.each(["/net/gnoland/w/bubble", "/w/other", "/net/nowhere/w/other", "/net/onyx/w/other"])(

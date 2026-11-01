@@ -1,0 +1,162 @@
+/* The hero: bottom left of the cosmos, 48 px from the left and 64 from the bottom, the kicker, the number at 176 px in mono and a
+   row with its line and two actions of 52 px, 28 px apart (the prototype's #hero, lines 514 to 546; frames 1 to 8); a block in
+   the page on a phone and on a screen too short to hold it over the page. */
+@layer components {
+  .hero {
+    /* layout: the kicker, the number and the row, one under the other */
+    display: flex;
+    /* layout: the arrangement the prototype and the frames draw */
+    flex-direction: column;
+    /* raw: 22 px between them (the prototype's #hero) */
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 22px;
+    /* The hero's own box takes no click from the page behind it; its words and actions do. */
+    pointer-events: none;
+  }
+
+  .hero > * {
+    pointer-events: auto;
+  }
+
+  .hero p {
+    /* layout: a paragraph with no margin of its own: the hero spaces it */
+    margin-block: 0;
+  }
+
+  .number {
+    font-family: var(--family-mono);
+    /* raw: 88 px to 176 px, 11vi between (the prototype's #hero .num) */
+    font-size: clamp(88px, 11vi, 176px);
+    font-weight: 400;
+    /* raw: the prototype's tight tracking and line for the big number */
+    letter-spacing: -0.06em;
+    line-height: 0.82;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row {
+    /* layout: the line and the actions on one row, wrapping when the screen is narrow */
+    display: flex;
+    /* layout: the arrangement the prototype and the frames draw */
+    align-items: center;
+    /* layout: the line and its actions apart */
+    /* raw: 28 px between the line and the actions (the prototype's #hero .heroRow) */
+    gap: 28px;
+  }
+
+  .line {
+    /* layout: the page's heading, in the line's own size: no margin, no heading size */
+    margin-block: 0;
+    /* raw: the line's own grey and 17 px (the prototype's #hero .heroCap) */
+    color: #c8d0de;
+    /* raw: the prototype's and the frames' own value */
+    font: 400 17px/1.5 var(--family-sans);
+    letter-spacing: normal;
+  }
+
+  .actions {
+    /* layout: the two actions side by side */
+    display: flex;
+    /* raw: 10 px between them (the prototype's #hero .cta) */
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 10px;
+  }
+
+  .action {
+    /* layout: the label and its arrow in a row, centred */
+    display: inline-grid;
+    /* layout: the label and its arrow in a row */
+    grid-auto-flow: column;
+    /* layout: the label and its arrow share a middle */
+    align-items: center;
+    /* layout: the content in the middle of the action */
+    justify-content: center;
+    /* raw: 10 px between the label and its arrow (the prototype's #hero .cta .link) */
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 10px;
+    /* raw: the action is 52 px tall, 48 on a phone (the prototype's #hero .cta .link, lines 543 and 772) */
+    block-size: 52px;
+    /* raw: 24 px at each side, 20 on a phone (the prototype's lines 543 and 772) */
+    padding-inline: 24px;
+    /* the action's edge is a ring inside its box, so a solid one needs none */
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    border-radius: var(--radius-pill);
+    /* raw: the night at 50% over the scene, as the prototype's 0.5 */
+    background: color-mix(in oklab, var(--color-surface) 50%, transparent);
+    /* raw: 15 px, 500 (the prototype's #hero .cta .link) */
+    font: 500 15px/1 var(--family-sans);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .action[data-emphasis="solid"] {
+    box-shadow: none;
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .worlds {
+    /* layout: the list stands off the hero above it when the page holds them in a column */
+    margin-block-start: var(--space-s);
+    /* The ticker is fixed over the foot of the page: the last link scrolls above it. */
+    padding-block-end: var(--space-xl);
+  }
+
+  /* The cosmos' worlds as plain links: no bullet, no link colour, the design system's type. */
+  .worlds ul {
+    padding-inline-start: 0;
+    list-style-type: none;
+    /* layout: the list's own margin, which the browser gives it, taken off */
+    margin-block: 0;
+  }
+
+  .worlds a {
+    color: var(--color-text-muted);
+    font: var(--font-ui);
+    text-decoration: none;
+  }
+
+  .worlds a:hover {
+    color: var(--color-text);
+  }
+
+  @media (max-width: 899px) {
+    .row {
+      /* layout: the actions go under the line when the phone is too narrow for both */
+      flex-wrap: wrap;
+    }
+
+    .action {
+      /* raw: 48 px tall and 20 at the sides on a phone (the prototype's line 772) */
+      block-size: 48px;
+      /* raw: the prototype's and the frames' own value */
+      padding-inline: 20px;
+    }
+
+    .line {
+      white-space: normal;
+    }
+  }
+
+  /* Over the page only where it holds: a screen of 800 px high, the list of worlds above it in the room that is left. */
+  @media (min-width: 900px) and (min-height: 800px) {
+    .hero {
+      position: fixed;
+      inset-inline-start: var(--space-xl);
+      inset-block-end: var(--space-2xl);
+    }
+
+    .worlds {
+      /* layout: no offset from the hero: the list is fixed at the top, the hero at the foot */
+      margin-block-start: 0;
+      padding-block-end: 0;
+      position: fixed;
+      /* raw: under the header's 96 px, and 16 more */
+      inset-block-start: 112px;
+      inset-inline-start: var(--space-xl);
+      /* raw: the room above the hero (the header, the hero at its tallest and the margins), whatever the list's length */
+      max-block-size: calc(100dvb - 520px);
+      overflow: auto;
+    }
+  }
+}

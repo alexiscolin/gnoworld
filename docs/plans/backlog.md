@@ -100,6 +100,14 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | A Threads view and following a thread | A view of the threads the account is in, with unread at the top, and a follow set (on the server or the device) with per-thread unread and notifications, as `docs/decisions.md:161` first named them | Narrowed out of slice 4 on 2026-10-27: the thread is read from the room's lines, with no follow state (M3); both need a store nothing holds yet |
 | A thread kept whole when a middle reply is deleted | A root map in the room's store (each reply's root, kept as a line arrives), so a deleted reply's own replies stay in the thread, and a thread's replies are found past the window | Accepted as a limit on 2026-10-27: `threadsOf` reads the window's lines, so a reply to a line gone is a thread of that msgid; a store's shape is Alexis's to approve |
 
+## Slice 5, after part 1's review
+
+| Item | Delivers | Why |
+|---|---|---|
+| More worlds than `_headers` holds (F2461) | The build's stop at 100 rules, about 20 worlds, replaced before the data reaches it: a host's rules that scale, and no stop for nginx, which has no such cap | Alexis, 2026-10-30: kept for now, one world today; the data's growth decides when |
+| A Combobox group's id (F2410) | `ui`'s `Combobox` says or checks that a group's id holds no space and no repeat, since it is joined into `aria-labelledby`; with its next change | An id with a space leaves the group unnamed for a screen reader; the palette's kinds have none today |
+| The composer's lost key (F2411) | The cause of the Home and End lost after a Tab's focus found, and `composer.spec.ts`'s `caretAt` stops pressing them again | The test retries, so a composer that loses the first key would still pass; F2402 left the cause unexplained |
+
 ## The design system, after slice 2
 
 Alexis, 2026-10-21: 2e's and 2f's reviews found these; each is true and none bites today, so each
@@ -112,7 +120,6 @@ comes with the slice that brings what it needs.
 | A link to a file of the site | The app hands ui's link slot its route test, so a path that names a file (the sitemap, a download) stays a plain anchor; with the sitemap (slice 5) | Every path from the root goes to the router today, whose catch-all shows "No page here" (F326) |
 | A thumb's picture from data | `PlanetThumb` takes only the site's own paths and data URIs, with no referrer; with the first picture from data | A picture from another host tells it each visitor's address (F336) |
 | Speaking and selected | Speaking gets a mark of its own, or DESIGN-SYSTEM.md says which wins; with the first selected avatar | The speaking ring and the selected cream ring look alike (F322) |
-| The chart's hover tooltip | `ActivityChart`'s tooltip on hover, as DESIGN-SYSTEM.md's table says; with a world's figures (slice 5) | The table promises it, and no plan has it (F304) |
 | Where the update notice sits | The update notice placed where it covers nothing the keyboard reaches at the page's top, or the page's top made room for while it shows; with slice 4's shell | Scroll padding keeps a link reached by the keyboard clear of the pill below the top, but the page's very top cannot scroll further down: a link there stays under it, and a pill that wraps on a narrow screen is taller than the room kept for it, a fixed height (F355; /simplify, 2g) |
 | A link Row's whole row | A link Row's `<a>` stretched over the row, with a title-only story; with the next Row change | A title-only link Row's target is its words, 21 px tall, under DESIGN-SYSTEM's 24 px (F365) |
 | Empty text is no text | One rule for every optional text slot: an empty string draws nothing and marks nothing; before the first data reaches them (slice 3) | `error=""` marks a Field invalid with an empty description; Row and Card draw empty boxes (F366) |
@@ -146,6 +153,28 @@ slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; on
 | 10 | Jarvis | The `jarvis` container (ADR-0002 §5, §7): the loop on `@anthropic-ai/sdk`, its allowlist and its log; one long-lived gnomcp, started read-only; our tools; gnoscope behind a switch; the skills; the hard budget, translation's own budget, timeouts; evals and traces in Grafana first. Then concierge, realm reader, digests, chain questions, action proposals, catch up, automatic translation; its button and its answer buttons | A tool off the allowlist is refused and logged; the injection suite passes; every number, link and function in a digest traces to its source; a proposal for a function that does not exist shows nothing; at 100% of the budget Jarvis stops and every feature falls back to its form without a model; a translation is made once per message and language; `jarvis` holds no key but Anthropic's | — | `@anthropic-ai/sdk`, `@modelcontextprotocol/client`, `@opentelemetry/api`, `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`, `promptfoo` (in `evals/`, never in an image) |
 | 11 | Satellites, on Onyx | The slot realm, written by Claude and audited (`gno-audit`), deployed on Onyx: a rent needs the moderation service's approval, verified in the realm (ed25519) and bound to everything it allows; 1, 3 or 7 days; one per world; 40 characters; the operator key's takedown with the days left refunded; the owner multisig's rotation and pause. The rent card, the slot on the plate, the satellites in space in the Onyx universe only, "Sponsored" and "Testnet" labels | A rent without a valid approval, or with one for other text, another slot or past its expiry, is refused; a takedown refunds the days left; a second satellite on a world is refused; only the multisig rotates or pauses; the mutation check finds every guard and now also flips operators and shifts constants (`>=` and `>`, `==` and `!=`, `&&` and `||`, `+` and `-`, a number by one), every survivor killed or in `GAPS` with its reason; the same approval sent twice at once is accepted once | — | — |
 | 12 | Phase-0 exit | The admin console on its own origin, on the private network only (ADR-0002 §6): roles from the repo (a file `server` has read since slice 3: `docs/decisions.md:147`, `:149`), the moderation queue with reports and contests, curation as pull requests, kill switches, the audit log shipped to the log backend. PostHog: counts only, cookieless, with field Web Vitals and the field frame rate. The hand-off to ops: every image (multi-architecture, SBOM, pinned), `.env.example`, `docs/OPERATIONS.md`, backups with a restore test, the outside probe and its alerts, checked by bringing the whole stack up from scratch on a clean machine. The red-team pass on Jarvis and the penetration test of the console. ADR-0001's and ADR-0002's exit criteria checked on a computer and on a phone; a plain IRC client joins the same room on the private network | A contest reaches a person; no PostHog event carries text or a name; a person without a role cannot open the console; a sensitive action without a fresh signature is refused; every action lands in the audit log; a call lands; Jarvis's evals pass; a satellite shows on Onyx only after its check; a backup restores; the exit criteria | — | `posthog-js`; a GitHub App; Claude Code's `posthog` plugin |
+
+## From the video's audit (2026-10-31)
+
+The end state is the prototype's video, to the pixel (`docs/decisions.md`, `docs/design/video-screens.md`). The audit of
+2026-10-31 found what the rows above leave out; a row's own text does not yet say so, this list does, and each slice's plan
+takes its lines. A slice's plan names the video's frames each of its screens is built to.
+
+| What | Goes to |
+|---|---|
+| The header, the plate, the home's layout, the list, "Testnet" | 5r |
+| The opt-in country tag, the person card, the bell and notifications by kind, the room's Media tab | 7 (Alexis, 2026-10-31; the compact dock is in 5q) |
+| The rail: its order, its cap of 25, "See all" | 7 |
+| Open Graph images and the preview-capture job, moved from slice 5 (question 5) | 7 |
+| The "Credits" link for the CC BY textures (`docs/DESIGN-SYSTEM.md:403`) | 7, with the first texture |
+| The scene's meteors, signs and the header's live counters | 7, once the 3:36 cut shows what they are |
+| The dock beside the 3D | 7 |
+| The "first words" arrival banner | 9 |
+| The AI Ring and Harbor station bodies | Once their content exists (slice 5, question 6) |
+| The composer's emoji picker | Waits for Alexis: it needs `emojibase-data` |
+| One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
+| The ticker's five `sample-` rows (`app/data/news.json`, `events.json`) leave before a public deploy, with a refusal at deploy that counts them (5m's review, row 11) | The slice that deploys in public |
+| The home's sparklines and the frame's spacing of the live line (decisions, 2026-10-31) | The markets' history, once the file holds one |
 
 ## Phase 1: social on chain
 

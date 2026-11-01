@@ -14,23 +14,33 @@ export function wrap(mark: string, size: number, children: Inline[]): Inline {
 // variation selectors) and the braille blank (F781).
 const BLANK = /^[\s\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
 
+/** Whether a text draws nothing: spaces, format characters, ignorable code points, the braille blank. */
+export const isBlank = (text: string): boolean => BLANK.test(text);
+
 // Whether nodes show nothing: texts and code that draw nothing, in marks or not. A link's label must show
 // something, or its address is a link no one sees.
 export function invisible(nodes: readonly Inline[]): boolean {
   return nodes.every((node) => {
-    if (node.type === "text" || node.type === "code") return BLANK.test(node.text);
+    if (node.type === "text" || node.type === "code") return isBlank(node.text);
     return "children" in node && invisible(node.children);
   });
 }
 
 /** Nodes with each mention in them, however deep, made text again: `@` and the address. */
-export function unmentioned(nodes: readonly Inline[]): Inline[] {
+function unmentioned(nodes: readonly Inline[]): Inline[] {
   const plain: Inline[] = [];
   for (const node of nodes) {
     if (node.type === "mention") append(plain, { type: "text", text: `@${node.address}` });
     else append(plain, "children" in node ? { ...node, children: unmentioned(node.children) } : node);
   }
   return plain;
+}
+
+/** A link's label from what it holds: no account is named in it, its mentions are text again; an image with no alt text
+ * names its address. */
+export function labelOf(nodes: readonly Inline[], href: string, image: boolean): Inline[] {
+  const named = unmentioned(nodes);
+  return image && invisible(named) ? [{ type: "text", text: href }] : named;
 }
 
 /** A node after the last: a text joins the text before it, and an empty one adds nothing. */

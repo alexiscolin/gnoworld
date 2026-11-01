@@ -4,7 +4,8 @@ For each `fix` commit of the branch that changes product code (packages, gno, ap
 server), the tests it adds or changes must fail on the commit before it: run there, they
 show the bug; run on the fix, the gate already saw them pass. A test that passes before the
 fix reproduces nothing, and the fix is refused. A fix with no test is refused, unless its
-message says why on a line `No-test: <why>`, which Alexis reads in review. A fix of the
+message says why on a line `No-test: <why>`, which Alexis reads in review. A merged fix whose message cannot change
+is excused by a line `No-test: <short sha> - <why>` on any later commit of the range. A fix of the
 harness alone is left to scripts/harness_mutate.py, which proves each guard is watched, and one
 of tests alone changes no product code, so it has nothing to prove.
 Usage: prove_fix.py <base>, from the repository root (check.sh --full)."""
@@ -78,10 +79,20 @@ def harness_files(commit):
     return set(listed.stdout.splitlines())
 
 
-def verdict(commit):
+EXCUSE = re.compile(r"^No-test: ([0-9a-f]{7,40}) - \S", re.M)
+
+
+def excused(base):
+    """The shas the range's messages excuse, each by a line `No-test: <sha> - <why>` (7 hex digits at least)."""
+    return {m for msg in git("log", "--no-merges", "--format=%B%x00", f"{base}..HEAD").split("\0") for m in EXCUSE.findall(msg)}
+
+
+def verdict(commit, excuses=frozenset()):
     """None when the commit is not a product fix or proves itself; otherwise what is wrong."""
     message = git("log", "-1", "--format=%B", commit)
     if not re.match(r"fix(\(.+?\))?!?:", message):
+        return None
+    if any(commit.startswith(sha) for sha in excuses):  # a later commit says why it needs no test
         return None
     # Every product file it touches, a deleted one included; the tests it runs, those it leaves.
     changed = git("diff-tree", "--no-commit-id", "--name-only", "-r", "--diff-filter=AMDT", commit).splitlines()
@@ -101,8 +112,9 @@ def verdict(commit):
 
 
 base = sys.argv[1]
+excuses = excused(base)
 problems = [f"{c[:7]} {git('log', '-1', '--format=%s', c).strip()}: {why}"
-            for c in git("rev-list", "--no-merges", "--reverse", f"{base}..HEAD").split() if (why := verdict(c))]
+            for c in git("rev-list", "--no-merges", "--reverse", f"{base}..HEAD").split() if (why := verdict(c, excuses))]
 if problems:
     print("prove_fix: a fix must come with a test that fails without it:", *problems, sep="\n  ", file=sys.stderr)
     sys.exit(1)

@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
 import { ActivityChart } from "./ActivityChart.tsx";
 import * as stories from "./ActivityChart.stories.tsx";
@@ -164,5 +164,234 @@ describe("ActivityChart", () => {
       lines: container.querySelectorAll("svg polyline").length,
     }));
     expect(shown.some((s) => s.bars === 24) && shown.some((s) => s.lines === 1)).toBe(true);
+  });
+});
+
+// F304 (slice 5j): DESIGN-SYSTEM.md's table gives the bars a hover tooltip: the count and the hour of the bar under the
+// pointer, as the table says them. The keyboard reaches the same words: the chart is one group, its arrows walk the bars.
+// The queries are anchored on the tooltip's own words: the chart's hidden table holds "This hour" and "N hours ago" rows too.
+describe("ActivityChart's tooltip (F304)", () => {
+  const draw = () => render(<ActivityChart label="Calls per hour, today" values={day} />);
+  const bar = (container: HTMLElement, hour: number) => {
+    const found = container.querySelector(`svg [data-hour="${String(hour)}"]`);
+    if (found === null) throw new Error(`no bar ${String(hour)}`);
+    return found;
+  };
+  // The pointer in an hour's column: a 24-slot plot 192 px wide (8 px an hour), as the drawing's own units stretch to the box.
+  const plotAt = (container: HTMLElement, slots = 24) => {
+    const plot = container.querySelector("[role='group']");
+    if (!(plot instanceof HTMLElement)) throw new Error("no plot");
+    plot.getBoundingClientRect = () => new DOMRect(0, 0, slots * 8, 48);
+    return plot;
+  };
+  const over = (container: HTMLElement, hour: number, slots = 24) => {
+    fireEvent.pointerMove(plotAt(container, slots), { clientX: hour * 8 + 4, clientY: 10 });
+  };
+  const away = (container: HTMLElement) => {
+    fireEvent.pointerLeave(plotAt(container));
+  };
+  const words = (count: number, when: string) => screen.queryByText(new RegExp(`^${String(count)}\\s*·\\s*${when}$`));
+  const anyWords = () => screen.queryByText(/^\d+\s*·\s*(This hour|Today|\d+ (hours?|days?) ago)$/);
+  const group = () => screen.getByRole("group", { name: "Calls per hour, today" });
+  // The focus the keyboard brings: Tab first, as jsdom's :focus-visible reads the events before the focus.
+  const focus = () => {
+    const chart = group();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Tab" });
+    act(() => {
+      chart.focus();
+    });
+    return chart;
+  };
+
+  it("shows the count and the hour of the bar under the pointer, and no words before", () => {
+    const { container } = draw();
+    expect(anyWords()).toBeNull();
+    over(container, 18);
+    expect(words(96, "5 hours ago")).not.toBeNull();
+  });
+
+  it("follows the pointer to another bar and leaves with it", () => {
+    const { container } = draw();
+    over(container, 18);
+    over(container, 23);
+    expect(words(96, "5 hours ago")).toBeNull();
+    expect(words(23, "This hour")).not.toBeNull();
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("is reached from the keyboard: the chart takes the focus, the arrows walk the bars, Escape hides the words", () => {
+    draw();
+    expect(group().getAttribute("tabindex")).toBe("0");
+    const chart = focus();
+    // The focus lands on the current hour, the last bar.
+    expect(words(23, "This hour")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    expect(words(22, "1 hour ago")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    expect(words(23, "This hour")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "Home" });
+    expect(words(0, "23 hours ago")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "End" });
+    expect(words(23, "This hour")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "Escape" });
+    expect(anyWords()).toBeNull();
+  });
+
+  it("stays on the first and the last bar at the ends, and wraps to none", () => {
+    draw();
+    const chart = focus();
+    fireEvent.keyDown(chart, { key: "ArrowRight" });
+    expect(words(23, "This hour")).not.toBeNull();
+    fireEvent.keyDown(chart, { key: "Home" });
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    expect(words(0, "23 hours ago")).not.toBeNull();
+  });
+
+  it("hides the words when the focus leaves the chart", () => {
+    draw();
+    focus();
+    expect(anyWords()).not.toBeNull();
+    act(() => {
+      group().blur();
+    });
+    expect(anyWords()).toBeNull();
+  });
+
+  it("keeps the focus's words when the pointer leaves, and the pointer's when the focus does (F334's class)", () => {
+    const { container } = draw();
+    focus();
+    over(container, 18);
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    away(container);
+    expect(words(23, "This hour")).not.toBeNull();
+    over(container, 18);
+    act(() => {
+      group().blur();
+    });
+    expect(words(96, "5 hours ago")).not.toBeNull();
+  });
+
+  // A click or a tap: the pointer goes down, then the browser focuses the group, which is no keyboard focus.
+  const clickFocus = (target: Element) => {
+    fireEvent.pointerDown(target);
+    fireEvent.mouseDown(target);
+    act(() => {
+      group().focus();
+    });
+  };
+
+  it("holds no words after a mouse click on a bar once the pointer has left it (F2862)", () => {
+    const { container } = draw();
+    over(container, 5);
+    clickFocus(bar(container, 5));
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("shows a tapped bar's own count while the finger is on it, never the last bar's (F2862)", () => {
+    const { container } = draw();
+    over(container, 18);
+    clickFocus(bar(container, 18));
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    expect(words(23, "This hour")).toBeNull();
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("shows the hour of the column the pointer is in, over a zero hour, a short bar's column or the gap, not only the ink (F2863)", () => {
+    const { container } = render(<ActivityChart label="Calls per hour, today" values={day} />);
+    // Hour 0 is a zero: a bar of no height, never under a pointer before.
+    over(container, 0);
+    expect(words(0, "23 hours ago")).not.toBeNull();
+    // The gap after a bar still belongs to its hour's slot.
+    fireEvent.pointerMove(plotAt(container), { clientX: 18 * 8 + 7, clientY: 1 });
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    // The plot's edges give the first and the last hour, never one past them.
+    fireEvent.pointerMove(plotAt(container), { clientX: -5 });
+    expect(words(0, "23 hours ago")).not.toBeNull();
+    fireEvent.pointerMove(plotAt(container), { clientX: 400 });
+    expect(words(23, "This hour")).not.toBeNull();
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("keeps the words while the pointer moves onto them, and hides them when it leaves the plot (F2863, WCAG 1.4.13)", () => {
+    const { container } = draw();
+    over(container, 18);
+    const tip = screen.getByText(/^96\s*·\s*5 hours ago$/);
+    // The words are inside the plot and take the pointer: moving onto them keeps the bar.
+    fireEvent.pointerMove(tip, { clientX: 200, clientY: -20 });
+    expect(words(96, "5 hours ago")).not.toBeNull();
+    away(container);
+    expect(anyWords()).toBeNull();
+  });
+
+  it("shows the words again when the pointer or the focus comes after Escape", () => {
+    const { container } = draw();
+    over(container, 18);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(anyWords()).toBeNull();
+    away(container);
+    over(container, 5);
+    expect(words(5, "18 hours ago")).not.toBeNull();
+  });
+
+  it("takes the first Escape, before a dialog around it: the dialog is not asked to close (F300's class)", () => {
+    const around = vi.fn();
+    const { container } = render(
+      <div onKeyDown={around}>
+        <ActivityChart label="Calls per hour, today" values={day} />
+      </div>,
+    );
+    over(container, 18);
+    const first = createEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent(document.body, first);
+    expect(first.defaultPrevented).toBe(true);
+    expect(anyWords()).toBeNull();
+    // Nothing shown, so the next Escape is the dialog's.
+    const second = createEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent(document.body, second);
+    expect(second.defaultPrevented).toBe(false);
+    expect(around).not.toHaveBeenCalled();
+  });
+
+  it("keeps the table as the one reading for assistive technology: the words are hidden from it", () => {
+    const { container } = draw();
+    over(container, 18);
+    const shown = words(96, "5 hours ago");
+    expect(shown).not.toBeNull();
+    expect(shown?.closest("[aria-hidden='true']")).not.toBeNull();
+  });
+
+  it("says the focused bar to assistive technology in a polite live region, which the table does not", () => {
+    draw();
+    expect(screen.getByRole("status").textContent).toBe("");
+    const chart = focus();
+    fireEvent.keyDown(chart, { key: "ArrowLeft" });
+    expect(screen.getByRole("status").textContent).toBe("1 hour ago, 22");
+    act(() => {
+      chart.blur();
+    });
+    expect(screen.getByRole("status").textContent).toBe("");
+  });
+
+  it("writes a day chart's words as the table does: Today, and 3 days ago", () => {
+    const { container } = render(<ActivityChart label="Calls this week" values={[3, 1, 2, 0]} unit="day" />);
+    over(container, 3, 4);
+    expect(screen.queryByText(/^0\s*·\s*Today$/)).not.toBeNull();
+    over(container, 0, 4);
+    expect(screen.queryByText(/^3\s*·\s*3 days ago$/)).not.toBeNull();
+  });
+
+  it("leaves a sparkline, and a chart with no value, with no focus stop and no tooltip", () => {
+    const { rerender } = render(<ActivityChart label="Calls" values={[1, 2, 3]} sparkline />);
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(document.querySelector("[tabindex]")).toBeNull();
+    rerender(<ActivityChart label="Calls" values={[]} />);
+    expect(screen.queryByRole("group")).toBeNull();
+    expect(document.querySelector("[tabindex]")).toBeNull();
+    expect(anyWords()).toBeNull();
+    expect(screen.queryByText(/NaN|undefined/)).toBeNull();
   });
 });

@@ -22,7 +22,8 @@ describe("the Earth's page", () => {
 
   test("lists the worlds of its universe, and only those", async () => {
     const onyx = await render(route("/net/:network/earth"), "/net/onyx/earth");
-    expect(onyx).toMatch(/<a [^>]*href="\/w\/bubble"[^>]*>Bubble<\/a>/);
+    expect(onyx).toMatch(/<a [^>]*href="\/w\/bubble"/);
+    expect(onyx).toContain("Bubble");
     const other = await render(route("/net/:network/earth"), "/net/gnoland/earth");
     expect(other).not.toContain("Bubble");
   });
@@ -70,4 +71,46 @@ describe("the Earth's page", () => {
 // The browser serves the pages the build wrote, from the same data (F2208).
 test("the browser's loader gives each pre-rendered earth what the build's does", () => {
   expectClientAsBuild("earth", clientLoader, loader);
+});
+
+// Slice 5r (frames 37 to 42): the Earth's page is a plate, with no 3D.
+describe("the Earth's plate", () => {
+  test("is a plate named Earth, holding the one heading and the worlds' links", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    const plate = /<section [^>]*data-look="plate"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(plate).toContain('aria-label="Earth"');
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toMatch(/<a [^>]*href="\/w\/bubble"/);
+  });
+
+  // The chief's comparison with frame 26: the worlds are the plate's connected-worlds rows, not a bare bulleted list.
+  test("lays the worlds as connected-worlds rows: one divided row each with its picture, name and description, no bulleted list", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    const rows = html.match(/data-look="divided"/g) ?? [];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(html.match(/<a [^>]*href="\/w\//g)).toHaveLength(rows.length);
+    expect(html).toMatch(/<a [^>]*href="\/w\/bubble"/);
+    expect(html).toMatch(/data-kind="world"/);
+    expect(html).not.toContain("<ul");
+    expect(html).toMatch(/>Worlds</);
+  });
+
+  test("draws no heading for the worlds in a universe with none, only the plain words", async () => {
+    const html = await render(route("/net/:network/earth"), "/net/gnoland/earth");
+    expect(html).not.toContain('data-look="divided"');
+  });
+
+  test("shows its vertical atlas caption to the eye only, and no figure the data does not hold", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    expect(html).toContain("gnoworld");
+    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
+    expect(html).not.toMatch(/<(canvas|video|picture|figure)\b/i);
+    // Frame 26's planet thumbs are the only pictures, each decorative (its name sits beside it).
+    for (const image of html.match(/<img\b[^>]*>/g) ?? []) expect(image).toContain('alt=""');
+  });
+
+  test("offers neither Follow nor Share: nothing behind them yet", async () => {
+    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
+    expect(html).not.toMatch(/>Follow<|>Share</);
+  });
 });

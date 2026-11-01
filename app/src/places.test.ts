@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import universes from "../data/universes.json" with { type: "json" };
 import { site, siteOf } from "./places.ts";
 import { FIXTURE } from "./placesFixture.ts";
 
@@ -74,7 +75,7 @@ describe("the site's worlds, by request", () => {
 });
 
 describe("the worlds of the data files", () => {
-  test("hold Bubble, at /w/bubble, its canonical under /net/onyx", () => {
+  test("hold Bubble and GovDAO, at /w/<slug>, each canonical under /net/onyx", () => {
     expect(site.worlds).toEqual([
       {
         slug: "bubble",
@@ -85,6 +86,16 @@ describe("the worlds of the data files", () => {
         testnet: true,
         path: "/w/bubble",
         canonical: "/net/onyx/w/bubble",
+      },
+      {
+        slug: "govdao",
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
+        universe: "onyx",
+        testnet: true,
+        path: "/w/govdao",
+        canonical: "/net/onyx/w/govdao",
+        realms: ["gno.land/r/gov/dao"],
       },
     ]);
   });
@@ -145,5 +156,52 @@ describe("a site of several universes, an ecosystem and a world of another unive
       init: { status: 404 },
     });
     expect(status(() => fixtureSite().ecosystem(at(`/e/${name}`)))).toMatchObject({ init: { status: 404 } });
+  });
+});
+
+// The header's two questions of the data (F3270): which universe a path belongs to, and which view it is.
+describe("the site's universe and view of a path", () => {
+  const onyx = () => fixtureSite().universes[0];
+  const gnoland = () => fixtureSite().universes[1];
+  const universeAt = (path: string) => fixtureSite().universeAt(path).id;
+  const viewAt = (universe: ReturnType<typeof onyx>, path: string) =>
+    universe === undefined ? undefined : fixtureSite().viewAt(universe, path);
+
+  test("a path under /net/<id> belongs to that universe, any other path to the default one", () => {
+    expect(universeAt("/net/gnoland/earth")).toBe("gnoland");
+    expect(universeAt("/net/onyx/")).toBe("onyx");
+    expect(universeAt("/earth")).toBe("onyx");
+    expect(universeAt("/net/nope")).toBe("onyx");
+    expect(universeAt("/")).toBe("onyx");
+  });
+
+  test("a view is current at its path and at its canonical address, a trailing slash or not", () => {
+    expect(viewAt(onyx(), "/earth")).toBe("earth");
+    expect(viewAt(onyx(), "/net/onyx/earth")).toBe("earth");
+    expect(viewAt(onyx(), "/net/onyx/earth/")).toBe("earth");
+    expect(viewAt(onyx(), "/")).toBe("cosmos");
+    expect(viewAt(onyx(), "/net/onyx/")).toBe("cosmos");
+    expect(viewAt(onyx(), "/net/onyx")).toBe("cosmos");
+    expect(viewAt(gnoland(), "/net/gnoland/earth")).toBe("earth");
+    expect(viewAt(onyx(), "/list")).toBe("list");
+    expect(viewAt(onyx(), "/list/")).toBe("list");
+  });
+
+  test("no view is current on a page that is none of the three, nor on another universe's", () => {
+    expect(viewAt(onyx(), "/w/bubble")).toBeUndefined();
+    expect(viewAt(onyx(), "/earthly")).toBeUndefined();
+    expect(viewAt(onyx(), "/net/gnoland/earth")).toBeUndefined();
+  });
+});
+
+// The home's block height comes from markets.json, which the server's timer writes (decision of 2026-10-31): the page reads no
+// chain, so a universe's view carries no RPC for it to ask.
+describe("a universe's view", () => {
+  test("carries no RPC: the home asks no chain", () => {
+    for (const universe of universes) {
+      const view = site.universes.find((each) => each.id === universe.id);
+      expect(view, universe.id).toBeDefined();
+      expect(Object.keys(view ?? {}), universe.id).not.toContain("rpc");
+    }
   });
 });

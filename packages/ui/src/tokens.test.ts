@@ -14,6 +14,7 @@ const BASE: Record<string, string> = {
   amber: "#FFC46B",
   violet: "#B79CFF",
   coral: "#FF8A7A",
+  dusk: "#6885D9",
 };
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
@@ -82,6 +83,8 @@ describe("parseTokens", () => {
     ["--measure", "Size"],
     ["--dialog-w", "Size"],
     ["--popover-w", "Size"],
+    ["--plate-w", "Size"],
+    ["--chat-dock", "Size"],
     ["--thumb-m", "Size"],
     ["--avatar-m", "Size"],
     ["--radius-s", "Shape"],
@@ -181,7 +184,9 @@ describe("the tokens", () => {
     ["--dialog-wide", "760px"],
     ["--popover-w", "300px"],
     ["--thumb-s", "32px"],
-    ["--thumb-m", "48px"],
+    ["--thumb-m", "52px"],
+    ["--plate-w", "808px"],
+    ["--chat-dock", "360px"],
     ["--thumb-l", "64px"],
     ["--avatar-s", "20px"],
     ["--avatar-m", "24px"],
@@ -221,5 +226,13 @@ describe("the New mark's colours", () => {
   it("names coral for what is new, and its rule above 3:1 on the page", () => {
     expect(value("--color-new")).toBe("var(--p-coral)");
     expect(contrast(over("--color-new-line", "space"), BASE["space"] ?? "")).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// docs/DESIGN-SYSTEM.md, "Type" (Alexis, 2026-10-31): the instrument figures, the board "Instrument" of the counter-proposal: Geist
+// Mono 500, 44 px (the video's figure on a plate); the Stat takes it (worldPage.spec.ts reads what it draws).
+describe("the instrument figure", () => {
+  it("is Geist Mono 500 at 44 px, in a token of its own", () => {
+    expect(value("--font-figure")).toBe("500 2.75rem/1 var(--family-mono)");
   });
 });

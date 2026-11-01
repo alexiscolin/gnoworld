@@ -1,7 +1,7 @@
 // The places of the data files, to filter by genre. One page for the site, at /list: it has no place of its own.
 import { Breadcrumb } from "@gnoworld/ui";
 import { data } from "react-router";
-import { PlacesList, type ListedPlace } from "../features/list/index.ts";
+import { Board, PlacesList, type ListedPlace } from "../features/list/index.ts";
 import { PlaceError } from "../features/errors/index.ts";
 import { listMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
@@ -28,11 +28,11 @@ export default function List() {
   const places = placesOf();
   const offered = site.genres.filter((genre) => places.some((place) => place.genres.includes(genre.slug)));
   return (
-    <>
+    <Board>
       <Breadcrumb label="You are here" items={[{ label: "Home", href: "/" }, { label: "Places" }]} />
       <h1>Places</h1>
       <PlacesList places={places} genres={offered} />
-    </>
+    </Board>
   );
 }
 

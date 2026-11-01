@@ -52,7 +52,7 @@ esac
 part() { case ",$ONLY," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
 # The rules the review depends on are required of every root (CR2): the four agents' briefs, each saying the git-index
 # rule, and CLAUDE.md's review card, its item 8; good_rules gives a fixture its own.
-agents="finding-verifier reviewer security-reviewer test-auditor"
+agents="design-reviewer finding-verifier reviewer security-reviewer test-auditor"
 good_rules() {
 	mkdir -p "$1/.claude/agents"
 	for a in $agents; do printf 'You never edit.\nNever run a git command that writes the index or the work tree (checkout,\nrestore); copy with cp.\n' >"$1/.claude/agents/$a.md"; done
@@ -169,7 +169,8 @@ import sys
 lines = [l.strip() for l in open(sys.argv[1]) if not l.lstrip().startswith("#")]
 at = lambda text: next(i for i, l in enumerate(lines) if l.startswith(text))
 assert "packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }" in lines
-assert at("copies=$(run copies") < at("installed=$(packages)") < at("node app/node_modules/@playwright/test/cli.js test") < at('[ "$(packages)" = "$installed" ]')
+last = lambda text: max(i for i, l in enumerate(lines) if l.startswith(text))
+assert at("copies=$(run copies") < at("installed=$(packages)") < at("run build:app") < at("node app/node_modules/@playwright/test/cli.js test") < last('[ "$(packages)" = "$installed" ]')
 PY
 # The full gate walks the stories: a command of its own, not a line that names it and runs nothing.
 grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
@@ -512,6 +513,11 @@ printf 'You may run a git command that writes the index or the work tree.\n' >"$
 rules >/dev/null && fail "check_docs accepted a brief that allows what the rule forbids (CR2)"
 printf 'Never run a git command that reads the index.\n' >"$r/.claude/agents/test-auditor.md"
 rules >/dev/null && fail "check_docs accepted a brief whose sentence is another's (CR2)"
+good_rules "$r"
+rm "$r/.claude/agents/design-reviewer.md"
+out=$(rules) && fail "check_docs accepted a root with no design-reviewer brief (harness-c, 5)"
+printf '%s' "$out" | grep -qF "agents/design-reviewer.md: the agent's brief is missing" || fail "check_docs did not name the missing design-reviewer brief: $out"
+good_rules "$r"
 rm "$r/.claude/agents/test-auditor.md"
 out=$(rules) && fail "check_docs accepted a missing agent file (CR2)"
 printf '%s' "$out" | grep -qF "agents/test-auditor.md: the agent's brief is missing" || fail "check_docs did not name the missing agent file: $out"
@@ -676,12 +682,8 @@ printf '%s' "$out" | grep -qF "no_such_block" || fail "harness_mutate --dry did 
 [ ! -e "$m/ran" ] || fail "harness_mutate --dry ran a test, which takes minutes"
 fi
 
-if part harness_shards; then
-# harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
-# a tree put back after each one, after a control run of each suite in every tree; with --changed
-# <base>, only the mutants of the guard files committed since base (a merge's own), all of them when a
-# suite or harness_mutate itself changed; a survivor fails the run either way, and the worktrees go.
-# On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
+# The planted copy these sections share: a suite, a guard file and a harness_mutate.py of its own, in a repository of two trees' worth of files.
+shards_fixture() {
 hs="$t/shards" && mkdir -p "$hs/src/scripts" "$hs/repo/scripts"
 # The suite: its section opens at the line's start, as harness_mutate reads it, which this file's
 # runner must not; with SHARDS_MEET, a mutant's run waits for that many trees to run at once.
@@ -689,16 +691,21 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
+	'	[ -n "${CUT:-}" ] && [ -n "$ONLY" ] && ! grep -q KEEP3 g.txt && kill -9 "$PPID"' \
+	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
+	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; *) exit "$INTR" ;; esac' \
+	'	fi' \
 	'	! grep -q " SPARE" g.txt && [ -n "${FLAKE:-}" ] && [ ! -e "$SHARD_ROOT/flaked" ] && { : >"$SHARD_ROOT/flaked"; exit 1; }' \
 	'	if [ -n "${SHARDS_MEET:-}" ]; then' \
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
 	'		until [ "$(ls "$SHARD_ROOT" | grep -c "^met\.")" -ge "$SHARDS_MEET" ]; do n=$((n + 1)); [ "$n" -lt 100 ] || { : >"$SHARD_ROOT/lonely"; break; }; sleep 0.1; done' \
 	'	fi' \
-	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt"' \
+	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt" && grep -q LINE1 m.txt && grep -q LINE2 m.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
 printf 'import os, sys\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt" && ac=$(printf '\303\251').txt && printf 'KEEP8\n' >"$hs/src/$ac"
+printf 'LINE1\nLINE2\n' >"$hs/src/m.txt"
 cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
 # the real repo_files.py, whose last_reviewed this run reads: the stub's worktree is the later definition.
@@ -749,6 +756,11 @@ planted = '''def mutants():
         yield from each("\\u00e9.txt", "KEEP8", "", "hooks", "planted keep8")
     if os.environ.get("PROBED"):
         yield from each("k.txt", "KEEP7", "", "probe", "planted keep7")
+    if os.environ.get("LINED"):
+        yield from each("m.txt", "LINE1", "", "hooks", "planted line1")
+        yield from each("m.txt", "LINE2", "", "hooks", "planted line2")
+    for n in range(int(os.environ.get("MANY", "0"))):
+        yield from each("g.txt", "KEEP1", "", "hooks", f"planted many{n}")
 
 
 def every_mutant():'''
@@ -756,21 +768,45 @@ gaps = '''GAPS = {
     **({"planted spare #1": "planted gap"} if os.environ.get("GAPPED") else {}),
     **({"planted keep1 #1": "planted gap"} if os.environ.get("GAPPED_KEEP") else {}),
 '''
-for a, b in (("def mutants():", planted), ("GAPS = {  # label -> why no test can notice it yet\n", gaps), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "k.txt": "y", "\\u00e9.txt": "x",\n')):
+for a, b in (("def mutants():", planted), ("GAPS = {  # label -> why no test can notice it yet\n", gaps), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "m.txt": "x", "k.txt": "y", "\\u00e9.txt": "x",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
 PY
-cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/$ac" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
+cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/m.txt" "$hs/src/$ac" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
 	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
 	[ -n "${WARM:-}" ] || rm -rf "${hs:?}/home" # each run with no cache of verdicts, unless WARM keeps the last run's
-	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n python3 -I harness_mutate.py "$@" 2>&1)
+	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
+}
+# The four sections run apart, so a change of harness_mutate.py reruns the one that holds its case.
+# A new mutant and one whose text changed, planted in the copy's harness_mutate.py and committed.
+plant_new_mutants() {
+python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
+spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
+assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
+s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
+s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
+open(p, "w").write(s)
+PY
+git -C "$hs/repo" commit -qam "a new mutant, a changed one"
+}
+if part harness_shards; then
+# harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
+# a tree put back after each one, after a control run of each suite in every tree; with --changed
+# <base>, only the mutants that rewrite a line committed since base (a merge's own) and those harness_mutate defines
+# anew or otherwise, and never past 100; a survivor fails the run either way, and the worktrees go.
+# On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
+shards_fixture
 # Three shards at once: every mutant judged once, in its order; the survivor behind another file's
 # killed mutant in its shard still survives (its tree put back); every worktree removed.
 out=$(SHARDS_MEET=3 shards 3) && fail "harness_mutate passed with surviving mutants: $out"
@@ -784,6 +820,14 @@ for k in spare spare2; do printf '%s\n' "$out" | grep -q "^FAIL  survives: plant
 [ "$(sort -u "$hs/ran" | wc -l | tr -d ' ')" = 3 ] || fail "harness_mutate did not spread its mutants over its 3 shards"
 [ ! -e "$hs/lonely" ] || fail "harness_mutate's shards did not run side by side"
 [ "$(count removed)" = 3 ] || fail "harness_mutate left worktrees behind"
+# A run cut short (the merge check's own time limit, a Ctrl+C) keeps the verdicts it reached: harness_mutate used to remember them
+# only at its end, so a run of 700 mutants cut at 100 minutes judged all of them again at the next (2026-10-30, slice-5-harness-a:
+# the lane "stalled" twice, 100 minutes of verdicts lost each time). One shard, killed hard while it judges the third mutant.
+out=$(CUT=1 shards 1) && fail "harness_mutate lived through the death of its process: $out"
+out=$(WARM=1 shards 1) && fail "harness_mutate passed with surviving mutants after a cut run"
+for k in keep1 keep2; do
+	printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted $k #1$" || fail "harness_mutate lost the verdict of planted $k when its run was cut short: $out"
+done
 # No shard asked for: one.
 out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one shard"
 [ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
@@ -820,11 +864,47 @@ printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "ha
 out=$(STALE=1 shards 2 --changed "$base") && fail "harness_mutate --changed passed with a stale mutant: $out"
 printf '%s\n' "$out" | grep -q "planted stale: nothing to mutate" || fail "harness_mutate --changed did not check every mutant: $out"
 [ "$(verdicts "$out")" = 0 ] || fail "harness_mutate --changed judged mutants beside a stale one: $out"
-# A suite changed: its cases may have weakened any guard's, so every mutant runs.
+# Two blank lines in a suite ask for nothing (on harness-a, 704 mutants of 951); the run with no argument, which main
+# requires, still judges every mutant --changed skipped: a test a branch weakens is seen there (Alexis, 2026-10-30).
 base=$(git -C "$hs/repo" rev-parse HEAD)
-printf '\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a suite changed: $out"
-[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate --changed did not judge every mutant after a suite changed: $out"
+printf '\n\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
+out=$(shards 2 --changed "$base") || fail "harness_mutate --changed failed on two blank lines in a suite: $out"
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed asked for mutants for two blank lines in a suite: $out"
+out=$(shards 2) && fail "harness_mutate passed with survivors, with no argument: $out"
+[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate with no argument did not judge every mutant --changed skipped: $out"
+# A changed line asks for the mutants that rewrite it, not for the rest of its file's, whatever git's colours or external
+# diff; a line removed touches the two beside it, in HEAD's numbers.
+printf 'LINE1\nGONE\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "three lines"
+git -C "$hs/repo" config color.ui always && git -C "$hs/repo" config diff.external false
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'LINE1\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "a line removed"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a removed line: $out"
+[ "$(verdicts "$out")" = 2 ] && printf '%s\n' "$out" | grep -q " 2 of 9 mutants" || fail "harness_mutate --changed did not ask for the two lines beside a removed one: $out"
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'LINE1 changed\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "a line changed"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed line: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line's mutant: $out"
+[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed asked for more than the changed line's mutant: $out"
+git -C "$hs/repo" config --unset color.ui && git -C "$hs/repo" config --unset diff.external
+# More than 100 to judge: --changed stops before any tree beyond the first, any control, any verdict, and says how many,
+# from where, and the way on. A control that fails proves a run got past the limit with nothing judged: 100 goes on, and
+# so does a run with no argument, and what the cache holds does not count.
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'KEEP1 KEEP2 KEEP3 SPARE many\n' >"$hs/repo/g.txt" && git -C "$hs/repo" commit -qam many
+out=$(MANY=97 shards 2 --changed "$base") && fail "harness_mutate --changed went on with 101 mutants to judge: $out"
+printf '%s\n' "$out" | grep -q "stops before judging 101 mutants" || fail "harness_mutate --changed did not say how many it stopped at: $out"
+printf '%s\n' "$out" | grep -q "g.txt 101" || fail "harness_mutate --changed did not say which files they come from: $out"
+printf '%s\n' "$out" | grep -q "check.sh --full" || fail "harness_mutate --changed did not name the way on: $out"
+[ "$(verdicts "$out")" = 0 ] && [ ! -e "$hs/controls" ] && [ "$(count made)" = 1 ] && [ "$(count removed)" = 1 ] || fail "harness_mutate --changed did work past its limit: $out"
+past() { printf '%s\n' "$1" | grep -q "fails on the untouched copy"; }
+out=$(MANY=96 BREAK_SECOND=hooks shards 2 --changed "$base") || :
+past "$out" || fail "harness_mutate --changed stopped at 100 mutants to judge: $out"
+out=$(MANY=97 BREAK_SECOND=hooks shards 2) || :
+past "$out" || fail "harness_mutate with no argument stopped at its limit: $out"
+shards 1 >/dev/null || : # keep1 to keep3 cached, with many0 next
+out=$(WARM=1 MANY=1 shards 1) || :
+out=$(WARM=1 MANY=97 BREAK_SECOND=hooks shards 2 --changed "$base") || :
+past "$out" || fail "harness_mutate --changed counted the verdicts of its cache against its limit: $out"
 # A merge's own mutants are those of the guard files changed since the last /pre-merge pass, not since base: the
 # pass judged what came before (as batch_size.py finds its base). i.txt changed before the pass, h.txt after it.
 base=$(git -C "$hs/repo" rev-parse HEAD)
@@ -854,6 +934,56 @@ out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness
 printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
 [ ! -e "$hs/controls" ] && [ ! -e "$hs/probe_controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
 [ "$(count made)" = 1 ] || fail "harness_mutate --changed made $(count made) worktrees for no mutant to judge, two shards asked: $out"
+# The controls run two at a time, never every tree's suites at once: beside the full gate's coverage lane, eight at once
+# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
+# waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
+CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
+[ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
+[ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
+fi
+
+if part harness_shards_signal; then
+shards_fixture
+# A Ctrl+C reaches the suite of every mutant in flight, which dies of the signal: that is no verdict, and none is kept. The run
+# was reading it as "killed" and writing it to the cache, where the next run, --full too, passed with the survivor (F2526, from
+# 2ca90ff6). The run is a group of its own, signalled from inside its surviving mutant's suite; the next run still fails on it.
+printf 'import signal, subprocess, sys\nsignal.signal(signal.SIGINT, lambda *_: None)  # this section runs in the background, whose shell ignores INT: the run below must not\nsys.exit(subprocess.run(sys.argv[1:], start_new_session=True).returncode)\n' >"$hs/group.py"
+out=$(INTR=group GROUPED=1 shards 1) && fail "harness_mutate passed after a signal cut its suite short: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed: planted spare #1$" && fail "harness_mutate read the signal that cut a suite short as a kill: $out"
+out=$(WARM=1 shards 1) && fail "harness_mutate passed with a survivor after a run cut by a signal: $out"
+printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted spare #1$" && fail "harness_mutate cached the signal that cut a suite short as a kill: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" || fail "harness_mutate lost its survivor after a run cut by a signal: $out"
+# The codes a shell gives a suite it ends by a signal are no verdict either (INT, KILL, TERM).
+for c in 130 137 143; do
+	out=$(INTR=$c shards 1) && fail "harness_mutate passed after a suite ended with $c: $out"
+	printf '%s\n' "$out" | grep -q "no verdict of this mutant is kept" || fail "harness_mutate took the end of a suite with $c for a verdict: $out"
+	printf '%s\n' "$out" | grep -q "killed: planted spare #1" && fail "harness_mutate read $c as a kill: $out"
+done
+# A Ctrl+C that reaches the run alone, its suites unharmed: the shard stops at once, starting no mutant and keeping no
+# verdict after it (the suite of the survivor goes on to pass; four mutants had run, never the seven).
+out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an interrupt: $out"
+[ "$(count ran)" = 4 ] || fail "harness_mutate went on judging after its interrupt: $(count ran) of 7 mutants ran"
+grep -q survives "$hs"/home/.cache/gnoworld-tools/* 2>/dev/null && fail "harness_mutate kept the verdict of a mutant judged after its interrupt"
+fi
+
+if part harness_shards_text; then
+shards_fixture
+# A file the branch marks `-diff` in .gitattributes (or one with a NUL byte) makes git print "Binary files differ", and a textconv
+# can turn its text into another: the changed lines are read as text, as the file is (F2537; merge.sh and scan_secrets.sh do too).
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf '* -diff\n' >"$hs/repo/.gitattributes" && printf 'LINE1 again\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" add .gitattributes && git -C "$hs/repo" commit -qam "a line changed, diff off"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file marked -diff: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file marked -diff: $out"
+[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed did not ask for the one changed line of a file marked -diff: $out"
+base=$(git -C "$hs/repo" rev-parse HEAD)
+printf 'm.txt diff=nc\n' >"$hs/repo/.gitattributes" && printf 'LINE1 once more\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" config diff.nc.textconv true && git -C "$hs/repo" commit -qam "a line changed, textconv"
+out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file with a textconv: $out"
+printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file with a textconv: $out"
+git -C "$hs/repo" config --unset diff.nc.textconv && git -C "$hs/repo" rm -q .gitattributes && git -C "$hs/repo" commit -qm "no attributes"
+fi
+
+if part harness_shards_records; then
+shards_fixture
 # The pass's record, on scratch clones of the first commit (F1430 to F1434): a record names a tree, not a commit,
 # so the commit before it and its own both match; only the newest counts, and what changed after it is judged.
 HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
@@ -932,8 +1062,12 @@ out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge an
 printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
 [ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
 unset HR
+fi
+
+if part harness_shards_changed; then
+shards_fixture
 # (Before the section z below: its if, last in the suite, would give every x mutant a passing exit.)
-# A change inside one section of a suite judges that section's mutants alone, with those of the files it changed.
+# A change inside one section of a suite asks for no mutant: only the lines a mutant rewrites do.
 printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
 cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
 printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
@@ -943,22 +1077,18 @@ for f in "$hs/src/scripts/test_hooks.sh" "$hs/repo/scripts/test_hooks.sh"; do
 	sed 's|^	grep -q KEEP6 j.txt$|	grep -q KEEP6 j.txt \&\& :|' "$f" >"$f.new" && mv "$f.new" "$f"
 done
 git -C "$hs/repo" commit -qam "z's line"
-out=$(SCOPED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one section changed: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep6 #1$" || fail "harness_mutate --changed skipped the changed section's mutant: $out"
-[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged the mutants of sections a change did not touch: $out"
-printf '%s\n' "$out" | grep -q "1 of 8 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
-# A change inside one block of probe.py judges that block's mutants alone: probe.py is a suite as test_hooks.sh is (G5).
+out=$(SCOPED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed section: $out"
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed asked for mutants for a changed section: $out"
+# A change inside one block of probe.py likewise: probe.py is a suite as test_hooks.sh is (G5).
 base=$(git -C "$hs/repo" rev-parse HEAD)
 for f in "$hs/src/scripts/probe.py" "$hs/repo/scripts/probe.py"; do
 	sed 's|^        sys.exit(1)$|        sys.exit(2)|' "$f" >"$f.new" && mv "$f.new" "$f"
 done
 git -C "$hs/repo" commit -qam "y's line"
-out=$(PROBED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one probe block changed: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep7 #1$" || fail "harness_mutate --changed skipped the changed probe block's mutant: $out"
-[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged more than the changed probe block's mutant: $out"
-printf '%s\n' "$out" | grep -q "1 of 8 mutants" || fail "harness_mutate --changed did not say how many it kept after a probe change: $out"
+out=$(PROBED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed probe block: $out"
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed asked for mutants for a changed probe block: $out"
 # harness_mutate.py itself changed: the mutants it defines anew or otherwise than base's script (a label, a text, a
-# suite) are judged, with those of the files and sections changed, not every mutant (Alexis, 2026-10-29: ~700 judged
+# suite) are judged, with those of the lines changed, not every mutant (Alexis, 2026-10-29: ~700 judged
 # for two new ones, 32 minutes). Its own guards are mutants of a file it changed, so they are judged. A comment alone:
 base=$(git -C "$hs/repo" rev-parse HEAD)
 printf '\n# a change of its own\n' >>"$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam itself
@@ -966,25 +1096,16 @@ out=$(shards 2 --changed "$base") || fail "harness_mutate --changed judged mutan
 [ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed judged unchanged mutants after it changed itself: $out"
 # A new mutant, and one whose text changed: those two alone. (Section z makes every x mutant survive, as above: the new
 # one is a probe block's, which can be killed.)
-python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
-spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
-assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
-s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
-s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
-open(p, "w").write(s)
-PY
-git -C "$hs/repo" commit -qam "a new mutant, a changed one"
+plant_new_mutants
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with the survivor it defined otherwise: $out"
 [ "$(verdicts "$out")" = 2 ] || fail "harness_mutate --changed did not judge only its new and changed mutants: $out"
 printf '%s\n' "$out" | grep -q "killed: planted keep7 again #1$" || fail "harness_mutate --changed skipped a mutant it defined anew: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed skipped a mutant whose text it changed: $out"
 printf '%s\n' "$out" | grep -q " 2 of 8 mutants" || fail "harness_mutate --changed did not say 2 of 8 mutants: $out"
-# A mutant is also told by its label alone, by the sections that judge it and by its place in GAPS: one change each.
-for edit in label sections gaps; do
+# A mutant is also told by its label alone, by a section it lost and by its place in GAPS: one change each. Sections it only
+# gained are no other definition: a mutant S kills, S and T kill. A branch that splits a section would otherwise ask for every
+# mutant of the file (harness-a: 158 of check.sh's for one section added; harness-b, past 256).
+for edit in label grown lost regrown gaps; do
 	base=$(git -C "$hs/repo" rev-parse HEAD)
 	python3 -I - "$hs/repo/harness_mutate.py" "$edit" <<'PY'
 import sys
@@ -992,7 +1113,9 @@ p, edit = sys.argv[1], sys.argv[2]
 s = open(p).read()
 old, new = {
     "label": ('"hooks", "planted keep4")', '"hooks", "planted keep4 renamed")'),
-    "sections": ('"i.txt": "x",', '"i.txt": "x,z",'),
+    "grown": ('"i.txt": "x",', '"i.txt": "x,z",'),
+    "lost": ('"i.txt": "x,z",', '"i.txt": "z",'),
+    "regrown": ('"i.txt": "z",', '"i.txt": "x,z",'),
     "gaps": ("GAPS = {\n", 'GAPS = {\n    "planted keep2 #1": "a planted gap",\n'),
 }[edit]
 assert s.count(old) == 1, f"the planted {edit} changed: update test_hooks.sh's harness_shards"
@@ -1000,7 +1123,8 @@ open(p, "w").write(s.replace(old, new))
 PY
 	git -C "$hs/repo" commit -qam "$edit alone"
 	out=$(shards 2 --changed "$base") || :
-	[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 8 mutants" || fail "harness_mutate --changed did not judge the one mutant whose $edit alone changed: $out"
+	case $edit in grown | regrown) want=0 ;; *) want=1 ;; esac
+	[ "$(verdicts "$out")" = "$want" ] && printf '%s\n' "$out" | grep -q " $want of 8 mutants" || fail "harness_mutate --changed did not judge $want mutant after its $edit alone: $out"
 done
 # A base script that does not run (a syntax error before its --dry line): every mutant.
 cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
@@ -1016,6 +1140,15 @@ git -C "$hs/repo" commit -qam "no dry line" && base=$(git -C "$hs/repo" rev-pars
 cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "the dry line back"
 out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a base it could not read: $out"
 [ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script it could not read: $out"
+# A name base's script imports that this tree's suite_parts.py dropped: base's script reads base's helper, and still says its
+# mutants (touched(), gone with the rule by lines, made all 973 of harness-a's look new, which only --full could then pass).
+cp "$hs/repo/harness_mutate.py" "$hs/hm.keep" && cp "$hs/repo/suite_parts.py" "$hs/sp.keep"
+printf '\n\ndef dropped():\n    pass\n' >>"$hs/repo/suite_parts.py"
+sed 's|^from suite_parts import code, parts, select$|from suite_parts import code, dropped, parts, select|' "$hs/hm.keep" >"$hs/repo/harness_mutate.py"
+git -C "$hs/repo" commit -qam "a helper base has" && base=$(git -C "$hs/repo" rev-parse HEAD)
+cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && cp "$hs/sp.keep" "$hs/repo/suite_parts.py" && git -C "$hs/repo" commit -qam "the helper dropped"
+out=$(shards 2 --changed "$base") || :
+[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed took every mutant for new when base's helper had a name this tree's lacks: $out"
 # A passes file it cannot read (a folder here): it refuses, before any worktree, and never judges fewer mutants.
 mkdir -p "$hs/repo/docs/review-passes.txt" && : >"$hs/repo/docs/review-passes.txt/x" && git -C "$hs/repo" add docs && git -C "$hs/repo" commit -qm "an unreadable record"
 rm -f "$hs/made"
@@ -1033,6 +1166,15 @@ for args in "--changed" "--changed a b" "--dry --changed x" "--bogus"; do
 	printf '%s\n' "$out" | grep -q "usage\|--changed" || fail "harness_mutate did not say why it refused $args: $out"
 	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
 done
+fi
+
+if part harness_shards_cache; then
+shards_fixture
+printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
+cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
+printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
+git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
+plant_new_mutants # the sections before it left them in the copy
 # The verdicts' cache (Alexis, 2026-10-29): a killed mutant whose text, the sections that judge it, the suite's text
 # outside its sections, every file of the tree that text names, and harness_mutate's own runner are as they were is not
 # judged again; a survivor always is. It lives in ~/.cache/gnoworld-tools; the CI starts with none and judges all.
@@ -1058,6 +1200,16 @@ out=$(WARM=1 PROBED=1 shards 2) || :
 printf 'x\n' >"$hs/src/unnamed.txt"
 out=$(WARM=1 PROBED=1 shards 2) || :
 [ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 7 ] || fail "harness_mutate dropped cached verdicts for a file nothing names: $out"
+# Two blank lines in a suite, outside its sections and inside the one that judges: every verdict holds (they missed the
+# cache for 704 mutants). Comments do count: a `#` line in a heredoc or a multi-line string is text.
+printf '\n\n' >>"$hs/src/scripts/test_hooks.sh"
+awk '{ print } /^	pwd >>/ { print ""; print "" }' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
+out=$(WARM=1 PROBED=1 shards 2) || :
+[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 7 ] || fail "harness_mutate dropped cached verdicts for blank lines in a suite: $out"
+# A blank line in a guard file keeps its own mutants' verdicts.
+printf '\n' >>"$hs/src/g.txt"
+out=$(WARM=1 PROBED=1 shards 2) || :
+[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): planted keep[123] #1$" || :)" = 3 ] || fail "harness_mutate dropped its mutants' verdicts for a blank line in their file: $out"
 # A section that judges them, changed: judged again.
 sed 's|^	pwd >>"$SHARD_ROOT/ran"$|	pwd >>"$SHARD_ROOT/ran" # changed|' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
 out=$(WARM=1 PROBED=1 shards 2) || :
@@ -1078,12 +1230,6 @@ sed 's|^part() {|part() { # changed outside every section\n|' "$hs/src/scripts/t
 python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("def judged(tree, label, path, mutated, test):\n", "def judged(tree, label, path, mutated, test):  # changed\n", 1))' "$hs/repo/harness_mutate.py"
 [ "$(warm)" = 0 ] || fail "harness_mutate kept cached verdicts after the runner that judges them changed: $out"
 rm -rf "${hs:?}/home"
-# The controls run two at a time, never every tree's suites at once: beside the full gate's coverage lane, eight at once
-# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
-# waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
-CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
-[ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
-[ "$(sort -n "$hs/overlap" | tail -1)" = 2 ] || fail "harness_mutate ran $(sort -n "$hs/overlap" | tail -1) controls at once, not two (F2138)"
 fi
 
 if part migrations; then
@@ -1876,7 +2022,21 @@ cat >"$step" <<'SH'
 n=$1
 shift
 echo "$n $*" >>"$GATE_LOG"
+# check.sh raises the open-files limit its steps inherit (F2543): every step logs the one it got.
+ulimit -n >>"$GATE_LOG.ulimit"
+# The switches check.sh drops (a run must not trust a binary or measure a busy machine on a caller's say-so): what each step saw.
+echo "$n sha=${NGINX_SHA256-} ceiling=${BENCH_WAIT_CEILING-} step=${BENCH_WAIT_STEP-} timeout=${NGINX_START_TIMEOUT-}" >>"$GATE_LOG.env"
+# The merge lock a step runs under (harness-c): LOCKPEEK makes each step write the lock's pid (and whether it is alive), worktree and
+# since; RUN_TAG tags the steps of one run among several sharing a log.
+if [ -n "${LOCKPEEK:-}" ]; then
+	l="$HOME/.cache/gnoworld-tools/merge.lock"
+	p=$(cat "$l/pid" 2>/dev/null || :)
+	if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then alive=live; else alive=dead; fi
+	echo "$n pid=$p $alive worktree=$(cat "$l/worktree" 2>/dev/null || :) since=$(cat "$l/since" 2>/dev/null || :)" >>"$GATE_LOG.lockpeek"
+fi
+[ -z "${RUN_TAG:-}" ] || echo "$RUN_TAG $n" >>"$GATE_LOG.tags"
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+[ "$n" != build:app ] || [ -z "${PW_EDIT:-}" ] || printf '\n' >>app/package.json # a build that installs edits a package file
 if [ "$n" = py:load ]; then
 	at=$(($(cat "$GATE_LOG.load" 2>/dev/null || echo 0) + 1)) && echo "$at" >"$GATE_LOG.load"
 	eval "echo \"\${LOAD_$at:-0 160}\""
@@ -1909,6 +2069,7 @@ case ",${FLAKY:-}," in *,"$n",*) [ -e "$GATE_LOG.flaked.$n" ] || { : >"$GATE_LOG
 case ",${FAIL:-}," in *,"$n",*) down=1 ;; esac
 if [ -n "$down" ]; then
 	echo "$n failed here" >&2
+	[ -z "${TAILPASS:-}" ] || echo "all checks passed in 3 s (budget 120 s)" >&2 # a nested fixture's log, which ends on a pass line
 	for a in "$@"; do
 		case $a in
 		--outputFile.json=*)
@@ -1940,15 +2101,16 @@ printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
 # The journeys' stub; with PW_EDIT, it edits a package file, as a build that installs would.
 printf 'const { spawnSync } = require("node:child_process");\nconst { appendFileSync, writeFileSync } = require("node:fs");\nconst stories = process.argv.some((a) => a.includes("stories"));\nconst name = stories ? (process.env.PICTURES_OF ? "pictures" : "stories") : "playwright";\nif (process.env.PW_EDIT) appendFileSync("app/package.json", "\\n");\nconst status = spawnSync("sh", [%s, name, "port=" + process.env.E2E_PORT, "of=" + (process.env.PICTURES_OF ?? ""), "on=" + (process.env.STORIES_PORT ?? ""), "out=" + (process.env.STORIES_OUT ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status;\nconst report = process.env.PLAYWRIGHT_JSON_OUTPUT_NAME;\nconst failing = process.env.NOREPORT === "empty" ? [] : [{ title: "a.spec.ts", file: "a.spec.ts", specs: [{ title: "journey", ok: false, file: "a.spec.ts" }] }];\nif (process.env.ALSO === "two") failing.push({ title: "b.spec.ts", file: "b.spec.ts", specs: [{ title: "second", ok: false, file: "b.spec.ts" }] });\nif (status && report && process.env.NOREPORT !== "1" && process.argv.some((a) => a.endsWith("json"))) writeFileSync(report, JSON.stringify({ config: { rootDir: process.cwd() + "/app/tests" }, errors: process.env.ALSO === "errors" ? [{ message: "globalSetup failed" }] : [], suites: [...failing, { title: "ok.spec.ts", file: "ok.spec.ts", specs: [{ title: "fine", ok: true, file: "ok.spec.ts" }] }] }));\nprocess.exit(status);\n' "'$step'" >"$g/app/node_modules/@playwright/test/cli.js"
+mkdir -p "$g/node_modules/vitest" && printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
 python3 -I - "$g/package.json" "$step" <<'PY'
 import json, sys
-names = ["format:check", "typecheck", "lint", "test", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
+names = ["build:app", "format:check", "typecheck", "lint", "test", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
 json.dump({"scripts": {n: f"sh {sys.argv[2]} {n}" for n in names}}, open(sys.argv[1], "w"))
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
@@ -1962,11 +2124,13 @@ gate() { : >"$log" && rm -f "$log".met.* "$log.load" "$log".flaked.* && (cd "$g"
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 before() { [ "$(grep -n "^$1\( \|$\)" "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n "^$2\( \|$\)" "$log" | head -1 | cut -d: -f1)" ]; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
-fast_steps="format:check typecheck lint test unused copies comments py:check_css sh:ergo playwright gno py:mutate gofmt go py:check_docs sh:test_hooks"
+fast_steps="format:check typecheck lint test unused copies comments py:check_css sh:ergo build:app gno py:mutate gofmt go py:check_docs sh:test_hooks"
+full_steps=$(printf '%s' "$fast_steps" | sed 's/build:app/playwright/') # the merge check and --full walk the journeys, which build the app themselves
 cheap="format:check unused copies comments py:check_css py:check_docs"
 everything() { # $1: what the run was given
 	for s in $fast_steps; do ran "$s" || fail "check.sh skipped $s on $1, which must run everything"; done
 	grep -q '^test .*--changed' "$log" && fail "check.sh ran only the changed tests on $1, which must run every test"
+	ran playwright && fail "check.sh walked the journeys on $1: a commit's gate walks none"
 	:
 }
 scoped() { # $1: what the run was given; then the steps it must run, "-", the steps it must not
@@ -1985,16 +2149,12 @@ nocache() { if grep -q '^lint .*--cache' "$log"; then fail "check.sh linted from
 if part gate_scope; then
 gate_fixture gate_scope
 # Nothing changed: everything runs, the lanes at once; each lane prints its time and each step's.
-out=$(MEET="lint gno sh:test_hooks playwright test" gate) || fail "check.sh's lanes did not run side by side: $out"
+out=$(MEET="lint gno sh:test_hooks build:app test" gate) || fail "check.sh's lanes did not run side by side: $out"
 everything "a tree with no change" && nocache "a tree with no change"
 for lane in ts types tests gno docs; do
 	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+\.[0-9] s:" || fail "check.sh did not print lane $lane's time: $out"
 done
 [ -z "$(git -C "$g" status --porcelain)" ] || fail "check.sh left files git sees: $(git -C "$g" status --porcelain)"
-# The journeys get a base port of their own, three free ports from it, so gates of several worktrees
-# run at once; never the fixed 4173 another gate may hold.
-port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
-[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh gave the journeys no free port of their own: $(grep '^playwright' "$log")"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the code it passed"
 # Prose alone is no change of code: everything runs.
 printf 'x\n' >>"$g/README.md"
@@ -2006,16 +2166,27 @@ reset
 rm -f "$g/.claude/tmp/green-full"
 printf 'y\n' >>"$g/server/src/a.ts"
 out=$(gate) || fail "check.sh failed on a server change: $out"
-scoped "a server change" $cheap typecheck lint test - playwright gno py:mutate go sh:test_hooks
+scoped "a server change" $cheap typecheck lint test - build:app gno py:mutate go sh:test_hooks
 nocache "a server change"
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a server change"
 printf '%s\n' "$out" | grep -q "(budget 30 s)$" || fail "check.sh gave a scoped run another budget than 30 s: $out"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "a fast run recorded the full gate"
 reset
+# Prettier keeps its cache in the worktree's own .claude/tmp (a rerun of an unchanged tree costs 0.9 s of 7.5), not in pre-commit's staged
+# copy, a new folder each time; and a file that changed is refused with the cache warm.
+flags=$(sed -n 's/^format:check //p' "$log")
+[ "$flags" = "--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache" ] || fail "check.sh gave Prettier no cache in the worktree's .claude/tmp: '$flags'"
+pc="$t/prettier_cache" && mkdir -p "$pc" && cp "$here/../.prettierrc.json" "$pc/" 2>/dev/null
+printf 'export const a = 1;\n' >"$pc/a.ts"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 || fail "Prettier refused a formatted file with a cold cache"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 || fail "Prettier refused a formatted file with a warm cache"
+printf 'export   const a =   1\n' >"$pc/a.ts"
+(cd "$pc" && "$here/../node_modules/.bin/prettier" --check --log-level warn $flags .) >/dev/null 2>&1 && fail "Prettier passed a changed, unformatted file with a warm cache"
+[ -d "$pc/.claude/tmp" ] || fail "Prettier kept no cache under .claude/tmp"
 # A server file deleted: its types still checked, which see what imported it.
 git -C "$g" rm -q server/src/b.ts
 gate >/dev/null || fail "check.sh failed on a deleted server file"
-scoped "a deleted server file" typecheck lint test - playwright
+scoped "a deleted server file" typecheck lint test - build:app
 reset
 # A new TypeScript file of the app, untracked: the app's journeys and the related tests; the journeys
 # after every reader of the build's output (F082); gno still not.
@@ -2023,15 +2194,16 @@ printf 'x\n' >"$g/app/src/b.tsx"
 out=$(gate) || fail "check.sh failed on a new app file: $out"
 # The app's step builds it and runs every journey, the work of a run of everything: its budget (slice-5a, F2162).
 printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
-scoped "a new app file" $cheap typecheck lint test playwright - gno sh:test_hooks
+scoped "a new app file" $cheap typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
-for s in unused copies comments py:check_css; do before "$s" playwright || fail "check.sh built the app before $s read the tree (F082)"; done
+for s in unused copies comments py:check_css; do before "$s" build:app || fail "check.sh built the app before $s read the tree (F082)"; done
 reset
 # The design system's TypeScript, and a journey: the same.
 for f in packages/ui/src/a.ts app/tests/a.spec.ts; do
 	printf 'y\n' >>"$g/$f"
 	gate >/dev/null || fail "check.sh failed on a change of $f"
-	scoped "a change of $f" typecheck lint test playwright - gno sh:test_hooks
+	scoped "a change of $f" typecheck lint test - gno sh:test_hooks playwright
+	if [ "$f" = packages/ui/src/a.ts ]; then ran build:app || fail "check.sh did not build the app on a change of the design system"; else ran build:app && fail "check.sh built the app on a change of a journey"; fi
 	grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the related tests on a change of $f"
 	reset
 done
@@ -2041,7 +2213,7 @@ done
 # Vitest's graph); another stylesheet of the design system, and no change, do not.
 printf 'y\n' >>"$g/packages/ui/src/tokens.css"
 gate >/dev/null || fail "check.sh failed on a change of tokens.css"
-scoped "a change of tokens.css" typecheck lint test playwright pictures - gno sh:test_hooks stories
+scoped "a change of tokens.css" typecheck lint test build:app pictures - gno sh:test_hooks stories
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change of a stylesheet"
 grep -q '^pictures port=[^ ]* of=tokens-- on=[0-9]* out=[^ ]*/storybook test -c app/playwright.stories.config.ts --reporter=dot pictures$' "$log" ||
 	fail "check.sh did not compare the tokens story's pictures alone, on a port of its own: $(grep '^pictures' "$log")"
@@ -2051,11 +2223,11 @@ reset
 # Beside another area's change, and under any comment: the stylesheet's text decides nothing, its path does.
 printf '/* pictures: skip, gate: off */\n' >>"$g/packages/ui/src/tokens.css" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a change of tokens.css beside a server change"
-scoped "a change of tokens.css beside a server change, with a comment that asks to skip" typecheck lint test playwright pictures - gno
+scoped "a change of tokens.css beside a server change, with a comment that asks to skip" typecheck lint test build:app pictures - gno
 reset
 printf 'y\n' >>"$g/packages/ui/src/base.css"
 gate >/dev/null || fail "check.sh failed on a change of another stylesheet"
-scoped "a change of base.css" typecheck test playwright - pictures gno
+scoped "a change of base.css" typecheck test build:app - pictures gno
 reset
 # The tokens pictures failing fails the gate, which names the lane and shows what it printed; a gate recorded nothing.
 rm -f "$g/.claude/tmp/green-fast"
@@ -2083,24 +2255,24 @@ done
 # Core: the server imports it, and main.test.ts runs the server as a child: every test, and the journeys.
 printf 'y\n' >>"$g/packages/core/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a core change"
-scoped "a core change" typecheck lint test playwright - gno sh:test_hooks
+scoped "a core change" typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a core change"
 reset
 # A file of the app that is not TypeScript (a fixture, a stylesheet) sits outside Vitest's graph: every test.
 printf 'x\n' >"$g/app/src/b.json"
 gate >/dev/null || fail "check.sh failed on an app fixture"
-scoped "an app fixture" test playwright
+scoped "an app fixture" test build:app
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change outside its graph"
 reset
 # A name with a space is one path, of its area.
 printf 'x\n' >"$g/server/src/a b.ts"
 gate >/dev/null || fail "check.sh failed on a path with a space"
-scoped "a server path with a space" typecheck - sh:test_hooks playwright
+scoped "a server path with a space" typecheck - sh:test_hooks build:app
 reset
 # A realm: gno, its mutations and the Go tools, the cheap checks, no other TypeScript step.
 printf 'y\n' >>"$g/gno/r/a.gno"
 gate >/dev/null || fail "check.sh failed on a gno change"
-scoped "a gno change" $cheap gno py:mutate gofmt go - typecheck lint test playwright sh:test_hooks
+scoped "a gno change" $cheap gno py:mutate gofmt go - typecheck lint test build:app sh:test_hooks
 reset
 # Outside a repository (pre-commit's staged copy): everything.
 cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
@@ -2109,26 +2281,26 @@ cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
 everything "a copy outside a repository"
 # There, pre-commit lists what the commit changes in GATE_CHANGED: the run checks those areas, every
 # test (Vitest finds the related ones through git), and prose alone is no change.
-outside() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
+outside() { : >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
 out=$(outside "server/src/a.ts
 docs/x.md") || fail "check.sh failed outside a repository on pre-commit's list: $out"
-scoped "pre-commit's list of a server change" $cheap typecheck lint test - playwright gno sh:test_hooks
+scoped "pre-commit's list of a server change" $cheap typecheck lint test - build:app gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
 outside "app/src/a.tsx" >/dev/null || fail "check.sh failed outside a repository on an app change"
-scoped "pre-commit's list of an app change" typecheck playwright test - gno
+scoped "pre-commit's list of an app change" typecheck build:app test - gno
 grep -q '^test .*--changed' "$log" && fail "check.sh asked Vitest for the related tests outside a repository"
 outside "gno/r/a.gno" >/dev/null || fail "check.sh failed outside a repository on a gno change"
-scoped "pre-commit's list of a gno change" gno - typecheck playwright
+scoped "pre-commit's list of a gno change" gno - typecheck build:app
 # The tokens story's pictures there too: pre-commit's list names the change, which a staged copy holds no repository to read.
 outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside a repository on a change of tokens.css"
-scoped "pre-commit's list of a change of tokens.css" typecheck test playwright pictures - gno
+scoped "pre-commit's list of a change of tokens.css" typecheck test build:app pictures - gno
 outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
-scoped "pre-commit's list of a change of base.css" typecheck test playwright - pictures
+scoped "pre-commit's list of a change of base.css" typecheck test build:app - pictures
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
 $prose" >/dev/null || fail "check.sh failed outside a repository on $prose"
-	scoped "pre-commit's list of a server change and $prose" typecheck - playwright sh:test_hooks
+	scoped "pre-commit's list of a server change and $prose" typecheck - build:app sh:test_hooks
 done
 # Prose alone, an empty list, an unknown path, a line git quoted or that reads otherwise (an empty
 # line, a space, a backslash): everything, as in a repository.
@@ -2149,16 +2321,16 @@ cp "$g-copy/.claude/tmp/green-fast" "$t/green-before" 2>/dev/null || : >"$t/gree
 outside "server/src/a.ts" >/dev/null || fail "check.sh failed outside a repository on a server change"
 cmp -s "$t/green-before" "$g-copy/.claude/tmp/green-fast" 2>/dev/null || [ ! -e "$g-copy/.claude/tmp/green-fast" ] || fail "check.sh recorded a copy's scoped run"
 # --full there is never scoped.
-: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh --full >/dev/null 2>&1) || : # it fails at merge-base, with no repository
-for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full took GATE_CHANGED's scope and skipped $s"; done
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh --full >/dev/null 2>&1) || : # it fails at merge-base, with no repository
+for s in $full_steps; do [ "$s" = test ] || [ "$s" = build:app ] || ran "$s" || fail "check.sh --full took GATE_CHANGED's scope and skipped $s"; done
 # In a repository, the run reads its change from git, never from GATE_CHANGED.
-: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh >/dev/null 2>&1) ||
+: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed in a repository with GATE_CHANGED set"
 everything "a repository with no change and GATE_CHANGED naming a realm"
 printf 'y\n' >>"$g/server/src/a.ts"
-: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=deploy/a.conf sh scripts/check.sh >/dev/null 2>&1) ||
+: >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED=deploy/a.conf sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed in a repository with a change and GATE_CHANGED set"
-scoped "a server change in a repository and GATE_CHANGED naming the deployment" typecheck - playwright sh:test_hooks
+scoped "a server change in a repository and GATE_CHANGED naming the deployment" typecheck - build:app sh:test_hooks
 reset
 fi
 
@@ -2176,7 +2348,7 @@ done
 # Two areas at once run both: what is staged counts with what is not.
 printf 'y\n' >>"$g/gno/r/a.gno" && git -C "$g" add gno && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a staged gno change beside a server one"
-scoped "a staged gno change beside an unstaged server one" gno typecheck test - playwright sh:test_hooks
+scoped "a staged gno change beside an unstaged server one" gno typecheck test - build:app sh:test_hooks
 reset
 # A rename keeps where it came from: a schema moved into the server runs everything.
 git -C "$g" mv packages/schemas/src/a.ts server/src/moved.ts
@@ -2188,11 +2360,12 @@ git -C "$g" rm -q packages/schemas/src/a.ts && printf 'y\n' >>"$g/server/src/a.t
 gate >/dev/null || fail "check.sh failed on a deleted schema"
 everything "a deleted schema beside a server change"
 reset
-# A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code.
-ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
+# A worktree's borrowed node_modules is a link, which .gitignore's folder rule misses: no change of code. The fixture's own folder
+# is moved away: `ln -s` would put the link inside it, git would see nothing, and the case would prove nothing.
+mv "$g/node_modules" "$g.node_modules" && ln -s "$t" "$g/node_modules" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed beside a linked node_modules"
-scoped "a server change beside a linked node_modules" typecheck - playwright sh:test_hooks
-rm "$g/node_modules" && reset
+scoped "a server change beside a linked node_modules" typecheck - build:app sh:test_hooks
+rm "$g/node_modules" && mv "$g.node_modules" "$g/node_modules" && reset
 # A git that cannot list the change fails the gate, rather than scoping it to nothing.
 real_git=$(command -v git)
 mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" diff --no-renames "*) exit 3 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/badgit/git" && chmod +x "$t/badgit/git"
@@ -2216,11 +2389,24 @@ printf '%s\n' "$out" | grep -q "^check.sh: lane types failed at lint" || fail "c
 printf '%s\n' "$out" | grep -q "^check.sh: lane gno failed at gno" || fail "check.sh did not name the failed lane gno: $out"
 ran py:mutate && fail "a lane went on past its failed step"
 [ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate that failed"
+# A failing run ends on its own last line, `check.sh: FAILED at <lane>:<step>`, whatever the failed lane's tail ended on (the first merge
+# check of the sum read a nested fixture's `all checks passed in 3 s` as the run's last line, F2638); the exit path of a lane, of a step in
+# the main shell, of a refused argument and of a signal each end on it.
+last() { printf '%s\n' "$1" | tail -n 1; }
+[ "$(last "$out")" = "check.sh: FAILED at types:lint" ] || fail "a run that failed at lint did not end on its FAILED line: $(last "$out")"
+out=$(TAILPASS=1 FAIL=lint gate) && fail "check.sh passed with a failing lint whose tail says it passed"
+printf '%s\n' "$out" | grep -q "^all checks passed in 3 s" || fail "the planted tail was not shown: $out"
+[ "$(last "$out")" = "check.sh: FAILED at types:lint" ] || fail "a failing run whose tail ended on a pass line ended on '$(last "$out")', not its FAILED line (F2638)"
+out=$(gate --merge --base 2>&1) && fail "check.sh passed a --base with no ref"
+[ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "a refused argument did not end on the FAILED line: $(last "$out")"
+out=$(gate) || fail "check.sh failed on a copy whose every step passes: $out"
+printf '%s\n' "$out" | grep -q "FAILED" && fail "a run that passed said FAILED: $out"
+last "$out" | grep -q "^all checks passed in [0-9]* s" || fail "a run that passed did not end on its pass line: $(last "$out")"
 # A lane that fails at once leaves a slow one to finish.
 (SLOW_STEP=py:check_docs FAIL=lint gate) >/dev/null && fail "check.sh passed with a failing lint"
 ran sh:test_hooks || fail "a lane's failure stopped another lane before its end"
 # Each lane's first and last step fail the gate, name their lane, and stop it.
-for case in format:check:ts playwright:ts typecheck:types lint:types sh:ergo:tests test:tests gno:gno go:gno py:check_docs:docs sh:test_hooks:docs; do
+for case in format:check:ts build:app:ts typecheck:types lint:types sh:ergo:tests test:tests gno:gno go:gno py:check_docs:docs sh:test_hooks:docs; do
 	s=${case%:*} lane=${case##*:}
 	out=$(FAIL=$s gate) && fail "check.sh passed with $s failing"
 	printf '%s\n' "$out" | grep -q "^check.sh: lane $lane failed" || fail "check.sh did not name lane $lane when $s failed: $out"
@@ -2230,6 +2416,9 @@ ran test && fail "check.sh ran the tests without the Ergo they start"
 # A build that edits a package file fails the gate (F080).
 out=$(PW_EDIT=1 gate) && fail "check.sh passed a build that edited app/package.json"
 printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh did not say the build changed a package file: $out"
+reset
+out=$(PW_EDIT=1 gate --full) && fail "check.sh --full passed journeys whose build edited app/package.json"
+printf '%s\n' "$out" | grep -q "building the app changed package.json" || fail "check.sh --full did not say the build changed a package file: $out"
 reset
 # GATE_BUDGET lowers the budget, never raises it, and a value that is no number leaves it.
 GATE_BUDGET=999 gate | grep -q "(budget 120 s)$" || fail "check.sh let GATE_BUDGET raise its budget"
@@ -2244,8 +2433,9 @@ reset
 unsteady=$g/.claude/tmp/unsteady.log
 tries() { grep -c "^$1\( \|$\)" "$log"; }
 unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one that passes), $4 the failed test, $5 the file that passes
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate) || fail "check.sh failed a $2 run that passed the second time: $out"
+	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate $gm) || fail "check.sh failed a $2 run that passed the second time: $out"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for one failure, not twice: $out"
 	grep -qF "$6" "$log" || fail "check.sh did not give the failed file to the second $1 run"
 	grep -qF "$5" "$log" && fail "check.sh ran a file that passed again ($1)"
@@ -2256,20 +2446,20 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 	printf '%s\n' "$out" | grep -q "^unsteady: .*running them once more" || fail "check.sh did not say it ran $1 again: $out"
 	# Fails twice: it refuses, after one more run only, and logs nothing.
 	rm -rf "${unsteady:?}"
-	out=$(FAIL=$1 gate) && fail "check.sh passed with $1 failing twice"
+	out=$(FAIL=$1 gate $gm) && fail "check.sh passed with $1 failing twice"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times when it failed, not twice"
 	printf '%s\n' "$out" | grep -q "failed twice" || fail "check.sh did not say $1 failed twice: $out"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a file of $1 that failed twice"
 	# A failure with no report (a crash, a config error) is no flake: nothing runs again, and it is no pass.
-	out=$(NOREPORT=1 FLAKY=$1 gate) && fail "check.sh passed a $1 failure that left no report"
+	out=$(NOREPORT=1 FLAKY=$1 gate $gm) && fail "check.sh passed a $1 failure that left no report"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again after a failure with no report"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 failure with no report"
 	# A report that names no failed file would run every file again: it refuses, with nothing run again.
-	out=$(NOREPORT=empty FLAKY=$1 gate) && fail "check.sh passed a $1 failure whose report names no failed file"
+	out=$(NOREPORT=empty FLAKY=$1 gate $gm) && fail "check.sh passed a $1 failure whose report names no failed file"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again for a report that names no failed file"
 	# A log that cannot be written (a folder where it goes): an unsteady test no one sees is not a pass.
 	mkdir -p "$unsteady"
-	out=$(FLAKY=$1 gate) && fail "check.sh passed an unsteady $1 test it could not log"
+	out=$(FLAKY=$1 gate $gm) && fail "check.sh passed an unsteady $1 test it could not log"
 	printf '%s\n' "$out" | grep -q "cannot be written" || fail "check.sh did not say it could not log $1: $out"
 	rm -rf "${unsteady:?}"
 }
@@ -2277,8 +2467,9 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 # holds none: its console does), Playwright's own errors, a failed file with no failed test (it did not load, or a hook failed).
 # The run refuses with nothing run again and nothing logged, even when the failed file itself passes the second time (R1).
 unsteady_refuses() { # $1 the step, $2 what else the run had (ALSO), $3 what check.sh says
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(ALSO=$2 FLAKY=$1 gate) && fail "check.sh passed a $1 run that also had: $2: $out"
+	out=$(ALSO=$2 FLAKY=$1 gate $gm) && fail "check.sh passed a $1 run that also had: $2: $out"
 	[ "$(tries "$1")" = 1 ] || fail "check.sh ran $1 again though the run also had: $2"
 	printf '%s\n' "$out" | grep -qF "$3" || fail "check.sh did not say why it refused $1 with: $2: $out"
 	[ ! -e "$unsteady" ] || fail "check.sh logged a $1 run that also had: $2"
@@ -2286,8 +2477,9 @@ unsteady_refuses() { # $1 the step, $2 what else the run had (ALSO), $3 what che
 }
 # Two files fail at once: both run again, in one run, and both are logged.
 unsteady_two() { # $1 the step, $2 the first file, $3 the second, as the second run is given them
+	gm= && [ "$1" != playwright ] || gm=--full # the journeys run in the merge check and --full alone
 	rm -rf "${unsteady:?}"
-	out=$(ALSO=two FLAKY=$1 gate) || fail "check.sh failed two $1 files that passed the second time: $out"
+	out=$(ALSO=two FLAKY=$1 gate $gm) || fail "check.sh failed two $1 files that passed the second time: $out"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for two files failing at once: $out"
 	grep -qF "$2" "$log" && grep -qF "$3" "$log" || fail "check.sh did not give both failed files to the second $1 run"
 	[ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not log both unsteady files of $1: $(cat "$unsteady")"
@@ -2303,13 +2495,15 @@ unsteady_case playwright playwright app/tests/a.spec.ts "journey" app/tests/ok.s
 # Pre-commit's staged copy has no repository and a link for node_modules: its unsteady test is logged in the repository's folder,
 # not in the copy, which is deleted after the run.
 c=$g.copy r=$g.repo
-rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" && mkdir -p "$r/node_modules" && ln -s "$r/node_modules" "$c/node_modules"
+rm -rf "${c:?}" "${r:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && mkdir -p "$r/node_modules" && ln -s "$r/node_modules" "$c/node_modules"
 (g=$c && FLAKY=test gate >/dev/null) || fail "check.sh failed an unsteady test in a staged copy"
 grep -qF "app/src/a.test.ts" "$r/.claude/tmp/unsteady.log" || fail "check.sh did not log a staged copy's unsteady test in the repository"
 [ ! -e "$c/.claude/tmp/unsteady.log" ] || fail "check.sh logged a staged copy's unsteady test in the copy, which is deleted"
 # A run that passes the first time runs nothing again and logs nothing.
 gate >/dev/null || fail "check.sh failed a clean run"
-[ "$(tries test)" = 1 ] && [ "$(tries playwright)" = 1 ] || fail "check.sh ran a passing step twice"
+[ "$(tries test)" = 1 ] && [ "$(tries build:app)" = 1 ] || fail "check.sh ran a passing step twice"
+gate --full >/dev/null || fail "check.sh --full failed a clean run"
+[ "$(tries playwright)" = 1 ] || fail "check.sh --full ran the journeys $(tries playwright) times on a clean run"
 [ ! -e "$unsteady" ] || fail "check.sh logged a clean run"
 # The log keeps each run's files: two unsteady runs leave two lines.
 FLAKY=test gate >/dev/null && FLAKY=test gate >/dev/null && [ "$(grep -c "" "$unsteady")" = 2 ] || fail "check.sh did not append to the unsteady log"
@@ -2319,10 +2513,16 @@ rm -rf "${unsteady:?}"
 # runs both lanes (CR8, R2).
 printf '\n' >>"$g/packages/ui/src/tokens.css"
 out=$(PORTS_FAIL=1 gate) && fail "check.sh passed with no free port: $out"
-printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not fail the journeys' lane at its app step when free_ports failed: $out"
 printf '%s\n' "$out" | grep -q "^check.sh: lane pictures failed at pictures" || fail "check.sh did not fail the pictures' lane when free_ports failed: $out"
-ran playwright && fail "check.sh started the journeys with no free port"
 ran pictures && fail "check.sh started the pictures with no free port"
+reset
+# The journeys of --full ask for three ports of their own (never the fixed 4173 another gate may hold), and a free_ports that fails stops them.
+out=$(PORTS_FAIL=1 gate --full) && fail "check.sh --full passed with no free port: $out"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh --full did not fail the journeys' lane at its app step when free_ports failed: $out"
+ran playwright && fail "check.sh --full started the journeys with no free port"
+gate --full >/dev/null || fail "check.sh --full failed on a copy whose every step passes"
+port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
+[ -n "$port" ] && [ "$port" -ge 1024 ] && [ "$port" -le 65533 ] && [ "$port" != 4173 ] || fail "check.sh --full gave the journeys no free port of their own: $(grep '^playwright' "$log")"
 reset
 fi
 
@@ -2410,11 +2610,13 @@ sh -c 'set -e; eval "$1"; E2E_PORT=$( (ulimit -n 24 && free_ports 40) 2>/dev/nul
 	fail "an assignment of free_ports went on after it found no free ports: $(cat "$t/ports.out")"
 fi
 
+full_fixture() { # $1: its folder's name
+	gate_fixture "$1"
+	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
+	mkdir -p "$g/node_modules/vitest"
+	}
 if part gate_full; then
-gate_fixture gate_full
-# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
-mkdir -p "$g/node_modules/vitest"
-printf 'import { spawnSync } from "node:child_process";\nprocess.exit(spawnSync("sh", [%s, "core_chromium", "switch=" + (process.env.CORE_CHROMIUM ?? ""), ...process.argv.slice(2)], { stdio: "inherit" }).status ?? 1);\n' "'$step'" >"$g/node_modules/vitest/vitest.mjs"
+full_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
@@ -2426,7 +2628,7 @@ out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewher
 grep -q '^stories port=[^ ]* of= on=[0-9][0-9]* out= test -c app/playwright.stories.config.ts' "$log" && ! grep -q '^stories .* on=6007 ' "$log" ||
 	fail "check.sh --full let its environment narrow or redirect the stories' walk, or gave it no port of its own: $(grep '^stories' "$log")"
 ran pictures && fail "check.sh --full compared the tokens story's pictures beside its whole walk"
-for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
@@ -2472,6 +2674,10 @@ rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 out=$(FAIL=py:batch_size gate --full) && fail "check.sh --full passed with its batch size failing"
 printf '%s\n' "$out" | grep -q "^py:batch_size failed here" || fail "check.sh --full hid the batch size's failure: $out"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate whose batch was too large"
+fi
+
+if part gate_full_order; then
+full_fixture gate_full_order
 # probe.py plants its faults in the source tree: it runs alone, before any full lane reads the tree (the
 # coverage's Vitest, check_regressions' list, StrykerJS, the stories' build), which saw its files come and go.
 (SLOW_STEP=py:probe gate --full) >/dev/null || fail "check.sh --full failed with a slow probe"
@@ -2491,11 +2697,16 @@ for s in coverage py:patch_coverage mutate; do
 	before "done stories" "$s" || fail "check.sh --full ran $s beside the stories' journeys (F815)"
 done
 (MEET="stories py:prove_fix" gate --full) >/dev/null || fail "check.sh --full ran the stories and the history lane one after the other"
+fi
+
+if part gate_full_fail; then
+full_fixture gate_full_fail
 # A dirty tree of one area: --full still checks everything, and records it.
 printf 'y\n' >>"$g/server/src/a.ts"
 gate --full >/dev/null || fail "check.sh --full failed on a server change"
-for s in $fast_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
+for s in $full_steps; do [ "$s" = test ] || ran "$s" || fail "check.sh --full with a server change skipped $s"; done
 nocache "--full with a server change"
+[ -z "$(sed -n 's/^format:check //p' "$log")" ] || fail "check.sh --full gave Prettier a cache, which the merge check must not read: '$(sed -n 's/^format:check //p' "$log")'"
 grep -qxF "$(record)" "$g/.claude/tmp/green-full" || fail "check.sh --full did not record a dirty tree it passed"
 reset
 printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
@@ -2529,13 +2740,19 @@ done
 (FAIL=stories gate --full) >/dev/null && fail "check.sh --full passed with the stories failing"
 ran py:audit || fail "check.sh --full stopped the history lane at the stories' failure: a phase's lanes run to their end"
 [ ! -e "$g/.claude/tmp/green-full" ] || fail "check.sh --full recorded a gate that failed"
+fi
+
+if part gate_full_merge; then
+full_fixture gate_full_merge
+# A harness changed since main, as the sections before it left it: --merge then judges its mutants.
+printf '\n' >>"$g/scripts/check_css.py" && git -C "$g" commit -qam y
 # --merge, a merge's own review: the full gate's steps, the harness mutants of the merge's guard files
 # alone, and no full record, which only --full writes (pre-push wants it for main).
 rm -f "$g/.claude/tmp/green-fast" "$g/.claude/tmp/green-full"
 base=$(git -C "$g" merge-base HEAD origin/main)
 printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
 out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
-for s in $fast_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench core_chromium stories coverage py:patch_coverage py:prove_fix mutate py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the merge's own harness mutants: $(grep harness_mutate "$log")"
@@ -2563,7 +2780,7 @@ out=$(gate --merge) || fail "check.sh --merge failed on a branch with no product
 for s in core_chromium stories coverage py:patch_coverage mutate py:prove_fix; do
 	ran "$s" && fail "check.sh --merge ran $s on a branch with no product code"
 done
-for s in $fast_steps py:probe py:bench py:batch_size py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
+for s in $full_steps py:probe py:bench py:batch_size py:check_regressions py:check_migrations sh:scan_secrets py:audit; do
 	[ "$s" = test ] || ran "$s" || fail "check.sh --merge skipped $s on a branch with no product code"
 done
 grep -qx "py:harness_mutate --changed $base" "$log" || fail "check.sh --merge did not judge the harness mutants of a branch with no product code"
@@ -2592,6 +2809,317 @@ grep -q '^stories ' "$log" && fail "check.sh --full started the stories with no 
 git -C "$g" update-ref -d refs/remotes/origin/main
 out=$(gate --full) && fail "check.sh --full passed with no origin/main"
 printf '%s\n' "$out" | grep -q "needs origin/main" || fail "check.sh --full did not say it needs origin/main: $out"
+fi
+
+# A commit's gate walks no journey (Alexis, 2026-10-31): the audit measured 487 and 505 CPU s of journeys against 67 to 91 for
+# the rest of a commit's gate. It still builds the app (the build fails on a route or an import the types do not see) and starts
+# no browser for it; the merge check and --full walk every journey, unfiltered. A session that writes a journey runs it itself.
+if part gate_journeys; then
+gate_fixture gate_journeys
+[ ! -e "$here/journeys.py" ] || fail "scripts/journeys.py still exists: nothing reads it since a commit's gate walks no journey"
+ran_browser() { grep -q "^\(playwright\|stories\|pictures\)\( \|$\)" "$log"; }
+for f in app/src/a.tsx packages/ui/src/a.ts app/tests/a.spec.ts server/src/a.ts app/src/a.json; do
+	printf 'y\n' >>"$g/$f"
+	out=$(gate) || fail "check.sh failed on a change of $f: $out"
+	ran playwright && fail "check.sh walked the journeys in a commit's gate on a change of $f"
+	ran_browser && fail "check.sh started a browser in a commit's gate on a change of $f: $(grep '^\(playwright\|stories\|pictures\)' "$log")"
+	reset
+done
+# What is built is the app: the build, in the app's step, for a change a page can load and for a run of everything; not for the server, a test of the
+# app or a journey, which no page loads. Its budget stays the 120 s of a run that builds.
+for f in app/src/a.tsx packages/ui/src/a.ts app/src/a.json; do
+	printf 'y\n' >>"$g/$f"
+	out=$(gate) || fail "check.sh failed on a change of $f: $out"
+	ran build:app || fail "check.sh did not build the app on a change of $f"
+	printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
+	reset
+done
+for f in server/src/a.ts app/tests/a.spec.ts app/tests/e2e/serve.mjs; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran build:app && fail "check.sh built the app on a change of $f, which no page loads"
+	reset
+done
+printf 'y\n' >>"$g/app/src/a.test.ts"
+gate >/dev/null || fail "check.sh failed on a change of a test of the app alone"
+ran build:app && fail "check.sh built the app on a change of a test of the app alone"
+ran test || fail "check.sh did not run the tests on a change of a test of the app alone"
+reset
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran build:app || fail "check.sh did not build the app on a run of everything"
+ran playwright && fail "check.sh walked the journeys on a run of everything at a commit"
+# A build that fails fails the gate, and names the lane and the step.
+printf 'y\n' >>"$g/app/src/a.tsx"
+out=$(FAIL=build:app gate) && fail "check.sh passed with the app's build failing"
+printf '%s\n' "$out" | grep -q "^check.sh: lane ts failed at app" || fail "check.sh did not name the lane ts and its step app when the build failed: $out"
+reset
+# The merge check and --full walk every journey, whatever changed: unfiltered, on a port of their own, and they build only through Playwright.
+for mode in --full --merge; do
+	printf 'y\n' >>"$g/app/src/a.tsx"
+	AUDIT_ANSWER=x gate $mode >/dev/null || fail "check.sh $mode failed on a copy whose every step passes"
+	ran playwright || fail "check.sh $mode ran no journey"
+	[ "$(sed -n 's/^playwright .* --reporter=dot,json *//p' "$log")" = "" ] || fail "check.sh $mode gave the journeys a filter: the merge check keeps every one"
+	ran build:app && fail "check.sh $mode built the app beside the journeys, which build it themselves"
+	reset
+done
+fi
+
+# A commit that touches a test file runs check_regressions in the fast gate (a renamed test passed it in 5b and failed only
+# the merge check), and a lockfile change runs the audit (lighthouse's advisories showed only at the merge check, 5e). The
+# commit has no message yet: the base is where the branch left main (the merge base with origin/main), so a `Removed-test:` line
+# of an earlier commit of the branch lets a later removal through; HEAD with no origin/main; none, and no check, with no commit
+# yet or in a merge (its full gate follows and judges the whole).
+if part gate_checks; then
+gate_fixture gate_checks
+printf 'test("a", () => {});\n' >"$g/server/src/a.test.ts" && printf 'func TestA(t *testing.T) {}\n' >"$g/gno/r/a_test.gno"
+git -C "$g" add -A && git -C "$g" commit -qm "tests"
+head=$(git -C "$g" rev-parse HEAD) base=$(git -C "$g" merge-base HEAD origin/main)
+[ "$head" != "$base" ] || fail "the fixture's branch has no commit past main: the base cannot be told from HEAD"
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test"
+grep -qx "py:check_regressions --quick $base" "$log" || fail "check.sh did not run check_regressions from where the branch left main on a renamed test (a Removed-test: line of a commit of the branch must count): $(grep check_regressions "$log")"
+reset
+# Every kind of file that is a test, a bench or an approved picture.
+for f in server/src/a.test.ts gno/r/a_test.gno app/tests/a.spec.ts packages/core/src/new.test.ts app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx \
+	"app/tests/e2e/home.spec.ts-snapshots/a-chromium.png" app/tests/e2e/__screenshots__/b.png; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	grep -qx "py:check_regressions --quick $base" "$log" || fail "check.sh did not run check_regressions on a change of $f"
+	reset
+done
+# A merge being committed (MERGE_HEAD): the full gate follows and judges the whole, so the fast gate does not.
+git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test in a merge"
+ran py:check_regressions && fail "check.sh ran check_regressions in a merge commit, whose declarations sit in the merged branch's commits"
+rm -f "$g/.git/MERGE_HEAD"
+reset
+# With no origin/main the base is HEAD.
+git -C "$g" update-ref -d refs/remotes/origin/main
+git -C "$g" mv server/src/a.test.ts server/src/renamed.test.ts
+gate >/dev/null || fail "check.sh failed on a renamed test with no origin/main"
+grep -qx "py:check_regressions --quick $head" "$log" || fail "check.sh did not fall back to HEAD with no origin/main: $(grep check_regressions "$log")"
+git -C "$g" update-ref refs/remotes/origin/main "$base"
+reset
+git -C "$g" rm -q server/src/a.test.ts
+gate >/dev/null || fail "check.sh failed on a deleted test"
+ran py:check_regressions || fail "check.sh did not run check_regressions on a deleted test"
+reset
+git -C "$g" rm -q gno/r/a_test.gno
+gate >/dev/null || fail "check.sh failed on a deleted gno test"
+ran py:check_regressions || fail "check.sh did not run check_regressions on a deleted gno test"
+reset
+for f in server/src/a.ts app/src/a.tsx; do
+	printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran py:check_regressions && fail "check.sh ran check_regressions on a change of $f, which touches no test"
+	reset
+done
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran py:check_regressions && fail "check.sh ran check_regressions on a tree with no change"
+printf 'y\n' >>"$g/server/src/a.test.ts"
+out=$(FAIL=py:check_regressions gate) && fail "check.sh passed with check_regressions refusing a test change: $out"
+printf '%s\n' "$out" | grep -q "^py:check_regressions failed here" || fail "check.sh hid check_regressions's refusal: $out"
+reset
+# The audit: a lockfile change, and only it. It asks npm (AUDIT_ANSWER, the test switch, never inherited).
+printf '\n' >>"$g/pnpm-lock.yaml"
+AUDIT_ANSWER=x gate >/dev/null || fail "check.sh failed on a lockfile change"
+ran py:audit || fail "check.sh did not run the audit on a lockfile change (5e: lighthouse's advisories showed at the merge check)"
+grep -qx "audit-answer unset" "$log" || fail "check.sh let AUDIT_ANSWER reach the audit of a lockfile change"
+# A merge being committed: the full gate follows and runs the audit whole.
+git -C "$g" rev-parse HEAD >"$g/.git/MERGE_HEAD"
+AUDIT_ANSWER=x gate >/dev/null || fail "check.sh failed on a lockfile change in a merge"
+ran py:audit && fail "check.sh ran the audit in a merge commit, whose full gate follows"
+rm -f "$g/.git/MERGE_HEAD"
+out=$(FAIL=py:audit gate) && fail "check.sh passed a lockfile change whose audit found an advisory"
+printf '%s\n' "$out" | grep -q "^py:audit failed here" || fail "check.sh hid the audit's failure: $out"
+reset
+printf '\n' >>"$g/pnpm-lock.yaml" && printf 'y\n' >>"$g/server/src/a.ts"
+gate >/dev/null || fail "check.sh failed on a lockfile change beside a server one"
+ran py:audit || fail "check.sh skipped the audit on a lockfile change beside a server one"
+reset
+for f in package.json app/package.json server/src/a.ts vitest.config.ts; do
+	printf '\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	ran py:audit && fail "check.sh ran the audit on a change of $f, which leaves the lockfile alone"
+	reset
+done
+gate >/dev/null || fail "check.sh failed on a tree with no change"
+ran py:audit && fail "check.sh ran the audit on a tree with no change"
+# Pre-commit's staged copy: the list names the lockfile; no repository there, so check_regressions is the hook's (below).
+cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="pnpm-lock.yaml" sh scripts/check.sh >/dev/null 2>&1) || fail "check.sh failed outside a repository on a lockfile change"
+ran py:audit || fail "check.sh did not run the audit on a lockfile change outside a repository"
+: >"$log" && (cd "$g-copy" && env -u SANDBOX_RUNTIME -u GATE_MERGE GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" PATH="$g/bin:$PATH" GATE_CHANGED="server/src/a.test.ts" sh scripts/check.sh >/dev/null 2>&1) || fail "check.sh failed outside a repository on a test change"
+ran py:check_regressions && fail "check.sh ran check_regressions in a copy with no repository, where git has nothing to compare"
+# pre-commit does, in the repository, before the staged copy's gate: a commit that touches a test file runs the staged copy's
+# check_regressions.py from the repository, with the base check.sh takes (where the branch left main, else HEAD), and a refusal
+# stops the commit. Not in a merge, not with no commit yet (nothing to compare).
+c3="$t/precommit_regr"
+precommit_in() { d=$1 code=$2 && shift 2 && (cd "$d" && REG_LOG="$t/reg.log" REG_EXIT="$code" sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
+precommit3() { code=${1:-0} && { [ $# -eq 0 ] || shift; } && precommit_in "$c3" "$code" "$@"; }
+regr_fixture() { # $1: a folder
+	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
+	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
+	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
+}
+logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
+regr_fixture "$c3"
+[ -z "$(sed -n 's/^format:check //p' "$log")" ] || fail "check.sh gave Prettier a cache in a copy outside a repository, a new folder each time"
+git -C "$c3" add -A && git -C "$c3" commit -qm base
+head3=$(git -C "$c3" rev-parse HEAD) && rm -f "$t/reg.log"
+git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
+precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes"
+logged "--quick $head3" || fail "pre-commit did not run check_regressions from the repository with HEAD as the base, there being no origin/main: $(cat "$t/reg.log" 2>&1)"
+precommit3 1 && fail "pre-commit let a renamed test through, check_regressions refusing it (the fast gate passed it in 5b)"
+git -C "$c3" reset -q --hard && rm -f "$t/reg.log"
+printf 'y\n' >>"$c3/server/src/a.ts" && git -C "$c3" add server/src/a.ts
+precommit3 1 || fail "pre-commit ran check_regressions on a commit that touches no test"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions on a commit that touches no test: $(cat "$t/reg.log")"
+# Where the branch left main is the base, so an earlier commit's `Removed-test:` line counts.
+git -C "$c3" update-ref refs/remotes/origin/main "$head3" && git -C "$c3" commit -qm "a commit of the branch"
+head3b=$(git -C "$c3" rev-parse HEAD)
+[ "$head3b" != "$head3" ] || fail "the fixture's branch has no commit past main"
+git -C "$c3" mv server/src/a.test.ts server/src/b.test.ts
+precommit3 || fail "pre-commit refused a renamed test with a check_regressions that passes, on a branch"
+logged "--quick $head3" || fail "pre-commit did not take where the branch left main as the base: $(cat "$t/reg.log" 2>&1)"
+! logged "--quick $head3b" || fail "pre-commit took HEAD as the base on a branch: a Removed-test: line of an earlier commit could not count"
+# A merge being committed: the full gate follows.
+rm -f "$t/reg.log"
+precommit3 1 --merge || fail "pre-commit ran check_regressions in a merge commit"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions in a merge commit: $(cat "$t/reg.log")"
+git -C "$c3" reset -q --hard
+# Every kind of test file, bench and approved picture.
+for f in app/src/home.test.tsx gno/tools/a_test.go app/tests/bench/a.bench.ts app/tests/bench/a.bench.tsx app/tests/a.spec.ts gno/r/a_test.gno "app/tests/e2e/home.spec.ts-snapshots/a.png" app/tests/e2e/__screenshots__/b.png; do
+	rm -f "$t/reg.log" && mkdir -p "$c3/$(dirname "$f")" && printf 'y\n' >>"$c3/$f" && git -C "$c3" add "$f"
+	precommit3 || fail "pre-commit refused a change of $f with a check_regressions that passes"
+	logged "--quick $head3" || fail "pre-commit did not run check_regressions on a change of $f"
+	git -C "$c3" reset -q --hard && git -C "$c3" clean -qfd
+done
+# No commit yet: nothing to compare, and the commit is not refused for it.
+c4="$t/precommit_unborn" && regr_fixture "$c4" && rm -f "$t/reg.log"
+git -C "$c4" add -A
+precommit_in "$c4" 1 || fail "pre-commit refused the first commit of a repository, check_regressions having nothing to compare"
+[ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions with no commit yet: $(cat "$t/reg.log")"
+fi
+
+# StrykerJS's sandboxes: a timed-out dry run leaves .stryker-tmp, which Vitest's bench project measured (the bench at 27 to
+# 41 ms instead of 2 to 4, 5n). Vitest ignores the folder, and check.sh empties it before StrykerJS starts.
+if part gate_stryker; then
+gate_fixture gate_stryker
+mkdir -p "$g/node_modules/vitest"
+# StrykerJS's step, here, fails when a sandbox is still there as it starts.
+python3 -I - "$g/package.json" "$step" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["scripts"]["mutate"] = f'test -z "$(ls -A .stryker-tmp 2>/dev/null)" || {{ echo "a sandbox was left in .stryker-tmp" >&2; exit 1; }}; sh {sys.argv[2]} mutate'
+json.dump(p, open(sys.argv[1], "w"))
+PY
+git -C "$g" add -A && git -C "$g" commit -qm "mutate checks its folder"
+mkdir -p "$g/.stryker-tmp/sandbox-1/app/src" "$g/.stryker-tmp/.vite" && printf 'x\n' >"$g/.stryker-tmp/sandbox-1/app/src/a.ts"
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full did not empty .stryker-tmp before StrykerJS started: $(printf '%s\n' "$out" | tail -5)"
+ran mutate || fail "check.sh --full did not run StrykerJS"
+[ -z "$(ls -A "$g/.stryker-tmp" 2>/dev/null)" ] || fail "check.sh --full left a sandbox in .stryker-tmp: $(ls -A "$g/.stryker-tmp")"
+# Only that folder: another folder of a tree is never emptied.
+mkdir -p "$g/.stryker-tmpx" "$g/keep" && printf 'x\n' >"$g/.stryker-tmpx/a" && printf 'x\n' >"$g/keep/a"
+AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folders beside .stryker-tmp"
+[ -e "$g/.stryker-tmpx/a" ] && [ -e "$g/keep/a" ] || fail "check.sh --full emptied a folder that is not .stryker-tmp"
+# A link named .stryker-tmp is emptied no further than itself: what it leads to is not StrykerJS's.
+rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
+AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
+[ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+# Vitest does not bench what a StrykerJS sandbox holds: on a copy of the config, a bench in .stryker-tmp is not measured. Only a
+# bench is reachable: the projects' includes (`app/src/**`, `packages/*/src/**`, `server/src/**`) are anchored at the root and
+# match nothing under .stryker-tmp, with or without the exclusion (a `vitest list` check passed with it removed); BENCHES is a
+# `**` glob, which does.
+if part vitest_stryker; then
+vt="$t/vt"
+mkdir -p "$vt/lint" "$vt/app/tests/bench" "$vt/.stryker-tmp/sandbox-1/app/tests/bench" "$vt/.stryker-tmp/sandbox-1/app/src"
+cp "$here/../vitest.config.ts" "$here/../.node-version" "$vt/" && cp "$here/../lint/shared.config.ts" "$vt/lint/" && cp "$here/../app/vitest.compiled.config.ts" "$vt/app/"
+ln -s "$here/../node_modules" "$vt/node_modules" && ln -s "$here/../app/node_modules" "$vt/app/node_modules"
+printf 'import { bench } from "vitest";\nbench("kept [1000 ms]", () => {});\n' >"$vt/app/tests/bench/ok.bench.ts"
+printf 'import { bench } from "vitest";\nbench("stale [1000 ms]", () => {});\n' >"$vt/.stryker-tmp/sandbox-1/app/tests/bench/x.bench.ts"
+printf 'import { test, expect } from "vitest";\ntest("stale", () => { expect(1).toBe(1); });\n' >"$vt/.stryker-tmp/sandbox-1/app/src/stale.test.ts"
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+(cd "$vt" && PATH="$nodebin:$PATH" node node_modules/vitest/vitest.mjs bench --run --project node --outputJson "$vt/bench.json") >"$vt/bench.out" 2>&1 || fail "vitest bench failed on the copy of the config: $(tail -5 "$vt/bench.out")"
+grep -q "kept" "$vt/bench.json" || fail "vitest bench did not measure the bench beside the config: $(tail -5 "$vt/bench.out")"
+grep -q "stale" "$vt/bench.json" && fail "vitest bench measured a bench a StrykerJS sandbox left in .stryker-tmp (5n: Cmd-K at 27 to 41 ms instead of 2 to 4)"
+:
+fi
+
+# F2414: the staged copy's lint once reported "14683 problems" and passed on retry; its first output was not kept. The one
+# cause found by reading: borrow_node_modules.sh copies every node_modules folder it finds, those of a StrykerJS sandbox
+# in .stryker-tmp too. This is hygiene, NOT the cause's proof: planted in such a copy, a sandbox's node_modules did not make
+# `eslint --max-warnings 0 .` report anything (eslint.config.ts includes .gitignore, which names .stryker-tmp/). The ledger
+# row stays `asked`; no test here reproduces "14683 problems".
+if part borrow; then
+b="$t/borrow" && mkdir -p "$b/src/node_modules/pkg" "$b/src/app/node_modules/@x" "$b/src/.stryker-tmp/sandbox-1/node_modules/pkg" "$b/src/.stryker-tmp/sandbox-1/app/node_modules/@x" "$b/copy"
+printf 'x\n' >"$b/src/node_modules/pkg/i.js" && printf 'x\n' >"$b/src/.stryker-tmp/sandbox-1/node_modules/pkg/i.js"
+(cd "$b/src" && sh "$here/borrow_node_modules.sh" "$b/copy") || fail "borrow_node_modules.sh failed"
+[ -e "$b/copy/node_modules/pkg/i.js" ] && [ -d "$b/copy/app/node_modules" ] || fail "borrow_node_modules.sh did not borrow the packages"
+[ ! -e "$b/copy/.stryker-tmp" ] || fail "borrow_node_modules.sh copied a StrykerJS sandbox into the staged copy (F2414): $(find "$b/copy/.stryker-tmp" -maxdepth 2 | head -5)"
+fi
+
+# The heavy sections are split (the brief, item 5): a change of harness_mutate.py rejudges its ~90 own mutants, each running
+# its sections; one of 400 lines made each run the whole. No section of these two families is past 150 lines, each family
+# holds more than one, and harness_mutate.py's SECTIONS (read as the data it is, not as text) names every section of this
+# file for the guard files that matter to it: a mention in a comment proves nothing. A file lists a proper part of a split family
+# unless it guards the whole of it, which `whole` lists.
+if part sections_split; then
+sizes=$(awk '/^if part /{n=$3; sub(/;$/, "", n); c=0} n!=""{c++} /^fi$/ && n!=""{print n, c; n=""}' "$here/test_hooks.sh")
+for family in gate_full harness_shards; do
+	names=$(printf '%s\n' "$sizes" | awk -v f="$family" 'index($1, f) == 1 {print $1}')
+	[ "$(printf '%s\n' "$names" | grep -c .)" -ge 2 ] || fail "test_hooks.sh holds $(printf '%s\n' "$names" | grep -c .) section of $family: split it, so a mutant reruns its own case"
+	printf '%s\n' "$sizes" | awk -v f="$family" 'index($1, f) == 1 && $2 > 150 {print $1, $2}' | grep . && fail "a section of $family is past 150 lines: split it"
+done
+printf '%s\n' "$sizes" | python3 -I -c '
+import ast, re, sys
+sizes = [line.split()[0] for line in sys.stdin.read().splitlines() if line]
+src = open(sys.argv[1]).read()
+tree = ast.parse(src)
+table = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "SECTIONS" for t in n.targets))
+listed = {}  # file -> the hooks sections it names
+for path, only in table.items():
+    names = only.get("hooks", "") if isinstance(only, dict) else only
+    listed[path] = set(names.split(",")) - {""}
+problems = []
+# What must guard what: the new guards, by file.
+need = {
+    "scripts/check.sh": {"gate_journeys", "gate_checks", "gate_stryker"},
+    ".githooks/pre-commit": {"gate_checks"},
+    "scripts/borrow_node_modules.sh": {"borrow"},
+    "vitest.config.ts": {"vitest_stryker"},
+}
+for path, sections in need.items():
+    missing = sections - listed.get(path, set())
+    if missing:
+        problems.append(path + " is not mapped to " + ",".join(sorted(missing)) + ": removing its guard would run no test that sees it")
+whole = {"harness_shards": {"scripts/harness_mutate.py", "scripts/repo_files.py", "scripts/suite_parts.py", "scripts/test_hooks.sh"}, "gate_full": {"scripts/check.sh", "scripts/test_hooks.sh"}}
+for family, owners in whole.items():
+    members = {s for s in sizes if s.startswith(family)}
+    if not any(members & l for l in listed.values()):
+        problems.append(f"no file is mapped to any section of {family}")
+    for path, l in listed.items():
+        if members <= l and path not in owners:
+            problems.append(f"{path} is mapped to every section of {family}: its mutants rerun them all; name the ones that see it")
+    for path in owners - {"scripts/test_hooks.sh"}:
+        if path in listed and not members & listed[path]:
+            problems.append(f"{path} names no section of {family}")
+    # The file the family tests whole names every section of it.
+    main = "scripts/harness_mutate.py" if family == "harness_shards" else "scripts/check.sh"
+    if members - listed.get(main, set()):
+        problems.append(main + " is not mapped to " + ",".join(sorted(members - listed.get(main, set()))))
+for s in sizes:
+    if s != "sections_split" and not any(s in l for l in listed.values()):
+        problems.append(f"no guard file is mapped to the section {s}: a mutant would never rerun it")
+if problems:
+    sys.exit("harness_mutate.py SECTIONS: " + "; ".join(problems))
+' "$here/harness_mutate.py" || fail "harness_mutate.py's SECTIONS do not name the sections that see its guards"
+:
 fi
 
 if part guard; then
@@ -2766,6 +3294,15 @@ base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => 2 * n;\n' >"$pf/packages/x/src/a.ts" && printf '// expects: export\n' >"$pf/packages/x/src/b.test.ts"
 fix "fix(x): a test that passed already"
 prove "$base" && fail "prove_fix accepted a fix whose test passed before it"
+# A later commit of the range excuses that one fix, by its short sha (cf67ea7: a CSS fix whose Vitest test, beside its journey,
+# could not fail before it, and a merged message cannot change). Another sha, or no reason, excuses nothing.
+bad=$(git -C "$pf" rev-parse --short=7 HEAD)
+git -C "$pf" commit -q --allow-empty -m "chore: a wrong sha" -m "No-test: 0000000 - not this fix"
+prove "$base" && fail "prove_fix excused a fix by a sha that is not its"
+git -C "$pf" commit -q --allow-empty -m "chore: no reason" -m "No-test: $bad"
+prove "$base" && fail "prove_fix excused a fix by a sha with no reason"
+git -C "$pf" commit -q --allow-empty -m "chore: the excuse" -m "No-test: $bad - its journey proves it, its unit test is beside the point"
+prove "$base" || fail "prove_fix refused a fix a later commit excuses by its sha"
 base=$(git -C "$pf" rev-parse HEAD)
 printf 'export const twice = (n: number) => n + n;\n' >"$pf/packages/x/src/a.ts"
 fix "fix(x): no test"
@@ -2969,9 +3506,700 @@ mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) 
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets passed a staged diff git could not read (F140)"
 fi
 
+if part merge_lock; then
+full_fixture merge_lock
+# One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five merge checks side by side at a load of 25 to 40
+# on 16 cores failed by load alone). `check.sh --merge` takes a lock in the tools' cache, shared by every worktree: a folder
+# `merge.lock` holding `pid`, `worktree` and `since` (seconds). It WAITS for a live holder, saying which worktree holds it and since
+# when, and never refuses; a holder whose pid is gone (a Ctrl+C, a crash) leaves no wait. The fast gate and --full ignore it, and
+# the run's time leaves the wait out. The same run also checks nginx (scripts/check_nginx.py), after the build, in --merge alone.
+lockdir="$g.home/.cache/gnoworld-tools/merge.lock"
+mkdir -p "${lockdir%/*}"
+hold() { # $1: the holder's pid, $2: its worktree
+	rm -rf "$lockdir" && mkdir "$lockdir" && printf '%s\n' "$1" >"$lockdir/pid" && printf '%s\n' "$2" >"$lockdir/worktree" && date +%s >"$lockdir/since"
+}
+took() { printf '%s\n' "$1" | sed -n 's/^all checks passed in \([0-9]*\) s.*/\1/p'; }
+printf 'z\n' >>"$g/server/src/a.ts" && git -C "$g" commit -qam "product code"
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes, with no lock held: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge left its lock behind after a pass: $(ls "$lockdir")"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited with no lock held: $out"
+solo=$(took "$out")
+[ -n "$solo" ] || fail "check.sh --merge printed no time: $out"
+# A running merge check HOLDS the lock (a check.sh that waited for a holder but never took the lock would let a second one start beside
+# it, the failure this branch ends): each step it runs sees the lock, its pid alive and one for the whole run, this worktree, a recent since.
+rm -f "$log.lockpeek"
+out=$(LOCKPEEK=1 gate --merge) || fail "check.sh --merge failed with its lock peeked at: $out"
+[ -s "$log.lockpeek" ] || fail "no step of check.sh --merge saw a lock (it holds none while it runs)"
+gp=$(cd "$g" && pwd -P)
+grep -q " dead " "$log.lockpeek" && fail "a step of check.sh --merge saw a lock whose pid is not alive: $(grep ' dead ' "$log.lockpeek" | head -1)"
+bad=$(grep -v " live worktree=$gp since=[0-9][0-9]*$" "$log.lockpeek" | head -1)
+[ -z "$bad" ] || fail "a step of check.sh --merge saw a lock with no pid, another worktree or no since: $bad"
+[ "$(sed -n 's/^[^ ]* pid=\([0-9]*\) .*/\1/p' "$log.lockpeek" | sort -u | wc -l | tr -d ' ')" = 1 ] || fail "the steps of one merge check saw different lock holders: $(cat "$log.lockpeek")"
+since_seen=$(sed -n 's/.* since=\([0-9]*\)$/\1/p' "$log.lockpeek" | sort -n | tail -1)
+[ "$(($(date +%s) - since_seen))" -lt 600 ] || fail "the lock's since is not the time the merge check started: $since_seen"
+# nginx -t and the served build: in the merge check, after the build; never in the fast gate.
+ran py:check_nginx || fail "check.sh --merge did not run scripts/check_nginx.py (nginx -t and the served build's policies)"
+before playwright py:check_nginx || fail "check.sh --merge checked nginx before the build the journeys make"
+out=$(FAIL=py:check_nginx gate --merge) && fail "check.sh --merge passed with the nginx check failing: $out"
+printf '%s\n' "$out" | grep -q "^py:check_nginx failed here" || fail "check.sh --merge hid the nginx check's failure: $out"
+[ ! -e "$lockdir" ] || fail "check.sh --merge left its lock behind after a failure"
+gate >/dev/null || fail "check.sh failed (fast)"
+ran py:check_nginx && fail "check.sh's fast gate ran the nginx check, which needs a pinned binary and a build"
+# rawrun execs check.sh in the job itself, so its pid is the job's.
+rawrun() { # $1: a launcher or nothing; $2: the run's tag; then check.sh's arguments (the log is not truncated: runs share it)
+	launch=$1 tag=$2
+	shift 2
+	cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" RUN_TAG="$tag" LOCKPEEK=1 SLOW_STEP="${SLOW:-}" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" $launch sh scripts/check.sh "$@"
+}
+# Taking the lock over is the way out of check.sh's wait, so one that does not take it never ends: this run has a limit, and a
+# kill reaches check.sh itself. Without it the suite hung, and that ended two full gates at harness_mutate's 600 s (2026-11-01).
+limited() { # $1: what holds the lock; its status is check.sh's, its output in $t/limited.out
+	rawrun "" L --merge >"$t/limited.out" 2>&1 &
+	job=$!
+	tries=0
+	while kill -0 "$job" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 1200 ] || { kill "$job" 2>/dev/null; fail "check.sh --merge never ended beside $1: $(cat "$t/limited.out")"; }
+		sleep 0.1
+	done
+	wait "$job"
+}
+# A holder that died: no wait, the lock taken over.
+sh -c 'exit 0' & dead=$!
+wait "$dead" || :
+hold "$dead" "/dead/worktree"
+limited "a lock whose holder died" || fail "check.sh --merge failed beside a lock whose holder died: $(cat "$t/limited.out")"
+grep -qi "waiting" "$t/limited.out" && fail "check.sh --merge waited for a holder that died: $(cat "$t/limited.out")"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a dead holder's lock"
+# A folder with no pid (a run killed between making it and writing the pid) is nobody's: the next merge check takes it, after a short wait.
+mkdir -p "$lockdir"
+: >"$lockdir/pid"
+limited "a lock folder with no pid" || fail "check.sh --merge failed beside a lock folder with no pid: $(cat "$t/limited.out")"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept a pid-less lock"
+# A holder another sandbox owns: a signal to it is refused (EPERM), which is a live process, not a dead one (F2616: each session runs its
+# merge check in a Bash call of its own, and `kill -0` failing for either reason read the holder as dead). pid 1 is alive for every user
+# and refuses the signal to any but root; the waiter must wait, say so, and leave the lock alone.
+hold 1 "/other/sandbox"
+# The waiter is the check.sh process itself (rawrun execs it): `gate` runs it in a subshell, whose pid a kill reaches alone, and the waiter
+# lived on, took the lock the section removed next and held it through the sections after, a merge check waiting for a holder that was
+# never killed (F2639: "waited for a holder killed by KILL", twice under load).
+rawrun "" E --merge >"$t/eperm.out" 2>&1 &
+eperm=$!
+tries=0
+until grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 100 ] || { kill "$eperm" 2>/dev/null; fail "check.sh --merge did not wait for a holder whose pid refuses a signal (EPERM, F2616): $(cat "$t/eperm.out")"; }
+	if ! kill -0 "$eperm" 2>/dev/null; then break; fi
+	sleep 0.1
+done
+grep -q "/other/sandbox" "$t/eperm.out" 2>/dev/null && kill -0 "$eperm" 2>/dev/null || fail "check.sh --merge took the lock of a live holder it was not allowed to signal (F2616): $(cat "$t/eperm.out")"
+kill "$eperm" 2>/dev/null
+wait "$eperm" 2>/dev/null && st=0 || st=$?
+# check.sh answers TERM with its trap, exit 1; a subshell around it dies of the signal (143) and leaves check.sh waiting on.
+[ "$st" = 1 ] || fail "the waiter that was killed ended with status $st, not check.sh's own 1: its pid is a wrapper's, and a kill leaves the waiter alive (F2639)"
+[ "$(cat "$lockdir/pid" 2>/dev/null)" = 1 ] || fail "check.sh --merge dropped the lock of a holder it could not signal (F2616)"
+rm -rf "${lockdir:?}"
+# A live holder: the fast gate and --full go on, untouched; the lock stays the holder's.
+sleep 120 & holder=$!
+hold "$holder" "/other/worktree"
+out=$(gate) || fail "check.sh's fast gate failed beside a held merge lock: $out"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh's fast gate waited for the merge lock: $out"
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed beside a held merge lock: $out"
+printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --full waited for the merge lock: $out"
+[ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] || fail "the fast gate or --full took or dropped the merge lock of another"
+# A waiter that is interrupted (TERM, HUP, and Ctrl+C as a terminal sends it) takes nothing and drops nothing: the lock stays the
+# holder's, and no step ran. A Ctrl+C reaches a background job of a script with its signal ignored, so the INT case starts through a
+# launcher that restores it. rawrun execs check.sh in the job itself, so its pid is the job's.
+printf 'import os, signal, sys\nsignal.signal(signal.SIGINT, signal.SIG_DFL)\nos.execvp(sys.argv[1], sys.argv[1:])\n' >"$t/unign.py"
+for sig in TERM HUP INT; do
+	launch=
+	[ "$sig" != INT ] || launch="python3 -I $t/unign.py"
+	: >"$log"
+	rawrun "$launch" W --merge >"$t/w.out" 2>&1 &
+	w=$!
+	tries=0
+	until grep -q "/other/worktree" "$t/w.out" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 200 ] || { kill "$w" "$holder" 2>/dev/null; fail "a merge check waiting for the lock never said so ($sig case): $(cat "$t/w.out")"; }
+		sleep 0.1
+	done
+	kill "-$sig" "$w"
+	tries=0
+	while kill -0 "$w" 2>/dev/null; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 100 ] || { kill -9 "$w" "$holder" 2>/dev/null; fail "a merge check waiting for the lock ignored $sig"; }
+		sleep 0.1
+	done
+	wait "$w" 2>/dev/null || :
+	[ "$(tail -n 1 "$t/w.out")" = "check.sh: FAILED at main:start" ] || fail "a merge check interrupted by $sig did not end on its FAILED line (F2638): $(tail -n 2 "$t/w.out")"
+	[ "$(cat "$lockdir/pid" 2>/dev/null)" = "$holder" ] && [ "$(cat "$lockdir/worktree" 2>/dev/null)" = /other/worktree ] || fail "a merge check interrupted by $sig while it waited took or dropped the lock of the holder"
+	[ ! -s "$log" ] || fail "a merge check interrupted by $sig while it waited ran a step: $(head -2 "$log")"
+done
+# --merge waits: it says which worktree holds the lock and since when, runs no step meanwhile, and starts when the holder dies;
+# its time in the log and on screen leaves the wait out.
+: >"$t/waiter.out"
+began=$(date +%s)
+gate --merge >"$t/waiter.out" 2>&1 &
+waiter=$!
+tries=0
+until grep -q "/other/worktree" "$t/waiter.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 200 ] || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge did not say which worktree holds the merge lock: $(cat "$t/waiter.out")"; }
+	sleep 0.1
+done
+grep -qi "waiting" "$t/waiter.out" && grep -q "since" "$t/waiter.out" || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge did not say it waits, and since when: $(cat "$t/waiter.out")"; }
+sleep 5
+kill -0 "$waiter" 2>/dev/null || { kill "$holder" 2>/dev/null; fail "check.sh --merge gave up waiting for a live holder: $(cat "$t/waiter.out")"; }
+[ ! -s "$log" ] || { kill "$holder" "$waiter" 2>/dev/null; fail "check.sh --merge ran a step while another merge check held the lock: $(head -3 "$log")"; }
+freed=$(date +%s)
+kill "$holder"
+wait "$holder" 2>/dev/null || :
+tries=0
+while kill -0 "$waiter" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 600 ] || { kill "$waiter" 2>/dev/null; fail "check.sh --merge did not start when the holder died: $(cat "$t/waiter.out")"; }
+	sleep 0.1
+done
+wait "$waiter" || fail "check.sh --merge failed after its wait: $(cat "$t/waiter.out")"
+# Measured against this run's own clock: against the first run's time, a load that slowed that run hid the 5 s (a mutant survived).
+waited=$(took "$(cat "$t/waiter.out")")
+[ -n "$waited" ] && [ "$waited" -le $(($(date +%s) - freed + 1)) ] || fail "check.sh --merge counted its $((freed - began)) s wait in its time: $waited s"
+[ ! -e "$lockdir" ] || fail "check.sh --merge kept the lock after its pass"
+# Two real merge checks side by side, one machine's cache: the second says it waits and runs no step until the first has ended.
+rm -f "$log" "$log.tags" "$log.lockpeek"
+: >"$log"
+SLOW=py:probe rawrun "" A --merge >"$t/a.out" 2>&1 &
+a=$!
+tries=0
+until [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$a" ]; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 200 ] || { kill "$a" 2>/dev/null; fail "a running check.sh --merge did not take the lock with its own pid: '$(cat "$lockdir/pid" 2>/dev/null)' for $a"; }
+	sleep 0.1
+done
+rawrun "" B --merge >"$t/b.out" 2>&1 &
+b=$!
+wait "$a" || fail "the first of two merge checks failed: $(cat "$t/a.out")"
+wait "$b" || fail "the second of two merge checks failed: $(cat "$t/b.out")"
+grep -qi "waiting" "$t/b.out" && grep -q "since" "$t/b.out" || fail "the second merge check did not say it waited: $(cat "$t/b.out")"
+grep -qi "waiting" "$t/a.out" && fail "the first merge check waited with no lock held: $(cat "$t/a.out")"
+last_a=$(grep -n '^A ' "$log.tags" | tail -1 | cut -d: -f1)
+first_b=$(grep -n '^B ' "$log.tags" | head -1 | cut -d: -f1)
+[ -n "$last_a" ] && [ -n "$first_b" ] && [ "$last_a" -lt "$first_b" ] || fail "the second merge check ran a step before the first had ended: $(cut -c1-40 "$log.tags" | tr '\n' ' ')"
+[ ! -e "$lockdir" ] || fail "two merge checks in turn left a lock behind"
+# A holder killed (TERM: it frees the lock; KILL: it cannot, the next one finds its pid gone): the next merge check does not wait.
+for sig in TERM KILL; do
+	: >"$log"
+	SLOW=py:probe rawrun "" H --merge >"$t/h.out" 2>&1 &
+	h=$!
+	tries=0
+	until [ "$(cat "$lockdir/pid" 2>/dev/null)" = "$h" ]; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 200 ] || { kill -9 "$h" 2>/dev/null; fail "a running check.sh --merge did not take the lock ($sig case)"; }
+		sleep 0.1
+	done
+	kill "-$sig" "$h"
+	wait "$h" 2>/dev/null || :
+	[ "$sig" != TERM ] || [ ! -e "$lockdir" ] || fail "a merge check killed by TERM kept its lock"
+	out=$(gate --merge) || fail "check.sh --merge failed after a holder was killed by $sig: $out"
+	printf '%s\n' "$out" | grep -qi "waiting" && fail "check.sh --merge waited for a holder killed by $sig: $out"
+	[ ! -e "$lockdir" ] || fail "check.sh --merge kept a lock after a holder killed by $sig"
+done
+sleep 3 # the killed runs' lanes finish on their own
+fi
+
+if part gate_limits; then
+gate_fixture gate_limits
+# check.sh raises its own open-files limit (F2543): the e2e web server dies of EMFILE under a low one, and each session had to
+# remember `ulimit -n 10240`. It sets the soft limit to 10240, up or down; a limit it cannot set is said, never hidden.
+# The lowest limit a step saw (a Node step raises its own soft limit to the hard one, whatever check.sh gave).
+ul() { sort -n "$log.ulimit" 2>/dev/null | head -1; }
+rm -f "$log.ulimit"
+out=$( (ulimit -S -n 512 && gate) ) || fail "check.sh failed under a low soft limit of open files: $out"
+[ "$(ul)" = 10240 ] || fail "check.sh did not raise the open-files limit to 10240 for its steps: got '$(ul)'"
+rm -f "$log.ulimit"
+out=$( (ulimit -n 512 && gate) ) || fail "check.sh failed when it could not raise the open-files limit: $out"
+[ "$(ul)" = 512 ] || fail "check.sh changed a hard limit it could not raise: got '$(ul)'"
+printf '%s\n' "$out" | grep -qi "open files" && printf '%s\n' "$out" | grep -q "512" || fail "check.sh did not say it could not raise the open-files limit (F2543): $out"
+# The switches of the nginx check and the bench's wait are the tests': a caller's value reaches no step (a run would trust any binary,
+# or measure a busy machine), whatever the order in check.sh. Each step logs what it saw.
+rm -f "$log.env"
+out=$(NGINX_SHA256=x BENCH_WAIT_CEILING=0 BENCH_WAIT_STEP=0 NGINX_START_TIMEOUT=0 gate) || fail "check.sh failed with the tests' switches set: $out"
+[ -s "$log.env" ] || fail "no step logged the switches it saw"
+leak=$(grep -v "^[^ ]* sha= ceiling= step= timeout=$" "$log.env" | head -1)
+[ -z "$leak" ] || fail "check.sh passed one of NGINX_SHA256, BENCH_WAIT_CEILING, BENCH_WAIT_STEP, NGINX_START_TIMEOUT to a step: $leak"
+# The soft limit is set to 10240, up or down (F2543 failed at 1048576, where a raise-only block did nothing): a limit above it is lowered.
+for high in 20000 1048576; do
+	if (ulimit -S -n "$high") 2>/dev/null; then
+		rm -f "$log.ulimit"
+		out=$( (ulimit -S -n "$high" && gate) ) || fail "check.sh failed under a high soft limit of $high: $out"
+		[ "$(ul)" = 10240 ] || fail "check.sh did not set the open-files limit to 10240 from $high: got '$(ul)'"
+	fi
+done
+fi
+
+if part nginx_check; then
+# scripts/check_nginx.py, in the merge check: the pinned nginx (1.30.6, the image's) from the tools' cache with its checksum
+# checked, `nginx -t` on the image's deploy/web/nginx.conf with the build's table (app/build/csp.conf), then the build served on a
+# free port, each page asked at its slashed, bare and index.html forms, each answering with its own policy (the build's _headers
+# rule), never the bare one. 5f's two high findings passed the gate and the first read of the review: F2459 (a second
+# map_hash_max_size, nginx refuses to start) and F2460 (a slashed address got the bare policy). The binary here is a stub that
+# models what those faults hit: nginx's duplicate directive, its missing include, the map keyed by $uri after try_files joined
+# without merging slashes. Docker stays refused in the sandbox (deploy/test.sh is Alexis's).
+nc="$t/nginxchk"
+mkdir -p "$nc/scripts" "$nc/deploy/web" "$nc/app/build/client/w/bubble" "$nc/tools/nginx-1.30.6/conf"
+cp "$here/../deploy/web/nginx.conf" "$nc/deploy/web/nginx.conf"
+bare="default-src 'none'; script-src 'self'"
+home="default-src 'none'; script-src 'self' 'sha256-HOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOMEHOM='"
+bub="default-src 'none'; script-src 'self' 'sha256-BUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBUBBBU='"
+printf '<html></html>\n' >"$nc/app/build/client/index.html" && printf '<html></html>\n' >"$nc/app/build/client/w/bubble/index.html"
+printf '/*\n  Content-Security-Policy: %s\n/\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n/w/bubble\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n/w/bubble/\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n' \
+	"$bare" "$home" "$bub" "$bub" >"$nc/app/build/client/_headers"
+table() { # $1: extra rows
+	printf 'map_hash_max_size 2048;\nmap_hash_bucket_size 64;\nmap $uri $csp {\n    default "%s";\n    "/" "%s";\n    "//index.html" "%s";\n    "/index.html" "%s";\n    "/w/bubble" "%s";\n    "/w/bubble/" "%s";\n    "/w/bubble//index.html" "%s";\n    "/w/bubble/index.html" "%s";\n%s}\n' \
+		"$bare" "$home" "$home" "$home" "$bub" "$bub" "$bub" "$bub" "${1:-}" >"$nc/app/build/csp.conf"
+}
+table
+: >"$nc/tools/nginx-1.30.6/conf/mime.types"
+cat >"$nc/tools/nginx-1.30.6/nginx" <<'PY'
+#!/usr/bin/env python3
+import http.server, os, re, sys
+a = sys.argv[1:]
+conf_path = a[a.index("-c") + 1]
+test = "-t" in a
+log = open(os.environ["STUB_LOG"], "a")
+conf = open(conf_path).read()
+log.write(("test " if test else "serve ") + " ".join(a) + "\n---\n" + conf + "\n===\n")
+log.flush()
+texts, includes = [conf], re.findall(r"^\s*include\s+(\S+);", conf, re.M)
+for inc in includes:
+    if not os.path.exists(inc):
+        print(f'nginx: [emerg] open() "{inc}" failed (2: No such file or directory) in {conf_path}', file=sys.stderr)
+        sys.exit(1)
+    texts.append(open(inc).read())
+everything = "\n".join(texts)
+if len(re.findall(r"^\s*map_hash_max_size\s", everything, re.M)) > 1:
+    print(f'nginx: [emerg] "map_hash_max_size" directive is duplicate in {conf_path}:50', file=sys.stderr)
+    sys.exit(1)
+for m in re.finditer(r"^\s*proxy_pass\s+https?://([^:/;\s]+)", conf, re.M):
+    host = m.group(1)
+    if not (re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host) or host == "localhost"):  # nginx resolves a literal host as it loads
+        print(f'nginx: [emerg] host not found in upstream "{host}" in {conf_path}', file=sys.stderr)
+        sys.exit(1)
+if re.search(r"^\s*pid\s+/tmp/nginx\.pid;", conf, re.M):  # the image's pid file is in /tmp: the sandbox refuses it, or two runs collide
+    print('nginx: [emerg] open() "/tmp/nginx.pid" failed (1: Operation not permitted)', file=sys.stderr)
+    sys.exit(1)
+if re.search(r"^\s*\w+_temp_path\s+/tmp/\w+_temp;", conf, re.M):
+    print('nginx: [emerg] mkdir() "/tmp/client_temp" failed (1: Operation not permitted)', file=sys.stderr)
+    sys.exit(1)
+if re.search(r"^\s*(error|access)_log\s+/dev/std", conf, re.M):  # the real nginx -t fails on /dev/stderr under the sandbox (seen on 1.30.6)
+    print('nginx: [emerg] open() "/dev/stderr" failed (6: Device not configured)', file=sys.stderr)
+    sys.exit(1)
+if os.environ.get("STUB_WARN"):
+    print("nginx: [warn] " + os.environ["STUB_WARN"], file=sys.stderr)
+if test:
+    print(f"nginx: configuration file {conf_path} test is successful", file=sys.stderr)
+    sys.exit(0)
+open(os.environ["STUB_PID"], "w").write(str(os.getpid()))
+if os.environ.get("STUB_NOSERVE") == "exit":  # a server that dies at once
+    print("nginx: [emerg] bind() to 127.0.0.1 failed (98: Address already in use)", file=sys.stderr)
+    sys.exit(1)
+if os.environ.get("STUB_NOSERVE") == "hang":  # one that never listens
+    import time
+    time.sleep(60)
+    sys.exit(1)
+listen = re.search(r"^\s*listen\s+([^;]*);", conf, re.M).group(1)
+port = int(re.search(r"(?:127\.0\.0\.1:)?(\d+)", listen).group(1))
+needs_proxy_protocol = "proxy_protocol" in listen
+needs_password = re.search(r"^\s*auth_basic\s+\"", conf, re.M) is not None
+root = re.search(r"^\s*root\s+(\S+);", conf, re.M).group(1)
+table_text = next(t for t, i in zip(texts[1:], includes) if not i.endswith("mime.types"))
+default = re.search(r'default "([^"]*)";', table_text).group(1)
+rows = dict(re.findall(r'^\s*"(/[^"]*)" "([^"]*)";', table_text, re.M))
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if needs_proxy_protocol:  # a plain request on a PROXY-protocol port is not understood
+            self.send_response(400)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if needs_password:
+            self.send_response(401)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        p = self.path.split("?")[0]
+        uri = None
+        if os.path.isfile(root + p):
+            uri = p
+        elif os.path.isfile(root + p + "/index.html"):
+            uri = p + "/index.html"  # try_files joins without merging slashes: "/w/bubble/" + "/index.html"
+        self.send_response(200 if uri else 404)
+        self.send_header("Content-Security-Policy", rows.get(uri, default) if uri else default)
+        if os.environ.get("STUB_DOUBLE"):  # a second policy header, as two add_header rules would send
+            self.send_header("Content-Security-Policy", default)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+    def log_message(self, *x):
+        pass
+http.server.ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+PY
+chmod +x "$nc/tools/nginx-1.30.6/nginx"
+sha=$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$nc/tools/nginx-1.30.6/nginx")
+# SHA: UNSET runs with no NGINX_SHA256, EMPTY with an empty one (the pin file's digest then decides), a value is the digest to trust.
+chk() {
+	case "${SHA:-}" in UNSET) shaenv="-u NGINX_SHA256" ;; EMPTY) shaenv="NGINX_SHA256=" ;; "") shaenv="NGINX_SHA256=$sha" ;; *) shaenv="NGINX_SHA256=$SHA" ;; esac
+	rm -f "$nc/stub.pid"
+	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
+}
+# What a failed check leaves running is a server per failed merge check: the nginx it started is dead, whatever failed.
+stopped() { # $1: what failed
+	[ -s "$nc/stub.pid" ] || return 0
+	if kill -0 "$(cat "$nc/stub.pid")" 2>/dev/null; then kill -9 "$(cat "$nc/stub.pid")"; fail "check_nginx left the nginx it started running after $1"; fi
+}
+rm -f "$nc/stub.log" "$nc/stub.pid"
+out=$(chk) || fail "check_nginx refused the image's config with a good table, every page answering its own policy: $out"
+grep -q "^test " "$nc/stub.log" || fail "check_nginx ran no nginx -t"
+grep -q "^serve " "$nc/stub.log" || fail "check_nginx did not serve the build after nginx -t"
+# Whole lines: `/index.html` is a part of `/w/bubble/index.html`, and a substring said it asked an address it never did (F2619).
+for form in "/" "/index.html" "/w/bubble/" "/w/bubble" "/w/bubble/index.html"; do
+	printf '%s\n' "$out" | grep -q "^ok    GET $form -> 200, " || fail "check_nginx did not say it asked $form: $out"
+done
+# The config tested is the image's, with the build's table: no path of the image's filesystem is left in it, the table is read
+# from the build, and the served one answers a free port without the PROXY protocol or the password (a plain request has neither).
+conf_tested=$(sed -n '/^test /,/^===$/p' "$nc/stub.log")
+printf '%s\n' "$conf_tested" | grep -qF "worker_connections 4096" || fail "check_nginx tested another config than deploy/web/nginx.conf"
+printf '%s\n' "$conf_tested" | grep -qF "/etc/nginx/csp.conf" && fail "check_nginx left the image's /etc/nginx/csp.conf in the config it tested"
+conf_served=$(sed -n '/^serve /,/^===$/p' "$nc/stub.log")
+printf '%s\n' "$conf_served" | grep -qE "^ *(listen +8080|listen .*proxy_protocol|auth_basic)" && fail "check_nginx served the config as the image has it (a fixed port, the PROXY protocol, the password file): a plain request cannot reach it"
+if [ -s "$nc/stub.pid" ]; then kill -0 "$(cat "$nc/stub.pid")" 2>/dev/null && { kill "$(cat "$nc/stub.pid")"; fail "check_nginx left the nginx it started running"; }; fi
+# F2460: a table with no row for the slashed address (try_files' $uri/index.html joins without merging slashes): the page gets
+# the bare policy at /w/bubble/, and the check says so.
+grep -v '//index.html' "$nc/app/build/csp.conf" >"$nc/c" && mv "$nc/c" "$nc/app/build/csp.conf"
+out=$(chk) && fail "check_nginx passed a table with no row for a slashed address (F2460): $out"
+printf '%s\n' "$out" | grep -qF "/w/bubble/" && printf '%s\n' "$out" | grep -qi "bare" || fail "check_nginx did not name the slashed address that got the bare policy: $out"
+stopped "a page that got the bare policy (F2460)"
+# Another page's policy is no more its own than the bare one.
+table '' && sed -E 's#("/w/bubble[^"]*" )"[^"]*"#\1"'"$home"'"#' "$nc/app/build/csp.conf" >"$nc/c" && mv "$nc/c" "$nc/app/build/csp.conf"
+out=$(chk) && fail "check_nginx passed a page answering another page's policy: $out"
+printf '%s\n' "$out" | grep -qF "/w/bubble" || fail "check_nginx did not name the page that got another's policy: $out"
+stopped "a page that got another's policy"
+table
+# F2619: the three address forms of a page come from the page files, not from _headers. A _headers that holds only a page's bare row
+# (or only its slashed row) still has every form asked: a home that loses /index.html, or a page its slashed address, goes unseen
+# when _headers names the address itself.
+cp "$nc/app/build/client/_headers" "$nc/headers.good"
+for only in bare slashed; do
+	if [ "$only" = bare ]; then drop='^/w/bubble/$'; keep=/w/bubble/; else drop='^/w/bubble$'; keep=/w/bubble; fi
+	python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^" + sys.argv[3][1:-1] + r"\n  ! Content-Security-Policy\n  Content-Security-Policy: [^\n]*\n", "", t, flags=re.M))' "$nc/headers.good" "$nc/app/build/client/_headers" "$drop"
+	grep -qx "$keep" "$nc/app/build/client/_headers" && fail "the fixture did not drop the row of the page's $only form"
+	out=$(chk) || fail "check_nginx refused a _headers holding only the $only row of a page: $out"
+	for form in "/" "/index.html" "/w/bubble/" "/w/bubble" "/w/bubble/index.html"; do
+		printf '%s\n' "$out" | grep -q "^ok    GET $form -> 200, " || fail "check_nginx did not ask $form when _headers holds only the $only row of the page: $out"
+	done
+done
+cp "$nc/headers.good" "$nc/app/build/client/_headers"
+# A page of the build that _headers has no rule for gets none: the check names the page, not only a policy that differs.
+mkdir -p "$nc/app/build/client/w/other" && printf '<html></html>\n' >"$nc/app/build/client/w/other/index.html"
+out=$(chk) && fail "check_nginx passed a page that _headers has no Content-Security-Policy rule for: $out"
+printf '%s\n' "$out" | grep -qF "has no Content-Security-Policy rule for the page w/other/index.html" || fail "check_nginx did not name the page with no rule: $out"
+stopped "a page with no rule"
+rm -r "$nc/app/build/client/w/other"
+# A page answering two policies is not answering its own.
+out=$(DOUBLE=1 chk) && fail "check_nginx passed a page answering two Content-Security-Policy headers: $out"
+printf '%s\n' "$out" | grep -qF "headers, not one" || fail "check_nginx did not say a page answered two policies: $out"
+stopped "a page answering two policies"
+# The image changed: a line this check rewrites is gone. It fails naming the line and runs nginx on nothing.
+cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
+grep -v 'listen 127.0.0.1:8081;' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+rm -f "$nc/stub.log"
+out=$(chk) && fail "check_nginx tested a config that lacks a line it rewrites: $out"
+printf '%s\n' "$out" | grep -qF "has no line" || fail "check_nginx did not say the image's config changed: $out"
+[ ! -e "$nc/stub.log" ] || fail "check_nginx ran nginx on a config it could not stage"
+cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
+# A page the build's _headers lists and the build does not hold: nginx answers 404, and the check names the page and the status.
+cp "$nc/app/build/client/_headers" "$nc/headers.good"
+printf '/gone\n  ! Content-Security-Policy\n  Content-Security-Policy: %s\n' "$bare" >>"$nc/app/build/client/_headers"
+out=$(chk) && fail "check_nginx passed a page of _headers that the build does not hold: $out"
+printf '%s\n' "$out" | grep -qF "/gone" && printf '%s\n' "$out" | grep -qF "404" || fail "check_nginx did not name the missing page and its 404: $out"
+stopped "a page that answered 404"
+cp "$nc/headers.good" "$nc/app/build/client/_headers"
+# A server that never answers: dead at once, or listening to nothing. The check fails in a bounded time, saying nginx did not start, and
+# leaves nothing running.
+t0=$(date +%s)
+out=$(NOSERVE=exit chk) && fail "check_nginx passed with an nginx that died at once: $out"
+[ "$(($(date +%s) - t0))" -lt 8 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that had already died"
+printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx did not start: $out"
+stopped "an nginx that died at once"
+t0=$(date +%s)
+out=$(NOSERVE=hang NGINX_START_TIMEOUT=2 chk) && fail "check_nginx passed with an nginx that never listens: $out"
+[ "$(($(date +%s) - t0))" -lt 15 ] || fail "check_nginx waited $(($(date +%s) - t0)) s for an nginx that never listens"
+printf '%s\n' "$out" | grep -qi "did not start" || fail "check_nginx did not say that nginx never answered: $out"
+stopped "an nginx that never listens"
+# A literal upstream host (deploy/web/nginx.conf's ergo and server) is one nginx -t refuses where no such host resolves: the check
+# tests a config that names none. Docker's names are the image's own; the stub refuses any host that is no address.
+sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "proxy_pass +http://(ergo|server)[:;]" && fail "check_nginx left the image's upstream host names in the config it tested (nginx: host not found in upstream)"
+# The image logs to /dev/stderr and /dev/stdout, which a real nginx -t cannot open under the sandbox: the check tests a config that logs
+# to a file of its own folder (the stub refuses the device paths as nginx does).
+sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "^ *(error|access)_log +/dev/std" && fail "check_nginx left the image's /dev/stderr or /dev/stdout log in the config it tested"
+# F2459: a second map_hash_max_size in the config nginx refuses; the check shows nginx's own words and serves nothing.
+cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
+python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^( *)(include /etc/nginx/csp\.conf;)", r"\1map_hash_max_size 4096;\n\1\2", t, flags=re.M))' "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
+[ "$(grep -c '^ *map_hash_max_size' "$nc/deploy/web/nginx.conf")" = 1 ] || fail "the fixture did not plant F2459's fault"
+rm -f "$nc/stub.log"
+out=$(chk) && fail "check_nginx passed a config nginx refuses to start with (F2459): $out"
+printf '%s\n' "$out" | grep -qF '"map_hash_max_size" directive is duplicate' || fail "check_nginx did not show nginx's own error for F2459: $out"
+grep -q "^serve " "$nc/stub.log" && fail "check_nginx served a build after nginx -t failed"
+cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
+# A warning fails, the hash table's included: csp-fixes (F2454) sized the table, and nginx 1.30.6 builds it with none.
+out=$(WARN='could not build optimal map_hash, you should increase either map_hash_max_size: 2048 or map_hash_bucket_size: 64' chk) && fail "check_nginx passed the hash table's warning, which csp-fixes' sizes removed (F2625): $out"
+printf '%s\n' "$out" | grep -qF 'could not build optimal map_hash' || fail "check_nginx did not show the hash table's warning that failed it: $out"
+out=$(WARN='the "user" directive makes sense only if the master process runs with super-user privileges, ignored' chk) && fail "check_nginx passed an unknown warning: $out"
+printf '%s\n' "$out" | grep -qF 'the "user" directive' || fail "check_nginx did not show the warning that failed it: $out"
+# What it cannot do fails, never skips: no binary, a binary whose checksum is not the pinned one, no build.
+out=$(cd "$nc" && mkdir -p empty && GNOWORLD_TOOLS="$nc/empty" python3 -I "$here/check_nginx.py" 2>&1) && fail "check_nginx passed with no nginx in the tools' cache: $out"
+printf '%s\n' "$out" | grep -qF "nginx-1.30.6" && printf '%s\n' "$out" | grep -qF "docs/DEVELOPMENT.md" || fail "check_nginx did not say where the pinned nginx comes from: $out"
+out=$(SHA=0000 chk) && fail "check_nginx ran a binary whose checksum is not the pinned one: $out"
+printf '%s\n' "$out" | grep -qi "checksum" || fail "check_nginx did not name the checksum: $out"
+# The switch is the tests': with none (or an empty one), the pin committed beside the script decides, and a stub is not nginx 1.30.6.
+for mode in UNSET EMPTY; do
+	out=$(SHA=$mode chk) && fail "check_nginx ran a binary that is not the pinned nginx, with NGINX_SHA256 $mode: $out"
+	printf '%s\n' "$out" | grep -qi "checksum" || fail "check_nginx did not name the checksum with NGINX_SHA256 $mode: $out"
+	stopped "a binary that is not the pinned one"
+done
+pin=$(head -1 "$here/nginx.sha256" 2>/dev/null || :)
+case "$pin" in
+unrecorded) ;;
+*[!0-9a-f]* | "") fail "scripts/nginx.sha256 holds neither a SHA-256 in hex nor the word 'unrecorded': '$pin'" ;;
+*) [ ${#pin} -eq 64 ] || fail "scripts/nginx.sha256 is not 64 hex characters: '$pin'" ;;
+esac
+# The default location: nothing in GNOWORLD_TOOLS, the binary at $HOME/.cache/gnoworld-tools/nginx-1.30.6/nginx.
+mkdir -p "$nc/home/.cache/gnoworld-tools/nginx-1.30.6/conf" && cp "$nc/tools/nginx-1.30.6/nginx" "$nc/home/.cache/gnoworld-tools/nginx-1.30.6/nginx" && : >"$nc/home/.cache/gnoworld-tools/nginx-1.30.6/conf/mime.types"
+out=$(cd "$nc" && env -u GNOWORLD_TOOLS HOME="$nc/home" NGINX_SHA256="$sha" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" python3 -I "$here/check_nginx.py" 2>&1) || fail "check_nginx did not find the pinned nginx at \$HOME/.cache/gnoworld-tools/nginx-1.30.6/nginx: $out"
+out=$(cd "$nc" && mkdir -p home2 && env -u GNOWORLD_TOOLS HOME="$nc/home2" python3 -I "$here/check_nginx.py" 2>&1) && fail "check_nginx passed with no nginx in the default location: $out"
+mv "$nc/app/build/csp.conf" "$nc/csp.keep"
+out=$(chk) && fail "check_nginx passed with no build's table: $out"
+printf '%s\n' "$out" | grep -qi "csp.conf" || fail "check_nginx did not name the missing table: $out"
+mv "$nc/csp.keep" "$nc/app/build/csp.conf"
+# The pinned binary is documented where Alexis sets the tools up, and the harness doc says how the lock works.
+grep -q "gnoworld-tools/nginx-1\.30\.6/nginx" "$here/../docs/DEVELOPMENT.md" && grep -q "scripts/nginx\.sha256" "$here/../docs/DEVELOPMENT.md" && grep -qi "sha256\|checksum" "$here/../docs/DEVELOPMENT.md" || fail "docs/DEVELOPMENT.md does not say how to get the pinned nginx 1.30.6 with its checksum"
+grep -qi "merge.lock\|one merge check at a time" "$here/../docs/HARNESS.md" || fail "docs/HARNESS.md does not say that merge checks take a lock, one at a time"
+# Its switches are the tests', never a run's: check.sh drops them (section gate_limits runs it with them set and shows the steps see none).
+fi
+
+if part bench_load; then
+# bench.py measures a quiet machine (harness-c, 4b): before it runs the benches it reads the load (scripts/load.py: tenths, "170 160"
+# is a load of 17.0 on 16 cores) and waits, up to a ceiling, for it to fall under the cores; it prints what it waited and the load,
+# and refuses, saying so, when the ceiling passes. No budget changes: an over-budget bench at a quiet load still fails. The tests' load
+# is scripts/load.py's stub, a line a read; BENCH_WAIT_CEILING and BENCH_WAIT_STEP (seconds) are theirs and check.sh drops them.
+bl="$t/benchload"
+mkdir -p "$bl/scripts" "$bl/node_modules/.bin"
+cp "$here/bench.py" "$here/repo_files.py" "$bl/scripts/"
+printf '#!/bin/sh\necho ran >>"$BENCH_RAN"\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_FIXTURE" "$2"; shift; done\n' >"$bl/node_modules/.bin/vitest" && chmod +x "$bl/node_modules/.bin/vitest"
+printf 'import os, sys\nlines = open(os.environ["LOAD_SEQ"]).read().split("\\n")\nlines = [l for l in lines if l]\nn = int(open(os.environ["LOAD_N"]).read()) if os.path.exists(os.environ["LOAD_N"]) else 0\nopen(os.environ["LOAD_N"], "w").write(str(n + 1))\nprint(lines[min(n, len(lines) - 1)])\n' >"$bl/scripts/load.py"
+printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean": %s}]}]}]}\n' 0.05 >"$bl/report.json"
+bload() { # $1: the load lines, one a read, separated by commas
+	rm -f "$bl/ran" "$bl/load.n" && printf '%s\n' "$1" | tr , '\n' >"$bl/seq"
+	# Bounded: a bench.py that waits for ever on a busy machine fails the case, it does not hang the suite.
+	(cd "$bl" && BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" BENCH_WAIT_CEILING="${CEILING:-10}" BENCH_WAIT_STEP="${STEP:-0.05}" python3 -I -c 'import subprocess, sys
+try:
+    r = subprocess.run([sys.executable, "-I", "scripts/bench.py"], capture_output=True, text=True, timeout=40)
+except subprocess.TimeoutExpired:
+    print("bench.py was still running after 40 s")
+    sys.exit(124)
+print(r.stdout + r.stderr)
+sys.exit(r.returncode)' 2>&1)
+}
+out=$(bload "10 160") || fail "bench.py refused a quiet machine: $out"
+printf '%s\n' "$out" | grep -qF "load 1.0" && printf '%s\n' "$out" | grep -qF "16 cores" || fail "bench.py did not print the load it measured at: $out"
+printf '%s\n' "$out" | grep -qi "waited" && fail "bench.py said it waited on a quiet machine: $out"
+[ "$(wc -l <"$bl/ran")" -eq 1 ] || fail "bench.py did not run the benches once at a quiet load"
+out=$(bload "900 160,900 160,100 160") || fail "bench.py did not wait for the load to fall: $out"
+printf '%s\n' "$out" | grep -qi "waited" || fail "bench.py did not say it waited for the load: $out"
+printf '%s\n' "$out" | grep -qF "load 90.0" && printf '%s\n' "$out" | grep -qF "16 cores" || fail "bench.py did not print the load it waited on, and the cores: $out"
+[ "$(cat "$bl/load.n")" -ge 3 ] || fail "bench.py did not read the load again while it waited: $(cat "$bl/load.n") reads"
+[ "$(wc -l <"$bl/ran")" -eq 1 ] || fail "bench.py ran the benches while the load was high"
+# Under the cores means under: a load equal to them waits.
+out=$(bload "160 160,159 160") || fail "bench.py did not wait at a load equal to the cores: $out"
+printf '%s\n' "$out" | grep -qi "waited" || fail "bench.py measured at a load equal to the machine's cores: $out"
+# A ceiling past: no verdict, said so, and the benches never run.
+out=$(CEILING=1 bload "900 160") && fail "bench.py gave a verdict on a machine that never fell quiet: $out"
+printf '%s\n' "$out" | grep -qF "needs a machine that can measure it" || fail "bench.py did not say why it refused (a machine that can measure): $out"
+printf '%s\n' "$out" | grep -qF "90.0" || fail "bench.py did not print the load it gave up at: $out"
+[ ! -e "$bl/ran" ] || fail "bench.py ran the benches on a machine past its ceiling"
+# The pause between two reads is the step (F2620): over a 2 s ceiling with a step of 1 s the load is read a few times, not in a loop.
+out=$(CEILING=2 STEP=1 bload "900 160") && fail "bench.py gave a verdict on a machine that never fell quiet (step 1 s): $out"
+[ "$(cat "$bl/load.n")" -le 5 ] || fail "bench.py read the load $(cat "$bl/load.n") times in 2 s with a step of 1 s: it does not pause between two reads (F2620)"
+[ "$(cat "$bl/load.n")" -ge 2 ] || fail "bench.py read the load once in 2 s with a step of 1 s: it did not read again"
+# The defaults, with no switch: a ceiling of 600 s said, and a step of 10 s (one read in the first seconds). It is stopped once seen.
+rm -f "$bl/ran" "$bl/load.n" && printf '900 160\n' >"$bl/seq"
+(cd "$bl" && env -u BENCH_WAIT_CEILING -u BENCH_WAIT_STEP BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" python3 -I scripts/bench.py >"$bl/dflt.out" 2>&1 & echo $! >"$bl/dflt.pid")
+tries=0
+until grep -q "up to" "$bl/dflt.out" 2>/dev/null; do
+	tries=$((tries + 1))
+	[ "$tries" -lt 300 ] || { kill "$(cat "$bl/dflt.pid")" 2>/dev/null; fail "bench.py with its defaults never said how long it waits: $(cat "$bl/dflt.out")"; }
+	kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults ended at a busy load before its ceiling: $(cat "$bl/dflt.out")"
+	sleep 0.1
+done
+sleep 2
+kill -0 "$(cat "$bl/dflt.pid")" 2>/dev/null || fail "bench.py with its defaults gave up within seconds at a busy load: $(cat "$bl/dflt.out")"
+kill "$(cat "$bl/dflt.pid")" 2>/dev/null
+grep -qF "up to 600 s" "$bl/dflt.out" || fail "bench.py's default ceiling is not 600 s (F2620): $(cat "$bl/dflt.out")"
+[ "$(cat "$bl/load.n")" -le 2 ] || fail "bench.py's default step is not seconds long: $(cat "$bl/load.n") reads within 3 s (F2620)"
+# A load that cannot be read is no quiet one: bench.py refuses, saying so, and runs no bench (it would measure a busy machine unannounced),
+# whether load.py fails, prints nothing or garbage, or reports no core.
+cp "$bl/scripts/load.py" "$bl/load.good"
+for bad in 'import sys; sys.exit(1)' 'print("x")' 'print("")' 'print("10 0")' 'print("10")'; do
+	printf '%s\n' "$bad" >"$bl/scripts/load.py"
+	out=$(bload "10 160") && fail "bench.py measured with a load it could not read ($bad): $out"
+	printf '%s\n' "$out" | grep -qi "cannot be read" || fail "bench.py did not say the load cannot be read ($bad): $out"
+	printf '%s\n' "$out" | grep -qi "traceback" && fail "bench.py crashed with a traceback on an unreadable load ($bad): $out"
+	[ ! -e "$bl/ran" ] || fail "bench.py ran the benches with a load it could not read ($bad)"
+done
+cp "$bl/load.good" "$bl/scripts/load.py"
+# No budget changes: an over-budget bench at a quiet load fails as before.
+printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean": 0.25}]}]}]}\n' >"$bl/report.json"
+out=$(bload "10 160") && fail "bench.py passed a bench over its budget at a quiet load: $out"
+printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: 0.2500 ms, over its 0.2 ms" || fail "bench.py did not name the bench over its budget at a quiet load: $out"
+# check.sh drops BENCH_WAIT_CEILING and BENCH_WAIT_STEP, with which a run would measure a busy machine: section gate_limits runs it with them set.
+fi
+
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
+# F2523: an exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` added an ignore that
+# ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
+# refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
+rx="$t/regrname" && mkdir -p "$rx/scripts"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
+git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
+mkdir -p "$rx/node_modules/.bin" && printf '#!/bin/sh\necho "[]"\n' >"$rx/node_modules/.bin/vitest" && chmod +x "$rx/node_modules/.bin/vitest" # no test to list
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**"] } };\n' >"$rx/vitest.config.ts"
+printf 'export default [globalIgnores(["docs/"]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts"
+printf 'const SKIP = new Set(["a"]);\n' >"$rx/scripts/check_comments.mjs"
+git -C "$rx" add -A && git -C "$rx" commit -qm base && xbase=$(git -C "$rx" rev-parse HEAD)
+regx() { (cd "$rx" && python3 -I scripts/check_regressions.py "$xbase" 2>&1); }
+nameback() { git -C "$rx" reset -q --hard "$xbase"; }
+out=$(regx) || fail "check_regressions refused a branch that changed no ignore: $out"
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**", STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an exclusion by name"
+out=$(regx) && fail "check_regressions passed an exclude list with a name added to it, which it cannot read (F2523): $out"
+printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions did not name the unread entry STRYKER_TMP: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the real shape of vitest.config.ts"
+out=$(regx) && fail "check_regressions passed [...configDefaults.exclude, STRYKER_TMP], the shape F2523 hid an ignore in: $out"
+printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions did not name STRYKER_TMP behind a spread: $out"
+nameback
+printf 'export default [globalIgnores(["docs/", GENERATED]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a name in globalIgnores"
+out=$(regx) && fail "check_regressions passed a bare name in globalIgnores: $out"
+printf '%s\n' "$out" | grep -qF "GENERATED" || fail "check_regressions did not name the unread entry GENERATED: $out"
+nameback
+printf 'export default [globalIgnores(["docs/"]), { ignores: [OTHER] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a name alone in ignores"
+out=$(regx) && fail "check_regressions passed a name alone in an ignores list: $out"
+printf '%s\n' "$out" | grep -qF "OTHER" || fail "check_regressions did not name the unread entry OTHER: $out"
+nameback
+printf 'const SKIP = new Set(["a", HIDDEN]);\n' >"$rx/scripts/check_comments.mjs" && git -C "$rx" commit -qam "a name in SKIP"
+out=$(regx) && fail "check_regressions passed a bare name in SKIP's list: $out"
+printf '%s\n' "$out" | grep -qF "HIDDEN" || fail "check_regressions did not name the unread entry HIDDEN: $out"
+nameback
+# What was read before is read still: a quoted entry named after the spread, and the spread of the defaults on its own.
+printf 'export default { test: { exclude: [...configDefaults.exclude, "a/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the defaults spread, nothing new"
+out=$(regx) || fail "check_regressions refused the spread of a tool's own defaults beside an entry the base had: $out"
+nameback
+printf 'export default { test: { exclude: [...configDefaults.exclude, "b/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted entry beside the spread"
+out=$(regx) && fail "check_regressions passed a quoted exclusion added beside the spread of the defaults: $out"
+printf '%s\n' "$out" | grep -qF "b/**" || fail "check_regressions did not name the quoted exclusion b/**: $out"
+nameback
+# Other shapes the reader could not see are refused too: a single-quoted entry is read (and named), a list passed by name with no
+# bracket, a list with a method on it (`.concat`), a template literal.
+printf "export default { test: { exclude: ['a/**', 'c/**'] } };\n" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a single-quoted entry"
+out=$(regx) && fail "check_regressions passed a single-quoted exclusion added to a list: $out"
+printf '%s\n' "$out" | grep -qF "c/**" || fail "check_regressions did not name the single-quoted entry c/**: $out"
+nameback
+for shape in 'exclude: ALL_EXCLUDES' 'exclude: ["a/**"].concat(MORE)' 'exclude: [...MORE]' 'exclude: ["a/**", `${DIR}/**`]'; do
+	case $shape in
+	'exclude: ALL'*) want=ALL_EXCLUDES ;;
+	*concat*) want='.concat(MORE)' ;;
+	*'[...MORE]') want='...MORE' ;;
+	*) want='${DIR}/**' ;;
+	esac
+	printf 'export default { test: { %s } };\n' "$shape" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an exclusion written another way"
+	out=$(regx) && fail "check_regressions passed an exclusion it cannot read, written as: $shape: $out"
+	printf '%s\n' "$out" | grep -q "vitest.config.ts" || fail "check_regressions did not name vitest.config.ts for: $shape: $out"
+	printf '%s\n' "$out" | grep -qF -- "$want" || fail "check_regressions did not name the entry $want of: $shape (F2618): $out"
+	nameback
+done
+# A bare name is excused as a quoted entry is, by a line of a commit naming it: `Lowered-floor: ignore <file> <name> - why`.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**", STRYKER_TMP] } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "an exclusion by name" -m "Lowered-floor: ignore vitest.config.ts STRYKER_TMP - the sandboxes of StrykerJS are not tests"
+out=$(regx) || fail "check_regressions refused a bare name that a commit names on a Lowered-floor line: $out"
+nameback
+# The real vitest.config.ts already holds a bare name at its base: a name that was there is no change. A new base with a name in each
+# file, then: an unrelated line changed passes; a quoted entry added is the only entry named; a name taken away passes.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts"
+printf 'export default [globalIgnores(["docs/", GENERATED]), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts"
+printf 'const SKIP = new Set(["a", HIDDEN]);\n' >"$rx/scripts/check_comments.mjs"
+git -C "$rx" add -A && git -C "$rx" commit -qm "a base that holds a name in each file" && xbase=$(git -C "$rx" rev-parse HEAD)
+out=$(regx) || fail "check_regressions refused a branch that changed nothing, over a base that holds bare names: $out"
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**"; // the sandboxes\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "an unrelated line"
+out=$(regx) || fail "check_regressions refused a bare name the base already held (the real vitest.config.ts has one): $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, "b/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted entry beside the name"
+out=$(regx) && fail "check_regressions passed a quoted exclusion added beside a name the base held: $out"
+printf '%s\n' "$out" | grep -qF "b/**" && ! printf '%s\n' "$out" | grep -qF "STRYKER_TMP" || fail "check_regressions named something other than the one entry added, b/**: $out"
+nameback
+printf 'export default { test: { exclude: [...configDefaults.exclude] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name taken away"
+out=$(regx) || fail "check_regressions refused a name taken away: $out"
+nameback
+# F2622: a name stands for its value. A const the file holds behind a name or a spread is read: its value is the entry, so widening
+# `STRYKER_TMP` to "**/*.test.ts", or adding to `SLOW`, shows though the list names the same words. Only the tool's own
+# `...configDefaults.exclude` is the tool's: a lookalike (`...myConfigDefaults.list`) is an entry.
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "a base whose list holds a name and a spread of consts" && xbase=$(git -C "$rx" rev-parse HEAD)
+out=$(regx) || fail "check_regressions refused a branch that changed nothing, over a base whose names are consts: $out"
+printf 'const STRYKER_TMP = "**/*.test.ts";\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name's value widened"
+out=$(regx) && fail "check_regressions passed a const widened to every test, behind a name the base held (F2622): $out"
+printf '%s\n' "$out" | grep -qF '**/*.test.ts' || fail "check_regressions did not name the value the const now holds: $out"
+git -C "$rx" commit -q --amend -m "the name's value widened" -m "Lowered-floor: ignore vitest.config.ts STRYKER_TMP - tests are measured elsewhere"
+out=$(regx) || fail "check_regressions refused a name's new value that a commit names on a Lowered-floor line: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nconst SLOW = ["s/**", "t/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a list behind a spread grown"
+out=$(regx) && fail "check_regressions passed an entry added to the list a spread names (F2622): $out"
+printf '%s\n' "$out" | grep -qF 't/**' || fail "check_regressions did not name the entry added behind the spread: $out"
+nameback
+printf 'const STRYKER_TMP = "**/.stryker-tmp/**"; // reworded\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a comment"
+out=$(regx) || fail "check_regressions refused a comment added beside consts that hold their values: $out"
+nameback
+printf 'const myConfigDefaults = { list: ["server/**"] };\nexport default { test: { exclude: [...myConfigDefaults.list, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a lookalike of the defaults"
+out=$(regx) && fail "check_regressions passed a spread that only looks like the tool's defaults (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'myConfigDefaults.list' || fail "check_regressions did not name the lookalike spread: $out"
+nameback
+# F2627: the other forms of the same exclusion: shorthand (`{ exclude }`), a quoted key, and the list on the next line, as Prettier
+# breaks a call of two arguments.
+printf 'const exclude = ["z/**"];\nexport default { test: { exclude } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "shorthand"
+out=$(regx) && fail "check_regressions passed an exclusion written as the shorthand { exclude } (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'z/**' || fail "check_regressions did not name the entry behind the shorthand: $out"
+nameback
+printf 'export default { test: { "exclude": ["z/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a quoted key"
+out=$(regx) && fail "check_regressions passed an exclusion under a quoted key (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'z/**' || fail "check_regressions did not name the entry under a quoted key: $out"
+nameback
+printf 'export default [globalIgnores(\n  ["docs/", "server/**"],\n  "name",\n), { ignores: ["packages/core/**"] }];\n' >"$rx/eslint.config.ts" && git -C "$rx" commit -qam "a list on the next line"
+out=$(regx) && fail "check_regressions passed a globalIgnores list that starts on the next line (F2627): $out"
+printf '%s\n' "$out" | grep -qF 'server/**' || fail "check_regressions did not name the entry on the next line: $out"
+nameback
+# F2623: a comment in a list is no entry. An apostrophe in one opened a string that ran across the list (the real vitest.config.ts has
+# `// The server's entry`), so raising a floor was refused as an ignore added; a `]` in one ended the list early.
+printf 'export default { test: { exclude: [\n  "a/**",\n  // The server'"'"'s entry, see [1]\n  "b/**",\n], coverage: { thresholds: { lines: 85 } } } };\n' >"$rx/vitest.config.ts"
+git -C "$rx" commit -qam "a base with a comment in the list" && xbase=$(git -C "$rx" rev-parse HEAD)
+sed 's/lines: 85/lines: 90/' "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "a floor raised"
+out=$(regx) || fail "check_regressions refused a floor raised beside a comment with an apostrophe in a list (F2623): $out"
+nameback
+sed "s/The server's entry, see \[1\]/The entry, reworded/" "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "a comment reworded"
+out=$(regx) || fail "check_regressions refused a comment reworded in a list (F2623): $out"
+nameback
+sed 's|^  "b/\*\*",|  "b/**",\n  "c/**",|' "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "an entry after the comment"
+out=$(regx) && fail "check_regressions passed an entry added after a comment holding a bracket (F2623): $out"
+printf '%s\n' "$out" | grep -qF 'c/**' || fail "check_regressions did not name c/** added after a comment: $out"
+nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
@@ -2991,6 +4219,91 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
+# An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
+# gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
+git -C "$rg" reset -q --hard "$base"
+mkdir -p "$rg/app/tests/e2e/home.spec.ts-snapshots" && printf 'one\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png" && printf 'two\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/b.png"
+git -C "$rg" add -A && git -C "$rg" commit -qm "two pictures" && base=$(git -C "$rg" rev-parse HEAD)
+printf 'changed\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png" && git -C "$rg" add -A
+out=$(reg) && fail "check_regressions passed an approved picture changed in the index only (the commit does not hold it yet): $out"
+printf '%s\n' "$out" | grep -qF "a.png" || fail "check_regressions did not name the picture changed in the index: $out"
+git -C "$rg" reset -q --hard "$base" && git -C "$rg" rm -q app/tests/e2e/home.spec.ts-snapshots/b.png
+out=$(reg) && fail "check_regressions passed an approved picture deleted in the index only: $out"
+printf '%s\n' "$out" | grep -qF "b.png" || fail "check_regressions did not name the picture deleted in the index: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'changed\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png"
+out=$(reg) && fail "check_regressions passed an approved picture changed in the working tree only: $out"
+git -C "$rg" reset -q --hard "$base" && printf 'new\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/c.png" && git -C "$rg" add -A
+out=$(reg) || fail "check_regressions refused a new approved picture: $out"
+git -C "$rg" reset -q --hard "$base"
+# --quick, which the hook and the fast gate run per commit (F2579): the base's listing of tests is kept in the tools' cache, one per base commit,
+# and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
+# its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
+rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
+cat >"$rq/node_modules/.bin/vitest" <<'EOF'
+#!/usr/bin/env python3
+import json, os, re, sys
+a = sys.argv[1:]
+out = next((x.split("=", 1)[1] for x in a if x.startswith("--json=")), None)
+files = [x for x in a[1:] if not x.startswith("--")]
+open(os.environ["VT_LOG"], "a").write(os.getcwd() + " " + " ".join(files) + "\n")
+found = []
+for d, ds, fs in os.walk("."):
+    ds[:] = [x for x in ds if x not in ("node_modules", ".git")]
+    for f in fs:
+        p = os.path.join(d, f)
+        if f.endswith(".test.ts") and (not files or any(x in p for x in files)):
+            names = re.findall(r'test\("([^"]+)"', open(p).read())
+            if os.path.exists(p[:-len(".test.ts")] + ".data"):  # names a test file generates from data, which a source file's change can rename
+                names += open(p[:-len(".test.ts")] + ".data").read().split()
+            found += [{"file": os.path.abspath(p), "name": n} for n in names]
+json.dump(found, open(out, "w") if out else sys.stdout)
+EOF
+chmod +x "$rq/node_modules/.bin/vitest"
+git -C "$rq" init -q && printf 'node_modules/\n' >"$rq/.gitignore" && : >"$rq/vitest.config.ts"
+printf 'test("a one", f);\ntest("a two", f);\n' >"$rq/app/src/a.test.ts" && printf 'test("b one", f);\n' >"$rq/app/src/b.test.ts" && printf 'x\n' >"$rq/app/src/c.ts" && printf 'gen1 gen2\n' >"$rq/app/src/a.data"
+git -C "$rq" add -A && git -C "$rq" commit -qm base && qbase=$(git -C "$rq" rev-parse HEAD)
+reqq() { : >"$t/vt.log" && (cd "$rq" && VT_LOG="$t/vt.log" GNOWORLD_TOOLS="$t/rtools" python3 -I scripts/check_regressions.py "$@" 2>&1); }
+wholes() { grep -c ' $' "$t/vt.log" || :; }
+back() { git -C "$rq" reset -q --hard "$qbase" && git -C "$rq" clean -qfd; }
+printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone: $out"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone: $out"
+[ "$(wholes)" = 1 ] || fail "check_regressions --quick listed $(wholes) whole times, not once (the base's, which nothing cached yet): $(cat "$t/vt.log")"
+grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the one file the change touches: $(cat "$t/vt.log")"
+[ -f "$t/rtools/regressions/base-$qbase.json" ] || fail "check_regressions --quick did not keep the base's listing in the tools' cache"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone, with the base cached: $out"
+[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the base again, though its listing is cached: $(cat "$t/vt.log")"
+out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test gone: $out"
+[ "$(wholes)" = 2 ] || fail "check_regressions without --quick did not list the base and the tree whole ($(wholes) whole listings): $(cat "$t/vt.log")"
+git -C "$rq" commit -qam "a test replaced" -m "Removed-test: app/src/b.test.ts > b one - replaced by b new"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a test gone that a commit says why of: $out"
+back
+rm -f "$rq/app/src/a.test.ts" && git -C "$rq" add -A
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test file deleted: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > a one" || fail "check_regressions --quick did not name the tests of the deleted file: $out"
+back
+printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts" && printf 'y\n' >>"$rq/app/src/c.ts"
+out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone beside a change of another file: $out"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone beside a change of another file: $out"
+[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the tree whole for a change beside the test files, not the touched file alone ($(wholes) whole listings): $(cat "$t/vt.log")"
+grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the touched test file alone beside a change of another file: $(cat "$t/vt.log")"
+back
+# A non-test file that renames what a test generates: the quick run, which lists the touched test files alone, does not see it; the whole run does.
+printf 'gen1 genX\n' >"$rq/app/src/a.data"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a rename its touched-files listing cannot see: $out"
+out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test renamed by a non-test file: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > gen2" || fail "check_regressions without --quick did not name the test a non-test file renamed: $out"
+back
+# A Playwright spec is no Vitest file: its names are not listed from the touched files, so the tree is listed whole.
+mkdir -p "$rq/app/tests" && printf 'y\n' >"$rq/app/tests/a.spec.ts"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new Playwright spec: $out"
+[ "$(wholes)" = 1 ] || fail "check_regressions --quick did not list the tree whole for a change of a Playwright spec ($(wholes) whole listings): $(cat "$t/vt.log")"
+back
+printf 'test("new", f);\n' >"$rq/app/src/d.test.ts"
+out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new test file: $out"
+grep -q ' app/src/d.test.ts$' "$t/vt.log" || fail "check_regressions --quick did not list a new, untracked test file: $(cat "$t/vt.log")"
+back
 fi
 
 if part ergo; then
@@ -3199,7 +4512,10 @@ printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = --outputJson ] && cp "$BENCH_
 report() { python3 -I -c 'import json, sys
 pairs = zip(sys.argv[2::2], sys.argv[3::2])
 json.dump({"files": [{"filepath": "a.bench.ts", "groups": [{"fullName": "g", "benchmarks": [{"name": n, "mean": float(m)} for n, m in pairs]}]}]}, open(sys.argv[1], "w"))' "$b/report.json" "$@"; }
-bench() { (cd "$b" && BENCH_FIXTURE="$b/report.json" python3 -I "$here/bench.py" 2>&1); }
+# A quiet machine's load, so these cases never wait on the real one (bench.py reads scripts/load.py before it measures; the cases of
+# the wait itself are the section bench_load's): a copy of the script beside a load.py that says 1.0 on 16 cores.
+mkdir -p "$b/scripts" && cp "$here/bench.py" "$here/repo_files.py" "$b/scripts/" && printf 'print("10 160")\n' >"$b/scripts/load.py"
+bench() { (cd "$b" && BENCH_FIXTURE="$b/report.json" python3 -I scripts/bench.py 2>&1); }
 report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
 out=$(bench) || fail "bench.py refused benches within their budgets: $out"
 printf '%s\n' "$out" | grep -q "0.0500 ms of 0.2 ms: a line" || fail "bench.py did not print a measure and its budget: $out"
@@ -3250,14 +4566,17 @@ rm -r "${b:?}/.git" "${b:?}/app" "${b:?}/node_modules/pkg" && rm "$b/.gitignore"
 fi
 
 if part mutant_scope; then
-# suite_parts.py: harness_mutate --changed judges the mutants of the sections a change touched, not all ~660 (twenty
-# minutes) whenever a suite changed. A section of test_hooks.sh ends at the fi that closes it, nested ifs at the
-# margin counted; one of probe.py at the next line as little indented; a change outside every section touches all.
+# suite_parts.py: harness_mutate --changed judges the mutants that rewrite a changed line, not all of a file's or a suite's;
+# a verdict's key reads a suite by sections. A section of test_hooks.sh ends at the fi that closes it, nested ifs at the
+# margin counted; one of probe.py at the next line as little indented.
 python3 -I - "$here" <<'PY' || fail "suite_parts.py misread which sections a change touched (above)"
 import sys
 sys.dont_write_bytecode = True  # a mutant of the same size, written in the same second, would be read from its .pyc
 sys.path.insert(0, sys.argv[1])
-from suite_parts import select, touched
+from suite_parts import code, parts, rewritten, select
+def touched(path, old, new):  # parts' reading of a change: the sections whose text differs, None outside them
+    (old_parts, old_outside), (new_parts, new_outside) = parts(path, old), parts(path, new)
+    return None if old_outside != new_outside else {name for name in old_parts.keys() | new_parts.keys() if old_parts.get(name) != new_parts.get(name)}
 sh = "pre\nif part a; then\nx\nif y; then\nz\nfi\nafter\nfi\nhelper() { :; }\nif part b; then\nw\nfi\n\nif part a; then\nv\nfi\ntrailer\n"
 cases = [
     (sh, set(), "no change"),
@@ -3286,14 +4605,27 @@ for new, want, what in [
 ]:
     got = touched("scripts/probe.py", py, new)
     assert got == want, f"probe.py, {what}: {got} for {want}"
-found = [("g1", "a.sh", "x", "hooks"), ("g2", "b.sh", "x", "hooks"), ("g3", "c.py", "x", "probe"), ("g4", "d.sh", "x", "hooks")]
-names = {"a.sh": "a", "b.sh": "b,c", "c.py": "p", "d.sh": "d"}
+text = "a\nb\nc\n"
+for new, want, what in [
+    ("a\nB\nc\n", {2}, "a line rewritten"),
+    ("a\nc\n", {2}, "a line removed"),
+    ("a\nb\nx\nc\n", {2, 3}, "a line added: the two beside it"),
+    ("x\n" + text, {0, 1}, "a line added before the first"),
+    ("A\nb\nC\n", {1, 2, 3}, "two lines: from the first to the last"),
+]:
+    assert rewritten(text, new) == want, f"{what}: {rewritten(text, new)} for {want}"
+assert rewritten("a\na\n", "a\na\na\n") == {2, 3}, "a line added among its like"
+assert rewritten("a\na\na\n", "a\na\n") == {3}, "a line removed among its like counts once, from one end"
+found = [("g1", "a.sh", "A\nb\nc\n", "hooks"), ("g2", "a.sh", "a\nb\nC\n", "hooks"), ("g3", "b.py", "x2\n", "probe"), ("g4", "a.sh", None, "hooks"), ("g5", "c.sh", None, "hooks")]
+original = {"a.sh": text, "b.py": "x\n"}.__getitem__
 labels = lambda chosen: [m[0] for m in chosen]
-sections = lambda path, test: names[path]
-assert labels(select(found, {"d.sh"}, {"hooks": {"c"}}, sections)) == ["g2", "g4"], "a changed guard file and a touched section"
-assert labels(select(found, set(), {"hooks": None}, sections)) == ["g1", "g2", "g4"], "a suite changed outside its sections"
-assert labels(select(found, set(), {}, sections)) == [], "nothing changed"
-assert labels(select(found, set(), {"probe": {"p"}}, sections)) == ["g3"], "a probe block"
+assert labels(select(found, {"a.sh": {3}}, original)) == ["g2", "g4"], "a changed line asks for its mutants, and one with no text for its file"
+assert labels(select(found, {"a.sh": {1, 3}, "b.py": {1}}, original)) == ["g1", "g2", "g3", "g4"], "lines of two files"
+assert labels(select(found, {"a.sh": {2}}, original)) == ["g4"], "a changed line no mutant rewrites"
+assert labels(select(found, {"a.sh": set()}, original)) == ["g4"], "a file changed by no line"
+assert labels(select(found, {}, original)) == [], "nothing changed"
+assert code("a\n\n  \nb\n\n") == "a\nb\n", "a blank line runs nothing"
+assert code("a\n# b\n") == "a\n# b\n", "a comment stays: it may be a heredoc's text"
 PY
 fi
 
@@ -3309,25 +4641,49 @@ const src = readFileSync(process.argv[2], "utf8").replace("export const meta", "
 const body = new Function("agent", "parallel", "phase", "log", "args", "budget", `return (async () => {${src}\n})();`);
 const ok = (cond, why) => { if (!cond) { console.error("workflow_branch: " + why); process.exit(1); } };
 const finding = (severity, file) => ({ severity, file, scenario: "s", evidence: "e", fix: "f", beyondPlan: false });
-async function run(answer) {
+async function run(answer, extra = {}) {
   const calls = [];
   const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
-  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049" }, { spent: () => 0 });
+  const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", exit: 0, survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
   : l === "merge check" ? gateOf(files)
   : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "", branch: "b" }
-  : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] } : null;
+  : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] }
+  : l === "design-reviewer" ? { findings: [], framesMissing: false } : null;
 const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
 (async () => {
   let t = await run(base(["app/src/a.ts"]));
   ok(t.r.status === "ready for the chief", `a clean branch is not ready: ${t.r.status}`);
   ok(!t.labels.includes("security") && !t.labels.some((l) => (l || "").startsWith("fix")), `a clean product branch ran ${t.labels}`);
+  // A merge check's verdict is the script's, not the agent's word (reviewer-1-2, F2617): a run killed, timed out or left in the background has
+  // no `all checks passed in N s` last line, and an agent saying `passed: true` over any other last line does not pass the step.
+  for (const last of ["", "check.sh: lane probe failed at nginx", "py:check_nginx failed", "all checks passed", "all checks passed in s", "  all checks passed in 5 s", "ok all checks passed in 5 s", "killed\nall checks passed in 5 s"]) {
+    t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: last } : base(["app/src/a.ts"])(l, p)));
+    ok(t.r.status.startsWith("blocked at the merge check") && !t.labels.includes("reviewer"), `a merge check whose last line was '${last}' passed on the agent's word: ${t.r.status} ${t.labels}`);
+    ok(t.calls.some((c) => (c.label || "").startsWith("gate fix") && c.prompt.includes("last line")), `a merge check with no pass line was not sent to a fixer with the reason: ${t.labels}`);
+  }
+  // A real last line, with the run's own time in it, passes; so does the same line of a run past its budget.
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status === "ready for the chief", `a merge check ending in its pass line did not pass: ${t.r.status}`);
+  // The gate's exit code is the other half of the proof (F2638): a last line that reads as a pass over an exit code that is not 0, or over
+  // none reported, never passes.
+  for (const code of [1, 2, 130, null, undefined, "0"]) {
+    t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), lastLine: "all checks passed in 5 s", exit: code } : base(["app/src/a.ts"])(l, p)));
+    ok(t.r.status.startsWith("blocked at the merge check") && !t.labels.includes("reviewer"), `a merge check with exit ${code} and a pass line passed: ${t.r.status} ${t.labels}`);
+    ok(t.calls.some((c) => (c.label || "").startsWith("gate fix") && c.prompt.includes("exit code")), `a merge check with exit ${code} was not sent to a fixer with the reason: ${t.labels}`);
+  }
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), exit: 0 } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status === "ready for the chief", `a merge check with exit 0 and its pass line did not pass: ${t.r.status}`);
+  ok(t.calls.some((c) => c.label === "merge check" && c.schema.required.includes("exit") && c.prompt.includes("exit code")), "the merge check's schema or brief does not ask for the exit code");
+  // A failure stays a failure whatever the line says.
+  t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), passed: false, failingLane: "probe", lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
+  ok(t.r.status.startsWith("blocked"), `a merge check the agent called failed passed on its line: ${t.r.status}`);
   t = await run((l, p) => (l === "red pass" ? null : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status.startsWith("blocked") && !t.labels.includes("build"), `a dead red pass let the build run: ${t.r.status} ${t.labels}`);
   t = await run((l, p) => (l === "reviewer" ? null : base(["app/src/a.ts"])(l, p)));
@@ -3347,17 +4703,18 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
   ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
   // A high tier-1 finding each round: round 2 runs only its lens, on the diff since its fix; after the third, Alexis decides.
-  t = await run((l, p, o) =>
+  const highEveryRound = (extra) => run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
     : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
-    : base(["scripts/a.sh"])(l, p));
+    : base(["scripts/a.sh"])(l, p), extra);
+  t = await highEveryRound();
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
   // Read-only agents are told to write nothing; writers get the shared files.
   for (const c of t.calls) {
-    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier"].includes(c.label);
+    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier", "design-reviewer"].includes(c.label);
     ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
   }
   // Each Bash command of an agent starts in the main checkout (the shell goes back there after every call): every one begins
@@ -3373,6 +4730,152 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
+  // Every tier-1 product path of docs/REVIEW.md's table that exists starts the security lens by itself, with no `tier1` argument, and
+  // a finding in it reaches the finding-verifier (5e and 5f launched the security-reviewer by hand; no csp.ts finding was verified).
+  const lensOf = async (file) => {
+    const only = await run((l, p, o) =>
+      l === "security" ? { findings: [finding("medium", file)] }
+      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "low", evidence: "e" }] }
+      : base([file])(l, p));
+    return only.labels;
+  };
+  // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
+  for (const file of ["app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
+    "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
+    "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
+    "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
+    const labels = await lensOf(file);
+    ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
+    ok(labels.includes("verifier"), `a security finding in ${file} never reached the finding-verifier: ${labels}`);
+  }
+  // A lookalike is no tier-1 file.
+  for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
+    const labels = await lensOf(file);
+    ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
+  }
+  // The design-reviewer (Alexis, 2026-10-31): a read-only agent that renders each changed screen at 1728 by 1080 and compares it with
+  // the video's frames. It starts by itself when a branch changes app/src/ or packages/ui/src/ (a `ui` change alone included), reports
+  // like the other lenses (numbered findings, high and medium fixed), and frames missing fail the step, never skip it.
+  {
+    const withDesign = (files, design) => run((l, p, o) =>
+      l === "design-reviewer" ? (design ? design(p, o) : { findings: [], framesMissing: false })
+      : (l || "").startsWith("fix round") ? { fixed: [{ id: "design-reviewer-1-1", commit: "fd" }], notes: "", branch: "b" }
+      : base(files)(l, p, o));
+    for (const file of ["packages/ui/src/Button.tsx", "packages/ui/src/tokens.css", "app/src/features/home/Home.tsx", "app/src/routes/home.tsx"]) {
+      const d = await withDesign([file]);
+      ok(d.labels.includes("design-reviewer"), `a change of ${file} alone started no design-reviewer: ${d.labels}`);
+      ok(d.r.status === "ready for the chief", `a clean design review of ${file} did not end ready: ${d.r.status}`);
+    }
+    for (const file of ["server/src/a.ts", "docs/x.md", "app/tests/e2e/a.spec.ts", "app/srcx/a.ts", "packages/ui/srcs/a.ts", "packages/core/src/a.ts", "scripts/check.sh"]) {
+      const d = await withDesign([file]);
+      ok(!d.labels.includes("design-reviewer"), `${file}, which is no screen, started the design-reviewer: ${d.labels}`);
+    }
+    const d = await withDesign(["packages/ui/src/Button.tsx"]);
+    const call = d.calls.find((c) => c.label === "design-reviewer");
+    ok(call.agentType === "design-reviewer", `the design lens ran as ${call.agentType}`);
+    for (const word of ["1728", "1080", "docs/design/video-screens.md", "video-frames", "write nothing"])
+      ok(call.prompt.includes(word), `the design-reviewer was not told ${word}: ${call.prompt}`);
+    ok(!call.prompt.includes("learnings.md"), "the read-only design-reviewer was told to write the learnings");
+    ok(call.schema.properties.framesMissing && call.schema.properties.findings, "the design-reviewer's answer has no framesMissing, or no findings");
+    // Its findings follow the loop: numbered by its label, a medium one fixed, the round's findings to the ledger.
+    const f = await withDesign(["app/src/a.ts"], () => ({ findings: [finding("medium", "app/src/a.ts")], framesMissing: false }));
+    const fixCall = f.calls.find((c) => (c.label || "").startsWith("fix round"));
+    ok(fixCall && fixCall.prompt.includes("design-reviewer-1-1"), `a medium design finding was not given to the fixer: ${fixCall && fixCall.prompt}`);
+    ok(f.labels.includes("ledger 1"), `a design finding never reached the ledger: ${f.labels}`);
+    // A screen and a tier-1 path in one change start both lenses; a finding fixed in round 1 starts no second design review, and a
+    // second round for a tier-1 high finding runs its lens alone.
+    const both = await withDesign(["packages/ui/src/a.ts", "app/src/csp.ts"]);
+    ok(both.labels.includes("design-reviewer") && both.labels.includes("security"), `a screen and a tier-1 path did not start both lenses: ${both.labels}`);
+    const hi = await withDesign(["packages/ui/src/a.ts"], () => ({ findings: [finding("high", "packages/ui/src/a.ts")], framesMissing: false }));
+    ok(hi.r.status === "ready for the chief", `a high design finding, fixed, did not end ready: ${hi.r.status}`);
+    ok(hi.labels.filter((l) => l === "design-reviewer").length === 1, `the design-reviewer ran again after its finding was fixed: ${hi.labels}`);
+    let secRuns = 0;
+    const two = await run((l, p, o) =>
+      l === "security" ? (secRuns++ ? { findings: [] } : { findings: [finding("high", "app/src/csp.ts")] })
+      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
+      : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "fs" }], notes: "", branch: "b" }
+      : base(["app/src/csp.ts"])(l, p));
+    ok(two.labels.filter((l) => l === "security").length === 2 && two.labels.filter((l) => l === "design-reviewer").length === 1 && two.labels.filter((l) => l === "reviewer").length === 1,
+      `round 2 for a tier-1 high finding did not run its lens alone: ${two.labels}`);
+    // Frames missing fail the step; so does an agent that dies.
+    const m = await withDesign(["app/src/a.ts"], () => ({ findings: [], framesMissing: true }));
+    ok(m.r.status.startsWith("blocked") && m.r.status.includes("frames"), `missing frames did not stop the loop: ${m.r.status}`);
+    const dead = await withDesign(["app/src/a.ts"], () => null);
+    ok(dead.r.status.startsWith("blocked"), `a dead design-reviewer counted as a clean review: ${dead.r.status}`);
+    // The agent's own brief.
+    const { dirname: dn } = require("node:path");
+    const repoRoot = dn(dn(dn(process.argv[2])));
+    let brief = "";
+    try { brief = readFileSync(repoRoot + "/.claude/agents/design-reviewer.md", "utf8"); } catch { /* absent */ }
+    ok(brief !== "", ".claude/agents/design-reviewer.md does not exist");
+    ok(/^name: design-reviewer$/m.test(brief), "the design-reviewer's brief names another agent");
+    const tools = ((brief.match(/^tools: (.*)$/m) || [])[1] || "");
+    ok(/\bRead\b/.test(tools) && !/\b(Write|Edit|NotebookEdit)\b/.test(tools), `the design-reviewer is not read-only: tools: ${tools}`);
+    for (const word of ["1728", "1080", "docs/design/video-screens.md", "~/.cache/gnoworld-tools/video-frames/", "position", "size", "spacing", "type", "colour", "radius", "both pictures"])
+      ok(brief.includes(word), `the design-reviewer's brief lacks ${word}`);
+    ok(/missing[^.]*fail[^.]*never skip/i.test(brief), "the design-reviewer's brief has no one sentence saying that missing frames fail the step, never skip it");
+    ok(/git command that writes the index/.test(brief), "the design-reviewer's brief lacks the git-index rule");
+  }
+  // The list and docs/REVIEW.md's table agree: each path of its tier-1 rows (a backticked word with a "/") that names files in the
+  // repository starts the lens through the first of them. A tier-1 area added to the table and not to the loop fails here.
+  {
+    const { readdirSync } = require("node:fs");
+    const { dirname } = require("node:path");
+    const root = dirname(dirname(dirname(process.argv[2])));
+    // A walk, not git: pre-commit runs this in a staged copy that is no repository. .stryker-tmp holds full copies of the repo
+    // (gitignored leftovers of a mutation run): their files are no tracked files.
+    const walk = (dir) => readdirSync(root + "/" + dir, { withFileTypes: true }).flatMap((e) =>
+      [".git", "node_modules", "dist", ".claude", ".stryker-tmp"].includes(e.name) ? [] : e.isDirectory() ? walk(dir + e.name + "/") : [dir + e.name]);
+    const tracked = walk("");
+    const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
+    const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
+    ok(paths.length >= 3, `the tier-1 rows of docs/REVIEW.md name no path I can read: ${paths}`);
+    // Both ways (F2530): a path of TIER1 that no tier-1 row names is a review nobody asked for, and a row written in prose, with
+    // no path in backticks, would pass the loop above unseen. The harness's folders and gno/ are tier 1 by the harness's own rule;
+    // the realms' two folders are the table's `gno/r/` and `gno/p/`.
+    {
+      const src = readFileSync(root + "/.claude/workflows/branch.js", "utf8");
+      const block = src.slice(src.indexOf("const TIER1 = ["), src.indexOf("...(A.tier1"));
+      const listed = [...block.matchAll(/^\s+"([^"]+)",$/gm)].map((m) => m[1]).filter((e) => !["scripts/", ".githooks/", ".github/", ".claude/", "gno/"].includes(e));
+      const named = paths.filter((e) => !["gno/r/", "gno/p/"].includes(e));
+      ok(listed.length >= 10, `I read no TIER1 list in branch.js: ${listed}`);
+      for (const e of listed) ok(named.includes(e), `branch.js's TIER1 holds ${e}, which no tier-1 row of docs/REVIEW.md names in backticks`);
+      for (const e of named) ok(listed.includes(e), `docs/REVIEW.md names ${e} as tier 1 in backticks, which branch.js's TIER1 lacks`);
+    }
+    for (const path of paths) {
+      const files = tracked.filter((f) => (f.startsWith(path) || f.includes("/" + path)) && !f.endsWith(".test.ts"));
+      if (!files.length) continue;
+      const labels = await lensOf(files[0]);
+      ok(labels.includes("security"), `docs/REVIEW.md names ${path} as tier 1, but a change of ${files[0]} starts no security lens: ${labels}`);
+    }
+  }
+  // The loop's base: main when absent; an argument for a branch cut from an integration branch. The merge check's file list and
+  // its diff file, the reviewer's and the security lens's diff all read from it, not from main (5f: 201 files from main).
+  const promptOf = (x, label) => (x.calls.find((c) => c.label === label) || { prompt: "" }).prompt;
+  const fromMain = /since main|main\.\.\.?HEAD/;
+  t = await run(base(["scripts/check.sh"]));
+  for (const label of ["merge check", "reviewer", "security"]) ok(fromMain.test(promptOf(t, label)), `${label} did not read from main when no base was given: ${promptOf(t, label)}`);
+  ok(!promptOf(t, "merge check").includes("--base"), `the merge check was given a base when none was: ${promptOf(t, "merge check")}`);
+  t = await run(base(["scripts/check.sh"]), { base: "slice-5-p2" });
+  // check.sh reads the same base (F2531): the prompt's file list and diffs alone would leave every lane on origin/main.
+  ok(promptOf(t, "merge check").includes("check.sh --merge --base slice-5-p2"), `the merge check was not told to run check.sh against the base: ${promptOf(t, "merge check")}`);
+  ok(promptOf(t, "merge check").includes("slice-5-p2...HEAD") && promptOf(t, "merge check").includes("slice-5-p2..HEAD"), `the merge check did not list files and loosening commits from the base: ${promptOf(t, "merge check")}`);
+  for (const label of ["merge check", "reviewer", "security"]) {
+    ok(!fromMain.test(promptOf(t, label)), `${label} still read from main with base slice-5-p2: ${promptOf(t, label)}`);
+    if (label !== "merge check") ok(promptOf(t, label).includes("since slice-5-p2"), `${label} did not read the diff since the base: ${promptOf(t, label)}`);
+  }
+  ok(promptOf(t, "reviewer").includes("holds the diff since slice-5-p2"), "the reviewer was told the diff file holds the diff since main, not since the base");
+  // A round 2 still reads since its first fix, whatever the base.
+  t = await highEveryRound({ base: "slice-5-p2" });
+  ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read since its first fix when a base was given");
+  // StrykerJS's and harness_mutate's survivors reach the reviewer: the merge check is told to take the lines `check.sh --merge`
+  // prints as `survivor: ...`, pass or fail, and hands them on.
+  ok(promptOf(t, "merge check").includes("survivor: "), "the merge check was not told to report the `survivor: ` lines check.sh prints, a pass included");
+  const gs = { ...gateOf(["app/src/a.ts"]), survivors: ["survivor: app/src/a.ts: line 3:5 [Survived] ConditionalExpression"] };
+  t = await run((l, p) => (l === "merge check" ? gs : base(["app/src/a.ts"])(l, p)));
+  ok(promptOf(t, "reviewer").includes("app/src/a.ts: line 3:5 [Survived] ConditionalExpression"), "a surviving mutant of a passing merge check did not reach the reviewer's brief");
+  t = await run(base(["app/src/a.ts"]));
+  ok(promptOf(t, "reviewer").includes("surviving mutants: []"), "a merge check with no survivor did not hand the reviewer an empty list");
 })();
 JS
 fi
@@ -3449,6 +4952,318 @@ printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py d
 # Helpers that only tests use are no product code (G8).
 git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
+fi
+
+if part gate_full; then
+# The merge check prints every surviving mutant, pass or fail (F2359, F2409): the lane logs are shown only on failure, and
+# StrykerJS exits 0 with survivors (the config has no break threshold), so the Workflow loop's `survivors` was always empty. Each
+# survivor of StrykerJS's clear-text report (`[Survived] Kind` or `[NoCoverage] Kind`, then `path:L:C`) is printed by
+# `check.sh --merge` as one line `survivor: <path>: line L:C [Status] Kind`; a killed mutant is not.
+gate_fixture gate_survivors
+mkdir -p "$g/node_modules/vitest"
+base=$(git -C "$g" merge-base HEAD origin/main)
+# The branch changes the files its survivors are on (the report lists the survivors of the files it changed alone, F2529).
+printf 'z\n' >>"$g/server/src/a.ts" && printf 'z\n' >>"$g/server/src/b.ts" && printf 'x\n' >"$g/app/src/a.ts" && git -C "$g" add app/src/a.ts && git -C "$g" commit -qam "product code"
+cat >"$g/bin/survive" <<SH
+#!/bin/sh
+sh "$step" mutate "\$@" || exit \$?
+cat "$g/survivors.txt"
+SH
+python3 -I - "$g/package.json" "$g/bin/survive" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["scripts"]["mutate"] = f"sh {sys.argv[2]}"
+json.dump(d, open(sys.argv[1], "w"))
+PY
+git -C "$g" update-ref refs/remotes/origin/main HEAD~1
+# StrykerJS 10's clear-text report as clear-text-reporter.js writes it (reportMutantResult, colorSourceFileAndLocation; stryker.config.json
+# sets no reporters, so it is the default one, with no colour): `[Status] Mutator`, then `path:line:column`, the original lines
+# after `-   ` and the mutated after `+   `. A Killed mutant is only in the debug log, but a report holding one must not make a survivor.
+cat >"$g/survivors.txt" <<'TXT'
+
+[Killed] ConditionalExpression
+app/src/killed.ts:9:1
+-   if (y) {
++   if (false) {
+Killed by: a works
+
+[Survived] ConditionalExpression
+app/src/a.ts:3:5
+-   if (x) {
++   if (true) {
+Ran all tests for this mutant.
+
+[NoCoverage] StringLiteral
+server/src/b.ts:7:12
+-   "kept"
++   ""
+
+Ran 4.00 tests per mutant on average.
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with a surviving mutant, which StrykerJS does not fail on: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: app/src/a\.ts: line 3:5 .*Survived.*ConditionalExpression' || fail "check.sh --merge did not print StrykerJS's survivor on a passing run: $out"
+printf '%s\n' "$out" | grep -qE '^survivor: server/src/b\.ts: line 7:12 .*NoCoverage.*StringLiteral' || fail "check.sh --merge did not print StrykerJS's NoCoverage mutant on a passing run: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*killed\.ts' && fail "check.sh --merge printed a killed mutant as a survivor: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print each survivor once: $out"
+# On a failing run too, once each (the failed lane's log is printed as well): a lane that runs beside or after the coverage lane fails.
+out=$(FAIL=py:harness_mutate gate --merge) && fail "check.sh --merge passed with its harness mutants failing"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge did not print the survivors once each when a lane failed: $out"
+# The coverage lane never ran (the history lane failed first, batch_size is in it): there is nothing to print, and it says so.
+out=$(FAIL=py:batch_size gate --merge) && fail "check.sh --merge passed with its batch size failing"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor though the coverage lane never ran: $out"
+# A survivor on a file this branch did not change is no line to read: the report is sized by the codebase, not the change (2794
+# survivors, about 200 KB, on a branch of nine files that touched none of them, F2529), and the reviewer's brief by the change. It
+# is counted in one line, so that the total is still known; a mutant of the harness is always listed.
+cat >>"$g/survivors.txt" <<'TXT'
+
+[Survived] ConditionalExpression
+app/src/untouched.ts:4:1
+-   if (q) {
++   if (true) {
+
+[NoCoverage] StringLiteral
+app/src/untouched.ts:8:2
+-   "z"
++   ""
+TXT
+out=$(gate --merge) || fail "check.sh --merge failed with survivors on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivor: .*untouched' && fail "check.sh --merge listed a survivor on a file the branch did not change: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^survivor: ')" = 2 ] || fail "check.sh --merge changed the survivors it lists when others sat on unchanged files: $out"
+printf '%s\n' "$out" | grep -q '^survivors not listed: 2 .*unchanged' || fail "check.sh --merge did not count the survivors it left out, 2 on one unchanged file: $out"
+# --base <ref>: the branch's own lines on an integration branch. Its range from main holds other branches' lines; every lane that reads
+# the base (the batch, the fixes, the regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product
+# code) reads from the ref, and without the argument from origin/main (F2531).
+printf 'survivors.txt\nnode_modules/\nbin/\n' >>"$g/.git/info/exclude" && git -C "$g" commit -qam "the fixture's stubs" # product code is judged on what git sees
+git -C "$g" branch -f integ HEAD
+printf 'own\n' >"$g/scripts/own.sh" && git -C "$g" add scripts/own.sh && git -C "$g" commit -qm "own lines"
+integ=$(git -C "$g" rev-parse integ) main=$(git -C "$g" rev-parse origin/main)
+out=$(gate --merge --base integ) || fail "check.sh --merge --base failed on a copy whose every step passes: $out"
+for s in py:batch_size py:check_regressions py:check_migrations; do
+	grep -qx "$s $integ" "$log" || fail "check.sh --merge --base integ did not give $s the base integ: $(grep "^$s" "$log")"
+	grep -qx "$s $main" "$log" && fail "check.sh --merge --base integ gave $s origin/main as its base"
+done
+printf '%s\n' "$out" | grep -q "no product code since $integ" || fail "check.sh --merge --base integ took other branches' product lines for its own: $out"
+ran py:prove_fix && fail "check.sh --merge --base integ ran prove_fix on a branch with no product code of its own"
+out=$(gate --merge) || fail "check.sh --merge failed on a copy whose every step passes: $out"
+grep -qx "py:batch_size $main" "$log" || fail "check.sh --merge, with no argument, did not read from origin/main: $(grep '^py:batch_size' "$log")"
+ran py:prove_fix || fail "check.sh --merge, with no argument, did not read the product code since origin/main"
+grep -qx "py:patch_coverage $main" "$log" || fail "check.sh --merge, with no argument, gave the patch's coverage a base other than origin/main's: $(grep '^py:patch_coverage' "$log")"
+out=$(gate --merge --base) && fail "check.sh --merge --base passed with no ref after it: $out"
+printf '%s\n' "$out" | grep -q "wants a ref" || fail "check.sh --merge --base with no ref did not say it wants one: $out"
+out=$(gate --merge --base no-such-ref) && fail "check.sh --merge --base passed with a ref that is none: $out"
+printf '%s\n' "$out" | grep -q "no-such-ref" || fail "check.sh --merge --base did not name the ref it could not compare with: $out"
+# No survivor, no line.
+: >"$g/survivors.txt"
+out=$(gate --merge) || fail "check.sh --merge failed with no survivor: $out"
+printf '%s\n' "$out" | grep -q '^survivor: ' && fail "check.sh --merge printed a survivor when there was none: $out"
+# harness_mutate's survivors (`FAIL  survives: <mutant>`) are survivors too, on a merge that fails on them.
+printf 'import os, sys\nprint("FAIL  survives: planted spare2 #1")\nsys.exit(1)\n' >"$g/scripts/harness_mutate.py"
+out=$(gate --merge) && fail "check.sh --merge passed with a harness mutant surviving"
+printf '%s\n' "$out" | grep -q '^survivor: .*planted spare2 #1' || fail "check.sh --merge did not print a harness mutant's survivor as a survivor: $out"
+fi
+
+if part deploy_lock; then
+# deploy/test.sh takes a lock (harness list item 10): two runs at once share the Docker project gnoworld-demo-test and each one's
+# start removes the other's containers (2026-10-30: `FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
+# the tools it calls are stubs on PATH; the first run is held at its first `docker run` while a second starts beside it.
+# Every process a run starts is recorded by pid (the stubs write them), killed by pid, and checked dead at the end: no pkill, which
+# the sandbox refuses.
+d="$t/lock" && mkdir -p "$d/bin" "$d/tmp" "$d/home"
+for tool in curl openssl htpasswd git netstat route ifconfig arp ss ip dig; do printf '#!/bin/sh\nexit 0\n' >"$d/bin/$tool"; done
+# macOS's mktemp -d ignores TMPDIR; the run's folder goes where the test can find it.
+printf '#!/bin/sh\nexec /usr/bin/mktemp -d "$TMPDIR/tmp.XXXXXX"\n' >"$d/bin/mktemp"
+# python3 records its pid (the canary's http.server is one) and becomes the real one.
+printf '#!/bin/sh\necho $$ >>"$LOCK_DOCKER_LOG.pids"\nexec "%s" "$@"\n' "$(command -v python3)" >"$d/bin/python3"
+cat >"$d/bin/docker" <<'SH'
+#!/bin/sh
+echo "$*" >>"$LOCK_DOCKER_LOG"
+case $1 in
+version) echo 28.0.0 ;;
+run) echo $$ >>"$LOCK_DOCKER_LOG.pids"; exec sleep 20 ;;
+compose)
+	case $2 in
+	ls) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != network ]; then printf '[{"Name":"%s","Status":"running(2)","ConfigFiles":"/x/compose.yaml"}]\n' "$LOCK_LEFTOVER"; else echo '[]'; fi ;;
+	esac
+	;;
+network) if [ -n "${LOCK_LEFTOVER:-}" ] && [ "${LOCK_LEFTOVER_VIA:-}" != compose ]; then echo "${LOCK_LEFTOVER}_default"; fi ;;
+esac
+exit 0
+SH
+chmod +x "$d/bin/"*
+# deploy_run <log's name> <project> [VAR=value...]: runs deploy/test.sh in the background (with $mode as its argument) in its own TMPDIR,
+# the same HOME as every run (the lock must not hang on TMPDIR, which a sandbox and a terminal do not share).
+deploy_run() {
+	name=$1 project=$2
+	shift 2
+	mkdir -p "$d/tmp.$name"
+	: >"$d/$name.docker" && (env HOME="$d/home" TMPDIR="$d/tmp.$name" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/$name.docker" TEST_PROJECT="$project" "$@" "$shell" "$here/../deploy/test.sh" $mode >"$d/$name.out" 2>&1 & echo $! >"$d/$name.pid")
+}
+alive() { kill -0 "$1" 2>/dev/null; }
+gone() { ! alive "$1"; }
+ended() { gone "$(cat "$d/$1.pid")"; }
+began() { grep -q '^run ' "$d/$1.docker"; }
+settled() { began "$1" || ended "$1"; }
+# The runner starts every section at once, and a run's first steps took over 15 s of that at load 45 (3 full suites in 9 failed
+# here): every wait ends on what it waits for, so only a fault reaches the ceiling, 2 minutes, and no clock decides a verdict.
+soon() {
+	tries=0
+	until "$@"; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 600 ] || return 1
+		sleep 0.2
+	done
+}
+reached() { soon settled "$1" && began "$1"; } # $1 the log's name: the run got past its checks to the first docker run
+refused() { soon settled "$1" && ! began "$1"; } # $1 the log's name: the run ended on its own, before any docker run
+stop_all() { # every process any run started is killed by its pid, then none may be alive
+	for f in "$d"/*.pid "$d"/*.docker.pids; do [ -e "$f" ] || continue; for p in $(cat "$f"); do kill -9 "$p" 2>/dev/null || true; done; done
+	for f in "$d"/*.pid "$d"/*.docker.pids; do
+		[ -e "$f" ] || continue
+		for p in $(cat "$f"); do soon gone "$p" || fail "a process of the lock test (pid $p, from $f) outlived it"; done
+	done
+	rm -f "$d"/*.pid "$d"/*.docker.pids
+	rm -rf "${d:?}/home/.cache"
+}
+mode= shell=sh
+p1=gnoworld-lock-a-$$
+deploy_run first "$p1"
+reached first || { stop_all; fail "the first deploy/test.sh never reached its first docker run (stubs): $(cat "$d/first.out")"; }
+# A second run of the same project beside it, even from another TMPDIR (a sandbox's is not a terminal's), is refused at once, with a
+# word naming the project, and starts nothing.
+deploy_run second "$p1"
+refused second || { stop_all; fail "a second deploy/test.sh ran beside a first holding the project $p1"; }
+grep -q "$p1" "$d/second.out" || { stop_all; fail "the refused run did not name the project it found held: $(cat "$d/second.out")"; }
+grep -qi 'already\|held\|in use\|another' "$d/second.out" || { stop_all; fail "the refused run did not say another run holds the project: $(cat "$d/second.out")"; }
+grep -q '^run \|^compose .* up' "$d/second.docker" && { stop_all; fail "the refused run still started docker work: $(cat "$d/second.docker")"; }
+grep -q 'down' "$d/second.docker" && { stop_all; fail "the refused run removed the first run's containers (compose down): $(cat "$d/second.docker")"; }
+alive "$(cat "$d/first.pid")" || { stop_all; fail "the refused second run stopped the first: $(cat "$d/first.out")"; }
+# The modes that start a stack take the same project: --mutants of it is refused too.
+mode=--mutants
+deploy_run mutants "$p1"
+mode=
+refused mutants || { stop_all; fail "deploy/test.sh --mutants ran beside a first run holding the project $p1"; }
+grep -q "$p1" "$d/mutants.out" || { stop_all; fail "the refused --mutants did not name the project: $(cat "$d/mutants.out")"; }
+grep -q '^run ' "$d/mutants.docker" && { stop_all; fail "the refused --mutants still started docker work: $(cat "$d/mutants.docker")"; }
+# --demo starts and removes nothing of the test's: the lock does not stop it, and it goes on to its own checks' first docker run.
+mode=--demo
+deploy_run demo "$p1"
+mode=
+reached demo || { stop_all; fail "deploy/test.sh --demo was refused by a test run's lock: $(cat "$d/demo.out")"; }
+# Another project is no one's lock.
+deploy_run other "gnoworld-lock-b-$$"
+reached other || { stop_all; fail "a run of another project was refused by the first's lock: $(cat "$d/other.out")"; }
+stop_all
+# A first run killed hard (no trap runs) leaves a stale lock: the next run takes it over.
+deploy_run killed "$p1"
+reached killed || { stop_all; fail "the run meant to be killed never started: $(cat "$d/killed.out")"; }
+kill -9 "$(cat "$d/killed.pid")"
+soon ended killed || { stop_all; fail "a run killed hard still runs"; }
+deploy_run after "$p1"
+reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
+stop_all
+# A holder another sandbox owns (its pid refuses a signal, EPERM, F2616) is alive: pid 1 holds the lock, and the run is refused.
+mkdir -p "$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock" && printf '1\n' >"$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock/pid"
+deploy_run eperm "$p1"
+refused eperm || { stop_all; fail "deploy/test.sh took over the lock of a live holder it was not allowed to signal (F2616): $(cat "$d/eperm.out")"; }
+grep -q "$p1" "$d/eperm.out" || { stop_all; fail "the run refused for a holder it could not signal did not name the project: $(cat "$d/eperm.out")"; }
+stop_all
+# A first run stopped by TERM releases the lock, under a Linux host's shell too: dash, unlike macOS's sh, runs no EXIT trap for a
+# signal with no trap of its own. The test waits for the run to end (after ending the stub `docker run` it waits on, which a
+# shell's trap otherwise outlasts).
+shell=$(command -v dash || echo sh)
+deploy_run quit "$p1"
+shell=sh
+reached quit || { stop_all; fail "the run meant to end never started: $(cat "$d/quit.out")"; }
+kill -TERM "$(cat "$d/quit.pid")"
+for p in $(cat "$d/quit.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+soon ended quit || { stop_all; fail "a run stopped by TERM never ended"; }
+[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by TERM left its lock: $(ls "$d/home/.cache/gnoworld-tools")"; }
+deploy_run again "$p1"
+reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
+stop_all
+# A run left by a Ctrl+C (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named in the refusal
+# with the command that removes it; nothing is started beside it.
+left=gnoworld-demo-mutant-77777777
+deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
+refused left || { stop_all; fail "deploy/test.sh started beside a mutant project a Ctrl+C left up"; }
+grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
+grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
+stop_all
+# Each source of a leftover is read alone (F2528: the stub printed it through both, so either guard passed without the other),
+# and a refusal on a leftover releases the lock it took.
+for via in compose network; do
+	deploy_run "via$via" "gnoworld-lock-$via-$$" LOCK_LEFTOVER="$left" LOCK_LEFTOVER_VIA=$via
+	refused "via$via" || { stop_all; fail "deploy/test.sh started beside a mutant project that only docker $via shows"; }
+	grep -q "docker compose -p $left down -v" "$d/via$via.out" || { stop_all; fail "the refusal did not name the leftover docker $via shows: $(cat "$d/via$via.out")"; }
+	[ -z "$(find "$d/home/.cache/gnoworld-tools" -name "*gnoworld-lock-$via-$$*" 2>/dev/null)" ] || { stop_all; fail "a run refused on a leftover (docker $via) kept its lock"; }
+	stop_all
+done
+# --mutants runs each fault in a project of that name: a run never takes its own for a leftover.
+own=gnoworld-demo-mutant-88888888
+deploy_run own "$own" LOCK_LEFTOVER="$own"
+reached own || { stop_all; fail "deploy/test.sh took its own project for a leftover: $(cat "$d/own.out")"; }
+stop_all
+# Another Compose project running on the machine is none of its business.
+deploy_run unrelated "gnoworld-lock-d-$$" LOCK_LEFTOVER=myapp
+reached unrelated || { stop_all; fail "deploy/test.sh was refused by an unrelated running project: $(cat "$d/unrelated.out")"; }
+stop_all
+# A run releases only a lock that holds its own pid: one another run took over (here, a live process's) stays when the first ends.
+lockdir=$d/home/.cache/gnoworld-tools
+deploy_run foreign "$p1"
+reached foreign || { stop_all; fail "the run meant to lose its lock never started: $(cat "$d/foreign.out")"; }
+sleep 60 &
+echo $! >"$d/other.pid"
+cat "$d/other.pid" >"$lockdir/deploy-test-$p1.lock/pid"
+kill -TERM "$(cat "$d/foreign.pid")"
+for p in $(cat "$d/foreign.docker.pids"); do kill -TERM "$p" 2>/dev/null || true; done
+soon ended foreign || { stop_all; fail "the run that lost its lock never ended"; }
+[ "$(cat "$lockdir/deploy-test-$p1.lock/pid" 2>/dev/null)" = "$(cat "$d/other.pid")" ] || { stop_all; fail "a run took down the lock of another run when it ended"; }
+stop_all
+# A real Ctrl+C, to a run in the foreground of a process group of its own (a section's shell, in the background, ignores INT):
+# the run ends with 130 and its lock is gone. Without the INT trap a shell ends of the signal, its EXIT trap unrun.
+py=$(command -v python3)
+cat >"$d/intrun.py" <<'PYX'
+import os, signal, subprocess, sys, time
+
+signal.signal(signal.SIGINT, lambda *_: None)  # a handler, not SIG_IGN, which the run below would inherit
+log, out = sys.argv[1], sys.argv[2]
+run = subprocess.Popen(sys.argv[3:], start_new_session=True, stdout=open(out, "w"), stderr=subprocess.STDOUT)
+for _ in range(600):
+    if run.poll() is not None or (os.path.exists(log) and any(line.startswith("run ") for line in open(log))):
+        break
+    time.sleep(0.2)
+os.killpg(run.pid, signal.SIGINT)
+try:
+    print(run.wait(timeout=60))
+except subprocess.TimeoutExpired:
+    os.killpg(run.pid, signal.SIGKILL)
+    print("hung")
+PYX
+mkdir -p "$d/tmp.int" && : >"$d/int.docker"
+code=$(env HOME="$d/home" TMPDIR="$d/tmp.int" PATH="$d/bin:$PATH" LOCK_DOCKER_LOG="$d/int.docker" TEST_PROJECT="$p1" "$py" "$d/intrun.py" "$d/int.docker" "$d/int.out" sh "$here/../deploy/test.sh")
+[ "$code" = 130 ] || { stop_all; fail "a run stopped by Ctrl+C ended with [$code], not 130: $(cat "$d/int.out")"; }
+[ -z "$(find "$lockdir" -name "*$p1*" 2>/dev/null)" ] || { stop_all; fail "a run stopped by Ctrl+C left its lock"; }
+stop_all
+# The run that made a lock is writing its pid: an empty lock is read again a second later (the stub sleep writes it there, at once
+# and with no clock), and a live holder's refuses; a lock found dead and removed, then taken by another run that very moment, refuses.
+mkdir -p "$d/bin2" "$d/bin3"
+printf '#!/bin/sh\n[ -n "${LOCK_FILL:-}" ] && [ "$1" = 1 ] && cat "$LOCK_FILL_SRC" >"$LOCK_FILL"\nexec /bin/sleep "$@"\n' >"$d/bin2/sleep"
+printf '#!/bin/sh\n/bin/rm "$@"\nstatus=$?\ncase "$*" in *deploy-test-*.lock*) [ -z "${LOCK_RETAKE:-}" ] || { mkdir -p "$LOCK_RETAKE"; cat "$LOCK_RETAKE_SRC" >"$LOCK_RETAKE/pid"; } ;; esac\nexit $status\n' >"$d/bin3/rm"
+chmod +x "$d/bin2/sleep" "$d/bin3/rm"
+sleep 60 &
+echo $! >"$d/live.pid"
+pw=gnoworld-lock-w-$$
+mkdir -p "$lockdir/deploy-test-$pw.lock"
+deploy_run waited "$pw" PATH="$d/bin2:$d/bin:$PATH" LOCK_FILL="$lockdir/deploy-test-$pw.lock/pid" LOCK_FILL_SRC="$d/live.pid"
+refused waited || { stop_all; fail "a run took over a lock whose run had not yet written its pid: $(cat "$d/waited.out")"; }
+grep -q "pid $(cat "$d/live.pid")" "$d/waited.out" || { stop_all; fail "the refusal did not name the holder that wrote its pid late: $(cat "$d/waited.out")"; }
+sh -c 'echo $$' >"$d/dead.txt"
+pr=gnoworld-lock-r-$$
+mkdir -p "$lockdir/deploy-test-$pr.lock" && cp "$d/dead.txt" "$lockdir/deploy-test-$pr.lock/pid"
+deploy_run retaken "$pr" PATH="$d/bin3:$d/bin:$PATH" LOCK_RETAKE="$lockdir/deploy-test-$pr.lock" LOCK_RETAKE_SRC="$d/live.pid"
+refused retaken || { stop_all; fail "a run went on after another took the lock it had just removed: $(cat "$d/retaken.out")"; }
+grep -q "took the project" "$d/retaken.out" || { stop_all; fail "the refusal did not say another run took the project: $(cat "$d/retaken.out")"; }
+stop_all
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"

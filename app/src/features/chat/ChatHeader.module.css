@@ -1,0 +1,27 @@
+@layer components {
+  .title {
+    min-inline-size: 0;
+    font: var(--font-title-room);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  /* The name that opens the menu: the heading's own type, a chevron a step after it. */
+  .trigger {
+    /* layout: the words and the chevron on one line */
+    display: inline-grid;
+    /* layout: side by side */
+    grid-auto-flow: column;
+    /* layout: the chevron centred on the words' line */
+    place-items: center;
+    /* layout: the chevron's distance from the words */
+    gap: var(--space-3xs);
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+  }
+
+  .controls {
+    /* layout: the controls at the far end of the header's row */
+    margin-inline-start: auto;
+  }
+}

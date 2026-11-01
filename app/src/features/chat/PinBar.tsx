@@ -33,7 +33,7 @@ export function PinStack({ pins, may, open, onToggle, onUnpin }: PinStackProps) 
     <section aria-label="Pinned messages" className={styles["bar"]}>
       <button type="button" className={styles["head"]} aria-expanded={open} onClick={onToggle}>
         <Icon name="pin" />
-        <span className={styles["newest"]} title={first.text}>
+        <span className={["truncate", styles["newest"]].join(" ")} title={first.text}>
           <b>
             <Person name={first.account} guest={false} />
           </b>{" "}

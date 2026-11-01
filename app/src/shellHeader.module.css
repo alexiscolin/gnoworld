@@ -1,0 +1,170 @@
+/* The header: on a computer, three columns of one row, the views exactly in the middle, 34 px from the top, 96 px high in all
+   and fixed at the top of the screen (the prototype's #hnav; DESIGN-SYSTEM.md, Layout; frames 1, 20, 37); on a phone, the logo
+   and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
+   room for. The one breakpoint of both is here. */
+@layer components {
+  .header {
+    /* layout: the header's cells on a grid, the account's group out of it on a phone */
+    display: grid;
+    /* layout: the logo and the account on one row, the network on the next */
+    grid-template-columns: auto 1fr;
+    /* layout: a space step between the cells */
+    gap: var(--space-2xs) var(--space-s);
+    /* layout: the cells' centres share a line */
+    align-items: center;
+    padding: var(--space-s);
+  }
+
+  .logo {
+    /* layout: the link is a box of its logo's height, so no line's leading moves the mark off the row's middle */
+    display: flex;
+    /* layout: the link is as wide as its logo, not as its cell */
+    justify-self: start;
+    text-decoration: none;
+  }
+
+  .end {
+    /* layout: on a phone the network and the account are the header's own cells */
+    display: contents;
+  }
+
+  .network {
+    /* layout: the network on its own row under the logo and the account on a phone */
+    grid-column: 1 / -1;
+    /* layout: after the account, which shares the logo's row */
+    order: 1;
+    /* layout: a paragraph with no margin of its own: the grid spaces it */
+    margin-block: 0;
+    color: var(--color-text-muted);
+    font: var(--font-ui);
+  }
+
+  .caution {
+    /* layout: the warning icon and its chip on a line, off the network's name */
+    display: inline-flex;
+    /* layout: the icon and the chip share a middle */
+    align-items: center;
+    /* layout: a step between them, and off the name */
+    gap: var(--space-3xs);
+    /* layout: the arrangement the prototype and the frames draw */
+    margin-inline-start: var(--space-2xs);
+    color: var(--color-warm);
+  }
+
+  /* The views: a pill with its links and the search, a bar over the page's foot on a phone. */
+  .views {
+    /* layout: the links, the divider and the search in one row */
+    display: flex;
+    /* layout: they share a middle */
+    align-items: center;
+    /* layout: the links 2 px apart (the prototype's #hnav .links) */
+    /* raw: the prototype's and the frames' own value */
+    gap: 2px;
+    position: fixed;
+    inset-inline: var(--space-s);
+    inset-block-end: var(--space-s);
+    /* raw: above the page's content until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
+    z-index: 1;
+    box-sizing: border-box;
+    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
+    block-size: 44px;
+    /* raw: four pixels between the pill's edge and its links */
+    padding: 4px;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45); no blur behind it until the scene has a sky (slice 7) */
+    background: color-mix(in oklab, var(--color-surface) 45%, transparent);
+  }
+
+  .view {
+    /* layout: the label in the middle of its link */
+    display: grid;
+    /* layout: the label in the middle of its link */
+    place-items: center;
+    /* raw: a link is 34 px tall inside the 44 px pill */
+    block-size: 34px;
+    padding-inline: var(--space-s);
+    border-radius: var(--radius-pill);
+    color: var(--color-text-muted);
+    /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
+    font: 500 11.5px/1 var(--family-sans);
+    /* raw: the prototype's and the frames' own value */
+    letter-spacing: 0.1em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .view[aria-current="page"] {
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .divider {
+    /* raw: a line 1 px wide and 16 high, 4 px off each side (the prototype's .vsep) */
+    inline-size: 1px;
+    /* raw: the prototype's and the frames' own value */
+    block-size: 16px;
+    /* layout: the arrangement the prototype and the frames draw */
+    /* raw: the prototype's and the frames' own value */
+    margin-inline: 4px;
+    background: var(--color-line-strong);
+  }
+
+  /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
+  /* The search is a control's own size, 40 px (44 by touch), centred in the pill's 34 px between its padding: the pill keeps its height. */
+  .views button {
+    /* layout: the control's overflow is shared by both sides, so it stays on the pill's middle line */
+    /* raw: the 34 px between the pill's padding */
+    margin-block: calc((34px - var(--control-m)) / 2);
+  }
+
+  .page {
+    /* raw: the bar's 44 px, its 16 px gap under it and 16 px over it */
+    padding-block-end: calc(44px + 2 * var(--space-s));
+  }
+
+  @media (min-width: 900px) {
+    .header {
+      /* layout: logo, views, the end: the views in the exact middle */
+      grid-template-columns: 1fr auto 1fr;
+      /* raw: 34 px from the top, 32 each side, and 18 under the 44 px row: 96 high in all (DESIGN-SYSTEM.md, Layout) */
+      padding: 34px var(--space-l) 18px;
+      /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */
+      position: sticky;
+      inset-block-start: 0;
+      /* raw: above the page and the fixed plate until the layers' tokens come with the scene */
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .header :is(a, button, nav, p) {
+      pointer-events: auto;
+    }
+
+    .end {
+      /* layout: the network and the account in a row at the right */
+      display: flex;
+      /* layout: a space step between them */
+      gap: var(--space-s);
+      /* layout: at the header's right edge */
+      justify-content: flex-end;
+      /* layout: their centres share a line */
+      align-items: center;
+    }
+
+    .network {
+      /* layout: the network is one cell of the end's row, before the account, not a row of its own */
+      grid-column: auto;
+      order: 0;
+    }
+
+    .views {
+      position: static;
+      inset: auto;
+    }
+
+    .page {
+      padding-block-end: 0;
+    }
+  }
+}

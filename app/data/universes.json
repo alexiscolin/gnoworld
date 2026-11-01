@@ -4,8 +4,18 @@
     "name": "Onyx",
     "chainId": "onyx-1",
     "rpc": "https://rpc.onyx.testnets.gno.land:443",
+    "gnoweb": "https://onyx.testnets.gno.land",
+    "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
     "testnet": true,
     "default": true
   },
-  { "id": "gnoland", "name": "gno.land", "chainId": "gnoland-1", "rpc": "https://rpc.gno.land:443", "testnet": false }
+  {
+    "id": "gnoland",
+    "name": "gno.land",
+    "chainId": "gnoland-1",
+    "rpc": "https://rpc.gno.land:443",
+    "gnoweb": "https://gno.land",
+    "indexer": "https://indexer.gno.land/graphql/query",
+    "testnet": false
+  }
 ]

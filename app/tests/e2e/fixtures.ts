@@ -69,8 +69,31 @@ async function flushWorker(page: Page, worker: Worker): Promise<void> {
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
   planted: boolean;
   violations: string[];
+  homeReads: undefined;
 }>({
   planted: [false, { option: true }],
+  // The home's one read, answered as a settled site would: a file with no price and a block three minutes old (the server's timer
+  // writes both), so no page fails a request it did not mean to and the age words stay still. The home asks no chain: a journey
+  // that reads one routes its own. A journey that asks otherwise routes its own file.
+  homeReads: [
+    async ({ context }, use) => {
+      const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
+      const ago = () => new Date(Date.now() - 3 * 60_000).toISOString();
+      await context.route("**/markets.json", (route) =>
+        route.fulfill({
+          headers: cors,
+          body: JSON.stringify({
+            source: "CoinGecko",
+            updated: ago(),
+            tokens: [],
+            block: { height: 1203885, time: ago(), host: "rpc.onyx.testnets.gno.land" },
+          }),
+        }),
+      );
+      await use(undefined);
+    },
+    { auto: true },
+  ],
   violations: [
     async ({ page, planted, javaScriptEnabled }, use) => {
       const context = page.context();

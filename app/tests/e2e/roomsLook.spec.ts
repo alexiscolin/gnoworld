@@ -21,7 +21,7 @@ test.describe("a world's rooms, as they look", () => {
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       scriptedErgo(ergo, GUEST);
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(page.getByText("Who is up for a round of")).toBeVisible();
   }
@@ -32,7 +32,9 @@ test.describe("a world's rooms, as they look", () => {
   ] as const) {
     test(`on a ${screen}'s screen`, async ({ page }) => {
       await asGuest(page, width);
-      await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
+      // A phone has no info panel: its people open from the quick action, in a dialog.
+      if (screen === "computer") await expect(page.getByRole("region", { name: "Who's here" })).toContainText("2 here");
+      else await expect(page.getByRole("toolbar", { name: "Quick actions" })).toBeVisible();
       await expect(page).toHaveScreenshot(`rooms-${screen}.png`);
     });
   }
@@ -52,10 +54,10 @@ test.describe("a world's rooms, as they look", () => {
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       scriptedErgo(ergo, ACCOUNT);
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(lines(page)).toHaveCount(2);
-    await expect(page.getByRole("complementary", { name: "Who's here" })).toContainText("2 here");
+    await expect(page.getByRole("region", { name: "Who's here" })).toContainText("2 here");
     await page.getByRole("textbox", { name: "Message #games" }).fill("I'm in: **tonight**, `9 pm` UTC");
     await expect(page).toHaveScreenshot("composer-computer.png", {
       mask: [page.getByRole("banner")],
@@ -76,7 +78,7 @@ test.describe("a world's rooms, as they look", () => {
         ],
       });
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const shown = lines(page);
     await expect(shown).toHaveCount(3);
@@ -126,7 +128,9 @@ async function sixtyLines(page: Page): Promise<() => WebSocketRoute> {
     socket = route;
     scriptedErgo(route, GUEST, { history });
   });
-  await page.goto("/w/bubble?room=games");
+  // The video's header (96 px) and the plate above the room leave a 720-high screen too little for the newest line.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(page.getByText("Line 59 of the room's history")).toBeInViewport();
   return () => {
@@ -165,7 +169,7 @@ test("sets a quoted line apart from the sender's own words", async ({ page }) =>
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, GUEST, { history: [["q1", "2026-10-25T10:00:00.000Z", "> what was said before"]] });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   const quote = page.getByRole("list", { name: "Messages" }).locator("blockquote");
   await expect(quote).toHaveText("what was said before");
@@ -187,7 +191,7 @@ test("shows a mention of an account not in the room whole, beside the member it 
       history: [["g1", "2026-10-25T10:00:00.000Z", `ask @${ground} or @${ACCOUNT} or @${MEMBER}`]],
     });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   const mentions = page.getByRole("list", { name: "Messages" }).locator("[data-mention]");
   await expect(mentions).toHaveText([`@${ground}`, "@g1jg8m…vsqf5", `@${MEMBER.slice(0, 6)}…${MEMBER.slice(-5)}`]);
@@ -201,7 +205,7 @@ test("draws no mention after a letter past the BMP, in the browser's own engine"
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, GUEST, { history: [["b1", "2026-10-25T10:00:00.000Z", `\u{10400}@${MEMBER} and @${MEMBER}`]] });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lineOf(page, "and @")).toContainText(`\u{10400}@${MEMBER} and`);
   await expect(lines(page).locator("[data-mention]")).toHaveCount(1);
@@ -217,7 +221,7 @@ test("counts a line that is a list as one line of the room", async ({ page }) =>
       ],
     });
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lineOf(page, "gnogolf at nine").locator("ul > li")).toHaveCount(1);
   await expect(lineOf(page, "bring a putter").locator("ol > li")).toHaveCount(1);

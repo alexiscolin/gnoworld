@@ -18,7 +18,7 @@ const said = (html: string) =>
 describe("RoomSections", () => {
   it("lists each section that has a room, its name over its links, as a visitor's page does: no count", () => {
     const html = renderToStaticMarkup(<RoomSections sections={SECTIONS} current="#bubble" />);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Other rooms"]);
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
     expect([...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual([
       "/w/bubble",
       "/w/bubble?room=games",
@@ -32,9 +32,9 @@ describe("RoomSections", () => {
     expect(html).toContain('aria-current="true"');
   });
 
-  it("puts what the page gives after a room's link, and says so when there is no room", () => {
+  it("puts what the page gives after a room's link, as its badge, and says so when there is no room", () => {
     const html = renderToStaticMarkup(
-      <RoomSections sections={SECTIONS} current={undefined} trail={(room) => <i>{`after ${room}`}</i>} />,
+      <RoomSections sections={SECTIONS} current={undefined} badge={(room) => ({ said: `after ${room}` })} />,
     );
     expect(said(html)).toContain("after #bubble");
     expect(said(html)).toContain("after #bubble/games");
@@ -51,8 +51,8 @@ describe("RoomsNav", () => {
     expect(html).toMatch(/^<nav /);
     expect(html).toContain('aria-label="Rooms"');
     expect(html).toContain('tabindex="-1"');
-    // The list scrolls, and the navigation has its own look: each class its stylesheet's.
-    expect(html).toMatch(/class="_scrolls_\w+ _nav_\w+"/);
+    // The navigation has its own look; its column scrolls in its region (ChatLayout), not in a list of its own.
+    expect(html).toMatch(/class="_nav_\w+"/);
     expect(html).toContain(">in it</nav>");
   });
 });

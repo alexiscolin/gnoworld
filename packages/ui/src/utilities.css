@@ -25,6 +25,14 @@
     text-transform: none;
   }
 
+  /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
+  .truncate {
+    min-inline-size: 0;
+    overflow: clip;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Words for assistive technology alone: a figure's value while its digits count, a chart's table. */
   .visually-hidden {
     position: absolute;

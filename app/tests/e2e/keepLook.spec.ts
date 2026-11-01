@@ -43,7 +43,7 @@ async function look(
   await page.routeWebSocket(/\/ws$/, (ergo) => {
     scriptedErgo(ergo, kept === undefined ? "guest-zzzzzz" : ACCOUNT);
   });
-  await page.goto("/w/bubble?room=games");
+  await page.goto("/w/bubble?room=games&chat=full");
   await hydrated(page);
   await expect(lines(page)).toHaveCount(2);
 }

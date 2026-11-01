@@ -45,6 +45,8 @@ test.describe("mark unread", () => {
   test("moves the New mark to the line, tells Ergo nothing backwards, and keeps it through a reload until read to the end", async ({
     page,
   }) => {
+    // The room is the full chat (?chat=full), which covers the plate: the page's own height does not matter.
+    await page.setViewportSize({ width: 1280, height: 720 });
     const address = await logIn(page, word("unread"));
     // Read to the newest line: no New, and Ergo's place already there, so nothing is told.
     const { sent } = await room(page, { me: address, history: SIXTY, read: T(59) });
@@ -115,8 +117,8 @@ test.describe("saved messages", () => {
     await room(page, { me: address });
     await expect(savedButton(page)).toBeVisible();
     await choose(page, 1, "Save message");
-    await expect(lines(page).nth(1)).toContainText(/^Saved /);
-    await expect(lines(page).filter({ hasText: /^Saved / })).toHaveCount(1);
+    await expect(lines(page).nth(1)).toContainText(/^\S+( you)? Saved /);
+    await expect(lines(page).filter({ hasText: /^\S+( you)? Saved / })).toHaveCount(1);
     await lines(page).nth(1).hover();
     await moreOf(page, 1).click();
     await expect(page.getByRole("menuitem", { name: "Remove from saved" })).toBeVisible();
@@ -125,21 +127,24 @@ test.describe("saved messages", () => {
     const dialog = savedDialog(page);
     await expect(dialog).toContainText("the second line");
     await expect(dialog).toContainText("Saved on this device only.");
-    await expect(dialog.getByRole("link", { name: "Open in room" })).toHaveAttribute("href", "/w/bubble?room=games");
+    await expect(dialog.getByRole("link", { name: "Open in room" })).toHaveAttribute(
+      "href",
+      "/w/bubble?room=games&chat=full",
+    );
     await dialog.getByRole("button", { name: /^Remove .* saved message$/ }).click();
     await expect(dialog).toContainText("Nothing saved yet.");
     await page.keyboard.press("Escape");
-    await expect(lines(page).filter({ hasText: /^Saved / })).toHaveCount(0);
+    await expect(lines(page).filter({ hasText: /^\S+( you)? Saved / })).toHaveCount(0);
   });
 
   test("keeps a saved line on the device through a reload, and for its own account alone", async ({ page }) => {
     const address = await logIn(page, word("saved"));
     await room(page, { me: address });
     await choose(page, 2, "Save message");
-    await expect(lines(page).nth(2)).toContainText(/^Saved /);
+    await expect(lines(page).nth(2)).toContainText(/^\S+( you)? Saved /);
     await page.reload();
     await hydrated(page);
-    await expect(lines(page).nth(2)).toContainText(/^Saved /);
+    await expect(lines(page).nth(2)).toContainText(/^\S+( you)? Saved /);
     const keys = await page.evaluate(() =>
       Object.keys(localStorage).filter((key) => key.startsWith("gnoworld:saved:")),
     );
@@ -152,7 +157,7 @@ test.describe("saved messages", () => {
     await choose(page, 0, "Save message");
     await sockets[0]?.close();
     await expect.poll(() => sockets.length, { timeout: 15_000 }).toBeGreaterThan(1);
-    await expect(lines(page).nth(0)).toContainText(/^Saved /);
+    await expect(lines(page).nth(0)).toContainText(/^\S+( you)? Saved /);
     await expect(savedButton(page)).toBeVisible();
   });
 
@@ -194,7 +199,7 @@ test.describe("on a phone", () => {
     await lines(phone).nth(1).tap();
     await moreOf(phone, 1).tap();
     await phone.getByRole("menuitem", { name: "Save message" }).tap();
-    await expect(lines(phone).nth(1)).toContainText(/^Saved /);
+    await expect(lines(phone).nth(1)).toContainText(/^\S+( you)? Saved /);
     await browser.close();
   });
 });

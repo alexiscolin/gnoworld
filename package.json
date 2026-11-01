@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @gnoworld/app dev",
+    "build:app": "cd app && node node_modules/@react-router/dev/bin.cjs build",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",
     "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json && tsc -p packages/ui/tsconfig.json && tsc -p server/tsconfig.json",

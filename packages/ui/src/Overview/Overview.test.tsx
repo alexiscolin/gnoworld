@@ -14,6 +14,8 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Button: ["Buttons", "button[data-emphasis]:not([aria-label])"],
   IconButton: ["Icon buttons", "button[data-emphasis][aria-label]"],
   Kicker: ["Kickers", "p.label"],
+  Logo: ["Logos", "svg[aria-hidden='true']"],
+  Panel: ["Panels", "section[data-look]"],
   Flash: ["Flashes", "[role='status'] p"],
   EmptyState: ["Empty states", "h3 + p"],
   Icon: ["Icons", "svg[data-icon]"],
@@ -31,6 +33,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Dialog: ["Dialogs", "dialog"],
   Skeleton: ["Skeletons", "[data-shape]"],
   Card: ["Cards", "article"],
+  NavItem: ["Rows", "[data-nav-item]"],
   Row: ["Rows", "[data-look]"],
   Field: ["Fields", "input"],
   Combobox: ["Fields", "input[role='combobox']"],
@@ -39,6 +42,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],
   LinkProvider: ["Links", "a[data-page-link]"],
+  ChatLayout: ["Chat layout", "[data-chat-layout] [data-region='conversation']"],
 };
 
 describe("Overview", () => {

@@ -1,0 +1,39 @@
+/* The logo: the mark at 32 px, and the wordmark at 19 px in the light weight with "gno" in the semibold (the prototype's #hnav .brand). */
+@layer components {
+  .logo {
+    /* layout: the mark and the word on a line */
+    display: inline-flex;
+    /* layout: they share a middle */
+    align-items: center;
+    /* raw: 10 px between the mark and the word (the prototype's #hnav .brand) */
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 10px;
+  }
+
+  .mark {
+    display: block;
+    /* layout: the arrangement the prototype and the frames draw */
+    flex: none;
+    inline-size: var(--control-s);
+    block-size: var(--control-s);
+    overflow: visible;
+  }
+
+  .word {
+    /* raw: 19 px, 300, -0.03em (the prototype's #hnav .brand) */
+    font: 300 19px/1 var(--family-sans);
+    letter-spacing: var(--tracking-tight);
+  }
+
+  .word b {
+    /* raw: the semibold of the first three letters (the prototype's #hnav .brand b) */
+    font-weight: 600;
+  }
+
+  /* When narrow, the word drops before the mark (DESIGN-SYSTEM.md, Layout); the link around it keeps its name. */
+  @media (max-width: 600px) {
+    .word {
+      display: none;
+    }
+  }
+}

@@ -12,28 +12,22 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
-import { inlineScripts, sha256 } from "./csp.ts";
+import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
+import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
+
+// 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
+const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
+// R-F3: and of their chains' public indexers, which the data names too (`indexer`).
+const INDEXER_ORIGINS = ["https://indexer.gno.land", "https://indexer.onyx.testnets.gno.land"];
 
 // Markup, a comment opener and a line separator in a description: what JSON-LD must carry as text.
 const HOSTILE = "</script><script>alert(1)</script><!-- \u2028";
 /** The text of each JSON-LD script of a page, as the browser reads it. */
 const ldScripts = (html: string): string[] =>
   [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
-
-/** Each page's policy in `_headers`: the address of its rule, then the policy. */
-function headerPolicies(headers: string): Map<string, string> {
-  const found = new Map<string, string>();
-  let rule = "";
-  for (const line of headers.split("\n")) {
-    if (/^\S/.test(line)) rule = line;
-    const policy = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
-    if (policy !== undefined) found.set(rule, policy);
-  }
-  return found;
-}
 
 /** The pages of a build: the address each is served at and its html. */
 function pagesOf(client: string): [string, string][] {
@@ -73,13 +67,8 @@ function lookups(
  * data block, has none), each line under `cap` characters, the longest page named when one is not.
  */
 async function expectPolicies(client: string, conf: string, cap: number): Promise<void> {
-  const headers = headerPolicies(readFileSync(join(client, "_headers"), "utf8"));
-  const table = new Map(
-    [...readFileSync(conf, "utf8").matchAll(/^\s*"?([^"\s]+)"?\s+"([^"]*)";$/gm)].map((match) => [
-      match[1] ?? "",
-      match[2] ?? "",
-    ]),
-  );
+  const headers = headerRules(readFileSync(join(client, "_headers"), "utf8"));
+  const table = nginxTable(readFileSync(conf, "utf8"));
   const pages = pagesOf(client);
   expect(pages.length).toBeGreaterThan(1);
   let longest = ["", 0] as [string, number];
@@ -98,7 +87,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the nine files into their schemas' shapes", () => {
+  it("reads the ten files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -106,6 +95,7 @@ describe("loadData", () => {
       expect(data.hubs[0]?.slug).toBe("bubble");
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
+        "bubbles",
         "ecosystems",
         "events",
         "expedition",
@@ -192,7 +182,7 @@ describe("loadData", () => {
   });
 
   // What worlds.ts held, moved and nothing more (the brief: "nothing invented"): one world, and the two networks it needs.
-  it("reads the files the repository ships: Bubble in Onyx, the build's default, and nothing else", () => {
+  it("reads the files the repository ships: Bubble and GovDAO in Onyx, the build's default, and nothing else", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.universes.map((u) => [u.id, u.default === true])).toEqual([
       ["onyx", true],
@@ -206,8 +196,16 @@ describe("loadData", () => {
           "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
         universe: "onyx",
       },
+      {
+        slug: "govdao",
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
+        universe: "onyx",
+        realms: ["gno.land/r/gov/dao"],
+      },
     ]);
-    for (const empty of ["ecosystems", "stations", "genres", "events", "expedition", "quests", "news"] as const)
+    // events and news hold the ticker's placeholders, listed below.
+    for (const empty of ["ecosystems", "stations", "genres", "expedition", "quests"] as const)
       expect(data[empty]).toEqual([]);
   });
 
@@ -218,6 +216,93 @@ describe("loadData", () => {
       expect(() => loadData(dir)).toThrow(/universes\.json: \(file\)/);
     } finally {
       rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+// Slice 6's 6a: the bubbles' rules (ADR-0001 §7), one object in app/data/bubbles.json, checked when the app builds.
+describe("bubbles.json", () => {
+  const planted = (change: (rules: Record<string, unknown>) => void) =>
+    plant((f) => {
+      change(f["bubbles.json"] as Record<string, unknown>);
+    });
+  const message = (dir: string): string => {
+    try {
+      loadData(dir);
+    } catch (error) {
+      return error instanceof Error ? error.message : "";
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+    return "";
+  };
+
+  it("is read as the rules, and the repository ships ADR-0001 section 7's starting values", () => {
+    const data = loadData(new URL("../data", import.meta.url).pathname);
+    expect(data.bubbles).toEqual({
+      maxOnScreen: 6,
+      showSeconds: 5,
+      speakerDelaySeconds: 30,
+      maxChars: 80,
+      readLast: 500,
+      maxAgeSeconds: 300,
+    });
+  });
+
+  it.each([
+    ["maxOnScreen", 13],
+    ["showSeconds", 16],
+    ["speakerDelaySeconds", 121],
+    ["maxChars", 19],
+    ["maxChars", 161],
+    ["readLast", 2001],
+    ["maxAgeSeconds", 29],
+    ["maxAgeSeconds", 86_401],
+    ["maxOnScreen", 0],
+  ])("stops the build on %s of %d, naming the file and the field", (field, value) => {
+    expect(
+      message(
+        planted((r) => {
+          r[field] = value;
+        }),
+      ),
+    ).toMatch(new RegExp(`^bubbles\\.json: ${field}\\b`));
+  });
+
+  it("stops the build on a missing rule, a wrong type, a list and an unknown rule, naming the file", () => {
+    const fault = (change: (r: Record<string, unknown>) => void) => message(planted(change));
+    expect(fault((r) => Reflect.deleteProperty(r, "maxChars"))).toMatch(/^bubbles\.json: maxChars\b/);
+    expect(fault((r) => Reflect.set(r, "showSeconds", "5"))).toMatch(/^bubbles\.json: showSeconds\b/);
+    expect(fault((r) => Reflect.set(r, "extra", 1))).toMatch(/^bubbles\.json: /);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", [])))).toMatch(/^bubbles\.json: \(file\)/);
+  });
+
+  it("stops the build when the file is missing or is no JSON", () => {
+    expect(message(plant((f) => Reflect.deleteProperty(f, "bubbles.json")))).toMatch(/bubbles\.json/);
+    expect(message(plant((f) => Reflect.set(f, "bubbles.json", "{")))).toMatch(/bubbles\.json/);
+  });
+
+  // 6b: the centres come from a public-domain source read, named in the header (the plan's question 3).
+  it("names, in the header of the country table, a public-domain source and where it was read", () => {
+    const table = new URL("../../packages/core/src/bubbles/countries.ts", import.meta.url).pathname;
+    const header = readFileSync(table, "utf8").split("\n").slice(0, 6).join("\n");
+    expect(header).toMatch(/public domain|CC0/i);
+    expect(header).toMatch(/https:\/\/\S+/);
+    expect(header).toMatch(/source/i);
+  });
+
+  // ADR-0001 §7's numbers live in the data file alone: the plan's "no number of §7 is written in code".
+  it("leaves the rules' numbers out of the code of packages/core/src/bubbles", () => {
+    const dir = new URL("../../packages/core/src/bubbles/", import.meta.url).pathname;
+    const sources = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "countries.ts");
+    expect(sources).toEqual(expect.arrayContaining(["pickBubbles.ts", "cut.ts", "rules.ts"]));
+    for (const file of sources) {
+      const code = readFileSync(join(dir, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code.match(/(?<![\w.])(?:5|6|30|80|500|5000|30000)(?![\w.])/g) ?? [], file).toEqual([]);
     }
   });
 });
@@ -289,12 +374,12 @@ describe("react-router build", () => {
         const client = join(copy, "build", "client");
         const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
         const pages: [string[], string, string][] = [
-          [[], "gno.world", "/net/onyx/"],
+          [[], "\\d+ worlds? in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
           [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "onyx"], "gno.world", "/net/onyx/"],
+          [["net", "onyx"], "\\d+ worlds? in Onyx", "/net/onyx/"],
           [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "gnoland"], "gno.land", "/net/gnoland/"],
+          [["net", "gnoland"], "\\d+ worlds? in gno\\.land", "/net/gnoland/"],
           [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
           [["earth"], "Earth", "/net/onyx/earth"],
           [["net", "onyx", "earth"], "Earth", "/net/onyx/earth"],
@@ -306,7 +391,8 @@ describe("react-router build", () => {
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
           const where = path.join("/") || "/";
-          expect(html, where).toContain(`<h1>${heading}</h1>`);
+          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern.
+          expect(html.replaceAll("<!-- -->", ""), where).toMatch(new RegExp(`<h1\\b[^>]*>${heading}</h1>`));
           expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
         }
         // The home lists the worlds of its universe alone, and the data's order is not a page.
@@ -317,11 +403,144 @@ describe("react-router build", () => {
         // 5f: each page has a policy of its own, holding its own scripts' hashes and no other (csp.ts), in _headers and in
         // nginx's table.
         await expectPolicies(client, join(copy, "build", "csp.conf"), 2000);
+        // F2458: buildEnd looked for sw.js before Vite's post hook wrote it, so a real build's _headers never held the worker's
+        // rule (decisions, 2026-10-30) and the worker shipped with the catch-all's policy on a _headers host. One rule, the bare
+        // policy, with the catch-all detached.
+        expect(existsSync(join(client, "sw.js"))).toBe(true);
+        const headers = readFileSync(join(client, "_headers"), "utf8");
+        const rule = `\n/sw.js\n  ! Content-Security-Policy\n  Content-Security-Policy: ${policy([])}\n`;
+        expect(headers.split(rule)).toHaveLength(2);
       } finally {
         rmSync(dir, { recursive: true });
       }
     },
   );
+
+  // Slice 5 part 2, 5g: connect-src is 'self' and the data's https RPC origins, in every policy a build writes, printed at
+  // build; a data file adding a host shows in the CSP, an http: one stops the build.
+  it("writes connect-src as the data's RPC origins in every policy, and prints it", { timeout: 120_000 }, () => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "extra",
+        name: "Extra",
+        chainId: "extra-1",
+        rpc: "https://rpc.extra.example:8443",
+        gnoweb: "https://gnoweb.extra.example",
+        indexer: "https://indexer.extra.example:8443/graphql/query",
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+      const want = [
+        "https://rpc.extra.example:8443",
+        "https://indexer.extra.example:8443",
+        ...RPC_ORIGINS,
+        ...INDEXER_ORIGINS,
+      ].sort();
+      const directive = `connect-src 'self' ${want.join(" ")}`;
+      expect(run.stdout).toContain(`csp: ${directive}`);
+      const client = join(copy, "build", "client");
+      const rules = headerRules(readFileSync(join(client, "_headers"), "utf8"));
+      const table = nginxTable(readFileSync(join(copy, "build", "csp.conf"), "utf8"));
+      expect(rules.size).toBeGreaterThan(2);
+      // The worker's script and nginx's default answer no page: 'self' alone (docs/decisions.md, 2026-10-31).
+      const pages = [...rules, ...table].filter(([where]) => where !== "/sw.js" && where !== "default");
+      expect(pages.length).toBeGreaterThan(2);
+      for (const [where, csp] of pages)
+        expect(
+          csp.split("; ").filter((d) => d.startsWith("connect-src")),
+          where,
+        ).toEqual([directive]);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // The schema's Link refuses http: before the csp code is reached: this guards the schema, the next test the csp code.
+  it("stops on an http: RPC (the schema's guard), naming it, before any page is written", { timeout: 120_000 }, () => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "plain",
+        name: "Plain",
+        chainId: "plain-1",
+        rpc: "http://rpc.plain.example:26657",
+        gnoweb: "https://gnoweb.plain.example",
+        indexer: "https://indexer.plain.example/graphql/query",
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      expect(run.status).not.toBe(0);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/universes\.json/);
+      expect(`${run.stdout}${run.stderr}`).toMatch(/rpc/);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // R-F3 (F2952): an indexer in the data is a source of connect-src like an RPC: http: stops the build at the schema, an odd host at csp.
+  it.each([
+    ["an http: indexer", "http://indexer.plain.example/graphql/query", /universes\.json/],
+    ["a wildcard host", "https://*.indexer.example/graphql/query", /csp: .*indexer/],
+    ["a directive after the host", "https://indexer.example;script-src/graphql/query", /csp: .*indexer/],
+  ])("stops on %s, naming it, before any page is written", { timeout: 120_000 }, (_name, indexer, message) => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "odd",
+        name: "Odd",
+        chainId: "odd-1",
+        rpc: "https://rpc.odd.example",
+        gnoweb: "https://gnoweb.odd.example",
+        indexer,
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status).not.toBe(0);
+      expect(output).toMatch(message);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // The schema's Link lets a wildcard or a directive in a host through: only rpcOrigins stops it, before any page is written.
+  it.each([
+    ["a wildcard host", "https://*.rpc.example"],
+    ["a directive after the host", "https://rpc.example;script-src"],
+  ])("stops on an RPC with %s, naming it, before any page is written", { timeout: 120_000 }, (_name, rpc) => {
+    const dir = plant((files) => {
+      const universes = files["universes.json"] as Record<string, unknown>[];
+      universes.push({
+        id: "odd",
+        name: "Odd",
+        chainId: "odd-1",
+        rpc,
+        gnoweb: "https://gnoweb.odd.example",
+        indexer: "https://indexer.odd.example/graphql/query",
+        testnet: true,
+      });
+    });
+    try {
+      const run = build(dir);
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status).not.toBe(0);
+      expect(output).toMatch(/csp: .*rpc/);
+      expect(output).toContain(rpc);
+      expect(existsSync(join(copy, "build", "client", "index.html"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
 
   // Slice 5's 5e: the build writes what a search engine reads, from the same data: the mainnet's places in sitemap.xml, robots.txt
   // naming it, and the pages' tags (a testnet's page noindex, a card and a JSON-LD on each).
@@ -482,5 +701,119 @@ describe("react-router build", () => {
       writeFileSync(root, original);
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// The ticker's placeholders (Alexis, 2026-10-31): named here, so none reaches a public deploy unnoticed; removing them is
+// deleting these ids from the two files and the lines below. No sample world, number or activity.
+const DIR = new URL("../data/", import.meta.url);
+const read = (file: string): unknown => JSON.parse(readFileSync(new URL(file, DIR), "utf8"));
+
+interface Row {
+  id: string;
+  title: string;
+  link: string;
+  date?: string;
+  start?: string;
+  embed?: string;
+}
+const news = read("news.json") as Row[];
+const events = read("events.json") as Row[];
+
+/** The placeholders of the ticker, by id: three news and two events. Change this list only with the files. */
+const SAMPLE_NEWS = ["sample-news-bubble-onyx", "sample-news-demo", "sample-news-testnet"];
+const SAMPLE_EVENTS = ["sample-event-community-call", "sample-event-demo-session"];
+
+describe("the ticker's placeholders", () => {
+  beforeEach(() => {
+    expect(news.length + events.length, "the files hold the five placeholders").toBe(5);
+  });
+
+  it("are the three news and the two events this list names, and nothing else", () => {
+    expect(news.map((row) => row.id)).toEqual(SAMPLE_NEWS);
+    expect(events.map((row) => row.id)).toEqual(SAMPLE_EVENTS);
+  });
+
+  it("are counted across every data file's text, not only the two lists: five ids, no sixth hidden in another file", () => {
+    const files = readdirSync(DIR.pathname, { recursive: true }).filter(
+      (file) => !file.includes("/") && file.endsWith(".json"),
+    );
+    const found = files.flatMap((file) =>
+      [...readFileSync(new URL(file, DIR), "utf8").matchAll(/"id":\s*"(sample-[^"]*)"/g)].map((match) => match[1]),
+    );
+    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS].toSorted());
+  });
+
+  it("do not name a session of the product that no document has announced", () => {
+    expect(events.map((row) => row.title).join(" | ")).not.toMatch(/gno\.world/i);
+  });
+
+  it("each begin with sample-, so they can be found and removed", () => {
+    for (const row of [...news, ...events]) expect(row.id).toMatch(/^sample-/);
+  });
+
+  it("are the only sample- rows of the data: no sample world, ecosystem, station or number", () => {
+    const files = readdirSync(DIR.pathname, { recursive: true }).filter(
+      (file) => !file.includes("/") && file.endsWith(".json") && file !== "news.json" && file !== "events.json",
+    );
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) expect(readFileSync(new URL(file, DIR), "utf8"), file).not.toMatch(/sample/i);
+  });
+
+  it("pass the data files' own checks, as the build runs them", () => {
+    const data = loadData(DIR.pathname);
+    expect(data.news).toHaveLength(3);
+    expect(data.events).toHaveLength(2);
+  });
+
+  it("are in English, short, and hold no digit, no markup and no address in their words: no number is made up", () => {
+    for (const row of [...news, ...events]) {
+      expect(row.title, row.id).toMatch(/^[A-Za-z][A-Za-z ',.:;()-]*$/);
+      expect(row.title.length, row.id).toBeLessThanOrEqual(90);
+    }
+  });
+
+  it("link to gno.land's own pages and to nothing else, over https", () => {
+    for (const row of [...news, ...events]) {
+      const url = new URL(row.link);
+      expect(url.protocol, row.id).toBe("https:");
+      expect(url.hostname === "gno.land" || url.hostname.endsWith(".gno.land"), `${row.id}: ${url.hostname}`).toBe(
+        true,
+      );
+      expect(url.username + url.password, row.id).toBe("");
+    }
+  });
+
+  it("embed nothing: no player, so no request before a click", () => {
+    for (const row of news) expect(row.embed, row.id).toBeUndefined();
+  });
+
+  it("say what is true of this product: Bubble's rooms on Onyx, the demo and the testnet are named", () => {
+    const text = news.map((row) => row.title).join(" | ");
+    expect(text).toMatch(/bubble/i);
+    expect(text).toMatch(/onyx/i);
+    expect(text).toMatch(/demo/i);
+    expect(text).toMatch(/testnet/i);
+  });
+
+  it("show a community call whose date is to be confirmed, in its own words", () => {
+    const call = events.find((row) => row.id === "sample-event-community-call");
+    expect(call?.title).toMatch(/community call/i);
+    expect(call?.title).toMatch(/date to be confirmed/i);
+  });
+
+  it("hold no date that was made up: an event waiting for its date starts at the one far-off sentinel, which the ticker never shows", () => {
+    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the event in the strip and
+    // the gate off the calendar. A real start replaces it with the content; this test then lists the event's id out.
+    for (const row of events) {
+      expect(row.title, row.id).toMatch(/date to be confirmed/i);
+      expect(row.start ?? "", row.id).toMatch(/^2099-12-\d\dT00:00:00Z$/);
+    }
+  });
+
+  it("date no news from a day that has not come", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const row of news) expect(row.date ?? "", row.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    for (const row of news) expect((row.date ?? "") <= today, `${row.id}: ${row.date ?? ""}`).toBe(true);
   });
 });

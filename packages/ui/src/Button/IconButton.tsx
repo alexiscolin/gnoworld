@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
-import { iconLook, iconSize, type ControlSize } from "./control.ts";
+import { iconLook, iconSize, type IconControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 export interface IconButtonProps {
@@ -9,7 +9,7 @@ export interface IconButtonProps {
   // Its name without the count: the button adds the count as shown ("Notifications, 8", "Notifications,
   // over 99"), since the icon and the badge are hidden and WCAG's label in name wants the count.
   label: string;
-  size?: ControlSize;
+  size?: IconControlSize;
   emphasis?: "outline" | "plain";
   pressed?: boolean;
   count?: number;

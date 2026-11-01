@@ -190,7 +190,7 @@ export async function opened(page: Page, me: string, script: Scripted = {}): Pro
     socket = ergo;
     scriptedErgo(ergo, me, script);
   });
-  await page.goto(`/w/bubble${script.room === "#bubble" ? "" : "?room=games"}`);
+  await page.goto(`/w/bubble${script.room === "#bubble" ? "?chat=full" : "?room=games&chat=full"}`);
   await hydrated(page);
   return () => {
     if (socket === undefined) throw new Error("the page opened no socket");

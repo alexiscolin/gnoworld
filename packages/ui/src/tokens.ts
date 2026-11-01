@@ -14,7 +14,7 @@ export interface Token {
 export function groups() {
   return [
     { name: "Primitives", prefixes: ["--p-"] },
-    { name: "Colour", prefixes: ["--color-"] },
+    { name: "Colour", prefixes: ["--color-", "--world"] },
     { name: "Type", prefixes: ["--family-", "--font-", "--tracking-"] },
     { name: "Space", prefixes: ["--space-"] },
     {
@@ -28,8 +28,11 @@ export function groups() {
         "--switch-",
         "--dialog-",
         "--popover-",
+        "--plate-",
         "--thumb-",
         "--avatar-",
+        "--chat-",
+        "--flash-",
       ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },

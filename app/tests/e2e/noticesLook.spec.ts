@@ -26,7 +26,7 @@ test.describe("what an account has not seen, as it looks", () => {
         .filter({ has: page.getByRole("link", { name: "#news", exact: true }) }),
     ).toContainText("1 unread");
     await expect(page).toHaveScreenshot("notices-computer.png", {
-      mask: [page.getByRole("banner"), page.getByRole("complementary", { name: "Who's here" })],
+      mask: [page.getByRole("banner"), page.getByRole("region", { name: "Who's here" })],
     });
   });
 
@@ -37,7 +37,7 @@ test.describe("what an account has not seen, as it looks", () => {
     await field(page).press("Tab");
     await expect(page.getByText("@room notifies no one in this room", { exact: false })).toBeVisible();
     await expect(page).toHaveScreenshot("room-hint-computer.png", {
-      mask: [page.getByRole("banner"), page.getByRole("complementary", { name: "Who's here" })],
+      mask: [page.getByRole("banner"), page.getByRole("region", { name: "Who's here" })],
     });
   });
 });

@@ -34,6 +34,9 @@ services:
       inside:
         ipv4_address: *web-address
     secrets: [demo_htpasswd]
+    # markets.json, which the server writes (5l) and this serves at /markets.json (5m): read-only here.
+    volumes:
+      - markets:/markets:ro
     cpus: 0.5
     mem_limit: 128m
     pids_limit: 64
@@ -111,11 +114,16 @@ services:
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
       NO_PROXY: ergo,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
+      # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
+      MARKETS_FILE: /markets/markets.json
+      # The same read takes the default universe's block height from its RPC (the host the way out lets out besides CoinGecko's and OpenAI's).
+      UNIVERSES_FILE: /app/app/data/universes.json
     secrets: [log_pepper, ergo_oper_password, openai_api_key]
     volumes:
       - server:/data
       - auth:/run/gnoworld
       - ergo:/ergo:ro
+      - markets:/markets
     cpus: 0.4
     mem_limit: 512m
     pids_limit: 128
@@ -161,7 +169,7 @@ services:
     depends_on:
       web: { condition: service_healthy }
 
-  # The demo's way out (decision 151): OpenAI's API host alone, in the guard's network behind its rules.
+  # The demo's way out (decision 151): the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
   egress:
     <<: *locked
     profiles: [demo]
@@ -235,6 +243,8 @@ volumes:
   tailscale: {}
   ergo: {}
   server: {}
+  # markets.json, which the server writes and the home page reads (5l, 5m).
+  markets: {}
   # The auth socket's folder, which the server makes the socket in and Ergo dials.
   auth: {}
 

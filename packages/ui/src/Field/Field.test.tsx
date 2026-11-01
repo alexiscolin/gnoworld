@@ -7,6 +7,13 @@ import { Field } from "./Field.tsx";
 import * as stories from "./Field.stories.tsx";
 
 describe("Field", () => {
+  it("shows the placeholder it is given in its empty box, and none when it has none", () => {
+    const { rerender } = render(<Field label="Message" placeholder="Message #general" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("placeholder")).toBe("Message #general");
+    rerender(<Field label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("placeholder")).toBe(false);
+  });
+
   it("is a text box named by its label, described by its help", () => {
     render(<Field label="Room name" help="Up to 32 letters" value="" onChange={vi.fn()} />);
     const box = screen.getByRole("textbox", { name: "Room name" });
@@ -176,6 +183,21 @@ describe("Field", () => {
       .getAllByRole("textbox", { name: "Name" })
       .map((box) => document.getElementById(box.getAttribute("aria-describedby") ?? "")?.textContent);
     expect(said).toEqual(["first", "second"]);
+  });
+
+  it("keeps a label for assistive technology alone when asked, the box still named by it", () => {
+    const { rerender } = render(<Field label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Message").className).not.toBe("visually-hidden");
+    rerender(<Field label="Message" hideLabel value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Message").className).toBe("visually-hidden");
+    expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy();
+  });
+
+  it("takes the handle off a box of lines that grows on its own, and leaves it on the others", () => {
+    const { rerender } = render(<Field kind="lines" label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(false);
+    rerender(<Field kind="lines" label="Message" resizable={false} value="" onChange={vi.fn()} />);
+    expect(screen.getByRole("textbox", { name: "Message" }).hasAttribute("data-fixed")).toBe(true);
   });
 
   it("shows a label, help, error and prefix made of markup, or very long, as text", () => {

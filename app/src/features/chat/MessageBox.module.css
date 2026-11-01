@@ -1,0 +1,139 @@
+/* The composer's box: three rows on a grid, the format bar, the field and the foot. */
+@layer components {
+  /* The composer's one box (frame 23.58.01, prototype index.html:196-224): three rows, the format bar, the field and the
+     foot. The field draws no edge of its own; its label is for assistive technology alone, the placeholder's job. */
+  .box {
+    /* layout: three rows on one grid, so the field's words, which the field draws itself, sit in the foot's row */
+    display: grid;
+    /* layout: the marks, the words that take what is left, Send */
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-box);
+    background: var(--color-fill);
+  }
+
+  /* The box carries the focus: one mint edge, as the video's (prototype .cbox:focus-within), the field's own ring and handle gone. */
+  .box:focus-within {
+    border-color: var(--color-mine);
+  }
+
+  /* The format bar: small, in a row of its own under a rule. */
+  .format {
+    /* layout: across the box's three columns, on its first row */
+    grid-column: 1 / -1;
+    /* layout: inset from the box's edge, the rule between it and the field */
+    margin-inline: var(--space-2xs);
+    padding-block: var(--space-3xs);
+    border-block-end: var(--line-width) solid var(--color-line);
+    color: var(--color-text-muted);
+  }
+
+  /* The icons at the video's 62% of the muted grey and 13 px (prototype #fmtBar button, #fmtBar svg). */
+  .format button {
+    /* raw: the video's 62% of the muted grey (the prototype's #fmtBar button) */
+    --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
+  }
+
+  .format svg {
+    /* raw: the video's 13 px icon of the format bar */
+    inline-size: 13px;
+    /* raw: the video's 13 px icon of the format bar */
+    block-size: 13px;
+  }
+
+  /* A rule between the groups of tools: 1 px by 12 px, a step either side (prototype #fmtBar .sep). */
+  .rule {
+    /* raw: the video's rule, 1 px wide and 12 px high */
+    inline-size: 1px;
+    /* raw: the video's rule is 12 px high */
+    block-size: 12px;
+    background: var(--color-line);
+  }
+
+  /* The field's wrapper and the field's own column dissolve, so its box and its words are the grid's. */
+  .field,
+  .field > div {
+    /* layout: the field's parts join the box's grid */
+    display: contents;
+  }
+
+  .box textarea {
+    /* layout: across the box, on the second row, one line high until it grows */
+    grid-area: 2 / 1 / auto / -1;
+    min-block-size: calc(1lh + var(--space-s));
+    padding-block: var(--space-xs) var(--space-3xs);
+    padding-inline: var(--space-s);
+    border: 0;
+    outline: none;
+    background: none;
+    font: var(--font-chat);
+  }
+
+  /* What the field says of the draft, or why it cannot go, at the foot's end, before Send. */
+  .box p {
+    /* layout: in the foot's row, between the marks and Send, against Send */
+    grid-area: 3 / 2;
+    /* layout: against Send, level with it */
+    place-self: center end;
+    /* layout: a step from the marks and from Send */
+    margin-inline: var(--space-2xs);
+  }
+
+  /* The hint is muted and small; a refusal, which the field draws in the same place, keeps its own danger colour and size. */
+  .box p:not([aria-hidden]) {
+    color: var(--color-text-muted);
+    font: var(--font-hint);
+  }
+
+  .marks {
+    /* layout: the marks side by side at the foot's start */
+    display: flex;
+    /* layout: the foot's row, its first column */
+    grid-area: 3 / 1;
+    padding: var(--space-3xs) var(--space-2xs);
+  }
+
+  /* The marks at the video's 34 px and 18 px icons, in the lighter grey (prototype .ctools .tbtn). */
+  .marks button {
+    /* raw: the video's 34 px tool */
+    --_h: 34px;
+    /* raw: the prototype's .ctools .tbtn colour */
+    --_ink: #c8d0de;
+  }
+
+  .marks svg {
+    /* raw: the video's 18 px icon of the foot's tools */
+    inline-size: 18px;
+    /* raw: the video's 18 px icon of the foot's tools */
+    block-size: 18px;
+  }
+
+  /* Send: a round button with an arrow up, on the cream fill, at the foot's end. */
+  .send {
+    /* layout: the arrow in the middle of its circle */
+    display: grid;
+    /* layout: the foot's row, its last column */
+    grid-area: 3 / 3;
+    /* layout: the arrow level with its circle's middle */
+    place-items: center;
+    /* layout: a step from the box's edge and from the words beside it */
+    margin: var(--space-3xs) var(--space-2xs) var(--space-2xs) 0;
+    inline-size: var(--control-s);
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+
+  .send svg {
+    /* layout: the arrow points up, as the video's does; the icon's own points along the text */
+    rotate: -90deg;
+  }
+
+  .send:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+}

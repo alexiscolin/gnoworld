@@ -1,7 +1,7 @@
 // The keyboard and the pointer among a room's lines (4c's message menu, docs/decisions.md 2026-10-26): the list is one
 // tab stop, a line, the arrows moving among them; a line pointed at or holding the focus shows its bar.
 import type { Line } from "@gnoworld/core";
-import { useEffect, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
 
 // The place of the line a list's event happened in, a link in its words included; -1 outside a line.
 function itemAt(list: HTMLElement, target: EventTarget | null): number {
@@ -63,9 +63,13 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   // Whether the focus is in the focused line's bar (its More, its menu): that bar stays whatever the pointer does.
   const [held, setHeld] = useState(false);
   const stop = stopOf(lines, chosen, fresh);
+  // Whether the pointer is pressed in the list, off the bar: the focus it gives is no reason to move the list, which would carry the
+  // line from under the pointer between the press and the release and lose the click (a chip, a link).
+  const pressedRef = useRef(false);
   // A focused line's bar, taller than a line, comes into the list's view as the focus comes to it, the same line
   // again after the focus left the list too (G8): never as a line arrives (/code-review) or under the pointer.
   useEffect(() => {
+    if (pressedRef.current) return;
     listRef.current?.querySelector(":scope > li:focus-within [role='toolbar']")?.scrollIntoView({ block: "nearest" });
   }, [focused, listRef]);
   const on = {
@@ -95,6 +99,20 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     },
     onPointerLeave: () => {
       setPointed(undefined);
+    },
+    // A press on the bar's own controls keeps the bar in view, as before: only a line's words, a chip, a link, are pressed.
+    onPointerDown: (event: { target: EventTarget }) => {
+      pressedRef.current = !(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
+      // Released anywhere, outside the list too: a press dragged off it would else leave the list thinking it is held (27).
+      if (pressedRef.current) {
+        const until = new AbortController();
+        const release = () => {
+          pressedRef.current = false;
+          until.abort();
+        };
+        document.addEventListener("pointerup", release, { signal: until.signal });
+        document.addEventListener("pointercancel", release, { signal: until.signal });
+      }
     },
     onKeyDown: (event: KeyboardEvent<HTMLOListElement>) => {
       moveAmong(event);

@@ -1,9 +1,9 @@
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last on 2026-10-28), 3 MB in all, the worker's
+// hydrated; its steps in docs/decisions.md, the last on 2026-10-31), 3 MB in all, the worker's
 // precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 170 * 1024;
+const FIRST_SCREEN_JS = 173 * 1024;
 const TOTAL = 3 * 1024 * 1024;
 
 const compressed = (page: Page, urls: readonly string[]) =>
@@ -21,6 +21,37 @@ const compressed = (page: Page, urls: readonly string[]) =>
 // (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
 const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
+// A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
+// screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
+const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+
+// The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
+// `import("./x.js")`), from the roots that are no other's import, the proposals' chunk apart.
+const withoutProposals = (page: Page, urls: readonly string[], skip: string) =>
+  page.evaluate(
+    async ([list, skipped]) => {
+      const edges = new Map<string, string[]>();
+      for (const url of list) {
+        const text = await (await fetch(url, { cache: "no-store" })).text();
+        edges.set(
+          url,
+          [...text.matchAll(/(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/g)].map(
+            (found) => new URL(found[1] ?? "", url).href,
+          ),
+        );
+      }
+      const imported = new Set([...edges.values()].flat());
+      const kept = new Set<string>();
+      const walk = (url: string) => {
+        if (kept.has(url) || !edges.has(url)) return;
+        kept.add(url);
+        for (const next of edges.get(url) ?? []) walk(next);
+      };
+      for (const url of list) if (url !== skipped && !imported.has(url)) walk(url);
+      return [...kept];
+    },
+    [[...urls], skip] as const,
+  );
 
 for (const path of PAGES) {
   test(`${path} stays within its budgets`, async ({ page }) => {
@@ -49,7 +80,10 @@ for (const path of PAGES) {
     await stream;
     await chat;
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
-    const firstScreen = [...scripts];
+    const asked = [...scripts].filter((url) => PROPOSALS.test(url));
+    // Only a world with a realm asks for the proposals' code.
+    expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
+    const firstScreen = asked[0] === undefined ? [...scripts] : await withoutProposals(page, [...scripts], asked[0]);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),

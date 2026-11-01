@@ -10,6 +10,9 @@ const PINNED = `v${readFileSync(new URL(".node-version", import.meta.url), "utf8
 if (process.version !== PINNED)
   throw new Error(`Vitest runs on Node ${PINNED} (.node-version), not ${process.version}`);
 
+// A StrykerJS run cut short leaves its sandboxes here, and a bench measured them (5n: Cmd-K at 27 to 41 ms, not 2 to 4).
+// Only a bench can reach the folder: the projects' includes are anchored at the root. check.sh empties it too.
+const STRYKER_TMP = "**/.stryker-tmp/**";
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
 // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode otherwise
@@ -40,9 +43,12 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
+    // 10 s on a machine at load 50 to 120, where the files' first transforms queue (F3200): a hook gets a minute.
+    hookTimeout: 60_000,
     // The benches are the files ESLint's BENCHES and scripts/repo_files.py's BENCH_FILE read, `*.bench.ts(x)`: Vitest's own
     // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
-    benchmark: { include: BENCHES },
+    benchmark: { include: BENCHES, exclude: [...configDefaults.exclude, STRYKER_TMP] },
     projects: [
       // The app's components compiled, which count their renders (app/vitest.compiled.config.ts).
       "app/vitest.compiled.config.ts",

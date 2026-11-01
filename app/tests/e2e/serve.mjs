@@ -9,24 +9,19 @@ import { createReadStream, readdirSync, readFileSync, realpathSync, statSync } f
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inlineScripts, policy, sha256 } from "../../src/csp.ts";
+import { originsOf } from "../../src/cspOrigins.ts";
 import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
+import { headerRules } from "./cspFiles.mjs";
 
 const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
 // The policy of each page the build wrote (src/csp.ts), by its address, as a host that reads _headers sends it. Every other
 // answer (a file, a 400, a 401, a 500) gets the one with no hash, as nginx's map sends its default.
-const RULES = new Map();
-{
-  let rule = "";
-  for (const line of readFileSync(join(root, "_headers"), "utf8").split("\n")) {
-    if (/^\S/.test(line)) rule = line;
-    const found = /^ {2}Content-Security-Policy: (.+)$/.exec(line)?.[1];
-    if (found !== undefined) RULES.set(rule, found);
-  }
-}
+const RULES = headerRules(readFileSync(join(root, "_headers"), "utf8"));
 // The catch-all rule (`/*`) every path no page names falls to.
 const ANY = RULES.get("/*");
 if (ANY === undefined) throw new Error("serve.mjs: the build's _headers names no catch-all Content-Security-Policy");
-const BARE = ANY.replace(/ 'sha256-[^']+'/g, "");
+const BARE = policy([]);
 // The types of what the build writes (`.data`: React Router's single-fetch.js). Any other kind of
 // file answers 500, so the journeys fail on it rather than pass on a type no real host would give.
 const TYPES = {
@@ -105,20 +100,16 @@ function workerOfRelease() {
 }
 
 // A page of the release: its own scripts' hashes, from the bytes it is sent with (a data block has none).
-function policyOfRelease(file) {
-  const hashes = new Set();
-  for (const [, attributes, text] of released(file)
-    .toString("utf8")
-    .matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))
-    if (!/\ssrc\s*=/i.test(attributes) && !/ld\+json/i.test(attributes))
-      hashes.add(`'sha256-${digest(text, "sha256")}'`);
-  return BARE.replace("script-src 'self'", `script-src 'self' ${[...hashes].join(" ")}`);
+// The build's own reading of the page (csp.ts), so the journeys hold a release to the rule the build holds, the RPC origins
+// the build named included (the home reads a block height).
+async function policyOfRelease(file) {
+  return policy(await Promise.all(inlineScripts(released(file).toString("utf8")).map(sha256)), originsOf(ANY));
 }
 
 // The policy of an answer: a page's, as a host that reads _headers picks it, by the request path (the rule that names it, else
 // the catch-all `/*`, whatever file is served there: F2451); a release's from the bytes it is sent with; any other file the
 // bare one, as nginx's map sends its default.
-function policyOf(file, pathname, deployed) {
+async function policyOf(file, pathname, deployed) {
   if (!file.endsWith(".html")) return BARE;
   if (deployed) return policyOfRelease(file);
   return RULES.get(pathname) ?? ANY;
@@ -132,7 +123,7 @@ function host({ bumping = false, password = false }) {
   let tampered = false;
   let down = false;
   let deployed = false;
-  return (request, response) => {
+  return async (request, response) => {
     response.setHeader("content-security-policy", BARE);
     if (password && request.headers.authorization !== PASSWORD) {
       response.writeHead(401, { "www-authenticate": 'Basic realm="gno.world demo"' }).end();
@@ -198,7 +189,7 @@ function host({ bumping = false, password = false }) {
       response.writeHead(500).end();
       return;
     }
-    response.setHeader("content-security-policy", policyOf(served, pathname, deployed));
+    response.setHeader("content-security-policy", await policyOf(served, pathname, deployed));
     response.writeHead(found ? 200 : 404, { "content-type": type });
     if (deployed) {
       const body = pathname === "/sw.js" ? workerOfRelease() : released(served);

@@ -4,7 +4,7 @@
 import type { MetaDescriptor } from "react-router";
 import type { Ecosystem, UniverseView, World } from "./places.ts";
 
-const ORIGIN = "https://gno.world";
+export const ORIGIN = "https://gno.world";
 
 const HUB = "gno.world, the social, on-chain hub of gno.land";
 
@@ -70,6 +70,11 @@ export function worldMeta(world: World | undefined): MetaDescriptor[] {
 /** A world that failed to load for another reason than its name. */
 export function failedWorldMeta(): MetaDescriptor[] {
   return unindexed("This world could not load");
+}
+
+/** A realm's view: titled by the realm's path, never indexed (its page is the chain's and gnoweb's), or, with none, not found. */
+export function realmMeta(realm: string | undefined): MetaDescriptor[] {
+  return unindexed(realm ?? "No realm here");
 }
 
 /** A path no route matches. */

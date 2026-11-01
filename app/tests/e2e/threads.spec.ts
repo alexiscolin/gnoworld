@@ -400,7 +400,7 @@ test.describe("threads", () => {
         replayed: sockets.length === 1 ? REPLIES.slice(0, 1) : [...REPLIES, away],
       });
     });
-    await page.goto("/w/bubble?room=games");
+    await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await chipOf(lines(page).first()).click();
     await expect(inThread(page)).toHaveCount(2);
@@ -473,14 +473,15 @@ test.describe("threads", () => {
     test("loads the panel's code when a thread is first opened, never before", async ({ page }) => {
       const asked: string[] = [];
       page.on("request", (request) => {
-        if (/\/assets\/ThreadBody-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
+        if (/\/assets\/Thread(Panel|Body)-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
       });
       await open(page);
       await expect(chipOf(lines(page).first())).toBeVisible();
       expect(asked).toEqual([]);
       await chipOf(lines(page).first()).click();
       await expect(panel(page)).toBeVisible();
-      expect(asked).toHaveLength(1);
+      // The panel's own code, then the thread's body it draws: both asked at the first thread, none before.
+      await expect.poll(() => asked.length).toBe(2);
     });
   });
 

@@ -36,6 +36,58 @@ done
 engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
 [ "${engine%%.*}" -ge 28 ] 2>/dev/null || missing "Docker Engine 28 or later is needed (an isolated network's gateway), not [$engine]"
 
+# --- One run at a time per project (2026-10-30: two runs shared gnoworld-demo-test, and each one's start removed the other's
+# containers: `No such container`). The lock is a folder in the user's own cache, not in TMPDIR, which a sandbox and a terminal
+# do not share; it holds its run's pid, so a run killed hard leaves a lock the next one finds dead and takes over. --demo starts
+# and removes nothing of the test's, and takes none.
+lock_dir=$HOME/.cache/gnoworld-tools
+lock=$lock_dir/deploy-test-$project.lock
+locked=
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616).
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
+release() { if [ -n "$locked" ] && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "${lock:?}"; fi; }
+if [ "${1:-}" != --demo ]; then
+	mkdir -p "$lock_dir"
+	if ! mkdir "$lock" 2>/dev/null; then
+		holder=$(cat "$lock/pid" 2>/dev/null || true)
+		if [ -z "$holder" ]; then sleep 1; holder=$(cat "$lock/pid" 2>/dev/null || true); fi # the run that made it is writing its pid
+		if [ -n "$holder" ] && pid_alive "$holder"; then
+			missing "another run (pid $holder) already holds the project $project: wait for it to end, or stop it"
+		fi
+		rm -rf "${lock:?}"
+		mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"
+	fi
+	echo "$$" >"$lock/pid"
+	locked=yes
+fi
+# Stopped by a signal, a run still removes what it made: exit runs the EXIT trap, which a shell otherwise skips while a command runs.
+trap 'release' EXIT
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+# A run a Ctrl+C left up (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named, not run beside.
+if [ "${1:-}" != --demo ]; then
+	leftover=$({
+		docker compose ls --all --format json 2>/dev/null | python3 -I -c 'import json, sys
+try:
+    for p in json.load(sys.stdin):
+        print(p.get("Name", ""))
+except ValueError:
+    pass' || true
+		docker network ls --format '{{.Name}}' 2>/dev/null | sed -n 's/^\(gnoworld-demo-mutant-[0-9]*\)_.*/\1/p' || true
+	} | grep -E '^gnoworld-demo-mutant-[0-9]+$' | grep -vx "$project" | sort -u | head -1 || true)
+	if [ -n "$leftover" ]; then
+		missing "the project $leftover is up (a run still going, or one a Ctrl+C left); it holds the test's network: docker compose -p $leftover down -v"
+	fi
+fi
+
 pass() { printf 'ok    %s\n' "$1"; }
 fail() {
 	printf 'FAIL  %s\n' "$1"
@@ -104,6 +156,7 @@ python3 -m http.server --bind 0.0.0.0 --directory "$tmp/canary" "$canary" >/dev/
 canary_pid=$!
 files="-f $here/compose.yaml${TEST_OVERRIDE:+ -f $TEST_OVERRIDE} --profile demo" # down leaves a profile's services otherwise
 cleanup() {
+	release
 	kill "$canary_pid" 2>/dev/null || true
 	wait "$canary_pid" 2>/dev/null || true
 	if [ -n "${started:-}" ]; then
@@ -300,7 +353,7 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
-	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=160#burst=60#'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=320#burst=60#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
 	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
@@ -382,6 +435,14 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "web's room for 1,024 connections" "forty visitors at their 16 WebSockets each, and another is served" \
 		nginx sed 's#worker_connections [0-9]*;#worker_connections 1024;#'
 	mutant "web's files left to Docker's default" "web may hold 8,192 files" compose 'services: { web: { ulimits: !reset {} } }'
+	mutant "web does not mount markets" "web serves markets.json from the volume" \
+		compose 'services: { web: { volumes: !override [] } }'
+	mutant "markets.json open without the password" "web serves markets.json only with the password" \
+		nginx awk '{ print } /location = \/markets\.json \{/ { print "            auth_basic off;" }'
+	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
+		nginx sed '/disable_symlinks on/d'
+	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
+		compose 'services: { web: { volumes: !override [ "markets:/markets" ] } }'
 	mutant "the server may write Ergo's volume" "the server holds Ergo's volume read-only" \
 		compose 'services: { server: { volumes: !override [ "server:/data", "auth:/run/gnoworld", "ergo:/ergo" ] } }'
 	mutant "the server measures another volume" "and it is Ergo's own volume" \
@@ -389,7 +450,17 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
-	mutant "a host added to the way out" "the way out lets one host out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	mutant "a host added to the way out" "the way out lets three hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
+	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
+	mutant "CoinGecko's whole domain let out" "the way out lets three hosts out" \
+		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
+	# The default universe's RPC (decision of 2026-10-31): its line gone, another universe's RPC let out beside it, its whole domain
+	# let out. A server with no data file fails closed at boot (main.test.ts), which the stack's start shows, no mutant needed.
+	mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC" acl sed '/- rpc\.onyx\./d'
+	mutant "another universe's RPC let out" "the way out lets three hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.gno.land" }'
+	mutant "the default RPC's whole domain let out" "the way out lets three hosts out" \
+		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
@@ -705,12 +776,12 @@ PY
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-400]')" 200
-	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-400]')" 200
-	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-400]')" 200
+	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-800]')" 200
+	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-800]')" 200
+	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-800]')" 200
 	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-400]" || true)
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-800]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"
@@ -726,7 +797,7 @@ PY
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-400]"
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-800]"
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
@@ -797,10 +868,11 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 	esac
 	# genpasswd hashes the first line alone: a blank or short one before a long one is refused too, and any shape
 	# but one word of 32 to 72 printable characters, 72 being what bcrypt keeps (F706). Each case is the file's text.
-	oper_render() { # printf's arguments: the file's text
-		printf "$@" >"$tmp/shaped_oper_password"
-		chmod 644 "$tmp/shaped_oper_password"
-		ERGO_OPER_PASSWORD_FILE=$tmp/shaped_oper_password docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
+	oper_render() { # printf's arguments: the file's text, in a new file each time, as `nginx` above (a run is a subshell: no counter)
+		shaped=$(mktemp "$tmp/shaped_oper_password.XXXXXX")
+		printf "$@" >"$shaped"
+		chmod 644 "$shaped"
+		ERGO_OPER_PASSWORD_FILE=$shaped docker compose -p "$project" $files run --rm --no-deps -e RENDER_ONLY=1 ergo 2>&1
 	}
 	oper_refused() { # what it is, then printf's arguments
 		what=$1
@@ -1250,13 +1322,25 @@ setTimeout(() => {
 	result=$(via https://api.openai.com/v1/models)
 	case $result in "200 "[1-5]*) pass "OpenAI's API answers through the way out" ;; *) fail "OpenAI's API does not answer through the way out: [$result]" ;; esac
 	docker cp "$egress:/etc/smokescreen/acl.yaml" - | tar -xO >"$tmp/acl.yaml"
-	expect "the way out lets one host out: OpenAI's API" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" "api.openai.com "
+	# The default universe's RPC host and another universe's, from the data the server reads (app/data/universes.json): the list holds
+	# the first, and the second stays refused.
+	rpc_host=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["rpc"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	other_rpc=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	gnoweb_host=$(python3 -I -c 'import json, sys, urllib.parse as u
+rows = json.load(open(sys.argv[1]))
+print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	expect "the way out lets three hosts out: CoinGecko's API, OpenAI's and the default universe's RPC" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
+		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" | sort | tr '\n' ' ')"
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
 	refuses() {
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
-	for target in https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://1.1.1.1/ \
+	for target in "https://$other_rpc/" "https://$rpc_host.evil.test/" "https://$gnoweb_host/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
 	done
@@ -1268,7 +1352,47 @@ setTimeout(() => {
 	# The server's own requests take the way out: Node's proxy from its settings (NODE_USE_ENV_PROXY, Node 24).
 	fetched() { docker exec "$server" /nodejs/bin/node -e "fetch('$1').then((r) => console.log(r.status), (e) => console.log('refused'))" 2>&1 || true; }
 	case $(fetched https://api.openai.com/v1/models) in [1-5][0-9][0-9]) pass "the server reaches OpenAI's API through the way out" ;; *) fail "the server does not reach OpenAI's API" ;; esac
+	# The prices timer's host (5l): CoinGecko's keyless price endpoint, asked as the timer asks it.
+	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
+	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
+	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
+	# The server read the data it names (UNIVERSES_FILE) at boot, or it would not be up: its default RPC is the list's third host.
+	expect "the server's data holds the default universe's RPC" "$(docker exec "$server" /nodejs/bin/node -e "const rows = JSON.parse(require('fs').readFileSync(process.env.UNIVERSES_FILE, 'utf8')); console.log(new URL(rows.find((row) => row.default).rpc).hostname)" 2>&1 || true)" "$rpc_host"
+	# The running timer itself writes the block (not a planted file): its first tick asks CoinGecko and the default RPC through the way
+	# out. A 429 from CoinGecko writes no file at all (the prices fail first), so this waits a minute and says what it saw.
+	timer_block=none
+	for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+		timer_block=$(docker exec "$server" /nodejs/bin/node -e "try { const m = JSON.parse(require('fs').readFileSync('/markets/markets.json', 'utf8')); console.log(Number.isSafeInteger(m.block?.height) && m.block.host === process.argv[1] ? 'block' : 'none') } catch { console.log('none') }" "$rpc_host" 2>/dev/null || true)
+		[ "$timer_block" = block ] && break
+		sleep 5
+	done
+	# CoinGecko's 429 is its answer to this address, and the prices fail first: said, and not judged (F3378). Nothing else excuses it.
+	if [ "$timer_block" != block ] && docker logs "$server" 2>&1 | grep -q '"error":"rate_limited"'; then
+		printf 'waived the running timer writes the block height: CoinGecko answered 429\n'
+	else
+		expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
+	fi
+	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
+	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
+	# markets.json through the web container (5m): a file the server wrote, read-only there, kept for a minute, with the
+	# server's headers (the location adds none of its own); the proof that Compose's volume, nginx's location and its cache
+	# line agree. The timer's file is replaced for the run and removed after: the timer writes it again.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/markets.json', JSON.stringify({ source: 'CoinGecko', updated: new Date().toISOString(), tokens: [] }))" >/dev/null 2>&1 || true
+	expect "web serves markets.json from the volume the server writes" "$(status /markets.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves markets.json with a short cache" "$(header cache-control /markets.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
+	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
+	expect "web serves markets.json only with the password" "$(status /markets.json 203.0.113.3)" 401
+	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404
+	# The mount itself, as Ergo's volume is checked: web is not the folder's owner, so a write is refused even on a writable mount.
+	expect "web cannot write in the folder of markets.json" \
+		"$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/markets"}}{{.RW}}{{end}}{{end}}' "$web")" false
+	expect "and it is the volume the server writes" "$(mounted "$web" /markets) $(mounted "$server" /markets)" "${project}_markets ${project}_markets"
+	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/markets.json')" >/dev/null 2>&1 || true
+	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
 	# whatever its list says. An ad hoc proxy of the same image and the live settings, its list its own, in the
 	# guard's network on 4751, asked from there: the guard's rules let only 4750's replies out to the network.

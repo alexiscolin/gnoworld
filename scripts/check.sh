@@ -7,7 +7,7 @@
 # - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
-# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the guard files the
+# - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the lines the
 #   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27), and without the stories, the
 #   coverage lane and prove_fix when no product code changed since main (2026-10-29); it records the fast gate only.
 #
@@ -15,18 +15,96 @@
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
 # shell's own differs.
 set -eu
-cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
-unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
-full=false merge=false
-[ "${1:-}" = "--full" ] && full=true
-[ "${1:-}" = "--merge" ] && full=true merge=true
 started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set
 # on the last line, tells a run that reached its end from one that died on the way.
-trap 'status=$?; rm -rf "$logs" || :; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
+lock_held=
+# Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
+release_lock() {
+	[ -n "$lock_held" ] || return 0
+	holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+	if [ -z "$holder" ] || [ "$holder" = "$$" ]; then rm -rf "${merge_lock:?}"; fi
+}
+# A failing run ends on its own last line, after any tail it showed (a nested fixture's log ended one on `all checks passed`, and a reader
+# of the last line took the run for a pass): `check.sh: FAILED at <lane>:<step>`, on every exit path, signals included.
+failed_at=
+say_failed() { # $status is the exit code the shell had; a run that never reached its last line failed too, whatever the code
+	[ "$status" != 0 ] || [ "${finished:-}" != 1 ] || return 0
+	echo "check.sh: FAILED at ${failed_at:-main:${step_name:-start}}" >&2
+}
+trap 'status=$?; rm -rf "${logs:?}" || :; release_lock; say_failed; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
+cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
+unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
+unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
+unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
+# The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
+# to 10240 for every step, up or down, and a limit that cannot be set is said, never hidden.
+open_files=$(ulimit -S -n)
+if [ "$open_files" != 10240 ]; then
+	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not set the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
+fi
+full=false merge=false
+[ "${1:-}" = "--full" ] && full=true
+[ "${1:-}" = "--merge" ] && full=true merge=true
+# `--full|--merge --base <ref>`: what this run's branch is measured against, in every lane that reads a base (the batch, the fixes, the
+# regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product code, the survivors listed): the
+# merge-base with <ref>, origin/main when absent. A branch cut from an integration branch names it (F2531): from main its range holds
+# the other branches' lines too.
+base_ref=origin/main
+if [ "${2:-}" = "--base" ]; then
+	base_ref=${3:-}
+	[ -n "$base_ref" ] || { echo "check.sh: --base wants a ref to compare with" >&2; exit 1; }
+fi
+changed_list= # the paths this branch changed since its base, one a line, once a full run has computed them
+# Alive means the process exists: `kill -0` fails alike for a gone pid (ESRCH) and for a live one another sandbox owns (EPERM, F2616), so
+# only ESRCH counts as dead. Python reads the errno, not the shell's wording.
+pid_alive() {
+	python3 -Ic 'import os, sys
+try:
+    os.kill(int(sys.argv[1]), 0)
+except ProcessLookupError:
+    sys.exit(1)
+except PermissionError:
+    pass' "$1"
+}
+# One merge check at a time on the machine (harness-c, Alexis 2026-10-31: five side by side at a load of 25 to 40 on 16 cores failed by load
+# alone). `--merge` takes a lock shared by every worktree, a folder in the tools' cache holding its pid, its worktree and its start (seconds),
+# and WAITS for a live holder, never refuses; a holder whose pid is gone (a crash, a kill -9) leaves no wait and its lock is taken over.
+# mkdir is the atomic step. Only the run that took the lock frees it, by its pid, so a waiter that is interrupted drops nothing of another's.
+# The fast gate and --full take none. The run's time starts after the wait.
+if $merge; then
+	mkdir -p "${merge_lock%/*}"
+	announced= unread=0
+	until mkdir "$merge_lock" 2>/dev/null; do
+		holder=$(cat "$merge_lock/pid" 2>/dev/null || :)
+		if [ -z "$holder" ]; then
+			# The run that made the folder is writing its pid; a folder that stays empty (a run killed in between) is nobody's.
+			unread=$((unread + 1))
+			[ "$unread" -lt 6 ] || { rm -rf "${merge_lock:?}"; unread=0; continue; }
+			sleep 1
+			continue
+		fi
+		unread=0
+		if ! pid_alive "$holder"; then # gone (ESRCH): its lock is taken over. A refused signal (EPERM) is a live process of another sandbox (F2616)
+			rm -rf "${merge_lock:?}"
+			continue
+		fi
+		if [ -z "$announced" ]; then
+			since=$(cat "$merge_lock/since" 2>/dev/null || :)
+			echo "check.sh --merge: waiting for the merge check of $(cat "$merge_lock/worktree" 2>/dev/null || echo "another worktree") (pid $holder), running since $(date -r "${since:-0}" '+%H:%M:%S' 2>/dev/null || echo "${since:-an unknown time}"): one merge check at a time on this machine" >&2
+			announced=1
+		fi
+		sleep 1
+	done
+	lock_held=1
+	printf '%s\n' "$$" >"$merge_lock/pid"
+	pwd >"$merge_lock/worktree"
+	date +%s >"$merge_lock/since"
+	started=$(date +%s) # the wait is not the run's time
+fi
 # The code this run tests; at the end it is recorded, unless it changed meanwhile (F076).
 tested=
 # A merge being committed has no time budget (Alexis, 2026-10-28): the full gate follows every merge. In a repository, git says
@@ -85,6 +163,7 @@ fi
 # module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
 # on a file's own text, so a type changed elsewhere would hide the error it brings there.
 all=true ts=false app=false gno=false tokens=false related=true changed=
+regressions=false audit=false # a test file touched; the lockfile changed (below)
 if ! $full && [ -z "$tested" ]; then
 	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
 elif ! $full; then
@@ -100,11 +179,21 @@ if [ -n "$changed" ]; then
 	while IFS= read -r path; do
 		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
 		code=true
+		# A commit that touches a test, a bench or an approved picture runs check_regressions (a renamed test passed the fast gate
+		# in 5b and failed only the merge check); one that changes the lockfile runs the audit (lighthouse's advisories showed only
+		# at the merge check, 5e). .githooks/pre-commit holds the same list of tests, for the staged copy's own gate.
+		case $path in
+		*.test.ts | *.test.tsx | *.bench.ts | *.bench.tsx | *.spec.ts | *_test.gno | *_test.go | *-snapshots/*.png | *__screenshots__/*.png) regressions=true ;;
+		pnpm-lock.yaml) audit=true ;;
+		esac
 		case $path in
 		server/src/*) ts=true related=false ;;
-		app/src/*.ts | app/src/*.tsx | app/tests/*.ts | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
+		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
+		app/tests/*.ts) ts=true ;; # the journeys and their helpers run in the merge check and --full alone
+		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
 		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
-		app/src/* | app/tests/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		app/tests/*) ts=true related=false ;;
+		app/src/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
 		esac
@@ -114,8 +203,18 @@ EOF
 	$code || all=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true related=false
+# check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
+# runs it (and the audit) whole. Its base is where the branch left main, so a `Removed-test:` line of an earlier commit of the
+# branch counts; with no origin/main, HEAD; with no commit yet, or no repository, nothing to compare (no base).
+regr_base=
+if $merging; then regressions=false; fi
+if $merging; then audit=false; fi
+if $regressions; then
+	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
+	[ -n "$regr_base" ] || regressions=false
+fi
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
-# A run that builds the app runs every journey, the work of a run of everything: 73-96 s on a quiet machine (slice-5a, F2162).
+# A run that builds the app has the build to wait for, and the lint and types of a whole project: the budget of a run of everything. A commit's gate walks no journey (Alexis, 2026-10-31): the merge check and --full do.
 $all || $app || budget=30
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
 tests_scope=
@@ -157,6 +256,29 @@ start() {
 	eval "pid_$lane=\$!"
 }
 seconds() { echo "$(($1 / 1000)).$(($1 % 1000 / 100))"; }
+# survivors <log>: every mutant that survived, as one line `survivor: <path>: line L:C [Status] Kind`, pass or fail (F2359, F2409: the
+# lanes' logs are shown only on failure, and StrykerJS exits 0 with survivors, so the Workflow loop never saw one). StrykerJS's
+# clear-text report (clear-text-reporter.js, v10) writes `[Survived] Kind` or `[NoCoverage] Kind`, then `path:line:column`;
+# harness_mutate.py writes `FAIL  survives: <mutant>`. A Killed mutant is neither.
+# Output sized by the change, not the codebase (F2529): with `changed_list`, a StrykerJS survivor on a file this branch did not change is
+# counted in one line (`survivors not listed: N ...`, no `survivor: ` line), the others and every harness mutant are listed.
+survivors() {
+	awk -v changed_list="$changed_list" '
+	BEGIN { while (changed_list != "" && (getline file < changed_list) > 0) changed[file] = 1 }
+	/^\[(Survived|NoCoverage)\] / { status = $1; gsub(/[][]/, "", status); kind = $0; sub(/^\[[A-Za-z]+\] /, "", kind); want = 1; next }
+	want && $0 ~ /^[^ :][^ ]*:[0-9]+:[0-9]+$/ {
+		n = split($0, part, ":")
+		path = substr($0, 1, length($0) - length(part[n]) - length(part[n - 1]) - 2)
+		want = 0
+		if (changed_list != "" && !(path in changed)) { left++; if (!(path in elsewhere)) { elsewhere[path] = 1; files++ } next }
+		print "survivor: " path ": line " part[n - 1] ":" part[n] " [" status "] " kind
+		next
+	}
+	/^\[/ { want = 0 }
+	/^FAIL  survives: / { sub(/^FAIL  survives: /, ""); print "survivor: " $0 }
+	END { if (left) print "survivors not listed: " left " StrykerJS survivors on " files " unchanged file" (files == 1 ? "" : "s") ", none of them changed by this branch since its base" }
+	' "$1"
+}
 # finish <lane>...: waits for each lane, prints its time and its steps', then each failed one's output.
 finish() {
 	failed=
@@ -174,8 +296,10 @@ finish() {
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
 		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
+		survivors "$logs/$l.log"
 	done
 	for l in $failed; do
+		[ -n "$failed_at" ] || failed_at="$l:$(cat "$logs/$l.at" 2>/dev/null || echo start)"
 		echo "check.sh: lane $l failed at $(cat "$logs/$l.at" 2>/dev/null || echo its start):" >&2
 		cat "$logs/$l.log" >&2
 	done
@@ -204,7 +328,11 @@ else:
 
 lane_ts() {
 	step format
-	run format:check
+	# Prettier's cache is keyed by a file's path and content: in a repository it lives in the worktree's own .claude/tmp and makes a rerun of
+	# an unchanged tree 0.9 s of 7.5 (speed-audit.md, row 6); pre-commit's staged copy is a new folder each time, so it keeps none, and --full and --merge read no writable cache.
+	format_cache=
+	{ $full || [ -z "$tested" ]; } || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
+	run format:check "$format_cache"
 	step unused
 	run unused
 	step copies
@@ -219,12 +347,20 @@ lane_ts() {
 	# A build never installs: React Router's default server entry adds isbot and runs the package
 	# manager, with whatever access the build has (finding F080).
 	step app
+	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
+	installed=$(packages)
+	if ! $full; then
+		# A commit's gate builds the app and walks no journey (Alexis, 2026-10-31: 487 and 505 CPU s of journeys against 67 to 91 for the
+		# rest of a commit's gate, speed-audit.md): the build still fails on a route or an import the types do not see. The merge check
+		# and --full walk every journey, which build the app themselves.
+		run build:app
+		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
+		return 0
+	fi
 	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
 	# a port taken between this and the build fails the run, never another's.
 	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
-	packages() { cat package.json app/package.json pnpm-lock.yaml | cksum; }
-	installed=$(packages)
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
 	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
@@ -287,6 +423,14 @@ lane_pictures() {
 lane_docs() {
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
+	if $regressions; then
+		step regressions # no test gone, no floor lower, no approved picture changed, unless a commit of the branch says why
+		python3 -I scripts/check_regressions.py --quick "$regr_base" # per commit: the base's listing cached, only the touched files listed (F2579)
+	fi
+	if $audit; then
+		step audit
+		python3 -I scripts/audit.py
+	fi
 	step parse
 	# Some scripts run only in --full: a broken one would pass every commit (finding F084).
 	python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
@@ -327,13 +471,14 @@ if ! $full && [ "$took" -gt "$budget" ]; then
 fi
 
 if $full; then
-	base=$(git merge-base HEAD origin/main) || { echo "check.sh --full: needs origin/main to compare with (git fetch)" >&2; exit 1; }
+	base=$(git merge-base HEAD "$base_ref") || { echo "check.sh --full: needs $base_ref to compare with (git fetch, or a ref that exists)" >&2; exit 1; }
+	changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
+	printf '%s\n' "$changes" >"$logs/changed" && changed_list="$logs/changed"
 	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
 	# the linters' configs alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
 	product=true
 	if $merge; then
 		product=false
-		changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
 		while IFS= read -r path; do
 			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
 		done <<EOF
@@ -348,6 +493,10 @@ EOF
 		python3 -I scripts/probe.py
 		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
 		python3 -I scripts/bench.py
+		if $merge; then
+			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
+			python3 -I scripts/check_nginx.py
+		fi
 	}
 	lane_stories() {
 		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
@@ -371,6 +520,9 @@ EOF
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
 		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
 		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
+		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
+		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
 		mkdir -p "${cache%/*}"
 		! parses "$cache" || cp "$cache" "$own"
 		stryker=0

@@ -37,6 +37,7 @@ describe("IconButton", () => {
   it.each([
     ["plain", "s", "m"],
     ["outline", "l", "l"],
+    ["plain", "xs", "m"],
   ] as const)("shows emphasis %s and size %s, with the icon at %s", (emphasis, size, iconSize) => {
     render(<IconButton icon="bell" label="Notifications" emphasis={emphasis} size={size} />);
     const button = screen.getByRole("button");
