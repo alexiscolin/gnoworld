@@ -93,13 +93,27 @@ describe("readRealmPaths", () => {
       expect(paced).toBe(chain.asked.length);
     });
 
-    it("gives up as too_many, after a bounded number of requests, on a chain that fills every prefix", async () => {
+    it("stops asking at the request cap and returns what it found, marked partial, not a fault (F3538)", async () => {
+      // Every prefix is full, and a prefix that is a realm path itself comes back as its own line.
       const hostile = (prefix: string): string =>
-        Array.from({ length: 10 }, (_, i) => `${prefix}${i.toString(36)}`).join("\n");
+        [prefix, ...Array.from({ length: 9 }, (_, i) => `${prefix}${i.toString(36)}`)].join("\n");
       const { chain, read } = pagedRead([], 10, hostile);
-      expect(await read()).toEqual({ ok: false, kind: "too_many" });
-      expect(chain.asked.length).toBeLessThanOrEqual(LIST_MAX_QUERIES);
+      const result = await read();
+      expect(chain.asked).toHaveLength(LIST_MAX_QUERIES);
+      expect(result.ok && result.partial).toBe(true);
+      expect(result.ok && result.paths.length).toBeGreaterThan(0);
     });
+  });
+
+  it("holds a full page of the longest legal paths: 256 bytes a path, 10,000 paths (F3538)", async () => {
+    const longest = Array.from(
+      { length: LIST_MAX_PATHS },
+      (_, i) => `gno.land/r/${"n".repeat(100)}/b${String(i).padStart(143, "0")}`,
+    );
+    expect(longest.every((path) => path.length === 256)).toBe(true);
+    const chain = fakeChain({ paths: () => longest.join("\n") });
+    const result = await readRealmPaths({ send: chain.send, rpc: RPC, limit: LIST_MAX_PATHS + 1 });
+    expect(result).toEqual({ ok: true, paths: longest });
   });
 
   it("takes an answer of exactly the byte cap and refuses one byte over", async () => {

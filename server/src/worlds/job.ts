@@ -124,6 +124,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   const pace = pacer(settings.wait, settings.pauseMs);
   const list = await readRealmPaths({ send, rpc: universe.rpc, pace });
   if (!list.ok) return list.kind;
+  if (list.partial === true) settings.log("worlds_shed", { error: "list" });
   const last = loadLast(settings.file, universe.id);
   const lastWorlds = new Map(last?.worlds.map((world) => [world.id, world] as const));
   const lastRealms = new Map(

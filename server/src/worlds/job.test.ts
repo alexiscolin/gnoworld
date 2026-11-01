@@ -431,6 +431,15 @@ describe("runWorlds", () => {
       });
     });
 
+    it("logs a list cut at the request cap once by a kind, and still writes what it found (F3538)", async () => {
+      // Every prefix answers a full page (10,000 lines); a prefix that is a realm path itself is among its lines.
+      const filler = Array.from({ length: 9_999 }, (_, i) => `gno.land/r/zz/p${String(i)}`).join("\n");
+      const { file, outcome, logged } = await run(chainRoutes([], { paths: (prefix) => `${filler}\n${prefix}` }));
+      expect(outcome).toEqual({ wrote: true });
+      expect(written(file).worlds.length).toBeGreaterThan(0);
+      expect(logged.filter(({ error }) => error === "list")).toEqual([{ event: "worlds_shed", error: "list" }]);
+    });
+
     it("writes a file for the recorded list of 743 realms under the default cap, with room to spare", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
         .split("\n")
