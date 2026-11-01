@@ -2,6 +2,9 @@
 // warped at low frequency, recoloured through a ramp, flooded, frozen or cracked, then lit: dusty on airless worlds, soft on cloudy ones.
 import { FIELD, LOOKUP, SEAMS } from "./chunks.ts";
 
+/** How fast a world turns, in radians a second of its `time`. */
+export const SPIN = 0.012;
+
 export const SURFACE_VERTEX = /* glsl */ `
 uniform vec3 sun;
 varying vec3 vLocal;
@@ -24,6 +27,7 @@ uniform sampler2D surface;
 uniform sampler2D second;
 uniform sampler2D cloudMap;
 uniform sampler2D ringMap;
+uniform sampler2D nightMap;
 uniform mat3 spin;
 uniform vec3 sun;
 uniform vec3 warpOffset;
@@ -52,6 +56,7 @@ uniform float glowLevel;
 uniform float ringInner;
 uniform float ringOuter;
 uniform float ringOpacity;
+uniform float nightLights;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -120,7 +125,7 @@ ${SEAMS}
 ${LOOKUP}
 ${PARTS}
 void main() {
-  float angle = time * 0.012;
+  float angle = time * ${String(SPIN)};
   vec3 axis = turned(normalize(vLocal), angle);
   vec3 flow = field(axis * warpFrequency + warpOffset);
   vec3 direction = spin * normalize(axis + warpAmount * flow);
@@ -144,6 +149,8 @@ void main() {
     wet = 1.0 - smoothstep(seaLevel - 0.012, seaLevel + 0.012, tone);
     albedo = mix(albedo, mix(seaDeep, seaShallow, smoothstep(seaLevel - 0.16, seaLevel, tone)), wet);
   }
+  // A real map holds its own seas: they are where it is bluest.
+  if (nightLights > 0.0) wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
   if (caps > 0.0) {
     float frozen = smoothstep(1.0 - caps, 1.0 - caps + 0.05, abs(axis.y) + 0.07 * flow.y + 0.16 * (tone - 0.5));
     albedo = mix(albedo, vec3(0.86, 0.9, 0.95), frozen);
@@ -169,8 +176,10 @@ void main() {
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
   float ripple = 0.55 + 0.45 * field(direction * 90.0).x;
-  colour += wet * (pow(gleam, 900.0) * 0.9 + pow(gleam, 90.0) * 0.05) * ripple * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
+  float glitter = nightLights > 0.0 ? pow(gleam, 320.0) * 0.13 : (pow(gleam, 900.0) * 0.9 + pow(gleam, 90.0) * 0.05) * ripple;
+  colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
 
+  float overcast = 0.0;
   if (cloudCover > 0.0) {
     vec3 high = spin * normalize(turned(axis, time * 0.006) + 0.09 * flow.yzx);
     float low = 1.0 - cloudCover * 1.25;
@@ -178,6 +187,14 @@ void main() {
     float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
     colour *= 1.0 - 0.36 * shadowed;
     colour = mix(colour, vec3(0.84, 0.86, 0.9) * shine * sunlight + 0.0015, cover * 0.9);
+    overcast = cover;
+  }
+  if (nightLights > 0.0) {
+    Lookup place = lookupOf(direction);
+    vec3 cities = read(nightMap, place).rgb;
+    vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
+    float dusk = 1.0 - smoothstep(-0.14, 0.05, day);
+    colour += (cities * 2.6 + spill * 0.9) * vec3(1.0, 0.8, 0.52) * dusk * (1.0 - 0.8 * overcast);
   }
   if (glowLevel > 0.0) {
     float heat = rifts > 0.0 ? rift * rift * smoothstep(0.1, 0.8, flow.z + 0.4) : smoothstep(glowLevel, glowLevel + 0.1, tone);

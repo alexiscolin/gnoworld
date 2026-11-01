@@ -14,7 +14,7 @@ import {
 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
-import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
+import { SPIN, SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
 const DAO = ascii("gno.land/r/gov/dao");
@@ -168,6 +168,39 @@ describe("createPlanet", () => {
   it("casts no ring's shadow on a world with no rings", () => {
     const surface = createPlanet(lookWith("gas giant", false), fixed().set, sphere).surface;
     expect(read(surface, "ringOuter")).toBe(0);
+  });
+
+  it("lights no city on a world with no night map: every world but the Earth stays as it was", () => {
+    const surface = createPlanet(planetLook(DAO, "temperate"), fixed().set, sphere).surface;
+    expect(read(surface, "nightLights")).toBe(0);
+  });
+
+  it("hands the shader a night map when a set holds one", () => {
+    const night = new Texture();
+    const surface = createPlanet(planetLook(DAO, "temperate"), { ...fixed().set, night }, sphere).surface;
+    expect(read(surface, "nightLights")).toBe(1);
+    expect(surface.uniforms["nightMap"]?.value).toBe(night);
+  });
+
+  it("leaves the edge of a world's air to its scattering, unless it is asked to light it", () => {
+    const planet = createPlanet(lookWith("temperate", false), fixed().set, sphere);
+    const air = meshes(planet)[1]?.material as ShaderMaterial;
+    expect(air.uniforms["limbLight"]?.value).toBe(0);
+    planet.setLimb(0.7);
+    expect(air.uniforms["limbLight"]?.value).toBe(0.7);
+  });
+
+  it("keeps the cities to the dark side, and off the day", () => {
+    expect(SURFACE_FRAGMENT).toMatch(/float dusk = 1\.0 - smoothstep\([^)]*, day\)/);
+    expect(SURFACE_FRAGMENT).toMatch(/colour \+= [^;]*dusk/);
+  });
+
+  it("dims the cities under the clouds", () => {
+    expect(SURFACE_FRAGMENT).toMatch(/colour \+= [^;]*overcast/);
+  });
+
+  it("turns at one rate, spelled once", () => {
+    expect(SURFACE_FRAGMENT).toContain(`float angle = time * ${String(SPIN)};`);
   });
 
   it("tilts a world's axis, its rings with it", () => {

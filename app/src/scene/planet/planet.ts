@@ -42,6 +42,8 @@ export interface MapSet {
   map(name: MapName): Texture;
   readonly clouds: Texture;
   readonly ring: Texture;
+  /** City lights, for the one world that has them. */
+  readonly night?: Texture;
 }
 
 export interface Planet {
@@ -52,6 +54,8 @@ export interface Planet {
   setSun(direction: Vector3): void;
   /** Turns the world and its clouds. The caller owns the clock. */
   setTime(seconds: number): void;
+  /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
+  setLimb(light: number): void;
   dispose(): void;
 }
 
@@ -86,6 +90,9 @@ function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     second: { value: maps.map(look.second) },
     cloudMap: { value: maps.clouds },
     ringMap: { value: maps.ring },
+    // A sampler must hold something on every world: the flag keeps it unread.
+    nightMap: { value: maps.night ?? maps.clouds },
+    nightLights: { value: maps.night === undefined ? 0 : 1 },
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
     time: { value: 0 },
@@ -122,6 +129,7 @@ function airMaterial(rim: NonNullable<PlanetLook["rim"]>): ShaderMaterial {
       sun: { value: new Vector3(1, 0, 0) },
       rimColour: { value: working(rim.colour) },
       rimThickness: { value: rim.thickness },
+      limbLight: { value: 0 },
     },
   });
 }
@@ -193,6 +201,11 @@ class LivePlanet implements Planet {
   setTime(seconds: number): void {
     const time = this.surface.uniforms["time"];
     if (time !== undefined) time.value = seconds;
+  }
+
+  setLimb(light: number): void {
+    for (const { uniforms } of this.#parts)
+      if (uniforms["limbLight"] !== undefined) uniforms["limbLight"].value = light;
   }
 
   dispose(): void {

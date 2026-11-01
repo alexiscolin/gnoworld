@@ -18,6 +18,7 @@ export const AIR_FRAGMENT = /* glsl */ `
 uniform vec3 sun;
 uniform vec3 rimColour;
 uniform float rimThickness;
+uniform float limbLight;
 varying vec3 vWorld;
 varying vec3 vCentre;
 varying float vOuter;
@@ -54,7 +55,7 @@ void main() {
     float height = max(length(at) - 1.0, 0.0);
     float density = exp(-height / scale) * stride;
     thick += density;
-    float past = dot(at, sun) < 0.0 ? length(cross(at, sun)) : 2.0;
+    float past = mix(2.0, length(cross(at, sun)), smoothstep(0.08, -0.08, dot(at, sun)));
     float lit = smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, past);
     float toSun = max(through(at, sun, outer).y, 0.0);
     vec3 passed = exp(-scatter * (thick + exp(-height / scale) * toSun * 0.5));
@@ -66,6 +67,13 @@ void main() {
   float g2 = GLARE * GLARE;
   float mie = (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0 * GLARE * cosine, 1.5));
   vec3 light = gathered * scatter * rayleigh + forward * mie * 5.0 * mix(vec3(1.0, 0.9, 0.78), rimColour, 0.35);
+  if (limbLight > 0.0) {
+    float along = -dot(eye, ray);
+    vec3 nearest = eye + ray * along;
+    float over = length(nearest) - 1.0;
+    float band = smoothstep(-0.004, 0.006, over) * exp(-max(over, 0.0) / (scale * 0.62));
+    light += vec3(0.62, 0.8, 1.0) * band * limbLight * smoothstep(-0.1, 0.5, dot(normalize(nearest), sun));
+  }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));
   #include <tonemapping_fragment>
