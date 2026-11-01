@@ -98,10 +98,20 @@ describe("fitted", () => {
       const nothing = calling(row("a-null", 1, 30), null);
       const none = calling(row("b-zero", 1, 20), 0);
       const some = calling(row("c-some", 1, 40), 1);
-      const limit = sizeOf([stripped(nothing), none, some]);
-      const result = fitted(head, [nothing, none, some], limit);
+      const limit = sizeOf([none, stripped(nothing), some]);
+      const result = fitted(head, [none, nothing, some], limit);
       expect(result?.stripped).toBe(1);
-      expect(result?.worlds).toEqual([stripped(nothing), none, some]);
+      expect(result?.worlds).toEqual([none, stripped(nothing), some]);
+    });
+
+    it("among worlds as quiet, sheds the most crowded namespace first: many cheap worlds cannot push out a few (F3542)", () => {
+      const crowd = Array.from({ length: 12 }, (_, i) =>
+        calling({ ...row("spam", 1, 5), id: `spam/w${String(i)}` }, null),
+      );
+      const few = [calling(row("real", 1, 5), null), calling(row("solid", 1, 5), 0)];
+      const result = fitted(head, [...few, ...crowd], sizeOf(few.map(stripped)));
+      expect(result?.worlds.map((w) => w.id)).toEqual(["real/app", "solid/app"]);
+      expect(result?.dropped).toBe(12);
     });
 
     it("keeps the order of the input in what it returns", () => {

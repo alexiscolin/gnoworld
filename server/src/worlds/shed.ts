@@ -1,7 +1,7 @@
 // Making the worlds file fit its caps (slice 7, 7c; F3513). A chain's rows are a stranger's: one deployer can fill a world, so a
 // file past a cap is shed, never refused, or one actor could stop the file for everyone for good. The least active world goes first
-// (calls ascending, a null count as none, then the heaviest): over the schema's count, whole worlds; over the bytes, lists
-// (functions and imports) first, then whole worlds. The others stay as they were, in the order they came.
+// (calls ascending, a null count as none, then the most crowded namespace, then the heaviest): over the schema's count, whole
+// worlds; over the bytes, lists (functions and imports) first, then whole worlds. The others stay as they were, in the order they came.
 import { WORLDS_CAPS, type Worlds } from "@gnoworld/schemas";
 
 type WorldRow = Worlds["worlds"][number];
@@ -19,6 +19,8 @@ interface Entry {
   world: WorldRow;
   size: number;
   readonly calls: number;
+  /** How many worlds its namespace holds. */
+  readonly crowd: number;
   readonly at: number;
   kept: boolean;
 }
@@ -62,7 +64,14 @@ function stripWhile(order: readonly Entry[], tally: Tally, over: () => boolean):
   }
 }
 
-const byActivity = (a: Entry, b: Entry): number => a.calls - b.calls || b.size - a.size || a.at - b.at;
+const byActivity = (a: Entry, b: Entry): number =>
+  a.calls - b.calls || b.crowd - a.crowd || b.size - a.size || a.at - b.at;
+
+function crowdsOf(worlds: readonly WorldRow[]): Map<string, number> {
+  const crowds = new Map<string, number>();
+  for (const { namespace } of worlds) crowds.set(namespace, (crowds.get(namespace) ?? 0) + 1);
+  return crowds;
+}
 
 /**
  * The worlds that fit `maxBytes` once written as the job writes them (JSON and a newline), or null when not even none do.
@@ -72,7 +81,15 @@ export function fitted(head: Head, worlds: readonly WorldRow[], maxBytes: number
   // The text of n worlds: the file with none, a newline, the worlds and a comma between two.
   const base = bytes({ ...head, worlds: [] }) + 1;
   if (base > maxBytes) return null;
-  const entries = worlds.map((world, at) => ({ world, size: bytes(world), calls: callsOf(world), at, kept: true }));
+  const crowds = crowdsOf(worlds);
+  const entries = worlds.map((world, at) => ({
+    world,
+    size: bytes(world),
+    calls: callsOf(world),
+    crowd: crowds.get(world.namespace) ?? 0,
+    at,
+    kept: true,
+  }));
   const order = [...entries].sort(byActivity);
   const tally = {
     sum: entries.reduce((total, { size }) => total + size, 0),
