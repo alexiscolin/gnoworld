@@ -22,6 +22,26 @@ const SECTIONS = [
   { name: null, rooms: open("#bubble/news") },
 ];
 
+// 7f2: the Earth is a page of its own, and its main room the general chat (frames 37 to 55).
+describe("a room of the Earth", () => {
+  it("has its address on the Earth's page, which no /w/ path holds", () => {
+    expect(roomHref("#earth")).toBe("/earth");
+    expect(roomHref("#earth/lisbon")).toBe("/earth?room=lisbon");
+    expect(roomHref("#earth/lisbon", true)).toBe("/earth?room=lisbon&chat=full");
+  });
+
+  it("calls its main room the general chat, and a side room by its own name", () => {
+    expect(roomLabel("#earth")).toBe("#general");
+    expect(roomLabel("#earth/lisbon")).toBe("#lisbon");
+  });
+
+  it("leaves a world's rooms as they were, a world that starts with the word included", () => {
+    expect(roomHref("#bubble")).toBe("/w/bubble");
+    expect(roomHref("#earthworks/news")).toBe("/w/earthworks?room=news");
+    expect(roomLabel("#earthworks")).toBe("#earthworks");
+  });
+});
+
 describe("the room a world's page shows", () => {
   it.each([
     ["the room the address names", "news", "#bubble/news"],
