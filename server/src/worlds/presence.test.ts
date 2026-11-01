@@ -167,7 +167,8 @@ describe("makePresence", () => {
       }
       presence.save();
       expect(readFileSync(file).byteLength).toBeLessThanOrEqual(8 * 1024 * 1024);
-    });
+      // 336 hours of 500 worlds: 120 ms bare, past Vitest's 5 s once StrykerJS's per-test coverage instruments the store (F3505).
+    }, 60_000);
 
     it("loads no more worlds than the cap from a file that holds more", () => {
       const file = fresh();
