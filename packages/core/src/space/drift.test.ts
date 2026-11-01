@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { driftAt } from "./drift.ts";
+import { driftAt, turnAt } from "./drift.ts";
 
 const spot = () => ({ x: 0, y: 0, z: 0 });
 const length = (a: { x: number; y: number; z: number }) => Math.hypot(a.x, a.y, a.z);
@@ -30,11 +30,21 @@ describe("driftAt", () => {
     expect(reused).toEqual(fresh);
   });
 
-  it("starts behind where the view rests, and comes forward", () => {
+  it("holds its value a second in, along its heading, into the view", () => {
+    const at = spot();
+    driftAt(at, 1);
+    expect(at.x).toBeCloseTo(-2.72319, 4);
+    expect(at.y).toBeCloseTo(-0.7906, 4);
+    expect(at.z).toBeCloseTo(8.31276, 4);
+  });
+
+  it("starts behind where the view rests, and comes forward, -z being ahead", () => {
     const start = spot();
     const later = spot();
     driftAt(start, 0);
     driftAt(later, 8);
+    expect(start.z).toBeGreaterThan(0);
+    expect(later.z).toBeLessThan(start.z);
     expect(length(start)).toBeGreaterThan(length(later));
   });
 
@@ -49,6 +59,41 @@ describe("driftAt", () => {
     fc.assert(
       fc.property(fc.double({ min: 0, max: 86_400, noNaN: true }), (seconds) => {
         expect(moved(seconds, seconds + 1 / 60)).toBeLessThan(1);
+      }),
+    );
+  });
+});
+
+describe("turnAt", () => {
+  const turn = (seconds: number) => {
+    const out = { yaw: NaN, pitch: NaN };
+    turnAt(out, seconds);
+    return out;
+  };
+  const DEGREE = Math.PI / 180;
+
+  it("starts looking straight ahead", () => {
+    expect(turn(0)).toEqual({ yaw: 0, pitch: 0 });
+  });
+
+  it("gives the same second the same look", () => {
+    expect(turn(47.5)).toEqual(turn(47.5));
+  });
+
+  it("looks about 10 degrees each way, a quarter of its 150 s out", () => {
+    expect(turn(37.5).yaw).toBeCloseTo(0.175, 6);
+    expect(turn(112.5).yaw).toBeCloseTo(-0.175, 6);
+  });
+
+  it("looks up and down less, on a period that never meets the other", () => {
+    expect(turn(27.5).pitch).toBeCloseTo(0.044, 6);
+    expect(Math.max(...Array.from({ length: 600 }, (_, at) => Math.abs(turn(at).pitch)))).toBeLessThanOrEqual(0.044);
+  });
+
+  it("pans about as the video does, half a degree a second at most, and never jumps", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 86_400, noNaN: true }), (seconds) => {
+        expect(Math.abs(turn(seconds + 1).yaw - turn(seconds).yaw)).toBeLessThanOrEqual(0.5 * DEGREE);
       }),
     );
   });
