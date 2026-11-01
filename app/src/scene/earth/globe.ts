@@ -1,5 +1,5 @@
 // The Earth, its one Moon and the golden ring, as one group: what the view stands on the stage. It owns all of it, the maps included.
-import { Group, SphereGeometry, Vector3, type Mesh, type Texture } from "three";
+import { Group, SphereGeometry, Vector3, type Euler, type Mesh, type Texture } from "three";
 import { Disposer } from "../disposer.ts";
 import { freeMap } from "../planet/maps.ts";
 import { createPlanet, type MapSet, type Planet } from "../planet/planet.ts";
@@ -8,7 +8,7 @@ import { Ground } from "./ground.ts";
 import { EARTH, GROUND_TO_MAP, MOON } from "./look.ts";
 import { loadEarthMaps, type EarthMaps } from "./maps.ts";
 import { createOrbit, type Orbit } from "./orbit.ts";
-import type { EarthDevice } from "./view.ts";
+import type { EarthDevice } from "./device.ts";
 
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
@@ -53,6 +53,11 @@ export class Globe {
   // One surface a set: no ring is drawn here, and the shader never reads what the flag keeps shut.
   #set(surface: Texture, clouds: Texture, night?: Texture): MapSet {
     return { map: () => surface, clouds, ring: clouds, ...(night === undefined ? {} : { night }) };
+  }
+
+  /** The Earth's lean, which every point of its ground takes. */
+  get lean(): Euler {
+    return this.#earth.group.rotation;
   }
 
   /** The real sun's height over the equator, in radians, kept for every `setSun`. */

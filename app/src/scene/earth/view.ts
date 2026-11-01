@@ -2,11 +2,13 @@
 // The real instant sets the sun's latitude and turns the ground under it; the sun's place on screen is the composition's, day towards the
 // dock, night towards the plate. Then the globe turns east at a planet's rate, as the video's does, so the hour is true on arrival.
 import { subSolarPoint } from "@gnoworld/core";
-import { Vector3, type PerspectiveCamera, type Scene, type WebGLRenderer } from "three";
+import { Vector3 } from "three";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { MOTION } from "../watch.ts";
+import type { EarthDevice } from "./device.ts";
 import { buildGlobe, type Globe } from "./globe.ts";
 import type { PlateGround } from "./ground.ts";
+import { eased, EyeTurn, GroundMarks, type Ground, type GroundMark, type LatLon, type Pose } from "./marks.ts";
 import { MOON_REST } from "./orbit.ts";
 import { earthStats, type EarthStats } from "./stats.ts";
 
@@ -19,22 +21,6 @@ export interface Circle {
   readonly y: number;
   readonly radius: number;
   readonly plate?: PlateGround;
-}
-
-export interface EarthDevice {
-  readonly renderer: {
-    readonly capabilities: Pick<WebGLRenderer["capabilities"], "getMaxAnisotropy">;
-    compileAsync: WebGLRenderer["compileAsync"];
-    initTexture: WebGLRenderer["initTexture"];
-  };
-  readonly stage: Scene;
-  readonly camera: PerspectiveCamera;
-  /** Whether memory is short, asked at each load: the probe may have decided since. */
-  readonly halved: () => boolean;
-  /** Where the site is served from. */
-  readonly base: string;
-  /** A frame is owed. */
-  readonly moved: () => void;
 }
 
 /** How far round the sun stands from the ground's x: 69° right of the eye at rest, as frame 39. */
@@ -50,12 +36,12 @@ const LONGEST_FRAME = 0.05;
 const MOON_RATE = 0.026;
 const MOON_SWEEP = 1.5;
 
-const eased = (share: number) => 1 - (1 - Math.min(share, 1)) ** 3;
-
-export class EarthView {
+export class EarthView implements Ground {
   readonly #device: EarthDevice;
   readonly #motion = matchMedia(MOTION);
   readonly #rest = new Vector3();
+  readonly #marks = new GroundMarks();
+  readonly #eye = new EyeTurn();
   #said: (state: EarthState) => void = () => undefined;
   #state: EarthState = "gone";
   #circle: Circle | undefined;
@@ -76,9 +62,9 @@ export class EarthView {
     this.#device = device;
   }
 
-  /** Whether the sun is still coming round: the scene holds the full rate for it. */
+  /** Whether the sun is still coming round, or the eye is on its way to a place: the scene holds the full rate for them. */
   get arriving(): boolean {
-    return this.#globe !== undefined && !this.#motion.matches && this.#arrived < ARRIVAL;
+    return this.#globe !== undefined && !this.#motion.matches && (this.#arrived < ARRIVAL || this.#eye.busy(this.#age));
   }
 
   #say(state: EarthState): void {
@@ -111,6 +97,7 @@ export class EarthView {
     this.#arrived = 0;
     this.#sunAt = Number.NaN;
     this.#drawn = 0;
+    this.#eye.reset();
   }
 
   #bring(): void {
@@ -175,15 +162,44 @@ export class EarthView {
     const globe = this.#globe;
     if (globe === undefined) return;
     const left = 1 - eased(arrived / ARRIVAL);
-    const sunAt = SUN_REST + left * SUN_SWEEP;
+    const gone = this.#eye.at(age, this.#motion.matches);
+    const sunAt = SUN_REST + left * SUN_SWEEP - gone;
     if (sunAt !== this.#sunAt) globe.setSun(sunAt);
     this.#sunAt = sunAt;
     const settling = 1 - eased(arrived / SETTLING);
-    this.#turned = this.#turn - SPIN * age;
+    this.#turned = this.#turn + gone - SPIN * age;
     globe.setTurn(this.#turned);
     globe.setMoon(MOON_REST + left * MOON_SWEEP - MOON_RATE * age);
     globe.group.position.copy(this.#rest).setX(-SETTLE_LEFT * settling);
     globe.group.scale.setScalar(1 + SETTLE_NEARER * settling);
+    this.#marks.place(this.#where(globe), { width: this.#width, height: this.#height, camera: this.#device.camera });
+  }
+
+  #poseNow(): void {
+    this.#pose(this.#age, this.#motion.matches ? ARRIVAL : this.#arrived);
+    this.#device.moved();
+  }
+
+  #where(globe: Globe): Pose {
+    const { position, scale } = globe.group;
+    return { turn: this.#turned, lean: globe.lean, centre: position, scale: scale.x };
+  }
+
+  setMarks(marks: readonly GroundMark[]): void {
+    this.#marks.set(marks);
+    if (this.#globe === undefined) return;
+    this.#poseNow();
+  }
+
+  facing(): LatLon | undefined {
+    return this.#globe === undefined ? undefined : this.#marks.facing(this.#where(this.#globe));
+  }
+
+  face({ lon }: LatLon): void {
+    const here = this.facing();
+    if (here === undefined) return;
+    this.#eye.by(lon - here.lon, this.#age);
+    this.#poseNow();
   }
 
   /** Moves the Earth to `seconds` on the scene's clock. Under reduced motion it stays at rest. */

@@ -3,6 +3,7 @@
 import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
+import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { createRenderer } from "./renderer.ts";
@@ -28,6 +29,8 @@ export interface Scene {
   cover(covered: boolean): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */
   earth(place: Circle | undefined, said: (state: EarthState) => void): void;
+  /** The ground the page's signs stand on. */
+  readonly ground: Ground;
   dispose(): void;
   stats(): SceneStats;
 }
@@ -192,6 +195,10 @@ class LiveScene implements Scene {
 
   earth(place: Circle | undefined, said: (state: EarthState) => void): void {
     this.#earth.show(place, said);
+  }
+
+  get ground(): Ground {
+    return this.#earth;
   }
 
   dispose(): void {

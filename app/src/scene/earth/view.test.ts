@@ -653,3 +653,295 @@ describe("motion", () => {
     expect(view.stats()?.moon).not.toEqual(before);
   });
 });
+
+// 7f2: the page's signs stand on the ground, and the HTML is told where: the picture's own sums, read back here through the shader's.
+describe("marks on the ground", () => {
+  interface Told {
+    x: number;
+    y: number;
+    front: boolean;
+  }
+  function mark(lat: number, lon: number) {
+    const told: Told[] = [];
+    return {
+      told,
+      lat,
+      lon,
+      place: (x: number, y: number, front: boolean) => {
+        told.push({ x, y, front });
+      },
+    };
+  }
+  const last = (m: ReturnType<typeof mark>): Told => {
+    const found = m.told.at(-1);
+    if (found === undefined) throw new Error("the mark was told nothing");
+    return found;
+  };
+  const DEGREE = Math.PI / 180;
+
+  // Where the eye's ray through a page's pixel meets the surface, in the mesh's own space, and in the world's.
+  function hit(stage: Stage, camera: PerspectiveCamera, { x, y }: Pick<Told, "x" | "y">) {
+    const surface = surfacesOf(stage)[0];
+    if (surface === undefined) throw new Error("no Earth");
+    stage.updateMatrixWorld(true);
+    camera.updateMatrixWorld();
+    const ray = new Vector3((x / WIDTH) * 2 - 1, 1 - (y / HEIGHT) * 2, 0.5).unproject(camera).normalize();
+    const inverse = new Matrix4().copy(surface.mesh.matrixWorld).invert();
+    const origin = new Vector3().applyMatrix4(inverse);
+    const direction = ray.clone().transformDirection(inverse);
+    const b = origin.dot(direction);
+    const local = origin.clone().addScaledVector(direction, -b - Math.sqrt(b * b - origin.lengthSq() + 1));
+    return { local: local.clone(), world: local.clone().applyMatrix4(surface.mesh.matrixWorld), surface };
+  }
+
+  // The place the shader draws at a pixel: `turned`, then `spin`, then `lookupOf`'s longitude and colatitude.
+  function drawnAt(stage: Stage, camera: PerspectiveCamera, at: Pick<Told, "x" | "y">) {
+    const { local, surface } = hit(stage, camera, at);
+    const angle = (surface.material.uniforms["time"]?.value as number) * SPIN;
+    const [c, s] = [Math.cos(angle), Math.sin(angle)];
+    const axis = new Vector3(c * local.x + s * local.z, local.y, c * local.z - s * local.x).normalize();
+    const direction = axis.applyMatrix3(surface.material.uniforms["spin"]?.value as Matrix3);
+    return { lat: Math.asin(direction.y) / DEGREE, lon: Math.atan2(direction.z, direction.x) / DEGREE };
+  }
+
+  async function ready() {
+    vi.useFakeTimers({ now: NOON, toFake: ["Date"] });
+    const made = opened();
+    await settled();
+    made.view.tick(0);
+    return made;
+  }
+
+  it("stands a place where the shader draws it: the map under the mark is the place's own", async () => {
+    const { stage, camera, view } = await ready();
+    const here = view.facing();
+    if (here === undefined) throw new Error("no facing");
+    const places = [
+      mark(46.7, here.lon),
+      mark(23.9, here.lon + 30),
+      mark(-13, here.lon - 40),
+      mark(0, here.lon + 10),
+      mark(60, here.lon - 15),
+    ];
+    view.setMarks(places);
+    expect(places.every((each) => last(each).front)).toBe(true);
+    for (const place of places) {
+      const drawn = drawnAt(stage, camera, last(place));
+      expect(drawn.lat).toBeCloseTo(place.lat, 3);
+      expect(drawn.lon).toBeCloseTo(place.lon, 3);
+    }
+  });
+
+  it("tells a place behind the globe that it stands behind, and one on the eye's side that it does not", async () => {
+    const { view } = await ready();
+    const here = view.facing();
+    if (here === undefined) throw new Error("no facing");
+    const near = mark(here.lat, here.lon);
+    const opposite = mark(-here.lat, here.lon > 0 ? here.lon - 180 : here.lon + 180);
+    view.setMarks([near, opposite]);
+    expect(last(near).front).toBe(true);
+    expect(last(opposite).front).toBe(false);
+  });
+
+  it("hides a place at the limb, where a sign would slide off the edge", async () => {
+    const { view } = await ready();
+    const here = view.facing();
+    if (here === undefined) throw new Error("no facing");
+    const rim = mark(0, here.lon + 86);
+    const clear = mark(here.lat, here.lon + 60);
+    view.setMarks([rim, clear]);
+    expect(last(rim).front).toBe(false);
+    expect(last(clear).front).toBe(true);
+  });
+
+  it("says which place faces the eye: the ground at the middle of the disc", async () => {
+    const { stage, camera, view } = await ready();
+    const here = view.facing();
+    if (here === undefined) throw new Error("no facing");
+    const drawn = drawnAt(stage, camera, PLACE);
+    expect(here.lat).toBeCloseTo(drawn.lat, 3);
+    expect(here.lon).toBeCloseTo(drawn.lon, 3);
+  });
+
+  it("faces nothing before the Earth stands, nor after it left", async () => {
+    const { view } = device();
+    expect(view.facing()).toBeUndefined();
+    const { view: left } = await ready();
+    left.show(undefined, () => undefined);
+    expect(left.facing()).toBeUndefined();
+  });
+
+  it("gives a place its point at once, and owes the frame that shows it", async () => {
+    const { view, moved } = await ready();
+    moved.mockClear();
+    const place = mark(0, 0);
+    view.setMarks([place]);
+    expect(place.told).toHaveLength(1);
+    expect(moved).toHaveBeenCalled();
+  });
+
+  it("holds marks given before the Earth stands, and places them as it comes", async () => {
+    const made = device();
+    const place = mark(0, 0);
+    made.view.setMarks([place]);
+    expect(place.told).toEqual([]);
+    made.view.resize(WIDTH, HEIGHT, 1);
+    made.view.show(PLACE, () => undefined);
+    await settled();
+    expect(place.told.length).toBeGreaterThan(0);
+  });
+
+  it("moves its marks with the page: a resize and a frame both tell them", async () => {
+    const { view } = await ready();
+    const place = mark(0, 0);
+    view.setMarks([place]);
+    const before = place.told.length;
+    view.show({ x: 700, y: 400, radius: 200 }, () => undefined);
+    expect(place.told.length).toBeGreaterThan(before);
+    view.tick(1);
+    expect(place.told.length).toBeGreaterThan(before + 1);
+  });
+
+  it("tells a mark nothing once it was taken away, or once the Earth left", async () => {
+    const { view } = await ready();
+    const place = mark(0, 0);
+    view.setMarks([place]);
+    view.setMarks([]);
+    const count = place.told.length;
+    view.tick(1);
+    expect(place.told).toHaveLength(count);
+    const other = mark(10, 10);
+    view.setMarks([other]);
+    view.show(undefined, () => undefined);
+    const after = other.told.length;
+    view.tick(2);
+    expect(other.told).toHaveLength(after);
+  });
+
+  describe("turning to a place", () => {
+    const motion = (on: boolean) => {
+      vi.stubGlobal("matchMedia", (query: string) => ({ matches: !on && query.includes("reduced-motion") }));
+    };
+    const lit = (stage: Stage, camera: PerspectiveCamera, told: Told) => {
+      const sun = sunOf(stage);
+      if (sun === undefined) throw new Error("no sun");
+      const { world } = hit(stage, camera, told);
+      const centre = hit(stage, camera, PLACE).surface.mesh.getWorldPosition(new Vector3());
+      return world.sub(centre).normalize().dot(sun.clone().normalize());
+    };
+
+    it("brings the place to the middle of the disc's width, at once under reduced motion", async () => {
+      const { view } = await ready();
+      const paris = mark(48.9, 2.4);
+      view.setMarks([paris]);
+      view.face({ lat: 48.9, lon: 2.4 });
+      expect(last(paris).front).toBe(true);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
+    });
+
+    it("owes the frame that shows the turn", async () => {
+      const { view, moved } = await ready();
+      moved.mockClear();
+      view.face({ lat: 0, lon: 170 });
+      expect(moved).toHaveBeenCalled();
+    });
+
+    it("moves the sun with the ground: the place keeps its true hour, so a night city stays at night", async () => {
+      const { stage, camera, view } = await ready();
+      const noon = subSolarPoint(NOON);
+      const [lat, lon] = [noon.latitude / DEGREE, noon.longitude / DEGREE];
+      const under = mark(lat, lon);
+      const dusk = mark(lat, lon - 50);
+      view.setMarks([under, dusk]);
+      const [noonLight, duskLight] = [lit(stage, camera, last(under)), lit(stage, camera, last(dusk))];
+      expect(noonLight).toBeCloseTo(1, 3);
+      expect(duskLight).toBeLessThan(0.8);
+      const before = view.facing()?.lon ?? Number.NaN;
+      view.face({ lat, lon: lon + 40 });
+      view.tick(1);
+      const after = view.facing()?.lon ?? Number.NaN;
+      expect(Math.abs(after - before)).toBeGreaterThan(5);
+      expect(last(under).front).toBe(true);
+      expect(lit(stage, camera, last(under))).toBeCloseTo(noonLight, 3);
+    });
+
+    it("shows a city under the night as night: facing it brings the dark, and never the sun, to the eye", async () => {
+      const { stage, camera, view } = await ready();
+      const noon = subSolarPoint(NOON);
+      const [lat, lon] = [-noon.latitude / DEGREE, noon.longitude / DEGREE + 150];
+      const city = mark(lat, lon);
+      view.setMarks([city]);
+      view.face({ lat, lon });
+      view.tick(1);
+      expect(last(city).front).toBe(true);
+      expect(lit(stage, camera, last(city))).toBeLessThan(-0.5);
+    });
+
+    it("takes the short way round: a place just behind the eye's left is reached going left", async () => {
+      motion(true);
+      const { view } = await ready();
+      view.tick(10);
+      const here = view.facing();
+      if (here === undefined) throw new Error("no facing");
+      const lon = here.lon + 170 > 180 ? here.lon - 190 : here.lon + 170;
+      view.face({ lat: 0, lon });
+      view.tick(10.4);
+      const midway = view.facing();
+      if (midway === undefined) throw new Error("no facing");
+      const gone = Math.abs(((midway.lon - here.lon + 540) % 360) - 180);
+      expect(gone).toBeGreaterThan(0);
+      expect(gone).toBeLessThan(171);
+    });
+
+    it("eases there over a turn of its own, at the full rate, then lets go of it", async () => {
+      motion(true);
+      const { view } = await ready();
+      for (let at = 0.05; at < 4; at += 0.05) view.tick(at);
+      view.tick(20);
+      expect(view.arriving).toBe(false);
+      const paris = mark(48.9, 2.4);
+      view.setMarks([paris]);
+      view.face({ lat: 48.9, lon: 2.4 });
+      expect(view.arriving).toBe(true);
+      view.tick(20.5);
+      expect(view.arriving).toBe(true);
+      view.tick(22);
+      expect(view.arriving).toBe(false);
+      expect(last(paris).front).toBe(true);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
+    });
+
+    it("keeps the arrival's own sweep apart: a turn asked on arrival ends at the place", async () => {
+      motion(true);
+      const { view } = await ready();
+      const paris = mark(48.9, 2.4);
+      view.setMarks([paris]);
+      view.face({ lat: 48.9, lon: 2.4 });
+      for (let at = 0.05; at < 4; at += 0.05) view.tick(at);
+      expect(last(paris).front).toBe(true);
+      expect(Math.abs(last(paris).x - PLACE.x)).toBeLessThan(PLACE.radius * 0.2);
+    });
+
+    it("turns nothing before the Earth stands", () => {
+      const { view } = device();
+      expect(() => {
+        view.face({ lat: 0, lon: 0 });
+      }).not.toThrow();
+      expect(view.arriving).toBe(false);
+    });
+
+    it("comes back at rest on the way back: a new visit starts from the true hour", async () => {
+      const { stage, camera, view } = await ready();
+      view.face({ lat: 0, lon: 170 });
+      view.show(undefined, () => undefined);
+      view.show(PLACE, () => undefined);
+      await settled();
+      view.tick(0);
+      const noon = subSolarPoint(NOON);
+      const under = mark(noon.latitude / DEGREE, noon.longitude / DEGREE);
+      view.setMarks([under]);
+      expect(last(under).x).toBeGreaterThan(PLACE.x);
+      expect(lit(stage, camera, last(under))).toBeCloseTo(1, 3);
+    });
+  });
+});
