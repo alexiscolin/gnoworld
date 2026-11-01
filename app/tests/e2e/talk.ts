@@ -3,7 +3,7 @@
 import { lines, word } from "./chat.ts";
 import type { Locator } from "@playwright/test";
 import { expect, type Page } from "./fixtures.ts";
-import { logIn } from "./irc.ts";
+import { another, logIn, type Launcher } from "./irc.ts";
 import { MEMBER, opened, type HistoryLine, type Scripted } from "./scripted.ts";
 
 export const OTHER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -50,6 +50,20 @@ export async function asAccount(page: Page, script: (address: string) => Scripte
     said: () => sent.filter((line) => /^(@\S+ )?(PRIVMSG|TAGMSG) /.test(line) && !line.includes("+typing=")),
     typed: () => sent.filter((line) => line.includes("+typing=")),
   };
+}
+
+/** Two accounts in #games on the real Ergo, each seeing the other there: `page`'s, and another in a browser of its own. */
+export async function twoInGames(page: Page, launcher: Launcher) {
+  const bob = await another(launcher, word("bob"));
+  const me = await logIn(page, word("as"));
+  await bob.page.goto("/w/bubble?room=games&chat=full");
+  await page.goto("/w/bubble?room=games&chat=full");
+  for (const [each, who] of [
+    [bob.page, me],
+    [page, bob.address],
+  ] as const)
+    await expect(each.getByRole("region", { name: "Who's here" }).getByTitle(who)).toBeVisible();
+  return bob;
 }
 
 /** The words of the list, a word at a time, that the box of a line's bar crosses. */

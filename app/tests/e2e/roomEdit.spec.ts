@@ -1,8 +1,7 @@
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
-import { another, logIn } from "./irc.ts";
 import { opened, type HistoryLine, type Scripted } from "./scripted.ts";
-import { asAccount, barOf, field, GUEST, HISTORY, ROOM, T, tagged } from "./talk.ts";
+import { asAccount, barOf, field, GUEST, HISTORY, ROOM, T, tagged, twoInGames } from "./talk.ts";
 
 // slice-4-room-edit (docs/decisions.md, 2026-10-28, F1560): a room's own lines get Edit as a direct message's do (dmBar.spec.ts):
 // its words in the composer, sent tagged +gnoworld/edit with the line's msgid, shown in the line's place marked edited.
@@ -340,16 +339,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     playwright,
     launchOptions,
   }) => {
-    const bob = await another({ playwright, launchOptions }, word("bob"));
-    const me = await logIn(page, word("as"));
-    // Each page in the room, then each seeing the other there.
-    await bob.page.goto("/w/bubble?room=games&chat=full");
-    await page.goto("/w/bubble?room=games&chat=full");
-    for (const [each, who] of [
-      [bob.page, me],
-      [page, bob.address],
-    ] as const)
-      await expect(each.getByRole("region", { name: "Who's here" }).getByTitle(who)).toBeVisible();
+    const bob = await twoInGames(page, { playwright, launchOptions });
     const text = word("hello");
     await field(page).fill(text);
     await field(page).press("Enter");

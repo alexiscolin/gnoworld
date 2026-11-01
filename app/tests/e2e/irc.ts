@@ -85,7 +85,7 @@ export async function loggedIn(page: Page, as = ""): Promise<{ address: string; 
   return { address, ticket: await ticketOf(page) };
 }
 
-type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
+export type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
 
 /** Another account, in a browser of its own (the sandbox's Chromium runs one process, one context): its address, and its
  * page to talk from. */
