@@ -55,8 +55,9 @@ void main() {
     float height = max(length(at) - 1.0, 0.0);
     float density = exp(-height / scale) * stride;
     thick += density;
-    float past = mix(2.0, length(cross(at, sun)), smoothstep(0.08, -0.08, dot(at, sun)));
-    float lit = smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, past);
+    float across = length(cross(at, sun));
+    float lit = smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, dot(at, sun) < 0.0 ? across : 2.0);
+    if (limbLight > 0.0) lit = mix(smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, across), 1.0, smoothstep(-0.08, 0.08, dot(at, sun)));
     float toSun = max(through(at, sun, outer).y, 0.0);
     vec3 passed = exp(-scatter * (thick + exp(-height / scale) * toSun * 0.5));
     gathered += density * lit * passed;
@@ -71,8 +72,8 @@ void main() {
     float along = -dot(eye, ray);
     vec3 nearest = eye + ray * along;
     float over = length(nearest) - 1.0;
-    float band = smoothstep(-0.004, 0.006, over) * exp(-max(over, 0.0) / (rimThickness * 0.34));
-    light += vec3(0.62, 0.8, 1.0) * band * limbLight * smoothstep(-0.1, 0.5, dot(normalize(nearest), sun));
+    float band = smoothstep(-0.004, 0.003, over) * exp(-max(over, 0.0) / (rimThickness * 0.3));
+    light += vec3(0.6, 0.78, 1.0) * band * limbLight * smoothstep(-0.35, 0.25, dot(normalize(nearest), sun));
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));

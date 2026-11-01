@@ -32,7 +32,7 @@ const POINT_FRAGMENT = /* glsl */ `
 varying vec3 vTint;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
-  gl_FragColor = vec4(vTint * smoothstep(1.0, 0.25, d), 1.0);
+  gl_FragColor = vec4(vTint * (1.0 - smoothstep(0.25, 1.0, d)), 1.0);
   #include <colorspace_fragment>
 }
 `;
@@ -50,7 +50,7 @@ varying vec2 vPlace;
 void main() {
   float d = length(vPlace);
   float fall = 1.0 - smoothstep(0.7, 1.0, d);
-  float core = smoothstep(0.022, 0.012, d) * 5.0;
+  float core = (1.0 - smoothstep(0.012, 0.022, d)) * 5.0;
   float glow = exp(-d * 60.0) * 2.2 + exp(-d * 16.0) * 0.34 + exp(-d * 5.0) * 0.05;
   vec3 warm = mix(vec3(1.0, 0.56, 0.24), vec3(1.0, 0.86, 0.68), exp(-d * 14.0));
   gl_FragColor = vec4((warm * glow + core) * fall, 1.0);

@@ -75,7 +75,7 @@ ${FIELD}
 float masked(vec2 at) {
   vec2 centre = (at - vec2(0.5, 0.52)) * vec2(aspect / 1.6, 1.0);
   float wander = field(vec3(at * 1.5, 3.0)).x * 0.32;
-  return smoothstep(0.62, 0.08, length(centre * vec2(0.82, 1.2)) - wander);
+  return 1.0 - smoothstep(0.08, 0.62, length(centre * vec2(0.82, 1.2)) - wander);
 }
 vec3 fromImage(vec2 at) {
   vec2 bent = at * vec2(0.66, 0.78) + vec2(0.08, 0.1) + field(vec3(at * 1.4, 7.0)).xy * 0.035;

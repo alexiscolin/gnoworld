@@ -13,8 +13,10 @@ import {
   Vector3,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
+import { AIR_FRAGMENT } from "./airShader.ts";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
-import { SPIN, SURFACE_FRAGMENT } from "./surfaceShader.ts";
+import { RING_FRAGMENT } from "./ringShader.ts";
+import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
 const DAO = ascii("gno.land/r/gov/dao");
@@ -199,8 +201,17 @@ describe("createPlanet", () => {
     expect(SURFACE_FRAGMENT).toMatch(/colour \+= [^;]*overcast/);
   });
 
-  it("turns at one rate, spelled once", () => {
-    expect(SURFACE_FRAGMENT).toContain(`float angle = time * ${String(SPIN)};`);
+  it("never asks a smoothstep with its edges reversed, which GLSL leaves undefined and a software GPU hides", () => {
+    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT])
+      for (const [, low = "0", high = "0"] of shader.matchAll(/smoothstep\((-?[\d.]+), (-?[\d.]+),/g))
+        expect(Number(low), shader.slice(0, 40)).toBeLessThan(Number(high));
+  });
+
+  it("leaves a generated world's air as 7b drew it: the softer terminator waits behind the Earth's limb", () => {
+    expect(AIR_FRAGMENT).toContain(
+      "float lit = smoothstep(1.0 - scale * 0.2, 1.0 + scale * 2.0, dot(at, sun) < 0.0 ? across : 2.0);",
+    );
+    expect(AIR_FRAGMENT).toMatch(/if \(limbLight > 0\.0\) lit = /);
   });
 
   it("tilts a world's axis, its rings with it", () => {
