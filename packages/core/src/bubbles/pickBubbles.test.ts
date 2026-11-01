@@ -833,6 +833,74 @@ describe("a bubble in the state at every call", () => {
   });
 });
 
+// F3366, by Alexis: a bubble stands for its line. What takes the line from the viewer takes the bubble at the next call,
+// whatever is left of its five seconds, and the line is not shown again.
+describe("a bubble leaves with its line (F3366)", () => {
+  const line = (over: Partial<BubbleMessage> = {}): BubbleMessage => msg(1, { country: "JP", ...over });
+  const mine = (over: Partial<BubbleMessage> = {}): BubbleMessage =>
+    msg(1, { id: "mine", account: "me", country: "JP", at: NOW - 100, ...over });
+  const later = NOW + 1000;
+
+  it.each([
+    ["a REDACT took it out of the list", () => []],
+    ["the room turned private", () => [line({ visibility: "private" })]],
+    ["the room became a direct message", () => [line({ visibility: "dm" })]],
+    ["the viewer left the room", () => [line({ joined: false })]],
+    ["the moderation hid it", () => [line({ hidden: true })]],
+  ])("takes the bubble off at once when %s", (_name, list) => {
+    const first = pick([line()]);
+    expect(ids(first.bubbles)).toEqual(["m1"]);
+    const out = pick(list(), ME, { shown: first.shown, now: later });
+    expect(out.bubbles).toEqual([]);
+    expect(out.counts).toEqual([]);
+  });
+
+  it("takes your own bubble off the same way: being yours keeps it from the far side, not from its line", () => {
+    const first = pick([mine()]);
+    expect(ids(first.bubbles)).toEqual(["mine"]);
+    expect(pick([], ME, { shown: first.shown, now: later }).bubbles).toEqual([]);
+    expect(pick([mine({ joined: false })], ME, { shown: first.shown, now: later }).bubbles).toEqual([]);
+  });
+
+  it("gives the country's place back at once, to the next line of that country", () => {
+    const first = pick([line()]);
+    const next = msg(2, { country: "JP", at: NOW + 500 });
+    expect(ids(pick([next], ME, { shown: first.shown, now: later }).bubbles)).toEqual(["m2"]);
+  });
+
+  it("does not bring the bubble back when the line comes back in a later list", () => {
+    const first = pick([line()]);
+    const gone = pick([line({ hidden: true })], ME, { shown: first.shown, now: later });
+    const back = pick([line()], ME, { shown: gone.shown, now: later + 1000 });
+    expect(back.bubbles).toEqual([]);
+    expect(back.counts).toEqual([]);
+  });
+
+  it("keeps the speaker waiting his delay: a bubble taken off still counts as said", () => {
+    const first = pick([line({ account: "ann" })]);
+    const gone = pick([], ME, { shown: first.shown, now: later });
+    const again = msg(2, { account: "ann", country: "FR", at: later + 100 });
+    const out = pick([again], ME, { shown: gone.shown, now: later + 200 });
+    expect(out.bubbles).toEqual([]);
+    expect(out.counts).toEqual([{ country: "FR", count: 1, far: false }]);
+  });
+
+  it("uses one rule for a new bubble and a kept one: what cannot be picked cannot stay", () => {
+    const first = pick([line({ account: "ann" }), msg(2, { country: "FR", account: "bob" })]);
+    expect(first.bubbles).toHaveLength(2);
+    const noCode = pick([noCountry(line({ account: "ann" })), msg(2, { country: "FR", account: "bob" })], ME, {
+      shown: first.shown,
+      now: later,
+    });
+    expect(ids(noCode.bubbles)).toEqual(["m2"]);
+    const badCode = pick([line({ account: "ann", country: "jp" }), msg(2, { country: "FR", account: "bob" })], ME, {
+      shown: first.shown,
+      now: later,
+    });
+    expect(ids(badCode.bubbles)).toEqual(["m2"]);
+  });
+});
+
 describe("for any input (property)", () => {
   const others = ["ann", "bob", "cy", "dee", "eve"];
   const speakers = [...others, "me"];
@@ -957,6 +1025,30 @@ describe("for any input (property)", () => {
             expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(rule.speakerDelaySeconds * 1000);
       }),
       { numRuns: 60 },
+    );
+  });
+
+  it("never keeps on screen a bubble whose line the list no longer allows, whatever each tick's list holds (F3366)", () => {
+    const shuffled = fc.array(fc.array(fc.nat({ max: 59 }), { maxLength: 60 }), {
+      minLength: steps.length,
+      maxLength: steps.length,
+    });
+    fc.assert(
+      fc.property(fc.array(message, { maxLength: 60 }), viewer, shuffled, (messages, who, keptAt) => {
+        let shown: readonly Bubble[] = [];
+        steps.forEach((now, k) => {
+          const kept = (keptAt[k] ?? []).flatMap((at) => messages[at] ?? []);
+          const out = pickBubbles(kept, now, who, RULES, shown);
+          const held = new Map(kept.map((m) => [m.id, m]));
+          for (const b of out.bubbles) {
+            const source = held.get(b.id);
+            expect(source, "a bubble with no line").toBeDefined();
+            if (source !== undefined) expect(open(source)).toBe(true);
+          }
+          shown = out.shown;
+        });
+      }),
+      { numRuns: 40 },
     );
   });
 

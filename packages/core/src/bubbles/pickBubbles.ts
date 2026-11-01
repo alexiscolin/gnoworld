@@ -54,15 +54,22 @@ function far(run: Run, country: string): boolean {
   return run.viewer.facing !== undefined && centre !== undefined && isFarSide(centre, run.viewer.facing);
 }
 
-/** Whether a bubble of the state may stay on screen: yours shows whatever the far side (§1, question 4), the rest not. */
-function visible(run: Run, s: Bubble): boolean {
+/** The one rule of what a bubble may be made of, for a new one and one on screen (F3366): a bubble stands for its line. */
+function allowed(run: Run, m: BubbleMessage): boolean {
   return (
-    s.until > run.now &&
-    centreOf(s.country) !== undefined &&
-    !run.blocked.has(fold(s.account)) &&
-    run.window.get(s.id)?.hidden !== true &&
-    (s.own || !far(run, s.country))
+    m.visibility === "public" &&
+    m.joined &&
+    m.hidden !== true &&
+    centreOf(m.country) !== undefined &&
+    !run.blocked.has(fold(m.account))
   );
+}
+
+/** Whether a bubble of the state may stay on screen: its line is still listed and allowed; yours shows whatever the far
+ * side (§1, question 4), the rest not. */
+function visible(run: Run, s: Bubble): boolean {
+  const line = run.window.get(s.id);
+  return s.until > run.now && line !== undefined && allowed(run, line) && (s.own || !far(run, s.country));
 }
 
 function rankOf(run: Run, m: BubbleMessage): number {
@@ -72,15 +79,7 @@ function rankOf(run: Run, m: BubbleMessage): number {
 }
 
 function open(run: Run, m: BubbleMessage): boolean {
-  return (
-    m.visibility === "public" &&
-    m.joined &&
-    m.hidden !== true &&
-    run.now - m.at <= run.age &&
-    !run.state.has(m.id) &&
-    centreOf(m.country) !== undefined &&
-    !run.blocked.has(fold(m.account))
-  );
+  return allowed(run, m) && run.now - m.at <= run.age && !run.state.has(m.id);
 }
 
 /** Whether a text draws nothing once cleaned: what the cut would remove (controls, lone surrogates), then the shared
@@ -184,8 +183,8 @@ function placeOther(run: Run, c: Candidate): void {
 }
 
 /** The screen from the state, which keeps every rule at every call: a bubble that stops being allowed (its country went
- * to the far side, its speaker was muted, its line hidden) ends for good, so it cannot come back past the caps; and a
- * smaller `maxOnScreen` takes the oldest bubbles off (F3360). */
+ * to the far side, its speaker was muted, its line hidden or gone) ends for good, so it cannot come back past the caps;
+ * and a smaller `maxOnScreen` takes the oldest bubbles off (F3360). */
 function settle(run: Run): void {
   run.screen = [];
   for (const s of [...run.state.values()]) {
