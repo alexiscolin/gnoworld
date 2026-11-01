@@ -373,7 +373,21 @@ for (const viewport of [COMPUTER, { width: 1100, height: 800 }, PHONE]) {
       await hydrated(page);
       await expect(page.locator("#chat")).toContainText("Loading the chat");
       const [title, slot] = [await box(page, "h1"), await box(page, "#chat")];
-      await page.evaluate(() => Reflect.set(globalThis, "__shift", 0));
+      // The page's own moves reach the observer a task late: they must not count as the chat's.
+      await expect(page.locator("[data-globe]")).toHaveAttribute("data-earth", /none|drawn/, SLOW);
+      await page.evaluate(
+        () =>
+          new Promise<void>((done) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  Reflect.set(globalThis, "__shift", 0);
+                  done();
+                }, 100);
+              });
+            });
+          }),
+      );
       release();
       await expect(page.locator("[data-chat-layout]")).toBeAttached();
       expect(await box(page, "h1")).toEqual(title);
