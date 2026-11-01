@@ -439,6 +439,10 @@ if [ "${1:-}" = --mutants ]; then
 		compose 'services: { web: { volumes: !override [] } }'
 	mutant "markets.json open without the password" "web serves markets.json only with the password" \
 		nginx awk '{ print } /location = \/markets\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds.json is not served" "web serves worlds.json from the volume the server writes" \
+		nginx sed '/location = \/worlds\.json {/,/}/d'
+	mutant "worlds.json open without the password" "web serves worlds.json only with the password" \
+		nginx awk '{ print } /location = \/worlds\.json \{/ { print "            auth_basic off;" }'
 	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
 		nginx sed '/disable_symlinks on/d'
 	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
@@ -1401,6 +1405,12 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
 	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
 	expect "web serves markets.json only with the password" "$(status /markets.json 203.0.113.3)" 401
+	# worlds.json (7c) rides the same volume and location: a file the server wrote, read-only there, with a short cache.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), worlds: [] }))" >/dev/null 2>&1 || true
+	expect "web serves worlds.json from the volume the server writes" "$(status /worlds.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves worlds.json with a short cache" "$(header cache-control /worlds.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves worlds.json only with the password" "$(status /worlds.json 203.0.113.3)" 401
+	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/worlds.json')" >/dev/null 2>&1 || true
 	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404

@@ -343,6 +343,14 @@ Slice 3, the server's retention (3n):
   for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
   chain. A failed height leaves `block` out and logs `{"event":"height_failed","error":"<kind>"}`, never what the answer held; a data
   file that is bad stops the server at boot, naming the file. Changing the default universe's RPC means changing `acl.yaml` with it.
+- **The worlds** (`WORLDS_FILE`, `/markets/worlds.json`, served at `/worlds.json`, 7c): with `UNIVERSES_FILE`, every half hour from
+  the end of the last pass the server reads the default universe's realm list (`vm/qpaths`), each new package once (`vm/qdoc`,
+  `vm/qfile`), each realm's calls from the universe's indexer and each new deployer's name, one call at a time with a quarter-second
+  pause, and writes the worlds by renaming a temporary file, at most 4 MiB. A failed list keeps the last file and logs
+  `{"event":"worlds_failed","error":"<kind>"}`; a silent indexer logs `worlds_indexer_failed` and leaves the counts null; the kinds
+  are `request`, `timeout`, `status`, `rate_limited`, `too_large`, `too_many`, `not_json`, `shape`, `chain_refused`, `empty`,
+  `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
+  of the realm list's, `vm/qdoc`'s and the indexer's answers is `deploy/test.sh`, which Alexis runs.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room

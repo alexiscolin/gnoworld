@@ -204,3 +204,39 @@ describe("the way out for the indexers", () => {
     expect(script).toMatch(/"https:\/\/\$indexer_host\.evil\.test\/"/);
   });
 });
+
+// The worlds file (7c) rides the volume the prices timer writes: the server writes it, web serves it read-only at /worlds.json
+// beside /markets.json, with the same minute of cache. Docker is refused in the sandbox, so the files are read as text.
+const nginx = read("deploy/web/nginx.conf");
+
+describe("worlds.json's way to the page", () => {
+  it("tells the server to write it in the folder of markets.json, the volume web mounts read-only", () => {
+    const folder = /^\s+MARKETS_FILE: (\/\S+)\/markets\.json\s*$/m.exec(compose)?.[1];
+    expect(folder).toBeDefined();
+    expect(compose).toContain(`WORLDS_FILE: ${String(folder)}/worlds.json`);
+  });
+
+  it("serves it from that folder beside markets.json, with no listing and no link followed, under the same password", () => {
+    const block = /location = \/worlds\.json \{([^}]*)\}/.exec(nginx)?.[1] ?? "";
+    expect(block).toMatch(/root \/markets;/);
+    expect(block).toMatch(/disable_symlinks on from=\$document_root;/);
+    expect(block).toMatch(/try_files \$uri =404;/);
+    expect(block).not.toMatch(/autoindex|auth_basic|add_header/);
+    expect(nginx).toMatch(/~\^\(200\|304\)\/worlds\\\.json\$ "public, max-age=60";/);
+  });
+
+  it("proves in the stack that web serves it from the volume, with a short cache, only with the password", () => {
+    expect(script).toMatch(/expect "web serves worlds\.json from the volume the server writes"/);
+    expect(script).toMatch(/expect "web serves worlds\.json with a short cache"/);
+    expect(script).toMatch(/expect "web serves worlds\.json only with the password"/);
+  });
+
+  it("has a mutant for the file not served and one for it served without the password, each killed by its check", () => {
+    expect(script).toMatch(
+      /mutant "worlds\.json is not served" "web serves worlds\.json from the volume the server writes"/,
+    );
+    expect(script).toMatch(
+      /mutant "worlds\.json open without the password" "web serves worlds\.json only with the password"/,
+    );
+  });
+});
