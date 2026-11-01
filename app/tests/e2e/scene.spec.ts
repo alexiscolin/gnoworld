@@ -5,6 +5,7 @@ import { brightness } from "./geometry.ts";
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
+const DOOR = /\/assets\/(?:mountUniverse|scene)-/;
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -57,11 +58,11 @@ const setHidden = (page: Page, hidden: boolean) =>
 
 const worlds = (page: Page) => page.getByRole("navigation", { name: "Worlds" });
 
-// The scene's chunk as the page asks for it, from now on.
-function sceneAsks(page: Page): string[] {
+// The chunks that match as the page asks for them, from now on.
+function asks(page: Page, chunks: RegExp): string[] {
   const asked: string[] = [];
   page.on("request", (request) => {
-    if (SCENE.test(request.url())) asked.push(request.url());
+    if (chunks.test(request.url())) asked.push(request.url());
   });
   return asked;
 }
@@ -102,11 +103,23 @@ test.describe("a computer", () => {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 
+  test("the space opens like an iris, on the design system's easing, and leaves no clip behind", async ({ page }) => {
+    await page.goto(HOME);
+    await running(page);
+    const iris = await page.locator("canvas").evaluate((canvas) =>
+      canvas.getAnimations().map((each) => ({
+        name: "animationName" in each ? each.animationName : "",
+        easing: each.effect?.getComputedTiming().easing,
+        duration: each.effect?.getComputedTiming().duration,
+      })),
+    );
+    expect(iris).toEqual([expect.objectContaining({ duration: 1500 })]);
+    await expect.poll(() => page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
+    expect(await page.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).clipPath)).toBe("none");
+  });
+
   test("a page that does not show space asks for none of its code, and the first that does asks", async ({ page }) => {
-    const asked: string[] = [];
-    page.on("request", (request) => {
-      if (/\/assets\/(?:mountUniverse|scene)-/.test(request.url())) asked.push(request.url());
-    });
+    const asked = asks(page, DOOR);
     await page.goto("/w/bubble?test-gpu");
     await hydrated(page);
     await page.evaluate(() => new Promise(requestAnimationFrame));
@@ -117,7 +130,7 @@ test.describe("a computer", () => {
   });
 
   test("a software GPU gets the list, and nothing of three", async ({ page }) => {
-    const asked = sceneAsks(page);
+    const asked = asks(page, SCENE);
     await page.goto("/");
     await hydrated(page);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
@@ -148,6 +161,27 @@ test.describe("a computer", () => {
     await expect.poll(() => patch(page)).toBeGreaterThan(0.5);
     await expect.poll(() => patch(page)).toBeLessThan(1.5);
   });
+});
+
+// Every route, by its first visit: the cosmos of each universe shows space, and no other page asks for its code.
+test.describe("which pages show space", () => {
+  test.use({ viewport: COMPUTER });
+
+  for (const path of ["/", "/net/onyx", "/net/gnoland"])
+    test(`${path} does`, async ({ page }) => {
+      await page.goto(`${path}?test-gpu`);
+      await running(page);
+    });
+
+  for (const path of ["/list", "/w/bubble", "/net/onyx/w/bubble", "/earth", "/net/gnoland/earth", "/nowhere"])
+    test(`${path} does not`, async ({ page }) => {
+      const asked = asks(page, DOOR);
+      await page.goto(`${path}?test-gpu`);
+      await hydrated(page);
+      await expect(page.locator("h1").first()).toBeVisible();
+      expect(asked).toEqual([]);
+      await expect(page.locator("canvas")).toHaveCount(0);
+    });
 });
 
 test.describe("the loop", () => {
@@ -192,11 +226,12 @@ test.describe("the loop", () => {
     expect(await servedOver(page, 2000)).toBeLessThanOrEqual(22);
   });
 
-  test("reduced motion draws its frame, then none", async ({ page }) => {
+  test("reduced motion draws its frame, then none, and opens no iris", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await countFrames(page);
     await page.goto(HOME);
     await running(page);
+    expect(await page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
     expect((await stats(page)).probing).toBe(false);
     // The first layout owes its frame: at rest once that has passed.
@@ -290,7 +325,7 @@ test.describe("a phone", () => {
   test.use({ viewport: PHONE });
 
   test("loads nothing of the 3D before View in space, the worker included", async ({ page }) => {
-    const asked = sceneAsks(page);
+    const asked = asks(page, SCENE);
     const view = await offered(page);
     await controlled(page);
     expect(asked).toEqual([]);
@@ -341,13 +376,36 @@ test.describe("a phone", () => {
     await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
   });
 
-  test("the data saver waits to be asked on a computer too", async ({ page }) => {
-    await page.setViewportSize(COMPUTER);
+  test("the data saver waits to be asked on a computer too, left of the rail and level with the hero", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1728, height: 1080 });
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "connection", { value: { saveData: true } });
     });
     await page.goto(HOME);
-    await expect(page.getByRole("button", { name: "View in space" })).toBeVisible();
+    const view = page.getByRole("button", { name: "View in space" });
+    await expect(view).toBeVisible();
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
+    const box = await view.boundingBox();
+    if (box === null) throw new Error("no button");
+    // The rail's column in f0004 and f0017 starts at x 1585; the hero's foot is 64 px from the window's.
+    expect(box.x + box.width).toBeLessThanOrEqual(1585);
+    expect(box.y + box.height).toBe(1080 - 64);
+  });
+
+  test("the failure's line stays clear of the markets at 900 px, and of the links at 390", async ({ page }) => {
+    await page.route(SCENE, (route) => route.abort());
+    for (const size of [{ width: 900, height: 900 }, PHONE]) {
+      await page.setViewportSize(size);
+      await page.goto(HOME);
+      const view = page.getByRole("button", { name: "View in space" });
+      if (size === PHONE) await view.click();
+      const line = page.getByRole("status").filter({ hasText: "Space is not available here" });
+      await expect(line).toBeVisible();
+      const box = await line.boundingBox();
+      if (box === null) throw new Error("no line");
+      expect(box.x + box.width).toBeLessThanOrEqual(size.width - 16);
+    }
   });
 });

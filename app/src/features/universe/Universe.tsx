@@ -21,7 +21,13 @@ export function Universe({ shown }: { shown: boolean }) {
   }, [host, shown]);
   return (
     <>
-      <canvas ref={canvasRef} className={styles["canvas"]} aria-hidden="true" data-scene={shown ? status : "covered"} />
+      <canvas
+        ref={canvasRef}
+        className={styles["canvas"]}
+        aria-hidden="true"
+        data-scene={shown ? status : "covered"}
+        data-opened={status === "on" ? "" : undefined}
+      />
       {shown && (status === "offered" || status === "asked") ? (
         <div className={styles["offer"]}>
           <Button

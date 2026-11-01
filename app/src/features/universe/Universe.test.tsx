@@ -445,6 +445,27 @@ describe("the view changing", () => {
     await settle();
     expect(scene.cover).toHaveBeenLastCalledWith(true);
   });
+
+  it("opens once: the iris stays open over a page that covers it", async () => {
+    const { box, rerender } = rendered(true);
+    await settle();
+    expect(one(box, "canvas").hasAttribute("data-opened")).toBe(true);
+    rerender(false);
+    expect(one(box, "canvas").hasAttribute("data-opened")).toBe(true);
+  });
+
+  it("opens again with a lost context's return, and not before", async () => {
+    const box = mount(<Universe shown />);
+    await settle();
+    act(() => {
+      started().onLost(true);
+    });
+    expect(one(box, "canvas").hasAttribute("data-opened")).toBe(false);
+    act(() => {
+      started().onLost(false);
+    });
+    expect(one(box, "canvas").hasAttribute("data-opened")).toBe(true);
+  });
 });
 
 describe("leaving", () => {
