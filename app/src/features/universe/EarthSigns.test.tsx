@@ -79,11 +79,23 @@ const signOf = (box: HTMLElement, text: string) => {
 };
 const marks = (ground: ReturnType<typeof parts>["ground"]) => ground.setMarks.mock.lastCall?.[0] ?? [];
 
+const sight: { seen?: (entries: { intersectionRatio: number }[]) => void } = {};
+
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW });
   vi.stubGlobal(
     "ResizeObserver",
     class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(seen: (entries: { intersectionRatio: number }[]) => void) {
+        sight.seen = seen;
+      }
       observe = vi.fn();
       disconnect = vi.fn();
     },
@@ -138,12 +150,6 @@ describe("a bubble", () => {
     expect(words(box, "hello")?.closest("[aria-hidden='true']")).not.toBeNull();
   });
 
-  it("marks your own, for the frames' ring", async () => {
-    const { box, say } = await shown();
-    say("m1", { from: ME, country: "FR" });
-    expect(signOf(box, "hello").hasAttribute("data-mine")).toBe(true);
-  });
-
   it("stands on its country", async () => {
     const { say, ground } = await shown();
     say("m1", { country: "JP" });
@@ -161,20 +167,31 @@ describe("a bubble", () => {
     expect(words(box, "hello")).toBeUndefined();
   });
 
-  it("opens leftwards when it would pass the edge, and stays on the screen", async () => {
+  const bubbleAt = (bubble: HTMLElement) => [
+    bubble.style.transform,
+    bubble.style.getPropertyValue("--_x"),
+    bubble.style.getPropertyValue("--_y"),
+  ];
+
+  it("stands on its point, and opens leftwards when it would pass the edge", async () => {
     const { box, say, ground } = await shown();
     say("m1");
     const bubble = signOf(box, "hello");
-    const place = marks(ground).find(({ lat }) => lat === 36.1)?.place;
-    place?.(100, 400, true);
-    expect(bubble.style.transform).toBe("translate(106px, 338px)");
-    expect(bubble.style.getPropertyValue("--_point")).toBe("-6px");
-    place?.(innerWidth - 20, 400, true);
-    expect(bubble.style.transform).toBe(`translate(${String(innerWidth - 20 - 262)}px, 338px)`);
-    expect(bubble.style.getPropertyValue("--_point")).toBe("262px");
-    place?.(100, 400, true);
-    place?.(200, 400, true);
-    expect(bubble.style.getPropertyValue("--_point")).toBe("-6px");
+    const mark = marks(ground).find(({ lat }) => lat === 36.1);
+    mark?.place(100, 400, true);
+    expect(bubbleAt(bubble)).toEqual(["translate(100px, 400px)", "6px", "-62px"]);
+    mark?.place(innerWidth - 20, 400, true);
+    expect(bubbleAt(bubble)).toEqual([`translate(${String(innerWidth - 20)}px, 400px)`, "-264px", "-62px"]);
+  });
+
+  it("writes its offset only when it changes, for the transition that eases it", async () => {
+    const { box, say, ground } = await shown();
+    say("m1");
+    const mark = marks(ground).find(({ lat }) => lat === 36.1);
+    mark?.place(100, 400, true);
+    const write = vi.spyOn(signOf(box, "hello").style, "setProperty");
+    mark?.place(101, 400, true);
+    expect(write).not.toHaveBeenCalled();
   });
 
   it("keeps eight pixels from the window's left edge, on a phone's narrow globe", async () => {
@@ -184,39 +201,48 @@ describe("a bubble", () => {
     marks(ground)
       .find(({ lat }) => lat === 36.1)
       ?.place(120, 400, true);
-    expect(signOf(box, "hello").style.transform).toBe("translate(8px, 338px)");
+    expect(bubbleAt(signOf(box, "hello"))).toEqual(["translate(120px, 400px)", "-112px", "-62px"]);
   });
 
-  it("moves a bubble clear of one that came before it: words are never hidden, and each still knows its place", async () => {
+  const threeBubbles = async () => {
     const { box, say, ground } = await shown();
     say("m1", { country: "JP", text: "first", from: "ann" });
     say("m2", { country: "KR", text: "second", from: "bob" });
-    const [one, two] = [signOf(box, "first"), signOf(box, "second")];
-    vi.spyOn(one, "offsetHeight", "get").mockReturnValue(56);
-    vi.spyOn(two, "offsetHeight", "get").mockReturnValue(56);
+    const bubbles = [signOf(box, "first"), signOf(box, "second")];
+    for (const each of bubbles) vi.spyOn(each, "offsetHeight", "get").mockReturnValue(56);
     say("m3", { country: "CN", text: "third", from: "cy" });
-    const places = marks(ground).filter(({ lat }) => lat === 36.1 || lat === 36.4);
+    const third = signOf(box, "third");
+    vi.spyOn(third, "offsetHeight", "get").mockReturnValue(56);
+    say("m4", { country: "TW", text: "fourth", from: "dee" });
+    return { bubbles: [...bubbles, third], marks: marks(ground).filter(({ lat }) => lat > 23 && lat < 37) };
+  };
+
+  it("moves a bubble clear of those before it: words are never hidden, and it says how far it went", async () => {
+    const { bubbles, marks: places } = await threeBubbles();
     for (const { place } of places) place(100, 400, true);
-    expect(one.style.transform).toBe("translate(106px, 338px)");
-    expect(two.style.transform).toBe("translate(106px, 276px)");
-    expect(two.style.getPropertyValue("--_lift")).toBe("62px");
-    expect(one.style.getPropertyValue("--_lift")).toBe("0px");
+    expect(bubbles[0]?.style.getPropertyValue("--_y")).toBe("-62px");
+    expect(bubbles[1]?.style.getPropertyValue("--_y")).toBe("-124px");
+    expect(bubbles[1]?.style.getPropertyValue("--_lift")).toBe("62px");
+    expect(bubbles[0]?.style.getPropertyValue("--_lift")).toBe("0px");
+  });
+
+  it("clears every bubble before it, not the nearest alone: one that clears the second may land on the first", async () => {
+    const { bubbles, marks: places } = await threeBubbles();
+    const [first, second, third] = places;
+    first?.place(100, 162, true);
+    second?.place(100, 232, true);
+    third?.place(100, 232, true);
+    expect(bubbles[2]?.style.getPropertyValue("--_y")).toBe("-194px");
   });
 
   it("gives a bubble its own place back when the other moved off", async () => {
-    const { box, say, ground } = await shown();
-    say("m1", { country: "JP", text: "first", from: "ann" });
-    say("m2", { country: "KR", text: "second", from: "bob" });
-    const two = signOf(box, "second");
-    vi.spyOn(signOf(box, "first"), "offsetHeight", "get").mockReturnValue(56);
-    vi.spyOn(two, "offsetHeight", "get").mockReturnValue(56);
-    say("m3", { country: "CN", text: "third", from: "cy" });
-    const [first, second] = marks(ground).filter(({ lat }) => lat === 36.1 || lat === 36.4);
+    const { bubbles, marks: places } = await threeBubbles();
+    const [first, second] = places;
     first?.place(100, 400, true);
     second?.place(100, 400, true);
     first?.place(600, 400, true);
     second?.place(100, 400, true);
-    expect(two.style.transform).toBe("translate(106px, 338px)");
+    expect(bubbles[1]?.style.getPropertyValue("--_y")).toBe("-62px");
   });
 
   it("stays over the globe's line when its place goes behind: it is the rules that end it", async () => {
@@ -293,6 +319,17 @@ describe("a pin", () => {
     place?.(500, 300, true);
     expect(sign?.hidden).toBe(false);
     expect(sign?.style.transform).toBe("translate(500px, 300px)");
+  });
+
+  it("keeps a pin in the focus's hands: it never drops the reader's place as the globe turns it away", async () => {
+    const { box, ground } = await shown();
+    const mark = marks(ground).find(({ lat }) => lat === 38.7);
+    pin(box).focus();
+    mark?.place(500, 300, false);
+    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hidden).toBe(false);
+    pin(box).blur();
+    mark?.place(500, 300, false);
+    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hidden).toBe(true);
   });
 
   it("draws no navigation when no room has a place", async () => {
@@ -375,15 +412,53 @@ describe("its life", () => {
     globe.remove();
   });
 
+  it("keeps the counts off the dock: their room ends at the ring's reach", async () => {
+    const globe = pageGlobe();
+    const { box } = await shown();
+    expect(one(box, "[data-signs]").style.getPropertyValue("--_room")).toBe("403px");
+    globe.remove();
+  });
+
+  it("follows the page when the window moves the globe without resizing it", async () => {
+    const globe = pageGlobe();
+    const { box } = await shown();
+    vi.spyOn(globe, "getBoundingClientRect").mockReturnValue({
+      left: 500,
+      top: 240,
+      width: 642,
+      height: 642,
+    } as DOMRect);
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(one(box, "[data-signs]").style.getPropertyValue("--_left")).toBe("773px");
+    globe.remove();
+  });
+
+  it("leaves the screen when the page scrolled the globe away: it stands fixed, and the chat comes under it", async () => {
+    const globe = pageGlobe();
+    const { box } = await shown();
+    const root = one(box, "[data-signs]");
+    act(() => {
+      sight.seen?.([{ intersectionRatio: 0.3 }]);
+    });
+    expect(root.hidden).toBe(true);
+    act(() => {
+      sight.seen?.([{ intersectionRatio: 0.9 }]);
+    });
+    expect(root.hidden).toBe(false);
+    globe.remove();
+  });
+
   it("keeps a bubble inside the ring's reach where the page keeps a globe, for the dock lies past it", async () => {
     const globe = pageGlobe();
     const { box, say, ground } = await shown();
     say("m1");
     const place = marks(ground).find(({ lat }) => lat === 36.1)?.place;
     place?.(1100, 400, true);
-    expect(signOf(box, "hello").style.getPropertyValue("--_point")).toBe("262px");
+    expect(signOf(box, "hello").style.getPropertyValue("--_x")).toBe("-264px");
     place?.(1040, 400, true);
-    expect(signOf(box, "hello").style.getPropertyValue("--_point")).toBe("-6px");
+    expect(signOf(box, "hello").style.getPropertyValue("--_x")).toBe("6px");
     globe.remove();
   });
 });

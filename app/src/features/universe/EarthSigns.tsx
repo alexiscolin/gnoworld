@@ -38,17 +38,11 @@ function Mark({ at, ...rest }: { at: { lat: number; lon: number } | undefined } 
 function BubbleSign({ bubble }: { bubble: Bubble }) {
   const name = speaker(bubble.account);
   return (
-    <Mark
-      at={centreOf(bubble.country)}
-      className={styles["anchor"]}
-      data-mark="bubble"
-      data-bubble=""
-      data-mine={bubble.own ? "" : undefined}
-    >
-      <div className={styles["bubble"]}>
+    <Mark at={centreOf(bubble.country)} className={styles["anchor"]} data-mark="bubble">
+      <div className={styles["bubble"]} data-bubble="">
         <span className={styles["who"]}>{initial(name)}</span>
         <div>
-          <div className="label truncate">
+          <div className={`truncate ${String(styles["head"])}`}>
             {name} · {countryName(bubble.country)}
           </div>
           <p dir="auto" className={styles["words"]}>

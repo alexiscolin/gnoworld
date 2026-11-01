@@ -26,6 +26,9 @@
   /* raw: the dock's breakpoint (ChatScreen.tsx) */
   @media (min-width: 1280px) {
     .chat {
+      /* The dock takes the plate's tint, as frames 43 to 85 have it: the fill as the page's own, read above the chat. */
+      --color-surface: var(--_tinted);
+
       /* layout: the dock's own height */
       block-size: 100%;
     }
@@ -48,6 +51,8 @@
       --_dock: 320px;
       /* raw: the frames' blue tints the plate (f0039: #162238), as a world's colour tints its own */
       --world: #5eaafd;
+      /* raw: the same 16% the plate takes (Panel.module.css) */
+      --_tinted: color-mix(in oklab, var(--world) 16%, var(--color-surface));
       /* raw: the plate's words end here */
       --_start: 578px;
       /* raw: the dock's left, from the window's width */

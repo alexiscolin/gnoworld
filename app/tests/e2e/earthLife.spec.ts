@@ -90,7 +90,7 @@ async function onEarth(
 const near = (actual: number, wanted: number, slack = 2) => {
   expect(Math.abs(actual - wanted), `${String(actual)}, the frame's ${String(wanted)}`).toBeLessThanOrEqual(slack);
 };
-const bubble = (page: Page, text: string) => page.locator("[data-mark]").filter({ hasText: text });
+const bubble = (page: Page, text: string) => page.locator("[data-bubble]").filter({ hasText: text });
 const pinOf = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Rooms on the globe" }).getByRole("link", { name });
 const bubbleBoxes = async (page: Page) => {
@@ -98,6 +98,14 @@ const bubbleBoxes = async (page: Page) => {
   return boxes.flatMap((found) => found ?? []);
 };
 const signsReady = (page: Page) => expect(page.getByRole("navigation", { name: "Rooms on the globe" })).toBeAttached();
+// The Earth, with your own line from Paris said on it: the globe has turned to Europe.
+async function parisSaid(page: Page) {
+  const { socket } = await onEarth(page, { me: ME });
+  await signsReady(page);
+  socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+  return socket;
+}
+
 const earthOf = async (page: Page) =>
   (await stats(page)) as unknown as { earth: { x: number; y: number; radius: number } };
 
@@ -116,17 +124,16 @@ test.describe("a computer, as the frames", () => {
 
   test("joins the general chat and the side rooms the list gives, so their lines reach the globe", async ({ page }) => {
     const { sent, socket } = await onEarth(page, { me: ME });
-    await expect.poll(() => sent.filter((line) => line.startsWith("JOIN ")).join(",")).toContain("#earth/lisbon");
-    expect(sent.filter((line) => line.startsWith("JOIN ")).join(",")).toContain("#earth");
+    const joined = () => sent.flatMap((line) => (line.startsWith("JOIN ") ? line.slice(5).split(",") : []));
+    await expect.poll(joined).toContain("#earth/lisbon");
+    expect(joined()).toContain("#earth");
     await signsReady(page);
     socket().send(raw({ id: "m1", text: "from a side room", country: "JP", from: "p2", room: "#earth/lisbon" }));
     await expect(bubble(page, "from a side room")).toBeAttached();
   });
 
   test("shows a person's line over their country, with their name and country, as frame 47", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    await parisSaid(page);
     const shown = bubble(page, "gm from Paris!");
     await expect(shown).toBeVisible();
     await expect(shown).toContainText(/FRANCE/i);
@@ -159,9 +166,7 @@ test.describe("a computer, as the frames", () => {
   });
 
   test("keeps every bubble off the plate's words and off the dock", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     const words = [
       ["m2", "good evening from Germany", "DE", "p2"],
       ["m3", "and from Italy", "IT", "p3"],
@@ -179,9 +184,7 @@ test.describe("a computer, as the frames", () => {
   });
 
   test("counts a country on the far side under the ring, as frame 47", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
     socket().send(raw({ id: "m2", text: "evening from Sydney", country: "AU", from: "p2" }));
     const count = page.getByText("Australia · 1, far side");
@@ -194,9 +197,7 @@ test.describe("a computer, as the frames", () => {
   });
 
   test("takes a redacted line's bubble off at once", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
     socket().send(redaction("m1"));
     await expect(bubble(page, "gm from Paris!")).toHaveCount(0, { timeout: 500 });
@@ -243,9 +244,7 @@ test.describe("a computer, as the frames", () => {
   });
 
   test("shows a pin of a room with a place, and opens the room in the dock", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    await parisSaid(page);
     const pin = pinOf(page, "#lisbon");
     await expect(pin).toBeVisible();
     await pin.click();
@@ -267,9 +266,7 @@ test.describe("a computer, as the frames", () => {
   test("hides a pin behind the globe from the keyboard too, and gives it back as the globe turns to it", async ({
     page,
   }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     await expect(pinOf(page, "#lisbon")).toBeVisible();
     await expect(pinOf(page, "#kyoto")).toHaveCount(0);
     socket().send(raw({ id: "m2", text: "gm from Tokyo!", country: "JP", from: ME, at: LATER }));
@@ -278,9 +275,7 @@ test.describe("a computer, as the frames", () => {
   });
 
   test("passes axe with bubbles, counts and pins on the globe", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     socket().send(raw({ id: "m2", text: "evening from Sydney", country: "AU", from: "p2" }));
     await expect(page.getByText("Australia · 1, far side")).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
@@ -292,28 +287,24 @@ test.describe("a computer, as the frames", () => {
     socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
     await expect(bubble(page, "gm from Paris!")).toBeAttached();
     const animation = await page
-      .locator("[data-bubble] > *")
+      .locator("[data-bubble]")
       .first()
       .evaluate((node) => getComputedStyle(node).animationName);
     expect(animation).not.toBe("none");
   });
 
   test("shows a bubble without its pop under reduced motion", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    await parisSaid(page);
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
     const animation = await page
-      .locator("[data-bubble] > *")
+      .locator("[data-bubble]")
       .first()
       .evaluate((node) => getComputedStyle(node).animationName);
     expect(animation).toBe("none");
   });
 
   test("takes the signs off with the page", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    await parisSaid(page);
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
     await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Cosmos" }).click();
     await expect(page.locator("[data-signs]")).toHaveCount(0);
@@ -400,6 +391,25 @@ for (const viewport of [COMPUTER, { width: 1100, height: 800 }, PHONE]) {
 test.describe("a window under the dock's breakpoint", () => {
   test.use({ viewport: { width: 1100, height: 800 } });
 
+  test("brings the chat to the reader when a pin opens a room: a room that changes out of sight says nothing", async ({
+    page,
+  }) => {
+    await parisSaid(page);
+    await pinOf(page, "#lisbon").click();
+    await expect(page.getByRole("heading", { level: 2, name: "#lisbon" })).toBeInViewport();
+  });
+
+  test("takes the signs off when the page scrolls the globe away: no pin lies over the chat", async ({ page }) => {
+    await onEarth(page, { me: ME });
+    await signsReady(page);
+    await page.locator("#chat").scrollIntoViewIfNeeded();
+    await expect(page.locator("[data-signs]")).toBeHidden();
+    await page.evaluate(() => {
+      scrollTo(0, 0);
+    });
+    await expect(page.locator("[data-signs]")).toBeVisible();
+  });
+
   test("keeps the chat in the page, under the globe: the Earth is what the page shows", async ({ page }) => {
     await onEarth(page, { me: ME });
     await signsReady(page);
@@ -414,9 +424,7 @@ test.describe("a narrower computer", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test("keeps a bubble off the dock: it opens to the left of its place", async ({ page }) => {
-    const { socket } = await onEarth(page, { me: ME });
-    await signsReady(page);
-    socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
+    const socket = await parisSaid(page);
     socket().send(raw({ id: "m2", text: "from far in the east of Europe", country: "UA", from: "p2" }));
     socket().send(raw({ id: "m3", text: "hello from Kazakhstan", country: "KZ", from: "p3" }));
     await expect(page.locator("[data-bubble]")).not.toHaveCount(0);
@@ -434,6 +442,10 @@ test.describe("a phone", () => {
     await page.route("**/api/rooms?world=earth", (route) => route.fulfill({ json: ROOMS }));
     let socket: WebSocketRoute | undefined;
     const sent: string[] = [];
+    const asked: string[] = [];
+    page.on("request", (request) => {
+      if (/EarthSigns-[\w-]+\.js$/.test(request.url())) asked.push(request.url());
+    });
     await page.routeWebSocket(/\/ws$/, (ergo) => {
       socket = ergo;
       scriptedErgo(ergo, ME, {
@@ -448,6 +460,7 @@ test.describe("a phone", () => {
     await hydrated(page);
     await expect(page.getByRole("heading", { level: 2, name: "#general" })).toBeAttached();
     await expect(page.locator("[data-signs]")).toHaveCount(0);
+    expect(asked, "no code of the signs before View in space").toEqual([]);
     await page.getByRole("button", { name: "View in space" }).click();
     await running(page);
     await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);

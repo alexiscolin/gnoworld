@@ -38,7 +38,12 @@ export default function Earth() {
   const page = {
     store,
     open: (href: string) => {
-      Promise.resolve(navigate(href)).catch(reportError);
+      // Under the dock's breakpoint the chat lies below the globe: a room that changes out of sight says nothing.
+      Promise.resolve(navigate(href, { preventScrollReset: true }))
+        .then(() => {
+          document.getElementById("chat")?.scrollIntoView();
+        })
+        .catch(reportError);
     },
   };
   // The chat comes once the door to space has: this page holds both, and the first screen's budget carries the door (budgets.spec.ts).

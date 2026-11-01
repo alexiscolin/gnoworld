@@ -6,6 +6,8 @@
     --_foot: 100vb;
     /* raw: the same, from the window's left edge */
     --_left: 0px;
+    /* raw: the same: what the ring leaves the counts, clear of the dock */
+    --_room: 520px;
 
     position: fixed;
     inset: 0;
@@ -51,13 +53,13 @@
   }
 
   .anchor[data-mark="bubble"] {
-    /* raw: how far it moved clear of a bubble before it, and where its point stands on its edge: the script writes both */
+    /* raw: the bubble's place from its point, and how far it moved clear of another: the script writes them */
+    --_x: 6px;
+    /* raw: the same, 62 px over the point */
+    --_y: -62px;
+    /* raw: the same */
     --_lift: 0px;
-    /* raw: the same, 6 px left of the bubble's edge until it opens leftwards */
-    --_point: -6px;
 
-    /* raw: frame 47's bubble, 258 px wide */
-    inline-size: 258px;
     visibility: hidden;
   }
 
@@ -70,19 +72,19 @@
     column-gap: var(--space-xs);
     /* layout: the face at the words' middle */
     align-items: center;
+    /* raw: frame 47's bubble, 258 px wide */
+    inline-size: 258px;
     /* raw: frame 47's corners */
     border-radius: 16px;
     border: var(--line-width) solid var(--color-line-strong);
     padding: var(--space-xs);
     /* raw: near-black over the night side: the frames' glass, with no blur, which is not yet baseline */
-    background: color-mix(in oklab, var(--color-space) 86%, transparent);
+    background: color-mix(in oklab, var(--color-space) 94%, transparent);
     /* raw: a quarter of a second, a little past its size and back */
     animation: pop 240ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
-    transform-origin: var(--_point) 100%;
-  }
-
-  [data-mine] > .bubble {
-    border-color: var(--color-mine-line);
+    translate: var(--_x) var(--_y);
+    /* raw: a fifth of a second, so a bubble that gives way is seen to move */
+    transition: translate 200ms ease-out;
   }
 
   @keyframes pop {
@@ -116,12 +118,36 @@
     overflow-wrap: anywhere;
   }
 
+  .head {
+    /* raw: frame 55's head, mono 10 px */
+    font: 400 0.625rem/1.3 var(--family-mono);
+    /* raw: the same, 7.2 px a letter */
+    letter-spacing: 0.12em;
+  }
+
+  .head:not(:empty) {
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
   /* A person spoke here: one ring leaves the place as the bubble comes. */
   .ping {
     position: absolute;
-    /* raw: the bubble stands 62 px over its place, and more when it moved clear of another */
-    inset-block-start: calc(62px + var(--_lift));
-    inset-inline-start: var(--_point);
+    /* raw: on the point itself */
+    inset: 0 auto auto 0;
+  }
+
+  /* A bubble that moved clear of another stays tied to its place by a line. */
+  .ping::before {
+    content: "";
+    position: absolute;
+    /* raw: from the point upwards */
+    inset-block-end: 0;
+    inline-size: var(--line-width);
+    block-size: var(--_lift);
+    background: var(--color-line-strong);
+    /* raw: the bubble's own ease */
+    transition: block-size 200ms ease-out;
   }
 
   .ping::after {
@@ -150,7 +176,7 @@
     inset: -20px;
     border: var(--line-width) solid currentcolor;
     /* raw: the frames' faint fill */
-    background: color-mix(in oklab, currentcolor 8%, transparent);
+    background: color-mix(in oklab, currentcolor 4%, transparent);
     /* raw: a slow beat, the frames' */
     animation: ring 2.4s ease-out infinite;
   }
@@ -173,8 +199,8 @@
 
     to {
       opacity: 0;
-      /* raw: a little past it, as it fades */
-      transform: scale(1.3);
+      /* raw: to frame 55's 62 px, as it fades */
+      transform: scale(1.6);
     }
   }
 
@@ -182,8 +208,8 @@
     position: absolute;
     /* raw: frame 52's place, 38 px over the point */
     inset-block-start: -38px;
-    /* raw: and 24 px right of it */
-    inset-inline-start: 24px;
+    /* raw: and 20 px right of it */
+    inset-inline-start: 20px;
     padding-inline: var(--space-2xs);
     /* raw: frame 52's 11 px mono, in a pill 20 px high */
     font: 500 0.6875rem/20px var(--family-mono);
@@ -205,7 +231,7 @@
     border: var(--line-width) solid var(--color-line-strong);
     padding-inline: var(--space-2xs);
     /* raw: the bubbles' dark */
-    background: color-mix(in oklab, var(--color-space) 86%, transparent);
+    background: color-mix(in oklab, var(--color-space) 94%, transparent);
     pointer-events: auto;
   }
 
@@ -231,8 +257,7 @@
     /* raw: 50 px under the ring, as the frames have them */
     inset-block-start: calc(var(--_foot) + 50px);
     inset-inline-start: var(--_left);
-    /* raw: the frames' far side, under the ring */
-    max-inline-size: 520px;
+    max-inline-size: var(--_room);
   }
 
   .count {
@@ -249,7 +274,13 @@
       animation: none;
     }
 
-    .ping {
+    .bubble,
+    .ping::before {
+      transition: none;
+    }
+
+    .ping::after {
+      animation: none;
       visibility: hidden;
     }
 
