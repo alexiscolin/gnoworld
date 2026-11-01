@@ -4,7 +4,8 @@
 # refuses, so the operator runs it:
 #   sh deploy/test.sh            builds the static server, starts it with the guard in a throwaway
 #                                project and a password of its own, checks both, then removes it;
-#   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail;
+#   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail, and its run ends at the check that
+#                                must catch it (STOP_AT), not after every check of the stack;
 #   sh deploy/test.sh --demo     checks the running demo: Tailscale, its tailnet, the public URL;
 #                                it asks for the demo's password, which no command line shows.
 # Its output names the host's own addresses and ports: never commit it, nor paste it in public.
@@ -92,6 +93,9 @@ pass() { printf 'ok    %s\n' "$1"; }
 fail() {
 	printf 'FAIL  %s\n' "$1"
 	failed=$((failed + 1))
+	# A mutant's run is told the check that must catch it (STOP_AT, see mutant() below) and ends at that check's failure, the other checks'
+	# failures shown before it: what comes after it, hours of the full stack, cannot change the verdict. A plain run has none, and goes through every check.
+	[ -z "${STOP_AT:-}" ] || case $1 in *"$STOP_AT"*) exit 1 ;; esac
 }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1: wanted [$3], got [$2]"; fi; }
 at_least() { if [ "$2" -ge "$3" ]; then pass "$1 ($2)"; else fail "$1: $2, under $3"; fi; }
@@ -272,7 +276,7 @@ guard_dns() { docker exec "$guard" iptables-nft -S OUTPUT | sed -n 's#^-A OUTPUT
 
 if [ "${1:-}" = --mutants ]; then
 	# The stack as it is passes first: a check that always failed would kill every mutant naming it.
-	TEST_PROJECT=gnoworld-demo-mutant-$$ sh "$0" >"$tmp/run.log" 2>&1 ||
+	STOP_AT= TEST_PROJECT=gnoworld-demo-mutant-$$ sh "$0" >"$tmp/run.log" 2>&1 ||
 		missing "the stack fails with no fault planted (first: $(grep '^FAIL' "$tmp/run.log" | head -1 | cut -c7-120)): fix it before the mutants"
 	# The faults each check must catch (CLAUDE.md: a guard lands with the fault that proves it).
 	# Each fault names the check that must catch it: killed by another one, it proves nothing.
@@ -283,7 +287,7 @@ if [ "${1:-}" = --mutants ]; then
 		[ -z "${ONLY_MUTANTS:-}" ] || printf '%s\n' "$label" | grep -qE -- "$ONLY_MUTANTS" || return 0
 		"$@" >"$tmp/override.yaml"
 		code=0
-		TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
+		STOP_AT=$wanted TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
 		if [ "$code" = 1 ] && grep '^FAIL' "$tmp/run.log" | grep -qF "$wanted"; then
 			pass "killed: $label, by \"$wanted\""
 		elif [ "$code" = 0 ]; then

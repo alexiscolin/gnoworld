@@ -203,8 +203,26 @@ refuses another Node (F816).
 `worktree` and `since`, shared by every worktree of the machine: five side by side at a load of 25 to 40 on 16 cores failed by load
 alone (2026-10-30). It waits for a live holder, printing which worktree holds it and since when, and never refuses; a holder whose pid is
 gone (a crash, `kill -9`) leaves no wait, its lock taken over; a waiter that is interrupted frees nothing of another's. The fast gate and
-`--full` take none, and the time a run prints leaves the wait out. `check.sh` also sets the soft limit (up or down) of open files to 10240 for its
+`--full` take none, and the time a run prints leaves the wait out. Each `--merge` appends one line to `~/.cache/gnoworld-tools/merge-waits.log`
+(UTC time, worktree, `waited N s`, the worktree that held the lock): the measure to read before anything more is built on the lock (the dream
+of 2026-11-01, 4). `check.sh` also sets the soft limit (up or down) of open files to 10240 for its
 steps (F2543), saying so when it cannot.
+
+**Two speeds, a merge check only** (`scripts/speeds.py`, slice 7). A change whose every path is on docs/REVIEW.md's tier-3 list (the
+backticked folders of that row, named one by one: six feature folders and the design system's component folders; a new folder, `chat/`,
+`realms/` and the root files of `packages/ui/src/` are not on it) runs no StrykerJS; the coverage, the patch's coverage, `prove_fix`
+and the stories still run. Any path outside that list, any path of a tier-1 row (login, the CSP, chain reads, roles, the worker, realms,
+the deploy folder, the harness), a table or a list the script cannot read, a path it cannot place (quoted, absolute, rewritten, a link, not
+UTF-8), and a script that fails or prints anything but the word `interface`, run the whole control. `--full`, which `main` requires, is
+always whole.
+
+**A failing merge check goes on** (the dream of 2026-11-01, 5): a failed lane, or a bench refused for the load, no longer stops the
+coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, which fails
+the mutation lane only after StrykerJS has run beside it (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
+the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
+`prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
+85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
+budget with the budget spec alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip).
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
@@ -353,7 +371,8 @@ costs context in every session.
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
-| `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
+| `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
+| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
