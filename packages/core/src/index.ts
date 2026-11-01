@@ -69,3 +69,9 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
+export type { Point } from "./space/cell.ts";
+export { driftAt, HOME, turnAt } from "./space/drift.ts";
+export { MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { tilingNoise } from "./space/noise.ts";
+export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
+export { wrapTo } from "./space/torus.ts";

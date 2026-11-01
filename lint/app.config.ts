@@ -7,7 +7,7 @@ import { readdirSync } from "node:fs";
 import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
 import { REACT_PROPERTIES } from "./react.config.ts";
-import { CLASS_AT_END, SWALLOWED, TESTS } from "./shared.config.ts";
+import { CLASS_AT_END, ON_A_FRAME, SWALLOWED, TESTS } from "./shared.config.ts";
 
 const SRC = "./app/src";
 // Each feature's folder, read as the lint starts: a new feature gets its zone at once.
@@ -158,6 +158,9 @@ export default defineConfig(
           ],
         },
       ],
+      "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, ON_A_FRAME],
+      // An index walks an array with no iterator, where a frame runs.
+      "@typescript-eslint/prefer-for-of": "off",
     },
   },
   { files: [`${SRC}/**/*.{ts,tsx}`], ignores: [`${SRC}/lib/**`, `${SRC}/sw/**`, ...TESTS], rules: reaching(REACHES) },

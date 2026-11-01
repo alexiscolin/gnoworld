@@ -22,6 +22,17 @@ export function watchPage(loop: FrameLoop, signal: AbortSignal): void {
   for (const name of INPUTS) window.addEventListener(name, input, { signal, passive: true });
 }
 
+/** Gives `aim` a mouse's place, -1 to 1 across the window, y up. A finger is no aim. */
+export function watchAim(aim: (x: number, y: number) => void, signal: AbortSignal): void {
+  window.addEventListener(
+    "pointermove",
+    ({ pointerType, clientX, clientY }) => {
+      if (pointerType === "mouse") aim((clientX / innerWidth) * 2 - 1, 1 - (clientY / innerHeight) * 2);
+    },
+    { signal, passive: true },
+  );
+}
+
 /** Calls `apply` when the window moves to a screen of another pixel ratio, and on the one after. */
 export function watchScreen(apply: () => void, signal: AbortSignal): void {
   const arm = () => {

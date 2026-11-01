@@ -250,6 +250,13 @@ Rules:
 - Each part (a world, a station, the belt, the labels) registers what it creates with one
   disposer. Leaving disposes everything it registered: geometry, material, texture, render
   target, listener.
+- The camera stays at the origin and the world comes to it (slice 7 §5): the eye is a position in doubles, and the GPU gets only what
+  remains of it, so a far coordinate is as steady as home.
+- The scenery (`scene/space.ts`, `core/space`) is computed from a position and tied to no data (ADR-0002 §10): the mood is a smooth field,
+  a cell's stars come from its hash, and both sit in tori of cells that follow the eye, so a step writes only what entered. The sky is
+  marched at half the buffer's size a side, shows through the image's one grade (`scene/renderer.ts`), and is added to the stage's black.
+- What runs on a frame makes nothing: `ON_A_FRAME` in `lint/shared.config.ts` holds it by name, in the scene and in core's `frame` and
+  `space`; a function a frame reaches joins that list as it is written.
 - Text is HTML anchored to the scene (ADR-0001 §7), never 3D geometry.
 - A page that shows space calls `useSpace` (`features/universe`). That door is all it holds of the scene: the universe comes after the
   text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the

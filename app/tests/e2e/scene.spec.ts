@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
+import { moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
+import { loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -9,24 +11,6 @@ const DOOR = /\/assets\/(?:mountUniverse|scene)-/;
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
-
-interface Stats {
-  frames: number;
-  tier: "high" | "low";
-  ratio: number;
-  probing: boolean;
-  calls: number;
-  geometries: number;
-  textures: number;
-}
-
-const stats = (page: Page) =>
-  page.evaluate(() => {
-    const scene: unknown = Reflect.get(globalThis, "__gnoworldScene");
-    return (scene as { stats: () => Stats }).stats();
-  });
-
-const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
 // Frames served by the screen to anyone at all, counted before any of the page's code runs: a second loop hidden in a library
 // shows here, where the scene's own count would not see it.
@@ -75,11 +59,37 @@ async function offered(page: Page) {
   return view;
 }
 
-// A patch of the window's right edge, where the page holds no word.
-const patch = async (page: Page) => {
-  const clip = { x: COMPUTER.width - 40, y: 400, width: 8, height: 8 };
-  const [light] = await brightness(page, await page.screenshot({ clip }), [[0, 0, clip.width, clip.height]]);
-  return light ?? Infinity;
+// A place with no haze along the view, found as a journey needs it: there the stage's own black shows between the stars.
+function emptySpot() {
+  const mood = newMood();
+  const hazeAround = (spot: { x: number; y: number; z: number }) =>
+    [120, 260, 520, 1000].some((reach) =>
+      [-320, 0, 320].some((side) => {
+        moodAt(mood, { x: spot.x + side, y: spot.y + side, z: spot.z - reach });
+        return mood.haze > 0;
+      }),
+    );
+  for (let at = 1; at < 10_000; at += 1) {
+    const spot = { x: at * 997, y: at * 613, z: at * -1409 };
+    if (!hazeAround(spot)) return spot;
+  }
+  throw new Error("no empty place in reach");
+}
+
+const goToEmpty = (page: Page) =>
+  page.evaluate((to) => {
+    (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
+  }, emptySpot());
+
+// The darkest patch of the window's right half, where the page holds no word: the scenery lights the rest.
+const darkest = async (page: Page) => {
+  const patches = Array.from({ length: 12 }, (_, row) =>
+    Array.from({ length: 16 }, (_, column): [number, number, number, number] => {
+      const [x, y] = [COMPUTER.width / 2 + column * 20, 120 + row * 50];
+      return [x, y, x + 8, y + 8];
+    }),
+  ).flat();
+  return Math.min(...(await brightness(page, await page.screenshot(), patches)));
 };
 
 test.describe("a computer", () => {
@@ -89,11 +99,12 @@ test.describe("a computer", () => {
     await page.goto("/");
     await hydrated(page);
     // The page's #05070d reads 6.8; the frames' rgb(1, 1, 1) reads 1.
-    expect(await patch(page), "the page's own colour before the scene").toBeGreaterThan(5);
+    expect(await darkest(page), "the page's own colour before the scene").toBeGreaterThan(5);
     await page.goto(HOME);
     await running(page);
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
-    await expect.poll(() => patch(page)).toBeLessThan(1.5);
+    await opened(page);
+    await goToEmpty(page);
+    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
   });
 
   test("keeps every place reachable over the scene, and passes axe", async ({ page }) => {
@@ -143,23 +154,20 @@ test.describe("a computer", () => {
   test("a lost context shows the list, and the scene comes back with its context", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
-    await page.evaluate(() => {
-      const context = document.querySelector("canvas")?.getContext("webgl2");
-      Reflect.set(globalThis, "__lose", context?.getExtension("WEBGL_lose_context"));
-      (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).loseContext();
-    });
+    await loseContext(page);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: "Space is not available here" })).toBeVisible();
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
-    await page.evaluate(() => {
-      (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
-    });
+    await restoreContext(page);
     await running(page);
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
-    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background.
-    await expect.poll(() => patch(page)).toBeGreaterThan(0.5);
-    await expect.poll(() => patch(page)).toBeLessThan(1.5);
+    await opened(page);
+    await goToEmpty(page);
+    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background. Read after the iris, or the
+    // page's colour would pass the first bound; the upper one first, for the page's colour is over it.
+    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
+    expect(await darkest(page)).toBeGreaterThan(0.5);
   });
 });
 
