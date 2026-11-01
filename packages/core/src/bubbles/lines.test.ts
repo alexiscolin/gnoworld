@@ -14,7 +14,7 @@ function line(id: string, over: Partial<Line> = {}): Line {
 function room(lines: readonly Line[], over: Partial<EarthRoom> = {}): EarthRoom {
   return { type: "open", lines, hidden: () => false, ...over };
 }
-const read = (rooms: readonly EarthRoom[], joined = true) => bubbleLines(rooms, joined);
+const read = (rooms: readonly EarthRoom[], joined = true) => bubbleLines(rooms, { joined, since: 0 });
 
 describe("bubbleLines", () => {
   it("reads nothing from nothing", () => {
@@ -100,6 +100,12 @@ describe("bubbleLines", () => {
     const named = line("m1", { text: `hello @${ME}` });
     expect(read([room([named])])[0]?.mentions).toEqual([ME]);
     expect(read([room([line("m2", { text: "hello" })])])[0]?.mentions).toEqual([]);
+  });
+
+  it("reads no mention of a line too old to be a bubble: parsing it would buy nothing", () => {
+    const named = line("m1", { text: `hello @${ME}` });
+    expect(bubbleLines([room([named])], { joined: true, since: AT + 1 })[0]?.mentions).toEqual([]);
+    expect(bubbleLines([room([named])], { joined: true, since: AT })[0]?.mentions).toEqual([ME]);
   });
 
   it("keeps a mention inside code out, as the chat does", () => {

@@ -185,6 +185,32 @@ describe("what comes up", () => {
     expect(signs.snapshot().bubbles).toEqual([]);
   });
 
+  it("runs no pick for a change of the room that moves no line: someone typing, someone joining", async () => {
+    const { store, ground, stop } = await started();
+    left.push(stop);
+    say(store, "m1");
+    ground.facing.mockClear();
+    const parsed = parseLine(`@+typing=active :${ANN}!u@h TAGMSG #earth`);
+    if (!parsed.ok) throw new Error("no line");
+    store.getState().chatActions.heard(parsed.message);
+    const joined = parseLine(`:bob!u@h JOIN #earth`);
+    if (!joined.ok) throw new Error("no line");
+    store.getState().chatActions.heard(joined.message);
+    expect(ground.facing).not.toHaveBeenCalled();
+  });
+
+  it("runs no pick for a line while the page is hidden, and catches up at the next second it shows", async () => {
+    const { store, signs, ground, stop } = await started();
+    left.push(stop);
+    vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    ground.facing.mockClear();
+    say(store, "m1");
+    expect(ground.facing).not.toHaveBeenCalled();
+    vi.spyOn(document, "hidden", "get").mockReturnValue(false);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(signs.snapshot().bubbles).toHaveLength(1);
+  });
+
   it("does not ask the store again for a change that holds no line", async () => {
     const { store, ground, stop } = await started();
     left.push(stop);

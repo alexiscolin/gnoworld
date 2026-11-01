@@ -52,6 +52,16 @@ const TWO_HOURS = 7_200_000;
 const reaches = ({ lines: [oldest] }: EarthRoom, now: number): boolean =>
   oldest !== undefined && Date.parse(oldest.time) <= now - TWO_HOURS;
 
+// Whether a change of the store moves what the rules read: typing, joins and the rest of a room's life do not.
+function linesMoved({ chat, verdicts }: AppState, before: AppState): boolean {
+  if (verdicts !== before.verdicts || chat.me !== before.chat.me || chat.listed !== before.chat.listed) return true;
+  const rooms = Object.entries(chat.rooms);
+  return (
+    rooms.length !== Object.keys(before.chat.rooms).length ||
+    rooms.some(([id, room]) => room.lines !== own(before.chat.rooms, id)?.lines)
+  );
+}
+
 export class Signs {
   readonly #deps: SignsDeps;
   readonly #state = createStore<Snapshot>(() => NOTHING);
@@ -70,7 +80,7 @@ export class Signs {
   /** Starts it; what this returns stops it. */
   start(): () => void {
     const stopHearing = this.#deps.store.subscribe((state, before) => {
-      if (state.chat !== before.chat || state.verdicts !== before.verdicts) this.#pick();
+      if (!document.hidden && linesMoved(state, before)) this.#pick();
     });
     const timer = setInterval(this.#second, SECOND);
     this.#pick();
@@ -109,27 +119,22 @@ export class Signs {
       });
   }
 
-  // ponytail: each pick reads every followed room's lines, 100 rooms of 200 at most; the Earth holds a few side rooms, and it runs once a
-  // second and on a line, never on a frame.
+  // ponytail: each pick reads every followed room's lines, 100 rooms of 200 at most, on a line and once a second, never on a frame; the Earth
+  // holds a few side rooms, and only the lines young enough for a bubble are parsed for mentions.
   #pick(): void {
     const { store, ground, rules } = this.#deps;
     const { me } = store.getState().chat;
     const now = Date.now();
-    const rooms = this.#rooms();
-    const joined = me !== undefined;
+    const how = { joined: me !== undefined, since: now - rules.maxAgeSeconds * 1000 };
+    const read = this.#rooms().map((room) => ({ room, messages: bubbleLines([room], how) }));
     const facing = ground.facing();
     const viewer = { account: me ?? "", muted: [], banned: [], ...(facing === undefined ? {} : { facing }) };
-    const { bubbles, counts, shown } = pickBubbles(bubbleLines(rooms, joined), now, viewer, rules, this.#shown);
+    const messages = read.flatMap((each) => each.messages);
+    const { bubbles, counts, shown } = pickBubbles(messages, now, viewer, rules, this.#shown);
     this.#shown = shown;
     this.#face(bubbles);
-    const trends = countryTrends(
-      bubbleLines(
-        rooms.filter((room) => reaches(room, now)),
-        joined,
-      ),
-      now,
-    );
-    this.#publish({ bubbles, counts, trends, pins: this.#pins() });
+    const whole = read.filter((each) => reaches(each.room, now)).flatMap((each) => each.messages);
+    this.#publish({ bubbles, counts, trends: countryTrends(whole, now), pins: this.#pins() });
   }
 
   // The globe turns to a line of yours once, as it comes (ADR-0002 §1).
