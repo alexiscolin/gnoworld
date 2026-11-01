@@ -167,6 +167,19 @@ describe("createPlanet", () => {
     expect(SURFACE_FRAGMENT).not.toContain("texture2D(ringMap,");
   });
 
+  // The grain on a real GPU: east and across differ by a whole number but fract() rounds each its own way, so choosing between them by
+  // comparing their fwidth() flipped from pixel to pixel; a quad whose pixels chose differently took dFdx() across a whole map (a lowest
+  // mip, a stray texel), and the choice moved with the turn: a shimmer. Software renderers round alike and never show it.
+  it("never picks the map's seam by comparing derivatives, which flips per pixel on a real GPU", () => {
+    expect(SURFACE_FRAGMENT).not.toMatch(/fwidth\(east\)\s*<=?\s*fwidth\(across\)/);
+    expect(SURFACE_FRAGMENT).not.toMatch(/dFdx\(uv\)|dFdy\(uv\)/);
+  });
+
+  it("takes each candidate longitude's own derivatives, so no quad mixes two of them", () => {
+    for (const name of ["east", "across"])
+      for (const axis of ["dFdx", "dFdy"]) expect(SURFACE_FRAGMENT).toContain(`${axis}(${name})`);
+  });
+
   it("casts no ring's shadow on a world with no rings", () => {
     const surface = createPlanet(lookWith("gas giant", false), fixed().set, sphere).surface;
     expect(read(surface, "ringOuter")).toBe(0);

@@ -42,7 +42,8 @@ float seams(vec3 p) {
 }
 `;
 
-/** Where a direction falls on an equirectangular map, with the derivatives that keep the seam out of the mipmaps. */
+/** Where a direction falls on an equirectangular map. A longitude is read two ways, one of them smooth at any seam, each with the derivatives
+ * of its own values: choosing by comparing derivatives flipped within a quad on a real GPU, where fract rounds, and read a whole map apart. */
 export const LOOKUP = /* glsl */ `
 const float PI = 3.14159265359;
 const float TAU = 6.28318530718;
@@ -50,9 +51,13 @@ struct Lookup { vec2 uv; vec2 dx; vec2 dy; };
 Lookup lookupOf(vec3 direction) {
   float east = atan(direction.z, direction.x) / TAU + 0.5;
   float across = fract(east + 0.5) - 0.5;
-  float u = fwidth(east) <= fwidth(across) ? east : across;
-  vec2 uv = vec2(u, acos(clamp(direction.y, -1.0, 1.0)) / PI);
-  return Lookup(uv, dFdx(uv), dFdy(uv));
+  float down = acos(clamp(direction.y, -1.0, 1.0)) / PI;
+  vec2 eastX = vec2(dFdx(east), dFdx(down));
+  vec2 eastY = vec2(dFdy(east), dFdy(down));
+  vec2 acrossX = vec2(dFdx(across), dFdx(down));
+  vec2 acrossY = vec2(dFdy(across), dFdy(down));
+  bool plain = abs(eastX.x) + abs(eastY.x) <= abs(acrossX.x) + abs(acrossY.x);
+  return Lookup(vec2(plain ? east : across, down), plain ? eastX : acrossX, plain ? eastY : acrossY);
 }
 vec4 read(sampler2D map, Lookup at) {
   return textureGrad(map, at.uv, at.dx, at.dy);
