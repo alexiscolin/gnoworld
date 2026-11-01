@@ -12,11 +12,13 @@ import { repeat } from "../repeat.ts";
 import { replaceFile } from "../replaceFile.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
+import { keptPaths } from "./group.ts";
 import { readHistory, type History } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
 import { Failure, kindOf, pacer, type Kind, type Send } from "./remote.ts";
+import { fitted } from "./shed.ts";
 
 interface Universe {
   readonly id: string;
@@ -117,7 +119,9 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
     last?.worlds.flatMap((world) => world.realms.map((realm) => [realm.path, realm] as const)),
   );
   if (list.paths.length === 0 && lastRealms.size > 0) return "empty";
-  const paths = sorted(new Set([...list.paths, ...lastRealms.keys()]));
+  const known = sorted(new Set([...list.paths, ...lastRealms.keys()]));
+  const paths = sorted(new Set(keptPaths(known)));
+  if (paths.length < known.length) settings.log("worlds_shed", { error: "realms" });
   if (isStopped()) return "stopped";
   const facts = await readPackages({ send, rpc: universe.rpc, known: knownFacts(lastRealms), pace }, paths);
   const earlierNames = namesOf(lastRealms);
@@ -143,15 +147,14 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     if (typeof read === "string") return fail(read);
     if (settings.isStopped()) return fail("stopped");
     const stamp = new Date(settings.now()).toISOString();
-    const file = Worlds.safeParse({
-      version: 1,
-      universe: settings.universe.id,
-      updated: stamp,
-      worlds: worldsOf(read, stamp),
-    });
+    const head = { version: 1, universe: settings.universe.id, updated: stamp } as const;
+    const worlds = fitted(head, worldsOf(read, stamp), settings.maxBytes);
+    if (worlds === null) return fail("too_large");
+    if (worlds.stripped > 0) settings.log("worlds_shed", { error: "lists" });
+    if (worlds.dropped > 0) settings.log("worlds_shed", { error: "worlds" });
+    const file = Worlds.safeParse({ ...head, worlds: worlds.worlds });
     if (!file.success) return fail("shape");
     const text = `${JSON.stringify(file.data)}\n`;
-    if (Buffer.byteLength(text, "utf8") > settings.maxBytes) return fail("too_large");
     return replaceFile(settings.file, text) ? { wrote: true } : fail("write");
   } catch (error) {
     return fail(kindOf(error));

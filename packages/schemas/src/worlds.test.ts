@@ -37,6 +37,12 @@ describe("RealmPath, the paths of gno.land's realms the job may write", () => {
     expect(RealmPath.safeParse(path).success).toBe(true);
   });
 
+  it("takes a namespace of 128 characters, the length of a Slug, and refuses one of 129", () => {
+    expect(RealmPath.safeParse(`gno.land/r/${"a".repeat(128)}/b`).success).toBe(true);
+    expect(RealmPath.safeParse(`gno.land/r/${"a".repeat(129)}/b`).success).toBe(false);
+    expect(RealmPath.safeParse(`gno.land/r/${"a".repeat(129)}`).success).toBe(false);
+  });
+
   it.each([
     "gno.land/p/nt/avl/v0",
     "evil.example/r/a/b",

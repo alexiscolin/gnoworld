@@ -366,15 +366,46 @@ describe("runWorlds", () => {
       expect(text).not.toContain("</script>");
     });
 
-    it("refuses to write a file past the byte cap, keeps the last one and logs too_large", async () => {
+    it("keeps the last file and logs too_large when not even a file with no realm fits the cap", async () => {
       const file = fresh();
       await run(chainRoutes([POOL]), { file });
       const before = readFileSync(file, "utf8");
-      const paths = Array.from({ length: 200 }, (_, i) => `gno.land/r/ns/app${String(i)}`);
-      const { outcome, logged } = await run(chainRoutes(paths), { file, maxBytes: 4_000 });
+      const { outcome, logged } = await run(chainRoutes([POOL, ROUTER]), { file, maxBytes: 40 });
       expect(outcome).toEqual({ wrote: false, kind: "too_large" });
       expect(readFileSync(file, "utf8")).toBe(before);
       expect(logged).toEqual([{ event: "worlds_failed", error: "too_large" }]);
+    });
+
+    describe("a world that breaks the byte cap", () => {
+      const fat = JSON.stringify({
+        imports: [],
+        funcs: Array.from({ length: 200 }, (_, i) => ({ type: "", name: `Fn${String(i)}` })),
+      });
+      const evil = (n: number, world: (i: number) => string): string[] =>
+        Array.from({ length: n }, (_, i) => `gno.land/r/evil/${world(i)}`);
+      const routes = (paths: string[]) => chainRoutes(paths, { doc: (path) => (path.includes("evil") ? fat : doc()) });
+
+      it("is shed to fit and not refused: its lists go, the other worlds stay whole", async () => {
+        const paths = [ROUTER, ...evil(6, (i) => `fat_${String(i)}`)];
+        const { file, outcome, logged } = await run(routes(paths), { maxBytes: 8_000 });
+        expect(outcome).toEqual({ wrote: true });
+        const worlds = written(file).worlds;
+        expect(worlds.find((world) => world.id === "gnoswap/router")?.realms[0]?.functions).toEqual(["Swap"]);
+        const lean = worlds.find((world) => world.id === "evil/fat");
+        expect(lean?.realms).toHaveLength(6);
+        expect(lean?.realms.every((realm) => realm.functions.length === 0 && realm.imports.length === 0)).toBe(true);
+        expect(readFileSync(file).byteLength).toBeLessThanOrEqual(8_000);
+        expect(logged).toContainEqual({ event: "worlds_shed", error: "lists" });
+      });
+
+      it("is dropped whole when stripped lists still pass the cap, and the others are written", async () => {
+        const paths = [ROUTER, ...evil(40, (i) => `fat${String(i)}`)];
+        const { file, outcome, logged } = await run(routes(paths), { maxBytes: 4_000 });
+        expect(outcome).toEqual({ wrote: true });
+        expect(readFileSync(file).byteLength).toBeLessThanOrEqual(4_000);
+        expect(written(file).worlds.map((world) => world.id)).toContain("gnoswap/router");
+        expect(logged).toContainEqual({ event: "worlds_shed", error: "worlds" });
+      });
     });
 
     it("writes a file for the recorded list of 743 realms under the default cap, with room to spare", async () => {
@@ -387,13 +418,34 @@ describe("runWorlds", () => {
       expect(readFileSync(file).byteLength).toBeLessThan(WORLDS_MAX_BYTES / 4);
     });
 
-    it("takes a file of exactly the byte cap and refuses one byte over", async () => {
+    it("takes a file of exactly the byte cap whole, and sheds the lists for one byte under", async () => {
       const probe = await run(chainRoutes([POOL, ROUTER]));
       const size = readFileSync(probe.file).byteLength;
       const exact = await run(chainRoutes([POOL, ROUTER]), { maxBytes: size });
       expect(exact.outcome).toEqual({ wrote: true });
-      const over = await run(chainRoutes([POOL, ROUTER]), { maxBytes: size - 1 });
-      expect(over.outcome).toEqual({ wrote: false, kind: "too_large" });
+      expect(written(exact.file).worlds[0]?.realms[0]?.functions).toEqual(["Swap"]);
+      const under = await run(chainRoutes([POOL, ROUTER]), { maxBytes: size - 1 });
+      expect(under.outcome).toEqual({ wrote: true });
+      expect(written(under.file).worlds.flatMap((world) => world.realms.flatMap((realm) => realm.functions))).toEqual([
+        "Swap",
+      ]);
+    });
+
+    it("keeps the other worlds when one world holds 513 realms, reading only 512 of them", async () => {
+      const many = Array.from({ length: 513 }, (_, i) => `gno.land/r/evil/a_x${String(i).padStart(3, "0")}`);
+      const { file, outcome, chain } = await run(chainRoutes([ROUTER, ...many]));
+      expect(outcome).toEqual({ wrote: true });
+      const worlds = written(file).worlds;
+      expect(worlds.find((world) => world.id === "evil/a")?.realms).toHaveLength(512);
+      expect(worlds.find((world) => world.id === "gnoswap/router")?.realms).toHaveLength(1);
+      expect(chain.asked.filter(({ kind }) => kind === "vm/qdoc")).toHaveLength(513);
+    });
+
+    it("keeps the other worlds when a list line names a namespace of 129 characters", async () => {
+      const long = `gno.land/r/${"a".repeat(129)}/x`;
+      const { file, outcome } = await run(chainRoutes([ROUTER, long]));
+      expect(outcome).toEqual({ wrote: true });
+      expect(written(file).worlds.map((world) => world.id)).toEqual(["gnoswap/router"]);
     });
 
     it("does not call a realm that left the list and came back a new world, nor its namespace a batch", async () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { groupWorlds } from "./group.ts";
+import { groupWorlds, keptPaths } from "./group.ts";
 
 // Onyx's 743 realm paths, 2026-11-01 00:11Z (onyxPaths.txt, copied from .claude/tmp/slice-5/recorded/7m-onyx-paths.txt, read
 // through gnomcp). The golden numbers come from a replica of the rule run on that list, not from the chain.
@@ -111,6 +111,15 @@ describe("groupWorlds, hostile paths", () => {
   ])("drops %s and keeps the good path beside it", (_name, bad) => {
     const worlds = groupWorlds([bad, good]);
     expect(worlds.flatMap((world) => world.realms)).toEqual([good]);
+  });
+
+  it("keeps the first 512 realms of a world in sorted order and leaves the others out, the other worlds whole", () => {
+    const many = Array.from({ length: 600 }, (_, i) => r(`evil/a_x${String(i).padStart(3, "0")}`));
+    const worlds = keptPaths([...many, good]);
+    expect(worlds).toHaveLength(513);
+    expect(worlds).toContain(good);
+    expect(worlds).toContain(many[511]);
+    expect(worlds).not.toContain(many[512]);
   });
 
   it("never throws, whatever strings it is given", () => {

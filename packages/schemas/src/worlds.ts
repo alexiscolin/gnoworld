@@ -9,11 +9,13 @@ export const WORLDS_CAPS = { worlds: 20_000, realms: 512, functions: 256, import
 /** The most bytes the job writes and a client accepts: 4 MiB, a few times the recorded chain's file. */
 export const WORLDS_MAX_BYTES = 4 * 1024 * 1024;
 
-/** A realm of gno.land by its path: gno's grammar for a segment (`[a-z][a-z0-9]*` joined by `_` or `-`, mempackage.go at v1.5.0), `_test` left out, at most 256 characters. */
+/** A realm of gno.land by its path: gno's grammar for a segment (`[a-z][a-z0-9]*` joined by `_` or `-`, mempackage.go at v1.5.0), `_test` left out, at most 256 characters, its namespace at most 128 (a Slug). */
 export const RealmPath = z.string().check(
   z.maxLength(WORLDS_CAPS.path),
   z.regex(/^gno\.land\/r\/[a-z0-9][a-z0-9]*(?:[_-][a-z0-9]+)*(?:\/[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*)*$/),
   z.refine((path) => !path.endsWith("_test"), { message: "no test path" }),
+  // The namespace is a world's namespace, a Slug: at most `name` characters.
+  z.refine((path) => (path.split("/")[2] ?? "").length <= WORLDS_CAPS.name, { message: "a namespace of at most 128" }),
 );
 
 const Slug = z.string().check(z.minLength(1), z.maxLength(WORLDS_CAPS.name), z.regex(/^[a-z0-9][a-z0-9_-]*$/));

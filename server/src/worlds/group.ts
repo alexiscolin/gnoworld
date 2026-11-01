@@ -2,7 +2,7 @@
 // namespace and the first folder under it, the text before its first `_` (memba_feed_v1 and memba_gov are `memba`), a trailing
 // `/vN` version dropped. Under a generic folder (`x`, `demo`) the whole path minus its version stands: one namespace there holds
 // hundreds of unrelated realms. A realm that is its namespace alone is a world of its own, named by the namespace.
-import { RealmPath } from "@gnoworld/schemas";
+import { RealmPath, WORLDS_CAPS } from "@gnoworld/schemas";
 
 export interface Group {
   readonly id: string;
@@ -35,4 +35,12 @@ export function groupWorlds(paths: readonly string[]): Group[] {
   return [...worlds.values()]
     .map((group) => ({ ...group, realms: group.realms.sort() }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * The paths a pass reads and writes: each world keeps its first 512 realms in sorted order (the file's cap), so one deployer's
+ * hundreds of realms cannot refuse the file, nor be read again every pass. A path that is no realm is dropped too.
+ */
+export function keptPaths(paths: readonly string[]): string[] {
+  return groupWorlds(paths).flatMap(({ realms }) => realms.slice(0, WORLDS_CAPS.realms));
 }
