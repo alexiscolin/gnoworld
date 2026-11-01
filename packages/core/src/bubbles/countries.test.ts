@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { centreOf, COUNTRIES } from "./countries.ts";
+import { centreOf, COUNTRIES, countryName } from "./countries.ts";
 
 // Slice 6's 6b: the table of countries a bubble can come from (docs/plans/slice-6.md §7): the ISO 3166-1 code, a name and
 // a centre in degrees, from a public-domain source named in the file's header (dataFiles.test.ts reads the header).
@@ -162,5 +162,16 @@ describe("centreOf", () => {
     const before = { ...one };
     (one as { lat: number }).lat = 0;
     expect(centreOf("JP")).toEqual(before);
+  });
+});
+
+describe("countryName", () => {
+  it("names a code the table holds", () => {
+    expect(countryName("FR")).toBe("France");
+    expect(countryName("JP")).toBe("Japan");
+  });
+
+  it.each(["jp", "ZZ", "", "__proto__", "constructor"])("names nothing for %j: a code is never guessed", (code) => {
+    expect(countryName(code)).toBeUndefined();
   });
 });

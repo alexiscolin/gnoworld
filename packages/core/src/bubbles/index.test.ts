@@ -8,7 +8,17 @@ import rules from "../../../../app/data/bubbles.json" with { type: "json" };
 // exposes `proposal` and `indexer`. The main entry stays as it is: the first screen's bytes do not carry the bubbles.
 describe("@gnoworld/core/bubbles", () => {
   it("gives the pick, the cut, the turn, the far side and the table's lookup", () => {
-    expect(Object.keys(bubbles).sort()).toEqual(["centreOf", "cutText", "isFarSide", "pickBubbles", "turnTo"]);
+    expect(Object.keys(bubbles).sort()).toEqual([
+      "bubbleLines",
+      "centreOf",
+      "countryName",
+      "countryTrends",
+      "cutText",
+      "isFarSide",
+      "isPublicRoom",
+      "pickBubbles",
+      "turnTo",
+    ]);
   });
 
   it("runs from the app's side, with the shipped rules, and gives the types a caller names", () => {
