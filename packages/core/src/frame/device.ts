@@ -3,17 +3,15 @@
 export type Tier = "high" | "low";
 export type SceneOffer = "auto" | "ask" | "none";
 
-const WEAK = [
-  /swiftshader|llvmpipe|softpipe|software|basic render/i,
-  /\bmali-(?:[34]\d\d|t[67]\d\d)\b/i,
-  /\badreno \(tm\) [34]\d\d\b/i,
-  /\bpowervr sgx\b/i,
-  /\bintel.*\b(?:gma|hd graphics(?! \d{3}\b))/i,
-];
-
 /** Whether a GPU's name says it cannot carry the scene: a software renderer, an old mobile or integrated chip. A masked name says no. */
 export function isWeakGpu(name: string): boolean {
-  return WEAK.some((pattern) => pattern.test(name));
+  return [
+    /swiftshader|llvmpipe|softpipe|software|basic render/i,
+    /\bmali-(?:[34]\d\d|t[67]\d\d)\b/i,
+    /\badreno \(tm\) [34]\d\d\b/i,
+    /\bpowervr sgx\b/i,
+    /\bintel.*\b(?:gma|hd graphics(?! \d{3}\b))/i,
+  ].some((pattern) => pattern.test(name));
 }
 
 /** The pixel ratio to draw at: the screen's, capped by the tier and by a touch screen. */
