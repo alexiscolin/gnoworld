@@ -14,6 +14,21 @@ export {
   sameName,
   topicAfter,
 } from "./chat/room.ts";
+export {
+  CELL,
+  DISC_HALF_THICKNESS,
+  heightField,
+  MAX_HEIGHT,
+  placeSystem,
+  placeSystems,
+  type PlaceOptions,
+  type SystemPlace,
+  type SystemRef,
+} from "./cosmos/cosmos.ts";
+export { abciQueryOf } from "./chain/abci.ts";
+export { cappedBytes, type ByteReader } from "./chain/capped.ts";
+export { isPublicOrigin } from "./chain/origin.ts";
+export { evalNameOf, isAddress } from "./chain/evalName.ts";
 export { dmOf } from "./chat/dm.ts";
 export { dmNotice, roomNotice, type Notice, type NoticeKind, type NoticeLine, type RoomAt } from "./chat/notice.ts";
 export { DEFAULT_MODE, NOTICE_MODES, type NoticeMode } from "./chat/noticeModes.ts";

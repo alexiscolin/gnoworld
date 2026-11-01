@@ -117,3 +117,47 @@ describe("connectOrigins", () => {
     expect(() => connectOrigins([{ ...gnoland, indexer }])).toThrow(/csp: .*indexer/);
   });
 });
+
+// F2819's public-host rule (F3376): the indexer is data now, so a host that is no public name must stop the build.
+describe("a public host only (F2819, F3376)", () => {
+  // The forms URL() folds into a loopback or private address, and the private ranges: a public host ends in a name. `.local`,
+  // `.internal` and `.localhost` are private names, refused on purpose.
+  const NOT_PUBLIC: [string, string][] = [
+    ["a loopback address", "https://127.0.0.1"],
+    ["a loopback address beyond .1", "https://127.1.2.3:8443"],
+    ["a loopback address written in hex", "https://0x7f.1"],
+    ["a loopback address written as one number", "https://2130706433"],
+    ["a loopback address written short", "https://127.1"],
+    ["a private address (10/8)", "https://10.0.0.1"],
+    ["a private address (192.168/16)", "https://192.168.1.1"],
+    ["a public IPv4 address, for a name is wanted", "https://1.1.1.1"],
+    ["localhost, a single label", "https://localhost"],
+    ["a name under .localhost", "https://app.localhost"],
+    ["a name under .local", "https://printer.local"],
+    ["a name under .internal", "https://rpc.internal"],
+    ["the link-local metadata address", "https://169.254.169.254"],
+    ["a single-label host", "https://rpc"],
+    ["a single-label host with a port", "https://rpc:8443"],
+    ["port 0", "https://rpc.gno.land:0"],
+    ["a port written 00", "https://rpc.gno.land:00"],
+    ["a port past 65535", "https://rpc.gno.land:65536"],
+  ];
+
+  it.each(NOT_PUBLIC)("refuses %s as an RPC, naming the field", (_name, address) => {
+    expect(() => rpcOrigins([{ rpc: address }])).toThrow(/csp: .*rpc/);
+  });
+
+  it.each(NOT_PUBLIC)("refuses %s as an indexer, naming the field", (_name, address) => {
+    expect(() => connectOrigins([{ rpc: GNOLAND, indexer: `${address}/graphql/query` }])).toThrow(/csp: .*indexer/);
+  });
+
+  it.each(NOT_PUBLIC)("keeps %s out of a connect-src written from origins, as written", (_name, address) => {
+    expect(() => connectSrc([address])).toThrow(RangeError);
+  });
+
+  it("still takes a public name, with or without a port", () => {
+    expect(connectSrc(["https://indexer.gno.land", "https://rpc.example.org:8443"])).toBe(
+      "connect-src 'self' https://indexer.gno.land https://rpc.example.org:8443",
+    );
+  });
+});

@@ -2,10 +2,11 @@
 // indexers, both read from the data at build.
 // The data's `rpc` and `indexer` end up in a header, so only a bare lower-case https host and port is ever written (csp.ts holds the rest).
 
-// A bare https origin as a CSP source list takes it: a lower-case host of letters, digits, dots and hyphens, an optional port,
-// and nothing else (no wildcard, path, quote, space, `;` or `,`).
+import { isPublicOrigin } from "@gnoworld/core";
+
+// A bare https origin on a public name, as a CSP source list takes it (F2819: the rule is core's, shared with the server).
 function isOrigin(origin: string): boolean {
-  return /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::[0-9]{1,5})?$/.test(origin);
+  return isPublicOrigin(origin);
 }
 
 /**

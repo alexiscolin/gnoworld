@@ -13,9 +13,10 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultRpc } from "./prices/universes.ts";
+import { defaultRpc, defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
+import { startWorlds } from "./worlds/job.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -37,6 +38,14 @@ const prices =
         log,
         ...(config.universes === undefined ? {} : { rpc: defaultRpc(config.universes) }),
       });
+// The default universe's realms grouped into worlds every half hour into the file WORLDS_FILE names (7c); without it, no job.
+// Only the default universe: the way out lets out its RPC and no other's.
+// A job meant that could not know which chain to read: the server stops rather than run without it.
+if (config.worlds !== undefined && config.universes === undefined) throw new Error("setting UNIVERSES_FILE: required");
+const worlds =
+  config.worlds === undefined || config.universes === undefined
+    ? undefined
+    : startWorlds({ file: config.worlds, log, universe: defaultUniverse(config.universes) });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -86,6 +95,7 @@ const drain = (): void => {
   log("stopping");
   retention.stop();
   prices?.stop();
+  worlds?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

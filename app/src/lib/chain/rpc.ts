@@ -1,6 +1,7 @@
 // The four reads of a chain (slice 5 part 2, 5g-reads), each one `readChain` of read.ts: the block height, a realm's page
 // (vm/qrender), a realm's functions (vm/qfuncs) and one call (vm/qeval). One request a call. What the realm wrote is returned
 // as text and never interpreted; its error text, Log and Info reach no failure and no value.
+import { abciQueryOf } from "@gnoworld/core";
 import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
 import { FunctionList } from "@gnoworld/schemas/functions";
 import { evalCall, isExportedName, isRealmPath } from "./evalCall.ts";
@@ -15,9 +16,6 @@ import {
 } from "./read.ts";
 
 type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
-
-const hexOf = (text: string): string =>
-  Array.from(new TextEncoder().encode(text), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 // The text of a base64 body, or null when it is no base64 or no UTF-8.
 function textOf(base64: string): string | null {
@@ -57,7 +55,7 @@ interface Ask<T> {
 
 // An abci_query: the data in hex, the answer's text through `decode`.
 async function query<T>(rpc: string, { path, data, decode }: Ask<T>, options: ReadOptions): Promise<ChainRead<T>> {
-  const url = `${withoutSlash(rpc)}/abci_query?path=%22${path.replace("/", "%2F")}%22&data=0x${hexOf(data)}`;
+  const url = `${withoutSlash(rpc)}${abciQueryOf(path, new TextEncoder().encode(data))}`;
   const answer = await readChain(url, QueryAnswer, options);
   if (!answer.ok) return failedRead(answer.failure.kind, answer.source, answer.failure.status);
   const body = bodyText(answer.value);

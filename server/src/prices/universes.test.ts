@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc } from "./universes.ts";
+import { defaultRpc, defaultUniverse } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -63,6 +63,31 @@ describe("defaultRpc", () => {
   });
 });
 
+describe("defaultUniverse", () => {
+  it("gives the id, RPC and indexer of the universe marked default, never another's", () => {
+    const expected = {
+      id: "onyx",
+      rpc: "https://rpc.default.example:443",
+      indexer: "https://indexer.default.example/graphql/query",
+    };
+    expect(defaultUniverse(planted(JSON.stringify([OTHER, ONYX])))).toEqual(expected);
+    expect(defaultUniverse(planted(JSON.stringify([ONYX, OTHER])))).toEqual(expected);
+  });
+
+  it("reads the data the app ships: Onyx, with its indexer", () => {
+    expect(defaultUniverse(DATA)).toEqual({
+      id: "onyx",
+      rpc: "https://rpc.onyx.testnets.gno.land:443",
+      indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+    });
+  });
+
+  it("refuses a file with no default universe, naming the file and none of its content", () => {
+    const file = planted(JSON.stringify([OTHER]));
+    expect(() => defaultUniverse(file)).toThrow(file);
+  });
+});
+
 // The egress proxy's list gains the default universe's RPC host from the data, and nothing else (decision of 2026-10-31). Docker is
 // refused in this sandbox, so these read the files as text; deploy/test.sh and its `--mutants` rows are the run against the stack.
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
@@ -70,7 +95,7 @@ const acl = read("deploy/egress/acl.yaml");
 const compose = read("deploy/compose.yaml");
 const dockerfile = read("deploy/server/Dockerfile");
 const script = read("deploy/test.sh");
-const data = JSON.parse(read("app/data/universes.json")) as { rpc: string; default?: true }[];
+const data = JSON.parse(read("app/data/universes.json")) as { rpc: string; indexer: string; default?: true }[];
 
 const hostOf = (rpc: string) => new URL(rpc).hostname;
 const chosen = data.find((universe) => universe.default === true);
@@ -80,9 +105,16 @@ const OTHER_HOSTS = data.filter((universe) => universe.default !== true).map((un
 const allowed = [...acl.matchAll(/^\s+-\s*"?([^"\s#]+)"?\s*$/gm)].map((match) => match[1]);
 
 describe("the way out's list", () => {
-  it("names CoinGecko's API, OpenAI's and the default universe's RPC host, each by its full name, and nothing else", () => {
+  it("names CoinGecko's, OpenAI's, the default RPC host and the two indexers, each by its full name, and nothing else", () => {
     expect(DEFAULT_HOST).not.toBe("");
-    expect([...allowed].sort()).toEqual(["api.coingecko.com", "api.openai.com", DEFAULT_HOST].sort());
+    expect([...allowed].sort()).toEqual(
+      [
+        "api.coingecko.com",
+        "api.openai.com",
+        DEFAULT_HOST,
+        ...data.map((universe) => new URL(universe.indexer).hostname),
+      ].sort(),
+    );
   });
 
   it("names the host the data's default universe has now, not a copy that drifts from it", () => {
@@ -105,9 +137,9 @@ describe("the server's data", () => {
 });
 
 describe("deploy/test.sh", () => {
-  it("expects the list's hosts from the data, three of them, and no other host reached through the way out", () => {
-    expect(script).toMatch(/the way out lets three hosts out/);
-    expect(script).not.toMatch(/the way out lets two hosts out/);
+  it("expects the list's hosts from the data, five of them, and no other host reached through the way out", () => {
+    expect(script).toMatch(/the way out lets five hosts out/);
+    expect(script).not.toMatch(/the way out lets three hosts out/);
     expect(script).toContain("app/data/universes.json");
   });
 
@@ -126,7 +158,85 @@ describe("deploy/test.sh", () => {
     expect(script).toMatch(
       /mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC"/,
     );
-    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets three hosts out"/);
-    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets three hosts out"/);
+    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets five hosts out"/);
+    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets five hosts out"/);
+  });
+});
+
+const INDEXER_HOSTS = data.map((universe) => new URL(universe.indexer).hostname);
+const escaped = (host: string): string => host.replaceAll(".", "\\.");
+
+describe("the way out for the indexers", () => {
+  it("names each universe's indexer host in full, and no wildcard", () => {
+    expect(INDEXER_HOSTS.length).toBeGreaterThanOrEqual(2);
+    for (const host of INDEXER_HOSTS) expect(acl).toMatch(new RegExp(`^\\s+-\\s*"?${escaped(host)}"?\\s*$`, "m"));
+    expect(acl).not.toMatch(/\*/);
+  });
+
+  // At red this passes: no host is there yet, so no sibling is. It fails the day a wildcard or a sibling is added.
+  it("keeps a look-alike and a sibling of each indexer host out", () => {
+    for (const host of INDEXER_HOSTS) {
+      expect(acl).not.toContain(`${host}.evil`);
+      expect(acl).not.toMatch(new RegExp(`^\\s+-\\s*"?[a-z0-9.-]+\\.${escaped(host)}"?\\s*$`, "m"));
+    }
+  });
+
+  it.each([
+    [
+      "Onyx's indexer dropped from the way out",
+      "the server does not reach the universe's indexer indexer.onyx.testnets.gno.land",
+    ],
+    [
+      "gno.land's indexer dropped from the way out",
+      "the server does not reach the universe's indexer indexer.gno.land",
+    ],
+    ["Onyx's indexer's whole domain let out", "the way out lets five hosts out"],
+    ["gno.land's indexer's whole domain let out", "the way out lets five hosts out"],
+  ])("has the mutant %j, killed by %j, which the stack's check also says", (label, wanted) => {
+    expect(script).toContain(`mutant "${label}" "${wanted}"`);
+    // Once in the mutant, once in the check itself (F695).
+    expect(script.split(wanted.replace(/ indexer\.[a-z.]+$/, " $indexer_host")).length - 1).toBeGreaterThanOrEqual(1);
+  });
+
+  it("proves in the stack that the server reaches each indexer through the way out, and that a look-alike is refused", () => {
+    expect(script).toMatch(/the server reaches the universe's indexer \$indexer_host through the way out/);
+    expect(script).toMatch(/the server does not reach the universe's indexer \$indexer_host through the way out/);
+    expect(script).toMatch(/"https:\/\/\$indexer_host\.evil\.test\/"/);
+  });
+});
+
+// The worlds file (7c) rides the volume the prices timer writes: the server writes it, web serves it read-only at /worlds.json
+// beside /markets.json, with the same minute of cache. Docker is refused in the sandbox, so the files are read as text.
+const nginx = read("deploy/web/nginx.conf");
+
+describe("worlds.json's way to the page", () => {
+  it("tells the server to write it in the folder of markets.json, the volume web mounts read-only", () => {
+    const folder = /^\s+MARKETS_FILE: (\/\S+)\/markets\.json\s*$/m.exec(compose)?.[1];
+    expect(folder).toBeDefined();
+    expect(compose).toContain(`WORLDS_FILE: ${String(folder)}/worlds.json`);
+  });
+
+  it("serves it from that folder beside markets.json, with no listing and no link followed, under the same password", () => {
+    const block = /location = \/worlds\.json \{([^}]*)\}/.exec(nginx)?.[1] ?? "";
+    expect(block).toMatch(/root \/markets;/);
+    expect(block).toMatch(/disable_symlinks on from=\$document_root;/);
+    expect(block).toMatch(/try_files \$uri =404;/);
+    expect(block).not.toMatch(/autoindex|auth_basic|add_header/);
+    expect(nginx).toMatch(/~\^\(200\|304\)\/worlds\\\.json\$ "public, max-age=60";/);
+  });
+
+  it("proves in the stack that web serves it from the volume, with a short cache, only with the password", () => {
+    expect(script).toMatch(/expect "web serves worlds\.json from the volume the server writes"/);
+    expect(script).toMatch(/expect "web serves worlds\.json with a short cache"/);
+    expect(script).toMatch(/expect "web serves worlds\.json only with the password"/);
+  });
+
+  it("has a mutant for the file not served and one for it served without the password, each killed by its check", () => {
+    expect(script).toMatch(
+      /mutant "worlds\.json is not served" "web serves worlds\.json from the volume the server writes"/,
+    );
+    expect(script).toMatch(
+      /mutant "worlds\.json open without the password" "web serves worlds\.json only with the password"/,
+    );
   });
 });

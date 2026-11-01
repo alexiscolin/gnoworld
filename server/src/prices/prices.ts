@@ -4,12 +4,11 @@
 // there, the same way out and the same five minutes, so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is data: capped, parsed, checked field by field, and only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
-import { send as netSend } from "../net.ts";
-
-type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
+import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, type Send } from "../net.ts";
+import { repeat } from "../repeat.ts";
+import { replaceFile } from "../replaceFile.ts";
 
 interface Options {
   file: string;
@@ -36,42 +35,8 @@ const EVERY_MS = 300_000;
 // A request that reached nothing: in the stack the server starts before the way out, and its first tick finds no proxy.
 const RETRY_MS = 15_000;
 
-type Kind =
-  "rate_limited" | "status" | "too_large" | "not_json" | "shape" | "no_price" | "timeout" | "request" | "write";
-class Failure extends Error {
-  readonly kind: Kind;
-  constructor(kind: Kind) {
-    super(kind);
-    this.kind = kind;
-  }
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-// The body, at most MAX_BYTES of it; a longer one is cut off and refused.
-async function readCapped(response: Response): Promise<string> {
-  const reader = response.body?.getReader();
-  if (reader === undefined) return "";
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const part: { done: boolean; value?: Uint8Array } = await reader.read();
-    if (part.done || part.value === undefined) break;
-    size += part.value.byteLength;
-    if (size > MAX_BYTES) {
-      try {
-        await reader.cancel();
-      } catch {
-        // Cut off already, or failing to be: the answer is refused either way.
-        throw new Failure("too_large");
-      }
-      throw new Failure("too_large");
-    }
-    chunks.push(part.value);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
 
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
@@ -96,41 +61,23 @@ function tokensOf(answer: unknown): Markets["tokens"] {
 
 // The RPC the height is read from, or a refusal at start: https alone, no user, no path, query or fragment.
 function checkedRpc(rpc: string): URL {
-  const url = URL.parse(rpc);
-  const bare = url?.pathname === "/" && url.search === "" && url.hash === "";
-  if (url?.protocol !== "https:" || url.username !== "" || url.password !== "" || !bare)
+  const url = publicUrl(rpc);
+  if (url?.pathname !== "/" || url.search !== "" || url.hash !== "")
     throw new RangeError("prices: the rpc is no bare https address");
   return url;
 }
 
 const reachedNothing = (error: unknown): boolean => error instanceof Failure && error.kind === "request";
-const named = (error: unknown): boolean =>
-  error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const rpc = options.rpc === undefined ? undefined : checkedRpc(options.rpc);
-  const temp = `${file}.tmp`;
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
   async function get(url: string): Promise<unknown> {
-    let text: string;
-    try {
-      const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
-      if (response.status === 429) throw new Failure("rate_limited");
-      if (!response.ok) throw new Failure("status");
-      text = await readCapped(response);
-    } catch (error) {
-      if (error instanceof Failure) throw error;
-      throw new Failure(named(error) ? "timeout" : "request");
-    }
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Failure("not_json");
-    }
+    const init = { method: "GET", headers: { accept: "application/json" } };
+    const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes: MAX_BYTES });
+    return jsonOf(Buffer.from(bytes).toString("utf8"));
   }
 
   // The default universe's latest block through its RPC's /status: through Zod, then the file's own bounds.
@@ -143,13 +90,13 @@ export function startPrices(options: Options): Prices {
     return block.data;
   }
 
-  async function read(): Promise<void> {
+  async function read(isStopped: () => boolean): Promise<void> {
     // Both asked at once, each its own failure: the prices' ends the read (the last file stays), the height's only leaves it out.
     const [priced, blocked] = await Promise.allSettled([
       get(URL_ASKED),
       rpc === undefined ? Promise.resolve(undefined) : readBlock(rpc),
     ]);
-    if (stopped) return;
+    if (isStopped()) return;
     if (priced.status === "rejected") throw priced.reason;
     const tokens = tokensOf(priced.value);
     let block: MarketBlock | undefined;
@@ -161,36 +108,15 @@ export function startPrices(options: Options): Prices {
       tokens,
       ...(block === undefined ? {} : { block }),
     });
-    try {
-      // Written beside the file and renamed over it: a reader sees the old file or the new one, never half of one.
-      writeFileSync(temp, `${JSON.stringify(markets)}\n`, { mode: 0o644 });
-      renameSync(temp, file);
-    } catch {
-      try {
-        unlinkSync(temp);
-      } catch {
-        // Nothing was written, or it is gone already.
-      }
-      throw new Failure("write");
-    }
+    if (!replaceFile(file, `${JSON.stringify(markets)}\n`)) throw new Failure("write");
   }
 
   // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
-  const next = (error?: unknown): void => {
-    if (!stopped) timer = setTimeout(tick, reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs);
-  };
-  function tick(): void {
-    read().then(next, (error: unknown) => {
-      if (!stopped) log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
-      next(error);
-    });
-  }
-
-  tick();
-  return {
-    stop: () => {
-      stopped = true;
-      if (timer !== undefined) clearTimeout(timer);
+  return repeat({
+    pass: read,
+    failed: (error) => {
+      log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
-  };
+    waitMs: (error) => (reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs),
+  });
 }
