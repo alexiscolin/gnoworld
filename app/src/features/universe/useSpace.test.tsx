@@ -20,6 +20,24 @@ async function door() {
 
 const left: (() => void)[] = [];
 
+// The page on screen, the chunk still coming.
+function open(Cosmos: () => null) {
+  const root = createRoot(document.createElement("div"));
+  act(() => {
+    root.render(<Cosmos />);
+  });
+  return () => {
+    act(() => {
+      root.unmount();
+    });
+  };
+}
+
+const arrived = () =>
+  act(async () => {
+    await vi.dynamicImportSettled();
+  });
+
 // The page that shows space, on screen until `leave` is called.
 async function visit(Cosmos: () => null) {
   const box = document.createElement("div");
@@ -28,12 +46,25 @@ async function visit(Cosmos: () => null) {
     root.render(<Cosmos />);
     await vi.dynamicImportSettled();
   });
+  let mounted = true;
   const leave = () => {
-    act(() => {
-      root.unmount();
-    });
+    if (mounted)
+      act(() => {
+        root.unmount();
+      });
+    mounted = false;
   };
+  left.push(leave);
   return { leave };
+}
+
+// A first visit whose universe did not mount.
+async function failedOnce() {
+  universe.mount.mockImplementationOnce(() => {
+    throw new Error("the universe did not mount");
+  });
+  const Cosmos = await door();
+  return { Cosmos, ...(await visit(Cosmos)) };
 }
 
 beforeEach(() => {
@@ -78,32 +109,26 @@ describe("useSpace", () => {
 
   it("covers it at once when the page left while it was coming", async () => {
     const Cosmos = await door();
-    const box = document.createElement("div");
-    const root = createRoot(box);
-    act(() => {
-      root.render(<Cosmos />);
-    });
-    act(() => {
-      root.unmount();
-    });
-    await act(async () => {
-      await vi.dynamicImportSettled();
-    });
+    open(Cosmos)();
+    await arrived();
     expect(universe.draw).toHaveBeenCalledExactlyOnceWith(false);
   });
 
-  it("asks once while it is coming, however many pages show it", async () => {
+  it("asks once when the page leaves and comes back while it is coming: one root, one canvas", async () => {
     const Cosmos = await door();
-    const box = document.createElement("div");
-    const first = createRoot(box);
-    act(() => {
-      first.render(<Cosmos />);
-    });
-    await visit(Cosmos);
+    open(Cosmos)();
+    const leave = open(Cosmos);
+    await arrived();
     expect(universe.mount).toHaveBeenCalledTimes(1);
-    act(() => {
-      first.unmount();
-    });
+    expect(universe.draw).toHaveBeenLastCalledWith(true);
+    leave();
+  });
+
+  it("asks for nothing on the way out of a failure: a page that leaves shows no space", async () => {
+    const { leave } = await failedOnce();
+    leave();
+    await vi.dynamicImportSettled();
+    expect(universe.mount).toHaveBeenCalledTimes(1);
   });
 
   it("leaves the page as it is when the chunk does not come", async () => {
@@ -116,11 +141,7 @@ describe("useSpace", () => {
   });
 
   it("asks again on the next page after a failure", async () => {
-    universe.mount.mockImplementationOnce(() => {
-      throw new Error("the universe did not mount");
-    });
-    const Cosmos = await door();
-    const { leave } = await visit(Cosmos);
+    const { Cosmos, leave } = await failedOnce();
     leave();
     await visit(Cosmos);
     expect(universe.mount).toHaveBeenCalledTimes(2);

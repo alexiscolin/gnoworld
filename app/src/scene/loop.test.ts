@@ -137,7 +137,7 @@ describe("the loop's rates", () => {
     loop.set({ covered: false });
     clock.run(1000 / 60);
     expect(draw).toHaveBeenCalledTimes(1);
-    expect(draw.mock.calls[0]?.[0]).toBeLessThanOrEqual(1000 / 30);
+    expect(draw.mock.calls[0]?.[0]).toBe(0);
   });
 });
 
