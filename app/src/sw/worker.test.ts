@@ -430,6 +430,18 @@ test("a cache that is not the worker's never answers: its copy of a hashed file 
   expect(await (await answer())?.text()).toBe(`network ${url}`);
 });
 
+// No version lists the scene's chunk, so a copy in one of the worker's caches can only have been planted there. This narrows one way
+// of carrying a planted file into the next version; the page open during an update is another, which it does not close (F181's row).
+test("the scene's chunk is left to the browser: a copy in the worker's own caches is never served", async () => {
+  const stores: Stores = new Map();
+  const site = await running(stores, PRECACHE, "");
+  const url = `${SITE}/assets/scene-AAAAAAAA.js`;
+  for (const store of stores.values()) store.set(url, "planted");
+  const { event, answers } = request(url);
+  site.fire("fetch", event);
+  expect(answers()).toBe(0);
+});
+
 // Only a hashed name is the content's: the worker answers no other file of the build's own folder.
 test("a name that is not a whole hashed name is left to the host: a short hash, a map, a nested path, another kind", () => {
   const { worker, fire } = scope();
