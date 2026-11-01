@@ -102,7 +102,9 @@ export class FrameLoop {
       this.#carried = 0;
       return;
     }
-    const wait = this.#lastRefresh === NONE ? 0 : frameWait(this.#carried, this.#rate);
+    // From the last refresh, not from now: the draw has spent some of the wait, and a change must not start it again.
+    const spent = this.#clock.now() - this.#lastRefresh;
+    const wait = this.#lastRefresh === NONE ? 0 : frameWait(this.#carried, this.#rate) - spent;
     if (wait > WORTH_A_TIMER_MS) this.#timer = this.#clock.wait(this.#wake, wait);
     else this.#frame = this.#clock.ask(this.#tick);
   }
@@ -124,6 +126,6 @@ export class FrameLoop {
       this.#state.owed = false;
       this.#draw(delta);
     } else this.#carried += elapsed;
-    if (this.#frame === NONE && this.#timer === NONE) this.#reschedule();
+    this.#reschedule();
   };
 }

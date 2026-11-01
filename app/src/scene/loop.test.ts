@@ -67,6 +67,40 @@ describe("the loop's rates", () => {
     expect(Math.abs(drawnOver(clock, draw, 10_000) - 300)).toBeLessThanOrEqual(1);
   });
 
+  it.each([0, 8, 9, 12, 15])("keeps its beat when a draw costs %i ms: frames 33 ms apart, not 17 and 50", (cost) => {
+    const clock = new FakeClock(60);
+    const gaps: number[] = [];
+    new FrameLoop(clock, (delta) => {
+      gaps.push(delta);
+      clock.time += cost;
+    });
+    clock.run(1000);
+    gaps.length = 0;
+    clock.run(3000);
+    expect(Math.abs(gaps.length - 90)).toBeLessThanOrEqual(1);
+    for (const gap of gaps) expect(Math.abs(gap - 1000 / 30)).toBeLessThan(1);
+  });
+
+  it("draws on under a stream of changes: a change does not start the wait again", () => {
+    const { clock, draw, loop } = started();
+    clock.run(1000);
+    const before = draw.mock.calls.length;
+    for (let at = 0; at < 200; at += 1) {
+      loop.set({ busy: false });
+      clock.run(10);
+    }
+    expect(Math.abs(draw.mock.calls.length - before - 60)).toBeLessThanOrEqual(1);
+  });
+
+  it("is at 30 within a frame of the first input after the idle minute, not at the next idle tick", () => {
+    const { clock, draw, loop } = started();
+    clock.run(MINUTE + 1000);
+    draw.mockClear();
+    loop.input();
+    clock.run(40);
+    expect(draw).toHaveBeenCalled();
+  });
+
   it("does not hold the frame back under a stream of inputs", () => {
     const { clock, draw, loop } = started();
     clock.run(1000);
@@ -145,6 +179,21 @@ describe("the loop at rest", () => {
     loop.set({ hidden: false });
     clock.run(100);
     expect(draw).toHaveBeenCalled();
+  });
+
+  it("owes a frame asked for inside a frame: the draw's own change is not lost", () => {
+    const clock = new FakeClock();
+    let asked = false;
+    const draw = vi.fn(() => {
+      if (asked) return;
+      asked = true;
+      loop.redraw();
+    });
+    const loop: FrameLoop = new FrameLoop(clock, draw);
+    loop.set({ still: true });
+    clock.run(1000);
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(clock.pending).toEqual({ frames: 0, timers: 0 });
   });
 
   it("owes one frame for a redraw under reduced motion, then rests", () => {

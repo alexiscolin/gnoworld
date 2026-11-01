@@ -48,7 +48,7 @@ export class FakeClock implements FrameClock {
     return { frames: this.frames.size, timers: this.timers.size };
   }
 
-  /** Time passes: each timer and each refresh that falls inside `ms`, in order. */
+  /** Time passes: each timer and each refresh that falls inside `ms`, in order. A draw may spend some with `time`. */
   run(ms: number) {
     const end = this.time + ms;
     for (;;) {
@@ -56,7 +56,7 @@ export class FakeClock implements FrameClock {
       const timer = [...this.timers].sort(([, a], [, b]) => a.at - b.at)[0];
       const at = Math.min(refreshAt, timer?.[1].at ?? Infinity);
       if (at > end) break;
-      this.time = at;
+      this.time = Math.max(this.time, at);
       if (timer !== undefined && timer[1].at <= refreshAt) {
         this.timers.delete(timer[0]);
         timer[1].run();
@@ -67,6 +67,6 @@ export class FakeClock implements FrameClock {
         for (const [, run] of due) run(at);
       }
     }
-    this.time = end;
+    this.time = Math.max(this.time, end);
   }
 }
