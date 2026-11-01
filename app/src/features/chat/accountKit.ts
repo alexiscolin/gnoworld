@@ -11,6 +11,10 @@ import { outbox, type Outbox } from "./outbox.ts";
 import { Speaking } from "./speaking.ts";
 import { Places, TypingOut } from "./telling.ts";
 
+// What the kit reads as it speaks and the room's menu sets, through here: an account loads both, and a file of its own would be one more on
+// every first load's list and in nginx's table (F3665).
+export { keepCountry, keptCountry, zoneCountry } from "../../lib/country.ts";
+
 /** What the link lends: the store, the connection and the key of its session ("guest" or an address), the way out to
  * Ergo, and the rooms Ergo said I am in. */
 export interface KitHost {
@@ -43,16 +47,18 @@ export const makeKit: MakeKit = ({ store, ergo, key, out, inside }) => {
   const sent = outbox(store);
   const notices = new Noticer(store, inside, () => key() !== "guest");
   const places = new Places((room) => store.getState().chat.rooms[room]?.read, out);
+  const speaking = new Speaking({ ergo, key, inside, outbox: sent, typing, store });
   return {
     places,
     outbox: sent,
-    speaking: new Speaking({ ergo, key, inside, outbox: sent, typing, store }),
+    speaking,
     groups: (rooms) => {
       notices.groups = rooms;
     },
     // A labeled-response batch's lines carry no label: the batch's own line does, read at its end (link.ts).
     heard: (message) => {
       sent.answered(message.tags, [message]);
+      speaking.heard(message);
       notices.live(message);
       const refused = refusedIn(message);
       if (refused !== undefined) store.getState().chatActions.reactionRefused(refused);

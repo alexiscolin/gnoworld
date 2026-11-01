@@ -51,7 +51,8 @@ const quiet = (line: Line, mode: NoticeMode, me: string): boolean =>
 const repliesTo = (line: Line, held: readonly Line[], me: string): boolean =>
   line.reply !== undefined && held.some((each) => each.id === line.reply && each.account === me);
 
-const hasAt = (text: string): boolean => text.includes("@") || fold(text).includes("@");
+/** Whether a text may mention anyone: most lines hold no @, and need no parsing. */
+export const hasAt = (text: string): boolean => text.includes("@") || fold(text).includes("@");
 
 /** The notice a room's line is for its reader, or none. */
 export function roomNotice(line: NoticeLine, room: string, at: RoomAt): Notice | undefined {

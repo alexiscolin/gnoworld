@@ -25,6 +25,7 @@ export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.ts
 export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
 export { NavItem, type NavItemProps } from "./NavItem/NavItem.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";
+export { Select, type SelectOption, type SelectProps } from "./Field/Select.tsx";
 export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
 export { Stat, type StatProps } from "./Stat/Stat.tsx";
 export { Tabs, type Tab, type TabsProps } from "./Tabs/Tabs.tsx";

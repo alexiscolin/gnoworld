@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { ShownLine } from "@gnoworld/core";
+import { countryName } from "@gnoworld/core/bubbles";
 import { describe, expect, it } from "vitest";
 import { all, faceOf, follows, mount, one } from "../../../tests/mount.tsx";
 import { LineView, type LineViewProps } from "./LineView.tsx";
@@ -141,5 +142,40 @@ describe("a line's marks in the new head", () => {
     const { row } = drawn({ chips: "1 👍", react: () => true, replies: 2, onThread: () => undefined });
     const chip = all(row, "button").at(-1) as Element;
     expect(follows(textOf(row), chip)).toBe(true);
+  });
+});
+
+// 7j: the country a line declares, between the face and the name as the video's frames 40 and 60 draw it; a reader and a screen reader get
+// its name. What the table of countries does not hold is no country, here as on the Earth.
+describe("a line's country", () => {
+  const mark = (row: Element) => row.querySelector("[data-line-country]");
+
+  it("shows none on a line that declares none: no tag, no country", () => {
+    expect(mark(drawn().row)).toBeNull();
+  });
+
+  it("shows the code the speaker declares, its name for a reader and a screen reader", () => {
+    const found = mark(drawn({ line: line({ country: "JP" }) }).row);
+    expect(found?.getAttribute("title")).toBe("Japan");
+    expect(one(found ?? document.body, "[aria-hidden='true']").textContent).toBe("JP");
+    expect(one(found ?? document.body, ".visually-hidden").textContent).toBe("Japan");
+  });
+
+  it("stands between the face and the name", () => {
+    const { row } = drawn({ line: line({ country: "JP" }) });
+    const head = one(row, "[data-line-head]");
+    const code = one(head, "[data-line-country]");
+    expect(follows(one(head, "[data-kind='person']"), code)).toBe(true);
+    expect(follows(code, one(head, `[title='${ALICE}']`))).toBe(true);
+  });
+
+  it("shows a code when the table of countries holds it, and only then: head, list and Earth agree on what a country is", () => {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+    const wrong = letters
+      .flatMap((first) => letters.map((second) => `${first}${second}`))
+      .filter(
+        (code) => (mark(drawn({ line: line({ country: code }) }).row) !== null) !== (countryName(code) !== undefined),
+      );
+    expect(wrong).toEqual([]);
   });
 });

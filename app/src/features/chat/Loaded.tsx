@@ -1,6 +1,6 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
-import type { RoomList } from "@gnoworld/schemas";
+import type { Address, RoomList } from "@gnoworld/schemas";
 import { useId, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
@@ -19,6 +19,7 @@ import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomChips } from "./RoomChips.tsx";
 import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
+import { CountryChoice } from "./CountryChoice.tsx";
 import { Saved } from "./Saved.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
 import { unreadOf } from "./unread.ts";
@@ -67,6 +68,9 @@ const modesOf = (room: string | undefined, notify: Noticing["notify"]) =>
   room === undefined || notify === undefined ? undefined : <NoticeModes room={room} {...notify} />;
 
 const addressOf = (session: AppState["login"]["session"]) => (session.kind === "in" ? session.address : undefined);
+
+// The country an account declares (7j): the choice is the account's, so it stands in a conversation's menu too.
+const countryOf = (me: Address | undefined) => (me === undefined ? undefined : <CountryChoice account={me} />);
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
 export interface LoadedProps {
@@ -188,6 +192,7 @@ export function Loaded(props: LoadedProps) {
     <RoomMenu note={shown?.note} noteId={noteId}>
       {modesOf(room, noticing.notify)}
       {dms.nav === undefined ? null : <OnlyKnown {...dms.nav} />}
+      {countryOf(me)}
     </RoomMenu>
   );
   return (

@@ -37,6 +37,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Row: ["Rows", "[data-look]"],
   Field: ["Fields", "input"],
   Combobox: ["Fields", "input[role='combobox']"],
+  Select: ["Fields", "select"],
   Stat: ["Stats", "[data-value]"],
   ActivityChart: ["Activity", "svg [data-hour]"],
   PlanetThumb: ["Planets", "[data-kind]"],

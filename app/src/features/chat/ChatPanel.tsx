@@ -64,13 +64,15 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
   });
 
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.
-function useRoomsAsked(world: string, query: string | undefined) {
+function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, query: string | undefined) {
   const [asked, setAsked] = useState<Asked>();
   useEffect(() => {
     if (query === undefined) return;
     let live = true;
     const settle = (sections: Asked["sections"]) => {
-      if (live) setAsked({ query, sections });
+      if (!live) return;
+      setAsked({ query, sections });
+      store.getState().chatActions.listed(sections);
     };
     pageRoomsApi()
       .rooms(world)
@@ -85,7 +87,7 @@ function useRoomsAsked(world: string, query: string | undefined) {
     return () => {
       live = false;
     };
-  }, [world, query]);
+  }, [store, world, query]);
   const loaded = query !== undefined && asked?.query === query;
   return { loaded, sections: loaded ? asked.sections : undefined };
 }
@@ -135,7 +137,7 @@ export function ChatPanel({ world, place }: { world: string; place: ChatPlace })
       made.stop();
     };
   }, [store]);
-  const { loaded, sections } = useRoomsAsked(world, query);
+  const { loaded, sections } = useRoomsAsked(store, world, query);
   const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
   // The page hidden: the reading places waiting their 2 s go at once (F940).
   useOnHide(() => {

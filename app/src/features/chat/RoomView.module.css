@@ -99,6 +99,24 @@
     color: var(--color-text-muted);
   }
 
+  /* The country a line declares: the video's frames 40 and 60, a box 22 by 15 between the face and the name. */
+  .country {
+    /* raw: a step above the line's width, and a corner under the small radius, as the frames draw it */
+    padding: 1px var(--space-3xs);
+    border: var(--line-width) solid var(--color-line);
+    /* raw: the frames' corner, under every radius token */
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    font-family: var(--family-mono);
+    /* raw: the frames' size, under every text token */
+    font-size: 9px;
+    line-height: 1.2;
+    /* raw: the frames' tracking, a tighter one than the labels' */
+    letter-spacing: 0.06em;
+    /* raw: the frames set it on the name's baseline, a pixel under the row's centre */
+    translate: 0 1px;
+  }
+
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
      bar, as the divider's rule does (the bar covers it only while pointed at). */
   .head {

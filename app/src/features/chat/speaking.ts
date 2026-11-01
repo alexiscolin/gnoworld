@@ -1,7 +1,10 @@
 // What the link sends for the account (slice 4's 4c to 4e, 4d's DM bar and the room's edits), moved out of link.ts for the
 // lint's sizes: its lines to a room or to another account, a correction, a reaction, a delete, its typing; each an account's alone,
 // a room's in a room Ergo says it is in. Whether each went.
-import type { Composed, Reacting } from "@gnoworld/core";
+import type { Composed, IrcMessage, Reacting } from "@gnoworld/core";
+import { isPublicRoom } from "@gnoworld/core/bubbles";
+import { Address } from "@gnoworld/schemas";
+import { keptCountry } from "../../lib/country.ts";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { reactInRoom, reactTo, redactFrom, redactIn, sayTo, speakIn, type DmOut } from "./dmOut.ts";
@@ -24,6 +27,7 @@ export interface Host {
 interface Tags {
   reply?: string | undefined;
   edit?: string | undefined;
+  country?: string | undefined;
 }
 
 export class Speaking {
@@ -32,12 +36,15 @@ export class Speaking {
   #batches = 0;
   // What the account sent in the last minute, against the server's rates (F2092).
   readonly #pace = new Pace();
+  // The rooms heard closing since the list came, which no new list follows in an open tab.
+  readonly #closed = new Set<string>();
 
   constructor(host: Host) {
     this.#host = host;
   }
 
-  readonly say = (room: string, composed: Composed, reply?: string): boolean => this.#speak(room, composed, { reply });
+  readonly say = (room: string, composed: Composed, reply?: string): boolean =>
+    this.#speak(room, composed, { reply, country: this.#country(room) });
 
   readonly correct = (room: string, composed: Composed, edit: string): boolean => this.#speak(room, composed, { edit });
 
@@ -62,6 +69,11 @@ export class Speaking {
     return may;
   };
 
+  /** A live line of Ergo's: a flag that closes a room to a passer-by (3m: +R an account's, +i a member's), alone or among others. */
+  readonly heard = ({ command, params: [room = "", flags = ""] }: IrcMessage): void => {
+    if (command === "MODE" && /\+[^-]*[iR]/.test(flags)) this.#closed.add(room);
+  };
+
   /** Why a message of a room is held back for the server's pace, none when it may go (F2092). */
   readonly slow = (composed: Composed): string | undefined => {
     const slow = this.#slow(composed);
@@ -78,6 +90,16 @@ export class Speaking {
   #slow(composed: Composed): Slow | undefined {
     const { messages, lines } = this.#weight(composed);
     return this.#pace.slow(Date.now(), messages, lines);
+  }
+
+  // The country a new line of `room` declares: the account's own choice, read as it speaks, in a room the list says anyone may read and none
+  // heard closing since. What it says stays out of the rest, and one no of a list that names the room twice is a no (ADR-0001 §7).
+  #country(room: string): string | undefined {
+    const { key, store } = this.#host;
+    const me = Address.safeParse(key());
+    const listed = store.getState().chat.listed?.flatMap(({ rooms }) => rooms.filter((each) => each.room === room));
+    const open = listed !== undefined && listed.length > 0 && listed.every(({ type }) => isPublicRoom(type));
+    return me.success && open && !this.#closed.has(room) ? keptCountry(me.data) : undefined;
   }
 
   #speak(room: string, composed: Composed, tags: Tags): boolean {
