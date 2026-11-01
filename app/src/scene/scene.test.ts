@@ -331,6 +331,14 @@ describe("what stops it", () => {
     scene.dispose();
   });
 
+  it("goes on when the focus moves into a frame of the page, an embed: the window still has it", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    window.dispatchEvent(new Event("blur"));
+    expect(clock.pending.frames + clock.pending.timers).toBe(1);
+    scene.dispose();
+  });
+
   it("follows the system's reduced motion as it changes", () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     query(MOTION).matches = true;

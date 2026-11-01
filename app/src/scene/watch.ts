@@ -13,20 +13,9 @@ export function watchPage(loop: FrameLoop, signal: AbortSignal): void {
   read();
   document.addEventListener("visibilitychange", read, { signal });
   motion.addEventListener("change", read, { signal });
-  window.addEventListener(
-    "focus",
-    () => {
-      loop.set({ focused: true });
-    },
-    { signal },
-  );
-  window.addEventListener(
-    "blur",
-    () => {
-      loop.set({ focused: false });
-    },
-    { signal },
-  );
+  // The document's word, not the event's: the focus going into an embed blurs the window that still has it.
+  window.addEventListener("focus", read, { signal });
+  window.addEventListener("blur", read, { signal });
   const input = () => {
     loop.input();
   };
