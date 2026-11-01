@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MULTILINE_BYTES } from "../irc/multiline.ts";
 import { cutText } from "./cut.ts";
 
 // Slice 6's 6a: the text of a bubble (docs/plans/slice-6.md §1, §3): plain text, cut at `max` graphemes, no Cc or Cf
@@ -240,9 +241,9 @@ describe("cutText: its cost", () => {
     expect(segment.mock.calls.length).toBeLessThanOrEqual(1);
   });
 
-  it("leaves nothing of what lies past the relay's 4096 units: no line of the relay reaches it", () => {
-    expect(cutText(`${"\u200b".repeat(4096)}visible`, MAX)).toBe("");
-    expect(cutText(`${"\u200b".repeat(4095)}visible`, MAX)).toBe("v");
+  it("leaves nothing of what lies past the relay's longest line: no line of the relay reaches it", () => {
+    expect(cutText(`${"\u200b".repeat(MULTILINE_BYTES)}visible`, MAX)).toBe("");
+    expect(cutText(`${"\u200b".repeat(MULTILINE_BYTES - 1)}visible`, MAX)).toBe("v");
   });
 
   it("never returns half a pair where the head ends", () => {
