@@ -15,6 +15,8 @@ describe("savesData: whether the reader saves data", () => {
     [{ connection: { saveData: false, effectiveType: "2g" } }, true],
     [{ connection: { effectiveType: "3g" } }, false],
     [{ connection: { effectiveType: "4g" } }, false],
+    [{ connection: { effectiveType: "not-2g" } }, false],
+    [{ connection: { effectiveType: "2g-ish" } }, false],
     [{ connection: { saveData: "true" } }, false],
     [{ connection: null }, false],
     [{ connection: "fast" }, false],
