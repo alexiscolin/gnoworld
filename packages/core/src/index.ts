@@ -14,6 +14,17 @@ export {
   sameName,
   topicAfter,
 } from "./chat/room.ts";
+export {
+  CELL,
+  DISC_HALF_THICKNESS,
+  heightField,
+  MAX_HEIGHT,
+  placeSystem,
+  placeSystems,
+  type PlaceOptions,
+  type SystemPlace,
+  type SystemRef,
+} from "./cosmos/cosmos.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
 export { evalNameOf, isAddress } from "./chain/evalName.ts";
 export { dmOf } from "./chat/dm.ts";
