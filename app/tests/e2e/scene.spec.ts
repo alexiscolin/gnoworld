@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
-import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
+import { loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -102,7 +102,7 @@ test.describe("a computer", () => {
     expect(await darkest(page), "the page's own colour before the scene").toBeGreaterThan(5);
     await page.goto(HOME);
     await running(page);
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
+    await opened(page);
     await goToEmpty(page);
     await expect.poll(() => darkest(page)).toBeLessThan(1.5);
   });
@@ -162,10 +162,12 @@ test.describe("a computer", () => {
     await running(page);
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
+    await opened(page);
     await goToEmpty(page);
-    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background.
-    await expect.poll(() => darkest(page)).toBeGreaterThan(0.5);
+    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background. Read after the iris, or the
+    // page's colour would pass the first bound; the upper one first, for the page's colour is over it.
     await expect.poll(() => darkest(page)).toBeLessThan(1.5);
+    expect(await darkest(page)).toBeGreaterThan(0.5);
   });
 });
 

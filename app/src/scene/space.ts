@@ -18,11 +18,16 @@ export class Space {
 
   /** Puts the scenery around the eye, `seconds` into its wind. Writes only what entered the view. */
   follow(eye: Point, seconds: number): void {
-    this.#sky.follow(eye);
+    this.#sky.follow(eye, seconds);
     for (let at = 0; at < this.#fields.length; at += 1) this.#fields[at]?.follow(eye, seconds);
   }
 
-  /** Draws the sky's picture, ahead of the stage. */
+  /** A context came back with nothing in it: the sky's picture is owed. */
+  redraw(): void {
+    this.#sky.redraw();
+  }
+
+  /** Draws the sky's picture, ahead of the stage, if the view has moved. */
   march(renderer: WebGLRenderer, camera: Camera): void {
     this.#sky.march(renderer, camera);
   }

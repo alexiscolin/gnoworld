@@ -6,12 +6,12 @@ import {
   PerspectiveCamera,
   Points,
   Scene as Stage,
+  Texture,
   WebGLRenderTarget,
   type EventDispatcher,
   type Material,
   type Object3D,
   type ShaderMaterial,
-  type Texture,
   type WebGLRenderer,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
@@ -114,12 +114,21 @@ describe("what it puts on the stage", () => {
     const { stage, pass } = made();
     expect(sky(pass).toneMapped).toBe(false);
     expect(sky(pass).fragmentShader).not.toContain("tonemapping_fragment");
-    expect(uniform(shown(stage), "uSky") as Texture).toBeDefined();
+    expect(uniform(shown(stage), "uSky")).toBeInstanceOf(Texture);
   });
 
-  it("shapes its points round, never a square", () => {
+  it("shapes its points round, never a square, and blends them", () => {
     const { stage } = made();
-    for (const field of fields(stage)) expect(materialOf(field).fragmentShader).toContain("gl_PointCoord");
+    for (const field of fields(stage)) {
+      expect(materialOf(field).fragmentShader).toContain("gl_PointCoord");
+      expect(materialOf(field).transparent).toBe(true);
+      expect(attribute(field, "tint").normalized).toBe(true);
+    }
+  });
+
+  it("fades its far points with its edges in order: reversed, a driver may draw anything", () => {
+    const { stage } = made();
+    for (const field of fields(stage)) expect(materialOf(field).vertexShader).not.toContain("smoothstep(uFar, ");
   });
 });
 
@@ -138,6 +147,36 @@ describe("following the eye", () => {
     for (const axis of [mood.x, mood.y, mood.z]) within(axis, 1);
     for (const shell of uniform(sky(pass), "uCloudAt") as Three[])
       for (const axis of [shell.x, shell.y, shell.z]) within(axis, 1);
+  });
+
+  it("gives the sky what remains of the eye, axis by axis, each shell at its own share of a step", () => {
+    const { pass, space } = made();
+    space.follow({ x: 1000, y: -500, z: 12345 }, 0);
+    const mood = uniform(sky(pass), "uMoodAt") as Three;
+    expect([mood.x, mood.y, mood.z]).toEqual([0.390625, 0.8046875, 0.822265625]);
+    const shells = uniform(sky(pass), "uCloudAt") as Three[];
+    const expected = [
+      [0.14423076923076922, 0.9278846153846154, 0.780528846153846],
+      [0.05952380952380952, 0.9702380952380952, 0.7348214285714286],
+      [0.021428571428571425, 0.9892857142857143, 0.26453571428571426],
+      [0.008333333333333333, 0.9958333333333333, 0.102875],
+    ];
+    shells.forEach((shell, at) => {
+      [shell.x, shell.y, shell.z].forEach((value, axis) => {
+        expect(value).toBeCloseTo(expected[at]?.[axis] ?? NaN, 10);
+      });
+    });
+  });
+
+  it("gives a field the eye in its own cells, wrapped to its torus, axis by axis", () => {
+    const { stage, space } = made();
+    space.follow({ x: 1000, y: -500, z: 12345 }, 0);
+    const [far] = fields(stage);
+    if (far === undefined) throw new Error("no field");
+    const eye = uniform(materialOf(far), "uEye") as Three;
+    expect(eye.x).toBe(0.625);
+    expect(eye.y).toBe(5.6875);
+    expect(eye.z).toBeCloseTo(1.715625, 10);
   });
 
   it("keeps a thousandth of a step at that far coordinate", () => {
@@ -203,7 +242,7 @@ describe("following the eye", () => {
     expect((uniform(sky(pass), "uMood") as { image: { data: Uint8Array } }).image.data).toEqual(mood.data);
   });
 
-  it("carries the motes on a slow wind, and leaves the stars where they are", () => {
+  it("carries the motes on a slow wind, 0.72 of a cell a minute along x and z, and leaves the stars where they are", () => {
     const { stage, space } = made();
     space.follow(HERE, 0);
     const eyes = () => fields(stage).map((field) => ({ ...(uniform(materialOf(field), "uEye") as Three) }));
@@ -211,7 +250,9 @@ describe("following the eye", () => {
     space.follow(HERE, 60);
     const after = eyes();
     expect(after.slice(0, SHELLS.length)).toEqual(before.slice(0, SHELLS.length));
-    expect(after.at(-1)).not.toEqual(before.at(-1));
+    expect(after.at(-1)?.x).toBeCloseTo(0.72, 10);
+    expect(after.at(-1)?.y).toBe(0);
+    expect(after.at(-1)?.z).toBeCloseTo(0.72, 10);
   });
 
   it("keeps the motes' wind in its torus after days", () => {
@@ -230,6 +271,106 @@ describe("the sky's pass", () => {
     expect(asked[0]).toBeInstanceOf(WebGLRenderTarget);
     expect(asked[1]).toBe(pass);
     expect(asked[2]).toBeNull();
+  });
+
+  describe("marches only when the view has moved", () => {
+    const passes = () => {
+      const { asked, gl, camera, space, stage } = made();
+      const count = () => asked.filter((step) => step instanceof Stage).length;
+      return { count, gl, camera, space, stage };
+    };
+
+    it("marches once for a view that stays", () => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      expect(count()).toBe(after);
+    });
+
+    it("skips a step under what a pixel of it can tell", () => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      space.follow({ x: 0.04, y: 0, z: 0 }, 0);
+      space.march(gl, camera);
+      expect(count()).toBe(after);
+    });
+
+    it.each([
+      ["x", { x: 0.06, y: 0, z: 0 }],
+      ["y", { x: 0, y: 0.06, z: 0 }],
+      ["z", { x: 0, y: 0, z: 0.06 }],
+    ])("marches for a step along %s past that", (_, step) => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      space.follow(step, 0);
+      space.march(gl, camera);
+      expect(count()).toBe(after + 1);
+    });
+
+    it("adds small steps up: a slow drift still arrives", () => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      for (let step = 1; step <= 6; step += 1) {
+        space.follow({ x: 0.02 * step, y: 0, z: 0 }, 0);
+        space.march(gl, camera);
+      }
+      expect(count()).toBeGreaterThan(after);
+    });
+
+    it.each([
+      ["sideways", "y" as const],
+      ["up", "x" as const],
+    ])("marches for a turn %s, the view being what it draws", (_, axis) => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      camera.rotation[axis] = 0.002;
+      space.march(gl, camera);
+      expect(count()).toBe(after + 1);
+    });
+
+    it.each([
+      [
+        "a new size, which empties the picture",
+        (space: Space) => {
+          space.resize(800, 600, 1);
+        },
+      ],
+      [
+        "a context come back with nothing in it",
+        (space: Space) => {
+          space.redraw();
+        },
+      ],
+    ])("marches after %s", (_, change) => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      change(space);
+      space.march(gl, camera);
+      expect(count()).toBe(after + 1);
+    });
+
+    it("marches when the mood's volume moved, a cell further on", () => {
+      const { count, gl, camera, space } = passes();
+      space.follow(HERE, 0);
+      space.march(gl, camera);
+      const after = count();
+      space.follow({ x: 100_000, y: 0, z: 0 }, 0);
+      space.march(gl, camera);
+      expect(count()).toBe(after + 1);
+    });
   });
 
   it("is half the buffer's size a side: a soft sky costs a quarter of its pixels", () => {
@@ -254,16 +395,64 @@ describe("the sky's pass", () => {
 });
 
 describe("a Low device", () => {
-  it("marches fewer shells of the sky, on the same program", () => {
+  const read = (pass: Stage) => ({
+    shells: uniform(sky(pass), "uShells") as number,
+    far: uniform(sky(pass), "uFar") as number,
+    gain: uniform(sky(pass), "uGain") as number,
+  });
+
+  it("starts thin when it is known slow, on the same program", () => {
     const { pass, space } = made();
-    const high = uniform(sky(pass), "uShells") as number;
+    const high = read(pass);
     const shader = sky(pass).fragmentShader;
     space.detail("low");
-    expect(uniform(sky(pass), "uShells") as number).toBeLessThan(high);
-    expect(uniform(sky(pass), "uShells") as number).toBeGreaterThan(0);
+    expect(read(pass).shells).toBeLessThan(high.shells);
+    expect(read(pass).shells).toBeGreaterThan(0);
+    expect(read(pass).far).toBe(0);
+    expect(read(pass).gain).toBeGreaterThan(high.gain);
     expect(sky(pass).fragmentShader).toBe(shader);
+  });
+
+  it("fades its far shells out over a second when the probe says Low, and lifts what stays: a drop would show", () => {
+    const { pass, space } = made();
+    const high = read(pass);
+    space.follow(HERE, 10);
+    space.detail("low");
+    expect(read(pass).far).toBe(1);
+    space.follow(HERE, 10.5);
+    expect(read(pass).far).toBeCloseTo(0.5, 6);
+    expect(read(pass).shells).toBe(high.shells);
+    expect(read(pass).gain).toBeGreaterThan(high.gain);
+    space.follow(HERE, 11.1);
+    expect(read(pass).far).toBe(0);
+    expect(read(pass).shells).toBeLessThan(high.shells);
+  });
+
+  it("marches through the fade, each step of it a new picture", () => {
+    const { pass, space, gl, camera, asked } = made();
+    space.follow(HERE, 10);
+    space.march(gl, camera);
+    space.detail("low");
+    const before = asked.filter((step) => step === pass).length;
+    space.follow(HERE, 10.5);
+    space.march(gl, camera);
+    expect(asked.filter((step) => step === pass).length).toBe(before + 1);
+  });
+
+  it("comes back whole on High", () => {
+    const { pass, space } = made();
+    const high = read(pass);
+    space.detail("low");
     space.detail("high");
-    expect(uniform(sky(pass), "uShells") as number).toBe(high);
+    expect(read(pass)).toEqual(high);
+  });
+
+  it("goes at once where time stands still: under reduced motion nothing fades", () => {
+    const { pass, space } = made();
+    space.follow(HERE, 5);
+    space.detail("low");
+    space.follow(HERE, 5);
+    expect(read(pass).far).toBe(0);
   });
 });
 

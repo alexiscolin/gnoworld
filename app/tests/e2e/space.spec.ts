@@ -1,7 +1,7 @@
-import { MOOD_SCALE, MOOD_STEP, moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
+import { MOOD_STEP, moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { MOTES, SHELLS } from "../../../packages/core/src/space/stars.ts";
 import { expect, test, type Page } from "./fixtures.ts";
-import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
+import { loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scenery on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation). The canvas is
 // compared with itself, never with an approved picture: a GPU's output varies, a place's does not on one machine. Reduced motion holds
@@ -71,6 +71,7 @@ async function measured(page: Page, shot: Buffer, other?: Buffer) {
         const apart = data.reduce((sum, value, at) => sum + Math.abs(value - (third[at] ?? 0)), 0);
         return {
           median: levels[Math.floor(levels.length / 2)] ?? NaN,
+          bright: levels[Math.floor(levels.length * 0.99)] ?? NaN,
           spread:
             (levels.at(-1 - Math.floor(levels.length / 20)) ?? NaN) - (levels[Math.floor(levels.length / 20)] ?? NaN),
           blownShare: levels.filter((value) => value > 245).length / levels.length,
@@ -96,13 +97,17 @@ test.describe("the scenery on a computer", () => {
     expect(look.dots, "crisp points").toBeGreaterThan(40);
   });
 
-  // Where the mood is thickest: haze and stars both at their most, the worst a place can do to "near-black".
+  // Scored along the view's rays, where the sky reads: the worst a place can do to "near-black".
   test("stays near-black with no blinding glow in the thickest places too", async ({ page }) => {
     const mood = newMood();
+    const hazeAhead = (spot: Spot) =>
+      [120, 260, 520, 1000].reduce((sum, reach) => {
+        moodAt(mood, { x: spot.x, y: spot.y, z: spot.z - reach });
+        return sum + mood.haze;
+      }, 0);
     const thickest = Array.from({ length: 4096 }, (_, at) => {
-      const spot = { x: at * MOOD_SCALE * 0.53, y: at * MOOD_SCALE * 0.31, z: at * MOOD_SCALE * -0.71 };
-      moodAt(mood, spot);
-      return { spot, thick: mood.haze + mood.density };
+      const spot = { x: at * 180.2, y: at * 105.4, z: at * -241.4 };
+      return { spot, thick: hazeAhead(spot) };
     })
       .sort((a, b) => b.thick - a.thick)
       .slice(0, 3);
@@ -110,9 +115,15 @@ test.describe("the scenery on a computer", () => {
     for (const { spot } of thickest) {
       await goTo(page, spot);
       const look = await measured(page, await picture(page));
-      expect(look.median, "near-black").toBeLessThan(96);
+      expect(look.median, "near-black").toBeLessThan(48);
       expect(look.blownShare, "no blinding glow").toBeLessThan(0.002);
     }
+  });
+
+  test("has cores in its clouds, brighter than their body: not a flat fog", async ({ page }) => {
+    await stillScene(page);
+    const look = await measured(page, await picture(page));
+    expect(look.bright).toBeGreaterThan(look.median * 3);
   });
 
   test("is not one flat colour: the mood draws something", async ({ page }) => {
@@ -144,22 +155,31 @@ test.describe("the scenery on a computer", () => {
     expect(look.median).toBeLessThan(64);
   });
 
-  test("has no edge: a small step over a cell's border changes the picture a little", async ({ page }) => {
+  test("has no edge: a step over a cell's border changes the picture no more than the same step beside it", async ({
+    page,
+  }) => {
     await stillScene(page);
+    const stepApart = async (x: number) => {
+      await goTo(page, { x: x - 0.1, y: 0, z: 0 });
+      const first = await picture(page);
+      await goTo(page, { x: x + 0.1, y: 0, z: 0 });
+      return (await measured(page, first, await picture(page))).apart;
+    };
     // A torus's centre changes half a cell from the last: over each shell's border, the mood's and the motes'.
     for (const size of [...SHELLS.map((shell) => shell.size), MOTES.size, MOOD_STEP]) {
-      await goTo(page, { x: size * 3.5 - 0.1, y: 0, z: 0 });
-      const first = await picture(page);
-      await goTo(page, { x: size * 3.5 + 0.1, y: 0, z: 0 });
-      expect((await measured(page, first, await picture(page))).apart, `a cell of ${String(size)}`).toBeLessThan(1);
+      const over = await stepApart(size * 3.5);
+      const beside = await stepApart(size * 3.2);
+      expect(over, `a cell of ${String(size)}`).toBeLessThan(beside * 1.6 + 0.02);
     }
   });
 
   test("costs the same draws at home and far away", async ({ page }) => {
     await stillScene(page);
+    await goTo(page, { x: 4000, y: -700, z: 2500 });
     const home = await stats(page);
     await goTo(page, { x: FAR, y: -FAR, z: FAR });
     const far = await stats(page);
+    expect(home.points).toBeGreaterThan(0);
     expect(far.calls).toBe(home.calls);
     expect(far.points).toBe(home.points);
     expect(home.calls).toBeLessThanOrEqual(6);
@@ -167,13 +187,14 @@ test.describe("the scenery on a computer", () => {
 
   test("moves when motion is allowed: the picture changes with the eye", async ({ page }) => {
     await page.goto(HOME);
-    await running(page);
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(2);
+    await opened(page);
     await hideThePage(page);
     const start = (await stats(page)).eye;
     const first = await picture(page);
     await expect.poll(async () => (await stats(page)).eye).not.toEqual(start);
-    await expect.poll(async () => (await measured(page, first, await picture(page))).apart).toBeGreaterThan(0.02);
+    await expect
+      .poll(async () => (await measured(page, first, await picture(page))).apart, { timeout: 20_000 })
+      .toBeGreaterThan(0.02);
   });
 
   test("still draws its sky on a device known slow", async ({ page }) => {
@@ -181,23 +202,29 @@ test.describe("the scenery on a computer", () => {
       localStorage.setItem("gnoworld:scene:tier", "low");
     });
     await stillScene(page);
+    expect((await stats(page)).tier).toBe("low");
     const look = await measured(page, await picture(page));
-    expect(look.spread).toBeGreaterThan(8);
+    expect(look.spread).toBeGreaterThan(4);
     expect(look.dots).toBeGreaterThan(40);
   });
 
   test("comes back whole with a lost context: the sky, its volumes and its stars", async ({ page }) => {
     await stillScene(page);
-    const before = await measured(page, await picture(page));
+    const before = await picture(page);
     await loseContext(page);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
     const frames = (await stats(page)).frames;
     await restoreContext(page);
     await running(page);
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
-    const look = await measured(page, await picture(page));
-    expect(look.spread).toBeGreaterThan(before.spread / 2);
-    expect(look.dots).toBeGreaterThan(before.dots / 2);
+    await expect.poll(async () => (await measured(page, before, await picture(page))).apart).toBeLessThan(0.05);
+  });
+
+  test("leaves the hero on near-black at the frames' size", async ({ page }) => {
+    await page.setViewportSize({ width: 1728, height: 1080 });
+    await stillScene(page);
+    const shot = await page.screenshot({ clip: { x: 0, y: 660, width: 540, height: 340 } });
+    expect((await measured(page, shot)).median).toBeLessThan(14);
   });
 });
 

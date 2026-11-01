@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { driftAt, HOME, turnAt } from "@gnoworld/core";
+import type { PerspectiveCamera } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeClock } from "../../tests/fakeClock.ts";
 import { startScene, type SceneOptions } from "./scene.ts";
@@ -8,8 +10,7 @@ const three = vi.hoisted(() => ({
     setPixelRatio: vi.fn<(ratio: number) => void>(),
     getPixelRatio: () => 1,
     setSize: vi.fn<(width: number, height: number, style: boolean) => void>(),
-    render:
-      vi.fn<(stage: unknown, camera: { aspect: number; position: { x: number; y: number; z: number } }) => void>(),
+    render: vi.fn<(stage: unknown, camera: PerspectiveCamera) => void>(),
     forceContextLoss: vi.fn<() => void>(),
     dispose: vi.fn<() => void>(),
     info: { render: { calls: 3, points: 7 }, memory: { geometries: 4, textures: 5 }, reset: vi.fn<() => void>() },
@@ -19,6 +20,7 @@ const three = vi.hoisted(() => ({
     follow: vi.fn<(eye: { x: number; y: number; z: number }, seconds: number) => void>(),
     detail: vi.fn<(tier: string) => void>(),
     march: vi.fn<() => void>(),
+    redraw: vi.fn<() => void>(),
     resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
   },
   owner: { current: undefined as { signal: AbortSignal } | undefined },
@@ -125,7 +127,9 @@ describe("the renderer it starts", () => {
     const scene = startScene(options(), clock);
     expect(three.renderer.setSize).toHaveBeenLastCalledWith(1280, 800, false);
     clock.run(100);
-    expect(three.renderer.render.mock.lastCall?.[1].aspect).toBe(1280 / 800);
+    const camera = three.renderer.render.mock.lastCall?.[1];
+    expect(camera?.aspect).toBe(1280 / 800);
+    expect(camera?.projectionMatrix.elements[0]).toBeCloseTo(1.3403168253184738, 6);
     scene.dispose();
   });
 
@@ -135,7 +139,9 @@ describe("the renderer it starts", () => {
     observed?.();
     clock.run(100);
     expect(three.renderer.setSize).toHaveBeenLastCalledWith(800, 1000, false);
-    expect(three.renderer.render.mock.lastCall?.[1].aspect).toBe(800 / 1000);
+    const camera = three.renderer.render.mock.lastCall?.[1];
+    expect(camera?.aspect).toBe(800 / 1000);
+    expect(camera?.projectionMatrix.elements[0]).toBeCloseTo(2.6806336506369477, 6);
     scene.dispose();
   });
 
@@ -521,14 +527,17 @@ it("reads three's own counters for the journeys", () => {
 describe("the eye", () => {
   const lastEye = () => three.space.follow.mock.lastCall?.[0];
 
-  // Where the eye is after `ms` from a pointer event, on a screen of its own, the drift the same in every run.
-  function eyeAfter(events: readonly Record<string, unknown>[], ms: number) {
+  // Where the eye is after each stretch of time, each with its pointer events first, on a screen of its own: the drift is the same in
+  // every run, so a run's difference from one with no events is the lean alone.
+  function eyeAfter(stretches: readonly { events?: readonly Record<string, unknown>[]; ms: number }[]) {
     clock = new FakeClock(60);
     three.space.follow.mockClear();
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(200);
-    for (const event of events) window.dispatchEvent(Object.assign(new Event("pointermove"), event));
-    clock.run(ms);
+    for (const { events = [], ms } of stretches) {
+      for (const event of events) window.dispatchEvent(Object.assign(new Event("pointermove"), event));
+      clock.run(ms);
+    }
     const eye = { x: NaN, y: NaN, z: NaN, ...lastEye() };
     scene.dispose();
     return eye;
@@ -597,12 +606,38 @@ describe("the eye", () => {
     scene.dispose();
   });
 
-  it("drifts while motion is allowed", () => {
+  it("drifts from where the view rests, plus the arrival's offset at its own time", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    frames(30, 34);
+    const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
+    const offset = { x: NaN, y: NaN, z: NaN };
+    driftAt(offset, seconds);
+    expect(lastEye()?.x).toBeCloseTo(HOME.x + offset.x, 8);
+    expect(lastEye()?.y).toBeCloseTo(HOME.y + offset.y, 8);
+    expect(lastEye()?.z).toBeCloseTo(HOME.z + offset.z, 8);
+    scene.dispose();
+  });
+
+  it("looks about at the arrival's own time, the camera staying at the origin", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(20_000);
+    const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
+    const turn = { yaw: NaN, pitch: NaN };
+    turnAt(turn, seconds);
+    const camera = three.renderer.render.mock.lastCall?.[1];
+    expect(camera?.rotation.y).toBeCloseTo(turn.yaw, 8);
+    expect(camera?.rotation.x).toBeCloseTo(turn.pitch, 8);
+    expect(camera?.rotation.y).not.toBe(0);
+    expect([camera?.position.x, camera?.position.y, camera?.position.z]).toEqual([0, 0, 0]);
+    scene.dispose();
+  });
+
+  it("looks straight ahead under reduced motion", () => {
+    query(MOTION).matches = true;
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(100);
-    const first = { ...lastEye() };
-    frames(30, 34);
-    expect(lastEye()).not.toEqual(first);
+    const camera = three.renderer.render.mock.lastCall?.[1];
+    expect([camera?.rotation.x, camera?.rotation.y]).toEqual([0, 0]);
     scene.dispose();
   });
 
@@ -660,31 +695,49 @@ describe("the eye", () => {
     scene.dispose();
   });
 
-  it("leans with a mouse, a little, with no jump", () => {
-    const still = eyeAfter([], 34);
-    const started = eyeAfter([mouse(1024, 384)], 34);
-    expect(Math.abs(started.x - still.x)).toBeLessThan(0.5);
-    const rested = eyeAfter([], 3000);
-    const leaned = eyeAfter([mouse(1024, 0)], 3000);
-    expect(leaned.x - rested.x).toBeGreaterThan(0.5);
-    expect(leaned.x - rested.x).toBeLessThan(6);
-    expect(leaned.y - rested.y).toBeGreaterThan(0.5);
+  it("leans with a mouse, a little, with no jump, up and right from the window's top right", () => {
+    const leanAfter = (ms: number) => {
+      const leaned = eyeAfter([{ events: [mouse(1024, 0)], ms }]);
+      const rested = eyeAfter([{ ms }]);
+      return { x: leaned.x - rested.x, y: leaned.y - rested.y, z: leaned.z - rested.z };
+    };
+    expect(Math.abs(leanAfter(34).x)).toBeLessThan(0.5);
+    expect(leanAfter(3000).x).toBeGreaterThan(0.5);
+    expect(leanAfter(3000).x).toBeLessThan(6);
+    expect(leanAfter(3000).y).toBeGreaterThan(0.5);
+    expect(leanAfter(3000).z).toBe(0);
   });
 
   it("comes back when the mouse does", () => {
-    const rested = eyeAfter([], 6000);
-    const back = eyeAfter([mouse(1024, 0), mouse(512, 384)], 6000);
-    expect(Math.abs(back.x - rested.x)).toBeLessThan(0.01);
-    expect(Math.abs(back.y - rested.y)).toBeLessThan(0.01);
+    const stretches = [
+      { events: [mouse(1024, 0)], ms: 3000 },
+      { events: [mouse(512, 384)], ms: 6000 },
+    ];
+    const rested = eyeAfter([{ ms: 9000 }]);
+    const out = eyeAfter(stretches.slice(0, 1));
+    const restedThen = eyeAfter([{ ms: 3000 }]);
+    expect(out.x - restedThen.x, "it had leaned").toBeGreaterThan(0.5);
+    const back = eyeAfter(stretches);
+    expect(Math.abs(back.x - rested.x)).toBeLessThan(0.05);
+    expect(Math.abs(back.y - rested.y)).toBeLessThan(0.05);
   });
 
   it("takes no lean from a finger: a touch is no aim", () => {
-    expect(eyeAfter([{ pointerType: "touch", clientX: 1024, clientY: 0 }], 3000)).toEqual(eyeAfter([], 3000));
+    const finger = { pointerType: "touch", clientX: 1024, clientY: 0 };
+    expect(eyeAfter([{ events: [finger], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
   });
 
   it("takes no lean under reduced motion", () => {
     query(MOTION).matches = true;
-    expect(eyeAfter([mouse(1024, 0)], 3000)).toEqual(eyeAfter([], 3000));
+    expect(eyeAfter([{ events: [mouse(1024, 0)], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
+  });
+
+  it("owes the sky a new picture when the context comes back", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    three.space.redraw.mockClear();
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(three.space.redraw).toHaveBeenCalled();
+    scene.dispose();
   });
 });
 
@@ -722,6 +775,20 @@ describe("the sky's detail", () => {
 });
 
 describe("leaving", () => {
+  it("takes every listener with it: each carries the signal that goes", () => {
+    const targets = [window, document, EventTarget.prototype, canvas];
+    const spies = targets.map((target) => vi.spyOn(target, "addEventListener"));
+    const scene = startScene(options(), clock);
+    const calls = spies.flatMap((spy) => spy.mock.calls);
+    expect(calls.length).toBeGreaterThan(5);
+    scene.dispose();
+    for (const [name, , listening] of calls) {
+      const signal = typeof listening === "object" ? listening.signal : undefined;
+      expect(signal?.aborted, `the ${name} listener`).toBe(true);
+    }
+    for (const spy of spies) spy.mockRestore();
+  });
+
   it("hands the space the scene's own owner, so it goes with the scene", () => {
     const scene = startScene(options(), clock);
     expect(three.owner.current?.signal.aborted).toBe(false);

@@ -108,6 +108,7 @@ class LiveScene implements Scene {
     });
     const lost = (now: boolean) => () => {
       this.#lost = now;
+      this.#space.redraw();
       this.#options.onLost(now);
       this.#stopOrGo();
     };
@@ -118,6 +119,7 @@ class LiveScene implements Scene {
   readonly #draw = (delta: number): void => {
     if (this.#viewportStale) this.#applyViewport();
     this.#eye.advance(delta, this.#motion.matches);
+    this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);

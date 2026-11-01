@@ -21,6 +21,14 @@ export const stats = (page: Page) =>
 
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
+// Once the iris has opened: before that a picture of the window shows the page's colour, not the stage.
+export const opened = async (page: Page) => {
+  await running(page);
+  await expect
+    .poll(() => page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length), { timeout: 15_000 })
+    .toBe(0);
+};
+
 export const loseContext = (page: Page) =>
   page.evaluate(() => {
     const context = document.querySelector("canvas")?.getContext("webgl2");

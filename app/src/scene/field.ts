@@ -27,7 +27,7 @@ varying vec4 vLight;
 void main() {
   vec3 around = mod(position - uEye + uSide * 0.5, uSide) - uSide * 0.5;
   float away = length(around);
-  float fade = smoothstep(uFar, uFar * 0.65, away) * smoothstep(uNear, uNear * 2.0, away);
+  float fade = (1.0 - smoothstep(uFar * 0.65, uFar, away)) * smoothstep(uNear, uNear * 2.0, away);
   float light = tint.a;
   vLight = vec4(tint.rgb * fade * (0.12 + light * 0.88), light);
   gl_Position = projectionMatrix * viewMatrix * vec4(around * uCell, 1.0);
@@ -42,8 +42,8 @@ void main() {
   vec2 at = gl_PointCoord * 2.0 - 1.0;
   float reach = dot(at, at);
   float bright = vLight.a;
-  float core = exp(-reach * (5.0 + bright * bright * 40.0));
-  float halo = exp(-reach * 3.0) * 0.1 * bright * bright;
+  float core = exp(-reach * (3.2 + bright * bright * 6.0));
+  float halo = exp(-reach * 2.0) * 0.06 * bright;
   float spikes = (exp(-abs(at.x) * 22.0) * exp(-at.y * at.y * 5.0) + exp(-abs(at.y) * 22.0) * exp(-at.x * at.x * 5.0)) * 0.5;
   float shape = (core + halo + spikes * smoothstep(0.8, 1.0, bright)) * (1.0 - smoothstep(0.75, 1.0, reach));
   gl_FragColor = vec4(vLight.rgb * shape * 1.6, 1.0);
@@ -56,8 +56,8 @@ export class Field {
   readonly #cells: StarCells;
   readonly #position: BufferAttribute;
   readonly #tint: BufferAttribute;
-  readonly #material: ShaderMaterial;
   readonly #eye = new Vector3();
+  readonly #ratio = { value: 1 };
   readonly #carried = { x: 0, y: 0, z: 0 };
 
   constructor(stage: Stage, owner: Disposer, shell: Shell) {
@@ -68,8 +68,7 @@ export class Field {
     const geometry = owner.add(new BufferGeometry());
     geometry.setAttribute("position", this.#position);
     geometry.setAttribute("tint", this.#tint);
-    this.#material = owner.add(this.#materialOf(shell));
-    const points = new Points(geometry, this.#material);
+    const points = new Points(geometry, owner.add(this.#materialOf(shell)));
     points.frustumCulled = false;
     points.renderOrder = -1;
     stage.add(points);
@@ -89,7 +88,7 @@ export class Field {
         uEye: { value: this.#eye },
         uSide: { value: side },
         uCell: { value: size },
-        uRatio: { value: 1 },
+        uRatio: this.#ratio,
         uNear: { value: near },
         uFar: { value: far },
         uPoint: { value: point },
@@ -119,7 +118,6 @@ export class Field {
   }
 
   resize(ratio: number): void {
-    const { uRatio } = this.#material.uniforms;
-    if (uRatio !== undefined) uRatio.value = ratio;
+    this.#ratio.value = ratio;
   }
 }
