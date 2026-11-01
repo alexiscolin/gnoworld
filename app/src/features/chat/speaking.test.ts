@@ -6,9 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { keepCountry } from "../../lib/country.ts";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
-import { outbox } from "./outbox.ts";
-import { Speaking } from "./speaking.ts";
-import { TypingOut } from "./telling.ts";
+import { makeKit } from "./accountKit.ts";
 
 // 7j: the country tag going out (ADR-0001 §7). It says where a person speaks from, so it fails shut: it rides only on a person's own new
 // line, only once they chose a country, and only in a room the list says anyone may read.
@@ -39,14 +37,19 @@ function setup({ type = "open", multiline = true, listed = ROOM }: Setup = {}) {
     multiline: () => multiline,
     nick: () => ME,
   };
-  const speaking = new Speaking({
+  const kit = makeKit({
+    store,
     ergo: () => ergo,
     key: () => key,
+    out: (line) => ergo.send(line),
     inside: new Set([ROOM]),
-    outbox: outbox(store),
-    typing: new TypingOut(),
-    store,
   });
+  const { speaking } = kit;
+  const heard = (line: string) => {
+    const parsed = parseLine(line);
+    if (!parsed.ok) throw new Error(`the test's line does not parse: ${line}`);
+    kit.heard(parsed.message);
+  };
   const list = (...types: (RoomType | undefined)[]) => {
     store
       .getState()
@@ -54,7 +57,7 @@ function setup({ type = "open", multiline = true, listed = ROOM }: Setup = {}) {
         types.map((each) => ({ name: null, rooms: each === undefined ? [] : [{ room: ROOM, type: each }] })),
       );
   };
-  return { sent, speaking, store, list, login: (next: string) => (key = next) };
+  return { sent, speaking, store, list, heard, login: (next: string) => (key = next) };
 }
 const said = (draft: string) => compose(ROOM, draft, ME);
 // What the page sent as Ergo relays it to a room: its own tags, with an id, a time, an account and a source.
@@ -124,6 +127,29 @@ describe("a line and the country its speaker declares", () => {
     list("members");
     speaking.say(ROOM, said("two"));
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
+  });
+
+  it.each([
+    ["a voice", "+v g1abci"],
+    ["a mute's mask", "+b m:g1abcR"],
+    ["a moderated room", "+m"],
+    ["a room opening", "-i"],
+    ["a room's flags taken back", "-iR+m"],
+  ])("carries it on through %s: a mode that closes nothing", (_, flags) => {
+    keepCountry(ME, "JP");
+    const { sent, speaking, heard } = setup();
+    heard(`:gnoworld!bot@h MODE ${ROOM} ${flags}`);
+    speaking.say(ROOM, said("hi"));
+    expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
+  });
+
+  it("carries it on when another room closes, or an account's own modes change", () => {
+    keepCountry(ME, "JP");
+    const { sent, speaking, heard } = setup();
+    heard(":gnoworld!bot@h MODE #garden +i");
+    heard(`:${ME}!u@h MODE ${ME} +R`);
+    speaking.say(ROOM, said("hi"));
+    expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
   });
 
   it("carries none once the list is gone: a list that failed says nothing of a room", () => {
@@ -209,7 +235,7 @@ describe("a line and the country its speaker declares", () => {
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
   });
 
-  it("carries none on a direct message: a conversation shows no country", () => {
+  it("carries none on a direct message: nothing of ours declares a country there", () => {
     keepCountry(ME, "JP");
     const { sent, speaking } = setup();
     speaking.sayTo(OTHER, { composed: compose(OTHER, "hi", ME), draft: "hi" });

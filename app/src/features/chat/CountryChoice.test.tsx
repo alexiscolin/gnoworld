@@ -29,6 +29,17 @@ function pick(box: HTMLElement, code: string) {
   });
 }
 
+// The suggestion taken on a device that refuses to keep it.
+function refused() {
+  const refusal = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("full");
+  });
+  const box = mount(<CountryChoice account={ME} />);
+  opened(box);
+  click(button(box, "Use Japan"));
+  return { box, refusal };
+}
+
 beforeEach(() => {
   inZone("Asia/Tokyo");
 });
@@ -64,7 +75,15 @@ describe("the choice of a country", () => {
 
   it("leaves the focus where it is when it opens on a choice already made: a closed menu holds it too", () => {
     keepCountry(ME, "JP");
-    expect(document.activeElement).not.toBe(list(mount(<CountryChoice account={ME} />)));
+    const box = mount(<CountryChoice account={ME} />);
+    expect(document.activeElement).not.toBe(list(box));
+  });
+
+  it("suggests again once a choice is taken back", () => {
+    keepCountry(ME, "JP");
+    const box = mount(<CountryChoice account={ME} />);
+    pick(box, "");
+    expect(button(box, "Use Japan")).toBeDefined();
   });
 
   it("takes the suggestion only when the person confirms it", () => {
@@ -151,15 +170,18 @@ describe("the choice of a country", () => {
   });
 
   it("says so when the device does not keep the choice, and does not claim it", () => {
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("full");
-    });
-    const box = mount(<CountryChoice account={ME} />);
-    opened(box);
-    click(button(box, "Use Japan"));
+    const { box } = refused();
     expect(box.textContent).toContain("Not kept on this device");
     expect(list(box).value).toBe("");
     expect(says(box)).toBe("Your messages show no country.");
+  });
+
+  it("takes the words back once the device keeps a later choice", () => {
+    const { box, refusal } = refused();
+    refusal.mockRestore();
+    click(button(box, "Use Japan"));
+    expect(box.textContent).not.toContain("Not kept on this device");
+    expect(keptCountry(ME)).toBe("JP");
   });
 
   it("names its list for a screen reader", () => {
