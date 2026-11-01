@@ -33,6 +33,8 @@ const TIMEOUT_MS = 10_000;
 // A good answer is under 1 KB; 64 KB leaves room and stops a stream that never ends.
 export const MAX_BYTES = 64 * 1024;
 const EVERY_MS = 300_000;
+// A request that reached nothing: in the stack the server starts before the way out, and its first tick finds no proxy.
+const RETRY_MS = 15_000;
 
 type Kind =
   "rate_limited" | "status" | "too_large" | "not_json" | "shape" | "no_price" | "timeout" | "request" | "write";
@@ -101,6 +103,7 @@ function checkedRpc(rpc: string): URL {
   return url;
 }
 
+const reachedNothing = (error: unknown): boolean => error instanceof Failure && error.kind === "request";
 const named = (error: unknown): boolean =>
   error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
@@ -172,14 +175,14 @@ export function startPrices(options: Options): Prices {
     }
   }
 
-  // After the read ends, answered or not: one request in flight, and a failure waits as long as a success.
-  const next = (): void => {
-    if (!stopped) timer = setTimeout(tick, everyMs);
+  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
+  const next = (error?: unknown): void => {
+    if (!stopped) timer = setTimeout(tick, reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs);
   };
   function tick(): void {
     read().then(next, (error: unknown) => {
       if (!stopped) log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
-      next();
+      next(error);
     });
   }
 

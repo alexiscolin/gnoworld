@@ -463,6 +463,30 @@ describe("the prices timer: when it runs", () => {
     expect(delays.filter((ms) => ms >= 1000)).toEqual([300_000]);
   });
 
+  it("asks again in 15 s when the way out does not answer yet: the stack starts the server before it", async () => {
+    const delays: number[] = [];
+    const real = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((fn: () => void, ms?: number) => {
+      delays.push(ms ?? 0);
+      return real(fn, ms !== undefined && ms >= 1000 ? 3_600_000 : ms);
+    });
+    const calls: Call[] = [];
+    const timer = startPrices({
+      file: join(fresh(), "markets.json"),
+      log: logger("a-pepper-of-forty-characters-0123456789", () => undefined),
+      now: () => NOW,
+      send: (url, init, ms) => {
+        calls.push({ url, init, ms });
+        return Promise.reject(new Error("down"));
+      },
+    });
+    running.push(timer);
+    await vi.waitFor(() => {
+      expect(calls).toHaveLength(1);
+      expect(delays.filter((ms) => ms >= 1000)).toEqual([15_000]);
+    });
+  });
+
   it("does not start a second request while the first has not answered", async () => {
     let release: (response: Response) => void = () => undefined;
     const slow = () =>
