@@ -12,6 +12,16 @@ describe("tilingNoise", () => {
     expect(tilingNoise(SIDE)).toEqual(tilingNoise(SIDE));
   });
 
+  // Worked out apart from this code, in Python's integers and doubles, each level rounded as a 32-bit float would.
+  it("holds its levels", () => {
+    expect([...tilingNoise(8).slice(0, 16)]).toEqual([
+      128, 136, 128, 139, 128, 140, 128, 95, 188, 167, 131, 111, 121, 151, 128, 139,
+    ]);
+    const cube = tilingNoise(16);
+    expect([...cube.slice(0, 12)]).toEqual([128, 143, 136, 125, 128, 129, 139, 159, 128, 130, 140, 121]);
+    expect(cube.reduce((sum, level) => sum + level, 0)).toBe(522268);
+  });
+
   it("uses most of its range, around a middle grey", () => {
     const noise = tilingNoise(SIDE);
     const levels = new Set(noise);

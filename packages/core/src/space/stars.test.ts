@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { moodAt, newMood } from "./mood.ts";
-import { MOTES, SHELLS, StarCells, type Shell } from "./stars.ts";
+import { densityAt } from "./mood.ts";
+import { MOTES, SHELLS, StarCells, tintOf, type Shell } from "./stars.ts";
 import { wrapTo } from "./torus.ts";
 
 const SHELL: Shell = { ...SHELLS[0], salt: 11, side: 4, size: 260, perCell: 24, steep: 5 } as Shell;
@@ -84,17 +84,29 @@ describe("StarCells", () => {
     }
   });
 
-  it("takes its count from the mood where the cell sits: a thick sky holds more than a thin one", () => {
-    const rows = Array.from({ length: 512 }, (_, at) => {
+  // Each point reads the field where it stands: a cell wider than the field's own lattice would otherwise show its plane.
+  it("lights a point by the density at its own spot, not at its cell's centre", () => {
+    const wide: Shell = { ...SHELL, size: 1600, perCell: 90 };
+    const seen = { low: { lit: 0, all: 0, wanted: 0 }, high: { lit: 0, all: 0, wanted: 0 } };
+    for (let at = 0; at < 256; at += 1) {
       const cell = cellOf(at * 3, at * 5, -at * 2);
-      const mood = newMood();
-      moodAt(mood, { x: (cell.x + 0.5) * SHELL.size, y: (cell.y + 0.5) * SHELL.size, z: (cell.z + 0.5) * SHELL.size });
-      return { density: mood.density, count: lit(written(cell).tints) };
-    }).sort((a, b) => a.density - b.density);
-    const mean = (part: typeof rows) => part.reduce((sum, { count }) => sum + count, 0) / part.length;
-    expect(mean(rows.slice(-128))).toBeGreaterThan(mean(rows.slice(0, 128)) * 1.3);
-    expect(Math.max(...rows.map(({ count }) => count))).toBeLessThanOrEqual(SHELL.perCell);
-    expect(Math.min(...rows.map(({ count }) => count))).toBeGreaterThan(0);
+      const { positions, tints } = written(cell, wide);
+      for (let point = 0; point < wide.perCell; point += 1) {
+        const inside = (axis: number) => (positions[point * 3 + axis] ?? NaN) % 1;
+        const density = densityAt({
+          x: (cell.x + inside(0)) * wide.size,
+          y: (cell.y + inside(1)) * wide.size,
+          z: (cell.z + inside(2)) * wide.size,
+        });
+        const bucket = density < 0.5 ? seen.low : seen.high;
+        bucket.all += 1;
+        bucket.wanted += Math.min(1, 0.2 + density);
+        if ((tints[point * 4 + 3] ?? 0) > 0) bucket.lit += 1;
+      }
+    }
+    expect(Math.abs(seen.low.lit - seen.low.wanted) / seen.low.all).toBeLessThan(0.03);
+    expect(Math.abs(seen.high.lit - seen.high.wanted) / seen.high.all).toBeLessThan(0.03);
+    expect(seen.high.lit / seen.high.all).toBeGreaterThan((seen.low.lit / seen.low.all) * 1.3);
   });
 
   it("makes bright stars rare: the steep law's many faint and few bright", () => {
@@ -105,6 +117,15 @@ describe("StarCells", () => {
     const faint = all.filter((light) => light < 60).length;
     expect(faint).toBeGreaterThan(bright * 5);
     expect(bright).toBeGreaterThan(0);
+  });
+
+  it.each([
+    [0, [255, 190, 140]],
+    [0.7, [255, 246, 235]],
+    [0.35, [255, 218, 188]],
+    [1, [190, 210, 255]],
+  ])("takes a star's colour from its heat %d", (heat, expected) => {
+    expect([0, 1, 2].map((channel) => tintOf(heat, channel))).toEqual(expected);
   });
 
   it("colours a star as a star: red to blue-white, never green", () => {
@@ -139,6 +160,13 @@ describe("the shells", () => {
   it("are each a sky of their own, and the motes' another", () => {
     const salts = [...SHELLS, MOTES].map(({ salt }) => salt);
     expect(new Set(salts).size).toBe(salts.length);
+  });
+
+  it("all draw at a size a round point can show, and none grows into a glow", () => {
+    for (const shell of [...SHELLS, MOTES]) {
+      expect(shell.point).toBeGreaterThanOrEqual(3);
+      expect(shell.point * (1 + shell.flare)).toBeLessThanOrEqual(7);
+    }
   });
 
   it("fade out before a wrapped point could show: a torus's reach is half its side, less the half cell the centre rounds by", () => {

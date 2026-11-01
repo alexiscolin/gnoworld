@@ -13,6 +13,29 @@ const coordinate = fc.double({ min: -far, max: far, noNaN: true });
 const nearby = fc.double({ min: -5000, max: 5000, noNaN: true });
 
 describe("moodAt", () => {
+  // Worked out apart from this code, in Python's doubles: the same place is the same mood, on every device and in every release.
+  it.each([
+    { x: 0, y: 0, z: 0, mood: [0.39276725859695627, 0.11714842487646512, 0.01493726540806163, 1, 0.924805551348254] },
+    { x: 170.25, y: -3000.5, z: 8123.125, mood: [0.1946194841509427, 0.017609649397640897, 0.03949922041589681, 0, 1] },
+    {
+      x: 2900,
+      y: 4400,
+      z: -1800,
+      mood: [0.18724543786955236, 0.018851757393358266, 0.04125090052840455, 0.0832055142119331, 0.8204884196353488],
+    },
+    {
+      x: 2 ** 40 + 0.5,
+      y: -(2 ** 33) + 0.25,
+      z: 7,
+      mood: [0.1329643708119279, 0.03852551363488118, 0.08464110357423997, 0, 0.3085894341678159],
+    },
+  ])("holds its value at $x, $y, $z", ({ x, y, z, mood }) => {
+    const found = read(x, y, z);
+    CHANNELS.forEach((channel, at) => {
+      expect(found[channel]).toBeCloseTo(mood[at] ?? NaN, 9);
+    });
+  });
+
   it("gives the same mood for the same position, from any earlier read", () => {
     fc.assert(
       fc.property(coordinate, coordinate, coordinate, (x, y, z) => {
@@ -45,7 +68,7 @@ describe("moodAt", () => {
           const here = read(x, y, z);
           const there = read(x + step, y, z);
           for (const channel of CHANNELS)
-            expect(Math.abs(here[channel] - there[channel])).toBeLessThanOrEqual(0.1 * Math.abs(step) + 1e-9);
+            expect(Math.abs(here[channel] - there[channel])).toBeLessThanOrEqual(0.02 * Math.abs(step) + 1e-9);
         },
       ),
     );
@@ -64,7 +87,7 @@ describe("moodAt", () => {
     let last = read(from * dx, from * dy, from * dz);
     for (let step = 1; step <= steps; step += 1) {
       const next = read((from + step) * dx, (from + step) * dy, (from + step) * dz);
-      for (const channel of CHANNELS) expect(Math.abs(next[channel] - last[channel])).toBeLessThanOrEqual(0.1);
+      for (const channel of CHANNELS) expect(Math.abs(next[channel] - last[channel])).toBeLessThanOrEqual(0.02);
       last = next;
     }
   });

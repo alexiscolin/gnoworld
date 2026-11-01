@@ -3,7 +3,7 @@
 // reaches are as fine as home. The colours are a ring of real space photography's: dust's rust, sulphur's amber, hydrogen's rose,
 // oxygen's teals, a reflection nebula's indigo, in linear light.
 import { mix, salted, settle, type Point } from "./cell.ts";
-import { smootherstep, smoothstep } from "./smooth.ts";
+import { clamp01, lerp, smootherstep, smoothstep } from "./smooth.ts";
 import { nearestCell, Torus } from "./torus.ts";
 
 export interface Mood {
@@ -61,21 +61,24 @@ function lattice(salt: number, at: Point, scale: number): number {
 const field = (salt: number, at: Point, scale: number): number =>
   lattice(salt, at, scale) * 0.7 + lattice(salt + 9, at, scale / 2.1) * 0.3;
 
-const ringAt = (hue: number, channel: number): number => RING[((hue + HUES) % HUES) * 3 + channel] ?? 0;
+const ringAt = (hue: number, channel: number): number => RING[(hue % HUES) * 3 + channel] ?? 0;
 
 /** A mood to read into: one a caller keeps, for a frame makes nothing. */
 export const newMood = (): Mood => ({ red: 0, green: 0, blue: 0, haze: 0, density: 0 });
 
-/** The mood at a position, the same on every device. */
+/** How thick the stars are at a position, in [0, 1]. */
+export const densityAt = (at: Point): number => clamp01((field(DENSITY, at, MOOD_SCALE * 0.8) - 0.25) * 2);
+
+/** The mood at a position, the same bytes on every device. */
 export function moodAt(out: Mood, at: Point): void {
   const tone = ((field(TONE, at, TONE_SCALE) - 0.2) / 0.6) * HUES + HUES;
   const hue = Math.floor(tone);
   const by = smootherstep(tone - hue);
-  out.red = ringAt(hue % HUES, 0) * (1 - by) + ringAt((hue + 1) % HUES, 0) * by;
-  out.green = ringAt(hue % HUES, 1) * (1 - by) + ringAt((hue + 1) % HUES, 1) * by;
-  out.blue = ringAt(hue % HUES, 2) * (1 - by) + ringAt((hue + 1) % HUES, 2) * by;
-  out.haze = smoothstep(0.42, 0.72, field(HAZE, at, MOOD_SCALE * 1.4)) ** 1.6;
-  out.density = Math.min(1, Math.max(0, (field(DENSITY, at, MOOD_SCALE * 0.8) - 0.25) * 2));
+  out.red = lerp(ringAt(hue, 0), ringAt(hue + 1, 0), by);
+  out.green = lerp(ringAt(hue, 1), ringAt(hue + 1, 1), by);
+  out.blue = lerp(ringAt(hue, 2), ringAt(hue + 1, 2), by);
+  out.haze = smoothstep(0.46, 0.74, field(HAZE, at, MOOD_SCALE * 1.4)) ** 1.6;
+  out.density = densityAt(at);
 }
 
 /** The field on a lattice around the eye, four bytes a point, for the sky to read as a volume. */
@@ -84,7 +87,7 @@ export function moodCells() {
   const mood = newMood();
   const spot = { x: 0, y: 0, z: 0 };
   const centre = { x: 0, y: 0, z: 0 };
-  const torus = new Torus(MOOD_SIDE, (slot, cell) => {
+  const write = (slot: number, cell: Point): void => {
     spot.x = cell.x * MOOD_STEP;
     spot.y = cell.y * MOOD_STEP;
     spot.z = cell.z * MOOD_STEP;
@@ -93,7 +96,8 @@ export function moodCells() {
     data[slot * 4 + 1] = Math.round(mood.green * 255);
     data[slot * 4 + 2] = Math.round(mood.blue * 255);
     data[slot * 4 + 3] = Math.round(mood.haze * 255);
-  });
+  };
+  const torus = new Torus(MOOD_SIDE, write);
   return {
     data,
     /** Moves the volume to the eye; whether a byte changed. */
