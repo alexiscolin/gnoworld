@@ -11,15 +11,20 @@ const SAVER_WITHIN_MS = 3;
 
 export type ProbeVerdict = "pending" | "keep" | "low" | "low-for-now";
 
-/** The verdict on the first `count` frame times of `frames`. Pending allocates nothing: the loop asks at every busy frame. */
-export function judgeFrames(frames: ArrayLike<number>, count: number): ProbeVerdict {
-  let spent = 0;
-  for (let at = 0; at < count; at += 1) spent += frames[at] ?? 0;
-  if (count < FEWEST_FRAMES || (count < PROBE_FRAMES && spent < PROBE_MS)) return "pending";
+// The once it comes to it, so free to sort.
+function verdictOn(frames: ArrayLike<number>, count: number): Exclude<ProbeVerdict, "pending"> {
   const kept = Array.from({ length: count }, (_, at) => frames[at] ?? 0)
     .sort((a, b) => a - b)
     .slice(0, count - Math.floor(count / 10));
   const mean = kept.reduce((sum, frame) => sum + frame, 0) / kept.length;
   if (mean <= LOW_ABOVE_MS) return "keep";
   return kept.every((frame) => Math.abs(frame - SAVER_MS) <= SAVER_WITHIN_MS) ? "low-for-now" : "low";
+}
+
+/** The verdict on the first `count` frame times of `frames`. Pending makes nothing: the loop asks at every busy frame. */
+export function judgeFrames(frames: ArrayLike<number>, count: number): ProbeVerdict {
+  let spent = 0;
+  for (let at = 0; at < count; at += 1) spent += frames[at] ?? 0;
+  if (count < FEWEST_FRAMES || (count < PROBE_FRAMES && spent < PROBE_MS)) return "pending";
+  return verdictOn(frames, count);
 }
