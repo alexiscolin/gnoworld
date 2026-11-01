@@ -1396,10 +1396,10 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	fi
 	# The worlds job's first real pass (7c), not a planted file: the running job reads the list, each package, each realm's calls from the
 	# indexer and the names, one call at a time. This proves vm/qdoc, vm/qfile and the indexer's GraphQL filter against the real chain
-	# (F3516): the file must hold a realm with a deployer, functions and counts read. A first pass takes minutes: it waits up to twenty.
+	# (F3516): the file must hold a realm with a deployer, functions and some call counted (F3545). A first pass takes minutes: it waits up to twenty.
 	worlds_real=none
 	for _ in $(seq 1 120); do
-		worlds_real=$(docker exec "$server" /nodejs/bin/node -e "try { const w = JSON.parse(require('fs').readFileSync('/markets/worlds.json', 'utf8')); console.log(w.worlds.some((x) => x.realms.some((r) => r.deployer !== null && r.functions.length > 0 && r.calls !== null)) ? 'read' : 'empty') } catch { console.log('none') }" 2>/dev/null || true)
+		worlds_real=$(docker exec "$server" /nodejs/bin/node -e "try { const w = JSON.parse(require('fs').readFileSync('/markets/worlds.json', 'utf8')); console.log(w.worlds.some((x) => x.realms.some((r) => r.deployer !== null && r.functions.length > 0 && r.calls > 0)) ? 'read' : 'empty') } catch { console.log('none') }" 2>/dev/null || true)
 		[ "$worlds_real" = read ] && break
 		sleep 10
 	done
