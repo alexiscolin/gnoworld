@@ -88,7 +88,7 @@ features/chat/
 
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` and `ui`
 since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`), `lib` and `store` since
-slice 4 (4a); `scene` gets its own with the slice that makes the folder.
+slice 4 (4a), `scene` since slice 7 (7a).
 
 | Folder | May import | Never imports |
 |---|---|---|
@@ -251,6 +251,10 @@ Rules:
   disposer. Leaving disposes everything it registered: geometry, material, texture, render
   target, listener.
 - Text is HTML anchored to the scene (ADR-0001 §7), never 3D geometry.
+- A page that shows space calls `useSpace` (`features/universe`). That door is all it holds of the scene: the universe comes after the
+  text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the
+  `scene` chunk, which the worker does not precache: a phone fetches it on "View in space". A test build (`VITE_GNOWORLD_TEST_GPU`, the
+  journeys') lets `?test-gpu` pass the software GPU the gate has; a production build holds no trace of it.
 - `?debug` shows fps, draw calls and `renderer.info.memory`.
 
 ## Memory: the checklist

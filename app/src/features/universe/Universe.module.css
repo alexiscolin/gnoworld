@@ -1,0 +1,45 @@
+/* The canvas lies under the page, the body's own colour around it until the first frame. It fades in, and fills the window. */
+@layer components {
+  .canvas {
+    position: fixed;
+    inset: 0;
+    /* raw: under the page's text, over the body's colour */
+    z-index: -1;
+    inline-size: 100%;
+    block-size: 100%;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--motion-wait) var(--ease-standard);
+  }
+
+  .canvas[data-scene="on"] {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Over the ticker, in the gutter, within the phone's reach; the hero keeps the left. */
+  .offer,
+  .status {
+    position: fixed;
+    /* raw: the ticker's 34 px and a step of space */
+    inset-block-end: calc(34px + var(--space-s));
+    inset-inline-end: var(--space-s);
+  }
+
+  /* The live region stands empty on the page, so a reader hears it fill. */
+  .status {
+    /* layout: a paragraph with no margin of its own */
+    margin-block: 0;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  /* On a phone the views' bar lifts the ticker (Ticker.module.css). */
+  @media (max-width: 899px) {
+    .offer,
+    .status {
+      /* raw: the bar's 44 px, the ticker's 34 px and three steps of space */
+      inset-block-end: calc(78px + 3 * var(--space-s));
+    }
+  }
+}

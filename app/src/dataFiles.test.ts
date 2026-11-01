@@ -331,11 +331,11 @@ describe("react-router build", () => {
     rmSync(root, { recursive: true });
   });
 
-  function build(data: string) {
+  function build(data: string, more: Record<string, string> = {}) {
     rmSync(join(copy, "build"), { recursive: true, force: true });
     return spawnSync(process.execPath, [BIN, "build"], {
       cwd: copy,
-      env: { ...process.env, GNOWORLD_DATA: data },
+      env: { ...process.env, GNOWORLD_DATA: data, ...more },
       encoding: "utf8",
     });
   }
@@ -352,6 +352,36 @@ describe("react-router build", () => {
       rmSync(dir, { recursive: true });
     }
   });
+
+  // ADR-0002 §9: the gate's browsers have a software GPU, so a test build lets `?test-gpu` pass it. In a production build neither the
+  // switch nor the journeys' door to the scene exists: the words are gone from every file the browser gets.
+  it(
+    "leaves nothing of the scene's test switch in a production build, and a test build holds it",
+    { timeout: 240_000 },
+    () => {
+      const dir = plant(() => undefined);
+      const client = join(copy, "build", "client");
+      const holding = () =>
+        readdirSync(client, { recursive: true })
+          .filter((name) => /\.(?:js|html|data)$/.test(name))
+          .filter((name) => /test-gpu|__gnoworldScene/.test(readFileSync(join(client, name), "utf8")));
+      try {
+        const production = build(dir);
+        expect(production.status, `${production.stdout}${production.stderr}`).toBe(0);
+        const names = readdirSync(client, { recursive: true });
+        expect(
+          names.some((name) => /^assets\/scene-[\w-]{8}\.js$/.test(name)),
+          "the scene's chunk under its own name",
+        ).toBe(true);
+        expect(holding()).toEqual([]);
+        const test = build(dir, { VITE_GNOWORLD_TEST_GPU: "1" });
+        expect(test.status, `${test.stdout}${test.stderr}`).toBe(0);
+        expect(holding().length, "the words this looks for are the switch's").toBeGreaterThan(0);
+      } finally {
+        rmSync(dir, { recursive: true });
+      }
+    },
+  );
 
   // The positive control: the data drives the pages. A build that ignored GNOWORLD_DATA, or kept a list in the config,
   // would write bubble alone; a config that failed on every build would write nothing. 5d: each place has its page, at its

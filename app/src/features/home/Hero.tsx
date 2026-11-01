@@ -16,7 +16,7 @@ export function Hero({ universe }: { universe: UniverseView }) {
         {count}
       </p>
       <div className={styles["row"]}>
-        <h1 className={styles["line"]}>
+        <h1 className={styles["line"]} tabIndex={-1}>
           {count} {count === 1 ? "world" : "worlds"} in {universe.name}
         </h1>
         <div className={styles["actions"]} data-hero="actions">

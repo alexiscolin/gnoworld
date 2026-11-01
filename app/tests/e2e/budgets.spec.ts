@@ -24,6 +24,11 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+// three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
+// gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
+const SCENE = /\/assets\/scene-[\w-]+\.js$/;
+const SCENE_JS = 150 * 1024;
+const THREE_MARK = "isWebGLRenderer";
 
 // The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
 // `import("./x.js")`), from the roots that are no other's import, the proposals' chunk apart.
@@ -93,5 +98,24 @@ for (const path of PAGES) {
     for (const cached of (await cacheContents(page)).paths) all.add(new URL(cached, page.url()).href);
     expect(await compressed(page, firstScreen)).toBeLessThanOrEqual(FIRST_SCREEN_JS);
     expect(await compressed(page, [...all])).toBeLessThanOrEqual(TOTAL);
+    const holdingThree = await page.evaluate(
+      async ([list, mark]) => {
+        const texts = await Promise.all(
+          list.map(async (url) => [url, await (await fetch(url, { cache: "no-store" })).text()] as const),
+        );
+        return texts.filter(([, text]) => text.includes(mark)).map(([url]) => url);
+      },
+      [firstScreen, THREE_MARK] as const,
+    );
+    expect(holdingThree, "nothing of three on the first screen").toEqual([]);
   });
 }
+
+test("the scene's chunk holds three, and stays within its cap", async ({ page }) => {
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const url = (await scene).url();
+  expect(await (await page.request.get(url)).text()).toContain(THREE_MARK);
+  expect(await compressed(page, [url])).toBeLessThanOrEqual(SCENE_JS);
+});

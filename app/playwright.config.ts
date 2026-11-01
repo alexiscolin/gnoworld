@@ -16,6 +16,8 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "node_modules/.bin/react-router build && node tests/e2e/serve.mjs",
+    // A test build: `?test-gpu` lets the scene run on the software GPU these browsers have (features/universe/gpu.ts).
+    env: { VITE_GNOWORLD_TEST_GPU: "1" },
     url: `${SITE}/`,
     timeout: 120_000,
     // TERM, not Playwright's default KILL: Ergo and the server stop, and their folders go (api.mjs).

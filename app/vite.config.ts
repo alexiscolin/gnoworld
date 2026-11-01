@@ -65,7 +65,8 @@ const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 // 173,363 B, not 178,495 B (F3157). The chat's and the lines' code stay behind their own chunks: budgets.spec.ts holds that.
 // The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first (F3260).
 const CHUNKS = [
-  { name: "store", test: /\/app\/src\/store\// },
+  // saveData goes with the store: the chat and the universe share it, and a file of its own costs a world's first screen 131 B.
+  { name: "store", test: /\/app\/src\/(?:store\/|lib\/saveData\.ts)/ },
   // The activity chart is no part of it: a world's page loads the bars apart, once it has a history (F304, slice 5j).
   // The stat is none of it either: the figure of who is here comes once the chat has someone to count (F2868).
   // Nor are Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState, Combobox, Field (7.7 KB, F2976).

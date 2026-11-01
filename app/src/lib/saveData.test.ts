@@ -10,6 +10,11 @@ describe("savesData: whether the reader saves data", () => {
   it.each([
     [{ connection: { saveData: true } }, true],
     [{ connection: { saveData: false } }, false],
+    [{ connection: { effectiveType: "2g" } }, true],
+    [{ connection: { effectiveType: "slow-2g" } }, true],
+    [{ connection: { saveData: false, effectiveType: "2g" } }, true],
+    [{ connection: { effectiveType: "3g" } }, false],
+    [{ connection: { effectiveType: "4g" } }, false],
     [{ connection: { saveData: "true" } }, false],
     [{ connection: null }, false],
     [{ connection: "fast" }, false],

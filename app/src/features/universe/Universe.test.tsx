@@ -1,0 +1,470 @@
+// @vitest-environment jsdom
+import { act, type ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import { Universe } from "./Universe.tsx";
+
+const scene = vi.hoisted(() => ({
+  cover: vi.fn<(covered: boolean) => void>(),
+  dispose: vi.fn<() => void>(),
+  start: vi.fn(),
+  load: vi.fn(),
+}));
+
+vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
+
+const STRONG = "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)";
+const SOFTWARE = "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)";
+const RENDERER_NAME = 37446;
+const VIEW = "View in space";
+const SORRY = "Space is not available here. Every place is in the list.";
+const lose = vi.fn();
+
+interface Device {
+  /** The GPU's name; null, no WebGL2 at all. */
+  gpu?: string | null;
+  phone?: boolean;
+  saveData?: boolean;
+  effectiveType?: string;
+}
+
+function device({ gpu = STRONG, phone = false, saveData = false, effectiveType = "4g" }: Device = {}) {
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: phone && query === "(max-width: 899px)" }));
+  Object.defineProperty(navigator, "connection", { configurable: true, value: { saveData, effectiveType } });
+  const context = {
+    getExtension: (name: string) =>
+      name === "WEBGL_debug_renderer_info"
+        ? { UNMASKED_RENDERER_WEBGL: RENDERER_NAME }
+        : name === "WEBGL_lose_context"
+          ? { loseContext: lose }
+          : null,
+    getParameter: (name: number) => (name === RENDERER_NAME ? gpu : null),
+  };
+  return vi
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockImplementation(() => (gpu === null ? null : context) as never);
+}
+
+const settle = () =>
+  act(async () => {
+    await vi.runAllTimersAsync();
+  });
+
+// A chunk that has not arrived yet: the load has begun, and `arrive` ends it.
+function slowChunk() {
+  let arrive: () => void = () => undefined;
+  scene.load.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        arrive = () => {
+          resolve({ startScene: scene.start });
+        };
+      }),
+  );
+  return () => {
+    arrive();
+  };
+}
+
+const on = (box: HTMLElement) => one(box, "canvas").getAttribute("data-scene") === "on";
+const said = (box: HTMLElement) => one(box, "[role='status']").textContent;
+const started = (at = 0) =>
+  scene.start.mock.calls[at]?.[0] as {
+    canvas: HTMLCanvasElement;
+    remembered: "low" | undefined;
+    remember: (tier: "low") => void;
+    onLost: (lost: boolean) => void;
+  };
+
+const heading = (child: ReactNode) => (
+  <>
+    <h1 tabIndex={-1}>Worlds</h1>
+    {child}
+  </>
+);
+
+const left: (() => void)[] = [];
+
+// A root of its own: a test here draws the component again with another prop, or leaves it.
+function rendered(shown: boolean, wrap: (child: ReactNode) => ReactNode = (child) => child) {
+  const box = document.createElement("div");
+  document.body.append(box);
+  const root = createRoot(box);
+  let mounted = true;
+  const rerender = (next: boolean) => {
+    act(() => {
+      root.render(wrap(<Universe shown={next} />));
+    });
+  };
+  rerender(shown);
+  const unmount = () => {
+    if (mounted)
+      act(() => {
+        root.unmount();
+      });
+    mounted = false;
+    box.remove();
+  };
+  left.push(unmount);
+  return { box, rerender, unmount };
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  scene.start.mockImplementation(() => ({ cover: scene.cover, dispose: scene.dispose, stats: () => ({}) }));
+  scene.load.mockImplementation(() => Promise.resolve({ startScene: scene.start }));
+  localStorage.clear();
+  device();
+});
+afterEach(() => {
+  for (const unmount of left.splice(0)) unmount();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  Reflect.deleteProperty(globalThis, "__gnoworldScene");
+  Reflect.deleteProperty(navigator, "connection");
+  history.replaceState(null, "", "/");
+});
+
+describe("the canvas", () => {
+  it("is silent, and off until the scene runs", () => {
+    const canvas = one(mount(<Universe shown />), "canvas");
+    expect(canvas.getAttribute("aria-hidden")).toBe("true");
+    expect(canvas.getAttribute("data-scene")).toBe("off");
+  });
+
+  it("says a page that does not show the scene covers it", () => {
+    expect(one(mount(<Universe shown={false} />), "canvas").getAttribute("data-scene")).toBe("covered");
+  });
+});
+
+describe("on a computer", () => {
+  it("starts by itself, after the page has hydrated, on its canvas", async () => {
+    const box = mount(<Universe shown />);
+    expect(scene.load).not.toHaveBeenCalled();
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+    expect(started().canvas).toBe(one(box, "canvas"));
+    expect(on(box)).toBe(true);
+  });
+
+  it("offers no button", async () => {
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(all(box, "button")).toEqual([]);
+  });
+
+  it("reads the GPU's name on a canvas of its own, and releases that context", async () => {
+    const getContext = device();
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(getContext).toHaveBeenCalledTimes(1);
+    expect(getContext.mock.contexts).not.toContain(one(box, "canvas"));
+    expect(lose).toHaveBeenCalledTimes(1);
+  });
+
+  it("takes a masked GPU for a strong one: the Auto probe judges it", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      () => ({ getExtension: () => null, getParameter: () => null }) as never,
+    );
+    mount(<Universe shown />);
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start on a page the scene does not show, nor read the GPU there", async () => {
+    const getContext = device();
+    mount(<Universe shown={false} />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+    expect(getContext).not.toHaveBeenCalled();
+  });
+});
+
+describe("on request", () => {
+  it.each([
+    ["a phone", { phone: true }],
+    ["the data saver", { saveData: true }],
+    ["a 2G link", { effectiveType: "2g" }],
+    ["a slow 2G link", { effectiveType: "slow-2g" }],
+  ])("%s loads nothing before View in space", async (_, what) => {
+    device(what);
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+    click(button(box, VIEW));
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+    expect(on(box)).toBe(true);
+    expect(button(box, VIEW)).toBeUndefined();
+  });
+
+  it("says it is busy while the scene comes, and loads once however often it is pressed", async () => {
+    device({ phone: true });
+    const arrive = slowChunk();
+    const box = mount(<Universe shown />);
+    await settle();
+    click(button(box, VIEW));
+    expect(button(box, VIEW)?.getAttribute("aria-busy")).toBe("true");
+    click(button(box, VIEW));
+    arrive();
+    await settle();
+    expect(scene.load).toHaveBeenCalledTimes(1);
+    expect(scene.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands the focus to the page's heading, for the button leaves", async () => {
+    device({ phone: true });
+    const { box } = rendered(true, heading);
+    await settle();
+    button(box, VIEW)?.focus();
+    click(button(box, VIEW));
+    await settle();
+    expect(document.activeElement).toBe(one(box, "h1"));
+  });
+
+  it("hands the focus over too when the load fails, with no button left busy", async () => {
+    device({ phone: true });
+    scene.load.mockRejectedValue(new TypeError("Failed to fetch dynamically imported module"));
+    const { box } = rendered(true, heading);
+    await settle();
+    click(button(box, VIEW));
+    await settle();
+    expect(said(box)).toBe(SORRY);
+    expect(all(box, "button")).toEqual([]);
+    expect(document.activeElement).toBe(one(box, "h1"));
+  });
+});
+
+describe("a device that cannot", () => {
+  it.each([
+    ["a software GPU", { gpu: SOFTWARE }],
+    ["a software GPU on a phone", { gpu: SOFTWARE, phone: true }],
+    ["no WebGL2", { gpu: null }],
+    ["no WebGL2 on a phone", { gpu: null, phone: true }],
+  ])("%s gets no scene and no offer", async (_, what) => {
+    device(what);
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+    expect(all(box, "button")).toEqual([]);
+    expect(one(box, "canvas").getAttribute("data-scene")).toBe("none");
+    expect(said(box)).toBe("");
+  });
+});
+
+describe("the test switch", () => {
+  it("lets a software GPU through in a test build, asked by the address", async () => {
+    vi.stubEnv("VITE_GNOWORLD_TEST_GPU", "1");
+    device({ gpu: SOFTWARE });
+    history.replaceState(null, "", "/?test-gpu");
+    mount(<Universe shown />);
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing in a test build that does not ask", async () => {
+    vi.stubEnv("VITE_GNOWORLD_TEST_GPU", "1");
+    device({ gpu: SOFTWARE });
+    mount(<Universe shown />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+  });
+
+  it("does not read a word that only holds the switch's name", async () => {
+    vi.stubEnv("VITE_GNOWORLD_TEST_GPU", "1");
+    device({ gpu: SOFTWARE });
+    history.replaceState(null, "", "/?not-test-gpu");
+    mount(<Universe shown />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+  });
+
+  it("does nothing in a production build, whatever the address says", async () => {
+    device({ gpu: SOFTWARE });
+    history.replaceState(null, "", "/?test-gpu");
+    mount(<Universe shown />);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+  });
+
+  it("shows the journeys the scene in a test build, and in no other", async () => {
+    mount(<Universe shown />);
+    await settle();
+    expect(Reflect.get(globalThis, "__gnoworldScene")).toBeUndefined();
+    vi.stubEnv("VITE_GNOWORLD_TEST_GPU", "1");
+    mount(<Universe shown />);
+    await settle();
+    expect(Reflect.get(globalThis, "__gnoworldScene")).toBeDefined();
+  });
+});
+
+describe("a failure never blanks the page", () => {
+  it("says the chunk did not come, and leaves the canvas off", async () => {
+    scene.load.mockRejectedValue(new TypeError("Failed to fetch dynamically imported module"));
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(on(box)).toBe(false);
+    expect(said(box)).toBe(SORRY);
+    expect(all(box, "button")).toEqual([]);
+  });
+
+  it("says the scene did not start: WebGL2 refused after all", async () => {
+    scene.start.mockImplementation(() => {
+      throw new Error("Error creating WebGL context.");
+    });
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(on(box)).toBe(false);
+    expect(said(box)).toBe(SORRY);
+  });
+
+  it("says nothing while all is well", async () => {
+    const box = mount(<Universe shown />);
+    await settle();
+    expect(said(box)).toBe("");
+  });
+
+  it("says nothing on a page that does not show the scene", async () => {
+    scene.load.mockRejectedValue(new TypeError("no"));
+    const { box, rerender } = rendered(true);
+    await settle();
+    rerender(false);
+    expect(said(box)).toBe("");
+  });
+
+  it("falls back when the context is lost, and comes back with it", async () => {
+    const box = mount(<Universe shown />);
+    await settle();
+    act(() => {
+      started().onLost(true);
+    });
+    expect(on(box)).toBe(false);
+    expect(said(box)).toBe(SORRY);
+    act(() => {
+      started().onLost(false);
+    });
+    expect(on(box)).toBe(true);
+    expect(said(box)).toBe("");
+  });
+});
+
+describe("the view changing", () => {
+  it("covers the scene on a page that does not show it, and uncovers it on return", async () => {
+    const { box, rerender } = rendered(true);
+    await settle();
+    scene.cover.mockClear();
+    rerender(false);
+    expect(scene.cover).toHaveBeenLastCalledWith(true);
+    expect(on(box)).toBe(false);
+    rerender(true);
+    expect(scene.cover).toHaveBeenLastCalledWith(false);
+    expect(on(box)).toBe(true);
+    expect(scene.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("decides on the first page that shows it", async () => {
+    const { rerender } = rendered(false);
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+    rerender(true);
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("decides once, however often the view comes back", async () => {
+    const getContext = device();
+    const { rerender } = rendered(true);
+    await settle();
+    rerender(false);
+    rerender(true);
+    await settle();
+    expect(getContext).toHaveBeenCalledTimes(1);
+    expect(scene.load).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers View in space only where the scene shows", async () => {
+    device({ phone: true });
+    const { box, rerender } = rendered(true);
+    await settle();
+    expect(button(box, VIEW)).toBeDefined();
+    rerender(false);
+    expect(button(box, VIEW)).toBeUndefined();
+    rerender(true);
+    expect(button(box, VIEW)).toBeDefined();
+  });
+
+  it("starts covered when the view left while the scene was coming", async () => {
+    const arrive = slowChunk();
+    const { rerender } = rendered(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(scene.load).toHaveBeenCalledTimes(1);
+    rerender(false);
+    arrive();
+    await settle();
+    expect(scene.cover).toHaveBeenLastCalledWith(true);
+  });
+
+  it("does not go on to load when the view left before the page settled", async () => {
+    const { rerender } = rendered(true);
+    rerender(false);
+    await settle();
+    expect(scene.cover).not.toHaveBeenCalledWith(false);
+  });
+});
+
+describe("leaving", () => {
+  it("disposes the scene with the component", async () => {
+    const { unmount } = rendered(true);
+    await settle();
+    unmount();
+    expect(scene.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads nothing when it leaves before the page has settled", async () => {
+    const { unmount } = rendered(true);
+    unmount();
+    await settle();
+    expect(scene.load).not.toHaveBeenCalled();
+  });
+
+  it("starts nothing when it leaves while the chunk is coming: no loop runs for ever", async () => {
+    const arrive = slowChunk();
+    const { unmount } = rendered(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(scene.load).toHaveBeenCalledTimes(1);
+    unmount();
+    arrive();
+    await settle();
+    expect(scene.start).not.toHaveBeenCalled();
+  });
+});
+
+describe("the tier", () => {
+  it("hands the scene what the device remembers", async () => {
+    localStorage.setItem("gnoworld:scene:tier", "low");
+    mount(<Universe shown />);
+    await settle();
+    expect(started().remembered).toBe("low");
+  });
+
+  it("hands it nothing on a device that remembers nothing", async () => {
+    mount(<Universe shown />);
+    await settle();
+    expect(started().remembered).toBeUndefined();
+  });
+
+  it("keeps on the device what the scene finds", async () => {
+    mount(<Universe shown />);
+    await settle();
+    started().remember("low");
+    expect(localStorage.getItem("gnoworld:scene:tier")).toBe("low");
+  });
+});
