@@ -374,6 +374,10 @@ describe("react-router build", () => {
           "the scene's chunk under its own name",
         ).toBe(true);
         expect(holding()).toEqual([]);
+        expect(
+          names.filter((name) => name.startsWith("lab")),
+          "the realism page is no part of a production build",
+        ).toEqual([]);
         const test = build(dir, { VITE_GNOWORLD_TEST_GPU: "1" });
         expect(test.status, `${test.stdout}${test.stderr}`).toBe(0);
         expect(holding().length, "the words this looks for are the switch's").toBeGreaterThan(0);
