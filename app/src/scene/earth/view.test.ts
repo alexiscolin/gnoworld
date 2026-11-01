@@ -9,11 +9,13 @@ import {
   type Mesh,
   type Object3D,
   type ShaderMaterial,
+  type Vector4,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { MAP_WIDTH, MOON_WIDTH } from "./maps.ts";
-import { EarthView, type Circle, type EarthState } from "./view.ts";
+import { MOON_REST, ORBIT_RADIUS } from "./orbit.ts";
+import { EarthView, SUN_REST, type Circle, type EarthState } from "./view.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
 
@@ -41,6 +43,7 @@ function device(halved = false) {
   const moved = vi.fn();
   const renderer = {
     capabilities: { getMaxAnisotropy: () => 16 },
+    initTexture: vi.fn(),
     compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
   };
   const view = new EarthView({ renderer, stage, camera, halved: () => halved, base: "/", moved });
@@ -51,12 +54,15 @@ const widthAsked = (name: string) =>
   (maps.load.mock.calls.find(([url]) => nameOf(url as string) === name)?.[1] as { width?: number }).width;
 
 // Everything that was asked has answered, and what follows it.
-const settled = () => vi.dynamicImportSettled().then(() => new Promise((done) => setTimeout(done)));
+const settled = async () => {
+  await vi.dynamicImportSettled();
+  for (let task = 0; task < NAMES.length + 2; task += 1) await new Promise((done) => setTimeout(done));
+};
 
 function opened(halved = false) {
   const made = device(halved);
   const said: EarthState[] = [];
-  made.view.resize(WIDTH, HEIGHT);
+  made.view.resize(WIDTH, HEIGHT, 1);
   made.view.show(PLACE, (state) => said.push(state));
   return { ...made, said };
 }
@@ -171,6 +177,20 @@ describe("what the Earth loads", () => {
     expect(renderer.compileAsync.mock.calls[0]).toEqual([expect.anything(), camera, stage]);
   });
 
+  it("uploads each map ahead of the first frame, one a task, so no draw stalls on all four at once", async () => {
+    const { renderer, stage } = opened();
+    await settled();
+    expect(renderer.initTexture).toHaveBeenCalledTimes(NAMES.length);
+    expect(stage.children).toHaveLength(1);
+  });
+
+  it("stops at the maps when the reader has left, and builds nothing for a page that is gone", async () => {
+    const { view, renderer } = opened();
+    view.show(undefined, () => undefined);
+    await settled();
+    expect(renderer.compileAsync).not.toHaveBeenCalled();
+  });
+
   it("owes a frame once it is on the stage", async () => {
     const { moved } = opened();
     await settled();
@@ -259,12 +279,14 @@ describe("a map that does not come", () => {
     expect(said).toEqual(["loading", "failed", "gone", "loading", "drawn"]);
   });
 
-  it("does not throw into the page when the shaders fail to compile", async () => {
+  it("says so and frees the maps when the shaders fail to compile", async () => {
     const { renderer, said, stage } = opened();
     renderer.compileAsync.mockImplementationOnce(() => Promise.reject(new Error("no shader")));
+    const freed = vi.spyOn(Texture.prototype, "dispose");
     await settled();
     expect(said.at(-1)).toBe("failed");
     expect(stage.children).toEqual([]);
+    expect(freed).toHaveBeenCalledTimes(NAMES.length);
   });
 });
 
@@ -340,7 +362,7 @@ describe("where the globe stands", () => {
     const made = device();
     made.camera.aspect = width / height;
     made.camera.updateProjectionMatrix();
-    made.view.resize(width, height);
+    made.view.resize(width, height, 1);
     made.view.show(circle, () => undefined);
     await settled();
     made.view.tick(0);
@@ -367,6 +389,36 @@ describe("where the globe stands", () => {
     view.tick(0);
     expect(view.stats()?.x).toBeCloseTo(700, 0);
     expect(view.stats()?.y).toBeCloseTo(400, 0);
+  });
+
+  it("shifts the lens and not the sphere, so the disc stays round where the page says", async () => {
+    const { camera, stage } = await placed(PLACE);
+    expect(camera.view?.offsetX).toBeCloseTo(WIDTH / 2 - PLACE.x, 6);
+    expect(camera.view?.offsetY).toBeCloseTo(HEIGHT / 2 - PLACE.y, 6);
+    const [globe] = stage.children;
+    expect(globe?.position.x).toBeCloseTo(0, 6);
+    expect(globe?.position.y).toBeCloseTo(0, 6);
+  });
+
+  it("gives the lens back when the Earth goes", async () => {
+    const { view, camera } = await placed(PLACE);
+    view.show(undefined, () => undefined);
+    expect(camera.view?.enabled ?? false).toBe(false);
+  });
+
+  it("paints the plate behind the globe where a page gives one, in its colour, at its place", async () => {
+    const plate = { left: 24, top: 98, right: 832, bottom: 1056, fill: [24, 34, 56] as const };
+    const { stage } = await placed({ ...PLACE, plate });
+    const ground = materialsOf(stage).find(({ material }) => "plate" in material.uniforms);
+    expect((ground?.material.uniforms["plate"]?.value as Vector4).toArray()).toEqual([24, 98, 832, 1056]);
+    expect(ground?.mesh.visible).toBe(true);
+    expect((ground?.material.uniforms["fill"]?.value as Vector3).toArray()).toEqual([24 / 255, 34 / 255, 56 / 255]);
+  });
+
+  it("paints no plate where the page keeps it in the flow, for it would stay behind as the page scrolls", async () => {
+    const { stage } = await placed(PLACE);
+    const ground = materialsOf(stage).find(({ material }) => "plate" in material.uniforms);
+    expect(ground?.mesh.visible).toBe(false);
   });
 
   it("owes a frame when the page moves it", async () => {
@@ -459,6 +511,43 @@ describe("the sun over the globe", () => {
   });
 });
 
+describe("the bodies on the stage", () => {
+  it("lights the Earth's limb, and only the Earth's", async () => {
+    const { stage } = opened();
+    await settled();
+    const lit = materialsOf(stage).filter(({ material }) => (material.uniforms["limbLight"]?.value ?? 0) > 0);
+    expect(lit).toHaveLength(1);
+  });
+
+  it("reads both maps through the mirror, the Moon's too", async () => {
+    const { stage } = opened();
+    await settled();
+    for (const { material } of surfacesOf(stage))
+      expect((material.uniforms["spin"]?.value as Matrix3).determinant()).toBeCloseTo(-1, 9);
+  });
+
+  it("makes the Moon a small world on the ring's path", async () => {
+    const { view, stage } = opened();
+    await settled();
+    view.tick(0);
+    const moon = surfacesOf(stage)[1]?.mesh.parent;
+    expect(moon?.scale.x).toBeLessThan(0.15);
+    expect(moon?.position.length()).toBeCloseTo(ORBIT_RADIUS, 6);
+  });
+
+  it("stands the Moon's glow and the ring's wake where it stands", async () => {
+    const { view, stage } = opened();
+    await settled();
+    view.tick(0);
+    const moon = surfacesOf(stage)[1]?.mesh.parent;
+    const glow = materialsOf(stage).find(({ mesh }) => mesh.geometry.type === "PlaneGeometry" && mesh.visible);
+    expect(glow?.mesh.position.x).toBeCloseTo(moon?.position.x ?? 0, 6);
+    expect(glow?.mesh.position.y).toBeCloseTo(moon?.position.y ?? 0, 6);
+    const line = materialsOf(stage).find(({ material }) => "head" in material.uniforms);
+    expect(line?.material.uniforms["head"]?.value).toBeCloseTo(MOON_REST, 6);
+  });
+});
+
 describe("motion", () => {
   function moving() {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
@@ -472,7 +561,7 @@ describe("motion", () => {
     view.tick(0);
     const rest = view.stats();
     view.tick(120);
-    expect(view.stats()).toEqual(rest);
+    expect(view.stats()).toEqual({ ...rest, drawn: 2 });
   });
 
   // Frames of a twentieth of a second, from `from` for `seconds`.
@@ -489,6 +578,43 @@ describe("motion", () => {
     run(view, 0, 4);
     expect(view.arriving).toBe(false);
     expect(sunOf(stage)?.z).toBeGreaterThan(0);
+  });
+
+  it("plays the whole arrival again on a second visit, at the true hour", async () => {
+    vi.useFakeTimers({ now: NOON, toFake: ["Date"] });
+    const { view, stage } = moving();
+    await settled();
+    run(view, 0, 4);
+    vi.setSystemTime(NOON + 3600 * 1000);
+    view.show(undefined, () => undefined);
+    view.show(PLACE, () => undefined);
+    await settled();
+    view.tick(100);
+    expect(view.arriving).toBe(true);
+    expect(sunOf(stage)?.z).toBeLessThan(-0.5);
+    run(view, 100, 4);
+    expect(view.stats()?.turn).toBeCloseTo(subSolarPoint(NOON + 3600 * 1000).longitude - SUN_REST - SPIN * 4, 0);
+  });
+
+  it("settles the globe into its place as the sun comes: it starts nearer and to the left", async () => {
+    const { view, stage } = moving();
+    await settled();
+    view.tick(0);
+    const [globe] = stage.children;
+    expect(globe?.scale.x).toBeGreaterThan(1.02);
+    expect(globe?.position.x).toBeLessThan(-0.05);
+    run(view, 0, 4);
+    expect(globe?.scale.x).toBe(1);
+    expect(globe?.position.x).toBeCloseTo(0, 6);
+  });
+
+  it("counts the frames drawn since it came, for a journey to wait on the first", async () => {
+    const { view } = moving();
+    await settled();
+    expect(view.stats()?.drawn).toBe(0);
+    view.tick(0);
+    view.tick(1);
+    expect(view.stats()?.drawn).toBe(2);
   });
 
   it("loses none of the arrival to a first frame that stalls on its uploads", async () => {

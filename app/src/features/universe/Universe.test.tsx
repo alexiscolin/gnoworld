@@ -552,9 +552,13 @@ describe("on the Earth's page", () => {
       earth: scene.earth,
       stats: () => ({}),
     }));
+    // As the scene does: the page's leaving is said back to it.
+    scene.earth.mockImplementation((where, told) => {
+      if (where === undefined) told("gone");
+    });
     globe = document.createElement("div");
     globe.dataset["globe"] = "";
-    globe.dataset["earth"] = "none";
+    globe.dataset["earth"] = "waiting";
     vi.spyOn(globe, "getBoundingClientRect").mockImplementation(
       () => ({ ...DOCK, right: DOCK.left + DOCK.width, bottom: DOCK.top + DOCK.height, x: 0, y: 0 }) as DOMRect,
     );
@@ -595,11 +599,69 @@ describe("on the Earth's page", () => {
     expect(scene.earth).toHaveBeenCalledTimes(1);
   });
 
-  it("asks for nothing and keeps no room on a page where the scene is not on", () => {
+  it("gives the room back on a phone, where nothing comes before it is asked", async () => {
     device({ phone: true });
     rendered("earth");
+    await settle();
     expect(scene.earth).not.toHaveBeenCalled();
     expect(space()).toBe("none");
+  });
+
+  it("gives the room back where the GPU cannot draw", async () => {
+    device({ gpu: SOFTWARE });
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("none");
+  });
+
+  it("keeps the page's room while the scene is still coming: a window that loads by itself must not jump", async () => {
+    const arrive = slowChunk();
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("waiting");
+    arrive();
+    await settle();
+    expect(space()).toBe("loading");
+  });
+
+  it("gives the room back when the scene cannot load", async () => {
+    scene.load.mockImplementation(() => Promise.reject(new Error("no chunk")));
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("none");
+  });
+
+  it("hands the scene the plate where the page fixes it beside the globe, with its colour read as sRGB", async () => {
+    const plate = document.createElement("section");
+    plate.dataset["look"] = "plate";
+    vi.spyOn(plate, "getBoundingClientRect").mockReturnValue({
+      left: 24,
+      top: 98,
+      right: 832,
+      bottom: 1056,
+    } as DOMRect);
+    document.body.append(plate);
+    const read = vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (element) =>
+        ({
+          position: element === globe ? "fixed" : "static",
+          backgroundColor: "oklab(0.2 0 0)",
+        }) as CSSStyleDeclaration,
+    );
+    const painter = { fillRect: () => undefined, getImageData: () => ({ data: [24, 34, 56, 255] }) };
+    const masked = { getExtension: () => null, getParameter: () => null };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      (kind: string) => (kind === "2d" ? painter : masked) as never,
+    );
+    await earthPage();
+    expect(place()).toMatchObject({ plate: { left: 24, top: 98, right: 832, bottom: 1056, fill: [24, 34, 56] } });
+    read.mockRestore();
+    plate.remove();
+  });
+
+  it("hands no plate where the page keeps it in the flow", async () => {
+    await earthPage();
+    expect(place()).not.toHaveProperty("plate");
   });
 
   it("keeps the room for the globe from the moment the scene is on, for the circle has no size before, and opens the plate once it is drawn", async () => {
@@ -674,9 +736,10 @@ describe("on the Earth's page", () => {
     rerender(false);
     expect(place()).toBeUndefined();
     expect(watching).toBe(0);
-    say("gone");
-    expect(space()).toBe("none");
     expect(button(box, "Credits")).toBeUndefined();
+    scene.earth.mockClear();
+    window.dispatchEvent(new Event("resize"));
+    expect(scene.earth).not.toHaveBeenCalled();
   });
 
   it("goes from the Earth to the cosmos, where no texture shows yet, so no credit either", async () => {
@@ -684,7 +747,6 @@ describe("on the Earth's page", () => {
     say("drawn");
     expect(button(box, "Credits")).toBeDefined();
     rerender(true);
-    say("gone");
     expect(place()).toBeUndefined();
     expect(button(box, "Credits")).toBeUndefined();
     expect(on(box)).toBe(true);

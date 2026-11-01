@@ -1,4 +1,4 @@
-import { Mesh, Vector3, type BufferGeometry, type ShaderMaterial } from "three";
+import { Mesh, Vector3, type BufferAttribute, type BufferGeometry, type ShaderMaterial } from "three";
 import { describe, expect, it } from "vitest";
 import { createOrbit, MOON_REST, ORBIT_RADIUS } from "./orbit.ts";
 import { ORBIT_FRAGMENT, ORBIT_VERTEX } from "./orbitShader.ts";
@@ -19,6 +19,18 @@ describe("the golden ring", () => {
     const deep = [0, 1, 2, 3].map((quarter) => orbit.moonAt(MOON_REST + (quarter * Math.PI) / 2).z);
     expect(Math.max(...deep)).toBeGreaterThan(0.2);
     expect(Math.min(...deep)).toBeLessThan(-0.2);
+    orbit.dispose();
+  });
+
+  it("draws its tube on the Moon's path, and around it", () => {
+    const orbit = createOrbit();
+    const line = orbit.group.children.find((part): part is Mesh => part instanceof Mesh);
+    const { position } = line?.geometry.attributes as { position: BufferAttribute };
+    for (let at = 0; at < position.count; at += 97) {
+      const point = new Vector3().fromBufferAttribute(position, at);
+      const onPath = new Vector3(point.x, 0, point.z).setLength(ORBIT_RADIUS);
+      expect(point.distanceTo(onPath)).toBeLessThan(0.1);
+    }
     orbit.dispose();
   });
 
@@ -60,6 +72,7 @@ describe("the golden ring", () => {
     const orbit = createOrbit();
     const line = orbit.group.children.find((part): part is Mesh => part instanceof Mesh);
     expect(Object.keys((line?.material as ShaderMaterial).uniforms)).toEqual(["head"]);
+    expect(ORBIT_FRAGMENT).not.toMatch(/progress|threshold|share/);
     orbit.dispose();
   });
 
@@ -73,10 +86,9 @@ describe("the golden ring", () => {
     orbit.dispose();
   });
 
-  it("follows the Moon: the glow stands where the Moon stands", () => {
+  it("hands the shader the Moon's angle, for its wake", () => {
     const orbit = createOrbit();
     orbit.setHead(1.2);
-    orbit.group.updateMatrixWorld(true);
     const line = orbit.group.children.find((part): part is Mesh => part instanceof Mesh);
     expect((line?.material as ShaderMaterial).uniforms["head"]?.value).toBe(1.2);
     orbit.dispose();

@@ -10,7 +10,21 @@ import {
   Texture,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
-import { decodeOptions, freeMap, mapBytes, mapUrl, prepareMap } from "./maps.ts";
+import { decodeOptions, freeMap, loadMap, mapBytes, mapUrl, prepareMap } from "./maps.ts";
+
+const decoded = vi.hoisted(() => ({ bitmap: { width: 4096, height: 2048, close: vi.fn() } }));
+
+vi.mock("three", async (original) => ({
+  ...(await original<typeof import("three")>()),
+  ImageBitmapLoader: class {
+    setOptions() {
+      return this;
+    }
+    loadAsync() {
+      return Promise.resolve(decoded.bitmap);
+    }
+  },
+}));
 
 const sized = (width: number, height: number, format?: typeof RedFormat): Texture => {
   const texture = new Texture({ width, height });
@@ -69,6 +83,18 @@ describe("decodeOptions", () => {
       resizeHeight: 1024,
       resizeQuality: "high",
     });
+  });
+});
+
+describe("loadMap", () => {
+  it("closes the bitmap once uploaded, and keeps its size for what counts the bytes", async () => {
+    decoded.bitmap.close.mockClear();
+    const texture = await loadMap("/textures/earth-day.webp", { kind: "colour", anisotropy: 4 });
+    expect(decoded.bitmap.close).not.toHaveBeenCalled();
+    texture.onUpdate?.(texture);
+    expect(decoded.bitmap.close).toHaveBeenCalledTimes(1);
+    expect(texture.image).toEqual({ width: 4096, height: 2048 });
+    expect(mapBytes([texture])).toBe(Math.round(4096 * 2048 * 4 * (4 / 3)));
   });
 });
 

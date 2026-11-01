@@ -167,7 +167,7 @@ class LiveScene implements Scene {
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
-    this.#earth.resize(width, height);
+    this.#earth.resize(width, height, this.#renderer.getPixelRatio());
   }
 
   readonly #viewportChanged = (): void => {

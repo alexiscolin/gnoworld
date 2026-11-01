@@ -6,9 +6,9 @@ import { GLOW_FRAGMENT, GLOW_VERTEX, ORBIT_FRAGMENT, ORBIT_VERTEX } from "./orbi
 /** In Earth radii. */
 export const ORBIT_RADIUS = 1.143;
 /** Where the Moon rests, on the front of the orbit, near the top. */
-export const MOON_REST = 1.75;
+export const MOON_REST = 1.67;
 
-const TUBE = 0.034;
+const TUBE = 0.085;
 const TUBE_SIDES = 16;
 const SEGMENTS = 360;
 const TILT = -1.24;

@@ -33,9 +33,9 @@ export const EARTH: PlanetLook = {
   map: "moon",
   tilt: -0.14,
   lean: 0.1,
-  relief: 0.003,
+  relief: 0,
   limb: 1,
-  clouds: 0.62,
+  clouds: 0.34,
   rim: { colour: [0.2, 0.32, 0.54], thickness: 0.05 },
 };
 

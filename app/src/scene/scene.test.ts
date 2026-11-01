@@ -19,7 +19,7 @@ const three = vi.hoisted(() => ({
 const earth = vi.hoisted(() => ({
   made: [] as { halved: () => boolean; moved: () => void }[],
   show: vi.fn<(place: unknown, said: () => void) => void>(),
-  resize: vi.fn<(width: number, height: number) => void>(),
+  resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
   tick: vi.fn<(seconds: number) => void>(),
   restored: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
@@ -569,7 +569,7 @@ describe("the Earth", () => {
 
   it("is told the buffer's size before its first frame", () => {
     const scene = startScene(options(), clock);
-    expect(earth.resize).toHaveBeenLastCalledWith(1280, 800);
+    expect(earth.resize).toHaveBeenLastCalledWith(1280, 800, 1);
     scene.dispose();
   });
 
@@ -607,6 +607,39 @@ describe("the Earth", () => {
     three.renderer.render.mockClear();
     frames(6, 16);
     expect(three.renderer.render.mock.calls.length).toBeLessThanOrEqual(4);
+    scene.dispose();
+  });
+
+  it("moves before it draws: no frame shows the last one's pose", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    frames(2, 34);
+    const [moved] = earth.tick.mock.invocationCallOrder;
+    const [drawn] = three.renderer.render.mock.invocationCallOrder;
+    expect(moved ?? Infinity).toBeLessThan(drawn ?? 0);
+    scene.dispose();
+  });
+
+  it("holds the full rate for the arrival when the probe ends first", () => {
+    earth.arriving = true;
+    const scene = startScene(options(), clock);
+    frames(100, 16);
+    expect(scene.stats().probing).toBe(false);
+    three.renderer.render.mockClear();
+    frames(6, 16);
+    expect(three.renderer.render.mock.calls.length).toBeGreaterThanOrEqual(5);
+    scene.dispose();
+  });
+
+  it("holds the full rate for the probe when the arrival ends first", () => {
+    earth.arriving = true;
+    const scene = startScene(options(), clock);
+    frames(3, 16);
+    earth.arriving = false;
+    frames(3, 16);
+    expect(scene.stats().probing).toBe(true);
+    three.renderer.render.mockClear();
+    frames(6, 16);
+    expect(three.renderer.render.mock.calls.length).toBeGreaterThanOrEqual(5);
     scene.dispose();
   });
 

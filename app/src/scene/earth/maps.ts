@@ -35,8 +35,5 @@ export async function loadEarthMaps(base: string, anisotropy: number, halved: bo
   )
     return { day: day.value, night: night.value, clouds: clouds.value, moon: moon.value };
   for (const answer of answers) if (answer.status === "fulfilled") freeMap(answer.value);
-  throw new AggregateError(
-    answers.filter(({ status }) => status === "rejected"),
-    "the Earth's maps did not come",
-  );
+  throw new Error("the Earth's maps did not come");
 }

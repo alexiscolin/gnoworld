@@ -16,10 +16,30 @@ export type Shown = boolean | "earth";
 
 const nothing = () => undefined;
 
+// The plate where the page fixes it beside the globe: in the flow it scrolls, and the canvas does not. Its fill as sRGB bytes, whatever
+// colour space the browser computes it in, for the scene paints it again behind the globe.
+function plateBeside(globe: HTMLElement) {
+  const plate = document.querySelector<HTMLElement>("[data-look='plate']");
+  const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (plate === null || context === null || getComputedStyle(globe).position !== "fixed") return undefined;
+  const { left, top, right, bottom } = plate.getBoundingClientRect();
+  context.fillStyle = getComputedStyle(plate, "::before").backgroundColor;
+  context.fillRect(0, 0, 1, 1);
+  const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data;
+  return { left, top, right, bottom, fill: [red, green, blue] as const };
+}
+
 // The circle the page keeps for the globe, on the page and not on the window: a page scrolled away keeps its globe.
 function circleOf(globe: HTMLElement) {
   const { left, top, width } = globe.getBoundingClientRect();
-  return width > 0 ? { x: left + width / 2, y: top + scrollY + width / 2, radius: width / 2 } : undefined;
+  if (width <= 0) return undefined;
+  const plate = plateBeside(globe);
+  return {
+    x: left + width / 2,
+    y: top + scrollY + width / 2,
+    radius: width / 2,
+    ...(plate === undefined ? {} : { plate }),
+  };
 }
 
 export class SceneHost {
@@ -31,7 +51,6 @@ export class SceneHost {
   #wantsEarth = false;
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
-  #globe: HTMLElement | undefined;
   #decided = false;
 
   readonly subscribe = (listener: () => void) => {
@@ -55,11 +74,15 @@ export class SceneHost {
     this.#tell();
   }
 
-  // The page's stylesheet keeps the globe's room and opens the plate from this: a lost context takes both away.
+  // The page's stylesheet keeps the globe's room and opens the plate from this: "waiting" while the scene may yet come, so a window that
+  // loads it by itself does not jump; "none" where nothing will. A lost context takes both away.
   #markPage(): void {
-    if (this.#globe === undefined) return;
+    const globe = this.#wantsEarth ? document.querySelector<HTMLElement>("[data-globe]") : null;
+    if (globe === null) return;
     const shows = this.#status === "on" && (this.#earth === "loading" || this.#earth === "drawn");
-    this.#globe.dataset["earth"] = shows ? this.#earth : "none";
+    const coming = this.#status === "off" || this.#status === "loading";
+    if (shows) globe.dataset["earth"] = this.#earth;
+    else globe.dataset["earth"] = coming ? "waiting" : "none";
   }
 
   readonly #earthSaid = (state: EarthState): void => {
@@ -73,7 +96,6 @@ export class SceneHost {
     if (globe === null) return;
     const watching = new AbortController();
     this.#watching = watching;
-    this.#globe = globe;
     this.#earthSaid("loading");
     const place = () => {
       const circle = circleOf(globe);
@@ -100,8 +122,6 @@ export class SceneHost {
     else if (!this.#wantsEarth && this.#watching !== undefined) {
       this.#stopWatching();
       scene.earth(undefined, this.#earthSaid);
-      this.#earthSaid("gone");
-      this.#globe = undefined;
     }
   }
 

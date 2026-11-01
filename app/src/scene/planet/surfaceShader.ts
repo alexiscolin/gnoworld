@@ -67,6 +67,9 @@ const PARTS = /* glsl */ `
 const float SUN = 1.0;
 const float TEXEL = 0.0032;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+// The frames' sea and the haze towards their limb, in the working space.
+const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
+const vec3 HAZE = vec3(0.2, 0.34, 0.6);
 
 vec3 turned(vec3 v, float angle) {
   float c = cos(angle);
@@ -150,7 +153,10 @@ void main() {
     albedo = mix(albedo, mix(seaDeep, seaShallow, smoothstep(seaLevel - 0.16, seaLevel, tone)), wet);
   }
   // A real map holds its own seas: they are where it is bluest.
-  if (nightLights > 0.0) wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
+  if (nightLights > 0.0) {
+    wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
+    albedo = mix(max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet), albedo, 0.0);
+  }
   if (caps > 0.0) {
     float frozen = smoothstep(1.0 - caps, 1.0 - caps + 0.05, abs(axis.y) + 0.07 * flow.y + 0.16 * (tone - 0.5));
     albedo = mix(albedo, vec3(0.86, 0.9, 0.95), frozen);
@@ -167,6 +173,7 @@ void main() {
 
   vec3 view = normalize(cameraPosition - vWorld);
   float light = max(dot(bumped(axis, flow, height * (1.0 - wet), angle), sun), 0.0) * smoothstep(-0.02, 0.1, day);
+  if (nightLights > 0.0) light = pow(light, 0.7);
   float facing = max(dot(normal, view), 0.001);
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
@@ -176,7 +183,7 @@ void main() {
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
   float ripple = 0.55 + 0.45 * field(direction * 90.0).x;
-  float glitter = nightLights > 0.0 ? pow(gleam, 320.0) * 0.13 : (pow(gleam, 900.0) * 0.9 + pow(gleam, 90.0) * 0.05) * ripple;
+  float glitter = nightLights > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 900.0) * 0.9 + pow(gleam, 90.0) * 0.05) * ripple;
   colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
 
   float overcast = 0.0;
@@ -195,6 +202,7 @@ void main() {
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
     float dusk = 1.0 - smoothstep(-0.14, 0.05, day);
     colour += (cities * 2.6 + spill * 0.9) * vec3(1.0, 0.8, 0.52) * dusk * (1.0 - 0.8 * overcast);
+    colour = mix(colour, HAZE, pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day) * 0.9);
   }
   if (glowLevel > 0.0) {
     float heat = rifts > 0.0 ? rift * rift * smoothstep(0.1, 0.8, flow.z + 0.4) : smoothstep(glowLevel, glowLevel + 0.1, tone);
