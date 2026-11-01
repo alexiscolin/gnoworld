@@ -22,6 +22,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - `scripts/check.sh` must pass before every commit that changes code (the pre-commit hook runs it). Never commit with `--no-verify`.
 - Strict TypeScript: no `any`, no `@ts-ignore`, no `!`. Data from the relay, the indexer or a realm goes through Zod first.
 - Never change a test to make code pass without saying so in the review card.
+- Reuse and factor: before writing a helper, search `packages/`, `server/src` and `app/src/lib` for one that does the job; reuse it, or move both to one shared place in the same branch, in a refactor commit of its own. Two copies of one logic are a finding, whatever `jscpd` says: it sees near-identical text, not a rewrite (Alexis, 2026-11-01).
 - Each area's rules are in `.claude/rules/`, loaded when its files are touched. Every review, `/code-review` included, also reads the tiers in `docs/REVIEW.md`.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
 - Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard.py` refuses the rest (`.claude/rules/gno.md`).
