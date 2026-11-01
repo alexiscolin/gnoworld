@@ -172,6 +172,7 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | The "first words" arrival banner | 9 |
 | The AI Ring and Harbor station bodies | Once their content exists (slice 5, question 6) |
 | The composer's emoji picker | Waits for Alexis: it needs `emojibase-data` |
+| Move the 3D to `WebGPURenderer` after the demo, for what WebGL cannot do, such as effects with very many particles: its shaders rewritten in TSL, its gain measured first on the same scene, and a way for the gate to test the real WebGPU rendering, not its WebGL fallback (Alexis, 2026-11-01) | After the demo |
 | One dev image and two commands to start the project: today it takes five tools by hand, and the full gate adds Ergo, a hand-built nginx and Chromium (Alexis, 2026-11-01). Each tool pinned in the image, reusing the CI's steps | After 7h. A new tool, so Alexis decides its form |
 | One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
 | The ticker's five `sample-` rows (`app/data/news.json`, `events.json`) leave before a public deploy, with a refusal at deploy that counts them (5m's review, row 11) | The slice that deploys in public |
