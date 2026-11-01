@@ -271,3 +271,5 @@ export function topicAfter(topic: string | undefined, message: IrcMessage, room:
   if ((command === "332" || command === "TOPIC") && text !== undefined) return text || undefined;
   return topic;
 }
+
+export { isCountryCode };

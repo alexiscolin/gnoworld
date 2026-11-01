@@ -9,6 +9,7 @@ import rules from "../../../../app/data/bubbles.json" with { type: "json" };
 describe("@gnoworld/core/bubbles", () => {
   it("gives the pick, the cut, the turn, the far side and the table's lookup", () => {
     expect(Object.keys(bubbles).sort()).toEqual([
+      "COUNTRIES",
       "bubbleLines",
       "centreOf",
       "countryName",

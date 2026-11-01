@@ -4,6 +4,7 @@ import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import {
   addLines,
   concerns,
+  isCountryCode,
   isTagMsgid,
   lineOf,
   membersAfter,
@@ -694,5 +695,31 @@ describe("isTagMsgid: a msgid a tag carries back", () => {
     "a\u007fb",
   ])("refuses %j", (id) => {
     expect(isTagMsgid(id)).toBe(false);
+  });
+});
+
+// 7j: what may ride in the tag, going out as coming in. A value is written into a line, so a character more could open a tag of its own.
+describe("isCountryCode", () => {
+  test("takes two capitals", () => {
+    expect(isCountryCode("JP")).toBe(true);
+  });
+
+  test.each([
+    "jp",
+    "J",
+    "JPN",
+    "J1",
+    "JP ",
+    " JP",
+    "JP\n",
+    "JP;a=b",
+    "JP x",
+    "",
+    "ЕР",
+    "US-CA",
+    "GB-ENG",
+    "35.6,139.7",
+  ])("refuses %j", (value) => {
+    expect(isCountryCode(value)).toBe(false);
   });
 });

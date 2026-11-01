@@ -2,6 +2,9 @@
 // lint's sizes: its lines to a room or to another account, a correction, a reaction, a delete, its typing; each an account's alone,
 // a room's in a room Ergo says it is in. Whether each went.
 import type { Composed, Reacting } from "@gnoworld/core";
+import { isPublicRoom } from "@gnoworld/core/bubbles";
+import { Address } from "@gnoworld/schemas";
+import { keptCountry } from "../../lib/country.ts";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { reactInRoom, reactTo, redactFrom, redactIn, sayTo, speakIn, type DmOut } from "./dmOut.ts";
@@ -24,6 +27,7 @@ export interface Host {
 interface Tags {
   reply?: string | undefined;
   edit?: string | undefined;
+  country?: string | undefined;
 }
 
 export class Speaking {
@@ -37,7 +41,8 @@ export class Speaking {
     this.#host = host;
   }
 
-  readonly say = (room: string, composed: Composed, reply?: string): boolean => this.#speak(room, composed, { reply });
+  readonly say = (room: string, composed: Composed, reply?: string): boolean =>
+    this.#speak(room, composed, { reply, country: this.#country(room) });
 
   readonly correct = (room: string, composed: Composed, edit: string): boolean => this.#speak(room, composed, { edit });
 
@@ -78,6 +83,16 @@ export class Speaking {
   #slow(composed: Composed): Slow | undefined {
     const { messages, lines } = this.#weight(composed);
     return this.#pace.slow(Date.now(), messages, lines);
+  }
+
+  // The country a new line of `room` declares: the account's own choice, read as it speaks, in a room the list says anyone may read. What it
+  // says stays out of the rest, and one no of a list that names the room twice is a no (ADR-0001 §7).
+  #country(room: string): string | undefined {
+    const { key, store } = this.#host;
+    const me = Address.safeParse(key());
+    const listed = store.getState().chat.listed?.flatMap(({ rooms }) => rooms.filter((each) => each.room === room));
+    const open = listed !== undefined && listed.length > 0 && listed.every(({ type }) => isPublicRoom(type));
+    return me.success && open ? keptCountry(me.data) : undefined;
   }
 
   #speak(room: string, composed: Composed, tags: Tags): boolean {

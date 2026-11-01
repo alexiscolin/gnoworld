@@ -7,6 +7,7 @@ export {
   concerns,
   lineOf,
   membersAfter,
+  isCountryCode,
   isTagMsgid,
   nickOf,
   redactAfter,
