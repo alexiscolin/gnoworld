@@ -11,7 +11,7 @@ import { send as netSend, publicUrl } from "../net.ts";
 import { repeat } from "../repeat.ts";
 import { replaceFile } from "../replaceFile.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
-import { compareLists } from "./compare.ts";
+import { compareLists, sorted } from "./compare.ts";
 import { readHistory, type History } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
@@ -44,7 +44,6 @@ export const EVERY_MS = 30 * 60_000;
 export const PAUSE_MS = 250;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-const sorted = (values: Iterable<string>): string[] => [...values].sort();
 
 // The options with their defaults, so the pass reads them as plain values.
 interface Settings {

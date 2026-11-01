@@ -15,7 +15,7 @@ export interface Comparison {
   readonly batches: { readonly namespace: string; readonly realms: string[] }[];
 }
 
-const sorted = (values: Iterable<string>): string[] => [...values].sort();
+export const sorted = (values: Iterable<string>): string[] => [...values].sort();
 
 export function compareLists(before: readonly string[], after: readonly string[]): Comparison {
   const oldWorlds = groupWorlds(before);

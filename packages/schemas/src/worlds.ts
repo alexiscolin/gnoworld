@@ -17,7 +17,10 @@ export const RealmPath = z.string().check(
 );
 
 const Slug = z.string().check(z.minLength(1), z.maxLength(WORLDS_CAPS.name), z.regex(/^[a-z0-9][a-z0-9_-]*$/));
-const Count = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(1e12));
+/** A count or a height read from a chain: a whole number from 0, at most 10^12. */
+export const ChainCount = z
+  .number()
+  .check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(1e12));
 const Moment = z.iso.datetime({ offset: true }).check(z.maxLength(40));
 
 /** An exported Go identifier, at most 128 characters. */
@@ -44,13 +47,18 @@ const Realm = z.strictObject({
   deployerName: z.nullable(DeployerName),
   functions: z.array(ExportedName).check(z.maxLength(WORLDS_CAPS.functions)),
   imports: z.array(ImportPath).check(z.maxLength(WORLDS_CAPS.imports)),
-  calls: z.nullable(Count),
-  callers: z.nullable(Count),
-  lastHeight: z.nullable(Count),
+  calls: z.nullable(ChainCount),
+  callers: z.nullable(ChainCount),
+  lastHeight: z.nullable(ChainCount),
 });
 
+/** A world by its id: a namespace, and for most worlds the folders that name it. */
+export const WorldId = z
+  .string()
+  .check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
+
 const World = z.strictObject({
-  id: z.string().check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/)),
+  id: WorldId,
   namespace: Slug,
   realms: z.array(Realm).check(z.maxLength(WORLDS_CAPS.realms)),
   // The time the world was first seen on the list (null on a first pass), and whether it joined in a batch.

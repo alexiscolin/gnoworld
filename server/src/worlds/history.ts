@@ -4,7 +4,7 @@
 // (chain-feasibility.md, "Corrections"), and a line may be a failed transaction: a count is a count of attempts, and a realm with
 // none is not dead. The query asks for no file body (a deploy carries its whole source) and sends the path as a variable.
 import { isAddress } from "@gnoworld/core";
-import { RealmPath } from "@gnoworld/schemas";
+import { ChainCount, RealmPath } from "@gnoworld/schemas";
 import { z } from "zod";
 import { jsonOf } from "../net.ts";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
@@ -26,12 +26,11 @@ export interface History {
 
 export type HistoryRead = { ok: true; history: History } | { ok: false; kind: Kind };
 
-const Height = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(1e12));
 const Answer = z.object({
   data: z.object({
     getTransactions: z.array(
       z.object({
-        block_height: Height,
+        block_height: ChainCount,
         messages: z.array(
           z.object({
             value: z.object({

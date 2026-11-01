@@ -1,6 +1,7 @@
 // The presence history (slice 7, 7c): the people present in each world, sampled by a caller, kept as the busiest sample of each hour
 // for 14 days, so a world can be compared with its own past ("rising", plan §9 question 6). It holds a world's id, an hour and a
 // count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store.
+import { WorldId } from "@gnoworld/schemas";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { replaceFile } from "../replaceFile.ts";
@@ -16,10 +17,9 @@ interface Slot {
   readonly people: number;
 }
 
-const Id = z.string().check(z.maxLength(256), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
 const Count = z.number().check(z.refine(Number.isSafeInteger, { message: "whole" }), z.gte(0), z.lte(PEOPLE_MAX));
 const Hour = z.number().check(z.refine((at) => Number.isSafeInteger(at) && at >= 0 && at % HOUR === 0));
-const File = z.record(Id, z.array(z.object({ at: Hour, people: Count })));
+const File = z.record(WorldId, z.array(z.object({ at: Hour, people: Count })));
 
 export interface Presence {
   record: (people: ReadonlyMap<string, number>) => void;
@@ -60,7 +60,7 @@ export function makePresence(options: { file: string; now: () => number }): Pres
     record(people) {
       const at = Math.floor(now() / HOUR) * HOUR;
       for (const [id, count] of people) {
-        if (!Id.safeParse(id).success || !Count.safeParse(count).success) continue;
+        if (!WorldId.safeParse(id).success || !Count.safeParse(count).success) continue;
         const slots = worlds.get(id);
         if (slots === undefined) {
           // A world nobody was in is not kept, nor are more worlds than the cap.
