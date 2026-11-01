@@ -1,6 +1,7 @@
 // The worlds job's reads of a chain and its indexer (slice 7, 7c), shared by its readers: one GET or POST through the server's one
 // way out with a time limit, a body read as a stream and cut at a byte cap, and a fault named by a kind, never by what the
 // answer or the error held. An abci_query goes through the envelope QueryAnswer describes, base64 and UTF-8 checked.
+import { abciQueryOf } from "@gnoworld/core";
 import { QueryAnswer } from "@gnoworld/schemas";
 
 export type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
@@ -91,8 +92,6 @@ export async function fetchText(
   }
 }
 
-const hexOf = (text: string): string => Buffer.from(text, "utf8").toString("hex");
-
 // The text of a base64 Data, or null when it is no base64 or no UTF-8.
 function textOf(base64: string): string | null {
   if (base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) return null;
@@ -129,7 +128,7 @@ export async function abciQuery(
   query: { readonly path: string; readonly data: string },
   limits: Limits,
 ): Promise<string> {
-  const url = `${new URL(chain.rpc).origin}/abci_query?path=${encodeURIComponent(`"${query.path}"`)}&data=0x${hexOf(query.data)}`;
+  const url = `${new URL(chain.rpc).origin}${abciQueryOf(query.path, new TextEncoder().encode(query.data))}`;
   // Base64 is a third larger than what it carries, and the envelope adds a little.
   const text = await fetchText(
     chain.send,
