@@ -92,8 +92,14 @@ export const COUNTRIES: readonly Country[] = ROWS.join("").split(";").map(parse)
 
 const BY_CODE: Readonly<Record<string, Country>> = Object.fromEntries(COUNTRIES.map((c) => [c.code, c]));
 
+const found = (code: string | undefined): Country | undefined =>
+  code !== undefined && Object.hasOwn(BY_CODE, code) ? BY_CODE[code] : undefined;
+
 /** The centre of a country (a copy), or nothing for a code the table does not hold: a code is never guessed. */
 export function centreOf(code: string | undefined): { lat: number; lon: number } | undefined {
-  const country = code !== undefined && Object.hasOwn(BY_CODE, code) ? BY_CODE[code] : undefined;
+  const country = found(code);
   return country === undefined ? undefined : { lat: country.lat, lon: country.lon };
 }
+
+/** A country's name, or nothing for a code the table does not hold. */
+export const countryName = (code: string | undefined): string | undefined => found(code)?.name;
