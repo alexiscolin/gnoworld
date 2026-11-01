@@ -14,8 +14,7 @@ export function quoted(words: string): string {
   return first.length > 80 ? `${first.slice(0, 80).join("")}…` : words;
 }
 
-/** An address's first six and last five characters, as the login shows one's own. */
-export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
+export { shortAddress } from "@gnoworld/schemas";
 
 // The Earth is a page of its own, under no /w/, and its main room is the general chat (frames 37 to 55).
 const EARTH = "earth";
