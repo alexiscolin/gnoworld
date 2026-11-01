@@ -475,15 +475,29 @@ describe("motion", () => {
     expect(view.stats()).toEqual(rest);
   });
 
+  // Frames of a twentieth of a second, from `from` for `seconds`.
+  const run = (view: EarthView, from: number, seconds: number) => {
+    for (let at = from; at <= from + seconds; at += 0.05) view.tick(at);
+  };
+
   it("opens with the sun behind the globe, then brings the day across it", async () => {
     const { view, stage } = moving();
     await settled();
     view.tick(0);
     expect(view.arriving).toBe(true);
     expect(sunOf(stage)?.z).toBeLessThan(-0.5);
-    view.tick(60);
+    run(view, 0, 4);
     expect(view.arriving).toBe(false);
     expect(sunOf(stage)?.z).toBeGreaterThan(0);
+  });
+
+  it("loses none of the arrival to a first frame that stalls on its uploads", async () => {
+    const { view, stage } = moving();
+    await settled();
+    view.tick(0);
+    view.tick(3);
+    expect(view.arriving).toBe(true);
+    expect(sunOf(stage)?.z).toBeLessThan(0);
   });
 
   it("turns the globe east at 7b's rate, as the video's globe turns", async () => {
@@ -498,8 +512,7 @@ describe("motion", () => {
   it("keeps the sun steady once it has arrived, and turns the ground under it", async () => {
     const { view, stage } = moving();
     await settled();
-    view.tick(0);
-    view.tick(30);
+    run(view, 0, 5);
     const rest = sunOf(stage)?.clone();
     view.tick(90);
     expect(sunOf(stage)?.distanceTo(rest ?? new Vector3())).toBeLessThan(1e-9);

@@ -40,6 +40,8 @@ const ANISOTROPY = 8;
 const SUN_REST = -0.698;
 const SUN_SWEEP = 2.007;
 const ARRIVAL = 2.6;
+// The first frames stall on the uploads, and the arrival is what the reader must see.
+const LONGEST_FRAME = 0.05;
 const MOON_RATE = 0.026;
 const MOON_SWEEP = 1.5;
 
@@ -58,10 +60,11 @@ export class EarthView {
   #width = 1;
   #height = 1;
   #born: number | undefined;
+  #last = 0;
   #latitude = 0;
   #turn = 0;
   #turned = 0;
-  #age = 0;
+  #arrived = 0;
 
   constructor(device: EarthDevice) {
     this.#device = device;
@@ -69,7 +72,7 @@ export class EarthView {
 
   /** Whether the sun is still coming round: the scene holds the full rate for it. */
   get arriving(): boolean {
-    return this.#globe !== undefined && !this.#motion.matches && this.#age < ARRIVAL;
+    return this.#globe !== undefined && !this.#motion.matches && this.#arrived < ARRIVAL;
   }
 
   #say(state: EarthState): void {
@@ -97,7 +100,8 @@ export class EarthView {
     this.#globe?.dispose();
     this.#globe = undefined;
     this.#born = undefined;
-    this.#age = 0;
+    this.#last = 0;
+    this.#arrived = 0;
   }
 
   #bring(): void {
@@ -136,7 +140,7 @@ export class EarthView {
     this.#aim();
     this.#device.stage.add(globe.group);
     this.#place();
-    this.#pose(0);
+    this.#pose(0, 0);
     this.#say("drawn");
     this.#device.moved();
   }
@@ -173,13 +177,11 @@ export class EarthView {
     this.#device.moved();
   }
 
-  // The whole pose, `age` seconds after the Earth came.
-  #pose(age: number): void {
+  // The whole pose, `age` seconds after the Earth came, `arrived` seconds into its arrival.
+  #pose(age: number, arrived: number): void {
     const globe = this.#globe;
     if (globe === undefined) return;
-    this.#age = age;
-    const arriving = Math.min(age / ARRIVAL, 1);
-    const left = 1 - eased(arriving);
+    const left = 1 - eased(Math.min(arrived / ARRIVAL, 1));
     this.#turned = this.#turn - SPIN * age;
     globe.earth.setTime(this.#turned / SPIN);
     const [x, y, z] = groundDirection({ latitude: this.#latitude, longitude: SUN_REST + left * SUN_SWEEP });
@@ -192,9 +194,15 @@ export class EarthView {
   /** Moves the Earth to `seconds` on the scene's clock. Under reduced motion it stays at rest. */
   tick(seconds: number): void {
     if (this.#globe === undefined) return;
+    if (this.#motion.matches) {
+      this.#pose(0, ARRIVAL);
+      return;
+    }
     this.#born ??= seconds;
-    if (this.#motion.matches) this.#pose(ARRIVAL);
-    else this.#pose(seconds - this.#born);
+    const step = Math.max(seconds - this.#born - this.#last, 0);
+    this.#last = seconds - this.#born;
+    this.#arrived = Math.min(this.#arrived + Math.min(step, LONGEST_FRAME), ARRIVAL);
+    this.#pose(this.#last, this.#arrived);
   }
 
   /** A context came back: a closed bitmap cannot be uploaded twice, so the maps come again. */
