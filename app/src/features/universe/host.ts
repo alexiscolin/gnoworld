@@ -7,7 +7,8 @@ import type { Scene } from "../../scene/scene.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 
-export type SceneStatus = "off" | "none" | "offered" | "loading" | "on" | "failed";
+/** `loading` came by itself; `asked` is the reader's press, which the button shows. */
+export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
 const nothing = () => undefined;
 
@@ -18,7 +19,6 @@ export class SceneHost {
   #scene: Scene | undefined;
   #shown = false;
   #decided = false;
-  #timer: ReturnType<typeof setTimeout> | undefined;
 
   readonly subscribe = (listener: () => void) => {
     this.#listeners.add(listener);
@@ -34,17 +34,14 @@ export class SceneHost {
     for (const listener of this.#listeners) listener();
   }
 
-  /** The canvas is on the page; what this returns takes everything away with it. */
-  readonly attach = (canvas: HTMLCanvasElement) => {
+  /** The canvas is on the page; what this returns takes the scene away with it. */
+  attach(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     return () => {
-      clearTimeout(this.#timer);
       this.#scene?.dispose();
-      this.#scene = undefined;
       this.#canvas = undefined;
-      this.#decided = false;
     };
-  };
+  }
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
   show(shown: boolean): void {
@@ -58,16 +55,16 @@ export class SceneHost {
     const offer = sceneOffer({ weak: !gpuCanDraw(), phone: matchMedia(PHONE_QUERY).matches, savesData: savesData() });
     if (offer === "none") this.#say("none");
     else if (offer === "ask") this.#say("offered");
-    else
-      this.#timer = setTimeout(() => {
-        this.load();
-      });
+    else this.#load("loading", nothing);
   }
 
-  /** Loads the 3D and starts it, then calls `settled`; a failure leaves the page as it is, and says so. */
-  readonly load = (settled: () => void = nothing): void => {
-    if (this.#status === "loading" || this.#status === "on") return;
-    this.#say("loading");
+  /** "View in space": loads the 3D, then calls `settled`, whichever way it went. */
+  readonly press = (settled: () => void): void => {
+    this.#load("asked", settled);
+  };
+
+  #load(status: "loading" | "asked", settled: () => void): void {
+    this.#say(status);
     loadScene()
       .then(({ startScene }) => {
         if (this.#canvas === undefined) return;
@@ -85,8 +82,8 @@ export class SceneHost {
       .catch(() => {
         this.#say("failed");
       })
-      .then(settled, settled);
-  };
+      .finally(settled);
+  }
 
   #started(scene: Scene): void {
     this.#scene = scene;

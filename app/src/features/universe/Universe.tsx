@@ -5,10 +5,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SceneHost } from "./host.ts";
 import styles from "./Universe.module.css";
 
-// The button leaves as the scene comes: the focus goes to the page's heading, not to nothing.
-const toHeading = () => {
-  document.querySelector("h1")?.focus();
-};
+// The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
+function handOver(button: HTMLElement) {
+  const held = document.activeElement;
+  if (held === button || held === document.body) document.querySelector("h1")?.focus({ preventScroll: true });
+}
 
 export function Universe({ shown }: { shown: boolean }) {
   const [host] = useState(() => new SceneHost());
@@ -18,16 +19,17 @@ export function Universe({ shown }: { shown: boolean }) {
   useEffect(() => {
     host.show(shown);
   }, [host, shown]);
-  const asking = shown && (status === "offered" || status === "loading");
   return (
     <>
       <canvas ref={canvasRef} className={styles["canvas"]} aria-hidden="true" data-scene={shown ? status : "covered"} />
-      {asking ? (
+      {shown && (status === "offered" || status === "asked") ? (
         <div className={styles["offer"]}>
           <Button
-            busy={status === "loading"}
-            onClick={() => {
-              host.load(toHeading);
+            busy={status === "asked"}
+            onClick={({ currentTarget }) => {
+              host.press(() => {
+                handOver(currentTarget);
+              });
             }}
           >
             View in space

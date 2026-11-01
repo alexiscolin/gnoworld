@@ -130,10 +130,13 @@ afterEach(() => {
 });
 
 describe("the canvas", () => {
-  it("is silent, and off until the scene runs", () => {
-    const canvas = one(mount(<Universe shown />), "canvas");
+  it("is silent, and not on until the scene runs", async () => {
+    const box = mount(<Universe shown />);
+    const canvas = one(box, "canvas");
     expect(canvas.getAttribute("aria-hidden")).toBe("true");
-    expect(canvas.getAttribute("data-scene")).toBe("off");
+    expect(on(box)).toBe(false);
+    await settle();
+    expect(on(box)).toBe(true);
   });
 
   it("says a page that does not show the scene covers it", () => {
@@ -144,15 +147,19 @@ describe("the canvas", () => {
 describe("on a computer", () => {
   it("starts by itself, after the page has hydrated, on its canvas", async () => {
     const box = mount(<Universe shown />);
-    expect(scene.load).not.toHaveBeenCalled();
     await settle();
     expect(scene.start).toHaveBeenCalledTimes(1);
     expect(started().canvas).toBe(one(box, "canvas"));
     expect(on(box)).toBe(true);
   });
 
-  it("offers no button", async () => {
+  it("offers no button, not even while the chunk comes: nobody asked", async () => {
+    const arrive = slowChunk();
     const box = mount(<Universe shown />);
+    await settle();
+    expect(scene.load).toHaveBeenCalledTimes(1);
+    expect(all(box, "button")).toEqual([]);
+    arrive();
     await settle();
     expect(all(box, "button")).toEqual([]);
   });
@@ -216,11 +223,40 @@ describe("on request", () => {
     expect(scene.start).toHaveBeenCalledTimes(1);
   });
 
-  it("hands the focus to the page's heading, for the button leaves", async () => {
+  it("hands the focus to the page's heading, for the button leaves, and scrolls nothing", async () => {
     device({ phone: true });
     const { box } = rendered(true, heading);
     await settle();
+    const focus = vi.spyOn(one(box, "h1"), "focus");
     button(box, VIEW)?.focus();
+    click(button(box, VIEW));
+    await settle();
+    expect(document.activeElement).toBe(one(box, "h1"));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it("leaves the focus where the reader took it while the scene was coming", async () => {
+    device({ phone: true });
+    const arrive = slowChunk();
+    const { box } = rendered(true, (child) => (
+      <>
+        {heading(child)}
+        <a href="#elsewhere">Bubble</a>
+      </>
+    ));
+    await settle();
+    button(box, VIEW)?.focus();
+    click(button(box, VIEW));
+    one(box, "a").focus();
+    arrive();
+    await settle();
+    expect(document.activeElement).toBe(one(box, "a"));
+  });
+
+  it("takes the focus from nowhere too: a press that gave the button none, as Safari's", async () => {
+    device({ phone: true });
+    const { box } = rendered(true, heading);
+    await settle();
     click(button(box, VIEW));
     await settle();
     expect(document.activeElement).toBe(one(box, "h1"));
@@ -409,28 +445,15 @@ describe("the view changing", () => {
     await settle();
     expect(scene.cover).toHaveBeenLastCalledWith(true);
   });
-
-  it("does not go on to load when the view left before the page settled", async () => {
-    const { rerender } = rendered(true);
-    rerender(false);
-    await settle();
-    expect(scene.cover).not.toHaveBeenCalledWith(false);
-  });
 });
 
 describe("leaving", () => {
   it("disposes the scene with the component", async () => {
     const { unmount } = rendered(true);
     await settle();
+    scene.dispose.mockClear();
     unmount();
     expect(scene.dispose).toHaveBeenCalledTimes(1);
-  });
-
-  it("loads nothing when it leaves before the page has settled", async () => {
-    const { unmount } = rendered(true);
-    unmount();
-    await settle();
-    expect(scene.load).not.toHaveBeenCalled();
   });
 
   it("starts nothing when it leaves while the chunk is coming: no loop runs for ever", async () => {
