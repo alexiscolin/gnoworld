@@ -97,7 +97,7 @@ float ringShade() {
   if (along <= 0.0) return 1.0;
   float reach = (length((vLocal + along * vSun).xz) - ringInner) / (ringOuter - ringInner);
   if (reach <= 0.0 || reach >= 1.0) return 1.0;
-  return 1.0 - 0.85 * ringOpacity * texture2D(ringMap, vec2(reach, 0.5)).r;
+  return 1.0 - 0.85 * ringOpacity * textureLod(ringMap, vec2(reach, 0.5), 0.0).r;
 }
 
 float lines(vec3 at, float width) {

@@ -14,6 +14,7 @@ import {
 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
+import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
 const DAO = ascii("gno.land/r/gov/dao");
@@ -155,6 +156,13 @@ describe("createPlanet", () => {
     expect(read(planet.surface, "ringMap")).toBe(set.ring);
     expect(read(planet.surface, "ringInner")).toBe(look.rings.inner);
     expect(read(planet.surface, "ringOuter")).toBe(look.rings.outer);
+  });
+
+  // Inside a branch that varies by pixel a GPU cannot take its own derivatives: an implicit level is undefined there, which a software
+  // renderer never shows.
+  it("reads the ring's shadow at a level it names", () => {
+    expect(SURFACE_FRAGMENT).toContain("textureLod(ringMap,");
+    expect(SURFACE_FRAGMENT).not.toContain("texture2D(ringMap,");
   });
 
   it("casts no ring's shadow on a world with no rings", () => {
