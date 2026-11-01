@@ -117,7 +117,7 @@ function galleryLayout(): Layout {
   const height = 2 * GALLERY.distance * Math.tan((GALLERY.fov * Math.PI) / 360);
   return {
     camera,
-    sun: new Vector3(-0.66, 0.34, 0.67).normalize(),
+    sun: new Vector3(-0.5, 0.3, 0.81).normalize(),
     place(planet, index, aspect) {
       const width = height * aspect;
       const column = index % GALLERY.columns;
@@ -150,7 +150,7 @@ function nebulaLayout(): Layout {
 
 function layoutOf(view: ViewName): Layout {
   if (view === "gallery") return galleryLayout();
-  if (view === "close") return closeLayout(new Vector3(0.72, 0.3, 0.62));
+  if (view === "close") return closeLayout(new Vector3(0.5, 0.26, 0.82));
   if (view === "eclipse") return closeLayout(new Vector3(0.178, 0.1, -1));
   return nebulaLayout();
 }
