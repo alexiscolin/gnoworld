@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
 import { loseContext, restoreContext, running, stats } from "./sceneStage.ts";
@@ -58,6 +59,28 @@ async function offered(page: Page) {
   return view;
 }
 
+// A place with no haze along the view, found as a journey needs it: there the stage's own black shows between the stars.
+function emptySpot() {
+  const mood = newMood();
+  const hazeAround = (spot: { x: number; y: number; z: number }) =>
+    [120, 260, 520, 1000].some((reach) =>
+      [-320, 0, 320].some((side) => {
+        moodAt(mood, { x: spot.x + side, y: spot.y + side, z: spot.z - reach });
+        return mood.haze > 0;
+      }),
+    );
+  for (let at = 1; at < 10_000; at += 1) {
+    const spot = { x: at * 997, y: at * 613, z: at * -1409 };
+    if (!hazeAround(spot)) return spot;
+  }
+  throw new Error("no empty place in reach");
+}
+
+const goToEmpty = (page: Page) =>
+  page.evaluate((to) => {
+    (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
+  }, emptySpot());
+
 // The darkest patch of the window's right half, where the page holds no word: the scenery lights the rest.
 const darkest = async (page: Page) => {
   const patches = Array.from({ length: 12 }, (_, row) =>
@@ -80,6 +103,7 @@ test.describe("a computer", () => {
     await page.goto(HOME);
     await running(page);
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
+    await goToEmpty(page);
     await expect.poll(() => darkest(page)).toBeLessThan(1.5);
   });
 
@@ -138,6 +162,7 @@ test.describe("a computer", () => {
     await running(page);
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
+    await goToEmpty(page);
     // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background.
     await expect.poll(() => darkest(page)).toBeGreaterThan(0.5);
     await expect.poll(() => darkest(page)).toBeLessThan(1.5);
