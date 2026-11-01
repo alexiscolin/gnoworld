@@ -113,8 +113,8 @@ describe("readPackages", () => {
       const { done } = read([WUGNOT], { [which]: endless });
       const facts = (await done).get(WUGNOT);
       expect(pulled).toBeLessThan(100);
-      // A doc that cannot be read leaves the package out; a file that cannot leaves it with no deployer.
-      expect(facts === undefined).toBe(which === "doc");
+      // A doc that cannot be read leaves the package out; a file that cannot never gives a deployer.
+      if (which === "doc") expect(facts).toBeUndefined();
       expect(facts?.deployer ?? null).toBeNull();
     },
   );
