@@ -3,7 +3,7 @@
 // odd text) is no name. A network fault ends the pass, a refusal by the chain only leaves that address without one.
 import { evalNameOf } from "@gnoworld/core";
 import { DeployerName } from "@gnoworld/schemas";
-import { abciQuery, kindOf, type Send } from "./remote.ts";
+import { abciQuery, isDown, kindOf, type Send } from "./remote.ts";
 
 const NAME_MAX_BYTES = 4096;
 const NAME_MS = 15_000;
@@ -30,7 +30,7 @@ export async function readNames(
       const checked = DeployerName.safeParse(name);
       if (checked.success) names.set(address, checked.data);
     } catch (error) {
-      down = ["request", "timeout", "status", "rate_limited"].includes(kindOf(error));
+      down = isDown(kindOf(error));
     }
   }
   return names;

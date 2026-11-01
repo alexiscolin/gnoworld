@@ -4,11 +4,10 @@
 // renamed over. One call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last
 // file; a silent indexer leaves a world at rest (null counts) and the rest of the file whole. Nothing a chain or an indexer wrote
 // reaches a log: a fault is logged by its kind. The file keeps every realm it has seen, for a chain only adds realms.
-import { isPublicOrigin } from "@gnoworld/core";
 import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas";
 import { readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Log } from "../log.ts";
-import { send as netSend } from "../net.ts";
+import { send as netSend, publicUrl } from "../net.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists } from "./compare.ts";
 import { readHistory, type History } from "./history.ts";
@@ -181,14 +180,9 @@ export interface WorldsJob {
 
 // The universe's addresses, or a refusal at start: https on a public name, no user, and an id that is a plain slug.
 function checked(universe: Universe): void {
-  const address = (value: string): URL | null => {
-    const url = URL.parse(value);
-    const good = url?.protocol === "https:" && url.username === "" && url.password === "" && isPublicOrigin(url.origin);
-    return good ? url : null;
-  };
   if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(universe.id)) throw new RangeError("worlds: the universe id is no plain name");
-  if (address(universe.rpc) === null) throw new RangeError("worlds: the rpc is no public https address");
-  if (address(universe.indexer) === null) throw new RangeError("worlds: the indexer is no public https address");
+  if (publicUrl(universe.rpc) === null) throw new RangeError("worlds: the rpc is no public https address");
+  if (publicUrl(universe.indexer) === null) throw new RangeError("worlds: the indexer is no public https address");
 }
 
 /** Runs a pass at start and after each pass ends, one at a time, `everyMs` apart; `stop` ends it, and a pass under way writes nothing. */

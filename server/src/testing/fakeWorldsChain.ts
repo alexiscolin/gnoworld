@@ -1,7 +1,7 @@
 // A chain and its indexer as the worlds job's tests build them (slice 7, 7c): one `send` that answers the RPC's abci_query reads
 // (vm/qpaths, vm/qdoc, vm/qfile, vm/qeval) and the indexer's GraphQL POST, each from a function the test gives, and records what
 // was asked and how many requests were in flight at once. The envelope of an abci_query is QueryAnswer's (packages/schemas/src/chain.ts).
-type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
+import type { Send } from "../net.ts";
 
 /** What a route gives: a text (the Data of a good abci_query, or the body of an indexer answer), a Response, or a fault. */
 type Given = string | Response | Error;

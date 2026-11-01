@@ -1,5 +1,6 @@
 // The browser's capped, timed GET (5g; 5m's markets read it too): the bytes of an answer under a time limit and a size cap,
 // or a kind of failure. Nothing here reads a schema: `read.ts` does.
+import { cappedBytes } from "@gnoworld/core";
 
 /** The time an answer has, its body read included. */
 const CHAIN_TIMEOUT_MS = 8_000;
@@ -29,29 +30,6 @@ async function drop(stream: { cancel(): Promise<void> } | null | undefined): Pro
   }
 }
 
-// The chunks of a body, or why not; the reader is cancelled the moment the total passes the cap.
-async function chunksOf(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  maxBytes: number,
-): Promise<Uint8Array[] | "too-big" | "down"> {
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) return chunks;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await drop(reader);
-        return "too-big";
-      }
-      chunks.push(value);
-    }
-  } catch {
-    return "down";
-  }
-}
-
 // The body's bytes, or why not.
 async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array | "too-big" | "down"> {
   const declared = Number(response.headers.get("content-length"));
@@ -60,15 +38,12 @@ async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array 
     return "too-big";
   }
   const reader = response.body?.getReader();
-  const chunks = reader === undefined ? [] : await chunksOf(reader, maxBytes);
-  if (typeof chunks === "string") return chunks;
-  const whole = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
-  let at = 0;
-  for (const chunk of chunks) {
-    whole.set(chunk, at);
-    at += chunk.byteLength;
+  if (reader === undefined) return new Uint8Array();
+  try {
+    return (await cappedBytes(reader, maxBytes)) ?? "too-big";
+  } catch {
+    return "down";
   }
-  return whole;
 }
 
 /** What a transport is given: the address's answer is read under the limit and the cap, with the credentials the caller names. */

@@ -2,7 +2,7 @@ import { once } from "node:events";
 import { createServer, type RequestListener, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { send } from "./net.ts";
+import { Failure, fetchCapped, jsonOf, kindOf, publicUrl, readCapped, send } from "./net.ts";
 
 const servers: Server[] = [];
 const far = async (listener: RequestListener): Promise<string> => {
@@ -74,5 +74,111 @@ describe("send", () => {
     await expect(send(moved, { redirect: "follow" }, 1000)).rejects.toThrow(TypeError);
     expect(reached).toBe(false);
     await expect(send(hangs, { signal: never }, 100)).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+});
+
+const fault = (name: string): Error => Object.assign(new Error("secret-of-the-answer"), { name });
+const breaking = (name: string): Response =>
+  new Response(
+    new ReadableStream({
+      pull() {
+        throw fault(name);
+      },
+    }),
+  );
+const textOf = (bytes: Uint8Array): string => new TextDecoder().decode(bytes);
+
+describe("kindOf", () => {
+  it("gives a Failure its own kind, a call out of time a timeout, and anything else a request", () => {
+    expect(kindOf(new Failure("too_large"))).toBe("too_large");
+    expect(kindOf(fault("TimeoutError"))).toBe("timeout");
+    expect(kindOf(fault("AbortError"))).toBe("timeout");
+    expect(kindOf(new TypeError("fetch failed"))).toBe("request");
+    expect(kindOf("a thrown text")).toBe("request");
+  });
+});
+
+describe("readCapped", () => {
+  it("gives the body's bytes up to the cap exactly", async () => {
+    expect(textOf(await readCapped(new Response("abc"), 3))).toBe("abc");
+  });
+
+  it("gives no bytes for a response with no body", async () => {
+    expect(await readCapped(new Response(null), 3)).toEqual(new Uint8Array());
+  });
+
+  it("refuses a body past the cap as too_large", async () => {
+    await expect(readCapped(new Response("abcd"), 3)).rejects.toMatchObject({ kind: "too_large" });
+  });
+
+  it("names a body that breaks by its kind, never by what it said", async () => {
+    await expect(readCapped(breaking("TimeoutError"), 3)).rejects.toMatchObject({
+      kind: "timeout",
+      message: "timeout",
+    });
+    await expect(readCapped(breaking("TypeError"), 3)).rejects.toMatchObject({ kind: "request", message: "request" });
+  });
+});
+
+describe("fetchCapped", () => {
+  const limits = { ms: 7, maxBytes: 3 };
+  const request = { url: "https://far.test/a", init: { method: "GET" } };
+
+  it("asks through the way out it is given, with its time, and gives the bytes", async () => {
+    const asked: unknown[] = [];
+    const through = (...call: unknown[]): Promise<Response> => {
+      asked.push(call);
+      return Promise.resolve(new Response("abc"));
+    };
+    expect(textOf(await fetchCapped(through, request, limits))).toBe("abc");
+    expect(asked).toEqual([[request.url, request.init, limits.ms]]);
+  });
+
+  it("names a refusal: 429 is rate_limited, any other status is status", async () => {
+    const answering = (status: number) => () => Promise.resolve(new Response("no", { status }));
+    await expect(fetchCapped(answering(429), request, limits)).rejects.toMatchObject({ kind: "rate_limited" });
+    await expect(fetchCapped(answering(500), request, limits)).rejects.toMatchObject({ kind: "status" });
+  });
+
+  it("names a call that fails, and caps the body", async () => {
+    const failing = (name: string) => () => Promise.reject(fault(name));
+    await expect(fetchCapped(failing("TimeoutError"), request, limits)).rejects.toMatchObject({ kind: "timeout" });
+    await expect(fetchCapped(failing("TypeError"), request, limits)).rejects.toMatchObject({ kind: "request" });
+    const long = () => Promise.resolve(new Response("abcd"));
+    await expect(fetchCapped(long, request, limits)).rejects.toMatchObject({ kind: "too_large" });
+  });
+});
+
+describe("jsonOf", () => {
+  it("gives what the text holds", () => {
+    expect(jsonOf('{"a":1}')).toEqual({ a: 1 });
+  });
+
+  it("refuses a text that is no JSON as not_json, with none of the text", () => {
+    expect(() => jsonOf("<secret>")).toThrow(new Failure("not_json"));
+  });
+});
+
+describe("publicUrl", () => {
+  it("gives the address of a public https name", () => {
+    expect(publicUrl("https://rpc.onyx.testnets.gno.land:443")?.hostname).toBe("rpc.onyx.testnets.gno.land");
+    expect(publicUrl("https://indexer.gno.land/graphql/query")?.pathname).toBe("/graphql/query");
+  });
+
+  it("refuses what is no address, no https, or a name of this machine or network", () => {
+    for (const address of [
+      "not an address",
+      "http://rpc.gno.land",
+      "https://127.0.0.1",
+      "https://localhost",
+      "https://169.254.169.254",
+      "https://rpc.internal",
+    ])
+      expect(publicUrl(address)).toBeNull();
+  });
+
+  it("refuses an address that carries a user or a password", () => {
+    expect(publicUrl("https://me@rpc.gno.land")).toBeNull();
+    expect(publicUrl("https://:secret@rpc.gno.land")).toBeNull();
   });
 });

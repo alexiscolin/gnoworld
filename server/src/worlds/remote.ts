@@ -1,74 +1,14 @@
-// The worlds job's reads of a chain and its indexer (slice 7, 7c), shared by its readers: one GET or POST through the server's one
-// way out with a time limit, a body read as a stream and cut at a byte cap, and a fault named by a kind, never by what the
-// answer or the error held. An abci_query goes through the envelope QueryAnswer describes, base64 and UTF-8 checked.
+// The worlds job's reads of a chain and its indexer (slice 7, 7c), shared by its readers, on top of the server's one way out
+// (net.ts): an answer's text, UTF-8 checked, and an abci_query through the envelope QueryAnswer describes, base64 checked.
 import { abciQueryOf } from "@gnoworld/core";
 import { QueryAnswer } from "@gnoworld/schemas";
+import { Failure, fetchCapped, kindOf, type Kind, type Limits, type Send } from "../net.ts";
 
-export type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
+export { Failure, kindOf, type Kind, type Send };
 
-export type Kind =
-  | "request"
-  | "timeout"
-  | "status"
-  | "rate_limited"
-  | "too_large"
-  | "too_many"
-  | "not_json"
-  | "shape"
-  | "chain_refused"
-  | "path"
-  | "empty"
-  | "write"
-  | "stopped";
-
-export class Failure extends Error {
-  readonly kind: Kind;
-  constructor(kind: Kind) {
-    super(kind);
-    this.kind = kind;
-  }
-}
-
-/** The kind of a fault: a Failure's own, a call that ran out of time, or a request that reached nothing. */
-export function kindOf(error: unknown): Kind {
-  if (error instanceof Failure) return error.kind;
-  const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-  return timedOut ? "timeout" : "request";
-}
-
-/** What a call may take and give back: the time it has and the most bytes of the answer it reads. */
-export interface Limits {
-  readonly ms: number;
-  readonly maxBytes: number;
-}
-
-// The body, at most `maxBytes` of it; a longer one is cancelled where it is, unread to its end.
-async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array> {
-  const reader = response.body?.getReader();
-  if (reader === undefined) return new Uint8Array();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    let part: { done: boolean; value?: Uint8Array };
-    try {
-      part = await reader.read();
-    } catch (error) {
-      throw new Failure(kindOf(error));
-    }
-    if (part.done || part.value === undefined) break;
-    size += part.value.byteLength;
-    if (size > maxBytes) {
-      try {
-        await reader.cancel();
-      } catch {
-        // Cut off already, or failing to be: the answer is refused either way.
-      }
-      throw new Failure("too_large");
-    }
-    chunks.push(part.value);
-  }
-  return Buffer.concat(chunks);
-}
+/** A fault that says the chain or the network is not answering, which ends a pass; any other is about one read. */
+export const isDown = (kind: Kind): boolean =>
+  kind === "request" || kind === "timeout" || kind === "status" || kind === "rate_limited";
 
 /** One call: the body's bytes as UTF-8 text, or a Failure. */
 export async function fetchText(
@@ -76,15 +16,7 @@ export async function fetchText(
   request: { readonly url: string; readonly init: RequestInit },
   limits: Limits,
 ): Promise<string> {
-  let response: Response;
-  try {
-    response = await send(request.url, request.init, limits.ms);
-  } catch (error) {
-    throw new Failure(kindOf(error));
-  }
-  if (response.status === 429) throw new Failure("rate_limited");
-  if (!response.ok) throw new Failure("status");
-  const bytes = await readCapped(response, limits.maxBytes);
+  const bytes = await fetchCapped(send, request, limits);
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {

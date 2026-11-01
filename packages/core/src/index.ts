@@ -26,6 +26,7 @@ export {
   type SystemRef,
 } from "./cosmos/cosmos.ts";
 export { abciQueryOf } from "./chain/abci.ts";
+export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
 export { evalNameOf, isAddress } from "./chain/evalName.ts";
 export { dmOf } from "./chat/dm.ts";

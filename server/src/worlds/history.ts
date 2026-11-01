@@ -6,6 +6,7 @@
 import { isAddress } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas";
 import { z } from "zod";
+import { jsonOf } from "../net.ts";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 
 /** The most bytes of one answer: about 38,000 lines of a call, far past the busiest realm recorded. */
@@ -62,13 +63,7 @@ export async function readHistory(
       { url: reader.indexer, init },
       { ms: HISTORY_MS, maxBytes: HISTORY_MAX_BYTES },
     );
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      throw new Failure("not_json");
-    }
-    const answer = Answer.safeParse(json);
+    const answer = Answer.safeParse(jsonOf(text));
     if (!answer.success) throw new Failure("shape");
     const calls = answer.data.data.getTransactions.flatMap((row) =>
       row.messages.flatMap(({ value }) =>

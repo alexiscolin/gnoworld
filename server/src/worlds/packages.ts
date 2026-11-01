@@ -6,7 +6,7 @@
 import { isAddress } from "@gnoworld/core";
 import { ExportedName, ImportPath, WORLDS_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { abciQuery, kindOf, type Send } from "./remote.ts";
+import { abciQuery, isDown, kindOf, type Send } from "./remote.ts";
 
 export interface PackageFacts {
   readonly deployer: string | null;
@@ -63,10 +63,6 @@ function factsOf(text: string): Omit<PackageFacts, "deployer"> | null {
   };
 }
 
-// A fault that says the chain or the network is not answering, which ends a pass; any other is about one package.
-const ends = (kind: string): boolean =>
-  kind === "request" || kind === "timeout" || kind === "status" || kind === "rate_limited";
-
 // One package's facts: its doc, then its file for the deployer. A fault of the network is thrown, to end the pass; a doc that is
 // refused or wrong gives null, and a file that is, no deployer.
 async function readOne(
@@ -87,7 +83,7 @@ async function readOne(
     );
     deployer = creatorOf(file);
   } catch (error) {
-    if (ends(kindOf(error))) throw error;
+    if (isDown(kindOf(error))) throw error;
   }
   return { deployer, ...doc };
 }
@@ -112,7 +108,7 @@ export async function readPackages(
       const read = await readOne(reader, path);
       if (read !== null) facts.set(path, read);
     } catch (error) {
-      if (ends(kindOf(error))) break;
+      if (isDown(kindOf(error))) break;
     }
   }
   return facts;
