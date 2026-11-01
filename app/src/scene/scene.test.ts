@@ -405,6 +405,14 @@ describe("what stops it", () => {
   });
 });
 
+it("paints the frames' deep black as the stage's own, which a restored context keeps", () => {
+  const scene = startScene(options({ remembered: "low" }), clock);
+  clock.run(100);
+  const stage = three.renderer.render.mock.lastCall?.[0] as { background: { getHex: () => number } };
+  expect(stage.background.getHex()).toBe(0x010101);
+  scene.dispose();
+});
+
 describe("a lost context", () => {
   it("stops drawing and says so, and says so again when it comes back, with one frame owed", () => {
     const scene = startScene(options({ remembered: "low" }), clock);

@@ -1,13 +1,15 @@
 // The scene (docs/ARCHITECTURE.md, "The scene"), behind its lazy chunk: the renderer, its one loop, the Auto probe and what stops them.
 // It draws through one owner, and imports no React: the universe feature mounts it.
 import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type ProbeVerdict, type Tier } from "@gnoworld/core";
-import { PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
+import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { createRenderer } from "./renderer.ts";
 import { MOTION, watchPage, watchScreen } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
+// The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
+const DEEP_BLACK = 0x010101;
 const FIELD_OF_VIEW = 50;
 const NEAR = 0.1;
 const FAR = 2000;
@@ -62,6 +64,7 @@ class LiveScene implements Scene {
     this.#tier = remembered ?? "high";
     this.#probing = remembered === undefined && !matchMedia(MOTION).matches;
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
+    this.#stage.background = new Color(DEEP_BLACK);
     this.#owner.add({
       dispose: () => {
         this.#renderer.forceContextLoss();

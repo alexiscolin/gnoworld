@@ -144,6 +144,9 @@ test.describe("a computer", () => {
     await running(page);
     const frames = (await stats(page)).frames;
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
+    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background.
+    await expect.poll(() => patch(page)).toBeGreaterThan(0.5);
+    await expect.poll(() => patch(page)).toBeLessThan(1.5);
   });
 });
 
