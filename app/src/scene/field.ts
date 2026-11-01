@@ -35,7 +35,7 @@ void main() {
   gl_PointSize = uPoint * (1.0 + light * light * light * uFlare) * uRatio;
 }`;
 
-// A round core, sharper the brighter the star; a faint halo; and on the brightest, a telescope's four thin spikes.
+// A round core, sharper the brighter the star, and a faint halo: a spike or a glow would read as a namespace.
 const FRAGMENT = /* glsl */ `
 varying vec4 vLight;
 void main() {
@@ -44,8 +44,7 @@ void main() {
   float bright = vLight.a;
   float core = exp(-reach * (3.2 + bright * bright * 6.0));
   float halo = exp(-reach * 2.0) * 0.06 * bright;
-  float spikes = (exp(-abs(at.x) * 22.0) * exp(-at.y * at.y * 5.0) + exp(-abs(at.y) * 22.0) * exp(-at.x * at.x * 5.0)) * 0.5;
-  float shape = (core + halo + spikes * smoothstep(0.8, 1.0, bright)) * (1.0 - smoothstep(0.75, 1.0, reach));
+  float shape = (core + halo) * (1.0 - smoothstep(0.75, 1.0, reach));
   gl_FragColor = vec4(vLight.rgb * shape * 1.6, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

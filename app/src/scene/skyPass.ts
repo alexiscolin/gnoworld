@@ -12,7 +12,7 @@ const CLOUDS = [260, 420, 700, 1200];
 const SLIDES = [0.3, 0.2, 0.12, 0.08];
 // The noise is read at whole multiples of this many clouds: an offset that wraps then jumps nowhere.
 const PERIOD = 8;
-export const SHELLS_LOW = 2;
+export const SHELLS_LOW = 3;
 export const GAIN = 0.34;
 const DUST = 0.9;
 export const SPAN = MOOD_SIDE * MOOD_STEP;
@@ -30,18 +30,13 @@ uniform int uShells;
 uniform float uFar;
 uniform float uGain;
 varying vec3 vRay;
+float cube(vec3 at) {
+  return texture(uNoise, at).r;
+}
 const float RADII[${String(RADII.length)}] = float[${String(RADII.length)}](${list(RADII)});
 const float CLOUDS[${String(RADII.length)}] = float[${String(RADII.length)}](${list(CLOUDS)});
-// Whole numbers, so the cube still tiles: a turn that lays its lattice off the axes.
+// Whole numbers, so the cube still tiles: a turn that lays its lattice off the axes, for nothing in a nebula runs along them.
 const mat3 TURNED = mat3(2.0, -1.0, 1.0, 1.0, 2.0, -1.0, -1.0, 1.0, 2.0);
-// A read with no facets: a magnified cube's straight blends between its levels would show as blocks.
-float cube(vec3 at) {
-  vec3 grid = at * ${NOISE_SIDE.toFixed(1)} + 0.5;
-  vec3 whole = floor(grid);
-  vec3 part = grid - whole;
-  part = part * part * part * (part * (part * 6.0 - 15.0) + 10.0);
-  return texture(uNoise, (whole + part - 0.5) / ${NOISE_SIDE.toFixed(1)}).r;
-}
 void main() {
   vec3 ray = normalize(vRay);
   vec3 light = vec3(0.0);
@@ -52,15 +47,16 @@ void main() {
     if (mood.a < 0.002) continue;
     float weight = shell < ${String(SHELLS_LOW)} ? 1.0 : uFar;
     vec3 at = uCloudAt[shell] + reach / (CLOUDS[shell] * ${PERIOD.toFixed(1)});
-    float warp = cube(at * 3.0) - 0.5;
+    float warp = cube(TURNED * at) - 0.5;
     float fine = cube(TURNED * at * 11.0 + warp * 0.7) - 0.5;
-    fine += (cube(at * 67.0 + warp) - 0.5) * 0.5;
-    float body = cube(at * 8.0 + warp * 0.45) + fine * 0.36;
+    fine += (cube(TURNED * at * 27.0 + warp) - 0.5) * 0.5;
+    float body = cube(TURNED * at * 3.0 + warp * 0.45) + fine * 0.36;
     float cloud = smoothstep(0.42, 0.72, body);
+    float heart = smoothstep(0.5, 0.95, body + fine * 0.3);
     float rim = exp(-pow((body - 0.5) / 0.035, 2.0));
-    float ridge = 1.0 - abs(2.0 * cube(at * 5.0 - warp + 0.5) - 1.0) + fine * 0.3;
+    float ridge = 1.0 - abs(2.0 * cube(TURNED * at * 2.0 - warp + 0.5) - 1.0) + fine * 0.3;
     float lane = smoothstep(0.72, 0.96, ridge);
-    float glow = cloud * cloud * 0.55 + rim * cloud * 0.5 + pow(cloud, 8.0) * 2.4;
+    float glow = cloud * cloud * 0.55 + heart * heart * 4.5 + rim * 0.2;
     light += through * mood.rgb * mood.a * (0.05 + glow) * (1.0 - 0.2 * float(shell)) * weight;
     through *= 1.0 - lane * ${DUST.toFixed(2)} * mood.a * weight;
   }

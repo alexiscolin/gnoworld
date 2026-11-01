@@ -21,7 +21,7 @@ import { GAIN, marchMaterial, NOISE_SIDE, PERIODS, RADII, SHELLS_LOW, shownMater
 
 // Low's shells fade out over this long, and what stays lifts to the same level: a drop would show.
 const FADE_SECONDS = 1;
-const LOW_LIFT = 1.35;
+const LOW_LIFT = 1.15;
 // How far the eye goes, and the view turns, before the sky's picture is marched again: under half a pixel of it.
 const MARCH_STEP = 0.05;
 const MARCH_TURN = 0.0008;
