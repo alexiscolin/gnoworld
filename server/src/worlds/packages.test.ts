@@ -184,6 +184,43 @@ describe("readPackages", () => {
     expect((await read([WUGNOT], { doc: () => bare }).done).get(WUGNOT)?.functions).toEqual(["Transfer"]);
   });
 
+  describe("the gnomod text is the author's but for the table the chain stamps", () => {
+    const stamp = `[addpkg]\n  creator = "${CREATOR}"\n  height = 5\n`;
+    const deployerOf = async (file: string) => (await read([WUGNOT], { file: () => file }).done).get(WUGNOT)?.deployer;
+
+    it.each([
+      ["no [addpkg] table", `module = "x"\ncreator = "${CREATOR}"\n`],
+      ["a creator in a table before [addpkg]", `[other]\ncreator = "${CREATOR}"\n[addpkg]\nheight = 5\n`],
+      ["a creator in a table after an empty [addpkg]", `[addpkg]\n[later]\ncreator = "${CREATOR}"\n`],
+      ["a creator in a table after [addpkg]'s own lines", `[addpkg]\nheight = 5\n[later]\ncreator = "${CREATOR}"\n`],
+      ["a creator that is not an address", `[addpkg]\ncreator = "nope"\n`],
+      ["a creator with a trailing comment", `[addpkg]\ncreator = "${CREATOR}" # mine\n`],
+      ["a key that only ends in creator", `[addpkg]\nxcreator = "${CREATOR}"\n`],
+      ["a key that only starts with creator", `[addpkg]\ncreator_x = "${CREATOR}"\n`],
+      ["a creator that is not quoted", `[addpkg]\ncreator = ${CREATOR}\n`],
+      ["text that is no gnomod", "\u0000\u0001 not toml"],
+      ["an empty file", ""],
+    ])("gives no deployer for %s", async (_name, file) => {
+      expect(await deployerOf(file)).toBeNull();
+    });
+
+    it.each([
+      ["the chain's own stamp", stamp],
+      ["lines ended by CRLF", stamp.replaceAll("\n", "\r\n")],
+      ["no spaces around the equals sign", `[addpkg]\ncreator="${CREATOR}"\n`],
+      ["many spaces and a tab", `[addpkg]\n\t creator  =\t "${CREATOR}"  \n`],
+      ["an indented table header", `  [addpkg]  \n  creator = "${CREATOR}"\n`],
+      ["a table before it", `[first]\nname = "x"\n${stamp}`],
+    ])("reads the deployer from %s", async (_name, file) => {
+      expect(await deployerOf(file)).toBe(CREATOR);
+    });
+
+    it("takes the first creator of the table when there are two", async () => {
+      const other = "g1kfj7rq3cjqkael8rslpw4y6rlelhev4h0fswcx";
+      expect(await deployerOf(`[addpkg]\ncreator = "${CREATOR}"\ncreator = "${other}"\n`)).toBe(CREATOR);
+    });
+  });
+
   describe("hostile answers", () => {
     it.each([
       ["not JSON", "<html>"],
