@@ -72,7 +72,7 @@ interface Run {
 }
 async function run(
   routes: Routes,
-  extra: { file?: string; now?: number; maxBytes?: number; delayMs?: number } = {},
+  extra: { file?: string; now?: number; maxBytes?: number; delayMs?: number; historyMax?: number } = {},
 ): Promise<Run> {
   const file = extra.file ?? fresh();
   const logged: Run["logged"] = [];
@@ -86,6 +86,7 @@ async function run(
     now: () => extra.now ?? NOW,
     wait: (ms) => Promise.resolve(void waits.push(ms)),
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
+    ...(extra.historyMax === undefined ? {} : { historyMax: extra.historyMax }),
   });
   return { file, logged, chain, outcome, waits };
 }
@@ -359,6 +360,22 @@ describe("runWorlds", () => {
       );
       const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
       expect(calls).toEqual({ "gnoswap/pool": 7, "gnoswap/router": 4 });
+    });
+
+    it("asks the indexer for at most the cap's realms a pass, the next run the next pass, and keeps the others' counts (F3518)", async () => {
+      const paths = Array.from({ length: 12 }, (_, i) => `gno.land/r/ev/a_r${String(i).padStart(2, "0")}`);
+      const file = fresh();
+      const asked = (chain: Run["chain"]): number => chain.asked.filter(({ kind }) => kind === "indexer").length;
+      const first = await run(chainRoutes(paths), { file, historyMax: 5, now: 0 });
+      expect(asked(first.chain)).toBe(5);
+      const second = await run(chainRoutes(paths, { indexer: ({ variables }) => history(9, pathOf(variables)) }), {
+        file,
+        historyMax: 5,
+        now: EVERY_MS,
+      });
+      expect(asked(second.chain)).toBe(5);
+      const calls = written(file).worlds.flatMap((world) => world.realms.map((realm) => realm.calls));
+      expect(calls).toEqual([2, 2, 2, 2, 2, 9, 9, 9, 9, 9, null, null]);
     });
 
     it("writes the file even when every read of a package failed, with empty facts", async () => {

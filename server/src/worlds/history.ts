@@ -12,6 +12,8 @@ import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 /** The most bytes of one answer: about 38,000 lines of a call, far past the busiest realm recorded. */
 export const HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 const HISTORY_MS = 20_000;
+/** The most indexer calls one pass makes: 10,000 calls are about 42 minutes at the pause between calls, a little past the cycle. */
+export const HISTORY_MAX_CALLS = 10_000;
 
 const QUERY =
   "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }";
@@ -45,6 +47,16 @@ const Answer = z.object({
   }),
   errors: z.optional(z.never()),
 });
+
+/**
+ * The realms this pass asks the indexer about: all of them up to `max`; past it a run of `max`, starting `max` further on at each
+ * pass number and wrapping round, so every realm is reached within ceil(n / max) passes in a row. No state is stored.
+ */
+export function realmsOfPass(paths: readonly string[], pass: number, max = HISTORY_MAX_CALLS): string[] {
+  if (paths.length <= max) return [...paths];
+  const start = (pass * max) % paths.length;
+  return Array.from({ length: max }, (_, i) => paths[(start + i) % paths.length] ?? "");
+}
 
 export async function readHistory(
   reader: { send: Send; indexer: string; pace?: () => Promise<void> },

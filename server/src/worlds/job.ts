@@ -13,7 +13,7 @@ import { replaceFile } from "../replaceFile.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths } from "./group.ts";
-import { readHistory, type History } from "./history.ts";
+import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type History } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
@@ -37,6 +37,8 @@ export interface RunOptions {
   /** The pause between two calls of a pass. */
   pauseMs?: number;
   maxBytes?: number;
+  /** The most realms asked of the indexer in one pass. */
+  historyMax?: number;
   isStopped?: () => boolean;
 }
 
@@ -57,6 +59,7 @@ interface Settings {
   readonly wait: (ms: number) => Promise<void>;
   readonly pauseMs: number;
   readonly maxBytes: number;
+  readonly historyMax: number;
   readonly isStopped: () => boolean;
 }
 
@@ -68,6 +71,7 @@ function settingsOf(options: RunOptions): Settings {
     wait: options.wait ?? sleep,
     pauseMs: options.pauseMs ?? PAUSE_MS,
     maxBytes: options.maxBytes ?? WORLDS_MAX_BYTES,
+    historyMax: options.historyMax ?? HISTORY_MAX_CALLS,
     isStopped: options.isStopped ?? (() => false),
   };
 }
@@ -88,9 +92,9 @@ const SHAPE_STRIKES = 3;
 // Whether a fault is about one realm's answer (too big, or of the wrong shape) and not about the indexer or the network.
 const aboutRealm = (kind: Kind): boolean => kind === "shape" || kind === "too_large";
 
-// The history of each realm in turn. A network fault, or SHAPE_STRIKES wrong-shape answers in a row, ends the asking; a fault about one
-// realm only leaves it with its earlier counts. ponytail: one request per realm per pass, about 3 minutes at 743 realms and 42 at
-// 9,999; a pass ends before the next is counted (repeat.ts), so it lengthens the cycle. A chain-wide read waits for the schema.
+// The history of each realm in turn; a network fault, or SHAPE_STRIKES wrong-shape answers in a row, ends the asking. ponytail: one
+// request per realm, at most HISTORY_MAX_CALLS a pass (about 3 minutes at 743 realms, 42 at the cap, past the cycle: repeat.ts waits
+// for the pass); a realm not asked or at fault keeps its earlier counts. A chain-wide read waits for the schema.
 async function readHistories(
   reader: { send: Send; indexer: string; pace: () => Promise<void> },
   paths: readonly string[],
@@ -142,7 +146,8 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   );
   const names = await readNames({ send, rpc: universe.rpc, pace }, unnamed);
   const reader = { send, indexer: universe.indexer, pace };
-  const histories = await readHistories(reader, paths, settings);
+  const asked = realmsOfPass(paths, Math.floor(settings.now() / EVERY_MS), settings.historyMax);
+  const histories = await readHistories(reader, asked, settings);
   const news = compareLists([...lastRealms.keys()], list.paths);
   return { lastWorlds, lastRealms, paths, news, facts, earlierNames, names, histories };
 }

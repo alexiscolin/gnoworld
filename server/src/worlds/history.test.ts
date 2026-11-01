@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fakeChain, INDEXER } from "../testing/fakeWorldsChain.ts";
-import { HISTORY_MAX_BYTES, readHistory } from "./history.ts";
+import { HISTORY_MAX_BYTES, HISTORY_MAX_CALLS, readHistory, realmsOfPass } from "./history.ts";
 
 // THE ANSWER'S SHAPE IS OURS, NOT RECORDED (F2950): no indexer answer was read through gnomcp, so the first live proof is
 // deploy/test.sh. History holds DIRECT calls only, and a line may be a failed transaction: a count is a count of attempts,
@@ -200,5 +200,49 @@ describe("readHistory", () => {
       const result = await ask(() => new Error("secret-token-123")).read();
       expect(JSON.stringify(result)).not.toContain("secret");
     });
+  });
+});
+
+describe("realmsOfPass (F3518)", () => {
+  const realms = (n: number): string[] =>
+    Array.from({ length: n }, (_, i) => `gno.land/r/ns/r${String(i).padStart(4, "0")}`);
+
+  it("holds the cap at 10,000 calls a pass", () => {
+    expect(HISTORY_MAX_CALLS).toBe(10_000);
+  });
+
+  it("gives every realm while they are no more than the cap", () => {
+    expect(realmsOfPass(realms(7), 3, 10)).toEqual(realms(7));
+    expect(realmsOfPass(realms(10), 99, 10)).toEqual(realms(10));
+    expect(realmsOfPass([], 5, 10)).toEqual([]);
+  });
+
+  it("gives a run of the cap's length, starting further on each pass, wrapping round", () => {
+    const all = realms(25);
+    expect(realmsOfPass(all, 0, 10)).toEqual(all.slice(0, 10));
+    expect(realmsOfPass(all, 1, 10)).toEqual(all.slice(10, 20));
+    expect(realmsOfPass(all, 2, 10)).toEqual([...all.slice(20), ...all.slice(0, 5)]);
+    expect(realmsOfPass(all, 3, 10)).toEqual(all.slice(5, 15));
+  });
+
+  it("reaches every realm within the passes that must reach it, from any pass, each run of the cap's length", () => {
+    for (const total of [11, 19, 20, 21, 25, 30, 47, 100]) {
+      const all = realms(total);
+      for (const first of [0, 1, 7, 1_000_003]) {
+        const reached = new Set<string>();
+        const needed = Math.ceil(total / 10);
+        for (let pass = first; pass < first + needed; pass += 1) {
+          const run = realmsOfPass(all, pass, 10);
+          expect(run).toHaveLength(10);
+          expect(new Set(run).size).toBe(10);
+          run.forEach((path) => reached.add(path));
+        }
+        expect(reached.size).toBe(total);
+      }
+    }
+  });
+
+  it("uses the default cap when none is given", () => {
+    expect(realmsOfPass(realms(HISTORY_MAX_CALLS + 5), 0)).toHaveLength(HISTORY_MAX_CALLS);
   });
 });
