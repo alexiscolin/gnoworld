@@ -43,7 +43,7 @@ app/                         the web client
   react-router.config.ts     ssr: false; prerender lists every place from data/
   data/                      universes, hubs, ecosystems, stations, events, expedition stops, quests,
                              news, bubble rules (Zod-checked at build, ADR-0002 §7)
-  public/                    fonts, KTX2 textures, preview captures, generated OG images
+  public/                    fonts, WebP textures, preview captures, generated OG images
   src/
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen
@@ -236,7 +236,7 @@ Rules:
 
 ## The scene
 
-- One `WebGPURenderer` with its WebGL2 fallback. One render loop.
+- One `WebGLRenderer` (ADR-0002 §10). One render loop.
 - It renders on demand, by what happens (ADR-0002 §9, rendering):
   - 60 fps while travelling or interacting, 30 when only scenery moves, 10 after a minute
     with no input, never above 60;
@@ -245,7 +245,7 @@ Rules:
   - no idle orbit under reduced motion or "Reduce animations".
 - The low-power GPU. The pixel ratio is capped at 1.25 on desktop and 1 on touch; the Low
   tier takes 1 and 0.8. Auto drops to Low from a 2 s frame probe.
-- Bodies are instanced, static meshes merged per material. Textures are KTX2. Shaders are
+- Bodies are instanced, static meshes merged per material. Textures are WebP. Shaders are
   compiled before a flight arrives. Generation runs in workers.
 - Each part (a world, a station, the belt, the labels) registers what it creates with one
   disposer. Leaving disposes everything it registered: geometry, material, texture, render

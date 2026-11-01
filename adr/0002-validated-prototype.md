@@ -1420,6 +1420,7 @@ This section overrides the text above where they differ. The reasons and the num
 - **Dependencies are not positions.** A world stays with its namespace's star; its dependencies show as lines on hover.
 - **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
 - **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
+- **The renderer** is `WebGLRenderer` for the demo, not ADR-0001's `WebGPURenderer`: the gate's software renderer then tests what people see, it weighs 88 KB less, and post-processing is ready. Moving later means rewriting the shaders in TSL.
 - **A universe's shape.** Systems sit in a thick disc, with clusters above and below it, their height from a smooth field of position. The placement of §3 holds: ring by ring, and placing one system depends on no other. Universes stay never shown together; far galaxies and doors between chains wait.
 - **The mood of space.** Colours, nebulae and density are a smooth field computed from a position: no list, no count, no border, nothing stored, and it means nothing on chain. The same place gives the same picture, and a star takes the mood of where it sits.
 - **A system is a postcard.** Its star, nebula, rings and debris come from its address, with a good arrival angle. Debris is only a far belt, for dust is a sign; rings are wide, for the status is a thin tilted line with its moon; real shadows fall on the one world seen close alone.
