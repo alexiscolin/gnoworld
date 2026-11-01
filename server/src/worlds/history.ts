@@ -15,7 +15,7 @@ const HISTORY_MS = 20_000;
 const QUERY =
   "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { caller } ... on MsgAddPackage { creator } } } } }";
 
-interface History {
+export interface History {
   /** Calls made to the realm, failed ones included. */
   readonly calls: number;
   readonly callers: number;
