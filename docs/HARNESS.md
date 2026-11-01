@@ -16,7 +16,8 @@ Three ideas run through it:
 
 ![How the AI works: Alexis's approvals, the chief session and the branch sessions, each branch's Workflow loop, the agents, the gates, the merge and the dream](harness.png)
 
-Its source is [harness.html](harness.html). After changing it, render the image again from the
+It shows four loops, one inside the other: a commit through the fast gate, a branch through review and fixes, a slice through the chief's
+integration, and the dream back into the rules. Its source is [harness.html](harness.html). After changing it, render the image again from the
 repository's root (in Claude Code's sandbox, launch Chromium with `args: ["--single-process"]`):
 
 ```sh
@@ -26,13 +27,16 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 ## Who does what
 
 From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
-- **Alexis** approves each slice's plan, opens the sessions, reviews blind first, runs what the
+- **Alexis** approves each slice's plan, reviews blind first, runs what the
   sandbox refuses (Docker's `deploy/test.sh`, the merge into `main`, the push), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
-  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, gives each branch its range of F numbers
-  (two branches side by side once took the same ones) and Alexis each branch's starting brief, integrates the branches, runs the full gate and the
-  slice's last `/pre-merge`, then the dream.
+  (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its range of F numbers
+  (two branches side by side once took the same ones), makes its worktree and brief, opens its session in a herdr pane through one
+  script that alone leaves the sandbox (`~/.claude/skills/herdr-branch/scripts/open.sh`, Alexis, 2026-11-01), merges each finished branch into
+  the slice's integration branch, runs the full gate and the slice's last `/pre-merge`, with the `design-reviewer` once more over every 3D view, then the dream.
+  In slice 7 alone the parts follow each other with one full verification before the demo: a part runs neither `--merge` nor the Workflow
+  (`docs/decisions.md`, `docs/plans/slice-7.md`).
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
