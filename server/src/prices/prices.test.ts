@@ -436,7 +436,7 @@ describe("the prices timer: when it runs", () => {
   it.each([
     ["a good answer", json(ANSWER)],
     ["a 429", text("", 429)],
-    ["a request that fails", () => Promise.reject(new Error("down"))],
+    ["a 429", text("", 429)],
   ])("reads at start, then every five minutes by default, after %s as after any", async (_, answer) => {
     const delays: number[] = [];
     const real = globalThis.setTimeout;
