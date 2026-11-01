@@ -70,7 +70,7 @@ const acl = read("deploy/egress/acl.yaml");
 const compose = read("deploy/compose.yaml");
 const dockerfile = read("deploy/server/Dockerfile");
 const script = read("deploy/test.sh");
-const data = JSON.parse(read("app/data/universes.json")) as { rpc: string; default?: true }[];
+const data = JSON.parse(read("app/data/universes.json")) as { rpc: string; indexer: string; default?: true }[];
 
 const hostOf = (rpc: string) => new URL(rpc).hostname;
 const chosen = data.find((universe) => universe.default === true);
@@ -80,9 +80,16 @@ const OTHER_HOSTS = data.filter((universe) => universe.default !== true).map((un
 const allowed = [...acl.matchAll(/^\s+-\s*"?([^"\s#]+)"?\s*$/gm)].map((match) => match[1]);
 
 describe("the way out's list", () => {
-  it("names CoinGecko's API, OpenAI's and the default universe's RPC host, each by its full name, and nothing else", () => {
+  it("names CoinGecko's, OpenAI's, the default RPC host and the two indexers, each by its full name, and nothing else", () => {
     expect(DEFAULT_HOST).not.toBe("");
-    expect([...allowed].sort()).toEqual(["api.coingecko.com", "api.openai.com", DEFAULT_HOST].sort());
+    expect([...allowed].sort()).toEqual(
+      [
+        "api.coingecko.com",
+        "api.openai.com",
+        DEFAULT_HOST,
+        ...data.map((universe) => new URL(universe.indexer).hostname),
+      ].sort(),
+    );
   });
 
   it("names the host the data's default universe has now, not a copy that drifts from it", () => {
@@ -105,9 +112,9 @@ describe("the server's data", () => {
 });
 
 describe("deploy/test.sh", () => {
-  it("expects the list's hosts from the data, three of them, and no other host reached through the way out", () => {
-    expect(script).toMatch(/the way out lets three hosts out/);
-    expect(script).not.toMatch(/the way out lets two hosts out/);
+  it("expects the list's hosts from the data, five of them, and no other host reached through the way out", () => {
+    expect(script).toMatch(/the way out lets five hosts out/);
+    expect(script).not.toMatch(/the way out lets three hosts out/);
     expect(script).toContain("app/data/universes.json");
   });
 
@@ -126,7 +133,49 @@ describe("deploy/test.sh", () => {
     expect(script).toMatch(
       /mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC"/,
     );
-    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets three hosts out"/);
-    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets three hosts out"/);
+    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets five hosts out"/);
+    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets five hosts out"/);
+  });
+});
+
+const INDEXER_HOSTS = data.map((universe) => new URL(universe.indexer).hostname);
+const escaped = (host: string): string => host.replaceAll(".", "\\.");
+
+describe("the way out for the indexers", () => {
+  it("names each universe's indexer host in full, and no wildcard", () => {
+    expect(INDEXER_HOSTS.length).toBeGreaterThanOrEqual(2);
+    for (const host of INDEXER_HOSTS) expect(acl).toMatch(new RegExp(`^\\s+-\\s*"?${escaped(host)}"?\\s*$`, "m"));
+    expect(acl).not.toMatch(/\*/);
+  });
+
+  // At red this passes: no host is there yet, so no sibling is. It fails the day a wildcard or a sibling is added.
+  it("keeps a look-alike and a sibling of each indexer host out", () => {
+    for (const host of INDEXER_HOSTS) {
+      expect(acl).not.toContain(`${host}.evil`);
+      expect(acl).not.toMatch(new RegExp(`^\\s+-\\s*"?[a-z0-9.-]+\\.${escaped(host)}"?\\s*$`, "m"));
+    }
+  });
+
+  it.each([
+    [
+      "Onyx's indexer dropped from the way out",
+      "the server does not reach the universe's indexer indexer.onyx.testnets.gno.land",
+    ],
+    [
+      "gno.land's indexer dropped from the way out",
+      "the server does not reach the universe's indexer indexer.gno.land",
+    ],
+    ["Onyx's indexer's whole domain let out", "the way out lets five hosts out"],
+    ["gno.land's indexer's whole domain let out", "the way out lets five hosts out"],
+  ])("has the mutant %j, killed by %j, which the stack's check also says", (label, wanted) => {
+    expect(script).toContain(`mutant "${label}" "${wanted}"`);
+    // Once in the mutant, once in the check itself (F695).
+    expect(script.split(wanted.replace(/ indexer\.[a-z.]+$/, " $indexer_host")).length - 1).toBeGreaterThanOrEqual(1);
+  });
+
+  it("proves in the stack that the server reaches each indexer through the way out, and that a look-alike is refused", () => {
+    expect(script).toMatch(/the server reaches the universe's indexer \$indexer_host through the way out/);
+    expect(script).toMatch(/the server does not reach the universe's indexer \$indexer_host through the way out/);
+    expect(script).toMatch(/"https:\/\/\$indexer_host\.evil\.test\/"/);
   });
 });

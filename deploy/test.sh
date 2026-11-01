@@ -450,17 +450,26 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
-	mutant "a host added to the way out" "the way out lets three hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	mutant "a host added to the way out" "the way out lets five hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
 	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
-	mutant "CoinGecko's whole domain let out" "the way out lets three hosts out" \
+	mutant "CoinGecko's whole domain let out" "the way out lets five hosts out" \
 		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
 	# The default universe's RPC (decision of 2026-10-31): its line gone, another universe's RPC let out beside it, its whole domain
 	# let out. A server with no data file fails closed at boot (main.test.ts), which the stack's start shows, no mutant needed.
 	mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC" acl sed '/- rpc\.onyx\./d'
-	mutant "another universe's RPC let out" "the way out lets three hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.gno.land" }'
-	mutant "the default RPC's whole domain let out" "the way out lets three hosts out" \
+	mutant "another universe's RPC let out" "the way out lets five hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.gno.land" }'
+	mutant "the default RPC's whole domain let out" "the way out lets five hosts out" \
 		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
+	# The worlds job's indexers (slice 7, 7c): each universe's host gone, or its whole domain let out beside it.
+	mutant "Onyx's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.onyx.testnets.gno.land" \
+		acl sed '/- indexer\.onyx\./d'
+	mutant "gno.land's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.gno.land" \
+		acl sed '/- indexer\.gno\.land/d'
+	mutant "Onyx's indexer's whole domain let out" "the way out lets five hosts out" \
+		acl awk '{ print } /- indexer\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
+	mutant "gno.land's indexer's whole domain let out" "the way out lets five hosts out" \
+		acl awk '{ print } /- indexer\.gno\.land/ { print "    - \"*.gno.land\"" }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
@@ -1333,13 +1342,17 @@ print(u.urlparse(next(row["rpc"] for row in rows if not row.get("default"))).hos
 	gnoweb_host=$(python3 -I -c 'import json, sys, urllib.parse as u
 rows = json.load(open(sys.argv[1]))
 print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
-	expect "the way out lets three hosts out: CoinGecko's API, OpenAI's and the default universe's RPC" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
-		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" | sort | tr '\n' ' ')"
+	# The worlds job's indexers (slice 7, 7c): every universe's, each by its full name.
+	indexer_hosts=$(python3 -I -c 'import json, sys, urllib.parse as u
+for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostname)' "$repo/app/data/universes.json")
+	expect "the way out lets five hosts out: CoinGecko's API, OpenAI's, the default universe's RPC and the universes' indexers" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
+		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" $indexer_hosts | sort | tr '\n' ' ')"
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
 	refuses() {
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
+	for indexer_host in $indexer_hosts; do refuses "https://$indexer_host.evil.test/"; done
 	for target in "https://$other_rpc/" "https://$rpc_host.evil.test/" "https://$gnoweb_host/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
@@ -1356,6 +1369,10 @@ print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).host
 	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
 	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
 	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
+	# The worlds job's indexers (slice 7, 7c): each universe's, asked as the job asks; any answer is a way through.
+	for indexer_host in $indexer_hosts; do
+		case $(fetched "https://$indexer_host/") in [1-5][0-9][0-9]) pass "the server reaches the universe's indexer $indexer_host through the way out" ;; *) fail "the server does not reach the universe's indexer $indexer_host through the way out" ;; esac
+	done
 	# The server read the data it names (UNIVERSES_FILE) at boot, or it would not be up: its default RPC is the list's third host.
 	expect "the server's data holds the default universe's RPC" "$(docker exec "$server" /nodejs/bin/node -e "const rows = JSON.parse(require('fs').readFileSync(process.env.UNIVERSES_FILE, 'utf8')); console.log(new URL(rows.find((row) => row.default).rpc).hostname)" 2>&1 || true)" "$rpc_host"
 	# The running timer itself writes the block (not a planted file): its first tick asks CoinGecko and the default RPC through the way

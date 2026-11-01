@@ -565,11 +565,17 @@ describe("the prices timer: when it runs", () => {
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("the egress proxy's list", () => {
-  // The block height (decision of 2026-10-31) adds one host, the default universe's RPC; universes.test.ts ties it to the data.
-  it("lets out CoinGecko's API, OpenAI's and the default universe's RPC, and no other host", () => {
+  // The block height (decision of 2026-10-31) adds the default RPC, the worlds job (7c) the indexers; universes.test.ts ties them to the data.
+  it("lets out CoinGecko's, OpenAI's, the default universe's RPC and the indexers, and no other host", () => {
     const acl = read("../../../deploy/egress/acl.yaml");
     const hosts = [...acl.matchAll(/^\s+-\s+(\S+)\s*$/gm)].map((match) => match[1]);
-    expect(hosts).toEqual(["api.coingecko.com", "api.openai.com", "rpc.onyx.testnets.gno.land"]);
+    expect(hosts).toEqual([
+      "api.coingecko.com",
+      "api.openai.com",
+      "rpc.onyx.testnets.gno.land",
+      "indexer.onyx.testnets.gno.land",
+      "indexer.gno.land",
+    ]);
   });
 
   it("names CoinGecko by the API's own name, never a wildcard or its parent domain", () => {
@@ -621,7 +627,7 @@ describe("deploy/test.sh", () => {
 
   it("names its mutants by checks that exist: the renamed one cannot be orphaned (F695)", () => {
     expect(script).not.toContain("lets one host out");
-    for (const wanted of ["the way out lets three hosts out", "the server does not reach CoinGecko"]) {
+    for (const wanted of ["the way out lets five hosts out", "the server does not reach CoinGecko"]) {
       // Once in a mutant that must be killed by the check, once in the check itself.
       expect(script.split(wanted).length - 1, wanted).toBeGreaterThanOrEqual(2);
     }
