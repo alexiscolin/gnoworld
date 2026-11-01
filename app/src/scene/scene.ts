@@ -5,10 +5,9 @@ import { PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { createRenderer } from "./renderer.ts";
-import { watchPage, watchScreen } from "./watch.ts";
+import { MOTION, watchPage, watchScreen } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
-const MOTION = "(prefers-reduced-motion: reduce)";
 const FIELD_OF_VIEW = 50;
 const NEAR = 0.1;
 const FAR = 2000;
@@ -55,6 +54,7 @@ class LiveScene implements Scene {
   #frames = 0;
   #width = 0;
   #height = 0;
+  #viewportStale = false;
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -68,8 +68,7 @@ class LiveScene implements Scene {
         this.#renderer.dispose();
       },
     });
-    this.#applyRatio();
-    this.#applySize();
+    this.#applyViewport();
     this.#loop = new FrameLoop(clock, this.#draw);
     this.#owner.add({
       dispose: () => {
@@ -83,7 +82,7 @@ class LiveScene implements Scene {
   #watch(canvas: HTMLCanvasElement): void {
     const { signal } = this.#owner;
     watchPage(this.#loop, signal);
-    watchScreen(this.#newRatio, signal);
+    watchScreen(this.#viewportChanged, signal);
     const observer = new ResizeObserver(this.#resized);
     observer.observe(canvas);
     this.#owner.add({
@@ -101,6 +100,7 @@ class LiveScene implements Scene {
   }
 
   readonly #draw = (delta: number): void => {
+    if (this.#viewportStale) this.#applyViewport();
     this.#renderer.render(this.#stage, this.#camera);
     this.#frames += 1;
     if (this.#probing && delta > 0) this.#sample(delta);
@@ -118,37 +118,36 @@ class LiveScene implements Scene {
     this.#loop.set({ busy: false });
     if (verdict === "keep") return;
     this.#tier = "low";
-    this.#newRatio();
+    this.#viewportChanged();
     if (verdict === "low") this.#options.remember("low");
   }
 
-  #applyRatio(): void {
+  // Both clear the buffer, so they wait for the frame that draws it, and never fall between two frames.
+  #applyViewport(): void {
+    this.#viewportStale = false;
     this.#renderer.setPixelRatio(pixelRatioFor(devicePixelRatio, this.#touch, this.#tier));
-  }
-
-  readonly #newRatio = (): void => {
-    this.#applyRatio();
-    this.#loop.redraw();
-  };
-
-  #applySize(): boolean {
     const { clientWidth: width, clientHeight: height } = this.#options.canvas;
-    if (width === 0 || height === 0 || (width === this.#width && height === this.#height)) return false;
+    if (width === 0 || height === 0) return;
     this.#width = width;
     this.#height = height;
     this.#renderer.setSize(width, height, false);
     this.#camera.aspect = width / height;
     this.#camera.updateProjectionMatrix();
-    return true;
   }
 
+  readonly #viewportChanged = (): void => {
+    this.#viewportStale = true;
+    this.#loop.redraw();
+  };
+
   readonly #resized = (): void => {
-    if (this.#applySize()) this.#loop.redraw();
+    const { clientWidth: width, clientHeight: height } = this.#options.canvas;
+    if (width !== 0 && height !== 0 && (width !== this.#width || height !== this.#height)) this.#viewportChanged();
   };
 
   #stopOrGo(): void {
     this.#loop.set({ covered: this.#covered || this.#lost });
-    if (!this.#covered && !this.#lost) this.#loop.redraw();
+    this.#loop.redraw();
   }
 
   cover(covered: boolean): void {

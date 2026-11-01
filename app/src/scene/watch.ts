@@ -1,7 +1,7 @@
 // What the scene listens to in the page; every listener goes with the signal.
 import type { FrameLoop } from "./loop.ts";
 
-const MOTION = "(prefers-reduced-motion: reduce)";
+export const MOTION = "(prefers-reduced-motion: reduce)";
 const INPUTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
 
 /** Feeds the loop from the tab, the window, the reader's motion setting and their inputs. */

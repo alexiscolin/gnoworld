@@ -119,9 +119,35 @@ describe("the renderer it starts", () => {
     const scene = startScene(options(), clock);
     sized(canvas, 800, 1000);
     observed?.();
-    expect(three.renderer.setSize).toHaveBeenLastCalledWith(800, 1000, false);
     clock.run(100);
+    expect(three.renderer.setSize).toHaveBeenLastCalledWith(800, 1000, false);
     expect(three.renderer.render.mock.lastCall?.[1].aspect).toBe(800 / 1000);
+    scene.dispose();
+  });
+
+  it("clears the buffer only in the frame that draws it: a new size waits for that frame", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    three.renderer.setSize.mockClear();
+    sized(canvas, 800, 1000);
+    observed?.();
+    expect(three.renderer.setSize).not.toHaveBeenCalled();
+    clock.run(100);
+    const [resized] = three.renderer.setSize.mock.invocationCallOrder;
+    const drawnAfter = three.renderer.render.mock.invocationCallOrder.filter((at) => at > (resized ?? Infinity));
+    expect(drawnAfter.length).toBeGreaterThan(0);
+    scene.dispose();
+  });
+
+  it("clears the buffer only in the frame that draws it: a new ratio waits for that frame", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(100);
+    three.renderer.setPixelRatio.mockClear();
+    vi.stubGlobal("devicePixelRatio", 1);
+    query("(resolution: 2dppx)").dispatchEvent(new Event("change"));
+    expect(three.renderer.setPixelRatio).not.toHaveBeenCalled();
+    clock.run(100);
+    expect(three.renderer.setPixelRatio).toHaveBeenCalledWith(1);
     scene.dispose();
   });
 
@@ -168,10 +194,16 @@ describe("the renderer it starts", () => {
     three.renderer.setPixelRatio.mockClear();
     vi.stubGlobal("devicePixelRatio", 0.5);
     query("(resolution: 2dppx)").dispatchEvent(new Event("change"));
+    clock.run(100);
     expect(three.renderer.setPixelRatio).toHaveBeenLastCalledWith(0.5);
     vi.stubGlobal("devicePixelRatio", 2);
     query("(resolution: 0.5dppx)").dispatchEvent(new Event("change"));
+    clock.run(100);
     expect(three.renderer.setPixelRatio).toHaveBeenLastCalledWith(1);
+    three.renderer.setPixelRatio.mockClear();
+    query("(resolution: 0.5dppx)").dispatchEvent(new Event("change"));
+    clock.run(100);
+    expect(three.renderer.setPixelRatio, "a screen left behind has no listener").not.toHaveBeenCalled();
     scene.dispose();
   });
 
@@ -187,12 +219,21 @@ describe("the renderer it starts", () => {
     scene.dispose();
   });
 
-  it("owes a frame when the Auto probe lowers the tier, whose ratio clears the canvas", () => {
+  it("owes a frame when the Auto probe lowers the tier, whose ratio clears the canvas, even with nothing moving", () => {
     clock = new FakeClock(40);
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
     const scene = startScene(options(), clock);
-    clock.run(2100);
+    clock.run(1000);
+    focus.mockReturnValue(false);
+    window.dispatchEvent(new Event("blur"));
+    three.renderer.setPixelRatio.mockClear();
+    clock.run(1100);
     expect(scene.stats().tier).toBe("low");
-    expect(three.renderer.render.mock.calls.length).toBeGreaterThan(40);
+    expect(three.renderer.setPixelRatio).toHaveBeenCalledExactlyOnceWith(1);
+    const [lowered] = three.renderer.setPixelRatio.mock.invocationCallOrder;
+    const [last] = three.renderer.render.mock.invocationCallOrder.slice(-1);
+    expect(last ?? 0, "the frame after the verdict draws on the new buffer").toBeGreaterThan(lowered ?? Infinity);
+    expect(clock.pending).toEqual({ frames: 0, timers: 0 });
     scene.dispose();
   });
 });
@@ -223,7 +264,7 @@ describe("the Auto probe", () => {
     clock = new FakeClock(40);
     const scene = startScene(options(), clock);
     three.renderer.setPixelRatio.mockClear();
-    clock.run(2100);
+    clock.run(2200);
     expect(scene.stats().tier).toBe("low");
     expect(three.renderer.setPixelRatio).toHaveBeenLastCalledWith(1);
     expect(remember).toHaveBeenCalledExactlyOnceWith("low");
@@ -258,7 +299,7 @@ describe("the Auto probe", () => {
 
   it("counts no time the tab was hidden against the machine", () => {
     const scene = startScene(options(), clock);
-    frames(30, 1000 / 60);
+    frames(3, 1000 / 60);
     const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
     document.dispatchEvent(new Event("visibilitychange"));
     clock.run(10_000);
