@@ -9,8 +9,8 @@ import {
   SRGBColorSpace,
   Texture,
 } from "three";
-import { describe, expect, it } from "vitest";
-import { mapBytes, mapUrl, prepareMap } from "./maps.ts";
+import { describe, expect, it, vi } from "vitest";
+import { decodeOptions, freeMap, mapBytes, mapUrl, prepareMap } from "./maps.ts";
 
 const sized = (width: number, height: number, format?: typeof RedFormat): Texture => {
   const texture = new Texture({ width, height });
@@ -53,6 +53,40 @@ describe("prepareMap", () => {
 
   it("never flips a bitmap, which the loader would ignore", () => {
     expect(prepareMap(new Texture(), "colour", 4).flipY).toBe(false);
+  });
+});
+
+describe("decodeOptions", () => {
+  it("decodes a bitmap as it was drawn: never flipped, never premultiplied", () => {
+    expect(decodeOptions(undefined)).toEqual({ imageOrientation: "none", premultiplyAlpha: "none" });
+  });
+
+  it("scales it to a 2:1 map of the width asked, in the browser's decoder, so a Low device never holds the full size", () => {
+    expect(decodeOptions(2048)).toEqual({
+      imageOrientation: "none",
+      premultiplyAlpha: "none",
+      resizeWidth: 2048,
+      resizeHeight: 1024,
+      resizeQuality: "high",
+    });
+  });
+});
+
+describe("freeMap", () => {
+  it("frees the texture and closes a bitmap never uploaded", () => {
+    const close = vi.fn();
+    const texture = new Texture({ width: 4, height: 2, close });
+    const disposed = vi.spyOn(texture, "dispose");
+    freeMap(texture);
+    expect(disposed).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a map already uploaded, whose bitmap went then, to three", () => {
+    const texture = new Texture({ width: 4, height: 2 });
+    const disposed = vi.spyOn(texture, "dispose");
+    freeMap(texture);
+    expect(disposed).toHaveBeenCalledTimes(1);
   });
 });
 

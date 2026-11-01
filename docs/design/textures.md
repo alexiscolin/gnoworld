@@ -24,6 +24,14 @@ fictional terrain, and the site lists Ceres and Eris as fictional.
 
 The shaders warp, recolour and mix them by each world's seed.
 
+The Earth's two are drawn as they came, with a row of their own in the credits. Read on the same day, from the same page. A Low or touch
+device decodes them at half each side, from the same files (`decodeOptions`, `earth/maps.ts`).
+
+| File | Source | Size | Changes |
+|---|---|---|---|
+| `earth-day.webp` | `8k_earth_daymap.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.9, 821 KB |
+| `earth-night.webp` | `8k_earth_nightmap.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.85, 304 KB |
+
 ## ESA/Hubble, CC BY 4.0
 
 https://esahubble.org/copyright/: images "released under the Creative Commons Attribution 4.0 International license"; the credit in

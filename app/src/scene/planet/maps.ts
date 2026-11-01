@@ -14,6 +14,13 @@ import {
 
 type MapKind = "colour" | "data";
 
+export interface MapLoad {
+  readonly kind: MapKind;
+  readonly anisotropy: number;
+  /** Decoded to this width, a map being twice as wide as it is high. */
+  readonly width?: number;
+}
+
 const MIPMAPS = 4 / 3;
 
 /** Where a map is, for a site served at `base`. */
@@ -45,16 +52,28 @@ export function mapBytes(textures: Iterable<Texture>): number {
   return bytes;
 }
 
+/** How the browser decodes a map, in full or scaled at once, so a small device never holds the full size. */
+export function decodeOptions(width: number | undefined): ImageBitmapOptions {
+  const drawn: ImageBitmapOptions = { imageOrientation: "none", premultiplyAlpha: "none" };
+  return width === undefined ? drawn : { ...drawn, resizeWidth: width, resizeHeight: width / 2, resizeQuality: "high" };
+}
+
+/** Frees a map, and its bitmap if it was never uploaded: the upload closes it, and three never would. */
+export function freeMap(texture: Texture): void {
+  texture.dispose();
+  (texture.image as Partial<ImageBitmap>).close?.();
+}
+
 /** Loads a map. */
-export async function loadMap(url: string, kind: MapKind, anisotropy: number): Promise<Texture> {
+export async function loadMap(url: string, { kind, anisotropy, width }: MapLoad): Promise<Texture> {
   const loader = new ImageBitmapLoader();
-  loader.setOptions({ imageOrientation: "none", premultiplyAlpha: "none" });
+  loader.setOptions(decodeOptions(width));
   const bitmap = await loader.loadAsync(url);
   const texture = prepareMap(new Texture(bitmap), kind, anisotropy);
-  const { width, height } = bitmap;
+  const size = { width: bitmap.width, height: bitmap.height };
   texture.onUpdate = () => {
     bitmap.close();
-    texture.image = { width, height };
+    texture.image = size;
   };
   return texture;
 }

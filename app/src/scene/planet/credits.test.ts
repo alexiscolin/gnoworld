@@ -11,6 +11,16 @@ const FILES = readdirSync(FOLDER, { recursive: true });
 const MAX_BYTES = 1024 * 1024;
 const LICENCES = ["CC BY 4.0"];
 const ascii = (bytes: Uint8Array) => String.fromCharCode(...bytes);
+const SIDE = 0x3fff;
+
+// A WebP's own size, as its header says: a lossy file's frame, or the extended header of one with alpha.
+function sizeOf(path: string) {
+  const bytes = readFileSync(path);
+  const read = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (ascii(bytes.subarray(12, 16)) === "VP8X")
+    return { width: (read.getUint32(24, true) & 0xffffff) + 1, height: (read.getUint32(27, true) & 0xffffff) + 1 };
+  return { width: read.getUint16(26, true) & SIDE, height: read.getUint16(28, true) & SIDE };
+}
 
 describe("the textures' credits", () => {
   it("names every file in the folder, and no file that is not there", () => {
@@ -35,6 +45,19 @@ describe("the textures' credits", () => {
     }
   });
 
+  it("dates every row: the day its terms and its files were read", () => {
+    for (const credit of CREDITS) expect(new Date(credit.read).toISOString().slice(0, 10)).toBe(credit.read);
+  });
+
+  it("gives the Earth's maps a row of their own, for they are drawn as they came, neither warped nor recoloured", () => {
+    const earth = CREDITS.find((credit) => credit.files.includes("earth-day"));
+    expect(earth?.files).toEqual(["earth-day", "earth-night"]);
+    expect(earth?.author).toBe("Solar System Scope");
+    expect(earth?.line).toContain("Earth");
+    expect(earth?.line).toContain("NASA");
+    expect(earth?.line).not.toContain("warped");
+  });
+
   it("notes the changes made to an ESA/Hubble image after its credit, as its terms ask", () => {
     const hubble = CREDITS.find((credit) => credit.author.includes("ESA/Hubble"));
     expect(hubble?.line).toContain(
@@ -45,6 +68,18 @@ describe("the textures' credits", () => {
 });
 
 describe("the textures' files", () => {
+  it("hold the Earth at the plan's size, which its memory budget assumes", () => {
+    for (const name of ["earth-day", "earth-night"])
+      expect(sizeOf(join(FOLDER, `${name}.webp`)), name).toEqual({ width: 4096, height: 2048 });
+  });
+
+  it("are 2:1 where the scene scales them: a map decoded smaller keeps its shape", () => {
+    for (const name of ["earth-day", "earth-night", "moon", "clouds"]) {
+      const { width, height } = sizeOf(join(FOLDER, `${name}.webp`));
+      expect(width, name).toBe(height * 2);
+    }
+  });
+
   it("are real WebP, small enough to send", () => {
     for (const file of FILES) {
       const path = join(FOLDER, file);

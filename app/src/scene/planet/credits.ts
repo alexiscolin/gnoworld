@@ -7,6 +7,8 @@ export interface Credit {
   readonly author: string;
   readonly licence: string;
   readonly source: string;
+  /** The day its terms and its files were read. */
+  readonly read: string;
   /** The words shown. */
   readonly line: string;
 }
@@ -17,13 +19,23 @@ export const CREDITS: readonly Credit[] = [
     author: "Solar System Scope",
     licence: "CC BY 4.0",
     source: "https://www.solarsystemscope.com/textures/",
+    read: "2026-11-02",
     line: "Maps: Solar System Scope, CC BY 4.0, warped and recoloured",
+  },
+  {
+    files: ["earth-day", "earth-night"],
+    author: "Solar System Scope",
+    licence: "CC BY 4.0",
+    source: "https://www.solarsystemscope.com/textures/",
+    read: "2026-11-02",
+    line: "Earth: Solar System Scope, CC BY 4.0, based on NASA imagery; scaled to 4096 by 2048",
   },
   {
     files: ["carina"],
     author: "ESA/Hubble",
     licence: "CC BY 4.0",
     source: "https://esahubble.org/images/heic0707a/",
+    read: "2026-11-02",
     line: "Nebula: NASA, ESA, N. Smith (University of California, Berkeley), and The Hubble Heritage Team (STScI/AURA), ESA/Hubble, CC BY 4.0; cropped, stars removed, recoloured and warped",
   },
 ];

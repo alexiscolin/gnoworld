@@ -86,12 +86,12 @@ async function mapsFor(looks: readonly PlanetLook[], base: string, anisotropy: n
   const names = [...new Set(looks.flatMap((look) => [look.map, look.second]))];
   const loaded = new Map(
     await Promise.all(
-      names.map(async (name) => [name, await loadMap(mapUrl(name, base), "colour", anisotropy)] as const),
+      names.map(async (name) => [name, await loadMap(mapUrl(name, base), { kind: "colour", anisotropy })] as const),
     ),
   );
   const [clouds, ring] = await Promise.all([
-    loadMap(mapUrl("clouds", base), "data", anisotropy),
-    loadMap(mapUrl("ring", base), "data", anisotropy),
+    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy }),
+    loadMap(mapUrl("ring", base), { kind: "data", anisotropy }),
   ]);
   const set: MapSet = {
     map: (name) => {
@@ -158,7 +158,7 @@ function layoutOf(view: ViewName): Layout {
 async function nebulaOf(choice: Choice, { renderer, base }: Device): Promise<Nebula | undefined> {
   if (choice.view !== "nebula") return undefined;
   if (choice.method === "computed") return computedNebula(renderer);
-  return imageNebula(await loadMap(mapUrl("carina", base), "colour", ANISOTROPY));
+  return imageNebula(await loadMap(mapUrl("carina", base), { kind: "colour", anisotropy: ANISOTROPY }));
 }
 
 // A stage holding `worlds` under one star, with the sky behind them.
