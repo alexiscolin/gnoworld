@@ -319,11 +319,13 @@ describe("what stops it", () => {
   });
 
   it("follows the window's focus", () => {
+    const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
     const scene = startScene(options({ remembered: "low" }), clock);
-    window.dispatchEvent(new Event("focus"));
     clock.run(100);
+    focus.mockReturnValue(false);
     window.dispatchEvent(new Event("blur"));
     expect(clock.pending).toEqual({ frames: 0, timers: 0 });
+    focus.mockReturnValue(true);
     window.dispatchEvent(new Event("focus"));
     expect(clock.pending.frames + clock.pending.timers).toBe(1);
     scene.dispose();
