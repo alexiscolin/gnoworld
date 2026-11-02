@@ -20,6 +20,12 @@ describe("the densest group", () => {
     expect(composed(four, spot(190, 110), false)).toBe(true);
     expect(composed([...four, spot(95, 55)], spot(190, 110), false)).toBe(false);
   });
+
+  // Seen on 7d6's review: a box centred on each body misses a group at the corners of one box.
+  it("refuses five bodies in any such box, though no box centred on one of them holds all five", () => {
+    const five = [spot(0, 0), spot(199, 0), spot(0, 119), spot(199, 119), spot(100, 0)];
+    expect(composed(five, spot(100, 300), false)).toBe(false);
+  });
 });
 
 describe("the air between bodies, and depth's cover", () => {

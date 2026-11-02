@@ -3,7 +3,7 @@
 import type { Seen } from "./restLook.ts";
 
 // Frame 4's densest group, measured by the chief at 1728 by 1080: four bodies in about 200 by 120 pixels.
-const GROUP = { across: 100, up: 60, most: 4 };
+const GROUP = { across: 200, up: 120, most: 4 };
 // The spread across the best line through the bodies against the spread along it, at the least, for four or more: three make a triangle.
 const ACROSS_LINE = 0.2;
 // A view with a close world and a lit Earth stands low over the disc: a tenth (the chief, 2026-11-02; Onyx's reads 0.11).
@@ -31,11 +31,15 @@ export function offLine(spots: readonly { readonly x: number; readonly y: number
   return middle + reach === 0 ? 0 : Math.sqrt((middle - reach) / (middle + reach));
 }
 
+// Any box of the group's size: one whose left edge stands at a body's centre and top edge at a body's, which tries every box that holds a
+// different set. ponytail: n³ on the dozen spots a view draws at most.
 const crowded = (spots: readonly Seen[]) =>
-  spots.some(
-    (one) =>
-      spots.filter(({ x, y }) => Math.abs(x - one.x) <= GROUP.across && Math.abs(y - one.y) <= GROUP.up).length >
-      GROUP.most,
+  spots.some((left) =>
+    spots.some(
+      (top) =>
+        spots.filter(({ x, y }) => x >= left.x && x <= left.x + GROUP.across && y >= top.y && y <= top.y + GROUP.up)
+          .length > GROUP.most,
+    ),
   );
 
 // Two bodies at a like distance keep a third of the smaller one's width between them; one this much nearer may cover a farther one, by half
