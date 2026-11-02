@@ -9,6 +9,7 @@ import {
   EARTH_PLACE,
   EARTH_RADIUS,
   GNO_LAND,
+  GRAIN,
   orbitPlace,
   ROOM,
   systemsOf,
@@ -95,10 +96,12 @@ describe("systemsOf", () => {
     expect(2 * ROOM).toBeLessThanOrEqual(CELL);
   });
 
-  it("keeps a namespace's worlds apart at any size, every pair and any mix of use: no pile-up in a cell of 500", () => {
+  it("keeps every body apart at any size, every pair and any mix of use: no pile-up in a cell of 500", () => {
     for (const count of [2, 3, 5, 12, 60, 172, 226, 500, 2000]) {
-      const { worlds } = named(systemsOf(mixedUse("a", count)), "a");
-      expect(worlds).toHaveLength(count);
+      const all = named(systemsOf(mixedUse("a", count)), "a").worlds;
+      expect(all).toHaveLength(count);
+      const worlds = all.filter(({ radius }) => radius >= GRAIN);
+      expect(worlds.length).toBeGreaterThan(0);
       const least = worlds.reduce(
         (close, one, at) =>
           worlds.reduce((nearest, other, next) => (next <= at ? nearest : Math.min(nearest, gapOf(one, other))), close),
@@ -111,11 +114,55 @@ describe("systemsOf", () => {
   it("shows a dense system by a few clear bodies: its three most used keep a world's size, the rest are grain", () => {
     const { worlds } = named(systemsOf(mixedUse("a", 127)), "a");
     for (const clear of worlds.slice(0, 3)) expect(clear.radius).toBeGreaterThan(0.6);
-    for (const grain of worlds.slice(3)) expect(grain.radius).toBeLessThan(0.3);
+    for (const grain of worlds.slice(3)) expect(grain.radius).toBeLessThan(GRAIN);
+  });
+
+  it("scatters a crowd's grain in loose clumps, never in the lattice's printed rows", () => {
+    const { worlds } = named(systemsOf(mixedUse("a", 172)), "a");
+    const grain = worlds.slice(3);
+    const turn = 2 * Math.PI;
+    const place = (world: Orbiter) => ((world.phase % turn) + turn) % turn;
+    const sectors = new Array<number>(24).fill(0);
+    for (const world of grain) {
+      const sector = Math.floor((place(world) / turn) * 24);
+      sectors[sector] = (sectors[sector] ?? 0) + 1;
+    }
+    const mean = grain.length / 24;
+    const spread = Math.sqrt(sectors.reduce((sum, count) => sum + (count - mean) ** 2, 0) / 24);
+    expect(spread / mean).toBeGreaterThan(0.4);
+    const orbits = new Set(grain.map(({ orbit }) => orbit.toFixed(3)));
+    expect(orbits.size).toBeGreaterThan(grain.length * 0.8);
+  });
+
+  it("scatters a crowd the same way each time: the same file, the same dust", () => {
+    expect(named(systemsOf(mixedUse("a", 172)), "a").worlds).toEqual(named(systemsOf(mixedUse("a", 172)), "a").worlds);
   });
 
   it("keeps a small system's worlds all at a world's size", () => {
     for (const { radius } of named(systemsOf(held("a", 5)), "a").worlds) expect(radius).toBeGreaterThan(0.5);
+  });
+
+  it.each([1, 3, 12, 60, 127, 500])(
+    "moves nothing with activity, %i worlds: other uses, the same place for each (ADR-0002 §3)",
+    (count) => {
+      const places = (uses: (at: number) => number) => {
+        const file = held("a", count).map((world, at) => ({ ...world, use: uses(at) }));
+        const { worlds } = named(systemsOf(file), "a");
+        return new Map(worlds.map(({ id, orbit, phase }) => [id, { orbit, phase }]));
+      };
+      const quiet = places(() => 0);
+      expect(places((at) => (count - at) * 37)).toEqual(quiet);
+      expect(places((at) => (at % 5 === 0 ? 900 : 1))).toEqual(quiet);
+      expect(places((at) => at * at)).toEqual(quiet);
+    },
+  );
+
+  it("lets activity change a size: the most used of a crowd stands clear", () => {
+    const uses = (busy: number) => held("a", 127).map((world, at) => ({ ...world, use: at === busy ? 900 : 1 }));
+    const radiusOf = (busy: number, at: number) =>
+      named(systemsOf(uses(busy)), "a").worlds.find(({ id }) => id === `a/w${String(at)}`)?.radius ?? NaN;
+    expect(radiusOf(40, 40)).toBeGreaterThan(GRAIN);
+    expect(radiusOf(41, 40)).toBeLessThan(GRAIN);
   });
 
   it("counts a world named twice once", () => {

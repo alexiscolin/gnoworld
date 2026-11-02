@@ -3,6 +3,8 @@
 import {
   asciiBytes,
   clearOf,
+  growthAt,
+  leanFor,
   orbitPlace,
   planetSeed,
   spreadAt,
@@ -16,8 +18,9 @@ import {
 } from "@gnoworld/core";
 import { Group, SphereGeometry, Vector3, type Camera } from "three";
 import { Disposer } from "../disposer.ts";
-import { angleAt, fromEyeOf, sideOf } from "../planet/light.ts";
-import { createPlanet, LIMB_LIGHT, type Planet } from "../planet/planet.ts";
+import { fromEyeOf } from "../planet/light.ts";
+import { createPlanet, type Planet } from "../planet/planet.ts";
+import { angleAt, limbAt, sideOf } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
 interface Body {
@@ -57,6 +60,8 @@ export class Bodies {
   readonly #ahead = new Vector3();
   readonly #spot = { x: 0, y: 0, radius: 0 };
   readonly group = new Group();
+  #last: Point | undefined;
+  #seconds = 0;
   #view: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
   constructor(maps: BodyMaps, owner: Disposer, camera: Camera) {
@@ -89,6 +94,7 @@ export class Bodies {
     for (const [id, [system, world]] of wanted) if (!this.#held.has(id)) this.#add(id, system, world);
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
+    if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
   }
 
   #add(id: string, system: StarSystem, world: Orbiter): void {
@@ -96,7 +102,6 @@ export class Bodies {
     const set = this.#maps.setFor(look);
     if (set === undefined) return;
     const planet = createPlanet(look, set, this.#sphere);
-    if (look.rim !== null) planet.setLimb(LIMB_LIGHT);
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(asciiBytes(`gno.land/r/${id}`)));
     this.#held.set(id, {
@@ -113,6 +118,8 @@ export class Bodies {
 
   /** One frame on: each where its orbit has it, from `eye`, in doubles. */
   tick(eye: Point, seconds: number): void {
+    this.#last = eye;
+    this.#seconds = seconds;
     for (let at = 0; at < this.#shown.length; at += 1) {
       const body = this.#shown[at];
       if (body !== undefined) this.#pose(body, eye, seconds);
@@ -136,9 +143,12 @@ export class Bodies {
     sun.subVectors(star, at).normalize();
     planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
     planet.setTime(seconds);
-    const room = this.#room(at, world.radius);
-    planet.group.scale.setScalar(world.radius * room);
+    if (planet.look.rim !== null) planet.setLimb(limbAt(away));
+    const radius = world.radius * growthAt(away);
+    const room = this.#room(at, radius);
+    planet.group.scale.setScalar(radius * room);
     planet.group.visible = room > 0;
+    planet.group.rotation.x = leanFor(planet.look.lean, Math.atan2(at.y, -at.z));
   }
 
   #spotOf(at: Vector3, radius: number): ScreenSpot {
@@ -156,13 +166,15 @@ export class Bodies {
     return box === undefined ? 1 : clearOf(this.#spotOf(at, radius), box);
   }
 
-  /** How much of what stands at `place` on the map, from `eye`, the box of the page's text leaves. */
-  shows(place: Point, eye: Point): number {
+  /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
+  shows(place: Point, radius: number, eye: Point): number {
     const { box } = this.#view;
     if (box === undefined) return 1;
     toScene(place, this.#onStage);
     this.#ahead.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
-    return clearOf(this.#spotOf(this.#ahead, 0), box);
+    this.#spotOf(this.#ahead, 0);
+    this.#spot.radius = radius;
+    return clearOf(this.#spot, box);
   }
 
   /** Where `at` stands on screen, for the journeys. */

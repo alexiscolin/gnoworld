@@ -5,8 +5,11 @@ import {
   CENTRE,
   DISC_TILT,
   dotLight,
+  GRAIN,
   onScreen,
   spreadAt,
+  textHash,
+  unitOf,
   worldLook,
   type Drawn,
   type Ladder,
@@ -30,8 +33,8 @@ export interface Sight {
   readonly eye: Point;
   readonly focal: number;
   readonly isBody: (id: string) => boolean;
-  /** How much of what stands at a place on the map the page's text leaves on screen. */
-  readonly shows: (place: Point) => number;
+  /** How much of what stands at a place on the map, of a radius in pixels, the page's text leaves on screen. */
+  readonly shows: (place: Point, radius: number) => number;
 }
 
 interface Held {
@@ -46,14 +49,25 @@ const GLOW_REACH = 26;
 const GLOW_MOST = 90;
 const GLOW_WARMTH = 0.5;
 const LINEAR = 2.2;
-// A star under the page's text keeps this little of its light, so the words stand on black.
+// A star under the page's text keeps this little of its halo and no core, its heart this many pixels wide: the words stand on black.
 const UNDER_TEXT = 0.1;
+const HEART_PIXELS = 60;
+// A world seen as a point is a glint a little off its look; grain is warm and dim.
+const DOT_LIFT = 0.45;
+const DOT_WARM: readonly [number, number, number] = [1, 0.86, 0.68];
+const GRAIN_TINT: readonly [number, number, number] = [0.2, 0.11, 0.05];
 
 // A point takes its world's look, in the working space: between the ramp's middle and its top, for a dark world's middle is near black.
 const colourOf = ({ ramp }: PlanetLook): [number, number, number] => {
   const [red, green, blue] = [0, 1, 2].map((at) => (((ramp[1][at] ?? 0) + (ramp[2][at] ?? 0)) / 2) ** LINEAR);
   return [red ?? 0, green ?? 0, blue ?? 0];
 };
+
+const lifted = ([red, green, blue]: readonly [number, number, number]): [number, number, number] => [
+  red + (DOT_WARM[0] - red) * DOT_LIFT,
+  green + (DOT_WARM[1] - green) * DOT_LIFT,
+  blue + (DOT_WARM[2] - blue) * DOT_LIFT,
+];
 
 const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
 
@@ -82,6 +96,7 @@ export class Disc {
   resize(focal: number, ratio: number): void {
     this.#suns.resize(focal);
     this.#dots.resize(ratio);
+    this.#belt.resize(ratio);
   }
 
   /** One frame on. */
@@ -102,7 +117,7 @@ export class Disc {
       const system = systems[drawn.stars[at] ?? -1];
       if (system === undefined) continue;
       const reach = REACH * Math.sqrt(system.star) + LEAST_REACH;
-      const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place);
+      const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS);
       this.#suns.set(at, system.place, { reach, warmth: system.warmth, glow: false, shows: light });
     }
     for (let at = 0; at < drawn.glowCount; at += 1) {
@@ -121,12 +136,14 @@ export class Disc {
 
   #paintDot(index: number, { system, world }: Held, sight: Sight): void {
     const distance = away(system.place, sight.eye);
-    const size = onScreen(world.radius, distance, sight.focal);
+    const grain = world.radius < GRAIN;
+    const share = unitOf(textHash(world.id));
+    const size = onScreen(world.radius, distance, sight.focal) * (grain ? 0.5 + 0.9 * share : 1);
     if (index === 0) this.dotPixels = size;
     this.#dots.set(index, system.place, {
       orbit: [world.orbit * spreadAt(distance), world.phase, system.spin],
-      tint: this.#colourFor(world.id),
-      size: [size, dotLight(distance) * sight.shows(system.place)],
+      tint: grain ? GRAIN_TINT : lifted(this.#colourFor(world.id)),
+      size: [size, dotLight(distance) * sight.shows(system.place, 0) * (grain ? 0.45 + 0.55 * share : 1)],
     });
   }
 

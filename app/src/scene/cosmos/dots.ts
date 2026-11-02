@@ -1,17 +1,10 @@
 // Worlds from afar: one draw of points around their stars. A point's size and light come from the ladder, written at each look, so no world
-// keeps a size as the eye leaves. Its orbit runs in the vertex shader, and it is a clear glint added to the light around it: a crowd reads as
-// fine bright grain round its star, never as black dots.
+// keeps a size as the eye leaves. Its orbit runs in the vertex shader, and it is a soft glint added to the light around it, so a crowd reads
+// as warm dust round its star, never as black dots.
 import type { Point } from "@gnoworld/core";
-import {
-  AdditiveBlending,
-  BufferAttribute,
-  BufferGeometry,
-  DynamicDrawUsage,
-  Points,
-  ShaderMaterial,
-  type Object3D,
-} from "three";
+import { AdditiveBlending, ShaderMaterial, type Object3D } from "three";
 import type { Disposer } from "../disposer.ts";
+import { pointCloud, type Cloud } from "./cloud.ts";
 
 interface DotLook {
   /** Its orbit's radius, its phase, its star's spin. */
@@ -23,7 +16,7 @@ interface DotLook {
 
 // A far body's light, FAR_ANGLE from the eye, on the side its star stands (planet/light.ts).
 const VERTEX = /* glsl */ `
-const vec2 SIDE = vec2(0.659, 0.752);
+const vec2 SIDE = vec2(0.906, 0.423);
 attribute vec3 aOrbit;
 attribute vec3 aTint;
 attribute vec2 aSize;
@@ -35,7 +28,7 @@ varying vec3 vStar;
 void main() {
   float angle = aOrbit.y + aOrbit.z * uSeconds;
   vec3 out_ = vec3(cos(angle), 0.0, sin(angle));
-  vTint = mix(aTint, vec3(1.0, 0.86, 0.68), 0.45);
+  vTint = aTint;
   vLight = aSize.y;
   vec2 side = normalize((mat3(modelViewMatrix) * -out_).xy + vec2(1.0e-4, 0.0));
   vStar = vec3(side * SIDE.x, SIDE.y);
@@ -60,29 +53,11 @@ void main() {
 }`;
 
 export class Dots {
-  readonly #geometry = new BufferGeometry();
-  readonly #at: BufferAttribute;
-  readonly #orbit: BufferAttribute;
-  readonly #tint: BufferAttribute;
-  readonly #size: BufferAttribute;
+  readonly #cloud: Cloud<"position" | "aOrbit" | "aTint" | "aSize">;
   readonly #seconds = { value: 0 };
   readonly #ratio = { value: 1 };
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
-    const size = (items: number) => {
-      const attribute = new BufferAttribute(new Float32Array(most * items), items);
-      attribute.setUsage(DynamicDrawUsage);
-      return attribute;
-    };
-    this.#at = size(3);
-    this.#orbit = size(3);
-    this.#tint = size(3);
-    this.#size = size(2);
-    this.#geometry.setAttribute("position", this.#at);
-    this.#geometry.setAttribute("aOrbit", this.#orbit);
-    this.#geometry.setAttribute("aTint", this.#tint);
-    this.#geometry.setAttribute("aSize", this.#size);
-    this.#geometry.setDrawRange(0, 0);
     const material = new ShaderMaterial({
       blending: AdditiveBlending,
       depthWrite: false,
@@ -91,11 +66,7 @@ export class Dots {
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });
-    const points = new Points(this.#geometry, material);
-    points.frustumCulled = false;
-    parent.add(points);
-    owner.add(this.#geometry);
-    owner.add(material);
+    this.#cloud = pointCloud(parent, owner, { most, items: { position: 3, aOrbit: 3, aTint: 3, aSize: 2 }, material });
   }
 
   resize(ratio: number): void {
@@ -109,15 +80,15 @@ export class Dots {
 
   /** Sets point `index`: around the star at `at`. */
   set(index: number, { x, y, z }: Point, { orbit, tint, size }: DotLook): void {
-    this.#at.setXYZ(index, x, y, z);
-    this.#orbit.setXYZ(index, ...orbit);
-    this.#tint.setXYZ(index, ...tint);
-    this.#size.setXY(index, ...size);
+    const { position, aOrbit, aTint, aSize } = this.#cloud.attributes;
+    position.setXYZ(index, x, y, z);
+    aOrbit.setXYZ(index, ...orbit);
+    aTint.setXYZ(index, ...tint);
+    aSize.setXY(index, ...size);
   }
 
   /** Shows the first `count`. */
   commit(count: number): void {
-    this.#geometry.setDrawRange(0, count);
-    for (const attribute of [this.#at, this.#orbit, this.#tint, this.#size]) attribute.needsUpdate = true;
+    this.#cloud.commit(count);
   }
 }

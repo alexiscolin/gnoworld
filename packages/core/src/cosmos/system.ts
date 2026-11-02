@@ -26,11 +26,18 @@ const STAR_MOST = 1024;
 const GOLDEN = 2.399963229728653;
 // A lattice's closest two stand this many times sqrt(its area / pi / its count) apart, measured from 4 to 2,048 slots; a world takes under half of that.
 const PACKING = (0.49 * 1.65) ** 2;
-// A crowd reads as a few clear bodies on an outer ring, 120 degrees apart, over fine grain: its worlds well under what the lattice allows.
+/** Under this radius a world is grain: dust round its star, never a body. */
+export const GRAIN = 0.3;
+
+// A crowd reads as a few clear bodies over fine grain: its worlds well under what the lattice allows.
 const CROWD_SLOTS = 32;
 const CROWD = 0.55;
 const CLEAR_BODIES = 3;
 const CLEAR_RADIUS = 0.85;
+const CLEAR_ROOM = 0.49;
+const LOOSE = 1.1;
+const LOOSE_ORBIT = 0.14;
+const CLUMP = 0.62;
 const BELTS = 1 / 3;
 const SPIN_LEAST = 0.05;
 const SPIN_SPAN = 0.1;
@@ -94,6 +101,21 @@ function largest(slots: number, inner: number, edge: number): number {
 const ranked = (worlds: readonly WorldHeld[]): WorldHeld[] =>
   [...worlds].sort((a, b) => b.use - a.use || (a.id < b.id ? -1 : 1));
 
+interface Scatter {
+  readonly start: number;
+  readonly outer: number;
+}
+
+// A lattice of many reads as printed rows: a crowd's grain leaves its slot by its own hash, then gathers in three loose clumps.
+function scattered(id: string, { orbit, phase }: Pick<Orbiter, "orbit" | "phase">, { start, outer }: Scatter) {
+  const hash = textHash(`grain ${id}`);
+  const loose = phase + LOOSE * (unitOf(hash) - 0.5);
+  return {
+    orbit: Math.min(orbit * (1 - LOOSE_ORBIT + 2 * LOOSE_ORBIT * unitOf(nextState(hash))), outer),
+    phase: loose + CLUMP * Math.sin(3 * loose + start),
+  };
+}
+
 function latticeOf(
   worlds: readonly WorldHeld[],
   slots: number,
@@ -103,28 +125,34 @@ function latticeOf(
   const most = Math.min(largest(slots, inner, edge) * (slots > CROWD_SLOTS ? CROWD : 1), WORLD_MOST);
   const outer = edge - most;
   const places = slotsOf(worlds, slots);
+  const crowd = slots > CROWD_SLOTS;
   return ranked(worlds).map(({ id, use }) => {
     const slot = places.get(id) ?? 0;
+    const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
+    const placed = { orbit, phase: start + slot * GOLDEN };
     return {
       id,
       radius: Math.min(worldSize(use), most),
-      orbit: Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots),
-      phase: start + slot * GOLDEN,
+      ...(crowd ? scattered(id, placed, { start, outer }) : placed),
     };
   });
 }
 
+const gap = (a: Orbiter, b: Orbiter): number =>
+  Math.sqrt(a.orbit ** 2 + b.orbit ** 2 - 2 * a.orbit * b.orbit * Math.cos(a.phase - b.phase));
+
+// Activity never moves anything (ADR-0002 §3): every world keeps the place its name gives it, and use only says which of a crowd stand clear
+// there, as large as the others of them leave room for.
 function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): Orbiter[] {
   const slots = stepOf(worlds.length + (worlds.length >> 1));
   if (slots <= CROWD_SLOTS) return latticeOf(worlds, slots, { star, start, edge: BELT_INNER });
-  const [clear, rest] = [ranked(worlds).slice(0, CLEAR_BODIES), ranked(worlds).slice(CLEAR_BODIES)];
-  const bodies = clear.map(({ id, use }, at) => ({
-    id,
-    radius: Math.min(worldSize(use), CLEAR_RADIUS),
-    orbit: BELT_INNER - CLEAR_RADIUS,
-    phase: start + (at * 2 * Math.PI) / CLEAR_BODIES,
-  }));
-  return [...bodies, ...latticeOf(rest, slots, { star, start, edge: BELT_INNER - 2 * CLEAR_RADIUS })];
+  const all = latticeOf(worlds, slots, { star, start, edge: BELT_INNER - CLEAR_RADIUS });
+  const clear = all.slice(0, CLEAR_BODIES);
+  return all.map((world, rank) => {
+    if (rank >= CLEAR_BODIES) return world;
+    const nearest = Math.min(...clear.filter((other) => other !== world).map((other) => gap(world, other)));
+    return { ...world, radius: Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM) };
+  });
 }
 
 function systemOf(id: string, place: SystemPlace, worlds: readonly WorldHeld[]): StarSystem {

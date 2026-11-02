@@ -33,6 +33,7 @@ export {
   EARTH_RADIUS,
   focusOf,
   GNO_LAND,
+  GRAIN,
   orbitPlace,
   ROOM,
   systemsOf,
@@ -54,7 +55,7 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
-export { clearOf, SPREAD, spreadAt, type ClearBox, type ScreenSpot } from "./lod/screen.ts";
+export { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt, type ClearBox, type ScreenSpot } from "./lod/screen.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -113,7 +114,7 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
-export type { Point } from "./space/cell.ts";
+export { textHash, unitOf, type Point } from "./space/cell.ts";
 export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { tilingNoise } from "./space/noise.ts";

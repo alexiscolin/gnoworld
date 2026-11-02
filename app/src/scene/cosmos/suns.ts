@@ -31,7 +31,7 @@ attribute vec3 aAt;
 attribute vec4 aSun;
 uniform float uFocal;
 varying vec2 vPlace;
-varying vec2 vLight;
+varying vec3 vLight;
 void main() {
   vec4 at = modelViewMatrix * vec4(aAt, 1.0);
   float away = length(at.xyz);
@@ -39,7 +39,7 @@ void main() {
   float star = 1.0 - smoothstep(${(MIDDLE * 0.75).toFixed(1)}, ${MIDDLE.toFixed(1)}, away);
   float region = smoothstep(${(MIDDLE * 0.75).toFixed(1)}, ${MIDDLE.toFixed(1)}, away) * (1.0 - smoothstep(${(HAZE * 0.6).toFixed(1)}, ${HAZE.toFixed(1)}, away));
   vPlace = position.xy;
-  vLight = vec2(mix(star, region, glow) * aSun.w, aSun.y);
+  vLight = vec3(mix(star, region, glow) * aSun.w, aSun.y, aSun.w * aSun.w * aSun.w);
   at.xy += position.xy * max(aSun.x, 3.0 * away / uFocal);
   gl_Position = projectionMatrix * at;
   // Behind every body, as the frames have it: a world by a sun is dark against its light, never washed by it.
@@ -49,7 +49,7 @@ void main() {
 // Amber far out, cream nearer, white at the heart: the frame's three steps, each a falloff, so a sun has no edge. Its reach ends in nothing.
 const FRAGMENT = /* glsl */ `
 varying vec2 vPlace;
-varying vec2 vLight;
+varying vec3 vLight;
 void main() {
   float reach = length(vPlace);
   if (reach >= 1.0) discard;
@@ -60,7 +60,7 @@ void main() {
   float near = exp(-reach * reach * 34.0);
   float heart = exp(-reach * reach * 420.0);
   float edge = 1.0 - smoothstep(0.55, 1.0, reach);
-  vec3 light = amber * wide * 0.62 * edge + cream * near * 0.7 + vec3(1.0, 0.95, 0.88) * heart * 7.0;
+  vec3 light = amber * wide * 0.62 * edge + cream * near * 0.7 + vec3(1.0, 0.95, 0.88) * heart * 7.0 * vLight.z;
   gl_FragColor = vec4(light * vLight.x, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

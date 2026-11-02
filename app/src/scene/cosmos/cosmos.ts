@@ -155,7 +155,7 @@ export class Cosmos {
       eye: this.#mapEye,
       focal: this.#focal,
       isBody: (id) => this.#bodies.has(id),
-      shows: (place) => this.#bodies.shows(place, this.#eye),
+      shows: (place, radius) => this.#bodies.shows(place, radius, this.#eye),
     });
     this.#device.moved();
   };

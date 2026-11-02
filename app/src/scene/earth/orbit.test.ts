@@ -1,4 +1,4 @@
-import { Mesh, Vector3, type BufferAttribute, type BufferGeometry, type ShaderMaterial } from "three";
+import { Group, Mesh, Vector3, type BufferAttribute, type BufferGeometry, type ShaderMaterial } from "three";
 import { describe, expect, it } from "vitest";
 import { createOrbit, MOON_REST, ORBIT_RADIUS } from "./orbit.ts";
 import { ORBIT_FRAGMENT, ORBIT_VERTEX } from "./orbitShader.ts";
@@ -98,5 +98,41 @@ describe("the golden ring", () => {
     expect(ORBIT_VERTEX).toContain("gl_Position");
     expect(ORBIT_FRAGMENT).toContain("#include <tonemapping_fragment>");
     expect(ORBIT_FRAGMENT).toContain("#include <colorspace_fragment>");
+  });
+});
+
+describe("the ring of an Earth among the worlds (f0004)", () => {
+  const fine = () => {
+    const orbit = createOrbit();
+    orbit.setFine(new Group());
+    return orbit;
+  };
+  const reach = (orbit: ReturnType<typeof createOrbit>) => {
+    const points = Array.from({ length: 180 }, (_, at) => orbit.moonAt((at * Math.PI) / 90, new Vector3()));
+    const flat = points.map(({ x, y }) => Math.hypot(x, y));
+    return { widest: Math.max(...flat), narrowest: Math.min(...flat) };
+  };
+
+  it("is a wide ellipse, about 1.9 radii by 1.1, standing away from the disc", () => {
+    const { widest, narrowest } = reach(fine());
+    expect(widest).toBeCloseTo(1.9, 1);
+    expect(narrowest).toBeCloseTo(1.1, 1);
+  });
+
+  it("wears no halo round its Moon", () => {
+    expect(fine().glow.visible).toBe(false);
+  });
+
+  it("takes the line it is given in place of its tube", () => {
+    const orbit = createOrbit();
+    const line = new Group();
+    orbit.setFine(line);
+    expect(orbit.group.children.filter(({ visible }) => visible)).toEqual([line]);
+  });
+
+  it("leaves the Earth's own ring as approved until it is asked", () => {
+    const orbit = createOrbit();
+    expect(orbit.glow.visible).toBe(true);
+    expect(orbit.moonAt(0.4, new Vector3()).length()).toBeCloseTo(ORBIT_RADIUS, 6);
   });
 });

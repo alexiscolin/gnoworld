@@ -59,12 +59,12 @@ async function arrived(page: Page, query = HOME) {
 // A place drawn: the look runs off the frame, so the count of looks says it has been taken.
 const moveTo = async (page: Page, spot: { x: number; y: number; z: number }) => {
   const { looks } = await cosmos(page);
+  const { frames } = await stats(page);
   await page.evaluate((to) => {
     (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
   }, spot);
   await expect.poll(async () => (await cosmos(page)).looks, SLOW).toBeGreaterThan(looks);
-  const { frames } = await stats(page);
-  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames);
+  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThanOrEqual(frames + 2);
 };
 
 test("draws the real file: a star a namespace, a landmark a system, under the page's policy", async ({ page }) => {
@@ -74,7 +74,7 @@ test("draws the real file: a star a namespace, a landmark a system, under the pa
   const drawn = await cosmos(page);
   expect(drawn.stars).toBeGreaterThan(40);
   expect(drawn.dots).toBeGreaterThan(50);
-  expect(drawn.earth).toBe(true);
+  await expect.poll(async () => (await cosmos(page)).earth, SLOW).toBe(true);
   expect(drawn.rocks).toBeGreaterThan(0);
   const { calls } = await stats(page);
   expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);

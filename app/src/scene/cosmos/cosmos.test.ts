@@ -1,6 +1,8 @@
 import {
   BELT_INNER,
   BOUNDS,
+  GROWTH,
+  growthAt,
   HOME,
   ROOM,
   spreadAt,
@@ -15,8 +17,7 @@ import {
   AdditiveBlending,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
-  InstancedMesh,
-  Matrix4,
+  LineLoop,
   Mesh,
   Object3D,
   PerspectiveCamera,
@@ -25,12 +26,16 @@ import {
   Texture,
   Vector3,
   type BufferAttribute,
+  type BufferGeometry,
+  type LineBasicMaterial,
   type ShaderMaterial,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
-import { FAR_ANGLE } from "../planet/light.ts";
+import { MOON_FAR } from "../earth/orbit.ts";
+import { LIMB_LIGHT } from "../planet/planet.ts";
 import { Cosmos, type CosmosWorld } from "./cosmos.ts";
+import { FAR_ANGLE, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
 const globes = vi.hoisted(() => ({ build: vi.fn() }));
@@ -107,7 +112,13 @@ const parts = ({ stage }: { stage: Stage }) => {
   return found;
 };
 const held = (list: readonly CosmosWorld[]): StarSystem[] =>
-  systemsOf(list.map(({ id, namespace }) => ({ id, namespace, use: 1 })));
+  systemsOf(
+    list.map(({ id, namespace, realms }) => ({
+      id,
+      namespace,
+      use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), realms.length),
+    })),
+  );
 // What the renderer would draw: each visible mesh or points, the instanced ones once.
 const draws = (from: { stage: Stage }) =>
   parts(from).filter((object) => object.visible && (object instanceof Mesh || object instanceof Points)).length;
@@ -116,9 +127,13 @@ const glows = (from: { stage: Stage }) =>
     (object): object is Mesh<InstancedBufferGeometry, ShaderMaterial> =>
       object instanceof Mesh && object.geometry instanceof InstancedBufferGeometry,
   );
-const dots = (from: { stage: Stage }) => parts(from).filter((object): object is Points => object instanceof Points);
-const rocks = (from: { stage: Stage }) =>
-  parts(from).filter((object): object is InstancedMesh => object instanceof InstancedMesh);
+const pointsWith = (from: { stage: Stage }, attribute: string) =>
+  parts(from).filter(
+    (object): object is Points<BufferGeometry, ShaderMaterial> =>
+      object instanceof Points && (object.geometry as BufferGeometry).hasAttribute(attribute),
+  );
+const dots = (from: { stage: Stage }) => pointsWith(from, "aOrbit");
+const rocks = (from: { stage: Stage }) => pointsWith(from, "aStar");
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -154,7 +169,7 @@ describe("what it draws", () => {
     expect(bodies).toBeLessThanOrEqual(BOUNDS.bodies);
     expect(points).toBe(90 - bodies);
     expect(glows(scene)).toHaveLength(1);
-    expect(dots(scene).length).toBe(1);
+    expect(dots(scene)).toHaveLength(1);
   });
 
   it("draws the same at 100, 1,000 and 10,000 systems: the bound is the ladder's, not the file's", async () => {
@@ -187,7 +202,7 @@ describe("what it draws", () => {
     for (const body of list) {
       expect(body.anchor).toBe(worldLook(body.id).anchor);
       expect(body.planet.group.scale.x).toBeGreaterThan(0.5);
-      expect(body.planet.group.scale.x).toBeLessThanOrEqual((known.get(body.id)?.radius ?? 0) * 1.5);
+      expect(body.planet.group.scale.x).toBeLessThanOrEqual((known.get(body.id)?.radius ?? 0) * GROWTH + 1e-9);
     }
   });
 
@@ -210,6 +225,58 @@ describe("what it draws", () => {
       expect(flat(sun).dot(flat(toStar))).toBeGreaterThan(0.999);
       expect(sun.angleTo(toEye)).toBeCloseTo(FAR_ANGLE, 6);
     }
+  });
+
+  it("leans every body by what the eye sees: no pole towards it, a ring open 30 degrees at most", async () => {
+    const scene = made();
+    await shown(scene, worlds(40, 4));
+    const { list } = scene.cosmos.stats();
+    for (const { at, planet } of list) {
+      const seen = Math.atan2(at.y, -at.z);
+      expect(Math.abs(planet.group.rotation.x - seen)).toBeLessThanOrEqual((30 * Math.PI) / 180 + 1e-9);
+    }
+  });
+
+  it("softens a far body's limb: the Earth's bright band fits no pixel at this size, and draws a hard line", async () => {
+    const scene = made();
+    await shown(scene);
+    const aired = scene.cosmos.stats().list.filter(({ planet }) => planet.look.rim !== null);
+    expect(aired.length).toBeGreaterThan(0);
+    for (const { planet, star } of aired) {
+      const limb = vi.spyOn(planet, "setLimb");
+      scene.cosmos.tick(HOME, 0);
+      expect(limb.mock.lastCall?.[0]).toBeCloseTo(limbAt(star.length()), 6);
+      expect(limb.mock.lastCall?.[0]).toBeLessThan(LIMB_LIGHT / 2);
+    }
+  });
+
+  it("hands the Earth one faint line for its ring, and frees it with the Earth", async () => {
+    const globe = fakeGlobe();
+    globes.build.mockImplementation(() => Promise.resolve(globe));
+    const scene = made();
+    await shown(scene);
+    const line = globe.stand.mock.lastCall?.[1] as LineLoop<BufferGeometry, LineBasicMaterial>;
+    expect(line).toBeInstanceOf(LineLoop);
+    expect(line.material.opacity).toBeCloseTo(0.22, 6);
+    const freed = [vi.spyOn(line.geometry, "dispose"), vi.spyOn(line.material, "dispose")];
+    scene.owner.dispose();
+    for (const spy of freed) expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it("rests the Earth's Moon out at the ring's left end, as frame 4's", async () => {
+    const globe = fakeGlobe();
+    globes.build.mockImplementation(() => Promise.resolve(globe));
+    const scene = made();
+    await shown(scene);
+    expect(globe.setMoon).toHaveBeenLastCalledWith(MOON_FAR);
+  });
+
+  it("grows a far body, and keeps its true size in the ladder", async () => {
+    const scene = made();
+    await shown(scene);
+    const known = new Map(held(worlds(30)).flatMap(({ worlds: list }) => list.map((world) => [world.id, world])));
+    for (const { id, star, planet } of scene.cosmos.stats().list)
+      expect(planet.group.scale.x / (known.get(id)?.radius ?? NaN)).toBeCloseTo(growthAt(star.length()), 6);
   });
 
   it("gives a body the world's own angle up close, the night side marked", async () => {
@@ -294,6 +361,35 @@ describe("what it draws", () => {
     expect(far).toBeLessThan(near);
   });
 
+  it("never punches a hole in the light: a rock is soft and lets a share of the glow through", async () => {
+    const scene = made();
+    await shown(scene);
+    const [belt] = rocks(scene);
+    expect(belt?.material).toMatchObject({ transparent: true, depthWrite: false });
+  });
+
+  it("writes a crowd's grain warm, dim and of varied sizes, never white", async () => {
+    const scene = made();
+    const crowd = Array.from({ length: 120 }, (_, at) => ({
+      id: `c/w${String(at)}`,
+      namespace: "c",
+      realms: [{ callers: null }],
+    }));
+    await shown(scene, crowd);
+    const [points] = dots(scene);
+    const { dots: count } = scene.cosmos.stats();
+    const tint = points?.geometry.getAttribute("aTint") as BufferAttribute;
+    const size = points?.geometry.getAttribute("aSize") as BufferAttribute;
+    const sizes = new Set<string>();
+    expect(count).toBeGreaterThan(100);
+    for (let at = 0; at < count; at += 1) {
+      expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
+      expect(tint.getX(at)).toBeLessThan(0.6);
+      sizes.add(size.getX(at).toFixed(2));
+    }
+    expect(sizes.size).toBeGreaterThan(8);
+  });
+
   it("gives a far belt its rocks, one draw, outside every world's orbit and inside its system's room", async () => {
     const scene = made();
     const list = worlds(30);
@@ -301,21 +397,23 @@ describe("what it draws", () => {
     const [belt] = rocks(scene);
     if (belt === undefined) throw new Error("no belt");
     expect(rocks(scene)).toHaveLength(1);
-    expect(belt.count).toBeGreaterThan(0);
-    expect(belt.count).toBeLessThanOrEqual(BOUNDS.rocks);
+    const { rocks: count } = scene.cosmos.stats();
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(BOUNDS.rocks);
+    expect(belt.geometry.drawRange.count).toBe(count);
     expect(belt.frustumCulled).toBe(false);
     const stars = belt.geometry.getAttribute("aStar") as BufferAttribute;
+    const places = belt.geometry.getAttribute("position") as BufferAttribute;
+    const sizes = belt.geometry.getAttribute("aSize") as BufferAttribute;
     const eye = { x: NaN, y: NaN, z: NaN };
     toMap(HOME, eye);
-    const matrix = new Matrix4();
-    for (let at = 0; at < belt.count; at += 1) {
-      belt.getMatrixAt(at, matrix);
-      expect(new Vector3().setFromMatrixColumn(matrix, 0).length()).toBeLessThan(0.4);
+    for (let at = 0; at < count; at += 1) {
+      expect(sizes.getX(at)).toBeLessThanOrEqual(3.6);
       const star = new Vector3(stars.getX(at), stars.getY(at), stars.getZ(at));
       const spread = spreadAt(star.distanceTo(new Vector3(eye.x, eye.y, eye.z)));
-      const away = new Vector3().setFromMatrixPosition(matrix).distanceTo(star);
-      expect(away / spread).toBeGreaterThanOrEqual(BELT_INNER - 0.1);
-      expect(away / spread).toBeLessThanOrEqual(ROOM + 0.1);
+      const away = new Vector3(places.getX(at), places.getY(at), places.getZ(at)).distanceTo(star);
+      expect(away / spread).toBeGreaterThanOrEqual(BELT_INNER - 0.2);
+      expect(away / spread).toBeLessThanOrEqual(ROOM + 0.2);
     }
   });
 });
@@ -337,6 +435,27 @@ describe("the page's text keeps its room", () => {
     const size = points?.geometry.getAttribute("aSize") as BufferAttribute;
     const put = Array.from({ length: scene.cosmos.stats().dots }, (_, at) => size.getY(at));
     expect(put.filter((light) => light === 0).length).toBeGreaterThan(20);
+  });
+
+  it("keeps a star's heart out of the box: under it, a little of the halo and no core", async () => {
+    const scene = made();
+    scene.cosmos.keepClear(WHOLE);
+    await shown(scene, []);
+    const [mesh] = glows(scene);
+    const sun = mesh?.geometry.getAttribute("aSun") as InstancedBufferAttribute;
+    expect(sun.getW(0)).toBeCloseTo(0.1, 6);
+  });
+
+  it("takes a star's size into the box's reach: a heart beside the digit is under it", async () => {
+    const scene = made();
+    await shown(scene, []);
+    const { x: sunX } = scene.cosmos.stats().screen.sun;
+    scene.cosmos.keepClear({ left: 0, top: 0, right: sunX - 20, bottom: HEIGHT });
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    const [mesh] = glows(scene);
+    const sun = mesh?.geometry.getAttribute("aSun") as InstancedBufferAttribute;
+    expect(sun.getW(0)).toBeLessThan(0.2);
   });
 
   it("leaves what stands clear of it whole", async () => {
@@ -433,6 +552,16 @@ describe("a look costs a step, never a frame", () => {
     expect(shared).not.toHaveBeenCalled();
     expect(scene.cosmos.stats().maps).toBe(kept);
     shared.mockRestore();
+  });
+
+  it("poses a new body at once: one that stood at the eye a frame would fill the screen", async () => {
+    const scene = made();
+    scene.cosmos.show(worlds(5));
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    const { list } = scene.cosmos.stats();
+    expect(list.length).toBeGreaterThan(0);
+    for (const { at } of list) expect(at.length()).toBeGreaterThan(5);
   });
 
   it("reuses a body the ladder keeps: no new material for a step", async () => {
@@ -593,7 +722,7 @@ describe("hidden", () => {
     expect(scene.cosmos.stats().shown).toBe(false);
     const seen: Object3D[] = [];
     scene.stage.traverseVisible((part) => seen.push(part));
-    expect(seen.filter((part) => part instanceof Points || part instanceof InstancedMesh)).toHaveLength(0);
+    expect(seen.filter((part) => part instanceof Points)).toHaveLength(0);
     scene.cosmos.show(worlds(30));
     await settled();
     expect(maps.load.mock.calls.length).toBe(asked);

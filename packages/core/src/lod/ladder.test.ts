@@ -4,7 +4,7 @@ import { systemsOf, toMap, type StarSystem, type WorldHeld } from "../cosmos/sys
 import { textHash, type Point } from "../space/cell.ts";
 import { HOME } from "../space/drift.ts";
 import { BOUNDS, dotLight, Drawn, HAZE, Ladder, LANDMARKS, MIDDLE, onScreen, screenRadius } from "./ladder.ts";
-import { clearOf, SPREAD, spreadAt } from "./screen.ts";
+import { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt } from "./screen.ts";
 
 // The ladder of detail (ADR-0002 §3): what is drawn depends on the distance alone, never on the universe's size. From close to far a world
 // is a body, a point, then part of its star; a star a star, then part of a region's one glow, and past the haze nothing.
@@ -377,6 +377,38 @@ describe("spreadAt: from afar a system opens, its true place kept (the chief's r
         expect(spreadAt(distance + 0.01)).toBeGreaterThanOrEqual(spreadAt(distance));
         expect(spreadAt(distance + 0.01) - spreadAt(distance)).toBeLessThan(0.01);
       }),
+    );
+  });
+});
+
+describe("growthAt: the first plane reads large, as f0004's does", () => {
+  it("leaves a body its true size up close, and grows it from afar, by degrees", () => {
+    expect(growthAt(5)).toBe(1);
+    expect(growthAt(36)).toBe(GROWTH);
+    expect(GROWTH).toBeGreaterThan(1.3);
+    expect(GROWTH).toBeLessThan(SPREAD);
+    expect(growthAt(16)).toBeGreaterThan(1);
+    expect(growthAt(16)).toBeLessThan(GROWTH);
+  });
+});
+
+describe("leanFor: no world shows its pole", () => {
+  const MOST = (30 * Math.PI) / 180;
+
+  it("adds the eye's own height, so what the eye sees is the world's lean, wherever it stands", () => {
+    expect(leanFor(0.2, 0.3)).toBeCloseTo(0.5, 9);
+    expect(leanFor(0.2, -0.3)).toBeCloseTo(-0.1, 9);
+  });
+
+  it("opens a ring 30 degrees at most, however its look leans", () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: -1, max: 1, noNaN: true }),
+        fc.double({ min: -1, max: 1, noNaN: true }),
+        (lean, seen) => {
+          expect(Math.abs(leanFor(lean, seen) - seen)).toBeLessThanOrEqual(MOST + 1e-9);
+        },
+      ),
     );
   });
 });

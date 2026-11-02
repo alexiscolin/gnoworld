@@ -66,7 +66,7 @@ interface BesideProps {
 // What stands with the running scene: wherever maps show, their credits.
 function Beside({ host, page, showsMaps, earth }: BesideProps) {
   if (earth === "drawn") return <OnTheEarth host={host} page={page} />;
-  return showsMaps ? <Credits /> : null;
+  return showsMaps ? <Credits overTicker /> : null;
 }
 
 export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | undefined }) {

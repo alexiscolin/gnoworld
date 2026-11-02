@@ -1,6 +1,15 @@
 // The Earth's golden ring, which is the Moon's orbit: a tilted line that passes behind the globe, never the flat ring (the decision of
 // 2026-10-31). It carries no state: nothing reports one for the Earth, and the video's "usual hour" has no source (ADR-0002, status ring).
-import { AdditiveBlending, Group, Mesh, PlaneGeometry, ShaderMaterial, TorusGeometry, Vector3 } from "three";
+import {
+  AdditiveBlending,
+  Group,
+  Mesh,
+  PlaneGeometry,
+  ShaderMaterial,
+  TorusGeometry,
+  Vector3,
+  type Object3D,
+} from "three";
 import { GLOW_FRAGMENT, GLOW_VERTEX, ORBIT_FRAGMENT, ORBIT_VERTEX } from "./orbitShader.ts";
 
 /** In Earth radii. */
@@ -14,6 +23,11 @@ const SEGMENTS = 360;
 const TILT = -1.24;
 const ROLL = -0.1;
 const GLOW_SIDE = 0.62;
+// Frame 4's ring, in Earth radii: 1.9 across, 1.1 up, so it leans the arcsine of their ratio.
+const FINE_REACH = 1.9;
+const FINE_TILT = -0.618;
+/** Where a small Earth's Moon rests: out at the ring's left end, as frame 4's. */
+export const MOON_FAR = 3.736;
 // Over the air, which is order 1.
 const ORBIT_ORDER = 2;
 
@@ -23,8 +37,8 @@ export interface Orbit {
   moonAt(angle: number, into: Vector3): Vector3;
   /** Where the Moon is: the wake follows it. */
   setHead(angle: number): void;
-  /** Keeps the line alone, for an Earth a few dozen pixels wide: frame 4's thin ring. */
-  setFine(): void;
+  /** For an Earth among the worlds: frame 4's wide ellipse, `line` in place of the tube, with no halo. */
+  setFine(line: Object3D): void;
   dispose(): void;
 }
 
@@ -58,7 +72,8 @@ class LiveOrbit implements Orbit {
   }
 
   moonAt(angle: number, into: Vector3): Vector3 {
-    return into.set(ORBIT_RADIUS * Math.cos(angle), 0, ORBIT_RADIUS * Math.sin(angle)).applyEuler(this.group.rotation);
+    const reach = ORBIT_RADIUS * this.group.scale.x;
+    return into.set(reach * Math.cos(angle), 0, reach * Math.sin(angle)).applyEuler(this.group.rotation);
   }
 
   setHead(angle: number): void {
@@ -66,9 +81,12 @@ class LiveOrbit implements Orbit {
     if (head !== undefined) head.value = angle;
   }
 
-  setFine(): void {
-    this.#line.material.defines = { FINE: "" };
-    this.#line.material.needsUpdate = true;
+  setFine(line: Object3D): void {
+    this.group.scale.setScalar(FINE_REACH / ORBIT_RADIUS);
+    this.group.rotation.x = FINE_TILT;
+    this.#glow.visible = false;
+    this.#line.visible = false;
+    this.group.add(line);
   }
 
   dispose(): void {
