@@ -95,6 +95,25 @@ describe("a world's rooms as moons", () => {
     expect(link?.hidden).toBe(true);
   });
 
+  it("writes a link's place only when it moved a whole pixel, showed or hid: the scene places it on every frame (F3615)", () => {
+    const { box, moons } = world({ "#bubble/games": 2 });
+    const link = links(box)[0];
+    const place = (x: number, y: number, shown: boolean) => {
+      act(() => {
+        lastMarks(moons)[0]?.place(x, y, shown);
+      });
+    };
+    place(700.2, 300, true);
+    expect(link?.style.translate).toBe("700px 300px");
+    if (link !== undefined) link.style.translate = "1px 1px";
+    place(700.4, 300.3, true);
+    expect(link?.style.translate, "still on the same pixel: nothing written").toBe("1px 1px");
+    place(700.4, 300.3, false);
+    expect(link?.hidden).toBe(true);
+    place(701, 300, false);
+    expect(link?.style.translate).toBe("701px 300px");
+  });
+
   it("makes one moon of a world whose realms are three and whose rooms are one", () => {
     const { box } = world({ "#bubble": 4 });
     expect(links(box)).toHaveLength(1);

@@ -3,7 +3,7 @@
 // threshold gives no ring and no "of 66.66%". The ring is the scene's tilted orbit (7e), handed to the page. A read that fails says its
 // state and links to the realm on gnoweb. This file is a chunk of its own, asked only by a world with a realm (world.tsx).
 import { Cluster, Stack } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { realmAt } from "../../realmAt.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { readProposals } from "../../lib/chain/proposal.ts";
@@ -68,16 +68,17 @@ function Failed({ read, home }: { read: ChainRead<Proposal[]>; home: string | un
 
 // The realm a path names and its proposals, read once: one request, no timer.
 function useProposals(path: string, options: ReadOptions) {
-  const [read, setRead] = useState<ChainRead<Proposal[]>>();
+  const [held, setHeld] = useState<{ readonly from: string; readonly read: ChainRead<Proposal[]> }>();
   const at = realmAt(path);
   const realm = at?.realm;
   const rpc = at?.chain.rpc;
+  const from = `${String(rpc)} ${String(realm)}`;
   useEffect(() => {
     if (realm === undefined || rpc === undefined) return;
     let live = true;
     readProposals(rpc, realm, options).then(
       (value) => {
-        if (live) setRead(value);
+        if (live) setHeld({ from: `${rpc} ${realm}`, read: value });
       },
       (error: unknown) => {
         reportError(error);
@@ -88,15 +89,18 @@ function useProposals(path: string, options: ReadOptions) {
     };
   }, [rpc, realm, options]);
   const origin = at?.chain.gnoweb;
-  return { read, realm, origin };
+  // A read of another realm, the page having moved since, is none of this one's.
+  return { read: held?.from === from ? held.read : undefined, realm, origin };
 }
 
-// The ring goes to the page as the read comes, and leaves it with this block.
+// The ring goes to the page as the read comes, leaves it while another realm's is on its way, and leaves it with this block.
 function useRing(read: ChainRead<Proposal[]> | undefined, onRing: ProposalsProps["onRing"]) {
+  const handedRef = useRef(false);
   useEffect(() => {
-    if (read === undefined || onRing === undefined) return;
-    const [newest] = read.ok ? read.value : [];
+    if (onRing === undefined || (read === undefined && !handedRef.current)) return;
+    const [newest] = read?.ok === true ? read.value : [];
     onRing(newest === undefined ? undefined : ringOf(newest));
+    handedRef.current = read !== undefined;
   }, [read, onRing]);
   useEffect(
     () => () => {

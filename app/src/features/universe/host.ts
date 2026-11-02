@@ -69,15 +69,12 @@ export class SceneHost {
   readonly ground = () => this.#scene?.ground;
 
   /** Where a world's page hands its moons, once the scene runs. */
-  readonly sky = () => {
-    const scene = this.#scene;
-    return scene === undefined
-      ? undefined
-      : {
-          moons: (marks: readonly MoonMark[]) => {
-            scene.worldMoons(marks);
-          },
-        };
+  readonly sky = () => (this.#scene === undefined ? undefined : this.#sky);
+
+  readonly #sky = {
+    moons: (marks: readonly MoonMark[]) => {
+      this.#scene?.worldMoons(marks);
+    },
   };
 
   readonly world = () => this.#world;
@@ -114,7 +111,9 @@ export class SceneHost {
     if (state !== "drawn" || colour === undefined || !COLOUR.test(colour)) return;
     tintPage(colour);
     // The plate took the world's colour: the scene paints it again in the circle, read once more.
-    queueMicrotask(this.#place);
+    queueMicrotask(() => {
+      this.#place();
+    });
   };
 
   readonly #earthSaid = (state: EarthState): void => {

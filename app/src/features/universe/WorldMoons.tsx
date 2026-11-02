@@ -72,6 +72,27 @@ class MoonKeeper {
   readonly rooms = () => this.#moons.rooms;
 }
 
+// Where a moon's link stands, written only when it moved a pixel, showed or hid, or is another link: the scene calls it on every frame.
+function placer(links: ReadonlyMap<string, HTMLAnchorElement>, room: string) {
+  const last: { x: number; y: number; link: HTMLAnchorElement | undefined } = {
+    x: Number.NaN,
+    y: Number.NaN,
+    link: undefined,
+  };
+  return (x: number, y: number, shown: boolean) => {
+    const link = links.get(room);
+    const left = Math.round(x);
+    const top = Math.round(y);
+    if (link === undefined || (link === last.link && left === last.x && top === last.y && link.hidden === !shown))
+      return;
+    last.link = link;
+    last.x = left;
+    last.y = top;
+    link.style.translate = `${String(left)}px ${String(top)}px`;
+    link.hidden = !shown;
+  };
+}
+
 export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
   const [keeper] = useState(() => new MoonKeeper(page));
   useEffect(() => {
@@ -87,12 +108,7 @@ export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
       rooms.map((room) => ({
         room,
         size: moonSize(chat.rooms[room]?.members.length ?? 0, busiest),
-        place: (x: number, y: number, shown: boolean) => {
-          const link = linksRef.current.get(room);
-          if (link === undefined) return;
-          link.style.translate = `${String(x)}px ${String(y)}px`;
-          link.hidden = !shown;
-        },
+        place: placer(linksRef.current, room),
       })),
     );
   }, [sky, rooms, chat]);

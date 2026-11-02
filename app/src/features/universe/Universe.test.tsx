@@ -1128,6 +1128,35 @@ describe("on a world's page", () => {
     expect(layout.style.getPropertyValue("--world")).toBe("");
   });
 
+  it("moves from one world to another: the first leaves, the second is drawn, the tint comes back with it (B1-1)", async () => {
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    const page = worldPage();
+    act(() => {
+      root.render(<Universe shown={GOVDAO} page={page} />);
+    });
+    await settle();
+    // The first world's colour comes in the same turn as the move: the place it queues is the page's by then, not the first world's (F3624).
+    act(() => {
+      scene.world.mock.lastCall?.[1]("drawn", "#7a5c3e");
+      root.render(<Universe shown={{ world: "bubble" }} page={page} />);
+    });
+    // A drawn world's moons follow its rooms on an interval: time moves on a little, never until no timer is left.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    const ids = scene.world.mock.calls.map(([asked]) => (asked as { id?: string } | undefined)?.id);
+    expect(ids).toContain(undefined);
+    expect(ids.at(-1)).toBe("bubble");
+    say("loading");
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+  });
+
   it("moves from the Earth to a world: the Earth leaves and the world is drawn (B1-1)", async () => {
     const { rerender } = shownWorld("earth");
     await settle();

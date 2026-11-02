@@ -78,6 +78,41 @@ describe("a world's proposals", () => {
     expect(onRing).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
+  it("hands the page no ring of the last realm while another's read is on its way (7e's review, B1-2)", async () => {
+    vi.resetModules();
+    const read = vi
+      .fn<() => Promise<ChainRead<Proposal[]>>>()
+      .mockResolvedValueOnce({
+        ok: true,
+        value: [{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }],
+        source: { url: "https://rpc.example", at: "2026-10-31T06:00:00.000Z" },
+      })
+      .mockReturnValue(new Promise(() => undefined));
+    vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
+      ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
+      readProposals: read,
+    }));
+    const { default: Moving } = await import("./Proposals.tsx");
+    const onRing = vi.fn();
+    const box = document.createElement("div");
+    const root = createRoot(box);
+    await act(async () => {
+      root.render(<Moving path="/r/gov/dao" onRing={onRing} />);
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    expect(onRing).toHaveBeenLastCalledWith({ lit: 0.33, mark: 0.6666 });
+    await act(async () => {
+      root.render(<Moving path="/r/bubble" onRing={onRing} />);
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    expect(onRing).toHaveBeenLastCalledWith(undefined);
+    expect(box.textContent).not.toContain("Proposal 15");
+    act(() => {
+      root.unmount();
+    });
+    vi.doUnmock("../../lib/chain/proposal.ts");
+  });
+
   it("takes its ring back from the page when the read fails, and when it leaves", async () => {
     const onRing = vi.fn();
     const failed = mount(
