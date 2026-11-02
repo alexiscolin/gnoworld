@@ -260,13 +260,86 @@ describe("the generated program", () => {
   // size taken once in main, where every fragment of a quad takes it.
   it("fades every octave out before a pixel can hold it", () => {
     const fbm = GENERATED_FRAGMENT.slice(
-      GENERATED_FRAGMENT.indexOf("vec3 fbm("),
+      GENERATED_FRAGMENT.indexOf("vec4 fbm("),
       GENERATED_FRAGMENT.indexOf("float shareOf("),
     );
     expect(fbm).toContain("for (int");
     expect(fbm).toMatch(/smoothstep\([^;]*frequency \* pixel\)/);
     const main = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("void main()"));
     expect(main).toMatch(/^ {2}float pixel = length\(fwidth\(axis\)\);$/m);
+  });
+
+  // F4228: an octave fading out takes its weight with it, or the normalised height jumps where it leaves, in a staircase of quads.
+  it("fades an octave's weight with its term, so no height jumps where an octave leaves", () => {
+    const fbm = GENERATED_FRAGMENT.slice(
+      GENERATED_FRAGMENT.indexOf("vec4 fbm("),
+      GENERATED_FRAGMENT.indexOf("float shareOf("),
+    );
+    expect(fbm).toMatch(/sum \+= faded \* n;/);
+    expect(fbm).toMatch(/weight \+= faded;/);
+    expect(fbm).toMatch(/squares \+= faded \* faded;/);
+    const streaks = GENERATED_FRAGMENT.slice(
+      GENERATED_FRAGMENT.indexOf("float streaksAt("),
+      GENERATED_FRAGMENT.indexOf("float bandsAt("),
+    );
+    expect(streaks).toMatch(/weight \+= faded;/);
+  });
+
+  // F4229: every finer noise fades by the pixel, the vents' crackle and the bands' second term too, or a small world sparkles.
+  it("fades the vents' crackle and the bands' finer term by the pixel", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/float crackle = [^;]*fadeAt\(/);
+    expect(GENERATED_FRAGMENT).toMatch(/band \+= [^;]*fadeAt\(/);
+  });
+
+  // F4227: a storm is drawn by the cell its centre lies in, so its whole disc lies inside the cells a point visits: never cut by a line.
+  it("keeps a storm whole, drawn only by the cell its centre lies in", () => {
+    expect(GENERATED_FRAGMENT).toContain("if (ivec3(floor(centre * 2.5 + offset)) != cell) continue;");
+  });
+
+  // F4230: the Earth's real cloud map is its own weather: on a generated world the cover is its own noise, the map lending detail only.
+  it("draws a generated world's clouds from its own noise, the Earth's cloud map for detail only", () => {
+    const main = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("void main()"));
+    expect(main).not.toContain("clouded(");
+    expect(main).toContain("cloudsOver(");
+    expect(SURFACE_FRAGMENT).toContain("cloudsOver(");
+  });
+
+  // F4233: no minor, or a banded world, reads no minor's map.
+  it("reads the minor's map only where a minor shows on a ground", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && banded < 0\.5\) \{[^}]*detailOf\(minorMap/);
+  });
+
+  // F4238: relief shaded from screen derivatives comes out in 2x2 blocks wherever it holds detail under a few pixels: the relief keeps
+  // octaves of 8 pixels and more, no map detail, and craters whose rims stay wider than a pixel and a half.
+  it("shades a relief smooth over a quad: no map detail in it, craters faded before their rims are thinner than a pixel", () => {
+    expect(GENERATED_FRAGMENT).not.toMatch(/relieved \+= fine/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /relieved = ground\.z \/ ground\.y \+ big \* 0\.8 \* \(1\.0 - smoothstep\(0\.04, 0\.08,/,
+    );
+  });
+
+  // F4240: rifts as warped ridges of varying width, never the cell edges of a polygon net.
+  it("draws rifts as warped ridges, never a polygon net", () => {
+    const lines = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("float lines("));
+    expect(lines.slice(0, lines.indexOf("\n}\n"))).not.toContain("seams(");
+    expect(lines).toMatch(/abs\(noise\(/);
+  });
+
+  // F4243: erosion carves the relief, not the share of land: the sea's level reads the plain fBm, whose spread the logistic assumes.
+  it("floods by the plain fBm's share, so erosion moves no coast", () => {
+    expect(GENERATED_FRAGMENT).toContain("t = shareOf(ground.wy);");
+  });
+
+  // F4239, F4241: a storm turns 1.5 radians at most and lies along its band; an ice margin wanders by a third of the pole's height.
+  it("turns a storm 1.5 radians at most, and wanders an ice margin", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/float turn = \(1\.0 - d\) \* \(1\.0 - d\) \* 1\.5 \*/);
+    expect(GENERATED_FRAGMENT).toMatch(/float pole = abs\(axis\.y\) \+ 0\.3 \*/);
+  });
+
+  // F4237: white-hot vents gather along the fissures and the low ground, never cream spots of one size spread evenly over the crust.
+  it("lights the vents along the fissures and the low ground", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/seam = lines\(cut, [\d.]+, 2\.3 \* pixel\) \* riven;/);
+    expect(GENERATED_FRAGMENT).toMatch(/float vents = [^;]*- 0\.5 \* height \+ 2\.0 \* \(seam - 0\.45\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

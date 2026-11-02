@@ -75,9 +75,7 @@ vec3 litBy(vec3 albedo, float wet, vec3 bent, vec3 normal, vec3 view, out float 
   return colour;
 }
 
-vec3 clouded(vec3 colour, vec3 high, float low, float shine, vec3 tint, out float cover) {
-  cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
-  float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
+vec3 cloudsOver(vec3 colour, float cover, float shadowed, float shine, vec3 tint) {
   colour *= 1.0 - 0.36 * shadowed;
   return mix(colour, tint * shine + 0.0015, cover * 0.9);
 }

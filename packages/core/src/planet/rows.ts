@@ -53,7 +53,7 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     rings: 0.04,
   },
   volcanic: {
-    maps: ["venus"],
+    maps: ["moon", "ceres"],
     palettes: [ramp(0x050404, 0x120d0a, 0x332114), ramp(0x0d0905, 0x291c0d, 0x5c421a)],
     warp: [0.04, 0.14],
     recolour: [0.92, 1],

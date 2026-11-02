@@ -32,8 +32,12 @@ float noise(vec3 p) {
         mix(corner(c, f, ivec3(0, 1, 1)), corner(c, f, ivec3(1, 1, 1)), u.x), u.y),
     u.z);
 }
-vec3 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
+float fadeAt(float frequency, float pixel) {
+  return 1.0 - smoothstep(0.25, 0.5, frequency * pixel);
+}
+vec4 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
   float sum = 0.0;
+  float plain = 0.0;
   float coarse = 0.0;
   float weight = 0.0;
   float squares = 0.0;
@@ -41,15 +45,17 @@ vec3 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
   for (int i = 0; i < 12; i++) {
     if (float(i) >= octaves || frequency * pixel > 0.5) break;
     float n = noise(p * frequency + float(i) * 1.7);
+    float faded = amplitude * fadeAt(frequency, pixel);
+    plain += faded * n;
     n += carved * (2.0 * (abs(n) - HOLLOW) - n);
-    sum += amplitude * n * (1.0 - smoothstep(0.25, 0.5, frequency * pixel));
+    sum += faded * n;
     coarse += amplitude * n * (1.0 - smoothstep(0.06, 0.125, frequency * pixel));
-    weight += amplitude;
-    squares += amplitude * amplitude;
+    weight += faded;
+    squares += faded * faded;
     amplitude *= shape.roughness;
     frequency *= shape.lacunarity;
   }
-  return vec3(sum, SPREAD * sqrt(max(squares, 1.0)), coarse) / max(weight, 1.0);
+  return vec4(sum, SPREAD * sqrt(max(squares, 1e-6)), coarse, plain) / max(weight, 1e-3);
 }
 float shareOf(vec2 height) {
   return 1.0 / (1.0 + exp(-1.702 * height.x / height.y));
@@ -88,10 +94,12 @@ vec3 stormed(vec3 q) {
         uint h = hashOf(cell + 211);
         if (float(h & 255u) / 255.0 >= shape.storms * 0.4) continue;
         vec3 centre = normalize((vec3(cell) + 0.5 + 0.25 * slopeAt(cell + 13) - offset) / 2.5);
+        if (ivec3(floor(centre * 2.5 + offset)) != cell) continue;
         float radius = 0.05 + 0.13 * float((h >> 8u) & 255u) / 255.0;
-        float d = length(q - centre) / radius;
+        vec3 apart = q - centre;
+        float d = length(vec3(apart.x, apart.y * 1.8, apart.z)) / radius;
         if (d >= 1.0) continue;
-        float turn = (1.0 - d) * (1.0 - d) * 5.0 * (float((h >> 16u) & 1u) * 2.0 - 1.0);
+        float turn = (1.0 - d) * (1.0 - d) * 1.5 * (float((h >> 16u) & 1u) * 2.0 - 1.0);
         q = q * cos(turn) + cross(centre, q) * sin(turn) + centre * dot(centre, q) * (1.0 - cos(turn));
       }
   return q;
@@ -103,27 +111,28 @@ float streaksAt(vec3 q, float pixel) {
   float frequency = shape.scale * 12.0;
   for (int i = 0; i < 6; i++) {
     if (frequency * pixel > 0.5) break;
-    sum += amplitude * noise(vec3(q.x, q.y * 5.0, q.z) * frequency + float(i) * 3.1) * (1.0 - smoothstep(0.3, 0.5, frequency * pixel));
-    weight += amplitude;
+    float faded = amplitude * (1.0 - smoothstep(0.3, 0.5, frequency * pixel));
+    sum += faded * noise(vec3(q.x, q.y * 5.0, q.z) * frequency + float(i) * 3.1);
+    weight += faded;
     amplitude *= 0.85;
     frequency *= 2.0;
   }
-  return sum / max(weight, 1.0) / SPREAD;
+  return sum / max(weight, 1e-3) / SPREAD;
 }
 float bandsAt(vec3 q, float pixel) {
-  vec3 churn = fbm(vec3(q.x, q.y * 4.0, q.z) + offset, shape.scale, pixel, 0.0, shape.octaves);
+  vec4 churn = fbm(vec3(q.x, q.y * 4.0, q.z) + offset, shape.scale, pixel, 0.0, shape.octaves);
   float latitude = q.y + shape.turbulence * 0.06 * churn.x / churn.y;
   float band = noise(vec3(latitude * shape.bands * 0.5, offset.x, offset.y));
-  band += 0.35 * noise(vec3(latitude * shape.bands * 1.37, offset.z, offset.x));
+  band += 0.35 * noise(vec3(latitude * shape.bands * 1.37, offset.z, offset.x)) * fadeAt(shape.bands * 1.37, pixel);
   return 0.5 + band * 1.4 + 0.12 * shape.turbulence * churn.x / churn.y;
 }
 `;
 
-// A real map's fine contrast: its colour over its own blurred self at a level past the pixel's, its colour kept by 1 - recolour. The
-// ground's slope on screen, as three's bump map takes a height's (perturbNormalArb). A rift never thinner than a pixel, `pixel` being
-// a pixel in the rifts' own units, or it crawls as the world turns: no derivative, so a pixel no rift reaches skips them. A locked world: scorched glass facing its star, desert, a thin belt of life, then ice to the far side.
+// A real map's fine contrast: its colour over its own blurred self past the pixel's level, its colour kept by 1 - recolour; the Earth's
+// cloud map lends its grain alone, over a sky of each world's own. The ground's slope on screen (three's perturbNormalArb). Rifts: a
+// warped noise's zero lines, never thinner than a pixel. A locked world: scorched glass facing its star, desert, a belt of life, ice.
 export const DETAIL = /* glsl */ `
-const float DETAIL_BLUR = 3.0;
+const float DETAIL_BLUR = 2.0;
 vec3 detailOf(sampler2D map, Lookup at) {
   vec3 fine = read(map, at).rgb;
   float level = log2(max(length(at.dx), length(at.dy)) * float(textureSize(map, 0).x) + 1.0);
@@ -143,8 +152,16 @@ vec3 bentBy(float height, vec3 normal) {
   return normalize(normal - slope);
 }
 float lines(vec3 at, float width, float pixel) {
-  float away = min(seams(at), seams(at * 2.3 + 11.0) * 2.0);
+  float away = min(abs(noise(at)), 2.0 * abs(noise(at * 2.3 + 11.0)));
   return 1.0 - smoothstep(0.0, max(width, pixel), away);
+}
+float skyAt(vec3 sky, float pixel) {
+  return shareOf(fbm(sky * 1.5 + minorOffset.yzx, 1.5, pixel, 0.0, 6.0).xy);
+}
+float cloudGrain(Lookup at) {
+  float level = log2(max(length(at.dx), length(at.dy)) * float(textureSize(cloudMap, 0).x) + 1.0);
+  float smoothed = textureLod(cloudMap, at.uv, max(level, 0.0) + DETAIL_BLUR).r;
+  return clamp(read(cloudMap, at).r / max(smoothed, 0.05), 0.5, 1.6);
 }
 vec3 eyeball(vec3 albedo, float tone, float day) {
   vec3 frost = mix(vec3(0.46, 0.58, 0.74), vec3(0.93, 0.96, 0.99), tone);

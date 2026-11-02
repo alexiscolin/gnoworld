@@ -4,6 +4,7 @@ import { planetSeed, type Stage, type WorldSigns } from "@gnoworld/core";
 import {
   DataTexture,
   PerspectiveCamera,
+  RedFormat,
   Scene,
   SphereGeometry,
   Vector3,
@@ -76,7 +77,9 @@ async function mapsFor(
     ),
   );
   const [clouds, ring] = await Promise.all([
-    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
+    flat
+      ? prepareMap(new DataTexture(new Uint8Array([128]), 1, 1, RedFormat), "data", anisotropy)
+      : loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
     loadMap(mapUrl("ring", base), { kind: "data", anisotropy }),
   ]);
   const lights = lit ? await loadMap(mapUrl("earth-night", base), { kind: "data", anisotropy, width }) : undefined;

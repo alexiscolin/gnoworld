@@ -54,7 +54,7 @@ const STATED: Record<Anchor, Row> = {
     rings: 0.04,
   },
   volcanic: {
-    maps: ["venus"],
+    maps: ["moon", "ceres"],
     warp: [0.04, 0.14],
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
@@ -143,7 +143,7 @@ const STATED: Record<Anchor, Row> = {
     rim: { colours: [0x7a5226, 0x80592c], thickness: [0.04, 0.05] },
   },
   "lava world": {
-    maps: ["venus"],
+    maps: ["moon", "ceres"],
     warp: [0.04, 0.14],
     recolour: [0.92, 1],
     relief: [0.012, 0.02],

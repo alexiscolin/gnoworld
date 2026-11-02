@@ -22,11 +22,16 @@ void main() {
 }
 `;
 
-// A slope read from the map beside each point, a pixel away and no nearer than a texel, so the detail a pixel can carry is shaded and no
-// finer: the same slope at any size, soft-clipped so a crater's rim never becomes a line.
+// The Earth's own clouds, its real cloud map by threshold, and its shadows. A slope read from the map beside each point, a pixel away and
+// no nearer than a texel, so the detail a pixel can carry is shaded and no finer, soft-clipped so a crater's rim never becomes a line.
 const RELIEF = /* glsl */ `
 uniform float cloudCover;
 uniform float nightLights;
+vec3 clouded(vec3 colour, vec3 high, float low, float shine, vec3 tint, out float cover) {
+  cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
+  float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
+  return cloudsOver(colour, cover, shadowed, shine, tint);
+}
 const float TEXEL = 0.0032;
 const float REACH = 0.012;
 vec3 bumped(vec3 axis, float height, float angle) {
@@ -49,8 +54,8 @@ ${COMMON}
 ${FIELD}
 ${LOOKUP}
 ${PARTS}
-${RELIEF}
 ${SHADE}
+${RELIEF}
 void main() {
   float angle = time * ${String(SPIN)};
   vec3 axis = turned(normalize(vLocal), angle);

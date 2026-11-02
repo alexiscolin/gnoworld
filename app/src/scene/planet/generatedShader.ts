@@ -55,9 +55,12 @@ void main() {
   vec3 flow = field(axis * warpFrequency + offset);
   vec3 direction = spin * normalize(axis + warpAmount * flow);
   Lookup place = lookupOf(direction);
-  Lookup elsewhere = lookupOf(spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy));
   vec3 own = detailOf(surface, place);
-  vec3 other = detailOf(minorMap, elsewhere);
+  vec3 other = own;
+  if (minorShare > 0.002 && banded < 0.5) {
+    Lookup elsewhere = lookupOf(spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy));
+    other = detailOf(minorMap, elsewhere);
+  }
 
   float minor = 0.0;
   if (minorShare > 0.002) {
@@ -76,16 +79,16 @@ void main() {
     t = clamp(bandsAt(swirled, pixel), 0.0, 1.0);
   } else {
     vec3 p = at + shape.warp * field(at * 1.1 + offset.yzx) + offset;
-    vec3 ground = fbm(p, shape.scale, pixel, shape.erosion, shape.octaves);
-    cratered = shape.craters > 0.0 ? cratersAt(p, shape.scale * 4.0, pixel) + 0.5 * cratersAt(p, shape.scale * 13.0, pixel) : 0.0;
-    t = shareOf(ground.xy);
+    vec4 ground = fbm(p, shape.scale, pixel, shape.erosion, shape.octaves);
+    float big = shape.craters > 0.0 ? cratersAt(p, shape.scale * 4.0, pixel) : 0.0;
+    cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(p, shape.scale * 13.0, pixel) : 0.0;
+    t = shareOf(ground.wy);
     height = ground.x / ground.y + cratered * 0.8;
-    relieved = ground.z / ground.y + cratered * 0.8;
+    relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.04, 0.08, shape.scale * 4.0 * pixel));
   }
-  vec3 detail = mix(own, other, minor * (1.0 - banded));
+  vec3 detail = mix(own, other, minor);
   float fine = dot(detail, LUMA) - 1.0;
   height += fine * shape.detail * 2.0;
-  relieved += fine * shape.detail * 0.3;
   float wet = 0.0;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
@@ -101,14 +104,17 @@ void main() {
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
   }
   if (shape.caps > 0.0) {
-    float pole = abs(axis.y) + 0.12 * flow.y + 0.12 * (t - 0.5);
-    albedo = mix(albedo, mix(vec3(0.86, 0.9, 0.95), high, 0.35) * detail, smoothstep(1.0 - shape.caps, 1.0 - shape.caps + 0.03, pole));
+    float pole = abs(axis.y) + 0.3 * (t - 0.5) + 0.15 * flow.y;
+    albedo = mix(albedo, mix(vec3(0.86, 0.9, 0.95), high, 0.35) * detail, smoothstep(1.0 - shape.caps, 1.0 - shape.caps + 0.06, pole));
   }
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
+  float seam = 0.0;
   if (shape.rifts > 0.0) {
     float riven = smoothstep(1.0 - shape.rifts, 1.2 - shape.rifts, shareOf(fbm(at * 1.3 + minorOffset.zxy, 1.5, pixel, 0.0, 2.0).xy));
-    if (riven > 0.0) rift = lines(at * 2.1 + 0.35 * flow, 0.004 + 0.012 * shape.rifts, 2.3 * pixel) * riven;
+    vec3 cut = at * 2.1 + 0.35 * flow;
+    if (riven > 0.0) rift = lines(cut, 0.004 + 0.012 * shape.rifts, 2.3 * pixel) * riven;
+    if (riven > 0.0 && glowLevel > 0.0) seam = lines(cut, 0.035, 2.3 * pixel) * riven;
   }
   albedo = mix(albedo, low * 0.6, rift * 0.7);
 
@@ -125,16 +131,20 @@ void main() {
   float overcast = 0.0;
   if (shape.clouds > 0.0 && banded < 0.5) {
     vec3 sky = spin * normalize(turned(axis, cloudTime * 0.006 * shape.drift) + 0.09 * flow.yzx);
-    float cover = shape.clouds * 1.25 + 0.2 * field(at * 1.6 + minorOffset).x;
-    colour = clouded(colour, sky, 1.0 - cover, shine, vec3(0.84, 0.86, 0.9), overcast);
+    float low = 1.0 - shape.clouds * 1.25;
+    float grain = cloudGrain(lookupOf(sky));
+    float cover = smoothstep(low - 0.1, low + 0.72, skyAt(sky, pixel));
+    float shadowed = smoothstep(low - 0.1, low + 0.72, skyAt(normalize(sky + spin * vSun * 0.016), pixel));
+    colour = cloudsOver(colour, cover, shadowed, shine, vec3(0.84, 0.86, 0.9) * mix(1.0, grain, 0.5));
+    overcast = cover;
   }
   if (settled > 0.0) colour += settlements(axis, direction, flow, day, rift) * (1.0 - 0.8 * overcast);
   colour = rimmed(colour, normal, view, day);
   if (glowLevel > 0.0) {
     float hot = 1.0 - (1.0 - glowLevel) * 0.2;
-    float crackle = (noise(at * shape.scale * 9.0 + offset) + 0.5 * noise(at * shape.scale * 29.0 + offset.yzx)) / SPREAD;
-    float vents = smoothstep(hot, hot + 0.06, shareOf(vec2(height + 0.9 * crackle, 1.3)));
-    float heat = max(rift * rift * smoothstep(0.5, 0.8, shape.rifts) * smoothstep(0.1, 0.8, flow.z + 0.4), vents);
+    float crackle = (noise(at * shape.scale * 9.0 + offset) * fadeAt(shape.scale * 9.0, pixel) + 0.5 * noise(at * shape.scale * 29.0 + offset.yzx) * fadeAt(shape.scale * 29.0, pixel)) / SPREAD;
+    float vents = smoothstep(hot, hot + 0.08, shareOf(vec2(0.9 * crackle - 0.5 * height + 2.0 * (seam - 0.45), 1.3)));
+    float heat = max(0.5 * rift * smoothstep(0.1, 0.8, flow.z + 0.4), vents);
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
     colour += mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
   }
