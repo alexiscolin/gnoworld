@@ -4,6 +4,7 @@ import {
   BOUNDS,
   CENTRE,
   DISC_TILT,
+  distanceOf as away,
   dotLight,
   GRAIN,
   onScreen,
@@ -68,8 +69,6 @@ const lifted = ([red, green, blue]: readonly [number, number, number]): [number,
   green + (DOT_WARM[1] - green) * DOT_LIFT,
   blue + (DOT_WARM[2] - blue) * DOT_LIFT,
 ];
-
-const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
 
 export class Disc {
   readonly #suns: Suns;

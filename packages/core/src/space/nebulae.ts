@@ -1,7 +1,7 @@
 // The nebulae (ADR-0002 §10, "Space views"): a telescope's view cut from a few real images, warped and recoloured, standing where the
 // mood's haze is. A lattice of cells, a cell holding one or none, everything about it from its cell's hash: a place keeps its nebula, and
 // nothing is listed or stored. Each stands as sheets one behind the other, so the eye moving parts them, the far ones softer.
-import { cellHash, nextState, unitOf, type Point } from "./cell.ts";
+import { cellHash, distanceOf, nextState, unitOf, type Point } from "./cell.ts";
 import { MOOD_SCALE, moodAt, newMood } from "./mood.ts";
 import { smoothstep } from "./smooth.ts";
 
@@ -108,8 +108,6 @@ const blank = (): Nebula => ({
   strength: 0,
 });
 
-const awayOf = (at: Point, eye: Point): number => Math.hypot(at.x - eye.x, at.y - eye.y, at.z - eye.z);
-
 /** The nebulae around an eye, into a pool kept for good: a look makes nothing. */
 export class NebulaField {
   readonly list: readonly Nebula[] = Array.from({ length: NEBULAE_MOST }, blank);
@@ -146,7 +144,7 @@ export class NebulaField {
     at.y = (y + WALL + ROOM * unitOf(state)) * CELL;
     state = nextState(state);
     at.z = (z + WALL + ROOM * unitOf(state)) * CELL;
-    const away = awayOf(at, eye);
+    const away = distanceOf(at, eye);
     if (away > NEBULA_REACH + MARGIN) return;
     moodAt(this.#mood, at);
     if (this.#mood.haze <= 0) return;
@@ -196,7 +194,7 @@ export class NebulaField {
 
 /** How much of a nebula shows from `eye`: none at the reach, none from within its middle sheet, none too faint to see. */
 export function nebulaLight(nebula: Nebula, eye: Point): number {
-  const away = awayOf(nebula, eye);
+  const away = distanceOf(nebula, eye);
   const far = 1 - smoothstep(FADES_FROM * NEBULA_REACH, NEBULA_REACH, away);
   const light = nebula.strength * far * smoothstep(NEAR_GONE * nebula.size, NEAR_WHOLE * nebula.size, away);
   return light < LEAST ? 0 : light;

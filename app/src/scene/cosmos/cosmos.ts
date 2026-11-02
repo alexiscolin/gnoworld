@@ -2,6 +2,7 @@
 // the ladder says. The camera stays at the origin, so the disc and each body come to it, and a frame writes only that. A look runs off the
 // frame, past a step of the eye: it stands the bodies and writes the disc.
 import {
+  distanceOf,
   Drawn,
   focusOf,
   Ladder,
@@ -139,7 +140,7 @@ export class Cosmos {
     this.#bodies.tick(eye, seconds);
     this.#home.tick(eye, seconds);
     this.#nebulae.follow(eye, seconds);
-    if (!(Math.hypot(eye.x - this.#looked.x, eye.y - this.#looked.y, eye.z - this.#looked.z) < STEP)) this.#askLook();
+    if (!(distanceOf(eye, this.#looked) < STEP)) this.#askLook();
   }
 
   #askLook(): void {

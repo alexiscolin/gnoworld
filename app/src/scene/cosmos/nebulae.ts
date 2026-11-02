@@ -2,6 +2,7 @@
 // eye; a frame brings them to the eye in doubles and lights them. Their images come once the worlds' maps had their turn, and each fades
 // in; near a world, and past a cluster's distance, they go out.
 import {
+  distanceOf,
   driftAt,
   focusDistance,
   glideAt,
@@ -154,7 +155,7 @@ export class Nebulae {
     at.x = eye.x + this.#drift.x - this.#glide.x;
     at.y = eye.y + this.#drift.y - this.#glide.y;
     at.z = eye.z + this.#drift.z - this.#glide.z;
-    const moved = Math.hypot(at.x - this.#placed.x, at.y - this.#placed.y, at.z - this.#placed.z);
+    const moved = distanceOf(at, this.#placed);
     if (!(moved < PLACE_STEP) && this.#placing === undefined) this.#placing = setTimeout(this.#standAround);
     this.advance(at, nebulaShare(focusDistance(eye)), seconds);
   }
