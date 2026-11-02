@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { textHash } from "../space/cell.ts";
 import { heightField, MAX_HEIGHT } from "../space/mood.ts";
 import {
   CELL,
@@ -307,6 +308,33 @@ describe("a hundred arrivals move no system far", () => {
     expect(inward(before, after)).toEqual([]);
   });
 
+  // One fixture missed the mutant that reads a wedge from the exact size (F3558): five names by ten sizes, none on a rung.
+  it("only ever moves others outward when one joins an ecosystem on its rung, whatever its name and size", () => {
+    for (const name of ["defi", "games", "art", "dao", "tools"]) {
+      for (const size of [3, 5, 6, 7, 9, 10, 12, 17, 20, 25]) {
+        const members = ids(size, name).map((id) => ({ id, ecosystem: name }));
+        const before = placeSystems([...set(300), ...members]);
+        const after = placeSystems([...set(300), ...members, { id: `${name}-new`, ecosystem: name }]);
+        expect(inward(before, after)).toEqual([]);
+      }
+    }
+  });
+
+  // An ecosystem's wedge narrows as its rank doubles, so the arrival that doubles it moves systems either way, once (F3557, accepted as
+  // seasonal by Claude for Alexis's review): 8.4 cells at most and 26 of 1,276 inward, measured. The ranks mirror `cosmos.ts`'s hashes.
+  it("moves no system far, and few inward, when a loose arrival doubles an ecosystem's rank", () => {
+    const curated = ids(30, "defi").map((id) => ({ id, ecosystem: "defi" }));
+    const own = textHash("ecosystem defi");
+    const first = ids(1_000).filter((id) => textHash(`system ${id}`) < own).length;
+    const ahead = ids(4_000, "arrival").filter((id) => textHash(`system ${id}`) < own);
+    const rung = 2 ** Math.ceil(Math.log2(first)) + 1 - first;
+    const before = placeSystems([...set(1_000), ...curated, ...loose(ahead.slice(0, rung - 1))]);
+    const after = placeSystems([...set(1_000), ...curated, ...loose(ahead.slice(0, rung))]);
+    expect(Math.max(...moves(before, after))).toBeLessThanOrEqual(16 * CELL);
+    expect(inward(before, after).length).toBeLessThanOrEqual(0.05 * before.size);
+    expect(inward(before, after).length).toBeGreaterThan(0);
+  });
+
   it("widens a wedge on its next rung, with no system going far", () => {
     const curated = ids(32, "defi").map((id) => ({ id, ecosystem: "defi" }));
     const joined = [{ id: "defi-new", ecosystem: "defi" }];
@@ -596,9 +624,10 @@ describe("the edges of the input", () => {
   });
 });
 
-// The worst rays a set can give, a whole set in one wedge, 45 ms measured: the test's own timeout is the bound (rings.test.ts says why).
+// A whole set in one ecosystem, 45 ms measured: the test's own timeout is the bound (rings.test.ts says why). Its wedge is the whole turn
+// (F3560): the worst rays, one ray, are rings.test.ts's.
 describe("its cost: n log n at most, measured", () => {
-  it("places 30,000 systems of one ecosystem, the worst its rays can do", () => {
+  it("places 30,000 systems of one ecosystem", () => {
     const places = placeSystems(ids(30_000).map((id) => ({ id, ecosystem: "one" })));
     expect(places.size).toBe(30_000);
     expect(closest(places.values())).toBeGreaterThanOrEqual(CELL);
