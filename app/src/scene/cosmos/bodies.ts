@@ -72,7 +72,8 @@ export class Bodies {
   readonly group = new Group();
   #last: Point | undefined;
   #seconds = 0;
-  #view: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
+  /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
+  sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
     this.#maps = maps;
@@ -82,15 +83,6 @@ export class Bodies {
 
   get size(): number {
     return this.#held.size;
-  }
-
-  /** The screen, in the page's pixels, its lens, and the box of the page's text. */
-  view(sight: BodyView): void {
-    this.#view = sight;
-  }
-
-  get sight(): BodyView {
-    return this.#view;
   }
 
   has(id: string): boolean {
@@ -167,7 +159,7 @@ export class Bodies {
   /** Where a round thing at `at` from the eye, `radius` units across, stands on screen, and its depth along the view: in a record kept
    * here, read at once (the labels' projector, 7h). */
   seen(at: Vector3, radius: number): ScreenSpot & { readonly depth: number } {
-    const { width, height, focal } = this.#view;
+    const { width, height, focal } = this.sight;
     const { camera } = this.#device;
     this.#screen.copy(at).project(camera);
     this.#spot.x = ((this.#screen.x + 1) * width) / 2;
@@ -181,7 +173,7 @@ export class Bodies {
 
   // What the box of the page's text leaves of a body at `at`.
   #room(at: Vector3, radius: number): number {
-    const { box } = this.#view;
+    const { box } = this.sight;
     return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
@@ -193,14 +185,14 @@ export class Bodies {
 
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
-    const { box } = this.#view;
+    const { box } = this.sight;
     return box === undefined ? 1 : clearOf({ ...this.seen(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
   /** Whether a round thing at `place` on the map, `radius` units across, shows on the screen from `eye`. */
   inView(place: Point, radius: number, eye: Point): boolean {
     const { x, y, radius: size, depth } = this.seen(this.#offEye(place, eye, this.#ahead), radius);
-    const { width, height } = this.#view;
+    const { width, height } = this.sight;
     return depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
   }
 

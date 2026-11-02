@@ -121,7 +121,7 @@ export class Cosmos {
 
   #frame(): void {
     const { aspect } = this.#device.camera;
-    this.#bodies.view({ width: this.#height * aspect, height: this.#height, focal: this.#focal, box: this.#box });
+    this.#bodies.sight = { width: this.#height * aspect, height: this.#height, focal: this.#focal, box: this.#box };
     this.#looked.x = NaN;
   }
 
