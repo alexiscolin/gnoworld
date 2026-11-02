@@ -50,18 +50,18 @@ const WAY: Record<Anchor, { kind: LightKind; grain: Span; fine: Span }> = {
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
   shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
-  "nitrogen ice": { kind: "cracks", grain: [1.2, 2], fine: [0.7, 1.05] },
-  "grooved ice": { kind: "cracks", grain: [1, 1.8], fine: [0.7, 1.05] },
-  snowball: { kind: "cracks", grain: [1.4, 2.2], fine: [0.7, 1] },
-  hycean: { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
-  archean: { kind: "coasts", grain: [1.2, 2], fine: [0.85, 1] },
-  "lava world": { kind: "seams", grain: [1.4, 2.4], fine: [4, 5.6] },
+  "nitrogen ice": { kind: "towns", grain: [1.3, 2.1], fine: [0.6, 0.95] },
+  "grooved ice": { kind: "towns", grain: [1.1, 1.9], fine: [0.55, 0.9] },
+  snowball: { kind: "towns", grain: [1.5, 2.3], fine: [0.65, 1] },
+  hycean: { kind: "pools", grain: [1.2, 2.2], fine: [3.6, 4.6] },
+  archean: { kind: "coasts", grain: [1.3, 2.1], fine: [0.8, 0.95] },
+  "lava world": { kind: "seams", grain: [1.5, 2.5], fine: [4.4, 6] },
   "two-faced": { kind: "towns", grain: [1.2, 2], fine: [0.5, 0.9] },
-  "water cloud giant": { kind: "belts", grain: [1, 1.8], fine: [24, 40] },
+  "water cloud giant": { kind: "belts", grain: [1.1, 1.9], fine: [20, 36] },
   "azure giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
-  "dark giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
+  "dark giant": { kind: "belts", grain: [1.1, 1.7], fine: [28, 44] },
   "hot giant": { kind: "belts", grain: [1.4, 2.4], fine: [16, 26] },
-  "sub-Neptune": { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
+  "sub-Neptune": { kind: "pools", grain: [1.6, 2.6], fine: [4.4, 5.4] },
 };
 const SEA: readonly Anchor[] = ["temperate", "ocean", "archean"];
 const between = ([from, to]: Span, share: number) => from + (to - from) * share;
@@ -220,7 +220,9 @@ describe("a stage reads the same on every class", () => {
     for (const reading of readings) expect(reading).toEqual(readings[0]);
   });
 
-  it("and each class shows it its own way", () => {
+  it("and each class shows it its own way, no two in the same form", () => {
+    const forms = ANCHORS.map((anchor) => JSON.stringify(WAY[anchor]));
+    expect(new Set(forms).size).toBe(ANCHORS.length);
     expect(Object.keys(WAY).sort()).toEqual([...ANCHORS].sort());
     for (const anchor of ANCHORS)
       for (const path of ["a", "b", "c"])

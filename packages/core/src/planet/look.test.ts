@@ -76,7 +76,7 @@ const BANDED: readonly Anchor[] = [
   "hot giant",
   "sub-Neptune",
 ];
-const CRACKED: readonly Anchor[] = ["ice", "nitrogen ice", "grooved ice", "snowball"];
+const CRACKED: readonly Anchor[] = ["ice"];
 
 describe("a world's look, from its id", () => {
   const paths = (count: number) => Array.from({ length: count }, (_, at) => `gno.land/r/n${String(at)}/home`);
@@ -207,7 +207,7 @@ describe("the anchors", () => {
     }
   });
 
-  it("locks one world alone, rifts one alone and cracks the icy ones alone", () => {
+  it("locks one world alone, rifts one alone and cracks Europa's alone", () => {
     for (const anchor of ANCHORS) {
       const look = planetLook(DAO, anchor);
       expect(look.locked).toBe(anchor === "tidally locked");
