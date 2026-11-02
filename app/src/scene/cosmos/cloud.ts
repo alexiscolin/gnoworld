@@ -10,18 +10,9 @@ export interface Cloud<Name extends string> {
   commit(count: number): void;
 }
 
-/** A cloud of `most` points on `parent`, each with `items` numbers in each named attribute, drawn with `material`. */
-export function pointCloud<Name extends string>(
-  parent: Object3D,
-  owner: Disposer,
-  {
-    most,
-    items,
-    material,
-  }: { readonly most: number; readonly items: Readonly<Record<Name, number>>; readonly material: ShaderMaterial },
-): Cloud<Name> {
-  const geometry = owner.add(new BufferGeometry());
-  owner.add(material);
+/** Room for `most` vertices, each with `items` numbers in each named attribute, none shown yet. Its geometry is the caller's to free. */
+function cloudOf<Name extends string>(most: number, items: Readonly<Record<Name, number>>): Cloud<Name> {
+  const geometry = new BufferGeometry();
   const names = Object.keys(items) as Name[];
   const attributes = Object.fromEntries(
     names.map((name) => {
@@ -32,9 +23,6 @@ export function pointCloud<Name extends string>(
     }),
   ) as Record<Name, BufferAttribute>;
   geometry.setDrawRange(0, 0);
-  const points = new Points(geometry, material);
-  points.frustumCulled = false;
-  parent.add(points);
   return {
     geometry,
     attributes,
@@ -43,4 +31,23 @@ export function pointCloud<Name extends string>(
       for (const name of names) attributes[name].needsUpdate = true;
     },
   };
+}
+
+/** A cloud of `most` points on `parent`, each with `items` numbers in each named attribute, drawn with `material`. */
+export function pointCloud<Name extends string>(
+  parent: Object3D,
+  owner: Disposer,
+  {
+    most,
+    items,
+    material,
+  }: { readonly most: number; readonly items: Readonly<Record<Name, number>>; readonly material: ShaderMaterial },
+): Cloud<Name> {
+  const cloud = cloudOf(most, items);
+  owner.add(cloud.geometry);
+  owner.add(material);
+  const points = new Points(cloud.geometry, material);
+  points.frustumCulled = false;
+  parent.add(points);
+  return cloud;
 }

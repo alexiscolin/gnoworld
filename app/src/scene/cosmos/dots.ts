@@ -14,6 +14,14 @@ interface DotLook {
   readonly size: readonly [number, number];
 }
 
+/** Which way a world stands from its star, its orbit's radius, phase and its star's spin given: the one place a world's point and its
+ * lines take it, at any distance (GLSL). */
+const ORBITING = /* glsl */ `
+vec3 orbiting(vec3 orbit, float seconds) {
+  float angle = orbit.y + orbit.z * seconds;
+  return vec3(cos(angle), 0.0, sin(angle));
+}`;
+
 // A far body's light, FAR_ANGLE from the eye, on the side its star stands (planet/light.ts).
 const VERTEX = /* glsl */ `
 const vec2 SIDE = vec2(0.906, 0.423);
@@ -25,9 +33,9 @@ uniform float uRatio;
 varying vec3 vTint;
 varying float vLight;
 varying vec3 vStar;
+${ORBITING}
 void main() {
-  float angle = aOrbit.y + aOrbit.z * uSeconds;
-  vec3 out_ = vec3(cos(angle), 0.0, sin(angle));
+  vec3 out_ = orbiting(aOrbit, uSeconds);
   vTint = aTint;
   vLight = aSize.y;
   vec2 side = normalize((mat3(modelViewMatrix) * -out_).xy + vec2(1.0e-4, 0.0));
