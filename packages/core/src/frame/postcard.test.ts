@@ -93,6 +93,31 @@ describe("a postcard's worlds", () => {
     }
   });
 
+  // 7d6's review (lots 3 and 4): the 15% rule and the eight largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
+  // is (each off its star, the nearest two 3 apart), so two at `arc` apart leave a gap of `6·sin(arc/2) − 0.6` between them.
+  const arcFor = (gap: number) => 2 * Math.asin((gap + 0.6) / 6);
+  const onOrbit = (phases: readonly number[]) => systemOf(phases.map((phase) => [0.3, 3, phase]));
+
+  it("refuses three worlds whose gaps differ by a tenth, and draws three whose gaps differ by a fifth, their orbits kept", () => {
+    const [first, tenth, fifth] = [arcFor(3), arcFor(2.7), arcFor(2.4)];
+    expect(postcardWorlds(onOrbit([0, first, first + tenth]))).toHaveLength(2);
+    const drawn = postcardWorlds(onOrbit([0, first, first + fifth]));
+    expect(drawn).toHaveLength(3);
+    for (const { orbit } of drawn) expect(orbit).toBe(3);
+  });
+
+  it("reads the gaps between neighbours round the star, whatever order its worlds come in", () => {
+    // Round the star at 0, 0.8, 2 and 3.7: gaps 1.74, 2.79, 3.91 and 5.17, no two alike.
+    expect(postcardWorlds(onOrbit([0, 2, 0.8, 3.7]))).toHaveLength(4);
+  });
+
+  it("chooses among its eight largest worlds: the eighth drawn, the ninth never", () => {
+    // Seven larger worlds past the cell's half, never drawn; the eighth and the ninth would stand apart, the ninth listed first.
+    const larger = Array.from({ length: 7 }, (_, at): [number, number, number] => [0.5 + 0.05 * at, 4.8, at]);
+    const drawn = postcardWorlds(systemOf([[0.31, 1.5, Math.PI], [0.4, 1, 0], ...larger]));
+    expect(drawn.map(({ radius }) => radius)).toEqual([0.4]);
+  });
+
   it("draws nothing as a body of grain alone, and four at most", () => {
     expect(postcardWorlds(systemOf([[0.1, 1, 0]]))).toEqual([]);
     const many = systemOf(Array.from({ length: 12 }, (_, at) => [0.3 + at * 0.08, 0.8 + at * 0.1, at * 1.3]));
