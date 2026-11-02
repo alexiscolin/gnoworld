@@ -14,8 +14,8 @@ export interface CosmosWorld {
   }[];
 }
 
-// How much a world is used: its realms, and their callers.
-const usageOf = ({ realms }: CosmosWorld): number =>
+/** How much a world is used: its realms, and their callers. */
+export const usageOf = ({ realms }: CosmosWorld): number =>
   realms.reduce((sum, { callers }) => sum + (callers ?? 0), realms.length);
 
 /** The worlds as the cosmos places them: each its id, its namespace and its use. */

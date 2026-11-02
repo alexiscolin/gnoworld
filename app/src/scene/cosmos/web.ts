@@ -8,15 +8,15 @@ import {
   linksOf,
   pointTint,
   softPoint,
-  spreadAt,
   toScene,
+  worldSize,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
 import { Group, LineSegments, Points } from "three";
 import { liveLight, universeOf, type CalledWorld, type Universe } from "../live.ts";
 import { cloudOf, type Cloud } from "./cloud.ts";
-import type { CosmosWorld } from "./cosmosWorld.ts";
+import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { lineLook, pointLook } from "./webLook.ts";
 
 /** A set to stand: its systems as the cosmos placed them, its worlds as the file holds them, and the file's time. */
@@ -33,9 +33,10 @@ export interface WebView {
   readonly focus: number;
 }
 
-// A live world's colour, the post's gold, in linear light, and how much brighter it stands.
+// A live world's colour, the post's gold, in linear light, and how much brighter and larger it stands.
 const GOLD = [1, 0.62, 0.18] as const;
 const GOLD_LIFT = 1.5;
+const GOLD_GROW = 0.5;
 // A world drawn: its system, its orbit, phase and size there, its colour with no activity, the file's word on it, and how live it was at the
 // last look.
 interface Held {
@@ -98,21 +99,26 @@ export class Web {
       if (place === undefined || at[from] >= 0) return;
       at[from] = this.#held.length;
       seen.set(world.id, this.#held.length);
-      const { orbit, phase, radius } = place.world;
+      const { orbit, phase } = place.world;
       const tint = tints.get(place.system.id) ?? tintAt(place.system);
       tints.set(place.system.id, tint);
       this.#held.push({
         system: place.system,
         orbit,
         phase,
-        radius,
+        radius: worldSize(usageOf(world)),
         tint,
         world,
         live: liveLight(world, this.#universe, now),
       });
     });
+    // A pair whose one world has no place goes whole, so no later pair slides onto another world.
     const links = linksOf(worlds);
-    this.#ends = links.flatMap((end) => at[end] ?? -1).filter((end) => end >= 0);
+    this.#ends = [];
+    for (let pair = 0; pair < links.length; pair += 2) {
+      const [from = -1, to = -1] = [at[links[pair] ?? -1], at[links[pair + 1] ?? -1]];
+      if (from >= 0 && to >= 0) this.#ends.push(from, to);
+    }
     this.#lights = new Float32Array(this.#held.length);
     this.#build();
   }
@@ -156,14 +162,12 @@ export class Web {
       const gold = Math.min(1, held.live);
       softPoint(held.radius, { distance, focus, focal }, this.#soft);
       this.#lights[index] = this.#soft.light * (1 + GOLD_LIFT * gold);
-      points.attributes.aSoft.setXY(index, this.#soft.size, this.#lights[index] ?? 0);
-      points.attributes.aCircle.setX(index, held.orbit * spreadAt(distance));
+      points.attributes.aSoft.setXY(index, this.#soft.size * (1 + GOLD_GROW * gold), this.#lights[index] ?? 0);
       const [red, green, blue] = held.tint.map((channel, at) => channel + ((GOLD[at] ?? 0) - channel) * gold);
       points.attributes.aTint.setXYZ(index, red ?? 0, green ?? 0, blue ?? 0);
     });
     this.#ends.forEach((end, vertex) => {
-      const { aCircle, aTint } = points.attributes;
-      lines.attributes.aCircle.setX(vertex, aCircle.getX(end));
+      const { aTint } = points.attributes;
       lines.attributes.aTint.setXYZ(vertex, aTint.getX(end), aTint.getY(end), aTint.getZ(end));
       lines.attributes.aLight.setX(vertex, this.#lights[end] ?? 0);
     });

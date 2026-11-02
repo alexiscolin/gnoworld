@@ -208,6 +208,15 @@ describe("the whole cosmos", () => {
     const [red = 0, green = 0, blue = 0] = gold;
     expect(red).toBeGreaterThan(green);
     expect(green).toBeGreaterThan(blue * 1.6);
+    // Larger as well as brighter, so it reads among the rest (F4152, finding 5).
+    const sizeOf = (last: ((at: number) => number | null) | undefined) => {
+      const { web, owner } = stood({ count: 30, ...(last === undefined ? {} : { last }) });
+      lookFrom(web, 900);
+      const size = Math.max(...rows(geometryOf(web, "Points"), ["aSoft"]).map((row) => Number(row.split(",")[0])));
+      owner.dispose();
+      return size;
+    };
+    expect(sizeOf((at) => (at === 0 ? 50_000 : null))).toBeGreaterThan(1.3 * sizeOf(undefined));
     // Half a run later, strictly between its quiet colour and its gold, on every channel that moves.
     const half = tintOf(liveAt(NOW + (RUN_BLOCKS / 2) * BLOCK_MS).find((row) => !quiet.includes(row)));
     for (const channel of [0, 1, 2]) {
@@ -288,6 +297,67 @@ describe("the whole cosmos", () => {
     expect(web.group.visible).toBe(true);
     expect(web.stats().share).toBe(0.25);
     owner.dispose();
+  });
+
+  // F4152, finding 1: a crowd's worlds stood on rings, the close view's lattice opened 2.6 times as the ladder opens a system from afar.
+  it("stands each world at its true place round its star, never opened as a system is from afar", () => {
+    const worlds = worldsOf({ count: 200 });
+    const orbits = new Map(
+      held(worlds).flatMap(({ worlds: list }) => list.map((world) => [world.id, world.orbit] as const)),
+    );
+    const web = new Web();
+    web.stand({ systems: held(worlds), worlds, written: WRITTEN }, NOW);
+    const expected = [...orbits.values()].map((orbit) => orbit.toFixed(6)).sort();
+    for (const height of [400, 2000]) {
+      lookFrom(web, height);
+      expect(rows(geometryOf(web, "Points"), ["aCircle"]).map((row) => row.split(",")[0])).toEqual(expected);
+    }
+    web.dispose();
+  });
+
+  // F4152, finding 3: a world alone was a large point and a crowd's a grain, the close view's packing, not data.
+  it("sizes each world by its use, not by the room its crowd leaves it", () => {
+    const world = (namespace: string, at: number, callers: number): CosmosWorld => ({
+      id: `${namespace}/w${String(at)}`,
+      namespace,
+      realms: [{ callers, path: `gno.land/r/${namespace}/w${String(at)}` }],
+    });
+    const worlds = [
+      world("lone", 0, 20),
+      ...Array.from({ length: 60 }, (_, at) => world("crowd", at, at === 0 ? 900 : 20)),
+    ];
+    const systems = systemsOf(
+      worlds.map(({ id, namespace, realms }) => ({ id, namespace, use: 1 + (realms[0]?.callers ?? 0) })),
+    );
+    const web = new Web();
+    web.stand({ systems, worlds, written: WRITTEN }, NOW);
+    const eye = { x: 0, y: 1500, z: 0 };
+    web.look({ eye, focal: FOCAL, focus: 1500 }, NOW);
+    const soft = attribute(geometryOf(web, "Points"), "aSoft");
+    const place = attribute(geometryOf(web, "Points"), "position");
+    // A point's radius on screen times its distance is its world's size, whatever its distance.
+    const sizes = worlds.map((_, at) => {
+      const distance = Math.hypot(place.getX(at) - eye.x, place.getY(at) - eye.y, place.getZ(at) - eye.z);
+      return soft.getX(at) * distance;
+    });
+    const [lone = 0, busy = 0, ...crowd] = sizes;
+    for (const each of crowd) expect(each / lone).toBeCloseTo(1, 1);
+    expect(busy).toBeGreaterThan(1.2 * lone);
+    web.dispose();
+  });
+
+  it("keeps every line on its own two worlds when a world of the file has no place", () => {
+    const worlds = worldsOf({ count: 40, linkEvery: 2 });
+    const placed = worlds.filter((_, at) => at !== 7);
+    const web = new Web();
+    web.stand({ systems: held(placed), worlds, written: WRITTEN }, NOW);
+    lookFrom(web, 900);
+    const ends = rows(geometryOf(web, "LineSegments"), ["position", "aCircle"]);
+    const points = new Set(rows(geometryOf(web, "Points"), ["position", "aCircle"]));
+    for (const end of ends) expect(points.has(end)).toBe(true);
+    // World 6 named world 7, which has no place: its line goes, every other stays.
+    expect(ends).toHaveLength(2 * (20 - 1));
+    web.dispose();
   });
 
   it("draws a world the file names twice as one point", () => {

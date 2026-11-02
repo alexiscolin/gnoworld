@@ -33,6 +33,7 @@ export {
   GRAIN,
   ROOM,
   systemsOf,
+  worldSize,
   type Orbiter,
   type StarSystem,
   type WorldHeld,

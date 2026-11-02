@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { toScene } from "../frame/disc.ts";
 import { MOOD_SCALE, moodAt, newMood } from "../space/mood.ts";
-import { systemsOf, type WorldHeld } from "./system.ts";
+import { systemsOf, worldSize, type WorldHeld } from "./system.ts";
 import { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld } from "./web.ts";
 
 // The whole cosmos (ADR-0002 §10; Alexis, 2026-11-02): past a cluster's distance the worlds themselves are the nebula, a soft point for
@@ -21,6 +21,8 @@ const pairsOf = (worlds: readonly LinkedWorld[], most?: number): string[] => {
   return pairs.sort();
 };
 
+// A walk over the field or 20,000 worlds: well under a second alone, more under StrykerJS's coverage or a loaded machine.
+const SLOW = 30_000;
 // The scene's lens at the video's size: 50 degrees from top to bottom.
 const WIDTH = 1728;
 const HEIGHT = 1080;
@@ -206,39 +208,46 @@ describe("softPoint", () => {
 
 describe("a frame's cost", () => {
   // Every point's round on screen, in whole screens, from eyes over the disc from the lab's start of the hand-over: the budget this part
-  // records, 1.37 measured at worst once the points' glow and opening were set on pictures (a doubled glow fills four times as much).
-  const FILL_MOST = 1.6;
+  // records, 4.37 measured at worst once points take their world's size by use (1.37 with the close view's packing; a doubled glow fills
+  // four times as much). A soft round is one read of nothing a fragment: 7d4's nebulae hold ten screens of a texture.
+  const FILL_MOST = 5;
   const set: WorldHeld[] = Array.from({ length: 20_000 }, (_, at) => ({
     id: `n${String(at % 4_000)}/w${String(at)}`,
     namespace: `n${String(at % 4_000)}`,
     use: (at * 37) % 900,
   }));
+  // The scene sizes a point by its world's use, whatever room its crowd leaves it (F4152).
+  const uses = new Map(set.map(({ id, use }) => [id, use]));
   const fill = (systems: ReturnType<typeof systemsOf>, eye: { x: number; y: number; z: number }, focus: number) => {
     const out = { size: 0, light: 0 };
     let covered = 0;
     for (const { place, worlds } of systems)
-      for (const { radius } of worlds) {
+      for (const { id } of worlds) {
         const distance = Math.hypot(place.x - eye.x, place.y - eye.y, place.z - eye.z);
-        softPoint(radius, { distance, focus, focal: FOCAL }, out);
+        softPoint(worldSize(uses.get(id) ?? 0), { distance, focus, focal: FOCAL }, out);
         if (out.light > 0) covered += Math.PI * out.size * out.size;
       }
     return covered / (WIDTH * HEIGHT);
   };
 
-  it("fills a few screens at most at 20,000 worlds, wherever the eye stands past a cluster's distance", () => {
-    const systems = systemsOf(set);
-    fc.assert(
-      fc.property(
-        fc.double({ min: -600, max: 600, noNaN: true }),
-        fc.double({ min: -600, max: 600, noNaN: true }),
-        fc.double({ min: 0.85 * MOOD_SCALE, max: 6 * MOOD_SCALE, noNaN: true }),
-        (x, z, height) => {
-          expect(fill(systems, { x, y: height, z }, height)).toBeLessThanOrEqual(FILL_MOST);
-        },
-      ),
-      { numRuns: 12 },
-    );
-  });
+  it(
+    "fills a few screens at most at 20,000 worlds, wherever the eye stands past a cluster's distance",
+    () => {
+      const systems = systemsOf(set);
+      fc.assert(
+        fc.property(
+          fc.double({ min: -600, max: 600, noNaN: true }),
+          fc.double({ min: -600, max: 600, noNaN: true }),
+          fc.double({ min: 0.85 * MOOD_SCALE, max: 6 * MOOD_SCALE, noNaN: true }),
+          (x, z, height) => {
+            expect(fill(systems, { x, y: height, z }, height)).toBeLessThanOrEqual(FILL_MOST);
+          },
+        ),
+        { numRuns: 40 },
+      );
+    },
+    SLOW,
+  );
 });
 
 describe("pointTint", () => {
@@ -303,21 +312,25 @@ describe("pointTint", () => {
 
   // The mood's own bound (mood.test.ts): a channel moves at most 0.02 for a unit's step. A point keeps it, so two systems a cell apart never
   // jump from one colour to another, even where the mood is dark and its hue turns.
-  it("takes the mood of where it stands: the same place the same colour, and the colour moves over the field as smoothly as the mood", () => {
-    const at = { x: 40, y: 1, z: -30 };
-    expect(tintAt(at)).toEqual(tintAt({ ...at }));
-    const hues = new Set<string>();
-    for (let x = -30_000; x <= 30_000; x += 3.1) {
-      const { red, green, blue } = tintAt({ x, y: 0, z: x / 2 });
-      hues.add(red > blue ? "warm" : "cool");
-      const step = tintAt({ x: x + 1, y: 0, z: x / 2 });
-      for (const [before, after] of [
-        [red, step.red],
-        [green, step.green],
-        [blue, step.blue],
-      ] as const)
-        expect(Math.abs(after - before)).toBeLessThanOrEqual(0.02);
-    }
-    expect(hues).toEqual(new Set(["warm", "cool"]));
-  });
+  it(
+    "takes the mood of where it stands: the same place the same colour, and the colour moves over the field as smoothly as the mood",
+    () => {
+      const at = { x: 40, y: 1, z: -30 };
+      expect(tintAt(at)).toEqual(tintAt({ ...at }));
+      const hues = new Set<string>();
+      for (let x = -30_000; x <= 30_000; x += 3.1) {
+        const { red, green, blue } = tintAt({ x, y: 0, z: x / 2 });
+        hues.add(red > blue ? "warm" : "cool");
+        const step = tintAt({ x: x + 1, y: 0, z: x / 2 });
+        for (const [before, after] of [
+          [red, step.red],
+          [green, step.green],
+          [blue, step.blue],
+        ] as const)
+          expect(Math.abs(after - before)).toBeLessThanOrEqual(0.02);
+      }
+      expect(hues).toEqual(new Set(["warm", "cool"]));
+    },
+    SLOW,
+  );
 });
