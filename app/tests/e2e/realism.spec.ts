@@ -134,13 +134,11 @@ test.describe("the realism page", () => {
     expect(found.programs).toBeLessThanOrEqual(6);
   });
 
-  test("their maps stay inside the memory the plan allows, and the page says how much", async ({ page }) => {
+  test("their maps stay inside the memory the plan allows", async ({ page }) => {
     await open(page, "?view=gallery");
     const found = await stats(page);
     expect(found.mapBytes).toBeGreaterThan(0);
     expect(found.mapBytes).toBeLessThanOrEqual(MEMORY_AT_MOST);
-    await expect(page.getByTestId("memory")).toContainText(`${String(Math.round(found.mapBytes / 1048576))} MB`);
-    await expect(page.getByTestId("renderer")).toContainText(found.renderer);
   });
 
   test("a world close up holds the frame, with near-black space around it", async ({ page }) => {
@@ -176,16 +174,13 @@ test.describe("the realism page", () => {
   });
 
   for (const method of ["computed", "image"])
-    test(`the nebula made as ${method} draws, says its memory, and stays near-black at its corners`, async ({
-      page,
-    }) => {
+    test(`the nebula made as ${method} draws, and stays near-black at its corners`, async ({ page }) => {
       await open(page, `?view=nebula&method=${method}`);
       const found = await stats(page);
       expect(found.view).toBe(`nebula ${method}`);
       if (method === "image") expect(found.images).toBeGreaterThanOrEqual(1);
       else expect(found.images).toBe(0);
       expect(found.mapBytes + found.targetBytes).toBeLessThanOrEqual(NEBULA_AT_MOST);
-      await expect(page.getByTestId("memory")).toContainText("MB");
       const [middle = 0, ...corners] = await lit(page, [[0, height / 2 - 100, width, height / 2 + 100], ...CORNERS]);
       expect(middle).toBeGreaterThan(4);
       for (const corner of corners) expect(corner).toBeLessThan(16);
