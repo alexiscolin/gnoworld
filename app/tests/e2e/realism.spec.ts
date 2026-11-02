@@ -6,8 +6,8 @@ import { brightness } from "./geometry.ts";
 // software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
 // The canvas is not pixel-compared (the plan, section 6).
 const PAGE = "/lab/realism.html";
-// Eight surface maps, the clouds and the ring's profile.
-const MAPS_AT_MOST = 10;
+// Nine surface maps (the Earth's among them), the clouds and the ring's profile.
+const MAPS_AT_MOST = 11;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
@@ -175,7 +175,7 @@ test.describe("the realism page", () => {
       // A thin box across the limb, on the side the star lights.
       [round(x + r * 0.97), round(y - r * 0.1), round(x + r * 1.05), round(y + r * 0.1)],
     ]);
-    expect(disc).toBeLessThan(6);
+    expect(disc).toBeLessThan(10);
     expect(rim).toBeGreaterThan(disc + 20);
   });
 
