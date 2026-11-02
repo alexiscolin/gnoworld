@@ -37,19 +37,20 @@ const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 const COSMOS_JS = 16 * 1024;
 const THREE_MARK = "isWebGLRenderer";
 
-// The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
-// `import("./x.js")`), from the roots that are no other's import, the chunk that comes late apart.
+// A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
+const STATIC_IMPORT = /(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/g;
+
+// The scripts the page's others import, as each file's own static imports say, from the roots that are no other's import, the chunk that
+// comes late apart.
 const without = (page: Page, urls: readonly string[], skip: string) =>
   page.evaluate(
-    async ([list, skipped]) => {
+    async ([list, skipped, pattern]) => {
       const edges = new Map<string, string[]>();
       for (const url of list) {
         const text = await (await fetch(url, { cache: "no-store" })).text();
         edges.set(
           url,
-          [...text.matchAll(/(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/g)].map(
-            (found) => new URL(found[1] ?? "", url).href,
-          ),
+          [...text.matchAll(new RegExp(pattern, "g"))].map((found) => new URL(found[1] ?? "", url).href),
         );
       }
       const imported = new Set([...edges.values()].flat());
@@ -62,7 +63,24 @@ const without = (page: Page, urls: readonly string[], skip: string) =>
       for (const url of list) if (url !== skipped && !imported.has(url)) walk(url);
       return [...kept];
     },
-    [[...urls], skip] as const,
+    [[...urls], skip, STATIC_IMPORT.source] as const,
+  );
+
+// A script and every script it imports statically, read file by file.
+const closureOf = (page: Page, start: string) =>
+  page.evaluate(
+    async ([first, pattern]) => {
+      const seen = new Set<string>();
+      const next = [first];
+      for (let url = next.pop(); url !== undefined; url = next.pop()) {
+        if (seen.has(url)) continue;
+        seen.add(url);
+        const text = await (await fetch(url, { cache: "no-store" })).text();
+        for (const found of text.matchAll(new RegExp(pattern, "g"))) next.push(new URL(found[1] ?? "", url).href);
+      }
+      return [...seen];
+    },
+    [start, STATIC_IMPORT.source] as const,
   );
 
 // The Earth's chat, once its page holds one: exactly one chunk of that name, named by no preload, and asked after the load and the door ended.
@@ -150,11 +168,16 @@ test("the cosmos's chunk stays within its cap, and the scene's holds none of it"
   expect(await compressed(page, [(await cosmos).url()])).toBeLessThanOrEqual(COSMOS_JS);
 });
 
+// The scene weighs its chunk and every chunk it imports statically that the door did not bring already: a part of three split into a chunk
+// of its own is still the scene's (7e: two lazy parts made rolldown split the scene's shared modules out of it).
 test("the scene's chunk holds three, and stays within its cap", async ({ page }) => {
   const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  const door = page.waitForResponse((response) => DOOR.test(response.url()));
   await page.goto("/?test-gpu");
   await hydrated(page);
   const url = (await scene).url();
+  const brought = new Set(await closureOf(page, (await door).url()));
+  const own = (await closureOf(page, url)).filter((each) => !brought.has(each));
   expect(await (await page.request.get(url)).text()).toContain(THREE_MARK);
-  expect(await compressed(page, [url])).toBeLessThanOrEqual(SCENE_JS);
+  expect(await compressed(page, own)).toBeLessThanOrEqual(SCENE_JS);
 });
