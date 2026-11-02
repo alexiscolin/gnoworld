@@ -243,7 +243,7 @@ Rules:
   - nothing when the tab is hidden, an opaque view covers the scene, or the window is
     blurred and still;
   - no idle orbit under reduced motion or "Reduce animations".
-- The low-power GPU. The pixel ratio is capped at 1.25 on desktop and 1 on touch; the Low
+- The low-power GPU. The pixel ratio is capped at 2 on desktop (a Retina screen is drawn sharp; the Auto probe is the net) and 1 on touch; the Low
   tier takes 1 and 0.8. Auto drops to Low from a 2 s frame probe.
 - Bodies are instanced, static meshes merged per material. Textures are WebP. Shaders are
   compiled before a flight arrives. Generation runs in workers.
