@@ -6,7 +6,7 @@ import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, colours, near } from "./geometry.ts";
-import { opened, running, stats } from "./sceneStage.ts";
+import { hideThePage, opened, running, stats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -124,10 +124,7 @@ test("shows warm suns on near-black: the great sun's glow, deep black in the cor
   await arrived(page);
   await standing(page);
   await opened(page);
-  await page.evaluate(() => {
-    for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
-  });
+  await hideThePage(page);
   const { screen } = await cosmos(page);
   const [x, y] = [Math.round(screen.sun.x), Math.round(screen.sun.y)];
   const shot = await page.locator("canvas").screenshot();
@@ -286,10 +283,7 @@ test("keeps the corners near-black and the draw bound with the nebulae lit", asy
   await opened(page);
   const { calls } = await stats(page);
   expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
-  await page.evaluate(() => {
-    for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
-  });
+  await hideThePage(page);
   const shot = await page.locator("canvas").screenshot();
   // The top left, and the bottom left under the hero; the right holds a sun and the Credits.
   const corners = await colours(page, shot, [
