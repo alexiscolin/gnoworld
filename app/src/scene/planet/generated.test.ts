@@ -368,6 +368,12 @@ describe("the generated program", () => {
   });
 
   // F4312: a sea's depth read the old field while its coast read the new one, so the old islands showed as shoals out at sea.
+  // F4335: an ocean world's continents left its close view open sea, under the rounding floor (2.75 against 9.2): a sea of 0.8 or
+  // more keeps its archipelagos, the ground's own field; a temperate world's sea (0.55 to 0.78) gathers its land in continents.
+  it("gathers land in continents only where the sea leaves room for them", () => {
+    expect(GENERATED_FRAGMENT).toContain("if (shape.sea > 0.0 && shape.sea < 0.8) {");
+  });
+
   it("deepens a sea from its own coast", () => {
     expect(GENERATED_FRAGMENT).toContain("float shore = t;");
     expect(GENERATED_FRAGMENT).toContain("float depth = smoothstep(0.0, 0.6, (shape.sea - shore) / shape.sea);");
