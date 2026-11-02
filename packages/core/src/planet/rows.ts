@@ -6,7 +6,8 @@ import type { Anchor, AnchorRow, Ramp, Rgb } from "./anchors.ts";
 const rgb = (hex: number): Rgb => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
 const ramp = (low: number, mid: number, high: number): Ramp => [rgb(low), rgb(mid), rgb(high)];
 
-const SKY: readonly [Rgb, Rgb] = [rgb(0x4c85f2), rgb(0x6b9eeb)];
+// Every air is drawn as the Earth's is (a max channel near 0.55, a thickness of 0.05 at most), each in its own colour.
+const SKY: readonly [Rgb, Rgb] = [rgb(0x335289), rgb(0x3a5e8c)];
 const LAVA: Rgb = rgb(0xf4753e);
 
 export const ROWS: Record<Anchor, AnchorRow> = {
@@ -21,7 +22,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     rings: 0.05,
   },
   temperate: {
-    maps: ["mars", "eris"],
+    maps: ["earth-day"],
     second: "ceres",
     palettes: [ramp(0x16240f, 0x4d6426, 0xb09a62), ramp(0x2a1f10, 0x6f6a2c, 0xc4ad78)],
     warp: [0.08, 0.2],
@@ -30,8 +31,8 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     limb: 0.4,
     caps: [0.08, 0.2],
     clouds: [0.22, 0.4],
-    sea: { level: [0.46, 0.58], shallow: rgb(0x0f426b), deep: rgb(0x040f29) },
-    rim: { colours: SKY, thickness: [0.035, 0.055] },
+    sea: { level: [0.46, 0.58], shallow: rgb(0x1f4a80), deep: rgb(0x0b2250) },
+    rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   desert: {
     maps: ["mars", "ceres"],
@@ -45,12 +46,12 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     clouds: [0, 0.12],
     rings: 0.04,
     rim: {
-      colours: [rgb(0xdb9e6b), rgb(0xcc805c)],
+      colours: [rgb(0x6e4f35), rgb(0x66402e)],
       thickness: [0.018, 0.03],
     },
   },
   ocean: {
-    maps: ["eris", "moon"],
+    maps: ["earth-day"],
     second: "mars",
     palettes: [ramp(0x1a2612, 0x56662e, 0xb8a874), ramp(0x2c2010, 0x6e5f30, 0xc2ad80)],
     warp: [0.1, 0.24],
@@ -59,8 +60,8 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     limb: 0.5,
     caps: [0.04, 0.14],
     clouds: [0.3, 0.48],
-    sea: { level: [0.5, 0.58], shallow: rgb(0x0a4c75), deep: rgb(0x020d2b) },
-    rim: { colours: SKY, thickness: [0.04, 0.06] },
+    sea: { level: [0.5, 0.58], shallow: rgb(0x1b5c8f), deep: rgb(0x0a2a5c) },
+    rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   ice: {
     maps: ["eris"],
@@ -83,7 +84,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     limb: 0.2,
     glow: { colour: LAVA, level: [0.5, 0.58] },
     rim: {
-      colours: [rgb(0xe6994c), rgb(0xdbad57)],
+      colours: [rgb(0x734d26), rgb(0x6e562b)],
       thickness: [0.016, 0.026],
     },
   },
@@ -99,7 +100,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     rings: 0.5,
     banded: true,
     rim: {
-      colours: [rgb(0xd6b88f), rgb(0xc2bda8)],
+      colours: [rgb(0x6b5c47), rgb(0x615e54)],
       thickness: [0.022, 0.03],
     },
   },
@@ -115,7 +116,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     rings: 0.45,
     banded: true,
     rim: {
-      colours: [rgb(0x6ba8f2), rgb(0x8fd6e6)],
+      colours: [rgb(0x36547a), rgb(0x477173)],
       thickness: [0.03, 0.04],
     },
   },
@@ -130,7 +131,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     contrast: [2, 2.6],
     banded: true,
     rim: {
-      colours: [rgb(0xf2cc85), rgb(0xeba85c)],
+      colours: [rgb(0x796643), rgb(0x765430)],
       thickness: [0.04, 0.05],
     },
   },
@@ -145,7 +146,7 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     limb: 0.3,
     clouds: [0.05, 0.2],
     rim: {
-      colours: [rgb(0xb8999e), rgb(0x999ec7)],
+      colours: [rgb(0x5c4d4f), rgb(0x4d4f64)],
       thickness: [0.02, 0.032],
     },
   },

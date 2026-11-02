@@ -36,9 +36,9 @@ const spread = (values: number[]) => Math.max(...values) - Math.min(...values);
 // only a far belt, for dust is a sign).
 const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: readonly MapName[] }> = {
   rocky: { sea: false, glow: false, air: false, maps: ["moon", "ceres"] },
-  temperate: { sea: true, glow: false, air: true, maps: ["mars", "eris"] },
+  temperate: { sea: true, glow: false, air: true, maps: ["earth-day"] },
   desert: { sea: false, glow: false, air: true, maps: ["mars", "ceres"] },
-  ocean: { sea: true, glow: false, air: true, maps: ["eris", "moon"] },
+  ocean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
   ice: { sea: false, glow: false, air: false, maps: ["eris"] },
   volcanic: { sea: false, glow: true, air: true, maps: ["venus"] },
   "gas giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },

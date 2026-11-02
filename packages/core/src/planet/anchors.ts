@@ -21,7 +21,7 @@ export const ANCHORS = [
 export type Anchor = (typeof ANCHORS)[number];
 
 /** The small set of real maps every world reuses. */
-export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze"] as const;
+export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze", "earth-day"] as const;
 export type MapName = (typeof MAPS)[number];
 
 export interface AnchorRow {
