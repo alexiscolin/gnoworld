@@ -514,7 +514,8 @@ describe("what it draws", () => {
         .map(({ phase }) => phase.toFixed(4)),
     );
     const sizes = new Set<string>();
-    expect(count).toBeGreaterThan(100);
+    // A postcard's specks that would stand on one of its bodies are left out (7d3): 91 of the crowd's 120 points stand.
+    expect(count).toBeGreaterThan(80);
     for (let at = 0; at < count; at += 1) {
       if (!grains.has(orbit.getY(at).toFixed(4))) continue;
       expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
