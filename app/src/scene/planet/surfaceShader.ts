@@ -73,15 +73,15 @@ void main() {
   albedo *= 1.0 - 0.95 * rift;
 
   vec3 view = normalize(cameraPosition - vWorld);
-  float light = max(dot(bumped(axis, flow, height * (1.0 - wet), angle), sun), 0.0) * smoothstep(-0.05, 0.22, day);
-  // Air spreads the terminator: dusk is a wide belt on the Earth, and on every world that has air.
-  light = pow(light, 1.0 - 0.3 * air);
+  // The day fades into the night over a wide arc, smooth at both ends, as the frames' terminators do: no shoulder where it starts.
+  float light = smoothstep(-0.16, 0.95, dot(bumped(axis, flow, height * (1.0 - wet), angle), sun));
   float facing = max(dot(normal, view), 0.001);
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
   // The light falls off towards the terminator on every world, as the Earth's does, more where there is air, whatever the row says.
   float shine = mix(dusty, soft, max(limb, mix(SOFT_BARE, SOFT_AIR, air))) * ringShade();
-  vec3 sunlight = SUN * mix(mix(vec3(1.0), vec3(1.0, 0.56, 0.32), air), vec3(1.0), smoothstep(0.0, 0.26, light));
+  // The star's light keeps no colour of its own: a land dims in its own hue, with no brown band at the terminator.
+  vec3 sunlight = vec3(SUN);
   vec3 colour = albedo * shine * sunlight + albedo * NIGHT;
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
@@ -103,7 +103,8 @@ void main() {
     Lookup place = lookupOf(direction);
     vec3 cities = read(nightMap, place).rgb;
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
-    float dusk = 1.0 - smoothstep(-0.14, 0.05, day);
+    // The lights come on across the same arc the day goes out in.
+    float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
     colour += (cities * 2.6 + spill * 0.9) * vec3(1.0, 0.8, 0.52) * dusk * (1.0 - 0.8 * overcast);
   }
   float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);

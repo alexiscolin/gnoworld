@@ -273,6 +273,16 @@ describe("createPlanet", () => {
     expect(SURFACE_FRAGMENT).toContain("max(limb, mix(SOFT_BARE, SOFT_AIR, air))");
   });
 
+  it("fades the day into the night over a wide arc, smooth at both ends, and gives the star no colour of its own", () => {
+    expect(SURFACE_FRAGMENT).toContain("smoothstep(-0.16, 0.95, dot(bumped(");
+    expect(SURFACE_FRAGMENT).not.toContain("pow(light, 1.0 - 0.3");
+    expect(SURFACE_FRAGMENT).toContain("vec3 sunlight = vec3(SUN);");
+  });
+
+  it("switches the Earth's city lights on across the arc the day goes out in", () => {
+    expect(SURFACE_FRAGMENT).toContain("float dusk = 1.0 - smoothstep(-0.16, 0.4, day);");
+  });
+
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {
     expect(RING_FRAGMENT).toMatch(/const float SHADED = 0\.[1-9]/);
     expect(RING_FRAGMENT).toContain("float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));");
