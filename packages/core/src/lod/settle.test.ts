@@ -1,5 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { DISTANCES } from "../frame/restLook.ts";
 import { BOXES_MOST, DEPTH, DISCS_MOST, LABEL_SLOTS, LabelLayout, PLACE, settle } from "./settle.ts";
 
 // Where the labels stand on a frame (ADR-0002 §1: labels never overlap; slice 7 §3: off the plate, the rail and each other): beside their
@@ -305,8 +306,21 @@ describe("no overlap", () => {
 });
 
 describe("depth", () => {
+  it("keeps the Earth's label whole at every distance the rest may look from (24 to 28 units)", () => {
+    const layout = layoutOf(DISTANCES.map((away, index) => ({ x: 200 + index * 300, y: 500, radius: 30, away })));
+    settle(layout);
+    DISTANCES.forEach((_, slot) => {
+      expect(layout.scale[slot]).toBe(1);
+      expect(layout.fade[slot]).toBe(1);
+    });
+  });
+
+  it("keeps a far label's figures at the design system's 11 px floor: --font-data's 12 px at its smallest scale", () => {
+    expect(12 * DEPTH.scale).toBeGreaterThanOrEqual(11);
+  });
+
   it("draws a far world's label smaller and fainter than a near one's, never under its floors", () => {
-    const steps = [1, DEPTH.near, 15, 26, 40, DEPTH.far, 400];
+    const steps = [1, DEPTH.near, 35, 50, 65, DEPTH.far, 400];
     const layout = layoutOf(steps.map((away, index) => ({ x: 120 + index * 220, y: 500, radius: 10, away })));
     settle(layout);
     const scales = steps.map((_, slot) => at(layout.scale, slot));

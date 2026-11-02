@@ -222,8 +222,8 @@ test("draws a farther world's label no larger and no brighter than a nearer one'
   expect(fades).toEqual([...fades].sort((a, b) => b - a));
   expect(Math.min(...scales) < Math.max(...scales) || Math.min(...fades) < Math.max(...fades)).toBe(true);
   // The design system's floor: no word under 11 px, a far label's name at its smallest included.
-  const sizes = await page.$$eval("[data-labels] > *", (elements) =>
-    elements.map((element) => Number.parseFloat(getComputedStyle(element.children[0] ?? element).fontSize)),
+  const sizes = await page.$$eval("[data-labels] > * > *", (parts) =>
+    parts.map((part) => Number.parseFloat(getComputedStyle(part).fontSize)),
   );
   const least = Math.min(...byDistance.map(({ scale }) => scale));
   expect(Math.min(...sizes) * least).toBeGreaterThanOrEqual(11);
