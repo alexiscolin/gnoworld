@@ -293,6 +293,28 @@ describe("a system's arrival: a good angle", () => {
     }
   });
 
+  // A ring of systems a little off the Earth: some first angles would set the Earth on the ball, and another angle is taken.
+  it("keeps the Earth off the postcards of systems beside it, whichever angle their names try first", () => {
+    const [template] = SETS["80 mixed systems"]().filter(({ worlds }) => worlds.length === 2);
+    if (template === undefined) throw new Error("no system of two");
+    for (let at = 0; at < 48; at += 1) {
+      const around = (at * 2 * Math.PI) / 48;
+      const place = {
+        x: EARTH_PLACE.x + 22 * Math.cos(around),
+        y: 2 * Math.sin(3 * around),
+        z: EARTH_PLACE.z + 22 * Math.sin(around),
+      };
+      const system = { ...template, id: `beside${String(at)}`, place };
+      const arrival = arrivalOf(system, [system]);
+      for (const screen of REST_SCREENS) {
+        const see = cameraOf(arrival, screen);
+        const [earth, ball] = [see(EARTH_PLACE, EARTH_RADIUS), see(place, reachOf(arrival))];
+        if (earth.depth > 0)
+          expect(Math.hypot(earth.x - ball.x, earth.y - ball.y)).toBeGreaterThanOrEqual(earth.radius + ball.radius);
+      }
+    }
+  });
+
   it("stands the eye outside every other system's room", () => {
     for (const { system, systems } of allCases()) {
       const { eye } = arrivalOf(system, systems);
