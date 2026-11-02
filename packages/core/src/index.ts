@@ -69,12 +69,20 @@ export {
   planetLook,
   planetSeed,
   worldLook,
+  worldPath,
   type Anchor,
   type MapName,
   type Nature,
   type PlanetLook,
   type RealmFunctions,
 } from "./planet/look.ts";
+export { REALM_PREFIX } from "./chain/realm.ts";
+export { NATURES } from "./planet/choice.ts";
+export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export { labOf, type Lab, type Palette } from "./planet/palette.ts";
+export { SURFACE, type SurfaceName } from "./planet/spans.ts";
+export { FINEST, type Surface } from "./planet/surface.ts";
+export { alike, featuresOf, type Features } from "./planet/variety.ts";
 export { nextVitality, presenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
 export {
   isFresh,

@@ -54,18 +54,26 @@ const Realm = z.strictObject({
   lastHeight: z.nullable(ChainCount),
 });
 
+/** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
+export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
+
 /** A world by its id: a namespace, and for most worlds the folders that name it. */
 export const WorldId = z
   .string()
   .check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
 
-const World = z.strictObject({
+// A key it does not know is dropped, never kept nor refused: a reader older than the job that wrote the file, an open tab or a server
+// rolled back, still reads every world, and nothing it cannot check reaches the app.
+const World = z.object({
   id: WorldId,
   namespace: Slug,
   realms: z.array(Realm).check(z.maxLength(WORLDS_CAPS.realms)),
   // The time the world was first seen on the list (null on a first pass), and whether it joined in a batch.
   seen: z.optional(z.nullable(Moment)),
   batch: z.optional(z.boolean()),
+  // Its nature, kept from the pass that first read every realm of it (null: no rule reads it); absent until then. A nature this reader
+  // does not know reads as absent, so the job reads it again: a newer job's, or one a later part drops, never refuses the file.
+  nature: z.optional(z.catch(z.optional(z.nullable(z.enum(WORLD_NATURES))), undefined)),
 });
 
 /** worlds.json: the universe it was read from, the time of the read, and the worlds, sorted by id. */

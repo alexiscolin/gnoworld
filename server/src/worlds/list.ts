@@ -3,6 +3,7 @@
 // not refused, so an answer of exactly the limit may be cut: the prefix is then split on the next character and each part asked
 // on its own (F3517; the chain pages by prefix only, handler.go:196, pagination not implemented there). What comes back is data: capped,
 // and each line kept only if it is a realm path. ponytail: at most LIST_MAX_QUERIES requests; then the list is returned, marked partial.
+import { REALM_PREFIX } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas/indexer";
 import { abciQuery, kindOf, type Kind, type Send } from "./remote.ts";
 
@@ -14,7 +15,6 @@ export const LIST_MAX_QUERIES = 2_000;
 /** The most paths one list holds: about 30 MB of heap at 300 bytes a path, past what the file's 4 MiB can name. */
 export const LIST_MAX_TOTAL = 100_000;
 const LIST_MS = 30_000;
-const ROOT = "gno.land/r/";
 // What may follow a prefix in a realm path: a segment's letters and digits, `_` and `-` inside it, and `/` between two.
 const NEXT = [
   "a",
@@ -78,14 +78,14 @@ export async function readRealmPaths(reader: {
   try {
     const limit = reader.limit ?? LIST_MAX_PATHS;
     const found = new Set<string>();
-    const prefixes = [ROOT];
+    const prefixes = [REALM_PREFIX];
     let partial = false;
     for (let asked = 0; prefixes.length > 0; asked += 1) {
       if (spent(asked, found.size)) {
         partial = true;
         break;
       }
-      const prefix = prefixes.shift() ?? ROOT;
+      const prefix = prefixes.shift() ?? REALM_PREFIX;
       await reader.pace?.();
       const text = await abciQuery(
         reader,

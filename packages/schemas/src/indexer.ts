@@ -34,6 +34,7 @@ export {
   ExportedName,
   ImportPath,
   RealmPath,
+  WORLD_NATURES,
   WorldId,
   Worlds,
   WORLDS_CAPS,
