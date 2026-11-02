@@ -26,6 +26,13 @@ export function settle(hash: number): number {
   return (mixed ^ (mixed >>> 15)) >>> 0;
 }
 
+/** The hash of a text: FNV-1a over its UTF-16 units, then spread. The map's seed: near names land far apart. */
+export function textHash(text: string): number {
+  let hash = 0x811c9dc5;
+  for (let at = 0; at < text.length; at += 1) hash = Math.imul(hash ^ text.charCodeAt(at), PRIME);
+  return settle(hash);
+}
+
 /** The hash of a cell, one for each salt. */
 export const cellHash = (salt: number, cell: Point): number =>
   settle(mix(mix(mix(salted(salt), cell.x), cell.y), cell.z));
