@@ -362,27 +362,43 @@ async function stillPicture(page: Page) {
   return page.locator("canvas").screenshot();
 }
 
+// The arrival without its nebulae, their images refused, then with them.
+async function bothWays(page: Page) {
+  let refused = true;
+  let asked = 0;
+  await page.route(NEBULA, (route) => {
+    asked += 1;
+    return refused ? route.fulfill({ status: 404 }) : route.fallback();
+  });
+  await served(page, RECORDED);
+  await arrived(page);
+  await expect.poll(() => asked, SLOW).toBeGreaterThan(0);
+  const without = await stillPicture(page);
+  expect((await cosmos(page)).nebulae).toBe(0);
+  refused = false;
+  await page.reload();
+  await hydrated(page);
+  await running(page);
+  await lit(page);
+  return { without, withNebulae: await stillPicture(page) };
+}
+
+// Frame 16's teal, top right (f0016.jpg read with ffmpeg, 2026-11-02): hues 182 to 193 from the tenth part of its pixels to the ninetieth,
+// mean sRGB (10, 44, 50), its ninetieth (10, 62, 66). The light a nebula adds is read against black, so a few degrees more either way.
+const FRAME_TEAL = { least: 176, most: 200, brightest: 66, saturation: 0.82 };
+function hueOf([red, green, blue]: readonly number[]): number {
+  const [r = 0, g = 0, b = 0] = [red, green, blue];
+  const top = Math.max(r, g, b);
+  const span = top - Math.min(r, g, b);
+  const sector = top === r ? (g - b) / span : top === g ? 2 + (b - r) / span : 4 + (r - g) / span;
+  return (sector * 60 + 360) % 360;
+}
+
 test.describe("the nebulae's light", () => {
   test.use({ serviceWorkers: "block" });
 
   test("recolours each nebula to the mood it stands in, and never washes out the glow behind it", async ({ page }) => {
-    let refused = true;
-    let asked = 0;
-    await page.route(NEBULA, (route) => {
-      asked += 1;
-      return refused ? route.fulfill({ status: 404 }) : route.fallback();
-    });
-    await served(page, RECORDED);
-    await arrived(page);
-    await expect.poll(() => asked, SLOW).toBeGreaterThan(0);
-    const without = await stillPicture(page);
-    expect((await cosmos(page)).nebulae).toBe(0);
-    refused = false;
-    await page.reload();
-    await hydrated(page);
-    await running(page);
-    await lit(page);
-    const withNebulae = await stillPicture(page);
+    const { without, withNebulae } = await bothWays(page);
     expect(
       addedLight(await colours(page, without, boxes()), await colours(page, withNebulae, boxes())),
     ).toBeGreaterThan(10);
@@ -391,6 +407,26 @@ test.describe("the nebulae's light", () => {
     const [[onEarth], [offEarth]] = [await colours(page, withNebulae, [disc]), await colours(page, without, [disc])];
     for (const [channel, value] of (onEarth ?? []).entries())
       expect(Math.abs(value - (offEarth?.[channel] ?? NaN))).toBeLessThan(2);
+  });
+
+  test("gives a cool nebula frame 16's teal, dark and discreet as there, never the grey-blue", async ({ page }) => {
+    const { without, withNebulae } = await bothWays(page);
+    const [before, after] = [await colours(page, without, boxes()), await colours(page, withNebulae, boxes())];
+    let teal = 0;
+    for (const [at, colour] of after.entries()) {
+      const behind = before[at] ?? [255, 255, 255];
+      const added = colour.map((value, channel) => value - (behind[channel] ?? 0));
+      const [red = 0, , blue = 0] = added;
+      const top = Math.max(...added);
+      // Read against near-black only, where the light added is the nebula's own; a warm box is no cool nebula.
+      if (top < 4 || Math.max(...behind) > 40 || blue <= red + 2) continue;
+      teal += 1;
+      expect(hueOf(added), `box ${String(at)}`).toBeGreaterThanOrEqual(FRAME_TEAL.least);
+      expect(hueOf(added), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.most);
+      expect(Math.max(...colour), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.brightest);
+      expect((top - Math.min(...added)) / top, `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.saturation + 0.1);
+    }
+    expect(teal).toBeGreaterThan(3);
   });
 });
 

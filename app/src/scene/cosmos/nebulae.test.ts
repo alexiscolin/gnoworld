@@ -6,6 +6,7 @@ import {
   NEBULA_LAYERS,
   NebulaField,
   nebulaLight,
+  nebulaTint,
   sheetOf,
   windowOf,
   type Nebula,
@@ -267,12 +268,15 @@ describe("its sheets", () => {
     expect(scene.nebulae.stats()).toEqual({ sheets, images: asked().length });
   });
 
+  // Its colour is the nebula's tint: the mood's, or frame 16's teal where it is cool (Alexis, 2026-11-02, decision 627), no longer the
+  // mood's alone as 7d4 drew it.
   it("cuts, turns, softens and colours each sheet as its nebula and its layer say", async () => {
     const scene = made();
     await awake(scene);
     scene.nebulae.advance(HOME, 1, 2);
     const window = { u: 0, v: 0, width: 0, height: 0 };
     const at = { x: 0, y: 0, z: 0 };
+    const tint = { red: 0, green: 0, blue: 0 };
     for (const [image, mesh] of meshes(scene).entries()) {
       if (!mesh.visible) continue;
       const expected = litFrom(HOME)
@@ -281,6 +285,7 @@ describe("its sheets", () => {
           NEBULA_LAYERS.map((layer) => {
             windowOf(nebula, layer, window);
             const half = sheetOf(nebula, layer, at);
+            nebulaTint(nebula, tint);
             return key([
               window.u,
               window.v,
@@ -289,9 +294,9 @@ describe("its sheets", () => {
               half,
               nebula.turn,
               layer.blur,
-              nebula.red,
-              nebula.green,
-              nebula.blue,
+              tint.red,
+              tint.green,
+              tint.blue,
             ]);
           }),
         );
