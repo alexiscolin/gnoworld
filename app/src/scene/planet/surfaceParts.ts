@@ -45,7 +45,6 @@ varying vec3 vSun;
 `;
 
 export const PARTS = /* glsl */ `
-const float SUN = 1.0;
 const float TEXEL = 0.0032;
 const float REACH = 0.012;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);

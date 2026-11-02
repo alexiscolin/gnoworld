@@ -48,7 +48,6 @@ void main() {
   float scale = rimThickness * 0.26;
   vec3 scatter = rimColour * rimColour * STRENGTH;
   vec3 gathered = vec3(0.0);
-  vec3 forward = vec3(0.0);
   float thick = 0.0;
   for (int i = 0; i < STEPS; i++) {
     vec3 at = eye + ray * (near + (float(i) + 0.5) * stride);
@@ -61,13 +60,12 @@ void main() {
     float toSun = max(through(at, sun, outer).y, 0.0);
     vec3 passed = exp(-scatter * (thick + exp(-height / scale) * toSun * 0.5));
     gathered += density * lit * passed;
-    forward += density * lit * passed;
   }
   float cosine = dot(ray, sun);
   float rayleigh = 0.75 * (1.0 + cosine * cosine);
   float g2 = GLARE * GLARE;
   float mie = (1.0 - g2) / (12.566 * pow(1.0 + g2 - 2.0 * GLARE * cosine, 1.5));
-  vec3 light = gathered * scatter * rayleigh + forward * mie * 5.0 * mix(vec3(1.0, 0.9, 0.78), rimColour, 0.35);
+  vec3 light = gathered * scatter * rayleigh + gathered * mie * 5.0 * mix(vec3(1.0, 0.9, 0.78), rimColour, 0.35);
   if (limbLight > 0.0) {
     float along = -dot(eye, ray);
     vec3 nearest = eye + ray * along;

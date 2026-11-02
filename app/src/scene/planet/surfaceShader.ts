@@ -51,23 +51,22 @@ void main() {
   float wet = 0.0;
   if (seaLevel >= 0.0) {
     // On the Earth's own map the sea is where the map is blue, as the Earth's is: whole oceans with their shores, not puddles of one tone.
-    wet = blueSea > 0.5 ? smoothstep(0.004, 0.02, base.b - max(base.r, base.g)) : 1.0 - smoothstep(seaLevel - 0.012, seaLevel + 0.012, tone);
-    float depth = blueSea > 0.5 ? smoothstep(0.1, 0.4, tone) : smoothstep(seaLevel - 0.16, seaLevel, tone);
+    wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
+    float depth = smoothstep(0.1, 0.4, tone);
     // Ice on that map is bright and grey; left to the blue test and the ramp it would be sea in one block and land in the next.
     float chroma = max(base.r, max(base.g, base.b)) - min(base.r, min(base.g, base.b));
-    float ice = blueSea > 0.5 ? smoothstep(0.55, 0.7, tone) * (1.0 - smoothstep(0.03, 0.09, chroma)) : 0.0;
+    float ice = smoothstep(0.55, 0.7, tone) * (1.0 - smoothstep(0.03, 0.09, chroma));
     wet *= 1.0 - ice;
     albedo = mix(mix(albedo, mix(seaDeep, seaShallow, depth), wet), vec3(0.86, 0.9, 0.95), ice);
   }
   // A real map holds its own seas: they are where it is bluest.
   if (nightLights > 0.0) {
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
-    albedo = mix(max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet), albedo, 0.0);
+    albedo = max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet);
   }
   if (caps > 0.0 && blueSea < 0.5) {
     float frozen = smoothstep(1.0 - caps, 1.0 - caps + 0.05, abs(axis.y) + 0.07 * flow.y + 0.16 * (tone - 0.5));
     albedo = mix(albedo, vec3(0.86, 0.9, 0.95), frozen);
-    wet *= 1.0 - frozen;
   }
   vec3 normal = normalize(vNormal);
   float day = dot(normal, sun);
@@ -87,12 +86,10 @@ void main() {
   // The light falls off towards the terminator on every world, as the Earth's does, more where there is air, whatever the row says.
   float shine = mix(dusty, soft, max(limb, mix(SOFT_BARE, SOFT_AIR, air))) * ringShade();
   // The star's light keeps no colour of its own: a land dims in its own hue, with no brown band at the terminator.
-  vec3 sunlight = vec3(SUN);
-  vec3 colour = albedo * shine * sunlight + albedo * NIGHT;
+  vec3 colour = albedo * shine + albedo * NIGHT;
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
-  float ripple = 0.8 + 0.2 * field(direction * 14.0).x;
-  float glitter = nightLights + blueSea > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 260.0) * 1.1 + pow(gleam, 40.0) * 0.1) * ripple;
+  float glitter = pow(gleam, 60.0) * 0.05;
   colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
 
   float overcast = 0.0;
@@ -102,7 +99,7 @@ void main() {
     float cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
     float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
     colour *= 1.0 - 0.36 * shadowed;
-    colour = mix(colour, vec3(0.84, 0.86, 0.9) * shine * sunlight + 0.0015, cover * 0.9);
+    colour = mix(colour, vec3(0.84, 0.86, 0.9) * shine + 0.0015, cover * 0.9);
     overcast = cover;
   }
   if (nightLights > 0.0) {
@@ -116,7 +113,7 @@ void main() {
   float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
   // Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
   if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);
-  else colour += EDGE * sunlight * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);
+  else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);
   if (glowLevel > 0.0) {
     float heat = rifts > 0.0 ? rift * rift * smoothstep(0.1, 0.8, flow.z + 0.4) : smoothstep(glowLevel, glowLevel + 0.1, tone);
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + warpOffset).y);
