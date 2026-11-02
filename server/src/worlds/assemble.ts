@@ -2,7 +2,7 @@
 // this pass could not read is the last file's, else nothing (null, or an empty list), never a zero.
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { Comparison } from "./compare.ts";
-import { groupWorlds } from "./group.ts";
+import { groupWorlds, type Group } from "./group.ts";
 import type { History } from "./history.ts";
 import type { PackageFacts } from "./packages.ts";
 
@@ -63,20 +63,30 @@ function rowOf(path: string, read: Gathered): RealmRow {
   };
 }
 
+interface Pass {
+  readonly fresh: ReadonlySet<string>;
+  readonly batched: ReadonlySet<string>;
+  readonly stamp: string;
+}
+
+// A world's first-seen time and batch flag: the last file's, else this pass's for a new world.
+function marksOf(before: WorldRow | undefined, { id, namespace }: Group, pass: Pass): Pick<WorldRow, "seen" | "batch"> {
+  const seen = before?.seen ?? (pass.fresh.has(id) ? pass.stamp : undefined);
+  const batch = before?.batch ?? (pass.fresh.has(id) && pass.batched.has(namespace) ? true : undefined);
+  return { ...(seen === undefined ? {} : { seen }), ...(batch === undefined ? {} : { batch }) };
+}
+
 // The worlds of every path known, a new world stamped with the time and flagged when its namespace came in a batch.
 export function worldsOf(read: Gathered, stamp: string): WorldRow[] {
   const fresh = new Set(read.news.newWorlds);
   const batched = new Set(read.news.batches.map(({ namespace }) => namespace));
-  return groupWorlds(read.paths).map(({ id, namespace, realms }) => {
-    const before = read.lastWorlds.get(id);
-    const seen = before?.seen ?? (fresh.has(id) ? stamp : undefined);
-    const batch = before?.batch ?? (fresh.has(id) && batched.has(namespace) ? true : undefined);
+  return groupWorlds(read.paths).map((group) => {
+    const before = read.lastWorlds.get(group.id);
     return {
-      id,
-      namespace,
-      realms: realms.map((path) => rowOf(path, read)),
-      ...(seen === undefined ? {} : { seen }),
-      ...(batch === undefined ? {} : { batch }),
+      id: group.id,
+      namespace: group.namespace,
+      realms: group.realms.map((path) => rowOf(path, read)),
+      ...marksOf(before, group, { fresh, batched, stamp }),
     };
   });
 }
