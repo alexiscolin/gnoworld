@@ -369,7 +369,8 @@ describe("its sheets", () => {
     ];
     driftAt(drift, seconds);
     glideAt(glide, seconds);
-    // The scenery's eye, as eye.ts builds it: the worlds' eye and the cruise, which the worlds leave out.
+    // The nebulae's own reckoning of the scenery's eye: the worlds' eye and the sky's cruise. Since 7d7 the sky adds its glide too (eye.ts),
+    // so with motion on they stand the glide behind it in the first seconds (F4283, asked).
     const scenery = { x: HOME.x + drift.x - glide.x, y: HOME.y + drift.y - glide.y, z: HOME.z + drift.z - glide.z };
     expect(Math.hypot(scenery.x - HOME.x, scenery.y - HOME.y, scenery.z - HOME.z)).toBeGreaterThan(300);
     scene.nebulae.follow(HOME, seconds, focusDistance(HOME));
