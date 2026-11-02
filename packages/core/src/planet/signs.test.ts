@@ -65,6 +65,7 @@ const byteOf = (bytes: Uint8Array, index: number): number => {
 const seedsOf = (anchor: Anchor, count: number): Uint8Array[] => {
   const found: Uint8Array[] = [];
   for (let at = 0; found.length < count; at += 1) {
+    if (at > 50_000) throw new Error(`no ${anchor} in 50,000 paths`);
     const seed = seedOf(`gno.land/r/n${String(at)}/home`);
     if (anchorOf(seed) === anchor) found.push(seed);
   }
@@ -376,8 +377,9 @@ describe("what the signs are worth", () => {
     expect(signs.lights.extent).toBeCloseTo(extent, 12);
   });
 
-  it("wakes a world at rest over an eighth of its surface at most", () => {
+  it("wakes a world at rest over an eighth of its surface at most, and adds nothing to a settled world's reach", () => {
     expect(at(0.1, 1).lights.extent).toBeCloseTo(0.12, 12);
+    expect(at(0.8, 1).lights.extent).toBeCloseTo(5 / 7, 12);
     expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.06, 12);
   });
 
