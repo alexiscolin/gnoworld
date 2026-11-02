@@ -2,7 +2,7 @@ import { ANCHORS } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { brightness, colours } from "./geometry.ts";
 
-// 7b's realism page (app/lab): twelve worlds and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
+// 7b's realism page (app/lab): a world of each anchor and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
 // software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
 // The canvas is not pixel-compared (the plan, section 6).
 const PAGE = "/lab/realism.html";
@@ -13,7 +13,7 @@ const MEMORY_AT_MOST = 120 * 1024 * 1024;
 // frame 4's does, and has a bound of its own.
 const LIT_APART = 6;
 const NET_APART = 30;
-const NETS: readonly string[] = ["volcanic", "dark carbon"];
+const NETS: readonly string[] = ["volcanic", "dark carbon", "lava world"];
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
 const VIEWS = [
@@ -126,7 +126,7 @@ const whole = (circle: Circle) => {
 };
 
 test.describe("the realism page", () => {
-  // SwiftShader draws twelve worlds in seconds at this size, and more at a gate's load.
+  // SwiftShader draws a world of each anchor in seconds at this size, and more at a gate's load.
   test.slow();
 
   // A shader that fails to compile only reaches the console, and a map that fails only draws black.
@@ -147,14 +147,14 @@ test.describe("the realism page", () => {
     expect(wrong, "the console and the textures").toEqual([]);
   });
 
-  test("twelve worlds in ADR-0002's order, all in frame, none on another", async ({ page }) => {
+  test("a world of each anchor in their order, all in frame, none on another", async ({ page }) => {
     await open(page, "?view=gallery");
     const found = await stats(page);
     expect(found.view).toBe("gallery");
-    expect(found.worlds).toBe(12);
+    expect(found.worlds).toBe(ANCHORS.length);
     expect((await looks(page)).map((look) => look.anchor)).toEqual(ANCHORS);
     const places = await circles(page);
-    expect(places).toHaveLength(12);
+    expect(places).toHaveLength(ANCHORS.length);
     for (const [index, place] of places.entries()) {
       whole(place);
       expect(place.r).toBeGreaterThan(60);
@@ -385,7 +385,7 @@ test.describe("the realism page", () => {
     expect(plain[0], "no glow at rest").toBeLessThan(6);
   });
 
-  test("a stage reads the same on all twelve classes: each night side lights up as a world grows", async ({ page }) => {
+  test("a stage reads the same on every class: each night side lights up as a world grows", async ({ page }) => {
     const climb = ["rest", "living", "inhabited", "busy", "beacon"];
     const seen: number[][] = [];
     for (const stage of climb) seen.push(await nightAt(page, stage));
