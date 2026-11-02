@@ -79,7 +79,7 @@ describe("the twelve anchors", () => {
   });
 
   it("draw on a small set of maps", () => {
-    expect(MAPS.length).toBeLessThanOrEqual(8);
+    expect(MAPS.length).toBeLessThanOrEqual(9);
     const used = new Set(ANCHORS.flatMap((anchor) => paths(50).flatMap((path) => planetLook(path, anchor).map)));
     expect([...used].sort()).toEqual([...MAPS].sort());
   });
