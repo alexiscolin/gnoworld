@@ -68,38 +68,38 @@ describe("the pool", () => {
   it("reuses its labels: a world kept between looks keeps its element, a new world takes a free one, none is made or dropped", () => {
     const before = slots();
     labels.show(
-      labelled([near("gov/dao"), near("memba/dao")]).map((label, at) => ({ label, at: body(at * 8 - 4, 0) })),
+      labelled([near("gov/govern"), near("memba/members")]).map((label, at) => ({ label, at: body(at * 8 - 4, 0) })),
     );
-    const held = before.find((slot) => slot.textContent.includes("memba/dao"));
+    const held = before.find((slot) => slot.textContent.includes("members"));
     vi.advanceTimersByTime(200);
     labels.show(
-      labelled([near("memba/dao"), near("games/go")]).map((label, at) => ({ label, at: body(at * 8 - 4, 0) })),
+      labelled([near("memba/members"), near("games/chess")]).map((label, at) => ({ label, at: body(at * 8 - 4, 0) })),
     );
     vi.advanceTimersByTime(200);
     const after = slots();
     expect(after).toHaveLength(LABEL_SLOTS);
     expect(after.every((slot, at) => slot === before[at])).toBe(true);
-    expect(held?.textContent).toContain("memba/dao");
-    expect(after.filter((slot) => slot.textContent.includes("gov/dao"))).toEqual([]);
-    expect(after.filter((slot) => slot.textContent.includes("games/go"))).toHaveLength(1);
+    expect(held?.textContent).toContain("members");
+    expect(after.filter((slot) => slot.textContent.includes("govern"))).toEqual([]);
+    expect(after.filter((slot) => slot.textContent.includes("chess"))).toHaveLength(1);
   });
 
   it("writes a world's words as text, markup and all", () => {
-    labels.show(each([near("gov/dao", "<img src=x onerror=1>")], 1).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(each([near("gov/govern", "<img src=x onerror=1>")], 1).map((label) => ({ label, at: body(0, 0) })));
     const slot = slots().find((each) => each.textContent.includes("<img"));
     expect(words(slot)[0]).toBe("<img src=x onerror=1>");
     expect(layer()?.querySelector("img")).toBeNull();
   });
 
   it("changes its words ten times a second at most", () => {
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
     vi.advanceTimersByTime(50);
-    labels.show(labelled([near("games/go")]).map((label) => ({ label, at: body(0, 0) })));
-    expect(layer()?.textContent).toContain("gov/dao");
-    expect(layer()?.textContent).not.toContain("games/go");
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));
+    expect(layer()?.textContent).toContain("govern");
+    expect(layer()?.textContent).not.toContain("chess");
     vi.advanceTimersByTime(50);
-    expect(layer()?.textContent).toContain("games/go");
-    expect(layer()?.textContent).not.toContain("gov/dao");
+    expect(layer()?.textContent).toContain("chess");
+    expect(layer()?.textContent).not.toContain("govern");
   });
 
   it(`shows the first ${String(LABEL_SLOTS)} it is given, and makes no ninth`, () => {
@@ -118,8 +118,8 @@ describe("the pool", () => {
   });
 
   it("leaves the page as it goes, its waiting words with it", () => {
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: body(0, 0) })));
-    labels.show(labelled([near("games/go")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));
     labels.dispose();
     expect(layer()).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
@@ -129,7 +129,7 @@ describe("the pool", () => {
 describe("a frame", () => {
   it("stands each label beside its body and fades the slots no label takes", () => {
     labels.show(
-      labelled([near("gov/dao"), near("memba/dao")]).map((label, at) => ({ label, at: body(at * 20 - 10, 0) })),
+      labelled([near("gov/govern"), near("memba/members")]).map((label, at) => ({ label, at: body(at * 20 - 10, 0) })),
     );
     labels.tick(EYE, true);
     expect(shown()).toHaveLength(2);
@@ -140,7 +140,7 @@ describe("a frame", () => {
   });
 
   it("writes on the page where the layout stands each label", () => {
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: body(-10, 0) })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(-10, 0) })));
     labels.tick(EYE, true);
     const stat = statOf(labels.stats());
     const [slot] = shown();
@@ -158,7 +158,7 @@ describe("a frame", () => {
     const earth = { position: new Vector3(0, 0, -20), scale: { x: 2 }, visible: true };
     const places = [earth, body(-8, -1.5)];
     keeping.show(
-      each([{ id: "earth", kind: "earth" }, near("gov/dao")], 2).map((label, at) => ({
+      each([{ id: "earth", kind: "earth" }, near("gov/govern")], 2).map((label, at) => ({
         label,
         at: places[at] ?? earth,
       })),
@@ -176,7 +176,7 @@ describe("a frame", () => {
   });
 
   it("hides every label where the view draws no bodies", () => {
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
     labels.tick(EYE, true);
     labels.tick(EYE, false);
     expect(shown()).toHaveLength(0);
@@ -184,13 +184,13 @@ describe("a frame", () => {
 
   it("hides a body's label while the body waits off the screen", () => {
     const waiting = { ...body(0, 0), visible: false };
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: waiting })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: waiting })));
     labels.tick(EYE, true);
     expect(shown()).toHaveLength(0);
   });
 
   it("points a far world's label at its star, smaller and fainter than a near one's", () => {
-    const asks: LabelAsk[] = [near("gov/dao"), { id: "games/go", kind: "far", signals: { here: 4 } }];
+    const asks: LabelAsk[] = [near("gov/govern"), { id: "games/chess", kind: "far", signals: { here: 4 } }];
     const star = { x: 30, y: 0, z: -900 };
     const onStage = { x: 0, y: 0, z: 0 };
     toScene(star, onStage);
@@ -205,7 +205,7 @@ describe("a frame", () => {
   });
 
   it("writes nothing when nothing moved", () => {
-    labels.show(labelled([near("gov/dao")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
     labels.tick(EYE, true);
     const changes: MutationRecord[] = [];
     const watching = new MutationObserver((records) => changes.push(...records));

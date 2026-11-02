@@ -15,22 +15,17 @@ const holdsAddress = (text: string) => /g1[023456789acdefghjklmnpqrstuvwxyz]{38}
 const titleOf = (name: string) => chooseLabels([near("gov/dao", { name })])[0]?.title ?? "";
 
 describe("a world's name on its label", () => {
-  it("is its folders past an address, never the address", () => {
+  it("is its last segment, as a person names a place, never the address", () => {
     expect(labelName(`${ADDRESS}/minichess`)).toBe("minichess");
     expect(labelName(`${OTHER}/x/fishbay`)).toBe("fishbay");
+    expect(labelName(`${OTHER}/x/daily/streak`)).toBe("streak");
     expect(labelName(`demo/${ADDRESS}`)).toBe("demo");
   });
 
-  it("drops a generic folder left first once the address before it goes, never the last word", () => {
-    expect(labelName(`${OTHER}/x/daily/streak`)).toBe("daily/streak");
-    expect(labelName(`${OTHER}/demo/games`)).toBe("games");
-    expect(labelName(`${OTHER}/x`)).toBe("x");
-    expect(labelName("x/daily")).toBe("x/daily");
-  });
-
-  it("is its whole id under a namespace that is a name", () => {
-    expect(labelName("gov/dao")).toBe("gov/dao");
-    expect(labelName("demo/defi")).toBe("demo/defi");
+  it("is its last segment under a namespace that is a name too, and the namespace where it stands alone", () => {
+    expect(labelName("gov/dao")).toBe("dao");
+    expect(labelName("demo/defi")).toBe("defi");
+    expect(labelName("memba")).toBe("memba");
   });
 
   it("is none where only an address names the world", () => {
@@ -39,7 +34,7 @@ describe("a world's name on its label", () => {
   });
 
   it("drops a segment that holds an address among its words, or inside a longer word", () => {
-    expect(labelName(`${OTHER}/feed_${ADDRESS}/board`)).toBe("board");
+    expect(labelName(`${OTHER}/board/feed_${ADDRESS}`)).toBe("board");
     expect(labelName(`games/x${ADDRESS}`)).toBe("games");
   });
 
@@ -47,8 +42,8 @@ describe("a world's name on its label", () => {
     const name = labelName(`games/${"a".repeat(40)}`);
     expect(name).toHaveLength(NAME_MOST);
     expect(name?.endsWith("…")).toBe(true);
-    expect(labelName(`games/${"b".repeat(NAME_MOST - 6)}`)).toBe(`games/${"b".repeat(NAME_MOST - 6)}`);
-    expect(labelName(`games/${"c".repeat(NAME_MOST - 5)}`)).toBe(`games/${"c".repeat(NAME_MOST - 7)}…`);
+    expect(labelName(`games/${"b".repeat(NAME_MOST)}`)).toBe("b".repeat(NAME_MOST));
+    expect(labelName(`games/${"c".repeat(NAME_MOST + 1)}`)).toBe(`${"c".repeat(NAME_MOST - 1)}…`);
   });
 
   it("never holds an address, whatever the id", () => {
@@ -78,15 +73,15 @@ describe("a world's name on its label", () => {
 describe("a name the data gives", () => {
   it("is taken, unless it holds an address", () => {
     expect(titleOf("GovDAO")).toBe("GovDAO");
-    expect(titleOf(ADDRESS)).toBe("gov/dao");
-    expect(titleOf(`My ${ADDRESS.toUpperCase()} hub`)).toBe("gov/dao");
+    expect(titleOf(ADDRESS)).toBe("dao");
+    expect(titleOf(`My ${ADDRESS.toUpperCase()} hub`)).toBe("dao");
     expect(chooseLabels([EARTH])[0]?.title).toBe("Earth");
   });
 
   it("is cut as an id's, kept to one line of plain text, and never left blank", () => {
     expect(titleOf("G".repeat(200))).toBe(`${"G".repeat(NAME_MOST - 1)}…`);
-    expect(titleOf("")).toBe("gov/dao");
-    expect(titleOf("   ")).toBe("gov/dao");
+    expect(titleOf("")).toBe("dao");
+    expect(titleOf("   ")).toBe("dao");
     expect(titleOf("Gov\nDAO\t hub")).toBe("Gov DAO hub");
     expect(titleOf("‮OAD voG‏")).toBe("OAD voG");
   });
