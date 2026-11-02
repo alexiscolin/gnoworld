@@ -32,9 +32,31 @@ const each = (asks: readonly LabelAsk[], count: number): Label[] => {
   if (made.length < count) throw new Error("a label is missing");
   return made;
 };
-// The first label's place as the stats give it, every field a number.
-const statOf = (stats: ReturnType<Labels["stats"]>, at = 0) => {
-  const stat = stats[at];
+// Each label's place, in its slot's order, read from the layout the stats hand over (as the journeys read it).
+const placed = (labels: Labels) => {
+  const { layout, labels: held } = labels.stats();
+  return [...layout.order].flatMap((index) => {
+    const label = held[index];
+    const read = (values: Float64Array) => values[index] ?? Number.NaN;
+    return label === undefined
+      ? []
+      : [
+          {
+            ...label,
+            shown: layout.shown[index] === 1,
+            left: read(layout.left),
+            top: read(layout.top),
+            width: read(layout.width),
+            height: read(layout.height),
+            scale: read(layout.scale),
+            fade: read(layout.fade),
+          },
+        ];
+  });
+};
+// One label's place, every field a number.
+const statOf = (labels: Labels, at = 0) => {
+  const stat = placed(labels)[at];
   if (stat === undefined) throw new Error("no such label");
   return stat;
 };
@@ -123,11 +145,11 @@ describe("the pool", () => {
     vi.advanceTimersByTime(50);
     labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(10, 0) })));
     labels.tick(EYE, true);
-    expect(labels.stats().filter(({ id }) => id === "gov/govern")).toEqual([]);
+    expect(placed(labels).filter(({ id }) => id === "gov/govern")).toEqual([]);
     expect(shown()).toHaveLength(0);
     vi.advanceTimersByTime(50);
     labels.tick(EYE, true);
-    expect(labels.stats().map(({ id }) => id)).toEqual(["games/chess"]);
+    expect(placed(labels).map(({ id }) => id)).toEqual(["games/chess"]);
   });
 
   it("hides its layer while the scene's canvas is not running, a lost context included", async () => {
@@ -163,7 +185,7 @@ describe("a frame", () => {
     );
     labels.tick(EYE, true);
     expect(shown()).toHaveLength(2);
-    const stat = statOf(labels.stats());
+    const stat = statOf(labels);
     expect(stat.shown).toBe(true);
     expect(stat.left).toBeCloseTo(SCREEN.width / 2 - 200 - PLACE.stem * stat.scale, 6);
     expect(slots().filter((slot) => slot.style.opacity === "0")).toHaveLength(LABEL_SLOTS - 2);
@@ -172,7 +194,7 @@ describe("a frame", () => {
   it("writes on the page where the layout stands each label", () => {
     labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(-10, 0) })));
     labels.tick(EYE, true);
-    const stat = statOf(labels.stats());
+    const stat = statOf(labels);
     const [slot] = shown();
     const [, left, top, scale] =
       /translate\((-?[\d.]+)px, (-?[\d.]+)px\) scale\((-?[\d.]+)\)/.exec(slot?.style.transform ?? "") ?? [];
@@ -194,8 +216,8 @@ describe("a frame", () => {
       })),
     );
     keeping.tick(EYE, true);
-    expect(keeping.stats().filter(({ shown: on }) => on)).toHaveLength(2);
-    for (const stat of keeping.stats().filter(({ shown: on }) => on)) {
+    expect(placed(keeping).filter(({ shown: on }) => on)).toHaveLength(2);
+    for (const stat of placed(keeping).filter(({ shown: on }) => on)) {
       const bottom = stat.top + stat.height * stat.scale;
       expect(bottom <= hero.top || stat.top >= hero.bottom, `${stat.title} over the page's text`).toBe(true);
       const dx = Math.max(stat.left - SCREEN.width / 2, 0, SCREEN.width / 2 - stat.left - stat.width * stat.scale);
@@ -227,7 +249,7 @@ describe("a frame", () => {
     const places = [body(-10, 0), star];
     labels.show(each(asks, 2).map((label, at) => ({ label, at: places[at] ?? star })));
     labels.tick({ x: onStage.x, y: onStage.y, z: onStage.z + 400 }, true);
-    const [nearStat, farStat] = [statOf(labels.stats()), statOf(labels.stats(), 1)];
+    const [nearStat, farStat] = [statOf(labels), statOf(labels, 1)];
     expect(farStat.shown).toBe(true);
     expect(farStat.left).toBeCloseTo(SCREEN.width / 2 - PLACE.stem * farStat.scale, 6);
     expect(farStat.scale).toBeLessThan(nearStat.scale);

@@ -80,10 +80,45 @@ const onPage = (page: Page) =>
   );
 const shownOnPage = async (page: Page): Promise<Seen[]> => (await onPage(page)).filter(({ opacity }) => opacity > 0.05);
 // Where each label stands, as the test build hands it to the journeys.
+interface Handed {
+  layout: Record<
+    "x" | "y" | "radius" | "away" | "width" | "height" | "left" | "top" | "scale" | "fade" | "stem",
+    Float64Array
+  > & {
+    order: Uint8Array;
+    shown: Uint8Array;
+    side: Int8Array;
+  };
+  labels: ({ id: string; kind: string; title: string } | undefined)[];
+}
 const placed = (page: Page): Promise<Placed[]> =>
   page.evaluate(() => {
-    const labels: unknown = Reflect.get(globalThis, "__gnoworldLabels");
-    return labels === undefined ? [] : (labels as { stats: () => Placed[] }).stats();
+    const handed = Reflect.get(globalThis, "__gnoworldLabels") as { stats: () => Handed } | undefined;
+    if (handed === undefined) return [];
+    const { layout, labels } = handed.stats();
+    return [...layout.order].flatMap((index) => {
+      const label = labels[index];
+      const read = (values: Float64Array) => values[index] ?? Number.NaN;
+      if (label === undefined) return [];
+      return [
+        {
+          id: label.id,
+          kind: label.kind,
+          title: label.title,
+          shown: layout.shown[index] === 1,
+          left: read(layout.left),
+          top: read(layout.top),
+          width: read(layout.width),
+          height: read(layout.height),
+          scale: read(layout.scale),
+          fade: read(layout.fade),
+          stem: read(layout.stem),
+          below: (layout.side[index] ?? 0) >= 2,
+          away: read(layout.away),
+          anchor: { x: read(layout.x), y: read(layout.y), radius: read(layout.radius) },
+        },
+      ];
+    });
   });
 // The labels a view at rest shows, once they stand: the bodies', and the Earth's once its globe has come.
 async function settled(page: Page, least = 4) {

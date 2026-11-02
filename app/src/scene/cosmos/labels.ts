@@ -182,31 +182,9 @@ export class Labels {
     if (shown) moveTo(slot, this.#layout, index);
   }
 
-  /** Where each label stands, in its slot's order, for the journeys. */
+  /** The layout and each slot's label, for the tests and the journeys to read: kept small, for it ships. */
   stats() {
-    return Array.from({ length: LABEL_SLOTS }, (_, at) => this.#layout.order[at] ?? at).flatMap((index) => {
-      const slot = this.#slots[index];
-      const label = slot?.chosen?.label;
-      if (slot === undefined || label === undefined) return [];
-      const layout = this.#layout;
-      const read = (values: Float64Array) => values[index] ?? Number.NaN;
-      return [
-        {
-          ...label,
-          shown: layout.shown[index] === 1,
-          left: read(layout.left),
-          top: read(layout.top),
-          width: read(layout.width),
-          height: read(layout.height),
-          scale: read(layout.scale),
-          fade: read(layout.fade),
-          stem: read(layout.stem),
-          below: (layout.side[index] ?? 0) >= 2,
-          away: read(layout.away),
-          anchor: { x: read(layout.x), y: read(layout.y), radius: read(layout.radius) },
-        },
-      ];
-    });
+    return { layout: this.#layout, labels: this.#slots.map(({ chosen }) => chosen?.label) };
   }
 
   /** Takes its layer off the page, and its waiting words. */
