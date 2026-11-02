@@ -2,7 +2,8 @@
 // then a few far ones among the most popular and the new. Signs mean real data (ADR-0002 §10): a far world nothing names gets no label, and
 // a count or a badge shows only what the data says. A name is plain text and never an address; a new world nobody here visited is an
 // uncharted signal, unnamed till charted.
-import { isAddress } from "../chain/evalName.ts";
+import { cutText } from "../bubbles/cut.ts";
+import { looksLikeAddress } from "../chain/evalName.ts";
 import { firstGraphemes } from "../markdown/graphemes.ts";
 
 /** The most labels a view shows, the most of them far worlds, and the most graphemes of a name. */
@@ -10,7 +11,6 @@ export const LABELS_MOST = 8;
 export const FAR_MOST = 3;
 export const NAME_MOST = 24;
 
-const ADDRESS_LENGTH = 40;
 const UNCHARTED = "Uncharted signal";
 const GO_AND_LOOK = "go and look";
 
@@ -43,14 +43,6 @@ export interface Label {
   readonly uncharted: boolean;
 }
 
-// Whether an address stands anywhere in a text, inside a longer word too, whatever its case. ponytail: a window a character, 40 long.
-function holdsAddress(text: string): boolean {
-  const lower = text.toLowerCase();
-  for (let at = 0; at + ADDRESS_LENGTH <= lower.length; at += 1)
-    if (isAddress(lower.slice(at, at + ADDRESS_LENGTH))) return true;
-  return false;
-}
-
 // Cut between graphemes, an ellipsis last, so a pair never splits.
 function cut(name: string): string {
   return firstGraphemes(name, NAME_MOST + 1).length > NAME_MOST
@@ -63,18 +55,17 @@ function cut(name: string): string {
 export function labelName(id: string): string | null {
   const last = id
     .split("/")
-    .filter((segment) => segment !== "" && !holdsAddress(segment))
+    .filter((segment) => segment !== "" && !looksLikeAddress(segment))
     .at(-1);
   return last === undefined ? null : cut(last);
 }
 
-// A name the data gives, on one line of plain text: no control or direction mark, no address, never blank.
+// A name the data gives, cleaned as a bubble's text (bubbles/cut.ts) on one line: no address, never blank.
 function givenName(name: string | undefined): string | null {
-  const plain = (name ?? "")
+  const plain = cutText(name ?? "", 4 * NAME_MOST)
     .replace(/\s+/g, " ")
-    .replace(/[\p{Cc}\p{Cf}]/gu, "")
     .trim();
-  return plain === "" || holdsAddress(plain) ? null : cut(plain);
+  return plain === "" || looksLikeAddress(plain) ? null : cut(plain);
 }
 
 function titleOf({ id, kind, name, signals }: LabelAsk): string | null {
@@ -100,25 +91,29 @@ function badgeOf({ rise, perHour = 0 }: Signals): string {
 const known = ({ here = 0, rise, use = 0, uncharted = false }: Signals) =>
   here > 0 || rise !== undefined || use > 0 || uncharted;
 
-// Rise first, then people here, then use; a tie by id, so the order the asks come in moves nothing.
-const weight = ({ signals = {} }: LabelAsk): readonly [number, number, number] => [
-  signals.rise ?? -1,
-  signals.here ?? 0,
-  signals.use ?? 0,
-];
-function ranked(a: LabelAsk, b: LabelAsk): number {
-  const [one, other] = [weight(a), weight(b)];
+// Rise first, then people here, then use; a tie by id, so the order the asks come in moves nothing. Weighed once an ask.
+type Weighed = readonly [LabelAsk, readonly [number, number, number]];
+const weighed = (ask: LabelAsk): Weighed => {
+  const { rise = -1, here = 0, use = 0 } = ask.signals ?? {};
+  return [ask, [rise, here, use]];
+};
+function ranked([a, one]: Weighed, [b, other]: Weighed): number {
   for (let at = 0; at < one.length; at += 1) if (one[at] !== other[at]) return (other[at] ?? 0) - (one[at] ?? 0);
   return a.id < b.id ? -1 : 1;
 }
+const best = (asks: readonly LabelAsk[]) =>
+  asks
+    .map(weighed)
+    .sort(ranked)
+    .map(([ask]) => ask);
 
 // The far worlds to label: the most popular, and one new one beside them, or more new ones where nothing else is known.
 function farOf(asks: readonly LabelAsk[], taken: ReadonlySet<string>): LabelAsk[] {
   const far = asks.filter(
     (ask) => ask.kind === "far" && !taken.has(ask.id) && known(ask.signals ?? {}) && titleOf(ask) !== null,
   );
-  const fresh = far.filter(({ signals }) => signals?.uncharted === true).sort(ranked);
-  const popular = far.filter(({ signals }) => signals?.uncharted !== true).sort(ranked);
+  const fresh = best(far.filter(({ signals }) => signals?.uncharted === true));
+  const popular = best(far.filter(({ signals }) => signals?.uncharted !== true));
   return [...popular.slice(0, FAR_MOST - Math.min(fresh.length, 1)), ...fresh].slice(0, FAR_MOST);
 }
 

@@ -44,8 +44,9 @@ const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of thei
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
+// Its first value is the part's (the chief, 2026-11-03): 6 KiB at most while the review's fixes land, then the final size and a tenth.
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 5 * 1024;
+const LABELS_JS = 6 * 1024;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";

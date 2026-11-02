@@ -86,6 +86,21 @@ describe("a name the data gives", () => {
     expect(titleOf("‮OAD voG‏")).toBe("OAD voG");
   });
 
+  it("is cleaned as a bubble's text: a family kept whole, a lone half of a pair dropped, a heap of accents dropped", () => {
+    expect(titleOf("Club 👨‍👩‍👧")).toBe("Club 👨‍👩‍👧");
+    expect(titleOf("abc\uD800def")).toBe("abcdef");
+    expect(titleOf(`a${"\u0301".repeat(2000)}bc`)).toBe("bc");
+  });
+
+  it("refuses an address cut short, split by a hyphen or inside a name, as a whole one", () => {
+    const short = ADDRESS.slice(0, 39);
+    expect(labelName(`alice/${short}`)).toBe("alice");
+    expect(labelName(`alice/${ADDRESS.slice(0, 18)}-${ADDRESS.slice(18)}`)).toBe("alice");
+    expect(labelName(`alice/${ADDRESS.slice(0, 30)}`)).toBe("alice");
+    expect(titleOf(`Pay ${short}`)).toBe("dao");
+    expect(labelName("alice/g1game")).toBe("g1game");
+  });
+
   it("is cut between graphemes, never inside a pair", () => {
     const cut = titleOf(`${"a".repeat(NAME_MOST - 2)}👍🏽👍🏽👍🏽`);
     expect(cut.isWellFormed()).toBe(true);

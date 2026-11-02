@@ -10,6 +10,12 @@ export function isAddress(address: string): boolean {
   return new RegExp(`^g1[${BECH32}]{38}$`).test(address);
 }
 
+/** Whether `text` holds an address or its look, a short or a split one too: `g1` and 8 or more of bech32's letters in a row, whatever
+ * the case. Shown text refuses it; it decides nothing that reaches a chain. */
+export function looksLikeAddress(text: string): boolean {
+  return new RegExp(`g1[${BECH32}]{8,}`, "i").test(text);
+}
+
 /** The data `vm/qeval` is asked for the name of one address, composed here and never from a path, or null. */
 export function evalNameOf(address: string): string | null {
   return isAddress(address) ? `gno.land/r/sys/users.ResolveAddress(address("${address}")).Name()` : null;
