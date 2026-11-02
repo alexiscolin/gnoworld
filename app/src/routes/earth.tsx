@@ -10,6 +10,7 @@ import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
 import styles from "./earth.module.css";
+import place from "./globe.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "earth");
@@ -51,7 +52,7 @@ export default function Earth() {
   return (
     <>
       {/* The globe's place: the page lays it out, the scene draws in it, and the universe says how far it came. */}
-      <div className={styles["globe"]} data-globe data-earth="waiting" />
+      <div className={`${String(place["globe"])} ${String(styles["earth"])}`} data-globe data-earth="waiting" />
       <Panel.Layout
         plate={
           <Panel label="Earth" look="plate" caption="gnoworld · hub atlas">
