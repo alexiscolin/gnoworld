@@ -8,6 +8,7 @@ import type { World } from "../planet/generated.ts";
 import type { MapSet } from "../planet/planet.ts";
 
 type Kit = typeof import("../planet/generated.ts");
+const kitCode = (): Promise<Kit> => import("../planet/generated.ts");
 
 const ANISOTROPY = 8;
 // A body of a few dozen pixels: the close view's 4096 waits for the close view.
@@ -19,28 +20,33 @@ export class BodyMaps {
   readonly #maps = new Map<string, Texture>();
   readonly #asked = new Set<string>();
   #loading = new AbortController();
+  readonly #code: () => Promise<Kit>;
   #kit: Kit | undefined;
   #askedKit = false;
 
-  constructor(device: EarthDevice, arrived: () => void) {
+  constructor(device: EarthDevice, arrived: () => void, code = kitCode) {
     this.#device = device;
     this.#arrived = arrived;
+    this.#code = code;
   }
 
   get size(): number {
     return this.#maps.size;
   }
 
-  /** The code that draws a generated world, asked if it was not: until it came, none. */
+  /** The code that draws a generated world, asked if it was not: until it came, none. One that failed is asked again the next time a
+   * world wants it, as the app's other chunks are (F1763). */
   kit(): Kit | undefined {
     if (!this.#askedKit) {
       this.#askedKit = true;
-      import("../planet/generated.ts").then(
+      this.#code().then(
         (kit) => {
           this.#kit = kit;
           this.#arrived();
         },
-        () => undefined,
+        () => {
+          this.#askedKit = false;
+        },
       );
     }
     return this.#kit;
