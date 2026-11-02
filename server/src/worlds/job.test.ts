@@ -311,6 +311,31 @@ describe("runWorlds", () => {
       expect(written(file).worlds[0]?.nature).toBe("game");
     });
 
+    it("asks a shed realm no more once its world has its nature: the job pays once", async () => {
+      const file = fresh();
+      await run(chainRoutes([VICTIM], { doc: (path) => docWith(path, ["Play", "Render"]) }), { file });
+      const shed = written(file);
+      const bare = shed.worlds.map((world) => ({
+        ...world,
+        realms: world.realms.map((one) => ({ ...one, functions: [], imports: [] })),
+      }));
+      writeFileSync(file, `${JSON.stringify({ ...shed, worlds: bare })}\n`);
+      const again = await run(chainRoutes([VICTIM]), { file });
+      expect(again.chain.asked.filter(({ kind }) => kind === "vm/qdoc")).toEqual([]);
+    });
+
+    it("counts a realm the last file read with imports and no function as read", async () => {
+      const file = fresh();
+      const imports = (path: string) =>
+        JSON.stringify({ package_path: path, imports: ["gno.land/p/nt/avl/v0"], funcs: [] });
+      await run(chainRoutes([POOL, POOL1], { doc: (path) => (path === POOL1 ? "not a doc" : imports(path)) }), {
+        file,
+      });
+      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+      await run(chainRoutes([POOL, POOL1]), { file });
+      expect(written(file).worlds[0]?.nature).toBe("exchange");
+    });
+
     it("keeps it whatever a new realm of the world says", async () => {
       const file = fresh();
       await run(chainRoutes([POOL]), { file });
