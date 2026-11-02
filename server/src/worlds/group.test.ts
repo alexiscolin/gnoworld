@@ -3,6 +3,7 @@ import {
   alike,
   ANCHORS,
   featuresOf,
+  labOf,
   NATURES,
   REALM_PREFIX,
   SURFACE,
@@ -10,6 +11,7 @@ import {
   worldRecipe,
   type Features,
   type Nature,
+  type PlanetLook,
 } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas/indexer";
 import fc from "fast-check";
@@ -154,27 +156,57 @@ const SHARE = 0.0001;
 type NatureOf = (id: string) => Nature | null;
 type Shaped = (features: Features) => Features;
 
-function closeness(ids: readonly string[], natureOf: NatureOf = () => null, shaped: Shaped = (features) => features) {
-  const features = ids.map((id) => shaped(featuresOf(worldLook(id, natureOf(id)), worldRecipe(id, natureOf(id)))));
-  const close = (at: number, other: number) => {
-    const [one, two] = [features[at], features[other]];
-    return one !== undefined && two !== undefined && alike(one, two) ? 1 : 0;
-  };
+// The pairs alike among `count` worlds within `view` of each other in id order, and the most in any window of `view`.
+function measured(count: number, view: number, close: (one: number, other: number) => boolean) {
   let pairs = 0;
   let found = 0;
   let worst = 0;
-  for (let start = 0; start + VIEW <= features.length; start += 1) {
+  for (let start = 0; start + view <= count; start += 1) {
     let inView = 0;
-    for (let one = start; one < start + VIEW; one += 1)
-      for (let two = one + 1; two < start + VIEW; two += 1) inView += close(one, two);
+    for (let one = start; one < start + view; one += 1)
+      for (let two = one + 1; two < start + view; two += 1) inView += close(one, two) ? 1 : 0;
     worst = Math.max(worst, inView);
   }
-  for (let one = 0; one < features.length; one += 1)
-    for (let two = one + 1; two < Math.min(one + VIEW, features.length); two += 1) {
+  for (let one = 0; one < count; one += 1)
+    for (let two = one + 1; two < Math.min(one + view, count); two += 1) {
       pairs += 1;
-      found += close(one, two);
+      found += close(one, two) ? 1 : 0;
     }
   return { share: found / pairs, worst, found };
+}
+
+function closeness(ids: readonly string[], natureOf: NatureOf = () => null, shaped: Shaped = (features) => features) {
+  const features = ids.map((id) => shaped(featuresOf(worldLook(id, natureOf(id)), worldRecipe(id, natureOf(id)))));
+  return measured(features.length, VIEW, (at, other) => {
+    const [one, two] = [features[at], features[other]];
+    return one !== undefined && two !== undefined && alike(one, two);
+  });
+}
+
+// What is drawn today is the look, not the recipe, until 7b5 (the finding-verifier): 7b2's golden still bounds it, its predicate and its
+// bounds as they were (views of eight, a fortieth of pairs, 0.22 of a view). With 24 anchors: 49 of 3,703 pairs (1.32%; 7b2's 62), 3 in
+// the worst view of 28; ten times larger, 1.31% and 6, near its bound.
+const DRAWN = { view: 8, colour: 6, surface: 0.04, share: 0.025, worst: 0.22 };
+function drawnAlike(one: PlanetLook, other: PlanetLook): boolean {
+  const [l, a, b] = labOf(one.ramp[1]);
+  const [ol, oa, ob] = labOf(other.ramp[1]);
+  return (
+    one.anchor === other.anchor &&
+    one.map === other.map &&
+    (one.rings === null) === (other.rings === null) &&
+    Math.hypot(l - ol, a - oa, b - ob) < DRAWN.colour &&
+    Math.abs(one.warp.amount - other.warp.amount) < DRAWN.surface &&
+    Math.abs(one.secondShare - other.secondShare) < DRAWN.surface * 4
+  );
+}
+
+function drawnCloseness(ids: readonly string[]) {
+  const looks = ids.map((id) => worldLook(id));
+  const { share, worst } = measured(looks.length, DRAWN.view, (at, other) => {
+    const [one, two] = [looks[at], looks[other]];
+    return one !== undefined && two !== undefined && drawnAlike(one, two);
+  });
+  return { share, worst: worst / ((DRAWN.view * (DRAWN.view - 1)) / 2) };
 }
 
 const recordedIds = () => groupWorlds(ONYX).map((world) => world.id);
@@ -225,6 +257,16 @@ describe("neighbours (ADR-0002 §3)", () => {
     const { share, worst } = closeness(tenTimes(recordedIds()), byNamespace);
     expect(share).toBeLessThan(SHARE);
     expect(worst).toBeLessThanOrEqual(WORST_PAIRS);
+  }, 30_000);
+
+  it("keeps today's drawn looks as few alike as 7b2's golden allowed, until 7b5 draws the recipe", () => {
+    for (const ids of [recordedIds(), tenTimes(recordedIds())]) {
+      const { share, worst } = drawnCloseness(ids);
+      expect(share).toBeLessThan(DRAWN.share);
+      expect(worst).toBeLessThan(DRAWN.worst);
+    }
+    const [id = ""] = recordedIds();
+    expect(drawnAlike(worldLook(id), worldLook(id))).toBe(true);
   }, 30_000);
 
   it("finds a world near-identical to itself, or the bound above would hold for nothing", () => {
