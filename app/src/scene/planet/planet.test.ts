@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AIR_FRAGMENT } from "./airShader.ts";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
 import { RING_FRAGMENT } from "./ringShader.ts";
+import { PARTS } from "./surfaceParts.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
@@ -281,6 +282,33 @@ describe("createPlanet", () => {
 
   it("switches the Earth's city lights on across the arc the day goes out in", () => {
     expect(SURFACE_FRAGMENT).toContain("float dusk = 1.0 - smoothstep(-0.16, 0.4, day);");
+  });
+
+  it("reads the Earth's own sea on the worlds that read its map, and no other", () => {
+    for (const anchor of ANCHORS) {
+      const surface = createPlanet(planetLook(DAO, anchor), fixed().set, sphere).surface;
+      expect(read(surface, "blueSea"), anchor).toBe(["temperate", "ocean"].includes(anchor) ? 1 : 0);
+    }
+    expect(SURFACE_FRAGMENT).toContain("wet = blueSea > 0.5 ? smoothstep(0.004, 0.02, base.b - max(base.r, base.g))");
+  });
+
+  it("never stretches a map by more than a fifth, at any frequency, so nothing streaks", () => {
+    for (const anchor of ANCHORS)
+      for (let i = 0; i < 40; i += 1) {
+        const look = planetLook(ascii(`gno.land/r/demo/stretch${String(i)}`), anchor);
+        const surface = createPlanet(look, fixed().set, sphere).surface;
+        const amount = read(surface, "warpAmount") as number;
+        expect(amount * look.warp.frequency, anchor).toBeLessThanOrEqual(0.2 + 1e-9);
+        expect(amount).toBeLessThanOrEqual(look.warp.amount);
+      }
+  });
+
+  it("gives every world with air the Earth's whole light and a night that is blue, not dead", () => {
+    expect(SURFACE_FRAGMENT).toContain("max(limb, mix(SOFT_BARE, SOFT_AIR, air))");
+    expect(PARTS).toContain("const float SOFT_AIR = 1.0;");
+    expect(SURFACE_FRAGMENT).toContain(
+      "if (air > 0.5 && nightLights <= 0.0) colour += mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW",
+    );
   });
 
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {

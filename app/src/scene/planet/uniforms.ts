@@ -13,6 +13,7 @@ const HAZE_LIFT = 0.45;
 const HAZE_STRENGTH = 0.9;
 const FULL_AIR = 0.05;
 const THINNEST_HAZE = 0.35;
+const MAX_STRETCH = 0.2;
 const NO_RINGS = { inner: 0, outer: 0, opacity: 0 };
 
 export interface MapSet {
@@ -39,6 +40,7 @@ function signUniforms(look: PlanetLook): Uniforms {
   const rings = look.rings ?? NO_RINGS;
   return {
     air: { value: look.rim === null ? 0 : 1 },
+    blueSea: { value: look.map === "earth-day" ? 1 : 0 },
     hazeColour: { value: working(haze(look.rim)) },
     hazeAmount: {
       value:
@@ -69,7 +71,8 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
     time: { value: 0 },
-    warpAmount: { value: warp.amount },
+    // The warp never stretches a map by more than a fifth, whatever its frequency: no streaks.
+    warpAmount: { value: Math.min(warp.amount, MAX_STRETCH / warp.frequency) },
     warpFrequency: { value: warp.frequency },
     warpOffset: { value: new Vector3(...warp.offset) },
     secondShare: { value: look.secondShare },

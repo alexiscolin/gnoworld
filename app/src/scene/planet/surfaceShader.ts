@@ -35,7 +35,7 @@ void main() {
   vec3 direction = spin * normalize(axis + warpAmount * flow);
   vec3 base = read(surface, lookupOf(direction)).rgb;
   float height = toneOf(base);
-  if (secondShare > 0.002) {
+  if (secondShare > 0.002 && blueSea < 0.5) {
     float patchy = smoothstep(0.42, 0.86, field(axis * 1.3 + warpOffset.zxy).x * 0.5 + 0.5 + secondShare * 0.6 - 0.2);
     vec3 elsewhere = spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy);
     base = mix(base, read(second, lookupOf(elsewhere)).rgb, patchy * 0.72);
@@ -50,15 +50,21 @@ void main() {
 
   float wet = 0.0;
   if (seaLevel >= 0.0) {
-    wet = 1.0 - smoothstep(seaLevel - 0.012, seaLevel + 0.012, tone);
-    albedo = mix(albedo, mix(seaDeep, seaShallow, smoothstep(seaLevel - 0.16, seaLevel, tone)), wet);
+    // On the Earth's own map the sea is where the map is blue, as the Earth's is: whole oceans with their shores, not puddles of one tone.
+    wet = blueSea > 0.5 ? smoothstep(0.004, 0.02, base.b - max(base.r, base.g)) : 1.0 - smoothstep(seaLevel - 0.012, seaLevel + 0.012, tone);
+    float depth = blueSea > 0.5 ? smoothstep(0.1, 0.4, tone) : smoothstep(seaLevel - 0.16, seaLevel, tone);
+    // Ice on that map is bright and grey; left to the blue test and the ramp it would be sea in one block and land in the next.
+    float chroma = max(base.r, max(base.g, base.b)) - min(base.r, min(base.g, base.b));
+    float ice = blueSea > 0.5 ? smoothstep(0.55, 0.7, tone) * (1.0 - smoothstep(0.03, 0.09, chroma)) : 0.0;
+    wet *= 1.0 - ice;
+    albedo = mix(mix(albedo, mix(seaDeep, seaShallow, depth), wet), vec3(0.86, 0.9, 0.95), ice);
   }
   // A real map holds its own seas: they are where it is bluest.
   if (nightLights > 0.0) {
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
     albedo = mix(max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet), albedo, 0.0);
   }
-  if (caps > 0.0) {
+  if (caps > 0.0 && blueSea < 0.5) {
     float frozen = smoothstep(1.0 - caps, 1.0 - caps + 0.05, abs(axis.y) + 0.07 * flow.y + 0.16 * (tone - 0.5));
     albedo = mix(albedo, vec3(0.86, 0.9, 0.95), frozen);
     wet *= 1.0 - frozen;
@@ -86,7 +92,7 @@ void main() {
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
   float ripple = 0.8 + 0.2 * field(direction * 14.0).x;
-  float glitter = nightLights > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 260.0) * 1.1 + pow(gleam, 40.0) * 0.1) * ripple;
+  float glitter = nightLights + blueSea > 0.0 ? pow(gleam, 60.0) * 0.05 : (pow(gleam, 260.0) * 1.1 + pow(gleam, 40.0) * 0.1) * ripple;
   colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
 
   float overcast = 0.0;
@@ -116,6 +122,8 @@ void main() {
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + warpOffset).y);
     colour += mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
   }
+  // A night with air keeps a deep blue and the faint form of the ground, as the Earth's does (its own comes from its night map).
+  if (air > 0.5 && nightLights <= 0.0) colour += mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light);
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

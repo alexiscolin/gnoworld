@@ -28,8 +28,8 @@ describe("sideLight, a generated world's star", () => {
   it("lights the disc as the frames do, a half to three quarters, from the Earth's side, never from the front", () => {
     for (const value of [0, 64, 128, 200, 255]) {
       const seen = angle(bytes(value));
-      expect(seen).toBeGreaterThanOrEqual((58 * Math.PI) / 180);
-      expect(seen).toBeLessThanOrEqual((84 * Math.PI) / 180);
+      expect(seen).toBeGreaterThanOrEqual((66 * Math.PI) / 180);
+      expect(seen).toBeLessThanOrEqual((92 * Math.PI) / 180);
       expect(sideLight(bytes(value), new Vector3()).x).toBeGreaterThan(0.85);
     }
   });

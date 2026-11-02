@@ -30,6 +30,7 @@ uniform float rifts;
 uniform float cracks;
 uniform float locked;
 uniform float air;
+uniform float blueSea;
 uniform float hazeAmount;
 uniform float seaLevel;
 uniform float glowLevel;
@@ -50,11 +51,13 @@ const float REACH = 0.012;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 // The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun.
 const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
-const float SOFT_AIR = 0.85;
+const float SOFT_AIR = 1.0;
 const float SOFT_BARE = 0.55;
 const float EDGE = 0.4;
 // What a world keeps in its night, so its dark side is a shape against the sky and not a hole in it.
 const float NIGHT = 0.007;
+const float NIGHT_GLOW = 0.07;
+const vec3 DEEP_BLUE = vec3(0.12, 0.22, 0.5);
 
 vec3 turned(vec3 v, float angle) {
   float c = cos(angle);
@@ -105,8 +108,8 @@ float lines(vec3 at, float width) {
 // One side always faces its star: scorched glass at the centre, desert, a thin belt of life, then ice to the far side.
 vec3 eyeball(vec3 albedo, float tone, float day) {
   vec3 ice = mix(vec3(0.46, 0.58, 0.74), vec3(0.93, 0.96, 0.99), tone);
-  vec3 cold = mix(ice, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.1, 0.3, day));
-  vec3 warm = mix(cold, albedo, smoothstep(0.3, 0.48, day));
+  vec3 cold = mix(ice, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.0, 0.4, day));
+  vec3 warm = mix(cold, albedo, smoothstep(0.2, 0.7, day));
   return mix(warm, albedo * vec3(0.3, 0.2, 0.16), smoothstep(0.78, 0.97, day));
 }
 `;
