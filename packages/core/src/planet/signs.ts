@@ -59,7 +59,9 @@ const CLIMB: readonly (readonly [Stage, number])[] = [
 const GROWTH = 0.6;
 const AWAKE = 0.12;
 const LEVEL: Span = [0.35, 1];
-const SEED_SIZE: Span = [0.5, 0.8];
+// A seed is a small heart in a glow, frame 4's "Uncharted signal"; a week's most climb fills its span, for what a seed has become is its matter.
+const SEED_SIZE: Span = [0.22, 0.34];
+const SEED_CLIMB = 5;
 const SEED_SIGNAL: Span = [0.45, 1];
 const OFFSET = 16;
 const TURN = Math.PI * 2;
@@ -76,7 +78,7 @@ const FORMS: Record<Anchor, { readonly kind: LightKind; readonly grain: Span; re
   "cloud deck": { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
-  shattered: { kind: "cracks", grain: [1.2, 2], fine: [0.3, 0.5] },
+  shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
 };
 
 /** A new family stays a seed until its first visit or 7 days; a world of unknown age is no new one. */
@@ -85,8 +87,7 @@ export const isFresh = (ageDays: number | null, visited: boolean): boolean =>
 
 export function stageOf({ vitality, fresh }: WorldState): Stage {
   if (fresh) return "seed";
-  const reached = share(vitality);
-  return CLIMB.find(([, from]) => reached >= from)?.[0] ?? "rest";
+  return CLIMB.find(([, from]) => vitality >= from)?.[0] ?? "rest";
 }
 
 // A world's own pattern, from the second hash's bytes past its class: it never changes while the world grows.
@@ -109,11 +110,11 @@ export function worldSigns(seed: Uint8Array, anchor: Anchor, state: WorldState):
   const popular = Math.max(grown, here);
   return {
     stage: stageOf(state),
-    size: state.fresh ? between(SEED_SIZE, popular) : 1 + GROWTH * climbed,
+    size: state.fresh ? between(SEED_SIZE, share(grown * SEED_CLIMB)) : 1 + GROWTH * climbed,
     signal: state.fresh ? between(SEED_SIGNAL, popular) : 0,
     lights: {
       ...formOf(seed, anchor),
-      extent: Math.max(((climbed + 1) * climbed) / 2, AWAKE * here),
+      extent: Math.max(climbed, AWAKE * here),
       level: between(LEVEL, here),
     },
   };

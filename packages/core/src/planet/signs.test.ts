@@ -49,7 +49,7 @@ const WAY: Record<Anchor, { kind: LightKind; grain: Span; fine: Span }> = {
   "cloud deck": { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
-  shattered: { kind: "cracks", grain: [1.2, 2], fine: [0.3, 0.5] },
+  shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
 };
 const SEA: readonly Anchor[] = ["temperate", "ocean"];
 const between = ([from, to]: Span, share: number) => from + (to - from) * share;
@@ -105,6 +105,12 @@ describe("the stages", () => {
     );
   });
 
+  it("reads what is no number as nothing, and what is past the top as the top", () => {
+    expect(stageOf({ vitality: Number.NaN, present: 0, fresh: false })).toBe("rest");
+    expect(stageOf({ vitality: Infinity, present: 0, fresh: false })).toBe("beacon");
+    expect(stageOf({ vitality: -1, present: 0, fresh: false })).toBe("rest");
+  });
+
   it("never lands on a stage from a value that is no share", () => {
     fc.assert(
       fc.property(wild, wild, (vitality, present) => {
@@ -126,6 +132,7 @@ describe("isFresh", () => {
     expect(isFresh(null, false)).toBe(false);
     expect(isFresh(Number.NaN, false)).toBe(false);
     expect(isFresh(-1, false)).toBe(false);
+    expect(isFresh(-0.1, false)).toBe(false);
   });
 });
 
@@ -188,7 +195,8 @@ describe("a stage reads the same on all twelve classes", () => {
         expect(signs.size, anchor).toBeGreaterThan(before?.size ?? 9);
       }
       expect(climb.at(-1)?.size, "a beacon stands out as matter").toBeGreaterThan(1.4);
-      expect(climb.at(-1)?.lights.extent, "a beacon is lit all over").toBeGreaterThan(0.75);
+      expect(climb.at(-1)?.lights.extent, "a beacon is lit all over").toBeGreaterThan(0.9);
+      expect(climb[1]?.lights.extent, "a living world shows at once").toBeGreaterThan(0.15);
     }
   });
 });
@@ -331,7 +339,7 @@ describe("a sign keeps its meaning and varies its form", () => {
     fc.assert(
       fc.property(anySeed, anyAnchor, anyState, (seed, anchor, state) => {
         const { size, signal, lights } = worldSigns(seed, anchor, state);
-        expect(size).toBeGreaterThan(0.4);
+        expect(size).toBeGreaterThan(0.2);
         expect(size).toBeLessThanOrEqual(1.6);
         expect(signal).toBeGreaterThanOrEqual(0);
         expect(signal).toBeLessThanOrEqual(1);
@@ -353,18 +361,73 @@ describe("a sign keeps its meaning and varies its form", () => {
   });
 });
 
+// The numbers docs/decisions.md gives, stated apart from the code: a change to one is a change to what a stage means.
+describe("what the signs are worth", () => {
+  const at = (vitality: number, present: number, fresh = false) => worldSigns(DAO, "ice", { vitality, present, fresh });
+
+  it.each([
+    [0.3, 1, 0],
+    [0.4, 1 + 0.6 / 7, 1 / 7],
+    [0.65, 1.3, 0.5],
+    [1, 1.6, 1],
+  ])("a vitality of %f gives a radius of %f and lights over %f of its surface", (vitality, size, extent) => {
+    const signs = at(vitality, 0);
+    expect(signs.size).toBeCloseTo(size, 12);
+    expect(signs.lights.extent).toBeCloseTo(extent, 12);
+  });
+
+  it("wakes a world at rest over an eighth of its surface at most", () => {
+    expect(at(0.1, 1).lights.extent).toBeCloseTo(0.12, 12);
+    expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.06, 12);
+  });
+
+  it("lights a world from 0.35 with nobody here to 1 at the most people", () => {
+    expect(at(0.8, 0).lights.level).toBeCloseTo(0.35, 12);
+    expect(at(0.8, 0.5).lights.level).toBeCloseTo(0.675, 12);
+    expect(at(0.8, 1).lights.level).toBe(1);
+  });
+
+  it("gives a seed a quarter of a world's radius or so, by what it has become", () => {
+    expect(at(0, 0, true).size).toBeCloseTo(0.22, 12);
+    expect(at(0.1, 0, true).size).toBeCloseTo(0.28, 12);
+    expect(at(0.2, 0, true).size).toBeCloseTo(0.34, 12);
+    expect(at(1, 0, true).size).toBeCloseTo(0.34, 12);
+  });
+
+  it("gives a seed a signal from 0.45 up, by the more popular of its two gauges", () => {
+    expect(at(0, 0, true).signal).toBeCloseTo(0.45, 12);
+    expect(at(1, 0, true).signal).toBe(1);
+    expect(at(0, 1, true).signal).toBe(1);
+    expect(at(0.5, 0.2, true).signal).toBeCloseTo(0.725, 12);
+    expect(at(0.2, 0.5, true).signal).toBeCloseTo(0.725, 12);
+  });
+});
+
 describe("a seed", () => {
-  it("is small, under any world at rest, and shows its signal", () => {
+  it("is a small heart, far under a world at rest, and shows its signal", () => {
     const { size, signal } = worldSigns(DAO, "rocky", AT.seed);
-    expect(size).toBeLessThan(1);
+    expect(size).toBeLessThan(0.35);
     expect(signal).toBeGreaterThan(0);
+  });
+
+  it("leaves a crowd out of its matter: people today move its glow, never its size", () => {
+    const [quiet, crowded] = [0, 1].map((present) => worldSigns(DAO, "rocky", { vitality: 0.1, present, fresh: true }));
+    expect(crowded?.size).toBe(quiet?.size);
+    expect(crowded?.signal).toBeGreaterThan(quiet?.signal ?? 1);
+  });
+
+  // docs/decisions.md: a seed's end is an event, for the world wakes, on its first visit or at its seventh day (7e's wake): no ramp hides it.
+  it("ends in one step, the wake's: the last day of a seed and the first of a world", () => {
+    const seed = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: true });
+    const woken = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: false });
+    expect(woken.size / seed.size).toBeGreaterThan(2.9);
+    expect(woken.signal).toBe(0);
   });
 
   it("shows how popular its start is: more matter and a stronger signal (Alexis, 2026-11-01)", () => {
     const quiet = worldSigns(DAO, "rocky", { vitality: 0, present: 0, fresh: true });
-    const known = worldSigns(DAO, "rocky", { vitality: 0.1, present: 0.8, fresh: true });
-    const grown = worldSigns(DAO, "rocky", { vitality: 0.8, present: 0.1, fresh: true });
-    expect(known.size).toBeGreaterThan(quiet.size);
+    const known = worldSigns(DAO, "rocky", { vitality: 0, present: 0.8, fresh: true });
+    const grown = worldSigns(DAO, "rocky", { vitality: 0.8, present: 0, fresh: true });
     expect(known.signal).toBeGreaterThan(quiet.signal);
     expect(grown.size).toBeGreaterThan(quiet.size);
     expect(grown.signal).toBeGreaterThan(quiet.signal);
