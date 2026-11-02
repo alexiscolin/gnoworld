@@ -3,12 +3,14 @@ import {
   alike,
   ANCHORS,
   featuresOf,
+  REALM_PREFIX,
   SURFACE,
   worldLook,
   worldRecipe,
   type Features,
   type Nature,
 } from "@gnoworld/core";
+import { RealmPath } from "@gnoworld/schemas/indexer";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { groupWorlds, keptPaths } from "./group.ts";
@@ -177,6 +179,17 @@ function closeness(ids: readonly string[], natureOf: NatureOf = () => null, shap
 const recordedIds = () => groupWorlds(ONYX).map((world) => world.id);
 const tenTimes = (ids: readonly string[]) =>
   ids.flatMap((id) => Array.from({ length: 10 }, (_, n) => `${id}${String(n)}`));
+
+// F4108: the realm prefix a world's seed reads is written once, in core, and is the one the worlds' file accepts.
+describe("the realm prefix", () => {
+  it("is gno.land's realms', and the file's realm paths start with it", () => {
+    expect(REALM_PREFIX).toBe("gno.land/r/");
+    expect(RealmPath.safeParse(`${REALM_PREFIX}samcrew/memba`).success).toBe(true);
+    expect(RealmPath.safeParse("gno.land/p/samcrew/memba").success).toBe(false);
+    for (const { id, realms } of groupWorlds(ONYX))
+      expect(realms.every((path) => path.startsWith(`${REALM_PREFIX}${id.split("/")[0] ?? ""}`))).toBe(true);
+  });
+});
 
 describe("neighbours (ADR-0002 §3)", () => {
   it("draws every class from the recorded list, none past a fifth of it", () => {
