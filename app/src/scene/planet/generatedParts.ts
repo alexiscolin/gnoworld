@@ -47,9 +47,10 @@ vec4 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
     float n = noise(p * frequency + float(i) * 1.7);
     float faded = amplitude * fadeAt(frequency, pixel);
     plain += faded * n;
-    n += carved * step(1.5, float(i)) * (2.0 * (sqrt(n * n + 0.0004) - HOLLOW) - n);
+    float crease = max(0.02, 0.008 * frequency);
+    n += carved * step(1.5, float(i)) * (2.0 * (sqrt(n * n + crease * crease) - HOLLOW) - n);
     sum += faded * n;
-    coarse += amplitude * n * (1.0 - smoothstep(0.06, 0.125, frequency * pixel));
+    coarse += amplitude * n * (1.0 - smoothstep(0.03, 0.0625, frequency * pixel));
     weight += faded;
     squares += faded * faded;
     amplitude *= shape.roughness;
@@ -62,7 +63,7 @@ float shareOf(vec2 height) {
 }
 `;
 
-// A ground: its height from the warped fBm, its craters, bowls with a raised rim where a cell holds one; a gas world: its bands, each
+// A ground: its height from the warped fBm, its craters, bowls with a rim no steeper than a quad holds; a gas world: its bands, each
 // latitude moved by a churn four times finer across the bands than along them, around storms that turn the flow.
 export const FORMS = /* glsl */ `
 float cratersAt(vec3 p, float frequency, float pixel) {
@@ -79,8 +80,9 @@ float cratersAt(vec3 p, float frequency, float pixel) {
         vec3 centre = vec3(cell) + 0.35 + 0.3 * vec3(float((h >> 16u) & 255u), float((h >> 24u) & 255u), float((h >> 4u) & 15u) * 17.0) / 255.0;
         float radius = 0.18 + 0.17 * float((h >> 8u) & 255u) / 255.0;
         float d = length(q - centre) / radius;
+        float rim = max(0.05, 8.0 * pow(frequency * pixel / radius, 2.0));
         depth += d < 1.0 ? d * d - 1.0 : 0.0;
-        depth += 0.4 * exp(-(d - 1.0) * (d - 1.0) / 0.05);
+        depth += 0.4 * sqrt(0.05 / rim) * exp(-(d - 1.0) * (d - 1.0) / rim);
       }
   return depth * (1.0 - smoothstep(0.1, 0.2, frequency * pixel));
 }
@@ -185,7 +187,7 @@ float lines(out float ridge, vec3 at, float width, float pixel) {
   float core = 1.0 - smoothstep(0.0, max(width, pixel), away);
   float edge = max(width, pixel);
   float margins = smoothstep(0.6 * edge, 1.2 * edge, away) * (1.0 - smoothstep(1.2 * edge, 2.4 * edge, away));
-  ridge = (margins - 0.6 * core) * smoothstep(3.0, 6.0, width / pixel);
+  ridge = (margins - 0.6 * core) * smoothstep(5.0, 9.0, width / pixel);
   return core;
 }
 float skyAt(vec3 sky, float pixel) {

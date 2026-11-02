@@ -86,7 +86,7 @@ void main() {
     broad = ground.z / ground.y;
     fray = (ground.x - ground.z) / ground.y;
     height = ground.x / ground.y + cratered * 0.8;
-    relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.04, 0.08, shape.scale * 4.0 * pixel));
+    relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.012, 0.03, shape.scale * 4.0 * pixel));
   }
   float minor = 0.0;
   if (minorShare > 0.002) {

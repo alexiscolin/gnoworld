@@ -322,8 +322,9 @@ describe("the generated program", () => {
   // octaves of 8 pixels and more, no map detail, and craters whose rims stay wider than a pixel and a half.
   it("shades a relief smooth over a quad: no map detail in it, craters faded before their rims are thinner than a pixel", () => {
     expect(GENERATED_FRAGMENT).not.toMatch(/relieved \+= fine/);
+    // Craters leave the relief while their cells are under 40 px (7b6, F4238: rims steeper than a quad stepped in 2x2 blocks).
     expect(GENERATED_FRAGMENT).toMatch(
-      /relieved = ground\.z \/ ground\.y \+ big \* 0\.8 \* \(1\.0 - smoothstep\(0\.04, 0\.08,/,
+      /relieved = ground\.z \/ ground\.y \+ big \* 0\.8 \* \(1\.0 - smoothstep\(0\.012, 0\.03,/,
     );
   });
 
@@ -367,8 +368,10 @@ describe("the generated program", () => {
   });
 
   it("carves only the finer octaves, their crease rounded", () => {
+    // The crease no narrower than the close view's pixels three times over, the same for every pixel of a quad (7b6, F4238).
+    expect(GENERATED_FRAGMENT).toMatch(/float crease = max\(0\.02, [\d.]+ \* frequency\);/);
     expect(GENERATED_FRAGMENT).toMatch(
-      /n \+= carved \* step\(1\.5, float\(i\)\) \* \(2\.0 \* \(sqrt\(n \* n \+ [\d.]+\) - HOLLOW\) - n\);/,
+      /n \+= carved \* step\(1\.5, float\(i\)\) \* \(2\.0 \* \(sqrt\(n \* n \+ crease \* crease\) - HOLLOW\) - n\);/,
     );
   });
 
