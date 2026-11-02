@@ -5,7 +5,7 @@ import {
   EARTH_RADIUS,
   clearOf,
   leanFor,
-  ORBIT_PACE,
+  orbitTime,
   orbitPlace,
   planetSeed,
   toScene,
@@ -145,7 +145,7 @@ export class Bodies {
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
     const away = this.#offEye(system.place, eye, star).length();
-    orbitPlace(body, body.still ? 0 : seconds * ORBIT_PACE, this.#place);
+    orbitPlace(body, body.still ? 0 : orbitTime(seconds), this.#place);
     planet.group.position.copy(this.#offEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();

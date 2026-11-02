@@ -8,7 +8,7 @@ import {
   dotLight,
   GRAIN,
   onScreen,
-  ORBIT_PACE,
+  orbitTime,
   textHash,
   unitOf,
   worldLook,
@@ -119,7 +119,7 @@ export class Disc {
   /** One frame on. */
   advance(eye: Point, seconds: number): void {
     this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);
-    this.#dots.advance(seconds);
+    this.#dots.advance(orbitTime(seconds));
   }
 
   /** Writes what a look saw. */
@@ -165,7 +165,7 @@ export class Disc {
       this.#sized += 1;
     }
     this.#dots.set(index, system.place, {
-      orbit: [world.orbit, world.phase, system.spin * ORBIT_PACE],
+      orbit: [world.orbit, world.phase, system.spin],
       plane: [system.node, system.tilt],
       tint: grain ? GRAIN_TINT : lifted(this.#colourFor(world.id)),
       size: [size, dotLight(distance) * sight.shows(system.place, 0) * (grain ? 0.45 + 0.55 * share : 1)],

@@ -188,7 +188,7 @@ describe("the search's cost", () => {
   const least = (systems: readonly StarSystem[]) => {
     restView(systems);
     let best = Infinity;
-    for (let run = 0; run < 5; run += 1) {
+    for (let run = 0; run < 9; run += 1) {
       const start = Date.now();
       restView(systems);
       best = Math.min(best, Date.now() - start);

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { driftAt, glideAt, swayAt, turnAt } from "./drift.ts";
+import { driftAt, glideAt, orbitTime, swayAt, turnAt } from "./drift.ts";
 
 const spot = () => ({ x: 0, y: 0, z: 0 });
 const length = (a: { x: number; y: number; z: number }) => Math.hypot(a.x, a.y, a.z);
@@ -183,5 +183,13 @@ describe("swayAt", () => {
       const [a, b] = [sway(seconds), sway(seconds + 1 / 60)];
       expect(Math.hypot(b.across - a.across, b.up - a.up)).toBeLessThan(0.01);
     }
+  });
+});
+
+// Alexis's decision through the chief, 2026-11-02: the worlds turn at a fifth of their spin, so the eye's sway reads as depth.
+describe("orbitTime", () => {
+  it("is the clock every world turns by, bodies and points alike: a fifth of the seconds", () => {
+    expect(orbitTime(10)).toBeCloseTo(2, 12);
+    expect(orbitTime(0)).toBe(0);
   });
 });

@@ -6,6 +6,8 @@ import {
   EARTH_PLACE,
   glideAt,
   GRAIN,
+  orbitPlace,
+  orbitTime,
   HOME,
   NEBULA_IMAGES,
   offLine,
@@ -770,6 +772,27 @@ describe("the view at rest (7d6)", () => {
     expect(ids().size).toBeGreaterThan(rest.size);
   });
 
+  // A body and a point of one world turn by one clock, or a world that becomes a body jumps on its orbit (7d6's review, lot 5).
+  it("turns a body by the worlds' clock its points turn by, and a point's spin is its system's own", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    scene.cosmos.tick({ x: HOME.x + 30, y: HOME.y + 20, z: HOME.z }, 40);
+    await settled();
+    const systems = held(ONYX);
+    const body = scene.cosmos.stats().list.find(({ still }) => !still);
+    if (body === undefined) throw new Error("no body");
+    const expected = { x: NaN, y: NaN, z: NaN };
+    orbitPlace(body, orbitTime(40), expected);
+    const place = { x: NaN, y: NaN, z: NaN };
+    toScene(expected, place);
+    const [eye] = [scene.cosmos.stats().eye];
+    expect(body.at.distanceTo(new Vector3(place.x - eye.x, place.y - eye.y, place.z - eye.z))).toBeLessThan(1e-6);
+    const [points] = dots(scene);
+    const orbits = points?.geometry.getAttribute("aOrbit") as BufferAttribute;
+    const spins = new Set(systems.map(({ spin }) => spin.toFixed(6)));
+    expect(spins.has(orbits.getZ(0).toFixed(6))).toBe(true);
+  });
+
   // 7d6's review: a postcard's bodies turned on its opened plane while its specks kept the plane `opened()` rejected (24.8 degrees apart).
   it("draws a postcard's specks in the plane its bodies turn in", async () => {
     const scene = made();
@@ -1191,14 +1214,14 @@ describe("hidden, and gone", () => {
     expect(late.dispose).toHaveBeenCalledOnce();
   });
 
-  it("turns the points' clock and the Earth with the seconds it is given, and lights the Earth from the great star", async () => {
+  it("turns the points by the worlds' clock (a fifth of the seconds) and the Earth, and lights the Earth from the great star", async () => {
     const globe = fakeGlobe();
     globes.build.mockImplementation(() => Promise.resolve(globe));
     const scene = made();
     await shown(scene);
     scene.cosmos.tick(HOME, 12);
     const [points] = dots(scene);
-    expect(points?.material.uniforms["uSeconds"]?.value).toBe(12);
+    expect(points?.material.uniforms["uSeconds"]?.value).toBeCloseTo(orbitTime(12), 12);
     expect(globe.setTurn).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number));
     const [turn] = globe.setTurn.mock.lastCall as [number, number];
     scene.cosmos.tick(HOME, 24);
