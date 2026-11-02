@@ -25,23 +25,23 @@ const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);
 // Regions open as a world settles, first where the map's lights are densest, then out across the field: its cores grow into its towns.
 float settledAt(vec3 axis, float spill) {
   float ground = smoothstep(-0.7, 0.7, field(axis * lightGrain + lightOffset).x);
-  float rank = 0.6 * (1.0 - smoothstep(0.0, 0.15, spill)) + 0.4 * ground;
+  float rank = 0.6 * (1.0 - smoothstep(0.0, 0.15, spill)) + 0.4 * ground - 0.1;
   return smoothstep(rank, rank + 0.15, settled * 1.15);
 }
 
-// A golden net on a faint amber ground, a soft glow once a cell is under a few pixels: a line would break into worms.
-float netOf(vec3 direction, float seam, vec3 lit) {
-  float wired = 0.18 + 0.36 * abs(field(direction * 4.0 + lightOffset).y) + 0.7 * lit.x;
-  return 0.025 + mix(seam * wired, 0.08 + 0.4 * lit.y, smoothstep(0.25, 0.5, lit.z));
+// A golden net with a copper glow along its lines, a soft glow once a cell is under a few pixels: a line would break into worms.
+float netOf(vec3 direction, vec2 seam, vec3 lit) {
+  float wired = 0.3 + 0.36 * abs(field(direction * 4.0 + lightOffset).y) + 0.7 * lit.x;
+  return mix(seam.x * wired + 0.16 * seam.y * seam.y, 0.1 + 0.4 * lit.y, smoothstep(0.25, 0.5, lit.z));
 }
 
 // The shape a class gives its lights, from the map's cities and its soft spill.
-float formOf(vec3 axis, vec3 direction, vec4 reads, vec2 lines) {
+float formOf(vec3 axis, vec3 direction, vec4 reads, vec3 lines) {
   float cities = reads.x;
   float spill = reads.y;
-  float crack = lines.y;
+  float crack = lines.z;
   float strung = cities * 2.4 + spill * 2.2;
-  if (lightKind == ${code("seams")}) return netOf(direction, lines.x, vec3(strung, spill, reads.w));
+  if (lightKind == ${code("seams")}) return netOf(direction, lines.xy, vec3(strung, spill, reads.w));
   if (lightKind == ${code("cracks")}) {
     return crack * (0.08 + 0.24 * abs(field(direction * 4.0 + lightOffset).y) + strung) * 1.6 * lightFine;
   }
@@ -63,10 +63,10 @@ vec3 settlements(vec3 axis, vec3 direction, vec3 flow, float day, float crack) {
   Lookup other = at;
   if (lightTurn != 0.0) other = lookupOf(place.zxy);
   float pixel = 0.5 * length(fwidth(direction)) * lightFine;
-  float seam = 0.0;
+  vec2 seam = vec2(0.0);
   if (lightKind == ${code("seams")}) {
     float away = seams(direction * lightFine + 0.3 * flow);
-    seam = 1.0 - smoothstep(0.0, max(0.014, 2.2 * fwidth(away)), away);
+    seam = vec2(1.0 - smoothstep(0.0, 2.2 * max(fwidth(away), 0.5 * pixel), away), 1.0 - smoothstep(0.0, 0.2, away));
   }
   float night = 1.0 - smoothstep(-0.16, 0.4, day);
   if (night <= 0.0) return vec3(0.0);
@@ -74,9 +74,11 @@ vec3 settlements(vec3 axis, vec3 direction, vec3 flow, float day, float crack) {
   float cities = max(read(nightMap, at).r, read(nightMap, other).r);
   float spill = max(textureLod(nightMap, at.uv, blur).r, textureLod(nightMap, other.uv, blur).r);
   float open = settledAt(axis, spill);
-  float form = formOf(axis, direction, vec4(cities * cities, spill * spill * 2.5, day, pixel), vec2(seam, crack));
+  float form = formOf(axis, direction, vec4(cities * cities, spill * spill * 2.5, day, pixel), vec3(seam, crack));
   vec3 tint = lightKind == ${code("seams")} ? CITY_LIGHT * CITY_LIGHT : CITY_LIGHT;
-  return tint * form * open * lightLevel * night;
+  // A net's world glows copper between its cells as it settles, open or not: a lit patch never floats on a black body.
+  vec3 ground = lightKind == ${code("seams")} ? CITY_LIGHT * CITY_LIGHT * CITY_LIGHT * 0.025 * settled : vec3(0.0);
+  return (tint * form * open + ground) * lightLevel * night;
 }
 `;
 
