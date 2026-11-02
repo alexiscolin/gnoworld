@@ -14,6 +14,7 @@ import {
 } from "@gnoworld/core";
 import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
+import { Ahead } from "./ahead.ts";
 import { Bodies } from "./bodies.ts";
 import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
@@ -40,6 +41,7 @@ export class Cosmos {
   readonly #maps: BodyMaps;
   readonly #bodies: Bodies;
   readonly #home: Home;
+  readonly #ahead: Ahead;
   readonly #drawn = new Drawn();
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
@@ -50,8 +52,6 @@ export class Cosmos {
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
-  #compiling = false;
-  #compiled = false;
   #looks = 0;
   #focal = 1;
   #height = 1;
@@ -64,27 +64,18 @@ export class Cosmos {
     this.#maps = new BodyMaps(device, this.#mapCame);
     this.#bodies = new Bodies(this.#maps, this.#owner, device);
     this.#home = new Home(device, this.#bodies.group);
+    this.#ahead = new Ahead(device, this.#disc.group, () => {
+      this.#setShown(this.#wanted);
+      this.#device.moved();
+    });
     this.#setShown(false);
     device.stage.add(this.#disc.group, this.#bodies.group);
   }
 
   #setShown(shown: boolean): void {
     this.#wanted = shown;
-    this.#disc.group.visible = shown && this.#compiled;
+    this.#disc.group.visible = shown && this.#ahead.done;
     this.#bodies.group.visible = shown;
-  }
-
-  // The disc's programs compile before it shows: a first-time compile on a frame stalls the arrival.
-  #compile(): void {
-    if (this.#compiling) return;
-    this.#compiling = true;
-    const { renderer, camera, stage } = this.#device;
-    const ready = () => {
-      this.#compiled = true;
-      this.#setShown(this.#wanted);
-      this.#device.moved();
-    };
-    renderer.compileAsync(this.#disc.group, camera, stage).then(ready, ready);
   }
 
   readonly #mapCame = (): void => {
@@ -108,7 +99,7 @@ export class Cosmos {
       this.#ladder = new Ladder(this.#systems);
     }
     this.#looked.x = NaN;
-    this.#compile();
+    this.#ahead.ask();
     this.#home.stand();
     this.#device.moved();
   }
