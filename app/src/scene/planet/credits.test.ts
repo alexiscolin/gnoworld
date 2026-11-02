@@ -59,6 +59,14 @@ describe("the textures' credits", () => {
     for (const credit of CREDITS) expect(new Date(credit.read).toISOString().slice(0, 10)).toBe(credit.read);
   });
 
+  it("links every row to the licence itself, as CC BY 4.0 §3(a)(1)(c) asks: the words alone do not", () => {
+    for (const credit of CREDITS) expect(credit.licenceUrl).toBe("https://creativecommons.org/licenses/by/4.0/");
+  });
+
+  it("notes that the worlds warp and recolour the Earth's day map, as CC BY 4.0 §3(a)(1)(b) asks", () => {
+    expect(CREDITS[1]?.line).toContain("the day map warped and recoloured on temperate and ocean worlds");
+  });
+
   it("gives the Earth's maps a row of their own", () => {
     const earth = CREDITS.find((credit) => credit.files.includes("earth-day"));
     expect(earth?.files).toEqual(["earth-day", "earth-night"]);

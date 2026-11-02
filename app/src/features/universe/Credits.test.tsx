@@ -43,6 +43,8 @@ describe("the credits", () => {
     const box = opened();
     const links = all(one(box, "dialog"), "a").map((link) => link.getAttribute("href"));
     for (const credit of CREDITS) expect(links).toContain(credit.source);
+    for (const credit of CREDITS) expect(links).toContain(credit.licenceUrl);
+    expect(links).toHaveLength(CREDITS.length * 2);
     for (const credit of CREDITS) expect(one(box, "dialog").textContent).toContain(credit.read);
   });
 

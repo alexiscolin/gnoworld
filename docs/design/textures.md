@@ -24,7 +24,8 @@ fictional terrain, and the site lists Ceres and Eris as fictional.
 
 The shaders warp, recolour and mix them by each world's seed.
 
-The Earth's two are drawn as they came, with a row of their own in the credits. Read on the same day, from the same page. A Low or touch
+The Earth's two are drawn as they came on the Earth, with a row of their own in the credits. Temperate and ocean worlds warp and recolour
+the day map, which that row says. Read on the same day, from the same page. A Low or touch
 device decodes them at half each side, from the same files (`decodeOptions`, `earth/maps.ts`).
 
 | File | Source | Size | Changes |

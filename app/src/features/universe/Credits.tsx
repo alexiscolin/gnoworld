@@ -26,13 +26,17 @@ export function Credits() {
         }}
       >
         <Stack as="ul">
-          {CREDITS.map(({ line, source, read }) => (
+          {CREDITS.map(({ line, source, licence, licenceUrl, read }) => (
             <li key={line}>
               <Stack space="3xs">
                 <p>{line}</p>
                 <p>
                   <a href={source} target="_blank" rel="noopener noreferrer">
                     {new URL(source).host}
+                  </a>{" "}
+                  ·{" "}
+                  <a href={licenceUrl} target="_blank" rel="noopener noreferrer">
+                    {licence}
                   </a>{" "}
                   · read on {read}
                 </p>
