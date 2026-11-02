@@ -117,6 +117,36 @@ describe("the pool", () => {
     expect(layer()?.textContent).not.toContain(`world ${String(LABEL_SLOTS)}`);
   });
 
+  it("lets a world that left go at once, though its words wait their tenth of a second", () => {
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(-10, 0) })));
+    labels.tick(EYE, true);
+    vi.advanceTimersByTime(50);
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(10, 0) })));
+    labels.tick(EYE, true);
+    expect(labels.stats().filter(({ id }) => id === "gov/govern")).toEqual([]);
+    expect(shown()).toHaveLength(0);
+    vi.advanceTimersByTime(50);
+    labels.tick(EYE, true);
+    expect(labels.stats().map(({ id }) => id)).toEqual(["games/chess"]);
+  });
+
+  it("hides its layer while the scene's canvas is not running, a lost context included", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.dataset["scene"] = "on";
+    document.body.append(canvas);
+    const watching = new Labels(document, projector());
+    const layers = () => [...document.querySelectorAll<HTMLElement>("[data-labels]")];
+    expect(layers().at(-1)?.hidden).toBe(false);
+    canvas.dataset["scene"] = "failed";
+    await Promise.resolve();
+    expect(layers().at(-1)?.hidden).toBe(true);
+    canvas.dataset["scene"] = "on";
+    await Promise.resolve();
+    expect(layers().at(-1)?.hidden).toBe(false);
+    watching.dispose();
+    canvas.remove();
+  });
+
   it("leaves the page as it goes, its waiting words with it", () => {
     labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
     labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));

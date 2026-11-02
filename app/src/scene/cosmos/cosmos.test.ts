@@ -1030,6 +1030,17 @@ describe("a look costs a step, never a frame", () => {
     shared.mockRestore();
   });
 
+  it("hides a body it frees at once, so nothing that points at its object takes it for one still drawn (7h)", async () => {
+    const scene = made();
+    await shown(scene);
+    const group = scene.cosmos.stats().list[0]?.planet.group;
+    if (group === undefined) throw new Error("no body");
+    expect(group.visible).toBe(true);
+    scene.cosmos.tick({ x: HOME.x + 5000, y: HOME.y, z: HOME.z }, 1);
+    await settled();
+    expect(group.visible).toBe(false);
+  });
+
   it("poses a new body at once: one that stood at the eye a frame would fill the screen", async () => {
     const scene = made();
     scene.cosmos.show(worlds(5));

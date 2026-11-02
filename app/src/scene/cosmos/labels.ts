@@ -45,6 +45,7 @@ export class Labels {
   #waiting: readonly Chosen[] | undefined;
   #timer: ReturnType<typeof setTimeout> | undefined;
   #wrote = Number.NEGATIVE_INFINITY;
+  #watching: MutationObserver | undefined;
 
   constructor(document: Document, projector: Projector) {
     this.#projector = projector;
@@ -54,6 +55,18 @@ export class Labels {
     this.#layer.dataset["labels"] = "";
     this.#slots = Array.from({ length: LABEL_SLOTS }, () => slotIn(this.#layer, document));
     document.body.append(this.#layer);
+    this.#mirror(document.querySelector("canvas[data-scene]"));
+  }
+
+  // The layer shows only while the scene's canvas runs: a lost context or a covered page stops the frames that would hide it.
+  #mirror(canvas: Element | null): void {
+    if (canvas === null) return;
+    const running = () => {
+      this.#layer.hidden = canvas.getAttribute("data-scene") !== "on";
+    };
+    this.#watching = new MutationObserver(running);
+    this.#watching.observe(canvas, { attributes: true, attributeFilter: ["data-scene"] });
+    running();
   }
 
   // The screen, in the page's pixels, and the box of the page's text: its bands written once a change.
@@ -72,6 +85,7 @@ export class Labels {
 
   /** The labels a look chose, in their order: written at once, or within a tenth of a second of the last words. */
   show(chosen: readonly Chosen[]): void {
+    this.#leave(chosen);
     this.#waiting = chosen;
     if (this.#timer !== undefined) return;
     const wait = this.#wrote + WORDS_MS - Date.now();
@@ -79,14 +93,19 @@ export class Labels {
     else this.#timer = setTimeout(this.#apply, wait);
   }
 
+  // A world no longer chosen lets its slot go at once: only words wait.
+  #leave(chosen: readonly Chosen[]): void {
+    const kept = new Set(chosen.map(({ label }) => label.id));
+    for (const slot of this.#slots)
+      if (slot.chosen !== undefined && !kept.has(slot.chosen.label.id)) slot.chosen = undefined;
+  }
+
   readonly #apply = (): void => {
     this.#timer = undefined;
     const chosen = (this.#waiting ?? []).slice(0, LABEL_SLOTS);
     this.#waiting = undefined;
     this.#wrote = Date.now();
-    const kept = new Set(chosen.map(({ label }) => label.id));
-    for (const slot of this.#slots)
-      if (slot.chosen !== undefined && !kept.has(slot.chosen.label.id)) slot.chosen = undefined;
+    this.#leave(chosen);
     chosen.forEach((each, order) => {
       const slot =
         this.#slots.find((one) => one.chosen?.label.id === each.label.id) ??
@@ -194,6 +213,7 @@ export class Labels {
   dispose(): void {
     clearTimeout(this.#timer);
     this.#timer = undefined;
+    this.#watching?.disconnect();
     this.#layer.remove();
   }
 }

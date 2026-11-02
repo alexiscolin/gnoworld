@@ -215,7 +215,9 @@ export class Bodies {
     return this.#held.get(id)?.planet.group;
   }
 
+  // Hidden as it goes: whatever still points at its object (a label) sees it gone.
   #free({ planet }: Body): void {
+    planet.group.visible = false;
     planet.group.removeFromParent();
     planet.dispose();
   }
