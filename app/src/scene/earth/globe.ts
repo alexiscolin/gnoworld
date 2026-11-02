@@ -1,6 +1,7 @@
 // The Earth, its one Moon and the golden ring, as one group: what the view stands on the stage. It owns all of it, the maps included.
 import { Group, SphereGeometry, Vector3, type Mesh, type Texture } from "three";
 import { Disposer } from "../disposer.ts";
+import { starAt } from "../planet/light.ts";
 import { freeMap } from "../planet/maps.ts";
 import { createPlanet, type MapSet, type Planet } from "../planet/planet.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
@@ -14,15 +15,14 @@ const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
 const LIMB = 1.05;
-const POLE = new Vector3(0, 1, 0);
 const ANISOTROPY = 8;
 
 export class Globe {
   readonly #owner = new Disposer();
   readonly #orbit: Orbit & { readonly glow: Mesh };
   readonly #moonAt = new Vector3();
-  readonly #noon = new Vector3();
   readonly #sun = new Vector3();
+  #latitude = 0;
   readonly #earth: Planet;
   readonly moon: Planet;
   readonly ground: Ground;
@@ -57,12 +57,12 @@ export class Globe {
 
   /** The real sun's height over the equator, in radians, kept for every `setSun`. */
   aim(latitude: number): void {
-    this.#noon.set(Math.cos(latitude), Math.sin(latitude), 0);
+    this.#latitude = latitude;
   }
 
   /** Stands the sun at `azimuth` round the pole, in the ground's sense, past the Earth's lean. */
   setSun(azimuth: number): void {
-    this.#sun.copy(this.#noon).applyAxisAngle(POLE, azimuth).applyEuler(this.#earth.group.rotation);
+    starAt(this.#latitude, azimuth, this.#sun).applyEuler(this.#earth.group.rotation);
     this.#earth.setSun(this.#sun);
     this.moon.setSun(this.#sun);
   }
