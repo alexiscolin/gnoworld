@@ -158,7 +158,7 @@ TypeScript compiler; a reviewer reads the map to see the whole repo without read
 - Imports by package name across workspaces (`@gnoworld/core`, `@gnoworld/schemas`) and by
   `#` subpath imports inside one (`#lib/adena`), with `import type` for types. Never tsconfig
   `paths`: Node ignores them.
-- Functions are verbs (`pickBubbles`, `placeSystem`), types are nouns, booleans read as
+- Functions are verbs (`pickBubbles`, `placeSystems`), types are nouns, booleans read as
   questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
 - Exported functions in `core` and `lib` carry a one-line TSDoc: what it returns and when it
   fails. Comments say why, never what.
