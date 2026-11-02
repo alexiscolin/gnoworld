@@ -23,6 +23,23 @@ void main() {
 }
 `;
 
+// In SURFACE_FRAGMENT: On the Earth's own map the sea is where the map is blue, as the Earth's is: whole oceans with their shores, not puddles of one tone.
+
+// In SURFACE_FRAGMENT: Ice on that map is bright and grey; left to the blue test and the ramp it would be sea in one block and land in the next.
+
+// In SURFACE_FRAGMENT: A real map holds its own seas: they are where it is bluest.
+
+// In SURFACE_FRAGMENT: The day fades into the night over a wide arc, smooth at both ends, as the frames' terminators do: no shoulder where it starts.
+
+// In SURFACE_FRAGMENT: The light falls off towards the terminator on every world, as the Earth's does, more where there is air.
+
+// In SURFACE_FRAGMENT: The star's light keeps no colour of its own: a land dims in its own hue, with no brown band at the terminator.
+
+// In SURFACE_FRAGMENT: The lights come on across the same arc the day goes out in.
+
+// In SURFACE_FRAGMENT: Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
+
+// In SURFACE_FRAGMENT: A night with air keeps a deep blue and the faint form of the ground, as the Earth's does (its own comes from its night map).
 export const SURFACE_FRAGMENT = /* glsl */ `
 ${UNIFORMS}
 ${LIGHT_UNIFORMS}
@@ -53,16 +70,13 @@ void main() {
 
   float wet = 0.0;
   if (blueSea > 0.5) {
-    // On the Earth's own map the sea is where the map is blue, as the Earth's is: whole oceans with their shores, not puddles of one tone.
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
     float depth = smoothstep(0.1, 0.4, tone);
-    // Ice on that map is bright and grey; left to the blue test and the ramp it would be sea in one block and land in the next.
     float chroma = max(base.r, max(base.g, base.b)) - min(base.r, min(base.g, base.b));
     float ice = smoothstep(0.55, 0.7, tone) * (1.0 - smoothstep(0.03, 0.09, chroma));
     wet *= 1.0 - ice;
     albedo = mix(mix(albedo, mix(seaDeep, seaShallow, depth), wet), vec3(0.86, 0.9, 0.95), ice);
   }
-  // A real map holds its own seas: they are where it is bluest.
   if (nightLights > 0.0) {
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
     albedo = max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet);
@@ -81,14 +95,11 @@ void main() {
   albedo *= 1.0 - 0.95 * rift;
 
   vec3 view = normalize(cameraPosition - vWorld);
-  // The day fades into the night over a wide arc, smooth at both ends, as the frames' terminators do: no shoulder where it starts.
   float light = smoothstep(-0.16, 0.95, dot(bumped(axis, flow, height * (1.0 - wet), angle), sun));
   float facing = max(dot(normal, view), 0.001);
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
-  // The light falls off towards the terminator on every world, as the Earth's does, more where there is air.
   float shine = mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();
-  // The star's light keeps no colour of its own: a land dims in its own hue, with no brown band at the terminator.
   vec3 colour = albedo * shine + albedo * NIGHT;
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
@@ -109,13 +120,11 @@ void main() {
     Lookup place = lookupOf(direction);
     vec3 cities = read(nightMap, place).rgb;
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
-    // The lights come on across the same arc the day goes out in.
     float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
     colour += (cities * 2.6 + spill * 0.9) * CITY_LIGHT * dusk * (1.0 - 0.8 * overcast);
   }
   if (settled > 0.0) colour += settlements(axis, direction, flow, day, crack) * (1.0 - 0.8 * overcast);
   float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
-  // Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
   if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);
   else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);
   if (glowLevel > 0.0) {
@@ -123,7 +132,6 @@ void main() {
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + warpOffset).y);
     colour += mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
   }
-  // A night with air keeps a deep blue and the faint form of the ground, as the Earth's does (its own comes from its night map).
   if (air > 0.5 && nightLights <= 0.0) colour += mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light);
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>

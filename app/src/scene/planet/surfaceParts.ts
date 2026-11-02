@@ -43,16 +43,25 @@ varying vec3 vWorld;
 varying vec3 vSun;
 `;
 
+// In PARTS: The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun.
+
+// In PARTS: What a world keeps in its night, so its dark side is a shape against the sky and not a hole in it.
+
+// In PARTS: A slope read from the map beside each point, a pixel away and no nearer than a texel, so the detail a pixel can carry is shaded and no
+
+// In PARTS: finer: the same slope at any size, soft-clipped so a crater's rim never becomes a line.
+
+// In PARTS: A line is never thinner than a pixel, or it crawls as the world turns.
+
+// In PARTS: One side always faces its star: scorched glass at the centre, desert, a thin belt of life, then ice to the far side.
 export const PARTS = /* glsl */ `
 const float TEXEL = 0.0032;
 const float REACH = 0.012;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-// The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun.
 const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
 const float SOFT_AIR = 1.0;
 const float SOFT_BARE = 0.55;
 const float EDGE = 0.4;
-// What a world keeps in its night, so its dark side is a shape against the sky and not a hole in it.
 const float NIGHT = 0.007;
 const float NIGHT_GLOW = 0.07;
 const vec3 DEEP_BLUE = vec3(0.12, 0.22, 0.5);
@@ -73,8 +82,6 @@ vec3 ramped(vec3 colour, float tone) {
   return mix(colour, stop * mix(vec3(1.0), colour / light, 0.22), recolour);
 }
 
-// A slope read from the map beside each point, a pixel away and no nearer than a texel, so the detail a pixel can carry is shaded and no
-// finer: the same slope at any size, soft-clipped so a crater's rim never becomes a line.
 vec3 bumped(vec3 axis, vec3 flow, float height, float angle) {
   vec3 normal = normalize(vNormal);
   if (relief < 0.004) return normal;
@@ -97,13 +104,11 @@ float ringShade() {
   return 1.0 - 0.85 * ringOpacity * textureLod(ringMap, vec2(reach, 0.5), 0.0).r;
 }
 
-// A line is never thinner than a pixel, or it crawls as the world turns.
 float lines(vec3 at, float width) {
   float away = min(seams(at), seams(at * 2.3 + 11.0) * 2.0);
   return 1.0 - smoothstep(0.0, max(width, 1.1 * fwidth(away)), away);
 }
 
-// One side always faces its star: scorched glass at the centre, desert, a thin belt of life, then ice to the far side.
 vec3 eyeball(vec3 albedo, float tone, float day) {
   vec3 ice = mix(vec3(0.46, 0.58, 0.74), vec3(0.93, 0.96, 0.99), tone);
   vec3 cold = mix(ice, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.0, 0.4, day));
