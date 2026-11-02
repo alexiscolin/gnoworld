@@ -34,8 +34,14 @@ const REST: WorldState = { vitality: 0.1, present: 0, fresh: false };
 const BUSY: WorldState = { vitality: 0.8, present: 0.6, fresh: false };
 const NEW: WorldState = { vitality: 0.1, present: 0.4, fresh: true };
 const sphere = new SphereGeometry(1, 8, 6);
-// What 21b00fc8's SURFACE_FRAGMENT hashes to, computed from that commit's three files.
-const APPROVED_SURFACE = "1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a";
+// What 21b00fc8's SURFACE_FRAGMENT hashes to, its comment lines taken out (they move above the strings, 7d6, for they ship), worked out
+// apart from this code on that commit's own files; with them, 1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a.
+const APPROVED_SURFACE = "de3aa66641d6ca657f973cda5d54836b89bcaf7dee968ab853bb11e26b38ce30";
+const uncommented = (text: string) =>
+  text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
 
 const mapSet = (extra: Partial<MapSet> = {}): MapSet => {
   const shared = new Texture();
@@ -183,7 +189,11 @@ describe("a world's signs on its render", () => {
       .replace(`${LIGHTS}\n`, "")
       .replace(gated, "")
       .replace("* CITY_LIGHT *", "* vec3(1.0, 0.8, 0.52) *");
-    expect(createHash("sha256").update(new TextEncoder().encode(approved)).digest("hex")).toBe(APPROVED_SURFACE);
+    expect(
+      createHash("sha256")
+        .update(new TextEncoder().encode(uncommented(approved)))
+        .digest("hex"),
+    ).toBe(APPROVED_SURFACE);
   });
 
   it("reads no light unless a world has some: `settled` is a uniform, so at rest not one of its reads runs", () => {
