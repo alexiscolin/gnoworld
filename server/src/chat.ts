@@ -13,17 +13,18 @@ import type { Command } from "./irc/lines.ts";
 import type { Log } from "./log.ts";
 import { act } from "./moderation/act.ts";
 import { makeProgress, type Progress } from "./moderation/catchup.ts";
-import { checkAgain, makeChecker, type Verdict } from "./moderation/check.ts";
+import { checkAgain, type Verdict } from "./moderation/check.ts";
+import { checkerFor } from "./moderation/checker.ts";
 import { makeMutes } from "./moderation/mute.ts";
-import { moderationClient, type Answer } from "./moderation/provider.ts";
+import type { Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
-import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
-import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
+import { listed, mayRead, staffOf, type World } from "./rooms/types.ts";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
@@ -113,24 +114,6 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
 
 // A world's rooms at most, its main room aside (3l).
 const ROOMS_PER_WORLD = 20;
-
-// The check of each line: its world's rules, then OpenAI when a key is set, or the alert that none is.
-function checkerFor(db: DatabaseSync, { worlds, moderation }: Settings, options: Options): Steps["check"] {
-  const { log, pepper, now = Date.now } = options;
-  const key = moderation.openaiKey;
-  if (key === undefined && options.provider === undefined) log("alert", { error: "moderation_off" });
-  return makeChecker({
-    db,
-    rulesOf: (room) => worlds.get(roomWorld(db, room) ?? "")?.rules,
-    publicRoom: (room) => publicRoom({ worlds }, room),
-    provider: options.provider ?? (key === undefined ? undefined : moderationClient({ key: key.reveal(), log })),
-    thresholds: moderation.thresholds,
-    pepper,
-    log,
-    now,
-    newAccountMs: moderation.newAccountHours * 60 * 60_000,
-  });
-}
 
 // A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
 const unknownChannels =
