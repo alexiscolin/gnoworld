@@ -1,7 +1,7 @@
 // A world's stage and the signs that show it (ADR-0002 §10), pure: a stage reads the same on every class, and each class shows it in
 // its own form. Fixed per sign: what it means, where it shows, how it grows, its colour family. Free per world, from its seed: its pattern.
-// Vitality is matter, the people present are light, and a world at rest with nobody here carries no sign at all, so it stays the render
-// Alexis approved. Every sign means real data (§10). Only + - * / reach a form. Tier 1 (docs/REVIEW.md).
+// Vitality is matter and the people present are light, nothing else (F4110): a world at rest with nobody here carries no sign at all, so it
+// stays the render Alexis approved. Every sign means real data (§10). Only + - * / reach a form. Tier 1 (docs/REVIEW.md).
 import type { Anchor, Rgb } from "./anchors.ts";
 import { moreSeed } from "./choice.ts";
 import { share } from "./gauges.ts";
@@ -23,7 +23,7 @@ export interface WorldState {
 }
 
 interface LightSign {
-  /** How much of its surface is settled, 0 to 1: none draws no light. It grows with the vitality, and a little with the people here. */
+  /** How much of its surface is lit, 0 to 1: the share of people here now, and nothing else (F4110). None draws no light. */
   readonly extent: number;
   /** How lit it is, by the people here: a vitality never brightens a world. */
   readonly level: number;
@@ -57,7 +57,6 @@ const CLIMB: readonly (readonly [Stage, number])[] = [
   ["living", LIVING],
 ];
 const GROWTH = 0.6;
-const AWAKE = 0.12;
 const LEVEL: Span = [0.35, 1];
 // A seed is a small heart in a glow, frame 4's "Uncharted signal"; a week's most climb fills its span, for what a seed has become is its matter.
 const SEED_SIZE: Span = [0.22, 0.34];
@@ -124,10 +123,6 @@ export function worldSigns(seed: Uint8Array, anchor: Anchor, state: WorldState):
     stage: stageOf(state),
     size: state.fresh ? between(SEED_SIZE, share(grown * SEED_CLIMB)) : 1 + GROWTH * climbed,
     signal: state.fresh ? between(SEED_SIGNAL, popular) : 0,
-    lights: {
-      ...formOf(seed, anchor),
-      extent: Math.max(climbed, AWAKE * here),
-      level: between(LEVEL, here),
-    },
+    lights: { ...formOf(seed, anchor), extent: here, level: between(LEVEL, here) },
   };
 }

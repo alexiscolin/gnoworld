@@ -350,11 +350,22 @@ test.describe("the realism page", () => {
     expect((await stats(page)).textures).toBe(textures + 1);
   });
 
-  test("how far lights reach follows the vitality alone, the people held", async ({ page }) => {
-    const settled = await discLight(page, "stage=inhabited&present=0.5");
-    const further = await discLight(page, "stage=beacon&present=0.5");
+  // F4110 (Alexis, 2026-11-02): night lights mean people here now and nothing else; the gallery draws every stage at one size.
+  test("a vitality moves no light: the people held, an inhabited world and a beacon light alike", async ({ page }) => {
+    const inhabited = await discLight(page, "stage=inhabited&present=0.5");
+    const beacon = await discLight(page, "stage=beacon&present=0.5");
     for (const [index, anchor] of ANCHORS.entries())
-      expect(further[index], anchor).toBeGreaterThan(settled[index] ?? 0);
+      expect(Math.abs((beacon[index] ?? 0) - (inhabited[index] ?? 0)), anchor).toBeLessThan(0.5);
+  });
+
+  test("with nobody here no stage lights a night side: a beacon is dark as a world at rest", async ({ page }) => {
+    const rest = await nightAt(page, "rest");
+    const empty = await discLight(page, "stage=beacon&present=0");
+    const crowded = await discLight(page, "stage=beacon&present=0.5");
+    for (const [index, anchor] of ANCHORS.entries()) {
+      expect(Math.abs((empty[index] ?? 0) - (rest[index] ?? 0)), anchor).toBeLessThan(0.5);
+      expect(crowded[index] ?? 0, anchor).toBeGreaterThan((empty[index] ?? 0) + 0.5);
+    }
   });
 
   test("how lit they are follows the people alone, the vitality held", async ({ page }) => {

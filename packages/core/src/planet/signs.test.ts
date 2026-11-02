@@ -175,7 +175,38 @@ describe("a world at rest", () => {
     expect(awake.stage).toBe("rest");
     expect(awake.size).toBe(1);
     expect(awake.lights.extent).toBeGreaterThan(0);
-    expect(awake.lights.extent).toBeLessThan(worldSigns(DAO, "rocky", AT.inhabited).lights.extent);
+    const beacon = worldSigns(DAO, "rocky", { vitality: 0.95, present: 0.5, fresh: false });
+    expect(awake.lights).toEqual(beacon.lights);
+  });
+
+  // F4110 (Alexis, 2026-11-02): night lights mean people here now and nothing else; a stage shows through its size.
+  it("lights a night side with the people here alone: a vitality moves neither how far nor how bright", () => {
+    fc.assert(
+      fc.property(fc.tuple(unit, unit, unit, anyAnchor), ([vitality, other, present, anchor]) => {
+        const one = worldSigns(DAO, anchor, { vitality, present, fresh: false }).lights;
+        const two = worldSigns(DAO, anchor, { vitality: other, present, fresh: false }).lights;
+        expect(two.extent).toBe(one.extent);
+        expect(two.level).toBe(one.level);
+      }),
+    );
+  });
+
+  it("shows no light on a settled world with nobody here, at any stage", () => {
+    fc.assert(
+      fc.property(unit, anyAnchor, (vitality, anchor) => {
+        expect(worldSigns(DAO, anchor, { vitality, present: 0, fresh: false }).lights.extent).toBe(0);
+      }),
+    );
+    for (const stage of ["living", "inhabited", "busy", "beacon"] as const)
+      expect(worldSigns(DAO, "rocky", { ...AT[stage], present: 0 }).lights.extent, stage).toBe(0);
+  });
+
+  it("spreads its lights as far as the people here reach: more people, more of the night side", () => {
+    const extent = (present: number) => worldSigns(DAO, "ice", { ...AT.living, present }).lights.extent;
+    expect(extent(0.05)).toBeCloseTo(0.05, 12);
+    expect(extent(0.3)).toBeCloseTo(0.3, 12);
+    expect(extent(0.9)).toBeCloseTo(0.9, 12);
+    expect(extent(1)).toBe(1);
   });
 });
 
@@ -208,7 +239,7 @@ describe("a stage reads the same on every class", () => {
         expect(signs.size, anchor).toBeGreaterThan(before?.size ?? 9);
       }
       expect(climb.at(-1)?.size, "a beacon stands out as matter").toBeGreaterThan(1.4);
-      expect(climb.at(-1)?.lights.extent, "a beacon is lit all over").toBeGreaterThan(0.9);
+      expect(climb.at(-1)?.lights.extent, "a beacon's crowd lights it nearly all over").toBeGreaterThanOrEqual(0.9);
       expect(climb[1]?.lights.extent, "a living world shows at once").toBeGreaterThan(0.15);
     }
   });
@@ -378,21 +409,23 @@ describe("a sign keeps its meaning and varies its form", () => {
 describe("what the signs are worth", () => {
   const at = (vitality: number, present: number, fresh = false) => worldSigns(DAO, "ice", { vitality, present, fresh });
 
+  // F4110: with nobody here, no vitality lights any of a world's surface.
   it.each([
     [0.3, 1, 0],
-    [0.4, 1 + 0.6 / 7, 1 / 7],
-    [0.65, 1.3, 0.5],
-    [1, 1.6, 1],
+    [0.4, 1 + 0.6 / 7, 0],
+    [0.65, 1.3, 0],
+    [1, 1.6, 0],
   ])("a vitality of %f gives a radius of %f and lights over %f of its surface", (vitality, size, extent) => {
     const signs = at(vitality, 0);
     expect(signs.size).toBeCloseTo(size, 12);
     expect(signs.lights.extent).toBeCloseTo(extent, 12);
   });
 
-  it("wakes a world at rest over an eighth of its surface at most, and adds nothing to a settled world's reach", () => {
-    expect(at(0.1, 1).lights.extent).toBeCloseTo(0.12, 12);
-    expect(at(0.8, 1).lights.extent).toBeCloseTo(5 / 7, 12);
-    expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.06, 12);
+  it("lights as much of a world's surface as the share of people here, at rest or settled", () => {
+    expect(at(0.1, 1).lights.extent).toBe(1);
+    expect(at(0.8, 1).lights.extent).toBe(1);
+    expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.5, 12);
+    expect(at(0.95, 0.05).lights.extent).toBeCloseTo(0.05, 12);
   });
 
   it("lights a world from 0.35 with nobody here to 1 at the most people", () => {
