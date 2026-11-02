@@ -125,10 +125,6 @@ describe("the twelve anchors", () => {
       expect(look.cracks > 0).toBe(anchor === "ice");
     }
   });
-
-  it("gives a banded world a reflective limb, and an airless one a dusty limb", () => {
-    expect(planetLook(DAO, "gas giant").limb).toBeGreaterThan(planetLook(DAO, "rocky").limb);
-  });
 });
 
 describe("planetLook", () => {

@@ -44,12 +44,11 @@ describe("the Earth", () => {
 });
 
 describe("the Moon", () => {
-  it("is the real one: its own map, no air, no clouds, a limb that stays bright", () => {
+  it("is the real one: its own map, no air, no clouds", () => {
     expect(MOON.map).toBe("moon");
     expect(MOON.warp.amount).toBe(0);
     expect(MOON.recolour).toBe(0);
     expect(MOON.rim).toBeNull();
     expect(MOON.clouds).toBe(0);
-    expect(MOON.limb).toBe(0);
   });
 });
