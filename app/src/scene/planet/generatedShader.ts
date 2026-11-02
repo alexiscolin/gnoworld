@@ -120,7 +120,11 @@ void main() {
   if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
   if (banded > 0.5) albedo = mix(albedo, mid, shape.clouds * 0.3) * (1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel));
   albedo *= mix(vec3(1.0), detail, min(shape.detail * 2.0, 1.0)) * (1.0 + 0.25 * clamp(cratered, -1.0, 1.0));
-  if (style > 1.5) albedo = mix(albedo, sulfurLow * 0.15, smoothstep(0.93, 0.96, molten));
+  if (style > 1.5) {
+    float caldera = smoothstep(0.9, 0.97, molten);
+    albedo = mix(albedo, vec3(0.3, 0.07, 0.02), 0.5 * smoothstep(0.84, 0.9, molten) * (1.0 - caldera));
+    albedo = mix(albedo, sulfurLow * 1.2, caldera);
+  }
   if (shape.sea > 0.0) {
     float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
