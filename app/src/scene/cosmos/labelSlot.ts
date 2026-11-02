@@ -21,7 +21,7 @@ export interface Slot {
   readonly element: HTMLElement;
   readonly words: readonly [HTMLElement, HTMLElement, HTMLElement];
   chosen: Chosen | undefined;
-  /** What was last written: left, top, scale, opacity, stem, below. */
+  /** What was last written: left, top, scale, opacity, stem, below, the words' fade. */
   readonly written: Float64Array;
 }
 
@@ -37,7 +37,7 @@ export function slotIn(layer: HTMLElement, document: Document): Slot {
   element.className = styles["label"] ?? "";
   element.style.setProperty("opacity", "0");
   layer.append(element);
-  return { element, words, chosen: undefined, written: new Float64Array(6).fill(Number.NaN) };
+  return { element, words, chosen: undefined, written: new Float64Array(7).fill(Number.NaN) };
 }
 
 /** Gives `slot` what `chosen` says, its words written as text and measured only when they changed. */
@@ -56,10 +56,15 @@ export function wordsInto(slot: Slot, chosen: Chosen, size: { layout: LabelLayou
   size.layout.height[size.index] = slot.element.offsetHeight;
 }
 
-/** Fades `slot` to `opacity`, written only when it changed. */
-export function fadeTo({ element, written }: Slot, opacity: number): void {
+/** Shows or hides `slot`, and fades its words with depth, never its pill (frame 4's are solid); an uncharted signal's words never fade.
+ * Written only when it changed. */
+export function fadeTo({ element, written, chosen }: Slot, shown: boolean, fade: number): void {
+  const opacity = shown ? 1 : 0;
+  const words = chosen?.label.uncharted === true ? 1 : fade;
   if (written[3] !== opacity) element.style.setProperty("opacity", String(opacity));
+  if (written[6] !== words) element.style.setProperty("--_fade", String(words));
   written[3] = opacity;
+  written[6] = words;
 }
 
 // Writes a shown label's place, at a tenth of a pixel and a thousandth of its scale, only when it moved.

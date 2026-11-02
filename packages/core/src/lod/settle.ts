@@ -6,7 +6,8 @@ import { clamp01 } from "../space/smooth.ts";
 
 export const LABEL_SLOTS = 8;
 export const BOXES_MOST = 8;
-export const DISCS_MOST = 16;
+// Every body a look stands (lod/bounds.ts BOUNDS.bodies, 40), the Earth and room to spare.
+export const DISCS_MOST = 48;
 /** Frame 4's measures, in pixels at a scale of 1: the stem in from the label's edge (f0004's Earth 12.5, Memba DAO 11.5), the gap to the
  * body's outline (20 to 29), the air kept from anything else, and the screen's margin. */
 export const PLACE = { stem: 12, gap: 22, air: 6, margin: 16, stemLeast: 8 } as const;

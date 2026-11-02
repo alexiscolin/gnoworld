@@ -201,7 +201,46 @@ describe("a frame", () => {
     expect(Number(left)).toBeCloseTo(stat.left, 1);
     expect(Number(top)).toBeCloseTo(stat.top, 1);
     expect(Number(scale)).toBeCloseTo(stat.scale, 2);
-    expect(Number(slot?.style.opacity)).toBeCloseTo(stat.fade, 2);
+    expect(slot?.style.opacity).toBe("1");
+    expect(Number(slot?.style.getPropertyValue("--_fade"))).toBeCloseTo(stat.fade, 2);
+  });
+
+  it("fades a far label's words, never its pill, and an uncharted signal's not at all (frame 4's solid pills)", () => {
+    const star = { x: 30, y: 0, z: -900 };
+    const onStage = { x: 0, y: 0, z: 0 };
+    toScene(star, onStage);
+    const eye = { x: onStage.x, y: onStage.y, z: onStage.z + 400 };
+    const asks: LabelAsk[] = [
+      { id: "games/chess", kind: "far", signals: { here: 4 } },
+      { id: "games/new", kind: "far", signals: { uncharted: true } },
+    ];
+    // 10 units right of the first, 200 px on this screen.
+    const places = [star, { x: 40, y: 0, z: -900 }];
+    labels.show(each(asks, 2).map((label, at) => ({ label, at: places[at] ?? star })));
+    labels.tick(eye, true);
+    const pills = shown();
+    expect(pills).toHaveLength(2);
+    for (const pill of pills) expect(pill.style.opacity).toBe("1");
+    const fades = pills.map((pill) => Number(pill.style.getPropertyValue("--_fade"))).sort();
+    expect(fades[0]).toBeLessThan(1);
+    expect(fades[1]).toBe(1);
+  });
+
+  it("keeps a label off a body the view draws that has no label of its own", () => {
+    const labelled_ = body(-10, 0);
+    const other = body(-9.4, 3.3);
+    labels.show(
+      labelled([near("gov/govern")]).map((label) => ({ label, at: labelled_ })),
+      [labelled_, other],
+    );
+    labels.tick(EYE, true);
+    const stat = statOf(labels);
+    expect(stat.shown).toBe(true);
+    const [x, y, radius] = [SCREEN.width / 2 - 9.4 * 20, SCREEN.height / 2 - 3.3 * 20, 20];
+    const right = stat.left + stat.width * stat.scale;
+    const bottom = stat.top + stat.height * stat.scale;
+    const apart = Math.hypot(Math.max(stat.left - x, 0, x - right), Math.max(stat.top - y, 0, y - bottom));
+    expect(apart).toBeGreaterThanOrEqual(radius);
   });
 
   it("keeps its labels off the page's text and off the Earth", () => {

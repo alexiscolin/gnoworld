@@ -46,6 +46,8 @@ export class Labels {
   #timer: ReturnType<typeof setTimeout> | undefined;
   #wrote = Number.NEGATIVE_INFINITY;
   #watching: MutationObserver | undefined;
+  // Every body the view draws: a label keeps off those that have none of their own too.
+  #around: readonly Anchor[] = [];
 
   constructor(document: Document, projector: Projector) {
     this.#projector = projector;
@@ -84,7 +86,8 @@ export class Labels {
   }
 
   /** The labels a look chose, in their order: written at once, or within a tenth of a second of the last words. */
-  show(chosen: readonly Chosen[]): void {
+  show(chosen: readonly Chosen[], around: readonly Anchor[] = []): void {
+    this.#around = around;
     this.#leave(chosen);
     this.#waiting = chosen;
     if (this.#timer !== undefined) return;
@@ -127,6 +130,7 @@ export class Labels {
     layout.screenHeight = this.#sight.height;
     layout.discCount = 0;
     for (let index = 0; index < LABEL_SLOTS; index += 1) this.#aim(index, eye, shown);
+    for (let at = 0; at < this.#around.length; at += 1) this.#keepOff(this.#around[at]);
     this.#keep();
     settle(layout);
     for (let index = 0; index < LABEL_SLOTS; index += 1) this.#place(index);
@@ -156,6 +160,19 @@ export class Labels {
     return this.#star.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
   }
 
+  // A body with no label of its own, kept clear of every label.
+  #keepOff(body: Anchor | undefined): void {
+    if (body === undefined || !body.visible || this.#slots.some(({ chosen }) => chosen?.at === body)) return;
+    const { x, y, radius, depth } = this.#projector.seen(body.position, body.scale.x);
+    const layout = this.#layout;
+    if (!(depth > 0) || radius < 2 || layout.discCount >= layout.discs.length / 3) return;
+    const disc = 3 * layout.discCount;
+    layout.discs[disc] = x;
+    layout.discs[disc + 1] = y;
+    layout.discs[disc + 2] = radius;
+    layout.discCount += 1;
+  }
+
   // A body's disc, kept clear of every other label.
   #disc(index: number, radius: number): void {
     const layout = this.#layout;
@@ -178,7 +195,7 @@ export class Labels {
     const slot = this.#slots[index];
     if (slot === undefined) return;
     const shown = this.#layout.shown[index] === 1;
-    fadeTo(slot, shown ? Math.round((this.#layout.fade[index] ?? 1) * 100) / 100 : 0);
+    fadeTo(slot, shown, Math.round((this.#layout.fade[index] ?? 1) * 100) / 100);
     if (shown) moveTo(slot, this.#layout, index);
   }
 

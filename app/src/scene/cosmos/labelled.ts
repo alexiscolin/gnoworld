@@ -61,7 +61,7 @@ export class CosmosLabels {
       const at: Anchor | Point | undefined = anchors.get(label.id) ?? stars.get(label.id);
       return at === undefined ? [] : [{ label, at }];
     });
-    this.#labels.show(chosen);
+    this.#labels.show(chosen, [...anchors.values()]);
   }
 
   tick(eye: Point, shown: boolean): void {

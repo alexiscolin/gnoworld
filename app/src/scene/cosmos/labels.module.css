@@ -14,6 +14,8 @@
   .label {
     /* raw: where the stem stands in from the pill's left edge, f0004's 12 px; the script writes it */
     --_stem: 12px;
+    /* How much of its words a far label keeps: the script writes it, the pill never fades */
+    --_fade: 1;
 
     position: absolute;
     inset: 0 auto auto 0;
@@ -37,18 +39,27 @@
     inline-size: 1px;
     /* raw: the gap core/lod keeps between a label and its body */
     block-size: 22px;
-    /* raw: f0004's stem, the muted grey at 60% */
-    background: color-mix(in oklab, var(--color-text-muted) 60%, transparent);
+    /* raw: f0004's stem, the muted grey at 60% fading to nothing towards the body */
+    background: linear-gradient(color-mix(in oklab, var(--color-text-muted) 60%, transparent), transparent);
     content: "";
   }
 
   .below::after {
     inset-block: auto 100%;
+    /* raw: the same stem, fading towards the body under the pill */
+    background: linear-gradient(to top, color-mix(in oklab, var(--color-text-muted) 60%, transparent), transparent);
   }
 
   .title {
     color: var(--color-text);
     font: var(--font-ui);
+  }
+
+  /* A far label's words fade with depth, never its pill: f0004's are solid. */
+  .title,
+  .count,
+  .badge {
+    opacity: var(--_fade);
   }
 
   .count,
@@ -74,7 +85,8 @@
 
   /* f0004's "Uncharted signal": a machine's word, violet, within a dashed edge. */
   .uncharted {
-    border: var(--line-width) dashed var(--color-signal-line);
+    /* raw: f0004's dashed edge, the machine's violet at 70%, seen over black as over a sun */
+    border: var(--line-width) dashed color-mix(in oklab, var(--color-signal) 70%, transparent);
     box-shadow: none;
   }
 
