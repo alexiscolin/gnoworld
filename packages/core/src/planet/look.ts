@@ -1,11 +1,12 @@
-// A world's look, a pure function of its path (ADR-0002 §3): sha256("gnoworld/planet/v1" ‖ path), whose 256 bits feed continuous values
+// A world's look, a pure function of its path and the anchor it is given (ADR-0002 §3): sha256("gnoworld/planet/v1" ‖ path), whose 256 bits feed continuous values
 // inside an anchor's row. Only + - * / reach a value, so every engine gives the same look: rotations stay angles, and the app does
 // the trigonometry. Tier 1 (docs/REVIEW.md). The path comes in as bytes: core has no TextEncoder.
 import { ANCHORS, MAPS, type Anchor, type AnchorRow, type MapName, type Ramp, type Rgb } from "./anchors.ts";
+import { anchorOf, natureOf, type Nature, type RealmFunctions } from "./choice.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 
-export { ANCHORS, MAPS, type Anchor, type MapName };
+export { anchorOf, ANCHORS, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
 
 /** Above this the warp smears a map's real detail (Alexis's review of the mock-up, 2026-11-01). */
 export const MAX_WARP_FREQUENCY = 2.4;
@@ -19,8 +20,21 @@ const RING_LEAN = [0.3, 0.65] as const;
 const RING_INNER = [1.25, 1.45] as const;
 const RING_WIDTH = [0.62, 0.95] as const;
 const RING_OPACITY = [0.34, 0.72] as const;
-// "gnoworld/planet/v1", its bytes spelled for want of a TextEncoder.
-const DOMAIN = Uint8Array.from("gnoworld/planet/v1", (character) => character.charCodeAt(0));
+const LAST_ASCII = 127;
+const WORLD_PATH = "gno.land/r/";
+
+/** The bytes of a text that is ASCII by its schema, for want of a TextEncoder: past it a code unit would wrap, and two ids be one planet. */
+export function asciiBytes(text: string): Uint8Array {
+  const bytes = new Uint8Array(text.length);
+  for (let at = 0; at < text.length; at += 1) {
+    const unit = text.charCodeAt(at);
+    if (unit > LAST_ASCII) throw new RangeError("a text past ASCII");
+    bytes[at] = unit;
+  }
+  return bytes;
+}
+
+const DOMAIN = asciiBytes("gnoworld/planet/v1");
 
 export interface PlanetLook {
   readonly anchor: Anchor;
@@ -73,7 +87,8 @@ const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
 ];
 
 // Words 0 to 5 turn and offset the map, word 6 mixes the palette; each byte from 14 on is one value of its own, in [0, 1], and a
-// byte may serve two values no anchor has together: rifts and cracks; caps and a banded world's contrast.
+// byte may serve two values no anchor has together: rifts and cracks; caps and a banded world's contrast. Byte 13 serves word 6 and the
+// lean, and bytes 0 and 1 the spin and the light: all 32 are taken (F3476), and what comes after reads `moreSeed`.
 const reader = (seed: Uint8Array) => ({
   word: (index: number): number => ((seed[index * 2] ?? 0) * 256 + (seed[index * 2 + 1] ?? 0)) / 65535,
   byte: (index: number): number => seedShare(seed, index),
@@ -115,9 +130,8 @@ function waters(row: AnchorRow, { byte }: Reader): Pick<PlanetLook, "sea" | "glo
   };
 }
 
-/** The look of `path` as `anchor`: choosing the anchor from the seed comes with the classes (7b2). */
-export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
-  const seed = reader(planetSeed(path));
+function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
+  const seed = reader(bytes);
   const { word, byte } = seed;
   const row = ROWS[anchor];
   const ramp = rampOf(row, seed);
@@ -148,4 +162,13 @@ export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
     ...waters(row, seed),
     rings,
   };
+}
+
+/** The look of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldLook`). */
+export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => lookOf(planetSeed(path), anchor);
+
+/** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. An id is ASCII by its schema. */
+export function worldLook(id: string, nature: Nature | null = null): PlanetLook {
+  const seed = planetSeed(asciiBytes(`${WORLD_PATH}${id}`));
+  return lookOf(seed, anchorOf(seed, nature));
 }

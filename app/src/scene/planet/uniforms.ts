@@ -1,6 +1,7 @@
 // A world's uniforms, from its look: what its surface shader reads, apart from the sun and the clock. A look is data, never shader text.
-import type { MapName, PlanetLook } from "@gnoworld/core";
+import type { MapName, PlanetLook, WorldSigns } from "@gnoworld/core";
 import { Color, Euler, Matrix3, Matrix4, SRGBColorSpace, Vector3, type IUniform, type Texture } from "three";
+import { lightCode } from "./signShaders.ts";
 
 type Rgb = readonly [number, number, number];
 type Uniforms = Record<string, IUniform>;
@@ -22,6 +23,8 @@ export interface MapSet {
   readonly ring: Texture;
   /** City lights, for the one world that has them. */
   readonly night?: Texture;
+  /** The one channel a generated world's lights are read from. */
+  readonly lights?: Texture;
 }
 
 export const working = ([red, green, blue]: Rgb) => new Color().setRGB(red, green, blue, SRGBColorSpace);
@@ -56,6 +59,17 @@ function signUniforms(look: PlanetLook): Uniforms {
   };
 }
 
+// No world starts with a light: a world at rest draws what it drew before any sign.
+const noLights = (): Uniforms => ({
+  settled: { value: 0 },
+  lightLevel: { value: 0 },
+  lightKind: { value: 0 },
+  lightGrain: { value: 0 },
+  lightFine: { value: 0 },
+  lightTurn: { value: 0 },
+  lightOffset: { value: new Vector3() },
+});
+
 export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
   const [low, mid, high] = look.ramp;
   const { warp } = look;
@@ -65,8 +79,8 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     second: { value: maps.map(look.second ?? look.map) },
     cloudMap: { value: maps.clouds },
     ringMap: { value: maps.ring },
-    // A sampler must hold something on every world: the flag keeps it unread.
-    nightMap: { value: maps.night ?? maps.clouds },
+    // A sampler must hold something on every world: the flag and `settled` keep it unread.
+    nightMap: { value: maps.night ?? maps.lights ?? maps.clouds },
     nightLights: { value: maps.night === undefined ? 0 : 1 },
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
@@ -89,5 +103,27 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     rifts: { value: look.rifts },
     locked: { value: look.locked ? 1 : 0 },
     ...signUniforms(look),
+    ...noLights(),
   };
+}
+
+/** Writes a number where a material holds its uniform. */
+export function setUniform(uniforms: Uniforms, name: string, value: number): void {
+  const uniform = uniforms[name];
+  if (uniform !== undefined) uniform.value = value;
+}
+
+/** Writes a world's lights: with none, only their reach, so a world at rest keeps every uniform it was made with. */
+export function setLights(
+  uniforms: Uniforms,
+  { extent, level, kind, grain, fine, turn, offset }: WorldSigns["lights"],
+): void {
+  setUniform(uniforms, "settled", extent);
+  if (extent <= 0) return;
+  setUniform(uniforms, "lightLevel", level);
+  setUniform(uniforms, "lightKind", lightCode(kind));
+  setUniform(uniforms, "lightGrain", grain);
+  setUniform(uniforms, "lightFine", fine);
+  setUniform(uniforms, "lightTurn", turn);
+  (uniforms["lightOffset"]?.value as Vector3 | undefined)?.set(...offset);
 }
