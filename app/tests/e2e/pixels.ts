@@ -5,14 +5,20 @@ import type { Page } from "./fixtures.ts";
 // page: a pixel's colour in CIE Lab (core's D65 formulas, which that page cannot import), its lightness, its luma, a block's mean.
 type Box = [number, number, number, number];
 type Lab = [number, number, number];
+type Rgb = readonly [number, number, number];
 interface Image {
   readonly data: Uint8ClampedArray;
   readonly width: number;
 }
 export interface Tools {
   readonly images: readonly Image[];
+  /** The first picture. */
+  readonly image: Image;
   readonly labAt: (image: Image, x: number, y: number) => Lab;
   readonly luma: (image: Image, x: number, y: number) => number;
+  readonly rgbAt: (image: Image, x: number, y: number) => Rgb;
+  /** The pixels of a disc inside `reach` of its radius. */
+  readonly inside: (disc: { x: number; y: number; r: number }, reach: number) => [number, number][];
   /** The mean lightness of an `s`-pixel block of `image` from (x, y). */
   readonly block: (image: Image, s: number, at: readonly [number, number]) => number;
 }
@@ -38,16 +44,29 @@ const install = async (base64s: readonly string[]) => {
     const fz = curve((0.0193339 * r + 0.119192 * g + 0.9503041 * b) / 1.08883);
     return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
   };
-  const luma = ({ data, width }: Image, x: number, y: number) => {
+  const rgbAt = ({ data, width }: Image, x: number, y: number): Rgb => {
     const at = (y * width + x) * 4;
-    return 0.2126 * (data[at] ?? 0) + 0.7152 * (data[at + 1] ?? 0) + 0.0722 * (data[at + 2] ?? 0);
+    return [data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0];
+  };
+  const luma = (image: Image, x: number, y: number) => {
+    const [red, green, blue] = rgbAt(image, x, y);
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const inside = ({ x, y, r }: { x: number; y: number; r: number }, reach: number) => {
+    const points: [number, number][] = [];
+    for (let py = Math.ceil(y - reach * r); py < y + reach * r; py++)
+      for (let px = Math.ceil(x - reach * r); px < x + reach * r; px++)
+        if ((px - x) ** 2 + (py - y) ** 2 <= (reach * r) ** 2) points.push([px, py]);
+    return points;
   };
   const block = (image: Image, s: number, [bx, by]: readonly [number, number]) => {
     let sum = 0;
     for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) sum += labAt(image, bx + i, by + j)[0];
     return sum / (s * s);
   };
-  Reflect.set(globalThis, "__pixels", { images, labAt, luma, block });
+  const [image] = images;
+  if (image === undefined) throw new Error("no picture");
+  Reflect.set(globalThis, "__pixels", { images, image, labAt, luma, rgbAt, inside, block });
 };
 
 /** Decodes `pictures` on a page of their own, then runs `read` there on `input`: `read` reaches the tools as `globalThis.__pixels`. */
@@ -118,13 +137,9 @@ export interface Glow {
   readonly pale: number;
   readonly lab: readonly [number, number, number];
 }
-type Rgb = readonly [number, number, number];
 const glowOf = (discs: readonly { x: number; y: number; r: number }[]) => {
-  const { images, luma, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
-  const [image] = images;
-  if (image === undefined) throw new Error("no picture");
+  const { image, luma, labAt, rgbAt, inside } = Reflect.get(globalThis, "__pixels") as Tools;
   const KINDS = ["hot", "white", "red", "glow", "pale"] as const;
-  const rgbAt = (at: number): Rgb => [image.data[at] ?? 0, image.data[at + 1] ?? 0, image.data[at + 2] ?? 0];
   const kindsOf = ([red, green, blue]: Rgb, light: number) => {
     const hot = light > 170 && red > blue + 20;
     const warm = !hot && red > 90;
@@ -136,20 +151,12 @@ const glowOf = (discs: readonly { x: number; y: number; r: number }[]) => {
       pale: light > 70 && red <= blue + 20,
     };
   };
-  const inside = ({ x, y, r }: { x: number; y: number; r: number }) => {
-    const reach = r * 0.95;
-    const points: [number, number][] = [];
-    for (let py = Math.ceil(y - reach); py < y + reach; py++)
-      for (let px = Math.ceil(x - reach); px < x + reach; px++)
-        if ((px - x) ** 2 + (py - y) ** 2 <= reach * reach) points.push([px, py]);
-    return points;
-  };
   const tally = (points: readonly [number, number][], centre: number) => {
     const counts = { hot: 0, white: 0, red: 0, glow: 0, pale: 0, left: 0, night: 0, seen: 0 };
     const lab = [0, 0, 0];
     for (const [px, py] of points) {
       const light = luma(image, px, py);
-      const kinds = kindsOf(rgbAt((py * image.width + px) * 4), light);
+      const kinds = kindsOf(rgbAt(image, px, py), light);
       for (const kind of KINDS) counts[kind] += Number(kinds[kind]);
       counts.left += Number(px < centre);
       counts.night += Number(px < centre && kinds.glow);
@@ -160,7 +167,7 @@ const glowOf = (discs: readonly { x: number; y: number; r: number }[]) => {
     return { counts, lab };
   };
   return discs.map((disc) => {
-    const points = inside(disc);
+    const points = inside(disc, 0.95);
     const { counts, lab } = tally(points, disc.x);
     const [all, seen] = [Math.max(points.length, 1), Math.max(counts.seen, 1)];
     return {
