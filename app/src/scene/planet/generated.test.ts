@@ -408,12 +408,12 @@ describe("the generated program", () => {
   // lights under the grade's toe: realism.spec's belts; matched, a dark giant lost its detail); a glowing crust's own. Never a soft blob.
   it("draws the minor through the ground's structure, at a narrow edge", () => {
     expect(GENERATED_FRAGMENT).toMatch(/float z = \(patches\.x \/ patches\.y \+ [\d.]+ \* broad \+ [\d.]+ \* pole\)/);
+    // A giant's minor is whole bands, from the latitude alone (7b6, F4245).
     expect(GENERATED_FRAGMENT).toMatch(
-      /if \(banded > 0\.5\) z = \([\d.]+ \* patches\.x \/ patches\.y \+ \(t - 0\.5\) \* /,
+      /z = noise\(vec3\(swirled\.y \* shape\.bands \* [\d.]+, minorOffset\.xy\)\) \/ SPREAD;/,
     );
-    expect(GENERATED_FRAGMENT).toMatch(
-      /minor = smoothstep\(1\.0 - minorShare - 0\.0[0-4]\d*, 1\.0 - minorShare \+ 0\.0[0-4]\d*,/,
-    );
+    expect(GENERATED_FRAGMENT).toMatch(/float edge = 0\.0[0-4]\d*;/);
+    expect(GENERATED_FRAGMENT).toContain("minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge,");
     // A dark palette's minor takes its main class's lightness too, as a glowing or banded world's does (7b6).
     expect(GENERATED_FRAGMENT).toMatch(
       /float matched = max\(max\(step\(0\.001, glowLevel\), 0\.6 \* banded\), 1\.0 - smoothstep\([\d.]+, [\d.]+, dot\(mid, LUMA\)\)\);/,

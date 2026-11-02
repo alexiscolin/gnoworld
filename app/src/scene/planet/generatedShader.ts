@@ -94,12 +94,15 @@ void main() {
   }
   float minor = 0.0;
   if (minorShare > 0.002) {
-    vec3 along = banded > 0.5 ? vec3(at.x, at.y * 3.0, at.z) : at;
-    vec4 patches = fbm(along + minorOffset, shape.mix, pixel, 0.0, 3.0);
+    vec4 patches = fbm(at + minorOffset, shape.mix, pixel, 0.0, 3.0);
     float pole = (abs(axis.y) - 0.5) * 3.46 * sign(minorOffset.x - 8.0);
     float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77 + 1.2 * fray;
-    if (banded > 0.5) z = (0.4 * patches.x / patches.y + (t - 0.5) * 3.5) * 0.93;
-    minor = smoothstep(1.0 - minorShare - 0.03, 1.0 - minorShare + 0.03, shareOf(vec2(z, 1.0)));
+    float edge = 0.03;
+    if (banded > 0.5) {
+      z = noise(vec3(swirled.y * shape.bands * 0.3, minorOffset.xy)) / SPREAD;
+      edge = min(0.1, minorShare);
+    }
+    minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge, shareOf(vec2(z, 1.0)));
   }
   vec3 detail = mix(own, other, minor);
   float fine = dot(detail, LUMA) - 1.0;
