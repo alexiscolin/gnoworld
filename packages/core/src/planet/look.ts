@@ -62,7 +62,10 @@ export function planetSeed(path: Uint8Array): Uint8Array {
   return sha256(message);
 }
 
-const between = ([from, to]: readonly [number, number], share: number): number => from + (to - from) * share;
+/** `share` of the way across a span. */
+export const between = ([from, to]: readonly [number, number], share: number): number => from + (to - from) * share;
+/** Byte `index` of a seed, as a share. */
+export const seedShare = (seed: Uint8Array, index: number): number => (seed[index] ?? 0) / 255;
 const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
   between([from[0], to[0]], share),
   between([from[1], to[1]], share),
@@ -73,7 +76,7 @@ const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
 // byte may serve two values no anchor has together: rifts and cracks; caps and a banded world's contrast.
 const reader = (seed: Uint8Array) => ({
   word: (index: number): number => ((seed[index * 2] ?? 0) * 256 + (seed[index * 2 + 1] ?? 0)) / 65535,
-  byte: (index: number): number => (seed[index] ?? 0) / 255,
+  byte: (index: number): number => seedShare(seed, index),
 });
 type Reader = ReturnType<typeof reader>;
 
