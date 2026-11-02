@@ -60,6 +60,18 @@ const SPANS: Record<Anchor, Spans> = {
   },
   "dark carbon": { craters: [0.3, 0.9], erosion: [0, 0.4] },
   shattered: { rifts: [0.55, 1], craters: [0.2, 0.7] },
+  "nitrogen ice": { craters: [0, 0.35], erosion: [0.1, 0.6], rifts: [0.1, 0.5] },
+  "grooved ice": { rifts: [0.5, 1], craters: [0.2, 0.6], erosion: [0, 0.3] },
+  snowball: { caps: [0.75, 1], erosion: [0, 0.3], clouds: [0.05, 0.3], rifts: [0, 0.3] },
+  hycean: { sea: [0.98, 1], craters: FLAT, erosion: FLAT, caps: [0, 0.1], clouds: [0.2, 0.6] },
+  archean: { sea: [0.85, 0.97], erosion: [0.2, 0.6], craters: [0, 0.1], clouds: [0.3, 0.7] },
+  "lava world": { craters: [0, 0.05], erosion: [0, 0.3], rifts: [0.3, 0.9] },
+  "two-faced": { craters: [0.4, 0.9], halves: [0.6, 0.95] },
+  "water cloud giant": { bands: [8, 20], turbulence: [0.1, 0.5], storms: [0, 0.5] },
+  "azure giant": { bands: [6, 16], turbulence: [0.1, 0.5], storms: [0, 0.4] },
+  "dark giant": { bands: [8, 20], turbulence: [0.2, 0.6], storms: [0, 0.3] },
+  "hot giant": { bands: [4, 12], turbulence: [0.4, 1], storms: [0.2, 0.8] },
+  "sub-Neptune": { bands: [2, 8], turbulence: [0, 0.3], storms: [0, 0.2], clouds: [0.5, 0.9] },
 };
 
 /** An anchor's span of a value: its own, else its kind's, else every world's, else none. */

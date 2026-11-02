@@ -105,6 +105,21 @@ describe("a class's structure", () => {
     expect(spanOf("cloud deck", "clouds")[0]).toBeGreaterThanOrEqual(0.8);
     expect(spanOf("desert", "erosion")[0]).toBeGreaterThan(0);
   });
+
+  it("reads the twelve more as theirs: a snowball iced to its tropics, a hycean all sea, an Archean Earth mostly sea", () => {
+    expect(spanOf("snowball", "caps")[0]).toBeGreaterThanOrEqual(0.7);
+    expect(spanOf("hycean", "sea")[0]).toBeGreaterThanOrEqual(0.97);
+    expect(spanOf("archean", "sea")[0]).toBeGreaterThanOrEqual(0.8);
+    expect(spanOf("grooved ice", "rifts")[0]).toBeGreaterThanOrEqual(0.4);
+    expect(spanOf("lava world", "rifts")[0]).toBeGreaterThan(0);
+    expect(spanOf("hot giant", "turbulence")[0]).toBeGreaterThan(spanOf("azure giant", "turbulence")[0]);
+    expect(spanOf("sub-Neptune", "bands")[1]).toBeLessThan(spanOf("gas giant", "bands")[0]);
+  });
+
+  it("halves one world alone, as Iapetus is: one face dark, the other bright", () => {
+    for (const anchor of ANCHORS) expect(flat(spanOf(anchor, "halves")), anchor).toBe(anchor !== "two-faced");
+    expect(spanOf("two-faced", "halves")[0]).toBeGreaterThanOrEqual(0.5);
+  });
 });
 
 describe("a world's surface", () => {

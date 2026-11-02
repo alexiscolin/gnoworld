@@ -3,7 +3,8 @@ import { PerspectiveCamera, Vector3 } from "three";
 import type { Planet } from "../src/scene/planet/planet.ts";
 import type { ViewName } from "./choice.ts";
 
-const GALLERY = { fov: 20, distance: 30, columns: 4, rows: 3, fill: 0.74 };
+// A world of each of the 24 anchors.
+const GALLERY = { fov: 20, distance: 30, columns: 6, rows: 4, fill: 0.74 };
 // A row holds the six stages, the biggest world filling its cell.
 const STAGES_ROW = { columns: 6, biggest: 1.6 };
 const CLOSE = { fov: 30, distance: 5.75 };

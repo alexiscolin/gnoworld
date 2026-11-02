@@ -1,4 +1,4 @@
-// Which of the twelve a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class reads a second hash of it. The
+// Which of the 24 a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class reads a second hash of it. The
 // strange ones stay rare. A nature leans a world without fixing it, and is never shown: the rules read 9 of 12 unseen realms right
 // (.claude/tmp/slice-7/reports/chain-feasibility.md), so an error must cost nothing. Tier 1 (docs/REVIEW.md).
 import type { Anchor } from "./anchors.ts";
@@ -12,20 +12,33 @@ export interface RealmFunctions {
   readonly functions: readonly string[];
 }
 
-// Each anchor's share of 256 bytes, in ADR-0002's order: tidally locked and shattered are the strange ones, about one world in ten.
+// Each anchor's share of 256 bytes, in ANCHORS' order. Tidally locked, shattered, lava world, two-faced and hot giant are the strange
+// ones, 26 of 256.
 const WEIGHTS: readonly (readonly [Anchor, number])[] = [
-  ["rocky", 30],
-  ["temperate", 26],
-  ["desert", 30],
-  ["ocean", 20],
-  ["ice", 26],
-  ["volcanic", 20],
-  ["gas giant", 26],
-  ["ice giant", 18],
-  ["cloud deck", 18],
-  ["tidally locked", 12],
-  ["dark carbon", 18],
-  ["shattered", 12],
+  ["rocky", 18],
+  ["temperate", 16],
+  ["desert", 18],
+  ["ocean", 13],
+  ["ice", 14],
+  ["volcanic", 13],
+  ["gas giant", 17],
+  ["ice giant", 12],
+  ["cloud deck", 11],
+  ["tidally locked", 6],
+  ["dark carbon", 9],
+  ["shattered", 5],
+  ["nitrogen ice", 11],
+  ["grooved ice", 11],
+  ["snowball", 9],
+  ["hycean", 9],
+  ["archean", 8],
+  ["lava world", 5],
+  ["two-faced", 5],
+  ["water cloud giant", 10],
+  ["azure giant", 9],
+  ["dark giant", 8],
+  ["hot giant", 5],
+  ["sub-Neptune", 14],
 ];
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
   token: ["gas giant", "ice giant"],

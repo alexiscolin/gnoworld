@@ -1,4 +1,4 @@
-// A world's stage and the signs that show it (ADR-0002 §10), pure: a stage reads the same on all twelve classes, and each class shows it in
+// A world's stage and the signs that show it (ADR-0002 §10), pure: a stage reads the same on every class, and each class shows it in
 // its own form. Fixed per sign: what it means, where it shows, how it grows, its colour family. Free per world, from its seed: its pattern.
 // Vitality is matter, the people present are light, and a world at rest with nobody here carries no sign at all, so it stays the render
 // Alexis approved. Every sign means real data (§10). Only + - * / reach a form. Tier 1 (docs/REVIEW.md).
@@ -79,6 +79,18 @@ const FORMS: Record<Anchor, { readonly kind: LightKind; readonly grain: Span; re
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
   shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
+  "nitrogen ice": { kind: "cracks", grain: [1.2, 2], fine: [0.8, 1.2] },
+  "grooved ice": { kind: "cracks", grain: [1, 1.8], fine: [0.9, 1.3] },
+  snowball: { kind: "cracks", grain: [1.4, 2.2], fine: [0.7, 1] },
+  hycean: { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
+  archean: { kind: "coasts", grain: [1.2, 2], fine: [0.85, 1] },
+  "lava world": { kind: "seams", grain: [1.4, 2.4], fine: [4, 5.6] },
+  "two-faced": { kind: "towns", grain: [1.2, 2], fine: [0.5, 0.9] },
+  "water cloud giant": { kind: "belts", grain: [1, 1.8], fine: [24, 40] },
+  "azure giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
+  "dark giant": { kind: "belts", grain: [1, 1.8], fine: [24, 40] },
+  "hot giant": { kind: "belts", grain: [1, 1.6], fine: [20, 34] },
+  "sub-Neptune": { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
 };
 
 /** A new family stays a seed until its first visit or 7 days; a world of unknown age is no new one. */

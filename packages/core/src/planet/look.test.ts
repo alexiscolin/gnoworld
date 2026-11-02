@@ -13,6 +13,8 @@ import {
   type MapName,
   type PlanetLook,
 } from "./look.ts";
+import { labOf } from "./palette.ts";
+import { ROWS } from "./rows.ts";
 
 // core/planet, its realism part (slice 7, 7b; ADR-0002 §3): a look is a pure function of a path, through
 // sha256("gnoworld/planet/v1" ‖ path). The anchor is given here: choosing it from the seed is 7b2.
@@ -50,9 +52,31 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
   "tidally locked": { sea: false, glow: false, air: true, maps: ["mars", "ceres"] },
   "dark carbon": { sea: false, glow: false, air: false, maps: ["ceres"] },
   shattered: { sea: false, glow: true, air: false, maps: ["moon"] },
+  "nitrogen ice": { sea: false, glow: false, air: false, maps: ["eris"] },
+  "grooved ice": { sea: false, glow: false, air: false, maps: ["moon"] },
+  snowball: { sea: false, glow: false, air: true, maps: ["eris"] },
+  hycean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
+  archean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
+  "lava world": { sea: false, glow: true, air: true, maps: ["venus"] },
+  "two-faced": { sea: false, glow: false, air: false, maps: ["moon", "ceres"] },
+  "water cloud giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
+  "azure giant": { sea: false, glow: false, air: true, maps: ["neptune"] },
+  "dark giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
+  "hot giant": { sea: false, glow: true, air: true, maps: ["jupiter"] },
+  "sub-Neptune": { sea: false, glow: false, air: true, maps: ["neptune"] },
 };
 
-const BANDED: readonly Anchor[] = ["gas giant", "ice giant", "cloud deck"];
+const BANDED: readonly Anchor[] = [
+  "gas giant",
+  "ice giant",
+  "cloud deck",
+  "water cloud giant",
+  "azure giant",
+  "dark giant",
+  "hot giant",
+  "sub-Neptune",
+];
+const CRACKED: readonly Anchor[] = ["ice", "nitrogen ice", "grooved ice", "snowball"];
 
 describe("a world's look, from its id", () => {
   const paths = (count: number) => Array.from({ length: count }, (_, at) => `gno.land/r/n${String(at)}/home`);
@@ -73,11 +97,12 @@ describe("a world's look, from its id", () => {
     const seeds = paths(6000).map(seedOf);
     for (const seed of seeds) seen.set(anchorOf(seed), (seen.get(anchorOf(seed)) ?? 0) + 1);
     expect(new Set(seen.keys())).toEqual(new Set(ANCHORS));
-    const strange = (seen.get("tidally locked") ?? 0) + (seen.get("shattered") ?? 0);
-    expect(strange / seeds.length).toBeGreaterThan(0.07);
-    expect(strange / seeds.length).toBeLessThan(0.13);
-    const common = ANCHORS.filter((anchor) => anchor !== "tidally locked" && anchor !== "shattered");
-    for (const anchor of common) expect((seen.get(anchor) ?? 0) / seeds.length).toBeGreaterThan(0.06);
+    const STRANGE: readonly Anchor[] = ["tidally locked", "shattered", "lava world", "two-faced", "hot giant"];
+    const strange = STRANGE.reduce((sum, anchor) => sum + (seen.get(anchor) ?? 0), 0);
+    expect(strange / seeds.length).toBeGreaterThan(0.08);
+    expect(strange / seeds.length).toBeLessThan(0.12);
+    const common = ANCHORS.filter((anchor) => !STRANGE.includes(anchor));
+    for (const anchor of common) expect((seen.get(anchor) ?? 0) / seeds.length).toBeGreaterThan(0.02);
   });
 });
 
@@ -108,8 +133,8 @@ describe("planetSeed", () => {
   );
 });
 
-describe("the twelve anchors", () => {
-  it("are ADR-0002 §3's, in its order", () => {
+describe("the anchors", () => {
+  it("are ADR-0002 §3's twelve in its order, then twelve more from real kinds of planets", () => {
     expect(ANCHORS).toEqual([
       "rocky",
       "temperate",
@@ -123,6 +148,18 @@ describe("the twelve anchors", () => {
       "tidally locked",
       "dark carbon",
       "shattered",
+      "nitrogen ice",
+      "grooved ice",
+      "snowball",
+      "hycean",
+      "archean",
+      "lava world",
+      "two-faced",
+      "water cloud giant",
+      "azure giant",
+      "dark giant",
+      "hot giant",
+      "sub-Neptune",
     ]);
   });
 
@@ -170,13 +207,78 @@ describe("the twelve anchors", () => {
     }
   });
 
-  it("locks one world alone, rifts one alone and cracks one alone", () => {
+  it("locks one world alone, rifts one alone and cracks the icy ones alone", () => {
     for (const anchor of ANCHORS) {
       const look = planetLook(DAO, anchor);
       expect(look.locked).toBe(anchor === "tidally locked");
       expect(look.rifts > 0).toBe(anchor === "shattered");
-      expect(look.cracks > 0).toBe(anchor === "ice");
+      expect(look.cracks > 0).toBe(CRACKED.includes(anchor));
     }
+  });
+
+  // look.ts reads rifts and cracks from one byte, and caps and a banded world's contrast from another: no anchor may have both of a pair.
+  it("gives no anchor both values of a shared byte", () => {
+    for (const anchor of ANCHORS)
+      for (const path of paths(20)) {
+        const look = planetLook(path, anchor);
+        expect(look.rifts > 0 && look.cracks > 0, anchor).toBe(false);
+        expect(look.caps > 0 && look.contrast > 1, anchor).toBe(false);
+      }
+  });
+});
+
+// Each new anchor reads as its reference by colour (7b4): both its ramps' mid colours in Lab, and Iapetus's two faces by its low and high.
+type Span = readonly [number, number];
+const REFERENCE: Record<string, { l: Span; a?: Span; b?: Span; chroma?: Span }> = {
+  "nitrogen ice": { l: [45, 70], a: [8, 20], b: [10, 25] },
+  "grooved ice": { l: [50, 65], chroma: [0, 9] },
+  snowball: { l: [70, 85], b: [-20, -10] },
+  hycean: { l: [20, 35], b: [-35, -12] },
+  archean: { l: [30, 45], a: [5, 15], b: [20, 30] },
+  "lava world": { l: [5, 15], a: [8, 18], b: [8, 18] },
+  "water cloud giant": { l: [78, 85], chroma: [0, 7] },
+  "azure giant": { l: [25, 38], b: [-50, -40] },
+  "dark giant": { l: [0, 10] },
+  "hot giant": { l: [20, 30], a: [18, 26], b: [20, 30] },
+  "sub-Neptune": { l: [58, 66], chroma: [0, 11] },
+};
+const inside = (value: number, [from, to]: Span) => value >= from && value <= to;
+
+describe("the anchors' colours", () => {
+  it.each(Object.keys(REFERENCE))("%s reads as its reference", (anchor) => {
+    const want = REFERENCE[anchor];
+    for (const ramp of ROWS[anchor as Anchor].palettes) {
+      const [l, a, b] = labOf(ramp[1]);
+      expect(inside(l, want?.l ?? [0, 0]), `L ${String(l)}`).toBe(true);
+      if (want?.a !== undefined) expect(inside(a, want.a), `a ${String(a)}`).toBe(true);
+      if (want?.b !== undefined) expect(inside(b, want.b), `b ${String(b)}`).toBe(true);
+      if (want?.chroma !== undefined) expect(inside(Math.hypot(a, b), want.chroma), "chroma").toBe(true);
+    }
+  });
+
+  it("gives Iapetus's two faces: one coal-dark, the other bright", () => {
+    for (const [low, , high] of ROWS["two-faced"].palettes) {
+      expect(labOf(low)[0]).toBeLessThan(5);
+      expect(labOf(high)[0]).toBeGreaterThan(88);
+    }
+  });
+
+  // A floor under which two anchors of one kind could pass for each other by colour; temperate and ocean, apart by their seas, sit at 6.6.
+  it("keeps any two anchors of one kind 6 apart in Lab, their palettes' centres", () => {
+    const centre = (anchor: Anchor) => {
+      const [one, other] = ROWS[anchor].palettes.map((ramp) => labOf(ramp[1]));
+      return [0, 1, 2].map((at) => ((one?.[at] ?? 0) + (other?.[at] ?? 0)) / 2);
+    };
+    for (const [at, anchor] of ANCHORS.entries())
+      for (const other of ANCHORS.slice(at + 1)) {
+        if (BANDED.includes(anchor) !== BANDED.includes(other)) continue;
+        const [l, a, b] = centre(anchor);
+        const [ol, oa, ob] = centre(other);
+        expect(
+          Math.hypot((l ?? 0) - (ol ?? 0), (a ?? 0) - (oa ?? 0), (b ?? 0) - (ob ?? 0)),
+          `${anchor} and ${other}`,
+        ).toBeGreaterThanOrEqual(6);
+      }
   });
 });
 
@@ -270,7 +372,7 @@ describe("planetLook", () => {
 
   it("turns a banded world about its pole alone, so its bands stay level", () => {
     fc.assert(
-      fc.property(anyPath, fc.constantFrom<Anchor>("gas giant", "ice giant", "cloud deck"), (path, anchor) => {
+      fc.property(anyPath, fc.constantFrom(...BANDED), (path, anchor) => {
         const { spin } = planetLook(path, anchor);
         expect(spin[1]).toBe(0);
         expect(spin[2]).toBe(0);

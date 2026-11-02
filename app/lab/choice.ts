@@ -39,6 +39,18 @@ const NAMES = [
   "dusk",
   "soot",
   "shard",
+  "plume",
+  "groove",
+  "frost",
+  "deep",
+  "dawn",
+  "magma",
+  "janus",
+  "pearl",
+  "azure",
+  "coal",
+  "kiln",
+  "mist",
 ];
 const STATES: Record<Stage, WorldState> = {
   seed: { vitality: 0.1, present: 0.3, fresh: true },

@@ -1,10 +1,11 @@
 // The twelve anchors of ADR-0002 §3, each a data row: the seed moves inside a row's spans. Palettes are read off real worlds (the Moon's
 // greys, Mercury's browns, Mars's rusts, Titan's haze, Io's sulphur, Neptune's and Uranus's blues), in sRGB. "Shattered" has fissures
-// and no debris in orbit: §10 keeps debris to a far belt, for dust is a sign.
-import type { Anchor, AnchorRow } from "./anchors.ts";
+// and no debris in orbit: §10 keeps debris to a far belt, for dust is a sign. The twelve more are more.ts's.
+import type { Anchor, AnchorRow, KeptAnchor } from "./anchors.ts";
 import { LAVA, ramp, rgb, SKY } from "./colours.ts";
+import { moreRows } from "./more.ts";
 
-export const ROWS: Record<Anchor, AnchorRow> = {
+const KEPT: Record<KeptAnchor, AnchorRow> = {
   rocky: {
     maps: ["moon", "ceres"],
     second: "ceres",
@@ -150,3 +151,5 @@ export const ROWS: Record<Anchor, AnchorRow> = {
     glow: { colour: LAVA, level: [0.3, 0.6] },
   },
 };
+
+export const ROWS: Record<Anchor, AnchorRow> = { ...KEPT, ...moreRows(KEPT) };
