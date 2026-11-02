@@ -156,6 +156,7 @@ export {
   NebulaField,
   nebulaLight,
   nebulaShare,
+  nebulaTint,
   sheetOf,
   wholeShare,
   windowOf,

@@ -3,7 +3,7 @@
 // nothing is listed or stored. Each stands as sheets one behind the other, so the eye moving parts them, the far ones softer.
 import { cellHash, distanceOf, nextState, unitOf, type Point } from "./cell.ts";
 import { MOOD_SCALE, moodAt, newMood } from "./mood.ts";
-import { smoothstep } from "./smooth.ts";
+import { lerp, smoothstep } from "./smooth.ts";
 
 /** The images, by their files' names under the textures. */
 export const NEBULA_IMAGES = ["carina", "veil", "cliffs"] as const;
@@ -210,6 +210,28 @@ export const nebulaShare = (distance: number): number =>
   smoothstep(WORLD, SYSTEM, distance) *
   (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
   (1 - wholeShare(distance));
+
+// Frame 16's teal, top right (f0016.jpg, read on 2026-11-02): its mean, sRGB (10, 44, 50), in linear light, its brightest channel at 1.
+const TEAL = { red: 0.09516135842160993, green: 0.7896549257303476, blue: 1 };
+// How much bluer than red a mood is before its nebula is all teal: rose and mauve stay the mood's.
+const COOL_FROM = 0.1;
+const COOL_TO = 0.5;
+
+/** A nebula's colour, its brightest channel at 1: the mood's where it is warm, frame 16's teal where it is cool, never the grey-blue between
+ * the mood's cool hues (Alexis, 2026-11-02). */
+export function nebulaTint(
+  { red, green, blue }: Pick<Nebula, "red" | "green" | "blue">,
+  out: { red: number; green: number; blue: number },
+): void {
+  const cool = smoothstep(COOL_FROM, COOL_TO, blue - red);
+  out.red = lerp(red, TEAL.red, cool);
+  out.green = lerp(green, TEAL.green, cool);
+  out.blue = lerp(blue, TEAL.blue, cool);
+  const brightest = Math.max(out.red, out.green, out.blue);
+  out.red /= brightest;
+  out.green /= brightest;
+  out.blue /= brightest;
+}
 
 /** Where a layer's sheet stands, into `out`; its half-width. */
 export function sheetOf(nebula: Nebula, layer: NebulaLayer, out: { x: number; y: number; z: number }): number {
