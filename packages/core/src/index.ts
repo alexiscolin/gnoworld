@@ -67,6 +67,7 @@ export {
 } from "./frame/disc.ts";
 export { coveredShare, offLine } from "./frame/composition.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
+export { haloAt } from "./frame/halo.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,
@@ -165,7 +166,7 @@ export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
 export { beatAt } from "./space/beat.ts";
-export { driftAt, glideAt, HOME, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
+export { driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { smoothstep } from "./space/smooth.ts";
 export {

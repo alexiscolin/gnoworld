@@ -2,11 +2,9 @@
 // (7d3), every other sun half its size on screen at most; seven halos at most, the ones the view needs and then the nearest whose heart
 // shows, each dimming and shrinking from 40 to 120 units into a point of a few pixels; no halo wider than the great star's at the approved
 // arrival, 36 units off (305 pixels).
-import { smoothstep, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
+import { haloAt, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
 
 const HALOS = 7;
-const HALO_NEAR = 40;
-const HALO_FAR = 120;
 const POINT_PIXELS = 10;
 const HALO_PIXELS = 320;
 const OTHER_SUN = 0.5;
@@ -59,8 +57,7 @@ export class Halos {
       } else if (inView(system.place, (POINT_PIXELS * (this.#aways[at] ?? 0)) / focal)) order.push(at);
     }
     order.sort((a, b) => (this.#aways[a] ?? 0) - (this.#aways[b] ?? 0));
-    for (const at of order.slice(0, Math.max(HALOS - kept, 0)))
-      this.#halos[at] = 1 - smoothstep(HALO_NEAR, HALO_FAR, this.#aways[at] ?? Infinity);
+    for (const at of order.slice(0, Math.max(HALOS - kept, 0))) this.#halos[at] = haloAt(this.#aways[at] ?? Infinity);
     this.#lead(sight);
   }
 

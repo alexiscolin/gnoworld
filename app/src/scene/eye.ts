@@ -1,9 +1,7 @@
 // Where the view is, in doubles (slice-7 §5): the camera stays at the origin, and the world comes to it. The arrival's drift, its slow
 // look about and a mouse's lean add to where it rests; under reduced motion none moves, and whatever they had stays, so nothing jumps back.
-import { driftAt, glideAt, HOME, turnAt, type Point } from "@gnoworld/core";
+import { driftAt, glideAt, HOME, LEAN, turnAt, type Point } from "@gnoworld/core";
 
-// How far a mouse at the window's edge leans the view, in world units: enough to part the motes from the stars.
-const LEAN = 3;
 const LEAN_MS = 900;
 
 export class Eye {
