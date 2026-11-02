@@ -21,6 +21,21 @@ export const share = (value: number): number => clamp01(value) || 0;
 
 const rung = (count: number, busiest: number) => share(Math.log1p(count) / Math.log1p(Math.max(busiest, QUIET_TOP)));
 
+// The universe of the day is read at a high rank, not at its busiest world: one world of a thousand sybil callers would halve every other's
+// use (F4111). Nearest rank, each half apart.
+const RANK = 0.95;
+
+const rankOf = (values: readonly number[]) => {
+  const sorted = values.map((value) => (Number.isFinite(value) ? value : 0)).sort((one, other) => one - other);
+  return sorted[Math.max(0, Math.ceil(RANK * sorted.length) - 1)] ?? 0;
+};
+
+/** What a universe's worlds are weighed against: its 95th percentile, social and realm apart. */
+export const referenceOf = (worlds: readonly UseCounts[]): UseCounts => ({
+  social: rankOf(worlds.map(({ social }) => social)),
+  realm: rankOf(worlds.map(({ realm }) => realm)),
+});
+
 /** How used a world is against the universe of the day, half social and half realm, on a logarithmic ladder (ADR-0002 §3). */
 export const useOf = (world: UseCounts, busiest: UseCounts): number =>
   (rung(world.social, busiest.social) + rung(world.realm, busiest.realm)) / 2;

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { nextVitality, presenceOf, useOf } from "./gauges.ts";
+import { nextVitality, presenceOf, referenceOf, useOf } from "./gauges.ts";
 
 // A world's two gauges (slice 7, 7b2; ADR-0002 §10): a vitality that remembers and moves a few percent a day, and the people present.
 const RISE = 0.03;
@@ -148,5 +148,48 @@ describe("presenceOf", () => {
     expect(presenceOf(Infinity, Infinity)).toBe(0);
     expect(presenceOf(5, Infinity)).toBe(0);
     expect(presenceOf(Number.NaN, 10)).toBe(0);
+  });
+});
+
+describe("referenceOf", () => {
+  const quiet = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({ social: (index % 40) + 1, realm: (index % 25) + 1 }));
+
+  it("reads the universe at its 95th percentile, each half apart, nearest rank", () => {
+    const worlds = Array.from({ length: 100 }, (_, index) => ({ social: index + 1, realm: 2 * (100 - index) }));
+    expect(referenceOf(worlds)).toEqual({ social: 95, realm: 190 });
+  });
+
+  it("takes the nearest rank at any size: one world, ten, twenty-one", () => {
+    const of = (count: number) =>
+      referenceOf(Array.from({ length: count }, (_, index) => ({ social: count - index, realm: index + 1 })));
+    expect(of(1)).toEqual({ social: 1, realm: 1 });
+    expect(of(10)).toEqual({ social: 10, realm: 10 });
+    expect(of(21)).toEqual({ social: 20, realm: 20 });
+  });
+
+  it("lets no outlier, 1,023 sybil callers or a million, move another world's use (F4111)", () => {
+    const worlds = quiet(533);
+    const reference = referenceOf(worlds);
+    for (const sybil of [1023, 1e6, 1e12]) {
+      const withSybil = referenceOf([...worlds, { social: 0, realm: sybil }]);
+      expect(useOf({ social: 12, realm: 9 }, withSybil)).toBeCloseTo(useOf({ social: 12, realm: 9 }, reference), 12);
+    }
+  });
+
+  it("is nothing for an empty universe, so the ladder's own floor holds", () => {
+    expect(referenceOf([])).toEqual({ social: 0, realm: 0 });
+  });
+
+  it("never passes the busiest world, nor falls under the quietest", () => {
+    fc.assert(
+      fc.property(fc.array(fc.tuple(fc.nat(10_000), fc.nat(10_000)), { minLength: 1, maxLength: 60 }), (pairs) => {
+        const worlds = pairs.map(([social, realm]) => ({ social, realm }));
+        const { social, realm } = referenceOf(worlds);
+        expect(social).toBeLessThanOrEqual(Math.max(...pairs.map(([each]) => each)));
+        expect(social).toBeGreaterThanOrEqual(Math.min(...pairs.map(([each]) => each)));
+        expect(realm).toBeLessThanOrEqual(Math.max(...pairs.map(([, each]) => each)));
+      }),
+    );
   });
 });

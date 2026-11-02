@@ -75,7 +75,10 @@ export {
   type PlanetLook,
   type RealmFunctions,
 } from "./planet/look.ts";
-export { nextVitality, presenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
+export { nextVitality, presenceOf, referenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
+export { auroraOf, BLOCK_MS, stormsOf } from "./planet/activity.ts";
+export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
+export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { worldIdOf } from "./cosmos/worldId.ts";
 export {
   isFresh,
