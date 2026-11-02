@@ -3,7 +3,7 @@
 // nearest it in its own colours, set by eye from its reference's published colour: its palette takes 85% of the map's colour or more,
 // so a borrowed real map lends its structure, not its look. Tier 1 (docs/REVIEW.md).
 import type { AnchorRow, KeptAnchor, MoreAnchor } from "./anchors.ts";
-import { ramp, rgb, SKY } from "./colours.ts";
+import { LAVA, ramp, rgb, SKY } from "./colours.ts";
 
 // Today's shader draws an ice world's cracks in Europa's rust, which none of the new ices has.
 const OWN: Pick<AnchorRow, "recolour"> = { recolour: [0.85, 1] };
@@ -22,8 +22,6 @@ export const moreRows = (kept: Record<KeptAnchor, AnchorRow>): Record<MoreAnchor
   "grooved ice": {
     ...kept.ice,
     ...UNCRACKED,
-    maps: ["moon"],
-    second: "eris",
     palettes: [ramp(0x3a3530, 0x8a8478, 0xdcdad4), ramp(0x34363a, 0x8e9196, 0xe4e6ea)],
   },
   // The Cryogenian Earth: ice to the tropics under a thin air.
@@ -48,10 +46,12 @@ export const moreRows = (kept: Record<KeptAnchor, AnchorRow>): Record<MoreAnchor
     sea: { shallow: rgb(0x3a4a30), deep: rgb(0x1a2416) },
     rim: { colours: [rgb(0x7a5226), rgb(0x80592c)], thickness: [0.04, 0.05] },
   },
-  // 55 Cancri e: magma seas under a dark crust, glowing as the volcanic world Alexis approved does.
+  // 55 Cancri e: magma seas under a dark crust. Its glow sits higher than the volcanic world's: on this redder crust a lower one whitens
+  // a sixth of the disc, where the approved volcanic world shows a few percent.
   "lava world": {
     ...kept.volcanic,
     palettes: [ramp(0x070302, 0x2a1208, 0x6a2a12), ramp(0x0a0403, 0x341608, 0x7a3416)],
+    glow: { colour: LAVA, level: [0.6, 0.72] },
   },
   // Iapetus: one face coal-dark, the other bright ice.
   "two-faced": {

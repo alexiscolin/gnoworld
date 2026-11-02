@@ -143,8 +143,8 @@ const STATED: Record<Anchor, Row> = {
     rings: 0.04,
   },
   "grooved ice": {
-    maps: ["moon"],
-    second: "eris",
+    maps: ["eris"],
+    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.012, 0.022],
@@ -184,7 +184,7 @@ const STATED: Record<Anchor, Row> = {
     warp: [0.04, 0.14],
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
-    glow: [0.5, 0.58],
+    glow: [0.6, 0.72],
     rim: { colours: [0x734d26, 0x6e562b], thickness: [0.016, 0.026] },
   },
   "two-faced": {

@@ -53,7 +53,7 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
   "dark carbon": { sea: false, glow: false, air: false, maps: ["ceres"] },
   shattered: { sea: false, glow: true, air: false, maps: ["moon"] },
   "nitrogen ice": { sea: false, glow: false, air: false, maps: ["eris"] },
-  "grooved ice": { sea: false, glow: false, air: false, maps: ["moon"] },
+  "grooved ice": { sea: false, glow: false, air: false, maps: ["eris"] },
   snowball: { sea: false, glow: false, air: true, maps: ["eris"] },
   hycean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
   archean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
