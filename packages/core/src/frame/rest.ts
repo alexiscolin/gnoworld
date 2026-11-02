@@ -125,15 +125,17 @@ function lastResort(near: readonly Held[]): Judged | undefined {
 
 /** The view at rest over `systems`, as `systemsOf` gives them: the same systems, the same view. */
 export function restView(systems: readonly StarSystem[]): RestView {
+  // The Earth's nearest first, then each laid out: a file of 20,000 systems lays out 24.
   const near = systems
-    .map((system, index) => {
+    .map((system, index) => ({ index, system, away: away(system.place, EARTH_PLACE) }))
+    .filter(({ system }) => system.worlds.length > 0)
+    .sort((a, b) => a.away - b.away)
+    .slice(0, NEARBY)
+    .map(({ index, system }) => {
       const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
       const reach = Math.max(0, ...bodies.map(({ orbit, radius }) => orbit + radius));
       return { index, system, bodies, postcard: postcardWorlds(system), reach };
-    })
-    .filter(({ system }) => system.worlds.length > 0)
-    .sort((a, b) => away(a.system.place, EARTH_PLACE) - away(b.system.place, EARTH_PLACE))
-    .slice(0, NEARBY);
+    });
   let chosen: Judged | undefined;
   // A view's score is at most its close world's, the bodies the two richest postcards draw and the depth's, less its stray: one that
   // cannot win is not judged.

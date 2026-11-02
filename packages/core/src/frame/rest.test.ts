@@ -161,6 +161,26 @@ describe("what the view is composed for", () => {
   });
 });
 
+// The search runs on the page's main thread once a file comes (reviews 2 and 3, 7d6): only the Earth's nearest systems are laid out. The
+// least of several runs after a warm-up: a busy machine only makes a run slower.
+describe("the search's cost", () => {
+  const least = (systems: readonly StarSystem[]) => {
+    restView(systems);
+    let best = Infinity;
+    for (let run = 0; run < 5; run += 1) {
+      const start = Date.now();
+      restView(systems);
+      best = Math.min(best, Date.now() - start);
+    }
+    return best;
+  };
+
+  it("finds the view of 10,000 systems, and of 20,000 of ten worlds each, in 100 ms or less", () => {
+    expect(least(systemsOf(spread(10_000, 2)))).toBeLessThanOrEqual(100);
+    expect(least(systemsOf(spread(20_000, 10)))).toBeLessThanOrEqual(100);
+  });
+});
+
 describe("the eye at rest", () => {
   it.each(Object.entries(files))(
     "looks at the Earth from 24 to 28 units, 6 to 30 degrees over the disc, with %s",
