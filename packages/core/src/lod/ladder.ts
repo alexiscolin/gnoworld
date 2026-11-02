@@ -18,8 +18,9 @@ export const MIDDLE = 320;
 export const HAZE = 1600;
 
 const REGION = 160;
-// The most points one star's worlds take of the bound.
+// The most points one star's worlds take of the bound, and what each star in reach is sure of first.
 const DOTS_A_STAR = 1024;
+const DOTS_FLOOR = BOUNDS.dots / BOUNDS.stars;
 // A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world.
 const BODY_PIXELS = 6;
 // A point's radius in pixels never falls under this: a pixel across, and it goes out by `MIDDLE`.
@@ -67,12 +68,15 @@ export class Ladder {
   readonly #glows: Nearest;
   // How many of a system's worlds are bodies, first ones first.
   readonly #bodies: Int32Array;
+  // Where each star's points have come to, between the two passes.
+  readonly #dotsFrom: Int32Array;
   /** How many systems the last look asked about. */
   visited = 0;
 
   constructor(systems: readonly StarSystem[]) {
     this.#systems = systems;
     this.#bodies = new Int32Array(systems.length);
+    this.#dotsFrom = new Int32Array(systems.length);
     this.#stars = new Nearest(systems.length);
     const held = new Map<number, number[]>();
     systems.forEach(({ place }, at) => {
@@ -166,17 +170,28 @@ export class Ladder {
     }
   }
 
-  // By star, nearest first, a share each: a crowd never takes what a near world needs.
+  // Two passes by star, nearest first (F3568, F3577): each its floor, then a share each of what is left, so no crowd, nor four, starve a near world.
   #addDots(drawn: Drawn): void {
     for (let index = 0; index < drawn.starCount; index += 1) {
       const at = drawn.stars[index] ?? 0;
+      this.#dotsFrom[at] = this.#bodies[at] ?? 0;
+    }
+    this.#addDotsUpTo(drawn, DOTS_FLOOR);
+    this.#addDotsUpTo(drawn, DOTS_A_STAR);
+  }
+
+  #addDotsUpTo(drawn: Drawn, share: number): void {
+    for (let index = 0; index < drawn.starCount; index += 1) {
+      const at = drawn.stars[index] ?? 0;
       const first = this.#bodies[at] ?? 0;
-      const count = Math.min(this.#systems[at]?.worlds.length ?? 0, first + DOTS_A_STAR);
-      for (let world = first; world < count && drawn.dotCount < BOUNDS.dots; world += 1) {
+      const count = Math.min(this.#systems[at]?.worlds.length ?? 0, first + share);
+      let world = this.#dotsFrom[at] ?? first;
+      for (; world < count && drawn.dotCount < BOUNDS.dots; world += 1) {
         drawn.dotSystems[drawn.dotCount] = at;
         drawn.dotWorlds[drawn.dotCount] = world;
         drawn.dotCount += 1;
       }
+      this.#dotsFrom[at] = world;
     }
   }
 

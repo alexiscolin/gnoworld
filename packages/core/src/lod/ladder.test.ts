@@ -134,6 +134,33 @@ describe("the draw bound", () => {
     expect(stars).toEqual([...stars].sort((a, b) => a - b));
   });
 
+  it("gives every star in reach its share of points before any crowd takes more: four crowds never starve a small system (F3577)", () => {
+    const crowds = crowd(4, 2000, 8);
+    const small = { ...pick(crowd(1, 5), 0), id: "small", place: { x: 0, y: 0, z: 120 } };
+    const list = [...crowds, small];
+    const drawn = look(new Ladder(list), { x: 4, y: 30, z: 4 });
+    const at = list.indexOf(small);
+    const mine = Array.from({ length: drawn.dotCount }, (_, index) => drawn.dotSystems[index]).filter(
+      (one) => one === at,
+    );
+    expect(mine.length).toBeGreaterThan(0);
+    expect(drawn.dotCount).toBe(BOUNDS.dots);
+  });
+
+  it("lets one crowd take 1,024 points at most, the nearest star though it is", () => {
+    const big = { ...pick(crowd(1, 3000), 0), place: { x: 0, y: 0, z: 6 } };
+    const smalls = crowd(400, 12, 6).map((system) => ({
+      ...system,
+      place: { ...system.place, z: system.place.z + 30 },
+    }));
+    const list = [big, ...smalls];
+    const drawn = look(new Ladder(list), { x: 0, y: 20, z: 0 });
+    const mine = Array.from({ length: drawn.dotCount }, (_, at) => drawn.dotSystems[at]).filter((one) => one === 0);
+    expect(drawn.dotCount).toBe(BOUNDS.dots);
+    expect(mine.length).toBeLessThanOrEqual(1024);
+    expect(mine.length).toBeGreaterThan(900);
+  });
+
   it("keeps the nearest stars when their cap binds", () => {
     const list = crowd(4000, 1);
     const eye = { x: 90, y: 20, z: 90 };
@@ -258,9 +285,10 @@ describe("the rungs", () => {
     expect(look(ladder, { x: 0, y: HAZE * 2, z: 0 }).glowCount).toBe(0);
   });
 
-  it("draws no glow nearer than its stars go out: the glow and its stars never both", () => {
+  it("draws no glow nearer than where its stars begin to go out", () => {
     const drawn = look(new Ladder(sized(10_000)), arrival());
     const ladder = new Ladder(sized(10_000));
+    expect(drawn.glowCount).toBeGreaterThan(0);
     for (let at = 0; at < drawn.glowCount; at += 1) {
       const region = ladder.region(drawn.glows[at] ?? -1);
       expect(Math.hypot(region.x - arrival().x, region.y - arrival().y, region.z - arrival().z)).toBeGreaterThan(
