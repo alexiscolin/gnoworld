@@ -20,10 +20,13 @@ const compressed = (page: Page, urls: readonly string[]) =>
 // A world's chat comes after hydration (Chat.tsx's boundary), its lines' view only once a room holds a line
 // (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
 const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
-// The Earth alone holds both the chat and the door to space: its chat waits for the load and the door (useSpace.ts), so its chunk leaves the first
-// screen here, by this name alone, and only once this page proves it came after them. The chief's call, 2026-11-02, for Alexis: 7f2's report.
+// A page that holds both the chat and the door to space, the Earth's and a world's: its chat waits for the load and the door (useSpace.ts), so
+// its chunk leaves the first screen here, by this name alone, and only once the page proves it came after them. The chief's calls, 2026-11-02,
+// for Alexis: 7f2's report for the Earth, 7e's for a world.
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
-const isEarth = (path: string) => path.endsWith("/earth");
+const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
+// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
+const LATE_CHAT_JS = 21 * 1024;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
@@ -43,7 +46,7 @@ const STATIC_IMPORT = /(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/g;
 
 // The scripts the page's others import, as each file's own static imports say, from the roots that are no other's import, the chunk that
 // comes late apart.
-const without = (page: Page, urls: readonly string[], skip: string) =>
+const without = (page: Page, urls: readonly string[], skip: readonly string[]) =>
   page.evaluate(
     async ([list, skipped, pattern]) => {
       const edges = new Map<string, string[]>();
@@ -57,11 +60,11 @@ const without = (page: Page, urls: readonly string[], skip: string) =>
       const imported = new Set([...edges.values()].flat());
       const kept = new Set<string>();
       const walk = (url: string) => {
-        if (kept.has(url) || !edges.has(url) || url === skipped) return;
+        if (kept.has(url) || !edges.has(url) || skipped.includes(url)) return;
         kept.add(url);
         for (const next of edges.get(url) ?? []) walk(next);
       };
-      for (const url of list) if (url !== skipped && !imported.has(url)) walk(url);
+      for (const url of list) if (!skipped.includes(url) && !imported.has(url)) walk(url);
       return [...kept];
     },
     [[...urls], skip, STATIC_IMPORT.source] as const,
@@ -84,9 +87,10 @@ const closureOf = (page: Page, start: string) =>
     [start, STATIC_IMPORT.source] as const,
   );
 
-// The Earth's chat, once its page holds one: exactly one chunk of that name, named by no preload, and asked after the load and the door ended.
+// The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
+// the door ended.
 async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) {
-  if (!isEarth(path) || (await page.locator("#chat").count()) === 0) return undefined;
+  if (!holdsDoor(path) || (await page.locator("#chat").count()) === 0) return undefined;
   await expect.poll(() => [...scripts].filter((url) => CHAT.test(url)).length).toBe(1);
   expect(await (await page.request.get(path)).text(), "no preload names the chat").not.toContain("ChatPanel");
   const { chunk, loaded, door } = await page.evaluate(
@@ -105,7 +109,12 @@ async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) 
   );
   expect(chunk, "the chat's chunk is asked after the load").toBeGreaterThanOrEqual(loaded);
   expect(chunk, "the chat's chunk is asked after the door came").toBeGreaterThanOrEqual(door);
-  return [...scripts].find((url) => CHAT.test(url));
+  const late = [...scripts].find((url) => CHAT.test(url));
+  expect(
+    await compressed(page, late === undefined ? [] : [late]),
+    "the late chat stays within its cap",
+  ).toBeLessThanOrEqual(LATE_CHAT_JS);
+  return late;
 }
 
 for (const path of PAGES) {
@@ -126,7 +135,7 @@ for (const path of PAGES) {
     });
     const world = isWorld(path);
     // The chat's socket answers nothing: no line comes, so nothing asks the lines' view but a fault.
-    if (world || isEarth(path)) await page.routeWebSocket(/\/ws$/, () => undefined);
+    if (world || holdsDoor(path)) await page.routeWebSocket(/\/ws$/, () => undefined);
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;
     // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
     const stream = world ? page.waitForResponse((response) => response.url().includes("/api/stream")) : undefined;
@@ -138,8 +147,8 @@ for (const path of PAGES) {
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
-    const late = asked[0] ?? (await lateChat(page, path, scripts));
-    const firstScreen = late === undefined ? [...scripts] : await without(page, [...scripts], late);
+    const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
+    const firstScreen = await without(page, [...scripts], late);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),
