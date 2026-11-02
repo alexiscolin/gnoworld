@@ -274,6 +274,10 @@ describe("createPlanet", () => {
     expect(SURFACE_FRAGMENT).toContain("light = pow(light, 1.0 - 0.3 * air);");
   });
 
+  it("lets the light come in over a wide dusk, as the frames' terminators do, not as a cut", () => {
+    expect(SURFACE_FRAGMENT).toContain("smoothstep(-0.05, 0.22, day)");
+  });
+
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {
     expect(RING_FRAGMENT).toMatch(/const float SHADED = 0\.[1-9]/);
     expect(RING_FRAGMENT).toContain("float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));");

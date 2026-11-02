@@ -73,7 +73,7 @@ void main() {
   albedo *= 1.0 - 0.95 * rift;
 
   vec3 view = normalize(cameraPosition - vWorld);
-  float light = max(dot(bumped(axis, flow, height * (1.0 - wet), angle), sun), 0.0) * smoothstep(-0.02, 0.1, day);
+  float light = max(dot(bumped(axis, flow, height * (1.0 - wet), angle), sun), 0.0) * smoothstep(-0.05, 0.22, day);
   // Air spreads the terminator: dusk is a wide belt on the Earth, and on every world that has air.
   light = pow(light, 1.0 - 0.3 * air);
   float facing = max(dot(normal, view), 0.001);
