@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CELL } from "../cosmos/cosmos.ts";
-import { BELT_INNER, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, GRAIN, systemsOf, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { orbitPlace } from "./disc.ts";
 import { postcardFrom, postcardOf, postcardWorlds } from "./postcard.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -142,6 +143,48 @@ describe("a postcard's worlds", () => {
     expect(postcardWorlds(systemOf([[0.1, 1, 0]]))).toEqual([]);
     const many = systemOf(Array.from({ length: 12 }, (_, at) => [0.3 + at * 0.08, 0.8 + at * 0.1, at * 1.3]));
     expect(postcardWorlds(many).length).toBeLessThanOrEqual(4);
+  });
+});
+
+// 7d3's review: a postcard's specks, its worlds too small for a body, stand at their own orbits in its plane while its bodies are widened;
+// one that would stand on a body's ground, or against it, is not drawn. A system turns as one, so what stands clear at rest stays clear.
+describe("a postcard's specks", () => {
+  const CLEAR = 0.5;
+  const placed = (system: StarSystem, world: Orbiter) => {
+    const out = { x: NaN, y: NaN, z: NaN };
+    orbitPlace({ system, world }, 0, out);
+    return out;
+  };
+
+  it("leaves out each speck that would stand within half a unit of a body's ground, and only those", () => {
+    const crowds = systemsOf(
+      ["a", "b", "c", "d", "e"].flatMap((namespace, at) =>
+        Array.from({ length: 12 + at * 40 }, (_, world) => ({
+          id: `${namespace}/w${String(world)}`,
+          namespace,
+          use: (world * 7) % 11,
+        })),
+      ),
+    );
+    let hidden = 0;
+    for (const system of crowds.filter(({ worlds }) => worlds.length > 0)) {
+      const { system: drawn, worlds, hidden: left } = postcardOf(system, { x: 0, y: 60, z: 0 });
+      const bodies = new Set(worlds.map(({ id }) => id));
+      for (const speck of system.worlds.filter(({ id }) => !bodies.has(id))) {
+        const near = worlds.some(
+          (body) =>
+            Math.hypot(
+              ...(["x", "y", "z"] as const).map((axis) => placed(drawn, speck)[axis] - placed(drawn, body)[axis]),
+            ) -
+              body.radius <
+            CLEAR,
+        );
+        expect(left.has(speck.id)).toBe(near);
+        if (near) hidden += 1;
+      }
+    }
+    expect(hidden).toBeGreaterThan(0);
+    expect(GRAIN).toBeGreaterThan(0);
   });
 });
 

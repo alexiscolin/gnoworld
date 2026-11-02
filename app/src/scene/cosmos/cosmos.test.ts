@@ -2061,6 +2061,40 @@ describe("a system's arrival (7d3)", () => {
     }
   });
 
+  // The points the disc writes: each one's star, its orbit and phase, and its size in pixels.
+  const pointsOf = (scene: ReturnType<typeof made>) => {
+    const [points] = dots(scene);
+    if (points === undefined) return [];
+    const read = (name: string, at: number, axis: "getX" | "getY" | "getZ") =>
+      points.geometry.getAttribute(name)[axis](at);
+    return Array.from({ length: scene.cosmos.stats().dots }, (_, at) => ({
+      star: { x: read("position", at, "getX"), y: read("position", at, "getY"), z: read("position", at, "getZ") },
+      orbit: read("aOrbit", at, "getX"),
+      phase: read("aOrbit", at, "getY"),
+      size: read("aSize", at, "getX"),
+    }));
+  };
+  // Two worlds' distance in their system's plane, from their orbits and phases.
+  const inPlane = (a: { orbit: number; phase: number }, b: { orbit: number; phase: number }) =>
+    Math.hypot(
+      a.orbit * Math.cos(a.phase) - b.orbit * Math.cos(b.phase),
+      a.orbit * Math.sin(a.phase) - b.orbit * Math.sin(b.phase),
+    );
+
+  it("draws its other worlds as whole points, none on a body's ground", async () => {
+    const { scene, system, arrival } = await atGnoswap();
+    const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+    expect(own.length).toBeGreaterThan(0);
+    for (const point of own) {
+      const world = system.worlds.find(
+        (each) => Math.abs(each.orbit - point.orbit) < 1e-4 && Math.abs(each.phase - point.phase) < 1e-4,
+      );
+      if (world !== undefined && world.radius >= GRAIN) expect(point.size).toBeGreaterThanOrEqual(2);
+      for (const body of arrival.postcard.worlds)
+        expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
   it.each(["", "no/such", "__proto__", "constructor", "x".repeat(10_000)])(
     "goes back to the view at rest for a system the file does not hold: %#",
     async (id) => {

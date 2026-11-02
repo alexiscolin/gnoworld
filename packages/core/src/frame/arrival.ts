@@ -77,7 +77,7 @@ function chosenOf(id: string): Chosen {
 interface Held {
   readonly place: Point;
   readonly reach: number;
-  readonly card: Postcard;
+  readonly card: Pick<Postcard, "system" | "worlds">;
   readonly instants: readonly number[];
   readonly near: readonly StarSystem[];
 }
@@ -159,7 +159,7 @@ function firstHolding(
       const card = { system: postcardFrom(system, worlds, camera.eye).system, worlds };
       const held = { place: system.place, reach, card, instants, near };
       if (Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
-        return { eye: camera.eye, look, postcard: card };
+        return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera.eye) };
     }
   return undefined;
 }
@@ -179,5 +179,5 @@ export function arrivalOf(system: StarSystem, systems: readonly StarSystem[]): A
     reach: LEAST_REACH,
     pick,
   });
-  return { eye: camera.eye, look, postcard: { system, worlds: [] } };
+  return { eye: camera.eye, look, postcard: postcardFrom(system, [], camera.eye) };
 }

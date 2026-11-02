@@ -172,7 +172,7 @@ export class Cosmos {
     this.#whole.look(this.#mapEye, this.#focal);
     toMap(this.#resting, this.#restingMap);
     const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
-    const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
+    const { bodies, close, hidden, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
     this.#bodies.stand(bodies, close);
     this.#disc.paint({
       ...sight,
@@ -180,7 +180,7 @@ export class Cosmos {
       systems: this.#systems,
       ladder,
       drawn: this.#drawn,
-      isBody: (id) => this.#bodies.has(id),
+      isBody: (id) => this.#bodies.has(id) || hidden.has(id),
       inView: (place, radius) => this.#bodies.inView(place, radius, this.#eye),
       shows: (place, radius) => this.#bodies.shows(place, radius, this.#eye),
     });

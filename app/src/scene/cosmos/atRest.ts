@@ -25,6 +25,7 @@ const WAITING: ReturnType<Searched["drawnFrom"]> = {
   needsHalo: (system: number) => system === 0,
   planeOf: () => undefined,
   main: 0,
+  hidden: new Set(),
 };
 
 function plainRest(): RestView {

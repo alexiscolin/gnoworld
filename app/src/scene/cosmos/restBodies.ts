@@ -22,6 +22,7 @@ const GLINT = 0.12;
 const REST_REACH = 5;
 const WHOLE = () => 1;
 const NO_PLANE = () => undefined;
+const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
 /** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, and its main light's system. */
 export interface Shown {
@@ -90,7 +91,8 @@ function everywhere(systems: readonly StarSystem[], drawn: Drawn): Wanted {
 }
 
 /** What is drawn from `sight`: `shown`'s bodies, close world, points, halos and planes where the eye rests at it (`resting`, on the map, the
- * eye less the arrival's glide and the sway), the ladder's `drawn` anywhere else; and the main light's system. */
+ * eye less the arrival's glide and the sway), the ladder's `drawn` anywhere else; the main light's system, and the specks left out for
+ * they would stand on a body (7d3). */
 export function drawnFrom(
   systems: readonly StarSystem[],
   { shown, drawn }: { shown: Shown; drawn: Drawn },
@@ -106,6 +108,7 @@ export function drawnFrom(
       needsHalo: (system: number) => system === 0 || system === main,
       planeOf: NO_PLANE,
       main,
+      hidden: NONE_HIDDEN,
     };
   return {
     bodies: restBodies(systems, { view, postcards }, sight),
@@ -114,5 +117,6 @@ export function drawnFrom(
     needsHalo: haloNeeds(view),
     planeOf: (system: number) => postcards.get(system)?.system,
     main,
+    hidden: new Set([...postcards.values()].flatMap(({ hidden }) => [...hidden])),
   };
 }

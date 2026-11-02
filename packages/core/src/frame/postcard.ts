@@ -20,11 +20,16 @@ const OFF_STAR = 3;
 const ROUNDING = 1e-9;
 // Of three bodies or more, no two gaps alike within this share: a regular figure reads as drawn on purpose.
 const ALIKE = 0.15;
+// A speck, a world too small for a body, at its own orbit while the bodies are widened: this near a body's ground it reads as that world's
+// debris, and is not drawn. The system turns as one, so what stands clear at rest stays clear.
+const SPECK_CLEAR = 0.5;
 
-/** A postcard as drawn: its system, its plane opened towards the eye if need be, and the worlds it draws as bodies. */
+/** A postcard as drawn: its system, its plane opened towards the eye if need be, the worlds it draws as bodies, and those of its specks it
+ * leaves out, for they would stand on a body's ground (7d3). */
 export interface Postcard {
   readonly system: StarSystem;
   readonly worlds: readonly Orbiter[];
+  readonly hidden: ReadonlySet<string>;
 }
 
 // `system`'s plane, opened towards `eye` till it is seen `OPEN_LEAST` open: its normal turned towards the eye's line, the nearer way.
@@ -45,7 +50,7 @@ function opened(system: StarSystem, eye: Point): StarSystem {
   return { ...system, tilt: Math.atan2(Math.hypot(x, z), Math.abs(y)), node: Math.atan2(-sign * x, sign * z) };
 }
 
-const placeIn = ({ orbit, phase }: Orbiter, spread: number) => ({
+const placeIn = ({ orbit, phase }: Pick<Orbiter, "orbit" | "phase">, spread: number) => ({
   x: spread * orbit * Math.cos(phase),
   y: spread * orbit * Math.sin(phase),
 });
@@ -102,10 +107,22 @@ export function postcardWorlds(system: StarSystem): Orbiter[] {
   return [];
 }
 
+// The specks of `system` that would stand within `SPECK_CLEAR` of the ground of one of `worlds`, in its plane.
+function hiddenOf(system: StarSystem, worlds: readonly Orbiter[]): Set<string> {
+  const bodies = new Set(worlds.map(({ id }) => id));
+  const near = ({ orbit, phase }: Orbiter) =>
+    worlds.some((body) => {
+      const [a, b] = [placeIn({ orbit, phase }, 1), placeIn(body, 1)];
+      return Math.hypot(a.x - b.x, a.y - b.y) - body.radius < SPECK_CLEAR;
+    });
+  return new Set(system.worlds.filter((world) => !bodies.has(world.id) && near(world)).map(({ id }) => id));
+}
+
 /** `worlds`, as `postcardWorlds` gives them, as a postcard from the eye at rest `eye`: its plane opened if need be. */
 export const postcardFrom = (system: StarSystem, worlds: readonly Orbiter[], eye: Point): Postcard => ({
   system: opened(system, eye),
   worlds,
+  hidden: hiddenOf(system, worlds),
 });
 
 /** A postcard as drawn from the eye at rest `eye`. */
