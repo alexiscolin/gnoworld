@@ -8,6 +8,7 @@ import {
   DISC_TILT,
   EARTH_PLACE,
   EARTH_RADIUS,
+  focusOf,
   GNO_LAND,
   GRAIN,
   orbitPlace,
@@ -92,6 +93,9 @@ describe("systemsOf", () => {
       }),
       { numRuns: 30 },
     );
+    for (const count of [5, 9, 17, 33, 47, 120, 333, 600])
+      for (const { orbit, radius } of named(systemsOf(held("a", count, 7)), "a").worlds)
+        expect(orbit + radius).toBeLessThanOrEqual(BELT_INNER + 1e-9);
     expect(BELT_INNER).toBeLessThan(ROOM);
     expect(2 * ROOM).toBeLessThanOrEqual(CELL);
   });
@@ -199,6 +203,28 @@ describe("systemsOf", () => {
       expect(Math.abs(spin)).toBeLessThan(0.2);
     }
     expect(new Set(systems.map(({ warmth }) => warmth)).size).toBeGreaterThan(250);
+  });
+});
+
+describe("focusOf", () => {
+  it("meets the disc where the view's axis does, from the arrival", () => {
+    const eye = { x: NaN, y: NaN, z: NaN };
+    toMap(HOME, eye);
+    const out = { x: NaN, y: NaN, z: NaN };
+    focusOf(eye, out);
+    expect(out.y).toBe(0);
+    expect(out.x).toBeCloseTo(eye.x, 9);
+    const stage = { x: NaN, y: NaN, z: NaN };
+    toScene(out, stage);
+    expect(stage.x - HOME.x).toBeCloseTo(0, 6);
+    expect(stage.y - HOME.y).toBeCloseTo(0, 6);
+    expect(stage.z).toBeLessThan(HOME.z);
+  });
+
+  it("looks straight below an eye under the disc", () => {
+    const out = { x: NaN, y: NaN, z: NaN };
+    focusOf({ x: 3, y: -4, z: 7 }, out);
+    expect(out).toEqual({ x: 3, y: 0, z: 7 });
   });
 });
 

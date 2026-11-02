@@ -86,6 +86,18 @@ describe("glideAt", () => {
     );
   });
 
+  it("is the drift less its cruise, at every second: the worlds and the sky arrive at one pace", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0.1, max: 600, noNaN: true }), (seconds) => {
+        const [drift, glide] = [spot(), spot()];
+        driftAt(drift, seconds);
+        glideAt(glide, seconds);
+        const cruise = { x: drift.x - glide.x, y: drift.y - glide.y, z: drift.z - glide.z };
+        expect(length(cruise) / (0.6 * seconds)).toBeCloseTo(1, 3);
+      }),
+    );
+  });
+
   it("slows all the way, along the drift's heading", () => {
     const [a, b, c] = [offset(0), offset(1), offset(4)].map(length);
     expect(a).toBeGreaterThan(b ?? 0);

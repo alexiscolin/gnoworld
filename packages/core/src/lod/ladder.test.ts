@@ -171,6 +171,13 @@ describe("the draw bound", () => {
   it("is a pure function of the place: the same eye, the same list, in a reused record too", () => {
     const ladder = new Ladder(sized(1000));
     const reused = new Drawn();
+    ladder.look(viewOf(arrival()), reused);
+    expect(reused.bodyCount).toBeGreaterThan(0);
+    ladder.look(viewOf({ x: 0, y: 60, z: 90 }, FOCAL, { x: 40, y: 0, z: 30 }), reused);
+    const away = { x: 0, y: 60, z: 90 };
+    const fresh0 = new Drawn();
+    new Ladder(sized(1000)).look(viewOf(away, FOCAL, { x: 40, y: 0, z: 30 }), fresh0);
+    expect(counts(reused)).toEqual(counts(fresh0));
     ladder.look(viewOf({ x: 900, y: 300, z: 900 }), reused);
     ladder.look(viewOf(arrival()), reused);
     const fresh = look(ladder, arrival());
@@ -195,6 +202,17 @@ describe("the rungs", () => {
     const gone = look(ladder, { x: 100_000, y: 0, z: 0 });
     expect(counts(gone)).toEqual({ bodies: 0, stars: 0, dots: 0, glows: 0 });
     expect(look(ladder, { x: 0, y: HAZE * 2, z: 0 }).glowCount).toBe(0);
+  });
+
+  it("draws no glow nearer than its stars go out: the glow and its stars never both", () => {
+    const drawn = look(new Ladder(sized(10_000)), arrival());
+    const ladder = new Ladder(sized(10_000));
+    for (let at = 0; at < drawn.glowCount; at += 1) {
+      const region = ladder.region(drawn.glows[at] ?? -1);
+      expect(Math.hypot(region.x - arrival().x, region.y - arrival().y, region.z - arrival().z)).toBeGreaterThan(
+        MIDDLE * 0.75,
+      );
+    }
   });
 
   it("gives a region one glow, however many systems it holds", () => {

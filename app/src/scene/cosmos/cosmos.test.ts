@@ -421,6 +421,17 @@ describe("what it draws", () => {
 describe("the page's text keeps its room", () => {
   const WHOLE = { left: 0, top: 0, right: WIDTH, bottom: HEIGHT };
 
+  it("hides a body whose edge alone crosses the box", async () => {
+    const scene = made();
+    await shown(scene);
+    const body = scene.cosmos.stats().screen.bodies.find(({ x, radius }) => x - radius > 100 && radius > 8);
+    if (body === undefined) throw new Error("no body clear of the left");
+    scene.cosmos.keepClear({ left: 0, top: 0, right: body.x - body.radius * 0.5, bottom: HEIGHT });
+    scene.cosmos.tick(HOME, 0);
+    const still = scene.cosmos.stats().screen.bodies.find(({ x, y }) => Math.hypot(x - body.x, y - body.y) < 1);
+    expect(still).toBeUndefined();
+  });
+
   it("puts out every body and point under the box, and every star but a faint one", async () => {
     const scene = made();
     scene.cosmos.keepClear(WHOLE);
@@ -582,6 +593,95 @@ describe("a look costs a step, never a frame", () => {
     expect(scene.cosmos.stats().list.map(({ at }) => at)).toEqual(places);
     scene.cosmos.tick(HOME, 30);
     expect(scene.cosmos.stats().list.map(({ at }) => at)).not.toEqual(places);
+  });
+});
+
+describe("hidden, and gone", () => {
+  it("asks no map and takes no look while hidden after its release", async () => {
+    const scene = made();
+    await shown(scene);
+    scene.cosmos.show(undefined);
+    await vi.advanceTimersByTimeAsync(6 * 60 * 1000);
+    const [asked, { looks }] = [maps.load.mock.calls.length, scene.cosmos.stats()];
+    scene.cosmos.tick({ x: HOME.x + 40, y: HOME.y, z: HOME.z }, 3);
+    await settled();
+    expect(maps.load.mock.calls.length).toBe(asked);
+    expect(scene.cosmos.stats().looks).toBe(looks);
+  });
+
+  it("builds no Earth when a context comes back while it is hidden", async () => {
+    const scene = made();
+    await shown(scene);
+    scene.cosmos.show(undefined);
+    const built = globes.build.mock.calls.length;
+    scene.cosmos.restored();
+    await settled();
+    expect(globes.build.mock.calls.length).toBe(built);
+  });
+
+  it("writes nothing for a look still pending when it goes", async () => {
+    const scene = made();
+    await shown(scene);
+    const { looks } = scene.cosmos.stats();
+    scene.cosmos.tick({ x: HOME.x + 40, y: HOME.y, z: HOME.z }, 1);
+    scene.owner.dispose();
+    await settled();
+    expect(scene.cosmos.stats().looks).toBe(looks);
+  });
+
+  it("takes a body that left the ladder out of the scene, not only its materials", async () => {
+    const scene = made();
+    await shown(scene);
+    const before = parts(scene).length;
+    const { planet } = scene.cosmos.stats().list[0] ?? {};
+    scene.cosmos.tick({ x: HOME.x + 5000, y: HOME.y, z: HOME.z }, 1);
+    await settled();
+    expect(planet?.group.parent).toBeNull();
+    expect(parts(scene).length).toBeLessThan(before);
+  });
+
+  it("sends the suns' light to the GPU at each look", async () => {
+    const scene = made();
+    await shown(scene);
+    const [mesh] = glows(scene);
+    const light = mesh?.geometry.getAttribute("aSun") as InstancedBufferAttribute;
+    const version = light.version;
+    scene.cosmos.tick({ x: HOME.x + 30, y: HOME.y, z: HOME.z }, 1);
+    await settled();
+    expect(light.version).toBeGreaterThan(version);
+  });
+
+  it("frees an Earth that comes after it went, whatever its build did with the signal", async () => {
+    let arrive: (globe: FakeGlobe) => void = () => undefined;
+    globes.build.mockImplementation(
+      () =>
+        new Promise<FakeGlobe>((done) => {
+          arrive = done;
+        }),
+    );
+    const scene = made();
+    scene.cosmos.show(worlds(5));
+    scene.owner.dispose();
+    const late = fakeGlobe();
+    arrive(late);
+    await settled();
+    expect(late.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("turns the points' clock and the Earth with the seconds it is given, and lights the Earth from the great star", async () => {
+    const globe = fakeGlobe();
+    globes.build.mockImplementation(() => Promise.resolve(globe));
+    const scene = made();
+    await shown(scene);
+    scene.cosmos.tick(HOME, 12);
+    const [points] = dots(scene);
+    expect(points?.material.uniforms["uSeconds"]?.value).toBe(12);
+    expect(globe.setTurn).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number));
+    const [turn] = globe.setTurn.mock.lastCall as [number, number];
+    scene.cosmos.tick(HOME, 24);
+    expect((globe.setTurn.mock.lastCall as [number, number])[0]).not.toBe(turn);
+    expect(globe.aim).toHaveBeenCalledOnce();
+    expect(globe.setSun).toHaveBeenCalledOnce();
   });
 });
 
