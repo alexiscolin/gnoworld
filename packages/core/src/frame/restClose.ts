@@ -2,7 +2,7 @@
 // rules it keeps there, at rest and at the corners of the eye's sway.
 import { EARTH_PLACE, EARTH_RADIUS, type Orbiter } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
-import { SWAY } from "../space/drift.ts";
+import { SWAY_CORNERS } from "../space/drift.ts";
 import {
   away,
   cameraOf,
@@ -32,12 +32,6 @@ const CLOSE_MOST = 0.5;
 // The eyes that stand a world at a side: so many degrees off the view's axis, round a circle in this many steps.
 const SIDE_ANGLES = [28, 30, 32, 34, 36, 38, 40, 42, 44];
 const AROUND = 120;
-const SWAYS: readonly (readonly [number, number])[] = [
-  [SWAY.across, SWAY.up],
-  [SWAY.across, -SWAY.up],
-  [-SWAY.across, SWAY.up],
-  [-SWAY.across, -SWAY.up],
-];
 
 // The rest of a close world's system shows nothing.
 const restOff = (look: Look, { system, bodies }: Held, world: Orbiter) =>
@@ -60,12 +54,12 @@ function closeHolds(look: Look, { held, world }: Close, atRest: boolean): boolea
 /** Whether a close world keeps its rules from `camera`, at rest and at each corner of the eye's sway. */
 export const closeFits = (camera: Camera, close: Close): boolean =>
   looksFrom(camera).every((look) => closeHolds(look, close, true)) &&
-  SWAYS.every((sway) => looksFrom(swayed(camera, sway)).every((look) => closeHolds(look, close, false)));
+  SWAY_CORNERS.every((sway) => looksFrom(swayed(camera, sway)).every((look) => closeHolds(look, close, false)));
 
 /** Whether a ball `reach` round `place` stands clear of the close world from `camera`, at rest and at each corner of the sway: no postcard
  * world behind it. */
 export function clearOfClose(camera: Camera, close: Close, { place, reach }: { place: Point; reach: number }): boolean {
-  const cameras = [camera, ...SWAYS.map((sway) => swayed(camera, sway))];
+  const cameras = [camera, ...SWAY_CORNERS.map((sway) => swayed(camera, sway))];
   const near = placeOf(close.held.system, close.world, 0);
   return cameras.every((one) =>
     looksFrom(one).every((look) => {

@@ -49,6 +49,13 @@ export const orbitTime = (seconds: number): number => seconds * ORBIT_PACE;
 
 /** How far the eye sways at rest, in world units, across the view and up it (7d6): the near worlds slide past the far ones. */
 export const SWAY = { across: 0.25, up: 0.12 } as const;
+/** The sway's four corners, across and up: what a view must hold with motion on. */
+export const SWAY_CORNERS: readonly (readonly [number, number])[] = [
+  [SWAY.across, SWAY.up],
+  [SWAY.across, -SWAY.up],
+  [-SWAY.across, SWAY.up],
+  [-SWAY.across, -SWAY.up],
+];
 // A slow figure eight, so its speed never falls to nothing: a tenth of a unit or more in two seconds at its slowest.
 const SWAY_SECONDS = 18;
 
