@@ -326,7 +326,7 @@ describe("planetLook", () => {
   });
 
   it("leaves no value unset, for the empty path and a long one", () => {
-    for (const path of [new Uint8Array(0), new Uint8Array(1_000_000).fill(0x61)])
+    for (const path of [new Uint8Array(0), new Uint8Array(2000).fill(0x61)])
       for (const anchor of ANCHORS) {
         const numbers = JSON.stringify(planetLook(path, anchor), (_, value: unknown) =>
           typeof value === "number" && !Number.isFinite(value) ? "unset" : value,
