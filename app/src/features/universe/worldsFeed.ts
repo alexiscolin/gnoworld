@@ -32,21 +32,29 @@ export class WorldsFeed {
     if (wanted && !this.#asked) this.#read(scene);
   }
 
-  // The file's time goes with its worlds, once there is one: it ages their calls; who is here, once said, names them.
+  // The file's time goes with its worlds, once there is one: it ages their calls; the signals, once come, name them.
   #hand(scene: Scene, worlds: readonly CosmosWorld[] | undefined): void {
     if (worlds !== undefined && this.#signals !== undefined) scene.cosmos(worlds, this.#written, this.#signals);
     else if (this.#written === undefined) scene.cosmos(worlds);
     else scene.cosmos(worlds, this.#written);
   }
 
-  // Who is here, now, and each minute while the cosmos shows once the server has answered; a read that ends after the cosmos left is let go.
+  // The names and visits as soon as their chunk comes (F3778: never waiting on the server), then who is here, now, and each minute while the
+  // cosmos shows once the server has answered; a read that ends after the cosmos left is let go.
   #poll(scene: Scene): void {
     const polling = new AbortController();
     this.#polling = polling;
     let timer: ReturnType<typeof setInterval> | undefined;
     const ask = () => {
       loadSignals()
-        .then(({ readSignals }) => readSignals(this.#signals))
+        .then(({ localSignals, readSignals }) => {
+          const kept = this.#signals ?? localSignals(Date.now());
+          if (this.#signals === undefined && !polling.signal.aborted) {
+            this.#signals = kept;
+            this.#hand(scene, this.#worlds);
+          }
+          return readSignals(kept);
+        })
         .then(
           (signals) => {
             if (polling.signal.aborted || signals === undefined) return;

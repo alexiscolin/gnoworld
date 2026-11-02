@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import type { Shown } from "./host.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -12,7 +12,8 @@ const scene = vi.hoisted(() => ({
   dispose: vi.fn<() => void>(),
   earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
   world: vi.fn<(place: unknown, said: (state: string, colour?: string) => void) => void>(),
-  cosmos: vi.fn<(worlds: unknown, written?: string) => void>(),
+  cosmos: vi.fn<(worlds: unknown, written?: string, signals?: unknown) => void>(),
+  presence: vi.fn(),
   keepClear: vi.fn<(box: unknown) => void>(),
   read: vi.fn(),
   counted: vi.fn<(count: number) => void>(),
@@ -27,6 +28,7 @@ vi.mock("./worldsCount.ts", async (original) => ({
   worldsDrawn: scene.counted,
 }));
 vi.mock("./EarthSigns.tsx", () => ({ PageSigns: () => <div data-signs="" /> }));
+vi.mock("../../lib/api/presence.ts", () => ({ pagePresenceApi: () => ({ read: scene.presence }) }));
 
 const STRONG = "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)";
 const SOFTWARE = "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)";
@@ -35,6 +37,18 @@ const VIEW = "View in space";
 const SORRY = "Space is not available here. Every place is in the list.";
 const lose = vi.fn();
 const WORLDS = [{ id: "a/b", namespace: "a", realms: [] }];
+const NOW = Date.parse("2026-11-03T12:00:00.000Z");
+// What the labels know with no word from the server (F3778): the default universe's hubs' names (data/hubs.json), keyed as the cosmos holds
+// each world, no count, and the clock; this reader's visits are a function, read where a test is about them.
+const local = () => ({
+  present: new Map(),
+  names: new Map([
+    ["bubble", "Bubble"],
+    ["gov/dao", "GovDAO"],
+  ]),
+  visited: expect.any(Function) as unknown,
+  now: NOW,
+});
 
 interface Device {
   /** The GPU's name; null, no WebGL2 at all. */
@@ -125,8 +139,13 @@ function rendered(shown: Shown, wrap: (child: ReactNode) => ReactNode = (child) 
   return { box, rerender, unmount };
 }
 
+// The labels' signals come in a chunk of their own: loaded once here, it resolves in the turns the fake clock runs, as in the browser's cache.
+beforeAll(async () => {
+  await import("./signals.ts");
+});
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ now: NOW });
+  scene.presence.mockImplementation(() => new Promise(() => undefined));
   scene.start.mockImplementation(() => ({
     cover: scene.cover,
     cosmos: scene.cosmos,
@@ -153,8 +172,7 @@ afterEach(() => {
 
 // The fixed places stand at the first call and in every one after: no file's world comes.
 const fixedPlacesAlone = () => {
-  expect(scene.cosmos.mock.calls[0]).toEqual([[]]);
-  for (const [worlds] of scene.cosmos.mock.calls) expect(worlds).toEqual([]);
+  expect(scene.cosmos.mock.calls).toEqual([[[]], [[], undefined, local()]]);
 };
 
 describe("the cosmos's worlds", () => {
@@ -162,8 +180,7 @@ describe("the cosmos's worlds", () => {
     rendered("cosmos");
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos.mock.lastCall?.[0]).toBe(WORLDS);
-    expect(scene.cosmos.mock.lastCall?.[1]).toBeUndefined();
+    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS, undefined, local());
   });
 
   it("tells the page how many worlds the cosmos draws: the file's, each once, and the Earth", async () => {
@@ -193,8 +210,8 @@ describe("the cosmos's worlds", () => {
     scene.read.mockImplementation(() => Promise.resolve({ worlds, updated: "2026-11-01T00:00:00Z" }));
     rendered("cosmos");
     await settle();
+    expect(scene.cosmos).toHaveBeenLastCalledWith(worlds, "2026-11-01T00:00:00Z", local());
     expect(scene.cosmos.mock.lastCall?.[0]).toBe(worlds);
-    expect(scene.cosmos.mock.lastCall?.[1]).toBe("2026-11-01T00:00:00Z");
   });
 
   it("stands the fixed places at once, whatever the file does: one that never answers draws them too", async () => {
@@ -248,7 +265,7 @@ describe("the cosmos's worlds", () => {
     rerender("cosmos");
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos.mock.lastCall?.[0]).toBe(WORLDS);
+    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS, undefined, local());
   });
 
   it("hands nothing over when the page left before the file came", async () => {

@@ -1,6 +1,7 @@
 // Who is here, as the cosmos's labels read it (7h): the server's counts keyed by each world as the cosmos holds it (a hub's world is its first
 // realm's, gov/dao for the slug govdao; the Earth and a hub with no realm by their slug), the default universe's hubs' names, and this
-// reader's visits. A chunk of its own, asked after the first screen. A failed read keeps the names and visits and drops every count.
+// reader's visits. A chunk of its own, asked after the first screen. The names and visits never wait on the server; a failed read drops
+// every count.
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
 import type { Presence } from "@gnoworld/schemas/indexer";
@@ -24,9 +25,12 @@ export function signalsOf({ worlds }: Presence, now: number): LabelSignals {
   };
 }
 
-/** Who is here now, or, when the server does not say, the signals kept with no count; none before any answer. */
-export async function readSignals(kept: LabelSignals | undefined): Promise<LabelSignals | undefined> {
+/** What the labels know with no word from the server, read at `now`: the names and this reader's visits, no count. */
+export const localSignals = (now: number): LabelSignals => signalsOf({ worlds: [] }, now);
+
+/** Who is here now; when the server does not say, the local signals if `kept` held counts, else nothing new. */
+export async function readSignals(kept: LabelSignals): Promise<LabelSignals | undefined> {
   const read = await pagePresenceApi().read();
   if (read.ok) return signalsOf(read.value, Date.now());
-  return kept === undefined ? undefined : { ...kept, present: new Map() };
+  return kept.present.size === 0 ? undefined : localSignals(Date.now());
 }
