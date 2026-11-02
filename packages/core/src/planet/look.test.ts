@@ -263,6 +263,20 @@ describe("the anchors' colours", () => {
     }
   });
 
+  it("runs every ramp from dark to light, so no relief reads as its negative", () => {
+    for (const anchor of ANCHORS)
+      for (const [low, mid, high] of ROWS[anchor].palettes) {
+        expect(labOf(mid)[0], anchor).toBeGreaterThan(labOf(low)[0]);
+        expect(labOf(high)[0], anchor).toBeGreaterThan(labOf(mid)[0]);
+      }
+  });
+
+  // A glow on a banded world hides its night's lights (2e76ee19): no row may have both.
+  it("gives no banded world a glow", () => {
+    for (const anchor of ANCHORS)
+      expect(ROWS[anchor].banded === true && ROWS[anchor].glow !== undefined, anchor).toBe(false);
+  });
+
   // A floor under which two anchors of one kind could pass for each other by colour; temperate and ocean, apart by their seas, sit at 6.6.
   it("keeps any two anchors of one kind 6 apart in Lab, their palettes' centres", () => {
     const centre = (anchor: Anchor) => {

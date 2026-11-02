@@ -72,6 +72,64 @@ describe("SURFACE, what 7b5 reads", () => {
   });
 });
 
+// Each anchor's own spans and the defaults, stated apart from spans.ts: a changed span re-rolls every world of its class.
+type Span = readonly [number, number];
+const DEFAULTS: Record<"every" | "ground" | "gas", Partial<Record<SurfaceName, Span>>> = {
+  every: {
+    scale: [0.9, 3.2],
+    lacunarity: [1.85, 2.2],
+    roughness: [0.42, 0.6],
+    warp: [0.05, 0.5],
+    drift: [0.6, 1.4],
+    detail: [0.2, 0.5],
+    mix: [0.6, 1.6],
+  },
+  ground: { erosion: [0, 0.6], craters: [0, 0.4] },
+  gas: { bands: [8, 24], turbulence: [0.2, 0.8], storms: [0, 0.6] },
+};
+const STATED: Record<Anchor, Partial<Record<SurfaceName, Span>>> = {
+  rocky: { craters: [0.55, 1], erosion: [0, 0.25], rifts: [0, 0.2] },
+  temperate: { sea: [0.55, 0.78], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
+  desert: { erosion: [0.2, 0.7], craters: [0.15, 0.6], caps: [0, 0.12], clouds: [0, 0.15], rifts: [0, 0.4] },
+  ocean: { sea: [0.8, 0.95], erosion: [0.3, 0.8], craters: [0, 0.03], caps: [0, 0.15], clouds: [0.3, 0.65] },
+  ice: { craters: [0, 0.25], erosion: [0, 0.3], rifts: [0.4, 1] },
+  volcanic: { craters: [0, 0.05], erosion: [0.1, 0.5], rifts: [0.2, 0.6] },
+  "gas giant": { bands: [12, 26], turbulence: [0.35, 0.9], storms: [0.2, 1] },
+  "ice giant": { bands: [4, 11], turbulence: [0, 0.35], storms: [0, 0.5] },
+  "cloud deck": { bands: [3, 10], turbulence: [0.2, 0.7], storms: [0, 0.25], clouds: [0.85, 1] },
+  "tidally locked": {
+    erosion: [0.2, 0.7],
+    craters: [0.1, 0.5],
+    caps: [0.15, 0.45],
+    clouds: [0.05, 0.3],
+    rifts: [0, 0.3],
+  },
+  "dark carbon": { craters: [0.3, 0.9], erosion: [0, 0.4] },
+  shattered: { rifts: [0.55, 1], craters: [0.2, 0.7] },
+  "nitrogen ice": { craters: [0, 0.35], erosion: [0.1, 0.6], rifts: [0.1, 0.5] },
+  "grooved ice": { rifts: [0.5, 1], craters: [0.2, 0.6], erosion: [0, 0.3] },
+  snowball: { caps: [0.75, 1], erosion: [0, 0.3], clouds: [0.05, 0.3], rifts: [0, 0.3] },
+  hycean: { sea: [0.98, 1], craters: [0, 0], erosion: [0, 0], caps: [0, 0.1], clouds: [0.2, 0.6] },
+  archean: { sea: [0.85, 0.97], erosion: [0.2, 0.6], craters: [0, 0.1], clouds: [0.3, 0.7] },
+  "lava world": { craters: [0, 0.05], erosion: [0, 0.3], rifts: [0.3, 0.9] },
+  "two-faced": { craters: [0.4, 0.9], halves: [0.6, 0.95] },
+  "water cloud giant": { bands: [8, 20], turbulence: [0.1, 0.5], storms: [0, 0.5] },
+  "azure giant": { bands: [6, 16], turbulence: [0.1, 0.5], storms: [0, 0.4] },
+  "dark giant": { bands: [8, 20], turbulence: [0.2, 0.6], storms: [0, 0.3] },
+  "hot giant": { bands: [4, 12], turbulence: [0.4, 1], storms: [0.2, 0.8] },
+  "sub-Neptune": { bands: [2, 8], turbulence: [0, 0.3], storms: [0, 0.2], clouds: [0.5, 0.9] },
+};
+
+describe("each anchor's spans, as stated", () => {
+  it.each([...ANCHORS])("%s reads its own span, else its kind's, else every world's, else none", (anchor) => {
+    for (const name of NAMES) {
+      const kind = banded(anchor) ? DEFAULTS.gas : DEFAULTS.ground;
+      const want = STATED[anchor][name] ?? kind[name] ?? DEFAULTS.every[name] ?? [0, 0];
+      expect(spanOf(anchor, name), name).toEqual(want);
+    }
+  });
+});
+
 describe("a class's structure", () => {
   it.each([...ANCHORS])("%s varies where any world does", (anchor) => {
     for (const name of EVERY_WORLD) expect(flat(spanOf(anchor, name)), name).toBe(false);

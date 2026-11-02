@@ -3,7 +3,17 @@
 // correlate past 0.1. A value is read as its place in its own world's span, so a class's ranges, which ADR-0002 §3 links on purpose, do
 // not count; each anchor's share of worlds is choice.test.ts's. And only + - * / reach a value (below).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ANCHORS, asciiBytes, planetLook, planetSeed, worldLook, type Anchor, type PlanetLook } from "./look.ts";
+import { NATURES } from "./choice.ts";
+import {
+  ANCHORS,
+  asciiBytes,
+  planetLook,
+  planetSeed,
+  worldLook,
+  worldPath,
+  type Anchor,
+  type PlanetLook,
+} from "./look.ts";
 import { labOf, type Lab } from "./palette.ts";
 import { planetRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
@@ -176,6 +186,17 @@ const worlds = () => [
   { look: worldLook("gnoswap/pool", "token"), recipe: worldRecipe("gnoswap/pool", "token") },
   { look: worldLook("nym-moultest123/x/amm"), recipe: worldRecipe("nym-moultest123/x/amm") },
 ];
+
+describe("a world's recipe", () => {
+  it("is its look's: the class its nature leans to, at its path, turned by its system", () => {
+    for (const nature of [null, ...NATURES])
+      for (let at = 0; at < 60; at += 1) {
+        const id = `ns${String(at % 7)}/world${String(at)}`;
+        const recipe = worldRecipe(id, nature);
+        expect(recipe, `${id} ${String(nature)}`).toEqual(planetRecipe(worldPath(id), worldLook(id, nature).anchor));
+      }
+  });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
