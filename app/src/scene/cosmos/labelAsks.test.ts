@@ -98,6 +98,52 @@ describe("what a look asks labels for", () => {
     expect(asks.filter(({ kind }) => kind === "far")).toEqual([{ id: "gov/dao", kind: "far", signals: { use: 31 } }]);
   });
 
+  it("reads, once it holds the file and its signals, only the worlds round the stars a look draws (F3777)", () => {
+    let reads = 0;
+    const many = Array.from({ length: 300 }, (_, at): CosmosWorld => {
+      const [id, namespace] = [`ns${String(at)}/world`, `ns${String(at)}`];
+      return {
+        get id() {
+          reads += 1;
+          return id;
+        },
+        get namespace() {
+          reads += 1;
+          return namespace;
+        },
+        realms: [{ callers: 1 }],
+      };
+    });
+    const systems = systemsOf(many.map(({ id, namespace }) => ({ id, namespace, use: 1 })));
+    const around = (...names: string[]) => {
+      const drawn = new Drawn();
+      for (const name of names) drawn.stars[drawn.starCount++] = systems.findIndex(({ id }) => id === name);
+      return drawn;
+    };
+    const held = signals();
+    asksOf({ systems, drawn: around("ns1"), bodies: [{ id: "ns2/world", away: 3 }], list: many, signals: held });
+    reads = 0;
+    const { asks } = asksOf({ systems, drawn: around("ns5", "ns7"), bodies: [], list: many, signals: held });
+    expect(asks.map(({ id }) => id)).toEqual(["earth", "ns5/world", "ns7/world"]);
+    expect(reads).toBeLessThanOrEqual(10);
+  });
+
+  it("asks this reader's visits only of the worlds under seven days old (F3777)", () => {
+    const old = Array.from({ length: 40 }, (_, at) =>
+      world(`old/w${String(at)}`, { seen: new Date(NOW - 30 * DAY).toISOString() }),
+    );
+    const asked: string[] = [];
+    const visited = (id: string) => {
+      asked.push(id);
+      return false;
+    };
+    ask({
+      list: [...old, world("new/one", { seen: new Date(NOW - DAY).toISOString() })],
+      signals: signals({ visited }),
+    });
+    expect(asked).toEqual(["new/one"]);
+  });
+
   it("asks for a body once, never again as a far world", () => {
     const present = new Map([["gov/vote", { here: 3, perHour: 0, rise: null }]]);
     const { asks } = ask({
