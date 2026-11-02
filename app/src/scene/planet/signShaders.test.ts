@@ -9,7 +9,6 @@ import {
   type PlanetLook,
   type WorldState,
 } from "@gnoworld/core";
-import { createHash } from "node:crypto";
 import {
   CustomBlending,
   FrontSide,
@@ -23,7 +22,7 @@ import {
 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createPlanet, type MapSet } from "./planet.ts";
-import { LIGHT_UNIFORMS, LIGHTS, lightCode } from "./signShaders.ts";
+import { LIGHTS, lightCode } from "./signShaders.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 // A world's signs on its render (slice 7, 7b2): a world at rest carries none, so the program, the meshes and every uniform are the ones
@@ -34,8 +33,6 @@ const REST: WorldState = { vitality: 0.1, present: 0, fresh: false };
 const BUSY: WorldState = { vitality: 0.8, present: 0.6, fresh: false };
 const NEW: WorldState = { vitality: 0.1, present: 0.4, fresh: true };
 const sphere = new SphereGeometry(1, 8, 6);
-// What 21b00fc8's SURFACE_FRAGMENT hashes to, computed from that commit's three files.
-const APPROVED_SURFACE = "1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a";
 
 const mapSet = (extra: Partial<MapSet> = {}): MapSet => {
   const shared = new Texture();
@@ -171,19 +168,25 @@ describe("a world's signs on its render", () => {
     expect(freed).toHaveBeenCalledOnce();
   });
 
-  // The 0 px apart in the render Alexis approved, kept: the hash of the surface shader of 21b00fc8, this file's own additions taken out.
-  // Any other change to what a world at rest draws lands here on purpose.
-  it("leaves the approved render's shader as it was, but for the lights' one gated line", () => {
-    const gated =
-      "  if (settled > 0.0) colour += settlements(axis, direction, flow, day, crack) * (1.0 - 0.8 * overcast);\n";
-    expect(SURFACE_FRAGMENT).toContain(gated);
+  // The light Alexis approved (21b00fc8), word for word: the terminator's arc, the softening towards it, the night a world keeps, its
+  // rim and the blue night of its air. 7b5 draws every world's surface anew, on purpose, so the pin holds the light, not the surface.
+  it("keeps the approved light word for word, whatever the surface under it", () => {
+    for (const line of [
+      "smoothstep(-0.16, 0.95, dot(",
+      "  float facing = max(dot(normal, view), 0.001);\n",
+      "  float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);\n",
+      "  float soft = pow(light, 0.9) * pow(facing, 0.28);\n",
+      "mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();\n",
+      "colour = albedo * shine + albedo * NIGHT;\n",
+      "  float glitter = pow(gleam, 60.0) * 0.05;\n",
+      "  float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);\n",
+      "  if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);\n",
+      "  else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);\n",
+      "mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light)",
+    ])
+      expect(SURFACE_FRAGMENT, line).toContain(line);
     // The Earth's own lights read CITY_LIGHT at rest, so its value is the approved one.
     expect(LIGHTS).toContain("const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);");
-    const approved = SURFACE_FRAGMENT.replace(`${LIGHT_UNIFORMS}\n`, "")
-      .replace(`${LIGHTS}\n`, "")
-      .replace(gated, "")
-      .replace("* CITY_LIGHT *", "* vec3(1.0, 0.8, 0.52) *");
-    expect(createHash("sha256").update(new TextEncoder().encode(approved)).digest("hex")).toBe(APPROVED_SURFACE);
   });
 
   it("reads no light unless a world has some: `settled` is a uniform, so at rest not one of its reads runs", () => {
