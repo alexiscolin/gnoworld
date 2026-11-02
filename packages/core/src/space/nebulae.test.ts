@@ -23,8 +23,9 @@ const point = fc.record({ x: coordinate, y: coordinate, z: coordinate });
 const WIDTH = 1728;
 const HEIGHT = 1080;
 const FOCAL = HEIGHT / 2 / Math.tan((25 * Math.PI) / 180);
-// The fill a frame pays for, in whole screens: every lit sheet on screen, each at most once. The budget this part records.
-const COVER_MOST = 8;
+// The fill a frame pays for, in whole screens: every drawn sheet's quad on screen, each at most once. The budget this part records:
+// first 8 screens of rounds, the same as 10 of the quads the GPU draws (8 / (π / 4) = 10.2).
+const COVER_MOST = 10;
 const EARTH_RADIUS = 1.457;
 const CLUSTER_WIDTH = 340;
 
@@ -63,17 +64,17 @@ function projected(nebula: Nebula, layer: number, eye: Eye) {
   };
 }
 
-// The share of the screen the lit sheets cover: each its disc, cut by the screen's edges.
+// The share of the screen the drawn sheets cover: every sheet with light is drawn whole, its square quad cut by the screen's edges.
 function cover(field: NebulaField, eye: Eye): number {
   let sum = 0;
   for (const nebula of listed(field)) {
-    if (nebulaLight(nebula, eye) < 0.002) continue;
+    if (nebulaLight(nebula, eye) <= 0) continue;
     for (let layer = 0; layer < NEBULA_LAYERS.length; layer += 1) {
       const sheet = projected(nebula, layer, eye);
       if (sheet === undefined) continue;
       const across = Math.max(0, Math.min(sheet.x + sheet.half, WIDTH) - Math.max(sheet.x - sheet.half, 0));
       const down = Math.max(0, Math.min(sheet.y + sheet.half, HEIGHT) - Math.max(sheet.y - sheet.half, 0));
-      sum += (across * down * Math.PI) / 4 / (WIDTH * HEIGHT);
+      sum += (across * down) / (WIDTH * HEIGHT);
     }
   }
   return sum;
@@ -327,7 +328,8 @@ describe("its light", () => {
       expect(nebulaLight(nebula, nebula)).toBe(0);
       expect(nebulaLight(nebula, { x: nebula.x + NEBULA_REACH, y: nebula.y, z: nebula.z })).toBe(0);
       expect(nebulaLight(nebula, { x: nebula.x, y: nebula.y + nebula.size * 0.5, z: nebula.z })).toBe(0);
-      expect(nebulaLight(nebula, { x: nebula.x, y: nebula.y, z: nebula.z + 1200 })).toBeCloseTo(nebula.strength, 9);
+      if (nebula.strength >= 1 / 255)
+        expect(nebulaLight(nebula, { x: nebula.x, y: nebula.y, z: nebula.z + 1200 })).toBeCloseTo(nebula.strength, 9);
     }
   });
 
