@@ -316,6 +316,28 @@ describe("the postcards", () => {
     },
   );
 
+  // 7d6's review (lots 3 and 4): the search's order, a close world before the postcards' bodies. No other set decides it: here the best view
+  // with no close world draws five bodies in its postcards (measured with the close world's score at 0), this one four.
+  it("takes a close world first, then the richest postcard of the Earth's 24 nearest, with poor and rich systems mixed", () => {
+    const rich = Array.from({ length: 180 }, (_, at) => ({
+      id: `rich${String(at % 30)}/w${String(at)}`,
+      namespace: `rich${String(at % 30)}`,
+      use: 1 + (at % 5) * 40,
+    }));
+    const { systems, view } = made([...spread(60, 1), ...rich]);
+    const counted = (system: StarSystem | undefined) =>
+      system === undefined ? 0 : Math.min(3, postcardOf(system, view.eye).worlds.length);
+    const awayOf = ({ place }: StarSystem) => Math.hypot(...Object.values(minus(place, EARTH_PLACE)));
+    const nearest = systems
+      .filter((system) => system.worlds.length > 0)
+      .sort((a, b) => awayOf(a) - awayOf(b))
+      .slice(0, 24)
+      .map(counted);
+    expect(view.close).toBeDefined();
+    expect(Math.max(...view.postcards.map((index) => counted(systems[index])))).toBe(Math.max(...nearest));
+    expect(Math.min(...nearest)).toBeLessThan(Math.max(...nearest));
+  });
+
   it("draws four bodies of a postcard at most, of a body's size, its others as specks: frame 4's densest group is four", () => {
     const [, system] = systemsOf([...crowd("big", 12), { id: "big/top", namespace: "big", use: 500 }]);
     if (system === undefined) throw new Error("no system");
