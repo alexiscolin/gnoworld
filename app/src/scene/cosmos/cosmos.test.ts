@@ -2042,8 +2042,8 @@ describe("the whole cosmos", () => {
         expect(seen(scene).filter((part) => part instanceof Mesh || part instanceof Points)).toHaveLength(0);
       }
       scene.cosmos.show(ONYX);
-      for (const clock of [1.1, 1.1, 1.2]) await frame(scene, clock);
-      const open = await frame(scene, 1.2 + DIVE.fade);
+      for (const clock of [1.1, 1.1, 1.1]) await frame(scene, clock);
+      const open = await frame(scene, 1.1 + DIVE.fade);
       expect(open.web?.share).toBe(1);
       expect((await frame(scene, 1.3 + DIVE.seconds)).dive.along).toBe(1);
       expect(earthShown(scene)).toBe(true);
