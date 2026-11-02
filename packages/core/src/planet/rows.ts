@@ -116,7 +116,7 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
   },
   "dark carbon": {
     maps: ["ceres"],
-    palettes: [ramp(0x040405, 0x0f0e0e, 0x383330), ramp(0x050403, 0x140f0b, 0x423629)],
+    palettes: [ramp(0x0c0b0b, 0x2a2725, 0x5e5650), ramp(0x0e0c0a, 0x2e2822, 0x6a5a48)],
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.022, 0.034],

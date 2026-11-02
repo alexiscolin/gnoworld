@@ -201,8 +201,10 @@ describe("the anchors", () => {
 });
 
 // Each new anchor reads as its reference by colour (7b4): both its ramps' mid colours in Lab, and Iapetus's two faces by its low and high.
+// Dark carbon reads dark but visible (the chief, 7b5; F4225, F4242): at L* 4 its lit ground fell under 8-bit rounding and the grade's toe.
 type Span = readonly [number, number];
 const REFERENCE: Record<string, { l: Span; a?: Span; b?: Span; chroma?: Span }> = {
+  "dark carbon": { l: [14, 22], chroma: [0, 10] },
   "nitrogen ice": { l: [45, 70], a: [8, 20], b: [10, 25] },
   "grooved ice": { l: [50, 65], chroma: [0, 9] },
   snowball: { l: [70, 85], b: [-20, -10] },
