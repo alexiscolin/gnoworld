@@ -12,6 +12,7 @@ import {
   type Nature,
   type RealmFunctions,
 } from "./look.ts";
+import { planetRecipe, worldRecipe } from "./recipe.ts";
 import { sha256 } from "./sha256.ts";
 
 // Which of the twelve a world is (slice 7, 7b2; ADR-0002 §3). All 32 bytes of the seed are taken (F3476), so the choice reads a second
@@ -103,6 +104,50 @@ describe("anchorOf", () => {
     expect(byteOf(sha256(seed), 0)).toBe(byte);
     expect(anchorOf(seed)).toBe(anchor);
   });
+});
+
+// The minor class (slice 7, 7b4; ADR-0002 §3): any other anchor, by the others' weights, on the second hash's bytes 26 and 27 read as one
+// word, so a small weight keeps its share where a byte would round it away.
+const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
+  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant);
+  const total = others.reduce((sum, [, weight]) => sum + weight, 0);
+  let left = Math.floor(((byteOf(more, 26) * 256 + byteOf(more, 27)) * total) / 65536);
+  for (const [anchor, weight] of others) {
+    if (left < weight) return anchor;
+    left -= weight;
+  }
+  throw new Error("the weights do not reach the word");
+};
+
+describe("the minor class", () => {
+  it("draws any other anchor by its weight among the others, on the second hash's bytes 26 and 27", () => {
+    for (const [at, seed] of seeds(2000).entries()) {
+      const dominant = ANCHORS[at % ANCHORS.length] ?? "rocky";
+      const path = asciiBytes(`gno.land/r/n${String(at)}/home`);
+      expect(planetRecipe(path, dominant).minor).toBe(minorOf(sha256(seed), dominant));
+    }
+  });
+
+  it("comes out at its weight within a percent, over 10,000 worlds", () => {
+    const counts = new Map<Anchor, number>();
+    const total = 10_000;
+    for (let at = 0; at < total; at += 1) {
+      const { minor } = worldRecipe(`mix${String(at)}/home`);
+      counts.set(minor, (counts.get(minor) ?? 0) + 1);
+    }
+    const expected = new Map(
+      ANCHORS.map((minor) => {
+        const weightOf = (anchor: Anchor) => WEIGHTS.find(([one]) => one === anchor)?.[1] ?? 0;
+        const share = ANCHORS.filter((dominant) => dominant !== minor).reduce(
+          (sum, dominant) => sum + (weightOf(dominant) / 256) * (weightOf(minor) / (256 - weightOf(dominant))),
+          0,
+        );
+        return [minor, share];
+      }),
+    );
+    for (const anchor of ANCHORS)
+      expect(Math.abs((counts.get(anchor) ?? 0) / total - (expected.get(anchor) ?? 0)), anchor).toBeLessThan(0.01);
+  }, 30_000);
 });
 
 describe("a world's nature nudges its class", () => {

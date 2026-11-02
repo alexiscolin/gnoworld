@@ -75,6 +75,10 @@ export {
   type PlanetLook,
   type RealmFunctions,
 } from "./planet/look.ts";
+export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export type { Lab, Palette } from "./planet/palette.ts";
+export { SURFACE, type SurfaceName } from "./planet/spans.ts";
+export { FINEST, type Surface } from "./planet/surface.ts";
 export { nextVitality, presenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
 export {
   isFresh,

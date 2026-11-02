@@ -1,6 +1,7 @@
 // A world's look, a pure function of its path and the anchor it is given (ADR-0002 §3): sha256("gnoworld/planet/v1" ‖ path), whose 256 bits feed continuous values
 // inside an anchor's row. Only + - * / reach a value, so every engine gives the same look: rotations stay angles, and the app does
 // the trigonometry. Tier 1 (docs/REVIEW.md). The path comes in as bytes: core has no TextEncoder.
+import { REALM_PREFIX } from "../chain/realm.ts";
 import { ANCHORS, MAPS, type Anchor, type AnchorRow, type MapName, type Ramp, type Rgb } from "./anchors.ts";
 import { anchorOf, natureOf, type Nature, type RealmFunctions } from "./choice.ts";
 import { ROWS } from "./rows.ts";
@@ -22,7 +23,6 @@ const RING_INNER = [1.25, 1.45] as const;
 const RING_WIDTH = [0.62, 0.95] as const;
 const RING_OPACITY = [0.34, 0.72] as const;
 const LAST_ASCII = 127;
-const WORLD_PATH = "gno.land/r/";
 
 /** The bytes of a text that is ASCII by its schema, for want of a TextEncoder: past it a code unit would wrap, and two ids be one planet. */
 export function asciiBytes(text: string): Uint8Array {
@@ -166,6 +166,6 @@ export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => look
 
 /** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. An id is ASCII by its schema. */
 export function worldLook(id: string, nature: Nature | null = null): PlanetLook {
-  const seed = planetSeed(asciiBytes(`${WORLD_PATH}${id}`));
+  const seed = planetSeed(asciiBytes(`${REALM_PREFIX}${id}`));
   return lookOf(seed, anchorOf(seed, nature));
 }

@@ -1,4 +1,4 @@
-// Which of the twelve a world is (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class reads a second hash of it. The
+// Which of the twelve a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class reads a second hash of it. The
 // strange ones stay rare. A nature leans a world without fixing it, and is never shown: the rules read 9 of 12 unseen realms right
 // (.claude/tmp/slice-7/reports/chain-feasibility.md), so an error must cost nothing. Tier 1 (docs/REVIEW.md).
 import type { Anchor } from "./anchors.ts";
@@ -13,7 +13,6 @@ export interface RealmFunctions {
 }
 
 // Each anchor's share of 256 bytes, in ADR-0002's order: tidally locked and shattered are the strange ones, about one world in ten.
-// The rest, 12, is shattered's.
 const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["rocky", 30],
   ["temperate", 26],
@@ -26,6 +25,7 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["cloud deck", 18],
   ["tidally locked", 12],
   ["dark carbon", 18],
+  ["shattered", 12],
 ];
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
   token: ["gas giant", "ice giant"],
@@ -34,27 +34,40 @@ const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
 };
 // The bytes under this, of 256, take a nature's lean: about a third, so a misread nature moves a third of its worlds at most.
 const LEAN = 90;
+const MINOR_WORD = 26;
 const TOKEN = ["Transfer", "Approve", "BalanceOf", "TotalSupply"];
 const GAME = ["Play", "Move", "Guess", "Shot", "Lobby", "Game", "Challenge"];
 
-/** 32 bytes more of a world, for what the seed's own have no room for. Byte 0 is its class, 1 and 2 its nudge, 3 to 8 its signs' form. */
+/**
+ * 32 bytes more of a world, for what the seed's own have no room for. Byte 0 is its class, 1 and 2 its nudge, 3 to 8 its signs' form,
+ * 9 to 25 its surface, 26 and 27 its minor class, 28 and 29 its palette's grade.
+ */
 export const moreSeed = (seed: Uint8Array): Uint8Array => sha256(seed);
 
-function drawn(byte: number): Anchor {
-  let left = byte;
-  for (const [anchor, weight] of WEIGHTS) {
-    if (left < weight) return anchor;
-    left -= weight;
+// The anchor `left` falls on, walking `weights` in order: what is past all but the last is the last's.
+function walked(weights: readonly (readonly [Anchor, number])[], left: number): Anchor {
+  let rest = left;
+  for (const [anchor, weight] of weights.slice(0, -1)) {
+    if (rest < weight) return anchor;
+    rest -= weight;
   }
-  return "shattered";
+  return weights.at(-1)?.[0] ?? "rocky";
 }
 
 /** The class of a world from its seed, a nature leaning a third of its worlds its own way. */
 export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor {
   const [draw = 0, lean = 0, among = 0] = moreSeed(seed);
-  if (nature === null || lean >= LEAN) return drawn(draw);
+  if (nature === null || lean >= LEAN) return walked(WEIGHTS, draw);
   const leaning = LEANS[nature];
-  return leaning[among % leaning.length] ?? drawn(draw);
+  return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
+}
+
+/** The class mixed under `dominant`: any other, by its weight among the others, on one word so a small weight keeps its share. */
+export function minorOf(more: Uint8Array, dominant: Anchor): Anchor {
+  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant);
+  const total = others.reduce((sum, [, weight]) => sum + weight, 0);
+  const word = (more[MINOR_WORD] ?? 0) * 256 + (more[MINOR_WORD + 1] ?? 0);
+  return walked(others, Math.floor((word * total) / 65536));
 }
 
 const holds = (functions: readonly string[], word: string) => functions.some((name) => name.includes(word));
