@@ -7,13 +7,13 @@ import { Labels, type Projector } from "./labels.ts";
 // The cosmos's labels on the page (ADR-0002 §9: HTML labels pooled, never made each frame; slice 7 §3: text only, off each other): eight
 // elements made once, their words written as text ten times a second at most, each frame moving them beside their bodies.
 const SCREEN = { width: 1728, height: 1080 };
-const projector = (box?: { left: number; top: number; right: number; bottom: number }): Projector => {
+const projector = (box?: { left: number; top: number; right: number; bottom: number }, screen = SCREEN): Projector => {
   const spot = { x: 0, y: 0, radius: 0, depth: 0 };
   return {
-    sight: { ...SCREEN, box },
+    sight: { ...screen, box },
     seen(at: Vector3, radius: number) {
-      spot.x = SCREEN.width / 2 + at.x * 20;
-      spot.y = SCREEN.height / 2 - at.y * 20;
+      spot.x = screen.width / 2 + at.x * 20;
+      spot.y = screen.height / 2 - at.y * 20;
       spot.radius = radius * 20;
       spot.depth = -at.z;
       return spot;
@@ -102,6 +102,7 @@ describe("the pool", () => {
     expect(after).toHaveLength(LABEL_SLOTS);
     expect(after.every((slot, at) => slot === before[at])).toBe(true);
     expect(held?.textContent).toContain("members");
+    expect(after.filter((slot) => slot.textContent.includes("members"))).toEqual([held]);
     expect(after.filter((slot) => slot.textContent.includes("govern"))).toEqual([]);
     expect(after.filter((slot) => slot.textContent.includes("chess"))).toHaveLength(1);
   });
@@ -310,5 +311,68 @@ describe("a frame", () => {
     changes.push(...watching.takeRecords());
     watching.disconnect();
     expect(changes).toEqual([]);
+  });
+});
+
+describe("where a label may stand (F3772)", () => {
+  // Each shown label's box on the screen, by its world.
+  const boxOf = (from: Labels, id: string) => {
+    const stat = placed(from).find((each) => each.id === id);
+    if (stat === undefined) throw new Error(`no label for ${id}`);
+    const right = stat.left + stat.width * stat.scale;
+    return { ...stat, right, bottom: stat.top + stat.height * stat.scale };
+  };
+  const one = (from: Labels, at: ReturnType<typeof body>) => {
+    from.show(labelled([near("gov/govern")]).map((label) => ({ label, at })));
+    from.tick(EYE, true);
+    return boxOf(from, "gov/govern");
+  };
+
+  it("shows no label for a body behind the eye", () => {
+    labels.show(
+      labelled([near("gov/govern")]).map((label) => ({
+        label,
+        at: { ...body(0, 0), position: new Vector3(0, 0, 20) },
+      })),
+    );
+    labels.tick(EYE, true);
+    expect(shown()).toHaveLength(0);
+  });
+
+  it("keeps a label off another labelled body's disc", () => {
+    const [first, second] = [body(-10, 0), body(-9.4, 3.3)];
+    const chosen = labelled([near("gov/govern"), near("memba/members")]);
+    labels.show(chosen.map((label, at) => ({ label, at: at === 0 ? first : second })));
+    labels.tick(EYE, true);
+    const box = boxOf(labels, "gov/govern");
+    const [x, y] = [SCREEN.width / 2 - 9.4 * 20, SCREEN.height / 2 - 3.3 * 20];
+    expect(box.shown).toBe(true);
+    expect(
+      Math.hypot(Math.max(box.left - x, 0, x - box.right), Math.max(box.top - y, 0, y - box.bottom)),
+    ).toBeGreaterThanOrEqual(20);
+  });
+
+  it("keeps a label out of the header's band, the top 9% of the window", () => {
+    const box = one(labels, body(0, (SCREEN.height / 2 - 110) / 20));
+    expect(box.shown).toBe(true);
+    expect(box.top).toBeGreaterThanOrEqual(0.09 * SCREEN.height);
+  });
+
+  it("keeps a label out of the ticker's band, the window's last 34 px, though its body sits just under the window", () => {
+    // Its pill above it would end 1,058 px down, in the ticker: hidden, for no other place is left.
+    const box = one(labels, body(0, (SCREEN.height / 2 - (SCREEN.height + 20)) / 20));
+    expect(box.shown && box.bottom > SCREEN.height - 34).toBe(false);
+  });
+
+  it("keeps a label out of the rail's band at 1728 px wide, and lets it stand there under 900 px, where there is no rail", () => {
+    const wide = one(labels, body((1728 - 190 - SCREEN.width / 2) / 20, 0));
+    expect(wide.shown).toBe(true);
+    expect(wide.right).toBeLessThanOrEqual(1728 - 168);
+    const narrow = { width: 899, height: SCREEN.height };
+    const phone = new Labels(document, projector(undefined, narrow));
+    const box = one(phone, body((899 - 190 - narrow.width / 2) / 20, 0));
+    expect(box.shown).toBe(true);
+    expect(box.right).toBeGreaterThan(899 - 168);
+    phone.dispose();
   });
 });

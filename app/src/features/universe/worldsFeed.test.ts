@@ -156,4 +156,37 @@ describe("the worlds' feed", () => {
     ]);
     worlds.leave();
   });
+
+  it.each([
+    [
+      "covered",
+      (worlds: WorldsFeed, scene: Scene) => {
+        worlds.sync(scene, false);
+      },
+    ],
+    [
+      "gone",
+      (worlds: WorldsFeed) => {
+        worlds.leave();
+      },
+    ],
+  ])("lets go of who-is-here read after the cosmos was %s: no worlds handed, no timer (F3780)", async (_, away) => {
+    let answer: (said: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    const before = cosmos.mock.calls.length;
+    away(worlds, scene);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(cosmos.mock.calls.slice(before).filter(([handed]) => handed !== undefined)).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+    worlds.leave();
+  });
 });
