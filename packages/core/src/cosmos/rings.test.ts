@@ -6,7 +6,7 @@ import { seatInRings, type Seat } from "./rings.ts";
 // core/cosmos's cells (slice 7, 7d1; ADR-0002 §10; F3520): ring r holds 6r cells, each system has a ray from the centre, and by rank
 // each takes the first cell free along its ray. `walked` is that sentence as plain code, a ring at a time for each ray in turn: it costs
 // n^1.5 steps and the real one must not, so it is the oracle here and never the product.
-const cellOn = (turn: number, ring: number): number => Math.floor(turn * 6 * ring);
+const cellOn = (turn: number, ring: number): number => Math.floor(turn * (6 * ring));
 
 function walked(turns: readonly number[]): Seat[] {
   const taken = new Set<number>();
@@ -168,15 +168,15 @@ describe("seatInRings, for any rays", () => {
   });
 });
 
-// The worst rays a walk can meet, 30 ms measured. No clock here, for two bounds on one failed at load 20 and 34 (F3551): the test's own
-// timeout is the bound, and a plain walk, at 7 billion steps, never reaches it.
+// The worst rays a walk can meet. No clock here, for two bounds on one failed at load 20 and 34 (F3551): the test's own timeout is the
+// bound, so n^2 must never fit it: with `nextFrom`'s links left uncompressed, 120,000 rays fitted (3.8 s), 250,000 took 54 s (F3559).
 describe("its cost: n log n at most, whatever the rays", () => {
-  it("seats 120,000 rays that are one ray, a ring each", () => {
-    expect(seatInRings(new Array<number>(120_000).fill(0.25)).at(-1)?.ring).toBe(120_000);
+  it("seats 250,000 rays that are one ray, a ring each", () => {
+    expect(seatInRings(new Array<number>(250_000).fill(0.25)).at(-1)?.ring).toBe(250_000);
   });
 
-  it("seats 120,000 rays on eight turns: each cell looked at seats one", () => {
-    const eight = Array.from({ length: 120_000 }, (_, at) => (at % 8) / 8);
-    expect(seatInRings(eight).at(-1)?.ring).toBe(15_000);
+  it("seats 250,000 rays on eight turns: each cell looked at seats one", () => {
+    const eight = Array.from({ length: 250_000 }, (_, at) => (at % 8) / 8);
+    expect(seatInRings(eight).at(-1)?.ring).toBe(31_250);
   });
 });
