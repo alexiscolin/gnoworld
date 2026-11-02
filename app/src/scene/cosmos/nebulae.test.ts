@@ -436,6 +436,24 @@ describe("its sheets", () => {
     expect(scene.stage.children).toHaveLength(0);
   });
 
+  it("asks nothing once its owner left, though its program finished compiling after", async () => {
+    const scene = made();
+    let compiled: (scene: Object3D) => void = () => undefined;
+    scene.renderer.compileAsync.mockImplementation(
+      () =>
+        new Promise<Object3D>((done) => {
+          compiled = done;
+        }),
+    );
+    await awake(scene);
+    const before = maps.load.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+    scene.owner.dispose();
+    compiled(scene.nebulae.group);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    expect(maps.load.mock.calls.length).toBe(before);
+  });
+
   it("asks nothing once its owner left, though it was waiting to", async () => {
     const scene = made();
     scene.nebulae.wake();

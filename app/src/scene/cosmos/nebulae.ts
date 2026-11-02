@@ -26,6 +26,7 @@ const FADE_SECONDS = 1;
 export class Nebulae {
   readonly group = new Group();
   readonly #device: EarthDevice;
+  readonly #gone: AbortSignal;
   readonly #maps: BodyMaps;
   readonly #ahead: Ahead;
   readonly #kept = new NebulaField();
@@ -39,6 +40,7 @@ export class Nebulae {
 
   constructor(device: EarthDevice, owner: Disposer) {
     this.#device = device;
+    this.#gone = owner.signal;
     this.#maps = new BodyMaps(device, this.#came);
     this.#ahead = new Ahead(device, this.group, this.#came);
     this.#images = NEBULA_IMAGES.map(() => sheetsOf(owner));
@@ -119,8 +121,10 @@ export class Nebulae {
     }
   }
 
-  // Something came, the program or an image, or the wait ended: each image a lit nebula needs is asked, and what is here shows.
+  // Something came, the program or an image, or the wait ended: each image a lit nebula needs is asked, and what is here shows. Once its
+  // owner left, nothing: a compile that ends late would ask the freed images again.
   readonly #came = (): void => {
+    if (this.#gone.aborted) return;
     for (const [at, image] of this.#images.entries()) {
       const name = NEBULA_IMAGES[at];
       const texture = this.#ready && image.count > 0 && name !== undefined ? this.#maps.named(name) : undefined;
