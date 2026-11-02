@@ -1,5 +1,5 @@
-// The small set of real maps the bodies share (ADR-0002 §3): each asked once, at a body's width, uploaded before a body shows it, and freed
-// together. A map that does not come leaves its worlds as points; the rest stand.
+// The small set of real maps the bodies share (ADR-0002 §3), and the nebulae's images: each asked once, at a body's width, uploaded before
+// it shows, and freed together. A map that does not come leaves its worlds as points, and an image its nebulae unshown; the rest stand.
 import type { MapName, PlanetLook } from "@gnoworld/core";
 import type { Texture } from "three";
 import type { EarthDevice } from "../earth/device.ts";
@@ -35,6 +35,12 @@ export class BodyMaps {
     const [clouds, ring] = [this.#maps.get("clouds"), this.#maps.get("ring")];
     if (clouds === undefined || ring === undefined || names.some((name) => !this.#maps.has(name))) return undefined;
     return { map: (name) => this.#maps.get(name) ?? clouds, clouds, ring };
+  }
+
+  /** A map by its name, asked if it was not: until it came, none. */
+  named(name: string): Texture | undefined {
+    this.#fetch(name);
+    return this.#maps.get(name);
   }
 
   #fetch(name: string): void {

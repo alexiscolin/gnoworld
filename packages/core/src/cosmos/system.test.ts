@@ -15,7 +15,7 @@ import {
   type StarSystem,
   type WorldHeld,
 } from "./system.ts";
-import { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
+import { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
 // its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one (F3563).
@@ -220,6 +220,26 @@ describe("focusOf", () => {
     const out = { x: NaN, y: NaN, z: NaN };
     focusOf({ x: 3, y: -4, z: 7 }, out);
     expect(out).toEqual({ x: 3, y: 0, z: 7 });
+  });
+});
+
+describe("focusDistance", () => {
+  it("is how far the eye stands from what it looks at: the arrival's 36 units", () => {
+    expect(focusDistance(HOME)).toBeCloseTo(36, 0);
+  });
+
+  it("agrees with focusOf from any eye above or under the disc", () => {
+    const near = fc.double({ min: -5000, max: 5000, noNaN: true });
+    fc.assert(
+      fc.property(near, near, near, (x, y, z) => {
+        const eye = { x: NaN, y: NaN, z: NaN };
+        const focus = { x: NaN, y: NaN, z: NaN };
+        toMap({ x: HOME.x + x, y: HOME.y + y, z: HOME.z + z }, eye);
+        focusOf(eye, focus);
+        const away = Math.hypot(eye.x - focus.x, eye.y - focus.y, eye.z - focus.z);
+        expect(focusDistance({ x: HOME.x + x, y: HOME.y + y, z: HOME.z + z })).toBeCloseTo(away, 6);
+      }),
+    );
   });
 });
 

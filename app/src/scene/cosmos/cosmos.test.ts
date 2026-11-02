@@ -4,6 +4,7 @@ import {
   GROWTH,
   growthAt,
   HOME,
+  NEBULA_IMAGES,
   ROOM,
   spreadAt,
   systemsOf,
@@ -1001,5 +1002,78 @@ describe("hidden", () => {
     arrive(late);
     await settled();
     expect(freed).toHaveBeenCalledOnce();
+  });
+});
+
+describe("its nebulae", () => {
+  const AFTER_THE_WAIT = 5000;
+  const nebulaImages = () =>
+    maps.load.mock.calls
+      .map(([url]) => nameOf(url as string))
+      .filter((name) => NEBULA_IMAGES.some((image) => image === name));
+  const sheetsShown = (scene: ReturnType<typeof made>) => {
+    const seen: Object3D[] = [];
+    scene.stage.traverseVisible((part) => seen.push(part));
+    return seen.filter(
+      (part) => part instanceof Mesh && "uImage" in ((part.material as Partial<ShaderMaterial>).uniforms ?? {}),
+    );
+  };
+  const lit = async () => {
+    const scene = made();
+    await shown(scene);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    scene.cosmos.tick(HOME, 0);
+    return scene;
+  };
+
+  it("brings them in behind the worlds: none at first, lit once their images came, none while hidden", async () => {
+    const scene = made();
+    await shown(scene);
+    expect(scene.cosmos.stats().nebulae).toBe(0);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    scene.cosmos.tick(HOME, 0);
+    expect(nebulaImages().length).toBeGreaterThan(0);
+    expect(scene.cosmos.stats().nebulae).toBeGreaterThan(0);
+    expect(sheetsShown(scene).length).toBeGreaterThan(0);
+    scene.cosmos.show(undefined);
+    expect(scene.cosmos.stats().nebulae).toBe(0);
+    expect(sheetsShown(scene)).toHaveLength(0);
+  });
+
+  it("darkens them near a world: an eye a little above the disc sees black between the bodies", async () => {
+    const scene = await lit();
+    expect(scene.cosmos.stats().nebulae).toBeGreaterThan(0);
+    const near = { x: 0, y: 0, z: 0 };
+    toScene({ x: 0, y: 2, z: 0 }, near);
+    scene.cosmos.tick(near, 0);
+    expect(scene.cosmos.stats().nebulae).toBe(0);
+  });
+
+  it("puts them out past a cluster's distance, where the whole cosmos is the view", async () => {
+    const scene = await lit();
+    const above = { x: 0, y: 0, z: 0 };
+    toScene({ x: 0, y: 700, z: 0 }, above);
+    scene.cosmos.tick(above, 0);
+    expect(scene.cosmos.stats().nebulae).toBe(0);
+  });
+
+  it("frees their images with the maps after five minutes covered, not before", async () => {
+    const free: string[] = [];
+    maps.load.mockImplementation((url: string) => {
+      const texture = new Texture(IMAGE);
+      vi.spyOn(texture, "dispose").mockImplementation(() => {
+        free.push(nameOf(url));
+      });
+      return Promise.resolve(texture);
+    });
+    const scene = made();
+    await shown(scene);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    expect(nebulaImages().length).toBeGreaterThan(0);
+    scene.cosmos.show(undefined);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 - 1000);
+    for (const image of nebulaImages()) expect(free).not.toContain(image);
+    await vi.advanceTimersByTimeAsync(2000);
+    for (const image of nebulaImages()) expect(free).toContain(image);
   });
 });

@@ -48,3 +48,9 @@ export function focusOf({ x, y, z }: Point, out: { x: number; y: number; z: numb
   out.y = 0;
   out.z = y > 0 ? z - (y * COS) / SIN : z;
 }
+
+/** How far the eye stands from what it looks at, `focusOf`'s place, in world units: along the view's axis, or straight down under the disc. */
+export function focusDistance({ y, z }: Point): number {
+  const height = (y - CENTRE.y) * COS + (z - CENTRE.z) * SIN;
+  return height > 0 ? height / SIN : -height;
+}

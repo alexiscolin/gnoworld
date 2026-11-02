@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { BOUNDS } from "../../../packages/core/src/lod/ladder.ts";
+import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
+import { toScene } from "../../../packages/core/src/frame/disc.ts";
+import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, colours, near } from "./geometry.ts";
 import { opened, running, stats } from "./sceneStage.ts";
@@ -42,6 +45,7 @@ const NOT_YET = {
   dotPixels: 0,
   earth: false,
   screen: { sun: { x: 0, y: 0, radius: 0 }, earth: undefined, bodies: [] },
+  nebulae: 0,
 };
 const served = (page: Page, body: string, status = 200) =>
   page.route("**/worlds.json", (route) => route.fulfill({ status, body, contentType: "application/json" }));
@@ -248,4 +252,71 @@ test("gives the release's page the cosmos as a view, from the recorded file, for
   await running(page);
   await standing(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
+});
+
+// The nebulae: real images, warped and recoloured, in layers behind the worlds (ADR-0002 §10, "Space views"), seen from a system's
+// distance to a cluster's, near-black near a world, each with its credit wherever it shows.
+const NEBULA = new RegExp(`/textures/(${NEBULA_IMAGES.join("|")})\\.webp$`);
+const lit = (page: Page) => expect.poll(async () => (await cosmos(page)).nebulae, SLOW).toBeGreaterThan(0);
+
+test("lights nebulae from real images behind the arrival, with their credits beside them", async ({ page }) => {
+  const images = new Set<string>();
+  page.on("request", (request) => {
+    const name = NEBULA.exec(request.url())?.[1];
+    if (name !== undefined) images.add(name);
+  });
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  expect(images.size).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Credits" }).click();
+  for (const name of images) {
+    const credit = CREDITS.find(({ files }) => files.includes(name));
+    expect(credit).toBeDefined();
+    await expect(page.getByRole("dialog")).toContainText(credit?.line ?? "no credit");
+  }
+});
+
+test("keeps the corners near-black and the draw bound with the nebulae lit", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  await opened(page);
+  const { calls } = await stats(page);
+  expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
+  await page.evaluate(() => {
+    for (const child of document.body.children)
+      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
+  });
+  const shot = await page.locator("canvas").screenshot();
+  // The top left, and the bottom left under the hero; the right holds a sun and the Credits.
+  const corners = await colours(page, shot, [
+    [4, 4, 40, 40],
+    [4, COMPUTER.height - 40, 40, COMPUTER.height - 4],
+  ]);
+  for (const corner of corners) expect(Math.max(...corner)).toBeLessThan(60);
+});
+
+test("puts the nebulae out near a world: space is near-black there", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  const near = { x: 0, y: 0, z: 0 };
+  toScene({ x: 0, y: 2, z: 0 }, near);
+  await moveTo(page, near);
+  await expect.poll(async () => (await cosmos(page)).nebulae, SLOW).toBe(0);
+});
+
+test("gives the release's page the nebulae, and their credits in its footer", async ({ page }) => {
+  await page.setViewportSize(COMPUTER);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await standing(page);
+  await lit(page);
+  for (const credit of CREDITS.filter(({ files }) => files.some((file) => NEBULA_IMAGES.some((name) => name === file))))
+    await expect(page.locator("footer")).toContainText(credit.line);
 });
