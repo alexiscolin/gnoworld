@@ -164,6 +164,7 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
+export { beatAt } from "./space/beat.ts";
 export { driftAt, glideAt, HOME, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { smoothstep } from "./space/smooth.ts";
