@@ -338,7 +338,14 @@ test.describe("a world with no capture shows no preview", () => {
       await page.goto(path);
       await hydrated(page);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
-      await expect(page.locator("figure, picture, img, video, canvas, iframe, [data-preview]")).toHaveCount(0);
+      // Not previews: the scene's own canvas (a world's page draws its planet in it, live) and PlanetThumb's drawn disc (the chat's
+      // column of worlds, `data-fallback`: no picture of any world, ui draws it). A capture, an image of the world, a frame or a
+      // `[data-preview]` still count.
+      await expect(
+        page.locator(
+          "figure, picture, img:not([data-fallback] > img), video, canvas:not([data-scene]), iframe, [data-preview]",
+        ),
+      ).toHaveCount(0);
       await expect(page.locator('meta[property="og:image"], meta[name="twitter:image"]')).toHaveCount(0);
     });
   }
