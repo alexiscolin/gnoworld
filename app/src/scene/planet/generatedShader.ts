@@ -83,6 +83,10 @@ void main() {
     float big = shape.craters > 0.0 ? cratersAt(round, shape.scale * 4.0, pixel) : 0.0;
     cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(round, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
+    if (shape.sea > 0.0) {
+      vec4 land = fbm(p, shape.scale * 0.6, pixel, 0.0, 3.0);
+      t = shareOf(vec2(0.92 * land.w / land.y + 0.4 * ground.w / ground.y, 1.003));
+    }
     broad = ground.z / ground.y;
     fray = (ground.x - ground.z) / ground.y;
     height = ground.x / ground.y + cratered * 0.8;
