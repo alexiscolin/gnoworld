@@ -8,7 +8,7 @@ import { postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { box, brightShare, colours, near } from "./geometry.ts";
+import { box, brightness, brightShare, colours, near } from "./geometry.ts";
 import { hideThePage, opened, running, stats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
@@ -539,6 +539,24 @@ test("gives the release's page the nebulae, and their credits in its footer", as
   await lit(page);
   for (const credit of CREDITS.filter(({ files }) => files.some((file) => NEBULA_IMAGES.some((name) => name === file))))
     await expect(page.locator("footer")).toContainText(credit.line);
+});
+
+// 7d6's design review: the lab drew in full the five suns the home dims under its hero, and Alexis judges the look on the lab.
+test("dims in the lab the suns the home dims under its hero, the same view drawn", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  const hero = await box(page, "[data-clear]");
+  const under = [hero.x, hero.y, hero.x + hero.width, hero.y + hero.height].map(Math.round);
+  const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = under;
+  await lit(page);
+  const [home] = await brightness(page, await stillPicture(page), [[x0, y0, x1, y1]]);
+  const { eye } = await cosmos(page);
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await lit(page);
+  const [lab] = await brightness(page, await stillPicture(page), [[x0, y0, x1, y1]]);
+  expect((await cosmos(page)).eye).toEqual(eye);
+  expect(lab).toBeLessThanOrEqual((home ?? NaN) + 1);
 });
 
 // The light the nebulae add, read as the same view twice, their images refused and then let through: the video's nebulae are coloured

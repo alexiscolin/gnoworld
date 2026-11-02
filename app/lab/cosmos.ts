@@ -1,7 +1,7 @@
 // The cosmos as a view (slice 7, 7d2 and 7d6), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file, the
 // view at rest first. The camera keeps the Earth at the centre: a wheel backs away and comes back, a drag moves the eye round it.
 import { Worlds } from "@gnoworld/schemas/indexer";
-import { HOME } from "@gnoworld/core";
+import { HERO_ZONE, HOME } from "@gnoworld/core";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { startScene } from "../src/scene/scene.ts";
 import recorded from "./worlds.json" with { type: "json" };
@@ -22,6 +22,17 @@ if (panel !== null) panel.hidden = true;
 const scene = startScene({ canvas, remembered: undefined, remember: () => undefined, onLost: () => undefined });
 scene.cosmos(Worlds.parse(recorded).worlds);
 Reflect.set(globalThis, "__gnoworldScene", scene);
+// The hero's room (core's HERO_ZONE), which holds the home's text: the suns the home dims under its words are dimmed here too.
+const keepHeroRoom = () => {
+  scene.keepClear({
+    left: 0,
+    top: HERO_ZONE.top * innerHeight,
+    right: HERO_ZONE.right * innerWidth,
+    bottom: innerHeight,
+  });
+};
+addEventListener("resize", keepHeroRoom);
+keepHeroRoom();
 
 let away = 1;
 let aside = 0;

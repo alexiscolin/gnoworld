@@ -83,5 +83,10 @@ export const restoreContext = (page: Page) =>
 export const hideThePage = (page: Page) =>
   page.evaluate(() => {
     for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
+      if (
+        child instanceof HTMLElement &&
+        !(child instanceof HTMLCanvasElement) &&
+        child.querySelector("canvas") === null
+      )
+        child.style.visibility = "hidden";
   });
