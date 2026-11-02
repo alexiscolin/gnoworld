@@ -18,6 +18,7 @@ export class Whole {
   #set: WebSet | undefined;
   #share = 0;
   #ratio = 1;
+  #compiled = false;
 
   /** `came` is told when its part came, which then needs a look. */
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
@@ -40,7 +41,10 @@ export class Whole {
     this.#device.stage.add(web.group);
     web.resize(this.#ratio);
     if (this.#set !== undefined) web.stand(this.#set, Date.now());
-    new Ahead(this.#device, web.group, this.#device.moved).ask();
+    new Ahead(this.#device, web.group, () => {
+      this.#compiled = true;
+      this.#device.moved();
+    }).ask();
     this.#came();
   };
 
@@ -57,13 +61,17 @@ export class Whole {
     this.#door.part?.resize(ratio);
   }
 
-  /** A frame from `eye`, on the stage: how much of the view is the whole cosmos's, which the rest gives up. */
+  /** A frame from `eye`, on the stage: how much of the view is the whole cosmos's, which the rest gives up. None while it cannot take it:
+   * its chunk on its way or failed, its program not compiled, no world to draw; its first frame asks a look. */
   advance(eye: Point, seconds: number): number {
     const distance = focusDistance(eye);
     if (distance > NEAR) this.#door.open();
-    this.#share = wholeShare(distance);
-    this.#door.part?.advance(eye, seconds, this.#share);
-    return this.#share;
+    const web = this.#door.part;
+    const share = web !== undefined && this.#compiled && web.count > 0 ? wholeShare(distance) : 0;
+    if (share > 0 && this.#share === 0) this.#came();
+    this.#share = share;
+    web?.advance(eye, seconds, share);
+    return share;
   }
 
   /** A look from the eye on the map, through a lens of `focal` pixels, from `eye` on the stage. */

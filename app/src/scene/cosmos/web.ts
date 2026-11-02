@@ -183,6 +183,11 @@ export class Web {
     this.group.visible = share > 0 && this.#held.length > 0;
   }
 
+  /** How many worlds it draws. */
+  get count(): number {
+    return this.#held.length;
+  }
+
   /** What stands, for the journeys. */
   stats() {
     return {

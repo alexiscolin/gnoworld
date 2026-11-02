@@ -1121,6 +1121,8 @@ describe("the whole cosmos", () => {
     scene.stage.traverseVisible((part) => found.push(part));
     return found;
   };
+  const earthShown = (scene: ReturnType<typeof made>) =>
+    seen(scene).some((part) => part instanceof Stage && part !== scene.stage);
   const shownWith = (scene: ReturnType<typeof made>, name: string) =>
     seen(scene).filter((part) => part instanceof Points && (part.geometry as BufferGeometry).hasAttribute(name));
 
@@ -1147,10 +1149,15 @@ describe("the whole cosmos", () => {
       const { web, bodies } = scene.cosmos.stats();
       shares.push(web?.share ?? NaN);
       expect(web?.share).toBeCloseTo(whole, 9);
-      // The disc's suns, points and rocks give up what the worlds' points take.
+      // The disc's suns, points and rocks give up faster than the worlds' points come (F4152, the hand-over's white glows), and the
+      // bodies, the Earth among them, go as they start: an opaque body cannot fade.
       const disc = fades(scene);
       expect(disc).toHaveLength(3);
-      for (const fade of disc) expect(fade + whole).toBeCloseTo(1, 9);
+      for (const fade of disc) {
+        expect(fade).toBeCloseTo((1 - whole) ** 2, 9);
+        expect(fade + whole).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      expect(earthShown(scene)).toBe(whole === 0);
       if (whole >= 1) {
         expect(bodies).toBe(0);
         expect(shownWith(scene, "aOrbit")).toHaveLength(0);
@@ -1216,6 +1223,24 @@ describe("the whole cosmos", () => {
     if (!(found instanceof Points)) throw new Error("no whole cosmos shown");
     return found as Points<BufferGeometry, ShaderMaterial>;
   };
+
+  // F4153: the disc faded and the bodies went by distance alone, the view going black when nothing was there to take it over.
+  it("keeps the disc and the bodies while the whole cosmos cannot take the view: its program not compiled yet, or no world to draw", async () => {
+    const waiting = made();
+    waiting.renderer.compileAsync.mockImplementation((group: Object3D) =>
+      group.name === "web" ? new Promise<Object3D>(() => undefined) : Promise.resolve(group),
+    );
+    await shown(waiting, linked(90));
+    const empty = made();
+    await shown(empty, []);
+    for (const scene of [waiting, empty]) {
+      await at(scene, out(900));
+      expect(scene.cosmos.stats().web?.share ?? 0).toBe(0);
+      for (const fade of fades(scene)) expect(fade).toBe(1);
+      expect(earthShown(scene)).toBe(true);
+      expect(shownWith(scene, "aCircle")).toHaveLength(0);
+    }
+  });
 
   it("hides the whole cosmos with the page, after it showed", async () => {
     const scene = made();

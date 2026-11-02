@@ -136,10 +136,11 @@ export class Cosmos {
     this.#bodies.tick(eye, seconds);
     this.#home.tick(eye, seconds);
     this.#nebulae.follow(eye, seconds);
-    // Past a cluster's distance the worlds' points take the view at one distance: the disc and the bodies give up what they take.
+    // Past a cluster's distance the worlds' points take the view at one distance: the disc gives up faster than they come, and the
+    // bodies, which cannot fade, go as they start.
     const whole = this.#whole.advance(eye, seconds);
-    this.#disc.fade(1 - whole, this.#ahead.done);
-    this.#bodies.group.visible = whole < 1;
+    this.#disc.fade((1 - whole) ** 2, this.#ahead.done);
+    this.#bodies.group.visible = whole === 0;
     if (!(distanceOf(eye, this.#looked) < STEP)) this.#askLook();
   }
 
