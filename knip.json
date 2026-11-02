@@ -5,7 +5,7 @@
   "workspaces": {
     ".": {},
     "app": {
-      "entry": ["src/**/*.test.{ts,tsx}"],
+      "entry": ["src/**/*.test.{ts,tsx}", "lab/main.ts"],
       "ignoreDependencies": ["camera-controls"],
       "react-router": { "config": ["react-router.config.ts"] },
       "playwright": { "config": ["playwright.config.ts", "playwright.stories.config.ts"] }

@@ -20,6 +20,11 @@ describe("the Earth's page", () => {
     expect(html).toContain("gno.land");
   });
 
+  test("keeps the globe's place in the page, which only the scene fills", async () => {
+    const html = await render(route("/earth"), "/earth");
+    expect(html).toMatch(/<div[^>]*data-globe[^>]*data-earth="waiting"[^>]*><\/div>/);
+  });
+
   test("lists the worlds of its universe, and only those", async () => {
     const onyx = await render(route("/net/:network/earth"), "/net/onyx/earth");
     expect(onyx).toMatch(/<a [^>]*href="\/w\/bubble"/);

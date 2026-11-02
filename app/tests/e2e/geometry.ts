@@ -21,11 +21,12 @@ export const near = (actual: number, wanted: number, what: string) => {
 
 // The mean brightness of boxes of a picture, read by a page of its own (the site's policy refuses a picture's pixels to a page
 // that holds none of its own): each box is [x0, y0, x1, y1].
-export async function brightness(
+/** The mean red, green and blue of each box of `picture`, from 0 to 255. */
+export async function colours(
   page: Page,
   picture: Buffer,
   boxes: [number, number, number, number][],
-): Promise<number[]> {
+): Promise<[number, number, number][]> {
   const reader = await page.context().newPage();
   try {
     await reader.goto("about:blank");
@@ -38,13 +39,18 @@ export async function brightness(
         context.drawImage(bitmap, 0, 0);
         const { data, width } = context.getImageData(0, 0, bitmap.width, bitmap.height);
         return cells.map(([x0, y0, x1, y1]) => {
-          let sum = 0;
+          let red = 0;
+          let green = 0;
+          let blue = 0;
           for (let y = y0; y < y1; y++)
             for (let x = x0; x < x1; x++) {
               const at = (y * width + x) * 4;
-              sum += 0.2126 * (data[at] ?? 0) + 0.7152 * (data[at + 1] ?? 0) + 0.0722 * (data[at + 2] ?? 0);
+              red += data[at] ?? 0;
+              green += data[at + 1] ?? 0;
+              blue += data[at + 2] ?? 0;
             }
-          return sum / ((x1 - x0) * (y1 - y0));
+          const pixels = (x1 - x0) * (y1 - y0);
+          return [red / pixels, green / pixels, blue / pixels] as [number, number, number];
         });
       },
       [picture.toString("base64"), boxes] as const,
@@ -53,3 +59,7 @@ export async function brightness(
     await reader.close();
   }
 }
+
+/** The mean light of each box of `picture`. */
+export const brightness = async (page: Page, picture: Buffer, boxes: [number, number, number, number][]) =>
+  (await colours(page, picture, boxes)).map(([red, green, blue]) => 0.2126 * red + 0.7152 * green + 0.0722 * blue);

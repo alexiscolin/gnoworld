@@ -32,6 +32,7 @@ const TYPES = {
   ".xml": "application/xml",
   ".txt": "text/plain; charset=utf-8",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".css": "text/css; charset=utf-8",
   ".woff2": "font/woff2",

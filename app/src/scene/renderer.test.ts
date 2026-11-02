@@ -32,8 +32,7 @@ it("takes its anti-aliasing from the caller", () => {
 it("sets the one image grade before anything compiles, for everything drawn after it", () => {
   const renderer = createRenderer(canvas, false);
   expect(renderer.toneMapping).toBe(4);
-  expect(renderer.toneMappingExposure).toBeGreaterThan(0);
-  expect(renderer.toneMappingExposure).toBeLessThanOrEqual(1);
+  expect(renderer.toneMappingExposure).toBe(0.8);
 });
 
 it("counts a frame's draws across its passes: the scene resets the count once a frame", () => {

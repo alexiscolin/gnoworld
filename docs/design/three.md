@@ -19,7 +19,7 @@ Settled by Alexis, 2026-11-01: `WebGLRenderer` for the demo, WebP, no KTX2, the 
 - Defaults: `antialias=false`, `alpha=false`, `powerPreference='default'`, `preserveDrawingBuffer=false`, `stencil=false`, `depth=true`, `failIfMajorPerformanceCaveat=false` (three:src/renderers/WebGLRenderer.js:76-84).
 - `antialias:true` is the browser's MSAA on the default framebuffer (WebGLRenderer.js:3725). Reason to be wary: render targets (shadow maps, composer) default to `samples: 0` (three:src/core/RenderTarget.js:41,72), so MSAA does not follow into a composer chain (inferred). Choose by tier: on for High on desktop, off on touch and Low.
 - `powerPreference` is a hint to the browser (WebGLRenderer.js:3728). ARCHITECTURE wants the low-power GPU: pass `'low-power'` (U#74 says `'high-performance'`: écarté, it burns battery for a mostly idle scene).
-- Pixel ratio: `setPixelRatio` resizes the buffer (WebGLRenderer.js:642-648). Cap it (1.25 desktop, 1 touch, Low 1 and 0.8; U#80 caps at 2, écarté, our budget is lower). Use `setSize(w, h, false)` so three does not write the canvas style (WebGLRenderer.js:673). A pixel ratio change also moves the point-size scale (see 7).
+- Pixel ratio: `setPixelRatio` resizes the buffer (WebGLRenderer.js:642-648). Cap it (2 desktop, as U#80, since a Retina screen drawn at 1.25 is blurred and 8 ms a frame leaves room; the Auto probe drops a slow device; 1 touch, Low 1 and 0.8). Use `setSize(w, h, false)` so three does not write the canvas style (WebGLRenderer.js:673). A pixel ratio change also moves the point-size scale (see 7).
 - `alpha:false` gives an opaque buffer (clear alpha 1, WebGLRenderer.js:3722); the scene is near-black space, so keep it opaque.
 - Context loss: three listens to `webglcontextlost` / `webglcontextrestored` on the canvas (WebGLRenderer.js:405-406), calls `preventDefault`, sets a flag, and `render()` returns at once while lost (WebGLRenderer.js:1117-1124, 1659 region); on restore it re-runs `initGLContext` and keeps the shadow and info settings (1127-1141). So: add your own listener (abortable) to show the list on loss and to ask one frame on restore. Tests use `forceContextLoss()`/`forceContextRestore()`, which need `WEBGL_lose_context` (WebGLRenderer.js:609-625). U#98 and W's device-loss doc agree; for WebGPU see 14.
 
@@ -117,7 +117,7 @@ Utsubo kept (code-confirmed above): tips 5, 30, 31, 33, 34, 36, 37, 38, 40, 41, 
 80 (the cap idea), 82, 94, 98, 100, 1-2-8 (fallback, `forceWebGL`), 27 (anisotropy). Écarté: 22/28 (KTX2: CSP); 32's r183 opacity (not in
 `BatchedMesh.js`); 11 `compileComputeAsync` (no compute here; exists, Renderer.js:1359); 12 occlusion (WebGPU `Renderer.js:2761`, unused);
 56 `SunLight` (no `SunLight` class found in `src/`); 53-56, 57-60 light budgets and CSM (not verifiable); 64-65 R3F (not used);
-73 pmndrs postprocessing (new dependency); 74 `'high-performance'`; 80 cap 2; 83 IntersectionObserver (app, not three);
+73 pmndrs postprocessing (new dependency); 74 `'high-performance'`; 83 IntersectionObserver (app, not three);
 97 timestamp tracking (experimental). The r186 mentions the article makes that held: 61 (PCFSoft removed), 11 (exists).
 webgpu-claude-skill (MIT, W) kept: `await renderer.init()` before use (Renderer.js:899, 2389); import from `three/webgpu`
 (package.json:18); device-loss recovery (Renderer.js:689); `forceWebGL` (WebGPURenderer.Nodes.js:25); `PI2` deprecated for

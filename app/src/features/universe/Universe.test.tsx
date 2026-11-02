@@ -8,6 +8,7 @@ import { Universe } from "./Universe.tsx";
 const scene = vi.hoisted(() => ({
   cover: vi.fn<(covered: boolean) => void>(),
   dispose: vi.fn<() => void>(),
+  earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
   start: vi.fn(),
   load: vi.fn(),
 }));
@@ -87,12 +88,12 @@ const heading = (child: ReactNode) => (
 const left: (() => void)[] = [];
 
 // A root of its own: a test here draws the component again with another prop, or leaves it.
-function rendered(shown: boolean, wrap: (child: ReactNode) => ReactNode = (child) => child) {
+function rendered(shown: boolean | "earth", wrap: (child: ReactNode) => ReactNode = (child) => child) {
   const box = document.createElement("div");
   document.body.append(box);
   const root = createRoot(box);
   let mounted = true;
-  const rerender = (next: boolean) => {
+  const rerender = (next: boolean | "earth") => {
     act(() => {
       root.render(wrap(<Universe shown={next} />));
     });
@@ -510,5 +511,283 @@ describe("the tier", () => {
     await settle();
     started().remember();
     expect(localStorage.getItem("gnoworld:scene:tier")).toBe("low");
+  });
+});
+
+describe("on the Earth's page", () => {
+  const SORRY_EARTH = "The Earth's maps did not come. Every place is in the list.";
+  const DOCK = { left: 800, top: 241, width: 642, height: 642 };
+  let globe: HTMLElement;
+  let resized: (() => void) | undefined;
+  let watching = 0;
+
+  class Observer {
+    constructor(run: () => void) {
+      resized = run;
+    }
+    observe() {
+      watching += 1;
+    }
+    disconnect() {
+      watching -= 1;
+    }
+  }
+
+  const space = () => globe.dataset["earth"];
+  // The last words the scene gave the page about the Earth.
+  const say = (state: string) => {
+    act(() => {
+      scene.earth.mock.lastCall?.[1](state);
+    });
+  };
+  const place = () => scene.earth.mock.lastCall?.[0];
+
+  beforeEach(() => {
+    watching = 0;
+    resized = undefined;
+    vi.stubGlobal("ResizeObserver", Observer);
+    scene.start.mockImplementation(() => ({
+      cover: scene.cover,
+      dispose: scene.dispose,
+      earth: scene.earth,
+      stats: () => ({}),
+    }));
+    // As the scene does: the page's leaving is said back to it.
+    scene.earth.mockImplementation((where, told) => {
+      if (where === undefined) told("gone");
+    });
+    globe = document.createElement("div");
+    globe.dataset["globe"] = "";
+    globe.dataset["earth"] = "waiting";
+    vi.spyOn(globe, "getBoundingClientRect").mockImplementation(
+      () => ({ ...DOCK, right: DOCK.left + DOCK.width, bottom: DOCK.top + DOCK.height, x: 0, y: 0 }) as DOMRect,
+    );
+    document.body.append(globe);
+  });
+  afterEach(() => {
+    globe.remove();
+  });
+
+  const earthPage = async () => {
+    const made = rendered("earth");
+    await settle();
+    return made;
+  };
+
+  it("draws the Earth in the circle the page keeps for it", async () => {
+    await earthPage();
+    expect(place()).toEqual({ x: 1121, y: 562, radius: 321 });
+  });
+
+  it("measures the circle on the page and not on the window, so a page scrolled away keeps its globe", async () => {
+    vi.stubGlobal("scrollY", 100);
+    await earthPage();
+    expect(place()).toEqual({ x: 1121, y: 662, radius: 321 });
+  });
+
+  it("follows the circle when the page lays it out again", async () => {
+    await earthPage();
+    scene.earth.mockClear();
+    resized?.();
+    expect(scene.earth).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows the window too, for the circle may move and keep its size", async () => {
+    await earthPage();
+    scene.earth.mockClear();
+    window.dispatchEvent(new Event("resize"));
+    expect(scene.earth).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the room back on a phone, where nothing comes before it is asked", async () => {
+    device({ phone: true });
+    rendered("earth");
+    await settle();
+    expect(scene.earth).not.toHaveBeenCalled();
+    expect(space()).toBe("none");
+  });
+
+  it("gives the room back where the GPU cannot draw", async () => {
+    device({ gpu: SOFTWARE });
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("none");
+  });
+
+  it("keeps the page's room while the scene is still coming: a window that loads by itself must not jump", async () => {
+    const arrive = slowChunk();
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("waiting");
+    arrive();
+    await settle();
+    expect(space()).toBe("loading");
+  });
+
+  it("gives the room back when the scene cannot load", async () => {
+    scene.load.mockImplementation(() => Promise.reject(new Error("no chunk")));
+    rendered("earth");
+    await settle();
+    expect(space()).toBe("none");
+  });
+
+  it("hands the scene the plate where the page fixes it beside the globe, with its colour read as sRGB", async () => {
+    const plate = document.createElement("section");
+    plate.dataset["look"] = "plate";
+    vi.spyOn(plate, "getBoundingClientRect").mockReturnValue({
+      left: 24,
+      top: 98,
+      right: 832,
+      bottom: 1056,
+    } as DOMRect);
+    document.body.append(plate);
+    const read = vi.spyOn(window, "getComputedStyle").mockImplementation(
+      (element) =>
+        ({
+          position: element === globe ? "fixed" : "static",
+          backgroundColor: "oklab(0.2 0 0)",
+        }) as CSSStyleDeclaration,
+    );
+    const painter = { fillRect: () => undefined, getImageData: () => ({ data: [24, 34, 56, 255] }) };
+    const masked = { getExtension: () => null, getParameter: () => null };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+      (kind: string) => (kind === "2d" ? painter : masked) as never,
+    );
+    await earthPage();
+    expect(place()).toMatchObject({ plate: { left: 24, top: 98, right: 832, bottom: 1056, fill: [24, 34, 56] } });
+    read.mockRestore();
+    plate.remove();
+  });
+
+  it("hands no plate where the page keeps it in the flow", async () => {
+    await earthPage();
+    expect(place()).not.toHaveProperty("plate");
+  });
+
+  it("keeps the room for the globe from the moment the scene is on, for the circle has no size before, and opens the plate once it is drawn", async () => {
+    const order: (string | undefined)[] = [];
+    scene.earth.mockImplementation(() => order.push(space()));
+    await earthPage();
+    expect(order).toEqual(["loading"]);
+    say("drawn");
+    expect(space()).toBe("drawn");
+  });
+
+  it("asks nothing of a circle with no size, and draws as soon as it has one", async () => {
+    let side = 0;
+    vi.spyOn(globe, "getBoundingClientRect").mockImplementation(
+      () => ({ left: 10, top: 20, width: side, height: side }) as DOMRect,
+    );
+    await earthPage();
+    expect(scene.earth).not.toHaveBeenCalled();
+    side = 100;
+    resized?.();
+    expect(place()).toEqual({ x: 60, y: 70, radius: 50 });
+  });
+
+  it("closes the plate and takes the Credits away while the context is lost, and gives them back with it", async () => {
+    const { box } = await earthPage();
+    say("drawn");
+    act(() => {
+      started().onLost(true);
+    });
+    expect(space()).toBe("none");
+    expect(button(box, "Credits")).toBeUndefined();
+    act(() => {
+      started().onLost(false);
+    });
+    say("loading");
+    expect(space()).toBe("loading");
+    say("drawn");
+    expect(space()).toBe("drawn");
+    expect(button(box, "Credits")).toBeDefined();
+  });
+
+  it("shows the Credits only while the textures show", async () => {
+    const { box } = await earthPage();
+    say("loading");
+    expect(button(box, "Credits")).toBeUndefined();
+    say("drawn");
+    expect(button(box, "Credits")).toBeDefined();
+  });
+
+  it("says plainly that a map did not come, leaves the plate whole and shows no credit", async () => {
+    const { box } = await earthPage();
+    say("loading");
+    say("failed");
+    expect(said(box)).toBe(SORRY_EARTH);
+    expect(space()).toBe("none");
+    expect(button(box, "Credits")).toBeUndefined();
+    expect(on(box)).toBe(true);
+  });
+
+  it("forgets a failure when the reader leaves", async () => {
+    const { box, rerender } = await earthPage();
+    say("failed");
+    expect(said(box)).toBe(SORRY_EARTH);
+    rerender(false);
+    expect(said(box)).toBe("");
+  });
+
+  it("tells the scene when the page leaves, and stops watching the page", async () => {
+    const { rerender, box } = await earthPage();
+    say("drawn");
+    expect(watching).toBe(1);
+    rerender(false);
+    expect(place()).toBeUndefined();
+    expect(watching).toBe(0);
+    expect(button(box, "Credits")).toBeUndefined();
+    scene.earth.mockClear();
+    window.dispatchEvent(new Event("resize"));
+    expect(scene.earth).not.toHaveBeenCalled();
+  });
+
+  it("goes from the Earth to the cosmos, where no texture shows yet, so no credit either", async () => {
+    const { rerender, box } = await earthPage();
+    say("drawn");
+    expect(button(box, "Credits")).toBeDefined();
+    rerender(true);
+    expect(place()).toBeUndefined();
+    expect(button(box, "Credits")).toBeUndefined();
+    expect(on(box)).toBe(true);
+  });
+
+  it("brings the Earth when the reader comes to it from the cosmos, the scene already on", async () => {
+    const { rerender } = rendered(true);
+    await settle();
+    expect(scene.earth).not.toHaveBeenCalled();
+    rerender("earth");
+    expect(place()).toEqual({ x: 1121, y: 562, radius: 321 });
+  });
+
+  it("asks for the Earth once View in space has brought the scene", async () => {
+    device({ phone: true });
+    const { box } = rendered("earth");
+    await settle();
+    expect(scene.earth).not.toHaveBeenCalled();
+    click(button(box, VIEW));
+    await settle();
+    expect(scene.earth).toHaveBeenCalledTimes(1);
+  });
+
+  it("never asks a cosmos page for a globe, even with a circle on the page", async () => {
+    const { box } = rendered(true);
+    await settle();
+    expect(on(box)).toBe(true);
+    expect(scene.earth).not.toHaveBeenCalled();
+  });
+
+  it("draws nothing on a page that holds no circle", async () => {
+    globe.remove();
+    const { box } = await earthPage();
+    expect(on(box)).toBe(true);
+    expect(scene.earth).not.toHaveBeenCalled();
+  });
+
+  it("stops watching with the universe", async () => {
+    const { unmount } = await earthPage();
+    expect(watching).toBe(1);
+    unmount();
+    expect(watching).toBe(0);
   });
 });

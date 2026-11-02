@@ -33,6 +33,7 @@ export function groups() {
         "--avatar-",
         "--chat-",
         "--flash-",
+        "--globe-",
       ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },

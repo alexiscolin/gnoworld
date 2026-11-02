@@ -47,3 +47,30 @@ export function watchScreen(apply: () => void, signal: AbortSignal): void {
   };
   arm();
 }
+
+/** Calls `on.resized` when the canvas's box changes, and `on.lost` with true when its context goes, false when it comes back. */
+export function watchCanvas(
+  canvas: HTMLCanvasElement,
+  on: { readonly resized: () => void; readonly lost: (now: boolean) => void },
+  signal: AbortSignal,
+): void {
+  const observer = new ResizeObserver(on.resized);
+  observer.observe(canvas);
+  signal.addEventListener("abort", () => {
+    observer.disconnect();
+  });
+  canvas.addEventListener(
+    "webglcontextlost",
+    () => {
+      on.lost(true);
+    },
+    { signal },
+  );
+  canvas.addEventListener(
+    "webglcontextrestored",
+    () => {
+      on.lost(false);
+    },
+    { signal },
+  );
+}

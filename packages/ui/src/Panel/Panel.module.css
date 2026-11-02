@@ -24,9 +24,11 @@
     --_fill: color-mix(in oklab, var(--world) 16%, var(--color-surface));
 
     /* raw: the dot grid, white at 7% on a 14 px pitch (the prototype's #fPlate) */
-    background:
+    --_ground:
       radial-gradient(color-mix(in oklab, var(--color-text) 7%, transparent) 1px, transparent 1.3px) 0 0 / 14px 14px,
       var(--_fill);
+
+    background: var(--_ground);
   }
 
   /* Seen only on the wide plate: a block in the page keeps its height to its words (the room under it needs the screen). */
@@ -100,8 +102,32 @@
       border: 0;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
-      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area */
-      mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+      /* raw: the fill's own layer holds the background now, so the words stack over it */
+      isolation: isolate;
+      background: none;
+    }
+
+    /* The fill stands apart from the words: the fade and a globe's circle are cut out of it alone, and no word fades with them. */
+    .panel[data-look="plate"]::before {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inline-size: 100%;
+      /* raw: under its own words, inside the panel's stacking */
+      z-index: -1;
+      border-start-start-radius: var(--radius-l);
+      border-end-start-radius: var(--radius-l);
+      background: var(--_ground);
+      /* raw: the last 64 px go to space, so the planet keeps the frame's free area; a page that draws a globe over the plate's right side
+         opens a circle for it, for the canvas lies under the plate */
+      mask-image:
+        linear-gradient(to right, #000 calc(100% - 64px), transparent),
+        radial-gradient(
+          circle var(--globe-hole) at calc(var(--globe-x) - var(--space-m)) calc(var(--globe-y) - 98px),
+          transparent 95%,
+          #000
+        );
+      mask-composite: intersect;
     }
 
     .panel[data-look="plate"] .content {

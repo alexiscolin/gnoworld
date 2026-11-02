@@ -16,7 +16,7 @@ export function isWeakGpu(name: string): boolean {
 
 /** The pixel ratio to draw at: the screen's, capped by the tier and by a touch screen. */
 export function pixelRatioFor(ratio: number, touch: boolean, tier: Tier): number {
-  const cap = tier === "high" ? (touch ? 1 : 1.25) : touch ? 0.8 : 1;
+  const cap = tier === "high" ? (touch ? 1 : 2) : touch ? 0.8 : 1;
   return Math.min(ratio, cap);
 }
 

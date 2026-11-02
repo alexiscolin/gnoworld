@@ -13,7 +13,8 @@ declare global {
 
 const RENDERER = "WEBGL_debug_renderer_info";
 
-function gpuName(context: WebGL2RenderingContext): string {
+/** The name the driver gives its GPU, or nothing where it is masked. */
+export function gpuName(context: WebGL2RenderingContext): string {
   const debug = context.getExtension(RENDERER);
   const name: unknown = debug === null ? "" : context.getParameter(debug.UNMASKED_RENDERER_WEBGL);
   return typeof name === "string" ? name : "";

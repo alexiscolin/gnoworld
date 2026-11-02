@@ -139,7 +139,7 @@ test.describe("at the video's size", () => {
       canvas.width = canvas.height = 1;
       const context = canvas.getContext("2d");
       if (context === null) throw new Error("no canvas context");
-      context.fillStyle = getComputedStyle(el).backgroundColor;
+      context.fillStyle = getComputedStyle(el, "::before").backgroundColor;
       context.fillRect(0, 0, 1, 1);
       return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     });

@@ -24,6 +24,18 @@ export {
   type SystemPlace,
   type SystemRef,
 } from "./cosmos/cosmos.ts";
+export {
+  ANCHORS,
+  between,
+  MAPS,
+  planetLook,
+  planetSeed,
+  seedShare,
+  type Anchor,
+  type MapName,
+  type PlanetLook,
+} from "./planet/look.ts";
+export { groundDirection, subSolarPoint, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
