@@ -1,5 +1,6 @@
 // Rings: wide, with gaps from one shared profile, in the world's shadow, brightening when lit from behind as thin ice does. Never the status
 // ring, which is a thin tilted line with its moon (ADR-0002 §10).
+import { FARAWAY } from "./chunks.ts";
 
 export const RING_VERTEX = /* glsl */ `
 varying vec3 vWorld;
@@ -25,6 +26,7 @@ uniform vec3 ringTint;
 uniform float ringInner;
 uniform float ringOuter;
 uniform float ringOpacity;
+uniform float faraway;
 varying vec3 vWorld;
 varying vec3 vCentre;
 varying float vRadius;
@@ -43,6 +45,7 @@ void main() {
   float behind = smoothstep(0.1, 1.0, -dot(view, sun));
   vec3 colour = mix(ringTint, vec3(0.72, 0.68, 0.62), 0.45) * lit * (0.56 + behind * 1.1) * (0.74 + 0.5 * fine);
   gl_FragColor = vec4(colour * density, density);
+  ${FARAWAY}
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

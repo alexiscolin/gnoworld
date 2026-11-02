@@ -1,5 +1,6 @@
 // The air: light scattered along each ray through a shell, not a painted rim, so a world lit from behind wears a thin ring of light and a
 // sunset along its terminator. Eight steps a pixel, in the world's own radii, over the whole disc: the shell's front covers it, so a close world pays for all of it.
+import { FARAWAY } from "./chunks.ts";
 
 export const AIR_VERTEX = /* glsl */ `
 varying vec3 vWorld;
@@ -19,6 +20,7 @@ uniform vec3 sun;
 uniform vec3 rimColour;
 uniform float rimThickness;
 uniform float limbLight;
+uniform float faraway;
 varying vec3 vWorld;
 varying vec3 vCentre;
 varying float vOuter;
@@ -79,6 +81,7 @@ void main() {
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));
+  ${FARAWAY}
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

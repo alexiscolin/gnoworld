@@ -520,6 +520,54 @@ describe("where the globe stands", () => {
     expect(globe?.position.y).toBeCloseTo(0, 6);
   });
 
+  // F4250: the eye's slow look about turns the camera, and a globe standing still in the world would leave its circle.
+  const lookAbout = (camera: PerspectiveCamera, view: EarthView) => {
+    camera.rotation.set(0.12, -0.26, 0);
+    camera.updateMatrixWorld();
+    view.tick(0);
+  };
+  const statsOf = (view: EarthView) => {
+    const stats = view.stats();
+    if (stats === undefined) throw new Error("no Earth");
+    return stats;
+  };
+
+  it("keeps the Earth on its circle as the eye looks about, its ring with it (F4250)", async () => {
+    const { view, camera } = await placed(PLACE);
+    const { orbit } = statsOf(view);
+    lookAbout(camera, view);
+    const stats = statsOf(view);
+    expect(stats.x).toBeCloseTo(PLACE.x, 0);
+    expect(stats.y).toBeCloseTo(PLACE.y, 0);
+    expect(stats.radius).toBeCloseTo(PLACE.radius, 0);
+    expect(stats.orbit.left).toBeCloseTo(orbit.left, 0);
+    expect(stats.orbit.top).toBeCloseTo(orbit.top, 0);
+  });
+
+  it("turns the Earth's light with the eye, so it stays on the same side of the screen (F4250)", async () => {
+    const { view, camera, stage } = await placed(PLACE);
+    const lit = sunOf(stage)?.clone() ?? new Vector3();
+    lookAbout(camera, view);
+    const seen = (sunOf(stage) ?? new Vector3()).clone().applyQuaternion(camera.quaternion.clone().invert());
+    expect(seen.distanceTo(lit)).toBeLessThan(1e-6);
+  });
+
+  it("keeps the page's signs on the ground the globe shows as the eye looks about: a pin, the ground facing the eye (F4250)", async () => {
+    const { view, camera } = await placed(PLACE);
+    const pins: [number, number, boolean][] = [];
+    view.setMarks([{ lat: 48.9, lon: 2.35, place: (x, y, front) => pins.push([x, y, front]) }]);
+    const before = pins.splice(0)[0] ?? [NaN, NaN, false];
+    const facing = view.facing() ?? { lat: NaN, lon: NaN };
+    lookAbout(camera, view);
+    const after = pins.at(-1) ?? [NaN, NaN, true];
+    expect(after[0]).toBeCloseTo(before[0], 0);
+    expect(after[1]).toBeCloseTo(before[1], 0);
+    expect(after[2]).toBe(before[2]);
+    const now = view.facing() ?? { lat: NaN, lon: NaN };
+    expect(now.lat).toBeCloseTo(facing.lat, 6);
+    expect(now.lon).toBeCloseTo(facing.lon, 6);
+  });
+
   it("gives the lens back when the Earth goes", async () => {
     const { view, camera } = await placed(PLACE);
     view.show(undefined, () => undefined);

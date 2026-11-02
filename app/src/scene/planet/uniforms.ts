@@ -84,6 +84,7 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     nightLights: { value: maps.night === undefined ? 0 : 1 },
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
+    faraway: { value: 0 },
     time: { value: 0 },
     cloudTime: { value: 0 },
     // The warp never stretches a map by more than a fifth, whatever its frequency: no streaks.

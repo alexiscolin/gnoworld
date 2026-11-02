@@ -356,7 +356,7 @@ test("the app opens with no network: the home, a world, a reload on it, and a pa
   });
   await page.reload();
   await hydrated(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
   // The router's own move to a world needs its route files and data, which are the cache's too.
   await page.getByRole("link", { name: "Bubble", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
@@ -715,5 +715,5 @@ test("a worker that cannot register reports its error, and the page still works"
   await page.goto("/");
   await hydrated(page);
   await expect.poll(() => errors.some((message) => message.includes("ServiceWorker"))).toBe(true);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
 });

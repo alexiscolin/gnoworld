@@ -2,7 +2,7 @@
 // The real instant sets the sun's latitude and turns the ground under it; the sun's place on screen is the composition's, day towards the
 // dock, night towards the plate. Then the globe turns east at a planet's rate, as the video's does, so the hour is true on arrival.
 import { subSolarPoint } from "@gnoworld/core";
-import { Euler, Vector3 } from "three";
+import { Euler, Quaternion, Vector3 } from "three";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { MOTION } from "../watch.ts";
 import type { Circle, EarthDevice, EarthState } from "./device.ts";
@@ -41,12 +41,11 @@ export class EarthView implements Ground {
   #globe: Globe | undefined;
   #loading: AbortController | undefined;
   readonly #screen: Screen;
-  readonly #posed: Pose = { turn: 0, lean: new Euler(), centre: this.#rest, scale: 1 };
+  readonly #posed: Pose = { turn: 0, lean: new Euler(), frame: new Quaternion(), centre: this.#rest, scale: 1 };
   #ratio = 1;
   #born: number | undefined;
   #age = 0;
   #arrived = 0;
-  #sunAt = Number.NaN;
   #leaned = Number.NaN;
   #turn = 0;
   #turned = 0;
@@ -90,7 +89,6 @@ export class EarthView implements Ground {
     this.#born = undefined;
     this.#age = 0;
     this.#arrived = 0;
-    this.#sunAt = Number.NaN;
     this.#leaned = Number.NaN;
     this.#drawn = 0;
     this.#eye.reset();
@@ -151,15 +149,17 @@ export class EarthView implements Ground {
     const gone = this.#eye.gone(age, still);
     const leaned = this.#eye.lean(age, still);
     const sunAt = SUN_REST + left * SUN_SWEEP - gone;
+    // The eye looks slowly about (F4250): the globe turns with the camera, so it keeps the page's circle, its light on the same side.
+    const { quaternion } = this.#device.camera;
+    globe.group.quaternion.copy(quaternion);
     if (leaned !== this.#leaned) globe.setLean(leaned);
-    if (sunAt !== this.#sunAt || leaned !== this.#leaned) globe.setSun(sunAt);
-    this.#sunAt = sunAt;
+    globe.setSun(sunAt);
     this.#leaned = leaned;
     const settling = 1 - eased(arrived / SETTLING);
     this.#turned = this.#turn + gone - SPIN * age;
     globe.setTurn(this.#turned, this.#turned - gone);
     globe.setMoon(MOON_REST + left * MOON_SWEEP - MOON_RATE * age);
-    globe.group.position.copy(this.#rest).setX(-SETTLE_LEFT * settling);
+    globe.group.position.set(-SETTLE_LEFT * settling, this.#rest.y, this.#rest.z).applyQuaternion(quaternion);
     globe.group.scale.setScalar(1 + SETTLE_NEARER * settling);
     this.#marks.place(this.#where(globe), this.#screen);
   }

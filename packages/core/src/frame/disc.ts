@@ -4,26 +4,51 @@ import type { Orbiter, StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { HOME } from "../space/drift.ts";
 
-/** How far the disc leans from facing the eye's way, in radians: seen from 60 degrees above it. */
-export const DISC_TILT = 1.0471975511965976;
-/** Where the map's centre stands on the stage: 36 units ahead of the eye at rest, the great sun where frame 4 has it. */
-export const CENTRE: Point = { x: HOME.x - 0.06, y: HOME.y + 0.155, z: HOME.z - 36 };
-
+/** How far the eye rests from the Earth, in world units (7d6). */
+export const REST_DISTANCE = 30;
+/** How far the disc leans from facing the eye's way, in radians: seen from 15 degrees above it, the rest's plain slant. */
+export const DISC_TILT = 0.2617993877991494;
 // The tilt's cosine and sine, as numbers: a call at a module's top stays in every chunk that imports core.
-const COS = 0.5;
-const SIN = 0.8660254037844386;
+const COS = 0.9659258262890683;
+const SIN = 0.25881904510252074;
+/** Where the map's centre stands on the stage: the Earth (-6.73, 0, 0.18) straight ahead of the eye at rest, `REST_DISTANCE` away. */
+export const CENTRE: Point = { x: HOME.x + 6.73, y: HOME.y + 0.18 * SIN, z: HOME.z - REST_DISTANCE - 0.18 * COS };
 
-/** Where a world stands `seconds` on, on the map, into `out`. */
+/** How far from a system's star, in its own plane: `along` its line of nodes, `across` it in the plane, `up` off it. */
+export interface InPlane {
+  along: number;
+  across: number;
+  up: number;
+}
+
+/** A place in `system`'s own plane, `offset` from its star, on the map, into `out`. */
+export function onPlane(
+  { place, tilt, node }: Pick<StarSystem, "place" | "tilt" | "node">,
+  { along, across, up }: InPlane,
+  out: { x: number; y: number; z: number },
+): void {
+  const cosNode = Math.cos(node);
+  const sinNode = Math.sin(node);
+  const cosTilt = Math.cos(tilt);
+  const sinTilt = Math.sin(tilt);
+  out.x = place.x + along * cosNode - across * sinNode * cosTilt - up * sinNode * sinTilt;
+  out.y = place.y - across * sinTilt + up * cosTilt;
+  out.z = place.z + along * sinNode + across * cosNode * cosTilt + up * cosNode * sinTilt;
+}
+
+// What a frame writes the orbit's offset into: nothing is made on a frame.
+const onOrbit: InPlane = { along: 0, across: 0, up: 0 };
+
+/** Where a world stands `seconds` on, on the map, into `out`: on its circle in its system's plane. */
 export function orbitPlace(
   { system, world }: { readonly system: StarSystem; readonly world: Orbiter },
   seconds: number,
   out: { x: number; y: number; z: number },
 ): void {
-  const { place, spin } = system;
-  const angle = world.phase + spin * seconds;
-  out.x = place.x + world.orbit * Math.cos(angle);
-  out.y = place.y;
-  out.z = place.z + world.orbit * Math.sin(angle);
+  const angle = world.phase + system.spin * seconds;
+  onOrbit.along = world.orbit * Math.cos(angle);
+  onOrbit.across = world.orbit * Math.sin(angle);
+  onPlane(system, onOrbit, out);
 }
 
 /** A place on the map, on the stage, into `out`: the map's far side up the view, its near side towards the eye. */

@@ -1,5 +1,5 @@
-// The home's hero (frames 1 to 8): the kicker, the big number, its line and the two big actions. The number counts what the data
-// holds, the worlds of the universe: no sample, and no count of people online while no source says so (slice 5m fills the rest).
+// The home's hero (frames 1 to 8): the kicker, the big number, its line and the two big actions. The number counts the worlds the page
+// gives it, the cosmos's or a universe's list: no sample, none while none is known, and no count of people online while no source says so.
 import { Icon, Kicker } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -7,17 +7,19 @@ import type { UniverseView } from "../../places.ts";
 import styles from "./Hero.module.css";
 import { Live } from "./Live.tsx";
 
-export function Hero({ universe }: { universe: UniverseView }) {
-  const count = universe.worlds.length;
+export function Hero({ universe, worlds }: { universe: UniverseView; worlds: number | undefined }) {
   return (
     <div className={styles["hero"]} data-clear="">
       <Kicker dot="warm">{universe.isDefault ? "gno.world" : universe.name}</Kicker>
+      {/* A figure space keeps the number's line while none is known: the page does not jump when it comes. */}
       <p className={styles["number"]} data-hero="number">
-        {count}
+        {worlds ?? "\u2007"}
       </p>
       <div className={styles["row"]}>
         <h1 className={styles["line"]} tabIndex={-1}>
-          {count} {count === 1 ? "world" : "worlds"} in {universe.name}
+          {worlds === undefined
+            ? `Worlds in ${universe.name}`
+            : `${String(worlds)} ${worlds === 1 ? "world" : "worlds"} in ${universe.name}`}
         </h1>
         <div className={styles["actions"]} data-hero="actions">
           <Link to={universe.earth.path} className={styles["action"]} data-emphasis="solid">

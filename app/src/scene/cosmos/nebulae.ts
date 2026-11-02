@@ -3,7 +3,6 @@
 // in; near a world, and past a cluster's distance, they go out.
 import {
   driftAt,
-  focusDistance,
   glideAt,
   NEBULA_IMAGES,
   NEBULA_LAYERS,
@@ -147,7 +146,7 @@ export class Nebulae {
 
   /** A frame of the cosmos, `eye` the worlds': the nebulae are scenery, so they stand around the scenery's eye, which adds the sky's
    * cruise (eye.ts), and take their share from how far the worlds' eye is from what it looks at. */
-  follow(eye: Point, seconds: number): void {
+  follow(eye: Point, seconds: number, distance: number): void {
     driftAt(this.#drift, seconds);
     glideAt(this.#glide, seconds);
     const at = this.#scenery;
@@ -156,7 +155,7 @@ export class Nebulae {
     at.z = eye.z + this.#drift.z - this.#glide.z;
     const moved = Math.hypot(at.x - this.#placed.x, at.y - this.#placed.y, at.z - this.#placed.z);
     if (!(moved < PLACE_STEP) && this.#placing === undefined) this.#placing = setTimeout(this.#standAround);
-    this.advance(at, nebulaShare(focusDistance(eye)), seconds);
+    this.advance(at, nebulaShare(distance), seconds);
   }
 
   // Off the frame: a look of its own, around where the scenery's eye has come.

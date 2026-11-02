@@ -1,7 +1,7 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { LIMB_LIGHT } from "../planet/planet.ts";
-import { angleAt, FAR_ANGLE, limbAt, sideOf } from "./far.ts";
+import { angleAt, fadeAt, FAR_ANGLE, limbAt, sideOf } from "./far.ts";
 
 describe("sideOf", () => {
   const eye = new Vector3(0, 0, 1);
@@ -52,5 +52,18 @@ describe("limbAt", () => {
     expect(limbAt(60)).toBeCloseTo(LIMB_LIGHT * 0.2, 6);
     expect(limbAt(18)).toBeGreaterThan(limbAt(60));
     expect(limbAt(18)).toBeLessThan(limbAt(4));
+  });
+});
+
+// Frame 4's far worlds are a little softer and dimmer than its near ones (7d6): the planet's `faraway`, by the body's distance.
+describe("fadeAt", () => {
+  it("leaves a body crisp up close, and softens it by degrees to 0.45 afar", () => {
+    const fades = [4, 14, 30, 45, 60, 200].map(fadeAt);
+    expect(fades[0]).toBe(0);
+    expect(fades[1]).toBe(0);
+    for (let at = 1; at < fades.length; at += 1) expect(fades[at]).toBeGreaterThanOrEqual(fades[at - 1] ?? Infinity);
+    expect(fades[2]).toBeGreaterThan(0);
+    expect(fades[4]).toBeCloseTo(0.45, 9);
+    expect(fades[5]).toBeCloseTo(0.45, 9);
   });
 });

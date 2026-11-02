@@ -140,7 +140,7 @@ class LiveScene implements Scene {
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
     this.#earth.tick(this.#seconds);
-    this.#parts.tick(this.#eye.worlds, this.#eye.seconds, this.#seconds);
+    this.#parts.tick(this.#eye, this.#seconds);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);
@@ -215,7 +215,7 @@ class LiveScene implements Scene {
       ratio: this.#renderer.getPixelRatio(),
       probing: this.#probe.running,
       ...rendered(this.#renderer.info),
-      eye: { ...this.#eye.at },
+      ...this.#eye.said(),
       earth: this.#earth.stats(),
       ...this.#parts.stats(),
     };

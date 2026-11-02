@@ -21,8 +21,8 @@ const REGION = 160;
 // The most points one star's worlds take of the bound, and what each star in reach is sure of first.
 const DOTS_A_STAR = 1024;
 const DOTS_FLOOR = BOUNDS.dots / BOUNDS.stars;
-// A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world.
-const BODY_PIXELS = 6;
+/** A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world. */
+export const BODY_PIXELS = 6;
 // A point's radius in pixels never falls under this: a pixel across, and it goes out by `MIDDLE`.
 const LEAST_DOT = 0.75;
 const DOT_FADE = 0.6;

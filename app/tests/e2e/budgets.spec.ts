@@ -38,7 +38,7 @@ const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 const SCENE_JS = 156 * 1024;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 17 * 1024; // 16 KiB again once 7d5 gives the nebulae a chunk of their own (Alexis, 2026-11-02).
+const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02).
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;

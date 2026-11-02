@@ -102,9 +102,13 @@ export class Parts {
     this.world.door.part?.resize(width, height, ratio);
   }
 
-  tick(eye: Point, seconds: number, clock: number): void {
+  /** The cosmos moves with the eye and rests where the view rests (its glide apart, 7d6); a world's page turns by the scene's clock. */
+  tick(
+    { worlds, seconds, resting }: { readonly worlds: Point; readonly seconds: number; readonly resting: Point },
+    clock: number,
+  ): void {
     this.world.door.part?.tick(clock);
-    this.cosmos.door.part?.tick(eye, seconds);
+    this.cosmos.door.part?.tick(worlds, seconds, resting);
   }
 
   restored(): void {

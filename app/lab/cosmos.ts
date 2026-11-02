@@ -1,7 +1,7 @@
-// The cosmos as a view (slice 7, 7d2), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file, a wheel to
-// leave and come back, a drag to go along the disc, as flights will once they land.
+// The cosmos as a view (slice 7, 7d2 and 7d6), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file, the
+// view at rest first. The camera keeps the Earth at the centre: a wheel backs away and comes back, a drag moves the eye round it.
 import { Worlds } from "@gnoworld/schemas/indexer";
-import { HOME } from "@gnoworld/core";
+import { HERO_ZONE, HOME } from "@gnoworld/core";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { startScene } from "../src/scene/scene.ts";
 import recorded from "./worlds.json" with { type: "json" };
@@ -22,14 +22,24 @@ if (panel !== null) panel.hidden = true;
 const scene = startScene({ canvas, remembered: undefined, remember: () => undefined, onLost: () => undefined });
 scene.cosmos(Worlds.parse(recorded).worlds);
 Reflect.set(globalThis, "__gnoworldScene", scene);
+// The hero's room (core's HERO_ZONE), which holds the home's text: the suns the home dims under its words are dimmed here too.
+const keepHeroRoom = () => {
+  scene.keepClear({
+    left: 0,
+    top: HERO_ZONE.top * innerHeight,
+    right: HERO_ZONE.right * innerWidth,
+    bottom: innerHeight,
+  });
+};
+addEventListener("resize", keepHeroRoom);
+keepHeroRoom();
 
 let away = 1;
 let aside = 0;
 let along = 0;
 
 const go = () => {
-  const out = (away - 1) * LEFT;
-  scene.moveTo({ x: HOME.x + aside, y: HOME.y + 0.86 * out + along * 0.86, z: HOME.z + 0.5 * out + along * 0.5 });
+  scene.moveTo({ x: HOME.x + aside, y: HOME.y + along, z: HOME.z + (away - 1) * LEFT });
 };
 
 addEventListener("wheel", ({ deltaY }) => {

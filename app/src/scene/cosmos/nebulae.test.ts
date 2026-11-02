@@ -1,5 +1,6 @@
 import {
   driftAt,
+  focusDistance,
   glideAt,
   HOME,
   NEBULA_IMAGES,
@@ -354,7 +355,7 @@ describe("its sheets", () => {
   it("drifts with the sky's cruise while the clock runs, standing with the eye of the scenery", async () => {
     const scene = made();
     scene.nebulae.wake();
-    scene.nebulae.follow(HOME, 0);
+    scene.nebulae.follow(HOME, 0, focusDistance(HOME));
     await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
     const seconds = 600;
     const [drift, glide] = [
@@ -366,9 +367,9 @@ describe("its sheets", () => {
     // The scenery's eye, as eye.ts builds it: the worlds' eye and the cruise, which the worlds leave out.
     const scenery = { x: HOME.x + drift.x - glide.x, y: HOME.y + drift.y - glide.y, z: HOME.z + drift.z - glide.z };
     expect(Math.hypot(scenery.x - HOME.x, scenery.y - HOME.y, scenery.z - HOME.z)).toBeGreaterThan(300);
-    scene.nebulae.follow(HOME, seconds);
+    scene.nebulae.follow(HOME, seconds, focusDistance(HOME));
     await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
-    scene.nebulae.follow(HOME, seconds);
+    scene.nebulae.follow(HOME, seconds, focusDistance(HOME));
     const at = { x: 0, y: 0, z: 0 };
     const expected = new Set<string>();
     for (const nebula of litFrom(scenery))

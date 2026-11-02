@@ -1,7 +1,7 @@
 // A far belt (ADR-0002 §10): rocks past every orbit, one draw, from a system's name alone. Dark brown and soft, a pixel or two, lit on one
 // side, with the glow a quarter through them: no black hole in the light. Points: at this size a rock has no shape to tell, and an instanced
 // mesh would bring three's classes into the scene's chunk. Scenery, so nothing here means data.
-import { BELT_INNER, ROOM, type StarSystem } from "@gnoworld/core";
+import { BELT_INNER, onPlane, ROOM, type StarSystem } from "@gnoworld/core";
 import { ShaderMaterial, type Object3D } from "three";
 import type { Disposer } from "../disposer.ts";
 import { pointCloud, type Cloud } from "./cloud.ts";
@@ -49,6 +49,8 @@ const streamOf = (seed: number) => {
 export class Belt {
   readonly #cloud: Cloud<"position" | "aStar" | "aSize">;
   readonly #ratio = { value: 1 };
+  readonly #at = { x: 0, y: 0, z: 0 };
+  readonly #offset = { along: 0, across: 0, up: 0 };
   #count = 0;
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
@@ -71,20 +73,19 @@ export class Belt {
     this.#ratio.value = ratio;
   }
 
-  /** Lays `system`'s rocks from rock `first` on, opened by `spread` as its worlds are, and says where the next go: the same name, the same rocks. */
-  lay(system: StarSystem, first: number, spread: number): number {
+  /** Lays `system`'s rocks from rock `first` on, in its own plane, and says where the next go: the same name, the same rocks. */
+  lay(system: StarSystem, first: number): number {
     const next = streamOf(Math.round(system.warmth * WORD));
     const { x, y, z } = system.place;
     const { position, aStar, aSize } = this.#cloud.attributes;
     for (let rock = 0; rock < ROCKS; rock += 1) {
       const angle = next() * Math.PI * 2;
-      const across = spread * (BELT_INNER + next() * (ROOM - BELT_INNER));
-      position.setXYZ(
-        first + rock,
-        x + across * Math.cos(angle),
-        y + (next() - 0.5) * THICK,
-        z + across * Math.sin(angle),
-      );
+      const across = BELT_INNER + next() * (ROOM - BELT_INNER);
+      this.#offset.along = across * Math.cos(angle);
+      this.#offset.across = across * Math.sin(angle);
+      this.#offset.up = (next() - 0.5) * THICK;
+      onPlane(system, this.#offset, this.#at);
+      position.setXYZ(first + rock, this.#at.x, this.#at.y, this.#at.z);
       aStar.setXYZ(first + rock, x, y, z);
       aSize.setX(first + rock, LEAST_PIXELS + MORE_PIXELS * next() ** 3);
     }

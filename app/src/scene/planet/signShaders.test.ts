@@ -22,6 +22,7 @@ import {
   Vector3,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
+import { FARAWAY } from "./chunks.ts";
 import { createPlanet, type MapSet } from "./planet.ts";
 import { LIGHT_UNIFORMS, LIGHTS, lightCode } from "./signShaders.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
@@ -35,7 +36,14 @@ const BUSY: WorldState = { vitality: 0.8, present: 0.6, fresh: false };
 const NEW: WorldState = { vitality: 0.1, present: 0.4, fresh: true };
 const sphere = new SphereGeometry(1, 8, 6);
 // What 21b00fc8's SURFACE_FRAGMENT hashes to, computed from that commit's three files.
-const APPROVED_SURFACE = "1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a";
+// The shader of 21b00fc8 with its comment lines taken out (they moved above the strings, 7d6, for they ship), worked out apart from this
+// code on that commit's own files; with them, 1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a.
+const APPROVED_SURFACE = "de3aa66641d6ca657f973cda5d54836b89bcaf7dee968ab853bb11e26b38ce30";
+const uncommented = (text: string) =>
+  text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
 
 const mapSet = (extra: Partial<MapSet> = {}): MapSet => {
   const shared = new Texture();
@@ -179,11 +187,18 @@ describe("a world's signs on its render", () => {
     expect(SURFACE_FRAGMENT).toContain(gated);
     // The Earth's own lights read CITY_LIGHT at rest, so its value is the approved one.
     expect(LIGHTS).toContain("const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);");
+    // 7d6's far touch, which a world seen close keeps at 0 (mix by 0, times 1): the same pixels, its line and its uniform taken out too.
     const approved = SURFACE_FRAGMENT.replace(`${LIGHT_UNIFORMS}\n`, "")
       .replace(`${LIGHTS}\n`, "")
+      .replace(`  ${FARAWAY}\n`, "")
+      .replace("uniform float faraway;\n", "")
       .replace(gated, "")
       .replace("* CITY_LIGHT *", "* vec3(1.0, 0.8, 0.52) *");
-    expect(createHash("sha256").update(new TextEncoder().encode(approved)).digest("hex")).toBe(APPROVED_SURFACE);
+    expect(
+      createHash("sha256")
+        .update(new TextEncoder().encode(uncommented(approved)))
+        .digest("hex"),
+    ).toBe(APPROVED_SURFACE);
   });
 
   it("reads no light unless a world has some: `settled` is a uniform, so at rest not one of its reads runs", () => {

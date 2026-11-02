@@ -1,20 +1,10 @@
-// What the ladder's distances mean on screen, for what is drawn from them (ADR-0002 §3): how far a system opens from afar, its true places
-// unchanged, and what the page's text leaves. Plain numbers, for a frame reaches them.
-import { lerp, smoothstep } from "../space/smooth.ts";
-
-/** How far a system opens, seen from afar: its worlds stand this many times further from their star on screen. */
-export const SPREAD = 2.6;
-
-/** How much larger a body stands from afar: f0004's first plane is 60 to 90 pixels across. */
-export const GROWTH = 1.5;
+// What a body on screen keeps (ADR-0002 §3): no pole towards the eye, a ring open 30 degrees at most, and room for the page's text. Plain
+// numbers, for a frame reaches them.
+import { smoothstep } from "../space/smooth.ts";
 
 const MOST_LEAN = 0.5235987755982988;
-const SPREAD_FROM = 8;
-const SPREAD_TO = 26;
 // Over this many pixels from the box of the page's text, a body comes out whole.
 const CLEAR_MARGIN = 28;
-
-const opened = (distance: number): number => smoothstep(SPREAD_FROM, SPREAD_TO, distance);
 
 /** A place on screen and a size there, in pixels. */
 export interface ScreenSpot {
@@ -30,12 +20,6 @@ export interface ClearBox {
   readonly right: number;
   readonly bottom: number;
 }
-
-/** How far a system stands open at a distance: shut up close, wide from the arrival on. */
-export const spreadAt = (distance: number): number => lerp(1, SPREAD, opened(distance));
-
-/** How much larger a body stands at a distance. */
-export const growthAt = (distance: number): number => lerp(1, GROWTH, opened(distance));
 
 /** How far to lean a body whose look leans `lean`, seen `seen` radians off the view's axis: no world shows its pole, a ring opens 30 degrees at most. */
 export const leanFor = (lean: number, seen: number): number => Math.max(-MOST_LEAN, Math.min(lean, MOST_LEAN)) + seen;
