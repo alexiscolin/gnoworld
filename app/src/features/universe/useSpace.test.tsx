@@ -81,6 +81,21 @@ async function visit(Cosmos: () => null) {
   return { leave };
 }
 
+// The door's chunk held back until the test calls what this returns.
+function heldDoor(): () => void {
+  let arrive: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    arrive = resolve;
+  });
+  vi.doMock("./mountUniverse.tsx", async () => {
+    await gate;
+    return { mountUniverse: universe.mount };
+  });
+  return () => {
+    arrive();
+  };
+}
+
 // A first visit whose universe did not mount.
 async function failedOnce() {
   universe.mount.mockImplementationOnce(() => {
@@ -135,14 +150,7 @@ describe("the end of the first screen", () => {
 
   it("waits for the door though the page has loaded: the two are the first screen", async () => {
     readyState("complete");
-    let arrive: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      arrive = resolve;
-    });
-    vi.doMock("./mountUniverse.tsx", async () => {
-      await gate;
-      return { mountUniverse: universe.mount };
-    });
+    const arrive = heldDoor();
     const Earth = await pageThatWaits();
     const box = document.createElement("div");
     const root = createRoot(box);
