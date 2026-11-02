@@ -135,8 +135,10 @@ const settled = async () => {
   await vi.dynamicImportSettled();
   await vi.advanceTimersByTimeAsync(100);
 };
+// A body waits for the generated worlds' code, a chunk of its own, as it waits for its maps (7b5).
 const shown = async (made_: ReturnType<typeof made>, list: readonly CosmosWorld[] = worlds(30)) => {
   made_.cosmos.show(list);
+  await vi.dynamicImportSettled();
   made_.cosmos.tick(HOME, 0);
   await settled();
   made_.cosmos.tick(HOME, 0);
@@ -998,6 +1000,12 @@ describe("a look costs a step, never a frame", () => {
   it("looks again past its step, once, and off the frame", async () => {
     const scene = made();
     await shown(scene);
+    // The generated worlds' maps come after their bodies are asked (7b5), each a look of its own: the place is seen once first, so the
+    // step's look is counted alone.
+    scene.cosmos.tick(eyeAt(30.1), 1);
+    await settled();
+    scene.cosmos.tick(eyeAt(0), 1);
+    await settled();
     const { looks } = scene.cosmos.stats();
     scene.cosmos.tick(eyeAt(30), 1);
     scene.cosmos.tick(eyeAt(30.1), 1.1);
@@ -1765,6 +1773,8 @@ describe("the whole cosmos", () => {
       await settled();
       return scene.cosmos.stats().looks - looks;
     };
+    // The generated worlds' maps come after their bodies are asked (7b5), each a look of its own: the near place is seen once first.
+    await at(scene, { ...out(0), z: out(0).z + 5 });
     expect(await looksAfter(out(0), 5)).toBe(1);
     expect(await looksAfter(out(900), 5)).toBe(0);
     expect(await looksAfter(out(900), 12)).toBe(1);

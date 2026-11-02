@@ -1,6 +1,6 @@
-// A world's recipe, ADR-0002 §3's layers 1 to 3 beyond today's look: its minor class, its surface generated from the seed and its
-// palette in Lab, turned by its system's hue. 7b5 draws it; today's shader reads `planetLook`, which this leaves as it was, and no page
-// imports this yet, so it weighs nothing in the scene's chunk until then. Only + - * / reach a value. Tier 1 (docs/REVIEW.md).
+// A world's recipe, ADR-0002 §3's layers 1 to 3 beyond its look: its minor class, its surface generated from the seed and its palette in
+// Lab, turned by its system's hue. The generated worlds' chunk draws it (app/src/scene/planet/generated.ts), so neither the scene's
+// chunk nor the cosmos's carries it. Only + - * / reach a value. Tier 1 (docs/REVIEW.md).
 import { REALM_PREFIX } from "../chain/realm.ts";
 import type { Anchor, MapName } from "./anchors.ts";
 import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
@@ -43,7 +43,8 @@ function hueOf(path: Uint8Array): Turn {
   return turnOf(((seed[0] ?? 0) * 256 + (seed[1] ?? 0)) / 65535);
 }
 
-function recipeOf(seed: Uint8Array, anchor: Anchor, turn: Turn): Recipe {
+/** The recipe a seed gives as `anchor`, turned by its system's hue. */
+export function seededRecipe(seed: Uint8Array, anchor: Anchor, turn: Turn): Recipe {
   const more = moreSeed(seed);
   const minor = minorOf(more, anchor);
   const grade = {
@@ -64,11 +65,11 @@ function recipeOf(seed: Uint8Array, anchor: Anchor, turn: Turn): Recipe {
 
 /** The recipe of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldRecipe`). */
 export const planetRecipe = (path: Uint8Array, anchor: Anchor): Recipe =>
-  recipeOf(planetSeed(path), anchor, hueOf(path));
+  seededRecipe(planetSeed(path), anchor, hueOf(path));
 
 /** The recipe of a world by its id, at its anchor as `worldLook` reads it. An id is ASCII by its schema. */
 export function worldRecipe(id: string, nature: Nature | null = null): Recipe {
   const path = worldPath(id);
   const seed = planetSeed(path);
-  return recipeOf(seed, anchorOf(seed, nature), hueOf(path));
+  return seededRecipe(seed, anchorOf(seed, nature), hueOf(path));
 }

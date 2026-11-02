@@ -74,7 +74,7 @@ export class Cosmos {
   #setShown(shown: boolean): void {
     this.#wanted = shown;
     this.#disc.group.visible = shown && this.#ahead.done && this.#shown > 0;
-    this.#bodies.group.visible = shown && this.#shown === 1;
+    this.#bodies.show(shown && this.#shown === 1);
     this.#nebulae.show(shown);
     if (!shown) this.#whole.hide();
   }

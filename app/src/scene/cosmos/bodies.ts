@@ -9,7 +9,6 @@ import {
   orbitPlace,
   planetSeed,
   toScene,
-  worldLook,
   worldPath,
   type ClearBox,
   type Orbiter,
@@ -21,7 +20,7 @@ import { Euler, Group, Quaternion, SphereGeometry, Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
-import { createPlanet, type Planet } from "../planet/planet.ts";
+import type { Planet } from "../planet/planet.ts";
 import { angleAt, fadeAt, limbAt, sideOf } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
@@ -90,6 +89,12 @@ export class Bodies {
     this.#view = sight;
   }
 
+  /** Shows the bodies or hides them; shown, the generated worlds' code is asked now, so it comes beside the first maps, not after them. */
+  show(shown: boolean): void {
+    this.group.visible = shown;
+    if (shown) this.#maps.kit();
+  }
+
   has(id: string): boolean {
     return this.#held.has(id);
   }
@@ -113,10 +118,12 @@ export class Bodies {
   }
 
   #add(id: string, system: StarSystem, world: Orbiter): void {
-    const look = worldLook(id);
-    const set = this.#maps.setFor(look);
+    const kit = this.#maps.kit();
+    if (kit === undefined) return;
+    const drawn = kit.worldOf(id);
+    const set = this.#maps.setFor(drawn);
     if (set === undefined) return;
-    const planet = createPlanet(look, set, this.#sphere);
+    const planet = kit.createWorld(drawn, set, this.#sphere);
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
@@ -230,11 +237,7 @@ export class Bodies {
 
   /** What stands, for the journeys, seen from `eye`, the Earth at `earth`: no body counted while hidden. */
   stats(shown: boolean, eye: Point, earth: Vector3 | undefined) {
-    return { bodies: shown ? this.size : 0, list: this.list(), screen: this.screen(eye, earth) };
-  }
-
-  /** What stands, for the journeys. */
-  list() {
-    return [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));
+    const list = [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));
+    return { bodies: shown ? this.size : 0, list, screen: this.screen(eye, earth) };
   }
 }

@@ -52,6 +52,11 @@ const NEBULAE_JS = 3.75 * 1024;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
+// Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
+// the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
+const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
+const GENERATED_JS = 8 * 1024; // 7,780 B at 7b5's end (zlib, level 6; 6,489 before its look pass); the chief's to set.
+const GENERATED_MARK = "minorShare";
 
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
 const STATIC_IMPORT = /(?:\bfrom|\bimport)\s*"\.\/([\w.-]+\.js)"/g;
@@ -252,4 +257,21 @@ test("the scene's chunk holds three, and stays within its cap", async ({ page })
   const own = (await closureOf(page, url)).filter((each) => !brought.has(each));
   expect(await (await page.request.get(url)).text()).toContain(THREE_MARK);
   expect(await compressed(page, own)).toBeLessThanOrEqual(SCENE_JS);
+});
+
+test("the generated worlds' chunk comes with the cosmos's worlds, within its own cap, and no other chunk holds it", async ({
+  page,
+}) => {
+  const chunks = [SCENE, COSMOS, GENERATED].map((chunk) =>
+    page.waitForResponse((response) => chunk.test(response.url())),
+  );
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const [sceneUrl = "", cosmosUrl = "", generatedUrl = ""] = await Promise.all(
+    chunks.map(async (response) => (await response).url()),
+  );
+  expect(await (await page.request.get(generatedUrl)).text()).toContain(GENERATED_MARK);
+  for (const url of [sceneUrl, cosmosUrl])
+    expect(await (await page.request.get(url)).text()).not.toContain(GENERATED_MARK);
+  expect(await compressed(page, [generatedUrl])).toBeLessThanOrEqual(GENERATED_JS);
 });

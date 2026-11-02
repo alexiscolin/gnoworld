@@ -14,7 +14,7 @@ import {
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Circle } from "../earth/device.ts";
-import { createPlanet } from "../planet/planet.ts";
+import { createWorld, worldOf } from "../planet/generated.ts";
 import type { WorldReading } from "./reading.ts";
 import { CLOSE_WIDTH } from "./standing.ts";
 import { WorldView, type MoonMark } from "./view.ts";
@@ -125,8 +125,8 @@ describe("the world in its circle", () => {
   it("loads the world's maps at the close view's width, and says it is drawn with its colour", async () => {
     const { said, colours } = await opened();
     expect(said).toEqual(["loading", "drawn"]);
-    const { map, second } = worldLook(ID);
-    for (const name of [map, second].filter((each) => each !== null))
+    const { look, recipe } = worldOf(ID);
+    for (const name of [look.map, recipe.minorMap])
       expect(
         maps.load.mock.calls.some(
           ([url, how]) =>
@@ -192,11 +192,9 @@ describe("the world in its circle", () => {
   it("draws the look the cosmos draws for the same id: its palette on its surface", async () => {
     for (const id of [ID, "gnoland/blog"]) {
       const { stage } = await opened({ id });
-      const [, mid] = worldLook(id).ramp;
-      const surface = materials(stage).find((material) => "rampMid" in material.uniforms);
-      expect((value(surface, "rampMid") as Color).getHexString()).toBe(
-        new Color().setRGB(...mid, SRGBColorSpace).getHexString(),
-      );
+      const [, mid] = worldOf(id).recipe.palette.linear;
+      const surface = materials(stage).find((material) => "minorMid" in material.uniforms);
+      expect((value(surface, "mid") as Color).getHexString()).toBe(new Color().setRGB(...mid).getHexString());
     }
   });
 
@@ -492,13 +490,13 @@ describe("real shadows on the one world seen close", () => {
     view.moons([mark("#a", 1).moon]);
     await settled();
     view.tick(3);
-    const surface = materials(stage).find((material) => "rampMid" in material.uniforms);
+    const surface = materials(stage).find((material) => "minorMid" in material.uniforms);
     expect((value(overlayOf(stage), "sun") as Vector3).toArray()).toEqual((value(surface, "sun") as Vector3).toArray());
   });
 
   it("is the close view's alone: a world drawn among the others carries no shadow", () => {
-    const planet = createPlanet(
-      worldLook(ID),
+    const planet = createWorld(
+      worldOf(ID),
       { map: () => new Texture(), clouds: new Texture(), ring: new Texture() },
       new BufferGeometry(),
     );
