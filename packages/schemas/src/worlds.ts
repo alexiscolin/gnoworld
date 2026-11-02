@@ -71,8 +71,9 @@ const World = z.object({
   // The time the world was first seen on the list (null on a first pass), and whether it joined in a batch.
   seen: z.optional(z.nullable(Moment)),
   batch: z.optional(z.boolean()),
-  // Its nature, kept from the pass that first read every realm of it (null: no rule reads it); absent until then.
-  nature: z.optional(z.nullable(z.enum(WORLD_NATURES))),
+  // Its nature, kept from the pass that first read every realm of it (null: no rule reads it); absent until then. A nature this reader
+  // does not know reads as absent, so the job reads it again: a newer job's, or one a later part drops, never refuses the file.
+  nature: z.optional(z.catch(z.optional(z.nullable(z.enum(WORLD_NATURES))), undefined)),
 });
 
 /** worlds.json: the universe it was read from, the time of the read, and the worlds, sorted by id. */

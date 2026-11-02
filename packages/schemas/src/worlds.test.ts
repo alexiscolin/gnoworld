@@ -82,6 +82,16 @@ describe("Worlds", () => {
     expect(Worlds.parse(world({})).worlds[0]).not.toHaveProperty("nature");
   });
 
+  it("reads a nature it does not know as none known, and still reads the world: a newer job's or a dropped one", () => {
+    const world = (extra: Record<string, unknown>) =>
+      file({ worlds: [{ id: "a/b", namespace: "a", realms: [], ...extra }] });
+    for (const nature of ["wizard", "Token", "name", "", 3, true]) {
+      const parsed = Worlds.safeParse(world({ nature }));
+      expect(parsed.success, String(nature)).toBe(true);
+      expect(parsed.data?.worlds[0]?.nature, String(nature)).toBeUndefined();
+    }
+  });
+
   it("drops a key of a world it does not know, so an older reader reads a newer file, and nothing unchecked passes", () => {
     const parsed = Worlds.parse(file({ worlds: [{ id: "a/b", namespace: "a", realms: [], later: "<b>x</b>" }] }));
     expect(parsed.worlds).toHaveLength(1);
