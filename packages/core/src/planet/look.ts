@@ -1,4 +1,4 @@
-// A world's look, a pure function of its path (ADR-0002 §3): sha256("gnoworld/planet/v1" ‖ path), whose 256 bits feed continuous values
+// A world's look, a pure function of its path and the anchor it is given (ADR-0002 §3): sha256("gnoworld/planet/v1" ‖ path), whose 256 bits feed continuous values
 // inside an anchor's row. Only + - * / reach a value, so every engine gives the same look: rotations stay angles, and the app does
 // the trigonometry. Tier 1 (docs/REVIEW.md). The path comes in as bytes: core has no TextEncoder.
 import { ANCHORS, MAPS, type Anchor, type AnchorRow, type MapName, type Ramp, type Rgb } from "./anchors.ts";
@@ -130,9 +130,8 @@ function waters(row: AnchorRow, { byte }: Reader): Pick<PlanetLook, "sea" | "glo
   };
 }
 
-/** The look of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldLook`). */
-export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
-  const seed = reader(planetSeed(path));
+function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
+  const seed = reader(bytes);
   const { word, byte } = seed;
   const row = ROWS[anchor];
   const ramp = rampOf(row, seed);
@@ -165,8 +164,11 @@ export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
   };
 }
 
+/** The look of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldLook`). */
+export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => lookOf(planetSeed(path), anchor);
+
 /** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. An id is ASCII by its schema. */
 export function worldLook(id: string, nature: Nature | null = null): PlanetLook {
-  const path = asciiBytes(`${WORLD_PATH}${id}`);
-  return planetLook(path, anchorOf(planetSeed(path), nature));
+  const seed = planetSeed(asciiBytes(`${WORLD_PATH}${id}`));
+  return lookOf(seed, anchorOf(seed, nature));
 }

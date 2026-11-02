@@ -1,6 +1,7 @@
 // A world's two gauges (ADR-0002 §10): a vitality that remembers, moving a few percent a day, and the people present. Time comes in as a
 // parameter. A gauge is a reading of the day, never part of a look: `Math.log1p`, approximate from one engine to the next, reaches no seed.
 // Tier 1 (docs/REVIEW.md).
+import { clamp01 } from "../space/smooth.ts";
 
 // Climbing takes about a month and falling three: a world keeps what it became.
 const RISE = 0.03;
@@ -15,8 +16,8 @@ export interface UseCounts {
   readonly realm: number;
 }
 
-/** `value` as a share; what is no number counts for nothing. */
-export const share = (value: number): number => (value > 0 ? Math.min(value, 1) : 0);
+/** `value` as a share, NaN counting for nothing. */
+export const share = (value: number): number => clamp01(value) || 0;
 
 const rung = (count: number, busiest: number) => share(Math.log1p(count) / Math.log1p(Math.max(busiest, QUIET_TOP)));
 

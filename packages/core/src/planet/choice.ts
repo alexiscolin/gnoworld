@@ -13,6 +13,7 @@ export interface RealmFunctions {
 }
 
 // Each anchor's share of 256 bytes, in ADR-0002's order: tidally locked and shattered are the strange ones, about one world in ten.
+// The rest, 12, is shattered's.
 const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["rocky", 30],
   ["temperate", 26],
@@ -25,7 +26,6 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["cloud deck", 18],
   ["tidally locked", 12],
   ["dark carbon", 18],
-  ["shattered", 12],
 ];
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
   token: ["gas giant", "ice giant"],
@@ -46,7 +46,7 @@ function drawn(byte: number): Anchor {
     if (left < weight) return anchor;
     left -= weight;
   }
-  return "rocky";
+  return "shattered";
 }
 
 /** The class of a world from its seed, a nature leaning a third of its worlds its own way. */
@@ -65,7 +65,7 @@ function realmNature({ functions }: RealmFunctions): Nature | null {
   return GAME.some((word) => holds(functions, word)) ? "game" : null;
 }
 
-/** What most of a world's realms are, a tie to the first rule. Names come capped from the worlds' schema: 512 realms of 256 at most. */
+/** The nature most of a world's classified realms have, a tie to the first rule. Names come capped: 512 realms of 256 at most. */
 export function natureOf(realms: readonly RealmFunctions[]): Nature | null {
   const counts = new Map<Nature, number>();
   for (const realm of realms) {
@@ -73,7 +73,10 @@ export function natureOf(realms: readonly RealmFunctions[]): Nature | null {
     if (nature !== null) counts.set(nature, (counts.get(nature) ?? 0) + 1);
   }
   let found: Nature | null = null;
-  for (const nature of NATURES)
-    if ((counts.get(nature) ?? 0) > (found === null ? 0 : (counts.get(found) ?? 0))) found = nature;
+  let most = 0;
+  for (const nature of NATURES) {
+    const count = counts.get(nature) ?? 0;
+    if (count > most) [found, most] = [nature, count];
+  }
   return found;
 }
