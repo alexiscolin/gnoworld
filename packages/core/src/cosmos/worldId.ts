@@ -3,12 +3,13 @@
 // a generic folder (`x`, `demo`) the whole path minus its version stands: one namespace there holds hundreds of unrelated realms. A realm
 // that is its namespace alone is a world of its own. The server's job groups by it, and a world's page draws the planet of the same id.
 
+import { REALM_PREFIX } from "../chain/realm.ts";
+
 const GENERIC = ["x", "demo"];
-const PREFIX = "gno.land/r/";
 
 /** The world of a realm's path on gno.land. */
 export function worldIdOf(path: string): string {
-  const segments = path.slice(PREFIX.length).split("/");
+  const segments = path.slice(REALM_PREFIX.length).split("/");
   const [namespace = "", folder = ""] = segments;
   const unversioned = segments.length > 1 && /^v[0-9]+$/.test(segments.at(-1) ?? "") ? segments.slice(0, -1) : segments;
   if (unversioned.length === 1) return namespace;

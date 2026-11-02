@@ -2,7 +2,6 @@
 // its realms' calls its aurora, its rooms' lines its storms, the worlds' file its matter. Today's use stands in for the vitality, for nothing
 // stores one yet (the chief's decision, 2026-11-02). A file of another universe is no file.
 import {
-  asciiBytes,
   auroraOf,
   BLOCK_MS,
   isFresh,
@@ -13,6 +12,7 @@ import {
   stormsOf,
   useOf as weighUse,
   worldLook,
+  worldPath,
   worldSigns,
   type PlanetLook,
   type WorldSigns,
@@ -57,7 +57,6 @@ interface Weighed {
 }
 
 const DAY = 86_400_000;
-const WORLD_PATH = "gno.land/r/";
 
 const realmUse = ({ realms }: FileWorld) => realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0);
 const callsOf = ({ realms }: FileWorld) =>
@@ -144,7 +143,7 @@ export function readingOf(file: Worlds | undefined, at: WorldNow): WorldReading 
   const heat = presenceOf(at.people, 0);
   const fresh = isFresh(ageOf(found.ours === undefined ? undefined : found.world, at.now), at.visited);
   const look = worldLook(at.id);
-  const seed = planetSeed(asciiBytes(`${WORLD_PATH}${at.id}`));
+  const seed = planetSeed(worldPath(at.id));
   const state = { vitality, present: heat, fresh };
   const used = usedIn(file, at, found);
   return {

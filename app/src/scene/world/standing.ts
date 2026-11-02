@@ -1,6 +1,6 @@
 // A world as it comes to the stage: its maps at the close view's width, its moons' small ones, the sphere they share, and, once every map is
 // here, its body and its moons. It owns all of it, and frees it all at once.
-import { asciiBytes, planetSeed, worldLook, type PlanetLook } from "@gnoworld/core";
+import { planetSeed, worldLook, worldPath, type PlanetLook } from "@gnoworld/core";
 import { Color, SphereGeometry, SRGBColorSpace } from "three";
 import { BodyMaps } from "../cosmos/maps.ts";
 import type { EarthDevice } from "../earth/device.ts";
@@ -33,7 +33,7 @@ export class Standing {
 
   constructor(device: EarthDevice, id: string, { arrived, failed }: StandingCalls) {
     this.id = id;
-    this.seed = planetSeed(asciiBytes(`gno.land/r/${id}`));
+    this.seed = planetSeed(worldPath(id));
     this.look = worldLook(id);
     this.#maps = new BodyMaps(device, arrived, { width: CLOSE_WIDTH, failed });
     this.#moonMaps = new BodyMaps(device, arrived, { width: MOON_WIDTH, failed });
