@@ -94,9 +94,11 @@ test("stands the arrival as frame f0004 does: the great sun left of nothing, the
   near(screen.earth?.x ?? NaN, 645, "the Earth's x");
   near(screen.earth?.y ?? NaN, 540, "the Earth's y");
   near(screen.earth?.radius ?? NaN, 47, "the Earth's radius");
-  const inView = screen.bodies.filter(({ x, y }) => x > 0 && x < COMPUTER.width && y > 0 && y < COMPUTER.height);
-  expect(inView.length).toBeGreaterThan(12);
-  for (const { radius } of inView) {
+  // A body shows once its programs are compiled, which a software GPU takes its time over.
+  const inViewOf = (bodies: typeof screen.bodies) =>
+    bodies.filter(({ x, y }) => x > 0 && x < COMPUTER.width && y > 0 && y < COMPUTER.height);
+  await expect.poll(async () => inViewOf((await cosmos(page)).screen.bodies).length, SLOW).toBeGreaterThan(12);
+  for (const { radius } of inViewOf((await cosmos(page)).screen.bodies)) {
     expect(radius).toBeGreaterThan(5);
     expect(radius).toBeLessThan(95);
   }

@@ -77,8 +77,10 @@ export class Disc {
   readonly #belt: Belt;
   readonly #colours = new Map<string, [number, number, number]>();
   readonly group = new Group();
-  /** A point's size, in the journeys' reading. */
+  /** The points' mean size, worlds and not grain, in the journeys' reading. */
   dotPixels = 0;
+  #sizes = 0;
+  #sized = 0;
   dotCount = 0;
 
   constructor(owner: Disposer) {
@@ -139,7 +141,10 @@ export class Disc {
     const grain = world.radius < GRAIN;
     const share = unitOf(textHash(world.id));
     const size = onScreen(world.radius, distance, sight.focal) * (grain ? 0.5 + 0.9 * share : 1);
-    if (index === 0) this.dotPixels = size;
+    if (!grain) {
+      this.#sizes += size;
+      this.#sized += 1;
+    }
     this.#dots.set(index, system.place, {
       orbit: [world.orbit * spreadAt(distance), world.phase, system.spin],
       tint: grain ? GRAIN_TINT : lifted(this.#colourFor(world.id)),
@@ -151,6 +156,8 @@ export class Disc {
   #paintDots(sight: Sight): void {
     const { drawn, systems } = sight;
     let count = 0;
+    this.#sizes = 0;
+    this.#sized = 0;
     const paint = (at: number, world: number, unless: boolean) => {
       const system = systems[at];
       const held = system?.worlds[world];
@@ -163,6 +170,7 @@ export class Disc {
       paint(drawn.bodySystems[at] ?? -1, drawn.bodyWorlds[at] ?? -1, true);
     for (let at = 0; at < drawn.dotCount; at += 1) paint(drawn.dotSystems[at] ?? -1, drawn.dotWorlds[at] ?? -1, false);
     this.dotCount = count;
+    this.dotPixels = this.#sized === 0 ? 0 : this.#sizes / this.#sized;
     this.#dots.commit(count);
   }
 

@@ -348,6 +348,17 @@ describe("what it draws", () => {
     expect(colours.size).toBeGreaterThan(3);
   });
 
+  it("reads the points' size for the journeys as the mean of all it wrote, not the first world's", async () => {
+    const scene = made();
+    await shown(scene, worlds(30, 6));
+    const [points] = dots(scene);
+    const size = points?.geometry.getAttribute("aSize") as BufferAttribute;
+    const { dots: count, dotPixels } = scene.cosmos.stats();
+    const sizes = Array.from({ length: count }, (_, at) => size.getX(at));
+    expect(new Set(sizes.map((one) => one.toFixed(3))).size).toBeGreaterThan(1);
+    expect(dotPixels).toBeCloseTo(sizes.reduce((sum, one) => sum + one, 0) / count, 6);
+  });
+
   it("writes a point's size from the ladder, so it falls as the eye leaves: no size of its own", async () => {
     const scene = made();
     await shown(scene);
