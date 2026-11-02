@@ -70,22 +70,20 @@ const without = (page: Page, urls: readonly string[], skip: readonly string[]) =
     [[...urls], skip, STATIC_IMPORT.source] as const,
   );
 
-// A script and every script it imports statically, read file by file.
-const closureOf = (page: Page, start: string) =>
-  page.evaluate(
-    async ([first, pattern]) => {
-      const seen = new Set<string>();
-      const next = [first];
-      for (let url = next.pop(); url !== undefined; url = next.pop()) {
-        if (seen.has(url)) continue;
-        seen.add(url);
-        const text = await (await fetch(url, { cache: "no-store" })).text();
-        for (const found of text.matchAll(new RegExp(pattern, "g"))) next.push(new URL(found[1] ?? "", url).href);
-      }
-      return [...seen];
-    },
-    [start, STATIC_IMPORT.source] as const,
-  );
+// A script and every script it imports statically, read file by file by the test, not the page: a page that draws the scene on a software GPU
+// is too busy to read twenty files in time.
+async function closureOf(page: Page, start: string): Promise<string[]> {
+  const seen = new Set<string>();
+  const next = [start];
+  for (let url = next.pop(); url !== undefined; url = next.pop()) {
+    if (seen.has(url)) continue;
+    seen.add(url);
+    const text = await (await page.request.get(url)).text();
+    for (const found of text.matchAll(new RegExp(STATIC_IMPORT.source, "g")))
+      next.push(new URL(found[1] ?? "", url).href);
+  }
+  return [...seen];
+}
 
 // The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
 // the door ended.
