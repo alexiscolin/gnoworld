@@ -8,7 +8,7 @@ import { CREDITS } from "./credits.ts";
 // its author and its licence.
 const FOLDER = new URL("../../../public/textures", import.meta.url).pathname;
 const FILES = readdirSync(FOLDER, { recursive: true });
-const MAX_BYTES = 1024 * 1024;
+const MAX_BYTES = 2 * 1024 * 1024;
 const LICENCES = ["CC BY 4.0"];
 const ascii = (bytes: Uint8Array) => String.fromCharCode(...bytes);
 const SIDE = 0x3fff;
