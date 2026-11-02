@@ -55,8 +55,10 @@ function Name({ title, menu }: Pick<ChatHeaderProps, "title" | "menu">) {
 export function ChatHeader({ kicker, title, onClose, size, rooms, menu, mark }: ChatHeaderProps) {
   return (
     <Cluster as="header" space="m">
-      {rooms}
-      <Kicker>{kicker}</Kicker>
+      <div className={styles["place"]}>
+        {rooms}
+        <Kicker>{kicker}</Kicker>
+      </div>
       <Name title={title} menu={menu} />
       {mark}
       <div className={styles["controls"]}>

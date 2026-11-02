@@ -176,6 +176,31 @@ for (const width of [1100, 1728])
     });
   });
 
+// A narrow chat's header (a dock's, a phone's) holds the rooms' control and the place on one row, the room's name and the close control on
+// the next: rows that let the header's items fall where they fit change as its title's font or the control's chunk comes, and the chat moves
+// under the reader (the 390 px journey below caught it, CLS 0.15, 2026-11-02).
+test.describe("the chat's header at 390 px", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("keeps two rows: the place, then the room's name with the close control", async ({ page }) => {
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    const chat = page.locator("#chat");
+    await expect(chat.getByRole("button", { name: "Rooms" })).toBeVisible(SLOW);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    const place = await chat.locator("header p").first().boundingBox();
+    const close = await chat.getByRole("button", { name: "Close the chat" }).boundingBox();
+    const name = await chat.getByRole("heading", { name: "#bubble" }).boundingBox();
+    if (place === null || close === null || name === null) throw new Error("no place, close control or room's name");
+    expect(name.y, "the room's name under the place").toBeGreaterThanOrEqual(place.y + place.height - 1);
+    const middle = close.y + close.height / 2;
+    expect(middle, "the close control on the name's row").toBeGreaterThanOrEqual(name.y);
+    expect(middle).toBeLessThanOrEqual(name.y + name.height);
+  });
+});
+
 // A world whose chat counts nobody, its socket answering nothing: the plate's "here, right now" keeps its place, empty, and nothing moves
 // (the chief, 2026-11-02: Bubble, GovDAO and a world with nobody, each under 0.05 at 390 px).
 test.describe("a world with nobody counted, at 390 px", () => {
