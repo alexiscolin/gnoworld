@@ -104,6 +104,11 @@ export class Disc {
     this.#belt = new Belt(this.group, owner, BOUNDS.rocks);
   }
 
+  /** What it draws, for the journeys: nothing while hidden. */
+  stats(shown: boolean) {
+    return { dots: shown ? this.dotCount : 0, rocks: shown ? this.rocks : 0, dotPixels: shown ? this.dotPixels : 0 };
+  }
+
   get rocks(): number {
     return this.#belt.count;
   }

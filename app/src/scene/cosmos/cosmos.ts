@@ -212,17 +212,13 @@ export class Cosmos {
     const shown = this.#wanted;
     return {
       shown,
-      bodies: shown ? this.#bodies.size : 0,
+      ...this.#bodies.stats(shown, this.#eye, this.#home.at),
       stars: shown ? this.#drawn.starCount : 0,
       glows: shown ? this.#drawn.glowCount : 0,
-      dots: shown ? this.#disc.dotCount : 0,
-      rocks: shown ? this.#disc.rocks : 0,
+      ...this.#disc.stats(shown),
       maps: this.#maps.size,
       looks: this.#looks,
-      dotPixels: shown ? this.#disc.dotPixels : 0,
       earth: this.#home.stood,
-      list: this.#bodies.list(),
-      screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
       // Counted from the systems it holds, apart from the hero's count of the file (7d6's review).
       worlds: this.#systems.reduce((sum, { worlds }) => sum + worlds.length, 1),

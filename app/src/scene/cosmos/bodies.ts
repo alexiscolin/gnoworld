@@ -224,15 +224,17 @@ export class Bodies {
     this.#shown.length = 0;
   }
 
-  /** Where the great star, the Earth at `earth` and each body shown stand on screen, from `eye`, for the journeys. */
-  screen({ x, y, z }: Point, earth: Vector3 | undefined) {
-    return {
-      sun: this.spotOf(new Vector3(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z), 0),
+  /** What stands, for the journeys, seen from `eye`, no body counted while hidden; and where the great star, the Earth at `earth` and each
+   * body shown stand on screen. */
+  stats(shown: boolean, eye: Point, earth: Vector3 | undefined) {
+    const screen = {
+      sun: this.spotOf(new Vector3(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z), 0),
       earth: earth === undefined ? undefined : this.spotOf(earth, EARTH_RADIUS),
       bodies: [...this.#held.values()].flatMap(({ id, at, planet }) =>
         planet.group.visible ? [{ ...this.spotOf(at, planet.group.scale.x), id, away: at.length() }] : [],
       ),
     };
+    return { bodies: shown ? this.size : 0, list: this.list(), screen };
   }
 
   /** What stands, for the journeys. */
