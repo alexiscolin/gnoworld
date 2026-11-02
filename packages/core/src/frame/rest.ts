@@ -22,7 +22,7 @@ import {
   type Look,
 } from "./restLook.ts";
 
-export { postcardOf } from "./postcard.ts";
+export { postcardOf, type Postcard } from "./postcard.ts";
 
 export { FIELD_OF_VIEW, HERO_ZONE, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 export { REST_DISTANCE };

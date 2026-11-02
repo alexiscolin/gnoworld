@@ -141,7 +141,7 @@ class LiveScene implements Scene {
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
     this.#earth.tick(this.#seconds);
-    this.#cosmos.tick(this.#eye.worlds, this.#eye.seconds);
+    this.#cosmos.tick(this.#eye.worlds, this.#eye.seconds, this.#eye.resting);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);

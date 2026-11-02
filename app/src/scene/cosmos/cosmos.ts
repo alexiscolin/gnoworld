@@ -7,7 +7,6 @@ import {
   Ladder,
   systemsOf,
   toMap,
-  worldsDrawn,
   type ClearBox,
   type Point,
   type StarSystem,
@@ -49,6 +48,9 @@ export class Cosmos {
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
   readonly #mapEye = { x: 0, y: 0, z: 0 };
+  // Where the eye rests, the view at rest's way off the scene's, less the arrival's glide and the sway: what says it is at rest.
+  readonly #resting = { x: NaN, y: NaN, z: NaN };
+  readonly #restingMap = { x: NaN, y: NaN, z: NaN };
   readonly #atRest = new AtRest(() => {
     this.#looked.x = NaN;
     this.#askLook();
@@ -56,7 +58,6 @@ export class Cosmos {
   });
   #box: ClearBox | undefined;
   #systems: readonly StarSystem[] = [];
-  #worlds = 1;
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
@@ -105,7 +106,6 @@ export class Cosmos {
       this.#list = worlds;
       const held = worlds.map((world) => ({ id: world.id, namespace: world.namespace, use: usageOf(world) }));
       this.#systems = systemsOf(held);
-      this.#worlds = worldsDrawn(held);
       this.#ladder = new Ladder(this.#systems);
       this.#atRest.search(this.#systems);
     }
@@ -137,10 +137,11 @@ export class Cosmos {
 
   /** One frame on: the eye, in doubles, and the clock everything orbits by. The eye sways about the view at rest's, and the camera keeps
    * the Earth at the centre. */
-  tick(eye: Point, seconds: number): void {
+  tick(eye: Point, seconds: number, resting: Point = eye): void {
     if (!this.#wanted) return;
     const { earth } = this.#atRest;
     this.#atRest.place(eye, seconds, this.#eye);
+    this.#atRest.place(resting, 0, this.#resting);
     this.#atRest.aim(this.#device.camera, this.#eye);
     this.#disc.advance(this.#eye, seconds);
     this.#bodies.tick(this.#eye, seconds);
@@ -163,7 +164,8 @@ export class Cosmos {
     this.#looks += 1;
     toMap(this.#eye, this.#mapEye);
     ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: EARTH_PLACE }, this.#drawn);
-    const sight = { eye: this.#mapEye, focal: this.#focal };
+    toMap(this.#resting, this.#restingMap);
+    const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
     const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
     this.#bodies.stand(bodies, close);
     this.#disc.paint({
@@ -224,7 +226,8 @@ export class Cosmos {
       list,
       screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
-      worlds: this.#worlds,
+      // Counted from the systems it holds, apart from the hero's count of the file (7d6's review).
+      worlds: this.#systems.reduce((sum, { worlds }) => sum + worlds.length, 1),
       // Where the eye stands on the stage: the scene's, moved to the view at rest's and swayed.
       eye: { ...this.#eye },
     };

@@ -5,6 +5,7 @@ import {
   GRAIN,
   postcardOf,
   screenRadius,
+  type Postcard,
   type Orbiter,
   type Point,
   type RestView,
@@ -15,10 +16,22 @@ import type { Wanted } from "./bodies.ts";
 // A distant star's worlds glint, drawn as worlds of this share of their size, so they still fall with distance.
 const GLINT = 0.12;
 
+/** The view's postcards as drawn, by their system's index: each laid out once, from the eye at rest. */
+export const postcardsOf = (
+  systems: readonly StarSystem[],
+  { eye, postcards }: RestView,
+): ReadonlyMap<number, Postcard> =>
+  new Map(
+    postcards.flatMap((index) => {
+      const system = systems[index];
+      return system === undefined ? [] : [[index, postcardOf(system, eye)] as const];
+    }),
+  );
+
 /** The view's bodies, from `eye` on the map with a lens of `focal` pixels. */
 export function restBodies(
   systems: readonly StarSystem[],
-  { eye, postcards, close }: RestView,
+  { view: { close }, postcards }: { view: RestView; postcards: ReadonlyMap<number, Postcard> },
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
@@ -29,11 +42,7 @@ export function restBodies(
     if (screenRadius(world.radius, away, sight.focal) >= BODY_PIXELS) wanted.set(world.id, [system, world]);
   };
   // A postcard's bodies stand spread round its star, in its plane as drawn, from the eye at rest: the same view, the same spread.
-  for (const index of postcards) {
-    const system = systems[index];
-    const postcard = system === undefined ? undefined : postcardOf(system, eye);
-    for (const world of postcard?.worlds ?? []) offer(postcard?.system, world);
-  }
+  for (const { system, worlds } of postcards.values()) for (const world of worlds) offer(system, world);
   if (close !== undefined) offer(systems[close.system], systems[close.system]?.worlds[close.world]);
   return wanted;
 }

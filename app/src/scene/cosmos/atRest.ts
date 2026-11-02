@@ -7,6 +7,7 @@ import {
   toScene,
   type Drawn,
   type Point,
+  type Postcard,
   type RestView,
   type StarSystem,
 } from "@gnoworld/core";
@@ -17,6 +18,7 @@ const loadSearch = () => import("./restSearch.ts");
 type Searched = Awaited<ReturnType<typeof loadSearch>>;
 const NONE: Wanted = new Map();
 const NO_POINT = () => 0;
+const NO_PLANE = () => undefined;
 const WHOLE = () => 1;
 // Until the view has come, and away from it, the great star's halo alone is needed: it is the first of the systems.
 const GREAT_STAR = (system: number) => system === 0;
@@ -46,6 +48,7 @@ export class AtRest {
   readonly earth = { x: NaN, y: NaN, z: NaN };
   readonly #found: () => void;
   #view = plainRest();
+  #postcards: ReadonlyMap<number, Postcard> = new Map();
   #searched: Searched | undefined;
   #eye: InstanceType<Searched["RestEye"]> | undefined;
   #asked = 0;
@@ -56,19 +59,23 @@ export class AtRest {
     toScene(EARTH_PLACE, this.earth);
   }
 
-  /** Looks for `systems`' view; a later search wins. A chunk that does not come leaves the plain view, with no body. */
+  /** Looks for `systems`' view; a later search wins. The eye stays where it rests till the view has come, so it moves once (7d6's
+   * review: it went back to the plain view first); a list with no world is no view. A chunk that does not come leaves no body. */
   search(systems: readonly StarSystem[]): void {
-    this.#view = plainRest();
-    this.#eye?.rest(this.#view);
+    this.#view = { ...this.#view, postcards: [], close: undefined };
+    this.#postcards = new Map();
     this.#asked += 1;
     const asked = this.#asked;
+    if (!systems.some(({ worlds }) => worlds.length > 0)) return;
     loadSearch().then(
       (searched) => {
+        if (asked !== this.#asked) return;
+        const view = searched.restView(systems);
         this.#searched = searched;
         this.#eye ??= new searched.RestEye();
-        if (asked !== this.#asked) return;
-        this.#view = searched.restView(systems);
-        this.#eye.rest(this.#view);
+        this.#view = view;
+        this.#postcards = searched.postcardsOf(systems, view);
+        this.#eye.rest(view);
         this.#found();
       },
       () => undefined,
@@ -90,21 +97,27 @@ export class AtRest {
     this.#eye?.aim(camera, eye);
   }
 
-  /** The worlds that stand as bodies from `sight`, the close world's id, how large each system's worlds stand as points and whose halos
-   * the view needs: the view at rest's where the eye rests, the ladder's `drawn` anywhere else. */
-  drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
+  /** The worlds that stand as bodies from `sight`, the close world's id, how large each system's worlds stand as points, whose halos the
+   * view needs and the plane a postcard's points turn in: the view at rest's where the eye rests (`resting`, on the map, the eye less the
+   * arrival's glide and the sway), the ladder's `drawn` anywhere else. */
+  drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number; resting: Point }, drawn: Drawn) {
     const searched = this.#searched;
-    const { eye } = this.#view;
-    if (
-      searched !== undefined &&
-      Math.hypot(sight.eye.x - eye.x, sight.eye.y - eye.y, sight.eye.z - eye.z) > REST_REACH
-    )
-      return { bodies: everywhere(systems, drawn), close: undefined, pointShare: WHOLE, needsHalo: GREAT_STAR };
+    const [{ eye }, { resting }] = [this.#view, sight];
+    if (searched !== undefined && Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH)
+      return {
+        bodies: everywhere(systems, drawn),
+        close: undefined,
+        pointShare: WHOLE,
+        needsHalo: GREAT_STAR,
+        planeOf: NO_PLANE,
+      };
+    const postcards = this.#postcards;
     return {
-      bodies: searched?.restBodies(systems, this.#view, sight) ?? NONE,
+      bodies: searched?.restBodies(systems, { view: this.#view, postcards }, sight) ?? NONE,
       close: searched?.closeId(systems, this.#view),
       pointShare: searched?.pointShares(this.#view) ?? NO_POINT,
       needsHalo: searched?.haloNeeds(this.#view) ?? GREAT_STAR,
+      planeOf: (system: number) => postcards.get(system)?.system,
     };
   }
 }

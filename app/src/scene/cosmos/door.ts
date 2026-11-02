@@ -51,8 +51,8 @@ export class CosmosDoor {
     this.#cosmos?.resize(height, ratio);
   }
 
-  tick(eye: Point, seconds: number): void {
-    this.#cosmos?.tick(eye, seconds);
+  tick(eye: Point, seconds: number, resting?: Point): void {
+    this.#cosmos?.tick(eye, seconds, resting);
   }
 
   restored(): void {

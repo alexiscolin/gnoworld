@@ -35,6 +35,7 @@ function sighted(systems: readonly StarSystem[], fill: (drawn: Drawn) => void): 
     isBody: () => false,
     pointShare: () => 1,
     needsHalo: (index) => index === 0,
+    planeOf: () => undefined,
     inView: () => true,
     shows: () => 1,
   };

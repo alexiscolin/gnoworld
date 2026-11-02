@@ -38,6 +38,8 @@ export interface Sight {
   /** How large a system's worlds stand as points, by its index: whole for the view at rest's postcards, none for its close world's
    * system, whose rest is off the screen, and a glint for every other, a distant star. */
   readonly pointShare: (system: number) => number;
+  /** The plane a postcard's points turn in, by its system's index, as its bodies' at rest: opened towards the eye if need be. */
+  readonly planeOf: (system: number) => StarSystem | undefined;
   /** Whether the view needs a system's halo, by its index, whatever its distance: the great star's and the postcards' stars'. */
   readonly needsHalo: (system: number) => boolean;
   /** Whether a round thing at a place on the map, of a radius in world units, shows on the screen. */
@@ -219,7 +221,8 @@ export class Disc {
       const share = sight.pointShare(at);
       if (system === undefined || held === undefined || count === BOUNDS.dots || sight.isBody(held.id) || share === 0)
         return;
-      this.#paintDot(count, { system, world: held, share }, sight);
+      // A postcard's points turn in the plane its bodies do.
+      this.#paintDot(count, { system: sight.planeOf(at) ?? system, world: held, share }, sight);
       count += 1;
     };
     for (let at = 0; at < drawn.bodyCount; at += 1) paint(drawn.bodySystems[at] ?? -1, drawn.bodyWorlds[at] ?? -1);
@@ -229,11 +232,12 @@ export class Disc {
     this.#dots.commit(count);
   }
 
-  #paintBelts({ drawn, systems }: Sight): void {
+  #paintBelts({ drawn, systems, planeOf }: Sight): void {
     let rocks = 0;
     for (let at = 0; at < drawn.nearCount && rocks + ROCKS <= BOUNDS.rocks; at += 1) {
-      const system = systems[drawn.near[at] ?? -1];
-      if (system?.belt === true) rocks = this.#belt.lay(system, rocks);
+      const index = drawn.near[at] ?? -1;
+      const system = systems[index];
+      if (system?.belt === true) rocks = this.#belt.lay(planeOf(index) ?? system, rocks);
     }
     this.#belt.commit(rocks);
   }

@@ -4,6 +4,7 @@ import {
   BOUNDS,
   CENTRE,
   EARTH_PLACE,
+  glideAt,
   GRAIN,
   HOME,
   NEBULA_IMAGES,
@@ -118,6 +119,12 @@ const shown = async (made_: ReturnType<typeof made>, list: readonly CosmosWorld[
   await settled();
   made_.cosmos.tick(HOME, 0);
   await settled();
+};
+// Each system's plane as the view at rest draws it: a postcard's opened towards the eye if need be, any other's its own.
+const drawnPlanes = (systems: readonly StarSystem[]) => {
+  const view = restView(systems);
+  return (system: StarSystem): StarSystem =>
+    view.postcards.includes(systems.indexOf(system)) ? postcardOf(system, view.eye).system : system;
 };
 const parts = ({ stage }: { stage: Stage }) => {
   const found: Object3D[] = [];
@@ -476,15 +483,17 @@ describe("what it draws", () => {
     const places = belt.geometry.getAttribute("position") as BufferAttribute;
     const sizes = belt.geometry.getAttribute("aSize") as BufferAttribute;
     const systems = held(list);
+    const planeOf = drawnPlanes(systems);
     for (let at = 0; at < count; at += 1) {
       expect(sizes.getX(at)).toBeLessThanOrEqual(3.6);
       const star = new Vector3(stars.getX(at), stars.getY(at), stars.getZ(at));
       const rock = new Vector3(places.getX(at), places.getY(at), places.getZ(at));
       expect(rock.distanceTo(star)).toBeGreaterThanOrEqual(BELT_INNER - 0.2);
       expect(rock.distanceTo(star)).toBeLessThanOrEqual(ROOM + 0.2);
-      // In its system's own plane, a thin ring: its offset across the plane is under a third of a unit.
-      const system = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
-      if (system === undefined) throw new Error("a rock with no star");
+      // In its system's plane as drawn (a postcard's opened at rest), a thin ring: its offset across the plane under a third of a unit.
+      const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
+      if (found === undefined) throw new Error("a rock with no star");
+      const system = planeOf(found);
       const normal = new Vector3(
         -Math.sin(system.node) * Math.sin(system.tilt),
         Math.cos(system.tilt),
@@ -502,11 +511,13 @@ describe("what it draws", () => {
     const plane = points?.geometry.getAttribute("aPlane") as BufferAttribute;
     const places = points?.geometry.getAttribute("position") as BufferAttribute;
     const systems = held(list);
+    const planeOf = drawnPlanes(systems);
     const { dots: count } = scene.cosmos.stats();
     expect(count).toBeGreaterThan(0);
     for (let at = 0; at < count; at += 1) {
       const star = new Vector3(places.getX(at), places.getY(at), places.getZ(at));
-      const system = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
+      const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
+      const system = found === undefined ? undefined : planeOf(found);
       expect(plane.getX(at)).toBeCloseTo(system?.node ?? NaN, 5);
       expect(plane.getY(at)).toBeCloseTo(system?.tilt ?? NaN, 5);
     }
@@ -753,6 +764,65 @@ describe("the view at rest (7d6)", () => {
     await settled();
     expect(ids()).not.toEqual(rest);
     expect(ids().size).toBeGreaterThan(rest.size);
+  });
+
+  // 7d6's review: a postcard's bodies turned on its opened plane while its specks kept the plane `opened()` rejected (24.8 degrees apart).
+  it("draws a postcard's specks in the plane its bodies turn in", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const view = restView(systems);
+    const [points] = dots(scene);
+    const plane = points?.geometry.getAttribute("aPlane") as BufferAttribute;
+    const drawn = pointsOf(scene, systems);
+    const ofPostcards = drawn.flatMap((point, at) => (view.postcards.includes(point.index) ? [{ point, at }] : []));
+    expect(ofPostcards.length).toBeGreaterThan(0);
+    for (const { point, at } of ofPostcards) {
+      const system = systems[point.index];
+      if (system === undefined) throw new Error("no system");
+      const shown = postcardOf(system, view.eye).system;
+      expect(plane.getX(at)).toBeCloseTo(shown.node, 6);
+      expect(plane.getY(at)).toBeCloseTo(shown.tilt, 6);
+    }
+  });
+
+  // 7d6's review: with motion on, the arrival's glide held the eye past the rest's reach, so the ladder's 33 bodies stood, then 29 went.
+  it("keeps the view at rest's bodies through the arrival's glide", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const ids = () => [...scene.cosmos.stats().list.map(({ id }) => id)].sort();
+    const rest = ids();
+    const glide = { x: 0, y: 0, z: 0 };
+    for (const seconds of [0, 0.5, 1, 2, 3, 5, 8]) {
+      glideAt(glide, seconds);
+      scene.cosmos.tick({ x: HOME.x + glide.x, y: HOME.y + glide.y, z: HOME.z + glide.z }, seconds, HOME);
+      await settled();
+      expect(ids()).toEqual(rest);
+    }
+  });
+
+  // 7d6's review: the home shows no file first; the search ran on it, then the eye went back to the plain view, then to the file's.
+  it("moves the eye once when the file comes: from the plain view to the file's, never through a view of no worlds", async () => {
+    const scene = made();
+    const eyes: Point[] = [];
+    const seen = () => {
+      const { eye } = scene.cosmos.stats();
+      eyes.push(eye);
+    };
+    scene.cosmos.show([]);
+    for (let step = 0; step < 3; step += 1) {
+      scene.cosmos.tick(HOME, 0);
+      await settled();
+      seen();
+    }
+    await shown(scene, ONYX);
+    seen();
+    const plain = eyes[0];
+    const onyx = eyes.at(-1);
+    if (plain === undefined || onyx === undefined) throw new Error("no eye");
+    for (const eye of eyes)
+      expect([plain, onyx].some((one) => Math.hypot(one.x - eye.x, one.y - eye.y, one.z - eye.z) < 1e-9)).toBe(true);
+    expect(Math.hypot(plain.x - HOME.x, plain.y - HOME.y, plain.z - HOME.z)).toBeLessThan(1e-9);
   });
 
   it("gives the body of a world its size on the screen, its id and how far it stands, for the journeys", async () => {

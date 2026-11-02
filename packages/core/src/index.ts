@@ -73,6 +73,7 @@ export {
   restView,
   STAR_HEART,
   type RestView,
+  type Postcard,
 } from "./frame/rest.ts";
 export {
   anchorOf,
