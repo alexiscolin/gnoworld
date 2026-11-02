@@ -43,6 +43,26 @@ const dm = (id: string, { from, to, minute, text }: { from: string; to: string; 
   `@msgid=${id};time=2026-10-25T10:0${String(minute)}:00.000Z;account=${from} :${from}!u@h PRIVMSG ${to} :${text}`;
 const axe = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
 
+// A phone's chat header keeps two fixed rows (81bfec1c); a direct message's mark takes a third of its own, said at once, so the partner's
+// name keeps the room it needs beside the close control (F4309: the mark on the name's row cut the name to its first letter).
+test("names the partner whole in a phone's header, its mark on a row of its own", async ({ page }) => {
+  await conversation(page, 390, MEMBER);
+  const name = page.getByRole("heading", { name: /^Direct message with/ });
+  await expect(name).toBeVisible();
+  const { whole, below } = await name.evaluate((heading) => {
+    const mark = [...(heading.closest("header")?.querySelectorAll("*") ?? [])].find(
+      (each) =>
+        each.children.length === 0 && each.textContent === "Not encrypted" && each.getBoundingClientRect().height > 0,
+    );
+    return {
+      whole: [heading, ...heading.querySelectorAll("button")].every((each) => each.scrollWidth <= each.clientWidth),
+      below: (mark?.getBoundingClientRect().top ?? -1) >= heading.getBoundingClientRect().bottom - 1,
+    };
+  });
+  expect(whole, "the partner's name whole").toBe(true);
+  expect(below, "the mark under the name").toBe(true);
+});
+
 test.describe("a direct message, as it looks", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 

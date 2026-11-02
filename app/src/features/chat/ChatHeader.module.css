@@ -54,6 +54,12 @@
       white-space: nowrap;
     }
 
+    /* A direct message's name, long, takes the second row whole; its mark, said at once, and the controls make the third. */
+    .title:has(~ .mark) {
+      /* layout: a row of its own */
+      flex-basis: 100%;
+    }
+
     /* A plain name gives way at the row's end; a name that opens the menu holds a control, whose focus ring nothing may clip. */
     .title:not(:has(.trigger)) {
       overflow: hidden;
