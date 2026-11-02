@@ -14,14 +14,12 @@ import type { Log } from "./log.ts";
 import { act } from "./moderation/act.ts";
 import { makeProgress, type Progress } from "./moderation/catchup.ts";
 import { checkAgain, type Verdict } from "./moderation/check.ts";
-import { checkerFor } from "./moderation/checker.ts";
-import { makeMutes } from "./moderation/mute.ts";
+import { checkerFor, strikesFor } from "./moderation/checker.ts";
 import type { Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
-import { makeStrike } from "./moderation/strikes.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
-import { ensureNamed, ensureRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, staffOf, type World } from "./rooms/types.ts";
@@ -141,7 +139,7 @@ function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => und
 }
 
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo, moderation } = settings;
+  const { worlds, ergo } = settings;
   const { log, pepper, now = Date.now } = options;
   ensureRooms(db, [...worlds.keys()], now());
   ensureNamed(db, typedRooms(worlds), now());
@@ -149,16 +147,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const stream = makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
-  const { mute } = moderation;
-  const mutes = makeMutes({
-    db,
-    send,
-    roomsOf: (world) => worldRooms(db, world),
-    now,
-    forMs: mute.minutes * 60_000,
-    max: mute.max,
-  });
-  const strike = makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) });
+  const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
   const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);

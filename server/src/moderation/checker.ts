@@ -1,15 +1,20 @@
-// The check of each line as the chat starts it (3i): its world's rules, then OpenAI when a key is set, or the alert that none is.
+// The chat's moderation as it starts: the check of each line (3i), its world's rules, then OpenAI when a key is set, or the alert that
+// none is; and the mutes with the strikes that call them (3k).
 import type { DatabaseSync } from "node:sqlite";
 import type { Config } from "../config.ts";
+import type { Command } from "../irc/lines.ts";
 import type { Log } from "../log.ts";
-import { roomWorld } from "../rooms/rooms.ts";
+import { roomWorld, worldRooms } from "../rooms/rooms.ts";
 import { publicRoom, type World } from "../rooms/types.ts";
 import { makeChecker } from "./check.ts";
+import { makeMutes } from "./mute.ts";
 import { moderationClient, type Answer } from "./provider.ts";
+import { makeStrike } from "./strikes.ts";
 
 interface Checked {
   worlds: ReadonlyMap<string, World>;
   moderation: Config["moderation"];
+  spared?: (account: string) => boolean;
 }
 
 interface Told {
@@ -36,4 +41,23 @@ export function checkerFor(db: DatabaseSync, { worlds, moderation }: Checked, op
     now,
     newAccountMs: moderation.newAccountHours * 60 * 60_000,
   });
+}
+
+interface Struck {
+  send: (command: Command, params: readonly string[]) => boolean;
+  pepper: string;
+  now: () => number;
+}
+
+/** The chat's mutes, and the strikes that call them. */
+export function strikesFor(db: DatabaseSync, { moderation: { mute }, spared }: Checked, { send, pepper, now }: Struck) {
+  const mutes = makeMutes({
+    db,
+    send,
+    roomsOf: (world) => worldRooms(db, world),
+    now,
+    forMs: mute.minutes * 60_000,
+    max: mute.max,
+  });
+  return { mutes, strike: makeStrike(db, { pepper, now, mute, mutes, spared: spared ?? (() => false) }) };
 }
