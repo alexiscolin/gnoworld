@@ -1,7 +1,7 @@
 // The cosmos on the stage (ADR-0002 §3 and §10; frames 1 to 8, 16, 17): gno.land's great star and the Earth, a star a namespace, the view at
 // rest's bodies (7d6). The camera stays at the origin and looks at the Earth, so the disc and each body come to it, and a frame writes only
 // that. A look runs off the frame, past a step of the eye: it stands the bodies and writes the disc.
-import { distanceOf, Drawn, EARTH_PLACE, Ladder, toMap, type ClearBox, type Point } from "@gnoworld/core";
+import { distanceOf, Drawn, EARTH_PLACE, Ladder, systemsOf, toMap, type ClearBox, type Point } from "@gnoworld/core";
 import { Disposer } from "../disposer.ts";
 import { focalOf } from "../lens.ts";
 import type { EarthDevice } from "../earth/device.ts";
@@ -11,7 +11,7 @@ import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
 import { AtRest } from "./atRest.ts";
-import { systemsFrom, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
+import { heldOf, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
 import { LazyLabels } from "./lazyLabels.ts";
 import { LazyNebulae } from "./lazyNebulae.ts";
 import { Whole } from "./whole.ts";
@@ -41,7 +41,7 @@ export class Cosmos {
     this.#device.moved();
   });
   #box: ClearBox | undefined;
-  #systems: ReturnType<typeof systemsFrom> = [];
+  #systems: ReturnType<typeof systemsOf> = [];
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
@@ -93,7 +93,7 @@ export class Cosmos {
     }
     if (worlds !== this.#list) {
       this.#list = worlds;
-      this.#systems = systemsFrom(worlds);
+      this.#systems = systemsOf(heldOf(worlds));
       this.#ladder = new Ladder(this.#systems);
       this.#atRest.search(this.#systems);
     }
