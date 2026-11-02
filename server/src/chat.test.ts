@@ -1376,14 +1376,17 @@ describe("the chat, as the server starts it", () => {
 
     it("counts who is here in the rooms a guest may see, a members room's people never, and answers it (7h)", async () => {
       const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
-      const { peer, chat, app } = await linked({ worlds: roled(), moderation: OFF }, { presence: file });
+      const { peer, chat, app } = await linked(
+        { worlds: roled(), moderation: OFF },
+        { presence: file, now: () => Date.now() },
+      );
       if (chat.presence === undefined) throw new Error("no presence route");
       app.route("/api/presence", chat.presence);
       await answer(peer, "#bubble", "~@gnoworld ada bo");
       await answer(peer, "#bubble/crew", `~@gnoworld ${MEMBER} cy`);
       await answer(peer, "#bubble/desk", `~@gnoworld ${WRITER}`);
       await expect
-        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds)
+        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
         .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
     });
 
@@ -1391,7 +1394,10 @@ describe("the chat, as the server starts it", () => {
       const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
       const hidden = roled();
       hidden.get("bubble")?.rooms.set("#bubble/attic", { type: "open", hidden: true });
-      const { peer, chat, app } = await linked({ worlds: hidden, moderation: OFF }, { presence: file });
+      const { peer, chat, app } = await linked(
+        { worlds: hidden, moderation: OFF },
+        { presence: file, now: () => Date.now() },
+      );
       if (chat.presence === undefined) throw new Error("no presence route");
       app.route("/api/presence", chat.presence);
       chat.rooms.create("bubble", "old");
@@ -1402,7 +1408,7 @@ describe("the chat, as the server starts it", () => {
       await answer(peer, "#bubble/desk", "~@gnoworld");
       await answer(peer, "#bubble/old", "~@gnoworld eve fay gus");
       await expect
-        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds)
+        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
         .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
     });
 

@@ -46,12 +46,15 @@ function setup({
   rooms = ROOMS,
   hidden = new Set(["#earth/desk", "#govdao/desk"]),
 }: Setup = {}) {
+  const logged: [string, unknown][] = [];
+  const listed = vi.fn(() => rooms);
   const present = startPresent({
     file,
     now: () => Date.now(),
     open: (room) => !hidden.has(room),
-    rooms: () => rooms,
+    rooms: listed,
     rates: (asked) => new Map(asked.map((room) => [room, rates[room] ?? 0])),
+    log: (event, fields) => logged.push([event, fields]),
   });
   running.push(present);
   const ask = async () => {
@@ -60,7 +63,7 @@ function setup({
   };
   const worlds = async () => Presence.parse(JSON.parse((await ask()).body)).worlds;
   const hereIn = async (world: string) => (await worlds()).find((each) => each.world === world)?.here;
-  return { present, file, ask, worlds, hereIn, hidden };
+  return { present, file, ask, worlds, hereIn, hidden, listed, logged };
 }
 
 beforeEach(() => {
@@ -98,13 +101,41 @@ describe("who is here", () => {
     expect((await worlds()).map(({ world }) => world)).toEqual(["bubble", "earth"]);
   });
 
-  it("stops counting a room the moment a guest may no longer see it", async () => {
+  it("stops counting a room a guest may no longer see once the answer it keeps a minute is redone", async () => {
     const { present, hereIn, hidden } = setup();
     present.seen("#earth", ["gnoworld", "ada"]);
     present.seen("#earth/kyoto", ["gnoworld", "bo"]);
     expect(await hereIn("earth")).toBe(2);
     hidden.add("#earth/kyoto");
+    vi.setSystemTime(T0 + MINUTE);
+    present.seen("#earth", ["gnoworld", "ada"]);
     expect(await hereIn("earth")).toBe(1);
+  });
+
+  it("keeps its answer while nothing changes, a minute at most, so asking it often costs no build", async () => {
+    const { present, ask, listed } = setup();
+    present.seen("#earth", ["gnoworld", "ada"]);
+    const first = (await ask()).body;
+    const calls = listed.mock.calls.length;
+    vi.setSystemTime(T0 + MINUTE - 1);
+    expect((await ask()).body).toBe(first);
+    expect(listed.mock.calls.length).toBe(calls);
+    vi.setSystemTime(T0 + MINUTE);
+    await ask();
+    expect(listed.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it("builds a changed answer again a second after its last build, never sooner", async () => {
+    const { present, ask, listed } = setup();
+    present.seen("#earth", ["gnoworld", "ada"]);
+    const first = (await ask()).body;
+    const calls = listed.mock.calls.length;
+    present.seen("#earth", ["gnoworld", "ada", "bo"]);
+    vi.setSystemTime(T0 + 999);
+    expect((await ask()).body).toBe(first);
+    expect(listed.mock.calls.length).toBe(calls);
+    vi.setSystemTime(T0 + 1000);
+    expect((await ask()).body).not.toBe(first);
   });
 
   it("forgets a room's people once the reconciler has not read it for three minutes, and not before", async () => {
@@ -113,9 +144,9 @@ describe("who is here", () => {
     present.seen("#earth/kyoto", ["gnoworld", "bo"]);
     vi.setSystemTime(T0 + 2 * MINUTE);
     present.seen("#earth/kyoto", ["gnoworld", "bo"]);
-    vi.setSystemTime(T0 + 3 * MINUTE - 1);
+    vi.setSystemTime(T0 + 3 * MINUTE);
     expect(await hereIn("earth")).toBe(2);
-    vi.setSystemTime(T0 + 3 * MINUTE + 1);
+    vi.setSystemTime(T0 + 4 * MINUTE + 1);
     expect(await hereIn("earth")).toBe(1);
   });
 
@@ -162,6 +193,42 @@ describe("who is here", () => {
 });
 
 describe("the history it keeps", () => {
+  it("keeps no hour for a world whose rooms went unread, so a return from an outage is no rise", async () => {
+    const file = fileOf();
+    const clock = { at: T0 - 48 * HOUR };
+    const past = makePresence({ file, now: () => clock.at });
+    for (let hour = 0; hour < 48; hour += 1, clock.at += HOUR) past.record(new Map([["bubble", 10]]));
+    expect(past.save()).toBe(true);
+    const { present, worlds } = setup({ file });
+    vi.advanceTimersByTime(60 * HOUR);
+    present.seen("#bubble", ["gnoworld", ...Array.from({ length: 10 }, (_, at) => `p${String(at)}`)]);
+    expect((await worlds()).find(({ world }) => world === "bubble")).toEqual({
+      world: "bubble",
+      here: 10,
+      perHour: 0,
+      rise: null,
+    });
+    present.stop();
+    const kept = makePresence({ file, now: () => Date.now() }).history("bubble");
+    expect(kept.filter(({ people }) => people === 0)).toEqual([]);
+  });
+
+  it("reads 10,000 rooms at most, the first it saw: a room past them counts no one", async () => {
+    const { present, hereIn } = setup({ rooms: [...ROOMS, { name: "#late", world: "late" }], hidden: new Set() });
+    for (let room = 0; room < 10_000; room += 1) present.seen(`#r${String(room)}`, ["gnoworld", "x"]);
+    present.seen("#late", ["gnoworld", "ada"]);
+    expect(await hereIn("late")).toBe(0);
+  });
+
+  it("says when its folder refuses the history, as the other files' writers do", () => {
+    const file = join(fileOf(), "inside-a-file", "presence.json");
+    writeFileSync(join(file, "..", ".."), "a file where a folder should be");
+    const { present, logged } = setup({ file });
+    present.seen("#bubble", ["gnoworld", "a"]);
+    vi.advanceTimersByTime(PRESENT_MS);
+    expect(logged).toContainEqual(["alert", { error: "presence_write" }]);
+  });
+
   it(`records each world's people every ${String(PRESENT_MS / MINUTE)} minutes into its file, the busiest of each hour`, () => {
     const { present, file } = setup();
     vi.advanceTimersByTime(PRESENT_MS - MINUTE);

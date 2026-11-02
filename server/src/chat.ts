@@ -171,6 +171,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     open: (room) => visible(room, undefined),
     rates: activity.rates,
     now,
+    log,
   });
   const reconciler = reconcilerFor(db, settings, {
     seen: present?.seen,
