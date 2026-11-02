@@ -136,7 +136,14 @@ describe("the world in its circle", () => {
       ).toBe(true);
     const [low, mid] = worldLook(ID).ramp;
     expect(low).toBeDefined();
-    expect(colours).toEqual([`#${new Color().setRGB(...mid, SRGBColorSpace).getHexString()}`]);
+    // The palette's hue, lit and coloured enough to tint a plate (the design review's second finding changed this test).
+    const hsl = (hex: string) => new Color(hex).getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const ramp = new Color().setRGB(...mid, SRGBColorSpace).getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const [colour = ""] = colours;
+    expect(colours).toHaveLength(1);
+    expect(hsl(colour).h).toBeCloseTo(ramp.h, 1);
+    expect(hsl(colour).l).toBeGreaterThanOrEqual(0.59);
+    expect(hsl(colour).s).toBeGreaterThanOrEqual(0.34);
   });
 
   it("halves the maps where memory is short, and casts no shadow there", async () => {

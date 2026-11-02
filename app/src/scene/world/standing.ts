@@ -10,6 +10,9 @@ import { moonLookOf, OrbitingMoons } from "./orbiting.ts";
 /** A world's maps' width at High, the Earth's. */
 export const CLOSE_WIDTH = 4096;
 const MOON_WIDTH = 512;
+// The least a plate's tint is lit and coloured: the frames' plates take their world's hue at about this weight (design review, 2).
+const TINT_LIGHTNESS = 0.6;
+const TINT_SATURATION = 0.35;
 
 export interface StandingCalls {
   /** A map came. */
@@ -36,10 +39,17 @@ export class Standing {
     this.#moonMaps = new BodyMaps(device, arrived, { width: MOON_WIDTH, failed });
   }
 
-  /** The world's own colour, its palette's middle, as the page writes a colour. */
+  /** The world's own colour, its palette's middle hue, at a lightness and a saturation that tint a plate: a dark palette would tint none. */
   get colour(): string {
     const [red, green, blue] = this.look.ramp[1];
-    return `#${new Color().setRGB(red, green, blue, SRGBColorSpace).getHexString()}`;
+    const hsl = new Color().setRGB(red, green, blue, SRGBColorSpace).getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const tint = new Color().setHSL(
+      hsl.h,
+      Math.max(hsl.s, TINT_SATURATION),
+      Math.max(hsl.l, TINT_LIGHTNESS),
+      SRGBColorSpace,
+    );
+    return `#${tint.getHexString()}`;
   }
 
   /** The body, made once every map it needs is here; none before. */
