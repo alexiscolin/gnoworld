@@ -2032,6 +2032,53 @@ describe("the whole cosmos", () => {
       }
     });
 
+    // The design review of 7d7: at its opening a row of stars at like steps showed, a ray of the systems' seats seen from its side. Four
+    // stars in a chain, each step within 12% of the others and 15% of a step off where the chain leads, a tenth off a line: a row laid out
+    // for show. Random points as many give none or one; Onyx's opening must give none.
+    const rowsOfFour = (spots: readonly { x: number; y: number }[]) => {
+      const nearest = (to: { x: number; y: number }) =>
+        spots.reduce((best, spot) =>
+          Math.hypot(spot.x - to.x, spot.y - to.y) < Math.hypot(best.x - to.x, best.y - to.y) ? spot : best,
+        );
+      const step = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+        const ahead = { x: 2 * to.x - from.x, y: 2 * to.y - from.y };
+        const next = nearest(ahead);
+        const off = Math.hypot(next.x - ahead.x, next.y - ahead.y);
+        return next === to || next === from || off > 0.15 * Math.hypot(to.x - from.x, to.y - from.y) ? undefined : next;
+      };
+      const gapsOf = (chain: readonly { x: number; y: number }[]) =>
+        chain.slice(1).map((one, at_) => Math.hypot(one.x - (chain[at_]?.x ?? NaN), one.y - (chain[at_]?.y ?? NaN)));
+      return spots.flatMap((a) =>
+        [...spots]
+          .filter((b) => b !== a)
+          .sort((one, two) => Math.hypot(one.x - a.x, one.y - a.y) - Math.hypot(two.x - a.x, two.y - a.y))
+          .slice(0, 4)
+          .flatMap((b) => {
+            const c = step(a, b);
+            const d = c === undefined ? undefined : step(b, c);
+            if (c === undefined || d === undefined) return [];
+            const gaps = gapsOf([a, b, c, d]);
+            return Math.max(...gaps) / Math.min(...gaps) <= 1.12 && offLine([a, b, c, d]) <= 0.1 ? [[a, b, c, d]] : [];
+          }),
+      );
+    };
+
+    it.each([
+      [1728, 1080],
+      [1920, 1080],
+    ])("opens on no row of four stars at like steps, at %i by %i", async (width, height) => {
+      const scene = await diving(false, width, height);
+      const { eye } = await frame(scene, DIVE.fade);
+      const at = new Vector3();
+      const spots = held(ONYX).flatMap(({ place }) => {
+        toScene(place, at);
+        const seen = at.set(at.x - eye.x, at.y - eye.y, at.z - eye.z).project(scene.camera);
+        return seen.z < 1 ? [{ x: ((seen.x + 1) * width) / 2, y: ((1 - seen.y) * height) / 2 }] : [];
+      });
+      expect(spots.length).toBeGreaterThan(80);
+      expect(rowsOfFour(spots)).toEqual([]);
+    });
+
     // The home's first show is the fixed places alone, before its file (worldsFeed.ts): the dive waits for a world to dive to.
     it("waits through the fixed places' empty list for the file, and opens on it", async () => {
       const scene = made();

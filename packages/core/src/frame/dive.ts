@@ -10,12 +10,13 @@ import { DEGREE, eyeInto } from "./restLook.ts";
  * how long the home waits for the whole cosmos before it gives the dive up. */
 export const DIVE = { fade: 0.8, seconds: 5.5, hold: 1.6, dissolve: 1.2, wait: 4 } as const;
 
-// Where it starts: past the distance from which the whole cosmos holds the view (space/whole.ts), high over the disc so the disc reads as
-// one, a little round from where it ends so the near worlds slide past the far ones.
-const FROM = 1000;
-const SLANT = 35 * DEGREE;
-const TURN = 40 * DEGREE;
-
+// Where it starts: as near as the whole cosmos still holds the view (680) when its fade-in ends; over the disc; round from where it ends,
+// its turn done half way. On Onyx it opens on no ray of the systems' seats and comes in past no three bodies at like gaps (the design
+// review of 7d7); a few degrees off, one shows: the seats' lattice is 7d1's (7d8).
+const FROM = 760;
+const SLANT = 34 * DEGREE;
+const TURN = -55 * DEGREE;
+const TURNED = 0.5;
 const terms = { distance: 0, slant: 0, turn: 0 };
 
 /** The eye `along` the dive, from 0 at its start to 1 on `rest`, the view at rest's eye, on the map, into `out`. */
@@ -28,6 +29,6 @@ export function diveAt(rest: Point, along: number, out: { x: number; y: number; 
   const distance = Math.hypot(across, upward, ahead);
   terms.distance = distance * (FROM / distance) ** left;
   terms.slant = lerp(Math.asin(upward / distance), SLANT, left);
-  terms.turn = Math.atan2(across, ahead) + TURN * left;
+  terms.turn = Math.atan2(across, ahead) + TURN * (1 - smootherstep(along > 0 ? Math.min(along / TURNED, 1) : 0));
   eyeInto(terms, out);
 }

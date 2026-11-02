@@ -70,7 +70,9 @@ describe("the dive's path", () => {
       const rest = restOf(terms);
       const { distance, slant } = polar(at(rest, 0));
       expect(wholeShare(distance)).toBe(1);
-      expect(slant).toBeGreaterThanOrEqual(25 * DEGREE);
+      // No farther than it must (the design review of 7d7): a sixth nearer, the whole cosmos would start to give the view up.
+      expect(wholeShare((5 / 6) * distance)).toBeLessThan(1);
+      expect(slant).toBeGreaterThanOrEqual(25 * DEGREE - 1e-12);
       // A still start, wherever the dive waits for what it shows; a clock it cannot read keeps it there.
       expect(at(rest, -1)).toEqual(at(rest, 0));
       expect(at(rest, Number.NaN)).toEqual(at(rest, 0));
