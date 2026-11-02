@@ -1,6 +1,7 @@
 import {
   BELT_INNER,
   BOUNDS,
+  GRAIN,
   GROWTH,
   growthAt,
   HOME,
@@ -198,7 +199,8 @@ describe("what it draws", () => {
     await shown(scene);
     const known = new Map(held(worlds(30)).flatMap(({ worlds: list }) => list.map((world) => [world.id, world])));
     const { list } = scene.cosmos.stats();
-    expect(list.length).toBeGreaterThan(5);
+    // The view at rest draws its postcards' and its close world's bodies, a few (Alexis, 2026-11-02).
+    expect(list.length).toBeGreaterThan(0);
     for (const body of list) {
       expect(body.anchor).toBe(worldLook(body.id).anchor);
       expect(body.planet.group.scale.x).toBeGreaterThan(0.5);
@@ -211,6 +213,11 @@ describe("what it draws", () => {
     const busy = [{ id: "a/busy", namespace: "a", realms: [{ callers: 900 }] }];
     const quiet = [{ id: "a/quiet", namespace: "a", realms: [{ callers: 0 }] }];
     await shown(scene, [...busy, ...quiet]);
+    // Up close to their star, where both stand as bodies whatever the view at rest draws.
+    const place = { x: NaN, y: NaN, z: NaN };
+    toScene(held([...busy, ...quiet]).find(({ worlds: list }) => list.length > 0)?.place ?? HOME, place);
+    scene.cosmos.tick({ x: place.x + 1, y: place.y + 2, z: place.z + 8 }, 0);
+    await settled();
     const size = (id: string) => scene.cosmos.stats().list.find((body) => body.id === id)?.planet.group.scale.x ?? NaN;
     expect(size("a/busy")).toBeGreaterThan(size("a/quiet"));
   });
@@ -363,6 +370,9 @@ describe("what it draws", () => {
   it("writes a point's size from the ladder, so it falls as the eye leaves: no size of its own", async () => {
     const scene = made();
     await shown(scene);
+    // Off the view at rest, whose distant stars' worlds glint at a share of their size: two eyes, the second farther out.
+    scene.cosmos.tick({ x: HOME.x, y: HOME.y + 30, z: HOME.z + 30 }, 0);
+    await settled();
     const near = scene.cosmos.stats().dotPixels;
     scene.cosmos.tick({ x: HOME.x, y: HOME.y + 150, z: HOME.z + 150 }, 0);
     await settled();
@@ -391,9 +401,17 @@ describe("what it draws", () => {
     const { dots: count } = scene.cosmos.stats();
     const tint = points?.geometry.getAttribute("aTint") as BufferAttribute;
     const size = points?.geometry.getAttribute("aSize") as BufferAttribute;
+    const orbit = points?.geometry.getAttribute("aOrbit") as BufferAttribute;
+    // The grain alone: a crowd's worlds of a body's size the view does not stand as bodies are points of their own look.
+    const grains = new Set(
+      (held(crowd).find(({ id }) => id === "c")?.worlds ?? [])
+        .filter(({ radius }) => radius < GRAIN)
+        .map(({ phase }) => phase.toFixed(4)),
+    );
     const sizes = new Set<string>();
     expect(count).toBeGreaterThan(100);
     for (let at = 0; at < count; at += 1) {
+      if (!grains.has(orbit.getY(at).toFixed(4))) continue;
       expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
       expect(tint.getX(at)).toBeLessThan(0.6);
       sizes.add(size.getX(at).toFixed(2));
@@ -485,7 +503,7 @@ describe("the page's text keeps its room", () => {
     scene.cosmos.keepClear({ left: 0, top: 0, right: 1, bottom: 1 });
     await shown(scene);
     const visible = scene.cosmos.stats().list.filter(({ planet }) => planet.group.visible);
-    expect(visible.length).toBeGreaterThan(5);
+    expect(visible.length).toBeGreaterThan(0);
   });
 
   it("shrinks a body by degrees as it nears the box, never over its own size", async () => {
