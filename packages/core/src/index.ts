@@ -41,6 +41,7 @@ export {
   type PlanetLook,
   type RealmFunctions,
 } from "./planet/look.ts";
+export { nextVitality, presenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
 export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
