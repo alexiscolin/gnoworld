@@ -1,23 +1,25 @@
 // The realism page (slice 7, 7b): twelve worlds from a small set of real maps, a world close up, a star behind a world, and one nebula made
 // two ways, for Alexis's eye on a real GPU. Not shipped: lab.config.ts builds it, and only the journeys and his link see it. Under reduced
 // motion it draws once a change, which is also what a software GPU's journeys want.
-import { ANCHORS, pixelRatioFor } from "@gnoworld/core";
+import { ANCHORS, pixelRatioFor, STAGES, type Stage } from "@gnoworld/core";
 import { ACESFilmicToneMapping, Vector3, type WebGLRenderer } from "three";
 import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { mapBytes } from "../src/scene/planet/maps.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
-import { buildView, looksOf, pathOf, type Choice, type Method, type View, type ViewName } from "./views.ts";
+import { looksOf, pathOf, type Choice, type Method, type ViewName } from "./choice.ts";
+import { buildView, type View } from "./views.ts";
 import "@gnoworld/ui/styles.css";
 import "./lab.css";
 
-const VIEWS: readonly ViewName[] = ["gallery", "close", "eclipse", "nebula", "earth"];
+const VIEWS: readonly ViewName[] = ["gallery", "close", "eclipse", "nebula", "earth", "stages"];
 const KEYS: Partial<Record<string, ViewName>> = {
   "1": "gallery",
   "2": "close",
   "3": "eclipse",
   "4": "nebula",
   "5": "earth",
+  "6": "stages",
 };
 // The grade 7a2 gives the renderer itself, once it lands.
 const EXPOSURE = 0.8;
@@ -46,8 +48,15 @@ function worldIn(query: URLSearchParams, view: ViewName): number {
 function chosen(query: URLSearchParams): Choice {
   const view = VIEWS.find((name) => name === query.get("view")) ?? "gallery";
   const method: Method = query.get("method") === "image" ? "image" : "computed";
-  return { view, world: worldIn(query, view), seed: 0, method };
+  const stage = STAGES.find((name) => name === query.get("stage")) ?? "rest";
+  return { view, world: worldIn(query, view), seed: 0, method, stage };
 }
+
+// The next stage along the road, stopping at its ends.
+const stageBy = (stage: Stage, by: number): Stage => {
+  const at = STAGES.indexOf(stage) + by;
+  return STAGES[Math.min(Math.max(at, 0), STAGES.length - 1)] ?? stage;
+};
 
 const canvas = theCanvas();
 const panel = need("main");
@@ -83,7 +92,7 @@ const aim = (current: View) => {
 function report(): void {
   const name = `${ANCHORS[choice.world] ?? ""}: ${pathOf(choice.world, choice.seed)}`;
   const names: Partial<Record<ViewName, string>> = { gallery: "All twelve anchors", earth: "The Earth" };
-  say("world", names[choice.view] ?? name);
+  say("world", `${names[choice.view] ?? name} · ${choice.view === "stages" ? "every stage" : choice.stage}`);
   for (const button of document.querySelectorAll<HTMLButtonElement>("nav button"))
     button.setAttribute("aria-pressed", String(button.dataset["view"] === choice.view));
 }
@@ -127,6 +136,8 @@ function pressed({ key }: KeyboardEvent): void {
   else if (key === "ArrowRight") step({ world: (choice.world + 1) % count });
   else if (key === "ArrowLeft") step({ world: (choice.world + count - 1) % count });
   else if (key === "s") step({ seed: choice.seed + 1 });
+  else if (key === "[") step({ stage: stageBy(choice.stage, -1) });
+  else if (key === "]") step({ stage: stageBy(choice.stage, 1) });
   else if (key === "n") step({ view: "nebula", method: choice.method === "image" ? "computed" : "image" });
   else if (key === "p") panel.hidden = !panel.hidden;
 }
@@ -204,6 +215,6 @@ if (!still)
     draw(view);
   });
 
-Reflect.set(globalThis, "__lab", { stats, circles, looks: () => looksOf(choice) });
+Reflect.set(globalThis, "__lab", { stats, circles, looks: () => looksOf(choice), stages: () => view?.stages ?? [] });
 
 step({});

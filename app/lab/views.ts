@@ -1,6 +1,6 @@
 // The realism page's four views. Each builds what it shows and frees it all, so the memory a view reports is what it takes. A view loads only
 // its own maps: the gallery shows the whole set, the others two or three.
-import { ANCHORS, planetLook, planetSeed, type PlanetLook } from "@gnoworld/core";
+import { planetSeed, type PlanetLook, type Stage, type WorldSigns } from "@gnoworld/core";
 import {
   PerspectiveCamera,
   Scene,
@@ -14,20 +14,11 @@ import {
 import { sideLight } from "../src/scene/planet/light.ts";
 import { loadMap, mapUrl } from "../src/scene/planet/maps.ts";
 import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../src/scene/planet/planet.ts";
+import { looksOf, pathBytes, signsOf, type Choice, type ViewName } from "./choice.ts";
 import { earthView } from "./earthView.ts";
 import { layoutOf, type Layout } from "./layouts.ts";
 import { computedNebula, imageNebula, type Nebula } from "./nebula.ts";
 import { starField, starSprite } from "./sky.ts";
-
-export type ViewName = "gallery" | "close" | "eclipse" | "nebula" | "earth";
-export type Method = "computed" | "image";
-
-export interface Choice {
-  readonly view: ViewName;
-  readonly world: number;
-  readonly seed: number;
-  readonly method: Method;
-}
 
 export interface Device {
   readonly renderer: WebGLRenderer;
@@ -40,6 +31,7 @@ export interface View {
   readonly stage: Scene;
   readonly camera: PerspectiveCamera;
   readonly worlds: readonly Planet[];
+  readonly stages: readonly Stage[];
   readonly textures: readonly Texture[];
   readonly images: number;
   readonly targetBytes: number;
@@ -49,20 +41,6 @@ export interface View {
   dispose(): void;
 }
 
-const NAMES = [
-  "atlas",
-  "harbor",
-  "ember",
-  "tide",
-  "glacier",
-  "forge",
-  "bubble",
-  "kelvin",
-  "veil",
-  "dusk",
-  "soot",
-  "shard",
-];
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 // The most a surface seen at a slant is read with; a GPU gives what it has.
@@ -72,24 +50,10 @@ const GALLERY_WIDTH = 2048;
 const CLOSE_WIDTH = 4096;
 const PAN = 0.14;
 
-const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
-
-/** The path of a world on the page: another seed, another world of the same anchor. */
-export const pathOf = (world: number, seed: number): string =>
-  `gno.land/r/${NAMES[world] ?? "atlas"}${seed === 0 ? "" : String(seed)}/home`;
-
-/** The look of the page's `world`th anchor. */
-const lookAt = (world: number, seed: number): PlanetLook =>
-  planetLook(ascii(pathOf(world, seed)), ANCHORS[world] ?? "rocky");
-
-/** The looks a choice shows. */
-export const looksOf = ({ view, world, seed }: Choice): PlanetLook[] =>
-  view === "gallery" ? ANCHORS.map((_, index) => lookAt(index, seed)) : [lookAt(world, seed)];
-
 async function mapsFor(
   looks: readonly PlanetLook[],
   base: string,
-  { anisotropy, width }: { anisotropy: number; width: number },
+  { anisotropy, width, lit }: { anisotropy: number; width: number; lit: boolean },
 ) {
   const names = [...new Set(looks.flatMap((look) => (look.second === null ? [look.map] : [look.map, look.second])))];
   const loaded = new Map(
@@ -103,6 +67,7 @@ async function mapsFor(
     loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
     loadMap(mapUrl("ring", base), { kind: "data", anisotropy }),
   ]);
+  const lights = lit ? await loadMap(mapUrl("earth-night", base), { kind: "colour", anisotropy, width }) : undefined;
   const set: MapSet = {
     map: (name) => {
       const texture = loaded.get(name);
@@ -111,8 +76,9 @@ async function mapsFor(
     },
     clouds,
     ring,
+    ...(lights === undefined ? {} : { lights }),
   };
-  return { set, textures: [...loaded.values(), clouds, ring] };
+  return { set, textures: [...loaded.values(), clouds, ring, ...(lights === undefined ? [] : [lights])] };
 }
 
 async function nebulaOf(choice: Choice, { renderer, base }: Device): Promise<Nebula | undefined> {
@@ -135,9 +101,15 @@ function staged(worlds: readonly Planet[], layout: Layout, sky: Object3D) {
 // The Earth's light for each world: its own star from its path's seed, and the bright limb of its air where it has one.
 function lightWorlds(worlds: readonly Planet[], choice: Choice): void {
   for (const [index, world] of worlds.entries()) {
-    const at = choice.view === "gallery" ? index : choice.world;
-    world.setSun(sideLight(planetSeed(ascii(pathOf(at, choice.seed))), new Vector3()));
+    world.setSun(sideLight(planetSeed(pathBytes(choice, index)), new Vector3()));
     if (world.look.rim !== null) world.setLimb(LIMB_LIGHT);
+  }
+}
+
+function showSigns(worlds: readonly Planet[], signs: readonly WorldSigns[]): void {
+  for (const [index, world] of worlds.entries()) {
+    const shown = signs[index];
+    if (shown !== undefined) world.setSigns(shown);
   }
 }
 
@@ -147,20 +119,29 @@ const spriteOf = (choice: Choice, { camera, sun }: Layout) =>
 
 const widthOf = (view: ViewName) => (view === "close" || view === "eclipse" ? CLOSE_WIDTH : GALLERY_WIDTH);
 
+// A map for lights is loaded only where a stage shows some: a view at rest pays for nothing.
+const litIn = ({ view, stage }: Choice) => view === "stages" || stage !== "rest";
+
 /** Builds a view: its maps first, then its worlds. */
 export async function buildView(choice: Choice, device: Device): Promise<View> {
   if (choice.view === "earth") return earthView(device);
   const { renderer, base, ratio } = device;
   const looks = looksOf(choice);
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
-  const { set, textures } = await mapsFor(looks, base, { anisotropy, width: widthOf(choice.view) });
+  const lit = litIn(choice);
+  const { set, textures } = await mapsFor(looks, base, { anisotropy, width: widthOf(choice.view), lit });
   const nebula = await nebulaOf(choice, device);
-  const layout = layoutOf(choice.view);
+  const signs = signsOf(choice, looks);
+  const layout = layoutOf(
+    choice.view,
+    signs.map(({ size }) => size),
+  );
   const sphere: BufferGeometry = new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT);
   const worlds = looks.map((look) => createPlanet(look, set, sphere));
   const stars = starField(ratio);
   const stage = staged(worlds, layout, stars);
   if (layout.sun === undefined) lightWorlds(worlds, choice);
+  showSigns(worlds, signs);
   if (nebula !== undefined) stage.add(nebula.mesh);
   const sprite = spriteOf(choice, layout);
   if (sprite !== undefined) stage.add(sprite);
@@ -170,6 +151,7 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
     stage,
     camera: layout.camera,
     worlds,
+    stages: signs.map(({ stage }) => stage),
     textures: all,
     images: image === undefined ? 0 : 1,
     targetBytes: nebula?.targetBytes ?? 0,
