@@ -200,12 +200,16 @@ export function nebulaLight(nebula: Nebula, eye: Point): number {
   return light < LEAST ? 0 : light;
 }
 
+/** How much of the view the whole cosmos takes with the eye `distance` from what it looks at: none to a cluster's distance, all from twice
+ * it. The nebulae, the suns and the bodies give up what it takes, so no frame shows both whole. */
+export const wholeShare = (distance: number): number => smoothstep(CLUSTER, GONE, distance);
+
 /** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, a third at a system's distance, all at
  * a cluster's, none past it. */
 export const nebulaShare = (distance: number): number =>
   smoothstep(WORLD, SYSTEM, distance) *
   (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
-  (1 - smoothstep(CLUSTER, GONE, distance));
+  (1 - wholeShare(distance));
 
 /** Where a layer's sheet stands, into `out`; its half-width. */
 export function sheetOf(nebula: Nebula, layer: NebulaLayer, out: { x: number; y: number; z: number }): number {

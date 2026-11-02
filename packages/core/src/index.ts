@@ -81,6 +81,7 @@ export { auroraOf, BLOCK_MS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { worldIdOf } from "./cosmos/worldId.ts";
+export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";
 export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
@@ -156,6 +157,7 @@ export {
   nebulaLight,
   nebulaShare,
   sheetOf,
+  wholeShare,
   windowOf,
   type Nebula,
   type NebulaLayer,

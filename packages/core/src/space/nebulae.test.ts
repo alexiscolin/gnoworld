@@ -11,6 +11,7 @@ import {
   nebulaLight,
   nebulaShare,
   sheetOf,
+  wholeShare,
   windowOf,
   type Nebula,
 } from "./nebulae.ts";
@@ -418,5 +419,22 @@ describe("its cost", () => {
           const eye = { x: nebula.x + aside, y: nebula.y, z: nebula.z + along };
           expect(cover(fieldAt(eye), eye)).toBeLessThanOrEqual(COVER_MOST);
         }
+  });
+});
+
+describe("the hand-over to the whole cosmos", () => {
+  it("gives the view to the worlds themselves at one distance: none to a cluster's, all from twice it, never both whole", () => {
+    expect(wholeShare(0)).toBe(0);
+    expect(wholeShare(CLUSTER_WIDTH)).toBe(0);
+    expect(wholeShare(CLUSTER_WIDTH * 1.5)).toBeCloseTo(0.5, 12);
+    expect(wholeShare(CLUSTER_WIDTH * 2)).toBe(1);
+    expect(wholeShare(1e9)).toBe(1);
+    for (let distance = 0; distance < 3000; distance += 0.5) {
+      const whole = wholeShare(distance);
+      expect(whole + nebulaShare(distance)).toBeLessThanOrEqual(1 + 1e-12);
+      // No dark gap between the two: past a cluster's distance one gives what the other takes.
+      if (distance >= CLUSTER_WIDTH) expect(whole + nebulaShare(distance)).toBeCloseTo(1, 12);
+      expect(Math.abs(wholeShare(distance + 0.5) - whole)).toBeLessThan(0.005);
+    }
   });
 });
