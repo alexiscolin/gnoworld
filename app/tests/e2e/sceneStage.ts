@@ -18,6 +18,7 @@ interface CosmosStats {
   dotPixels: number;
   earth: boolean;
   screen: { sun: Spot; earth: Spot | undefined; bodies: Spot[] };
+  nebulae: number;
 }
 interface Stats {
   frames: number;
@@ -72,4 +73,11 @@ export const loseContext = (page: Page) =>
 export const restoreContext = (page: Page) =>
   page.evaluate(() => {
     (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
+  });
+
+/** Hides the page's text over the canvas, so a journey reads what the scene drew. */
+export const hideThePage = (page: Page) =>
+  page.evaluate(() => {
+    for (const child of document.body.children)
+      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
   });

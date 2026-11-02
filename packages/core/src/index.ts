@@ -59,7 +59,7 @@ export {
   type ClearBox,
   type ScreenSpot,
 } from "./frame/screen.ts";
-export { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
+export { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -135,6 +135,19 @@ export { PHONE_QUERY } from "./frame/phone.ts";
 export { textHash, unitOf, type Point } from "./space/cell.ts";
 export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export {
+  NEBULA_IMAGES,
+  NEBULA_LAYERS,
+  NEBULA_REACH,
+  NEBULAE_MOST,
+  NebulaField,
+  nebulaLight,
+  nebulaShare,
+  sheetOf,
+  windowOf,
+  type Nebula,
+  type NebulaLayer,
+} from "./space/nebulae.ts";
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
 export { wrapTo } from "./space/torus.ts";

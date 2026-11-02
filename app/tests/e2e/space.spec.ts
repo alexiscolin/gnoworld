@@ -1,7 +1,7 @@
 import { MOOD_STEP, moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { MOTES, SHELLS } from "../../../packages/core/src/space/stars.ts";
 import { expect, test, type Page } from "./fixtures.ts";
-import { loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
+import { hideThePage, loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scenery on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation). The canvas is
 // compared with itself, never with an approved picture: a GPU's output varies, a place's does not on one machine. Reduced motion holds
@@ -13,13 +13,6 @@ const PHONE = { width: 390, height: 844 };
 const FAR = 2 ** 40;
 
 type Spot = Awaited<ReturnType<typeof stats>>["eye"];
-
-// The page's text sits over the canvas: a journey reads what the scene drew.
-const hideThePage = (page: Page) =>
-  page.evaluate(() => {
-    for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
-  });
 
 async function stillScene(page: Page, path = HOME) {
   await page.emulateMedia({ reducedMotion: "reduce" });
