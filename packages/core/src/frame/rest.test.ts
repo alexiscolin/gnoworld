@@ -24,10 +24,8 @@ const files = {
   "300 systems of four": spread(300, 4),
 } as const satisfies Record<string, readonly WorldHeld[]>;
 
-// The three systems all stand beyond the great star: a view that lights the Earth has them behind the eye, so theirs stands it unlit,
-// and, its worlds kept off their stars, stands one of them whole.
+// The three systems all stand beyond the great star: a view that lights the Earth has them behind the eye, so theirs stands it unlit.
 const UNLIT = new Set<string>(["3 systems"]);
-const POSTCARDS: Partial<Record<keyof typeof files, number>> = { "3 systems": 1 };
 
 function spread(systems: number, each: number): WorldHeld[] {
   return Array.from({ length: systems * each }, (_, at) => ({
@@ -90,6 +88,27 @@ function cameraOf(
       away: Math.hypot(from.x, from.y, from.z),
     };
   };
+}
+
+// A ball's true outline on a screen: the box of its surface's points, seen through `see`, sampled close enough to read to a pixel.
+function outline(see: (at: Point) => Seen, centre: Point, radius: number) {
+  const box = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  for (let ring = 0; ring <= 180; ring += 1)
+    for (let step = 0; step < 360; step += 1) {
+      const [lat, lon] = [(ring * Math.PI) / 180 - Math.PI / 2, (step * Math.PI) / 180];
+      const { x, y } = see({
+        x: centre.x + radius * Math.cos(lat) * Math.cos(lon),
+        y: centre.y + radius * Math.sin(lat),
+        z: centre.z + radius * Math.cos(lat) * Math.sin(lon),
+      });
+      [box.left, box.right, box.top, box.bottom] = [
+        Math.min(box.left, x),
+        Math.max(box.right, x),
+        Math.min(box.top, y),
+        Math.max(box.bottom, y),
+      ];
+    }
+  return box;
 }
 
 const bodiesOf = (system: StarSystem) => system.worlds.filter(({ radius }) => radius >= GRAIN);
@@ -252,12 +271,10 @@ describe("the eye at rest", () => {
 describe("the postcards", () => {
   it.each(Object.entries(files))(
     "draws two neighbour systems whole, at every phase, at both screens, with %s",
-    (name, file) => {
+    (_, file) => {
       const { systems, view } = made(file);
       const neighbours = systems.filter((system) => system.worlds.length > 0).length;
-      expect(view.postcards).toHaveLength(
-        POSTCARDS[name as keyof typeof files] ?? Math.min(2, neighbours - (view.close === undefined ? 0 : 1)),
-      );
+      expect(view.postcards).toHaveLength(Math.min(2, neighbours - (view.close === undefined ? 0 : 1)));
       expect(new Set(view.postcards).size).toBe(view.postcards.length);
       expect(view.postcards).not.toContain(view.close?.system);
       for (const index of view.postcards) {
@@ -627,16 +644,17 @@ describe("the close world", () => {
       expect(view.postcards).not.toContain(view.close.system);
       for (const [{ width, height }, swayed] of SCREENS_SWAYED) {
         const see = cameraOf(view, { width, height }, swayed);
-        const seen = see(placeOf(system, world, 0), world.radius);
+        const centre = placeOf(system, world, 0);
+        const seen = see(centre, world.radius);
         const earth = see(EARTH_PLACE, EARTH_RADIUS);
         expect(seen.depth).toBeGreaterThan(world.radius);
         expect(seen.radius).toBeGreaterThanOrEqual(2 * earth.radius);
-        const cut = [seen.x - seen.radius < 0, seen.x + seen.radius > width];
-        expect(cut.filter(Boolean)).toHaveLength(1);
-        expect(seen.y - seen.radius).toBeGreaterThanOrEqual(0);
-        expect(seen.y + seen.radius).toBeLessThanOrEqual(height);
-        const shown = Math.min(seen.x + seen.radius, width) - Math.max(seen.x - seen.radius, 0);
-        expect(shown).toBeGreaterThanOrEqual(0.25 * 2 * seen.radius);
+        // Its true outline on the screen, off the view's axis wider outward than a circle (7d6's review, lot 2).
+        const { left, right, top, bottom } = outline(see, centre, world.radius);
+        expect([left < 0, right > width].filter(Boolean)).toHaveLength(1);
+        expect(top).toBeGreaterThanOrEqual(0);
+        expect(bottom).toBeLessThanOrEqual(height);
+        expect(Math.min(right, width) - Math.max(left, 0)).toBeGreaterThanOrEqual(0.25 * (right - left));
       }
     }
   });

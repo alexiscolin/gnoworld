@@ -3,6 +3,7 @@
 import { EARTH_PLACE, EARTH_RADIUS, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
+import { outlineOf, type Outline } from "./outline.ts";
 
 /** The camera's field of view, in degrees, up and down: the scene's own lens. */
 export const FIELD_OF_VIEW = 50;
@@ -68,7 +69,7 @@ export interface Camera {
 }
 
 /** A place on a screen: its centre and radius in pixels, its depth along the view, its distance from the eye. */
-export interface Seen {
+export interface Seen extends Outline {
   readonly x: number;
   readonly y: number;
   readonly radius: number;
@@ -150,8 +151,10 @@ export class Look {
     const from = minus(at, eye);
     const depth = dot(from, ahead);
     const scale = this.#focal / Math.max(depth, 1e-9);
-    const [x, y] = [this.width / 2 + dot(from, right) * scale, this.height / 2 - dot(from, up) * scale];
-    return { x, y, radius: radius * scale, depth, away: Math.hypot(from.x, from.y, from.z) };
+    const [across, upward] = [dot(from, right), dot(from, up)];
+    const [x, y] = [this.width / 2 + across * scale, this.height / 2 - upward * scale];
+    const box = outlineOf({ across, up: upward, depth, radius }, this.#focal, [this.width, this.height]);
+    return { x, y, radius: radius * scale, depth, away: Math.hypot(from.x, from.y, from.z), ...box };
   }
 
   /** A ball `reach` round `at`, as wide as anything turning in it can stand on screen: its near side stands larger, and off the axis a
@@ -197,23 +200,21 @@ export class Look {
 
   /** Whether a body there stands whole on the screen, under the header, `margin` pixels in. */
   whole(at: Seen, margin: number): boolean {
-    const across = at.x - at.radius >= margin && at.x + at.radius <= this.width - margin;
-    return (
-      at.depth > 0 && across && at.y - at.radius >= HEADER * this.height && at.y + at.radius <= this.height - margin
-    );
+    const across = at.left >= margin && at.right <= this.width - margin;
+    return at.depth > 0 && across && at.top >= HEADER * this.height && at.bottom <= this.height - margin;
   }
 
   /** Whether a body there shows nothing on the screen. */
   off(at: Seen): boolean {
-    const beside = at.x + at.radius < 0 || at.x - at.radius > this.width;
-    return at.depth <= 0 || beside || at.y + at.radius < 0 || at.y - at.radius > this.height;
+    const beside = at.right < 0 || at.left > this.width;
+    return at.depth <= 0 || beside || at.bottom < 0 || at.top > this.height;
   }
 
   /** Whether a body there is cut by exactly one side, `least` of its width shown, whole from top to bottom. */
   cutBySide(at: Seen, least: number): boolean {
-    const sides = Number(at.x - at.radius < 0) + Number(at.x + at.radius > this.width);
-    const shown = Math.min(at.x + at.radius, this.width) - Math.max(at.x - at.radius, 0);
-    return sides === 1 && shown >= least * 2 * at.radius && at.y - at.radius >= 0 && at.y + at.radius <= this.height;
+    const sides = Number(at.left < 0) + Number(at.right > this.width);
+    const shown = Math.min(at.right, this.width) - Math.max(at.left, 0);
+    return sides === 1 && shown >= least * (at.right - at.left) && at.top >= 0 && at.bottom <= this.height;
   }
 }
 

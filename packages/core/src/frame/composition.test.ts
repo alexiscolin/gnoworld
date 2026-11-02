@@ -3,7 +3,14 @@ import { composed, coveredShare, offLine, type Frame } from "./composition.ts";
 import type { Seen } from "./restLook.ts";
 
 // Spots placed by hand just inside and just outside each rule (7d6's review, F4251): the view's sets never come near its limits.
-const spot = (x: number, y: number, [radius, away] = [4, 40]): Seen => ({ x, y, radius, depth: away, away });
+const spot = (x: number, y: number, [radius, away] = [4, 40]): Seen => ({
+  x,
+  y,
+  radius,
+  depth: away,
+  away,
+  ...{ left: x - radius, right: x + radius, top: y - radius, bottom: y + radius },
+});
 // The Earth far from every spot and off the screen, unless a test puts it among them.
 const EARTH = spot(-5000, -5000);
 // A screen wide enough for every spot placed, with no glowing star: with a close world, or not.
