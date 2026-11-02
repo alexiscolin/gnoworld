@@ -8,7 +8,7 @@ import { postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { box, colours, near } from "./geometry.ts";
+import { box, brightShare, colours, near } from "./geometry.ts";
 import { hideThePage, opened, running, stats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
@@ -152,6 +152,19 @@ test("shows warm suns on near-black: the great sun's glow, deep black in the cor
   expect(red).toBeGreaterThan(blue * 1.5);
   expect(red).toBeGreaterThan(green);
   expect(Math.max(...(corner ?? [255]))).toBeLessThan(60);
+});
+
+// 7d6's design review: the low view's halos washed the sky (18.8% of it at 150 or over, frame 4 7.2%); the great star is now the main light,
+// every other sun half its size at most, no halo wider than the approved arrival's great star. Measured on SwiftShader at the tip: 1.2% of
+// the canvas, the page hidden; frame 4, read the same way, 6.3%.
+test("keeps the sky dark between its suns: 150 and over on under 9% of it, as frame 4", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await opened(page);
+  await hideThePage(page);
+  const shot = await page.locator("canvas").screenshot();
+  expect(await brightShare(page, shot, 150)).toBeLessThan(0.09);
 });
 
 test("holds the draw bound from far above, and piles nothing up", async ({ page }) => {

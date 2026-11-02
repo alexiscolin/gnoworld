@@ -192,7 +192,8 @@ describe("the suns' halos", () => {
     expect(pixels[1]).toBeGreaterThan(100);
   });
 
-  // A star three units from the eye, the close world's, spread its amber over the whole screen: the approved arrival's widest was 769 pixels.
+  // A star three units from the eye, the close world's, spread its amber over the whole screen: no halo now outgrows the great star's at
+  // the approved arrival, 36 units off (305 pixels).
   it("keeps a halo by the eye no wider than the approved arrival's widest, and asks whether its heart, not its reach, is in view", () => {
     const asked: number[] = [];
     const suns = sunsAt([40, 3], {
@@ -201,8 +202,19 @@ describe("the suns' halos", () => {
         return true;
       },
     });
-    expect(((suns[1]?.reach ?? NaN) * 1158) / 3).toBeLessThanOrEqual(800);
+    expect(((suns[1]?.reach ?? NaN) * 1158) / 3).toBeLessThanOrEqual(320);
     expect(asked).toEqual([(10 * 3) / 1158]);
+  });
+
+  // 7d6's design review against f0004: the great star's white heart 70 px across, the others' half that; a postcard's star and a near plain
+  // one stood as large as the great one, and the warm light washed the sky.
+  it("keeps every other sun half the great star's size on screen or less, a postcard's too, however near", () => {
+    const aways = [40, 20, 30, 80, 6];
+    const suns = sunsAt(aways, { needsHalo: (index) => index === 0 || index === 1 });
+    const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
+    expect(pixels[0]).toBeCloseTo((9.5 * 1158) / 40, 6);
+    for (const other of pixels.slice(1)) expect(other).toBeLessThanOrEqual((pixels[0] ?? 0) / 2 + 1e-9);
+    expect(pixels[1]).toBeCloseTo((pixels[0] ?? 0) / 2, 6);
   });
 
   it("keeps a region's glow whole: it is no sun's halo", () => {

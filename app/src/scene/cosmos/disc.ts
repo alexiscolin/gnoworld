@@ -9,7 +9,6 @@ import {
   GRAIN,
   onScreen,
   ORBIT_PACE,
-  smoothstep,
   textHash,
   unitOf,
   worldLook,
@@ -24,6 +23,7 @@ import { Group } from "three";
 import type { Disposer } from "../disposer.ts";
 import { Belt, ROCKS } from "./belt.ts";
 import { Dots } from "./dots.ts";
+import { Halos } from "./halos.ts";
 import { Suns } from "./suns.ts";
 
 /** What a look saw. */
@@ -56,20 +56,10 @@ interface Held {
 }
 
 // A star's reach, from its size; a region's glow, from the systems it holds.
-const REACH = 7.5;
-const LEAST_REACH = 2;
 const GLOW_REACH = 26;
 const GLOW_MOST = 90;
 const GLOW_WARMTH = 0.5;
 const LINEAR = 2.2;
-// Frame 4 shows about seven halos, its other stars points: a halo dims and shrinks from the first distance to a point of so many pixels
-// by the second, in world units, and seven at most stand in view.
-const HALOS = 7;
-const HALO_NEAR = 40;
-const HALO_FAR = 120;
-const POINT_PIXELS = 10;
-// The approved arrival's widest halo was 769 pixels: no star by the eye spreads its amber over the whole screen.
-const HALO_PIXELS = 800;
 // A star under the page's text keeps this little of its halo and no core, its heart this many pixels wide: the words stand on black.
 const UNDER_TEXT = 0.1;
 const HEART_PIXELS = 60;
@@ -94,17 +84,13 @@ const lifted = ([red, green, blue]: readonly [number, number, number]): [number,
 ];
 
 const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
-const reachOf = ({ star }: StarSystem): number => REACH * Math.sqrt(star) + LEAST_REACH;
 
 export class Disc {
   readonly #suns: Suns;
   readonly #dots: Dots;
   readonly #belt: Belt;
   readonly #colours = new Map<string, [number, number, number]>();
-  // Each drawn star's halo, its distance to the eye, and the stars in view by distance: written on a look, kept from one to the next.
-  readonly #halos: number[] = [];
-  readonly #aways: number[] = [];
-  readonly #order: number[] = [];
+  readonly #halos = new Halos();
   readonly group = new Group();
   /** The points' mean size, worlds and not grain, in the journeys' reading. */
   dotPixels = 0;
@@ -143,38 +129,15 @@ export class Disc {
     this.#paintBelts(sight);
   }
 
-  // Which drawn stars keep a halo: those the view needs, then the nearest in view, seven at most, each as its distance leaves it.
-  #haloes({ systems, drawn, eye, focal, needsHalo, inView }: Sight): void {
-    const order = this.#order;
-    order.length = 0;
-    let kept = 0;
+  #paintSuns(sight: Sight): void {
+    const { systems, ladder, drawn, shows } = sight;
+    this.#halos.choose(sight);
     for (let at = 0; at < drawn.starCount; at += 1) {
       const index = drawn.stars[at] ?? -1;
       const system = systems[index];
-      this.#halos[at] = 0;
-      this.#aways[at] = system === undefined ? Infinity : away(system.place, eye);
       if (system === undefined) continue;
-      if (needsHalo(index)) {
-        this.#halos[at] = 1;
-        kept += 1;
-      } else if (inView(system.place, (POINT_PIXELS * (this.#aways[at] ?? 0)) / focal)) order.push(at);
-    }
-    order.sort((a, b) => (this.#aways[a] ?? 0) - (this.#aways[b] ?? 0));
-    for (const at of order.slice(0, Math.max(HALOS - kept, 0)))
-      this.#halos[at] = 1 - smoothstep(HALO_NEAR, HALO_FAR, this.#aways[at] ?? Infinity);
-  }
-
-  #paintSuns(sight: Sight): void {
-    const { systems, ladder, drawn, shows, focal } = sight;
-    this.#haloes(sight);
-    for (let at = 0; at < drawn.starCount; at += 1) {
-      const system = systems[drawn.stars[at] ?? -1];
-      if (system === undefined) continue;
-      const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-      const full = Math.min(reachOf(system), (HALO_PIXELS * distance) / focal);
-      const point = Math.min(full, (POINT_PIXELS * distance) / focal);
+      const { reach, halo } = this.#halos.sunOf(at, index, system);
       const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS);
-      const reach = point + (full - point) * halo;
       this.#suns.set(at, system.place, { reach, warmth: system.warmth, glow: false, shows: light, halo });
     }
     for (let at = 0; at < drawn.glowCount; at += 1) {
