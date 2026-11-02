@@ -57,8 +57,10 @@ class LiveScene implements Scene {
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
     this.#renderer.debug.onShaderError = this.#shaderRefused;
     this.#stage.background = new Color(DEEP_BLACK);
+    // Last, once every part let go: the loop stops, the renderer goes.
     this.#owner.add({
       dispose: () => {
+        this.#loop.stop();
         this.#renderer.forceContextLoss();
         this.#renderer.dispose();
       },
@@ -94,11 +96,6 @@ class LiveScene implements Scene {
     });
     this.#viewport.apply();
     this.#loop = new FrameLoop(clock, this.#draw);
-    this.#owner.add({
-      dispose: () => {
-        this.#loop.stop();
-      },
-    });
     this.#loop.set({ busy: this.#probe.running });
     this.#watch(canvas);
   }
