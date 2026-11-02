@@ -1,7 +1,15 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { heightField, MAX_HEIGHT } from "../space/mood.ts";
-import { CELL, DISC_HALF_THICKNESS, placeSystems, starSize, type SystemPlace, type SystemRef } from "./cosmos.ts";
+import {
+  CELL,
+  DISC_HALF_THICKNESS,
+  driftedPlaces,
+  placeSystems,
+  starSize,
+  type SystemPlace,
+  type SystemRef,
+} from "./cosmos.ts";
 
 // core/cosmos (slice 7, 7c and 7d1; ADR-0002 §3 and §10; F3520): systems take cells in rings by their rank in the set, a thick disc with
 // clusters above and below it, their height from a smooth field of position. Nothing piles up, an arrival moves others little and only
@@ -313,6 +321,67 @@ describe("a hundred arrivals move no system far", () => {
   it("gives a place back to what comes again: the same set, the same map", () => {
     const left = placeSystems(loose(ids(500).filter((id) => id !== "ns250")));
     expect(placeSystems(loose([...left.keys(), "ns250"]))).toEqual(placed(500));
+  });
+});
+
+describe("driftedPlaces, what moved on its way over a season", () => {
+  const from = new Map<string, SystemPlace>([
+    ["a", { x: 0, y: 0, z: 0 }],
+    ["b", { x: 10, y: 20, z: 30 }],
+    ["gone", { x: 1, y: 1, z: 1 }],
+  ]);
+  const to = new Map<string, SystemPlace>([
+    ["a", { x: 40, y: 8, z: -20 }],
+    ["b", { x: 10, y: 20, z: 30 }],
+    ["new", { x: 5, y: 5, z: 5 }],
+  ]);
+
+  it("stands at last season's map at its start and at this season's at its end", () => {
+    expect(driftedPlaces(from, to, 0).get("a")).toEqual({ x: 0, y: 0, z: 0 });
+    expect(driftedPlaces(from, to, 1).get("a")).toEqual({ x: 40, y: 8, z: -20 });
+  });
+
+  it("stands halfway at the season's middle, on all three axes", () => {
+    expect(driftedPlaces(from, to, 0.5).get("a")).toEqual({ x: 20, y: 4, z: -10 });
+  });
+
+  it("starts and ends gently: no step at either end of the season", () => {
+    const x = (progress: number): number => driftedPlaces(from, to, progress).get("a")?.x ?? NaN;
+    expect(x(0.01)).toBeLessThan(0.02);
+    expect(x(0.99)).toBeGreaterThan(39.98);
+  });
+
+  it("never passes either map, before or after the season", () => {
+    expect(driftedPlaces(from, to, -1).get("a")).toEqual({ x: 0, y: 0, z: 0 });
+    expect(driftedPlaces(from, to, 2).get("a")).toEqual({ x: 40, y: 8, z: -20 });
+  });
+
+  it("leaves what did not move, puts an arrival at its place at once, and forgets what left", () => {
+    const places = driftedPlaces(from, to, 0.3);
+    expect(places.get("b")).toEqual({ x: 10, y: 20, z: 30 });
+    expect(places.get("new")).toEqual({ x: 5, y: 5, z: 5 });
+    expect(places.has("gone")).toBe(false);
+    expect(places.size).toBe(3);
+  });
+
+  it("refuses a progress that is no number, so no place turns to NaN in the scene", () => {
+    expect(() => driftedPlaces(from, to, Number.NaN)).toThrow(
+      new RangeError("cosmos: a season's progress is a number"),
+    );
+    expect(driftedPlaces(from, to, Number.POSITIVE_INFINITY).get("a")).toEqual({ x: 40, y: 8, z: -20 });
+  });
+
+  it("stands every system at its place when there is no last season, and leaves both maps as they were", () => {
+    expect(driftedPlaces(new Map(), to, 0.5)).toEqual(to);
+    expect(from.size).toBe(3);
+    expect(to.get("a")).toEqual({ x: 40, y: 8, z: -20 });
+  });
+
+  it("carries a real map to the next with no step past a cell in a hundredth of a season", () => {
+    const before = placed(1_000);
+    const after = placeSystems(loose([...ids(1_000), ...ids(100, "new")]));
+    const steps = moves(driftedPlaces(before, after, 0.5), driftedPlaces(before, after, 0.51));
+    expect(Math.max(...steps)).toBeLessThan(CELL);
   });
 });
 

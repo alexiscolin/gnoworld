@@ -18,6 +18,7 @@ export {
 export {
   CELL,
   DISC_HALF_THICKNESS,
+  driftedPlaces,
   placeSystems,
   starSize,
   type SystemPlace,
