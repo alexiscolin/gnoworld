@@ -2,7 +2,6 @@
 // holds a slot of a sunflower's lattice: its hash picks the slot, so an arrival moves only a world it meets, and the lattice keeps any
 // number of worlds apart in the room a cell leaves. A system turns as one, so none ever crosses another. The disc lies tilted on the stage.
 import { cellHash, nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { HOME } from "../space/drift.ts";
 import { lerp } from "../space/smooth.ts";
 import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos.ts";
 
@@ -12,10 +11,6 @@ export const GNO_LAND = "gno.land";
 export const ROOM = CELL / 2;
 /** Where a far belt starts: no world goes past it. */
 export const BELT_INNER = 0.84 * ROOM;
-/** How far the disc leans from facing the eye's way, in radians: seen from 60 degrees above it. */
-export const DISC_TILT = 1.0471975511965976;
-/** Where the map's centre stands on the stage: 36 units ahead of the eye at rest, the great sun where frame 4 has it. */
-export const CENTRE: Point = { x: HOME.x - 0.06, y: HOME.y + 0.155, z: HOME.z - 36 };
 /** A fixed place, beside the great star, and its size: frame 4's Earth. */
 export const EARTH_PLACE: Point = { x: -6.73, y: 0, z: 0.18 };
 export const EARTH_RADIUS = 1.457;
@@ -42,9 +37,6 @@ const BELTS = 1 / 3;
 const SPIN_LEAST = 0.05;
 const SPIN_SPAN = 0.1;
 const SALT = 2;
-// The tilt's cosine and sine, as numbers: a call at a module's top stays in every chunk that imports core.
-const COS = 0.5;
-const SIN = 0.8660254037844386;
 
 export { WORLD_MOST };
 
@@ -196,39 +188,4 @@ export function systemsOf(worlds: readonly WorldHeld[]): StarSystem[] {
     return place === undefined ? [] : [systemOf(id, place, held(id))];
   });
   return [greatStar(), ...stars];
-}
-
-/** Where a world stands `seconds` on, on the map, into `out`. */
-export function orbitPlace(
-  { system, world }: { readonly system: StarSystem; readonly world: Orbiter },
-  seconds: number,
-  out: { x: number; y: number; z: number },
-): void {
-  const { place, spin } = system;
-  const angle = world.phase + spin * seconds;
-  out.x = place.x + world.orbit * Math.cos(angle);
-  out.y = place.y;
-  out.z = place.z + world.orbit * Math.sin(angle);
-}
-
-/** A place on the map, on the stage, into `out`: the map's far side up the view, its near side towards the eye. */
-export function toScene({ x, y, z }: Point, out: { x: number; y: number; z: number }): void {
-  out.x = CENTRE.x + x;
-  out.y = CENTRE.y + y * COS - z * SIN;
-  out.z = CENTRE.z + y * SIN + z * COS;
-}
-
-/** A place on the stage, on the map, into `out`. */
-export function toMap({ x, y, z }: Point, out: { x: number; y: number; z: number }): void {
-  const [dy, dz] = [y - CENTRE.y, z - CENTRE.z];
-  out.x = x - CENTRE.x;
-  out.y = dy * COS + dz * SIN;
-  out.z = dz * COS - dy * SIN;
-}
-
-/** Where the view's axis, straight ahead, meets the disc: what the eye looks at. An eye under the disc looks at the place under it. */
-export function focusOf({ x, y, z }: Point, out: { x: number; y: number; z: number }): void {
-  out.x = x;
-  out.y = 0;
-  out.z = y > 0 ? z - (y * COS) / SIN : z;
 }

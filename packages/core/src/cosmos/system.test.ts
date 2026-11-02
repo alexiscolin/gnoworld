@@ -4,23 +4,18 @@ import { HOME } from "../space/drift.ts";
 import { CELL, placeSystems, starSize } from "./cosmos.ts";
 import {
   BELT_INNER,
-  CENTRE,
-  DISC_TILT,
   EARTH_PLACE,
   EARTH_RADIUS,
-  focusOf,
   GNO_LAND,
   GRAIN,
-  orbitPlace,
   ROOM,
   systemsOf,
-  toMap,
-  toScene,
   WORLD_MOST,
   type Orbiter,
   type StarSystem,
   type WorldHeld,
 } from "./system.ts";
+import { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
 // its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one (F3563).

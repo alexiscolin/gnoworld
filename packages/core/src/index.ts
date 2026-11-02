@@ -27,18 +27,12 @@ export {
 } from "./cosmos/cosmos.ts";
 export {
   BELT_INNER,
-  CENTRE,
-  DISC_TILT,
   EARTH_PLACE,
   EARTH_RADIUS,
-  focusOf,
   GNO_LAND,
   GRAIN,
-  orbitPlace,
   ROOM,
   systemsOf,
-  toMap,
-  toScene,
   type Orbiter,
   type StarSystem,
   type WorldHeld,
@@ -55,7 +49,17 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
-export { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt, type ClearBox, type ScreenSpot } from "./lod/screen.ts";
+export {
+  clearOf,
+  GROWTH,
+  growthAt,
+  leanFor,
+  SPREAD,
+  spreadAt,
+  type ClearBox,
+  type ScreenSpot,
+} from "./frame/screen.ts";
+export { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
 export {
   anchorOf,
   ANCHORS,

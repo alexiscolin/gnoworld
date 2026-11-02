@@ -1,10 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { systemsOf, toMap, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
+import { systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
+import { toMap } from "../frame/disc.ts";
 import { textHash, type Point } from "../space/cell.ts";
 import { HOME } from "../space/drift.ts";
 import { BOUNDS, dotLight, Drawn, HAZE, Ladder, LANDMARKS, MIDDLE, onScreen, screenRadius } from "./ladder.ts";
-import { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt } from "./screen.ts";
+import { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt } from "../frame/screen.ts";
 
 // The ladder of detail (ADR-0002 §3): what is drawn depends on the distance alone, never on the universe's size. From close to far a world
 // is a body, a point, then part of its star; a star a star, then part of a region's one glow, and past the haze nothing.
