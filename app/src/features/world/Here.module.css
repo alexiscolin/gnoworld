@@ -1,0 +1,8 @@
+/* "Here, right now" keeps its place on the plate before the chat has counted anyone, and where nobody is: the plate under it never
+   moves as the count comes (7e, 2026-11-02). */
+@layer components {
+  .here {
+    /* raw: the fact's height: its figure's line (--font-figure, 2.75rem/1), Stat's 3xs step and its caption's line (--font-label, 0.6875rem/1) */
+    min-block-size: calc(2.75rem + var(--space-3xs) + 0.6875rem);
+  }
+}
