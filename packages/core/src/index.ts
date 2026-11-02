@@ -15,17 +15,7 @@ export {
   sameName,
   topicAfter,
 } from "./chat/room.ts";
-export {
-  CELL,
-  DISC_HALF_THICKNESS,
-  heightField,
-  MAX_HEIGHT,
-  placeSystem,
-  placeSystems,
-  type PlaceOptions,
-  type SystemPlace,
-  type SystemRef,
-} from "./cosmos/cosmos.ts";
+export { CELL, DISC_HALF_THICKNESS, placeSystems, type SystemPlace, type SystemRef } from "./cosmos/cosmos.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
@@ -72,7 +62,7 @@ export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from
 export { PHONE_QUERY } from "./frame/phone.ts";
 export type { Point } from "./space/cell.ts";
 export { driftAt, HOME, turnAt } from "./space/drift.ts";
-export { MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
 export { wrapTo } from "./space/torus.ts";
