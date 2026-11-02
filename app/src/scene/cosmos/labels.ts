@@ -96,11 +96,14 @@ export class Labels {
     else this.#timer = setTimeout(this.#apply, wait);
   }
 
-  // A world no longer chosen lets its slot go at once: only words wait.
+  // A world no longer chosen lets its slot go at once, and the side it took: only words wait.
   #leave(chosen: readonly Chosen[]): void {
     const kept = new Set(chosen.map(({ label }) => label.id));
-    for (const slot of this.#slots)
-      if (slot.chosen !== undefined && !kept.has(slot.chosen.label.id)) slot.chosen = undefined;
+    this.#slots.forEach((slot, index) => {
+      if (slot.chosen === undefined || kept.has(slot.chosen.label.id)) return;
+      slot.chosen = undefined;
+      this.#layout.side[index] = -1;
+    });
   }
 
   readonly #apply = (): void => {

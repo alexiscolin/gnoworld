@@ -328,6 +328,15 @@ describe("where a label may stand (F3772)", () => {
     return boxOf(from, "gov/govern");
   };
 
+  it("stands a new world in a freed slot above its body, never on the side the world before it took (F3758)", () => {
+    const below = one(labels, body(0, (SCREEN.height / 2 - 110) / 20));
+    expect(below.top).toBeGreaterThan(110);
+    vi.advanceTimersByTime(200);
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.tick(EYE, true);
+    expect(boxOf(labels, "games/chess").bottom).toBeLessThan(SCREEN.height / 2);
+  });
+
   it("shows no label for a body behind the eye", () => {
     labels.show(
       labelled([near("gov/govern")]).map((label) => ({
