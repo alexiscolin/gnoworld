@@ -794,13 +794,13 @@ PY
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	# 1,120 requests: the burst of 640 and the 480 over it that 800 left the burst of 320, so the floor of 200 keeps its margin (F3665).
-	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-1120]')" 200
-	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-1120]')" 200
-	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-1120]')" 200
+	# 1,600 requests, twice those that met the burst of 320: a slow host's refill then eats no more of the floor of 200 than it did (F3665).
+	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-1600]')" 200
+	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-1600]')" 200
+	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-1600]')" 200
 	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-1120]" || true)
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-1600]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"
@@ -814,11 +814,12 @@ PY
 		--haproxy-clientip 198.51.100.9 -u "$auth" --parallel --parallel-max 50 $fetches || true)
 	expect "a visitor's first load, twice its files at once, gets no 429" "$(printf '%s\n' "$load" | grep -c '^429$' || true)" 0
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
-	# The room itself (F3665): a build's first load sits under 320, so only this tells a burst of 640 from the one before it.
-	at_least "a burst of 640 requests is served whole" "$(codes 200 198.51.100.13 -u "$auth" 'http://web:8080/[1-640]')" 640
+	# The room itself (F3665): a build's first load sits under 320, so only this tells a burst of 640 from the one before it. A real file: a
+	# made-up path is the app's 404, which would count nothing.
+	at_least "a burst of 640 requests is served whole" "$(codes 200 198.51.100.13 -u "$auth" 'http://web:8080/sw.js?[1-640]')" 640
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-1120]"
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-1600]"
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0

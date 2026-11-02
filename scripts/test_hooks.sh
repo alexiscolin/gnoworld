@@ -4047,9 +4047,26 @@ out=$(chk) && fail "check_nginx passed a burst of 5, under twice the 3 files of 
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst of 5: $out"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 chk >/dev/null || fail "check_nginx refused the image's burst for a build of 3 files"
-# The table the burst lives in (F3665, Alexis, 2026-11-02): 640 on both lines of the visitors' zone, and the rate unchanged.
-[ "$(grep -c 'limit_req zone=visitors burst=640 nodelay;' "$here/../deploy/web/nginx.conf")" = 2 ] || fail "the visitors' burst is not 640 on both lines of deploy/web/nginx.conf (F3665)"
-grep -q 'zone=visitors:1m rate=20r/s;' "$here/../deploy/web/nginx.conf" || fail "the visitors' rate is not 20 a second in deploy/web/nginx.conf (F3665)"
+# The table the burst lives in (F3665, Alexis, 2026-11-02): the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each
+# line is read from its start, for a comment proves nothing: the faults under it are what a loose grep passed (7d1's security review).
+burst_table() {
+	[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors ' "$1")" = 2 ] &&
+		[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors burst=640 nodelay;$' "$1")" = 2 ] &&
+		grep -Eq '^[[:space:]]*limit_req_zone \$proxy_protocol_addr zone=visitors:1m rate=20r/s;$' "$1"
+}
+burst_table "$here/../deploy/web/nginx.conf" || fail "the visitors' zone in deploy/web/nginx.conf is not two lines at a burst of 640 and 20 a second (F3665)"
+sed 's/burst=640 nodelay;/burst=64000 nodelay;/' "$nc/nginx.good" >"$nc/table.conf"
+printf '# limit_req zone=visitors burst=640 nodelay;\n# limit_req zone=visitors burst=640 nodelay;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table read two comments as its two lines"
+cp "$nc/nginx.good" "$nc/table.conf"
+printf '        limit_req zone=visitors burst=64000 nodelay;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table passed a third line at another burst"
+sed 's#rate=20r/s;#rate=2000r/s;#' "$nc/nginx.good" >"$nc/table.conf"
+printf '# limit_req_zone $proxy_protocol_addr zone=visitors:1m rate=20r/s;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table read a comment as its rate"
+sed 's/limit_req zone=visitors burst=640 nodelay;/limit_req zone=visitors burst=320 nodelay;/' "$nc/nginx.good" >"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table passed the old burst"
+rm "$nc/table.conf"
 fi
 
 if part bench_load; then
