@@ -1990,7 +1990,9 @@ describe("a system's arrival (7d3)", () => {
     expect(halo?.getX(indexOf(system.place))).toBe(1);
     const own = size(system.place);
     expect(own).toBeGreaterThan(0);
-    for (const other of systems) if (other !== system) expect(size(other.place)).toBeLessThanOrEqual(own / 2 + 1e-9);
+    // Read from a Float32 attribute, as the GPU holds it: to a float's precision.
+    for (const other of systems)
+      if (other !== system) expect(size(other.place)).toBeLessThanOrEqual((own / 2) * (1 + 1e-6));
   });
 
   it("lays its far belt clear of its worlds: every rock half a unit or more off every world it draws, at any turn", async () => {
