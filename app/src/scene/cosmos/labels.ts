@@ -91,7 +91,7 @@ export class Labels {
     this.#leave(chosen);
     this.#waiting = chosen;
     if (this.#timer !== undefined) return;
-    const wait = this.#wrote + WORDS_MS - Date.now();
+    const wait = this.#wrote + WORDS_MS - performance.now();
     if (wait <= 0) this.#apply();
     else this.#timer = setTimeout(this.#apply, wait);
   }
@@ -110,7 +110,7 @@ export class Labels {
     this.#timer = undefined;
     const chosen = (this.#waiting ?? []).slice(0, LABEL_SLOTS);
     this.#waiting = undefined;
-    this.#wrote = Date.now();
+    this.#wrote = performance.now();
     this.#leave(chosen);
     chosen.forEach((each, order) => {
       const slot =

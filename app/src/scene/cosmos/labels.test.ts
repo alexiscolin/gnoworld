@@ -125,6 +125,15 @@ describe("the pool", () => {
     expect(layer()?.textContent).not.toContain("govern");
   });
 
+  it("changes its words within a tenth of a second though the wall clock steps back an hour (F3776)", () => {
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
+    vi.advanceTimersByTime(50);
+    vi.setSystemTime(Date.now() - 3_600_000);
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));
+    vi.advanceTimersByTime(60);
+    expect(layer()?.textContent).toContain("chess");
+  });
+
   it(`shows the first ${String(LABEL_SLOTS)} it is given, and makes no ninth`, () => {
     const many: Label[] = Array.from({ length: LABEL_SLOTS + 3 }, (_, index) => ({
       id: `w/${String(index)}`,
