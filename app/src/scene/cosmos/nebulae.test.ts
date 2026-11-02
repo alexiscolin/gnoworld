@@ -139,6 +139,27 @@ describe("the nebulae's images", () => {
     expect(asked()).toHaveLength(wanted.size);
   });
 
+  it("waits its two seconds from the cosmos showing, to the millisecond", async () => {
+    const scene = made();
+    scene.nebulae.wake();
+    scene.nebulae.place(HOME);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(maps.load).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(maps.load).toHaveBeenCalled();
+  });
+
+  it("asks a frame when an image comes: a still page draws only when asked", async () => {
+    const scene = made();
+    scene.nebulae.wake();
+    scene.nebulae.place(HOME);
+    await vi.advanceTimersByTimeAsync(10);
+    scene.moved.mockClear();
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    expect(shownMeshes(scene).length).toBeGreaterThan(0);
+    expect(scene.moved).toHaveBeenCalled();
+  });
+
   it("halves them where memory is short", async () => {
     const scene = made(true);
     await awake(scene);
@@ -269,6 +290,32 @@ describe("its sheets", () => {
         ]),
       );
       expect(found.sort()).toEqual(expected.sort());
+    }
+  });
+
+  it("uploads what a look writes and what a frame writes, each time", async () => {
+    const scene = made();
+    await awake(scene);
+    const names = ["aSheet", "aWindow", "aLight", "position"];
+    const shown = meshes(scene).filter(({ visible }) => visible);
+    const versions = () =>
+      names.flatMap((name) => shown.map((mesh) => (mesh.geometry.getAttribute(name) as BufferAttribute).version));
+    expect(shown.length).toBeGreaterThan(0);
+    const before = versions();
+    scene.nebulae.place({ x: HOME.x + 5, y: HOME.y, z: HOME.z });
+    scene.nebulae.advance(HOME, 1, 2);
+    for (const [at, version] of versions().entries()) expect(version).toBeGreaterThan(before[at] ?? NaN);
+  });
+
+  it("bends each layer of a nebula its own way, the far one at the nebula's own seed", async () => {
+    const scene = made();
+    await awake(scene);
+    for (const [image, mesh] of meshes(scene).entries()) {
+      if (!mesh.visible) continue;
+      const nebulae = litFrom(HOME).filter((nebula) => nebula.image === image);
+      const seeds = Array.from({ length: sheetCount(mesh) }, (_, sheet) => numbers(mesh, "aSheet", sheet)[3] ?? NaN);
+      expect(new Set(seeds).size).toBe(seeds.length);
+      for (const nebula of nebulae) expect(seeds).toContain(Math.fround(nebula.seed));
     }
   });
 

@@ -331,6 +331,20 @@ describe("its light", () => {
     }
   });
 
+  // Worked out apart from this code, in Python, for the nebula held at home above.
+  it("holds its fades' middles: the share's two ramps and the light's two", () => {
+    expect(nebulaShare(7.5)).toBeCloseTo(0.5, 12);
+    expect(nebulaShare(12)).toBe(1);
+    expect(nebulaShare(510)).toBeCloseTo(0.5, 12);
+    expect(nebulaShare(600)).toBeCloseTo(0.14003663749236717, 12);
+    const nebula = byId(fieldAt(HOME)).get(26874738);
+    if (nebula === undefined) throw new Error("no nebula 26874738 at home");
+    const from = (away: number) => nebulaLight(nebula, { x: nebula.x + away, y: nebula.y, z: nebula.z });
+    expect(from(1700)).toBeCloseTo(0.4621798478299752, 12);
+    expect(from(545.2747530804481)).toBeCloseTo(0.4621798478299752, 12);
+    expect(from(1300)).toBeCloseTo(0.9243596956599504, 12);
+  });
+
   it("is dark near a world, whole from a system's distance to a cluster's, gone past it", () => {
     expect(nebulaShare(0)).toBe(0);
     expect(nebulaShare(EARTH_RADIUS * 2)).toBe(0);
