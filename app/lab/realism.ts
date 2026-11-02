@@ -1,29 +1,26 @@
-// The realism page (slice 7, 7b): twelve worlds from a small set of real maps, a world close up, a star behind a world, and one nebula made
-// two ways, for Alexis's eye on a real GPU. Not shipped: lab.config.ts builds it, and only the journeys and his link see it. Under reduced
-// motion it draws once a change, which is also what a software GPU's journeys want.
+// The realism page (slice 7, 7b): twelve worlds from a small set of real maps, a world close up, a star behind a world, for Alexis's eye on
+// a real GPU; the nebulae are the cosmos's (7d4). Not shipped: lab.config.ts builds it, and only the journeys and his link see it. Under
+// reduced motion it draws once a change, which is also what a software GPU's journeys want.
 import { ANCHORS, pixelRatioFor, STAGES, type Stage } from "@gnoworld/core";
 import { ACESFilmicToneMapping, Vector3, type WebGLRenderer } from "three";
 import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { mapBytes } from "../src/scene/planet/maps.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
-import { looksOf, pathOf, type Choice, type Method, type ViewName } from "./choice.ts";
+import { looksOf, pathOf, type Choice, type ViewName } from "./choice.ts";
 import { buildView, type View } from "./views.ts";
 
-const VIEWS: readonly ViewName[] = ["gallery", "gallery24", "close", "eclipse", "nebula", "earth", "stages"];
+const VIEWS: readonly ViewName[] = ["gallery", "gallery24", "close", "eclipse", "earth", "stages"];
 const KEYS: Partial<Record<string, ViewName>> = {
   "1": "gallery",
   "2": "close",
   "3": "eclipse",
-  "4": "nebula",
   "5": "earth",
   "6": "stages",
   "8": "gallery24",
 };
 // The grade 7a2 gives the renderer itself, once it lands.
 const EXPOSURE = 0.8;
-// The nebula's foreground, unless a world is asked for: the gas giant.
-const GIANT = 6;
 
 function need(selector: string): HTMLElement {
   const found = document.querySelector<HTMLElement>(selector);
@@ -37,19 +34,17 @@ function theCanvas(): HTMLCanvasElement {
   return found;
 }
 
-function worldIn(query: URLSearchParams, view: ViewName): number {
+function worldIn(query: URLSearchParams): number {
   const world = Number(query.get("world"));
   const valid = query.has("world") && Number.isInteger(world) && world >= 0 && world < ANCHORS.length;
-  if (valid) return world;
-  return view === "nebula" ? GIANT : 0;
+  return valid ? world : 0;
 }
 
 function chosen(query: URLSearchParams): Choice {
   const view = VIEWS.find((name) => name === query.get("view")) ?? "gallery";
-  const method: Method = query.get("method") === "image" ? "image" : "computed";
   const stage = STAGES.find((name) => name === query.get("stage")) ?? "rest";
   const present = query.has("present") ? Number(query.get("present")) : null;
-  return { view, world: worldIn(query, view), seed: 0, method, stage, present };
+  return { view, world: worldIn(query), seed: 0, stage, present };
 }
 
 // The next stage along the road, stopping at its ends.
@@ -142,7 +137,6 @@ function pressed({ key }: KeyboardEvent): void {
   else if (key === "s") step({ seed: choice.seed + 1 });
   else if (key === "[") step({ stage: stageBy(choice.stage, -1) });
   else if (key === "]") step({ stage: stageBy(choice.stage, 1) });
-  else if (key === "n") step({ view: "nebula", method: choice.method === "image" ? "computed" : "image" });
   else if (key === "p") panel.hidden = !panel.hidden;
 }
 
@@ -162,16 +156,14 @@ function resized(): void {
 }
 
 function stats() {
-  const empty = { view: "", worlds: 0, images: 0, mapBytes: 0, targetBytes: 0 };
+  const empty = { view: "", worlds: 0, mapBytes: 0 };
   const shown =
     view === undefined
       ? empty
       : {
-          view: choice.view === "nebula" ? `nebula ${choice.method}` : choice.view,
+          view: choice.view,
           worlds: view.worlds.length,
-          images: view.images,
           mapBytes: mapBytes(view.textures),
-          targetBytes: view.targetBytes,
         };
   const { memory, render, programs } = renderer.info;
   return {

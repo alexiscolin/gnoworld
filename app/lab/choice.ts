@@ -13,14 +13,12 @@ import {
   type WorldState,
 } from "@gnoworld/core";
 
-export type ViewName = "gallery" | "gallery24" | "close" | "eclipse" | "nebula" | "earth" | "stages";
-export type Method = "computed" | "image";
+export type ViewName = "gallery" | "gallery24" | "close" | "eclipse" | "earth" | "stages";
 
 export interface Choice {
   readonly view: ViewName;
   readonly world: number;
   readonly seed: number;
-  readonly method: Method;
   readonly stage: Stage;
   /** The people here, in place of a stage's usual crowd. */
   readonly present: number | null;

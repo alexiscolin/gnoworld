@@ -1,4 +1,4 @@
-// Where the realism page's views put their camera, their worlds and their star: a gallery's grid, one world close, a nebula's corner.
+// Where the realism page's views put their camera, their worlds and their star: a gallery's grid, one world close.
 import { PerspectiveCamera, Vector3 } from "three";
 import type { Planet } from "../src/scene/planet/planet.ts";
 import type { ViewName } from "./choice.ts";
@@ -66,23 +66,10 @@ function closeLayout(sun: Vector3 | undefined): Layout {
   return { camera, sun: sun?.normalize(), place: () => undefined };
 }
 
-function nebulaLayout(): Layout {
-  const camera = new PerspectiveCamera(CLOSE.fov, 1.6, 0.5, FAR_PLANE);
-  camera.position.z = 22;
-  return {
-    camera,
-    sun: new Vector3(-0.8, 0.3, 0.52).normalize(),
-    place(planet, _, aspect) {
-      planet.group.position.set(3.2 * aspect, -2.3, 0);
-    },
-  };
-}
-
 export function layoutOf(view: ViewName, sizes: readonly number[]): Layout {
   if (view === "gallery") return galleryLayout(TWELVE);
   if (view === "gallery24") return galleryLayout(ALL);
   if (view === "stages") return stagesLayout(sizes);
-  if (view === "close") return closeLayout(undefined);
   if (view === "eclipse") return closeLayout(new Vector3(0.178, 0.1, -1));
-  return nebulaLayout();
+  return closeLayout(undefined);
 }
