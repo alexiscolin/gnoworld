@@ -70,11 +70,8 @@ void main() {
     float along = -dot(eye, ray);
     vec3 nearest = eye + ray * along;
     float over = length(nearest) - 1.0;
-    float lit = smoothstep(-0.35, 0.25, dot(normalize(nearest), sun));
-    float band = smoothstep(-0.003, 0.002, over) * (1.0 - smoothstep(rimThickness * 0.42, rimThickness * 0.62, over));
-    float haze = smoothstep(-0.075, 0.0, over) * (1.0 - smoothstep(-0.002, 0.003, over));
-    light = mix(light, vec3(0.16, 0.22, 0.33) * dot(light, vec3(0.34)), 0.85);
-    light += (vec3(0.47, 0.62, 0.82) * band + vec3(0.02, 0.035, 0.06) * haze) * limbLight * lit;
+    float band = smoothstep(-0.004, 0.003, over) * exp(-max(over, 0.0) / (rimThickness * 0.3));
+    light += vec3(0.6, 0.78, 1.0) * band * limbLight * smoothstep(-0.35, 0.25, dot(normalize(nearest), sun));
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));
