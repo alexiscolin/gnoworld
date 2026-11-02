@@ -78,6 +78,7 @@ export class AtRest {
     loadSearch().then(
       ({ Dive }) => {
         if (this.#still !== undefined) this.#dive ??= this.#owner.add(new Dive(this.#device.stage, still));
+        this.#device.moved();
       },
       // A chunk that does not come leaves no view to dive to.
       () => {
@@ -86,13 +87,13 @@ export class AtRest {
     );
   }
 
-  /** A frame at `clock`, the whole cosmos `ready` to take the view or not: how much of the cosmos shows, none while the dive waits. While
-   * it runs each frame asks the next, its last among them, which takes away what it drew. */
+  /** A frame at `clock`, the whole cosmos `ready` to take the view or not: how much of the cosmos shows, none while the dive waits. Once
+   * its code came, each frame asks the next, its last among them, which takes away what it drew; a chunk on its way asks none. */
   advance(clock: number, ready: boolean): number {
     if (this.#still === undefined) return 1;
-    this.#device.moved();
     const dive = this.#dive;
     if (dive === undefined) return 0;
+    this.#device.moved();
     dive.advance(clock, ready && this.#searched !== undefined);
     if (dive.along === 1 && dive.veil === 0) this.#still = undefined;
     return dive.shown;
