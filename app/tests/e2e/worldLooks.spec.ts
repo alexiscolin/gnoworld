@@ -146,22 +146,17 @@ test.describe("the generated worlds polished", () => {
     });
   });
 
-  // A dark giant's minor moves its few lit levels by less than the 8 a pixel must move to count as shown: only its lightness is held.
-  for (const [anchor, showing] of [
-    ["dark carbon", MINOR.worlds],
-    ["dark giant", 0],
-  ] as const)
-    test(`a ${anchor} world's minor keeps its main class's lightness, and still shows`, async ({ page }) => {
-      const { places, pictures } = await withMinor(page, anchor);
-      const moves = await lightness(page, pictures, places);
-      test.info().annotations.push({ type: "lightness", description: JSON.stringify(moves) });
-      for (const [at, { move, far }] of moves.entries()) {
-        expect(Math.abs(move), `world ${String(at)}: its lightness`).toBeLessThanOrEqual(MINOR.move);
-        expect(far, `world ${String(at)}: no cream patch`).toBeLessThanOrEqual(MINOR.far);
-      }
-      const shown = (await apart(page, pictures, places)).filter(({ moved }) => moved > MINOR.shown);
-      expect(shown.length, "worlds that show their minor").toBeGreaterThanOrEqual(showing);
-    });
+  test("a dark carbon world's minor keeps its main class's lightness, and still shows", async ({ page }) => {
+    const { places, pictures } = await withMinor(page, "dark carbon");
+    const moves = await lightness(page, pictures, places);
+    test.info().annotations.push({ type: "lightness", description: JSON.stringify(moves) });
+    for (const [at, { move, far }] of moves.entries()) {
+      expect(Math.abs(move), `world ${String(at)}: its lightness`).toBeLessThanOrEqual(MINOR.move);
+      expect(far, `world ${String(at)}: no cream patch`).toBeLessThanOrEqual(MINOR.far);
+    }
+    const shown = (await apart(page, pictures, places)).filter(({ moved }) => moved > MINOR.shown);
+    expect(shown.length, "worlds that show their minor").toBeGreaterThanOrEqual(MINOR.worlds);
+  });
 
   test("a grooved world seen close: sharp parallel grooves, in sets that cross at angles", async ({ page }) => {
     await seeds(page, "grooved ice", async (place, shot) => {

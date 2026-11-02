@@ -121,7 +121,7 @@ void main() {
   float tint = mix(0.7, t, 0.8);
   vec3 major = rampOf(low, mid, high, tint);
   vec3 second = rampOf(minorLow, minorMid, minorHigh, tint);
-  float matched = max(max(step(0.001, glowLevel), 0.6 * banded), 1.0 - smoothstep(0.028, 0.036, dot(mid, LUMA)));
+  float matched = max(step(0.001, glowLevel), banded > 0.5 ? 0.6 : 1.0 - smoothstep(0.028, 0.036, dot(mid, LUMA)));
   second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), matched);
   vec3 albedo = mix(major, second, minor);
   if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
