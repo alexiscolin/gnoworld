@@ -2,6 +2,7 @@
 // namespace and the first folder under it, the text before its first `_` (memba_feed_v1 and memba_gov are `memba`), a trailing
 // `/vN` version dropped. Under a generic folder (`x`, `demo`) the whole path minus its version stands: one namespace there holds
 // hundreds of unrelated realms. A realm that is its namespace alone is a world of its own, named by the namespace.
+import { REALM_PREFIX } from "@gnoworld/core";
 import { RealmPath, WORLDS_CAPS } from "@gnoworld/schemas/indexer";
 
 export interface Group {
@@ -11,7 +12,6 @@ export interface Group {
 }
 
 const GENERIC = ["x", "demo"];
-const PREFIX = "gno.land/r/";
 
 function worldOf(segments: readonly string[]): string {
   const [namespace = "", folder = ""] = segments;
@@ -26,7 +26,7 @@ export function groupWorlds(paths: readonly string[]): Group[] {
   const worlds = new Map<string, Group>();
   for (const path of new Set(paths)) {
     if (!RealmPath.safeParse(path).success) continue;
-    const segments = path.slice(PREFIX.length).split("/");
+    const segments = path.slice(REALM_PREFIX.length).split("/");
     const id = worldOf(segments);
     const group = worlds.get(id) ?? { id, namespace: segments[0] ?? "", realms: [] };
     group.realms.push(path);

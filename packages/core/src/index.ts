@@ -75,6 +75,7 @@ export {
   type PlanetLook,
   type RealmFunctions,
 } from "./planet/look.ts";
+export { REALM_PREFIX } from "./chain/realm.ts";
 export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
 export type { Lab, Palette } from "./planet/palette.ts";
 export { SURFACE, type SurfaceName } from "./planet/spans.ts";
