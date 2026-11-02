@@ -77,13 +77,28 @@
     cursor: pointer;
   }
 
-  /* Under the plate's breakpoint no margin holds it: it lies over the page's words, and over a phone's views. */
+  /* Under the plate's breakpoint no margin holds it: it lies over the page's words. */
   @media (max-width: 1279px) {
     .credits {
       inset-block-end: var(--space-3xs);
       padding-block: var(--space-3xs);
       border-radius: var(--radius-s);
       background: var(--color-surface);
+    }
+  }
+
+  /* On a phone it stands where the offer stood, above the views' bar. */
+  @media (max-width: 899px) {
+    .credits {
+      /* raw: the bar's 44 px, the ticker's 34 px and three steps of space */
+      inset-block-end: calc(78px + 3 * var(--space-s));
+    }
+  }
+
+  /* A finger's size, wherever a finger is the pointer. */
+  @media (pointer: coarse) {
+    .credits {
+      min-block-size: var(--control-m);
     }
   }
 

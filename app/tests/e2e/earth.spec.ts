@@ -376,13 +376,26 @@ test.describe("a window that loads the scene by itself, under the plate's breakp
 test.describe("a touch screen", () => {
   test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
 
-  test("holds the Earth at half the size each way, for the memory a phone has", async ({ page }) => {
+  const inSpace = async (page: Page) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(EARTH);
     await hydrated(page);
     await page.getByRole("button", { name: "View in space" }).click();
     await painted(page);
+  };
+
+  test("holds the Earth at half the size each way, for the memory a phone has", async ({ page }) => {
+    await inSpace(page);
     expect((await earth(page)).mapWidth).toBe(2048);
+  });
+
+  test("keeps Credits clear of the views' bar, a finger's size", async ({ page }) => {
+    await inSpace(page);
+    const link = await credits(page).boundingBox();
+    const views = await page.getByRole("navigation", { name: "Views" }).boundingBox();
+    if (link === null || views === null) throw new Error("no link or no bar");
+    expect(link.height).toBeGreaterThanOrEqual(44);
+    expect(link.y + link.height).toBeLessThanOrEqual(views.y);
   });
 });
 
