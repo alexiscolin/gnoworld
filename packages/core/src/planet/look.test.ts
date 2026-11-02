@@ -58,6 +58,22 @@ describe("planetSeed", () => {
     const cafe = Uint8Array.from([...ascii("gno.land/r/caf"), 0xc3, 0xa9]);
     expect(hex(planetSeed(cafe))).toBe("77e22dc6c4cd2ea65ebd87f6070ac800b6a38d4e3ac1df4d49f9e763615d16dd");
   });
+
+  it("reads a path past one block of the hash: its digest, computed apart with Python's hashlib", () => {
+    const long = ascii(`gno.land/r/demo/${"a".repeat(100)}`);
+    expect(hex(planetSeed(long))).toBe("4b21724e71e5ff8c432addbd5ce98225aaec78f49c02c842893afdf33e3eaba7");
+  });
+
+  // 18 bytes of domain: 37 and 38 straddle the first block's padding, 45 and 46 its end, 109 to 111 and 174 the next two.
+  it.each([37, 38, 45, 46, 109, 110, 111, 174, 200, 1000])(
+    "tells two paths of %i bytes apart by their last byte alone",
+    (length) => {
+      const path = new Uint8Array(length).fill(0x61);
+      const twin = Uint8Array.from(path);
+      twin[length - 1] = 0x62;
+      expect(hex(planetSeed(twin))).not.toBe(hex(planetSeed(path)));
+    },
+  );
 });
 
 describe("the twelve anchors", () => {
@@ -131,6 +147,30 @@ describe("planetLook", () => {
         expect(planetLook(one, anchor)).not.toEqual(planetLook(other, anchor));
       }),
     );
+  });
+
+  // The plan's bound on near-identical neighbours (section 6): realms named one after the other are not one world twice.
+  it("keeps neighbours apart: a path a digit away moves at least four of the six angles and offsets by 1%", () => {
+    const shares = (look: PlanetLook) => [
+      ...look.spin.map((turn) => turn / TURN),
+      ...look.warp.offset.map((at) => at / 16),
+    ];
+    const all = paths(1000).map((path) => shares(planetLook(path, "rocky")));
+    for (const [index, one] of all.slice(1).entries()) {
+      const other = all[index] ?? [];
+      const moved = one.filter((share, at) => Math.abs(share - (other[at] ?? share)) > 0.01);
+      expect(moved.length, `world${String(index)}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("gives long twins two worlds, not one: every word of a seed reaches the look", () => {
+    const path = new Uint8Array(200).fill(0x61);
+    const twin = Uint8Array.from(path);
+    twin[199] = 0x62;
+    const [one, other] = [planetLook(path, "rocky"), planetLook(twin, "rocky")];
+    expect(other.spin[0]).not.toBeCloseTo(one.spin[0], 2);
+    expect(other.warp.offset[0]).not.toBeCloseTo(one.warp.offset[0], 2);
+    expect(other.tilt).not.toBeCloseTo(one.tilt, 2);
   });
 
   it("feeds the seed's words into the look, in order", () => {
@@ -235,6 +275,26 @@ describe("planetLook", () => {
         }
       }),
     );
+  });
+
+  it("keeps every air as thin and as dim as the Earth's, each in its own colour", () => {
+    for (const anchor of ANCHORS)
+      for (const path of paths(100)) {
+        const { rim } = planetLook(path, anchor);
+        if (rim === null) continue;
+        expect(rim.thickness, anchor).toBeLessThanOrEqual(0.05);
+        expect(Math.max(...rim.colour), anchor).toBeLessThanOrEqual(0.55);
+      }
+  });
+
+  it("gives a temperate world and an ocean world the frames' seas, a shallow blue over a deep one", () => {
+    const byte = ([red, green, blue]: readonly number[]) =>
+      (red ?? 0) * 255 * 65536 + (green ?? 0) * 255 * 256 + (blue ?? 0) * 255;
+    const seaOf = (anchor: Anchor) => planetLook(DAO, anchor).sea;
+    expect(byte(seaOf("temperate")?.shallow ?? [])).toBeCloseTo(0x1f4a80, 6);
+    expect(byte(seaOf("temperate")?.deep ?? [])).toBeCloseTo(0x0b2250, 6);
+    expect(byte(seaOf("ocean")?.shallow ?? [])).toBeCloseTo(0x1b5c8f, 6);
+    expect(byte(seaOf("ocean")?.deep ?? [])).toBeCloseTo(0x0a2a5c, 6);
   });
 
   it("draws rings wide on any world, so they never read as the status ring", () => {
