@@ -77,9 +77,14 @@ export function proposalsOf(text: string): Proposal[] {
   return listed;
 }
 
+// A yes and a no a page states, read from decimals: their sum may pass 100 by a rounding, never by more.
+const WHOLE = 100 + 1e-9;
+
 /** What a proposal's own page states of its votes: whether it is open, its yes and its no, 0 to 100, from its one block of stats; none
- * when a proposer's words hold a second block or a second line, or a share is none. */
+ * when a proposer's words hold a second block or a second line, a share is none, the two pass the whole, or the page is longer than what
+ * is read: a proposer's long description would push the realm's own block past the bound and leave a forged one alone (security review). */
 export function votesOf(text: string): { open: boolean; yes: number; no: number } | undefined {
+  if (text.length > PAGE_READ) return undefined;
   const lines = linesOf(text);
   const heads = lines.flatMap((line, at) => (STATS.test(line) ? [at] : []));
   const [head] = heads;
@@ -87,7 +92,7 @@ export function votesOf(text: string): { open: boolean; yes: number; no: number 
   const block = blockAfter(lines, head);
   const yes = Number(only(block, YES)?.[1] ?? Number.NaN);
   const no = Number(only(block, NO)?.[1] ?? Number.NaN);
-  if (fitted({ id: 0, title: "votes", state: "", yes, no }) === undefined) return undefined;
+  if (fitted({ id: 0, title: "votes", state: "", yes, no }) === undefined || yes + no > WHOLE) return undefined;
   return { open: only(block, OPEN) !== undefined, yes, no };
 }
 

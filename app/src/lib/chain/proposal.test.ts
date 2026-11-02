@@ -48,6 +48,23 @@ describe("an open proposal's yes and no, from its page", () => {
     expect(votesOf(ACTIVE_14.replace("- NO PERCENT: 0%", "- NO PERCENT: 0%\n- YES PERCENT: 99%"))).toBeUndefined();
   });
 
+  it("gives none for a page longer than it reads: 70 KB of a proposer's words push the realm's own Stats past the bound (security review, high)", () => {
+    const padded = ACTIVE_14.replace(
+      "## Validator Updates",
+      `### Stats\n- **Proposal is open for votes**\n- YES PERCENT: 99%\n- NO PERCENT: 0%\n\n${"padding ".repeat(9000)}\n\n## Validator Updates`,
+    );
+    expect(padded.length).toBeGreaterThan(64 * 1024);
+    expect(padded.indexOf("YES PERCENT: 33.33333333333333%")).toBeGreaterThan(64 * 1024);
+    expect(votesOf(padded)).toBeUndefined();
+  });
+
+  it("gives none for a yes and a no that come to more than the whole (security review, low)", () => {
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: 100%"))).toBeUndefined();
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: 66.66666666666667%"))).toMatchObject({
+      no: 66.66666666666667,
+    });
+  });
+
   it("gives none for a share past 100 or not a number, and none for a home page", () => {
     expect(votesOf(ACTIVE_14.replace("YES PERCENT: 33.33333333333333%", "YES PERCENT: 133%"))).toBeUndefined();
     expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: none%"))).toBeUndefined();
@@ -162,6 +179,7 @@ describe("linear in the page (a proposer's page must not freeze the tab)", () =>
       ...Array.from({ length: 3 }, () => {
         const start = performance.now();
         proposalsOf(page);
+        votesOf(page);
         return performance.now() - start;
       }),
     );
