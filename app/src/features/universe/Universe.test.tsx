@@ -955,6 +955,12 @@ describe("on the Earth's page", () => {
 });
 
 describe("on a world's page", () => {
+  // A world's moons follow its rooms on an interval of their own: time moves on a minute, never until no timer is left, which under load
+  // ran out the test's time (the gate, 2026-11-02).
+  const settle = () =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
   const DOCK = { left: 800, top: 241, width: 600, height: 600 };
   const GOVDAO = { world: "gov/dao" };
   let globe: HTMLElement;
@@ -1142,10 +1148,7 @@ describe("on a world's page", () => {
       scene.world.mock.lastCall?.[1]("drawn", "#7a5c3e");
       root.render(<Universe shown={{ world: "bubble" }} page={page} />);
     });
-    // A drawn world's moons follow its rooms on an interval: time moves on a little, never until no timer is left.
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(100);
-    });
+    await settle();
     const ids = scene.world.mock.calls.map(([asked]) => (asked as { id?: string } | undefined)?.id);
     expect(ids).toContain(undefined);
     expect(ids.at(-1)).toBe("bubble");
