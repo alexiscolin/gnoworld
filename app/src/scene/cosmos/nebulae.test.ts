@@ -1,4 +1,6 @@
 import {
+  driftAt,
+  glideAt,
   HOME,
   NEBULA_IMAGES,
   NEBULA_LAYERS,
@@ -346,6 +348,38 @@ describe("its sheets", () => {
     for (const mesh of shownMeshes(scene))
       for (let sheet = 0; sheet < sheetCount(mesh); sheet += 1)
         found.add(key([...numbers(mesh, "position", sheet), numbers(mesh, "aLight", sheet)[3] ?? NaN]));
+    expect(found).toEqual(expected);
+  });
+
+  it("drifts with the sky's cruise while the clock runs, standing with the eye of the scenery", async () => {
+    const scene = made();
+    scene.nebulae.wake();
+    scene.nebulae.follow(HOME, 0);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    const seconds = 600;
+    const [drift, glide] = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 0 },
+    ];
+    driftAt(drift, seconds);
+    glideAt(glide, seconds);
+    // The scenery's eye, as eye.ts builds it: the worlds' eye and the cruise, which the worlds leave out.
+    const scenery = { x: HOME.x + drift.x - glide.x, y: HOME.y + drift.y - glide.y, z: HOME.z + drift.z - glide.z };
+    expect(Math.hypot(scenery.x - HOME.x, scenery.y - HOME.y, scenery.z - HOME.z)).toBeGreaterThan(300);
+    scene.nebulae.follow(HOME, seconds);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    scene.nebulae.follow(HOME, seconds);
+    const at = { x: 0, y: 0, z: 0 };
+    const expected = new Set<string>();
+    for (const nebula of litFrom(scenery))
+      for (const layer of NEBULA_LAYERS) {
+        sheetOf(nebula, layer, at);
+        expected.add(key([at.x - scenery.x, at.y - scenery.y, at.z - scenery.z]));
+      }
+    const found = new Set<string>();
+    for (const mesh of shownMeshes(scene))
+      for (let sheet = 0; sheet < sheetCount(mesh); sheet += 1) found.add(key(numbers(mesh, "position", sheet)));
+    expect(expected.size).toBeGreaterThan(0);
     expect(found).toEqual(expected);
   });
 

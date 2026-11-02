@@ -2,7 +2,9 @@
 // eye; a frame brings them to the eye in doubles and lights them. Their images come once the worlds' maps had their turn, and each fades
 // in; near a world, and past a cluster's distance, they go out.
 import {
+  driftAt,
   focusDistance,
+  glideAt,
   NEBULA_IMAGES,
   NEBULA_LAYERS,
   NebulaField,
@@ -21,6 +23,8 @@ import { sheetsOf, type Sheets } from "./sheets.ts";
 
 // The arrival's worlds ask their maps first: 0.6 MB of nebulae waits its turn.
 const WAIT_MS = 2000;
+// How far the scenery's eye goes before the nebulae are stood again around it: well inside the field's margin past its reach.
+const PLACE_STEP = 40;
 const FADE_SECONDS = 1;
 
 export class Nebulae {
@@ -33,7 +37,12 @@ export class Nebulae {
   readonly #images: readonly Sheets[];
   readonly #at = { x: 0, y: 0, z: 0 };
   readonly #window = { u: 0, v: 0, width: 0, height: 0 };
+  readonly #drift = { x: 0, y: 0, z: 0 };
+  readonly #glide = { x: 0, y: 0, z: 0 };
+  readonly #scenery = { x: 0, y: 0, z: 0 };
+  readonly #placed = { x: NaN, y: NaN, z: NaN };
   #wait: ReturnType<typeof setTimeout> | undefined;
+  #placing: ReturnType<typeof setTimeout> | undefined;
   #ready = false;
   #seconds = 0;
   #share = 0;
@@ -49,6 +58,7 @@ export class Nebulae {
     owner.add({
       dispose: () => {
         this.sleep();
+        clearTimeout(this.#placing);
         this.#maps.free();
         this.group.removeFromParent();
       },
@@ -135,10 +145,28 @@ export class Nebulae {
     this.#device.moved();
   };
 
-  /** A frame of the cosmos: the share from how far the eye stands from what it looks at. */
+  /** A frame of the cosmos, `eye` the worlds': the nebulae are scenery, so they stand around the scenery's eye, which adds the sky's
+   * cruise (eye.ts), and take their share from how far the worlds' eye is from what it looks at. */
   follow(eye: Point, seconds: number): void {
-    this.advance(eye, nebulaShare(focusDistance(eye)), seconds);
+    driftAt(this.#drift, seconds);
+    glideAt(this.#glide, seconds);
+    const at = this.#scenery;
+    at.x = eye.x + this.#drift.x - this.#glide.x;
+    at.y = eye.y + this.#drift.y - this.#glide.y;
+    at.z = eye.z + this.#drift.z - this.#glide.z;
+    const moved = Math.hypot(at.x - this.#placed.x, at.y - this.#placed.y, at.z - this.#placed.z);
+    if (!(moved < PLACE_STEP) && this.#placing === undefined) this.#placing = setTimeout(this.#standAround);
+    this.advance(at, nebulaShare(focusDistance(eye)), seconds);
   }
+
+  // Off the frame: a look of its own, around where the scenery's eye has come.
+  readonly #standAround = (): void => {
+    this.#placing = undefined;
+    this.#placed.x = this.#scenery.x;
+    this.#placed.y = this.#scenery.y;
+    this.#placed.z = this.#scenery.z;
+    this.place(this.#placed);
+  };
 
   /** A frame: each sheet from `eye`, lit by its distance, by `share` and by its image's fade, which a still clock completes at once. */
   advance(eye: Point, share: number, seconds: number): void {

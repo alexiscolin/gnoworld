@@ -157,7 +157,6 @@ export class Cosmos {
     focusOf(this.#mapEye, this.#focus);
     ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: this.#focus }, this.#drawn);
     this.#bodies.stand(this.#wantedBodies());
-    this.#nebulae.place(this.#eye);
     this.#disc.paint({
       systems: this.#systems,
       ladder,
