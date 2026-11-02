@@ -66,6 +66,7 @@ export {
   type InPlane,
 } from "./frame/disc.ts";
 export { coveredShare, offLine } from "./frame/composition.ts";
+export { arrivalOf, type Arrival } from "./frame/arrival.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,
