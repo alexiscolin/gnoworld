@@ -172,9 +172,11 @@ test.describe("a computer", () => {
       [26, 1052, 28, 1054],
       [38, 108, 40, 110],
     ]);
-    expect(top).toBeLessThan(8);
-    expect(bottom).toBeLessThan(8);
     expect(inside).toBeGreaterThan(20);
+    // The sky shows past a round corner (7a2's nebula reads 12 there), so a corner is held under half of the plate's own light: a square
+    // plate would read as much as the plate.
+    expect(top).toBeLessThan(inside / 2);
+    expect(bottom).toBeLessThan(inside / 2);
   });
 
   test("rests the Moon on the front of its orbit, off the plate's words", async ({ page }) => {
