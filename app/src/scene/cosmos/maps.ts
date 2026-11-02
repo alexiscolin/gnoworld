@@ -52,18 +52,20 @@ export class BodyMaps {
     return this.#maps.size;
   }
 
-  /** The code that draws a generated world, asked if it was not: until it came, none. One that failed is asked again the next time a
-   * world wants it, as the app's other chunks are (F1763). */
+  /** The code that draws a generated world, asked if it was not: until it came, none. One that failed says so and is asked again the next
+   * time a world wants it, as the app's other chunks are (F1763); code that comes once its maps were freed is kept, told to no one. */
   kit(): Kit | undefined {
     if (!this.#askedKit) {
       this.#askedKit = true;
+      const { signal } = this.#loading;
       this.#code().then(
         (kit) => {
           this.#kit = kit;
-          this.#arrived();
+          if (!signal.aborted) this.#arrived();
         },
         () => {
           this.#askedKit = false;
+          if (!signal.aborted) this.#failed();
         },
       );
     }

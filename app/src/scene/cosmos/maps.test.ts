@@ -36,4 +36,31 @@ describe("the generated worlds' code", () => {
     expect(maps.kit()).toBe(generated);
     expect(load).toHaveBeenCalledTimes(2);
   });
+
+  // 7b6's review (F4310): a world page left before the code came built the world it had freed, and fetched its maps for no one.
+  it("hands code that comes after `free` to no one, and keeps it for the next ask", async () => {
+    const arrived = vi.fn();
+    const maps = new BodyMaps(device, arrived, { code: () => Promise.resolve(generated) });
+    maps.kit();
+    maps.free();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(arrived).not.toHaveBeenCalled();
+    expect(maps.kit()).toBe(generated);
+  });
+
+  // F4311: a world page whose code never came said "loading" for ever.
+  it("says it failed when the code does not come, and nothing once it was freed", async () => {
+    const failed = vi.fn();
+    const maps = new BodyMaps(device, vi.fn(), { code: () => Promise.reject(new Error("no chunk")), failed });
+    maps.kit();
+    await vi.waitFor(() => {
+      expect(failed).toHaveBeenCalledOnce();
+    });
+    maps.kit();
+    maps.free();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(failed).toHaveBeenCalledOnce();
+  });
 });
