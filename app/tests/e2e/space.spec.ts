@@ -205,6 +205,10 @@ test.describe("the scenery on a computer", () => {
 
   test("comes back whole with a lost context: the sky, its volumes and its stars", async ({ page }) => {
     await stillScene(page);
+    // The Earth's maps come after the first frames: "before" is taken with it on stage and a frame drawn since.
+    await expect.poll(async () => (await stats(page)).cosmos?.earth).toBe(true);
+    const drawn = (await stats(page)).frames;
+    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(drawn);
     const before = await picture(page);
     await loseContext(page);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
