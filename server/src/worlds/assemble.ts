@@ -1,6 +1,6 @@
 // Putting a pass's reads together (slice 7, 7c): what was read, the last file it builds on, and the rows of the new file. A fact
 // this pass could not read is the last file's, else nothing (null, or an empty list), never a zero.
-import type { Worlds } from "@gnoworld/schemas";
+import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { Comparison } from "./compare.ts";
 import { groupWorlds } from "./group.ts";
 import type { History } from "./history.ts";

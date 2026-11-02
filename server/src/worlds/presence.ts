@@ -1,7 +1,7 @@
 // The presence history (slice 7, 7c): the people present in each world, sampled by a caller, kept as the busiest sample of each hour
 // for 14 days, so a world can be compared with its own past ("rising", plan §9 question 6). It holds a world's id, an hour and a
 // count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store.
-import { WorldId } from "@gnoworld/schemas";
+import { WorldId } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { replaceFile } from "../replaceFile.ts";

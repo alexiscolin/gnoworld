@@ -4,7 +4,7 @@
 // (chain-feasibility.md, "Corrections"), and a line may be a failed transaction: a count is a count of attempts, and a realm with
 // none is not dead. The query asks for no file body (a deploy carries its whole source) and sends the path as a variable.
 import { isAddress } from "@gnoworld/core";
-import { ChainCount, RealmPath } from "@gnoworld/schemas";
+import { ChainCount, RealmPath } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
 import { jsonOf } from "../net.ts";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";

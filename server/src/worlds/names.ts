@@ -2,7 +2,7 @@
 // expression is composed. The answer is typed text, `("name" string)`; anything else (no name registered, a panic, a longer or
 // odd text) is no name. A network fault ends the pass, a refusal by the chain only leaves that address without one.
 import { evalNameOf } from "@gnoworld/core";
-import { DeployerName } from "@gnoworld/schemas";
+import { DeployerName } from "@gnoworld/schemas/indexer";
 import { abciQuery, isDown, kindOf, type Send } from "./remote.ts";
 
 const NAME_MAX_BYTES = 4096;

@@ -4,7 +4,7 @@
 // renamed over. One call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last
 // file; a silent indexer leaves a world at rest (null counts) and the rest of the file whole. Nothing a chain or an indexer wrote
 // reaches a log: a fault is logged by its kind. The file keeps every realm it has seen, for a chain only adds realms.
-import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas";
+import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";

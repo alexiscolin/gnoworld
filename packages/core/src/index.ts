@@ -59,16 +59,15 @@ export {
   anchorOf,
   ANCHORS,
   asciiBytes,
-  between,
   MAPS,
   planetLook,
   planetSeed,
-  seedShare,
   worldLook,
   type Anchor,
   type MapName,
   type PlanetLook,
 } from "./planet/look.ts";
+export { between, seedShare } from "./planet/shares.ts";
 export { groundDirection, subSolarPoint, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";

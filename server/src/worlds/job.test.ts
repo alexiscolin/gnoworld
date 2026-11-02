@@ -1,4 +1,4 @@
-import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas";
+import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
