@@ -2,7 +2,7 @@
 // mood's haze is. A lattice of cells, a cell holding one or none, everything about it from its cell's hash: a place keeps its nebula, and
 // nothing is listed or stored. Each stands as sheets one behind the other, so the eye moving parts them, the far ones softer.
 import { cellHash, nextState, unitOf, type Point } from "./cell.ts";
-import { moodAt, newMood } from "./mood.ts";
+import { MOOD_SCALE, moodAt, newMood } from "./mood.ts";
 import { smoothstep } from "./smooth.ts";
 
 /** The images, by their files' names under the textures. */
@@ -81,8 +81,8 @@ const FARTHEST = 2 ** 50;
 // The eye's distance to what it looks at: near a world, a system's, a cluster's, and where the whole cosmos takes over.
 const WORLD = 3;
 const SYSTEM = 12;
-const CLUSTER = 340;
-const GONE = 680;
+const CLUSTER = MOOD_SCALE;
+const GONE = 2 * MOOD_SCALE;
 
 const blank = (): Nebula => ({
   id: 0,
