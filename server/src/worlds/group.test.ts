@@ -139,7 +139,17 @@ const VIEW = 8;
 const SAME_COLOUR = 6;
 const SAME_SURFACE = 0.04;
 // Measured on the code that lands, pinned so a change of rows or bytes shows: the found count exact, the shares as bounds a little over it.
-const GOLDEN = { found: 62, share: 0.025, worst: 0.22, nudged: { token: 0.022, dao: 0.075, game: 0.025 } };
+const GOLDEN = {
+  found: 62,
+  share: 0.025,
+  worst: 0.22,
+  tenTimes: 0.15,
+  nudged: {
+    token: { share: 0.022, worst: 0.14 },
+    dao: { share: 0.075, worst: 0.44 },
+    game: { share: 0.025, worst: 0.22 },
+  },
+};
 
 type Rgb = readonly [number, number, number];
 
@@ -219,14 +229,17 @@ describe("neighbours (ADR-0002 §3)", () => {
 
   // A system's worlds sit together and often share a nature, so the nudge gathers the very neighbours this measures: each nature for all, then one per namespace.
   it.each(["token", "dao", "game"] as const)("holds when every world is a %s, the nudge at its worst", (nature) => {
-    const { share } = closeness(recordedIds(), () => nature);
-    expect(share).toBeLessThan(GOLDEN.nudged[nature]);
+    const { share, worst } = closeness(recordedIds(), () => nature);
+    expect(share).toBeLessThan(GOLDEN.nudged[nature].share);
+    expect(worst).toBeLessThan(GOLDEN.nudged[nature].worst);
   });
 
   it("holds with a nature per namespace, in a universe ten times larger", () => {
     const natures = [null, "token", "dao", "game"] as const;
     const byNamespace: NatureOf = (id) => natures[(id.split("/")[0]?.length ?? 0) % natures.length] ?? null;
-    expect(closeness(tenTimes(recordedIds()), byNamespace).share).toBeLessThan(GOLDEN.share);
+    const { share, worst } = closeness(tenTimes(recordedIds()), byNamespace);
+    expect(share).toBeLessThan(GOLDEN.share);
+    expect(worst).toBeLessThan(GOLDEN.nudged.dao.worst + GOLDEN.tenTimes);
   });
 
   it("finds a world near-identical to itself, or the bound above would hold for nothing", () => {

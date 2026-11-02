@@ -175,6 +175,23 @@ describe("natureOf", () => {
     },
   );
 
+  it.each(["TransferFrom", "ApproveAll", "BalanceOfBatch", "TotalSupplyOf"])(
+    "wants a token's four exact names: %s is not one",
+    (near) => {
+      const names = ["Transfer", "Approve", "BalanceOf", "TotalSupply"];
+      const [exact] = names.filter((name) => near.startsWith(name));
+      expect(natureOf([realm([...names.filter((name) => name !== exact), near])])).toBeNull();
+    },
+  );
+
+  it("needs no name past a token's four", () => {
+    expect(natureOf([realm(["Transfer", "Approve", "BalanceOf", "TotalSupply"])])).toBe("token");
+  });
+
+  it("reads no other word for a game", () => {
+    expect(natureOf([realm(["SetScore", "GetOwner", "Mint"])])).toBeNull();
+  });
+
   it("is case-sensitive: Remove is no Move", () => {
     expect(natureOf([realm(["Remove", "display"])])).toBeNull();
   });
@@ -219,7 +236,7 @@ describe("worldLook", () => {
   it("spells a text's bytes for a seed: an id is ASCII by its schema", () => {
     expect([...asciiBytes("a/z-0")]).toEqual([97, 47, 122, 45, 48]);
     expect([...asciiBytes("")]).toEqual([]);
-    expect([...asciiBytes("~")]).toEqual([126]);
+    expect([...asciiBytes("\u007f")]).toEqual([127]);
   });
 
   it.each(["é", "gnoswap/é", "\u0080", "\u0100", "a\u{1F30D}"])(
@@ -235,11 +252,14 @@ describe("worldLook", () => {
     expect(worldLook(id)).toEqual(planetLook(path, anchorOf(planetSeed(path))));
   });
 
-  it("passes the nature on", () => {
-    const id = "gnoswap/pool";
+  it("passes the nature on: a world whose bytes fall under the lean takes it", () => {
+    const id = "gnoland/wugnot";
+    expect(worldLook(id).anchor).toBe("tidally locked");
+    expect(worldLook(id, "token").anchor).toBe("gas giant");
+    expect(worldLook(id, "dao").anchor).toBe("temperate");
+    expect(worldLook(id, "game").anchor).toBe("shattered");
     const path = asciiBytes(`gno.land/r/${id}`);
-    for (const nature of NATURES)
-      expect(worldLook(id, nature)).toEqual(planetLook(path, anchorOf(planetSeed(path), nature)));
+    expect(worldLook(id, "token")).toEqual(planetLook(path, "gas giant"));
   });
 
   it("gives a path one planet", () => {
