@@ -62,7 +62,7 @@ export class EarthView {
   #state: EarthState = "gone";
   #circle: Circle | undefined;
   #globe: Globe | undefined;
-  #asked = 0;
+  #loading: AbortController | undefined;
   #width = 1;
   #height = 1;
   #ratio = 1;
@@ -99,12 +99,12 @@ export class EarthView {
   }
 
   #leave(): void {
-    this.#asked += 1;
     this.#drop();
     this.#say("gone");
   }
 
   #drop(): void {
+    this.#loading?.abort();
     this.#globe?.dispose();
     this.#globe = undefined;
     this.#device.camera.clearViewOffset();
@@ -116,15 +116,15 @@ export class EarthView {
   }
 
   #bring(): void {
-    this.#asked += 1;
-    const asked = this.#asked;
+    const loading = new AbortController();
+    this.#loading = loading;
     this.#say("loading");
-    buildGlobe(this.#device, () => asked !== this.#asked).then(
+    buildGlobe(this.#device, loading.signal).then(
       (globe) => {
         if (globe !== undefined) this.#stand(globe);
       },
       () => {
-        if (asked === this.#asked) this.#say("failed");
+        if (!loading.signal.aborted) this.#say("failed");
       },
     );
   }
@@ -212,7 +212,6 @@ export class EarthView {
   }
 
   dispose(): void {
-    this.#asked += 1;
     this.#drop();
   }
 

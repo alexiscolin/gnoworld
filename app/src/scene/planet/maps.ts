@@ -19,6 +19,8 @@ export interface MapLoad {
   readonly anisotropy: number;
   /** Decoded to this width, a map being twice as wide as it is high. */
   readonly width?: number;
+  /** Going, it stops the fetch. */
+  readonly signal?: AbortSignal;
 }
 
 const MIPMAPS = 4 / 3;
@@ -65,9 +67,17 @@ export function freeMap(texture: Texture): void {
 }
 
 /** Loads a map. */
-export async function loadMap(url: string, { kind, anisotropy, width }: MapLoad): Promise<Texture> {
+export async function loadMap(url: string, { kind, anisotropy, width, signal }: MapLoad): Promise<Texture> {
+  signal?.throwIfAborted();
   const loader = new ImageBitmapLoader();
   loader.setOptions(decodeOptions(width));
+  signal?.addEventListener(
+    "abort",
+    () => {
+      loader.abort();
+    },
+    { once: true },
+  );
   const bitmap = await loader.loadAsync(url);
   const texture = prepareMap(new Texture(bitmap), kind, anisotropy);
   const size = { width: bitmap.width, height: bitmap.height };

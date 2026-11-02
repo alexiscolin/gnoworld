@@ -345,6 +345,47 @@ describe("leaving", () => {
 });
 
 describe("a load the page left behind", () => {
+  // Each map waits for its abort, as a fetch does, and answers nothing before it.
+  const hung = () => {
+    const signals: AbortSignal[] = [];
+    maps.load.mockImplementation((_url: string, { signal }: { signal: AbortSignal }) => {
+      signals.push(signal);
+      return new Promise((_done, refuse) => {
+        signal.addEventListener("abort", () => {
+          refuse(new Error("aborted"));
+        });
+      });
+    });
+    return signals;
+  };
+
+  it("is stopped, every map of it, the moment the page goes, and says nothing more", async () => {
+    const signals = hung();
+    const { view, said } = opened();
+    expect(signals).toHaveLength(NAMES.length);
+    expect(signals.some(({ aborted }) => aborted)).toBe(false);
+    view.show(undefined, (state) => said.push(state));
+    expect(signals.every(({ aborted }) => aborted)).toBe(true);
+    await settled();
+    expect(said).toEqual(["loading", "gone"]);
+  });
+
+  it("is stopped with the scene", () => {
+    const signals = hung();
+    const { view } = opened();
+    view.dispose();
+    expect(signals.every(({ aborted }) => aborted)).toBe(true);
+  });
+
+  it("is stopped by a restored context, and the new load keeps its own", () => {
+    const signals = hung();
+    const { view } = opened();
+    view.restored();
+    expect(signals).toHaveLength(NAMES.length * 2);
+    expect(signals.slice(0, NAMES.length).every(({ aborted }) => aborted)).toBe(true);
+    expect(signals.slice(NAMES.length).some(({ aborted }) => aborted)).toBe(false);
+  });
+
   it("never speaks over the visit that followed it", async () => {
     let refuse: (reason: Error) => void = () => undefined;
     maps.load.mockImplementationOnce(

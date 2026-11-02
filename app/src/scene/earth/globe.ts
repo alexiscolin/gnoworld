@@ -96,24 +96,24 @@ const nextTask = () =>
     setTimeout(done);
   });
 
-/** Loads and builds the globe, nothing of it reaching the first frame unfinished; or nothing, once `stale` says the page has gone. Each upload
- * has a task of its own: the mipmaps of a 4096 map are the longest thing this page does. */
-export async function buildGlobe(device: EarthDevice, stale: () => boolean): Promise<Globe | undefined> {
+/** Loads and builds the globe, nothing of it reaching the first frame unfinished; or nothing, once `signal` says the page has gone. Each
+ * upload has a task of its own: the mipmaps of a 4096 map are the longest thing this page does. */
+export async function buildGlobe(device: EarthDevice, signal: AbortSignal): Promise<Globe | undefined> {
   const { renderer, camera, stage, base, halved } = device;
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
-  const maps = await loadEarthMaps(base, anisotropy, halved());
+  const maps = await loadEarthMaps(base, { anisotropy, halved: halved(), signal });
   const globe = new Globe(maps);
   try {
     for (const map of Object.values(maps)) {
-      if (!stale()) renderer.initTexture(map as Texture);
+      if (!signal.aborted) renderer.initTexture(map as Texture);
       await nextTask();
     }
-    if (!stale()) await renderer.compileAsync(globe.group, camera, stage);
+    if (!signal.aborted) await renderer.compileAsync(globe.group, camera, stage);
   } catch (error) {
     globe.dispose();
     throw error;
   }
-  if (!stale()) return globe;
+  if (!signal.aborted) return globe;
   globe.dispose();
   return undefined;
 }

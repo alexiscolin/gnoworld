@@ -12,7 +12,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { decodeOptions, freeMap, loadMap, mapBytes, mapUrl, prepareMap } from "./maps.ts";
 
-const decoded = vi.hoisted(() => ({ bitmap: { width: 4096, height: 2048, close: vi.fn() } }));
+const decoded = vi.hoisted(() => ({
+  bitmap: { width: 4096, height: 2048, close: vi.fn() },
+  aborts: vi.fn(),
+  starts: vi.fn(),
+}));
 
 vi.mock("three", async (original) => ({
   ...(await original<typeof import("three")>()),
@@ -20,7 +24,12 @@ vi.mock("three", async (original) => ({
     setOptions() {
       return this;
     }
+    abort() {
+      decoded.aborts();
+      return this;
+    }
     loadAsync() {
+      decoded.starts();
       return Promise.resolve(decoded.bitmap);
     }
   },
@@ -95,6 +104,26 @@ describe("loadMap", () => {
     expect(decoded.bitmap.close).toHaveBeenCalledTimes(1);
     expect(texture.image).toEqual({ width: 4096, height: 2048 });
     expect(mapBytes([texture])).toBe(Math.round(4096 * 2048 * 4 * (4 / 3)));
+  });
+});
+
+describe("loadMap, with a signal", () => {
+  const load = (signal: AbortSignal) => loadMap("/textures/mars.webp", { kind: "colour", anisotropy: 4, signal });
+
+  it("stops its fetch when the signal goes", async () => {
+    decoded.aborts.mockClear();
+    const leaving = new AbortController();
+    const texture = load(leaving.signal);
+    expect(decoded.aborts).not.toHaveBeenCalled();
+    leaving.abort();
+    expect(decoded.aborts).toHaveBeenCalledTimes(1);
+    await texture;
+  });
+
+  it("asks for nothing once the signal has gone", async () => {
+    decoded.starts.mockClear();
+    await expect(load(AbortSignal.abort())).rejects.toThrow();
+    expect(decoded.starts).not.toHaveBeenCalled();
   });
 });
 

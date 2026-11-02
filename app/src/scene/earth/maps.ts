@@ -17,14 +17,20 @@ export const MOON_WIDTH = 1024;
 
 export const earthWidth = (halved: boolean): number => (halved ? MAP_WIDTH / 2 : MAP_WIDTH);
 
+interface EarthLoad {
+  readonly anisotropy: number;
+  readonly halved: boolean;
+  readonly signal: AbortSignal;
+}
+
 /** Loads them all, or none. */
-export async function loadEarthMaps(base: string, anisotropy: number, halved: boolean): Promise<EarthMaps> {
+export async function loadEarthMaps(base: string, { anisotropy, halved, signal }: EarthLoad): Promise<EarthMaps> {
   const width = earthWidth(halved);
   const answers = await Promise.allSettled([
-    loadMap(mapUrl("earth-day", base), { kind: "colour", anisotropy, width }),
-    loadMap(mapUrl("earth-night", base), { kind: "colour", anisotropy, width }),
-    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
-    loadMap(mapUrl("moon", base), { kind: "colour", anisotropy, width: MOON_WIDTH }),
+    loadMap(mapUrl("earth-day", base), { kind: "colour", anisotropy, width, signal }),
+    loadMap(mapUrl("earth-night", base), { kind: "colour", anisotropy, width, signal }),
+    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width, signal }),
+    loadMap(mapUrl("moon", base), { kind: "colour", anisotropy, width: MOON_WIDTH, signal }),
   ]);
   const [day, night, clouds, moon] = answers;
   if (
