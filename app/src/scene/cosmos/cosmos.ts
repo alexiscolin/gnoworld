@@ -22,20 +22,13 @@ import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
 import { Nebulae } from "./nebulae.ts";
+import { heldOf, type CosmosWorld } from "./cosmosWorld.ts";
 
-/** A world of the file: what the scene reads of it. */
-export interface CosmosWorld {
-  readonly id: string;
-  readonly namespace: string;
-  readonly realms: readonly { readonly callers: number | null }[];
-}
+export type { CosmosWorld } from "./cosmosWorld.ts";
 
 // How far the eye moves before a look: a point's size is out by a few percent at most.
 const STEP = 4;
 const RELEASE_MS = 5 * 60_000;
-
-const usageOf = ({ realms }: CosmosWorld): number =>
-  realms.reduce((sum, { callers }) => sum + (callers ?? 0), realms.length);
 
 export class Cosmos {
   readonly #device: EarthDevice;
@@ -99,9 +92,7 @@ export class Cosmos {
     }
     if (worlds !== this.#list) {
       this.#list = worlds;
-      this.#systems = systemsOf(
-        worlds.map((world) => ({ id: world.id, namespace: world.namespace, use: usageOf(world) })),
-      );
+      this.#systems = systemsOf(heldOf(worlds));
       this.#ladder = new Ladder(this.#systems);
     }
     this.#looked.x = NaN;
