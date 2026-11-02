@@ -955,7 +955,7 @@ test("keeps the postcard whole as the eye sways, motion on", async ({ page }) =>
 const BEAT_FROM = Date.parse(recorded().updated);
 const beatTop = () =>
   Array.from({ length: 400 }, (_, at) => BEAT_FROM + 30 * BLOCK_MS + at * 10).reduce((best, now) =>
-    beatAt(BEAT_FROM, now) > beatAt(BEAT_FROM, best) ? now : best,
+    beatAt(BEAT_FROM, now, BEAT_FROM) > beatAt(BEAT_FROM, best, BEAT_FROM) ? now : best,
   );
 const beatRest = () => beatTop() + BLOCK_MS / 2;
 // The light of a box right of a star's heart, past its white, on a frame drawn at `now`: two more frames with motion on, the one a change
@@ -991,7 +991,7 @@ test("beats the great star once a block: its halo brighter at the beat's top tha
   await standing(page);
   const top = await haloAt(page, beatTop(), { at: undefined });
   const rest = await haloAt(page, beatRest(), { at: undefined });
-  expect(beatAt(BEAT_FROM, beatRest())).toBe(0);
+  expect(beatAt(BEAT_FROM, beatRest(), BEAT_FROM)).toBe(0);
   expect(top).toBeGreaterThan(rest * 1.04);
 });
 

@@ -2068,19 +2068,6 @@ describe("a system's arrival (7d3)", () => {
     expect(halo?.getX(indexOf(system.place))).toBe(1);
   });
 
-  it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
-    const { scene, arrival } = await atGnoswap();
-    const { to } = await arrived(scene, GNOSWAP);
-    const look = onStage(arrival.look);
-    for (const seconds of [2.25, 4.5]) {
-      scene.cosmos.tick(to, seconds);
-      const eye = new Vector3().copy(scene.cosmos.stats().eye);
-      const offset = eye.clone().sub(onStage(arrival.eye));
-      expect(offset.length()).toBeGreaterThan(0.01);
-      expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
-    }
-  });
-
   it("lights an arrival's bodies as up close: each world its own angle from the eye", async () => {
     const { scene } = await atGnoswap();
     const { list } = scene.cosmos.stats();
@@ -2122,6 +2109,19 @@ describe("a system's arrival (7d3)", () => {
       if (world !== undefined && world.radius >= GRAIN) expect(point.size).toBeGreaterThanOrEqual(2);
       for (const body of arrival.postcard.worlds)
         expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const { to } = await arrived(scene, GNOSWAP);
+    const look = onStage(arrival.look);
+    for (const seconds of [2.25, 4.5]) {
+      scene.cosmos.tick(to, seconds);
+      const eye = new Vector3().copy(scene.cosmos.stats().eye);
+      const offset = eye.clone().sub(onStage(arrival.eye));
+      expect(offset.length()).toBeGreaterThan(0.01);
+      expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
     }
   });
 
@@ -2214,8 +2214,10 @@ describe("the sun's beat (7d3)", () => {
     vi.spyOn(Date, "now").mockReturnValue(now);
     scene.cosmos.tick(eye, seconds);
   };
-  // The file shown with its time, as the home's feed hands it.
-  const timed = async (scene: ReturnType<typeof made>, list: readonly CosmosWorld[]) => {
+  // The file shown with its time, as the home's feed hands it, read ten minutes after its writing.
+  const READ = written + 600_000;
+  const timed = async (scene: ReturnType<typeof made>, list: readonly CosmosWorld[], read = READ) => {
+    vi.spyOn(Date, "now").mockReturnValue(read);
     scene.cosmos.show(list, WRITTEN);
     await vi.dynamicImportSettled();
     scene.cosmos.tick(HOME, 0);
@@ -2226,7 +2228,7 @@ describe("the sun's beat (7d3)", () => {
   // The beat's top in a block forty blocks on, read in the test that runs: a mutant of the beat moves it.
   const peakOf = () =>
     Array.from({ length: 400 }, (_, at) => written + 40 * BLOCK_MS + at * 10).reduce((best, now) =>
-      beatAt(written, now) > beatAt(written, best) ? now : best,
+      beatAt(written, now, READ) > beatAt(written, best, READ) ? now : best,
     );
   afterEach(() => {
     vi.restoreAllMocks();
@@ -2239,7 +2241,7 @@ describe("the sun's beat (7d3)", () => {
     for (let step = 0; step < 80; step += 1) {
       const now = written + 8000 + step * 50;
       frameAt(scene, now, { seconds: 1 + step / 30 });
-      const expected = beatAt(written, now);
+      const expected = beatAt(written, now, READ);
       if (expected === 0) expect(beat(scene)).toBe(0);
       else lifts.push(beat(scene) / expected);
     }
@@ -2259,6 +2261,17 @@ describe("the sun's beat (7d3)", () => {
     expect(beat(scene)).toBeGreaterThan(0);
     frameAt(scene, peak, { seconds: 0.5 });
     expect(beat(scene)).toBe(0);
+  });
+
+  it("gives none from a file shown more than an hour after its writing, and beats on hours later from one shown fresh", async () => {
+    const stale = made();
+    await timed(stale, worlds(30), written + 2 * 3_600_000);
+    frameAt(stale, peakOf() + 2 * 3_600_000, { seconds: 1 });
+    expect(beat(stale)).toBe(0);
+    const fresh = made();
+    await timed(fresh, worlds(30));
+    frameAt(fresh, peakOf() + 5 * 3_600_000, { seconds: 1 });
+    expect(beat(fresh)).toBeGreaterThan(0.1);
   });
 
   it("asks no frame of its own: it rides the frames the scene draws for its orbits", async () => {

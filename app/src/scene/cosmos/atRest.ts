@@ -40,8 +40,8 @@ export class AtRest {
   readonly looked = { x: NaN, y: NaN, z: NaN };
   /** The same on the map, around which the ladder stands bodies. */
   focus: Point = EARTH_PLACE;
-  /** The worlds' file's time, in milliseconds, which sets the sun's beat; none, no beat. */
-  written = Number.NaN;
+  #written = Number.NaN;
+  #read = Number.NaN;
   readonly #found: () => void;
   #view = plainRest();
   #postcards: ReadonlyMap<number, Postcard> = new Map();
@@ -119,9 +119,15 @@ export class AtRest {
     }
   }
 
+  /** The worlds' file's time, in milliseconds, which sets the sun's beat (none, no beat), and with a new one, when it was read. */
+  set written(at: number) {
+    if (at !== this.#written) this.#read = Date.now();
+    this.#written = at;
+  }
+
   /** How much the great star lifts its light on the sun's beat, a frame `seconds` on the worlds' clock (7d3). */
   lift(seconds: number): number {
-    return this.#beat?.lift(this.written, seconds) ?? 0;
+    return this.#beat?.lift(this.#written, this.#read, seconds) ?? 0;
   }
 
   /** Turns `camera` from `eye` to what it looks at; the scene's own turn stands until the view has come. */
