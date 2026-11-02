@@ -113,7 +113,7 @@ export function placeSystems(set: readonly SystemRef[]): Map<string, SystemPlace
 }
 
 /** Where systems stand `progress` through a season, 0 to 1 and eased, from last season's map to this one's (ADR-0002 §3). An arrival
- * stands at its place at once, for it has no other. */
+ * stands at its place at once, for it has no other. On the way two may pass closer than a cell: the spacing is each map's (F3556). */
 export function driftedPlaces(
   from: ReadonlyMap<string, SystemPlace>,
   to: ReadonlyMap<string, SystemPlace>,
