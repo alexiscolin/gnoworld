@@ -93,6 +93,25 @@ describe("the worlds' feed", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("asks nothing while the tab is hidden, and asks at once when it shows again (F3783)", async () => {
+    const hidden = (value: boolean) => {
+      Object.defineProperty(document, "hidden", { configurable: true, value });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    hidden(true);
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(1);
+    hidden(false);
+    await settled();
+    expect(feed.presence).toHaveBeenCalledTimes(2);
+    worlds.leave();
+    Reflect.deleteProperty(document, "hidden");
+  });
+
   it("drops the counts but keeps the names and visits when who-is-here fails after it came", async () => {
     const { cosmos, scene } = sceneOf();
     const worlds = new WorldsFeed();

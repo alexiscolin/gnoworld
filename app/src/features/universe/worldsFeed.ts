@@ -60,11 +60,22 @@ export class WorldsFeed {
             if (polling.signal.aborted || signals === undefined) return;
             this.#signals = signals;
             this.#hand(scene, this.#worlds);
-            timer ??= setInterval(ask, PRESENCE_MS);
+            timer ??= setInterval(whileSeen, PRESENCE_MS);
           },
           () => undefined,
         );
     };
+    // A hidden tab asks nothing (F3783), and asks at once when it shows again, once the server has answered.
+    const whileSeen = () => {
+      if (!document.hidden) ask();
+    };
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (timer !== undefined) whileSeen();
+      },
+      { signal: polling.signal },
+    );
     polling.signal.addEventListener("abort", () => {
       clearInterval(timer);
     });
