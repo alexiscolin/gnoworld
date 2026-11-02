@@ -2195,6 +2195,19 @@ describe("the whole cosmos", () => {
       expect(picture?.image).toMatchObject({ width: 2 * WIDTH, height: 2 * HEIGHT });
     });
 
+    // The security review of 7d7: a dissolve that goes before its frame was copied gives the stage its hook back, and copies nothing.
+    it("gives the stage its own hook back when the cosmos goes before the frame was copied", async () => {
+      const scene = await diving(true);
+      for (const clock of [0, DIVE.hold / 2, DIVE.hold]) await frame(scene, clock, true);
+      // Armed: the stage holds a hook of its own, the dissolve's.
+      expect(Object.hasOwn(scene.stage, "onAfterRender")).toBe(true);
+      scene.owner.dispose();
+      const { gl, copy } = fakeGl();
+      drawn(scene, gl);
+      expect(copy).not.toHaveBeenCalled();
+      expect(scene.stage.getObjectByName("dissolve")).toBeUndefined();
+    });
+
     it("frees the copied frame when the cosmos goes in the middle of its dissolve", async () => {
       const scene = await diving(true);
       const { gl } = fakeGl();
