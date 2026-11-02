@@ -62,6 +62,8 @@ interface Options {
   state: (room: string) => Promise<RoomState | undefined>;
   send: (command: Command, params: readonly string[]) => boolean;
   log: Log;
+  // Who is in a room, by nick, as each read finds them (7h: who-is-here counts them).
+  seen?: ((room: string, present: readonly string[]) => void) | undefined;
 }
 
 export interface Reconciler {
@@ -77,13 +79,17 @@ export interface Reconciler {
   flags: () => void;
 }
 
-export function makeReconciler({ rooms, desired, state, send, log }: Options): Reconciler {
+export function makeReconciler({ rooms, desired, state, send, log, seen }: Options): Reconciler {
   const waiting = new Set<string>();
   let running: Promise<void> | undefined;
   // A room Ergo did not answer for waits for the next pass.
   const one = async (room: string): Promise<void> => {
     const now = await state(room);
     if (now === undefined) return;
+    seen?.(
+      room,
+      now.present.map(({ nick }) => nick),
+    );
     // What the link sent: a link down or a form lines.ts refuses changes nothing, and logs nothing (F581).
     const sent = changes(room, now, desired(room)).filter(([command, ...params]) => send(command, params));
     if (sent.length === 0) return;
