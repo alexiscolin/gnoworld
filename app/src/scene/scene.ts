@@ -61,6 +61,7 @@ class LiveScene implements Scene {
   #seconds = 0;
   #arriving = false;
   #earthTimed = false;
+  #refused = false;
   #width = 0;
   #height = 0;
   #viewportStale = false;
@@ -71,6 +72,7 @@ class LiveScene implements Scene {
     this.#tier = remembered ?? "high";
     this.#probe = new Probe(remembered === undefined && !matchMedia(MOTION).matches, this.#judged);
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
+    this.#renderer.debug.onShaderError = this.#shaderRefused;
     this.#stage.background = new Color(DEEP_BLACK);
     this.#owner.add({
       dispose: () => {
@@ -125,6 +127,12 @@ class LiveScene implements Scene {
     canvas.addEventListener("webglcontextrestored", lost(false), { signal });
   }
 
+  // Three calls this in place of its own log, in the middle of a draw, which must end before anything is freed.
+  readonly #shaderRefused = (gl: WebGLRenderingContext, program: WebGLProgram): void => {
+    reportError(new Error(`a shader was refused: ${gl.getProgramInfoLog(program) ?? ""}`));
+    this.#refused = true;
+  };
+
   // The first frames time an empty stage, and the Earth comes after them: it is what a device must carry. Once a scene.
   #timeEarth(): void {
     const timed = this.#earthTimed || this.#options.remembered !== undefined;
@@ -140,6 +148,8 @@ class LiveScene implements Scene {
     this.#earth.tick(this.#seconds);
     this.#renderer.render(this.#stage, this.#camera);
     this.#frames += 1;
+    if (this.#refused) this.#earth.refused();
+    this.#refused = false;
     this.#probe.frame(delta);
     this.#holdRate();
   };

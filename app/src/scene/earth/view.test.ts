@@ -430,6 +430,34 @@ describe("standing", () => {
   });
 });
 
+describe("a shader the driver refuses", () => {
+  it("takes the Earth away, frees it and says so: the page keeps its words, never a hole in the plate", async () => {
+    const { view, said, stage } = opened();
+    await settled();
+    const freed = vi.spyOn(Texture.prototype, "dispose");
+    view.refused();
+    expect(said).toEqual(["loading", "drawn", "failed"]);
+    expect(stage.children).toEqual([]);
+    expect(freed).toHaveBeenCalledTimes(NAMES.length);
+  });
+
+  it("says nothing where no Earth stands: another part's shader is no failure of a page that shows none", () => {
+    const { view } = device();
+    const said: EarthState[] = [];
+    view.show(undefined, (state) => said.push(state));
+    said.length = 0;
+    view.refused();
+    expect(said).toEqual([]);
+  });
+
+  it("gives the lens back", async () => {
+    const { view, camera } = opened();
+    await settled();
+    view.refused();
+    expect(camera.view?.enabled ?? false).toBe(false);
+  });
+});
+
 describe("a context that comes back", () => {
   it("loads the maps again, for a closed bitmap cannot be uploaded twice", async () => {
     const { view, said, stage } = opened();

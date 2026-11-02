@@ -272,21 +272,26 @@ test.describe("the pages that hold no Earth", () => {
     });
 });
 
+// The page keeps its words and its plate shut, says so, and credits nothing it does not show.
+const givenUp = async (page: Page) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(EARTH);
+  await hydrated(page);
+  await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
+  await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
+  await expect(kept(page)).toHaveCount(0);
+  await expect(credits(page)).toHaveCount(0);
+  expect(await earthOf(page)).toMatchObject({ state: "failed" });
+};
+
 // The worker would answer these requests itself, past `page.route`: with it off, the fault is the one planted.
 test.describe("a texture that does not come", () => {
   test.use({ viewport: COMPUTER, serviceWorkers: "block" });
 
   test("leaves the page whole, says so, keeps the plate shut, and shows no credit", async ({ page }) => {
     await page.route(NIGHT, (route) => route.fulfill({ status: 404, body: "" }));
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(EARTH);
-    await hydrated(page);
-    await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
-    await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
+    await givenUp(page);
     await expect(page.getByRole("link", { name: "Bubble" }).first()).toBeVisible();
-    await expect(kept(page)).toHaveCount(0);
-    await expect(credits(page)).toHaveCount(0);
-    expect(await earthOf(page)).toMatchObject({ state: "failed" });
   });
 
   test("tries again on the next visit, and draws", async ({ page }) => {
@@ -311,6 +316,22 @@ test.describe("a texture that does not come", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(EARTH);
     await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
+  });
+});
+
+// A software GPU refuses nothing, so the fault is planted in the chunk the worker would otherwise answer for.
+test.describe("a shader the driver refuses", () => {
+  test.use({ viewport: COMPUTER, serviceWorkers: "block" });
+
+  test("leaves the page whole, says so, and keeps the plate shut: no hole with no word", async ({ page }) => {
+    await page.route(/\/assets\/scene-[\w-]+\.js$/, async (route) => {
+      const answer = await route.fetch();
+      await route.fulfill({ response: answer, body: (await answer.text()).replace("float facing =", "flot facing =") });
+    });
+    const refused: string[] = [];
+    page.on("pageerror", ({ message }) => refused.push(message));
+    await givenUp(page);
+    expect(refused.join()).toContain("a shader was refused");
   });
 });
 

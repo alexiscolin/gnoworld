@@ -211,6 +211,13 @@ export class EarthView {
     this.#bring();
   }
 
+  /** The driver refused a shader. A globe it cannot draw would be a hole in the plate, with no word. */
+  refused(): void {
+    if (this.#globe === undefined) return;
+    this.#drop();
+    this.#say("failed");
+  }
+
   dispose(): void {
     this.#drop();
   }

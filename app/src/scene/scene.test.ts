@@ -12,6 +12,7 @@ const three = vi.hoisted(() => ({
     forceContextLoss: vi.fn<() => void>(),
     dispose: vi.fn<() => void>(),
     info: { render: { calls: 3 }, memory: { geometries: 4, textures: 5 } },
+    debug: { onShaderError: null as ((gl: unknown, program: unknown) => void) | null },
   },
   create: vi.fn<(canvas: unknown, antialias: boolean) => unknown>(),
 }));
@@ -22,6 +23,7 @@ const earth = vi.hoisted(() => ({
   resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
   tick: vi.fn<(seconds: number) => void>(),
   restored: vi.fn<() => void>(),
+  refused: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
   arriving: false,
@@ -40,6 +42,7 @@ vi.mock("./earth/view.ts", () => ({
     resize = earth.resize;
     tick = earth.tick;
     restored = earth.restored;
+    refused = earth.refused;
     dispose = earth.dispose;
     stats = earth.stats;
   },
@@ -713,6 +716,24 @@ describe("the Earth", () => {
     three.renderer.render.mockClear();
     frames(6, 16);
     expect(three.renderer.render.mock.calls.length).toBeGreaterThanOrEqual(5);
+    scene.dispose();
+  });
+
+  it("gives the Earth up when the driver refuses a shader, after the frame that found it, and says why", () => {
+    const told = vi.fn();
+    vi.stubGlobal("reportError", told);
+    earth.refused.mockClear();
+    const scene = startScene(options(), clock);
+    const gl = { getProgramInfoLog: () => "line 3: flot" };
+    three.renderer.render.mockImplementationOnce(() => {
+      three.renderer.debug.onShaderError?.(gl, {});
+      expect(earth.refused).not.toHaveBeenCalled();
+    });
+    clock.run(100);
+    expect(earth.refused).toHaveBeenCalledTimes(1);
+    expect(String(told.mock.lastCall?.[0])).toContain("line 3: flot");
+    clock.run(100);
+    expect(earth.refused).toHaveBeenCalledTimes(1);
     scene.dispose();
   });
 
