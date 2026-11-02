@@ -100,12 +100,23 @@ for (const width of [390, 1280, 1728] as const) {
       await page.goto("/w/govdao");
       await hydrated(page);
       await expect(page.locator("[data-look='plate'] [data-field='number']").first()).toBeVisible();
+      // A phone's chat takes the page (ChatScreen's takesPage) and closing it leaves for the universe's home: the picture hides it, so it
+      // shows the proposals as they stand under it, not the chat.
+      if (width === 390) {
+        const chatScreen = page.locator("[data-full]");
+        await expect(chatScreen).toBeAttached({ timeout: 30_000 });
+        await chatScreen.evaluate((screen) => {
+          screen.setAttribute("hidden", "");
+        });
+      }
       // The read's time is the run's clock, and its words' width moves the line: one time of the same shape, as shell.spec.ts does.
       await page.locator("section[aria-labelledby='proposals-title'] time").evaluateAll((times) => {
         for (const time of times) time.textContent = "2026-10-31 06:07 UTC";
       });
+      // A phone's views bar stands fixed over the page's foot: masked, as the shell's own journeys mask the header.
       await expect(page.locator("section[aria-labelledby='proposals-title']")).toHaveScreenshot(
         `govdao-${String(width)}.png`,
+        { mask: [page.getByRole("navigation", { name: "Views" })] },
       );
     });
   });
