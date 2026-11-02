@@ -120,11 +120,16 @@ describe("what the Earth loads", () => {
     opened(false);
     await settled();
     expect(widthAsked("earth-day")).toBe(MAP_WIDTH);
+    expect(widthAsked("earth-night")).toBe(MAP_WIDTH);
+    expect(widthAsked("clouds")).toBe(MAP_WIDTH);
+    expect(widthAsked("moon")).toBe(MOON_WIDTH);
     maps.load.mockClear();
     opened(true);
     await settled();
     expect(widthAsked("earth-day")).toBe(MAP_WIDTH / 2);
     expect(widthAsked("earth-night")).toBe(MAP_WIDTH / 2);
+    expect(widthAsked("clouds")).toBe(MAP_WIDTH / 2);
+    expect(widthAsked("moon")).toBe(MOON_WIDTH);
   });
 
   it("asks how much memory there is at each load: a device found slow takes the small maps on its next visit", async () => {

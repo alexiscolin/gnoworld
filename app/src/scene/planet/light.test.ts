@@ -34,6 +34,22 @@ describe("sideLight, a generated world's star", () => {
     }
   });
 
+  it.each([
+    { first: 0, second: 0, away: 1.2, height: -0.3 },
+    { first: 255, second: 0, away: 1.55, height: -0.3 },
+    { first: 0, second: 255, away: 1.2, height: 0.34 },
+    { first: 255, second: 255, away: 1.55, height: 0.34 },
+  ])("takes its angle from the seed's first byte and its height from the second: $first, $second", (row) => {
+    for (const rest of [0, 255]) {
+      const seed = bytes(rest);
+      seed[0] = row.first;
+      seed[1] = row.second;
+      const star = sideLight(seed, new Vector3());
+      expect(Math.atan2(star.x, star.z)).toBeCloseTo(row.away, 10);
+      expect(Math.asin(star.y)).toBeCloseTo(row.height, 10);
+    }
+  });
+
   it("varies a little with the seed, and the same seed gives the same star", () => {
     const low = sideLight(bytes(0), new Vector3());
     expect(low.distanceTo(sideLight(bytes(255), new Vector3()))).toBeGreaterThan(0.1);

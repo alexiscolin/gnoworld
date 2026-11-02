@@ -9,17 +9,16 @@ import { CREDITS } from "./credits.ts";
 const FOLDER = new URL("../../../public/textures", import.meta.url).pathname;
 const FILES = readdirSync(FOLDER, { recursive: true });
 const MAX_BYTES = 2 * 1024 * 1024;
+const ALL_BYTES = 10 * 1024 * 1024;
 const LICENCES = ["CC BY 4.0"];
 const ascii = (bytes: Uint8Array) => String.fromCharCode(...bytes);
-const SIDE = 0x3fff;
 
-// A WebP's own size, as its header says: a lossy file's frame, or the extended header of one with alpha.
+// A WebP's own size, as its extended header says. Every file here has one, and any other form reads otherwise: this says so, not a wrong size.
 function sizeOf(path: string) {
   const bytes = readFileSync(path);
   const read = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (ascii(bytes.subarray(12, 16)) === "VP8X")
-    return { width: (read.getUint32(24, true) & 0xffffff) + 1, height: (read.getUint32(27, true) & 0xffffff) + 1 };
-  return { width: read.getUint16(26, true) & SIDE, height: read.getUint16(28, true) & SIDE };
+  if (ascii(bytes.subarray(12, 16)) !== "VP8X") throw new Error(`${path} has no extended header`);
+  return { width: (read.getUint32(24, true) & 0xffffff) + 1, height: (read.getUint32(27, true) & 0xffffff) + 1 };
 }
 
 describe("the textures' credits", () => {
@@ -89,6 +88,23 @@ describe("the textures' files", () => {
       const { width, height } = sizeOf(join(FOLDER, `${name}.webp`));
       expect(width, name).toBe(height * 2);
     }
+  });
+
+  it("are all 2:1, a power of two and 4096 wide at most, but the ring's profile, one strip of it", () => {
+    const maps = FILES.filter((file) => file !== "ring.webp");
+    expect(maps.length).toBeGreaterThanOrEqual(12);
+    for (const file of maps) {
+      const { width, height } = sizeOf(join(FOLDER, file));
+      expect(width, file).toBe(height * 2);
+      expect(width & (width - 1), file).toBe(0);
+      expect(width, file).toBeLessThanOrEqual(4096);
+    }
+    expect(sizeOf(join(FOLDER, "ring.webp"))).toEqual({ width: 1024, height: 16 });
+  });
+
+  it("weigh 10 MiB together at most, for every one of them ships", () => {
+    const total = FILES.reduce((sum, file) => sum + statSync(join(FOLDER, file)).size, 0);
+    expect(total).toBeLessThanOrEqual(ALL_BYTES);
   });
 
   it("are real WebP, small enough to send", () => {

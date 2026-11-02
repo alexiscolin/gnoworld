@@ -13,6 +13,8 @@ import {
   Vector3,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
+import { EARTH, MOON } from "../earth/look.ts";
+import { GLOW_FRAGMENT, ORBIT_FRAGMENT } from "../earth/orbitShader.ts";
 import { AIR_FRAGMENT } from "./airShader.ts";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
 import { RING_FRAGMENT } from "./ringShader.ts";
@@ -53,6 +55,12 @@ const materialOf = (mesh: Mesh): ShaderMaterial => {
 };
 const linear = ([red, green, blue]: readonly [number, number, number]) =>
   new Color().setRGB(red, green, blue, SRGBColorSpace);
+// An edge's value with every name at a half, for edges written as sums: `low - 0.1`, `1.0 - caps + 0.05`, `1.0 + scale * 2.0`.
+const edge = (text: string): number =>
+  [...text.replaceAll(/[a-zA-Z]\w*/g, "0.5").matchAll(/([-+]?)\s*([\d.]+)(?:\s*\*\s*([\d.]+))?/g)].reduce(
+    (sum, [, sign, value = "0", times = "1"]) => sum + (sign === "-" ? -1 : 1) * Number(value) * Number(times),
+    0,
+  );
 
 describe("createPlanet", () => {
   it.each([...ANCHORS])("draws %s's surface, then its air and rings if it has them", (anchor) => {
@@ -97,6 +105,29 @@ describe("createPlanet", () => {
     if (look.sea === null) throw new Error("a temperate world has a sea");
     expect(read(surface, "seaShallow")).toEqual(linear(look.sea.shallow));
     expect(read(surface, "seaDeep")).toEqual(linear(look.sea.deep));
+  });
+
+  it.each([
+    { amount: 0.1, frequency: 1, drawn: 0.1 },
+    { amount: 0.1, frequency: 2, drawn: 0.1 },
+    { amount: 0.2, frequency: 1, drawn: 0.2 },
+    { amount: 0.2, frequency: 2, drawn: 0.1 },
+  ])(
+    "warps by the look's $amount at frequency $frequency, $drawn once a fifth of stretch binds it",
+    ({ amount, frequency, drawn }) => {
+      const look = { ...planetLook(DAO, "rocky"), warp: { amount, frequency, offset: [0, 0, 0] as const } };
+      expect(read(createPlanet(look, fixed().set, sphere).surface, "warpAmount")).toBeCloseTo(drawn, 10);
+    },
+  );
+
+  it("marks the air of the worlds that have it and of the Earth, so the halo and the blue night follow it", () => {
+    const airless = ["rocky", "ice", "dark carbon", "shattered"];
+    for (const anchor of ANCHORS) {
+      const { surface } = createPlanet(planetLook(DAO, anchor), fixed().set, sphere);
+      expect(read(surface, "air"), anchor).toBe(airless.includes(anchor) ? 0 : 1);
+    }
+    expect(read(createPlanet(EARTH, fixed().set, sphere).surface, "air")).toBe(1);
+    expect(read(createPlanet(MOON, fixed().set, sphere).surface, "air")).toBe(0);
   });
 
   it("hands every number of the surface to its own uniform", () => {
@@ -227,9 +258,30 @@ describe("createPlanet", () => {
   });
 
   it("never asks a smoothstep with its edges reversed, which GLSL leaves undefined and a software GPU hides", () => {
-    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT])
-      for (const [, low = "0", high = "0"] of shader.matchAll(/smoothstep\((-?[\d.]+), (-?[\d.]+),/g))
-        expect(Number(low), shader.slice(0, 40)).toBeLessThan(Number(high));
+    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT, ORBIT_FRAGMENT, GLOW_FRAGMENT])
+      for (const [call = "", low = "0", high = "0"] of shader.matchAll(/smoothstep\(([^,()]+), ([^,()]+),/g))
+        expect(edge(low), call).toBeLessThan(edge(high));
+  });
+
+  it("takes every fragment through the one grade, the tone first, then the screen's colours (ADR-0002 §10)", () => {
+    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT, ORBIT_FRAGMENT, GLOW_FRAGMENT]) {
+      const tone = shader.indexOf("#include <tonemapping_fragment>");
+      expect(tone).toBeGreaterThan(0);
+      expect(shader.indexOf("#include <colorspace_fragment>")).toBeGreaterThan(tone);
+    }
+  });
+
+  it("keeps the Earth's map whole on the worlds that read it: no second map, no painted caps, the Earth's faint gleam", () => {
+    expect(SURFACE_FRAGMENT).toContain("if (secondShare > 0.002 && blueSea < 0.5) {");
+    expect(SURFACE_FRAGMENT).toContain("if (caps > 0.0 && blueSea < 0.5) {");
+    expect(SURFACE_FRAGMENT).toContain("float glitter = nightLights + blueSea > 0.0 ? pow(gleam, 60.0) * 0.05 :");
+  });
+
+  it("holds what a night keeps at the values the eclipse's ceiling and the Earth's sea were tuned to", () => {
+    expect(PARTS).toContain("const float NIGHT = 0.007;");
+    expect(PARTS).toContain("const float NIGHT_GLOW = 0.07;");
+    expect(PARTS).toContain("const vec3 DEEP_BLUE = vec3(0.12, 0.22, 0.5);");
+    expect(PARTS).toContain("const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);");
   });
 
   it("leaves a generated world's air as 7b drew it: the softer terminator waits behind the Earth's limb", () => {
@@ -251,6 +303,26 @@ describe("createPlanet", () => {
     expect(read(surface, "hazeAmount")).toBeGreaterThan(0.3);
     const bare = createPlanet(planetLook(DAO, "rocky"), fixed().set, sphere).surface;
     expect(read(bare, "hazeAmount")).toBe(0);
+  });
+
+  it("draws the Earth's halo at full strength, in its air lifted 45% towards white", () => {
+    const { surface } = createPlanet(EARTH, fixed().set, sphere);
+    expect(read(surface, "hazeAmount")).toBeCloseTo(0.9, 10);
+    const { r, g, b } = read(surface, "hazeColour") as Color;
+    const wanted = linear([0.56, 0.626, 0.747]);
+    expect([r, g, b].map((channel) => channel.toFixed(10))).toEqual(
+      [wanted.r, wanted.g, wanted.b].map((channel) => channel.toFixed(10)),
+    );
+  });
+
+  it.each([
+    { thickness: 0.05, amount: 0.9 },
+    { thickness: 0.08, amount: 0.9 },
+    { thickness: 0.03, amount: 0.54 },
+    { thickness: 0.01, amount: 0.315 },
+  ])("draws a halo of $amount on an air $thickness thick, thinning to a floor", ({ thickness, amount }) => {
+    const look = { ...EARTH, rim: { colour: [0.2, 0.32, 0.54] as const, thickness } };
+    expect(read(createPlanet(look, fixed().set, sphere).surface, "hazeAmount")).toBeCloseTo(amount, 10);
   });
 
   it("draws a thinner halo for a thinner air, never none", () => {
@@ -312,7 +384,7 @@ describe("createPlanet", () => {
   });
 
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {
-    expect(RING_FRAGMENT).toMatch(/const float SHADED = 0\.[1-9]/);
+    expect(RING_FRAGMENT).toContain("const float SHADED = 0.3;");
     expect(RING_FRAGMENT).toContain("float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));");
   });
 
