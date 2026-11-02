@@ -1,7 +1,7 @@
 // The ladder of detail (ADR-0002 §3). Tier 1. What is drawn depends on the distance alone: far, a region as one glow; middle, a star and its
 // worlds as points; near what the eye looks at, bodies, one landmark a system first. A grid holds the map, so a look asks only what is
 // around the eye, and the caps bind before any universe can. A look runs off the frame, past a step of the eye, into a record the caller keeps.
-import type { Point } from "../space/cell.ts";
+import { distanceOf as apart, type Point } from "../space/cell.ts";
 import { smoothstep } from "../space/smooth.ts";
 import type { StarSystem } from "../cosmos/system.ts";
 import { BOUNDS } from "./bounds.ts";
@@ -56,7 +56,6 @@ interface Region {
 
 const cellOf = (at: number): number => Math.floor(at / REGION);
 const keyOf = (x: number, z: number): number => (x + KEY / 2) * KEY + (z + KEY / 2);
-const apart = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 export class Ladder {
   readonly #systems: readonly StarSystem[];

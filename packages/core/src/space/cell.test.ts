@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { cellHash, nextState, textHash, unitOf } from "./cell.ts";
+import { cellHash, distanceOf, nextState, textHash, unitOf } from "./cell.ts";
 
 // Worked out apart from this code, in Python's unbounded integers: the same cell gives the same hash on every device. FNV-1a's
 // prime over the salt and then each axis's low and high words, finished by murmur3's mixer with Mueller's constants.
@@ -127,5 +127,25 @@ describe("a cell's stream", () => {
       sum += unitOf(state);
     }
     expect(Math.abs(sum / steps - 0.5)).toBeLessThan(0.02);
+  });
+});
+
+// One way to measure how far two places are, for the ladder, the disc and the nebulae alike (F3580).
+describe("distanceOf", () => {
+  const coordinate = fc.double({ min: -1e12, max: 1e12, noNaN: true });
+  const place = fc.record({ x: coordinate, y: coordinate, z: coordinate });
+
+  it("is the straight distance between two places, the same both ways, and none from a place to itself", () => {
+    expect(distanceOf({ x: 0, y: 0, z: 0 }, { x: 2, y: 3, z: 6 })).toBe(7);
+    expect(distanceOf({ x: 1, y: -1, z: 4 }, { x: -2, y: 3, z: 4 })).toBe(5);
+    fc.assert(
+      fc.property(place, place, (a, b) => {
+        expect(distanceOf(a, b)).toBe(distanceOf(b, a));
+        expect(distanceOf(a, a)).toBe(0);
+        expect(distanceOf(a, b)).toBeGreaterThanOrEqual(
+          Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.z - b.z)),
+        );
+      }),
+    );
   });
 });

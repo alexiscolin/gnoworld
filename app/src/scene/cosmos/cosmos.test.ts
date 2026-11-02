@@ -3,6 +3,7 @@ import {
   BELT_INNER,
   BOUNDS,
   CENTRE,
+  distanceOf,
   EARTH_PLACE,
   glideAt,
   GRAIN,
@@ -18,6 +19,7 @@ import {
   ROOM,
   systemsOf,
   toScene,
+  wholeShare,
   worldLook,
   type Orbiter,
   type Point,
@@ -35,12 +37,12 @@ import {
   Euler,
   Quaternion,
   Scene as Stage,
+  ShaderMaterial,
   Texture,
   Vector3,
   type BufferAttribute,
   type BufferGeometry,
   type LineBasicMaterial,
-  type ShaderMaterial,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
@@ -48,7 +50,8 @@ import { MOON_FAR } from "../earth/orbit.ts";
 import { fromEyeOf, starAt } from "../planet/light.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
 import recorded from "../../../lab/worlds.json" with { type: "json" };
-import { Cosmos, type CosmosWorld } from "./cosmos.ts";
+import { Cosmos } from "./cosmos.ts";
+import type { CosmosWorld } from "./cosmosWorld.ts";
 import { angleAt, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
@@ -1563,5 +1566,246 @@ describe("its nebulae", () => {
     for (const image of nebulaImages()) expect(free).not.toContain(image);
     await vi.advanceTimersByTimeAsync(2000);
     for (const image of nebulaImages()) expect(free).toContain(image);
+  });
+});
+
+// Past a cluster's distance the worlds themselves are the nebula (ADR-0002 §10; Alexis, 2026-11-02): their soft points and the lines of
+// their imports take the view from the bodies, the suns and the nebulae at one distance, never both whole, and with no second place.
+describe("the whole cosmos", () => {
+  // The eye going out as the lab's wheel takes it: back from the arrival, the Earth ahead.
+  const out = (away: number) => ({ x: HOME.x, y: HOME.y, z: HOME.z + away });
+  const earth = { x: 0, y: 0, z: 0 };
+  toScene(EARTH_PLACE, earth);
+  const linked = (count: number): CosmosWorld[] =>
+    Array.from({ length: count }, (_, at) => ({
+      id: `n${String(at % 9)}/w${String(at)}`,
+      namespace: `n${String(at % 9)}`,
+      realms: [
+        {
+          callers: null,
+          path: `gno.land/r/n${String(at % 9)}/w${String(at)}`,
+          imports: at % 4 === 0 ? [`gno.land/r/n${String((at + 1) % 9)}/w${String(at + 1)}`] : [],
+          calls: null,
+          lastHeight: null,
+        },
+      ],
+    }));
+  // Its chunk is a real import, which no fake clock waits for: a cold one, alone in a run, came after the frames.
+  const at = async (scene: ReturnType<typeof made>, eye: Point) => {
+    scene.cosmos.tick(eye, 0);
+    await settled();
+    await vi.dynamicImportSettled();
+    scene.cosmos.tick(eye, 0);
+    await settled();
+  };
+  const fades = (scene: ReturnType<typeof made>) =>
+    parts(scene).flatMap((part) => {
+      if (!(part instanceof Mesh || part instanceof Points)) return [];
+      const material: unknown = part.material;
+      return material instanceof ShaderMaterial && "uFade" in material.uniforms
+        ? [Number(material.uniforms["uFade"].value)]
+        : [];
+    });
+  const seen = (scene: ReturnType<typeof made>) => {
+    const found: Object3D[] = [];
+    scene.stage.traverseVisible((part) => found.push(part));
+    return found;
+  };
+  const earthShown = (scene: ReturnType<typeof made>) =>
+    seen(scene).some((part) => part instanceof Stage && part !== scene.stage);
+  const shownWith = (scene: ReturnType<typeof made>, name: string) =>
+    seen(scene).filter((part) => part instanceof Points && (part.geometry as BufferGeometry).hasAttribute(name));
+
+  it("asks for its chunk only once the eye leaves for it, never at the arrival", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, HOME);
+    expect(scene.cosmos.stats().web).toBeUndefined();
+    await at(scene, out(400));
+    expect(scene.cosmos.stats().web).toMatchObject({ points: 90, lines: 23 });
+  });
+
+  it("hands the view from the bodies, the suns and the nebulae to the worlds' points at one distance, never both whole", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, out(400));
+    const shares: number[] = [];
+    const outward = [0, 100, 200, 300, 380, 450, 520, 600, 640, 700, 900, 1500];
+    // Out, then back in: nothing it hands over stays handed over.
+    for (const away of [...outward, ...[...outward].reverse()]) {
+      const eye = out(away);
+      await at(scene, eye);
+      // What the eye looks at is the Earth (7d6): its distance from where the cosmos stands the eye says the share, as for the nebulae.
+      const { web, bodies, eye: placed } = scene.cosmos.stats();
+      const whole = wholeShare(distanceOf(placed, earth));
+      shares.push(web?.share ?? NaN);
+      expect(web?.share).toBeCloseTo(whole, 9);
+      // The disc's suns, points and rocks give up faster than the worlds' points come (F4152, the hand-over's white glows), and the
+      // bodies, the Earth among them, go as they start: an opaque body cannot fade.
+      const disc = fades(scene);
+      expect(disc).toHaveLength(3);
+      for (const fade of disc) {
+        expect(fade).toBeCloseTo((1 - whole) ** 2, 9);
+        expect(fade + whole).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      expect(earthShown(scene)).toBe(whole === 0);
+      if (whole >= 1) {
+        expect(bodies).toBe(0);
+        expect(shownWith(scene, "aOrbit")).toHaveLength(0);
+        expect(
+          seen(scene).filter((part) => part instanceof Mesh && part.geometry instanceof InstancedBufferGeometry),
+        ).toHaveLength(0);
+      }
+      expect(shownWith(scene, "aCircle")).toHaveLength(whole > 0 ? 1 : 0);
+    }
+    expect(Math.min(...shares)).toBe(0);
+    expect(Math.max(...shares)).toBe(1);
+    expect(shares.some((share) => share > 0.1 && share < 0.9)).toBe(true);
+    expect(shares.at(-1)).toBe(0);
+    expect(scene.cosmos.stats().bodies).toBeGreaterThan(0);
+  });
+
+  it("stands no whole cosmos once the page has gone, though its chunk was on its way", async () => {
+    const hidden = made();
+    await shown(hidden, linked(90));
+    hidden.cosmos.tick(out(400), 0);
+    hidden.cosmos.show(undefined);
+    await settled();
+    await vi.dynamicImportSettled();
+    expect(shownWith(hidden, "aCircle")).toHaveLength(0);
+    const gone = made();
+    await shown(gone, linked(90));
+    gone.cosmos.tick(out(400), 0);
+    gone.owner.dispose();
+    await settled();
+    await vi.dynamicImportSettled();
+    expect(gone.stage.getObjectByName("web")).toBeUndefined();
+  });
+
+  it("stands each world where the ladder's points stand it: one place for a world, at any distance", async () => {
+    const scene = made();
+    const list = linked(90);
+    await shown(scene, list);
+    await at(scene, out(150));
+    const [ladder] = dots(scene);
+    if (ladder === undefined) throw new Error("no points");
+    // Each point's star, its orbit, phase and spin, and its system's plane (7d6's tilt), one row a world.
+    const placesOf = (points: Points<BufferGeometry, ShaderMaterial>, orbit: string) => {
+      const cells = ["position", orbit, "aPlane"].map((name) => points.geometry.getAttribute(name));
+      return new Set(
+        Array.from({ length: points.geometry.drawRange.count }, (_, index) =>
+          cells
+            .flatMap((cell) => Array.from({ length: cell.itemSize }, (_, item) => cell.getComponent(index, item)))
+            .map((value) => value.toFixed(5))
+            .join(","),
+        ),
+      );
+    };
+    const fromLadder = placesOf(ladder, "aOrbit");
+    await at(scene, out(900));
+    const web = parts(scene).find(
+      (part): part is Points<BufferGeometry, ShaderMaterial> =>
+        part instanceof Points && (part.geometry as BufferGeometry).hasAttribute("aCircle"),
+    );
+    if (web === undefined) throw new Error("no whole cosmos");
+    expect(fromLadder.size).toBeGreaterThan(3);
+    const fromWeb = placesOf(web, "aCircle");
+    for (const place of fromLadder) expect(fromWeb.has(place)).toBe(true);
+    expect(web.parent?.rotation.x).toBe(ladder.parent?.rotation.x);
+    // One clock for both, 7d6's: a world keeps its place on its orbit as the view changes hands.
+    scene.cosmos.tick(out(900), 12);
+    const clockOf = ({ material }: Points<BufferGeometry, ShaderMaterial>) =>
+      Number(material.uniforms["uSeconds"]?.value);
+    expect(clockOf(web)).toBe(clockOf(ladder));
+    expect(clockOf(web)).toBeGreaterThan(0);
+    // Both at the eye the cosmos stands, the view at rest's swayed (7d6), not the scene's.
+    expect(web.parent?.position.toArray()).toEqual(ladder.parent?.position.toArray());
+    expect(scene.cosmos.stats().eye).not.toEqual(out(900));
+  });
+
+  const webLook = (scene: ReturnType<typeof made>) => {
+    const found = shownWith(scene, "aCircle")[0];
+    if (!(found instanceof Points)) throw new Error("no whole cosmos shown");
+    return found as Points<BufferGeometry, ShaderMaterial>;
+  };
+
+  // F4153: the disc faded and the bodies went by distance alone, the view going black when nothing was there to take it over.
+  it("keeps the disc and the bodies while the whole cosmos cannot take the view: its program not compiled yet, or no world to draw", async () => {
+    const waiting = made();
+    waiting.renderer.compileAsync.mockImplementation((group: Object3D) =>
+      group.name === "web" ? new Promise<Object3D>(() => undefined) : Promise.resolve(group),
+    );
+    await shown(waiting, linked(90));
+    const empty = made();
+    await shown(empty, []);
+    for (const scene of [waiting, empty]) {
+      await at(scene, out(900));
+      expect(scene.cosmos.stats().web?.share ?? 0).toBe(0);
+      for (const fade of fades(scene)) expect(fade).toBe(1);
+      expect(earthShown(scene)).toBe(true);
+      expect(shownWith(scene, "aCircle")).toHaveLength(0);
+    }
+  });
+
+  // F4153, finding 1: a look ran each 4 units the eye went, nearly every frame of a wheel out there. It runs each hundredth of the way
+  // to what the eye looks at, near as before.
+  it("looks again as often as the distance asks: each 4 units near, each hundredth of the way far", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    const looksAfter = async (from: Point, by: number) => {
+      await at(scene, from);
+      const { looks } = scene.cosmos.stats();
+      scene.cosmos.tick({ ...from, z: from.z + by }, 0);
+      await settled();
+      return scene.cosmos.stats().looks - looks;
+    };
+    expect(await looksAfter(out(0), 5)).toBe(1);
+    expect(await looksAfter(out(900), 5)).toBe(0);
+    expect(await looksAfter(out(900), 12)).toBe(1);
+  });
+
+  it("hides the whole cosmos with the page, after it showed", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, out(900));
+    expect(shownWith(scene, "aCircle")).toHaveLength(1);
+    scene.cosmos.show(undefined);
+    expect(shownWith(scene, "aCircle")).toHaveLength(0);
+  });
+
+  it("gives the whole cosmos the screen's pixels, set before its chunk came", async () => {
+    const scene = made();
+    scene.cosmos.resize(HEIGHT, 2);
+    await shown(scene, linked(90));
+    await at(scene, out(900));
+    expect(webLook(scene).material.uniforms["uRatio"]?.value).toBe(2);
+  });
+
+  it("draws the whole cosmos once its chunk comes, the eye standing still", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    const eye = out(900);
+    scene.cosmos.tick(eye, 0);
+    await settled();
+    await vi.dynamicImportSettled();
+    for (let frame = 0; frame < 4; frame += 1) {
+      scene.cosmos.tick(eye, 0);
+      await settled();
+    }
+    const sizes = webLook(scene).geometry.getAttribute("aSoft");
+    expect(Array.from({ length: 90 }, (_, index) => sizes.getX(index)).every((size) => size >= 0.75)).toBe(true);
+  });
+
+  it("gives the whole cosmos the file's time: gold for a world called in the last run only", async () => {
+    const scene = made();
+    const list = linked(30).map((world, index) =>
+      index === 0 ? { ...world, realms: [{ ...world.realms[0], callers: null, calls: 40, lastHeight: 9000 }] } : world,
+    );
+    scene.cosmos.show(list, new Date(Date.now()).toISOString());
+    await at(scene, out(900));
+    expect(scene.cosmos.stats().web?.gold).toBe(1);
+    scene.cosmos.show(list, "2000-01-01T00:00:00Z");
+    await at(scene, out(901));
+    expect(scene.cosmos.stats().web?.gold).toBe(0);
   });
 });

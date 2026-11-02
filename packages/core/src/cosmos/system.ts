@@ -73,7 +73,8 @@ export interface StarSystem {
   readonly worlds: readonly Orbiter[];
 }
 
-const worldSize = (use: number): number =>
+/** A world's radius from its use, before any crowd's room: a world seen from afar is as large as its use says. */
+export const worldSize = (use: number): number =>
   lerp(WORLD_LEAST, WORLD_MOST, (starSize(Math.min(Math.max(use, 1), STAR_MOST)) - 1) / 4);
 
 // By a world's own hash, then the next slot free, so an arrival moves only the world it meets. A power of two over 1.5 times the count keeps probes short.

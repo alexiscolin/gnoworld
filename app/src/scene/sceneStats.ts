@@ -1,7 +1,8 @@
 // What the scene shows the page: its door, and what it says of itself for `?debug` and the journeys.
 import type { ClearBox, Point, Tier } from "@gnoworld/core";
 import type { WebGLRenderer } from "three";
-import type { Cosmos, CosmosWorld } from "./cosmos/cosmos.ts";
+import type { Cosmos } from "./cosmos/cosmos.ts";
+import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
 import type { Ground } from "./earth/marks.ts";
 import type { Circle, EarthState, EarthView } from "./earth/view.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
@@ -28,8 +29,8 @@ export interface Scene {
   world(asked: WorldAsk | undefined, said: WorldSaid): void;
   /** The rooms' moons the page keeps links for. */
   worldMoons(marks: readonly MoonMark[]): void;
-  /** Stands these worlds and the fixed places, or takes them away. */
-  cosmos(worlds: readonly CosmosWorld[] | undefined): void;
+  /** Stands these worlds and the fixed places, or takes them away; `written`, the file's time, ages their calls. */
+  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string): void;
   /** The box of the page's text, in its pixels: no body stands under it. */
   keepClear(box: ClearBox | undefined): void;
   dispose(): void;

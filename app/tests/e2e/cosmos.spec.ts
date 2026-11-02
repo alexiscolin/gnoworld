@@ -9,7 +9,7 @@ import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
-import { hideThePage, opened, running, stats } from "./sceneStage.ts";
+import { hideThePage, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -37,7 +37,7 @@ const SLOW = { timeout: 90_000 };
 test.describe.configure({ timeout: 180_000 });
 
 const cosmos = async (page: Page) => (await stats(page)).cosmos ?? NOT_YET;
-const NOT_YET = {
+const NOT_YET: CosmosStats = {
   shown: false,
   bodies: 0,
   stars: 0,
@@ -72,6 +72,15 @@ async function arrived(page: Page, query = HOME, size = COMPUTER) {
   await page.goto(query);
   await hydrated(page);
   await running(page);
+}
+
+// The release's lab page, its cosmos view standing, for Alexis's own GPU.
+async function inTheLab(page: Page) {
+  await page.setViewportSize(COMPUTER);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await standing(page);
 }
 
 // A place drawn: the look runs off the frame, so the count of looks says it has been taken.
@@ -467,11 +476,7 @@ for (const systems of [100, 1000, 10_000])
 test("gives the release's page the cosmos as a view, from the recorded file, for Alexis's own GPU", async ({
   page,
 }) => {
-  await page.setViewportSize(COMPUTER);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/lab/realism.html?view=cosmos");
-  await running(page);
-  await standing(page);
+  await inTheLab(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
 });
 
@@ -531,11 +536,7 @@ test("puts the nebulae out near a world: space is near-black there", async ({ pa
 });
 
 test("gives the release's page the nebulae, and their credits in its footer", async ({ page }) => {
-  await page.setViewportSize(COMPUTER);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/lab/realism.html?view=cosmos");
-  await running(page);
-  await standing(page);
+  await inTheLab(page);
   await lit(page);
   for (const credit of CREDITS.filter(({ files }) => files.some((file) => NEBULA_IMAGES.some((name) => name === file))))
     await expect(page.locator("footer")).toContainText(credit.line);
@@ -598,35 +599,85 @@ async function earthDisc(page: Page): Promise<[number, number, number, number]> 
   return [x - third, y - third, x + third, y + third];
 }
 
-// The arrival drawn and still, its page hidden, as a picture.
-async function stillPicture(page: Page) {
+// Where the Earth stands on the stage: what the eye looks at (7d6).
+const EARTH = { x: 0, y: 0, z: 0 };
+toScene(EARTH_PLACE, EARTH);
+const fromEarth = ({ x, y, z }: { x: number; y: number; z: number }) =>
+  Math.hypot(x - EARTH.x, y - EARTH.y, z - EARTH.z);
+
+// The view at rest looks towards a red nebula's bright side (7d6); a quarter turn round the Earth, about the map's up, at the rest's
+// distance, the cool ones stand behind it. A sweep of twelve turns on the merged tree (7d5's merge notes, 2026-11-03): 76 cool boxes, hues
+// 195 to 198, at a quarter turn; none at the arrival.
+async function quarterTurned(page: Page) {
+  const [top, middle] = [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 0 },
+  ];
+  toScene({ x: 0, y: 1, z: 0 }, top);
+  toScene({ x: 0, y: 0, z: 0 }, middle);
+  const up = { x: top.x - middle.x, y: top.y - middle.y, z: top.z - middle.z };
+  const [{ eye: rest }, { eye: scene }] = [await cosmos(page), await stats(page)];
+  const [x, y, z] = [rest.x - EARTH.x, rest.y - EARTH.y, rest.z - EARTH.z];
+  const along = up.x * x + up.y * y + up.z * z;
+  // The rest's offset turned a quarter round `up`: up x offset, plus its part along up.
+  const turned = {
+    x: up.y * z - up.z * y + up.x * along,
+    y: up.z * x - up.x * z + up.y * along,
+    z: up.x * y - up.y * x + up.z * along,
+  };
+  await moveTo(page, {
+    x: scene.x + EARTH.x + turned.x - rest.x,
+    y: scene.y + EARTH.y + turned.y - rest.y,
+    z: scene.z + EARTH.z + turned.z - rest.z,
+  });
+}
+
+// The arrival drawn and still, its page hidden, as a picture; turned first if asked.
+async function stillPicture(page: Page, turn?: (page: Page) => Promise<void>) {
   await standing(page);
+  await turn?.(page);
   await opened(page);
   await hideThePage(page);
   return page.locator("canvas").screenshot();
+}
+
+// The arrival without its nebulae, their images refused, then with them.
+async function bothWays(page: Page, turn?: (page: Page) => Promise<void>) {
+  let refused = true;
+  let asked = 0;
+  await page.route(NEBULA, (route) => {
+    asked += 1;
+    return refused ? route.fulfill({ status: 404 }) : route.fallback();
+  });
+  await served(page, RECORDED);
+  await arrived(page);
+  await expect.poll(() => asked, SLOW).toBeGreaterThan(0);
+  const without = await stillPicture(page, turn);
+  expect((await cosmos(page)).nebulae).toBe(0);
+  refused = false;
+  await page.reload();
+  await hydrated(page);
+  await running(page);
+  await lit(page);
+  return { without, withNebulae: await stillPicture(page, turn) };
+}
+
+// Frame 16's teal, top right (f0016.jpg read with ffmpeg, 2026-11-02): hues 182 to 193 from the tenth part of its pixels to the ninetieth,
+// mean sRGB (10, 44, 50), its ninetieth (10, 62, 66). The light a nebula adds is read against black, so a few degrees more either way.
+const FRAME_TEAL = { least: 176, most: 200, brightest: 66, saturation: 0.82 };
+function hueOf([red, green, blue]: readonly number[]): number {
+  const [r = 0, g = 0, b = 0] = [red, green, blue];
+  const top = Math.max(r, g, b);
+  const span = top - Math.min(r, g, b);
+  const sector = top === r ? (g - b) / span : top === g ? 2 + (b - r) / span : 4 + (r - g) / span;
+  return (sector * 60 + 360) % 360;
 }
 
 test.describe("the nebulae's light", () => {
   test.use({ serviceWorkers: "block" });
 
   test("recolours each nebula to the mood it stands in, and never washes out the glow behind it", async ({ page }) => {
-    let refused = true;
-    let asked = 0;
-    await page.route(NEBULA, (route) => {
-      asked += 1;
-      return refused ? route.fulfill({ status: 404 }) : route.fallback();
-    });
-    await served(page, RECORDED);
-    await arrived(page);
-    await expect.poll(() => asked, SLOW).toBeGreaterThan(0);
-    const without = await stillPicture(page);
-    expect((await cosmos(page)).nebulae).toBe(0);
-    refused = false;
-    await page.reload();
-    await hydrated(page);
-    await running(page);
-    await lit(page);
-    const withNebulae = await stillPicture(page);
+    const { without, withNebulae } = await bothWays(page);
     expect(
       addedLight(await colours(page, without, boxes()), await colours(page, withNebulae, boxes())),
     ).toBeGreaterThan(10);
@@ -636,4 +687,159 @@ test.describe("the nebulae's light", () => {
     for (const [channel, value] of (onEarth ?? []).entries())
       expect(Math.abs(value - (offEarth?.[channel] ?? NaN))).toBeLessThan(2);
   });
+
+  test("gives a cool nebula frame 16's teal, dark and discreet as there, never the grey-blue", async ({ page }) => {
+    const { without, withNebulae } = await bothWays(page, quarterTurned);
+    const [before, after] = [await colours(page, without, boxes()), await colours(page, withNebulae, boxes())];
+    let teal = 0;
+    for (const [at, colour] of after.entries()) {
+      const behind = before[at] ?? [255, 255, 255];
+      const added = colour.map((value, channel) => value - (behind[channel] ?? 0));
+      const [red = 0, , blue = 0] = added;
+      const top = Math.max(...added);
+      // Read against near-black only, where the light added is the nebula's own; a warm box is no cool nebula.
+      if (top < 4 || Math.max(...behind) > 40 || blue <= red + 2) continue;
+      teal += 1;
+      expect(hueOf(added), `box ${String(at)}`).toBeGreaterThanOrEqual(FRAME_TEAL.least);
+      expect(hueOf(added), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.most);
+      expect(Math.max(...colour), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.brightest);
+      expect((top - Math.min(...added)) / top, `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.saturation + 0.1);
+    }
+    expect(teal).toBeGreaterThan(3);
+  });
+});
+
+// The whole cosmos (ADR-0002 §10; Alexis, 2026-11-02): past a cluster's distance the worlds themselves are the nebula, a soft point for each
+// real world, a thin line for each real import between two, gold for real live activity only. Two draws of its own, whatever the file.
+const WHOLE_JS = /\/assets\/web-[\w-]+\.js$/;
+// The sky's own, the nebulae's three images and the whole cosmos's two: what a frame draws out there.
+const WHOLE_DRAWS_AT_MOST = 10;
+// The sky's stars and motes, whatever the file: 46,656 drawn on this window. Out there no point of the disc is.
+const SKY_POINTS_AT_MOST = 48 * 1024;
+const linkedFileOf = (count: number) => {
+  const namespaces = Math.max(1, Math.round(count / 5));
+  const id = (at: number) => `n${String(at % namespaces)}/w${String(at)}`;
+  return JSON.stringify({
+    version: 1,
+    universe: "onyx",
+    updated: "2026-11-01T00:00:00Z",
+    worlds: Array.from({ length: count }, (_, at) => ({
+      id: id(at),
+      namespace: `n${String(at % namespaces)}`,
+      realms: [
+        {
+          path: `gno.land/r/${id(at)}`,
+          deployer: null,
+          deployerName: null,
+          functions: [],
+          imports: at % 3 === 0 ? [`gno.land/r/${id((at + 7) % count)}`] : [],
+          calls: null,
+          callers: null,
+          lastHeight: null,
+        },
+      ],
+    })),
+  });
+};
+// Its pairs, counted apart from the code: every third world names the seventh on, each pair once whichever way.
+const linesOf = (count: number) => {
+  const pairs = new Set<string>();
+  for (let at = 0; at < count; at += 3) {
+    const to = (at + 7) % count;
+    if (to !== at) pairs.add([Math.min(at, to), Math.max(at, to)].join(" "));
+  }
+  return pairs.size;
+};
+const whole = async (page: Page) => {
+  const { eye } = await stats(page);
+  // Back along the view's axis, the disc in the middle.
+  const far = { x: eye.x, y: eye.y, z: eye.z + 1100 };
+  await moveTo(page, far);
+  // What the eye looks at is the Earth (7d6): its distance from the cosmos's own eye says the share.
+  expect(fromEarth((await cosmos(page)).eye)).toBeGreaterThan(1000);
+  await expect.poll(async () => (await cosmos(page)).web?.share ?? 0, SLOW).toBe(1);
+};
+
+test("asks nothing of the whole cosmos at the arrival", async ({ page }) => {
+  let asked = 0;
+  await page.route(WHOLE_JS, (route) => {
+    asked += 1;
+    return route.fallback();
+  });
+  await served(page, linkedFileOf(300));
+  await arrived(page);
+  await standing(page);
+  expect(asked).toBe(0);
+  expect((await cosmos(page)).web).toBeUndefined();
+});
+
+for (const count of [100, 1_000, 10_000, 20_000])
+  test(`draws the whole cosmos at ${String(count)} worlds: a point a world, a line a link, two draws`, async ({
+    page,
+  }) => {
+    await served(page, linkedFileOf(count));
+    await arrived(page);
+    await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+    await whole(page);
+    expect((await cosmos(page)).web).toMatchObject({ points: count, lines: linesOf(count), gold: 0 });
+    const { calls, points } = await stats(page);
+    expect(calls).toBeLessThanOrEqual(WHOLE_DRAWS_AT_MOST);
+    expect(points - count).toBeLessThanOrEqual(SKY_POINTS_AT_MOST);
+  });
+
+test("draws the recorded file whole: 533 soft points, no line and no gold, for it read no package and no call", async ({
+  page,
+}) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 0, gold: 0 });
+  await opened(page);
+  await hideThePage(page);
+  const shot = await page.locator("canvas").screenshot();
+  const [middle, corner] = await colours(page, shot, [
+    [COMPUTER.width / 2 - 60, COMPUTER.height / 2 - 60, COMPUTER.width / 2 + 60, COMPUTER.height / 2 + 60],
+    [4, 4, 40, 40],
+  ]);
+  // Warm at home, rose and peach, on near-black: the disc's middle in the middle of the view (about (15, 9, 6) on average there).
+  const [red = 0, green = 0, blue = 0] = middle ?? [];
+  expect(red).toBeGreaterThan(blue * 1.5);
+  expect(red + green + blue).toBeGreaterThan(15);
+  expect(Math.max(...(corner ?? [255]))).toBeLessThan(60);
+});
+
+test("lights gold the one world called in the last run, read from a file written now", async ({ page }) => {
+  const file = JSON.parse(linkedFileOf(300)) as {
+    updated: string;
+    worlds: { realms: { calls: number | null; lastHeight: number | null }[] }[];
+  };
+  file.updated = new Date().toISOString();
+  const [first] = file.worlds;
+  for (const realm of first?.realms ?? []) Object.assign(realm, { calls: 40, lastHeight: 9000 });
+  await served(page, JSON.stringify(file));
+  await arrived(page);
+  await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 300, gold: 1 });
+});
+
+test("costs the same two draws on a weak GPU's tier, at 20,000 worlds", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("gnoworld:scene:tier", "low");
+  });
+  await served(page, linkedFileOf(20_000));
+  await arrived(page);
+  await expect.poll(async () => (await stats(page)).tier, SLOW).toBe("low");
+  await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 20_000, lines: linesOf(20_000) });
+  expect((await stats(page)).calls).toBeLessThanOrEqual(WHOLE_DRAWS_AT_MOST);
+});
+
+test("gives the release's page the whole cosmos, with the links read on the chain for its sample", async ({ page }) => {
+  await inTheLab(page);
+  await whole(page);
+  // The 18 pairs of worlds the sample of 58 realms read on Onyx links (app/lab/imports.json, the part's state file).
+  expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 18, gold: 0 });
 });

@@ -5,6 +5,7 @@ import {
   BOUNDS,
   CENTRE,
   DISC_TILT,
+  distanceOf as away,
   dotLight,
   GRAIN,
   onScreen,
@@ -83,8 +84,6 @@ const lifted = ([red, green, blue]: readonly [number, number, number]): [number,
   blue + (DOT_WARM[2] - blue) * DOT_LIFT,
 ];
 
-const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
-
 export class Disc {
   readonly #suns: Suns;
   readonly #dots: Dots;
@@ -114,6 +113,14 @@ export class Disc {
     this.#suns.resize(focal);
     this.#dots.resize(ratio);
     this.#belt.resize(ratio);
+  }
+
+  /** How much of the disc shows, 0 to 1, the whole cosmos taking the rest, once its programs are `ready`: none, and it draws nothing. */
+  fade(level: number, ready: boolean): void {
+    this.group.visible = ready && level > 0;
+    this.#suns.fade.value = level;
+    this.#dots.fade.value = level;
+    this.#belt.fade.value = level;
   }
 
   /** One frame on. */

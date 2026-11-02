@@ -7,7 +7,7 @@ interface Spot {
   y: number;
   radius: number;
 }
-interface CosmosStats {
+export interface CosmosStats {
   shown: boolean;
   bodies: number;
   stars: number;
@@ -22,6 +22,7 @@ interface CosmosStats {
   nebulae: number;
   worlds: number;
   eye: { x: number; y: number; z: number };
+  web?: { points: number; lines: number; gold: number; share: number };
 }
 interface Stats {
   frames: number;
