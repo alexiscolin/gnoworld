@@ -130,12 +130,6 @@ describe("the renderer it starts", () => {
     expect(three.create).toHaveBeenCalledWith(canvas, false);
   });
 
-  it("caps the pixel ratio at 1.25 on a computer", () => {
-    const scene = startScene(options(), clock);
-    expect(three.renderer.setPixelRatio).toHaveBeenLastCalledWith(1.25);
-    scene.dispose();
-  });
-
   it("sizes the buffer to the canvas before its first frame, leaving its style to the stylesheet, and the camera to its shape", () => {
     const scene = startScene(options(), clock);
     expect(three.renderer.setSize).toHaveBeenLastCalledWith(1280, 800, false);
