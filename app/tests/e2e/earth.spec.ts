@@ -163,6 +163,20 @@ test.describe("a computer", () => {
     expect(after[0] ?? 255).toBeLessThan((before[0] ?? 0) / 2);
   });
 
+  test("keeps the plate's left corners round once the scene draws: the canvas paints no square behind them", async ({
+    page,
+  }) => {
+    await opened(page);
+    const [top = 255, bottom = 255, inside = 0] = await brightness(page, await page.screenshot(), [
+      [26, 100, 28, 102],
+      [26, 1052, 28, 1054],
+      [38, 108, 40, 110],
+    ]);
+    expect(top).toBeLessThan(8);
+    expect(bottom).toBeLessThan(8);
+    expect(inside).toBeGreaterThan(20);
+  });
+
   test("rests the Moon on the front of its orbit, off the plate's words", async ({ page }) => {
     await opened(page);
     const { moon, orbit, x } = await earth(page);

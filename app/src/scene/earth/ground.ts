@@ -29,16 +29,20 @@ void main() {
 }
 `;
 
-// The page's own colours, written as they are: no grade, for the plate is not in the scene's light. Its fade and dots are the stylesheet's.
+// The page's own colours, written as they are: no grade, for the plate is not in the scene's light. Its fade, dots and left corners are the
+// stylesheet's: outside those corners the page stays black.
 const FRAGMENT = /* glsl */ `
 uniform vec4 plate;
 uniform vec3 fill;
 uniform float pageHeight;
 uniform float ratio;
 const vec3 INK = vec3(0.957, 0.965, 0.98);
+const float CORNER = 24.0;
 void main() {
   vec2 at = vec2(gl_FragCoord.x / ratio, pageHeight - gl_FragCoord.y / ratio);
   if (at.x < plate.x || at.x > plate.z || at.y < plate.y || at.y > plate.w) discard;
+  vec2 round = vec2(plate.x + CORNER - at.x, max(plate.y + CORNER - at.y, at.y - plate.w + CORNER));
+  if (min(round.x, round.y) > 0.0 && length(round) > CORNER) discard;
   float kept = clamp((plate.z - at.x) / 64.0, 0.0, 1.0);
   vec2 tile = mod(at - plate.xy, 14.0) - 7.0;
   vec3 colour = mix(fill, INK, 0.07 * (1.0 - smoothstep(1.0, 1.3, length(tile))));
