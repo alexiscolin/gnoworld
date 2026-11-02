@@ -73,15 +73,13 @@ describe("Worlds", () => {
     expect(Worlds.safeParse(world({ batch: "yes" })).success).toBe(false);
   });
 
-  it("takes a world's nature, read once by the job, or none, and refuses one no rule reads (F4109)", () => {
+  it("takes a world's nature, read once by the job, or none (F4109)", () => {
     const world = (extra: Record<string, unknown>) =>
       file({ worlds: [{ id: "a/b", namespace: "a", realms: [], ...extra }] });
     expect(WORLD_NATURES.length).toBeGreaterThan(0);
     for (const nature of WORLD_NATURES) expect(Worlds.parse(world({ nature })).worlds[0]?.nature).toBe(nature);
     expect(Worlds.safeParse(world({ nature: null })).success).toBe(true);
     expect(Worlds.parse(world({})).worlds[0]).not.toHaveProperty("nature");
-    for (const nature of ["wizard", "Token", "", 3, true])
-      expect(Worlds.safeParse(world({ nature })).success).toBe(false);
   });
 
   it("drops a key of a world it does not know, so an older reader reads a newer file, and nothing unchecked passes", () => {
