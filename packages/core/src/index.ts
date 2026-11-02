@@ -52,6 +52,7 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
+export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
   CENTRE,
