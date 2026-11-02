@@ -83,13 +83,15 @@ const attribute = (geometry: BufferGeometry, name: string): BufferAttribute => {
   if (!(found instanceof BufferAttribute)) throw new Error(`no ${name}`);
   return found;
 };
+// Each vertex drawn, through the geometry's index where it has one, as a row of the named attributes.
 const rows = (geometry: BufferGeometry, names: readonly string[]): string[] => {
   const cells = (name: string, at: number) => {
     const { array, itemSize } = attribute(geometry, name);
     return Array.from({ length: itemSize }, (_, item) => (array[at * itemSize + item] ?? NaN).toFixed(6)).join(",");
   };
+  const vertexOf = (drawn: number) => geometry.index?.getX(drawn) ?? drawn;
   return Array.from({ length: geometry.drawRange.count }, (_, at) =>
-    names.map((name) => cells(name, at)).join(" "),
+    names.map((name) => cells(name, vertexOf(at))).join(" "),
   ).sort();
 };
 
@@ -286,6 +288,18 @@ describe("the whole cosmos", () => {
     expect(web.group.visible).toBe(true);
     expect(web.stats().share).toBe(0.25);
     owner.dispose();
+  });
+
+  it("draws a world the file names twice as one point", () => {
+    const [first, ...rest] = worldsOf({ count: 20 });
+    if (first === undefined) throw new Error("no world");
+    const worlds = [first, ...rest, first];
+    const web = new Web();
+    web.stand({ systems: held(worlds), worlds, written: WRITTEN }, NOW);
+    lookFrom(web, 900);
+    expect(web.stats().points).toBe(20);
+    expect(geometryOf(web, "Points").drawRange.count).toBe(20);
+    web.dispose();
   });
 
   it("frees its two draws with its owner", () => {

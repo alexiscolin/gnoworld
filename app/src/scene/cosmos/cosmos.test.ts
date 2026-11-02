@@ -1100,9 +1100,11 @@ describe("the whole cosmos", () => {
         },
       ],
     }));
+  // Its chunk is a real import, which no fake clock waits for: a cold one, alone in a run, came after the frames.
   const at = async (scene: ReturnType<typeof made>, eye: Point) => {
     scene.cosmos.tick(eye, 0);
     await settled();
+    await vi.dynamicImportSettled();
     scene.cosmos.tick(eye, 0);
     await settled();
   };
@@ -1207,6 +1209,44 @@ describe("the whole cosmos", () => {
     expect(fromLadder.size).toBeGreaterThan(3);
     for (const star of fromLadder) expect(starsOf(web).has(star)).toBe(true);
     expect(web.parent?.rotation.x).toBe(ladder.parent?.rotation.x);
+  });
+
+  const webLook = (scene: ReturnType<typeof made>) => {
+    const found = shownWith(scene, "aCircle")[0];
+    if (!(found instanceof Points)) throw new Error("no whole cosmos shown");
+    return found as Points<BufferGeometry, ShaderMaterial>;
+  };
+
+  it("hides the whole cosmos with the page, after it showed", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, out(900));
+    expect(shownWith(scene, "aCircle")).toHaveLength(1);
+    scene.cosmos.show(undefined);
+    expect(shownWith(scene, "aCircle")).toHaveLength(0);
+  });
+
+  it("gives the whole cosmos the screen's pixels, set before its chunk came", async () => {
+    const scene = made();
+    scene.cosmos.resize(HEIGHT, 2);
+    await shown(scene, linked(90));
+    await at(scene, out(900));
+    expect(webLook(scene).material.uniforms["uRatio"]?.value).toBe(2);
+  });
+
+  it("draws the whole cosmos once its chunk comes, the eye standing still", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    const eye = out(900);
+    scene.cosmos.tick(eye, 0);
+    await settled();
+    await vi.dynamicImportSettled();
+    for (let frame = 0; frame < 4; frame += 1) {
+      scene.cosmos.tick(eye, 0);
+      await settled();
+    }
+    const sizes = webLook(scene).geometry.getAttribute("aSoft");
+    expect(Array.from({ length: 90 }, (_, index) => sizes.getX(index)).every((size) => size >= 0.75)).toBe(true);
   });
 
   it("gives the whole cosmos the file's time: gold for a world called in the last run only", async () => {
