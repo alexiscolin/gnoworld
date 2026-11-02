@@ -2255,6 +2255,22 @@ describe("the whole cosmos", () => {
       expect(scene.stage.getObjectByName("dissolve")).toBeUndefined();
     });
 
+    // The review of 7d7 (1): a reader who left the home during the dissolve left its picture on the stage every page draws on.
+    it("ends the dive when the home goes: nothing of it stays on the stage, and the home comes back at rest", async () => {
+      const scene = await diving(true);
+      const { gl } = fakeGl();
+      for (const clock of [0, DIVE.hold, DIVE.hold + 0.01, DIVE.hold + DIVE.dissolve / 2]) {
+        await frame(scene, clock, true);
+        drawn(scene, gl);
+      }
+      expect(scene.cosmos.stats().dive.veil).toBeGreaterThan(0);
+      scene.cosmos.show(undefined);
+      await frame(scene, DIVE.hold + DIVE.dissolve, true);
+      expect(scene.stage.getObjectByName("dissolve")).toBeUndefined();
+      scene.cosmos.show(ONYX);
+      expect((await frame(scene, DIVE.hold + DIVE.dissolve + 1, true)).dive).toEqual({ along: 1, veil: 0 });
+    });
+
     it("frees the copied frame when the cosmos goes in the middle of its dissolve", async () => {
       const scene = await diving(true);
       const { gl } = fakeGl();

@@ -87,6 +87,12 @@ export class AtRest {
     );
   }
 
+  /** The home went (the review of 7d7): the dive lands at once, and nothing of it stays on the stage the other pages draw on. */
+  land(): void {
+    this.#still = undefined;
+    this.#dive?.dispose();
+  }
+
   /** A frame at `clock`, the whole cosmos `ready` to take the view or not: how much of the cosmos shows, none while the dive waits. Once
    * its code came, each frame asks the next, its last among them, which takes away what it drew; a chunk on its way asks none. */
   advance(clock: number, ready: boolean): number {
@@ -129,12 +135,13 @@ export class AtRest {
   }
 
   /** Stands the eye `seconds` on from the scene's `eye`, and turns `camera` to the Earth from it; the scene's own turn stands until the
-   * view has come. */
-  stand(eye: Point, seconds: number, camera: PerspectiveCamera): void {
+   * view has come. Gives the eye it stood. */
+  stand(eye: Point, seconds: number, camera: PerspectiveCamera): Point {
     this.#place(eye, seconds, this.eye);
     this.#place(eye, 0, this.#resting);
     if (this.#still !== undefined) this.#dive?.dived(this.#view.eye, this.eye);
     this.#eye?.aim(camera, this.eye);
+    return this.eye;
   }
 
   #place(eye: Point, seconds: number, out: { x: number; y: number; z: number }): void {

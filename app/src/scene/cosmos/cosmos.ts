@@ -90,6 +90,7 @@ export class Cosmos {
     this.#setShown(worlds !== undefined);
     clearTimeout(this.#release);
     if (worlds === undefined) {
+      this.#atRest.land();
       this.#release = setTimeout(this.#releaseMaps, RELEASE_MS);
       return;
     }
@@ -138,8 +139,7 @@ export class Cosmos {
   tick(eye: Point, seconds: number, clock = seconds): void {
     if (!this.#wanted) return;
     this.#shown = this.#atRest.advance(clock, this.#whole.ready);
-    this.#atRest.stand(eye, seconds, this.#device.camera);
-    const placed = this.#atRest.eye;
+    const placed = this.#atRest.stand(eye, seconds, this.#device.camera);
     this.#disc.advance(placed, seconds);
     this.#bodies.tick(placed, seconds);
     this.#home.tick(placed, seconds, this.#device.camera.quaternion);
