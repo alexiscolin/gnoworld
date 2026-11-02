@@ -158,7 +158,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run test:c
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" "python3 -I scripts/load.py" \
-	'unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py" \
+	'unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py" \
 	"PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -2069,6 +2069,8 @@ if [ -n "${LOCKPEEK:-}" ]; then
 	echo "$n pid=$p $alive worktree=$(cat "$l/worktree" 2>/dev/null || :) since=$(cat "$l/since" 2>/dev/null || :)" >>"$GATE_LOG.lockpeek"
 fi
 [ -z "${RUN_TAG:-}" ] || echo "$RUN_TAG $n" >>"$GATE_LOG.tags"
+# The folder a build or a journey run is told to build and serve (F4249): GNOWORLD_BUILD, empty for app/build.
+case "$n" in build:app | playwright) echo "$n build=${GNOWORLD_BUILD-}" >>"$GATE_LOG.build" ;; esac
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
 # The patch's coverage reads the report of a coverage run that passed (or passed on its retry); a failed one leaves none, and the real script fails.
 [ "$n" != py:patch_coverage ] || grep -qx "done coverage" "$GATE_LOG" || { echo "patch_coverage: no coverage report" >&2; exit 1; }
@@ -2156,7 +2158,7 @@ for f in server/src/a.ts server/src/b.ts server/roles.json app/src/a.tsx app/tes
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x && git -C "$g" update-ref refs/remotes/origin/main HEAD
 }
-gate() { : >"$log" && rm -f "$log".met.* "$log.load" "$log".flaked.* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
+gate() { : >"$log" && rm -f "$log".met.* "$log.load" "$log".flaked.* "$log.build" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" PATH="$g/bin:$PATH" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 # A commit's gate that builds the app reads the first screen's budget with the budget spec alone (the dream of 2026-11-01, 6): that is no journey.
 journeys() { grep '^playwright ' "$log" | grep -qv "app/tests/e2e/budgets.spec.ts"; }
@@ -2233,6 +2235,18 @@ out=$(gate) || fail "check.sh failed on a new app file: $out"
 # The app's step builds it and runs every journey, the work of a run of everything: its budget (slice-5a, F2162).
 printf '%s\n' "$out" | grep -q "(budget 120 s)$" || fail "check.sh gave a run that builds the app another budget than 120 s: $out"
 scoped "a new app file" $cheap typecheck lint test build:app - gno sh:test_hooks
+# A commit's gate builds the app and reads its budget in a folder of its own, never app/build, which the journeys build and serve: a build
+# empties its folder, and one run while a session's journeys were served emptied the site under them (33 ERR_EMPTY_RESPONSE, F4249).
+# Both steps get the same folder, outside the worktree, and it is gone when the gate ends.
+[ "$(wc -l <"$log.build")" -eq 2 ] || fail "check.sh did not build and read the budget once each at a commit: $(cat "$log.build")"
+own=$(sed -n 's/^build:app build=//p' "$log.build")
+[ -n "$own" ] && [ "$(sed -n 's/^playwright build=//p' "$log.build")" = "$own" ] || fail "check.sh's build and its budget run did not share a build folder of their own (GNOWORLD_BUILD): $(cat "$log.build")"
+real=$(cd "$g" && pwd -P)
+case "$own" in "$real"/app/build-gate/?*) ;; *) fail "check.sh's build folder is not app/build-gate/<run>, an absolute folder inside the app: $own" ;; esac
+[ ! -e "$g/app/build-gate" ] || fail "check.sh left app/build-gate behind"
+# A caller's own GNOWORLD_BUILD does not steer the gate to a folder it did not make.
+GNOWORLD_BUILD=/elsewhere gate >/dev/null || fail "check.sh failed with GNOWORLD_BUILD set"
+[ "$(sed -n 's/^build:app build=//p' "$log.build")" != /elsewhere ] || fail "check.sh built into the caller's GNOWORLD_BUILD"
 grep -q '^test .*--changed' "$log" || fail "check.sh did not run only the tests an app change touches"
 for s in unused copies comments py:check_css; do before "$s" build:app || fail "check.sh built the app before $s read the tree (F082)"; done
 reset
@@ -2658,7 +2672,7 @@ full_fixture gate_full
 # The full gate: every fast step but the plain tests, then the full ones in lanes, each told where the
 # branch left main; harness_mutate only when the harness changed since main.
 base=$(git -C "$g" rev-parse HEAD)
-out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
+out=$(AUDIT_ANSWER=x PICTURES_OF=nothing STORIES_PORT=6007 STORIES_OUT=/elsewhere GNOWORLD_BUILD=/elsewhere gate --full) || fail "check.sh --full failed on a copy whose every step passes: $out"
 # The stories' walk is every story's, whatever PICTURES_OF the environment carries, and the tokens comparison is the fast
 # gate's alone (F1190).
 # Its file server takes a free port of its own run, as the tokens' pictures do, never the caller's 6007 nor the config's: two
@@ -2670,6 +2684,8 @@ for s in $full_steps py:probe py:bench core_chromium stories coverage py:patch_c
 	[ "$s" = test ] || ran "$s" || fail "check.sh --full skipped $s"
 done
 ran test && fail "check.sh --full ran the tests twice, with and without coverage"
+# The journeys build and serve app/build: their run is told no other folder, whatever the caller's environment says (F4249).
+grep -qx 'playwright build=' "$log.build" || fail "check.sh --full gave the journeys another build folder than app/build: $(cat "$log.build")"
 # Core's tests run again in Chromium, whose engine reads some regexes and Unicode otherwise than Node's (F816): their
 # project, which vitest.config.ts opens only when CORE_CHROMIUM is set.
 grep -qx "core_chromium switch=1 run --project core_chromium" "$log" ||

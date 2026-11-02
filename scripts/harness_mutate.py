@@ -140,6 +140,13 @@ def journeys_mutants():
         yield from each(check, find, replace, "hooks", f"check.sh {label}")
 
 
+def build_folder_mutants():
+    """A commit's gate builds the app and reads its budget in app/build-gate/<run>, never in app/build, which the journeys serve (F4249)."""
+    yield from each("scripts/check.sh", "\t\tGNOWORLD_BUILD=$gate_build\n\t\texport GNOWORLD_BUILD\n", "", "hooks", "check.sh builds at a commit into app/build, where the journeys are served")
+    yield from each("scripts/check.sh", "\t\tGNOWORLD_BUILD=$gate_build\n", "\t\tGNOWORLD_BUILD=$PWD/app/build\n", "hooks", "check.sh builds at a commit into app/build by name")
+    yield from each("scripts/check.sh", "\t\texport GNOWORLD_BUILD\n", "", "hooks", "check.sh keeps the budget run's build folder to itself")
+
+
 def quick_mutants():
     """check_regressions --quick, per commit (F2579): the hook and the fast gate ask for it, and it lists only what the change touches."""
     yield from each(".githooks/pre-commit", '--quick "$base"', '"$base"', "hooks", "pre-commit lists every test of the base and the tree per commit")
@@ -792,7 +799,7 @@ def mutants():
     yield from each(".githooks/pre-commit", "--name-only -z --", "--name-only --", "hooks", "pre-commit keeps a harness file's name whole")
     yield from each("scripts/guard.py", 'if sub in ("send-pack", "http-push", "receive-pack"):', "if False:", "hooks", "guard refuses send-pack")
     yield from each("scripts/guard.py", 'w.lower().startswith("alias.") or', "False or", "hooks", "guard refuses git aliases")
-    yield from each("scripts/check.sh", "unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
+    yield from each("scripts/check.sh", "unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/code_changed.sh", 'git ls-files -s -- "$@"; git diff --binary -- "$@";', "git rev-parse HEAD; git diff HEAD --binary;", "hooks", "code_changed state leaves prose out")
@@ -1093,6 +1100,7 @@ def mutants():
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from journeys_mutants()
+    yield from build_folder_mutants()
     yield from quick_mutants()
     yield from checks_mutants()
     yield from stryker_mutants()

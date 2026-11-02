@@ -21,6 +21,9 @@ const origins = connectOrigins(data.universes);
 export default {
   appDirectory: "src",
   ssr: false,
+  // app/build, which the journeys build and serve. The commit's gate builds into a folder of its own (GNOWORLD_BUILD, an absolute path, check.sh):
+  // a build empties its folder, and one into the journeys' would empty the site they are served from mid-run (F4249).
+  buildDirectory: process.env["GNOWORLD_BUILD"] ?? "build",
   prerender: prerenderPaths(placesFrom(data)),
   // After the pages are written (React Router's buildEnd follows the prerender): a policy for each page, holding its own
   // scripts' hashes, for a host that reads _headers, for nginx, and for the test host (5f).

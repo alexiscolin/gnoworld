@@ -13,7 +13,10 @@ const SHAPE = new RegExp(
 );
 const HASH = /'sha256-[^']+'/g;
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
-const BUILD = new URL("../../build/", import.meta.url);
+const BUILD =
+  process.env["GNOWORLD_BUILD"] === undefined
+    ? new URL("../../build/", import.meta.url)
+    : new URL(`file://${process.env["GNOWORLD_BUILD"]}/`);
 
 test.describe("the content security policy", () => {
   // 5f: one policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at

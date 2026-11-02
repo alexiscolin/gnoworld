@@ -6,6 +6,8 @@ import { defineConfig, type Plugin } from "vite";
 // addresses `vite preview` may answer, exactly. LAB_STATIC, an absolute folder, builds a static `index.html` with relative paths.
 const hosts = process.env["LAB_HOSTS"]?.split(",").filter(Boolean) ?? [];
 const folder = process.env["LAB_STATIC"];
+// Beside the site, in the site's build folder: app/build, or GNOWORLD_BUILD (react-router.config.ts).
+const built = process.env["GNOWORLD_BUILD"];
 
 // Written, the page is renamed: Vite names an html file as its source. The folder must be absolute.
 const asIndex: Plugin = {
@@ -22,7 +24,7 @@ export default defineConfig({
   publicDir: "../public",
   plugins: folder === undefined ? [] : [asIndex],
   build: {
-    outDir: folder ?? "../build/client/lab",
+    outDir: folder ?? (built === undefined ? "../build/client/lab" : join(built, "client", "lab")),
     emptyOutDir: true,
     rolldownOptions: { input: "lab/realism.html" },
   },

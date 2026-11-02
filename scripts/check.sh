@@ -21,6 +21,7 @@ logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # on the last line, tells a run that reached its end from one that died on the way.
 merge_lock="${HOME}/.cache/gnoworld-tools/merge.lock" # --merge's lock, below
 lock_held=
+gate_build= # the folder a commit's gate builds the app into, below; its trap removes it
 # Only the run that took the lock frees it: by its pid, or while the pid is not yet written (a signal between the folder and the pid).
 release_lock() {
 	[ -n "$lock_held" ] || return 0
@@ -34,11 +35,13 @@ say_failed() { # $status is the exit code the shell had; a run that never reache
 	[ "$status" != 0 ] || [ "${finished:-}" != 1 ] || return 0
 	echo "check.sh: FAILED at ${failed_at:-main:${step_name:-start}}" >&2
 }
-trap 'status=$?; rm -rf "${logs:?}" || :; release_lock; say_failed; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+trap 'status=$?; rm -rf "${logs:?}" || :; [ -z "$gate_build" ] || { rm -rf "${gate_build:?}" || :; rmdir "${gate_build%/*}" 2>/dev/null || :; }; release_lock; say_failed; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
+# Beside the logs' folder, so two gates of one worktree (a hook and a Stop hook) never share it; app/ is where a build finds its node_modules.
+gate_build="$(pwd)/app/build-gate/${logs##*/}"
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
-unset AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
+unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
 # The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
 # to 10240 for every step, up or down, and a limit that cannot be set is said, never hidden.
@@ -362,6 +365,11 @@ lane_ts() {
 		# A commit's gate builds the app and walks no journey (Alexis, 2026-10-31: 487 and 505 CPU s of journeys against 67 to 91 for the
 		# rest of a commit's gate, speed-audit.md): the build still fails on a route or an import the types do not see. The merge check
 		# and --full walk every journey, which build the app themselves.
+		# In a folder of its own (app/build-gate/<this run>, gitignored, removed when the gate ends; inside the app, where the server bundle finds its node_modules): a build empties the folder it writes, and app/build is the one the journeys
+		# of a session build and serve, so a gate run beside them left their site empty (33 ERR_EMPTY_RESPONSE, F4249). The budget run below
+		# builds again and serves the same folder (react-router.config.ts, serve.mjs, lab.config.ts read GNOWORLD_BUILD).
+		GNOWORLD_BUILD=$gate_build
+		export GNOWORLD_BUILD
 		run build:app
 		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 		# And the first screen's budget, read with the budget spec's own measure, the browser's gzip, and nothing else of the journeys: the build
