@@ -19,8 +19,14 @@ const RING_LEAN = [0.3, 0.65] as const;
 const RING_INNER = [1.25, 1.45] as const;
 const RING_WIDTH = [0.62, 0.95] as const;
 const RING_OPACITY = [0.34, 0.72] as const;
-// "gnoworld/planet/v1", its bytes spelled for want of a TextEncoder.
-const DOMAIN = Uint8Array.from("gnoworld/planet/v1", (character) => character.charCodeAt(0));
+// The strange ones stay rare, about one world in ten (ADR-0002 §3): 26 of a hash byte's 256.
+const STRANGE: readonly Anchor[] = ["tidally locked", "shattered"];
+const STRANGE_BELOW = 26;
+
+/** A text's bytes, for want of a TextEncoder: a path or a world's id is ASCII by its schema. */
+export const asciiBytes = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
+
+const DOMAIN = asciiBytes("gnoworld/planet/v1");
 
 export interface PlanetLook {
   readonly anchor: Anchor;
@@ -115,7 +121,14 @@ function waters(row: AnchorRow, { byte }: Reader): Pick<PlanetLook, "sea" | "glo
   };
 }
 
-/** The look of `path` as `anchor`: choosing the anchor from the seed comes with the classes (7b2). */
+/** The anchor a seed gives, from a hash of it: all 32 of its own bytes are taken. */
+export function anchorOf(seed: Uint8Array): Anchor {
+  const common = ANCHORS.filter((anchor) => !STRANGE.includes(anchor));
+  const byte = sha256(seed)[0] ?? 0;
+  return (byte < STRANGE_BELOW ? STRANGE[byte % STRANGE.length] : common[byte % common.length]) ?? "rocky";
+}
+
+/** The look of `path` as `anchor`. */
 export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
   const seed = reader(planetSeed(path));
   const { word, byte } = seed;
@@ -148,4 +161,10 @@ export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
     ...waters(row, seed),
     rings,
   };
+}
+
+/** The look of a world by its id, at its path on gno.land: a world keeps it across versions. */
+export function worldLook(id: string): PlanetLook {
+  const path = asciiBytes(`gno.land/r/${id}`);
+  return planetLook(path, anchorOf(planetSeed(path)));
 }

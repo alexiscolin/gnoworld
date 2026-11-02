@@ -1,6 +1,6 @@
 // The realism page's four views. Each builds what it shows and frees it all, so the memory a view reports is what it takes. A view loads only
 // its own maps: the gallery shows the whole set, the others two or three.
-import { ANCHORS, planetLook, planetSeed, type PlanetLook } from "@gnoworld/core";
+import { ANCHORS, asciiBytes, planetLook, planetSeed, type PlanetLook } from "@gnoworld/core";
 import {
   PerspectiveCamera,
   Scene,
@@ -72,15 +72,13 @@ const GALLERY_WIDTH = 2048;
 const CLOSE_WIDTH = 4096;
 const PAN = 0.14;
 
-const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
-
 /** The path of a world on the page: another seed, another world of the same anchor. */
 export const pathOf = (world: number, seed: number): string =>
   `gno.land/r/${NAMES[world] ?? "atlas"}${seed === 0 ? "" : String(seed)}/home`;
 
 /** The look of the page's `world`th anchor. */
 const lookAt = (world: number, seed: number): PlanetLook =>
-  planetLook(ascii(pathOf(world, seed)), ANCHORS[world] ?? "rocky");
+  planetLook(asciiBytes(pathOf(world, seed)), ANCHORS[world] ?? "rocky");
 
 /** The looks a choice shows. */
 export const looksOf = ({ view, world, seed }: Choice): PlanetLook[] =>
@@ -136,7 +134,7 @@ function staged(worlds: readonly Planet[], layout: Layout, sky: Object3D) {
 function lightWorlds(worlds: readonly Planet[], choice: Choice): void {
   for (const [index, world] of worlds.entries()) {
     const at = choice.view === "gallery" ? index : choice.world;
-    world.setSun(sideLight(planetSeed(ascii(pathOf(at, choice.seed))), new Vector3()));
+    world.setSun(sideLight(planetSeed(asciiBytes(pathOf(at, choice.seed))), new Vector3()));
     if (world.look.rim !== null) world.setLimb(LIMB_LIGHT);
   }
 }

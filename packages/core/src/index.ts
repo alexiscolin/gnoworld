@@ -26,12 +26,15 @@ export {
   type SystemRef,
 } from "./cosmos/cosmos.ts";
 export {
+  anchorOf,
   ANCHORS,
+  asciiBytes,
   between,
   MAPS,
   planetLook,
   planetSeed,
   seedShare,
+  worldLook,
   type Anchor,
   type MapName,
   type PlanetLook,
