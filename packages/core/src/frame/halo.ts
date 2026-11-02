@@ -3,8 +3,8 @@
 import { smoothstep } from "../space/smooth.ts";
 
 const HALO_NEAR = 40;
-// Past this a star is a point.
-const HALO_FAR = 120;
+/** Past this a star is a point. */
+export const HALO_FAR = 120;
 
 /** The share of its halo a star keeps `distance` from the eye. */
 export const haloAt = (distance: number): number => 1 - smoothstep(HALO_NEAR, HALO_FAR, distance);

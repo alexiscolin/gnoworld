@@ -90,15 +90,15 @@ const groupsOf = (choice: readonly Orbiter[], count: number): Orbiter[][] =>
     ? [[]]
     : choice.flatMap((world, at) => groupsOf(choice.slice(at + 1), count - 1).map((rest) => [world, ...rest]));
 
-/** The worlds a postcard of `system` draws as bodies, widened round its star: the most, then the largest, that stand apart in its cell, inside
- * its far belt if it has one (7d3: never among its rocks), and read as no figure. Its others are specks. */
-export function postcardWorlds(system: StarSystem): Orbiter[] {
+/** The worlds a postcard of `system` draws as bodies, `most` at most, widened round its star: the most, then the largest, that stand apart
+ * in its cell, inside its far belt if it has one (7d3: never among its rocks), and read as no figure. Its others are specks. */
+export function postcardWorlds(system: StarSystem, most = POSTCARD_BODIES): Orbiter[] {
   const choice = system.worlds
     .filter(({ radius }) => radius >= GRAIN)
     .sort((a, b) => b.radius - a.radius)
     .slice(0, CHOICE);
   const room = system.belt ? BELT_INNER : ROOM;
-  for (let count = Math.min(POSTCARD_BODIES, choice.length); count > 0; count -= 1)
+  for (let count = Math.min(most, POSTCARD_BODIES, choice.length); count > 0; count -= 1)
     for (const worlds of groupsOf(choice, count)) {
       const spread = spreadOf(worlds, room);
       const fits = worlds.every(({ orbit, radius }) => spread * orbit + radius <= room + ROUNDING);

@@ -66,8 +66,8 @@ export {
   type InPlane,
 } from "./frame/disc.ts";
 export { coveredShare, offLine } from "./frame/composition.ts";
-export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { haloAt } from "./frame/halo.ts";
+export { ARRIVAL_LEAN, arrivalOf, type Arrival } from "./frame/arrival.ts";
+export { HALO_FAR, haloAt } from "./frame/halo.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,

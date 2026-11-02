@@ -146,6 +146,30 @@ describe("a postcard's worlds", () => {
   });
 });
 
+describe("a postcard's worlds at a count", () => {
+  it("chooses as many as asked at most, by the same rules: as no figure, apart, within the cell", () => {
+    const four = systemOf(
+      [
+        [0.6, 1.0, 0.2],
+        [0.4, 1.8, 2.1],
+        [0.5, 2.5, 4.4],
+        [0.35, 3.1, 5.3],
+      ],
+      0.3,
+      1.1,
+    );
+    const all = postcardWorlds(four);
+    expect(all.length).toBeGreaterThan(2);
+    for (let most = all.length; most > 0; most -= 1) {
+      const some = postcardWorlds(four, most);
+      expect(some.length).toBeLessThanOrEqual(most);
+      expect(some.length).toBeGreaterThan(0);
+    }
+    expect(postcardWorlds(four, 0)).toEqual([]);
+    expect(postcardWorlds(four, 4)).toEqual(all);
+  });
+});
+
 // 7d3's review: a postcard's specks, its worlds too small for a body, stand at their own orbits in its plane while its bodies are widened;
 // one that would stand on a body's ground, or against it, is not drawn. A system turns as one, so what stands clear at rest stays clear.
 describe("a postcard's specks", () => {

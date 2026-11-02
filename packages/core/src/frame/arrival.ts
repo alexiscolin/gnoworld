@@ -1,12 +1,13 @@
 // A system's arrival (slice 7d3; ADR-0002 §10, "A system is a postcard"): where the eye rests when it comes to a system, and what it looks
 // at. Built on the view at rest's rules (7d6): `postcardWorlds`' worlds, judged on the screens that view is composed for by `composed`. The
-// address orders the angles tried, so the same address gives the same postcard and two systems are seldom seen alike; the star stands a
-// third of the way in, never centred for the camera, and the eye near enough that the system's near side reads larger than its far side.
+// address picks the slant, the side and the height the star stands at and the order the angles are tried in, so the same address gives the
+// same postcard and two systems are seldom seen alike; the eye stands near enough that the system's near side reads larger than its far.
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { SWAY_CORNERS } from "../space/drift.ts";
+import { LEAN, SWAY_CORNERS } from "../space/drift.ts";
 import { composed } from "./composition.ts";
-import { onPlane } from "./disc.ts";
+import { CENTRE, onPlane, toMap } from "./disc.ts";
+import { HALO_FAR, haloAt } from "./halo.ts";
 import { postcardFrom, postcardWorlds, type Postcard } from "./postcard.ts";
 import { instantsOf, spotsOf } from "./restCards.ts";
 import {
@@ -30,25 +31,47 @@ export interface Arrival {
   readonly postcard: Postcard;
 }
 
-// Slants over the system's plane, in degrees: seen at a slant, never face on (rings round the star), never edge on (a row).
-const SLANTS = [32, 40, 48, 56];
+/** How far a mouse leans the eye at an arrival: half the home's, for the eye stands nearer what it looks at (7d3's review). */
+export const ARRIVAL_LEAN = LEAN / 2;
+
+// Slants over the system's plane, in degrees, from the least, over a span, tried a fourth of it apart: never face on (rings round the
+// star), never edge on (a row).
+const SLANT_LEAST = 32;
+const SLANT_SPAN = 24;
+const SLANT_TRIES = 4;
 const TURNS = 16;
 // The share of the screen's height its ball takes, and how far its star stands off the middle and up or down, in heights.
 const FILL = [0.45, 0.6] as const;
-const ASIDE = [0.24, 0.3] as const;
-const LIFT = 0.06;
+const ASIDE = [0.27, 0.36] as const;
+const LIFT = 0.16;
 // The view looks no steeper than this up or down the map: its up stays up.
 const STEEP = Math.sin(60 * DEGREE);
 const MARGIN = 24;
 // A system of grain alone is framed by its star.
 const LEAST_REACH = 2.5;
-// What the arrival reads of its set: another system's room round the eye, and a star near enough to keep a halo of its own (halos.ts: whole
-// to 40 units, a point by 120), which on the postcard would be a second sun. The eye stands 29 units off at most, so nothing past 100 counts.
+// What the arrival reads of its set: another system's room round the eye, and any star that keeps three quarters of its halo or more (64
+// units off or nearer), which on the postcard would read as a second sun. The eye stands 29 units off at most, so nothing farther than that
+// past a halo's reach counts.
 const OUTSIDE = ROOM + 1;
-const HALOED = 60;
-const NEAR = 100;
+const SECOND_SUN = 0.75;
+const NEAR = HALO_FAR + 30;
+// A mouse's lean on the map: the eight edges of the stage's across and up, at an arrival's lean.
+const LEANS: readonly Point[] = [
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+].map(([across = 0, up = 0]) => {
+  const out = { x: 0, y: 0, z: 0 };
+  toMap({ x: CENTRE.x + across * ARRIVAL_LEAN, y: CENTRE.y + up * ARRIVAL_LEAN, z: CENTRE.z }, out);
+  return out;
+});
 
-/** What an address picks: how much of the screen its system takes, where its star stands, where the angles tried start. */
+/** What an address picks: how much of the screen its system takes, where its star stands, the slant and turn the angles start from. */
 interface Chosen {
   readonly fill: number;
   readonly aside: number;
@@ -69,7 +92,7 @@ function chosenOf(id: string): Chosen {
     aside: side * (ASIDE[0] + (ASIDE[1] - ASIDE[0]) * next()),
     lift: LIFT * (2 * next() - 1),
     first: next(),
-    slant: Math.floor(next() * SLANTS.length),
+    slant: SLANT_SPAN * next(),
   };
 }
 
@@ -84,17 +107,24 @@ interface Held {
 
 const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y);
 
-// On one screen from one eye: the ball whole under the header, the Earth and every haloed star off it, no world on the star's heart.
-function sees(look: Look, { place, reach, card, near }: Held): boolean {
+// On one screen from one eye: the ball whole under the header, no world on the star's heart.
+function sees(look: Look, { place, reach, card }: Held): boolean {
+  const star = look.seen(place);
+  return (
+    look.whole(look.ball(place, reach), MARGIN) &&
+    spotsOf(look, [card], {}).every((spot) => apart(spot, star) - spot.radius >= STAR_HEART)
+  );
+}
+
+// From the eye at rest: the Earth and every star that keeps a good share of its halo off the ball.
+function alone(look: Look, { place, reach, near }: Held): boolean {
   const ball = look.ball(place, reach);
   const { earth } = look;
-  if (!look.whole(ball, MARGIN) || (earth.depth > 0 && apart(earth, ball) < earth.radius + ball.radius)) return false;
-  const star = look.seen(place);
-  const lit = near.every((other) => {
+  if (earth.depth > 0 && apart(earth, ball) < earth.radius + ball.radius) return false;
+  return near.every((other) => {
     const seen = look.seen(other.place);
-    return seen.depth <= 0 || seen.away > HALOED || apart(seen, ball) >= ball.radius;
+    return seen.depth <= 0 || haloAt(seen.away) < SECOND_SUN || apart(seen, ball) >= ball.radius;
   });
-  return lit && spotsOf(look, [card], {}).every((spot) => apart(spot, star) - spot.radius >= STAR_HEART);
 }
 
 // As the view at rest's rules read it: the first picture with its star, the worlds alone through their turn, for a world, its star and
@@ -110,13 +140,19 @@ function reads(look: Look, { place, card, instants }: Held): boolean {
   return judged(0, [star]) && instants.every((seconds) => judged(seconds, []));
 }
 
-const holds = (camera: Camera, look: Point, held: Held): boolean =>
+// The eye outside every other room; at rest alone with its star, read well, whole and clear; whole and clear through the sway, and
+// through a mouse's lean where `leaning`.
+const holds = (camera: Camera, look: Point, held: Held & { readonly leaning: boolean }): boolean =>
   held.near.every((other) => away(other.place, camera.eye) >= OUTSIDE) &&
-  looksFrom(camera).every((each) => sees(each, held) && reads(each, held)) &&
-  SWAY_CORNERS.every((sway) => looksFrom(swayed(camera, sway, look)).every((each) => sees(each, held)));
+  looksFrom(camera).every((each) => alone(each, held) && sees(each, held) && reads(each, held)) &&
+  SWAY_CORNERS.every((sway) => looksFrom(swayed(camera, sway, look)).every((each) => sees(each, held))) &&
+  (!held.leaning ||
+    LEANS.every((lean) =>
+      looksFrom(cameraTowards(along(camera.eye, lean, 1), look)).every((each) => sees(each, held)),
+    ));
 
 // The eye `slant` over the system's plane and `turn` round its normal, framing a ball `reach` round the star, and what it looks at: beside
-// the star, so the star stands `aside` of the middle.
+// the star, so the star stands `aside` of the middle and `lift` above or below it.
 function tryOf(
   system: StarSystem,
   [slant, turn]: readonly [number, number],
@@ -141,43 +177,50 @@ function tryOf(
 const reachOf = (system: StarSystem, worlds: readonly Orbiter[]) =>
   Math.max(system.belt ? ROOM : 0, ...worlds.map(({ orbit, radius }) => orbit + radius)) || LEAST_REACH;
 
+// The angles in the address's order: its slants a fourth of the span apart, each all round from its turn.
+function anglesOf(pick: Chosen): (readonly [number, number])[] {
+  return Array.from({ length: SLANT_TRIES * TURNS }, (_, at) => {
+    const slant = SLANT_LEAST + ((pick.slant + (Math.floor(at / TURNS) * SLANT_SPAN) / SLANT_TRIES) % SLANT_SPAN);
+    return [slant * DEGREE, 2 * Math.PI * (pick.first + (at % TURNS) / TURNS)] as const;
+  });
+}
+
+interface Asked {
+  readonly pick: Chosen;
+  readonly near: readonly StarSystem[];
+  readonly leaning: boolean;
+}
+
 // The first angle, in the address's order, from which `worlds` read as the rules ask; none if no angle holds.
-function firstHolding(
-  system: StarSystem,
-  worlds: readonly Orbiter[],
-  { pick, near }: { pick: Chosen; near: readonly StarSystem[] },
-) {
+function firstHolding(system: StarSystem, worlds: readonly Orbiter[], { pick, near, leaning }: Asked) {
   const reach = reachOf(system, worlds);
   const instants = instantsOf([system.spin]);
-  for (let slant = 0; slant < SLANTS.length; slant += 1)
-    for (let turn = 0; turn < TURNS; turn += 1) {
-      const angle = [
-        (SLANTS[(pick.slant + slant) % SLANTS.length] ?? 0) * DEGREE,
-        2 * Math.PI * (pick.first + turn / TURNS),
-      ] as const;
-      const { camera, look } = tryOf(system, angle, { reach, pick });
-      const card = { system: postcardFrom(system, worlds, camera.eye).system, worlds };
-      const held = { place: system.place, reach, card, instants, near };
-      if (Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
-        return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera.eye) };
-    }
+  for (const angle of anglesOf(pick)) {
+    const { camera, look } = tryOf(system, angle, { reach, pick });
+    const card = { system: postcardFrom(system, worlds, camera.eye).system, worlds };
+    const held = { place: system.place, reach, card, instants, near, leaning };
+    if (Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
+      return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera.eye) };
+  }
   return undefined;
 }
 
-/** `system`'s arrival among `systems`: the most of its postcard's worlds, the largest first, that some angle reads well, from the first such
- * angle its address gives. A system none reads well with stands by its star alone, from its address's first angle. */
+/** `system`'s arrival among `systems`: the most of its postcard's worlds that some angle reads well, chosen again at each count, from the
+ * first such angle its address gives; one that holds through a mouse's lean first, else one that holds at rest and through the sway. A
+ * system none reads well with stands by its star and its far belt alone, from its first angle that does not look down the map. */
 export function arrivalOf(system: StarSystem, systems: readonly StarSystem[]): Arrival {
   const pick = chosenOf(system.id);
   // ponytail: one pass over the set an arrival, asked once a system and off the frame: 20,000 distances.
   const near = systems.filter((other) => other.id !== system.id && away(other.place, system.place) <= NEAR);
-  const all = postcardWorlds(system);
-  for (let count = all.length; count >= 0; count -= 1) {
-    const found = firstHolding(system, all.slice(0, count), { pick, near });
-    if (found !== undefined) return found;
-  }
-  const { camera, look } = tryOf(system, [(SLANTS[pick.slant] ?? 0) * DEGREE, 2 * Math.PI * pick.first], {
-    reach: LEAST_REACH,
-    pick,
-  });
+  for (let count = postcardWorlds(system).length; count >= 0; count -= 1)
+    for (const leaning of [true, false]) {
+      const found = firstHolding(system, postcardWorlds(system, count), { pick, near, leaning });
+      if (found !== undefined) return found;
+    }
+  const reach = reachOf(system, []);
+  const tries = anglesOf(pick).map((angle) => tryOf(system, angle, { reach, pick }));
+  const [first] = tries;
+  const { camera, look } =
+    tries.find((tried) => Math.abs(tried.camera.ahead.y) <= STEEP) ?? first ?? tryOf(system, [0, 0], { reach, pick });
   return { eye: camera.eye, look, postcard: postcardFrom(system, [], camera.eye) };
 }
