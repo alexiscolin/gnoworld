@@ -238,6 +238,42 @@ describe("createPlanet", () => {
     expect(AIR_FRAGMENT).toMatch(/if \(limbLight > 0\.0\) lit = /);
   });
 
+  it("tints the halo of a world's air with the air's own colour, lifted, and gives an airless world none", () => {
+    const look = planetLook(DAO, "temperate");
+    if (look.rim === null) throw new Error("a temperate world has air");
+    const surface = createPlanet(look, fixed().set, sphere).surface;
+    const halo = read(surface, "hazeColour") as Color;
+    const own = linear(look.rim.colour);
+    expect(halo.b).toBeGreaterThan(own.b);
+    expect(halo.b).toBeLessThan(1);
+    expect(halo.b / halo.r).toBeGreaterThan(1);
+    expect(read(surface, "hazeAmount")).toBeGreaterThan(0.3);
+    const bare = createPlanet(planetLook(DAO, "rocky"), fixed().set, sphere).surface;
+    expect(read(bare, "hazeAmount")).toBe(0);
+  });
+
+  it("draws a thinner halo for a thinner air, never none", () => {
+    const amounts = ["temperate", "volcanic"].map((anchor) =>
+      read(
+        createPlanet(planetLook(DAO, anchor as (typeof ANCHORS)[number]), fixed().set, sphere).surface,
+        "hazeAmount",
+      ),
+    );
+    const [thick = 0, thin = 0] = amounts as number[];
+    expect(thin).toBeGreaterThan(0);
+    expect(thin).toBeLessThan(thick);
+  });
+
+  it("lights the edge of every world: the air's halo where there is air, a thin edge of sunlight where there is none", () => {
+    expect(SURFACE_FRAGMENT).toMatch(/if \(air > 0\.5\) colour = mix\(colour, hazeColour, rim \* hazeAmount\);/);
+    expect(SURFACE_FRAGMENT).toMatch(/else colour \+= EDGE \* sunlight \* pow\(1\.0 - facing, 5\.0\)/);
+  });
+
+  it("softens the light towards the terminator on every world, as the Earth's", () => {
+    expect(SURFACE_FRAGMENT).toContain("max(limb, mix(SOFT_BARE, SOFT_AIR, air))");
+    expect(SURFACE_FRAGMENT).toContain("light = pow(light, 1.0 - 0.3 * air);");
+  });
+
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {
     expect(RING_FRAGMENT).toMatch(/const float SHADED = 0\.[1-9]/);
     expect(RING_FRAGMENT).toContain("float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));");

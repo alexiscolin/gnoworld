@@ -3,7 +3,7 @@ import { Group, SphereGeometry, Vector3, type Mesh, type Texture } from "three";
 import { Disposer } from "../disposer.ts";
 import { starAt } from "../planet/light.ts";
 import { freeMap } from "../planet/maps.ts";
-import { createPlanet, type MapSet, type Planet } from "../planet/planet.ts";
+import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { Ground } from "./ground.ts";
 import { EARTH, GROUND_TO_MAP, MOON } from "./look.ts";
@@ -14,7 +14,6 @@ import type { EarthDevice } from "./view.ts";
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
-const LIMB = 1.05;
 const ANISOTROPY = 8;
 
 export class Globe {
@@ -40,7 +39,7 @@ export class Globe {
     const sphere = this.#owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
     const { clouds } = maps;
     this.#earth = this.#owner.add(createPlanet(EARTH, this.#set(maps.day, clouds, maps.night), sphere));
-    this.#earth.setLimb(LIMB);
+    this.#earth.setLimb(LIMB_LIGHT);
     this.moon = this.#owner.add(createPlanet(MOON, this.#set(maps.moon, clouds), sphere));
     this.moon.group.scale.setScalar(MOON_RADIUS);
     for (const { surface } of [this.#earth, this.moon])

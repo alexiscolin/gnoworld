@@ -74,13 +74,15 @@ void main() {
 
   vec3 view = normalize(cameraPosition - vWorld);
   float light = max(dot(bumped(axis, flow, height * (1.0 - wet), angle), sun), 0.0) * smoothstep(-0.02, 0.1, day);
-  if (nightLights > 0.0) light = pow(light, 0.7);
+  // Air spreads the terminator: dusk is a wide belt on the Earth, and on every world that has air.
+  light = pow(light, 1.0 - 0.3 * air);
   float facing = max(dot(normal, view), 0.001);
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
-  float shine = mix(dusty, soft, limb) * ringShade();
+  // The light falls off towards the terminator on every world, as the Earth's does, more where there is air, whatever the row says.
+  float shine = mix(dusty, soft, max(limb, mix(SOFT_BARE, SOFT_AIR, air))) * ringShade();
   vec3 sunlight = SUN * mix(mix(vec3(1.0), vec3(1.0, 0.56, 0.32), air), vec3(1.0), smoothstep(0.0, 0.26, light));
-  vec3 colour = albedo * shine * sunlight + albedo * 0.002;
+  vec3 colour = albedo * shine * sunlight + albedo * NIGHT;
 
   float gleam = max(dot(normal, normalize(sun + view)), 0.0);
   float ripple = 0.8 + 0.2 * field(direction * 14.0).x;
@@ -103,8 +105,11 @@ void main() {
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
     float dusk = 1.0 - smoothstep(-0.14, 0.05, day);
     colour += (cities * 2.6 + spill * 0.9) * vec3(1.0, 0.8, 0.52) * dusk * (1.0 - 0.8 * overcast);
-    colour = mix(colour, HAZE, pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day) * 0.9);
   }
+  float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
+  // Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
+  if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);
+  else colour += EDGE * sunlight * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);
   if (glowLevel > 0.0) {
     float heat = rifts > 0.0 ? rift * rift * smoothstep(0.1, 0.8, flow.z + 0.4) : smoothstep(glowLevel, glowLevel + 0.1, tone);
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + warpOffset).y);

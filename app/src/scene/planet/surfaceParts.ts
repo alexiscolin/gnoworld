@@ -15,6 +15,7 @@ uniform vec3 rampHigh;
 uniform vec3 seaShallow;
 uniform vec3 seaDeep;
 uniform vec3 glowColour;
+uniform vec3 hazeColour;
 uniform float time;
 uniform float warpAmount;
 uniform float warpFrequency;
@@ -29,6 +30,7 @@ uniform float rifts;
 uniform float cracks;
 uniform float locked;
 uniform float air;
+uniform float hazeAmount;
 uniform float seaLevel;
 uniform float glowLevel;
 uniform float ringInner;
@@ -46,9 +48,13 @@ const float SUN = 1.0;
 const float TEXEL = 0.0032;
 const float REACH = 0.012;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-// The frames' sea and the haze towards their limb, in the working space.
+// The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun.
 const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
-const vec3 HAZE = vec3(0.2, 0.34, 0.6);
+const float SOFT_AIR = 0.85;
+const float SOFT_BARE = 0.55;
+const float EDGE = 0.4;
+// What a world keeps in its night, so its dark side is a shape against the sky and not a hole in it.
+const float NIGHT = 0.007;
 
 vec3 turned(vec3 v, float angle) {
   float c = cos(angle);
