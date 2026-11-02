@@ -55,7 +55,7 @@ const Realm = z.strictObject({
 });
 
 /** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
-export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
+export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 
 /** A world by its id: a namespace, and for most worlds the folders that name it. */
 export const WorldId = z

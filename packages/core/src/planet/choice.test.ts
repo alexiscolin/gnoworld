@@ -45,18 +45,17 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
 ];
 const STRANGE: readonly Anchor[] = ["tidally locked", "shattered", "lava world", "two-faced", "hot giant"];
 // Each nature leans to anchors of its own (7b4, Alexis 2026-11-02): an NFT to the jewel-like ices, a token to the giants (ADR-0002 §3), an
-// exchange to the seas, a DAO to temperate worlds, a name to old ground, a game to fire and the strange ones.
+// exchange to the seas, a DAO to temperate worlds, a game to fire and the strange ones. No name: its rule read 3 of 7 unseen registries.
 const LEANS = {
   nft: ["nitrogen ice", "grooved ice"],
   token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
   exchange: ["ocean", "hycean"],
   dao: ["temperate"],
-  name: ["rocky", "desert"],
   game: ["volcanic", "tidally locked", "shattered", "lava world", "two-faced", "hot giant"],
 } as const satisfies Record<Nature, readonly Anchor[]>;
 // A nudge takes the bytes under this, of 256: about a third of a nature's worlds.
 const LEAN = 90;
-const NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
+const NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 
 const drawn = (byte: number): Anchor => {
   let left = byte;
@@ -240,7 +239,6 @@ describe("a world's nature nudges its class", () => {
     expect(anchorOf(seedOf("gnoland/wugnot"), "game")).toBe("shattered");
     expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "nft")).toBe("grooved ice");
     expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "exchange")).toBe("hycean");
-    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "name")).toBe("desert");
   });
 
   it.each(NATURES)("%s leans without fixing: every class stays open to it", (nature) => {
@@ -264,10 +262,9 @@ describe("natureOf", () => {
     expect(natureOf([realm(CONNECT4)])).toBe("game");
   });
 
-  it("reads an NFT, an exchange and a name from names read on the chain", () => {
+  it("reads an NFT and an exchange from names read on the chain", () => {
     expect(natureOf([realm(FISHNFT)])).toBe("nft");
     expect(natureOf([realm(AMM)])).toBe("exchange");
-    expect(natureOf([realm(NAMES)])).toBe("name");
   });
 
   it("wants an owner and a token's art or mint for an NFT: a name registry's OwnerOf is no NFT", () => {
@@ -275,7 +272,7 @@ describe("natureOf", () => {
     expect(natureOf([realm(["TokenURI", "Mint"])])).toBeNull();
     expect(natureOf([realm(["OwnerOf", "TokenURI"])])).toBe("nft");
     expect(natureOf([realm(["MustOwnerOf", "Mint"])])).toBe("nft");
-    expect(natureOf([realm(["Register", "OwnerOf", "HandleOf"])])).toBe("name");
+    expect(natureOf([realm(["Register", "OwnerOf", "HandleOf"])])).toBeNull();
     expect(natureOf([realm(["OwnerOfAll", "TokenURIs"])])).toBeNull();
   });
 
@@ -288,35 +285,26 @@ describe("natureOf", () => {
     expect(natureOf([realm(["swap", "Render"])])).toBeNull();
   });
 
-  it.each(["Resolve", "Lookup", "Available", "HandleOf", "OwnerOf", "ByName"])(
-    "reads a name from a registration and a lookup holding %s",
-    (word) => {
-      expect(natureOf([realm(["RegisterUser", `Get${word}Now`])])).toBe("name");
-    },
-  );
-
-  it("never reads a name from a registration alone: a token registry and a game's registry are none", () => {
-    expect(natureOf([realm(["Register"])])).toBeNull();
+  it("reads no nature from a name registry, nor from one of tokens or of a game's players", () => {
+    expect(natureOf([realm(NAMES)])).toBeNull();
+    expect(natureOf([realm(["RegisterUser", "ResolveName"])])).toBeNull();
     expect(natureOf([realm(GRC20REG)])).toBeNull();
     expect(natureOf([realm(["RegisterVein", "Mine"])])).toBeNull();
-    expect(natureOf([realm(["Lookup", "Resolve"])])).toBeNull();
   });
 
-  it("gives a tie to the rule before: NFT, token, exchange, DAO, name, then game", () => {
+  it("gives a tie to the rule before: NFT, token, exchange, DAO, then game", () => {
     expect(natureOf([realm(WUGNOT), realm(FISHNFT)])).toBe("nft");
     expect(natureOf([realm(AMM), realm(WUGNOT)])).toBe("token");
     expect(natureOf([realm(GOV_DAO), realm(AMM)])).toBe("exchange");
-    expect(natureOf([realm(NAMES), realm(GOV_DAO)])).toBe("dao");
-    expect(natureOf([realm(CONNECT4), realm(NAMES)])).toBe("name");
+    expect(natureOf([realm(CONNECT4), realm(GOV_DAO)])).toBe("dao");
     expect(natureOf([realm(CONNECT4), realm(CONNECT4), realm(FISHNFT)])).toBe("game");
   });
 
-  it("takes an NFT first, then a token, an exchange, a DAO, a name and a game", () => {
+  it("takes an NFT first, then a token, an exchange, a DAO and a game", () => {
     expect(natureOf([realm([...WUGNOT, "OwnerOf", "TokenURI"])])).toBe("nft");
     expect(natureOf([realm([...WUGNOT, "Swap"])])).toBe("token");
     expect(natureOf([realm(["Swap", ...GOV_DAO])])).toBe("exchange");
-    expect(natureOf([realm([...GOV_DAO, "Register", "Lookup"])])).toBe("dao");
-    expect(natureOf([realm(["Register", "Lookup", "Play"])])).toBe("name");
+    expect(natureOf([realm([...GOV_DAO, "Play"])])).toBe("dao");
   });
 
   it("calls nothing what no rule reads", () => {

@@ -277,9 +277,9 @@ describe("runWorlds", () => {
       JSON.stringify({ package_path: path, imports: [], funcs: names.map((name) => ({ type: "", name })) });
 
     it("names the file's natures as core's rules do", () => {
-      const six = ["nft", "token", "exchange", "dao", "name", "game"];
-      expect(WORLD_NATURES).toEqual(six);
-      expect(NATURES).toEqual(six);
+      const five = ["nft", "token", "exchange", "dao", "game"];
+      expect(WORLD_NATURES).toEqual(five);
+      expect(NATURES).toEqual(five);
     });
 
     it("writes a world's nature once every realm of it is read", async () => {

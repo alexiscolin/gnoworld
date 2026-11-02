@@ -6,7 +6,7 @@ import type { Anchor } from "./anchors.ts";
 import { sha256 } from "./sha256.ts";
 
 /** What a nudge reads, in the order its rules are tried: the rest of a realm's nature leans nowhere, and `/p/` packages make no world. */
-export const NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
+export const NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 export type Nature = (typeof NATURES)[number];
 
 export interface RealmFunctions {
@@ -42,13 +42,13 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["sub-Neptune", 14],
 ];
 // Each nature to anchors of its own: tokens to the giants, DAOs to temperate worlds and games to fire and the strange ones (ADR-0002 §3);
-// NFTs to the jewel-like ices, exchanges to the seas, names to old ground (Alexis, 2026-11-02).
+// NFTs to the jewel-like ices and exchanges to the seas (Alexis, 2026-11-02). Names were measured and dropped: a rule read 3 of 7 unseen
+// registries (reports/slice-7b4-natures-2.md).
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
   nft: ["nitrogen ice", "grooved ice"],
   token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
   exchange: ["ocean", "hycean"],
   dao: ["temperate"],
-  name: ["rocky", "desert"],
   game: ["volcanic", "tidally locked", "shattered", "lava world", "two-faced", "hot giant"],
 };
 // The bytes under this, of 256, take a nature's lean: about a third, so a misread nature moves a third of its worlds at most.
@@ -56,7 +56,6 @@ const LEAN = 90;
 const MINOR_WORD = 26;
 const TOKEN = ["Transfer", "Approve", "BalanceOf", "TotalSupply"];
 const GAME = ["Play", "Move", "Guess", "Shot", "Lobby", "Game", "Challenge"];
-const LOOKUP = ["Resolve", "Lookup", "Available", "HandleOf", "OwnerOf", "ByName"];
 
 /**
  * 32 bytes more of a world, for what the seed's own have no room for. Byte 0 is its class, 1 and 2 its nudge, 3 to 8 its signs' form,
@@ -100,7 +99,6 @@ const RULES: Record<Nature, (functions: readonly string[]) => boolean> = {
   exchange: (functions) =>
     holds(functions, "Swap") || (functions.includes("AddLiquidity") && functions.includes("RemoveLiquidity")),
   dao: (functions) => holds(functions, "Vote") && holds(functions, "Propos"),
-  name: (functions) => holds(functions, "Register") && LOOKUP.some((word) => holds(functions, word)),
   game: (functions) => GAME.some((word) => holds(functions, word)),
 };
 
