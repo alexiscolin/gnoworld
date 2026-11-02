@@ -319,6 +319,17 @@ describe("each sign on its data", () => {
     expect(view.stats().ring).toBeUndefined();
   });
 
+  it("draws an open proposal's no from the ring's right end and no threshold's mark where the realm states none (F4308)", async () => {
+    const { view, stage } = await opened();
+    view.ring(statusOrbit({ lit: 0.4, against: 0.3 }));
+    view.tick(1);
+    const tube = materials(stage).find((material) => "litTo" in material.uniforms);
+    expect(value(tube, "against")).toBeCloseTo(Math.PI * 0.3, 12);
+    expect(value(tube, "mark") as number).toBeLessThan(0);
+    expect(view.stats().ring?.mark).toBeUndefined();
+    expect(view.stats().ring?.against).toBeCloseTo(Math.PI * 0.3, 12);
+  });
+
   it("stands the ring's moon on the front half, at the share its realm reports", async () => {
     const { view, stage } = await opened();
     const orbit = statusOrbit({ lit: 0.33, mark: 0.6666 });
@@ -329,7 +340,7 @@ describe("each sign on its data", () => {
     expect(ring?.front).toBe(true);
     const tube = materials(stage).find((material) => "litTo" in material.uniforms);
     expect(value(tube, "litTo")).toBeCloseTo(orbit.moon, 12);
-    expect(value(tube, "mark")).toBeCloseTo(orbit.mark, 12);
+    expect(value(tube, "mark")).toBeCloseTo(orbit.mark ?? Number.NaN, 12);
     expect(tube?.fragmentShader).toMatch(/litTo/);
     expect(tube?.fragmentShader).toMatch(/mark/);
   });

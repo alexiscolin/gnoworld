@@ -25,14 +25,24 @@ describe("statusOrbit", () => {
     fc.assert(
       fc.property(share, share, (lit, mark) => {
         const orbit = statusOrbit({ lit, mark });
-        for (const angle of [orbit.moon, orbit.mark]) {
+        const marked = orbit.mark ?? Number.NaN;
+        for (const angle of [orbit.moon, marked]) {
           expect(angle).toBeGreaterThanOrEqual(0);
           expect(angle).toBeLessThanOrEqual(Math.PI);
         }
-        if (lit >= mark) expect(orbit.moon).toBeLessThanOrEqual(orbit.mark);
-        if (mark - lit > 1e-9) expect(orbit.moon).toBeGreaterThan(orbit.mark);
+        if (lit >= mark) expect(orbit.moon).toBeLessThanOrEqual(marked);
+        if (mark - lit > 1e-9) expect(orbit.moon).toBeGreaterThan(marked);
       }),
     );
+  });
+
+  it("lights an open proposal's no from the right end, and stands no mark where the realm states no threshold (F4308)", () => {
+    const orbit = statusOrbit({ lit: 1 / 3, against: 0.25 });
+    expect(Object.keys(orbit).toSorted()).toEqual(["against", "moon"]);
+    expect(orbit.moon).toBeCloseTo(Math.PI * (2 / 3), 12);
+    expect(orbit.against).toBeCloseTo(Math.PI * 0.25, 12);
+    expect(statusOrbit({ lit: 0.5, against: 1.4 }).against).toBe(Math.PI);
+    expect(statusOrbit({ lit: 0.5, against: Number.NaN }).against).toBe(0);
   });
 
   it("holds a share the realm sent out of range, or no number, to the half's ends", () => {

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
 import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { opened, stats } from "./sceneStage.ts";
 
 // GovDAO, a world with a realm (docs/decisions.md, 2026-10-31): its page reads the realm's proposals from the chain, in the format
 // RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own comment). The page states no threshold, so the
@@ -20,6 +21,32 @@ async function chain(page: Page, { down = false }: { down?: boolean } = {}): Pro
     if (new URL(route.request().url()).pathname === "/status")
       return route.fulfill({ headers: CORS, body: JSON.stringify(statusEnvelope(796379, "2026-10-31T09:46:00Z")) });
     return route.fulfill({ headers: CORS, body: JSON.stringify(queryEnvelope({ data: HOME })) });
+  });
+}
+
+// A recorded page without its provenance line.
+const recorded = (name: string) =>
+  readFileSync(new URL(`../chain/recorded/${name}`, import.meta.url), "utf8")
+    .split("\n")
+    .slice(1)
+    .join("\n");
+
+// A chain whose realm has an open proposal: gnoland-1's home page, its #14 open, and #14's own page with its yes and no, as RECORDED.
+async function openChain(page: Page): Promise<void> {
+  const home = recorded("gnoland-1-gov-dao-home.md");
+  const fourteen = recorded("gnoland-1-gov-dao-14-active.md");
+  await page.route(RPC, (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/status")
+      return route.fulfill({ headers: CORS, body: JSON.stringify(statusEnvelope(1208159, "2026-10-31T09:46:00Z")) });
+    const hex = /^0x([0-9a-f]*)$/.exec(url.searchParams.get("data") ?? "")?.[1] ?? "";
+    const asked = new TextDecoder().decode(
+      Uint8Array.from(hex.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)),
+    );
+    return route.fulfill({
+      headers: CORS,
+      body: JSON.stringify(queryEnvelope({ data: asked.endsWith(":14") ? fourteen : home })),
+    });
   });
 }
 
@@ -112,6 +139,32 @@ test.describe("GovDAO at the video's size", () => {
       "[data-look='plate'] section[aria-labelledby='proposals-title'] [data-field='number']",
     );
     near(card.x - 17, 100, "the cards' left, the column's");
+  });
+});
+
+// An open proposal (Alexis, 2026-11-02, F4308): the ring and the pill show what the chain gives, its yes and its no, and no threshold where
+// none exists; the scene's ring has no mark.
+test.describe("GovDAO with an open proposal", () => {
+  test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
+
+  test("says the open proposal's yes and no, invents no threshold, and rings it with no mark", async ({ page }) => {
+    await openChain(page);
+    await page.goto("/w/govdao?test-gpu");
+    await hydrated(page);
+    const plate = page.locator("[data-look='plate']");
+    await expect(plate.getByRole("status").filter({ hasText: "Proposal 14" })).toHaveText(
+      "Proposal 14 · YES 33% · NO 0%",
+    );
+    await expect(plate).not.toContainText(/YES \d+% of/);
+    await opened(page);
+    const ring = async () =>
+      ((await stats(page)) as unknown as { world?: { ring?: { moon: number; against?: number; mark?: number } } }).world
+        ?.ring;
+    await expect.poll(async () => (await ring())?.against, { timeout: 90_000 }).toBe(0);
+    const shown = await ring();
+    expect(shown?.mark, "no threshold's mark").toBeUndefined();
+    expect(shown?.moon).toBeCloseTo(Math.PI * (1 - 33.33333333333333 / 100), 6);
+    expect(await violations(page)).toEqual([]);
   });
 });
 

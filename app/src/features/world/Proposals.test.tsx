@@ -30,22 +30,42 @@ function answering(response: () => Response) {
   return vi.fn<ChainFetch>(() => Promise.resolve(response()));
 }
 
-// The block again, its proposals read as one that gave its tally, invented: no recorded page has one.
-async function tallied() {
+// The block again, its realm's proposals read as `value`.
+async function readingAs(value: Proposal[]) {
   vi.resetModules();
   vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
     ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
     readProposals: (): Promise<ChainRead<Proposal[]>> =>
       Promise.resolve({
         ok: true,
-        value: [{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }],
+        value,
         source: { url: "https://rpc.onyx.testnets.gno.land:443", at: "2026-10-31T06:00:00.000Z" },
       }),
   }));
   return (await import("./Proposals.tsx")).default;
 }
 
+// Its proposals read as one that gave its tally, invented: no recorded page has one.
+const tallied = () => readingAs([{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }]);
+
+// Its newest proposal accepted and the one before open, read with its yes and no as gnoland-1's #14 states them.
+const opened = () =>
+  readingAs([
+    { id: 15, title: "Set node halt height", state: "ACCEPTED" },
+    { id: 14, title: "Add valoper lurien to the valset", state: "ACTIVE", yes: 33.33333333333333, no: 0 },
+  ]);
+
 describe("a world's proposals", () => {
+  it("rings the open proposal, not the newest, with its yes and no and no mark, and its pill says them (F4308)", async () => {
+    const Open = await opened();
+    const onRing = vi.fn();
+    const el = mount(<Open path={PATH} onRing={onRing} />);
+    await flush();
+    expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 14 · YES 33% · NO 0%");
+    expect(onRing).toHaveBeenLastCalledWith({ lit: 33.33333333333333 / 100, against: 0 });
+    vi.doUnmock("../../lib/chain/proposal.ts");
+  });
+
   it("draws the newest proposal under its pill and the newest three as cards, each with its gnoweb link, and no tally", async () => {
     const el = mount(
       <Proposals

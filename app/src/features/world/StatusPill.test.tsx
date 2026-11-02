@@ -13,7 +13,7 @@ afterEach(() => {
   host?.remove();
   host = undefined;
 });
-function draw(proposal: { id: number; yes?: number; threshold?: number; title?: string }) {
+function draw(proposal: { id: number; yes?: number; no?: number; threshold?: number; title?: string }) {
   host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -44,6 +44,17 @@ describe("the status pill", () => {
       expect(draw({ id: 7, yes, threshold }).textContent).toBe(words);
     },
   );
+
+  it("says an open proposal's yes and no where the realm states no threshold, never an invented one (F4308)", () => {
+    expect(draw({ id: 14, yes: 33.33333333333333, no: 0 }).textContent).toBe("Proposal 14 · YES 33% · NO 0%");
+  });
+
+  it("rings an open proposal's yes and no, with no mark where no threshold is stated (F4308)", () => {
+    expect(ringOf({ id: 14, yes: 33.33333333333333, no: 25 })).toStrictEqual({
+      lit: 33.33333333333333 / 100,
+      against: 0.25,
+    });
+  });
 
   it("says the proposal's number, 0 included", () => {
     expect(draw({ id: 0 }).textContent).toBe("Proposal 0");

@@ -26,7 +26,11 @@ export interface ProposalsProps {
   onRing?: (ring: Ring | undefined) => void;
 }
 
-// What the read holds, in its place: the realm's newest under the pill, then the cards.
+// The open proposal the realm's page gave votes for (lib/chain/proposal.ts reads the newest open one's), whose pill and ring stand for the
+// realm; none when none is open.
+const openOf = (proposals: readonly Proposal[]) => proposals.find(({ yes }) => yes !== undefined);
+
+// What the read holds, in its place: the open proposal, or the newest, under the pill, then the cards.
 function Read({ read, realm, origin }: { read: ChainRead<Proposal[]>; realm: string; origin: string | undefined }) {
   if (!read.ok) return null;
   const [newest] = read.value;
@@ -34,7 +38,7 @@ function Read({ read, realm, origin }: { read: ChainRead<Proposal[]>; realm: str
   return (
     <>
       <Cluster space="xs">
-        <StatusPill proposal={newest} />
+        <StatusPill proposal={openOf(read.value) ?? newest} />
       </Cluster>
       {read.value.slice(0, SHOWN).map((proposal) => {
         const href = origin === undefined ? undefined : gnowebLink(origin, realm, proposal.id);
@@ -98,8 +102,8 @@ function useRing(read: ChainRead<Proposal[]> | undefined, onRing: ProposalsProps
   const handedRef = useRef(false);
   useEffect(() => {
     if (onRing === undefined || (read === undefined && !handedRef.current)) return;
-    const [newest] = read?.ok === true ? read.value : [];
-    onRing(newest === undefined ? undefined : ringOf(newest));
+    const open = read?.ok === true ? openOf(read.value) : undefined;
+    onRing(open === undefined ? undefined : ringOf(open));
     handedRef.current = read !== undefined;
   }, [read, onRing]);
   useEffect(

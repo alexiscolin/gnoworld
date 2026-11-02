@@ -10,6 +10,7 @@ export const OCCLUDERS_MAX = 5;
 // behind the world; `litTo` and `mark` are angles round the orbit, the tube's own u.
 export const STATUS_FRAGMENT = /* glsl */ `
 uniform float litTo;
+uniform float against;
 uniform float mark;
 varying vec3 vNormal;
 varying vec3 vToEye;
@@ -22,10 +23,13 @@ void main() {
   float centred = max(dot(normalize(vNormal), ray), 0.0);
   float angle = vAlong * TAU;
   float lit = step(litTo, angle) * step(angle, HALF);
-  float tick = 1.0 - smoothstep(0.012, 0.024, abs(angle - mark));
+  float refused = step(angle, against) * step(0.0001, against);
+  float tick = (1.0 - smoothstep(0.012, 0.024, abs(angle - mark))) * step(0.0, mark);
   vec3 amber = vec3(1.0, 0.56, 0.2) * (pow(centred, 40.0) * 0.6 + pow(centred, 8.0) * 0.12);
   vec3 core = vec3(1.0, 0.88, 0.7) * pow(centred, 300.0) * 2.2;
-  vec3 colour = (amber + core) * (0.16 + 0.84 * lit) + vec3(1.0, 0.95, 0.86) * tick * pow(centred, 4.0) * 1.4;
+  vec3 coral = vec3(0.95, 0.42, 0.36) * (pow(centred, 40.0) * 0.6 + pow(centred, 8.0) * 0.12);
+  vec3 colour = (amber + core) * (0.16 + 0.84 * lit) + coral * 0.84 * refused * (1.0 - lit);
+  colour += vec3(1.0, 0.95, 0.86) * tick * pow(centred, 4.0) * 1.4;
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

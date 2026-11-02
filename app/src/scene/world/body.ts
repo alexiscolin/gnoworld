@@ -24,6 +24,8 @@ import { WorldHalo } from "./halo.ts";
 import { OCCLUDERS_MAX, OVERLAY_FRAGMENT, OVERLAY_VERTEX, STATUS_FRAGMENT, WAKE_FRAGMENT } from "./shaders.ts";
 
 const OVER_GROUND = 1.004;
+// Off the orbit: no threshold's mark, where the realm states none.
+const NO_MARK = -1;
 const TUBE = 0.012;
 const RING_MOON = 0.06;
 const WAKE_REACH = 3.4;
@@ -103,7 +105,13 @@ export class WorldBody {
     this.#tube = this.#top(
       new Mesh(
         this.#owner.add(new TorusGeometry(ORBIT_RADIUS, TUBE, 12, 360).rotateX(Math.PI / 2)),
-        this.#owner.add(added(ORBIT_VERTEX, STATUS_FRAGMENT, { litTo: { value: Math.PI }, mark: { value: Math.PI } })),
+        this.#owner.add(
+          added(ORBIT_VERTEX, STATUS_FRAGMENT, {
+            litTo: { value: Math.PI },
+            against: { value: 0 },
+            mark: { value: NO_MARK },
+          }),
+        ),
       ),
     );
     this.ringMoon = this.#owner.add(createPlanet(maps.moonLook, maps.moon, sphere));
@@ -168,7 +176,8 @@ export class WorldBody {
     if (orbit === undefined) return;
     const { uniforms } = this.#tube.material;
     if (uniforms["litTo"] !== undefined) uniforms["litTo"].value = orbit.moon;
-    if (uniforms["mark"] !== undefined) uniforms["mark"].value = orbit.mark;
+    if (uniforms["against"] !== undefined) uniforms["against"].value = orbit.against ?? 0;
+    if (uniforms["mark"] !== undefined) uniforms["mark"].value = orbit.mark ?? NO_MARK;
     const at = new Vector3(Math.cos(orbit.moon), 0, Math.sin(orbit.moon)).multiplyScalar(ORBIT_RADIUS);
     this.ringMoon.group.position.copy(at);
     // The halo faces the eye, so it stands outside the orbit's lean, in front of the moon.
