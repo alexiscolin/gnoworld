@@ -113,7 +113,8 @@ void main() {
   float tint = mix(0.7, t, 0.8);
   vec3 major = rampOf(low, mid, high, tint);
   vec3 second = rampOf(minorLow, minorMid, minorHigh, tint);
-  if (glowLevel > 0.0 || banded > 0.5) second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), glowLevel > 0.0 ? 1.0 : 0.6);
+  float matched = max(max(step(0.001, glowLevel), 0.6 * banded), 1.0 - smoothstep(0.028, 0.036, dot(mid, LUMA)));
+  second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), matched);
   vec3 albedo = mix(major, second, minor);
   if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
   if (banded > 0.5) albedo = mix(albedo, mid, shape.clouds * 0.3) * (1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel));

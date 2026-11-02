@@ -404,8 +404,12 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(
       /minor = smoothstep\(1\.0 - minorShare - 0\.0[0-4]\d*, 1\.0 - minorShare \+ 0\.0[0-4]\d*,/,
     );
+    // A dark palette's minor takes its main class's lightness too, as a glowing or banded world's does (7b6).
     expect(GENERATED_FRAGMENT).toMatch(
-      /if \(glowLevel > 0\.0 \|\| banded > 0\.5\) second \*= mix\(1\.0, dot\(major, LUMA\) \/ max\(dot\(second, LUMA\), 1e-4\), glowLevel > 0\.0 \? 1\.0 : 0\.6\);/,
+      /float matched = max\(max\(step\(0\.001, glowLevel\), 0\.6 \* banded\), 1\.0 - smoothstep\([\d.]+, [\d.]+, dot\(mid, LUMA\)\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toContain(
+      "second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), matched);",
     );
   });
 
