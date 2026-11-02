@@ -1,11 +1,12 @@
-// Which of the 24 a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class reads a second hash of it. The
-// strange ones stay rare. A nature leans a world without fixing it, and is never shown: the rules read 9 of 12 unseen realms right
-// (.claude/tmp/slice-7/reports/chain-feasibility.md), so an error must cost nothing. Tier 1 (docs/REVIEW.md).
+// Which of the 24 a world is, and which other mixes under it (ADR-0002 §3). Every byte of the seed feeds a look (F3476), so the class
+// reads a second hash of it. The strange ones stay rare, about one world in ten. A nature leans a world without fixing it, and is never
+// shown: its rules read real realms right most of the time, not always (.claude/tmp/slice-7/reports/chain-feasibility.md and
+// slice-7b4-natures.md), so an error must cost nothing. Tier 1 (docs/REVIEW.md).
 import type { Anchor } from "./anchors.ts";
 import { sha256 } from "./sha256.ts";
 
-/** What a nudge reads: the rest of a realm's nature (a system, a page) leans nowhere, and `/p/` packages make no world. */
-const NATURES = ["token", "dao", "game"] as const;
+/** What a nudge reads, in the order its rules are tried: the rest of a realm's nature leans nowhere, and `/p/` packages make no world. */
+export const NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
 export type Nature = (typeof NATURES)[number];
 
 export interface RealmFunctions {
@@ -40,16 +41,22 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["hot giant", 5],
   ["sub-Neptune", 14],
 ];
+// Each nature to anchors of its own: tokens to the giants, DAOs to temperate worlds and games to fire and the strange ones (ADR-0002 §3);
+// NFTs to the jewel-like ices, exchanges to the seas, names to old ground (Alexis, 2026-11-02).
 const LEANS: Record<Nature, readonly [Anchor, ...Anchor[]]> = {
-  token: ["gas giant", "ice giant"],
+  nft: ["nitrogen ice", "grooved ice"],
+  token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
+  exchange: ["ocean", "hycean"],
   dao: ["temperate"],
-  game: ["volcanic", "tidally locked", "shattered"],
+  name: ["rocky", "desert"],
+  game: ["volcanic", "tidally locked", "shattered", "lava world", "two-faced", "hot giant"],
 };
 // The bytes under this, of 256, take a nature's lean: about a third, so a misread nature moves a third of its worlds at most.
 const LEAN = 90;
 const MINOR_WORD = 26;
 const TOKEN = ["Transfer", "Approve", "BalanceOf", "TotalSupply"];
 const GAME = ["Play", "Move", "Guess", "Shot", "Lobby", "Game", "Challenge"];
+const LOOKUP = ["Resolve", "Lookup", "Available", "HandleOf", "OwnerOf", "ByName"];
 
 /**
  * 32 bytes more of a world, for what the seed's own have no room for. Byte 0 is its class, 1 and 2 its nudge, 3 to 8 its signs' form,
@@ -84,12 +91,21 @@ export function minorOf(more: Uint8Array, dominant: Anchor): Anchor {
 }
 
 const holds = (functions: readonly string[], word: string) => functions.some((name) => name.includes(word));
+const names = (functions: readonly string[], ...wanted: string[]) => wanted.some((name) => functions.includes(name));
 
-function realmNature({ functions }: RealmFunctions): Nature | null {
-  if (TOKEN.every((name) => functions.includes(name))) return "token";
-  if (holds(functions, "Vote") && holds(functions, "Propos")) return "dao";
-  return GAME.some((word) => holds(functions, word)) ? "game" : null;
-}
+// Each nature's rule on a realm's own names, in NATURES' order: the first that reads it wins.
+const RULES: Record<Nature, (functions: readonly string[]) => boolean> = {
+  nft: (functions) => names(functions, "OwnerOf", "MustOwnerOf") && names(functions, "TokenURI", "Mint"),
+  token: (functions) => TOKEN.every((name) => functions.includes(name)),
+  exchange: (functions) =>
+    holds(functions, "Swap") || (functions.includes("AddLiquidity") && functions.includes("RemoveLiquidity")),
+  dao: (functions) => holds(functions, "Vote") && holds(functions, "Propos"),
+  name: (functions) => holds(functions, "Register") && LOOKUP.some((word) => holds(functions, word)),
+  game: (functions) => GAME.some((word) => holds(functions, word)),
+};
+
+const realmNature = ({ functions }: RealmFunctions): Nature | null =>
+  NATURES.find((nature) => RULES[nature](functions)) ?? null;
 
 /** The nature most of a world's classified realms have, a tie to the first rule. Names come capped: 512 realms of 256 at most. */
 export function natureOf(realms: readonly RealmFunctions[]): Nature | null {

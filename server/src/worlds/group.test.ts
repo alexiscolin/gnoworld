@@ -3,6 +3,7 @@ import {
   alike,
   ANCHORS,
   featuresOf,
+  NATURES,
   REALM_PREFIX,
   SURFACE,
   worldLook,
@@ -212,14 +213,14 @@ describe("neighbours (ADR-0002 §3)", () => {
   }, 30_000);
 
   // A system's worlds sit together and often share a nature, so the nudge gathers the very neighbours this measures: each nature for all, then one per namespace.
-  it.each(["token", "dao", "game"] as const)("holds when every world is a %s, the nudge at its worst", (nature) => {
+  it.each([...NATURES])("holds when every world is a %s, the nudge at its worst", (nature) => {
     const { share, worst } = closeness(recordedIds(), () => nature);
     expect(share).toBeLessThan(SHARE);
     expect(worst).toBeLessThanOrEqual(WORST_PAIRS);
   });
 
   it("holds with a nature per namespace, in a universe ten times larger", () => {
-    const natures = [null, "token", "dao", "game"] as const;
+    const natures = [null, ...NATURES] as const;
     const byNamespace: NatureOf = (id) => natures[(id.split("/")[0]?.length ?? 0) % natures.length] ?? null;
     const { share, worst } = closeness(tenTimes(recordedIds()), byNamespace);
     expect(share).toBeLessThan(SHARE);

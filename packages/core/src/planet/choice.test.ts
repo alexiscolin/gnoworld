@@ -44,14 +44,19 @@ const WEIGHTS: readonly (readonly [Anchor, number])[] = [
   ["sub-Neptune", 14],
 ];
 const STRANGE: readonly Anchor[] = ["tidally locked", "shattered", "lava world", "two-faced", "hot giant"];
+// Each nature leans to anchors of its own (7b4, Alexis 2026-11-02): an NFT to the jewel-like ices, a token to the giants (ADR-0002 §3), an
+// exchange to the seas, a DAO to temperate worlds, a name to old ground, a game to fire and the strange ones.
 const LEANS = {
-  token: ["gas giant", "ice giant"],
+  nft: ["nitrogen ice", "grooved ice"],
+  token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
+  exchange: ["ocean", "hycean"],
   dao: ["temperate"],
-  game: ["volcanic", "tidally locked", "shattered"],
+  name: ["rocky", "desert"],
+  game: ["volcanic", "tidally locked", "shattered", "lava world", "two-faced", "hot giant"],
 } as const satisfies Record<Nature, readonly Anchor[]>;
 // A nudge takes the bytes under this, of 256: about a third of a nature's worlds.
 const LEAN = 90;
-const NATURES = ["token", "dao", "game"] as const;
+const NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
 
 const drawn = (byte: number): Anchor => {
   let left = byte;
@@ -75,6 +80,52 @@ const shareOf = (anchors: readonly Anchor[], wanted: readonly Anchor[]) =>
 const WUGNOT = ["Deposit", "Withdraw", "Render", "TotalSupply", "BalanceOf", "Allowance", "Transfer", "Approve"];
 const GOV_DAO = ["Render", "MustCreateProposal", "ExecuteProposal", "CreateProposal", "VoteOnProposal", "UpdateImpl"];
 const CONNECT4 = ["Offer", "Accept", "Reveal", "RevealSeed", "Play", "ClaimTimeout", "Resign", "Cancel", "Render"];
+// Read on onyx-1 with gnomcp's gno_read by part 7b4, 2026-11-02, top-level names only (the rules measured in reports/slice-7b4-natures.md):
+// r/g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx/fishnft, a GRC721; r/nym-moultest123/x/amm/v0; r/g1egtnurppfnh7exvzpwu3nrfyw57lmf4d375rl4/ggg_names_v1;
+// r/nt/grc20reg/v0, which registers tokens and is no name.
+const FISHNFT = [
+  "Init",
+  "Transfer",
+  "Version",
+  "Minted",
+  "Name",
+  "Symbol",
+  "RarityOf",
+  "SpeciesOf",
+  "ModelOf",
+  "TokenURI",
+  "OwnerOf",
+  "Render",
+];
+const AMM = [
+  "AddLiquidity",
+  "RemoveLiquidity",
+  "Swap",
+  "TransferLP",
+  "ApproveLP",
+  "TransferFromLP",
+  "AmountOut",
+  "Quote",
+  "Reserves",
+  "SharesOf",
+  "TotalShares",
+  "LPToken",
+  "AllowanceLP",
+  "PoolCount",
+  "Render",
+];
+const NAMES = [
+  "Normalize",
+  "Register",
+  "Rename",
+  "Lookup",
+  "Owner",
+  "Available",
+  "History",
+  "RegistryVersion",
+  "Render",
+];
+const GRC20REG = ["Register", "Get", "MustGet", "Transfer", "Approve", "TransferFrom", "Render", "GetRegistry"];
 const realm = (functions: readonly string[]): RealmFunctions => ({ functions });
 
 describe("anchorOf", () => {
@@ -181,12 +232,15 @@ describe("a world's nature nudges its class", () => {
 
   it("moves a world whose bytes fall under the lean, and leaves the others: hashlib's bytes for two recorded worlds", () => {
     const seedOf = (id: string) => planetSeed(asciiBytes(`gno.land/r/${id}`));
-    expect(anchorOf(seedOf("gnoland/wugnot"), "token")).toBe("gas giant");
+    expect(anchorOf(seedOf("gnoland/wugnot"), "token")).toBe("water cloud giant");
     expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "dao")).toBe("temperate");
     expect(anchorOf(seedOf("gov/dao"), "dao")).toBe("dark carbon");
-    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "token")).toBe("ice giant");
-    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "game")).toBe("shattered");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "token")).toBe("azure giant");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "game")).toBe("hot giant");
     expect(anchorOf(seedOf("gnoland/wugnot"), "game")).toBe("shattered");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "nft")).toBe("grooved ice");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "exchange")).toBe("hycean");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "name")).toBe("desert");
   });
 
   it.each(NATURES)("%s leans without fixing: every class stays open to it", (nature) => {
@@ -208,6 +262,61 @@ describe("natureOf", () => {
     expect(natureOf([realm(WUGNOT)])).toBe("token");
     expect(natureOf([realm(GOV_DAO)])).toBe("dao");
     expect(natureOf([realm(CONNECT4)])).toBe("game");
+  });
+
+  it("reads an NFT, an exchange and a name from names read on the chain", () => {
+    expect(natureOf([realm(FISHNFT)])).toBe("nft");
+    expect(natureOf([realm(AMM)])).toBe("exchange");
+    expect(natureOf([realm(NAMES)])).toBe("name");
+  });
+
+  it("wants an owner and a token's art or mint for an NFT: a name registry's OwnerOf is no NFT", () => {
+    expect(natureOf([realm(["OwnerOf"])])).toBeNull();
+    expect(natureOf([realm(["TokenURI", "Mint"])])).toBeNull();
+    expect(natureOf([realm(["OwnerOf", "TokenURI"])])).toBe("nft");
+    expect(natureOf([realm(["MustOwnerOf", "Mint"])])).toBe("nft");
+    expect(natureOf([realm(["Register", "OwnerOf", "HandleOf"])])).toBe("name");
+    expect(natureOf([realm(["OwnerOfAll", "TokenURIs"])])).toBeNull();
+  });
+
+  it("reads an exchange from a swap, or from liquidity both ways", () => {
+    expect(natureOf([realm(["ExactInSwapRoute", "Render"])])).toBe("exchange");
+    expect(natureOf([realm(["AddLiquidity"])])).toBeNull();
+    expect(natureOf([realm(["RemoveLiquidity"])])).toBeNull();
+    expect(natureOf([realm(["AddLiquidity", "RemoveLiquidity"])])).toBe("exchange");
+    expect(natureOf([realm(["Swapped"])])).toBe("exchange");
+    expect(natureOf([realm(["swap", "Render"])])).toBeNull();
+  });
+
+  it.each(["Resolve", "Lookup", "Available", "HandleOf", "OwnerOf", "ByName"])(
+    "reads a name from a registration and a lookup holding %s",
+    (word) => {
+      expect(natureOf([realm(["RegisterUser", `Get${word}Now`])])).toBe("name");
+    },
+  );
+
+  it("never reads a name from a registration alone: a token registry and a game's registry are none", () => {
+    expect(natureOf([realm(["Register"])])).toBeNull();
+    expect(natureOf([realm(GRC20REG)])).toBeNull();
+    expect(natureOf([realm(["RegisterVein", "Mine"])])).toBeNull();
+    expect(natureOf([realm(["Lookup", "Resolve"])])).toBeNull();
+  });
+
+  it("gives a tie to the rule before: NFT, token, exchange, DAO, name, then game", () => {
+    expect(natureOf([realm(WUGNOT), realm(FISHNFT)])).toBe("nft");
+    expect(natureOf([realm(AMM), realm(WUGNOT)])).toBe("token");
+    expect(natureOf([realm(GOV_DAO), realm(AMM)])).toBe("exchange");
+    expect(natureOf([realm(NAMES), realm(GOV_DAO)])).toBe("dao");
+    expect(natureOf([realm(CONNECT4), realm(NAMES)])).toBe("name");
+    expect(natureOf([realm(CONNECT4), realm(CONNECT4), realm(FISHNFT)])).toBe("game");
+  });
+
+  it("takes an NFT first, then a token, an exchange, a DAO, a name and a game", () => {
+    expect(natureOf([realm([...WUGNOT, "OwnerOf", "TokenURI"])])).toBe("nft");
+    expect(natureOf([realm([...WUGNOT, "Swap"])])).toBe("token");
+    expect(natureOf([realm(["Swap", ...GOV_DAO])])).toBe("exchange");
+    expect(natureOf([realm([...GOV_DAO, "Register", "Lookup"])])).toBe("dao");
+    expect(natureOf([realm(["Register", "Lookup", "Play"])])).toBe("name");
   });
 
   it("calls nothing what no rule reads", () => {
@@ -319,11 +428,11 @@ describe("worldLook", () => {
   it("passes the nature on: a world whose bytes fall under the lean takes it", () => {
     const id = "gnoland/wugnot";
     expect(worldLook(id).anchor).toBe("azure giant");
-    expect(worldLook(id, "token").anchor).toBe("gas giant");
+    expect(worldLook(id, "token").anchor).toBe("water cloud giant");
     expect(worldLook(id, "dao").anchor).toBe("temperate");
     expect(worldLook(id, "game").anchor).toBe("shattered");
     const path = asciiBytes(`gno.land/r/${id}`);
-    expect(worldLook(id, "token")).toEqual(planetLook(path, "gas giant"));
+    expect(worldLook(id, "token")).toEqual(planetLook(path, "water cloud giant"));
   });
 
   it("gives a path one planet", () => {
