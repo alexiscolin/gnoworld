@@ -84,7 +84,7 @@ void main() {
     cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(round, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
     if (shape.sea > 0.0) {
-      vec4 land = fbm(p, shape.scale * 0.6, pixel, 0.0, 3.0);
+      vec4 land = fbm(p, shape.scale, pixel, 0.0, 3.0);
       t = shareOf(vec2(0.92 * land.w / land.y + 0.4 * ground.w / ground.y, 1.003));
     }
     broad = ground.z / ground.y;
@@ -113,6 +113,7 @@ void main() {
     molten = shareOf(vec2(0.35 * crackle - height, 1.3));
   }
   float wet = 0.0;
+  float shore = t;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
     wet = 1.0 - smoothstep(shape.sea - coast, shape.sea + coast, t);
@@ -133,7 +134,7 @@ void main() {
     albedo = mix(albedo, sulfurLow * 1.2, caldera);
   }
   if (shape.sea > 0.0) {
-    float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
+    float depth = smoothstep(0.0, 0.6, (shape.sea - shore) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
   }
   if (shape.caps > 0.0) {

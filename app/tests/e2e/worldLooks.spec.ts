@@ -48,10 +48,12 @@ const WHOLE_BANDS = 0.75;
 // Io's calderas dark but never punched black: the well-lit ground's 0.5th percentile over its median no darker than a cratered
 // ground's darkest (rocky 0.27, the Earth 0.29) by more than a quarter, and calderas there (7b5's Io 0.115, luma 17 in 150).
 const CALDERA = [0.2, 0.5] as const;
-// Temperate worlds of continents (F4243): the Earth's close view holds 84% of its land in one piece and 43.5% of its lit disc in land
-// (textures.ts's land: lit, its blue not leading); 7b5's 24 temperate worlds' medians 0.56 and 0.37. Land, but no desert world.
+// Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
+// (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
+// world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
 const CONTINENT = 0.7;
 const LAND = [0.3, 0.6] as const;
+const ALL_SEA = 0.05;
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -203,5 +205,7 @@ test.describe("the generated worlds polished", () => {
     expect(median(land.map(({ largest }) => largest)), "one large piece").toBeGreaterThanOrEqual(CONTINENT);
     expect(median(land.map(({ share }) => share)), "land").toBeGreaterThanOrEqual(LAND[0]);
     expect(median(land.map(({ share }) => share)), "and sea").toBeLessThanOrEqual(LAND[1]);
+    for (const [at, { share }] of land.entries())
+      expect(share, `world ${String(at)}: some land`).toBeGreaterThan(ALL_SEA);
   });
 });

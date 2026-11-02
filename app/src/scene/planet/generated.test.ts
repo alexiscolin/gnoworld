@@ -367,6 +367,12 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).not.toMatch(/cratersAt\(p, /);
   });
 
+  // F4312: a sea's depth read the old field while its coast read the new one, so the old islands showed as shoals out at sea.
+  it("deepens a sea from its own coast", () => {
+    expect(GENERATED_FRAGMENT).toContain("float shore = t;");
+    expect(GENERATED_FRAGMENT).toContain("float depth = smoothstep(0.0, 0.6, (shape.sea - shore) / shape.sea);");
+  });
+
   it("carves only the finer octaves, their crease rounded", () => {
     // The crease no narrower than the close view's pixels three times over, the same for every pixel of a quad (7b6, F4238).
     expect(GENERATED_FRAGMENT).toMatch(/float crease = max\(0\.02, [\d.]+ \* frequency\);/);

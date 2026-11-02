@@ -100,9 +100,14 @@ function grainOf(discs: readonly Circle[]): Grain[] {
 
 const HELPERS = [fineIn, echoOf, tileOf].map(String).join("\n");
 
-// Land is a lit pixel (luma over 25) whose blue does not lead its red and green, as sea's does; its pieces join by their sides.
+// Land is a lit pixel (luma over 25) whose blue does not lead its red and green, as sea's does, and no cloud (pale, past L* 55, under 8 of
+// chroma): a cloud is neither land nor sea. Its pieces join by their sides.
 function landOf(discs: readonly Circle[]): Land[] {
-  const { image, luma, rgbAt } = Reflect.get(globalThis, "__pixels") as Tools;
+  const { image, luma, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
+  const cloud = (px: number, py: number) => {
+    const [lightness, a, b] = labAt(image, px, py);
+    return lightness > 55 && Math.hypot(a, b) < 8;
+  };
   return discs.map(({ x, y, r }) => {
     const [x0, y0, w] = [Math.ceil(x - r), Math.ceil(y - r), Math.floor(2 * r)];
     const [land, seen] = [new Uint8Array(w * w), new Uint8Array(w * w)];
@@ -110,7 +115,7 @@ function landOf(discs: readonly Circle[]): Land[] {
     for (let i = 0; i < w * w; i++) {
       const [px, py] = [x0 + (i % w), y0 + Math.floor(i / w)];
       const [red, green, blue] = rgbAt(image, px, py);
-      if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) continue;
+      if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25 || cloud(px, py)) continue;
       lit += 1;
       land[i] = blue > red + 8 && blue >= green ? 0 : 1;
     }
