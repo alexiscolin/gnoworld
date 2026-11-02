@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { toScene } from "../frame/disc.ts";
-import { MOOD_SCALE } from "../space/mood.ts";
+import { MOOD_SCALE, moodAt, newMood } from "../space/mood.ts";
 import { systemsOf, type WorldHeld } from "./system.ts";
 import { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld } from "./web.ts";
 
@@ -158,6 +158,18 @@ describe("softPoint", () => {
     expect(pointAt(1.5, 300, 900).size).toBeGreaterThan(pointAt(1.5, 600, 900).size);
   });
 
+  // Past a pixel across a point would sparkle and pile up: it keeps that size and dims instead.
+  it("never shrinks under its floor, three quarters of a pixel of radius: past it, it keeps that size and its light goes on falling", () => {
+    let before = pointAt(0.2, 1000, 1000);
+    expect(before.size).toBe(0.75);
+    for (let distance = 1100; distance < 50_000; distance *= 1.1) {
+      const after = pointAt(0.2, distance, distance);
+      expect(after.size).toBe(0.75);
+      expect(after.light).toBeLessThan(before.light);
+      before = after;
+    }
+  });
+
   it("keeps a point at or past the focus fine: what is far is small and sharp", () => {
     for (const distance of [400, 600, 1200])
       expect(pointAt(1.5, distance, 400)).toEqual(pointAt(1.5, distance, distance));
@@ -183,7 +195,7 @@ describe("softPoint", () => {
         (radius, distance, focus) => {
           const { size, light } = pointAt(radius, distance, focus);
           expect(Number.isFinite(size) && Number.isFinite(light)).toBe(true);
-          expect(size).toBeGreaterThan(0);
+          expect(size).toBeGreaterThanOrEqual(0.75);
           expect(light).toBeGreaterThanOrEqual(0);
           expect(light).toBeLessThanOrEqual(1);
         },
@@ -244,6 +256,34 @@ describe("pointTint", () => {
     expect(green).toBeGreaterThan(blue);
     expect(blue).toBeGreaterThan(0.05);
     expect(Math.max(red, green, blue)).toBeLessThanOrEqual(1);
+  });
+
+  // Each channel follows the mood's own: over a walk across the field, a tint's red, green and blue rise and fall with the mood's.
+  it("follows the mood on every channel, not on red and blue alone", () => {
+    const mood = newMood();
+    const stage = { x: 0, y: 0, z: 0 };
+    const pairs: [number, number][][] = [[], [], []];
+    for (let x = -30_000; x <= 30_000; x += 97) {
+      const place = { x, y: 0, z: x / 3 };
+      const tint = tintAt(place);
+      toScene(place, stage);
+      moodAt(mood, stage);
+      const brightest = Math.max(mood.red, mood.green, mood.blue);
+      for (const [at, [own, theirs]] of [
+        [tint.red, mood.red],
+        [tint.green, mood.green],
+        [tint.blue, mood.blue],
+      ].entries())
+        pairs[at]?.push([own ?? 0, (theirs ?? 0) / brightest]);
+    }
+    const correlation = (list: readonly [number, number][]) => {
+      const mean = (pick: (pair: [number, number]) => number) =>
+        list.reduce((sum, pair) => sum + pick(pair), 0) / list.length;
+      const [ma, mb] = [mean(([a]) => a), mean(([, b]) => b)];
+      const cov = mean(([a, b]) => (a - ma) * (b - mb));
+      return cov / Math.sqrt(mean(([a]) => (a - ma) ** 2) * mean(([, b]) => (b - mb) ** 2));
+    };
+    for (const list of pairs) expect(correlation(list)).toBeGreaterThan(0.8);
   });
 
   // The mood's own bound (mood.test.ts): a channel moves at most 0.02 for a unit's step. A point keeps it, so two systems a cell apart never
