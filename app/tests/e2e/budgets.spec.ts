@@ -43,6 +43,12 @@ const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of thei
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
+// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
+// once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B).
+const REST = /\/assets\/restSearch-[\w-]+\.js$/;
+const REST_JS = 7.25 * 1024;
+const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
+const NEBULAE_JS = 3.75 * 1024;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -210,6 +216,20 @@ test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and
   const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
   expect(await compressed(page, await ownOf(page, (await whole).url(), there))).toBeLessThanOrEqual(WHOLE_JS);
 });
+
+for (const [name, chunk, cap] of [
+  ["view at rest's", REST, REST_JS],
+  ["nebulae's", NEBULAE, NEBULAE_JS],
+] as const)
+  test(`the ${name} chunk stays within its cap, apart from the cosmos's and the scene's`, async ({ page }) => {
+    const late = page.waitForResponse((response) => chunk.test(response.url()));
+    const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+    const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+    await page.goto("/?test-gpu");
+    await hydrated(page);
+    const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+    expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
+  });
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {
   const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));
