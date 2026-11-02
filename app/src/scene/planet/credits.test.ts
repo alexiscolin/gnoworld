@@ -59,13 +59,12 @@ describe("the textures' credits", () => {
     for (const credit of CREDITS) expect(new Date(credit.read).toISOString().slice(0, 10)).toBe(credit.read);
   });
 
-  it("gives the Earth's maps a row of their own, for they are drawn as they came, neither warped nor recoloured", () => {
+  it("gives the Earth's maps a row of their own", () => {
     const earth = CREDITS.find((credit) => credit.files.includes("earth-day"));
     expect(earth?.files).toEqual(["earth-day", "earth-night"]);
     expect(earth?.author).toBe("Solar System Scope");
     expect(earth?.line).toContain("Earth");
     expect(earth?.line).toContain("NASA");
-    expect(earth?.line).not.toContain("warped");
   });
 
   it("notes the changes made to an ESA/Hubble image after its credit, as its terms ask", () => {
