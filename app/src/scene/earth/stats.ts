@@ -1,5 +1,6 @@
 // Where the Earth stands on the screen, for the journeys, which read no pixel of the canvas to hold its geometry.
-import { Vector3, type PerspectiveCamera } from "three";
+import type { Screen } from "./marks.ts";
+import { Vector3 } from "three";
 import type { Globe } from "./globe.ts";
 import { ORBIT_RADIUS } from "./orbit.ts";
 import type { EarthState } from "./view.ts";
@@ -18,12 +19,6 @@ export interface EarthStats {
   readonly mapWidth: number;
   /** Frames drawn since it came. */
   readonly drawn: number;
-}
-
-interface Screen {
-  readonly width: number;
-  readonly height: number;
-  readonly camera: PerspectiveCamera;
 }
 
 interface Status {

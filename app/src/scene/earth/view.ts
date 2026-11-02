@@ -10,7 +10,7 @@ import { buildGlobe, type Globe } from "./globe.ts";
 import { EARTH } from "./look.ts";
 import { eased, EyeTurn, GroundMarks, poseOf } from "./marks.ts";
 import type { Ground, GroundMark, LatLon, Pose, Screen } from "./marks.ts";
-import { standIn } from "./lens.ts";
+import { standIn } from "../lens.ts";
 import { MOON_REST } from "./orbit.ts";
 import { earthStats, type EarthStats } from "./stats.ts";
 

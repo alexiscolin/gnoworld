@@ -13,6 +13,7 @@ import {
   type StarSystem,
 } from "@gnoworld/core";
 import { Disposer } from "../disposer.ts";
+import { focalOf } from "../lens.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { Bodies } from "./bodies.ts";
 import { Disc } from "./disc.ts";
@@ -116,7 +117,7 @@ export class Cosmos {
   /** The canvas's height in its CSS pixels, and the pixels to one of them. */
   resize(height: number, ratio: number): void {
     this.#height = height;
-    this.#focal = height / 2 / Math.tan((this.#device.camera.fov * Math.PI) / 360);
+    this.#focal = focalOf(this.#device.camera, height);
     this.#disc.resize(this.#focal, ratio);
     this.#frame();
   }

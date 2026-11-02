@@ -1,5 +1,6 @@
 // The page's signs stand on the ground: a point of the Earth, and the HTML told where it stands on each frame the Earth moves (ADR-0001 §7, text
 // is HTML). The sums are the shader's: `groundDirection`, the turn about the pole, then the globe's lean. Nothing is made on a frame.
+import type { Screen as LensScreen } from "../lens.ts";
 import { groundDirection, within } from "@gnoworld/core";
 import type { LatLon } from "@gnoworld/core/bubbles";
 import { Quaternion, Vector3, type Euler, type Group, type PerspectiveCamera } from "three";
@@ -38,9 +39,7 @@ export function poseOf(pose: Pose, globe: { readonly lean: Euler; readonly group
   return pose;
 }
 
-export interface Screen {
-  width: number;
-  height: number;
+export interface Screen extends LensScreen {
   readonly camera: PerspectiveCamera;
 }
 
