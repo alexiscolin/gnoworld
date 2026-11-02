@@ -195,6 +195,17 @@ describe("the nebulae's images", () => {
     expect(asked().length).toBe(count * 2);
   });
 
+  it("waits its turn again after a release, behind the worlds' maps, and comes back by itself while shown", async () => {
+    const scene = made();
+    await awake(scene);
+    const first = maps.load.mock.calls.length;
+    scene.nebulae.free();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(maps.load.mock.calls.length).toBe(first);
+    await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
+    expect(maps.load.mock.calls.length).toBe(first * 2);
+  });
+
   it("leaves out an image that does not come, and shows the rest", async () => {
     const [refused, ...others] = [...new Set(litFrom(HOME).map(({ image }) => NEBULA_IMAGES[image]))];
     maps.load.mockImplementation((url: string) => {

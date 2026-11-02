@@ -167,9 +167,13 @@ export class Nebulae {
     }
   }
 
-  /** Its images go: five minutes covered, or a context lost. They are asked again at the next look. */
+  /** Its images go: five minutes covered, or a context lost. They come again behind the worlds' maps, by themselves while it shows. */
   free(): void {
     this.#maps.free();
+    this.#ready = false;
+    clearTimeout(this.#wait);
+    this.#wait = undefined;
+    if (this.group.visible) this.wake();
     for (const image of this.#images) {
       image.image.value = null;
       image.mesh.visible = false;
