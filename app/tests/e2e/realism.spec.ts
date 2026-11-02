@@ -255,8 +255,9 @@ test.describe("the realism page", () => {
     await page.keyboard.press("2");
     await expect.poll(async () => (await stats(page)).view).toBe("close");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByTestId("world")).toContainText("temperate");
+    // The caption is written as the view is first drawn: under four journeys a close view takes past the 5 s a caption is waited for.
     await drawn(page);
+    await expect(page.getByTestId("world")).toContainText("temperate");
     await page.keyboard.press("3");
     await expect.poll(async () => (await stats(page)).view).toBe("eclipse");
     await drawn(page);

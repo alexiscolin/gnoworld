@@ -256,6 +256,8 @@ test.describe("generated worlds", () => {
     test("eight classes in frame on a few shared programs and maps, their cost read beside the Earth's", async ({
       page,
     }) => {
+      // Four views at twice the pixels on a software GPU: past 90 s when four journeys share the machine (7b5's full runs).
+      test.setTimeout(240_000);
       const read: Record<string, number[]> = {};
       for (const tier of ["high", "low"])
         for (const view of ["earth", "variety"])
