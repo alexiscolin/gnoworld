@@ -35,6 +35,8 @@ export interface EarthDevice {
   readonly base: string;
   /** A frame is owed. */
   readonly moved: () => void;
+  /** The globe came on the stage. */
+  readonly stood: () => void;
 }
 
 /** How far round the sun stands from the ground's x: 69° right of the eye at rest, as frame 39. */
@@ -135,6 +137,7 @@ export class EarthView {
     this.#device.stage.add(globe.group);
     this.#place();
     this.#say("drawn");
+    this.#device.stood();
   }
 
   /** The buffer's size, in the page's pixels, and its pixels to one of the page's. */

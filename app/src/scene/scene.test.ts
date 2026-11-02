@@ -17,7 +17,7 @@ const three = vi.hoisted(() => ({
 }));
 
 const earth = vi.hoisted(() => ({
-  made: [] as { halved: () => boolean; moved: () => void }[],
+  made: [] as { halved: () => boolean; moved: () => void; stood: () => void }[],
   show: vi.fn<(place: unknown, said: () => void) => void>(),
   resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
   tick: vi.fn<(seconds: number) => void>(),
@@ -30,7 +30,7 @@ const earth = vi.hoisted(() => ({
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
 vi.mock("./earth/view.ts", () => ({
   EarthView: class {
-    constructor(device: { halved: () => boolean; moved: () => void }) {
+    constructor(device: { halved: () => boolean; moved: () => void; stood: () => void }) {
       earth.made.push(device);
     }
     get arriving() {
@@ -307,6 +307,79 @@ describe("the Auto probe", () => {
     expect(scene.stats().tier).toBe("low");
     expect(remember).not.toHaveBeenCalled();
     scene.dispose();
+  });
+
+  describe("once the Earth stands, for an empty stage proves nothing", () => {
+    it("times the device again, and drops a device that cannot carry it", () => {
+      const scene = startScene(options(), clock);
+      clock.run(2000);
+      expect(scene.stats()).toMatchObject({ probing: false, tier: "high" });
+      earth.made[0]?.stood();
+      expect(scene.stats().probing).toBe(true);
+      clock = new FakeClock(40);
+      scene.dispose();
+      const slow = startScene(options(), clock);
+      clock.run(0);
+      earth.made[1]?.stood();
+      clock.run(2200);
+      expect(slow.stats()).toMatchObject({ probing: false, tier: "low" });
+      expect(remember).toHaveBeenCalledTimes(1);
+      slow.dispose();
+    });
+
+    it("forgets the frames before it, while the first probe still runs", () => {
+      const scene = startScene(options(), clock);
+      clock.run(1000);
+      earth.made[0]?.stood();
+      clock.run(1000);
+      expect(scene.stats()).toMatchObject({ probing: true, tier: "high" });
+      clock.run(1000);
+      expect(scene.stats().probing).toBe(false);
+      scene.dispose();
+    });
+
+    it("keeps High where it carries the Earth, and rests again", () => {
+      const scene = startScene(options(), clock);
+      clock.run(2000);
+      earth.made[0]?.stood();
+      clock.run(2000);
+      expect(scene.stats()).toMatchObject({ probing: false, tier: "high" });
+      expect(remember).not.toHaveBeenCalled();
+      three.renderer.render.mockClear();
+      clock.run(1000);
+      expect(Math.abs(three.renderer.render.mock.calls.length - 30)).toBeLessThanOrEqual(1);
+      scene.dispose();
+    });
+
+    it("times it once a scene: a page shown again or a restored context proves nothing new", () => {
+      const scene = startScene(options(), clock);
+      earth.made[0]?.stood();
+      clock.run(2000);
+      earth.made[0]?.stood();
+      expect(scene.stats().probing).toBe(false);
+      scene.dispose();
+    });
+
+    it("leaves alone a device found slow before, and a reader who wants no motion", () => {
+      const low = startScene(options({ remembered: "low" }), clock);
+      earth.made[0]?.stood();
+      expect(low.stats().probing).toBe(false);
+      low.dispose();
+      query(MOTION).matches = true;
+      const still = startScene(options(), clock);
+      earth.made[1]?.stood();
+      expect(still.stats().probing).toBe(false);
+      still.dispose();
+    });
+
+    it("leaves alone a device the first probe already dropped", () => {
+      clock = new FakeClock(40);
+      const scene = startScene(options(), clock);
+      clock.run(2200);
+      earth.made[0]?.stood();
+      expect(scene.stats().probing).toBe(false);
+      scene.dispose();
+    });
   });
 
   it("does not run on a device found slow before", () => {

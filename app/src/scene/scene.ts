@@ -60,6 +60,7 @@ class LiveScene implements Scene {
   #frames = 0;
   #seconds = 0;
   #arriving = false;
+  #earthTimed = false;
   #width = 0;
   #height = 0;
   #viewportStale = false;
@@ -86,6 +87,9 @@ class LiveScene implements Scene {
         base: import.meta.env.BASE_URL,
         moved: () => {
           this.#loop.redraw();
+        },
+        stood: () => {
+          this.#timeEarth();
         },
       }),
     );
@@ -119,6 +123,15 @@ class LiveScene implements Scene {
     };
     canvas.addEventListener("webglcontextlost", lost(true), { signal });
     canvas.addEventListener("webglcontextrestored", lost(false), { signal });
+  }
+
+  // The first frames time an empty stage, and the Earth comes after them: it is what a device must carry. Once a scene.
+  #timeEarth(): void {
+    const timed = this.#earthTimed || this.#options.remembered !== undefined;
+    if (timed || this.#tier === "low" || matchMedia(MOTION).matches) return;
+    this.#earthTimed = true;
+    this.#probe.again();
+    this.#loop.set({ busy: true });
   }
 
   readonly #draw = (delta: number): void => {

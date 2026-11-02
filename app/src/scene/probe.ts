@@ -16,6 +16,12 @@ export class Probe {
     return this.#running;
   }
 
+  /** Times again from nothing. */
+  again(): void {
+    this.#sampled = 0;
+    this.#running = true;
+  }
+
   /** A frame took `delta` ms. */
   frame(delta: number): void {
     if (!this.#running || delta <= 0) return;

@@ -46,8 +46,9 @@ function device(halved = false) {
     initTexture: vi.fn(),
     compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
   };
-  const view = new EarthView({ renderer, stage, camera, halved: () => halved, base: "/", moved });
-  return { stage, camera, moved, renderer, view };
+  const stood = vi.fn();
+  const view = new EarthView({ renderer, stage, camera, halved: () => halved, base: "/", moved, stood });
+  return { stage, camera, moved, stood, renderer, view };
 }
 
 const widthAsked = (name: string) =>
@@ -134,8 +135,8 @@ describe("what the Earth loads", () => {
 
   it("asks how much memory there is at each load: a device found slow takes the small maps on its next visit", async () => {
     let short = false;
-    const { stage, camera, moved, renderer } = device();
-    const view = new EarthView({ renderer, stage, camera, halved: () => short, base: "/", moved });
+    const { stage, camera, moved, stood, renderer } = device();
+    const view = new EarthView({ renderer, stage, camera, halved: () => short, base: "/", moved, stood });
     view.show(PLACE, () => undefined);
     await settled();
     short = true;
@@ -372,6 +373,22 @@ describe("a load the page left behind", () => {
   });
 });
 
+describe("standing", () => {
+  it("tells the scene once the globe stands, and not while it loads", async () => {
+    const { stood } = opened();
+    expect(stood).not.toHaveBeenCalled();
+    await settled();
+    expect(stood).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells nothing of a load that failed", async () => {
+    maps.load.mockImplementationOnce(() => Promise.reject(new Error("404")));
+    const { stood } = opened();
+    await settled();
+    expect(stood).not.toHaveBeenCalled();
+  });
+});
+
 describe("a context that comes back", () => {
   it("loads the maps again, for a closed bitmap cannot be uploaded twice", async () => {
     const { view, said, stage } = opened();
@@ -384,8 +401,8 @@ describe("a context that comes back", () => {
   });
 
   it("asks for nothing when no Earth was shown", async () => {
-    const { stage, camera, moved, renderer } = device();
-    new EarthView({ renderer, stage, camera, halved: () => false, base: "/", moved }).restored();
+    const { stage, camera, moved, stood, renderer } = device();
+    new EarthView({ renderer, stage, camera, halved: () => false, base: "/", moved, stood }).restored();
     await settled();
     expect(maps.load).not.toHaveBeenCalled();
   });

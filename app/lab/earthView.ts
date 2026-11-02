@@ -22,6 +22,7 @@ export async function earthView({ renderer, base, ratio }: Device): Promise<View
     halved: () => false,
     base,
     moved: () => undefined,
+    stood: () => undefined,
   });
   const size = new Vector2(800, 500);
   const circle = () => ({ x: size.x / 2, y: size.y / 2, radius: Math.min(size.x, size.y) * FRACTION });
