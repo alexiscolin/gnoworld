@@ -9,8 +9,8 @@ export interface Screen {
   height: number;
 }
 
-// The lens's focal length, in the page's pixels.
-const focalOf = (camera: PerspectiveCamera, { height }: Screen): number =>
+/** The lens's focal length, in the page's pixels. */
+export const focalOf = (camera: PerspectiveCamera, { height }: Screen): number =>
   height / 2 / Math.tan((camera.fov * Math.PI) / 360);
 
 /** Shifts `camera`'s lens so the screen's middle falls on `circle`, and gives how far ahead a sphere of radius 1 fills it. */

@@ -1,0 +1,38 @@
+// The wake (decision row F4103): a seed on this reader's first visit grows to its world's size in one step, and a wave of light runs out from
+// it a little longer. Under reduced motion it is the world at once, with no wave.
+import type { WorldSigns } from "@gnoworld/core";
+import { eased } from "../earth/marks.ts";
+import type { WorldReading } from "./reading.ts";
+
+const GROW = 1.4;
+const RUN = 3;
+
+export class Wake {
+  #from: number | undefined;
+  /** What is left of the wave, 1 as it starts and 0 once gone. */
+  left = 0;
+
+  /** A reading that wakes a seed starts the wake on the next frame. */
+  read(reading: WorldReading, last: WorldReading | undefined): void {
+    if (reading.wake && last?.wake !== true) this.#from = undefined;
+  }
+
+  /** The signs at `seconds`. */
+  signsAt(reading: WorldReading | undefined, seconds: number, still: boolean): WorldSigns | undefined {
+    this.left = 0;
+    if (reading?.woken === undefined || !reading.wake) return reading?.signs;
+    if (still) return reading.woken;
+    this.#from ??= seconds;
+    const age = seconds - this.#from;
+    const grown = eased(Math.min(age / GROW, 1));
+    this.left = Math.max(0, 1 - age / RUN);
+    const { signs, woken } = reading;
+    if (grown >= 1) return woken;
+    return { ...signs, size: signs.size + (woken.size - signs.size) * grown, signal: signs.signal * (1 - grown) };
+  }
+
+  reset(): void {
+    this.#from = undefined;
+    this.left = 0;
+  }
+}

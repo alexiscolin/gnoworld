@@ -20,8 +20,9 @@ export const MOON_REST = 1.67;
 const TUBE = 0.085;
 const TUBE_SIDES = 16;
 const SEGMENTS = 360;
-const TILT = -1.24;
-const ROLL = -0.1;
+/** The orbit's lean, the Earth's and a world's status ring's alike. */
+export const ORBIT_TILT = -1.24;
+export const ORBIT_ROLL = -0.1;
 const GLOW_SIDE = 0.62;
 // Frame 4's ring, in Earth radii: 1.9 across, 1.1 up, so it leans the arcsine of their ratio.
 const FINE_REACH = 1.9;
@@ -42,7 +43,8 @@ export interface Orbit {
   dispose(): void;
 }
 
-const added = (vertexShader: string, fragmentShader: string, uniforms: ShaderMaterial["uniforms"]) =>
+/** A material of added light, the orbit's and a world's ring's and glows alike. */
+export const added = (vertexShader: string, fragmentShader: string, uniforms: ShaderMaterial["uniforms"]) =>
   new ShaderMaterial({
     vertexShader,
     fragmentShader,
@@ -58,7 +60,7 @@ class LiveOrbit implements Orbit {
   readonly #glow: Mesh<PlaneGeometry, ShaderMaterial>;
 
   constructor() {
-    this.group.rotation.set(TILT, 0, ROLL, "ZXY");
+    this.group.rotation.set(ORBIT_TILT, 0, ORBIT_ROLL, "ZXY");
     const tube = new TorusGeometry(ORBIT_RADIUS, TUBE, TUBE_SIDES, SEGMENTS).rotateX(Math.PI / 2);
     this.#line = new Mesh(tube, added(ORBIT_VERTEX, ORBIT_FRAGMENT, { head: { value: 0 } }));
     this.#line.renderOrder = ORBIT_ORDER;

@@ -11,6 +11,7 @@ const scene = vi.hoisted(() => ({
   cover: vi.fn<(covered: boolean) => void>(),
   dispose: vi.fn<() => void>(),
   earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
+  world: vi.fn<(place: unknown, said: (state: string, colour?: string) => void) => void>(),
   cosmos: vi.fn<(worlds: unknown) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   read: vi.fn(),
@@ -950,5 +951,187 @@ describe("on the Earth's page", () => {
     expect(watching).toBe(1);
     unmount();
     expect(watching).toBe(0);
+  });
+});
+
+describe("on a world's page", () => {
+  const DOCK = { left: 800, top: 241, width: 600, height: 600 };
+  const GOVDAO = { world: "gov/dao" };
+  let globe: HTMLElement;
+  let layout: HTMLElement;
+
+  const space = () => globe.dataset["world"];
+  // A world's page hands its store and router, as the route does.
+  const worldPage = () => ({
+    store: createAppStore(),
+    open: vi.fn(),
+    slug: "govdao",
+    room: null,
+    universe: "onyx",
+    path: "/w/govdao",
+  });
+  function shownWorld(shown: Shown = GOVDAO) {
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    const page = worldPage();
+    const rerender = (next: Shown) => {
+      act(() => {
+        root.render(<Universe shown={next} page={page} />);
+      });
+    };
+    rerender(shown);
+    return {
+      rerender,
+      unmount: () => {
+        act(() => {
+          root.unmount();
+        });
+        box.remove();
+      },
+    };
+  }
+  const say = (state: string, colour?: string) => {
+    act(() => {
+      scene.world.mock.lastCall?.[1](state, colour);
+    });
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    scene.start.mockImplementation(() => ({
+      cover: scene.cover,
+      dispose: scene.dispose,
+      earth: scene.earth,
+      world: scene.world,
+      worldMoons: vi.fn(),
+      cosmos: scene.cosmos,
+      ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
+      stats: () => ({}),
+    }));
+    scene.world.mockImplementation((where, told) => {
+      if (where === undefined) told("gone");
+    });
+    globe = document.createElement("div");
+    globe.dataset["globe"] = "";
+    globe.dataset["world"] = "waiting";
+    layout = document.createElement("div");
+    vi.spyOn(globe, "getBoundingClientRect").mockImplementation(
+      () => ({ ...DOCK, right: DOCK.left + DOCK.width, bottom: DOCK.top + DOCK.height, x: 0, y: 0 }) as DOMRect,
+    );
+    document.body.append(globe, layout);
+  });
+  afterEach(() => {
+    globe.remove();
+    layout.remove();
+  });
+
+  it("draws the world the page names in the circle it keeps, and never the Earth there", async () => {
+    shownWorld();
+    await settle();
+    expect(scene.world.mock.lastCall?.[0]).toMatchObject({ circle: { x: 1100, y: 541, radius: 300 }, id: "gov/dao" });
+    expect(scene.earth).not.toHaveBeenCalled();
+  });
+
+  // A wide page lays the circle out only once the world is coming (globe.module.css): measured before, it has no size.
+  it("marks the world coming before it measures its circle, so a wide page lays the circle out", async () => {
+    vi.spyOn(globe, "getBoundingClientRect").mockImplementation(() => {
+      const width = ["loading", "drawn"].includes(globe.dataset["world"] ?? "") ? DOCK.width : 0;
+      return {
+        ...DOCK,
+        width,
+        height: width,
+        right: DOCK.left + width,
+        bottom: DOCK.top + width,
+        x: 0,
+        y: 0,
+      } as DOMRect;
+    });
+    shownWorld();
+    await settle();
+    expect(scene.world.mock.lastCall?.[0]).toMatchObject({ circle: { x: 1100, y: 541, radius: 300 } });
+  });
+
+  it("keeps the room while the world comes, and opens it once it is drawn", async () => {
+    shownWorld();
+    await settle();
+    say("loading");
+    expect(space()).toBe("loading");
+    say("drawn", "#7a5c3e");
+    expect(space()).toBe("drawn");
+  });
+
+  it("tints the page with the world's own colour once the scene gives it, and gives the page its blue back on leaving", async () => {
+    const { unmount } = shownWorld();
+    await settle();
+    const placed = scene.world.mock.calls.length;
+    say("drawn", "#7a5c3e");
+    expect(layout.style.getPropertyValue("--world")).toBe("#7a5c3e");
+    expect(globe.style.getPropertyValue("--world")).toBe("#7a5c3e");
+    await settle();
+    // The plate changed colour: the scene is told the circle again, to paint the plate as it now is.
+    expect(scene.world.mock.calls.length).toBeGreaterThan(placed);
+    unmount();
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+  });
+
+  it("gives the room back and tints nothing when the world could not be drawn", async () => {
+    shownWorld();
+    await settle();
+    say("failed");
+    expect(space()).toBe("none");
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+  });
+
+  it("writes nothing but a colour into the page: any other word from the scene leaves its blue", async () => {
+    shownWorld();
+    await settle();
+    say("drawn", "red;background:url(//x)");
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+    expect(layout.getAttribute("style") ?? "").not.toContain("url");
+  });
+
+  it("hands the scene the world's ring, its rooms' store and the way to a room, from the page", async () => {
+    const store = createAppStore();
+    const open = vi.fn();
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    const ring = { lit: 0.33, mark: 0.6666 };
+    act(() => {
+      root.render(
+        <Universe
+          shown={GOVDAO}
+          page={{ store, open, ring, slug: "govdao", room: null, universe: "onyx", path: "/w/govdao" }}
+        />,
+      );
+    });
+    await settle();
+    expect(scene.world.mock.lastCall?.[0]).toMatchObject({ id: "gov/dao", page: { store, open, ring } });
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+  });
+
+  it("gives the room back where the GPU cannot draw, and leaves the page's blue", async () => {
+    device({ gpu: SOFTWARE });
+    shownWorld();
+    await settle();
+    expect(space()).toBe("none");
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+  });
+
+  it("takes the world away when the page goes elsewhere", async () => {
+    const { rerender } = shownWorld();
+    await settle();
+    rerender(true);
+    expect(scene.world.mock.lastCall?.[0]).toBeUndefined();
   });
 });

@@ -47,6 +47,12 @@ describe("a world's page", () => {
     expect(html).toContain("the BUBBLE token, its governance");
   });
 
+  // 7e: the world's planet stands beside the plate as the Earth's does, in a place the page keeps while the scene may yet come.
+  test("keeps the place of the world's planet, waiting for the scene", async () => {
+    for (const path of ["/w/bubble", "/w/govdao"])
+      expect(await render(route(), path)).toMatch(/<div[^>]*data-globe[^>]*data-world="waiting"[^>]*><\/div>/);
+  });
+
   // The chat's rooms come from the server once the page runs: the build writes the page waiting for them.
   test("holds the world's chat, its rooms still to load", async () => {
     const html = await render(route(), "/w/bubble");

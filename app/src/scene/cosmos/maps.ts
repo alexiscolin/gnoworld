@@ -12,16 +12,31 @@ const BODY_WIDTH = 2048;
 
 const namesOf = ({ map, second }: PlanetLook): readonly MapName[] => (second === null ? [map] : [map, second]);
 
+interface BodyMapsOptions {
+  /** A map's width at High; the close view takes the Earth's 4096. */
+  readonly width?: number;
+  /** A map did not come. */
+  readonly failed?: () => void;
+}
+
 export class BodyMaps {
   readonly #device: EarthDevice;
   readonly #arrived: () => void;
+  readonly #width: number;
+  readonly #failed: () => void;
   readonly #maps = new Map<string, Texture>();
   readonly #asked = new Set<string>();
   #loading = new AbortController();
 
-  constructor(device: EarthDevice, arrived: () => void) {
+  constructor(
+    device: EarthDevice,
+    arrived: () => void,
+    { width = BODY_WIDTH, failed = () => undefined }: BodyMapsOptions = {},
+  ) {
     this.#device = device;
     this.#arrived = arrived;
+    this.#width = width;
+    this.#failed = failed;
   }
 
   get size(): number {
@@ -43,7 +58,7 @@ export class BodyMaps {
     const { renderer, base, halved } = this.#device;
     const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
     const kind = name === "clouds" || name === "ring" ? "data" : "colour";
-    const sized = name === "ring" ? {} : { width: halved() ? BODY_WIDTH / 2 : BODY_WIDTH };
+    const sized = name === "ring" ? {} : { width: halved() ? this.#width / 2 : this.#width };
     const { signal } = this.#loading;
     loadMap(mapUrl(name, base), { kind, anisotropy, signal, ...sized }).then(
       (map) => {
@@ -55,7 +70,9 @@ export class BodyMaps {
         this.#maps.set(name, map);
         this.#arrived();
       },
-      () => undefined,
+      () => {
+        if (!signal.aborted) this.#failed();
+      },
     );
   }
 

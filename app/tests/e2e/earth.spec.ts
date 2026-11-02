@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, near } from "./geometry.ts";
-import { countShifts, loseContext, restoreContext, running, shifted, stats } from "./sceneStage.ts";
+import { countShifts, loseContext, restoreContext, running, shaderRefusals, shifted, stats } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
@@ -69,10 +69,7 @@ test.describe("a computer", () => {
   test("draws the Earth on its page, its maps from the site, with no CSP violation and no shader refused", async ({
     page,
   }) => {
-    const refused: string[] = [];
-    page.on("console", (message) => {
-      if (message.text().includes("THREE.WebGLProgram")) refused.push(message.text());
-    });
+    const refused = shaderRefusals(page);
     const asked = mapsAsked(page);
     await opened(page);
     expect(refused).toEqual([]);

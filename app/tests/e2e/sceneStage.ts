@@ -73,3 +73,12 @@ export const restoreContext = (page: Page) =>
   page.evaluate(() => {
     (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
   });
+
+/** Every shader the driver refused while the page runs, as three logs them. */
+export function shaderRefusals(page: Page): string[] {
+  const refused: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("THREE.WebGLProgram")) refused.push(message.text());
+  });
+  return refused;
+}

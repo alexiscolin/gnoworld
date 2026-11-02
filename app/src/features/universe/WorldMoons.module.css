@@ -1,0 +1,20 @@
+/* A world's rooms as moons: a label under each moon, a link to its room, over the canvas and under the plate and the dock. */
+@layer components {
+  .moon {
+    position: fixed;
+    /* raw: the script moves it from the window's corner to its moon, the label centred a step under it */
+    inset: 0 auto auto 0;
+    /* raw: centred under the moon's disc, which the script's point is, a step below it */
+    transform: translate(-50%, 6px);
+    /* raw: over the page's own flow, under the header and the dock, as the Earth's signs */
+    z-index: 0;
+    font: var(--font-meta);
+    color: var(--color-text);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .moon:is(:hover, :focus-visible) {
+    color: var(--color-primary);
+  }
+}

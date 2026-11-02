@@ -6,16 +6,25 @@ import { savesData } from "../../lib/saveData.ts";
 import { rememberedTier, rememberLow } from "../../lib/sceneTier.ts";
 import type { EarthState } from "../../scene/earth/view.ts";
 import type { Scene } from "../../scene/scene.ts";
+import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
 import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
+import { circleOf, tintPage, worldAsk } from "./globe.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
-/** Whether the page shows space, and the Earth or the default universe's worlds in it. */
-export type Shown = boolean | "earth" | "cosmos";
+/** A world's page: the world it shows, by the id the worlds' job groups it under. */
+export interface WorldShown {
+  readonly world: string;
+}
+
+/** Whether the page shows space, and the Earth, the default universe's worlds or one world in it. */
+export type Shown = boolean | "earth" | "cosmos" | WorldShown;
+
+export type { WorldPage };
 
 /** What the Earth's signs need of the page: this root lies outside its store and its router. */
 export interface EarthPage {
@@ -25,32 +34,8 @@ export interface EarthPage {
 }
 
 const nothing = () => undefined;
-
-// The plate where the page fixes it beside the globe: in the flow it scrolls, and the canvas does not. Its fill as sRGB bytes, whatever
-// colour space the browser computes it in, for the scene paints it again behind the globe.
-function plateBeside(globe: HTMLElement) {
-  const plate = document.querySelector<HTMLElement>("[data-look='plate']");
-  const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-  if (plate === null || context === null || getComputedStyle(globe).position !== "fixed") return undefined;
-  const { left, top, right, bottom } = plate.getBoundingClientRect();
-  context.fillStyle = getComputedStyle(plate, "::before").backgroundColor;
-  context.fillRect(0, 0, 1, 1);
-  const [red = 0, green = 0, blue = 0] = context.getImageData(0, 0, 1, 1).data;
-  return { left, top, right, bottom, fill: [red, green, blue] as const };
-}
-
-// The circle the page keeps for the globe, on the page and not on the window: a page scrolled away keeps its globe.
-function circleOf(globe: HTMLElement) {
-  const { left, top, width } = globe.getBoundingClientRect();
-  if (width <= 0) return undefined;
-  const plate = plateBeside(globe);
-  return {
-    x: left + width / 2,
-    y: top + scrollY + width / 2,
-    radius: width / 2,
-    ...(plate === undefined ? {} : { plate }),
-  };
-}
+// The one form a world's colour takes on the page: anything else the scene said is left out.
+const COLOUR = /^#[0-9a-f]{6}$/;
 
 export class SceneHost {
   readonly #listeners = new Set<() => void>();
@@ -60,6 +45,10 @@ export class SceneHost {
   #shown = false;
   #wantsEarth = false;
   #wantsWorlds = false;
+  #wantsWorld: string | undefined;
+  #page: EarthPage | WorldPage | undefined;
+  #world: EarthState = "gone";
+  #watched: string | undefined;
   readonly #feed = new WorldsFeed();
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
@@ -79,6 +68,20 @@ export class SceneHost {
   /** The ground the signs stand on, once the scene runs. */
   readonly ground = () => this.#scene?.ground;
 
+  /** Where a world's page hands its moons, once the scene runs. */
+  readonly sky = () => {
+    const scene = this.#scene;
+    return scene === undefined
+      ? undefined
+      : {
+          moons: (marks: readonly MoonMark[]) => {
+            scene.worldMoons(marks);
+          },
+        };
+  };
+
+  readonly world = () => this.#world;
+
   #tell(): void {
     this.#markPage();
     for (const listener of this.#listeners) listener();
@@ -90,15 +93,29 @@ export class SceneHost {
   }
 
   // The page's stylesheet keeps the globe's room and opens the plate from this: "waiting" while the scene may yet come, so a window that
-  // loads it by itself does not jump; "none" where nothing will. A lost context takes both away.
+  // loads it by itself does not jump; "none" where nothing will. A lost context takes both away. The Earth's page and a world's alike.
   #markPage(): void {
-    const globe = this.#wantsEarth ? document.querySelector<HTMLElement>("[data-globe]") : null;
+    const wanted = this.#wantsEarth || this.#wantsWorld !== undefined;
+    const globe = wanted ? document.querySelector<HTMLElement>("[data-globe]") : null;
     if (globe === null) return;
-    const shows = this.#status === "on" && (this.#earth === "loading" || this.#earth === "drawn");
-    const coming = this.#status === "off" || this.#status === "loading";
-    if (shows) globe.dataset["earth"] = this.#earth;
-    else globe.dataset["earth"] = coming ? "waiting" : "none";
+    const state = this.#bodyState(this.#wantsEarth ? this.#earth : this.#world);
+    globe.dataset[this.#wantsEarth ? "earth" : "world"] = state;
+    if (state !== "drawn") tintPage(undefined);
   }
+
+  #bodyState(body: EarthState): EarthState | "waiting" | "none" {
+    if (this.#status === "on" && (body === "loading" || body === "drawn")) return body;
+    return this.#status === "off" || this.#status === "loading" ? "waiting" : "none";
+  }
+
+  readonly #worldSaid = (state: EarthState, colour?: string): void => {
+    this.#world = state;
+    this.#tell();
+    if (state !== "drawn" || colour === undefined || !COLOUR.test(colour)) return;
+    tintPage(colour);
+    // The plate took the world's colour: the scene paints it again in the circle, read once more.
+    queueMicrotask(this.#place);
+  };
 
   readonly #earthSaid = (state: EarthState): void => {
     this.#earth = state;
@@ -111,11 +128,18 @@ export class SceneHost {
     if (globe === null) return;
     const watching = new AbortController();
     this.#watching = watching;
-    this.#earthSaid("loading");
+    const world = this.#wantsWorld;
+    this.#watched = world;
+    if (world === undefined) this.#earthSaid("loading");
+    else this.#worldSaid("loading");
     const place = () => {
       const circle = circleOf(globe);
-      if (circle !== undefined) scene.earth(circle, this.#earthSaid);
+      if (circle === undefined) return;
+      if (world === undefined) scene.earth(circle, this.#earthSaid);
+      else if (this.#page !== undefined && "slug" in this.#page)
+        scene.world(worldAsk(circle, world, this.#page), this.#worldSaid);
     };
+    this.#place = place;
     const observer = new ResizeObserver(place);
     observer.observe(globe);
     watching.signal.addEventListener("abort", () => {
@@ -125,19 +149,27 @@ export class SceneHost {
     place();
   }
 
+  #place: () => void = nothing;
+
   #stopWatching(): void {
     this.#watching?.abort();
     this.#watching = undefined;
+    this.#place = nothing;
   }
 
   #syncEarth(): void {
     const scene = this.#scene;
     if (scene === undefined) return;
-    if (this.#wantsEarth && this.#watching === undefined) this.#watchGlobe(scene);
-    else if (!this.#wantsEarth && this.#watching !== undefined) {
+    const wanted = this.#wantsEarth || this.#wantsWorld !== undefined;
+    const moved = this.#watching !== undefined && this.#watched !== this.#wantsWorld;
+    if (this.#watching !== undefined && (!wanted || moved)) {
+      const world = this.#watched;
       this.#stopWatching();
-      scene.earth(undefined, this.#earthSaid);
+      if (world === undefined) scene.earth(undefined, this.#earthSaid);
+      else scene.world(undefined, this.#worldSaid);
     }
+    if (wanted && this.#watching === undefined) this.#watchGlobe(scene);
+    else this.#place();
   }
 
   #syncWorlds(): void {
@@ -150,16 +182,19 @@ export class SceneHost {
     return () => {
       this.#feed.leave();
       this.#stopWatching();
+      tintPage(undefined);
       this.#scene?.dispose();
       this.#canvas = undefined;
     };
   }
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
-  show(shown: Shown): void {
+  show(shown: Shown, page?: EarthPage | WorldPage): void {
     this.#shown = shown !== false;
+    this.#page = page;
     this.#wantsEarth = shown === "earth";
     this.#wantsWorlds = shown === "cosmos";
+    this.#wantsWorld = typeof shown === "object" ? shown.world : undefined;
     this.#scene?.cover(!this.#shown);
     this.#syncEarth();
     this.#syncWorlds();

@@ -14,6 +14,7 @@ import { createRenderer } from "./renderer.ts";
 import { Space } from "./space.ts";
 import { Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
+import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import { MOTION, watchAim, watchCanvas, watchPage, watchScreen } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
@@ -139,7 +140,7 @@ class LiveScene implements Scene {
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
     this.#earth.tick(this.#seconds);
-    this.#parts.tick(this.#eye.worlds, this.#eye.seconds);
+    this.#parts.tick(this.#eye.worlds, this.#eye.seconds, this.#seconds);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);
@@ -181,6 +182,15 @@ class LiveScene implements Scene {
 
   earth(place: Circle | undefined, said: (state: EarthState) => void): void {
     this.#earth.show(place, said);
+  }
+
+  world(asked: WorldAsk | undefined, said: WorldSaid): void {
+    this.#parts.world.show(asked, said);
+    this.#loop.redraw();
+  }
+
+  worldMoons(marks: readonly MoonMark[]): void {
+    this.#parts.world.moons(marks);
   }
 
   cosmos(worlds: readonly CosmosWorld[] | undefined): void {

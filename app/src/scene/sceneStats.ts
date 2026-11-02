@@ -4,6 +4,8 @@ import type { WebGLRenderer } from "three";
 import type { Cosmos, CosmosWorld } from "./cosmos/cosmos.ts";
 import type { Ground } from "./earth/marks.ts";
 import type { Circle, EarthState, EarthView } from "./earth/view.ts";
+import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
+import type { WorldStats } from "./world/view.ts";
 
 export interface SceneOptions {
   readonly canvas: HTMLCanvasElement;
@@ -22,6 +24,10 @@ export interface Scene {
   earth(place: Circle | undefined, said: (state: EarthState) => void): void;
   /** The ground the page's signs stand on. */
   readonly ground: Ground;
+  /** Stands the world a world's page asks for in its circle, or takes it away, and says how it goes. */
+  world(asked: WorldAsk | undefined, said: WorldSaid): void;
+  /** The rooms' moons the page keeps links for. */
+  worldMoons(marks: readonly MoonMark[]): void;
   /** Stands these worlds and the fixed places, or takes them away. */
   cosmos(worlds: readonly CosmosWorld[] | undefined): void;
   /** The box of the page's text, in its pixels: no body stands under it. */
@@ -42,6 +48,7 @@ export interface SceneStats {
   readonly eye: Point;
   readonly earth: ReturnType<EarthView["stats"]>;
   readonly cosmos: ReturnType<Cosmos["stats"]> | undefined;
+  readonly world: WorldStats | undefined;
 }
 
 export const rendered = ({ render, memory }: WebGLRenderer["info"]) => ({

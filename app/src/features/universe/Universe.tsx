@@ -13,8 +13,9 @@ import {
 } from "react";
 import { Credits } from "./Credits.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
+import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
-import { SceneHost, type EarthPage, type Shown } from "./host.ts";
+import { SceneHost, type EarthPage, type Shown, type WorldPage } from "./host.ts";
 import styles from "./Universe.module.css";
 
 // The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
@@ -41,8 +42,26 @@ const Signs = lazy<ComponentType<ComponentProps<typeof PageSigns>>>(() =>
   ),
 );
 
+// A world's rooms as moons, their code asked once a world stands: a chunk that does not come leaves the world without them.
+const Moons = lazy<ComponentType<ComponentProps<typeof WorldMoons>>>(() =>
+  import("./WorldMoons.tsx").then(
+    ({ WorldMoons: moons }) => ({ default: moons }),
+    () => ({ default: () => null }),
+  ),
+);
+
+// What stands on a world once it is drawn: its moons' links, where the page holds a world.
+function OnTheWorld({ host, page }: { host: SceneHost; page: EarthPage | WorldPage | undefined }) {
+  const sky = host.sky();
+  return page === undefined || !("slug" in page) || sky === undefined ? null : (
+    <Suspense fallback={null}>
+      <Moons page={page} sky={sky} />
+    </Suspense>
+  );
+}
+
 // What stands on the Earth once it is drawn.
-function OnTheEarth({ host, page }: { host: SceneHost; page: EarthPage | undefined }) {
+function OnTheEarth({ host, page }: { host: SceneHost; page: EarthPage | WorldPage | undefined }) {
   const ground = host.ground();
   return (
     <>
@@ -58,26 +77,29 @@ function OnTheEarth({ host, page }: { host: SceneHost; page: EarthPage | undefin
 
 interface BesideProps {
   readonly host: SceneHost;
-  readonly page: EarthPage | undefined;
+  readonly page: EarthPage | WorldPage | undefined;
   readonly showsMaps: boolean;
   readonly earth: EarthState;
+  readonly world: EarthState;
 }
 
 // What stands with the running scene: wherever maps show, their credits.
-function Beside({ host, page, showsMaps, earth }: BesideProps) {
+function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
   if (earth === "drawn") return <OnTheEarth host={host} page={page} />;
+  if (world === "drawn") return <OnTheWorld host={host} page={page} />;
   return showsMaps ? <Credits overTicker /> : null;
 }
 
-export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | undefined }) {
+export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | WorldPage | undefined }) {
   const [host] = useState(() => new SceneHost());
   const status = useSyncExternalStore(host.subscribe, host.status);
   const earth = useSyncExternalStore(host.subscribe, host.earth);
+  const world = useSyncExternalStore(host.subscribe, host.world);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => (canvasRef.current === null ? undefined : host.attach(canvasRef.current)), [host]);
   useEffect(() => {
-    host.show(shown);
-  }, [host, shown]);
+    host.show(shown, page);
+  }, [host, shown, page]);
   return (
     <>
       <canvas
@@ -104,7 +126,9 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | und
       <p role="status" className={styles["status"]}>
         {shown ? lineOf(status === "failed", earth === "failed") : null}
       </p>
-      {status === "on" ? <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} /> : null}
+      {status === "on" ? (
+        <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
+      ) : null}
     </>
   );
 }

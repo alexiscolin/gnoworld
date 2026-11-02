@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const universe = vi.hoisted(() => ({
-  draw: vi.fn<(shown: boolean | "earth" | "cosmos", page?: unknown) => void>(),
+  draw: vi.fn<(shown: boolean | "earth" | "cosmos" | { world: string }, page?: unknown) => void>(),
   mount: vi.fn(),
 }));
 
@@ -276,6 +276,48 @@ describe("useSpace", () => {
     const Cosmos = await door();
     await expect(visit(Cosmos)).resolves.toBeDefined();
     expect(universe.mount).not.toHaveBeenCalled();
+  });
+
+  it("tells the universe which world a world's page wants, by its id", async () => {
+    vi.resetModules();
+    const { useSpace } = await import("./useSpace.ts");
+    const asked = { world: "gov/dao" };
+    await visit(function World() {
+      useSpace(asked);
+      return null;
+    });
+    expect(universe.draw).toHaveBeenLastCalledWith(asked);
+  });
+
+  it("asks the world again only when the page names another: the same id is the same world", async () => {
+    vi.resetModules();
+    const { useSpace } = await import("./useSpace.ts");
+    let id = "gov/dao";
+    const World = () => {
+      useSpace({ world: id });
+      return null;
+    };
+    const box = document.createElement("div");
+    const root = createRoot(box);
+    await act(async () => {
+      root.render(<World />);
+      await vi.dynamicImportSettled();
+    });
+    const drawn = universe.draw.mock.calls.length;
+    await act(async () => {
+      root.render(<World />);
+      await vi.dynamicImportSettled();
+    });
+    expect(universe.draw.mock.calls.length).toBe(drawn);
+    id = "bubble";
+    await act(async () => {
+      root.render(<World />);
+      await vi.dynamicImportSettled();
+    });
+    expect(universe.draw).toHaveBeenLastCalledWith({ world: "bubble" });
+    act(() => {
+      root.unmount();
+    });
   });
 
   it("tells the universe the Earth is wanted", async () => {

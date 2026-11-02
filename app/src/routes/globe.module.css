@@ -1,4 +1,4 @@
-/* The planet's place beside the plate, which the scene fills: the page lays it out, so a breakpoint moves the planet with
+/* The planet's place beside the plate, the Earth's and a world's, which the scene fills: the page lays it out, so a breakpoint moves the planet with
    what is around it. The page lays it out only once space is on: until then the plate stands whole and no room is kept. */
 @layer components {
   .globe {
@@ -13,14 +13,14 @@
     pointer-events: none;
   }
 
-  .globe:is([data-earth="loading"], [data-earth="drawn"]) {
+  .globe:is([data-earth="loading"], [data-earth="drawn"], [data-world="loading"], [data-world="drawn"]) {
     display: block;
   }
 
   /* A window this wide loads the scene by itself: the room is kept from the first paint, or the plate jumps half a screen under the reader. */
   /* raw: the phone's end and the plate's breakpoint */
   @media (min-width: 900px) and (max-width: 1279px) {
-    .globe[data-earth="waiting"] {
+    .globe:is([data-earth="waiting"], [data-world="waiting"]) {
       display: block;
     }
   }
@@ -57,7 +57,7 @@
     }
 
     /* The canvas lies under the plate: the plate opens a circle a little wider than the ring, and the scene paints the plate again in it. */
-    .globe[data-earth="drawn"] + * {
+    .globe:is([data-earth="drawn"], [data-world="drawn"]) + * {
       --globe-x: var(--_x);
       --globe-y: var(--_middle);
       --globe-hole: calc(var(--_reach) + 44px);
