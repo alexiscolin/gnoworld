@@ -76,6 +76,7 @@ export {
   type RealmFunctions,
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, useOf, type UseCounts } from "./planet/gauges.ts";
+export { worldIdOf } from "./cosmos/worldId.ts";
 export {
   isFresh,
   LIGHT_KINDS,
