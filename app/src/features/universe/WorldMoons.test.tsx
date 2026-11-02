@@ -41,6 +41,10 @@ function world(rooms: Record<string, number>, room: string | null = null) {
 
 const lastMarks = (moons: { mock: { calls: (readonly [readonly MoonMark[]])[] } }) =>
   moons.mock.calls.at(-1)?.[0] ?? [];
+function never(): never {
+  throw new Error("a followed room is missing");
+}
+
 const links = (box: HTMLElement) => all(box, "nav[aria-label='Rooms in orbit'] a");
 
 afterEach(() => {
@@ -108,7 +112,50 @@ describe("a world's rooms as moons", () => {
     expect(href.searchParams.get("room")).toBe(hostile.slice("#bubble/".length));
   });
 
-  it("takes its moons back from the scene when it leaves", () => {
+  it("follows the page to the room it shows (B1-3)", () => {
+    const store = createAppStore();
+    store.getState().chatActions.follow(["#bubble", "#bubble/games"]);
+    store.getState().chatActions.listed(listed("#bubble", "#bubble/games"));
+    const moons = vi.fn<(marks: readonly MoonMark[]) => void>();
+    const page = { store, open: vi.fn(), slug: "bubble", room: null, universe: "onyx", path: "/w/bubble" };
+    const root = createRoot(document.createElement("div"));
+    act(() => {
+      root.render(<WorldMoons page={page} sky={{ moons }} />);
+    });
+    act(() => {
+      root.render(<WorldMoons page={{ ...page, room: "games" }} sky={{ moons }} />);
+    });
+    expect(lastMarks(moons).map(({ room }) => room)).toContain("#bubble/games");
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  it("asks the moons again as time passes, so a room busy long enough takes its place (B1-3)", () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 10, 2) });
+    const { moons, store } = world({ "#bubble": 9, "#bubble/a": 8, "#bubble/b": 7, "#bubble/c": 6, "#bubble/d": 0 });
+    act(() => {
+      store.setState((state) => ({
+        chat: {
+          ...state.chat,
+          rooms: {
+            ...state.chat.rooms,
+            "#bubble/d": {
+              ...(state.chat.rooms["#bubble/d"] ?? never()),
+              members: Array.from({ length: 30 }, (_, at) => `g${String(at)}`),
+            },
+          },
+        },
+      }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(5 * 60_000);
+    });
+    expect(lastMarks(moons).map(({ room }) => room)).toContain("#bubble/d");
+    vi.useRealTimers();
+  });
+
+  it("takes its moons back from the scene when it leaves, and stops listening to the store", () => {
     const store = createAppStore();
     store.getState().chatActions.follow(["#bubble"]);
     store.getState().chatActions.listed(listed("#bubble"));
@@ -127,5 +174,11 @@ describe("a world's rooms as moons", () => {
       root.unmount();
     });
     expect(moons).toHaveBeenLastCalledWith([]);
+    // And it stops listening to the store (B1-3).
+    const after = moons.mock.calls.length;
+    act(() => {
+      store.getState().chatActions.listed(listed("#bubble", "#bubble/games"));
+    });
+    expect(moons.mock.calls.length).toBe(after);
   });
 });

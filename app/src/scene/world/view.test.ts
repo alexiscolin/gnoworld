@@ -142,6 +142,7 @@ describe("the world in its circle", () => {
   it("halves the maps where memory is short, and casts no shadow there", async () => {
     const { view } = await opened({ halved: true });
     expect(maps.load.mock.calls.map(([, how]) => (how as { width?: number }).width)).toContain(CLOSE_WIDTH / 2);
+    view.ring(statusOrbit({ lit: 0.4, mark: 0.5 }));
     view.moons([mark("#a", 1).moon]);
     await settled();
     view.tick(1);
@@ -186,6 +187,30 @@ describe("the world in its circle", () => {
     const { said, colours } = await opened();
     expect(said).toEqual(["loading", "failed"]);
     expect(colours).toEqual([]);
+  });
+
+  it("never stands a world the page left while it compiled, and takes its lens shift back (A2a-4)", async () => {
+    const made = device();
+    let compiled: () => void = () => undefined;
+    made.renderer.compileAsync.mockImplementationOnce(
+      (scene: Object3D) =>
+        new Promise<Object3D>((done) => {
+          compiled = () => {
+            done(scene);
+          };
+        }),
+    );
+    made.view.resize(WIDTH, HEIGHT, 1);
+    made.view.show({ circle: PLACE, id: ID }, () => undefined);
+    await settled();
+    made.view.show({ circle: PLACE, id: "gnoland/blog" }, () => undefined);
+    await settled();
+    compiled();
+    await settled();
+    expect(made.view.stats().anchor).toBe(worldLook("gnoland/blog").anchor);
+    expect(made.stage.children.filter((child) => child.children.length > 0)).toHaveLength(1);
+    made.view.show(undefined, () => undefined);
+    expect(made.camera.view?.enabled === true).toBe(false);
   });
 
   it("stands another world in place of the first when the page names another, and never the first late", async () => {

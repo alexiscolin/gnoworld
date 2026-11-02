@@ -1128,6 +1128,54 @@ describe("on a world's page", () => {
     expect(layout.style.getPropertyValue("--world")).toBe("");
   });
 
+  it("moves from the Earth to a world: the Earth leaves and the world is drawn (B1-1)", async () => {
+    const { rerender } = shownWorld("earth");
+    await settle();
+    rerender(GOVDAO);
+    await settle();
+    expect(scene.earth).toHaveBeenLastCalledWith(undefined, expect.any(Function));
+    expect(scene.world.mock.lastCall?.[0]).toMatchObject({ id: "gov/dao" });
+  });
+
+  it("hands the scene the ring that arrives after the world was placed (B1-1)", async () => {
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    const page = {
+      store: createAppStore(),
+      open: vi.fn(),
+      slug: "govdao",
+      room: null,
+      universe: "onyx",
+      path: "/w/govdao",
+    };
+    act(() => {
+      root.render(<Universe shown={GOVDAO} page={page} />);
+    });
+    await settle();
+    const ring = { lit: 0.4, mark: 0.5 };
+    act(() => {
+      root.render(<Universe shown={GOVDAO} page={{ ...page, ring }} />);
+    });
+    await settle();
+    expect(scene.world.mock.lastCall?.[0]).toMatchObject({ page: { ring } });
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+  });
+
+  it("takes the tint back when the context is lost (B1-1)", async () => {
+    shownWorld();
+    await settle();
+    say("drawn", "#7a5c3e");
+    const options = scene.start.mock.lastCall?.[0] as { onLost: (lost: boolean) => void } | undefined;
+    act(() => {
+      options?.onLost(true);
+    });
+    expect(layout.style.getPropertyValue("--world")).toBe("");
+  });
+
   it("takes the world away when the page goes elsewhere", async () => {
     const { rerender } = shownWorld();
     await settle();

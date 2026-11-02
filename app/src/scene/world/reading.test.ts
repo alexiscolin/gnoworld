@@ -117,6 +117,14 @@ describe("readingOf", () => {
     expect(readingOf(two(newest), quiet()).aurora).toBeGreaterThan(0);
   });
 
+  it("reads the chain's height at the newest call of any world, not the first world's (B1-4)", () => {
+    const file = fileOf(
+      { id: "gov/dao", namespace: "gov", realms: [realm("gno.land/r/gov/dao", { calls: 400, lastHeight: 1000 })] },
+      { id: "x/y", namespace: "x", realms: [realm("gno.land/r/x/y", { calls: 9, lastHeight: 5000 })] },
+    );
+    expect(readingOf(file, quiet()).aurora).toBe(0);
+  });
+
   it("lets the aurora fade with a file that has not been written again: an old run is no run", () => {
     const run = (updated: string) => ({
       ...fileOf({
