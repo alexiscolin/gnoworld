@@ -86,9 +86,9 @@ test.describe("the realism page", () => {
   test.beforeEach(({ page }) => {
     wrong.length = 0;
     page.on("console", (message) => {
-      // A screenshot reads the buffer back, which the driver remarks on.
-      if (["error", "warning"].includes(message.type()) && !message.text().includes("GPU stall"))
-        wrong.push(message.text());
+      // A screenshot reads the buffer back, which the driver remarks on; a software GPU has no parallel compile, which the Earth's build asks for.
+      const software = ["GPU stall", "KHR_parallel_shader_compile"].some((remark) => message.text().includes(remark));
+      if (["error", "warning"].includes(message.type()) && !software) wrong.push(message.text());
     });
     page.on("pageerror", (error) => wrong.push(error.message));
     page.on("response", (response) => {
