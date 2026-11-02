@@ -3,8 +3,10 @@ import { PerspectiveCamera, Vector3 } from "three";
 import type { Planet } from "../src/scene/planet/planet.ts";
 import type { ViewName } from "./choice.ts";
 
-// A world of each of the 24 anchors.
-const GALLERY = { fov: 20, distance: 30, columns: 6, rows: 4, fill: 0.74 };
+const GALLERY = { fov: 20, distance: 30, fill: 0.74 };
+// The twelve anchors Alexis approved in a grid of four by three, as he saw them; all 24 in six by four.
+const TWELVE = { columns: 4, rows: 3 };
+const ALL = { columns: 6, rows: 4 };
 // A row holds the six stages, the biggest world filling its cell.
 const STAGES_ROW = { columns: 6, biggest: 1.6 };
 const CLOSE = { fov: 30, distance: 5.75 };
@@ -24,17 +26,17 @@ function farCamera() {
   return { camera, height: 2 * GALLERY.distance * Math.tan((GALLERY.fov * Math.PI) / 360) };
 }
 
-function galleryLayout(): Layout {
+function galleryLayout({ columns, rows }: { columns: number; rows: number }): Layout {
   const { camera, height } = farCamera();
   return {
     camera,
     sun: undefined,
     place(planet, index, aspect) {
       const width = height * aspect;
-      const column = index % GALLERY.columns;
-      const row = Math.floor(index / GALLERY.columns);
-      const cellWidth = width / GALLERY.columns;
-      const cellHeight = height / GALLERY.rows;
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const cellWidth = width / columns;
+      const cellHeight = height / rows;
       planet.group.position.set((column + 0.5) * cellWidth - width / 2, height / 2 - (row + 0.5) * cellHeight, 0);
       // A ringed world is drawn smaller, its rings kept inside its cell and on the screen.
       const room = Math.min(cellWidth, cellHeight) / 2;
@@ -77,7 +79,8 @@ function nebulaLayout(): Layout {
 }
 
 export function layoutOf(view: ViewName, sizes: readonly number[]): Layout {
-  if (view === "gallery") return galleryLayout();
+  if (view === "gallery") return galleryLayout(TWELVE);
+  if (view === "gallery24") return galleryLayout(ALL);
   if (view === "stages") return stagesLayout(sizes);
   if (view === "close") return closeLayout(undefined);
   if (view === "eclipse") return closeLayout(new Vector3(0.178, 0.1, -1));

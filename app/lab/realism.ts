@@ -10,7 +10,7 @@ import { createRenderer } from "../src/scene/renderer.ts";
 import { looksOf, pathOf, type Choice, type Method, type ViewName } from "./choice.ts";
 import { buildView, type View } from "./views.ts";
 
-const VIEWS: readonly ViewName[] = ["gallery", "close", "eclipse", "nebula", "earth", "stages"];
+const VIEWS: readonly ViewName[] = ["gallery", "gallery24", "close", "eclipse", "nebula", "earth", "stages"];
 const KEYS: Partial<Record<string, ViewName>> = {
   "1": "gallery",
   "2": "close",
@@ -18,6 +18,7 @@ const KEYS: Partial<Record<string, ViewName>> = {
   "4": "nebula",
   "5": "earth",
   "6": "stages",
+  "8": "gallery24",
 };
 // The grade 7a2 gives the renderer itself, once it lands.
 const EXPOSURE = 0.8;
@@ -90,7 +91,11 @@ const aim = (current: View) => {
 
 function report(): void {
   const name = `${ANCHORS[choice.world] ?? ""}: ${pathOf(choice.world, choice.seed)}`;
-  const names: Partial<Record<ViewName, string>> = { gallery: "All twelve anchors", earth: "The Earth" };
+  const names: Partial<Record<ViewName, string>> = {
+    gallery: "ADR-0002's twelve anchors",
+    gallery24: "All 24 anchors",
+    earth: "The Earth",
+  };
   say("world", `${names[choice.view] ?? name} · ${choice.view === "stages" ? "every stage" : choice.stage}`);
   for (const button of document.querySelectorAll<HTMLButtonElement>("nav button"))
     button.setAttribute("aria-pressed", String(button.dataset["view"] === choice.view));
