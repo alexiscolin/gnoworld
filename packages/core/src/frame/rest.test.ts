@@ -561,37 +561,41 @@ describe("what the drawn bodies leave clear", () => {
     }
   });
 
-  // Three points make a triangle: a line shows from four. The Earth's system counts among the three. A view with a close world and a lit Earth
-  // stands low over the disc: its spread across is a tenth of its spread along at the least (the chief, 2026-11-02), others a fifth.
-  it("reads in 3D: the Earth and the bodies of its systems on screen fit no line", () => {
-    for (const file of [
-      files["100 systems"],
-      files["1,000 systems"],
-      files["10,000 systems"],
-      files["one namespace of 20,000"],
-    ]) {
+  // What stands on the screen (the centres on it, the great star and the postcards' stars, which glow) fits no line, unless its bodies
+  // recede, their sizes falling twice or more from the nearest to the farthest (the chief, 2026-11-02, after Alexis's references): a
+  // tenth across a line with a close world, a fifth without. The unlit set's view is the last resort, which takes what fits however it reads.
+  it.each(Object.entries(files).filter(([name]) => !UNLIT.has(name)))(
+    "reads in 3D: what stands on the screen is in no row that does not recede, with %s",
+    (_, file) => {
       const { systems, view } = made(file);
-      const [{ width, height }] = REST_SCREENS;
-      const see = cameraOf(view, { width, height });
-      const spots = [
-        see(EARTH_PLACE, EARTH_RADIUS),
-        ...drawn(systems, view).map(({ system, world }) => see(placeOf(system, world, 0), world.radius)),
-      ].filter((spot) => !offScreen(spot, width, height));
-      expect(spots.length).toBeGreaterThanOrEqual(4);
-      // The spread across the best line through them against the spread along it: a line would give nothing across.
-      const mean = {
-        x: spots.reduce((sum, { x }) => sum + x, 0) / spots.length,
-        y: spots.reduce((sum, { y }) => sum + y, 0) / spots.length,
-      };
-      const [xx, xy, yy] = spots.reduce(
-        ([a, b, c], { x, y }) => [a + (x - mean.x) ** 2, b + (x - mean.x) * (y - mean.y), c + (y - mean.y) ** 2],
-        [0, 0, 0],
-      );
-      const middle = (xx + yy) / 2;
-      const reach = Math.sqrt(((xx - yy) / 2) ** 2 + xy ** 2);
-      expect(Math.sqrt((middle - reach) / (middle + reach))).toBeGreaterThan(view.close === undefined ? 0.2 : 0.1);
-    }
-  });
+      for (const { width, height } of REST_SCREENS) {
+        const see = cameraOf(view, { width, height });
+        const onScreen = ({ x, y }: Seen) => x >= 0 && x <= width && y >= 0 && y <= height;
+        const bodies = [
+          see(EARTH_PLACE, EARTH_RADIUS),
+          ...drawn(systems, view).map(({ system, world }) => see(placeOf(system, world, 0), world.radius)),
+        ].filter(onScreen);
+        const stars = [{ x: 0, y: 0, z: 0 }, ...view.postcards.map((index) => systems[index]?.place ?? EARTH_PLACE)]
+          .map((place) => see(place))
+          .filter(onScreen);
+        const marks = [...bodies, ...stars];
+        expect(marks.length).toBeGreaterThan(0);
+        if (marks.length < 3) continue;
+        const mean = {
+          x: marks.reduce((sum, { x }) => sum + x, 0) / marks.length,
+          y: marks.reduce((sum, { y }) => sum + y, 0) / marks.length,
+        };
+        const [xx, xy, yy] = marks.reduce(
+          ([a, b, c], { x, y }) => [a + (x - mean.x) ** 2, b + (x - mean.x) * (y - mean.y), c + (y - mean.y) ** 2],
+          [0, 0, 0],
+        );
+        const [middle, reach] = [(xx + yy) / 2, Math.sqrt(((xx - yy) / 2) ** 2 + xy ** 2)];
+        if (Math.sqrt((middle - reach) / (middle + reach)) > (view.close === undefined ? 0.2 : 0.1)) continue;
+        const byAway = [...bodies].sort((a, b) => a.away - b.away);
+        expect((byAway[0]?.radius ?? 0) / (byAway.at(-1)?.radius ?? Infinity)).toBeGreaterThanOrEqual(2);
+      }
+    },
+  );
 });
 
 describe("the close world", () => {

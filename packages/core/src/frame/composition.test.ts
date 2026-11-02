@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { composed, coveredShare, offLine } from "./composition.ts";
+import { composed, coveredShare, offLine, type Frame } from "./composition.ts";
 import type { Seen } from "./restLook.ts";
 
 // Spots placed by hand just inside and just outside each rule (7d6's review, F4251): the view's sets never come near its limits.
 const spot = (x: number, y: number, [radius, away] = [4, 40]): Seen => ({ x, y, radius, depth: away, away });
-// The Earth far from every spot, unless a test puts it among them.
+// The Earth far from every spot and off the screen, unless a test puts it among them.
 const EARTH = spot(-5000, -5000);
+// A screen wide enough for every spot placed, with no glowing star: with a close world, or not.
+const SCREEN = { width: 10_000, height: 10_000, lights: [] };
+const FLAT: Frame = { ...SCREEN, deep: false };
+const DEEP: Frame = { ...SCREEN, deep: true };
 // Four corners of a W by H rectangle, far from the Earth: they read `H / W` off a line.
 const corners = (width: number, height: number, away = 40) => [
   spot(0, 0, [4, away]),
@@ -17,14 +21,14 @@ const corners = (width: number, height: number, away = 40) => [
 describe("the densest group", () => {
   it("keeps four bodies in a box of 200 by 120 pixels, the Earth among them, and refuses a fifth", () => {
     const four = [spot(0, 0), spot(190, 0), spot(0, 110)];
-    expect(composed(four, spot(190, 110), false)).toBe(true);
-    expect(composed([...four, spot(95, 55)], spot(190, 110), false)).toBe(false);
+    expect(composed(four, spot(190, 110), FLAT)).toBe(true);
+    expect(composed([...four, spot(95, 55)], spot(190, 110), FLAT)).toBe(false);
   });
 
   // Seen on 7d6's review: a box centred on each body misses a group at the corners of one box.
   it("refuses five bodies in any such box, though no box centred on one of them holds all five", () => {
     const five = [spot(0, 0), spot(199, 0), spot(0, 119), spot(199, 119), spot(100, 0)];
-    expect(composed(five, spot(100, 300), false)).toBe(false);
+    expect(composed(five, spot(100, 300), FLAT)).toBe(false);
   });
 });
 
@@ -32,8 +36,8 @@ describe("the air between bodies, and depth's cover", () => {
   // Two bodies 10 pixels across at a like distance: a third of the smaller one's width is 6.67 pixels.
   it("keeps a third of the smaller one's width between two bodies at a like distance, within 1.5 times", () => {
     const left = spot(0, 0, [10, 40]);
-    expect(composed([left, spot(27, 0, [10, 59])], EARTH, false)).toBe(true);
-    expect(composed([left, spot(26, 0, [10, 59])], EARTH, false)).toBe(false);
+    expect(composed([left, spot(27, 0, [10, 59])], EARTH, FLAT)).toBe(true);
+    expect(composed([left, spot(26, 0, [10, 59])], EARTH, FLAT)).toBe(false);
   });
 
   // Equal radii `r`, centres `d` apart: the lens is 2r²·acos(d/2r) − (d/2)·√(4r² − d²).
@@ -52,8 +56,8 @@ describe("the air between bodies, and depth's cover", () => {
 
   it("lets a body 1.5 times nearer cover a farther one by half at most", () => {
     const near = spot(0, 0, [10, 20]);
-    expect(composed([near, spot(apartFor(0.49), 0, [10, 30])], EARTH, false)).toBe(true);
-    expect(composed([near, spot(apartFor(0.51), 0, [10, 30])], EARTH, false)).toBe(false);
+    expect(composed([near, spot(apartFor(0.49), 0, [10, 30])], EARTH, FLAT)).toBe(true);
+    expect(composed([near, spot(apartFor(0.51), 0, [10, 30])], EARTH, FLAT)).toBe(false);
   });
 
   it("measures the share covered: none apart, a small one's whole disc, a large one's all, a lens between", () => {
@@ -73,8 +77,8 @@ describe("no line, and depth with a close world", () => {
 
   // The Earth at the rectangle's middle adds nothing across or along.
   it("refuses four bodies a fifth across or less, and keeps them past it", () => {
-    expect(composed(corners(600, 114), spot(300, 57), false)).toBe(false);
-    expect(composed(corners(600, 126), spot(300, 63), false)).toBe(true);
+    expect(composed(corners(600, 114), spot(300, 57), FLAT)).toBe(false);
+    expect(composed(corners(600, 126), spot(300, 63), FLAT)).toBe(true);
   });
 
   // With a close world: corners of `height` by 600, their sizes `sizes` times apart and distances `distances` times, the Earth between.
@@ -87,7 +91,7 @@ describe("no line, and depth with a close world", () => {
         spot(600, height, [20, 20]),
       ],
       spot(300, height / 2, [20, 12]),
-      true,
+      DEEP,
     );
 
   it("keeps a view with a close world a tenth across a line, its sizes four times apart and distances 2.5 times", () => {
@@ -95,5 +99,35 @@ describe("no line, and depth with a close world", () => {
     expect(deep(54, 4, 2.5)).toBe(false);
     expect(deep(66, 3.9, 2.5)).toBe(false);
     expect(deep(66, 4, 2.4)).toBe(false);
+  });
+});
+
+// The chief, 2026-11-02: a line is not wrong in itself (Alexis's references put worlds on a slanted line that recedes, and that is depth); a
+// row of three or more is refused when it does not recede, its sizes falling less than twice from near to far. It is judged on what stands
+// on the screen: centres on it, and the glowing stars.
+describe("a row of bodies", () => {
+  const row = (radii: readonly number[], aways: readonly number[]) =>
+    radii.map((radius, at) => spot(300 + 300 * at, 500 + 30 * at, [radius, aways[at] ?? NaN]));
+
+  it("refuses three bodies of a size in a row", () => {
+    expect(composed(row([20, 20, 20], [20, 30, 40]), EARTH, FLAT)).toBe(false);
+  });
+
+  it("keeps a row that recedes: its distances rising one way, its sizes falling twice or more from the nearest to the farthest", () => {
+    expect(composed(row([40, 24, 20], [10, 20, 30]), EARTH, FLAT)).toBe(true);
+    expect(composed(row([40, 24, 21], [10, 20, 30]), EARTH, FLAT)).toBe(false);
+    expect(composed(row([40, 10, 20], [10, 40, 30]), EARTH, FLAT)).toBe(false);
+  });
+
+  it("judges the row on the centres on the screen: a body whose centre stands off it does not break the row", () => {
+    const off = spot(-30, 2000, [300, 5]);
+    expect(composed([...row([20, 20, 20], [20, 30, 40]), off], EARTH, { ...FLAT, width: 1728, height: 1080 })).toBe(
+      false,
+    );
+  });
+
+  it("counts the glowing stars in the row: one off the line breaks it", () => {
+    const lights = [{ x: 600, y: 900, radius: 0 }];
+    expect(composed(row([20, 20, 20], [20, 30, 40]), EARTH, { ...FLAT, lights })).toBe(true);
   });
 });

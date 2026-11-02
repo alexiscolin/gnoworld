@@ -81,7 +81,9 @@ export function postcardsOf(
     looks.every((look) => {
       const [one, other] = pair.map(({ held, reach }) => look.ball(held.system.place, reach));
       const spread = one === undefined || other === undefined || apart(one, other);
-      return spread && composed(spotsOf(look, pair, close), look.earth, close !== undefined);
+      const lights = [look.star, ...pair.map(({ held }) => look.seen(held.system.place))];
+      const frame = { deep: close !== undefined, lights, width: look.width, height: look.height };
+      return spread && composed(spotsOf(look, pair, close), look.earth, frame);
     });
   const pairs = fit.flatMap((first, at) => fit.slice(at + 1).map((second) => [first, second]));
   if (wanted === 2) return pairs.find(reads);

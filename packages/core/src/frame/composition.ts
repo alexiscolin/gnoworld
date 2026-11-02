@@ -4,11 +4,13 @@ import type { Seen } from "./restLook.ts";
 
 // Frame 4's densest group, measured by the chief at 1728 by 1080: four bodies in about 200 by 120 pixels.
 const GROUP = { across: 200, up: 120, most: 4 };
-// The spread across the best line through the bodies against the spread along it, at the least, for four or more: three make a triangle.
+// The spread across the best line through what stands on the screen against the spread along it, at the least, for three or more; a
+// view with a close world and a lit Earth stands low over the disc: a tenth (the chief, 2026-11-02). A row that recedes, its sizes
+// falling `RECEDES` times or more from near to far, is depth, not a row (Alexis's references).
 const ACROSS_LINE = 0.2;
-// A view with a close world and a lit Earth stands low over the disc: a tenth (the chief, 2026-11-02; Onyx's reads 0.11).
 const ACROSS_LOW = 0.1;
-const LINE_LEAST = 4;
+const LINE_LEAST = 3;
+const RECEDES = 2;
 const SIZES_APART = 4;
 const DISTANCES_APART = 2.5;
 
@@ -17,6 +19,14 @@ interface Spot {
   readonly x: number;
   readonly y: number;
   readonly radius: number;
+}
+
+/** What a view's composition is judged on: whether it holds a close world, the glowing stars' places, and the screen. */
+export interface Frame {
+  readonly deep: boolean;
+  readonly lights: readonly Spot[];
+  readonly width: number;
+  readonly height: number;
 }
 
 const ratio = (values: readonly number[]) => Math.max(...values) / Math.min(...values);
@@ -69,13 +79,44 @@ const meet = (one: Seen, other: Seen) => {
 const piled = (spots: readonly Seen[]) =>
   spots.some((one, at) => spots.slice(at + 1).some((other) => meet(one, other)));
 
-/** Whether the bodies on screen, `spots`, and the Earth read as the view must: spread, apart, off a line, and deep with a close world. */
-export function composed(spots: readonly Seen[], earth: Seen, deep: boolean): boolean {
-  const all = [earth, ...spots];
-  if (crowded(all) || piled(all) || (all.length >= LINE_LEAST && offLine(all) <= (deep ? ACROSS_LOW : ACROSS_LINE)))
-    return false;
+// Whether `bodies` recede along the best line through them: their distances rising one way, the nearest one's size `RECEDES` times the
+// farthest one's or more.
+function recedes(bodies: readonly Seen[]): boolean {
+  const count = bodies.length;
+  const [x0, y0] = [
+    bodies.reduce((sum, { x }) => sum + x, 0) / count,
+    bodies.reduce((sum, { y }) => sum + y, 0) / count,
+  ];
+  let [xx, xy, yy] = [0, 0, 0];
+  for (const { x, y } of bodies) [xx, xy, yy] = [xx + (x - x0) ** 2, xy + (x - x0) * (y - y0), yy + (y - y0) ** 2];
+  const angle = Math.atan2(2 * xy, xx - yy) / 2;
+  const along = [...bodies].sort((a, b) => (a.x - b.x) * Math.cos(angle) + (a.y - b.y) * Math.sin(angle));
+  const rising = along.every((body, at) => at === 0 || body.away > (along[at - 1]?.away ?? Infinity));
+  const falling = along.every((body, at) => at === 0 || body.away < (along[at - 1]?.away ?? -Infinity));
+  const byAway = [...bodies].sort((a, b) => a.away - b.away);
+  const [nearest, farthest] = [byAway[0], byAway.at(-1)];
   return (
-    !deep ||
+    (rising || falling) &&
+    nearest !== undefined &&
+    farthest !== undefined &&
+    nearest.radius >= RECEDES * farthest.radius
+  );
+}
+
+// What stands on the screen reads as a row: three or more of the bodies' centres on it and the glowing stars near a line, not receding.
+function aRow(all: readonly Seen[], { deep, lights, width, height }: Frame): boolean {
+  const shown = all.filter(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height);
+  const marks = [...shown, ...lights.filter(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height)];
+  return marks.length >= LINE_LEAST && offLine(marks) <= (deep ? ACROSS_LOW : ACROSS_LINE) && !recedes(shown);
+}
+
+/** Whether the bodies on screen, `spots`, and the Earth read as the view must, judged in `frame`: spread, apart, in no row that does not
+ * recede, and deep with a close world. */
+export function composed(spots: readonly Seen[], earth: Seen, frame: Frame): boolean {
+  const all = [earth, ...spots];
+  if (crowded(all) || piled(all) || aRow(all, frame)) return false;
+  return (
+    !frame.deep ||
     (ratio(all.map(({ radius }) => radius)) >= SIZES_APART && ratio(all.map(({ away }) => away)) >= DISTANCES_APART)
   );
 }
