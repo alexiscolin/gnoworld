@@ -76,7 +76,7 @@ function standAt(screenWidth: number, side: number): boolean {
   const start = side % 2 === 0 ? x - PLACE.stem * scale : x - wide + PLACE.stem * scale;
   const left = Math.min(Math.max(start, PLACE.margin), screenWidth - PLACE.margin - wide);
   const stemAt = Math.min(Math.max(x, left + PLACE.stemLeast * scale), left + wide - PLACE.stemLeast * scale);
-  if (!(Math.abs(stemAt - x) <= radius) || !(wide > 0) || !Number.isFinite(y)) return false;
+  if (!(Math.abs(stemAt - x) <= radius) || !(wide > 0)) return false;
   const outline = Math.sqrt(radius * radius - (stemAt - x) * (stemAt - x));
   tried.left = left;
   tried.top = side < 2 ? y - outline - PLACE.gap * scale - high : y + outline + PLACE.gap * scale;

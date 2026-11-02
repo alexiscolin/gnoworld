@@ -16,7 +16,7 @@ export const RISE = { days: 14, hours: 24, least: 0.2, people: 3 } as const;
 /** How far `people` now stand above the world's usual hour over its last 14 days, as a share (0.21 for 21%), or null: a history too short
  * to say, or no rise. The hour `now` falls in is left out of its own usual. */
 export function riseOf(people: number, history: readonly PresenceSlot[], now: number): number | null {
-  if (!Number.isFinite(people) || people < 0) return null;
+  if (!Number.isFinite(people)) return null;
   const hour = Math.floor(now / HOUR) * HOUR;
   const oldest = hour - RISE.days * 24 * HOUR;
   const counts = history
