@@ -174,9 +174,14 @@ describe("a world's signs on its render", () => {
   // The 0 px apart in the render Alexis approved, kept: the hash of the surface shader of 21b00fc8, this file's own additions taken out.
   // Any other change to what a world at rest draws lands here on purpose.
   it("leaves the approved render's shader as it was, but for the lights' one gated line", () => {
+    const gated =
+      "  if (settled > 0.0) colour += settlements(axis, direction, flow, day, crack) * (1.0 - 0.8 * overcast);\n";
+    expect(SURFACE_FRAGMENT).toContain(gated);
+    // The Earth's own lights read CITY_LIGHT at rest, so its value is the approved one.
+    expect(LIGHTS).toContain("const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);");
     const approved = SURFACE_FRAGMENT.replace(`${LIGHT_UNIFORMS}\n`, "")
       .replace(`${LIGHTS}\n`, "")
-      .replace(/ {2}if \(settled > 0\.0\).*\n/u, "")
+      .replace(gated, "")
       .replace("* CITY_LIGHT *", "* vec3(1.0, 0.8, 0.52) *");
     expect(createHash("sha256").update(new TextEncoder().encode(approved)).digest("hex")).toBe(APPROVED_SURFACE);
   });
@@ -188,8 +193,12 @@ describe("a world's signs on its render", () => {
     );
   });
 
-  it("takes a derivative nowhere past the branch that skips a day pixel, which varies by pixel", () => {
-    const [, past = ""] = LIGHTS.split("if (night <= 0.0)");
-    for (const word of ["dFdx", "dFdy", "fwidth", "lookupOf", "lines("]) expect(past, word).not.toContain(word);
+  it("takes a derivative nowhere past the branch that skips a day pixel, nor in anything it calls", () => {
+    const start = LIGHTS.indexOf("vec3 settlements(");
+    const branch = LIGHTS.indexOf("if (night <= 0.0)", start);
+    expect(branch).toBeGreaterThan(start);
+    const checked = LIGHTS.slice(0, start) + LIGHTS.slice(branch);
+    for (const word of ["dFdx", "dFdy", "fwidth", "lookupOf", "lines(", "texture2D(", "texture("])
+      expect(checked, word).not.toContain(word);
   });
 });

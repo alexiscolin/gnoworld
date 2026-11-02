@@ -9,8 +9,11 @@ const PAGE = "/lab/realism.html";
 // Nine surface maps (the Earth's among them), the clouds and the ring's profile.
 const MAPS_AT_MOST = 11;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
-// How far apart two classes' added light may lie at one stage: their forms differ, and a golden net lights a whole disc, as frame 4's does.
-const LIT_APART = 22;
+// How far apart two classes' added light may lie at one stage: their forms differ, their reading must not. A golden net lights a whole disc, as
+// frame 4's does, and has a bound of its own.
+const LIT_APART = 6;
+const NET_APART = 22;
+const NETS: readonly string[] = ["volcanic", "dark carbon"];
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
 const VIEWS = [
@@ -103,8 +106,11 @@ const addedOver = (levels: readonly number[], rest: readonly number[]) =>
 const readsAlike = ([rest = [], living = [], , , beacon = []]: readonly number[][]) => {
   const stirring = addedOver(living, rest).filter((added) => added > 0);
   expect(stirring.length, "most worlds show their first lights").toBeGreaterThanOrEqual(ANCHORS.length / 2);
-  const added = addedOver(beacon, rest).sort((one, other) => one - other);
-  expect((added.at(-1) ?? 0) / (added[0] ?? 1), "one stage, read alike").toBeLessThan(LIT_APART);
+  const added = addedOver(beacon, rest);
+  const towns = added.filter((_, index) => !NETS.includes(ANCHORS[index] ?? ""));
+  const faintest = Math.min(...towns);
+  expect(Math.max(...towns) / faintest, "one stage, read alike").toBeLessThan(LIT_APART);
+  expect(Math.max(...added) / faintest, "a net, the brightest").toBeLessThan(NET_APART);
 };
 // Blue gains the least. Red cannot rise where a shattered world's own lava already fills it, so green speaks for that one.
 const warmer = (anchor: string, before: readonly number[] = [], after: readonly number[] = []) => {
