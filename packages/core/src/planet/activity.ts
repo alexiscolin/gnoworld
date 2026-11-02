@@ -23,7 +23,7 @@ export interface Called {
 /** The aurora of a world `called` so, at the chain's height `newest`, its calls weighed against the universe's `top`. */
 export function auroraOf({ calls, lastHeight }: Called, newest: number | null, top: number): number {
   if (calls === null || lastHeight === null || newest === null) return 0;
-  const left = share(1 - Math.max(newest - lastHeight, 0) / RUN_BLOCKS);
+  const left = share(1 - (newest - lastHeight) / RUN_BLOCKS);
   return presenceOf(calls, top) * left;
 }
 

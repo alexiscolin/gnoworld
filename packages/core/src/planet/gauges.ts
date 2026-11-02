@@ -27,7 +27,7 @@ const RANK = 0.95;
 
 const rankOf = (values: readonly number[]) => {
   const sorted = values.map((value) => (Number.isFinite(value) ? value : 0)).sort((one, other) => one - other);
-  return sorted[Math.max(0, Math.ceil(RANK * sorted.length) - 1)] ?? 0;
+  return sorted[Math.ceil(RANK * sorted.length) - 1] ?? 0;
 };
 
 /** What a universe's worlds are weighed against: its 95th percentile, social and realm apart. */
