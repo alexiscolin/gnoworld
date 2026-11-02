@@ -228,19 +228,15 @@ describe("a stage reads the same on every class", () => {
     expect(new Set(Object.values(WAY).map(({ kind }) => kind))).toEqual(new Set(LIGHT_KINDS));
   });
 
-  it("grows stage by stage on every class: matter and lights, never a step back", () => {
+  // Its lights are the people's (F4110), held by their own tests: AT's crowds grow with the stages and would hold them for nothing here.
+  it("grows stage by stage on every class: matter, never a step back", () => {
     for (const anchor of ANCHORS) {
       const climb = (["rest", "living", "inhabited", "busy", "beacon"] as const).map((stage) =>
-        worldSigns(DAO, anchor, AT[stage]),
+        worldSigns(DAO, anchor, { ...AT[stage], present: 0.5 }),
       );
-      for (const [index, signs] of climb.slice(1).entries()) {
-        const before = climb[index];
-        expect(signs.lights.extent, anchor).toBeGreaterThan(before?.lights.extent ?? 1);
-        expect(signs.size, anchor).toBeGreaterThan(before?.size ?? 9);
-      }
+      for (const [index, signs] of climb.slice(1).entries())
+        expect(signs.size, anchor).toBeGreaterThan(climb[index]?.size ?? 9);
       expect(climb.at(-1)?.size, "a beacon stands out as matter").toBeGreaterThan(1.4);
-      expect(climb.at(-1)?.lights.extent, "a beacon's crowd lights it nearly all over").toBeGreaterThanOrEqual(0.9);
-      expect(climb[1]?.lights.extent, "a living world shows at once").toBeGreaterThan(0.15);
     }
   });
 });

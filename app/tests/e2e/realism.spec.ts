@@ -98,7 +98,8 @@ const discLight = async (page: Page, query: string, view = "gallery") => {
   return lit(page, discs(await circles(page)));
 };
 const nightAt = (page: Page, stage: string) => discLight(page, `stage=${stage}`);
-// Each class's night side, stage by stage. A living world's few first lights may stand on its far side as it turns: from inhabited on, none may hide.
+// Each class's night side, stage by stage, under the lab's presets, whose crowd grows with the stage: lights are the people's (F4110). A
+// living world's few first lights may stand on its far side as it turns: from inhabited on, none may hide.
 const holdsItsClimb = (climb: readonly string[], seen: readonly number[][], anchors: readonly string[] = TWELVE) => {
   for (const [index, anchor] of anchors.entries()) {
     const ladder = seen.map((levels) => levels[index] ?? 0);
