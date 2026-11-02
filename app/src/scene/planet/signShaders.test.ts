@@ -1,5 +1,6 @@
 import {
   ANCHORS,
+  asciiBytes,
   LIGHT_KINDS,
   planetLook,
   planetSeed,
@@ -8,21 +9,33 @@ import {
   type PlanetLook,
   type WorldState,
 } from "@gnoworld/core";
-import { AdditiveBlending, FrontSide, Mesh, ShaderMaterial, SphereGeometry, Texture, Vector3 } from "three";
+import { createHash } from "node:crypto";
+import {
+  CustomBlending,
+  FrontSide,
+  Mesh,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
+  ShaderMaterial,
+  SphereGeometry,
+  Texture,
+  Vector3,
+} from "three";
 import { describe, expect, it, vi } from "vitest";
 import { createPlanet, type MapSet } from "./planet.ts";
-import { lightCode } from "./signShaders.ts";
+import { LIGHT_UNIFORMS, LIGHTS, lightCode } from "./signShaders.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 // A world's signs on its render (slice 7, 7b2): a world at rest carries none, so the program, the meshes and every uniform are the ones
 // the lab drew, and the signs a stage adds only ever add light.
-const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
-const PATH = ascii("gno.land/r/gov/dao");
+const PATH = asciiBytes("gno.land/r/gov/dao");
 const SEED = planetSeed(PATH);
 const REST: WorldState = { vitality: 0.1, present: 0, fresh: false };
 const BUSY: WorldState = { vitality: 0.8, present: 0.6, fresh: false };
 const NEW: WorldState = { vitality: 0.1, present: 0.4, fresh: true };
 const sphere = new SphereGeometry(1, 8, 6);
+// What 21b00fc8's SURFACE_FRAGMENT hashes to, computed from that commit's three files.
+const APPROVED_SURFACE = "1f2191403f755cd1cc69368caaa43664f3ea4048a4c4fc69dde1f98750244c2a";
 
 const mapSet = (extra: Partial<MapSet> = {}): MapSet => {
   const shared = new Texture();
@@ -115,7 +128,10 @@ describe("a world's signs on its render", () => {
     expect(haloOf(planet.group)).toHaveLength(1);
     expect(halo.visible).toBe(true);
     expect(uniform(halo.material, "signal")).toBe(signs.signal);
-    expect(halo.material.blending).toBe(AdditiveBlending);
+    expect(halo.material.blending).toBe(CustomBlending);
+    expect(halo.material.blendSrc).toBe(OneFactor);
+    expect(halo.material.blendDst).toBe(OneMinusSrcAlphaFactor);
+    expect(halo.renderOrder, "over the air and the rings of any world").toBeGreaterThan(2);
     expect(halo.material.side).toBe(FrontSide);
     expect(halo.material.depthWrite).toBe(false);
     expect(halo.material.transparent).toBe(true);
@@ -135,6 +151,15 @@ describe("a world's signs on its render", () => {
     expect(planet.group.scale.toArray()).toEqual([3, 3, 3]);
   });
 
+  it("still takes the sun and the limb with a halo on", () => {
+    const planet = planetOf(planetLook(PATH, "desert"));
+    planet.setSigns(signsAt("desert", NEW));
+    expect(() => {
+      planet.setSun(new Vector3(0, 1, 0));
+      planet.setLimb(1);
+    }).not.toThrow();
+  });
+
   it("frees the halo with the world", () => {
     const planet = planetOf(planetLook(PATH, "rocky"));
     planet.setSigns(signsAt("rocky", NEW));
@@ -146,11 +171,25 @@ describe("a world's signs on its render", () => {
     expect(freed).toHaveBeenCalledOnce();
   });
 
-  // No pixel reaches a unit test: the 0 px apart on the lab's views is a capture against the base, in the review card. This holds the one gate.
-  it("reads no light unless a world has some", () => {
+  // The 0 px apart in the render Alexis approved, kept: the hash of the surface shader of 21b00fc8, this file's own additions taken out.
+  // Any other change to what a world at rest draws lands here on purpose.
+  it("leaves the approved render's shader as it was, but for the lights' one gated line", () => {
+    const approved = SURFACE_FRAGMENT.replace(`${LIGHT_UNIFORMS}\n`, "")
+      .replace(`${LIGHTS}\n`, "")
+      .replace(/ {2}if \(settled > 0\.0\).*\n/u, "")
+      .replace("* CITY_LIGHT *", "* vec3(1.0, 0.8, 0.52) *");
+    expect(createHash("sha256").update(new TextEncoder().encode(approved)).digest("hex")).toBe(APPROVED_SURFACE);
+  });
+
+  it("reads no light unless a world has some: `settled` is a uniform, so at rest not one of its reads runs", () => {
     expect(SURFACE_FRAGMENT).toContain("if (settled > 0.0)");
     expect(SURFACE_FRAGMENT.lastIndexOf("settlements(")).toBeGreaterThan(
       SURFACE_FRAGMENT.indexOf("if (settled > 0.0)"),
     );
+  });
+
+  it("takes a derivative nowhere past the branch that skips a day pixel, which varies by pixel", () => {
+    const [, past = ""] = LIGHTS.split("if (open <= 0.0)");
+    for (const word of ["dFdx", "dFdy", "fwidth", "lookupOf", "lines("]) expect(past, word).not.toContain(word);
   });
 });

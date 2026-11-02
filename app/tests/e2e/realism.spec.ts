@@ -9,8 +9,8 @@ const PAGE = "/lab/realism.html";
 // Nine surface maps (the Earth's among them), the clouds and the ring's profile.
 const MAPS_AT_MOST = 11;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
-// How far apart two classes' added light may lie at one stage: their forms differ, their reading must not.
-const LIT_APART = 6;
+// How far apart two classes' added light may lie at one stage: their forms differ, and a net, the brightest, is frame 4's own.
+const LIT_APART = 11;
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
 const VIEWS = [
@@ -84,10 +84,11 @@ const CORNERS: [number, number, number, number][] = [
 // Each world's whole disc: a stage adds its lights near the limb too, and the day side, which it leaves alone, cancels out.
 const discs = (places: readonly Circle[]): [number, number, number, number][] =>
   places.map(({ x, y, r }) => [Math.round(x - r), Math.round(y - r), Math.round(x + r), Math.round(y + r)]);
-const nightAt = async (page: Page, stage: string) => {
-  await open(page, `?view=gallery&stage=${stage}`);
+const discLight = async (page: Page, query: string) => {
+  await open(page, `?view=gallery&${query}`);
   return lit(page, discs(await circles(page)));
 };
+const nightAt = (page: Page, stage: string) => discLight(page, `stage=${stage}`);
 // Each class's night side, stage by stage. A living world's few first lights may stand on its far side as it turns: from inhabited on, none may hide.
 const holdsItsClimb = (climb: readonly string[], seen: readonly number[][]) => {
   for (const [index, anchor] of ANCHORS.entries()) {
@@ -334,14 +335,48 @@ test.describe("the realism page", () => {
       .toBe(0);
   });
 
-  // Against the base, the 0 px apart is a capture in the review card: the canvas's pixels are no golden here (the plan, section 6).
-  test("a world told it is at rest draws what the lab draws, and asks for no map more", async ({ page }) => {
+  test("a view at rest asks for no map more: only a stage's lights do", async ({ page }) => {
     await open(page, "?view=close&world=2");
-    const plain = (await page.locator("canvas").screenshot()).toString("base64");
     const { textures } = await stats(page);
     await open(page, "?view=close&world=2&stage=rest");
     expect((await stats(page)).textures).toBe(textures);
-    expect((await page.locator("canvas").screenshot()).toString("base64")).toBe(plain);
+    await open(page, "?view=close&world=2&stage=busy");
+    expect((await stats(page)).textures).toBe(textures + 1);
+  });
+
+  test("how far lights reach follows the vitality alone, the people held", async ({ page }) => {
+    const settled = await discLight(page, "stage=inhabited&present=0.5");
+    const further = await discLight(page, "stage=beacon&present=0.5");
+    for (const [index, anchor] of ANCHORS.entries())
+      expect(further[index], anchor).toBeGreaterThan(settled[index] ?? 0);
+  });
+
+  test("how lit they are follows the people alone, the vitality held", async ({ page }) => {
+    const empty = await discLight(page, "stage=busy&present=0.05");
+    const full = await discLight(page, "stage=busy&present=0.95");
+    for (const [index, anchor] of ANCHORS.entries()) expect(full[index], anchor).toBeGreaterThan(empty[index] ?? 0);
+  });
+
+  test("a seed glows pink past its limb, fades out by three radii, and a world at rest does not glow", async ({
+    page,
+  }) => {
+    await open(page, "?view=stages&world=0");
+    const [seed, rest] = await circles(page);
+    if (seed === undefined || rest === undefined) throw new Error("no worlds");
+    const beside = ({ x, y, r }: Circle, from: number): [number, number, number, number] => [
+      Math.round(x + r * from),
+      Math.round(y - r * 0.2),
+      Math.round(x + r * from + 8),
+      Math.round(y + r * 0.2),
+    ];
+    await page.keyboard.press("p");
+    const picture = await page.locator("canvas").screenshot();
+    const [near, far, plain] = await colours(page, picture, [beside(seed, 1.4), beside(seed, 3.2), beside(rest, 1.4)]);
+    if (near === undefined || far === undefined || plain === undefined) throw new Error("no boxes");
+    expect(near[0], "its glow").toBeGreaterThan(plain[0] + 8);
+    expect(near[0], "red over blue").toBeGreaterThan(near[1]);
+    expect(far[0], "gone by three radii").toBeLessThan(near[0] / 3);
+    expect(plain[0], "no glow at rest").toBeLessThan(6);
   });
 
   test("a stage reads the same on all twelve classes: each night side lights up as a world grows", async ({ page }) => {
@@ -438,6 +473,10 @@ test.describe("the realism page", () => {
     expect(gallery.textures).toBeLessThanOrEqual(MAPS_AT_MOST + 1);
     expect(gallery.programs).toBeLessThanOrEqual(6);
     expect(gallery.mapBytes).toBeLessThanOrEqual(MEMORY_AT_MOST);
+    await open(page, "?view=close&world=2&stage=beacon");
+    expect((await stats(page)).mapBytes, "a world seen close, its two maps at 4096").toBeLessThanOrEqual(
+      MEMORY_AT_MOST,
+    );
   });
 
   for (const asked of ["bogus", "__proto__", "constructor", ""])

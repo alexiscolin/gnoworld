@@ -113,7 +113,7 @@ void main() {
     float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
     colour += (cities * 2.6 + spill * 0.9) * CITY_LIGHT * dusk * (1.0 - 0.8 * overcast);
   }
-  if (settled > 0.0) colour += settlements(axis, direction, flow, day, max(crack, rift)) * (1.0 - 0.8 * overcast);
+  if (settled > 0.0) colour += settlements(axis, direction, flow, day, crack) * (1.0 - 0.8 * overcast);
   float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
   // Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
   if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);

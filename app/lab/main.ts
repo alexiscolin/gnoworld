@@ -49,7 +49,8 @@ function chosen(query: URLSearchParams): Choice {
   const view = VIEWS.find((name) => name === query.get("view")) ?? "gallery";
   const method: Method = query.get("method") === "image" ? "image" : "computed";
   const stage = STAGES.find((name) => name === query.get("stage")) ?? "rest";
-  return { view, world: worldIn(query, view), seed: 0, method, stage };
+  const present = query.has("present") ? Number(query.get("present")) : null;
+  return { view, world: worldIn(query, view), seed: 0, method, stage, present };
 }
 
 // The next stage along the road, stopping at its ends.

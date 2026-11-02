@@ -67,7 +67,7 @@ async function mapsFor(
     loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
     loadMap(mapUrl("ring", base), { kind: "data", anisotropy }),
   ]);
-  const lights = lit ? await loadMap(mapUrl("earth-night", base), { kind: "colour", anisotropy, width }) : undefined;
+  const lights = lit ? await loadMap(mapUrl("earth-night", base), { kind: "data", anisotropy, width }) : undefined;
   const set: MapSet = {
     map: (name) => {
       const texture = loaded.get(name);

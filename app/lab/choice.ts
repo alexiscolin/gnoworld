@@ -22,6 +22,8 @@ export interface Choice {
   readonly seed: number;
   readonly method: Method;
   readonly stage: Stage;
+  /** The people here, in place of a stage's usual crowd. */
+  readonly present: number | null;
 }
 
 const NAMES = [
@@ -67,10 +69,10 @@ export function looksOf({ view, world, seed }: Choice): PlanetLook[] {
 
 /** What each world of a choice shows: one stage in every view, all six in their own. */
 export const signsOf = (choice: Choice, looks: readonly PlanetLook[]): WorldSigns[] =>
-  looks.map(({ anchor }, index) =>
-    worldSigns(
-      planetSeed(pathBytes(choice, index)),
-      anchor,
-      STATES[choice.view === "stages" ? (STAGES[index] ?? "rest") : choice.stage],
-    ),
-  );
+  looks.map(({ anchor }, index) => {
+    const state = STATES[choice.view === "stages" ? (STAGES[index] ?? "rest") : choice.stage];
+    return worldSigns(planetSeed(pathBytes(choice, index)), anchor, {
+      ...state,
+      present: choice.present ?? state.present,
+    });
+  });

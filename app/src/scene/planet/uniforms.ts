@@ -23,7 +23,7 @@ export interface MapSet {
   readonly ring: Texture;
   /** City lights, for the one world that has them. */
   readonly night?: Texture;
-  /** The map a generated world's lights are read from. */
+  /** The one channel a generated world's lights are read from. */
   readonly lights?: Texture;
 }
 
@@ -107,7 +107,8 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
   };
 }
 
-function setUniform(uniforms: Uniforms, name: string, value: number): void {
+/** Writes a number where a material holds its uniform. */
+export function setUniform(uniforms: Uniforms, name: string, value: number): void {
   const uniform = uniforms[name];
   if (uniform !== undefined) uniform.value = value;
 }

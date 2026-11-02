@@ -18,6 +18,7 @@ import { GLOW_FRAGMENT, ORBIT_FRAGMENT } from "../earth/orbitShader.ts";
 import { AIR_FRAGMENT } from "./airShader.ts";
 import { createPlanet, type MapSet, type Planet } from "./planet.ts";
 import { RING_FRAGMENT } from "./ringShader.ts";
+import { HALO_FRAGMENT } from "./signShaders.ts";
 import { PARTS } from "./surfaceParts.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
@@ -278,13 +279,20 @@ describe("createPlanet", () => {
   });
 
   it("never asks a smoothstep with its edges reversed, which GLSL leaves undefined and a software GPU hides", () => {
-    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT, ORBIT_FRAGMENT, GLOW_FRAGMENT])
+    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT, ORBIT_FRAGMENT, GLOW_FRAGMENT, HALO_FRAGMENT])
       for (const [call = "", low = "0", high = "0"] of shader.matchAll(/smoothstep\(([^,()]+), ([^,()]+),/g))
         expect(edge(low), call).toBeLessThan(edge(high));
   });
 
   it("takes every fragment through the one grade, the tone first, then the screen's colours (ADR-0002 §10)", () => {
-    for (const shader of [SURFACE_FRAGMENT, AIR_FRAGMENT, RING_FRAGMENT, ORBIT_FRAGMENT, GLOW_FRAGMENT]) {
+    for (const shader of [
+      SURFACE_FRAGMENT,
+      AIR_FRAGMENT,
+      RING_FRAGMENT,
+      ORBIT_FRAGMENT,
+      GLOW_FRAGMENT,
+      HALO_FRAGMENT,
+    ]) {
       const tone = shader.indexOf("#include <tonemapping_fragment>");
       expect(tone).toBeGreaterThan(0);
       expect(shader.indexOf("#include <colorspace_fragment>")).toBeGreaterThan(tone);

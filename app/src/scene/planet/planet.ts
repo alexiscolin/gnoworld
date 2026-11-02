@@ -2,7 +2,6 @@
 // maps and the sphere are shared by every world and stay with their owner, the part that loads them.
 import type { PlanetLook, WorldSigns } from "@gnoworld/core";
 import {
-  AdditiveBlending,
   BufferGeometry,
   CustomBlending,
   DoubleSide,
@@ -20,7 +19,7 @@ import { AIR_FRAGMENT, AIR_VERTEX } from "./airShader.ts";
 import { RING_FRAGMENT, RING_VERTEX } from "./ringShader.ts";
 import { HALO_FRAGMENT, HALO_VERTEX } from "./signShaders.ts";
 import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
-import { setLights, surfaceUniforms, working, type MapSet } from "./uniforms.ts";
+import { setLights, setUniform, surfaceUniforms, working, type MapSet } from "./uniforms.ts";
 
 export type { MapSet };
 
@@ -29,6 +28,7 @@ const RING_FLAT = -Math.PI / 2;
 // Over the surface, under the rings, for a ring in front of a world sits in front of its air.
 const AIR_ORDER = 1;
 const RING_ORDER = 2;
+const HALO_ORDER = 3;
 // A seed's glow reaches this far past its small body, in front of it: frame 4's signal is a glow with a heart, not a ring round a disc.
 const HALO_REACH = 2.6;
 export interface Planet {
@@ -94,7 +94,9 @@ const haloMaterial = (): ShaderMaterial =>
     fragmentShader: HALO_FRAGMENT,
     transparent: true,
     depthWrite: false,
-    blending: AdditiveBlending,
+    blending: CustomBlending,
+    blendSrc: OneFactor,
+    blendDst: OneMinusSrcAlphaFactor,
     uniforms: { signal: { value: 0 } },
   });
 
@@ -164,14 +166,14 @@ class LivePlanet implements Planet {
     if (signal <= 0 && this.#halo === undefined) return;
     const halo = (this.#halo ??= this.#addHalo());
     halo.visible = signal > 0;
-    const glow = halo.material.uniforms["signal"];
-    if (glow !== undefined) glow.value = signal;
+    setUniform(halo.material.uniforms, "signal", signal);
   }
 
   // Made for the worlds that need one: a world at rest keeps the meshes the lab drew. No sun reaches it, so it stays out of `#parts`.
   #addHalo(): Mesh<BufferGeometry, ShaderMaterial> {
     const halo = new Mesh(this.#sphere, this.#owner.add(haloMaterial()));
     halo.scale.setScalar(HALO_REACH);
+    halo.renderOrder = HALO_ORDER;
     this.group.add(halo);
     return halo;
   }
