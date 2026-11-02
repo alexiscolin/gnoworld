@@ -41,8 +41,8 @@ void main() {
   gl_Position.z = gl_Position.w * 0.99999;
 }`;
 
-// The image bent by a slow field, cut to a soft uneven round, its level kept, its own hue and the mood's both softened towards grey: a
-// telescope's colours, never pushed.
+// The image bent by a slow field, cut to a soft uneven round, its level kept and its hue mostly the mood's: a blue image takes a warm or
+// a teal place's colour, never grey. Its light bends down as it grows, hue kept, so no sheet washes out the glow it lies on.
 const FRAGMENT = /* glsl */ `
 uniform sampler2D uImage;
 varying vec2 vCorner;
@@ -57,10 +57,11 @@ void main() {
   vec2 at = vec2(0.5) + vec2(0.5, -0.5) * (vCorner + 0.1 * bend.xy);
   vec3 image = texture2D(uImage, vWindow.xy + at * vWindow.zw, vSoft.x).rgb;
   float level = dot(image, vec3(0.2126, 0.7152, 0.0722));
-  vec3 own = mix(vec3(level), image, 0.7);
-  vec3 tint = mix(vec3(1.0), vLight.rgb, 0.7);
-  vec3 colour = mix(own, tint * level * 1.3, 0.55) * smoothstep(0.02, 0.3, level);
-  gl_FragColor = vec4(colour * edge * edge * vLight.a * 0.75, 1.0);
+  vec3 own = mix(vec3(level), image, 0.5);
+  vec3 tint = mix(vec3(1.0), vLight.rgb, 0.85);
+  vec3 colour = mix(own, tint * level * 1.3, 0.85) * smoothstep(0.02, 0.3, level) * edge * edge * vLight.a * 0.75;
+  colour *= 0.045 / (0.045 + dot(colour, vec3(0.2126, 0.7152, 0.0722)));
+  gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

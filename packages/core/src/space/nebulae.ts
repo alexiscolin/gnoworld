@@ -83,6 +83,11 @@ const WORLD = 3;
 const SYSTEM = 12;
 const CLUSTER = MOOD_SCALE;
 const GONE = 2 * MOOD_SCALE;
+// At a system's distance, the arrival's, the worlds are the subject and the nebulae lie low under the suns' glow; seen from a cluster's,
+// they are the view.
+const SYSTEM_SHARE = 0.35;
+const ARRIVAL = 36;
+const CLUSTER_VIEW = 240;
 
 const blank = (): Nebula => ({
   id: 0,
@@ -197,9 +202,12 @@ export function nebulaLight(nebula: Nebula, eye: Point): number {
   return light < LEAST ? 0 : light;
 }
 
-/** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, all from a system to a cluster. */
+/** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, a third at a system's distance, all at
+ * a cluster's, none past it. */
 export const nebulaShare = (distance: number): number =>
-  smoothstep(WORLD, SYSTEM, distance) * (1 - smoothstep(CLUSTER, GONE, distance));
+  smoothstep(WORLD, SYSTEM, distance) *
+  (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
+  (1 - smoothstep(CLUSTER, GONE, distance));
 
 /** Where a layer's sheet stands, into `out`; its half-width. */
 export function sheetOf(nebula: Nebula, layer: NebulaLayer, out: { x: number; y: number; z: number }): number {
