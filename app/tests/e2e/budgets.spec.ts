@@ -34,7 +34,7 @@ const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 const SCENE_JS = 150 * 1024;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 16 * 1024;
+const COSMOS_JS = 17 * 1024; // 16 KiB again once 7d5 gives the nebulae a chunk of their own (Alexis, 2026-11-02).
 const THREE_MARK = "isWebGLRenderer";
 
 // The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic

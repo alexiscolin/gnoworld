@@ -1,6 +1,7 @@
 // The realm a path names (5h): /r/<path> in the default universe, /net/<id>/r/<path> in another, read from that universe's
 // chain. A client route's address, with no page written ahead (docs/plans/slice-5-part-2.md §1): the path is the realm's, so
 // it passes gno's grammar for one (lib/chain's isRealmPath) or it names nothing.
+import { REALM_PREFIX } from "@gnoworld/core";
 import universes from "../data/universes.json" with { type: "json" };
 import { isRealmPath } from "./lib/chain/evalCall.ts";
 import { site } from "./places.ts";
@@ -21,7 +22,7 @@ export function realmAt(pathname: string): RealmAt | undefined {
   if (found === null || rest === undefined) return undefined;
   const universe = site.universeAt(pathname);
   const row = universes.find((each) => each.id === universe.id);
-  const realm = `gno.land/r/${rest}`;
+  const realm = `${REALM_PREFIX}${rest}`;
   if (row === undefined || (found[1] !== undefined && found[1] !== universe.id) || !isRealmPath(realm))
     return undefined;
   return {

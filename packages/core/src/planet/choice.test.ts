@@ -12,32 +12,50 @@ import {
   type Nature,
   type RealmFunctions,
 } from "./look.ts";
+import { planetRecipe, worldRecipe } from "./recipe.ts";
 import { sha256 } from "./sha256.ts";
 
-// Which of the twelve a world is (slice 7, 7b2; ADR-0002 §3). All 32 bytes of the seed are taken (F3476), so the choice reads a second
+// Which of the 24 a world is (slice 7, 7b2 and 7b4; ADR-0002 §3). All 32 bytes of the seed are taken (F3476), so the choice reads a second
 // hash, and the anchor's look stands as the lab showed it: a world is `planetLook` at the anchor its seed chose.
 const WEIGHTS: readonly (readonly [Anchor, number])[] = [
-  ["rocky", 30],
-  ["temperate", 26],
-  ["desert", 30],
-  ["ocean", 20],
-  ["ice", 26],
-  ["volcanic", 20],
-  ["gas giant", 26],
-  ["ice giant", 18],
-  ["cloud deck", 18],
-  ["tidally locked", 12],
-  ["dark carbon", 18],
-  ["shattered", 12],
+  ["rocky", 18],
+  ["temperate", 16],
+  ["desert", 18],
+  ["ocean", 13],
+  ["ice", 14],
+  ["volcanic", 13],
+  ["gas giant", 17],
+  ["ice giant", 12],
+  ["cloud deck", 11],
+  ["tidally locked", 6],
+  ["dark carbon", 9],
+  ["shattered", 5],
+  ["nitrogen ice", 11],
+  ["grooved ice", 11],
+  ["snowball", 9],
+  ["hycean", 9],
+  ["archean", 8],
+  ["lava world", 5],
+  ["two-faced", 5],
+  ["water cloud giant", 10],
+  ["azure giant", 9],
+  ["dark giant", 8],
+  ["hot giant", 5],
+  ["sub-Neptune", 14],
 ];
+const STRANGE: readonly Anchor[] = ["tidally locked", "shattered", "lava world", "two-faced", "hot giant"];
+// Each nature leans to anchors of its own (7b4, Alexis 2026-11-02): an NFT to the jewel-like ices, a token to the giants (ADR-0002 §3), an
+// exchange to the seas, a DAO to temperate worlds, a game to fire and the strange ones. No name: its rule read 3 of 7 unseen registries.
 const LEANS = {
-  token: ["gas giant", "ice giant"],
+  nft: ["nitrogen ice", "grooved ice"],
+  token: ["gas giant", "ice giant", "water cloud giant", "azure giant"],
+  exchange: ["ocean", "hycean"],
   dao: ["temperate"],
-  game: ["volcanic", "tidally locked", "shattered"],
+  game: ["volcanic", "tidally locked", "shattered", "lava world", "two-faced", "hot giant"],
 } as const satisfies Record<Nature, readonly Anchor[]>;
 // A nudge takes the bytes under this, of 256: about a third of a nature's worlds.
 const LEAN = 90;
-const NATURES = ["token", "dao", "game"] as const;
+const NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 
 const drawn = (byte: number): Anchor => {
   let left = byte;
@@ -61,10 +79,56 @@ const shareOf = (anchors: readonly Anchor[], wanted: readonly Anchor[]) =>
 const WUGNOT = ["Deposit", "Withdraw", "Render", "TotalSupply", "BalanceOf", "Allowance", "Transfer", "Approve"];
 const GOV_DAO = ["Render", "MustCreateProposal", "ExecuteProposal", "CreateProposal", "VoteOnProposal", "UpdateImpl"];
 const CONNECT4 = ["Offer", "Accept", "Reveal", "RevealSeed", "Play", "ClaimTimeout", "Resign", "Cancel", "Render"];
+// Read on onyx-1 with gnomcp's gno_read by part 7b4, 2026-11-02, top-level names only (the rules measured in reports/slice-7b4-natures.md):
+// r/g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx/fishnft, a GRC721; r/nym-moultest123/x/amm/v0; r/g1egtnurppfnh7exvzpwu3nrfyw57lmf4d375rl4/ggg_names_v1;
+// r/nt/grc20reg/v0, which registers tokens and is no name.
+const FISHNFT = [
+  "Init",
+  "Transfer",
+  "Version",
+  "Minted",
+  "Name",
+  "Symbol",
+  "RarityOf",
+  "SpeciesOf",
+  "ModelOf",
+  "TokenURI",
+  "OwnerOf",
+  "Render",
+];
+const AMM = [
+  "AddLiquidity",
+  "RemoveLiquidity",
+  "Swap",
+  "TransferLP",
+  "ApproveLP",
+  "TransferFromLP",
+  "AmountOut",
+  "Quote",
+  "Reserves",
+  "SharesOf",
+  "TotalShares",
+  "LPToken",
+  "AllowanceLP",
+  "PoolCount",
+  "Render",
+];
+const NAMES = [
+  "Normalize",
+  "Register",
+  "Rename",
+  "Lookup",
+  "Owner",
+  "Available",
+  "History",
+  "RegistryVersion",
+  "Render",
+];
+const GRC20REG = ["Register", "Get", "MustGet", "Transfer", "Approve", "TransferFrom", "Render", "GetRegistry"];
 const realm = (functions: readonly string[]): RealmFunctions => ({ functions });
 
 describe("anchorOf", () => {
-  it("weighs the twelve as stated, on a second hash of the seed: a byte of the seed's own is another value's (F3476)", () => {
+  it("weighs the anchors as stated, on a second hash of the seed: a byte of the seed's own is another value's (F3476)", () => {
     expect(WEIGHTS.reduce((sum, [, weight]) => sum + weight, 0)).toBe(256);
     expect(WEIGHTS.map(([anchor]) => anchor)).toEqual(ANCHORS);
     for (const seed of seeds(5000)) expect(anchorOf(seed)).toBe(drawn(byteOf(sha256(seed), 0)));
@@ -73,12 +137,18 @@ describe("anchorOf", () => {
   it("gives every anchor some worlds, and keeps the strange ones rare, about one in ten (ADR-0002 §3)", () => {
     const anchors = seeds(6000).map((seed) => anchorOf(seed));
     expect(new Set(anchors)).toEqual(new Set(ANCHORS));
-    const strange = shareOf(anchors, ["tidally locked", "shattered"]);
-    expect(strange).toBeGreaterThan(0.07);
-    expect(strange).toBeLessThan(0.13);
-    for (const anchor of ANCHORS.filter((one) => one !== "tidally locked" && one !== "shattered"))
-      expect(shareOf(anchors, [anchor]), anchor).toBeGreaterThan(0.06);
+    const strange = shareOf(anchors, STRANGE);
+    expect(strange).toBeGreaterThan(0.08);
+    expect(strange).toBeLessThan(0.12);
+    for (const anchor of ANCHORS.filter((one) => !STRANGE.includes(one)))
+      expect(shareOf(anchors, [anchor]), anchor).toBeGreaterThan(0.02);
   });
+
+  it("brings each anchor out at its weight within a percent, over 10,000 worlds", () => {
+    const anchors = Array.from({ length: 10_000 }, (_, at) => worldLook(`weigh${String(at)}/home`).anchor);
+    for (const [anchor, weight] of WEIGHTS)
+      expect(Math.abs(shareOf(anchors, [anchor]) - weight / 256), anchor).toBeLessThan(0.01);
+  }, 30_000);
 
   it("gives a seed one anchor, whatever asks", () => {
     fc.assert(
@@ -92,17 +162,61 @@ describe("anchorOf", () => {
 
   // Computed apart with Python's hashlib: a change of byte or weight re-rolls every world, and this says so.
   it.each([
-    ["gov/dao", 139, "volcanic"],
-    ["gnoswap/pool", 171, "gas giant"],
+    ["gov/dao", 139, "dark carbon"],
+    ["gnoswap/pool", 171, "grooved ice"],
     ["nym-alexiscolin000/gnogolf", 5, "rocky"],
-    ["samcrew/memba", 188, "ice giant"],
-    ["gnoland/wugnot", 225, "tidally locked"],
-    ["samcrew/connect4", 37, "temperate"],
+    ["samcrew/memba", 188, "hycean"],
+    ["gnoland/wugnot", 225, "azure giant"],
+    ["samcrew/connect4", 37, "desert"],
   ] as const)("keeps %s's class", (id, byte, anchor) => {
     const seed = planetSeed(asciiBytes(`gno.land/r/${id}`));
     expect(byteOf(sha256(seed), 0)).toBe(byte);
     expect(anchorOf(seed)).toBe(anchor);
   });
+});
+
+// The minor class (slice 7, 7b4; ADR-0002 §3): any other anchor, by the others' weights, on the second hash's bytes 26 and 27 read as one
+// word, so a small weight keeps its share where a byte would round it away.
+const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
+  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant);
+  const total = others.reduce((sum, [, weight]) => sum + weight, 0);
+  let left = Math.floor(((byteOf(more, 26) * 256 + byteOf(more, 27)) * total) / 65536);
+  for (const [anchor, weight] of others) {
+    if (left < weight) return anchor;
+    left -= weight;
+  }
+  throw new Error("the weights do not reach the word");
+};
+
+describe("the minor class", () => {
+  it("draws any other anchor by its weight among the others, on the second hash's bytes 26 and 27", () => {
+    for (const [at, seed] of seeds(2000).entries()) {
+      const dominant = ANCHORS[at % ANCHORS.length] ?? "rocky";
+      const path = asciiBytes(`gno.land/r/n${String(at)}/home`);
+      expect(planetRecipe(path, dominant).minor).toBe(minorOf(sha256(seed), dominant));
+    }
+  });
+
+  it("comes out at its weight within a percent, over 10,000 worlds", () => {
+    const counts = new Map<Anchor, number>();
+    const total = 10_000;
+    for (let at = 0; at < total; at += 1) {
+      const { minor } = worldRecipe(`mix${String(at)}/home`);
+      counts.set(minor, (counts.get(minor) ?? 0) + 1);
+    }
+    const expected = new Map(
+      ANCHORS.map((minor) => {
+        const weightOf = (anchor: Anchor) => WEIGHTS.find(([one]) => one === anchor)?.[1] ?? 0;
+        const share = ANCHORS.filter((dominant) => dominant !== minor).reduce(
+          (sum, dominant) => sum + (weightOf(dominant) / 256) * (weightOf(minor) / (256 - weightOf(dominant))),
+          0,
+        );
+        return [minor, share];
+      }),
+    );
+    for (const anchor of ANCHORS)
+      expect(Math.abs((counts.get(anchor) ?? 0) / total - (expected.get(anchor) ?? 0)), anchor).toBeLessThan(0.01);
+  }, 30_000);
 });
 
 describe("a world's nature nudges its class", () => {
@@ -117,12 +231,14 @@ describe("a world's nature nudges its class", () => {
 
   it("moves a world whose bytes fall under the lean, and leaves the others: hashlib's bytes for two recorded worlds", () => {
     const seedOf = (id: string) => planetSeed(asciiBytes(`gno.land/r/${id}`));
-    expect(anchorOf(seedOf("gnoland/wugnot"), "token")).toBe("gas giant");
+    expect(anchorOf(seedOf("gnoland/wugnot"), "token")).toBe("water cloud giant");
     expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "dao")).toBe("temperate");
-    expect(anchorOf(seedOf("gov/dao"), "dao")).toBe("volcanic");
-    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "token")).toBe("ice giant");
-    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "game")).toBe("shattered");
+    expect(anchorOf(seedOf("gov/dao"), "dao")).toBe("dark carbon");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "token")).toBe("azure giant");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "game")).toBe("hot giant");
     expect(anchorOf(seedOf("gnoland/wugnot"), "game")).toBe("shattered");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "nft")).toBe("grooved ice");
+    expect(anchorOf(seedOf("nym-vikbez000/nightsky"), "exchange")).toBe("hycean");
   });
 
   it.each(NATURES)("%s leans without fixing: every class stays open to it", (nature) => {
@@ -144,6 +260,51 @@ describe("natureOf", () => {
     expect(natureOf([realm(WUGNOT)])).toBe("token");
     expect(natureOf([realm(GOV_DAO)])).toBe("dao");
     expect(natureOf([realm(CONNECT4)])).toBe("game");
+  });
+
+  it("reads an NFT and an exchange from names read on the chain", () => {
+    expect(natureOf([realm(FISHNFT)])).toBe("nft");
+    expect(natureOf([realm(AMM)])).toBe("exchange");
+  });
+
+  it("wants an owner and a token's art or mint for an NFT: a name registry's OwnerOf is no NFT", () => {
+    expect(natureOf([realm(["OwnerOf"])])).toBeNull();
+    expect(natureOf([realm(["TokenURI", "Mint"])])).toBeNull();
+    expect(natureOf([realm(["OwnerOf", "TokenURI"])])).toBe("nft");
+    expect(natureOf([realm(["MustOwnerOf", "Mint"])])).toBe("nft");
+    expect(natureOf([realm(["Register", "OwnerOf", "HandleOf"])])).toBeNull();
+    expect(natureOf([realm(["OwnerOfAll", "TokenURIs"])])).toBeNull();
+  });
+
+  it("reads an exchange from a swap, or from liquidity both ways", () => {
+    expect(natureOf([realm(["ExactInSwapRoute", "Render"])])).toBe("exchange");
+    expect(natureOf([realm(["AddLiquidity"])])).toBeNull();
+    expect(natureOf([realm(["RemoveLiquidity"])])).toBeNull();
+    expect(natureOf([realm(["AddLiquidity", "RemoveLiquidity"])])).toBe("exchange");
+    expect(natureOf([realm(["Swapped"])])).toBe("exchange");
+    expect(natureOf([realm(["swap", "Render"])])).toBeNull();
+  });
+
+  it("reads no nature from a name registry, nor from one of tokens or of a game's players", () => {
+    expect(natureOf([realm(NAMES)])).toBeNull();
+    expect(natureOf([realm(["RegisterUser", "ResolveName"])])).toBeNull();
+    expect(natureOf([realm(GRC20REG)])).toBeNull();
+    expect(natureOf([realm(["RegisterVein", "Mine"])])).toBeNull();
+  });
+
+  it("gives a tie to the rule before: NFT, token, exchange, DAO, then game", () => {
+    expect(natureOf([realm(WUGNOT), realm(FISHNFT)])).toBe("nft");
+    expect(natureOf([realm(AMM), realm(WUGNOT)])).toBe("token");
+    expect(natureOf([realm(GOV_DAO), realm(AMM)])).toBe("exchange");
+    expect(natureOf([realm(CONNECT4), realm(GOV_DAO)])).toBe("dao");
+    expect(natureOf([realm(CONNECT4), realm(CONNECT4), realm(FISHNFT)])).toBe("game");
+  });
+
+  it("takes an NFT first, then a token, an exchange, a DAO and a game", () => {
+    expect(natureOf([realm([...WUGNOT, "OwnerOf", "TokenURI"])])).toBe("nft");
+    expect(natureOf([realm([...WUGNOT, "Swap"])])).toBe("token");
+    expect(natureOf([realm(["Swap", ...GOV_DAO])])).toBe("exchange");
+    expect(natureOf([realm([...GOV_DAO, "Play"])])).toBe("dao");
   });
 
   it("calls nothing what no rule reads", () => {
@@ -254,12 +415,12 @@ describe("worldLook", () => {
 
   it("passes the nature on: a world whose bytes fall under the lean takes it", () => {
     const id = "gnoland/wugnot";
-    expect(worldLook(id).anchor).toBe("tidally locked");
-    expect(worldLook(id, "token").anchor).toBe("gas giant");
+    expect(worldLook(id).anchor).toBe("azure giant");
+    expect(worldLook(id, "token").anchor).toBe("water cloud giant");
     expect(worldLook(id, "dao").anchor).toBe("temperate");
     expect(worldLook(id, "game").anchor).toBe("shattered");
     const path = asciiBytes(`gno.land/r/${id}`);
-    expect(worldLook(id, "token")).toEqual(planetLook(path, "gas giant"));
+    expect(worldLook(id, "token")).toEqual(planetLook(path, "water cloud giant"));
   });
 
   it("gives a path one planet", () => {

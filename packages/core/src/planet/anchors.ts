@@ -1,10 +1,10 @@
-// What an anchor of ADR-0002 §3 is made of, and the small set of maps; rows.ts holds the twelve.
+// What an anchor of ADR-0002 §3 is made of, and the small set of maps; rows.ts holds the twelve of the ADR, more.ts the twelve more.
 
 export type Rgb = readonly [number, number, number];
 export type Ramp = readonly [Rgb, Rgb, Rgb];
 type Span = readonly [number, number];
 
-export const ANCHORS = [
+const KEPT = [
   "rocky",
   "temperate",
   "desert",
@@ -18,7 +18,25 @@ export const ANCHORS = [
   "dark carbon",
   "shattered",
 ] as const;
+// Each a real body or a documented kind of planet (Alexis, 2026-11-02); the references are in more.ts.
+const MORE = [
+  "nitrogen ice",
+  "grooved ice",
+  "snowball",
+  "hycean",
+  "archean",
+  "lava world",
+  "two-faced",
+  "water cloud giant",
+  "azure giant",
+  "dark giant",
+  "hot giant",
+  "sub-Neptune",
+] as const;
+export const ANCHORS = [...KEPT, ...MORE] as const;
 export type Anchor = (typeof ANCHORS)[number];
+export type KeptAnchor = (typeof KEPT)[number];
+export type MoreAnchor = (typeof MORE)[number];
 
 /** The small set of real maps every world reuses. */
 export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze", "earth-day"] as const;

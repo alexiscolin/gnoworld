@@ -130,7 +130,7 @@ describe("createPlanet", () => {
   );
 
   it("marks the air of the worlds that have it and of the Earth, so the halo and the blue night follow it", () => {
-    const airless = ["rocky", "ice", "dark carbon", "shattered"];
+    const airless = ["rocky", "ice", "dark carbon", "shattered", "nitrogen ice", "grooved ice", "two-faced"];
     for (const anchor of ANCHORS) {
       const { surface } = createPlanet(planetLook(DAO, anchor), fixed().set, sphere);
       expect(read(surface, "air"), anchor).toBe(airless.includes(anchor) ? 0 : 1);
@@ -380,7 +380,9 @@ describe("createPlanet", () => {
   it("reads the Earth's own sea on the worlds that read its map, and no other", () => {
     for (const anchor of ANCHORS) {
       const surface = createPlanet(planetLook(DAO, anchor), fixed().set, sphere).surface;
-      expect(read(surface, "blueSea"), anchor).toBe(["temperate", "ocean"].includes(anchor) ? 1 : 0);
+      expect(read(surface, "blueSea"), anchor).toBe(
+        ["temperate", "ocean", "hycean", "archean"].includes(anchor) ? 1 : 0,
+      );
     }
     expect(SURFACE_FRAGMENT).toContain("smoothstep(0.004, 0.02, base.b - max(base.r, base.g))");
   });
