@@ -143,7 +143,8 @@ void main() {
   vec3 view = normalize(cameraPosition - vWorld);
   float world = length(modelMatrix[0].xyz);
   vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world, normal);
-  if (banded < 0.5) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet), angle);
+  float near = 1.0 - smoothstep(0.004, 0.008, pixel);
+  if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet) * near, angle);
   float light;
   float shine;
   vec3 colour = litBy(albedo, wet, bent, normal, view, light, shine);

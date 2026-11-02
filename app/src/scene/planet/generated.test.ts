@@ -392,13 +392,15 @@ describe("the generated program", () => {
 
   // Fidelity (the chief, 7b5): a real map's fine contrast shades the ground too, as the approved base and the Earth do; its slope read
   // from the map a pixel away, never by a screen derivative, so no 2x2 blocks; the class's relief its strength; a giant has no ground.
+  // Its four reads cost 30% of a frame on the real file's 24 (912 ms against 1,181): only where a pixel shows it, a radius past 250 px.
   it("shades the ground by its map's fine contrast, read a pixel away", () => {
     const grained = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("vec3 grained("));
     expect(grained.slice(0, grained.indexOf("\n}\n"))).toMatch(
       /detailOf\(surface, lookupOf\(spin \* normalize\(at \+ east \* reach\)\)\)/,
     );
     expect(grained.slice(0, grained.indexOf("\n}\n"))).not.toMatch(/dFd[xy]|fwidth/);
-    expect(GENERATED_FRAGMENT).toMatch(/if \(banded < 0\.5\) bent = grained\(bent, /);
+    expect(GENERATED_FRAGMENT).toMatch(/if \(banded < 0\.5 && near > 0\.0\) bent = grained\(bent, /);
+    expect(GENERATED_FRAGMENT).toMatch(/float near = 1\.0 - smoothstep\(0\.004, 0\.008, pixel\);/);
   });
 
   // The volcanic styles (Alexis through the chief, 2026-11-03: "on peut avoir plusieurs styles"): a volcanic world takes one of three
