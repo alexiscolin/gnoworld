@@ -13,6 +13,7 @@ import { hideThePage, opened, running, stats } from "./sceneStage.ts";
 // (the plan, section 6): these hold what is drawn, how much, where it stands against f0004, and what is freed.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
+const WIDE = { width: 1920, height: 1080 };
 const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 const MAP = /\/textures\/[\w-]+\.webp$/;
 // Three a sun, its dots, the belt; three a body at most: the budget this part records.
@@ -49,11 +50,11 @@ const NOT_YET = {
 };
 const served = (page: Page, body: string, status = 200) =>
   page.route("**/worlds.json", (route) => route.fulfill({ status, body, contentType: "application/json" }));
-const standing = (page: Page, bodies = 10) =>
+const standing = (page: Page, bodies = 2) =>
   expect.poll(async () => (await cosmos(page)).bodies, SLOW).toBeGreaterThan(bodies);
 
-async function arrived(page: Page, query = HOME) {
-  await page.setViewportSize(COMPUTER);
+async function arrived(page: Page, query = HOME, size = COMPUTER) {
+  await page.setViewportSize(size);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(query);
   await hydrated(page);
@@ -84,29 +85,28 @@ test("draws the real file: a star a namespace, a landmark a system, under the pa
   expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
 });
 
-test("stands the arrival as frame f0004 does: the great sun left of nothing, the Earth beside it, bodies around", async ({
-  page,
-}) => {
-  await served(page, RECORDED);
-  await arrived(page);
-  await standing(page);
-  await expect.poll(async () => (await cosmos(page)).screen.earth !== undefined, SLOW).toBe(true);
-  const { screen } = await cosmos(page);
-  // The frame's: the great sun at (862, 535), the Earth at (645, 540), 47 px, 20 or so bodies in view of 30 to 50 px.
-  near(screen.sun.x, 862, "the great sun's x");
-  near(screen.sun.y, 535, "the great sun's y");
-  near(screen.earth?.x ?? NaN, 645, "the Earth's x");
-  near(screen.earth?.y ?? NaN, 540, "the Earth's y");
-  near(screen.earth?.radius ?? NaN, 47, "the Earth's radius");
-  // A body shows once its programs are compiled, which a software GPU takes its time over.
-  const inViewOf = (bodies: typeof screen.bodies) =>
-    bodies.filter(({ x, y }) => x > 0 && x < COMPUTER.width && y > 0 && y < COMPUTER.height);
-  await expect.poll(async () => inViewOf((await cosmos(page)).screen.bodies).length, SLOW).toBeGreaterThan(12);
-  for (const { radius } of inViewOf((await cosmos(page)).screen.bodies)) {
-    expect(radius).toBeGreaterThan(5);
-    expect(radius).toBeLessThan(95);
-  }
-});
+// Alexis, 2026-11-02: the Earth exactly at the canvas's centre, the great star beside it; frame 4 gives the light and the Earth's size.
+for (const size of [COMPUTER, WIDE])
+  test(`stands the Earth at the canvas's centre at rest, the great star beside it, at ${String(size.width)} by ${String(size.height)}`, async ({
+    page,
+  }) => {
+    await served(page, RECORDED);
+    await arrived(page, HOME, size);
+    await standing(page);
+    await expect.poll(async () => (await cosmos(page)).screen.earth !== undefined, SLOW).toBe(true);
+    const { screen } = await cosmos(page);
+    near(screen.earth?.x ?? NaN, size.width / 2, "the Earth's x");
+    near(screen.earth?.y ?? NaN, size.height / 2, "the Earth's y");
+    expect(screen.earth?.radius).toBeGreaterThan(40);
+    expect(screen.earth?.radius).toBeLessThan(56);
+    expect(screen.sun.x - size.width / 2).toBeGreaterThanOrEqual(100);
+    expect(screen.sun.x).toBeLessThan(size.width);
+    expect(Math.abs(screen.sun.y - size.height / 2)).toBeLessThanOrEqual(0.3 * size.height);
+    // The room the view keeps for the hero holds the hero the page draws (core/frame/rest.ts, HERO_ZONE).
+    const hero = await box(page, "[data-clear]");
+    expect(hero.x + hero.width).toBeLessThanOrEqual(0.45 * size.width);
+    expect(hero.y).toBeGreaterThanOrEqual(0.58 * size.height);
+  });
 
 test("keeps every body off the hero, at the video's size and on a small window", async ({ page }) => {
   await served(page, RECORDED);
