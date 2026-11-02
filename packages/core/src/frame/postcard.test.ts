@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CELL } from "../cosmos/cosmos.ts";
-import type { Orbiter, StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { postcardFrom, postcardOf, postcardWorlds } from "./postcard.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -90,6 +90,26 @@ describe("a postcard's worlds", () => {
       const worlds = postcardWorlds(system);
       expect(worlds.length).toBeGreaterThan(0);
       for (const { orbit, radius } of worlds) expect(orbit).toBeGreaterThanOrEqual(3 * radius - 1e-9);
+    }
+  });
+
+  // 7d3, no debris near a planet: widened past it, a world would stand in its system's far belt, among the rocks.
+  it("keeps a belted system's worlds inside the belt's inner edge, off their star as far as that leaves them", () => {
+    const [one, three] = [
+      systemOf([[1.5, 1.2, 0.4]]),
+      systemOf([
+        [0.6, 1.0, 0.2],
+        [0.4, 1.8, 2.1],
+        [0.3, 2.5, 4.4],
+      ]),
+    ];
+    // Unbelted, the room is its cell's half: the large world goes past the belt's edge.
+    expect(postcardWorlds(one)[0]?.orbit).toBeCloseTo(CELL / 2 - 1.5, 12);
+    expect(postcardWorlds({ ...one, belt: true })[0]?.orbit).toBeCloseTo(BELT_INNER - 1.5, 12);
+    for (const system of [one, three]) {
+      const worlds = postcardWorlds({ ...system, belt: true });
+      expect(worlds.length).toBeGreaterThan(0);
+      for (const { orbit, radius } of worlds) expect(orbit + radius).toBeLessThanOrEqual(BELT_INNER + 1e-9);
     }
   });
 

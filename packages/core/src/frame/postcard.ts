@@ -3,7 +3,7 @@
 // spin, with a third of the smaller one's width between them; never past its own cell, and never a regular figure. A plane seen near its
 // edge is opened towards the eye, at display only.
 import { CELL } from "../cosmos/cosmos.ts";
-import { GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 
 // Frame 4's densest group is four bodies; a postcard's are chosen among its eight largest.
@@ -16,6 +16,8 @@ const ROOM = CELL / 2;
 // A plane is seen at least this open at display, 30 degrees from its edge: its worlds read round their star, not on a line.
 const OPEN_LEAST = 0.5;
 const OFF_STAR = 3;
+// A world widened to its room's very edge lands a rounding past it.
+const ROUNDING = 1e-9;
 // Of three bodies or more, no two gaps alike within this share: a regular figure reads as drawn on purpose.
 const ALIKE = 0.15;
 
@@ -50,9 +52,9 @@ const placeIn = ({ orbit, phase }: Orbiter, spread: number) => ({
 
 // How much `worlds` widen their orbits so no two meet, seen at the least open: their places in the plane, apart enough when foreshortened;
 // and each off its star, its centre `OFF_STAR` of its radii from it (f0004's worlds stand 3 to 4 of theirs from their star), or as far as
-// its cell lets it.
-function spreadOf(worlds: readonly Orbiter[]): number {
-  const off = ({ orbit, radius }: Orbiter) => Math.min(OFF_STAR * radius, ROOM - radius) / Math.max(orbit, 1e-9);
+// its `room` lets it.
+function spreadOf(worlds: readonly Orbiter[], room: number): number {
+  const off = ({ orbit, radius }: Orbiter) => Math.min(OFF_STAR * radius, room - radius) / Math.max(orbit, 1e-9);
   let spread = Math.max(1, ...worlds.map(off));
   for (const [at, one] of worlds.entries())
     for (const other of worlds.slice(at + 1)) {
@@ -83,17 +85,18 @@ const groupsOf = (choice: readonly Orbiter[], count: number): Orbiter[][] =>
     ? [[]]
     : choice.flatMap((world, at) => groupsOf(choice.slice(at + 1), count - 1).map((rest) => [world, ...rest]));
 
-/** The worlds a postcard of `system` draws as bodies, widened round its star: the most, then the largest, that stand apart in its cell and
- * read as no figure. Its others are specks. */
+/** The worlds a postcard of `system` draws as bodies, widened round its star: the most, then the largest, that stand apart in its cell, inside
+ * its far belt if it has one (7d3: never among its rocks), and read as no figure. Its others are specks. */
 export function postcardWorlds(system: StarSystem): Orbiter[] {
   const choice = system.worlds
     .filter(({ radius }) => radius >= GRAIN)
     .sort((a, b) => b.radius - a.radius)
     .slice(0, CHOICE);
+  const room = system.belt ? BELT_INNER : ROOM;
   for (let count = Math.min(POSTCARD_BODIES, choice.length); count > 0; count -= 1)
     for (const worlds of groupsOf(choice, count)) {
-      const spread = spreadOf(worlds);
-      const fits = worlds.every(({ orbit, radius }) => spread * orbit + radius <= ROOM);
+      const spread = spreadOf(worlds, room);
+      const fits = worlds.every(({ orbit, radius }) => spread * orbit + radius <= room + ROUNDING);
       if (fits && natural(worlds, spread)) return worlds.map((world) => ({ ...world, orbit: spread * world.orbit }));
     }
   return [];

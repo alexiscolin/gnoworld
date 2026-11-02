@@ -31,6 +31,7 @@ export {
   EARTH_RADIUS,
   GNO_LAND,
   GRAIN,
+  ROCKS_FROM,
   ROOM,
   systemsOf,
   worldSize,

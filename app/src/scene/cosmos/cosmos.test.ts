@@ -16,6 +16,7 @@ import {
   planetSeed,
   postcardOf,
   restView,
+  ROCKS_FROM,
   ROOM,
   systemsOf,
   toScene,
@@ -169,6 +170,47 @@ const ONYX: readonly CosmosWorld[] = recorded.worlds;
 const systemOf = (systems: readonly StarSystem[], id: string) =>
   systems.find(({ worlds: list }) => list.some((world) => world.id === id));
 const rocks = (from: { stage: Stage }) => pointsWith(from, "aStar");
+// Each rock the belt draws, and its star's place, on the map.
+const rocksOf = (from: { stage: Stage }, count: number) => {
+  const [belt] = rocks(from);
+  if (belt === undefined) return [];
+  const [stars, places] = [belt.geometry.getAttribute("aStar"), belt.geometry.getAttribute("position")];
+  return Array.from({ length: count }, (_, at) => ({
+    star: new Vector3(stars.getX(at), stars.getY(at), stars.getZ(at)),
+    rock: new Vector3(places.getX(at), places.getY(at), places.getZ(at)),
+  }));
+};
+// Where `world` stands in `system`'s plane, `seconds` on its turn, on the map.
+const turned = (system: StarSystem, world: Orbiter, seconds: number) => {
+  const out = { x: NaN, y: NaN, z: NaN };
+  orbitPlace({ system, world }, seconds, out);
+  return new Vector3(out.x, out.y, out.z);
+};
+// Half a unit: debris is only a far belt (ADR-0002 §10), and a rock this near a world's ground would read as that world crumbling.
+const DEBRIS_CLEAR = 0.5;
+// Every rock `scene` draws, against every world of its system as drawn, `drawnOf` giving each system's plane and worlds, through a turn.
+function debrisClear(
+  scene: ReturnType<typeof made>,
+  systems: readonly StarSystem[],
+  drawnOf: (system: StarSystem) => { system: StarSystem; worlds: readonly Orbiter[] },
+) {
+  let judged = 0;
+  for (const { star, rock } of rocksOf(scene, scene.cosmos.stats().rocks)) {
+    // In its band: from ROCKS_FROM to the room's edge, a little off the plane.
+    expect(rock.distanceTo(star)).toBeGreaterThanOrEqual(ROCKS_FROM - 1e-6);
+    expect(rock.distanceTo(star)).toBeLessThanOrEqual(Math.hypot(ROOM, 0.15) + 1e-6);
+    const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
+    if (found === undefined) throw new Error("a rock with no star");
+    const { system, worlds: drawnWorlds } = drawnOf(found);
+    for (const world of drawnWorlds)
+      for (let step = 0; step < 16; step += 1) {
+        const seconds = (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
+        expect(rock.distanceTo(turned(system, world, seconds)) - world.radius).toBeGreaterThanOrEqual(DEBRIS_CLEAR);
+        judged += 1;
+      }
+  }
+  return judged;
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -513,6 +555,32 @@ describe("what it draws", () => {
       expect(Math.abs(rock.clone().sub(star).dot(normal))).toBeLessThanOrEqual(0.31);
     }
   });
+
+  // 7d3: a postcard's worlds, widened at display, stood in its far belt's rocks (10 of Onyx's 31 belted systems).
+  it.each([
+    ["Onyx", ONYX],
+    ["30 systems", worlds(30)],
+  ] as const)(
+    "leaves no debris near a planet on %s: every rock half a unit or more off every world its system draws, at any turn",
+    async (_, list) => {
+      const scene = made();
+      await shown(scene, list);
+      const systems = held(list);
+      const view = restView(systems);
+      const drawnOf = (system: StarSystem) => {
+        if (!view.postcards.includes(systems.indexOf(system))) return { system, worlds: system.worlds };
+        // A postcard's bodies widened round its star, its specks at their own orbits, all in its plane as drawn.
+        const postcard = postcardOf(system, view.eye);
+        return { system: postcard.system, worlds: [...postcard.worlds, ...system.worlds] };
+      };
+      expect(debrisClear(scene, systems, drawnOf)).toBeGreaterThan(0);
+      // A band, not a line: the rocks spread across it.
+      const reach = rocksOf(scene, scene.cosmos.stats().rocks).map(({ star, rock }) => rock.distanceTo(star));
+      const mean = reach.reduce((sum, at) => sum + at, 0) / reach.length;
+      const spread = Math.sqrt(reach.reduce((sum, at) => sum + (at - mean) ** 2, 0) / reach.length);
+      expect(spread).toBeGreaterThanOrEqual((ROOM - ROCKS_FROM) / 4);
+    },
+  );
 
   it("turns each point in its system's plane: the plane's tilt and line of nodes go with it", async () => {
     const scene = made();
