@@ -30,6 +30,7 @@ import {
   Object3D,
   PerspectiveCamera,
   Points,
+  Euler,
   Quaternion,
   Scene as Stage,
   Texture,
@@ -42,7 +43,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { MOON_FAR } from "../earth/orbit.ts";
-import { fromEyeOf } from "../planet/light.ts";
+import { fromEyeOf, starAt } from "../planet/light.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import { Cosmos, type CosmosWorld } from "./cosmos.ts";
@@ -64,6 +65,7 @@ const nameOf = (url: string) => /textures\/([\w-]+)\.webp$/.exec(url)?.[1] ?? ur
 
 interface FakeGlobe {
   readonly group: Stage;
+  readonly lean: Euler;
   readonly dispose: ReturnType<typeof vi.fn>;
   readonly aim: ReturnType<typeof vi.fn>;
   readonly setSun: ReturnType<typeof vi.fn>;
@@ -72,8 +74,10 @@ interface FakeGlobe {
   readonly stand: ReturnType<typeof vi.fn>;
 }
 
+// The Earth's own lean and tilt, as its look gives them (earth/look.ts): the light must reach the ground past them.
 const fakeGlobe = (): FakeGlobe => ({
   group: new Stage(),
+  lean: new Euler(0.1, 0, -0.14),
   dispose: vi.fn(),
   aim: vi.fn(),
   setSun: vi.fn(),
@@ -1212,14 +1216,19 @@ describe("hidden, and gone", () => {
     scene.cosmos.tick({ x: HOME.x + 3, y: HOME.y + 2, z: HOME.z }, 5);
     expect(scene.camera.quaternion.angleTo(new Quaternion())).toBeGreaterThan(0.01);
     expect(globe.group.quaternion.angleTo(scene.camera.quaternion)).toBeCloseTo(0, 6);
-    // The great star, in the Earth's own frame: its height is the aim, its way round the sun's azimuth (Home's own sense).
+    // The light the globe takes (its aim and azimuth, past the Earth's lean and the globe's turn, as Globe.setSun does) points at the great
+    // star (7d6's review: it fell 9.7 degrees off, the lean left out).
     const earth = { x: NaN, y: NaN, z: NaN };
     toScene(EARTH_PLACE, earth);
-    const star = new Vector3(CENTRE.x - earth.x, CENTRE.y - earth.y, CENTRE.z - earth.z)
-      .applyQuaternion(scene.camera.quaternion.clone().invert())
-      .normalize();
-    expect(globe.aim.mock.lastCall?.[0]).toBeCloseTo(Math.asin(star.y), 6);
-    expect(globe.setSun.mock.lastCall?.[0]).toBeCloseTo(Math.atan2(-star.z, star.x), 6);
+    const star = new Vector3(CENTRE.x - earth.x, CENTRE.y - earth.y, CENTRE.z - earth.z).normalize();
+    const light = starAt(
+      globe.aim.mock.lastCall?.[0] as number,
+      globe.setSun.mock.lastCall?.[0] as number,
+      new Vector3(),
+    )
+      .applyEuler(globe.lean)
+      .applyQuaternion(globe.group.quaternion);
+    expect(light.angleTo(star)).toBeLessThan(1e-6);
   });
 });
 

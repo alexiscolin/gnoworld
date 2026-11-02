@@ -30,6 +30,7 @@ export class Home {
   readonly #stage = { x: 0, y: 0, z: 0 };
   readonly #toward = new Vector3();
   readonly #back = new Quaternion();
+  readonly #unlean = new Quaternion();
   #globe: Globe | undefined;
   #line: LineLoop<BufferGeometry, LineBasicMaterial> | undefined;
   #building = false;
@@ -85,10 +86,12 @@ export class Home {
     const { x, y, z } = this.#stage;
     globe.group.position.set(x - eye.x, y - eye.y, z - eye.z);
     globe.group.quaternion.copy(turned);
-    // The great star, as the turned Earth sees it: its height is the sun's latitude, its way round the sun's azimuth.
+    // The great star, as the turned and leaned Earth sees it: its height is the sun's latitude, its way round the sun's azimuth. The globe
+    // lights its ground past its lean, then its turn (Globe.setSun): both are undone here.
     const toward = this.#toward
       .set(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z)
-      .applyQuaternion(this.#back.copy(turned).invert());
+      .applyQuaternion(this.#back.copy(turned).invert())
+      .applyQuaternion(this.#unlean.setFromEuler(globe.lean).invert());
     toward.normalize();
     globe.aim(Math.asin(toward.y));
     globe.setSun(Math.atan2(-toward.z, toward.x));
