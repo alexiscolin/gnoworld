@@ -2,6 +2,7 @@
 // costs, which uniforms a world's program keeps, and the worlds it shows.
 import { labOf } from "@gnoworld/core";
 import { Vector3, type WebGLRenderer } from "three";
+import { styleOf } from "../src/scene/planet/generated.ts";
 import { mapBytes } from "../src/scene/planet/maps.ts";
 import type { Choice } from "./choice.ts";
 import type { View } from "./views.ts";
@@ -96,6 +97,7 @@ export function probes(page: Probed) {
       shown().map(({ look, recipe }) =>
         look.sea !== null && recipe.surface.sea >= 0.5 ? labOf(look.sea.deep) : recipe.palette.lab[1],
       ),
+    styles: () => shown().map((world) => styleOf(world)),
     stages: () => page.view()?.stages ?? [],
   };
 }

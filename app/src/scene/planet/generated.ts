@@ -18,6 +18,18 @@ const NO_COLOUR: Rgb = [0, 0, 0];
 // The real map's warp never stretches it by more than a fifth, whatever its frequency: no streaks.
 const MAX_STRETCH = 0.2;
 const linear = ([red, green, blue]: Rgb) => new Color().setRGB(red, green, blue);
+// A volcanic world's style (Alexis, 2026-11-03: several, each from a real reference): its seed's byte 18, read back from the minor's
+// offset (core gives byte / 255 * 16). Io's sulfur crust, dark orange to pale yellow, set by eye from its description, no image sampled.
+const STYLES = 3;
+const SULFUR: readonly [Rgb, Rgb, Rgb] = [
+  [0.42, 0.2, 0.05],
+  [0.86, 0.64, 0.13],
+  [0.96, 0.88, 0.4],
+];
+
+/** A volcanic world's look among three: 0 the approved dark crust with white-hot vents, 1 gold veins, 2 a sulfur crust; 0 elsewhere. */
+export const styleOf = ({ look }: World): number =>
+  look.anchor === "volcanic" ? Math.round((look.minorOffset[0] * 255) / 16) % STYLES : 0;
 
 /** What a generated world's program reads: its look's and its recipe's values, and its maps. */
 export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<string, IUniform> {
@@ -41,6 +53,10 @@ export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<str
     seaDeep: { value: working(sea.deep) },
     glowColour: { value: working(look.glow?.colour ?? NO_COLOUR) },
     glowLevel: { value: look.glow?.level ?? 0 },
+    style: { value: styleOf({ look, recipe }) },
+    sulfurLow: { value: working(SULFUR[0]) },
+    sulfurMid: { value: working(SULFUR[1]) },
+    sulfurHigh: { value: working(SULFUR[2]) },
     minorShare: { value: recipe.minorShare },
     warpAmount: { value: Math.min(warp.amount, MAX_STRETCH / warp.frequency) },
     warpFrequency: { value: warp.frequency },

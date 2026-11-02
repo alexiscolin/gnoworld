@@ -32,6 +32,10 @@ uniform float recolour;
 uniform float banded;
 uniform float locked;
 uniform float glowLevel;
+uniform float style;
+uniform vec3 sulfurLow;
+uniform vec3 sulfurMid;
+uniform vec3 sulfurHigh;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -62,14 +66,8 @@ void main() {
     other = detailOf(minorMap, elsewhere);
   }
 
-  float minor = 0.0;
-  if (minorShare > 0.002) {
-    vec3 along = banded > 0.5 ? vec3(at.x, at.y * 3.0, at.z) : at;
-    float region = shareOf(fbm(along + minorOffset, shape.mix, pixel, 0.0, 3.0).xy);
-    float edge = min(0.08, minorShare * 0.5);
-    minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge, region);
-  }
   float height = 0.0;
+  float broad = 0.0;
   float relieved = 0.0;
   float cratered = 0.0;
   float t;
@@ -83,12 +81,27 @@ void main() {
     float big = shape.craters > 0.0 ? cratersAt(p, shape.scale * 4.0, pixel) : 0.0;
     cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(p, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
+    broad = ground.z / ground.y;
     height = ground.x / ground.y + cratered * 0.8;
     relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.04, 0.08, shape.scale * 4.0 * pixel));
+  }
+  float minor = 0.0;
+  if (minorShare > 0.002) {
+    vec3 along = banded > 0.5 ? vec3(at.x, at.y * 3.0, at.z) : at;
+    vec4 patches = fbm(along + minorOffset, shape.mix, pixel, 0.0, 3.0);
+    float pole = (abs(axis.y) - 0.5) * 3.46 * sign(minorOffset.x - 8.0);
+    float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77;
+    if (banded > 0.5) z = (0.4 * patches.x / patches.y + (t - 0.5) * 3.5) * 0.93;
+    minor = smoothstep(1.0 - minorShare - 0.03, 1.0 - minorShare + 0.03, shareOf(vec2(z, 1.0)));
   }
   vec3 detail = mix(own, other, minor);
   float fine = dot(detail, LUMA) - 1.0;
   height += fine * shape.detail * 2.0;
+  float molten = 0.0;
+  if (glowLevel > 0.0) {
+    float crackle = (noise(at * shape.scale * 9.0 + offset) * fadeAt(shape.scale * 9.0, pixel) + 0.5 * noise(at * shape.scale * 29.0 + offset.yzx) * fadeAt(shape.scale * 29.0, pixel)) / SPREAD;
+    molten = shareOf(vec2(0.35 * crackle - height, 1.3));
+  }
   float wet = 0.0;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
@@ -96,9 +109,14 @@ void main() {
     t = clamp((t - shape.sea) / max(1.0 - shape.sea, 0.001), 0.0, 1.0);
   }
   float tint = mix(0.7, t, 0.8);
-  vec3 albedo = mix(rampOf(low, mid, high, tint), rampOf(minorLow, minorMid, minorHigh, tint), minor);
+  vec3 major = rampOf(low, mid, high, tint);
+  vec3 second = rampOf(minorLow, minorMid, minorHigh, tint);
+  if (glowLevel > 0.0 || banded > 0.5) second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), glowLevel > 0.0 ? 1.0 : 0.6);
+  vec3 albedo = mix(major, second, minor);
+  if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
   if (banded > 0.5) albedo = mix(albedo, mid, shape.clouds * 0.3) * (1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel));
   albedo *= mix(vec3(1.0), detail, min(shape.detail * 2.0, 1.0)) * (1.0 + 0.25 * clamp(cratered, -1.0, 1.0));
+  if (style > 1.5) albedo = mix(albedo, sulfurLow * 0.15, smoothstep(0.93, 0.96, molten));
   if (shape.sea > 0.0) {
     float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
@@ -109,14 +127,15 @@ void main() {
   }
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
-  float seam = 0.0;
   if (shape.rifts > 0.0) {
     float riven = smoothstep(1.0 - shape.rifts, 1.2 - shape.rifts, shareOf(fbm(at * 1.3 + minorOffset.zxy, 1.5, pixel, 0.0, 2.0).xy));
-    vec3 cut = at * 2.1 + 0.35 * flow;
-    if (riven > 0.0) rift = lines(cut, 0.004 + 0.012 * shape.rifts, 2.3 * pixel) * riven;
-    if (riven > 0.0 && glowLevel > 0.0) seam = lines(cut, 0.035, 2.3 * pixel) * riven;
+    if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
+    float ridge = 0.0;
+    if (riven > 0.0) rift = lines(ridge, at * 2.1 + 0.35 * flow, 0.006 + 0.03 * shape.rifts, 2.3 * pixel) * riven;
+    relieved += 0.4 * ridge * riven;
+    vec3 riftTint = mix(low * 0.6, vec3(0.42, 0.2, 0.11), smoothstep(0.12, 0.3, dot(mid, LUMA)));
+    albedo = mix(albedo, riftTint, rift * 0.75);
   }
-  albedo = mix(albedo, low * 0.6, rift * 0.7);
 
   vec3 normal = normalize(vNormal);
   float day = dot(normal, sun);
@@ -124,6 +143,7 @@ void main() {
   vec3 view = normalize(cameraPosition - vWorld);
   float world = length(modelMatrix[0].xyz);
   vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world, normal);
+  if (banded < 0.5) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet), angle);
   float light;
   float shine;
   vec3 colour = litBy(albedo, wet, bent, normal, view, light, shine);
@@ -142,11 +162,12 @@ void main() {
   colour = rimmed(colour, normal, view, day);
   if (glowLevel > 0.0) {
     float hot = 1.0 - (1.0 - glowLevel) * 0.2;
-    float crackle = (noise(at * shape.scale * 9.0 + offset) * fadeAt(shape.scale * 9.0, pixel) + 0.5 * noise(at * shape.scale * 29.0 + offset.yzx) * fadeAt(shape.scale * 29.0, pixel)) / SPREAD;
-    float vents = smoothstep(hot, hot + 0.08, shareOf(vec2(0.9 * crackle - 0.5 * height + 2.0 * (seam - 0.45), 1.3)));
-    float heat = max(0.5 * rift * smoothstep(0.1, 0.8, flow.z + 0.4), vents);
+    float vents = style > 1.5 ? smoothstep(0.985, 0.995, molten) : smoothstep(hot - 0.11, hot + 0.06, molten);
+    float heat = mix(vents, rift * smoothstep(0.1, 0.8, flow.z + 0.4), smoothstep(0.08, 0.2, shape.craters));
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
-    colour += mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
+    vec3 glow = mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
+    if (style > 0.5 && style < 1.5) glow = goldOf(veinsAt(at, pixel), burn);
+    colour += glow;
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);
   gl_FragColor = vec4(colour, 1.0);

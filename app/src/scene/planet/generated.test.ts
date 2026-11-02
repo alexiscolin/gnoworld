@@ -13,7 +13,7 @@ import {
 } from "@gnoworld/core";
 import { Color, Mesh, RingGeometry, ShaderMaterial, SphereGeometry, Texture, Vector3 } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWorld, worldOf, worldUniforms, type World } from "./generated.ts";
+import { createWorld, styleOf, worldOf, worldUniforms, type World } from "./generated.ts";
 import { GENERATED_FRAGMENT } from "./generatedShader.ts";
 import type { MapSet, Planet } from "./planet.ts";
 import { SHADE } from "./surfaceParts.ts";
@@ -304,6 +304,15 @@ describe("the generated program", () => {
     expect(SURFACE_FRAGMENT).toContain("cloudsOver(");
   });
 
+  // Its noise's share mapped through the Earth's cloud map's own distribution (its nine deciles, weighted by area: 0.004 to 0.584,
+  // fitted by 0.736 u^2.19 within 0.01), so `clouds` covers a generated sky as much as it covered the map: a uniform share covered four
+  // times more (31.6% against 7.6% at 0.5), and an ocean's lights fell faintest under it (realism.spec, "a net, the brightest").
+  it("covers a generated sky as the Earth's cloud map does at the same share", () => {
+    const sky = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("float skyAt("));
+    expect(sky.slice(0, sky.indexOf("\n}\n"))).toMatch(/return 0\.736 \* pow\(shareOf\(/);
+    expect(sky.slice(0, sky.indexOf("\n}\n"))).toMatch(/\), 2\.19\);/);
+  });
+
   // F4233: no minor, or a banded world, reads no minor's map.
   it("reads the minor's map only where a minor shows on a ground", () => {
     expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && banded < 0\.5\) \{[^}]*detailOf\(minorMap/);
@@ -336,10 +345,85 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(/float pole = abs\(axis\.y\) \+ 0\.3 \*/);
   });
 
-  // F4237: white-hot vents gather along the fissures and the low ground, never cream spots of one size spread evenly over the crust.
-  it("lights the vents along the fissures and the low ground", () => {
-    expect(GENERATED_FRAGMENT).toMatch(/seam = lines\(cut, [\d.]+, 2\.3 \* pixel\) \* riven;/);
-    expect(GENERATED_FRAGMENT).toMatch(/float vents = [^;]*- 0\.5 \* height \+ 2\.0 \* \(seam - 0\.45\)/);
+  // The look pass (the chief, 7b5; F4237): the approved volcanic character, white-hot vents in organic patches on a dark crust, from the
+  // ground's own low places cut by a fine crackle. A young crust, uncratered (volcanic, lava), glows there and never along its rifts,
+  // which drew red squiggles; an old one, cratered (shattered), only through its fractures, as the approved shattered world does.
+  it("lights white-hot vents in a young crust's low ground, and an old crust's glow in its fractures alone", () => {
+    const start = GENERATED_FRAGMENT.indexOf("if (glowLevel > 0.0) {\n    float hot");
+    const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
+    expect(GENERATED_FRAGMENT).toMatch(/molten = shareOf\(vec2\([\d.]+ \* crackle - height, /);
+    expect(glow).toMatch(/: smoothstep\(hot - [\d.]+, hot \+ [\d.]+, molten\);/);
+    expect(glow).toMatch(/float heat = mix\(vents, rift \* [^;]*, smoothstep\([\d.]+, [\d.]+, shape\.craters\)\);/);
+    expect(glow).not.toMatch(/seam/);
+  });
+
+  // The concentric marbling (the chief: real24's fourth world): erosion carved the two largest octaves too, whose few long creases the
+  // warp bends into arcs a grazing light terraces in 2x2 steps; carving starts at the third octave, its crease rounded.
+  it("carves only the finer octaves, their crease rounded", () => {
+    expect(GENERATED_FRAGMENT).toMatch(
+      /n \+= carved \* step\(1\.5, float\(i\)\) \* \(2\.0 \* \(sqrt\(n \* n \+ [\d.]+\) - HOLLOW\) - n\);/,
+    );
+  });
+
+  // Fractures as bands (the chief, after Europa's lineae and Enceladus's stripes): a width that swells and narrows along each, a tint,
+  // and raised margins in the relief, never a line of one width.
+  it("draws a rift as a band whose width varies along it, tinted and relieved", () => {
+    const band = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("float lines("));
+    expect(band.slice(0, band.indexOf("\n}\n"))).toMatch(/width \*= [\d.]+ \+ [\d.]+ \* smoothstep\(/);
+    expect(GENERATED_FRAGMENT).toMatch(/relieved \+= [^;]*ridge/);
+    expect(GENERATED_FRAGMENT).toMatch(/albedo = mix\(albedo, riftTint, /);
+  });
+
+  // The minor through the structure (the chief; F4245): on a ground, the broad height (a finer term flips its edge into specks) and the
+  // latitude, at a narrow edge; on a giant, whole bands, 60% of the way to the main class's lightness (darker, they dimmed the night's
+  // lights under the grade's toe: realism.spec's belts; matched, a dark giant lost its detail); a glowing crust's own. Never a soft blob.
+  it("draws the minor through the ground's structure, at a narrow edge", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/float z = \(patches\.x \/ patches\.y \+ [\d.]+ \* broad \+ [\d.]+ \* pole\)/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(banded > 0\.5\) z = \([\d.]+ \* patches\.x \/ patches\.y \+ \(t - 0\.5\) \* /,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /minor = smoothstep\(1\.0 - minorShare - 0\.0[0-4]\d*, 1\.0 - minorShare \+ 0\.0[0-4]\d*,/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(glowLevel > 0\.0 \|\| banded > 0\.5\) second \*= mix\(1\.0, dot\(major, LUMA\) \/ max\(dot\(second, LUMA\), 1e-4\), glowLevel > 0\.0 \? 1\.0 : 0\.6\);/,
+    );
+  });
+
+  // Fidelity (the chief, 7b5): a real map's fine contrast shades the ground too, as the approved base and the Earth do; its slope read
+  // from the map a pixel away, never by a screen derivative, so no 2x2 blocks; the class's relief its strength; a giant has no ground.
+  it("shades the ground by its map's fine contrast, read a pixel away", () => {
+    const grained = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("vec3 grained("));
+    expect(grained.slice(0, grained.indexOf("\n}\n"))).toMatch(
+      /detailOf\(surface, lookupOf\(spin \* normalize\(at \+ east \* reach\)\)\)/,
+    );
+    expect(grained.slice(0, grained.indexOf("\n}\n"))).not.toMatch(/dFd[xy]|fwidth/);
+    expect(GENERATED_FRAGMENT).toMatch(/if \(banded < 0\.5\) bent = grained\(bent, /);
+  });
+
+  // The volcanic styles (Alexis through the chief, 2026-11-03: "on peut avoir plusieurs styles"): a volcanic world takes one of three
+  // looks by its seed's byte 18, read back from its minor offset: the approved dark crust with white-hot vents, a network of gold veins
+  // glowing day and night (the video's frame 4, "Music"), and a sulfur crust with dark calderas (after Io).
+  it("gives a volcanic world one of three styles by its seed, the approved one first, and every other world that one", () => {
+    const counts = [0, 0, 0];
+    for (let at = 0; at < 300; at += 1) {
+      const world = worldAt("volcanic", asciiBytes(`gno.land/r/demo/fire${String(at)}`));
+      const style = styleOf(world);
+      const byte = Math.round((world.look.minorOffset[0] * 255) / 16);
+      expect(style).toBe(byte % 3);
+      expect(worldUniforms(world, fixed().set)["style"]?.value).toBe(style);
+      counts[style] = (counts[style] ?? 0) + 1;
+    }
+    for (const count of counts) expect(count).toBeGreaterThan(70);
+    expect(styleOf(worldAt("rocky"))).toBe(0);
+    expect(styleOf(worldAt("lava world"))).toBe(0);
+  });
+
+  it("draws each style from its uniform: veins glowing on the night side too, a sulfur crust with calderas", () => {
+    const start = GENERATED_FRAGMENT.indexOf("if (glowLevel > 0.0) {\n    float hot");
+    const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
+    expect(glow).toMatch(/if \(style > 0\.5 && style < 1\.5\) [^;]*veinsAt\(/);
+    expect(GENERATED_FRAGMENT).toMatch(/if \(style > 1\.5\) albedo = rampOf\(sulfurLow, sulfurMid, sulfurHigh, tint\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

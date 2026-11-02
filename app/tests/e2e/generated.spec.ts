@@ -1,6 +1,7 @@
 import { ANCHORS, SURFACE, worldLook, type Lab } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, COMPUTER, listen, looks, noneOnAnother, open, picture, stats, type Circle } from "./lab.ts";
+import { glows } from "./pixels.ts";
 import {
   alikeOnScreen,
   alikePairs,
@@ -23,6 +24,19 @@ const ALIKE_AT_MOST = 2;
 const DETAIL_SHARE = 0.8;
 const GRAIN = 3;
 const ROUNDING = 2.3;
+// The volcanic character Alexis approved (2026-11-02), a dark crust with white-hot vents red at their edges, as the approved lab measures
+// it (41776567, pixels.ts's glows): the gallery's 6.05% white-hot and 4.56% red, the close view's 3.87% and 3.24%, nothing pale. Its
+// style's median holds in that span, red over white-hot within half and twice theirs (0.75, 0.84).
+const APPROVED_HOT = [0.0387, 0.0605] as const;
+const APPROVED_RED_OVER_HOT = [0.75, 0.84] as const;
+const PALE_AT_MOST = 0.01;
+// The veins of the video's frame 4 "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; pixels.ts's glows): 55.2% of its disc,
+// 62.8% of its night half; its brightest pixels gold (blue 0.57 of red), never white. A veined world holds half of each at least.
+const MUSIC = [0.552, 0.628] as const;
+const NEVER_WHITE = 0.005;
+// Io's sulfur crust as the chief described it, yellow to orange and bright, a few hot spots: set from that description, no image of Io
+// measured. Lab hue of the lit ground in degrees, its chroma, its lightness, and its white share at most (lit sulfur is bright, not white).
+const SULFUR = { hue: [55, 100], chroma: 25, lightness: 35, white: 0.01 } as const;
 // The instant realism.spec pins the Earth at: its detail is measured on that same picture.
 const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
 // What the hand-made Earth's view draws: earthView.ts's circle, a third of the screen's height at its centre.
@@ -149,22 +163,24 @@ test.describe("generated worlds", () => {
   });
 
   // ADR-0002 §3 bounds alike neighbours on the real list (above); 24 worlds of one class never meet in the cosmos, so how many of them read
-  // as one, and how far their textures spread, are reported for Alexis's eye (which families still repeat), not held.
+  // as one, and how far their textures spread, are reported for Alexis's eye (which families still repeat), not held. The volcanic class
+  // reads by its styles' marks instead (below): its dark palette asks a grey disc no glowing crust gives, the approved one included.
   for (const [index, anchor] of ANCHORS.entries())
-    test(`24 ${anchor} worlds read as their class, each lit enough to read`, async ({ page }) => {
-      await open(page, classView(index));
-      expect(new Set((await looks(page)).map((look) => look.anchor))).toEqual(new Set([anchor]));
-      const all = await portraitsOf(page);
-      nonDegenerate(all);
-      const mids = await askLab<Lab[]>(page, "mids");
-      const reading = all.filter(({ lab }, at) => {
-        const mid = mids[at] ?? [0, 0, 0];
-        return chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
+    if (anchor !== "volcanic")
+      test(`24 ${anchor} worlds read as their class, each lit enough to read`, async ({ page }) => {
+        await open(page, classView(index));
+        expect(new Set((await looks(page)).map((look) => look.anchor))).toEqual(new Set([anchor]));
+        const all = await portraitsOf(page);
+        nonDegenerate(all);
+        const mids = await askLab<Lab[]>(page, "mids");
+        const reading = all.filter(({ lab }, at) => {
+          const mid = mids[at] ?? [0, 0, 0];
+          return chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
+        });
+        expect(reading.length, `${anchor} reads as its own palette`).toBeGreaterThanOrEqual(READ_AS_CLASS);
+        const [alike, spread] = [alikePairs(all).length, textureSpread(all)];
+        test.info().annotations.push({ type: "variety", description: JSON.stringify({ anchor, alike, spread }) });
       });
-      expect(reading.length, `${anchor} reads as its own palette`).toBeGreaterThanOrEqual(READ_AS_CLASS);
-      const [alike, spread] = [alikePairs(all).length, textureSpread(all)];
-      test.info().annotations.push({ type: "variety", description: JSON.stringify({ anchor, alike, spread }) });
-    });
 
   // The dominant reads from afar (ADR-0002 §3): taken out, the minor moves on the whole no more than it holds, and nothing where it barely shows.
   for (const anchor of ["desert", "gas giant", "rocky"] as const)
@@ -186,6 +202,48 @@ test.describe("generated worlds", () => {
         VIEW_OF_24 / 4,
       );
     });
+
+  // The volcanic styles (Alexis through the chief, 2026-11-03: "on peut avoir plusieurs styles"), each read on its own discs.
+  test("24 volcanic worlds show each of their three styles, each with its own mark, none with a pale blob", async ({
+    page,
+  }) => {
+    await open(page, classView(ANCHORS.indexOf("volcanic")));
+    const [shot, places] = [await picture(page), await circles(page)];
+    nonDegenerate(await portraits(page, shot, places));
+    const shares = await glows(page, shot, places);
+    const styles = await askLab<number[]>(page, "styles");
+    expect(shares).toHaveLength(VIEW_OF_24);
+    expect(new Set(styles)).toEqual(new Set([0, 1, 2]));
+    test.info().annotations.push({
+      type: "styles",
+      description: JSON.stringify(shares.map((share, at) => ({ ...share, style: styles[at] }))),
+    });
+    const of = (style: number) => shares.filter((_, at) => styles[at] === style);
+    const vents = of(0);
+    const hot = vents.map((share) => share.hot).sort((one, other) => one - other);
+    const median = ((hot[Math.floor((hot.length - 1) / 2)] ?? 0) + (hot[Math.ceil((hot.length - 1) / 2)] ?? 0)) / 2;
+    expect(median, "the approved crust's white-hot share").toBeGreaterThanOrEqual(APPROVED_HOT[0]);
+    expect(median, "the approved crust's white-hot share").toBeLessThanOrEqual(APPROVED_HOT[1]);
+    const sum = (key: "hot" | "red") => vents.reduce((total, share) => total + share[key], 0);
+    expect(sum("red") / sum("hot"), "red edges round white cores").toBeGreaterThanOrEqual(APPROVED_RED_OVER_HOT[0] / 2);
+    expect(sum("red") / sum("hot"), "red edges round white cores").toBeLessThanOrEqual(APPROVED_RED_OVER_HOT[1] * 2);
+    for (const veins of of(1)) {
+      expect(veins.glow, "veins over the disc").toBeGreaterThanOrEqual(MUSIC[0] / 2);
+      expect(veins.night, "veins on the night side").toBeGreaterThanOrEqual(MUSIC[1] / 2);
+      expect(veins.white, "gold, never white").toBeLessThanOrEqual(NEVER_WHITE);
+    }
+    for (const sulfur of of(2)) {
+      const [lightness, a, b] = sulfur.lab;
+      const hue = (Math.atan2(b, a) * 180) / Math.PI;
+      expect(hue, "sulfur's yellow to orange").toBeGreaterThanOrEqual(SULFUR.hue[0]);
+      expect(hue, "sulfur's yellow to orange").toBeLessThanOrEqual(SULFUR.hue[1]);
+      expect(Math.hypot(a, b), "sulfur's colour").toBeGreaterThanOrEqual(SULFUR.chroma);
+      expect(lightness, "a bright crust").toBeGreaterThanOrEqual(SULFUR.lightness);
+      expect(sulfur.white, "a few hot spots, no white-hot crust").toBeLessThanOrEqual(SULFUR.white);
+    }
+    for (const [at, { pale }] of shares.entries())
+      expect(pale, `world ${String(at)}: nothing pale`).toBeLessThanOrEqual(PALE_AT_MOST);
+  });
 
   test("a real map lends its fine contrast only: with every map grey, a world keeps its shapes", async ({ page }) => {
     await open(page, "?view=real24&maps=flat");

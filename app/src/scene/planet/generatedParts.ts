@@ -47,7 +47,7 @@ vec4 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
     float n = noise(p * frequency + float(i) * 1.7);
     float faded = amplitude * fadeAt(frequency, pixel);
     plain += faded * n;
-    n += carved * (2.0 * (abs(n) - HOLLOW) - n);
+    n += carved * step(1.5, float(i)) * (2.0 * (sqrt(n * n + 0.0004) - HOLLOW) - n);
     sum += faded * n;
     coarse += amplitude * n * (1.0 - smoothstep(0.06, 0.125, frequency * pixel));
     weight += faded;
@@ -119,6 +119,17 @@ float streaksAt(vec3 q, float pixel) {
   }
   return sum / max(weight, 1e-3) / SPREAD;
 }
+float veinsAt(vec3 p, float pixel) {
+  float frequency = 7.0 + 2.0 * shape.scale;
+  vec3 q = p * frequency + offset;
+  float finer = 1.5 * abs(noise(q * 2.2 + 5.0)) + 1.0 - fadeAt(frequency * 2.2, pixel);
+  float away = min(abs(noise(q)), finer);
+  float width = 0.022 * (0.5 + smoothstep(-0.25, 0.25, noise(q * 0.3 + 9.0)));
+  return 1.0 - smoothstep(0.0, max(width, 1.1 * frequency * pixel), away);
+}
+vec3 goldOf(float vein, float burn) {
+  return mix(vec3(0.6, 0.16, 0.02), vec3(0.9, 0.42, 0.07), vein) * vein * (0.4 + 0.1 * burn) + vec3(0.03, 0.008, 0.0);
+}
 float bandsAt(vec3 q, float pixel) {
   vec4 churn = fbm(vec3(q.x, q.y * 4.0, q.z) + offset, shape.scale, pixel, 0.0, shape.octaves);
   float latitude = q.y + shape.turbulence * 0.06 * churn.x / churn.y;
@@ -141,6 +152,15 @@ vec3 detailOf(sampler2D map, Lookup at) {
   float light = dot(fine, LUMA) / max(dot(smoothed, LUMA), 0.01);
   return mix(ratio, vec3(clamp(light, 0.25, 3.0)), recolour);
 }
+vec3 grained(vec3 normal, vec3 at, float here, float reach, float amount, float angle) {
+  vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), at));
+  vec3 north = cross(at, east);
+  float toEast = dot(detailOf(surface, lookupOf(spin * normalize(at + east * reach))), LUMA);
+  float toNorth = dot(detailOf(surface, lookupOf(spin * normalize(at + north * reach))), LUMA);
+  vec3 slope = (east * (toEast - here) + north * (toNorth - here)) / reach;
+  slope /= 1.0 + 0.35 * length(slope);
+  return normalize(normal - amount * mat3(modelMatrix) * turned(slope, -angle) / length(modelMatrix[0].xyz));
+}
 vec3 bentBy(float height, vec3 normal) {
   vec3 dx = dFdx(vWorld);
   vec3 dy = dFdy(vWorld);
@@ -151,12 +171,17 @@ vec3 bentBy(float height, vec3 normal) {
   slope /= 1.0 + 3.0 * length(slope);
   return normalize(normal - slope);
 }
-float lines(vec3 at, float width, float pixel) {
-  float away = min(abs(noise(at)), 2.0 * abs(noise(at * 2.3 + 11.0)));
-  return 1.0 - smoothstep(0.0, max(width, pixel), away);
+float lines(out float ridge, vec3 at, float width, float pixel) {
+  float away = min(abs(noise(at)), 3.0 * abs(noise(at * 1.6 + 11.0)));
+  width *= 0.5 + 2.0 * smoothstep(-0.25, 0.25, noise(at * 0.4 + 7.0));
+  float core = 1.0 - smoothstep(0.0, max(width, pixel), away);
+  float edge = max(width, pixel);
+  float margins = smoothstep(0.6 * edge, 1.2 * edge, away) * (1.0 - smoothstep(1.2 * edge, 2.4 * edge, away));
+  ridge = (margins - 0.6 * core) * smoothstep(3.0, 6.0, width / pixel);
+  return core;
 }
 float skyAt(vec3 sky, float pixel) {
-  return shareOf(fbm(sky * 1.5 + minorOffset.yzx, 1.5, pixel, 0.0, 6.0).xy);
+  return 0.736 * pow(shareOf(fbm(sky * 1.5 + minorOffset.yzx, 1.5, pixel, 0.0, 6.0).xy), 2.19);
 }
 float cloudGrain(Lookup at) {
   float level = log2(max(length(at.dx), length(at.dy)) * float(textureSize(cloudMap, 0).x) + 1.0);
