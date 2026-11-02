@@ -1,4 +1,5 @@
-import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
+import { NATURES } from "@gnoworld/core";
+import { WORLD_NATURES, Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -263,6 +264,106 @@ describe("runWorlds", () => {
         mass.map(() => "mass"),
       );
       expect(worlds.find((world) => world.id === "gnoswap/pool")?.batch).toBeUndefined();
+    });
+  });
+
+  // F4109 (Alexis, 2026-11-02): a nature leans a world's class, so it is read once, from every realm's own names, and kept with the
+  // world as its first-seen time is: a stranger filling the file, whose lists the job then sheds, can no longer move another's class.
+  describe("a world's nature, read once", () => {
+    const VICTIM = "gno.land/r/victim/game";
+    // A cap the file passes only once the stranger's lists and then the quiet victim's are shed, found by trying.
+    const VICTIM_STRIPPED = 3_000;
+    const docWith = (path: string, names: string[]): string =>
+      JSON.stringify({ package_path: path, imports: [], funcs: names.map((name) => ({ type: "", name })) });
+
+    it("names the file's natures as core's rules do", () => {
+      const six = ["nft", "token", "exchange", "dao", "name", "game"];
+      expect(WORLD_NATURES).toEqual(six);
+      expect(NATURES).toEqual(six);
+    });
+
+    it("writes a world's nature once every realm of it is read", async () => {
+      const { file } = await run(chainRoutes([POOL, POOL1, ROUTER]));
+      expect(written(file).worlds.map((world) => [world.id, world.nature])).toEqual([
+        ["gnoswap/pool", "exchange"],
+        ["gnoswap/router", "exchange"],
+      ]);
+    });
+
+    it("writes none while a realm of the world is unread, then reads it when every one is", async () => {
+      const file = fresh();
+      await run(chainRoutes([POOL, POOL1], { doc: (path) => (path === POOL1 ? "not a doc" : doc(path)) }), { file });
+      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+      await run(chainRoutes([POOL, POOL1]), { file });
+      expect(written(file).worlds[0]?.nature).toBe("exchange");
+    });
+
+    it("keeps the nature it read when the file's lists were stripped since", async () => {
+      const file = fresh();
+      await run(chainRoutes([VICTIM], { doc: (path) => docWith(path, ["Play", "Render"]) }), { file });
+      const shed = written(file);
+      const bare = shed.worlds.map((world) => ({
+        ...world,
+        realms: world.realms.map((one) => ({ ...one, functions: [], imports: [] })),
+      }));
+      writeFileSync(file, `${JSON.stringify({ ...shed, worlds: bare })}\n`);
+      await run(chainRoutes([VICTIM]), { file });
+      expect(written(file).worlds[0]?.nature).toBe("game");
+    });
+
+    it("keeps it whatever a new realm of the world says", async () => {
+      const file = fresh();
+      await run(chainRoutes([POOL]), { file });
+      const governed = [POOL, POOL1, `${POOL}_gov`];
+      await run(chainRoutes(governed, { doc: (path) => docWith(path, ["Vote", "Propose"]) }), { file });
+      expect(written(file).worlds[0]?.nature).toBe("exchange");
+    });
+
+    it("reads no nature from a last file written before natures whose lists were stripped: absent, never none", async () => {
+      const file = fresh();
+      await run(chainRoutes([VICTIM], { doc: (path) => docWith(path, ["Play", "Render"]) }), { file });
+      const before = written(file);
+      const stripped = before.worlds.map((world) => ({
+        ...world,
+        nature: undefined,
+        realms: world.realms.map((one) => ({ ...one, functions: [], imports: [] })),
+      }));
+      writeFileSync(file, `${JSON.stringify({ ...before, worlds: stripped })}\n`);
+      await run(chainRoutes([VICTIM]), { file });
+      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+    });
+
+    it("holds a world's nature back while a realm of it was read with no name at all", async () => {
+      const { file } = await run(
+        chainRoutes([POOL, POOL1], { doc: (path) => (path === POOL1 ? docWith(path, []) : doc(path)) }),
+      );
+      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+    });
+
+    it("reads a world no rule names as none, and keeps it so", async () => {
+      const file = fresh();
+      await run(chainRoutes([POOL], { doc: (path) => docWith(path, ["Render"]) }), { file });
+      expect(written(file).worlds[0]?.nature).toBeNull();
+      await run(chainRoutes([POOL, POOL1]), { file });
+      expect(written(file).worlds[0]?.nature).toBeNull();
+    });
+
+    it("reads it before the file is shed: a stranger's flood strips a quiet world's lists, not its nature", async () => {
+      const fat = (path: string, first: string) =>
+        docWith(path, [first, ...Array.from({ length: 200 }, (_, i) => `Fn${String(i)}`)]);
+      const paths = [ROUTER, VICTIM, ...Array.from({ length: 6 }, (_, i) => `gno.land/r/evil/fat_${String(i)}`)];
+      const routes = chainRoutes(paths, {
+        doc: (path) => (path === VICTIM ? fat(path, "Swap") : path.includes("evil") ? fat(path, "Play") : doc(path)),
+        indexer: ({ variables }) => history(pathOf(variables) === ROUTER ? 2 : 0, pathOf(variables)),
+      });
+      const { file, logged } = await run(routes, { maxBytes: VICTIM_STRIPPED });
+      expect(logged).toContainEqual({ event: "worlds_shed", error: "lists" });
+      const worlds = written(file).worlds;
+      const victim = worlds.find((world) => world.id === "victim/game");
+      expect(victim?.realms.every((one) => one.functions.length === 0)).toBe(true);
+      expect(victim?.nature).toBe("exchange");
+      expect(worlds.find((world) => world.id === "evil/fat")?.nature).toBe("game");
+      expect(worlds.find((world) => world.id === "gnoswap/router")?.nature).toBe("exchange");
     });
   });
 

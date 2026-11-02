@@ -54,6 +54,9 @@ const Realm = z.strictObject({
   lastHeight: z.nullable(ChainCount),
 });
 
+/** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
+export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "name", "game"] as const;
+
 /** A world by its id: a namespace, and for most worlds the folders that name it. */
 export const WorldId = z
   .string()
@@ -66,6 +69,8 @@ const World = z.strictObject({
   // The time the world was first seen on the list (null on a first pass), and whether it joined in a batch.
   seen: z.optional(z.nullable(Moment)),
   batch: z.optional(z.boolean()),
+  // Its nature, kept from the pass that first read every realm of it (null: no rule reads it); absent until then.
+  nature: z.optional(z.nullable(z.enum(WORLD_NATURES))),
 });
 
 /** worlds.json: the universe it was read from, the time of the read, and the worlds, sorted by id. */

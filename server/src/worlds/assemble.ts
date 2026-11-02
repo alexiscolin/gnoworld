@@ -1,5 +1,6 @@
 // Putting a pass's reads together (slice 7, 7c): what was read, the last file it builds on, and the rows of the new file. A fact
 // this pass could not read is the last file's, else nothing (null, or an empty list), never a zero.
+import { natureOf } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { Comparison } from "./compare.ts";
 import { groupWorlds, type Group } from "./group.ts";
@@ -63,6 +64,18 @@ function rowOf(path: string, read: Gathered): RealmRow {
   };
 }
 
+// A world's nature (F4109): the last file's, else read from its realms' own names once every one of them holds some, before the file is
+// shed; a realm with no name may be one whose lists were shed, so the world waits. Kept once read, so neither a stranger's flood nor a
+// new realm moves a world's class.
+function natureFor(before: WorldRow | undefined, rows: readonly RealmRow[], read: Gathered): WorldRow["nature"] {
+  if (before?.nature !== undefined) return before.nature;
+  const named = rows.every(({ path }) => {
+    const facts = read.facts.get(path);
+    return facts !== undefined && facts.functions.length + facts.imports.length > 0;
+  });
+  return named ? natureOf(rows) : undefined;
+}
+
 interface Pass {
   readonly fresh: ReadonlySet<string>;
   readonly batched: ReadonlySet<string>;
@@ -82,11 +95,14 @@ export function worldsOf(read: Gathered, stamp: string): WorldRow[] {
   const batched = new Set(read.news.batches.map(({ namespace }) => namespace));
   return groupWorlds(read.paths).map((group) => {
     const before = read.lastWorlds.get(group.id);
+    const rows = group.realms.map((path) => rowOf(path, read));
+    const nature = natureFor(before, rows, read);
     return {
       id: group.id,
       namespace: group.namespace,
-      realms: group.realms.map((path) => rowOf(path, read)),
+      realms: rows,
       ...marksOf(before, group, { fresh, batched, stamp }),
+      ...(nature === undefined ? {} : { nature }),
     };
   });
 }

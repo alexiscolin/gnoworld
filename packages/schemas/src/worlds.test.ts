@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RealmPath, Worlds, WORLDS_CAPS, WORLDS_MAX_BYTES } from "./worlds.ts";
+import { RealmPath, WORLD_NATURES, Worlds, WORLDS_CAPS, WORLDS_MAX_BYTES } from "./worlds.ts";
 
 // The file the server's worlds job writes and every client reads (slice 7, 7c): worlds grouped from the chain's realm list, each
 // realm with what was read of its package and its history. A null is a fact not read, never a zero. Everything in it came from
@@ -71,6 +71,17 @@ describe("Worlds", () => {
     expect(Worlds.safeParse(world({ seen: null })).success).toBe(true);
     expect(Worlds.safeParse(world({ seen: "soon" })).success).toBe(false);
     expect(Worlds.safeParse(world({ batch: "yes" })).success).toBe(false);
+  });
+
+  it("takes a world's nature, read once by the job, or none, and refuses one no rule reads (F4109)", () => {
+    const world = (extra: Record<string, unknown>) =>
+      file({ worlds: [{ id: "a/b", namespace: "a", realms: [], ...extra }] });
+    expect(WORLD_NATURES.length).toBeGreaterThan(0);
+    for (const nature of WORLD_NATURES) expect(Worlds.parse(world({ nature })).worlds[0]?.nature).toBe(nature);
+    expect(Worlds.safeParse(world({ nature: null })).success).toBe(true);
+    expect(Worlds.parse(world({})).worlds[0]).not.toHaveProperty("nature");
+    for (const nature of ["wizard", "Token", "", 3, true])
+      expect(Worlds.safeParse(world({ nature })).success).toBe(false);
   });
 
   it("takes a realm whose package or history was not read, with nulls and empty lists", () => {
