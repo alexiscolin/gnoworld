@@ -391,6 +391,34 @@ describe("the whole cosmos", () => {
     expect(crowd["LineSegments"]).toBeGreaterThan(0);
   });
 
+  // A crowd of one star stacks its worlds' light in a few pixels: Onyx's 127 and 172 burnt to white at a cluster's distance (the part's
+  // pictures after F4152's fixes). A world's light falls with its system's crowd as with the whole file's, so a crowd stays a warm cloud.
+  it("keeps a crowded system from burning: its worlds' light falls with its crowd", () => {
+    const world = (namespace: string, at: number): CosmosWorld => ({
+      id: `${namespace}/w${String(at)}`,
+      namespace,
+      realms: [{ callers: 20, path: `gno.land/r/${namespace}/w${String(at)}` }],
+    });
+    const worlds = [world("lone", 0), ...Array.from({ length: 128 }, (_, at) => world("crowd", at))];
+    const systems = systemsOf(worlds.map(({ id, namespace }) => ({ id, namespace, use: 21 })));
+    const web = new Web();
+    web.stand({ systems, worlds, written: WRITTEN }, NOW);
+    const eye = { x: 0, y: 1500, z: 0 };
+    web.look({ eye, focal: FOCAL, focus: 1500 }, NOW);
+    const soft = attribute(geometryOf(web, "Points"), "aSoft");
+    const place = attribute(geometryOf(web, "Points"), "position");
+    // A point's light times the square of its distance is what its world gives, whatever its distance.
+    const given = worlds.map((_, at) => {
+      const distance = Math.hypot(place.getX(at) - eye.x, place.getY(at) - eye.y, place.getZ(at) - eye.z);
+      return soft.getY(at) * soft.getX(at) ** 2 * distance ** 2;
+    });
+    const [lone = 0, ...crowd] = given;
+    for (const each of crowd) expect(each).toBeLessThanOrEqual(0.3 * lone);
+    // The crowd as a whole still gives more than one world alone.
+    expect(crowd.reduce((sum, each) => sum + each, 0)).toBeGreaterThan(2 * lone);
+    web.dispose();
+  });
+
   // F4153, finding 1: a look at 20,000 worlds took 50 ms, parsing the file's time once a world and uploading all it held.
   it("costs a look little: the file's time read once, and only sizes, lights and tints uploaded", () => {
     const { web, owner } = stood({ count: 2_000, linkEvery: 3, last: (at) => (at % 50 === 0 ? 49_000 : null) });

@@ -7,17 +7,15 @@ import {
   DISC_TILT,
   distanceOf,
   linksOf,
-  pointTint,
   softPoint,
-  toScene,
-  worldSize,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
 import { BufferGeometry, Group, LineSegments, Points } from "three";
-import { callsOf, heightAt, lastOf, universeOf, type Universe } from "../live.ts";
+import { heightAt, universeOf, type Universe } from "../live.ts";
 import { cloudOf, type Cloud } from "./cloud.ts";
-import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
+import type { CosmosWorld } from "./cosmosWorld.ts";
+import { calmFor, endsOf, heldOf, type Held } from "./webHeld.ts";
 import { lineLook, pointLook } from "./webLook.ts";
 
 /** A set to stand: its systems as the cosmos placed them, its worlds as the file holds them, and the file's time. */
@@ -41,30 +39,7 @@ const GOLD_GROW = 0.5;
 // How many points and lines a view holds whole: past that, each adds less, as the square root of how many more, so a crowd keeps its dark.
 const POINTS_CALM = 2_000;
 const LINES_CALM = 200;
-// A world drawn: its system, its orbit, phase and size there, its colour with no activity, the file's word on it, and how live it was at the
-// last look.
-interface Held {
-  readonly system: StarSystem;
-  readonly orbit: number;
-  readonly phase: number;
-  readonly radius: number;
-  readonly tint: readonly [number, number, number];
-  readonly called: { readonly calls: number | null; readonly lastHeight: number | null };
-  live: number;
-}
-
-// A system's worlds' colour, from the mood where its star stands on the stage.
-function tintAt(system: StarSystem): readonly [number, number, number] {
-  const stage = { x: 0, y: 0, z: 0 };
-  const tint = { red: 0, green: 0, blue: 0 };
-  toScene(system.place, stage);
-  pointTint(stage, tint);
-  return [tint.red, tint.green, tint.blue];
-}
-
 type PointCloud = Cloud<"position" | "aCircle" | "aTint" | "aSoft">;
-
-const calmFor = (count: number, whole: number): number => Math.min(1, Math.sqrt(whole / Math.max(count, 1)));
 
 export class Web {
   readonly group = new Group();
@@ -97,39 +72,9 @@ export class Web {
   stand({ systems, worlds, written }: WebSet, now: number): void {
     this.#free();
     this.#universe = universeOf(written === undefined ? { worlds } : { worlds, updated: written });
-    const tints = new Map<string, readonly [number, number, number]>();
-    const places = new Map(
-      systems.flatMap((system) => system.worlds.map((world) => [world.id, { system, world }] as const)),
-    );
-    const at = new Int32Array(worlds.length).fill(-1);
-    const seen = new Map<string, number>();
-    this.#held = [];
-    worlds.forEach((world, from) => {
-      const place = places.get(world.id);
-      at[from] = seen.get(world.id) ?? -1;
-      if (place === undefined || at[from] >= 0) return;
-      at[from] = this.#held.length;
-      seen.set(world.id, this.#held.length);
-      const { orbit, phase } = place.world;
-      const tint = tints.get(place.system.id) ?? tintAt(place.system);
-      tints.set(place.system.id, tint);
-      this.#held.push({
-        system: place.system,
-        orbit,
-        phase,
-        radius: worldSize(usageOf(world)),
-        tint,
-        called: { calls: callsOf(world), lastHeight: lastOf(world) },
-        live: 0,
-      });
-    });
-    // A pair whose one world has no place goes whole, so no later pair slides onto another world.
-    const links = linksOf(worlds);
-    this.#ends = [];
-    for (let pair = 0; pair < links.length; pair += 2) {
-      const [from = -1, to = -1] = [at[links[pair] ?? -1], at[links[pair + 1] ?? -1]];
-      if (from >= 0 && to >= 0) this.#ends.push(from, to);
-    }
+    const { held, at } = heldOf(systems, worlds);
+    this.#held = held;
+    this.#ends = endsOf(linksOf(worlds), at);
     this.#pointCalm.value = calmFor(this.#held.length, POINTS_CALM);
     this.#lineCalm.value = calmFor(this.#ends.length / 2, LINES_CALM);
     this.#build();
@@ -176,7 +121,11 @@ export class Web {
     this.#held.forEach((held, index) => {
       const gold = Math.min(1, held.live);
       softPoint(held.radius, { distance: distanceOf(held.system.place, eye), focus, focal }, this.#soft);
-      aSoft.setXY(index, this.#soft.size * (1 + GOLD_GROW * gold), this.#soft.light * (1 + GOLD_LIFT * gold));
+      aSoft.setXY(
+        index,
+        this.#soft.size * (1 + GOLD_GROW * gold),
+        this.#soft.light * held.calm * (1 + GOLD_LIFT * gold),
+      );
       const [red = 0, green = 0, blue = 0] = held.tint.map(
         (channel, at) => channel + ((GOLD[at] ?? 0) - channel) * gold,
       );
