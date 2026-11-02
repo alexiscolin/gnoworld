@@ -79,8 +79,9 @@ void main() {
   } else {
     vec3 p = at + shape.warp * field(at * 1.1 + offset.yzx) + offset;
     vec4 ground = fbm(p, shape.scale, pixel, shape.erosion, shape.octaves);
-    float big = shape.craters > 0.0 ? cratersAt(p, shape.scale * 4.0, pixel) : 0.0;
-    cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(p, shape.scale * 13.0, pixel) : 0.0;
+    vec3 round = at + offset;
+    float big = shape.craters > 0.0 ? cratersAt(round, shape.scale * 4.0, pixel) : 0.0;
+    cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(round, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
     broad = ground.z / ground.y;
     fray = (ground.x - ground.z) / ground.y;

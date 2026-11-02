@@ -359,6 +359,13 @@ describe("the generated program", () => {
 
   // The concentric marbling (the chief: real24's fourth world): erosion carved the two largest octaves too, whose few long creases the
   // warp bends into arcs a grazing light terraces in 2x2 steps; carving starts at the third octave, its crease rounded.
+  it("keeps craters round: they are placed on the ground's point before its warp, never stretched with it (7b5's design pass, 7)", () => {
+    expect(GENERATED_FRAGMENT).toContain("vec3 round = at + offset;");
+    expect(GENERATED_FRAGMENT).toContain("cratersAt(round, shape.scale * 4.0, pixel)");
+    expect(GENERATED_FRAGMENT).toContain("cratersAt(round, shape.scale * 13.0, pixel)");
+    expect(GENERATED_FRAGMENT).not.toMatch(/cratersAt\(p, /);
+  });
+
   it("carves only the finer octaves, their crease rounded", () => {
     expect(GENERATED_FRAGMENT).toMatch(
       /n \+= carved \* step\(1\.5, float\(i\)\) \* \(2\.0 \* \(sqrt\(n \* n \+ [\d.]+\) - HOLLOW\) - n\);/,
