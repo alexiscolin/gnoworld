@@ -22,30 +22,26 @@ export const LIGHTS = /* glsl */ `
 // The Earth's own lights, the frames' warm family: a form varies, a colour does not.
 const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);
 
-// Regions open out of a low-frequency field as a world settles, about a share of its surface for a share of settled.
-float settledAt(vec3 axis) {
+// Regions open as a world settles, first where the map's lights are densest, then out across the field: its cores grow into its towns.
+float settledAt(vec3 axis, float spill) {
   float ground = smoothstep(-0.7, 0.7, field(axis * lightGrain + lightOffset).x);
-  return smoothstep(ground, ground + 0.2, settled * 1.22);
+  float rank = 0.6 * (1.0 - smoothstep(0.0, 0.15, spill)) + 0.4 * ground;
+  return smoothstep(rank, rank + 0.15, settled * 1.15);
 }
 
-// A seam's line, its pixel's size taken ahead, for past the skip below no fwidth holds. One scale alone: a finer one under a pixel would shimmer.
-float seamAt(vec3 at, float pixel) {
-  return 1.0 - smoothstep(0.0, max(0.014, 1.1 * pixel), seams(at));
-}
-
-// A golden net, a soft glow once a pixel holds more than a few of its cells: a line would break into worms.
-float netOf(vec3 direction, vec3 flow, vec3 lit) {
-  float wired = 0.24 + 0.6 * abs(field(direction * 4.0 + lightOffset).y) + 1.1 * lit.x;
-  float line = seamAt(direction * lightFine + 0.3 * flow, lit.z);
-  return mix(line * wired, 0.08 + lit.y, smoothstep(0.03, 0.12, lit.z));
+// A golden net on a faint amber ground, a soft glow once a cell is under a few pixels: a line would break into worms.
+float netOf(vec3 direction, float seam, vec3 lit) {
+  float wired = 0.18 + 0.36 * abs(field(direction * 4.0 + lightOffset).y) + 0.7 * lit.x;
+  return 0.025 + mix(seam * wired, 0.08 + 0.4 * lit.y, smoothstep(0.25, 0.5, lit.z));
 }
 
 // The shape a class gives its lights, from the map's cities and its soft spill.
-float formOf(vec3 axis, vec3 direction, vec3 flow, vec4 reads, float crack) {
+float formOf(vec3 axis, vec3 direction, vec4 reads, vec2 lines) {
   float cities = reads.x;
   float spill = reads.y;
+  float crack = lines.y;
   float strung = cities * 2.4 + spill * 2.2;
-  if (lightKind == ${code("seams")}) return netOf(direction, flow, vec3(strung, spill, reads.w));
+  if (lightKind == ${code("seams")}) return netOf(direction, lines.x, vec3(strung, spill, reads.w));
   if (lightKind == ${code("cracks")}) {
     return crack * (0.08 + 0.24 * abs(field(direction * 4.0 + lightOffset).y) + strung) * 1.6 * lightFine;
   }
@@ -59,21 +55,28 @@ float formOf(vec3 axis, vec3 direction, vec3 flow, vec4 reads, float crack) {
   return (cities * 2.6 + spill * 1.2) * lightFine;
 }
 
-// A world's lights, on the arc its night comes on across, the Earth's level for level. The map holds one channel, squared here into light.
+// A world's lights, on the arc its night comes on across, the Earth's level for level. The map holds one channel, squared here into light. A net
+// is gold, the same family a shade deeper, as frame 4's is; its line is as wide as two of its own pixels, so a wall grazing the sphere stays thin.
 vec3 settlements(vec3 axis, vec3 direction, vec3 flow, float day, float crack) {
   vec3 place = lightTurn == 0.0 ? direction : spin * normalize(turned(axis, lightTurn) + warpAmount * flow);
   Lookup at = lookupOf(place);
   Lookup other = at;
   if (lightTurn != 0.0) other = lookupOf(place.zxy);
   float pixel = 0.5 * length(fwidth(direction)) * lightFine;
+  float seam = 0.0;
+  if (lightKind == ${code("seams")}) {
+    float away = seams(direction * lightFine + 0.3 * flow);
+    seam = 1.0 - smoothstep(0.0, max(0.014, 2.2 * fwidth(away)), away);
+  }
   float night = 1.0 - smoothstep(-0.16, 0.4, day);
-  float open = night > 0.0 ? settledAt(axis) : 0.0;
-  if (open <= 0.0) return vec3(0.0);
+  if (night <= 0.0) return vec3(0.0);
   float blur = lightKind == ${code("pools")} ? lightFine : 3.5;
   float cities = max(read(nightMap, at).r, read(nightMap, other).r);
   float spill = max(textureLod(nightMap, at.uv, blur).r, textureLod(nightMap, other.uv, blur).r);
-  float form = formOf(axis, direction, flow, vec4(cities * cities, spill * spill * 2.5, day, pixel), crack);
-  return CITY_LIGHT * form * open * lightLevel * night;
+  float open = settledAt(axis, spill);
+  float form = formOf(axis, direction, vec4(cities * cities, spill * spill * 2.5, day, pixel), vec2(seam, crack));
+  vec3 tint = lightKind == ${code("seams")} ? CITY_LIGHT * CITY_LIGHT : CITY_LIGHT;
+  return tint * form * open * lightLevel * night;
 }
 `;
 
@@ -95,10 +98,10 @@ varying vec3 vNormal;
 varying vec3 vView;
 void main() {
   float centre = abs(dot(normalize(vNormal), normalize(vView)));
-  vec3 glow = mix(vec3(0.4, 0.05, 0.07), vec3(0.95, 0.56, 0.74), pow(centre, 18.0));
-  // The heart covers the small body, so no limb shows through.
-  float cover = smoothstep(0.82, 0.96, centre);
-  gl_FragColor = vec4(glow * pow(centre, 4.0) * signal * 0.62, cover);
+  vec3 glow = mix(vec3(0.4, 0.05, 0.07), vec3(0.95, 0.56, 0.74), pow(centre, 30.0));
+  // The heart covers the small body, whose edge falls near 0.92, so no limb shows through.
+  float cover = smoothstep(0.82, 0.92, centre);
+  gl_FragColor = vec4(glow * (0.42 * pow(centre, 4.0) + 0.42 * pow(centre, 30.0)) * signal, cover);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

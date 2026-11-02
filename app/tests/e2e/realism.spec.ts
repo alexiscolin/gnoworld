@@ -9,8 +9,8 @@ const PAGE = "/lab/realism.html";
 // Nine surface maps (the Earth's among them), the clouds and the ring's profile.
 const MAPS_AT_MOST = 11;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
-// How far apart two classes' added light may lie at one stage: their forms differ, and a net, the brightest, is frame 4's own.
-const LIT_APART = 11;
+// How far apart two classes' added light may lie at one stage: their forms differ, and a golden net lights a whole disc, as frame 4's does.
+const LIT_APART = 22;
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
 const VIEWS = [

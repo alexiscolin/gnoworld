@@ -189,7 +189,7 @@ describe("a world's signs on its render", () => {
   });
 
   it("takes a derivative nowhere past the branch that skips a day pixel, which varies by pixel", () => {
-    const [, past = ""] = LIGHTS.split("if (open <= 0.0)");
+    const [, past = ""] = LIGHTS.split("if (night <= 0.0)");
     for (const word of ["dFdx", "dFdy", "fwidth", "lookupOf", "lines("]) expect(past, word).not.toContain(word);
   });
 });
