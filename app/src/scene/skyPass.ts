@@ -20,6 +20,7 @@ export const PERIODS = CLOUDS.map((cloud, shell) => (cloud * PERIOD) / (SLIDES[s
 
 const list = (values: readonly number[]) => values.map((value) => value.toFixed(1)).join(", ");
 
+// TURNED's whole numbers keep the cube tiling: a turn that lays its lattice off the axes, for nothing in a nebula runs along them.
 const MARCH = /* glsl */ `
 precision highp sampler3D;
 uniform sampler3D uMood;
@@ -35,7 +36,6 @@ float cube(vec3 at) {
 }
 const float RADII[${String(RADII.length)}] = float[${String(RADII.length)}](${list(RADII)});
 const float CLOUDS[${String(RADII.length)}] = float[${String(RADII.length)}](${list(CLOUDS)});
-// Whole numbers, so the cube still tiles: a turn that lays its lattice off the axes, for nothing in a nebula runs along them.
 const mat3 TURNED = mat3(2.0, -1.0, 1.0, 1.0, 2.0, -1.0, -1.0, 1.0, 2.0);
 void main() {
   vec3 ray = normalize(vRay);
