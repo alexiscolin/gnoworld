@@ -74,6 +74,10 @@ const FADES_FROM = 0.7;
 const NEAR_GONE = 0.7;
 const NEAR_WHOLE = 1.6;
 const HAZE_WHOLE = 0.35;
+// Under a level of eight bits a sheet adds nothing to see: it is not drawn at all, for its quad would still be paid for.
+const LEAST = 1 / 255;
+// Past this, a cell's index is no longer a whole number: the lattice cannot count, and stands nothing.
+const FARTHEST = 2 ** 50;
 // The eye's distance to what it looks at: near a world, a system's, a cluster's, and where the whole cosmos takes over.
 const WORLD = 3;
 const SYSTEM = 12;
@@ -114,6 +118,7 @@ export class NebulaField {
   around(eye: Point): void {
     const reach = NEBULA_REACH + MARGIN;
     this.count = 0;
+    if (!(Math.max(Math.abs(eye.x), Math.abs(eye.y), Math.abs(eye.z)) < FARTHEST)) return;
     for (let x = Math.floor((eye.x - reach) / CELL); x <= Math.floor((eye.x + reach) / CELL); x += 1)
       for (let y = Math.floor((eye.y - reach) / CELL); y <= Math.floor((eye.y + reach) / CELL); y += 1)
         for (let z = Math.floor((eye.z - reach) / CELL); z <= Math.floor((eye.z + reach) / CELL); z += 1) {
@@ -184,11 +189,12 @@ export class NebulaField {
   }
 }
 
-/** How much of a nebula shows from `eye`: none at the reach, none from within its middle sheet. */
+/** How much of a nebula shows from `eye`: none at the reach, none from within its middle sheet, none too faint to see. */
 export function nebulaLight(nebula: Nebula, eye: Point): number {
   const away = awayOf(nebula, eye);
   const far = 1 - smoothstep(FADES_FROM * NEBULA_REACH, NEBULA_REACH, away);
-  return nebula.strength * far * smoothstep(NEAR_GONE * nebula.size, NEAR_WHOLE * nebula.size, away);
+  const light = nebula.strength * far * smoothstep(NEAR_GONE * nebula.size, NEAR_WHOLE * nebula.size, away);
+  return light < LEAST ? 0 : light;
 }
 
 /** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, all from a system to a cluster. */

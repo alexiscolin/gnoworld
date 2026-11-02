@@ -182,6 +182,15 @@ describe("the nebulae around an eye", () => {
     expect(shared).toBeGreaterThan(100);
   });
 
+  it.each([2 ** 60, -(2 ** 60)])("stands none for an eye at %s, past where a lattice counts whole cells", (farOut) => {
+    for (const eye of [
+      { x: farOut, y: 0, z: 0 },
+      { x: 0, y: farOut, z: 0 },
+      { x: 0, y: 0, z: farOut },
+    ])
+      expect(fieldAt(eye).count).toBe(0);
+  });
+
   it("keeps each one within reach, finite at any coordinate, never twice and never more than the bound", () => {
     fc.assert(
       fc.property(point, (eye) => {
@@ -322,6 +331,20 @@ describe("its light", () => {
     }
     expect(lit).toBeGreaterThan(1000);
   }, 60_000);
+
+  it("is none when it would add less than a level of eight bits: a sheet too faint to see is not drawn", () => {
+    fc.assert(
+      fc.property(point, (eye) => {
+        for (const nebula of listed(fieldAt(eye))) {
+          const light = nebulaLight(nebula, eye);
+          expect(light === 0 || light >= 1 / 255).toBe(true);
+        }
+      }),
+    );
+    const [nebula] = listed(fieldAt(HOME));
+    if (nebula === undefined) throw new Error("no nebula at home");
+    expect(nebulaLight(nebula, { x: nebula.x + NEBULA_REACH - 1, y: nebula.y, z: nebula.z })).toBe(0);
+  });
 
   it("is none at the reach, and none from its centre, where a flat sheet would read as a wash", () => {
     for (const nebula of listed(fieldAt(HOME))) {
