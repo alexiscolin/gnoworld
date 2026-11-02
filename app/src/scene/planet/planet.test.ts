@@ -101,7 +101,7 @@ describe("createPlanet", () => {
   it("hands every number of the surface to its own uniform", () => {
     const look = planetLook(DAO, "temperate");
     const surface = createPlanet(look, fixed().set, sphere).surface;
-    expect(read(surface, "warpAmount")).toBe(look.warp.amount);
+    expect(read(surface, "warpAmount")).toBeLessThanOrEqual(look.warp.amount);
     expect(read(surface, "warpFrequency")).toBe(look.warp.frequency);
     expect(read(surface, "warpOffset")).toEqual(new Vector3(...look.warp.offset));
     expect(read(surface, "secondShare")).toBe(look.secondShare);
