@@ -82,13 +82,14 @@ describe("no line, and depth with a close world", () => {
     expect(offLine([spot(0, 0), spot(10, 10), spot(20, 20), spot(30, 30)])).toBe(0);
   });
 
-  // The Earth at the rectangle's middle adds nothing across or along.
+  // The Earth off the screen: at the rectangle's middle it added nothing across or along, but stood on its diagonals at like gaps.
   it("refuses four bodies a fifth across or less, and keeps them past it", () => {
-    expect(composed(corners(600, 114), spot(300, 57), FLAT)).toBe(false);
-    expect(composed(corners(600, 126), spot(300, 63), FLAT)).toBe(true);
+    expect(composed(corners(600, 114), EARTH, FLAT)).toBe(false);
+    expect(composed(corners(600, 126), EARTH, FLAT)).toBe(true);
   });
 
-  // With a close world: corners of `height` by 600, their sizes `sizes` times apart and distances `distances` times, the Earth between.
+  // With a close world: corners of `height` by 600, their sizes `sizes` times apart and distances `distances` times, the Earth off the
+  // screen (between them it stood on their diagonals at like gaps).
   const deep = (height: number, sizes: number, distances: number) =>
     composed(
       [
@@ -97,7 +98,7 @@ describe("no line, and depth with a close world", () => {
         spot(0, height, [20, 15]),
         spot(600, height, [20, 20]),
       ],
-      spot(300, height / 2, [20, 12]),
+      spot(-5000, -5000, [20, 12]),
       DEEP,
     );
 
@@ -133,8 +134,11 @@ describe("a row of bodies", () => {
     );
   });
 
+  // Its gaps unequal, 300 and 600 pixels: at like gaps the row is refused whatever stands off it.
   it("counts the glowing stars in the row: one off the line breaks it", () => {
+    const uneven = [spot(300, 500, [20, 20]), spot(600, 530, [20, 30]), spot(1200, 590, [20, 40])];
     const lights = [{ x: 600, y: 900, radius: 0 }];
-    expect(composed(row([20, 20, 20], [20, 30, 40]), EARTH, { ...FLAT, lights })).toBe(true);
+    expect(composed(uneven, EARTH, FLAT)).toBe(false);
+    expect(composed(uneven, EARTH, { ...FLAT, lights })).toBe(true);
   });
 });
