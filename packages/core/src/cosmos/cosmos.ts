@@ -66,7 +66,7 @@ function ranked(set: readonly SystemRef[]): Ranked[] {
 }
 
 // The power of two that holds `count`: a wedge only changes when this does, so its rays stay put between rungs.
-function stepOf(count: number): number {
+export function stepOf(count: number): number {
   let step = 1;
   while (step < count) step *= 2;
   return step;

@@ -26,6 +26,36 @@ export {
   type SystemRef,
 } from "./cosmos/cosmos.ts";
 export {
+  BELT_INNER,
+  CENTRE,
+  DISC_TILT,
+  EARTH_PLACE,
+  EARTH_RADIUS,
+  focusOf,
+  GNO_LAND,
+  orbitPlace,
+  ROOM,
+  systemsOf,
+  toMap,
+  toScene,
+  type Orbiter,
+  type StarSystem,
+  type WorldHeld,
+} from "./cosmos/system.ts";
+export {
+  BOUNDS,
+  dotLight,
+  Drawn,
+  HAZE,
+  Ladder,
+  LANDMARKS,
+  MIDDLE,
+  onScreen,
+  screenRadius,
+  type LadderView,
+} from "./lod/ladder.ts";
+export { clearOf, SPREAD, spreadAt, type ClearBox, type ScreenSpot } from "./lod/screen.ts";
+export {
   anchorOf,
   ANCHORS,
   asciiBytes,
@@ -85,7 +115,7 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export type { Point } from "./space/cell.ts";
-export { driftAt, HOME, turnAt } from "./space/drift.ts";
+export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";

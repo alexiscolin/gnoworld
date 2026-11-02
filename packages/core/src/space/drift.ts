@@ -24,6 +24,14 @@ export function driftAt(out: { x: number; y: number; z: number }, seconds: numbe
   out.z = HEADING.z * along;
 }
 
+/** The arrival alone, into `out`: what the worlds are seen from, for the sky's cruise would leave them behind. */
+export function glideAt(out: { x: number; y: number; z: number }, seconds: number): void {
+  const along = -GLIDE * Math.exp(-seconds / SETTLE_SECONDS);
+  out.x = HEADING.x * along;
+  out.y = HEADING.y * along;
+  out.z = HEADING.z * along;
+}
+
 /** The way the view looks, `seconds` after it arrived, into `out`, in radians. */
 export function turnAt(out: { yaw: number; pitch: number }, seconds: number): void {
   const angle = (2 * Math.PI * seconds) / TURN_SECONDS;

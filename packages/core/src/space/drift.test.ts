@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { driftAt, turnAt } from "./drift.ts";
+import { driftAt, glideAt, turnAt } from "./drift.ts";
 
 const spot = () => ({ x: 0, y: 0, z: 0 });
 const length = (a: { x: number; y: number; z: number }) => Math.hypot(a.x, a.y, a.z);
@@ -61,6 +61,36 @@ describe("driftAt", () => {
         expect(moved(seconds, seconds + 1 / 60)).toBeLessThan(1);
       }),
     );
+  });
+});
+
+describe("glideAt", () => {
+  const offset = (seconds: number) => {
+    const out = spot();
+    glideAt(out, seconds);
+    return out;
+  };
+
+  it("starts where the drift starts, so the worlds and the sky arrive as one", () => {
+    const start = spot();
+    driftAt(start, 0);
+    expect(offset(0)).toEqual(start);
+  });
+
+  it("ends where the eye rests, for a world must not be left behind by the sky's cruise", () => {
+    expect(length(offset(120))).toBeLessThan(1e-6);
+    fc.assert(
+      fc.property(fc.double({ min: 40, max: 86_400, noNaN: true }), (seconds) => {
+        expect(length(offset(seconds))).toBeLessThan(1e-3);
+      }),
+    );
+  });
+
+  it("slows all the way, along the drift's heading", () => {
+    const [a, b, c] = [offset(0), offset(1), offset(4)].map(length);
+    expect(a).toBeGreaterThan(b ?? 0);
+    expect(b).toBeGreaterThan(c ?? 0);
+    expect(offset(1).x / offset(1).z).toBeCloseTo(offset(0).x / offset(0).z, 9);
   });
 });
 
