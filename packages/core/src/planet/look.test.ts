@@ -62,7 +62,7 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
   "water cloud giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
   "azure giant": { sea: false, glow: false, air: true, maps: ["neptune"] },
   "dark giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
-  "hot giant": { sea: false, glow: true, air: true, maps: ["jupiter"] },
+  "hot giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
   "sub-Neptune": { sea: false, glow: false, air: true, maps: ["neptune"] },
 };
 

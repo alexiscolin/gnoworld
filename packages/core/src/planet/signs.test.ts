@@ -50,8 +50,8 @@ const WAY: Record<Anchor, { kind: LightKind; grain: Span; fine: Span }> = {
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
   shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
-  "nitrogen ice": { kind: "cracks", grain: [1.2, 2], fine: [0.8, 1.2] },
-  "grooved ice": { kind: "cracks", grain: [1, 1.8], fine: [0.9, 1.3] },
+  "nitrogen ice": { kind: "cracks", grain: [1.2, 2], fine: [0.7, 1.05] },
+  "grooved ice": { kind: "cracks", grain: [1, 1.8], fine: [0.7, 1.05] },
   snowball: { kind: "cracks", grain: [1.4, 2.2], fine: [0.7, 1] },
   hycean: { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
   archean: { kind: "coasts", grain: [1.2, 2], fine: [0.85, 1] },
@@ -59,8 +59,8 @@ const WAY: Record<Anchor, { kind: LightKind; grain: Span; fine: Span }> = {
   "two-faced": { kind: "towns", grain: [1.2, 2], fine: [0.5, 0.9] },
   "water cloud giant": { kind: "belts", grain: [1, 1.8], fine: [24, 40] },
   "azure giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
-  "dark giant": { kind: "belts", grain: [1, 1.8], fine: [24, 40] },
-  "hot giant": { kind: "belts", grain: [1, 1.6], fine: [20, 34] },
+  "dark giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
+  "hot giant": { kind: "belts", grain: [1.4, 2.4], fine: [16, 26] },
   "sub-Neptune": { kind: "pools", grain: [1.4, 2.4], fine: [4, 5] },
 };
 const SEA: readonly Anchor[] = ["temperate", "ocean", "archean"];

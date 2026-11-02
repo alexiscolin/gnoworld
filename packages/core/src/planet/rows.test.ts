@@ -237,7 +237,6 @@ const STATED: Record<Anchor, Row> = {
     contrast: [1.2, 1.6],
     rings: 0.5,
     rim: { colours: [0x6b5c47, 0x615e54], thickness: [0.022, 0.03] },
-    glow: [0.2, 0.32],
   },
   "sub-Neptune": {
     maps: ["neptune"],

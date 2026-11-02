@@ -56,11 +56,10 @@ export const moreRows = (kept: Record<KeptAnchor, AnchorRow>): Record<MoreAnchor
     ...kept["gas giant"],
     palettes: [ramp(0x060505, 0x161210, 0x3a2c24), ramp(0x080606, 0x1c1410, 0x46302a)],
   },
-  // KELT-9 b, an ultra-hot Jupiter: silicate clouds, a glowing night.
+  // KELT-9 b, an ultra-hot Jupiter: silicate clouds; no glow today, for a glow on a banded world hides its night's lights.
   "hot giant": {
     ...kept["gas giant"],
     palettes: [ramp(0x1a0a06, 0x5a2a16, 0xb8724a), ramp(0x200c08, 0x6a3018, 0xc88050)],
-    glow: { colour: rgb(0xc8401e), level: [0.2, 0.32] },
   },
   // GJ 1214 b: a hazy, featureless sky, the commonest size of planet known.
   "sub-Neptune": {
