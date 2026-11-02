@@ -270,6 +270,19 @@ test.describe("a computer", () => {
   });
 });
 
+test.describe("a 16:9 window", () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
+
+  test("keeps the Moon under the header's pill and the ring off the plate's outline", async ({ page }) => {
+    await opened(page);
+    const { moon, orbit } = await earth(page);
+    const views = await box(page, "nav[aria-label='Views']");
+    // The pill's foot, and the outline's top (98 px) with the 24 px the ring keeps off it.
+    expect(moon.y).toBeGreaterThan(views.y + views.height + 24);
+    expect(orbit.top).toBeGreaterThanOrEqual(98 + 24);
+  });
+});
+
 test.describe("the pages that hold no Earth", () => {
   test.use({ viewport: COMPUTER });
 

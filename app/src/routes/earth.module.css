@@ -42,8 +42,8 @@
       --_top: 98px;
       /* raw: the window's foot, a step of space off, and 16 px over the frame's middle */
       --_middle: calc((var(--_top) + 100vb - var(--space-m)) / 2 - 16px);
-      /* raw: the ring keeps 28 px off the words and the dock, and 24 px off the outline's top */
-      --_reach: min(calc((var(--_end) - var(--_start)) / 2 - 28px), calc(var(--_middle) - var(--_top) - 24px));
+      /* raw: the ring keeps 28 px off the words and the dock; its height is held to 0.86 of the room under the outline (24 px kept), for the tilted ring and the Moon stand above the globe's top: on a 16:9 window they would reach the header and the outline (F3483) */
+      --_reach: min(calc((var(--_end) - var(--_start)) / 2 - 28px), calc((var(--_middle) - var(--_top) - 24px) * 0.86));
       --_x: calc((var(--_start) + var(--_end)) / 2);
       /* raw: the ring reaches 1.106 radii of the globe */
       --_radius: calc(var(--_reach) / 1.106);
