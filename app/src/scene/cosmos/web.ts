@@ -2,6 +2,7 @@
 // world of the file and a thin line for each import between two, one draw each, gold for a world called in the last run and nothing else. A
 // look writes sizes and lights; a frame brings the disc to the eye and moves the clock and the share, as the ladder's points do.
 import {
+  auroraOf,
   CENTRE,
   DISC_TILT,
   distanceOf,
@@ -13,8 +14,8 @@ import {
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
-import { Group, LineSegments, Points } from "three";
-import { liveLight, universeOf, type CalledWorld, type Universe } from "../live.ts";
+import { BufferGeometry, Group, LineSegments, Points } from "three";
+import { callsOf, heightAt, lastOf, universeOf, type Universe } from "../live.ts";
 import { cloudOf, type Cloud } from "./cloud.ts";
 import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { lineLook, pointLook } from "./webLook.ts";
@@ -37,6 +38,9 @@ export interface WebView {
 const GOLD = [1, 0.62, 0.18] as const;
 const GOLD_LIFT = 1.5;
 const GOLD_GROW = 0.5;
+// How many points and lines a view holds whole: past that, each adds less, as the square root of how many more, so a crowd keeps its dark.
+const POINTS_CALM = 2_000;
+const LINES_CALM = 200;
 // A world drawn: its system, its orbit, phase and size there, its colour with no activity, the file's word on it, and how live it was at the
 // last look.
 interface Held {
@@ -45,7 +49,7 @@ interface Held {
   readonly phase: number;
   readonly radius: number;
   readonly tint: readonly [number, number, number];
-  readonly world: CalledWorld;
+  readonly called: { readonly calls: number | null; readonly lastHeight: number | null };
   live: number;
 }
 
@@ -59,22 +63,29 @@ function tintAt(system: StarSystem): readonly [number, number, number] {
 }
 
 type PointCloud = Cloud<"position" | "aCircle" | "aTint" | "aSoft">;
-type LineCloud = Cloud<"position" | "aCircle" | "aTint" | "aLight">;
+
+const calmFor = (count: number, whole: number): number => Math.min(1, Math.sqrt(whole / Math.max(count, 1)));
 
 export class Web {
   readonly group = new Group();
   readonly #seconds = { value: 0 };
   readonly #ratio = { value: 1 };
   readonly #share = { value: 0 };
-  readonly #pointLook = pointLook({ uSeconds: this.#seconds, uRatio: this.#ratio, uShare: this.#share });
-  readonly #lineLook = lineLook({ uSeconds: this.#seconds, uShare: this.#share });
+  readonly #pointCalm = { value: 1 };
+  readonly #lineCalm = { value: 1 };
+  readonly #pointLook = pointLook({
+    uSeconds: this.#seconds,
+    uRatio: this.#ratio,
+    uShare: this.#share,
+    uCalm: this.#pointCalm,
+  });
+  readonly #lineLook = lineLook({ uSeconds: this.#seconds, uShare: this.#share, uCalm: this.#lineCalm });
   readonly #soft = { size: 0, light: 0 };
   #held: Held[] = [];
   #universe: Universe = { calls: 0, newest: null, written: undefined };
   #ends: number[] = [];
-  #lights = new Float32Array(0);
   #points: PointCloud | undefined;
-  #lines: LineCloud | undefined;
+  #lines: BufferGeometry | undefined;
 
   constructor() {
     this.group.name = "web";
@@ -108,8 +119,8 @@ export class Web {
         phase,
         radius: worldSize(usageOf(world)),
         tint,
-        world,
-        live: liveLight(world, this.#universe, now),
+        called: { calls: callsOf(world), lastHeight: lastOf(world) },
+        live: 0,
       });
     });
     // A pair whose one world has no place goes whole, so no later pair slides onto another world.
@@ -119,31 +130,35 @@ export class Web {
       const [from = -1, to = -1] = [at[links[pair] ?? -1], at[links[pair + 1] ?? -1]];
       if (from >= 0 && to >= 0) this.#ends.push(from, to);
     }
-    this.#lights = new Float32Array(this.#held.length);
+    this.#pointCalm.value = calmFor(this.#held.length, POINTS_CALM);
+    this.#lineCalm.value = calmFor(this.#ends.length / 2, LINES_CALM);
     this.#build();
+    this.#age(now);
   }
 
+  // How live each world is at `now`: the chain's height read once, each world's calls as the stand read them.
+  #age(now: number): void {
+    const height = heightAt(this.#universe, now);
+    for (const held of this.#held) held.live = auroraOf(held.called, height, this.#universe.calls);
+  }
+
+  // The points hold every world's place, written once; the lines read the same buffers through an index, so a look writes nothing of theirs.
   #build(): void {
     const points = cloudOf(this.#held.length, { position: 3, aCircle: 3, aTint: 3, aSoft: 2 });
-    const lines = cloudOf(this.#ends.length, { position: 3, aCircle: 3, aTint: 3, aLight: 1 });
     this.#held.forEach(({ system, orbit, phase }, index) => {
       const { x, y, z } = system.place;
       points.attributes.position.setXYZ(index, x, y, z);
       points.attributes.aCircle.setXYZ(index, orbit, phase, system.spin);
     });
-    this.#ends.forEach((end, vertex) => {
-      for (const name of ["position", "aCircle"] as const)
-        lines.attributes[name].setXYZ(
-          vertex,
-          points.attributes[name].getX(end),
-          points.attributes[name].getY(end),
-          points.attributes[name].getZ(end),
-        );
-    });
+    points.geometry.setDrawRange(0, this.#held.length);
+    const lines = new BufferGeometry();
+    for (const [name, attribute] of Object.entries(points.attributes)) lines.setAttribute(name, attribute);
+    lines.setIndex(this.#ends);
+    lines.setDrawRange(0, this.#ends.length);
     this.#points = points;
     this.#lines = lines;
     this.#add(new Points(points.geometry, this.#pointLook));
-    this.#add(new LineSegments(lines.geometry, this.#lineLook));
+    this.#add(new LineSegments(lines, this.#lineLook));
   }
 
   #add(drawn: Points | LineSegments): void {
@@ -151,28 +166,24 @@ export class Web {
     this.group.add(drawn);
   }
 
-  /** A look at `now`: each point's size, light and opening from where the eye stands, and its gold from how lately its world was called. */
+  /** A look at `now`: each point's size and light from where the eye stands, and its gold from how lately its world was called. It
+   * uploads those and nothing else. */
   look({ eye, focal, focus }: WebView, now: number): void {
     const points = this.#points;
-    const lines = this.#lines;
-    if (points === undefined || lines === undefined) return;
+    if (points === undefined) return;
+    this.#age(now);
+    const { aSoft, aTint } = points.attributes;
     this.#held.forEach((held, index) => {
-      const distance = distanceOf(held.system.place, eye);
-      held.live = liveLight(held.world, this.#universe, now);
       const gold = Math.min(1, held.live);
-      softPoint(held.radius, { distance, focus, focal }, this.#soft);
-      this.#lights[index] = this.#soft.light * (1 + GOLD_LIFT * gold);
-      points.attributes.aSoft.setXY(index, this.#soft.size * (1 + GOLD_GROW * gold), this.#lights[index] ?? 0);
-      const [red, green, blue] = held.tint.map((channel, at) => channel + ((GOLD[at] ?? 0) - channel) * gold);
-      points.attributes.aTint.setXYZ(index, red ?? 0, green ?? 0, blue ?? 0);
+      softPoint(held.radius, { distance: distanceOf(held.system.place, eye), focus, focal }, this.#soft);
+      aSoft.setXY(index, this.#soft.size * (1 + GOLD_GROW * gold), this.#soft.light * (1 + GOLD_LIFT * gold));
+      const [red = 0, green = 0, blue = 0] = held.tint.map(
+        (channel, at) => channel + ((GOLD[at] ?? 0) - channel) * gold,
+      );
+      aTint.setXYZ(index, red, green, blue);
     });
-    this.#ends.forEach((end, vertex) => {
-      const { aTint } = points.attributes;
-      lines.attributes.aTint.setXYZ(vertex, aTint.getX(end), aTint.getY(end), aTint.getZ(end));
-      lines.attributes.aLight.setX(vertex, this.#lights[end] ?? 0);
-    });
-    points.commit(this.#held.length);
-    lines.commit(this.#ends.length);
+    aSoft.needsUpdate = true;
+    aTint.needsUpdate = true;
   }
 
   resize(ratio: number): void {
@@ -205,7 +216,7 @@ export class Web {
   #free(): void {
     for (const child of [...this.group.children]) child.removeFromParent();
     this.#points?.geometry.dispose();
-    this.#lines?.geometry.dispose();
+    this.#lines?.dispose();
     this.#points = undefined;
     this.#lines = undefined;
   }

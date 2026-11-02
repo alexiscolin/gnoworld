@@ -13,10 +13,11 @@ attribute vec2 aSoft;
 uniform float uSeconds;
 uniform float uRatio;
 uniform float uShare;
+uniform float uCalm;
 varying vec3 vLight;
 ${ORBITING}
 void main() {
-  vLight = aTint * aSoft.y * uShare * ${POINT_LIGHT.toFixed(2)};
+  vLight = aTint * aSoft.y * uShare * uCalm * ${POINT_LIGHT.toFixed(2)};
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position + orbiting(aCircle, uSeconds) * aCircle.x, 1.0);
   gl_Position.z = gl_Position.w * 0.99998;
   gl_PointSize = 2.0 * aSoft.x * uRatio;
@@ -37,13 +38,14 @@ void main() {
 const LINE_VERTEX = /* glsl */ `
 attribute vec3 aCircle;
 attribute vec3 aTint;
-attribute float aLight;
+attribute vec2 aSoft;
 uniform float uSeconds;
 uniform float uShare;
+uniform float uCalm;
 varying vec3 vLight;
 ${ORBITING}
 void main() {
-  vLight = aTint * aLight * uShare * ${LINE_LIGHT.toFixed(2)};
+  vLight = aTint * aSoft.y * uShare * uCalm * ${LINE_LIGHT.toFixed(2)};
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position + orbiting(aCircle, uSeconds) * aCircle.x, 1.0);
   gl_Position.z = gl_Position.w * 0.99998;
 }`;
@@ -71,5 +73,5 @@ type Uniforms = Record<string, { value: number }>;
 /** The points' material: a soft round each, its size and light from the look, all of it by the share. */
 export const pointLook = (uniforms: Uniforms) => added(POINT_VERTEX, POINT_FRAGMENT, uniforms);
 
-/** The lines' material: a thin line each, its ends' light and colour. */
+/** The lines' material: a thin line each, read through an index from the points' own buffers: its ends' light and colour. */
 export const lineLook = (uniforms: Uniforms) => added(LINE_VERTEX, LINE_FRAGMENT, uniforms);

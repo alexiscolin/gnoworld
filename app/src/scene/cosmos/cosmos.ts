@@ -25,8 +25,6 @@ import { Nebulae } from "./nebulae.ts";
 import { heldOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { Whole } from "./whole.ts";
 
-// How far the eye moves before a look: a point's size is out by a few percent at most.
-const STEP = 4;
 const RELEASE_MS = 5 * 60_000;
 
 export class Cosmos {
@@ -141,7 +139,7 @@ export class Cosmos {
     const whole = this.#whole.advance(eye, seconds);
     this.#disc.fade((1 - whole) ** 2, this.#ahead.done);
     this.#bodies.group.visible = whole === 0;
-    if (!(distanceOf(eye, this.#looked) < STEP)) this.#askLook();
+    if (!(distanceOf(eye, this.#looked) < this.#whole.step)) this.#askLook();
   }
 
   #askLook(): void {

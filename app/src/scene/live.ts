@@ -15,14 +15,14 @@ export interface Universe {
   readonly written: string | undefined;
 }
 
-// All a world's calls; none where no realm's were read.
-const callsOf = ({ realms }: CalledWorld): number | null =>
+/** All a world's calls; none where no realm's were read. */
+export const callsOf = ({ realms }: CalledWorld): number | null =>
   realms.some(({ calls }) => (calls ?? null) !== null)
     ? realms.reduce((sum, { calls }) => sum + (calls ?? 0), 0)
     : null;
 
-// The height of a world's last call; none where no realm's was read.
-const lastOf = ({ realms }: CalledWorld): number | null =>
+/** The height of a world's last call; none where no realm's was read. */
+export const lastOf = ({ realms }: CalledWorld): number | null =>
   realms.reduce<number | null>(
     (last, { lastHeight = null }) => (lastHeight === null ? last : Math.max(last ?? 0, lastHeight)),
     null,
@@ -56,16 +56,12 @@ export function universeOf({
   return { calls, newest, written: updated };
 }
 
-// The chain's height now, as far as the file tells: its newest call, plus the blocks since it was written.
-function heightNow(written: string | undefined, newest: number | null, now: number): number | null {
+/** The chain's height at `now`, as far as the file tells: its newest call, plus the blocks since it was written; none with no time. */
+export function heightAt({ written, newest }: Universe, now: number): number | null {
   const at = written === undefined ? Number.NaN : Date.parse(written);
   return newest === null || !Number.isFinite(at) ? null : newest + Math.max(now - at, 0) / BLOCK_MS;
 }
 
 /** A world's live light at `now`: its aurora, none past a run after its last call, none from a file with no time. */
 export const liveLight = (world: CalledWorld, universe: Universe, now: number): number =>
-  auroraOf(
-    { calls: callsOf(world), lastHeight: lastOf(world) },
-    heightNow(universe.written, universe.newest, now),
-    universe.calls,
-  );
+  auroraOf({ calls: callsOf(world), lastHeight: lastOf(world) }, heightAt(universe, now), universe.calls);

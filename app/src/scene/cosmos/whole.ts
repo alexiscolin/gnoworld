@@ -10,6 +10,9 @@ import type { Web, WebSet } from "./web.ts";
 
 // Past this distance from what it looks at, the eye may be leaving for it: its chunk is asked well before it shows.
 const NEAR = MOOD_SCALE / 2;
+// How far the eye moves before a look, near and as a share of the way to what it looks at: a point's size is out by a few percent at most.
+const STEP = 4;
+const STEP_SHARE = 0.01;
 
 export class Whole {
   readonly #device: EarthDevice;
@@ -19,6 +22,8 @@ export class Whole {
   #share = 0;
   #ratio = 1;
   #compiled = false;
+  /** How far the eye may move before the cosmos looks again, from where this frame found it. */
+  step = STEP;
 
   /** `came` is told when its part came, which then needs a look. */
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
@@ -65,6 +70,7 @@ export class Whole {
    * its chunk on its way or failed, its program not compiled, no world to draw; its first frame asks a look. */
   advance(eye: Point, seconds: number): number {
     const distance = focusDistance(eye);
+    this.step = Math.max(STEP, STEP_SHARE * distance);
     if (distance > NEAR) this.#door.open();
     const web = this.#door.part;
     const share = web !== undefined && this.#compiled && web.count > 0 ? wholeShare(distance) : 0;

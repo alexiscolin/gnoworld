@@ -1,7 +1,15 @@
 import { LINKS_MOST, MOOD_SCALE, RUN_BLOCKS, systemsOf, type Point } from "@gnoworld/core";
 import { WORLDS_CAPS } from "@gnoworld/schemas/indexer";
-import { BufferAttribute, LineSegments, Points, type BufferGeometry, type Material, type Object3D } from "three";
-import { describe, expect, it } from "vitest";
+import {
+  BufferAttribute,
+  LineSegments,
+  Points,
+  ShaderMaterial,
+  type BufferGeometry,
+  type Material,
+  type Object3D,
+} from "three";
+import { describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
 import type { CosmosWorld } from "./cosmosWorld.ts";
 import { Web } from "./web.ts";
@@ -358,6 +366,53 @@ describe("the whole cosmos", () => {
     // World 6 named world 7, which has no place: its line goes, every other stays.
     expect(ends).toHaveLength(2 * (20 - 1));
     web.dispose();
+  });
+
+  // F4152, finding 2: at 10,000 worlds the added points and lines burnt the cloud to yellow-white. Their light falls with how many there
+  // are, so a crowd keeps its dark between them; a file of Onyx's size keeps all of it.
+  it("keeps a crowd of points and lines from burning: the more the file holds, the less each adds", () => {
+    const calm = (spec: Spec) => {
+      const { web, owner } = stood(spec);
+      lookFrom(web, 900);
+      const found = Object.fromEntries(
+        drawables(web).map(({ type, materials }) => {
+          const [material] = materials;
+          const value: unknown = material instanceof ShaderMaterial ? material.uniforms["uCalm"]?.value : undefined;
+          return [type, typeof value === "number" ? value : NaN];
+        }),
+      );
+      owner.dispose();
+      return found;
+    };
+    expect(calm({ count: 533, linkEvery: 30 })).toEqual({ Points: 1, LineSegments: 1 });
+    const crowd = calm({ count: 10_000, linkEvery: 3 });
+    expect(crowd["Points"]).toBeLessThanOrEqual(0.5);
+    expect(crowd["LineSegments"]).toBeLessThanOrEqual(0.3);
+    expect(crowd["LineSegments"]).toBeGreaterThan(0);
+  });
+
+  // F4153, finding 1: a look at 20,000 worlds took 50 ms, parsing the file's time once a world and uploading all it held.
+  it("costs a look little: the file's time read once, and only sizes, lights and tints uploaded", () => {
+    const { web, owner } = stood({ count: 2_000, linkEvery: 3, last: (at) => (at % 50 === 0 ? 49_000 : null) });
+    lookFrom(web, 900);
+    const versions = () =>
+      Object.fromEntries(
+        Object.entries(geometryOf(web, "Points").attributes).map(([name, each]) => [
+          name,
+          "version" in each ? each.version : -1,
+        ]),
+      );
+    const before = versions();
+    const parse = vi.spyOn(Date, "parse");
+    lookFrom(web, 1000);
+    expect(parse.mock.calls.length).toBeLessThanOrEqual(1);
+    parse.mockRestore();
+    const after = versions();
+    expect(after["position"]).toBe(before["position"]);
+    expect(after["aCircle"]).toBe(before["aCircle"]);
+    expect(after["aSoft"]).toBeGreaterThan(before["aSoft"] ?? Infinity);
+    expect(after["aTint"]).toBeGreaterThan(before["aTint"] ?? Infinity);
+    owner.dispose();
   });
 
   it("draws a world the file names twice as one point", () => {

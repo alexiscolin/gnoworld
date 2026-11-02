@@ -1242,6 +1242,23 @@ describe("the whole cosmos", () => {
     }
   });
 
+  // F4153, finding 1: a look ran each 4 units the eye went, nearly every frame of a wheel out there. It runs each hundredth of the way
+  // to what the eye looks at, near as before.
+  it("looks again as often as the distance asks: each 4 units near, each hundredth of the way far", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    const looksAfter = async (from: Point, by: number) => {
+      await at(scene, from);
+      const { looks } = scene.cosmos.stats();
+      scene.cosmos.tick({ ...from, z: from.z + by }, 0);
+      await settled();
+      return scene.cosmos.stats().looks - looks;
+    };
+    expect(await looksAfter(out(0), 5)).toBe(1);
+    expect(await looksAfter(out(900), 5)).toBe(0);
+    expect(await looksAfter(out(900), 12)).toBe(1);
+  });
+
   it("hides the whole cosmos with the page, after it showed", async () => {
     const scene = made();
     await shown(scene, linked(90));
