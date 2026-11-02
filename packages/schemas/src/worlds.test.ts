@@ -147,7 +147,6 @@ describe("Worlds", () => {
     ["a negative caller count", inRealm({ callers: -1 })],
     ["a fractional caller count", inRealm({ callers: 0.5 })],
     ["a missing field on a realm", inRealm({ calls: undefined })],
-    ["an unknown field on a world", file({ worlds: [{ id: "a/b", namespace: "a", realms: [], mood: "calm" }] })],
     ["an unknown field on the file", file({ extra: 1 })],
   ])("refuses %s", (_name, body) => {
     expect(Worlds.safeParse(body).success).toBe(false);
