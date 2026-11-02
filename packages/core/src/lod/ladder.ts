@@ -4,10 +4,12 @@
 import type { Point } from "../space/cell.ts";
 import { smoothstep } from "../space/smooth.ts";
 import type { StarSystem } from "../cosmos/system.ts";
+import { BOUNDS } from "./bounds.ts";
+import { Drawn, NEAR_MOST } from "./drawn.ts";
 import { Nearest } from "./nearest.ts";
 
-/** The most drawn: the budget of slice 7's bench. */
-export const BOUNDS = { bodies: 40, stars: 1024, dots: 4096, glows: 256, rocks: 480 } as const;
+export { BOUNDS, Drawn };
+
 /** How far around what the eye looks at a system shows a body. */
 export const LANDMARKS = 52;
 /** How far a star stands alone, in world units; past it, a region's glow. */
@@ -16,7 +18,6 @@ export const MIDDLE = 320;
 export const HAZE = 1600;
 
 const REGION = 160;
-const NEAR_MOST = 128;
 // The most points one star's worlds take of the bound.
 const DOTS_A_STAR = 1024;
 // A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world.
@@ -43,23 +44,6 @@ export interface LadderView {
   readonly eye: Point;
   readonly focal: number;
   readonly focus: Point;
-}
-
-/** What a look leaves: indices into the systems the ladder was made with. */
-export class Drawn {
-  readonly stars = new Int32Array(BOUNDS.stars);
-  readonly glows = new Int32Array(BOUNDS.glows);
-  readonly bodySystems = new Int32Array(BOUNDS.bodies);
-  readonly bodyWorlds = new Int32Array(BOUNDS.bodies);
-  readonly dotSystems = new Int32Array(BOUNDS.dots);
-  readonly dotWorlds = new Int32Array(BOUNDS.dots);
-  /** Systems around what the eye looks at, nearest first. */
-  readonly near = new Int32Array(NEAR_MOST);
-  starCount = 0;
-  glowCount = 0;
-  bodyCount = 0;
-  dotCount = 0;
-  nearCount = 0;
 }
 
 interface Region {
