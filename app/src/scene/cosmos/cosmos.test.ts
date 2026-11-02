@@ -4,29 +4,40 @@ import {
   BOUNDS,
   CENTRE,
   distanceOf,
-  EARTH_PLACE,
+  DIVE,
+  driftAt,
   glideAt,
+  EARTH_PLACE,
+  evenRow,
   GRAIN,
   orbitPlace,
   orbitTime,
   HOME,
   NEBULA_IMAGES,
+  nebulaShare,
   offLine,
   onScreen,
   planetSeed,
   postcardOf,
   restView,
   ROOM,
+  softPoint,
   systemsOf,
+  toMap,
   toScene,
   wholeShare,
   worldLook,
+  worldSize,
   type Orbiter,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
 import {
   AdditiveBlending,
+  Box3,
+  BufferGeometry,
+  FramebufferTexture,
+  Group,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   LineLoop,
@@ -39,19 +50,21 @@ import {
   Scene as Stage,
   ShaderMaterial,
   Texture,
+  Vector2,
   Vector3,
   type BufferAttribute,
-  type BufferGeometry,
   type LineBasicMaterial,
+  type WebGLRenderer,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
+import { focalOf } from "../lens.ts";
 import { MOON_FAR } from "../earth/orbit.ts";
 import { fromEyeOf, starAt } from "../planet/light.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import { Cosmos } from "./cosmos.ts";
-import type { CosmosWorld } from "./cosmosWorld.ts";
+import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { angleAt, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
@@ -537,6 +550,7 @@ describe("what it draws", () => {
 // seed round the Earth at the cosmos's usual distances, 20 to 60 units, up to 30 degrees over or under the disc. The chief's bar: every eye
 // that sees four bodies or more beside the Earth, twenty of them, holds each rule; the others are counted.
 const EYES_TRIED = 400;
+const EYES_FARTHEST = 60;
 // The chief, 2026-11-02: 1.9 times, measured; Onyx's second eye, 60 units out, reads 1.993, use making its far worlds larger.
 const SIZES_APART = 1.9;
 const QUALIFYING = 20;
@@ -547,7 +561,11 @@ function seededEyes(seed: number): Point[] {
     return state / 2_147_483_648;
   };
   return Array.from({ length: EYES_TRIED }, () => {
-    const [distance, slant, turn] = [20 + 40 * next(), ((next() * 60 - 30) * Math.PI) / 180, next() * 2 * Math.PI];
+    const [distance, slant, turn] = [
+      20 + (EYES_FARTHEST - 20) * next(),
+      ((next() * 60 - 30) * Math.PI) / 180,
+      next() * 2 * Math.PI,
+    ];
     return {
       x: EARTH_PLACE.x + distance * Math.cos(slant) * Math.sin(turn),
       y: EARTH_PLACE.y + distance * Math.sin(slant),
@@ -831,21 +849,6 @@ describe("the view at rest (7d6)", () => {
       const shown = postcardOf(system, view.eye).system;
       expect(plane.getX(at)).toBeCloseTo(shown.node, 6);
       expect(plane.getY(at)).toBeCloseTo(shown.tilt, 6);
-    }
-  });
-
-  // 7d6's review: with motion on, the arrival's glide held the eye past the rest's reach, so the ladder's 33 bodies stood, then 29 went.
-  it("keeps the view at rest's bodies through the arrival's glide", async () => {
-    const scene = made();
-    await shown(scene, ONYX);
-    const ids = () => [...scene.cosmos.stats().list.map(({ id }) => id)].sort();
-    const rest = ids();
-    const glide = { x: 0, y: 0, z: 0 };
-    for (const seconds of [0, 0.5, 1, 2, 3, 5, 8]) {
-      glideAt(glide, seconds);
-      scene.cosmos.tick({ x: HOME.x + glide.x, y: HOME.y + glide.y, z: HOME.z + glide.z }, seconds, HOME);
-      await settled();
-      expect(ids()).toEqual(rest);
     }
   });
 
@@ -1636,10 +1639,13 @@ describe("the whole cosmos", () => {
       const eye = out(away);
       await at(scene, eye);
       // What the eye looks at is the Earth (7d6): its distance from where the cosmos stands the eye says the share, as for the nebulae.
-      const { web, bodies, eye: placed } = scene.cosmos.stats();
+      const { web, bodies, eye: placed, sky } = scene.cosmos.stats();
+      const nebulae = sky.share;
       const whole = wholeShare(distanceOf(placed, earth));
       shares.push(web?.share ?? NaN);
       expect(web?.share).toBeCloseTo(whole, 9);
+      expect(nebulae).toBeCloseTo(nebulaShare(distanceOf(placed, earth)), 9);
+      expect(nebulae + whole).toBeLessThanOrEqual(1 + 1e-9);
       // The disc's suns, points and rocks give up faster than the worlds' points come (F4152, the hand-over's white glows), and the
       // bodies, the Earth among them, go as they start: an opaque body cannot fade.
       const disc = fades(scene);
@@ -1807,5 +1813,478 @@ describe("the whole cosmos", () => {
     scene.cosmos.show(list, "2000-01-01T00:00:00Z");
     await at(scene, out(901));
     expect(scene.cosmos.stats().web?.gold).toBe(0);
+  });
+
+  // The review of 7d5's merge (2): each world's soft point is sized from the eye the cosmos stands, in focus at the Earth, which it looks at.
+  it("sizes each world's soft point from the placed eye, in focus where it looks", async () => {
+    const scene = made();
+    const list = linked(90);
+    await shown(scene, list);
+    await at(scene, out(900));
+    const { eye } = scene.cosmos.stats();
+    const mapEye = { x: 0, y: 0, z: 0 };
+    toMap(eye, mapEye);
+    const [focus, focal] = [distanceOf(eye, earth), focalOf(scene.camera, HEIGHT)];
+    const systems = held(list);
+    const soft = { size: 0, light: 0 };
+    // The whole cosmos sizes a world by its use, as webHeld.ts does, not by the ladder's capped radius (the red pass, 1).
+    const expected = list.map((world) => {
+      const place = systemOf(systems, world.id)?.place ?? EARTH_PLACE;
+      softPoint(worldSize(usageOf(world)), { distance: distanceOf(place, mapEye), focus, focal }, soft);
+      return soft.size;
+    });
+    const sizes = webLook(scene).geometry.getAttribute("aSoft");
+    expect(new Set(expected).size).toBeGreaterThan(5);
+    for (const [index, size] of expected.entries()) expect(sizes.getX(index)).toBeCloseTo(size, 3);
+  });
+
+  // The home's dive (7d7; Alexis, 2026-11-02): it opens on the whole cosmos and comes down to the view at rest in a few seconds, the Earth
+  // at the centre; under reduced motion the whole cosmos stands still, then dissolves into the view at rest, and no camera moves.
+  describe("the dive (7d7)", () => {
+    // The home asks for the dive, then shows Onyx; the clock stands at 0 until its chunks are in and the whole cosmos is compiled.
+    const diving = async (still = false, width = WIDTH, height = HEIGHT) => {
+      const scene = made(width, height);
+      scene.cosmos.dive(still);
+      scene.cosmos.show(ONYX);
+      for (let step = 0; step < 3; step += 1) {
+        scene.cosmos.tick(HOME, 0, 0);
+        await settled();
+      }
+      return scene;
+    };
+    // A frame `clock` seconds into the dive: with motion on the eye's own clock runs with it, under reduced motion it stands.
+    const frame = async (scene: ReturnType<typeof made>, clock: number, still = false) => {
+      scene.cosmos.tick(HOME, still ? 0 : clock, clock);
+      await settled();
+      return scene.cosmos.stats();
+    };
+    const atRest = async (width = WIDTH, height = HEIGHT) => {
+      const plain = made(width, height);
+      await shown(plain, ONYX);
+      return plain;
+    };
+    const spotKey = ({ x, y, z }: Point) => [x, y, z].map((value) => value.toFixed(6)).join(",");
+    // What the renderer does once a frame is drawn: the page's real one copies what it drew.
+    const drawn = (scene: ReturnType<typeof made>, gl: WebGLRenderer) => {
+      scene.stage.onAfterRender(gl, scene.stage, scene.camera, new BufferGeometry(), new ShaderMaterial(), new Group());
+    };
+    const fakeGl = () => {
+      const copy = vi.fn();
+      const gl = {
+        getDrawingBufferSize: (out: Vector2) => out.set(WIDTH * 2, HEIGHT * 2),
+        copyFramebufferToTexture: copy,
+      } as unknown as WebGLRenderer;
+      return { gl, copy };
+    };
+
+    it("opens on the whole cosmos: its points whole, no body, sun or nebula, the Earth ahead at the centre", async () => {
+      const scene = await diving();
+      const start = distanceOf((await frame(scene, 0)).eye, earth);
+      const rest = distanceOf((await atRest()).cosmos.stats().eye, earth);
+      const first = await frame(scene, DIVE.fade);
+      expect(first.web?.share).toBe(1);
+      expect(Math.log(start / distanceOf(first.eye, earth)) / Math.log(start / rest)).toBeLessThan(0.1);
+      expect(wholeShare(distanceOf(first.eye, earth))).toBe(1);
+      expect(earthShown(scene)).toBe(false);
+      for (const fade of fades(scene)) expect(fade).toBe(0);
+      expect(first.sky.share).toBe(0);
+      expect(first.screen.earth?.x).toBeCloseTo(WIDTH / 2, 1);
+      expect(first.screen.earth?.y).toBeCloseTo(HEIGHT / 2, 1);
+    });
+
+    it("fades the whole cosmos in at its start, from nothing", async () => {
+      const scene = await diving();
+      const shares = [];
+      for (const clock of [0, DIVE.fade / 3, (2 * DIVE.fade) / 3, DIVE.fade])
+        shares.push((await frame(scene, clock)).web?.share);
+      expect(shares[0]).toBe(0);
+      expect(shares[1]).toBeGreaterThan(0);
+      expect(shares[2]).toBeGreaterThan(shares[1] ?? Infinity);
+      expect(shares[3]).toBe(1);
+    });
+
+    it.each([
+      [1728, 1080],
+      [1920, 1080],
+    ])("ends on the view at rest's framing, within a pixel, at %i by %i", async (width, height) => {
+      const scene = await diving(false, width, height);
+      const plain = await atRest(width, height);
+      for (let step = 1; step < 30; step += 1) await frame(scene, (step / 30) * DIVE.seconds);
+      for (const clock of [DIVE.seconds - 1 / 60, DIVE.seconds, DIVE.seconds + 2]) {
+        const dived = await frame(scene, clock);
+        const rest = await frame(plain, clock);
+        if (clock >= DIVE.seconds) expect(dived.dive.along).toBe(1);
+        else expect(dived.dive.along).toBeLessThan(1);
+        const pairs = [[dived.screen.earth, rest.screen.earth] as const];
+        expect(rest.screen.bodies.length).toBeGreaterThan(2);
+        expect(dived.screen.bodies.map(({ id }) => id).sort()).toEqual(rest.screen.bodies.map(({ id }) => id).sort());
+        for (const body of rest.screen.bodies)
+          pairs.push([dived.screen.bodies.find(({ id }) => id === body.id), body] as const);
+        for (const [one, other] of pairs) {
+          if (one === undefined || other === undefined) throw new Error("a body is missing");
+          expect(Math.abs(one.x - other.x)).toBeLessThanOrEqual(1);
+          expect(Math.abs(one.y - other.y)).toBeLessThanOrEqual(1);
+          expect(Math.abs(one.radius - other.radius)).toBeLessThanOrEqual(1);
+        }
+      }
+    });
+
+    it("comes down with no jump, the Earth at the centre in every frame, and asks each frame while it moves", async () => {
+      const scene = await diving();
+      const frames = Math.round(DIVE.seconds * 60);
+      let before = scene.cosmos.stats().eye;
+      const start = distanceOf(before, earth);
+      for (let at_ = 1; at_ <= frames + 30; at_ += 1) {
+        scene.moved.mockClear();
+        scene.cosmos.tick(HOME, at_ / 60, at_ / 60);
+        const { eye, screen } = scene.cosmos.stats();
+        expect(distanceOf(before, eye)).toBeLessThanOrEqual(distanceOf(eye, earth) / 20);
+        expect(screen.earth?.x).toBeCloseTo(WIDTH / 2, 1);
+        expect(screen.earth?.y).toBeCloseTo(HEIGHT / 2, 1);
+        if (at_ < frames) expect(scene.moved).toHaveBeenCalled();
+        before = eye;
+      }
+      expect(start).toBeGreaterThan(20 * distanceOf(before, earth));
+      scene.moved.mockClear();
+      scene.cosmos.tick(HOME, frames / 60 + 5, frames / 60 + 5);
+      expect(scene.moved).not.toHaveBeenCalled();
+    });
+
+    // F4152's "never both whole", and the review of 7d5's merge (1): the nebulae take their share from the placed eye's distance, as the
+    // whole cosmos does, so each gives up what the other takes, at each step of the way down.
+    it("never shows the points and the bodies both whole, nor the points and the nebulae: each follows the placed eye", async () => {
+      const scene = await diving();
+      const shares: number[] = [];
+      const drawn: number[] = [];
+      const drawables = () => seen(scene).filter((part) => part instanceof Mesh || part instanceof Points).length;
+      for (let step = 0; step <= 44; step += 1) {
+        const stats = await frame(scene, DIVE.fade + (step / 40) * DIVE.seconds);
+        const [whole, distance] = [stats.web?.share ?? NaN, distanceOf(stats.eye, earth)];
+        expect(whole).toBeCloseTo(wholeShare(distance), 9);
+        expect(stats.sky.share).toBeCloseTo(nebulaShare(distance), 9);
+        expect(whole + stats.sky.share).toBeLessThanOrEqual(1 + 1e-9);
+        for (const fade of fades(scene)) expect(fade + whole).toBeLessThanOrEqual(1 + 1e-9);
+        if (whole > 0) expect(earthShown(scene)).toBe(false);
+        if (earthShown(scene)) expect(whole).toBe(0);
+        if (whole >= 1) {
+          expect(stats.bodies).toBe(0);
+          expect(shownWith(scene, "aOrbit")).toHaveLength(0);
+          expect(
+            seen(scene).filter((part) => part instanceof Mesh && part.geometry instanceof InstancedBufferGeometry),
+          ).toHaveLength(0);
+        }
+        shares.push(whole);
+        drawn.push(drawables());
+      }
+      // What it costs to draw: at rest's draws and the whole cosmos's two at most, at every step (the red pass, 7).
+      await frame(scene, DIVE.seconds + 1);
+      expect(Math.max(...drawn)).toBeLessThanOrEqual(drawables() + 2);
+      expect(shares[0]).toBe(1);
+      expect(shares.at(-1)).toBe(0);
+      expect(shares.some((share) => share > 0.1 && share < 0.9)).toBe(true);
+      expect(earthShown(scene)).toBe(true);
+    });
+
+    // The review of 7d5's merge (1), settled: the nebulae are scenery, so they stand round the scenery's eye, the scene's and the sky's
+    // cruise, while the worlds' placed eye dives; their share alone reads the placed eye.
+    it("keeps the nebulae round the scenery's eye while the placed eye dives", async () => {
+      const scene = await diving();
+      const [drift, glide] = [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0, z: 0 },
+      ];
+      for (const clock of [DIVE.seconds / 3, (2 * DIVE.seconds) / 3]) {
+        const { sky, eye } = await frame(scene, clock);
+        driftAt(drift, clock);
+        glideAt(glide, clock);
+        expect(sky.eye.x).toBeCloseTo(HOME.x + drift.x - glide.x, 6);
+        expect(sky.eye.y).toBeCloseTo(HOME.y + drift.y - glide.y, 6);
+        expect(sky.eye.z).toBeCloseTo(HOME.z + drift.z - glide.z, 6);
+        expect(distanceOf(eye, earth)).toBeGreaterThan(30);
+      }
+    });
+
+    // The red pass (2): its clock starts when the whole cosmos can take the view, however late within the wait.
+    it("starts when the whole cosmos is ready, however late in the wait, at its start and from nothing", async () => {
+      for (const late of [3, DIVE.wait - 0.1]) {
+        const scene = made();
+        let release = (): void => undefined;
+        scene.renderer.compileAsync.mockImplementation((group: Object3D) =>
+          group.name === "web"
+            ? new Promise<Object3D>((done) => {
+                release = () => {
+                  done(group);
+                };
+              })
+            : Promise.resolve(group),
+        );
+        scene.cosmos.dive(false);
+        scene.cosmos.show(ONYX);
+        for (const clock of [0, 0, 1, late]) await frame(scene, clock);
+        release();
+        await settled();
+        const first = await frame(scene, late + 0.01);
+        expect(first.web?.share ?? NaN).toBeLessThan(0.05);
+        expect(first.dive.along).toBeLessThan(0.01);
+        expect(earthShown(scene)).toBe(false);
+        expect((await frame(scene, late + 0.01 + DIVE.seconds / 2)).dive.along).toBeCloseTo(0.5, 6);
+        expect((await frame(scene, late + 0.02 + DIVE.seconds)).dive.along).toBe(1);
+      }
+    });
+
+    // The home's first show is the fixed places alone, before its file (worldsFeed.ts): the dive waits for a world to dive to.
+    it("waits through the fixed places' empty list for the file, and opens on it", async () => {
+      const scene = made();
+      scene.cosmos.dive(false);
+      scene.cosmos.show([]);
+      for (const clock of [0, 0.5, 1]) {
+        await frame(scene, clock);
+        expect(seen(scene).filter((part) => part instanceof Mesh || part instanceof Points)).toHaveLength(0);
+      }
+      scene.cosmos.show(ONYX);
+      for (const clock of [1.1, 1.1, 1.2]) await frame(scene, clock);
+      const open = await frame(scene, 1.2 + DIVE.fade);
+      expect(open.web?.share).toBe(1);
+      expect((await frame(scene, 1.3 + DIVE.seconds)).dive.along).toBe(1);
+      expect(earthShown(scene)).toBe(true);
+    });
+
+    // 7d6's review (F4264): the view at rest's bodies hold where the eye comes to rest, so none stands then goes as it lands.
+    it("draws only the view at rest's bodies on the way down, each staying once it came, so none comes and goes as it lands", async () => {
+      const scene = await diving();
+      const plain = await atRest();
+      const rest = new Set(plain.cosmos.stats().list.map(({ id }) => id));
+      let before = new Set<string>();
+      let whole = 0;
+      for (let step = 0; step <= 30; step += 1) {
+        const { list, dive } = await frame(scene, (step / 30) * (DIVE.seconds + 1));
+        const ids = new Set(list.map(({ id }) => id));
+        for (const id of ids) expect(rest.has(id)).toBe(true);
+        for (const id of before) expect(ids.has(id)).toBe(true);
+        if (ids.size === rest.size && dive.along < 0.95) whole += 1;
+        before = ids;
+      }
+      expect(whole).toBeGreaterThan(0);
+      expect(before).toEqual(rest);
+    });
+
+    // Alexis, 2026-11-02: depth everywhere, and not a planetarium. Each frame of the way down that shows four bodies or more slides the
+    // near ones more than the far and stands no three at like gaps; within the twenty eyes' distances, 60 units, their bar too: sizes 1.9
+    // times apart, off a line. Farther, all stand 100 units off or more, their sizes as their distances, 1.65 times apart at 115 units.
+    it("reads in depth on the way down, and shows no row at like gaps", async () => {
+      const scene = await diving();
+      let qualified = 0;
+      for (let step = 0; step <= 60; step += 1) {
+        const { screen, eye } = await frame(scene, (step / 60) * DIVE.seconds);
+        if (screen.earth === undefined || !earthShown(scene)) continue;
+        const bodies = screen.bodies.filter(
+          ({ x, y, radius }) => x + radius > 0 && x - radius < WIDTH && y + radius > 0 && y - radius < HEIGHT,
+        );
+        const marks = [{ ...screen.earth, away: distanceOf(eye, earth) }, ...bodies].map(({ x, y, radius, away }) => ({
+          x,
+          y,
+          radius,
+          away,
+          depth: away,
+          left: x - radius,
+          right: x + radius,
+          top: y - radius,
+          bottom: y + radius,
+        }));
+        expect(evenRow(marks)).toBe(false);
+        if (bodies.length < 4) continue;
+        const slid = slides(scene);
+        expect(slid[0]?.by ?? 0).toBeGreaterThan(slid.at(-1)?.by ?? Infinity);
+        if (distanceOf(eye, earth) > EYES_FARTHEST) continue;
+        qualified += 1;
+        const sizes = [screen.earth.radius, ...bodies.map(({ radius }) => radius)];
+        expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThanOrEqual(SIZES_APART);
+        expect(offLine([screen.earth, ...bodies])).toBeGreaterThan(0.1);
+      }
+      expect(qualified).toBeGreaterThanOrEqual(3);
+    });
+
+    // Each frame of a dissolve, 80 of them to `end`: the eye, the veil, and what shows of the points and of the bodies.
+    const dissolving = async (scene: ReturnType<typeof made>, end: number) => {
+      const { gl, copy } = fakeGl();
+      // The red pass (4): the frame copied is the whole cosmos still, whole, after the hold, with no picture over it yet.
+      let clock = 0;
+      const copied: { clock: number; share: number | undefined; veil: number }[] = [];
+      copy.mockImplementation(() => {
+        const { web, dive } = scene.cosmos.stats();
+        copied.push({ clock, share: web?.share, veil: dive.veil });
+      });
+      const frames = [];
+      for (let step = 0; step <= 80; step += 1) {
+        clock = (step / 80) * end;
+        const before = scene.cosmos.stats().dive;
+        scene.moved.mockClear();
+        const stats = await frame(scene, clock, true);
+        drawn(scene, gl);
+        // A frame asked each tick until it has landed, the one that takes its picture away among them (the red pass, 5); what shows of
+        // the points, the whole cosmos drawn or the picture of it the dissolve holds, and of the bodies, what it lets through.
+        frames.push({
+          landed: before.along === 1 && before.veil === 0,
+          asked: scene.moved.mock.calls.length > 0,
+          eye: spotKey(stats.eye),
+          veil: stats.dive.veil,
+          strength: Math.max(stats.web?.share ?? 0, stats.dive.veil) + (earthShown(scene) ? 1 - stats.dive.veil : 0),
+        });
+      }
+      return { frames, copied, copy };
+    };
+
+    it("moves no camera under reduced motion: the whole cosmos still, then a dissolve into the view at rest", async () => {
+      const scene = await diving(true);
+      const plain = await atRest();
+      const end = DIVE.hold + DIVE.dissolve + 0.5;
+      const { frames, copied, copy } = await dissolving(scene, end);
+      for (const { landed, asked, strength } of frames) {
+        if (!landed) expect(asked).toBe(true);
+        expect(strength).toBeLessThanOrEqual(1 + 1e-9);
+      }
+      const [eyes, veils] = [new Set(frames.map(({ eye }) => eye)), frames.map(({ veil }) => veil)];
+      expect(eyes.size).toBe(2);
+      expect(eyes.has(spotKey(plain.cosmos.stats().eye))).toBe(true);
+      expect(copy).toHaveBeenCalledTimes(1);
+      expect(copied[0]?.clock).toBeGreaterThanOrEqual(DIVE.hold);
+      expect(copied[0]).toMatchObject({ share: 1, veil: 0 });
+      expect(veils[Math.round((80 * DIVE.hold) / 2 / end)]).toBe(0);
+      const going = veils.slice(veils.indexOf(Math.max(...veils)));
+      expect(Math.max(...veils)).toBe(1);
+      for (let at_ = 1; at_ < going.length; at_ += 1)
+        expect(going[at_] ?? NaN).toBeLessThanOrEqual(going[at_ - 1] ?? NaN);
+      expect(going.some((veil) => veil > 0.1 && veil < 0.9)).toBe(true);
+      expect(veils.at(-1)).toBe(0);
+      expect(earthShown(scene)).toBe(true);
+      expect(scene.stage.getObjectByName("dissolve")).toBeUndefined();
+    });
+
+    // The picture laid over the stage while it dissolves: on every pixel, over everything, as much of it as the veil says.
+    const laidOver = (scene: ReturnType<typeof made>, veil: number) => {
+      const over = scene.stage.getObjectByName("dissolve") as Mesh<BufferGeometry, ShaderMaterial> | undefined;
+      if (over === undefined) throw new Error("no picture laid over");
+      expect(over.visible).toBe(true);
+      expect(over.material.depthTest).toBe(false);
+      expect(over.material.uniforms["uVeil"]?.value).toBeCloseTo(veil, 9);
+      let highest = -Infinity;
+      scene.stage.traverse((part) => {
+        if (part !== over) highest = Math.max(highest, part.renderOrder);
+      });
+      expect(over.renderOrder).toBeGreaterThan(highest);
+      over.geometry.computeBoundingBox();
+      const { min, max } = over.geometry.boundingBox ?? new Box3();
+      expect(Math.max(min.x, min.y)).toBeLessThanOrEqual(-1);
+      expect(Math.min(max.x, max.y)).toBeGreaterThanOrEqual(3);
+    };
+
+    it("lays the copied frame over the whole screen, on top, as much of it as the veil says, at the drawing buffer's size", async () => {
+      const scene = await diving(true);
+      const { gl, copy } = fakeGl();
+      let checked = 0;
+      for (let step = 0; step <= 60; step += 1) {
+        const { dive } = await frame(scene, (step / 60) * (DIVE.hold + DIVE.dissolve), true);
+        drawn(scene, gl);
+        if (dive.veil <= 0 || dive.veil >= 1) continue;
+        checked += 1;
+        laidOver(scene, dive.veil);
+      }
+      expect(checked).toBeGreaterThan(5);
+      const [picture] = (copy.mock.calls[0] ?? []) as [FramebufferTexture?];
+      expect(picture).toBeInstanceOf(FramebufferTexture);
+      expect(picture?.image).toMatchObject({ width: 2 * WIDTH, height: 2 * HEIGHT });
+    });
+
+    it("frees the copied frame when the cosmos goes in the middle of its dissolve", async () => {
+      const scene = await diving(true);
+      const { gl } = fakeGl();
+      const disposed = vi.spyOn(FramebufferTexture.prototype, "dispose");
+      for (const clock of [0, DIVE.hold, DIVE.hold + 0.01, DIVE.hold + DIVE.dissolve / 2]) {
+        await frame(scene, clock, true);
+        drawn(scene, gl);
+      }
+      expect(scene.cosmos.stats().dive.veil).toBeGreaterThan(0);
+      scene.owner.dispose();
+      expect(disposed).toHaveBeenCalledTimes(1);
+      disposed.mockRestore();
+    });
+
+    it("frees the dissolve's picture once it is done, and copies none with motion on", async () => {
+      const scene = await diving(true);
+      const { gl, copy } = fakeGl();
+      const disposed = vi.spyOn(FramebufferTexture.prototype, "dispose");
+      for (let step = 0; step <= 40; step += 1) {
+        await frame(scene, (step / 40) * (DIVE.hold + DIVE.dissolve + 0.5), true);
+        drawn(scene, gl);
+      }
+      expect(copy).toHaveBeenCalledTimes(1);
+      expect(disposed).toHaveBeenCalledTimes(1);
+      const moving = await diving();
+      const other = fakeGl();
+      for (let step = 0; step <= 40; step += 1) {
+        await frame(moving, (step / 40) * (DIVE.seconds + 1));
+        drawn(moving, other.gl);
+      }
+      expect(other.copy).not.toHaveBeenCalled();
+      disposed.mockRestore();
+    });
+
+    it("shows nothing of the cosmos while it waits for the whole cosmos, and gives the dive up for the view at rest after a while", async () => {
+      const scene = made();
+      scene.renderer.compileAsync.mockImplementation((group: Object3D) =>
+        group.name === "web" ? new Promise<Object3D>(() => undefined) : Promise.resolve(group),
+      );
+      scene.cosmos.dive(false);
+      scene.cosmos.show(ONYX);
+      for (const clock of [0, 0, 1, DIVE.wait - 0.1]) {
+        const stats = await frame(scene, clock);
+        expect(seen(scene).filter((part) => part instanceof Mesh || part instanceof Points)).toHaveLength(0);
+        expect(stats.sky.share).toBe(0);
+      }
+      const late = await frame(scene, DIVE.wait + 0.1);
+      const rest = await frame(await atRest(), DIVE.wait + 0.1);
+      expect(late.dive.along).toBe(1);
+      expect(spotKey(late.eye)).toBe(spotKey(rest.eye));
+      await frame(scene, DIVE.wait + 0.2);
+      expect(earthShown(scene)).toBe(true);
+    });
+
+    it("gives the dive up for the fixed places when no world comes within the wait: the great star and the Earth", async () => {
+      const scene = made();
+      scene.cosmos.dive(false);
+      scene.cosmos.show([]);
+      // The wait counts from its first frame once its code is here, a few milliseconds after it was asked.
+      await frame(scene, 0);
+      await frame(scene, 0);
+      expect((await frame(scene, DIVE.wait - 0.1)).dive.along).toBe(0);
+      await frame(scene, DIVE.wait + 0.1);
+      const { dive, stars } = await frame(scene, DIVE.wait + 0.2);
+      expect(dive.along).toBe(1);
+      expect(stars).toBe(1);
+      expect(earthShown(scene)).toBe(true);
+    });
+
+    // The red pass (3): the feed reads its file once, but a new list after the landing moves the eye once, as 7d6's view does, and dives
+    // no more.
+    it("dives no more once landed: a new list moves the eye once to its own view", async () => {
+      const scene = await diving();
+      await frame(scene, DIVE.seconds + 0.5);
+      const other = worlds(30);
+      const plain = made();
+      await shown(plain, other);
+      scene.cosmos.show(other);
+      for (const clock of [DIVE.seconds + 0.6, DIVE.seconds + 0.7]) await frame(scene, clock);
+      const [moved, rest] = [await frame(scene, DIVE.seconds + 1), await frame(plain, DIVE.seconds + 1)];
+      expect(moved.dive).toEqual({ along: 1, veil: 0 });
+      expect(moved.web?.share ?? 0).toBe(0);
+      expect(spotKey(moved.eye)).toBe(spotKey(rest.eye));
+      expect(spotKey(rest.eye)).not.toBe(spotKey((await frame(await atRest(), DIVE.seconds + 1)).eye));
+    });
+
+    it("dives only when asked: a cosmos shown without it stands at rest at once", async () => {
+      const plain = await atRest();
+      expect(plain.cosmos.stats().dive).toEqual({ along: 1, veil: 0 });
+      expect(earthShown(plain)).toBe(true);
+    });
   });
 });

@@ -150,7 +150,8 @@ export class Nebulae {
   };
 
   /** A frame of the cosmos, `eye` the worlds': the nebulae are scenery, so they stand around the scenery's eye, which adds the sky's
-   * cruise (eye.ts), and take their share from how far the worlds' eye is from what it looks at. */
+   * cruise (eye.ts), and take their share from how far the worlds' eye is from what it looks at. The worlds glide no more (7d7), so with
+   * motion on they stand the sky's glide behind it, 14 units at the start and 1 after 7 s, as still as it under reduced motion. */
   follow(eye: Point, seconds: number, distance: number): void {
     driftAt(this.#drift, seconds);
     glideAt(this.#glide, seconds);
@@ -211,6 +212,11 @@ export class Nebulae {
       image.mesh.visible = false;
       image.fade = 0;
     }
+  }
+
+  /** The share of the view it follows and the eye it stands round, for the journeys. */
+  follows(): { share: number; eye: Point } {
+    return { share: this.#share, eye: { ...this.#scenery } };
   }
 
   /** What shows, for the journeys: its lit sheets, and the images it holds. */

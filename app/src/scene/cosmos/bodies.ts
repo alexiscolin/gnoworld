@@ -228,6 +228,11 @@ export class Bodies {
     };
   }
 
+  /** What stands, for the journeys, seen from `eye`, the Earth at `earth`: no body counted while hidden. */
+  stats(shown: boolean, eye: Point, earth: Vector3 | undefined) {
+    return { bodies: shown ? this.size : 0, list: this.list(), screen: this.screen(eye, earth) };
+  }
+
   /** What stands, for the journeys. */
   list() {
     return [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));

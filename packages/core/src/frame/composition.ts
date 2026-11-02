@@ -119,8 +119,9 @@ function evenly(three: readonly (Spot | Seen)[]): boolean {
   return bodies.length < three.length || !recedes(bodies);
 }
 
-// ponytail: n³ on the dozen marks a view draws at most.
-const evenRow = (marks: readonly (Spot | Seen)[]) =>
+/** Whether three of `marks` stand near a line at like gaps, bodies that recede apart: laid out for show. ponytail: n³ on the dozen marks
+ * a view draws at most. */
+export const evenRow = (marks: readonly (Spot | Seen)[]): boolean =>
   marks.some((one, a) =>
     marks.slice(a + 1).some((two, b) => marks.slice(a + b + 2).some((three) => evenly([one, two, three]))),
   );

@@ -194,6 +194,7 @@ class LiveScene implements Scene {
   }
 
   cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+    if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
     this.#parts.cosmos.show(worlds, written);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
     this.#loop.redraw();

@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { BOUNDS } from "../../../packages/core/src/lod/ladder.ts";
 import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
 import { EARTH_PLACE, systemsOf } from "../../../packages/core/src/cosmos/system.ts";
+import { distanceOf } from "../../../packages/core/src/space/cell.ts";
 import { coveredShare, offLine } from "../../../packages/core/src/frame/composition.ts";
 import { postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
@@ -52,6 +53,8 @@ const NOT_YET: CosmosStats = {
   nebulae: 0,
   worlds: 0,
   eye: { x: 0, y: 0, z: 0 },
+  sky: { share: 0, eye: { x: 0, y: 0, z: 0 } },
+  dive: { along: 0, veil: 0 },
 };
 const served = (page: Page, body: string, status = 200) =>
   page.route("**/worlds.json", (route) => route.fulfill({ status, body, contentType: "application/json" }));
@@ -66,12 +69,22 @@ async function standing(page: Page, bodies = 2) {
     .toBe(true);
 }
 
+// The home's dive over (7d7): under reduced motion the whole cosmos stood still, then dissolved into the view at rest.
+const landed = (page: Page) =>
+  expect
+    .poll(async () => {
+      const { along, veil } = (await cosmos(page)).dive;
+      return along === 1 && veil === 0;
+    }, SLOW)
+    .toBe(true);
+
 async function arrived(page: Page, query = HOME, size = COMPUTER) {
   await page.setViewportSize(size);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(query);
   await hydrated(page);
   await running(page);
+  await landed(page);
 }
 
 // The release's lab page, its cosmos view standing, for Alexis's own GPU.
@@ -80,6 +93,7 @@ async function inTheLab(page: Page) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/lab/realism.html?view=cosmos");
   await running(page);
+  await landed(page);
   await standing(page);
 }
 
@@ -414,7 +428,7 @@ test("keeps the Earth at the centre with motion on, the near bodies sliding more
     await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames + 1);
     return (await cosmos(page)).screen;
   };
-  // The arrival's glide over first: it moves the eye along the view, which slides the near world across the screen no more than a far one.
+  // The dive over first (7d7): it moves the eye along the view, which slides the near world across the screen no more than a far one.
   await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(15);
   const first = await at();
   const { seconds } = await stats(page);
@@ -445,6 +459,9 @@ test("counts in the hero the worlds the cosmos draws", async ({ page }) => {
 // are the field of stars and the nebulae's dust: the approved arrival drew 47,438 on this file, this view 47,437 (7d6, SwiftShader).
 const DRAWS_AT_REST = 90;
 const POINTS_AT_REST = 48_000;
+// What the dive adds at most: the whole cosmos's points and lines, two draws, and its worlds' points.
+const DRAWS_IN_THE_DIVE = DRAWS_AT_REST + 2;
+const POINTS_IN_THE_DIVE = 1_000;
 for (const tier of ["high", "low"] as const)
   test(`holds the draw bound and a frame's cost at rest on the ${tier} tier`, async ({ page }) => {
     if (tier === "low")
@@ -463,6 +480,133 @@ for (const tier of ["high", "low"] as const)
     expect(textures).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
   });
 
+// The home's dive (7d7; Alexis, 2026-11-02), with motion on: from the whole cosmos down to the view at rest, the Earth at the centre all the
+// way. The software GPU draws few of its frames: each is read through the scene's stats as it comes, with what it cost to draw.
+interface Dived {
+  readonly along: number;
+  readonly share: number;
+  readonly earth: { readonly x: number; readonly y: number } | undefined;
+  readonly eye: { readonly x: number; readonly y: number; readonly z: number };
+  readonly calls: number;
+  readonly points: number;
+  readonly textures: number;
+}
+async function dove(page: Page, size = COMPUTER, path = HOME): Promise<Dived[]> {
+  await served(page, RECORDED);
+  await page.setViewportSize(size);
+  await page.goto(path);
+  if (path === HOME) await hydrated(page);
+  await running(page);
+  const seen: Dived[] = [];
+  await expect
+    .poll(
+      async () => {
+        const { cosmos: drawn, ...cost } = await stats(page);
+        const one = drawn === undefined ? undefined : divedOf(drawn, cost);
+        if (one !== undefined && (one.share > 0 || one.along > 0)) seen.push(one);
+        return one?.along === 1 && seen.some(({ along }) => along < 1);
+      },
+      { ...SLOW, intervals: [10] },
+    )
+    .toBe(true);
+  return seen;
+}
+const divedOf = (
+  { dive, web, screen, eye }: CosmosStats,
+  { calls, points, textures }: { calls: number; points: number; textures: number },
+): Dived => ({ along: dive.along, share: web?.share ?? 0, earth: screen.earth, eye, calls, points, textures });
+
+// The Earth at the canvas's centre, where it stands on screen.
+function centred(earth: Dived["earth"], size: typeof COMPUTER) {
+  // A globe that came between two frames has no place till the next.
+  if (earth === undefined || !Number.isFinite(earth.x)) return;
+  near(earth.x, size.width / 2, "the Earth's x on the way down");
+  near(earth.y, size.height / 2, "the Earth's y on the way down");
+}
+
+for (const size of [COMPUTER, WIDE])
+  test(`dives from the whole cosmos to the view at rest, the Earth at the centre all the way, at ${String(size.width)} by ${String(size.height)}`, async ({
+    page,
+  }) => {
+    const seen = await dove(page, size);
+    expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
+    expect(seen.some(({ share, along }) => share === 0 && along > 0 && along < 1)).toBe(true);
+    for (const [at, { along }] of seen.entries()) expect(along).toBeGreaterThanOrEqual(seen[at - 1]?.along ?? 0);
+    for (const { earth } of seen) centred(earth, size);
+    // It lands on 7d6's eye, swayed: the view at rest the core searched on the same file.
+    const rest = { x: 0, y: 0, z: 0 };
+    toScene(viewOf().view.eye, rest);
+    const landed_ = seen.at(-1);
+    if (landed_ === undefined) throw new Error("no frame");
+    expect(distanceOf(landed_.eye, rest)).toBeLessThan(0.3);
+    expect(distanceOf(seen[0]?.eye ?? rest, EARTH)).toBeGreaterThan(20 * distanceOf(landed_.eye, EARTH));
+  });
+
+// The draw bound and a frame's cost through the dive, on the High tier and a weak GPU's: what it adds to the view at rest is the whole
+// cosmos's two draws and its worlds' points, at most.
+for (const tier of ["high", "low"] as const)
+  test(`holds the draw bound and a frame's cost through the dive on the ${tier} tier`, async ({ page }) => {
+    // The tier held: with motion on, the Auto probe would drop the gate's software GPU to Low.
+    await page.addInitScript((held) => {
+      localStorage.setItem("gnoworld:scene:tier", held);
+    }, tier);
+    const seen = await dove(page);
+    expect((await stats(page)).tier).toBe(tier);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_IN_THE_DIVE);
+    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST + POINTS_IN_THE_DIVE);
+    expect(Math.max(...seen.map(({ textures }) => textures))).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
+  });
+
+// Under reduced motion no camera moves: the whole cosmos stands still, then dissolves into the view at rest (7d7). The page's clock is held,
+// so each picture is taken where it is wanted. The dissolving one is the still cosmos laid over the view at rest as much as the veil says:
+// nearer that mix than to the view at rest under a picture copied black.
+test("dissolves the whole cosmos into the view at rest under reduced motion, and moves no camera", async ({ page }) => {
+  await page.clock.install();
+  await served(page, RECORDED);
+  await page.setViewportSize(COMPUTER);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(HOME);
+  await hydrated(page);
+  await running(page);
+  await hideThePage(page);
+  // Held, the page's time moves only as the journey runs it, three frames at a time.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  const eyes = new Set<string>();
+  let veil = 0;
+  const until = async (wanted: (drawn: CosmosStats) => boolean) => {
+    await expect
+      .poll(
+        async () => {
+          await page.clock.runFor(48);
+          const drawn = await cosmos(page);
+          if (drawn.shown && ((drawn.web?.share ?? 0) > 0 || drawn.dive.along > 0))
+            eyes.add([drawn.eye.x, drawn.eye.y, drawn.eye.z].map((value) => value.toFixed(4)).join(","));
+          veil = drawn.dive.veil;
+          return wanted(drawn);
+        },
+        { ...SLOW, intervals: [10] },
+      )
+      .toBe(true);
+    return page.locator("canvas").screenshot();
+  };
+  const still = await until(({ web, dive }) => web?.share === 1 && dive.veil === 0 && dive.along === 0);
+  const dissolving = await until(({ dive }) => dive.veil > 0.4 && dive.veil < 0.9);
+  const shown = veil;
+  const rest = await until(({ dive }) => dive.along === 1 && dive.veil === 0);
+  expect(eyes.size).toBe(2);
+  const cells = Array.from({ length: 48 }, (_, at): [number, number, number, number] => {
+    const [x, y] = [(at % 8) * 216, Math.floor(at / 8) * 180];
+    return [x, y, x + 216, y + 180];
+  });
+  const [one = [], two = [], three = []] = await Promise.all(
+    [still, dissolving, rest].map((shot) => brightness(page, shot, cells)),
+  );
+  const off = (made: (at: number) => number) => two.reduce((sum, value, at) => sum + Math.abs(value - made(at)), 0);
+  const mixed = off((at) => shown * (one[at] ?? 0) + (1 - shown) * (three[at] ?? 0));
+  const black = off((at) => (1 - shown) * (three[at] ?? 0));
+  expect(mixed).toBeLessThan(black / 2);
+});
+
 for (const systems of [100, 1000, 10_000])
   test(`holds the draw bound at ${String(systems)} systems`, async ({ page }) => {
     await served(page, fileOf(systems));
@@ -472,6 +616,13 @@ for (const systems of [100, 1000, 10_000])
     expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
     expect((await cosmos(page)).bodies).toBeLessThanOrEqual(BOUNDS.bodies);
   });
+
+// 7d7: the lab is the site's own scene, so it opens with the dive too, which Alexis judges on his own GPU.
+test("opens the release's page with the dive, from the whole cosmos to the view at rest", async ({ page }) => {
+  const seen = await dove(page, COMPUTER, "/lab/realism.html?view=cosmos");
+  expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
+  expect(seen.at(-1)?.along).toBe(1);
+});
 
 test("gives the release's page the cosmos as a view, from the recorded file, for Alexis's own GPU", async ({
   page,
@@ -602,8 +753,6 @@ async function earthDisc(page: Page): Promise<[number, number, number, number]> 
 // Where the Earth stands on the stage: what the eye looks at (7d6).
 const EARTH = { x: 0, y: 0, z: 0 };
 toScene(EARTH_PLACE, EARTH);
-const fromEarth = ({ x, y, z }: { x: number; y: number; z: number }) =>
-  Math.hypot(x - EARTH.x, y - EARTH.y, z - EARTH.z);
 
 // The view at rest looks towards a red nebula's bright side (7d6); a quarter turn round the Earth, about the map's up, at the rest's
 // distance, the cool ones stand behind it. A sweep of twelve turns on the merged tree (7d5's merge notes, 2026-11-03): 76 cool boxes, hues
@@ -658,6 +807,7 @@ async function bothWays(page: Page, turn?: (page: Page) => Promise<void>) {
   await page.reload();
   await hydrated(page);
   await running(page);
+  await landed(page);
   await lit(page);
   return { without, withNebulae: await stillPicture(page, turn) };
 }
@@ -756,21 +906,26 @@ const whole = async (page: Page) => {
   const far = { x: eye.x, y: eye.y, z: eye.z + 1100 };
   await moveTo(page, far);
   // What the eye looks at is the Earth (7d6): its distance from the cosmos's own eye says the share.
-  expect(fromEarth((await cosmos(page)).eye)).toBeGreaterThan(1000);
+  expect(distanceOf((await cosmos(page)).eye, EARTH)).toBeGreaterThan(1000);
   await expect.poll(async () => (await cosmos(page)).web?.share ?? 0, SLOW).toBe(1);
 };
 
-test("asks nothing of the whole cosmos at the arrival", async ({ page }) => {
-  let asked = 0;
-  await page.route(WHOLE_JS, (route) => {
-    asked += 1;
-    return route.fallback();
+// 7d7: the home opens in the whole cosmos, so its chunk is asked at the arrival, once, and the view at rest leaves it with nothing to draw.
+// The service worker's own fetches escape page.route: blocked, so each ask is seen.
+test.describe("the whole cosmos's chunk", () => {
+  test.use({ serviceWorkers: "block" });
+  test("asks for the whole cosmos once at the arrival, and leaves it nothing to draw at rest", async ({ page }) => {
+    let asked = 0;
+    await page.route(WHOLE_JS, (route) => {
+      asked += 1;
+      return route.fallback();
+    });
+    await served(page, linkedFileOf(300));
+    await arrived(page);
+    await standing(page);
+    expect(asked).toBe(1);
+    expect((await cosmos(page)).web?.share).toBe(0);
   });
-  await served(page, linkedFileOf(300));
-  await arrived(page);
-  await standing(page);
-  expect(asked).toBe(0);
-  expect((await cosmos(page)).web).toBeUndefined();
 });
 
 for (const count of [100, 1_000, 10_000, 20_000])

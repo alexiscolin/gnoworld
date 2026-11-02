@@ -3,3 +3,4 @@
 export { restView } from "@gnoworld/core";
 export { closeId, haloNeeds, pointShares, postcardsOf, restBodies } from "./restBodies.ts";
 export { RestEye } from "./restEye.ts";
+export { Dive } from "./dive.ts";
