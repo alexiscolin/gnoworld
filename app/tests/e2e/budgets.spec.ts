@@ -28,6 +28,9 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 const SCENE_JS = 150 * 1024;
+// The cosmos, a chunk of its own: only the home that shows worlds asks for it.
+const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
+const COSMOS_JS = 16 * 1024;
 const THREE_MARK = "isWebGLRenderer";
 
 // The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
@@ -110,6 +113,13 @@ for (const path of PAGES) {
     expect(holdingThree, "nothing of three on the first screen").toEqual([]);
   });
 }
+
+test("the cosmos's chunk stays within its cap, and the scene's holds none of it", async ({ page }) => {
+  const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  expect(await compressed(page, [(await cosmos).url()])).toBeLessThanOrEqual(COSMOS_JS);
+});
 
 test("the scene's chunk holds three, and stays within its cap", async ({ page }) => {
   const scene = page.waitForResponse((response) => SCENE.test(response.url()));

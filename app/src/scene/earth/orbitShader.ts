@@ -36,6 +36,10 @@ void main() {
   float hidden = length(vToEye) > along ? 1.0 - smoothstep(1.0, 1.06, clear) : 0.0;
   vec3 amber = vec3(1.0, 0.56, 0.2) * (pow(centred, 40.0) * 0.6 + pow(centred, 8.0) * 0.12);
   vec3 core = vec3(1.0, 0.88, 0.7) * pow(centred, 300.0) * (2.2 + 0.5 * wake);
+  #ifdef FINE
+  amber = vec3(0.0);
+  core *= 0.5;
+  #endif
   gl_FragColor = vec4((amber + core) * (1.0 - hidden) * clearOfMoon, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

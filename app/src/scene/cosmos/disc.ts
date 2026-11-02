@@ -1,0 +1,160 @@
+// What a look writes on the tilted disc: suns and region glows, worlds as points, far belts. Each is one draw whatever the universe, written
+// off the frame; a frame only brings the disc to the eye, in doubles, and moves the points' clock.
+import {
+  BOUNDS,
+  CENTRE,
+  DISC_TILT,
+  dotLight,
+  onScreen,
+  spreadAt,
+  worldLook,
+  type Drawn,
+  type Ladder,
+  type Orbiter,
+  type PlanetLook,
+  type Point,
+  type StarSystem,
+} from "@gnoworld/core";
+import { Group } from "three";
+import type { Disposer } from "../disposer.ts";
+import { Belt, ROCKS } from "./belt.ts";
+import { Dots } from "./dots.ts";
+import { Suns } from "./suns.ts";
+
+/** What a look saw. */
+export interface Sight {
+  readonly systems: readonly StarSystem[];
+  readonly ladder: Ladder;
+  readonly drawn: Drawn;
+  /** The eye, on the map. */
+  readonly eye: Point;
+  readonly focal: number;
+  readonly isBody: (id: string) => boolean;
+  /** How much of what stands at a place on the map the page's text leaves on screen. */
+  readonly shows: (place: Point) => number;
+}
+
+interface Held {
+  readonly system: StarSystem;
+  readonly world: Orbiter;
+}
+
+// A star's reach, from its size; a region's glow, from the systems it holds.
+const REACH = 7.5;
+const LEAST_REACH = 2;
+const GLOW_REACH = 26;
+const GLOW_MOST = 90;
+const GLOW_WARMTH = 0.5;
+const LINEAR = 2.2;
+// A star under the page's text keeps this little of its light, so the words stand on black.
+const UNDER_TEXT = 0.1;
+
+// A point takes its world's look, in the working space: between the ramp's middle and its top, for a dark world's middle is near black.
+const colourOf = ({ ramp }: PlanetLook): [number, number, number] => {
+  const [red, green, blue] = [0, 1, 2].map((at) => (((ramp[1][at] ?? 0) + (ramp[2][at] ?? 0)) / 2) ** LINEAR);
+  return [red ?? 0, green ?? 0, blue ?? 0];
+};
+
+const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
+
+export class Disc {
+  readonly #suns: Suns;
+  readonly #dots: Dots;
+  readonly #belt: Belt;
+  readonly #colours = new Map<string, [number, number, number]>();
+  readonly group = new Group();
+  /** A point's size, in the journeys' reading. */
+  dotPixels = 0;
+  dotCount = 0;
+
+  constructor(owner: Disposer) {
+    this.group.rotation.x = DISC_TILT;
+    this.#suns = new Suns(this.group, owner, BOUNDS.stars + BOUNDS.glows);
+    this.#dots = new Dots(this.group, owner, BOUNDS.dots);
+    this.#belt = new Belt(this.group, owner, BOUNDS.rocks);
+  }
+
+  get rocks(): number {
+    return this.#belt.count;
+  }
+
+  /** The lens, in pixels, and the pixels to one of the page's. */
+  resize(focal: number, ratio: number): void {
+    this.#suns.resize(focal);
+    this.#dots.resize(ratio);
+  }
+
+  /** One frame on. */
+  advance(eye: Point, seconds: number): void {
+    this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);
+    this.#dots.advance(seconds);
+  }
+
+  /** Writes what a look saw. */
+  paint(sight: Sight): void {
+    this.#paintSuns(sight);
+    this.#paintDots(sight);
+    this.#paintBelts(sight);
+  }
+
+  #paintSuns({ systems, ladder, drawn, shows }: Sight): void {
+    for (let at = 0; at < drawn.starCount; at += 1) {
+      const system = systems[drawn.stars[at] ?? -1];
+      if (system === undefined) continue;
+      const reach = REACH * Math.sqrt(system.star) + LEAST_REACH;
+      const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place);
+      this.#suns.set(at, system.place, { reach, warmth: system.warmth, glow: false, shows: light });
+    }
+    for (let at = 0; at < drawn.glowCount; at += 1) {
+      const region = ladder.region(drawn.glows[at] ?? -1);
+      const reach = GLOW_REACH * Math.sqrt(Math.min(region.systems, GLOW_MOST));
+      this.#suns.set(drawn.starCount + at, region, { reach, warmth: GLOW_WARMTH, glow: true, shows: 1 });
+    }
+    this.#suns.commit(drawn.starCount + drawn.glowCount);
+  }
+
+  #colourFor(id: string): [number, number, number] {
+    const known = this.#colours.get(id) ?? colourOf(worldLook(id));
+    this.#colours.set(id, known);
+    return known;
+  }
+
+  #paintDot(index: number, { system, world }: Held, sight: Sight): void {
+    const distance = away(system.place, sight.eye);
+    const size = onScreen(world.radius, distance, sight.focal);
+    if (index === 0) this.dotPixels = size;
+    this.#dots.set(index, system.place, {
+      orbit: [world.orbit * spreadAt(distance), world.phase, system.spin],
+      tint: this.#colourFor(world.id),
+      size: [size, dotLight(distance) * sight.shows(system.place)],
+    });
+  }
+
+  // A world the ladder made a body whose maps are not here yet stands as a point, as any other.
+  #paintDots(sight: Sight): void {
+    const { drawn, systems } = sight;
+    let count = 0;
+    const paint = (at: number, world: number, unless: boolean) => {
+      const system = systems[at];
+      const held = system?.worlds[world];
+      if (system === undefined || held === undefined || count === BOUNDS.dots || (unless && sight.isBody(held.id)))
+        return;
+      this.#paintDot(count, { system, world: held }, sight);
+      count += 1;
+    };
+    for (let at = 0; at < drawn.bodyCount; at += 1)
+      paint(drawn.bodySystems[at] ?? -1, drawn.bodyWorlds[at] ?? -1, true);
+    for (let at = 0; at < drawn.dotCount; at += 1) paint(drawn.dotSystems[at] ?? -1, drawn.dotWorlds[at] ?? -1, false);
+    this.dotCount = count;
+    this.#dots.commit(count);
+  }
+
+  #paintBelts({ drawn, systems, eye }: Sight): void {
+    let rocks = 0;
+    for (let at = 0; at < drawn.nearCount && rocks + ROCKS <= BOUNDS.rocks; at += 1) {
+      const system = systems[drawn.near[at] ?? -1];
+      if (system?.belt === true) rocks = this.#belt.lay(system, rocks, spreadAt(away(system.place, eye)));
+    }
+    this.#belt.commit(rocks);
+  }
+}

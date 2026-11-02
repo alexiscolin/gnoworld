@@ -26,7 +26,8 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
   const now = useClock();
-  useSpace();
+  // Universes are never shown together: the worlds' file is the default one's.
+  useSpace(universe.isDefault ? "cosmos" : undefined);
   return (
     <>
       <Hero universe={universe} />

@@ -10,7 +10,7 @@ import { Live } from "./Live.tsx";
 export function Hero({ universe }: { universe: UniverseView }) {
   const count = universe.worlds.length;
   return (
-    <div className={styles["hero"]}>
+    <div className={styles["hero"]} data-clear="">
       <Kicker dot="warm">{universe.isDefault ? "gno.world" : universe.name}</Kicker>
       <p className={styles["number"]} data-hero="number">
         {count}

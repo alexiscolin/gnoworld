@@ -80,6 +80,11 @@ export class Globe {
     this.#orbit.setHead(angle);
   }
 
+  /** For an Earth seen small, among the worlds: its ring a thin line. */
+  stand(): void {
+    this.#orbit.setFine();
+  }
+
   /** The orbit's point at `angle`, in the group's space. */
   orbitAt(angle: number): Vector3 {
     return this.#orbit.moonAt(angle, new Vector3());

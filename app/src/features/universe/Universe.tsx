@@ -56,7 +56,7 @@ export function Universe({ shown }: { shown: Shown }) {
       <p role="status" className={styles["status"]}>
         {shown ? lineOf(status === "failed", earth === "failed") : null}
       </p>
-      {status === "on" && earth === "drawn" ? <Credits /> : null}
+      {status === "on" && (earth === "drawn" || shown === "cosmos") ? <Credits /> : null}
     </>
   );
 }

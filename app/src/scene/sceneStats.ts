@@ -1,0 +1,49 @@
+// What the scene shows the page: its door, and what it says of itself for `?debug` and the journeys.
+import type { ClearBox, Point, Tier } from "@gnoworld/core";
+import type { WebGLRenderer } from "three";
+import type { Cosmos, CosmosWorld } from "./cosmos/cosmos.ts";
+import type { Circle, EarthState, EarthView } from "./earth/view.ts";
+
+export interface SceneOptions {
+  readonly canvas: HTMLCanvasElement;
+  /** The tier this device was found at before, if any. */
+  readonly remembered: Tier | undefined;
+  readonly remember: () => void;
+  /** The context went (true), or came back (false). */
+  readonly onLost: (lost: boolean) => void;
+}
+
+export interface Scene {
+  cover(covered: boolean): void;
+  /** Where the view rests, in world units of any size. */
+  moveTo(to: Point): void;
+  /** Stands the Earth in `place`, or takes it away, and says how it goes. */
+  earth(place: Circle | undefined, said: (state: EarthState) => void): void;
+  /** Stands these worlds and the fixed places, or takes them away. */
+  cosmos(worlds: readonly CosmosWorld[] | undefined): void;
+  /** The box of the page's text, in its pixels: no body stands under it. */
+  keepClear(box: ClearBox | undefined): void;
+  dispose(): void;
+  stats(): SceneStats;
+}
+
+export interface SceneStats {
+  readonly frames: number;
+  readonly tier: Tier;
+  readonly ratio: number;
+  readonly probing: boolean;
+  readonly calls: number;
+  readonly points: number;
+  readonly geometries: number;
+  readonly textures: number;
+  readonly eye: Point;
+  readonly earth: ReturnType<EarthView["stats"]>;
+  readonly cosmos: ReturnType<Cosmos["stats"]> | undefined;
+}
+
+export const rendered = ({ render, memory }: WebGLRenderer["info"]) => ({
+  calls: render.calls,
+  points: render.points,
+  geometries: memory.geometries,
+  textures: memory.textures,
+});

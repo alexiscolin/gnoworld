@@ -1,7 +1,7 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { SUN_REST } from "../earth/view.ts";
-import { sideLight, starAt } from "./light.ts";
+import { angleAt, FAR_ANGLE, sideLight, sideOf, starAt } from "./light.ts";
 
 const EYE = new Vector3(0, 0, 1);
 const bytes = (value: number) => new Uint8Array(32).fill(value);
@@ -54,5 +54,47 @@ describe("sideLight, a generated world's star", () => {
     const low = sideLight(bytes(0), new Vector3());
     expect(low.distanceTo(sideLight(bytes(255), new Vector3()))).toBeGreaterThan(0.1);
     expect(low.distanceTo(sideLight(bytes(0), new Vector3()))).toBe(0);
+  });
+});
+
+describe("sideOf", () => {
+  const eye = new Vector3(0, 0, 1);
+  const lit = (star: Vector3) => sideOf(star.clone().normalize(), eye, 1.3);
+
+  it("keeps the side its star stands on, on screen", () => {
+    const light = lit(new Vector3(-3, 1, 0.4));
+    expect(light.x / light.y).toBeCloseTo(-3, 6);
+  });
+
+  it("stands always at the world's angle from the eye: a star behind the world or before it lights it the same", () => {
+    for (const z of [-5, -1, 0, 1, 5]) {
+      const light = lit(new Vector3(1, 0.2, z));
+      expect(light.length()).toBeCloseTo(1, 6);
+      expect(light.angleTo(eye)).toBeCloseTo(1.3, 6);
+    }
+  });
+
+  it("still gives a light when the star stands dead on the axis", () => {
+    expect(lit(new Vector3(0, 0, -1)).angleTo(eye)).toBeCloseTo(1.3, 6);
+  });
+});
+
+describe("angleAt", () => {
+  it("keeps a world's own angle up close: the marked night side stays for the close view", () => {
+    expect(angleAt(1.4, 3)).toBe(1.4);
+    expect(angleAt(1.4, 8)).toBe(1.4);
+  });
+
+  it("brings the light round to the eye from afar, a little off it, so a far world's whole disc reads", () => {
+    expect(angleAt(1.4, 40)).toBe(FAR_ANGLE);
+    expect(angleAt(1.2, 400)).toBe(FAR_ANGLE);
+    expect(FAR_ANGLE).toBeGreaterThan(0.45);
+    expect(FAR_ANGLE).toBeLessThan(0.95);
+  });
+
+  it("moves by degrees, as the eye does", () => {
+    const middle = angleAt(1.4, 18);
+    expect(middle).toBeGreaterThan(FAR_ANGLE);
+    expect(middle).toBeLessThan(1.4);
   });
 });

@@ -26,8 +26,8 @@ function show(shown: Shown): void {
   }
 }
 
-/** Shows space while the calling page is on screen, with the Earth in it if the page asks. */
-export function useSpace(body?: "earth"): void {
+/** Shows space while the calling page is on screen, with the Earth or the worlds in it if the page asks. */
+export function useSpace(body?: "earth" | "cosmos"): void {
   useEffect(() => {
     show(body ?? true);
     return () => {

@@ -23,6 +23,8 @@ export interface Orbit {
   moonAt(angle: number, into: Vector3): Vector3;
   /** Where the Moon is: the wake follows it. */
   setHead(angle: number): void;
+  /** Keeps the line alone, for an Earth a few dozen pixels wide: frame 4's thin ring. */
+  setFine(): void;
   dispose(): void;
 }
 
@@ -62,6 +64,11 @@ class LiveOrbit implements Orbit {
   setHead(angle: number): void {
     const head = this.#line.material.uniforms["head"];
     if (head !== undefined) head.value = angle;
+  }
+
+  setFine(): void {
+    this.#line.material.defines = { FINE: "" };
+    this.#line.material.needsUpdate = true;
   }
 
   dispose(): void {

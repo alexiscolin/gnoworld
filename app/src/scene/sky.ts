@@ -54,6 +54,7 @@ export class Sky {
     uFar: { value: 1 },
     uGain: { value: GAIN },
   };
+  readonly #veil = { value: 1 };
   readonly #eye = { x: 0, y: 0, z: 0 };
   readonly #marched = { x: NaN, y: NaN, z: NaN, pitch: NaN, yaw: NaN };
   #owed = true;
@@ -67,7 +68,7 @@ export class Sky {
     const clouds = new Mesh(geometry, owner.add(marchMaterial(this.#uniforms)));
     clouds.frustumCulled = false;
     this.#pass.add(clouds);
-    const shown = new Mesh(geometry, owner.add(shownMaterial(this.#picture.texture)));
+    const shown = new Mesh(geometry, owner.add(shownMaterial(this.#picture.texture, this.#veil)));
     shown.frustumCulled = false;
     shown.renderOrder = -2;
     stage.add(shown);
@@ -139,6 +140,11 @@ export class Sky {
     renderer.setRenderTarget(this.#picture);
     renderer.render(this.#pass, camera);
     renderer.setRenderTarget(null);
+  }
+
+  /** How much of the sky shows: the worlds' view keeps black between its suns. */
+  veil(share: number): void {
+    this.#veil.value = share;
   }
 
   /** The picture went: a context came back with nothing in it. */

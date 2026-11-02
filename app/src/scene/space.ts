@@ -38,6 +38,11 @@ export class Space {
     for (let at = 0; at < this.#fields.length; at += 1) this.#fields[at]?.resize(ratio);
   }
 
+  /** How much of the sky shows. */
+  veil(share: number): void {
+    this.#sky.veil(share);
+  }
+
   detail(tier: Tier): void {
     this.#sky.detail(tier);
   }

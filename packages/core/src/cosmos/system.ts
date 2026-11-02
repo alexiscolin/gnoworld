@@ -13,7 +13,7 @@ export const ROOM = CELL / 2;
 /** Where a far belt starts: no world goes past it. */
 export const BELT_INNER = 0.84 * ROOM;
 /** How far the disc leans from facing the eye's way, in radians: seen from 60 degrees above it. */
-export const DISC_TILT = Math.PI / 3;
+export const DISC_TILT = 1.0471975511965976;
 /** Where the map's centre stands on the stage: 36 units ahead of the eye at rest, the great sun where frame 4 has it. */
 export const CENTRE: Point = { x: HOME.x - 0.06, y: HOME.y + 0.155, z: HOME.z - 36 };
 /** A fixed place, beside the great star, and its size: frame 4's Earth. */
@@ -23,7 +23,7 @@ export const EARTH_RADIUS = 1.457;
 const WORLD_LEAST = 1.05;
 const WORLD_MOST = 1.7;
 const STAR_MOST = 1024;
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+const GOLDEN = 2.399963229728653;
 // A lattice's closest two stand this many times sqrt(its area / pi / its count) apart, measured from 4 to 2,048 slots; a world takes under half of that.
 const PACKING = (0.49 * 1.65) ** 2;
 // A crowd reads as a few clear bodies on an outer ring, 120 degrees apart, over fine grain: its worlds well under what the lattice allows.
@@ -35,8 +35,9 @@ const BELTS = 1 / 3;
 const SPIN_LEAST = 0.05;
 const SPIN_SPAN = 0.1;
 const SALT = 2;
-const COS = Math.cos(DISC_TILT);
-const SIN = Math.sin(DISC_TILT);
+// The tilt's cosine and sine, as numbers: a call at a module's top stays in every chunk that imports core.
+const COS = 0.5;
+const SIN = 0.8660254037844386;
 
 export { WORLD_MOST };
 
@@ -141,7 +142,7 @@ function systemOf(id: string, place: SystemPlace, worlds: readonly WorldHeld[]):
   };
 }
 
-const GREAT_STAR: StarSystem = {
+const greatStar = (): StarSystem => ({
   id: GNO_LAND,
   place: { x: 0, y: 0, z: 0 },
   star: starSize(STAR_MOST),
@@ -149,7 +150,7 @@ const GREAT_STAR: StarSystem = {
   spin: SPIN_LEAST,
   belt: false,
   worlds: [],
-};
+});
 
 /** The systems of a file, gno.land's first and the others by id: the same file gives the same list, in any order. A world named twice counts once. */
 export function systemsOf(worlds: readonly WorldHeld[]): StarSystem[] {
@@ -161,10 +162,12 @@ export function systemsOf(worlds: readonly WorldHeld[]): StarSystem[] {
   }
   const ids = [...byNamespace.keys()].sort();
   const places = placeSystems(ids.map((id) => ({ id })));
-  return [
-    GREAT_STAR,
-    ...ids.map((id) => systemOf(id, places.get(id) ?? GREAT_STAR.place, [...(byNamespace.get(id)?.values() ?? [])])),
-  ];
+  const held = (id: string) => [...(byNamespace.get(id)?.values() ?? [])];
+  const stars = ids.flatMap((id) => {
+    const place = places.get(id);
+    return place === undefined ? [] : [systemOf(id, place, held(id))];
+  });
+  return [greatStar(), ...stars];
 }
 
 /** Where a world stands `seconds` on, on the map, into `out`. */

@@ -5,6 +5,7 @@ import { CELL, placeSystems, starSize } from "./cosmos.ts";
 import {
   BELT_INNER,
   CENTRE,
+  DISC_TILT,
   EARTH_PLACE,
   EARTH_RADIUS,
   GNO_LAND,
@@ -151,6 +152,16 @@ describe("systemsOf", () => {
       expect(Math.abs(spin)).toBeLessThan(0.2);
     }
     expect(new Set(systems.map(({ warmth }) => warmth)).size).toBeGreaterThan(250);
+  });
+});
+
+describe("the tilt's numbers", () => {
+  it("are the tilt's own cosine and sine: the two are written as numbers", () => {
+    const out = { x: NaN, y: NaN, z: NaN };
+    toScene({ x: 0, y: 1, z: 0 }, out);
+    expect(out.y - CENTRE.y).toBeCloseTo(Math.cos(DISC_TILT), 12);
+    expect(out.z - CENTRE.z).toBeCloseTo(Math.sin(DISC_TILT), 12);
+    expect(DISC_TILT).toBeCloseTo(Math.PI / 3, 12);
   });
 });
 
