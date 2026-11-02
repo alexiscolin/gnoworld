@@ -10,6 +10,9 @@ const GROUP = { across: 200, up: 120, most: 4 };
 const ACROSS_LINE = 0.2;
 const ACROSS_LOW = 0.1;
 const LINE_LEAST = 3;
+// Three bodies, or three glowing stars, a tenth or less off a line read as laid out for show when their two gaps are alike within this
+// share; at unequal gaps they read as depth (the chief, 2026-11-03). A mix is not judged: a world, its star and another stand so as they turn.
+const EVEN = 0.15;
 const RECEDES = 2;
 const SIZES_APART = 4;
 const DISTANCES_APART = 2.5;
@@ -103,11 +106,33 @@ function recedes(bodies: readonly Seen[]): boolean {
   );
 }
 
-// What stands on the screen reads as a row: three or more of the bodies' centres on it and the glowing stars near a line, not receding.
+const apart = (one: Spot, other: Spot) => Math.hypot(one.x - other.x, one.y - other.y);
+
+// Three marks near a line at like gaps, unless they are bodies that recede: of three nearly on a line, the two gaps are the two shorter of
+// their distances, compared first as the cheaper test.
+function evenly(three: readonly (Spot | Seen)[]): boolean {
+  const [one, two, last] = three;
+  if (one === undefined || two === undefined || last === undefined) return false;
+  const [short = 0, long = 0] = [apart(one, two), apart(two, last), apart(one, last)].sort((a, b) => a - b);
+  if (long - short > EVEN * long || offLine(three) > ACROSS_LOW) return false;
+  const bodies = three.filter((mark): mark is Seen => "away" in mark);
+  return bodies.length < three.length || !recedes(bodies);
+}
+
+// ponytail: n³ on the dozen marks a view draws at most.
+const evenRow = (marks: readonly (Spot | Seen)[]) =>
+  marks.some((one, a) =>
+    marks.slice(a + 1).some((two, b) => marks.slice(a + b + 2).some((three) => evenly([one, two, three]))),
+  );
+
+// What stands on the screen reads as a row: three or more of the bodies' centres on it and the glowing stars near a line, not receding;
+// or three bodies, or three stars, near one at like gaps.
 function aRow(all: readonly Seen[], { deep, lights, width, height }: Frame): boolean {
   const shown = all.filter(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height);
-  const marks = [...shown, ...lights.filter(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height)];
-  return marks.length >= LINE_LEAST && offLine(marks) <= (deep ? ACROSS_LOW : ACROSS_LINE) && !recedes(shown);
+  const stars = lights.filter(({ x, y }) => x >= 0 && x <= width && y >= 0 && y <= height);
+  const marks = [...shown, ...stars];
+  const lined = marks.length >= LINE_LEAST && offLine(marks) <= (deep ? ACROSS_LOW : ACROSS_LINE) && !recedes(shown);
+  return lined || evenRow(shown) || evenRow(stars);
 }
 
 /** Whether the bodies on screen, `spots`, and the Earth read as the view must, judged in `frame`: spread, apart, in no row that does not

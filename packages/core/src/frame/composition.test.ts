@@ -142,3 +142,41 @@ describe("a row of bodies", () => {
     expect(composed(uneven, EARTH, { ...FLAT, lights })).toBe(true);
   });
 });
+
+// The chief, 2026-11-03: what gives a planetarium away is a row at like gaps; a line at unequal gaps reads as depth. Three bodies, or
+// three glowing stars, a tenth or less off a line, their two gaps alike within 15%, are refused among others off it; a mix is not judged.
+describe("a row at like gaps", () => {
+  const SIZE = { width: 1728, height: 1080 };
+  const sun = (x: number, y: number) => ({ x, y, radius: 0 });
+  // Two bodies and the Earth off the suns' line: the whole set stands half across, no row.
+  const ASIDE = [spot(400, 800), spot(1000, 1000)];
+  const BESIDE = spot(1400, 800, [54, 26]);
+
+  it("refuses the design review's three suns, 343 and 373 pixels apart, and keeps them 321 and 395 apart", () => {
+    const lights = [sun(200, 300), sun(540, 345), sun(910, 300)];
+    expect(composed(ASIDE, BESIDE, { ...SIZE, deep: false, lights })).toBe(false);
+    const unequal = [sun(200, 300), sun(518, 345), sun(910, 300)];
+    expect(composed(ASIDE, BESIDE, { ...SIZE, deep: false, lights: unequal })).toBe(true);
+  });
+
+  it("refuses three bodies at like gaps whatever stands off them, and keeps a body, a star and a body at like gaps", () => {
+    const lights = [sun(600, 900)];
+    const even = [spot(300, 500, [20, 20]), spot(600, 530, [20, 30]), spot(900, 560, [20, 40])];
+    expect(composed(even, EARTH, { ...SIZE, deep: false, lights })).toBe(false);
+    const mixed = [spot(200, 300), spot(910, 300)];
+    expect(composed([...ASIDE, ...mixed], BESIDE, { ...SIZE, deep: false, lights: [sun(540, 345)] })).toBe(true);
+  });
+
+  it("keeps Onyx's view at rest: the Earth, streak and agents on a line 520 and 184 pixels apart, as depth", () => {
+    const [streak, agents, gnoslinger, close] = [
+      spot(1338, 754, [25, 39.9]),
+      spot(1503, 836, [29, 39.5]),
+      spot(592, 349, [17, 77.8]),
+      spot(-31, 405, [157, 9.8]),
+    ];
+    const lights = [sun(1168, 558), sun(1415, 838), sun(640, 365)];
+    expect(
+      composed([streak, agents, gnoslinger, close], spot(864, 540, [54, 26]), { ...SIZE, deep: true, lights }),
+    ).toBe(true);
+  });
+});
