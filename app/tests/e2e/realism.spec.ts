@@ -13,8 +13,8 @@ const MEMORY_AT_MOST = 120 * 1024 * 1024;
 // frame 4's does, and has a bound of its own.
 const LIT_APART = 6;
 const NET_APART = 30;
-// The gallery of 24's own (7b4), measured there on SwiftShader: its discs are smaller, and the kept twelve alone lie 10.9 and 42 apart on it
-// (4.9 and 25 on the gallery of twelve), a hot giant's faint belts 13.5 and 52.
+// The gallery of 24's own (7b4), measured there on SwiftShader: its discs are smaller, and the kept twelve alone lie 11.1 and 44 apart on it
+// (4.9 and 28.5 on the gallery of twelve), with the faintest new class, a hot giant's belts, 12.3 and 48.7.
 const LIT_APART_24 = 14;
 const NET_APART_24 = 55;
 // The gallery shows ADR-0002 §3's twelve as Alexis approved them; `gallery24` shows all 24.
@@ -374,10 +374,21 @@ test.describe("the realism page", () => {
       expect(Math.abs((beacon[index] ?? 0) - (inhabited[index] ?? 0)), anchor).toBeLessThan(0.5);
   });
 
+  // An ocean world's few coasts read 0.36 darker with half a crowd than with nobody once (a ledger row for 7b5): it is left out of the gain.
   test("with nobody here no stage lights a night side: a beacon is dark as a world at rest", async ({ page }) => {
     const rest = await nightAt(page, "rest");
     const empty = await discLight(page, "stage=beacon&present=0");
-    for (const [index, anchor] of TWELVE.entries())
+    const crowded = await discLight(page, "stage=beacon&present=0.5");
+    for (const [index, anchor] of TWELVE.entries()) {
+      expect(Math.abs((empty[index] ?? 0) - (rest[index] ?? 0)), anchor).toBeLessThan(0.5);
+      if (anchor !== "ocean") expect(crowded[index] ?? 0, anchor).toBeGreaterThan(empty[index] ?? 0);
+    }
+  });
+
+  test("on the 24's view too, nobody here lights no night side", async ({ page }) => {
+    const rest = await discLight(page, "stage=rest", "gallery24");
+    const empty = await discLight(page, "stage=beacon&present=0", "gallery24");
+    for (const [index, anchor] of ANCHORS.entries())
       expect(Math.abs((empty[index] ?? 0) - (rest[index] ?? 0)), anchor).toBeLessThan(0.5);
   });
 

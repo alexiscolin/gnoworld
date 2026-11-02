@@ -3,10 +3,10 @@ import { PerspectiveCamera, Vector3 } from "three";
 import type { Planet } from "../src/scene/planet/planet.ts";
 import type { ViewName } from "./choice.ts";
 
-const GALLERY = { fov: 20, distance: 30, fill: 0.74 };
-// The twelve anchors Alexis approved in a grid of four by three, as he saw them; all 24 in six by four.
-const TWELVE = { columns: 4, rows: 3 };
-const ALL = { columns: 6, rows: 4 };
+const GALLERY = { fov: 20, distance: 30 };
+// The twelve anchors Alexis approved in a grid of four by three, as he saw them; all 24 in six by four, a little apart from the credits.
+const TWELVE = { columns: 4, rows: 3, fill: 0.74 };
+const ALL = { columns: 6, rows: 4, fill: 0.7 };
 // A row holds the six stages, the biggest world filling its cell.
 const STAGES_ROW = { columns: 6, biggest: 1.6 };
 const CLOSE = { fov: 30, distance: 5.75 };
@@ -26,7 +26,7 @@ function farCamera() {
   return { camera, height: 2 * GALLERY.distance * Math.tan((GALLERY.fov * Math.PI) / 360) };
 }
 
-function galleryLayout({ columns, rows }: { columns: number; rows: number }): Layout {
+function galleryLayout({ columns, rows, fill }: { columns: number; rows: number; fill: number }): Layout {
   const { camera, height } = farCamera();
   return {
     camera,
@@ -40,7 +40,7 @@ function galleryLayout({ columns, rows }: { columns: number; rows: number }): La
       planet.group.position.set((column + 0.5) * cellWidth - width / 2, height / 2 - (row + 0.5) * cellHeight, 0);
       // A ringed world is drawn smaller, its rings kept inside its cell and on the screen.
       const room = Math.min(cellWidth, cellHeight) / 2;
-      planet.group.scale.setScalar(Math.min(room * GALLERY.fill, (room * 1.1) / (planet.look.rings?.outer ?? 1)));
+      planet.group.scale.setScalar(Math.min(room * fill, (room * 1.1) / (planet.look.rings?.outer ?? 1)));
     },
   };
 }
