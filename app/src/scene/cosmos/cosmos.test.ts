@@ -1,6 +1,7 @@
 import {
   arrivalOf,
   asciiBytes,
+  beatAt,
   BELT_INNER,
   BOUNDS,
   CENTRE,
@@ -11,6 +12,7 @@ import {
   orbitPlace,
   orbitTime,
   HOME,
+  BLOCK_MS,
   MOOD_SCALE,
   NEBULA_IMAGES,
   offLine,
@@ -2093,5 +2095,119 @@ describe("a system's arrival (7d3)", () => {
     await vi.dynamicImportSettled();
     await settled();
     expect(go).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the sun's beat (7d3)", () => {
+  const WRITTEN = "2026-11-03T06:00:00.000Z";
+  const written = Date.parse(WRITTEN);
+  const beat = (scene: ReturnType<typeof made>) => {
+    const [mesh] = glows(scene);
+    return Number(mesh?.material.uniforms["uBeat"]?.value);
+  };
+  // A frame at `now`, the wall's time, the scene's clock at `seconds`: the beat follows the chain's time, and moves only while the clock runs.
+  const frameAt = (
+    scene: ReturnType<typeof made>,
+    now: number,
+    { seconds, eye = HOME }: { seconds: number; eye?: Point },
+  ) => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    scene.cosmos.tick(eye, seconds);
+  };
+  // The file shown with its time, as the home's feed hands it.
+  const timed = async (scene: ReturnType<typeof made>, list: readonly CosmosWorld[]) => {
+    scene.cosmos.show(list, WRITTEN);
+    await vi.dynamicImportSettled();
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+  };
+  // The beat's top in a block forty blocks on, read in the test that runs: a mutant of the beat moves it.
+  const peakOf = () =>
+    Array.from({ length: 400 }, (_, at) => written + 40 * BLOCK_MS + at * 10).reduce((best, now) =>
+      beatAt(written, now) > beatAt(written, best) ? now : best,
+    );
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("lifts the great star's light once a block from the file's time, a fifth at most, and rests between", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const lifts: number[] = [];
+    for (let step = 0; step < 80; step += 1) {
+      const now = written + 8000 + step * 50;
+      frameAt(scene, now, { seconds: 1 + step / 30 });
+      const expected = beatAt(written, now);
+      if (expected === 0) expect(beat(scene)).toBe(0);
+      else lifts.push(beat(scene) / expected);
+    }
+    expect(lifts.length).toBeGreaterThan(5);
+    for (const lift of lifts) expect(lift).toBeCloseTo(lifts[0] ?? NaN, 9);
+    expect(lifts[0]).toBeGreaterThan(0.1);
+    expect(lifts[0]).toBeLessThanOrEqual(0.2);
+  });
+
+  it("beats nothing while the scene's clock stands still, as under reduced motion: no orbit turns, no sun swells", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const peak = peakOf();
+    frameAt(scene, peak, { seconds: 0 });
+    expect(beat(scene)).toBe(0);
+    frameAt(scene, peak, { seconds: 0.5 });
+    expect(beat(scene)).toBeGreaterThan(0);
+    frameAt(scene, peak, { seconds: 0.5 });
+    expect(beat(scene)).toBe(0);
+  });
+
+  it("asks no frame of its own: it rides the frames the scene draws for its orbits", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const asked = scene.moved.mock.calls.length;
+    for (let step = 0; step < 40; step += 1) frameAt(scene, written + 8000 + step * 100, { seconds: 1 + step / 30 });
+    expect(scene.moved.mock.calls.length).toBe(asked);
+  });
+
+  // The suns' shader lifts the one at the map's very centre: the great star, and no other.
+  const atTheCentre = (scene: ReturnType<typeof made>) => {
+    const [mesh] = glows(scene);
+    const at = mesh?.geometry.getAttribute("aAt");
+    return Array.from({ length: mesh?.geometry.instanceCount ?? 0 }, (_, index) => index).filter(
+      (index) => at?.getX(index) === 0 && at.getY(index) === 0 && at.getZ(index) === 0,
+    );
+  };
+
+  it("stands the great star alone at the map's centre among the suns: the one its beat lifts", async () => {
+    const scene = made();
+    await shown(scene, worlds(30));
+    expect(atTheCentre(scene)).toHaveLength(1);
+    expect(held(worlds(30)).filter(({ place: { x, y, z } }) => x === 0 && y === 0 && z === 0)).toHaveLength(1);
+  });
+
+  it("gives no beat from a file with no time: no time, no chain to beat for", async () => {
+    const scene = made();
+    await shown(scene, worlds(30));
+    for (const [step, into] of [0, 100, 250, 900].entries()) {
+      frameAt(scene, written + into, { seconds: 1 + step });
+      expect(beat(scene)).toBe(0);
+    }
+  });
+
+  it("lifts no sun where the great star is not drawn: none stands at the map's centre", async () => {
+    const scene = made();
+    const list = worlds(3000, 3);
+    await timed(scene, list);
+    const systems = held(list);
+    const [far] = [...systems].sort((a, b) => distanceOf(b.place, EARTH_PLACE) - distanceOf(a.place, EARTH_PLACE));
+    if (far === undefined) throw new Error("no system");
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.arrive(far.id, go);
+    await settled();
+    const to = go.mock.lastCall?.[0] ?? HOME;
+    scene.cosmos.tick(to, 0);
+    await settled();
+    frameAt(scene, peakOf(), { seconds: 1, eye: to });
+    expect(atTheCentre(scene)).toHaveLength(0);
   });
 });

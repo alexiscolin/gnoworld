@@ -96,6 +96,7 @@ export class Cosmos {
       this.#release = setTimeout(this.#releaseMaps, RELEASE_MS);
       return;
     }
+    this.#atRest.written = Date.parse(written ?? "");
     if (worlds !== this.#list) {
       this.#list = worlds;
       this.#systems = systemsOf(heldOf(worlds));
@@ -142,7 +143,7 @@ export class Cosmos {
     this.#atRest.place(eye, seconds, this.#eye);
     this.#atRest.place(resting, 0, this.#resting);
     this.#atRest.aim(this.#device.camera, this.#eye);
-    this.#disc.advance(this.#eye, seconds);
+    this.#disc.advance(this.#eye, seconds, this.#atRest.lift(seconds));
     this.#bodies.tick(this.#eye, seconds);
     this.#home.tick(this.#eye, seconds, this.#device.camera.quaternion);
     // What the eye looks at, the Earth or a system it came to: its distance says how much of the nebulae and of the whole cosmos shows.

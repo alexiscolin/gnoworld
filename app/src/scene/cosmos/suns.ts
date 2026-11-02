@@ -28,12 +28,14 @@ interface SunLook {
 const CORNERS = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
 const QUAD = [0, 1, 2, 0, 2, 3];
 
-// Its last line draws behind every body, as the frames have it: a world by a sun is dark against its light, never washed by it.
+// Its last line draws behind every body, as the frames have it: a world by a sun is dark against its light, never washed by it. The sun at
+// the map's very centre is the great star, which beats (7d3).
 const VERTEX = /* glsl */ `
 attribute vec3 aAt;
 attribute vec4 aSun;
 attribute float aHalo;
 uniform float uFocal;
+uniform float uBeat;
 varying vec2 vPlace;
 varying vec3 vLight;
 varying float vHalo;
@@ -45,7 +47,7 @@ void main() {
   float region = smoothstep(${(MIDDLE * 0.75).toFixed(1)}, ${MIDDLE.toFixed(1)}, away) * (1.0 - smoothstep(${(HAZE * 0.6).toFixed(1)}, ${HAZE.toFixed(1)}, away));
   vPlace = position.xy;
   vHalo = aHalo;
-  vLight = vec3(mix(star, region, glow) * aSun.w, aSun.y, aSun.w * aSun.w * aSun.w);
+  vLight = vec3(mix(star, region, glow) * aSun.w * (1.0 + uBeat * step(dot(aAt, aAt), 0.0)), aSun.y, aSun.w * aSun.w * aSun.w);
   at.xy += position.xy * max(aSun.x, 3.0 * away / uFocal);
   gl_Position = projectionMatrix * at;
   gl_Position.z = gl_Position.w * 0.99998;
@@ -82,6 +84,8 @@ export class Suns {
   readonly #focal = { value: 1 };
   /** How much of them shows: the whole cosmos takes the rest. */
   readonly fade = { value: 1 };
+  /** How much the great star, the sun at the map's centre, lifts its light on the sun's beat. */
+  readonly beat = { value: 0 };
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
     const size = (items: number) => {
@@ -102,7 +106,7 @@ export class Suns {
       blending: AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      uniforms: { uFocal: this.#focal, uFade: this.fade },
+      uniforms: { uFocal: this.#focal, uFade: this.fade, uBeat: this.beat },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });

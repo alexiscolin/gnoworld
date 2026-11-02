@@ -130,10 +130,11 @@ export class Disc {
     this.#belt.fade.value = level;
   }
 
-  /** One frame on. */
-  advance(eye: Point, seconds: number): void {
+  /** One frame on, the great star lifted `lift` on the sun's beat. */
+  advance(eye: Point, seconds: number, lift = 0): void {
     this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);
     this.#dots.advance(orbitTime(seconds));
+    this.#suns.beat.value = lift;
   }
 
   /** Writes what a look saw. */

@@ -38,11 +38,14 @@ export class AtRest {
   readonly looked = { x: NaN, y: NaN, z: NaN };
   /** The same on the map, around which the ladder stands bodies. */
   focus: Point = EARTH_PLACE;
+  /** The worlds' file's time, in milliseconds, which sets the sun's beat; none, no beat. */
+  written = Number.NaN;
   readonly #found: () => void;
   #view = plainRest();
   #postcards: ReadonlyMap<number, Postcard> = new Map();
   #searched: Searched | undefined;
   #eye: InstanceType<Searched["RestEye"]> | undefined;
+  #beat: InstanceType<Searched["Beat"]> | undefined;
   #asked = 0;
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
@@ -93,6 +96,7 @@ export class AtRest {
         const view = searched.restView(systems);
         this.#searched = searched;
         this.#eye ??= new searched.RestEye();
+        this.#beat ??= new searched.Beat();
         this.#view = view;
         this.#postcards = searched.postcardsOf(systems, view);
         this.#eye.rest(view);
@@ -111,6 +115,11 @@ export class AtRest {
       out.y = eye.y;
       out.z = eye.z;
     }
+  }
+
+  /** How much the great star lifts its light on the sun's beat, a frame `seconds` on the worlds' clock (7d3). */
+  lift(seconds: number): number {
+    return this.#beat?.lift(this.written, seconds) ?? 0;
   }
 
   /** Turns `camera` from `eye` to what it looks at; the scene's own turn stands until the view has come. */
