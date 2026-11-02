@@ -113,7 +113,6 @@ void main() {
     molten = shareOf(vec2(0.35 * crackle - height, 1.3));
   }
   float wet = 0.0;
-  float shore = t;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
     wet = 1.0 - smoothstep(shape.sea - coast, shape.sea + coast, t);
@@ -134,7 +133,7 @@ void main() {
     albedo = mix(albedo, sulfurLow * 1.2, caldera);
   }
   if (shape.sea > 0.0) {
-    float depth = smoothstep(0.0, 0.6, (shape.sea - shore) / shape.sea);
+    float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
   }
   if (shape.caps > 0.0) {
