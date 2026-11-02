@@ -62,7 +62,9 @@ export const WorldId = z
   .string()
   .check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
 
-const World = z.strictObject({
+// A key it does not know is dropped, never kept nor refused: a reader older than the job that wrote the file, an open tab or a server
+// rolled back, still reads every world, and nothing it cannot check reaches the app.
+const World = z.object({
   id: WorldId,
   namespace: Slug,
   realms: z.array(Realm).check(z.maxLength(WORLDS_CAPS.realms)),

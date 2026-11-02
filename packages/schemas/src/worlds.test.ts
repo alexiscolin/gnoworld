@@ -84,6 +84,13 @@ describe("Worlds", () => {
       expect(Worlds.safeParse(world({ nature })).success).toBe(false);
   });
 
+  it("drops a key of a world it does not know, so an older reader reads a newer file, and nothing unchecked passes", () => {
+    const parsed = Worlds.parse(file({ worlds: [{ id: "a/b", namespace: "a", realms: [], later: "<b>x</b>" }] }));
+    expect(parsed.worlds).toHaveLength(1);
+    expect(parsed.worlds[0]).not.toHaveProperty("later");
+    expect(Object.keys(parsed.worlds[0] ?? {}).sort()).toEqual(["id", "namespace", "realms"]);
+  });
+
   it("takes a realm whose package or history was not read, with nulls and empty lists", () => {
     const quiet = realm({
       deployer: null,
