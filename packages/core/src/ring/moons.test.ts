@@ -1,7 +1,16 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { presenceOf } from "../planet/gauges.ts";
-import { MOON_HOLD_MS, MOON_SET_MS, MOON_SMALLEST, moonSize, MOONS_MAX, nextMoons, type RoomCount } from "./moons.ts";
+import {
+  MOON_HOLD_MS,
+  MOON_SET_MS,
+  MOON_SMALLEST,
+  moonSize,
+  MOONS_MAX,
+  nextMoons,
+  type Moons,
+  type RoomCount,
+} from "./moons.ts";
 
 // Rooms as moons (ADR-0002 §1 and §3): a world's busiest rooms orbit it, four at most, and the room you are in is always one. Moons stay
 // steady: the set changes at most once a minute, and a room takes a moon's place only when it stays clearly busier for several minutes.
@@ -152,6 +161,34 @@ describe("nextMoons", () => {
     });
     expect(moved.rooms).toContain("#e");
     expect(moved.rooms).toHaveLength(MOONS_MAX);
+  });
+
+  it("lets a moon nobody is in leave at the next change (A1-3)", () => {
+    const start = nextMoons(undefined, rooms(["#a", 9], ["#b", 8]), { current: undefined, now: T0 });
+    const quiet = rooms(["#a", 9], ["#b", 0]);
+    expect(nextMoons(start, quiet, { current: undefined, now: T0 + 1_000 }).rooms).toContain("#b");
+    expect(nextMoons(start, quiet, { current: undefined, now: T0 + MOON_SET_MS }).rooms).toEqual(["#a"]);
+  });
+
+  it("keeps four at most, no room twice and yours in, minute after minute (A1-3)", () => {
+    const names = ["#a", "#b", "#c", "#d", "#e", "#f", "#g"];
+    fc.assert(
+      fc.property(
+        fc.array(fc.array(fc.nat({ max: 30 }), { minLength: 7, maxLength: 7 }), { minLength: 1, maxLength: 40 }),
+        (steps) => {
+          let moons: Moons | undefined;
+          steps.forEach((counts, step) => {
+            moons = nextMoons(moons, rooms(...names.map((room, at) => [room, counts[at] ?? 0] as const)), {
+              current: "#g",
+              now: T0 + step * 70_000,
+            });
+            expect(moons.rooms.length).toBeLessThanOrEqual(MOONS_MAX);
+            expect(new Set(moons.rooms).size).toBe(moons.rooms.length);
+            expect(moons.rooms).toContain("#g");
+          });
+        },
+      ),
+    );
   });
 
   it("lets a room that left the list leave at once", () => {

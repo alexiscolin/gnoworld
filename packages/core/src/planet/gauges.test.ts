@@ -177,6 +177,16 @@ describe("referenceOf", () => {
     }
   });
 
+  it("counts a world's count that is no number as nothing (A1-4)", () => {
+    const worlds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((count) => ({
+      social: count,
+      realm: count,
+    }));
+    const spoilt = [...worlds, { social: Number.NaN, realm: Infinity }, { social: -Infinity, realm: Number.NaN }];
+    // Twenty-two worlds, the two spoilt ones at nothing: the 95th percentile is the 21st, 19.
+    expect(referenceOf(spoilt)).toEqual({ social: 19, realm: 19 });
+  });
+
   it("is nothing for an empty universe, so the ladder's own floor holds", () => {
     expect(referenceOf([])).toEqual({ social: 0, realm: 0 });
   });
