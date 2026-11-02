@@ -162,6 +162,48 @@ test.describe("a computer", () => {
   });
 });
 
+// A world's planet takes the frames' sizes (Alexis, 2026-11-02, F4307): its circle is its busiest, frame 104's Bubble, 336 px of radius at
+// 1728 by 1080, whose ring at 1.143 radii reaches the plate's words and the dock and never passes under them; a world at rest, as these are,
+// is frame 22's quieter GovDAO, 172 px. The Earth's circle stays its own (earth.spec.ts).
+const RING = 1.143;
+for (const viewport of [
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
+  COMPUTER,
+  { width: 2560, height: 1440 },
+])
+  test.describe(`a world's size, at ${String(viewport.width)} by ${String(viewport.height)}`, () => {
+    test.use({ viewport });
+
+    test("keeps its busiest ring between the plate's words and the dock, and stands at rest as the frames do", async ({
+      page,
+    }) => {
+      await visit(page, "/w/bubble?test-gpu");
+      await drawn(page);
+      await opened(page);
+      const circle = await page.locator("[data-globe]").boundingBox();
+      const dock = await page.locator("#chat").boundingBox();
+      if (circle === null || dock === null) throw new Error("no circle, or no dock");
+      const words = await page
+        .locator("[data-look='plate'] :is(h1, h2, p, a, button)")
+        .evaluateAll((all) => Math.max(...all.map((each) => each.getBoundingClientRect().right)));
+      const radius = circle.width / 2;
+      const middle = circle.x + radius;
+      expect(middle - RING * radius, "the busiest ring clear of the plate's words").toBeGreaterThanOrEqual(words - 1);
+      expect(middle + RING * radius, "the busiest ring clear of the dock").toBeLessThanOrEqual(dock.x + 1);
+      // Within 10 px of the frames: their edges read to about 3 px, and a sphere's outline under perspective falls a little under its share.
+      if (viewport === COMPUTER) {
+        expect(Math.abs(radius - 336), "the busiest as frame 104's Bubble").toBeLessThan(10);
+        await expect
+          .poll(async () => Math.abs(((await world(page))?.centre.radius ?? 0) - 172), {
+            ...SLOW,
+            message: "at rest as frame 22's GovDAO",
+          })
+          .toBeLessThan(10);
+      }
+    });
+  });
+
 // A window this wide lays the planet's room out from the first paint, or the plate jumps under the reader as the world comes (7e's review,
 // B2-2; the Earth's own journey holds the same for its globe).
 for (const width of [1100, 1728])

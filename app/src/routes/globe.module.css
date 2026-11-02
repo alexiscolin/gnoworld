@@ -47,6 +47,15 @@
       --_radius: calc(var(--_reach) / 1.106);
     }
 
+    /* A world's circle is its busiest planet, frame 104's Bubble (Alexis, 2026-11-02): its ring, 1.143 radii, comes a small step short of
+       the plate's words and the dock, never under them, and the window's height caps it as the Earth's; a quieter world fills less (fit.ts). */
+    .globe[data-world] {
+      /* raw: the world's ring reaches 1.143 radii */
+      --_radius: calc(
+        min((var(--_end) - var(--_start)) / 2 - var(--space-2xs), (var(--_middle) - var(--_top) - 24px) * 0.86) / 1.143
+      );
+    }
+
     .globe {
       position: fixed;
       inset-block-start: calc(var(--_middle) - var(--_radius));

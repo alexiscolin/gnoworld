@@ -57,6 +57,8 @@ const CLIMB: readonly (readonly [Stage, number])[] = [
   ["living", LIVING],
 ];
 const GROWTH = 0.6;
+/** The size of the busiest world: a world at rest is 1, and grows by GROWTH as it climbs from living to the top. */
+export const SIZE_BUSIEST = 1 + GROWTH;
 const AWAKE = 0.12;
 const LEVEL: Span = [0.35, 1];
 // A seed is a small heart in a glow, frame 4's "Uncharted signal"; a week's most climb fills its span, for what a seed has become is its matter.

@@ -83,6 +83,7 @@ export { worldIdOf } from "./cosmos/worldId.ts";
 export {
   isFresh,
   LIGHT_KINDS,
+  SIZE_BUSIEST,
   STAGES,
   worldSigns,
   type LightKind,

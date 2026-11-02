@@ -161,8 +161,8 @@ describe("the world in its circle", () => {
     const { centre } = view.stats();
     expect(centre.x).toBeCloseTo(PLACE.x, 0);
     expect(centre.y).toBeCloseTo(PLACE.y, 0);
-    expect(centre.radius).toBeGreaterThan(PLACE.radius * 0.7);
-    expect(centre.radius).toBeLessThanOrEqual(PLACE.radius);
+    // At rest, frame 22's GovDAO against frame 104's busiest Bubble, which fills the circle (F4307 changed this test: it asked 0.7 to 1).
+    expect(centre.radius / PLACE.radius).toBeCloseTo(172 / 336, 1);
   });
 
   it("keeps the world on its circle as the eye turns about, its light turning with it", async () => {

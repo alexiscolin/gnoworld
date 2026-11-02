@@ -13,11 +13,10 @@ import { Standing } from "./standing.ts";
 import { statsOf } from "./stats.ts";
 import { Wake } from "./wake.ts";
 import type { WorldBody } from "./body.ts";
+import { fitOf } from "./fit.ts";
 
 export type { MoonMark };
 
-// A world at rest fills this share of the circle; a busy one grows to fill it, a seed is a small heart in it.
-const REST = 0.8;
 const NO_CASTER: readonly Vector4[] = [];
 
 export type WorldSaid = (state: EarthState, colour?: string) => void;
@@ -45,7 +44,7 @@ export class WorldView {
   #orbit: StatusOrbit | undefined;
   #marks: readonly MoonMark[] = [];
   readonly #waking = new Wake();
-  #fit = REST;
+  #fit = fitOf(1);
   #shadows = 0;
   // The world that could not come: placed again, it is not asked again. Another id, or a context restored, tries again.
   #failed: string | undefined;
@@ -176,7 +175,7 @@ export class WorldView {
   }
 
   #grow(body: WorldBody, signs: WorldSigns | undefined): void {
-    this.#fit = Math.min(1, REST * (signs?.size ?? 1));
+    this.#fit = fitOf(signs?.size ?? 1);
     body.sized.scale.setScalar(this.#fit);
     body.setWake(this.#waking.left);
     if (signs !== undefined && this.#reading !== undefined) body.setSigns(signs, this.#reading);
