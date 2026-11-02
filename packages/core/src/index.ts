@@ -109,6 +109,7 @@ export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";
 export { alike, featuresOf, type Features } from "./planet/variety.ts";
 export {
+  daysSince,
   isFresh,
   LIGHT_KINDS,
   STAGES,
