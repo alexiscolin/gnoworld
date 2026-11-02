@@ -65,13 +65,22 @@ const lastOf = ({ realms }: FileWorld) =>
     null,
   );
 
+// One count a namespace, its busiest world's: an owner who makes many worlds weighs as one (security review, S1).
+function perNamespace(file: Worlds, count: (world: FileWorld) => number): number[] {
+  const top = new Map<string, number>();
+  for (const world of file.worlds) top.set(world.namespace, Math.max(top.get(world.namespace) ?? 0, count(world)));
+  return [...top.values()];
+}
+
 // The universe's weights, once a file: its percentile of use and of calls, and its newest call, the chain's height at the file's writing.
 const weighed = new WeakMap<Worlds, Weighed>();
 function weigh(file: Worlds): Weighed {
   const known = weighed.get(file);
   if (known !== undefined) return known;
-  const use = referenceOf(file.worlds.map((world) => ({ social: 0, realm: realmUse(world) })));
-  const calls = referenceOf(file.worlds.map((world) => ({ social: 0, realm: callsOf(world) ?? 0 }))).realm;
+  const use = referenceOf(perNamespace(file, realmUse).map((realm) => ({ social: 0, realm })));
+  const calls = referenceOf(
+    perNamespace(file, (world) => callsOf(world) ?? 0).map((realm) => ({ social: 0, realm })),
+  ).realm;
   const newest = file.worlds.reduce<number | null>((top, world) => {
     const last = lastOf(world);
     return last === null ? top : Math.max(top ?? 0, last);

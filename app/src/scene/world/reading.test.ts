@@ -151,6 +151,30 @@ describe("readingOf", () => {
     expect(readingOf(withTop(1e6), quiet()).aurora).toBe(readingOf(withTop(59), quiet()).aurora);
   });
 
+  it("lets no owner of many worlds move another's aurora or use: a namespace counts once (security review, S1)", () => {
+    const honest = Array.from({ length: 40 }, (_, at) => ({
+      id: `n${String(at)}/w`,
+      namespace: `n${String(at)}`,
+      realms: [realm(`gno.land/r/n${String(at)}/w`, { calls: at * 3, callers: at % 9, lastHeight: 4990 })],
+    }));
+    const ours = {
+      id: "gov/dao",
+      namespace: "gov",
+      realms: [realm("gno.land/r/gov/dao", { calls: 90, callers: 7, lastHeight: 5000 })],
+    };
+    const owned = Array.from({ length: 30 }, (_, at) => ({
+      id: `sybil/w${String(at)}`,
+      namespace: "sybil",
+      realms: [realm(`gno.land/r/sybil/w${String(at)}`, { calls: 1e9, callers: 1e6, lastHeight: 4995 })],
+    }));
+    // Thirty worlds of one owner weigh as one of them would: any new namespace moves a percentile by one rank, and no more.
+    const one = readingOf(fileOf(ours, ...honest, ...owned.slice(0, 1)), quiet());
+    const flooded = readingOf(fileOf(ours, ...honest, ...owned), quiet());
+    expect(flooded.aurora).toBeCloseTo(one.aurora, 12);
+    expect(flooded.vitality).toBeCloseTo(one.vitality, 12);
+    expect(flooded.aurora).toBeGreaterThan(0);
+  });
+
   it("reads a file of another universe as no file: a world's page never takes the wrong chain's counts", () => {
     const busy = fileOf({
       id: "gov/dao",
