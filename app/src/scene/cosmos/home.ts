@@ -31,6 +31,7 @@ export class Home {
   #globe: Globe | undefined;
   #line: LineLoop<BufferGeometry, LineBasicMaterial> | undefined;
   #building = false;
+  #said = false;
   #loading = new AbortController();
 
   constructor(device: EarthDevice, parent: Group) {
@@ -52,17 +53,16 @@ export class Home {
     if (this.#globe !== undefined || this.#building) return;
     this.#building = true;
     const loading = this.#loading;
-    buildGlobe({ ...this.#device, halved: () => true }, loading.signal).then(
-      (globe) => {
-        this.#building = false;
-        if (globe === undefined) return;
-        if (loading.signal.aborted) globe.dispose();
-        else this.#place(globe);
-      },
-      () => {
-        this.#building = false;
-      },
-    );
+    // Only the load still current unlocks the next: an old one answering late must not start a second Earth (F3571).
+    const settled = () => {
+      if (loading === this.#loading) this.#building = false;
+    };
+    buildGlobe({ ...this.#device, halved: () => true }, loading.signal).then((globe) => {
+      settled();
+      if (globe === undefined) return;
+      if (loading.signal.aborted || this.#globe !== undefined) globe.dispose();
+      else this.#place(globe);
+    }, settled);
   }
 
   #place(globe: Globe): void {
@@ -76,6 +76,8 @@ export class Home {
     globe.aim(Math.asin(toward.y));
     globe.setSun(Math.atan2(-toward.z, toward.x));
     this.#device.moved();
+    if (!this.#said) this.#device.stood();
+    this.#said = true;
   }
 
   /** One frame on, from `eye`. */

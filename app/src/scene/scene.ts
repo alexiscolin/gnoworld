@@ -72,15 +72,12 @@ class LiveScene implements Scene {
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
+      // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
+      stood: () => {
+        this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
+      },
     };
-    this.#earth = this.#owner.add(
-      new EarthView({
-        ...device,
-        stood: () => {
-          this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
-        },
-      }),
-    );
+    this.#earth = this.#owner.add(new EarthView(device));
     this.#cosmos = new CosmosDoor(device, this.#owner, () => {
       this.#viewport.changed();
     });

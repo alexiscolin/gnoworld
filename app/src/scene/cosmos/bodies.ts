@@ -2,6 +2,8 @@
 // where their star stands on screen, always at the Earth's angle from the eye: a world is never a flat disc nor a black one.
 import {
   asciiBytes,
+  CENTRE,
+  EARTH_RADIUS,
   clearOf,
   growthAt,
   leanFor,
@@ -16,8 +18,9 @@ import {
   type ScreenSpot,
   type StarSystem,
 } from "@gnoworld/core";
-import { Group, SphereGeometry, Vector3, type Camera } from "three";
+import { Group, SphereGeometry, Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
 import { createPlanet, type Planet } from "../planet/planet.ts";
 import { angleAt, limbAt, sideOf } from "./far.ts";
@@ -32,6 +35,8 @@ interface Body {
   readonly star: Vector3;
   readonly sun: Vector3;
   readonly fromEye: number;
+  /** Its programs are compiled: until then it waits off the screen. */
+  ready: boolean;
 }
 
 interface BodyView {
@@ -55,7 +60,7 @@ export class Bodies {
   readonly #place = { x: 0, y: 0, z: 0 };
   readonly #onStage = { x: 0, y: 0, z: 0 };
   readonly #toEye = new Vector3();
-  readonly #camera: Camera;
+  readonly #device: EarthDevice;
   readonly #screen = new Vector3();
   readonly #ahead = new Vector3();
   readonly #spot = { x: 0, y: 0, radius: 0 };
@@ -64,9 +69,9 @@ export class Bodies {
   #seconds = 0;
   #view: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
-  constructor(maps: BodyMaps, owner: Disposer, camera: Camera) {
+  constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
     this.#maps = maps;
-    this.#camera = camera;
+    this.#device = device;
     this.#sphere = owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
   }
 
@@ -104,7 +109,7 @@ export class Bodies {
     const planet = createPlanet(look, set, this.#sphere);
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(asciiBytes(`gno.land/r/${id}`)));
-    this.#held.set(id, {
+    const body: Body = {
       id,
       system,
       world,
@@ -113,7 +118,16 @@ export class Bodies {
       star: new Vector3(),
       sun: new Vector3(),
       fromEye,
-    });
+      ready: false,
+    };
+    this.#held.set(id, body);
+    // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
+    const { renderer, camera, stage, moved } = this.#device;
+    const ready = () => {
+      body.ready = true;
+      moved();
+    };
+    renderer.compileAsync(planet.group, camera, stage).then(ready, ready);
   }
 
   /** One frame on: each where its orbit has it, from `eye`, in doubles. */
@@ -147,13 +161,13 @@ export class Bodies {
     const radius = world.radius * growthAt(away);
     const room = this.#room(at, radius);
     planet.group.scale.setScalar(radius * room);
-    planet.group.visible = room > 0;
+    planet.group.visible = body.ready && room > 0;
     planet.group.rotation.x = leanFor(planet.look.lean, Math.atan2(at.y, -at.z));
   }
 
   #spotOf(at: Vector3, radius: number): ScreenSpot {
     const { width, height, focal } = this.#view;
-    this.#screen.copy(at).project(this.#camera);
+    this.#screen.copy(at).project(this.#device.camera);
     this.#spot.x = ((this.#screen.x + 1) * width) / 2;
     this.#spot.y = ((1 - this.#screen.y) * height) / 2;
     this.#spot.radius = (radius * focal) / Math.max(-at.z, radius);
@@ -191,6 +205,17 @@ export class Bodies {
     }
     this.#held.clear();
     this.#shown.length = 0;
+  }
+
+  /** Where the great star, the Earth at `earth` and each body shown stand on screen, from `eye`, for the journeys. */
+  screen({ x, y, z }: Point, earth: Vector3 | undefined) {
+    return {
+      sun: this.spotOf(new Vector3(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z), 0),
+      earth: earth === undefined ? undefined : this.spotOf(earth, EARTH_RADIUS),
+      bodies: [...this.#held.values()].flatMap(({ at, planet }) =>
+        planet.group.visible ? [this.spotOf(at, planet.group.scale.x)] : [],
+      ),
+    };
   }
 
   /** What stands, for the journeys. */

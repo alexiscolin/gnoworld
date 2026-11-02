@@ -8,7 +8,7 @@ import type { Cosmos, CosmosWorld } from "./cosmos.ts";
 const loadCosmos = () => import("./cosmos.ts");
 
 export class CosmosDoor {
-  readonly #device: Omit<EarthDevice, "stood">;
+  readonly #device: EarthDevice;
   readonly #owner: Disposer;
   readonly #came: () => void;
   #cosmos: Cosmos | undefined;
@@ -16,7 +16,7 @@ export class CosmosDoor {
   #box: ClearBox | undefined;
   #asked = false;
 
-  constructor(device: Omit<EarthDevice, "stood">, owner: Disposer, came: () => void) {
+  constructor(device: EarthDevice, owner: Disposer, came: () => void) {
     this.#device = device;
     this.#owner = owner;
     this.#came = came;
@@ -33,7 +33,7 @@ export class CosmosDoor {
     loadCosmos().then(
       ({ Cosmos: Loaded }) => {
         if (this.#owner.signal.aborted) return;
-        this.#cosmos = this.#owner.add(new Loaded({ ...this.#device, stood: () => undefined }));
+        this.#cosmos = this.#owner.add(new Loaded(this.#device));
         this.#cosmos.keepClear(this.#box);
         this.#cosmos.show(this.#worlds);
         this.#came();

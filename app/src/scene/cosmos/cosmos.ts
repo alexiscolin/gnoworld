@@ -2,9 +2,7 @@
 // the ladder says. The camera stays at the origin, so the disc and each body come to it, and a frame writes only that. A look runs off the
 // frame, past a step of the eye: it stands the bodies and writes the disc.
 import {
-  CENTRE,
   Drawn,
-  EARTH_RADIUS,
   focusOf,
   Ladder,
   systemsOf,
@@ -14,7 +12,6 @@ import {
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
-import { Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { Bodies } from "./bodies.ts";
@@ -53,6 +50,8 @@ export class Cosmos {
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
+  #compiling = false;
+  #compiled = false;
   #looks = 0;
   #focal = 1;
   #height = 1;
@@ -63,7 +62,7 @@ export class Cosmos {
     this.#device = device;
     this.#disc = new Disc(this.#owner);
     this.#maps = new BodyMaps(device, this.#mapCame);
-    this.#bodies = new Bodies(this.#maps, this.#owner, device.camera);
+    this.#bodies = new Bodies(this.#maps, this.#owner, device);
     this.#home = new Home(device, this.#bodies.group);
     this.#setShown(false);
     device.stage.add(this.#disc.group, this.#bodies.group);
@@ -71,8 +70,21 @@ export class Cosmos {
 
   #setShown(shown: boolean): void {
     this.#wanted = shown;
-    this.#disc.group.visible = shown;
+    this.#disc.group.visible = shown && this.#compiled;
     this.#bodies.group.visible = shown;
+  }
+
+  // The disc's programs compile before it shows: a first-time compile on a frame stalls the arrival.
+  #compile(): void {
+    if (this.#compiling) return;
+    this.#compiling = true;
+    const { renderer, camera, stage } = this.#device;
+    const ready = () => {
+      this.#compiled = true;
+      this.#setShown(this.#wanted);
+      this.#device.moved();
+    };
+    renderer.compileAsync(this.#disc.group, camera, stage).then(ready, ready);
   }
 
   readonly #mapCame = (): void => {
@@ -96,6 +108,7 @@ export class Cosmos {
       this.#ladder = new Ladder(this.#systems);
     }
     this.#looked.x = NaN;
+    this.#compile();
     this.#home.stand();
     this.#device.moved();
   }
@@ -170,9 +183,11 @@ export class Cosmos {
     return wanted;
   }
 
+  // Five minutes covered: bodies, their maps and the cosmos's own Earth go; the way back stands them again.
   readonly #releaseMaps = (): void => {
     this.#bodies.drop();
     this.#maps.free();
+    this.#home.drop();
   };
 
   /** A context came back: a closed bitmap cannot be uploaded twice, so bodies, maps and the Earth come again. */
@@ -197,10 +212,7 @@ export class Cosmos {
   /** What stands, for the journeys. */
   stats() {
     const shown = this.#wanted;
-    const { x, y, z } = this.#eye;
-    const earth = this.#home.at;
     const list = this.#bodies.list();
-    const spot = (at: Vector3, radius: number) => this.#bodies.spotOf(at, radius);
     return {
       shown,
       bodies: shown ? this.#bodies.size : 0,
@@ -213,11 +225,7 @@ export class Cosmos {
       dotPixels: shown ? this.#disc.dotPixels : 0,
       earth: this.#home.stood,
       list,
-      screen: {
-        sun: spot(new Vector3(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z), 0),
-        earth: earth === undefined ? undefined : spot(earth, EARTH_RADIUS),
-        bodies: list.flatMap(({ at, planet }) => (planet.group.visible ? [spot(at, planet.group.scale.x)] : [])),
-      },
+      screen: this.#bodies.screen(this.#eye, this.#home.at),
     };
   }
 }

@@ -90,11 +90,10 @@ function made() {
     initTexture: vi.fn(),
     compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
   };
-  const cosmos = owner.add(
-    new Cosmos({ renderer, stage, camera, halved: () => false, base: "/", moved, stood: vi.fn() }),
-  );
+  const stood = vi.fn();
+  const cosmos = owner.add(new Cosmos({ renderer, stage, camera, halved: () => false, base: "/", moved, stood }));
   cosmos.resize(HEIGHT, 1);
-  return { stage, camera, owner, moved, renderer, cosmos };
+  return { stage, camera, owner, moved, renderer, cosmos, stood };
 }
 
 // A look runs off the frame, and maps load behind it: every task due is run, none guessed at.
@@ -593,6 +592,108 @@ describe("a look costs a step, never a frame", () => {
     expect(scene.cosmos.stats().list.map(({ at }) => at)).toEqual(places);
     scene.cosmos.tick(HOME, 30);
     expect(scene.cosmos.stats().list.map(({ at }) => at)).not.toEqual(places);
+  });
+});
+
+describe("its Earth", () => {
+  it("stands one Earth however a context's return and the file cross its build (F3571)", async () => {
+    const builds: ((globe: FakeGlobe) => void)[] = [];
+    const made_ = [] as FakeGlobe[];
+    globes.build.mockImplementation(
+      () =>
+        new Promise<FakeGlobe>((done) => {
+          builds.push(done);
+        }),
+    );
+    const scene = made();
+    scene.cosmos.show([]);
+    scene.cosmos.restored();
+    const first = fakeGlobe();
+    builds[0]?.(first);
+    await settled();
+    scene.cosmos.show(worlds(5));
+    for (const build of builds.slice(1)) {
+      const globe = fakeGlobe();
+      made_.push(globe);
+      build(globe);
+    }
+    await settled();
+    const onStage = [first, ...made_].filter((globe) => globe.group.parent !== null);
+    expect(onStage).toHaveLength(1);
+    expect(first.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("goes with the maps after five minutes covered, and comes back with the page", async () => {
+    const globe = fakeGlobe();
+    globes.build.mockImplementation(() => Promise.resolve(globe));
+    const scene = made();
+    await shown(scene);
+    scene.cosmos.show(undefined);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+    expect(globe.dispose).toHaveBeenCalledOnce();
+    expect(scene.cosmos.stats().earth).toBe(false);
+    await shown(scene);
+    expect(globes.build).toHaveBeenCalledTimes(2);
+  });
+
+  it("says it stood once, for the Auto probe to time what the home draws", async () => {
+    const scene = made();
+    await shown(scene);
+    expect(scene.stood).toHaveBeenCalledOnce();
+    scene.cosmos.show(undefined);
+    await shown(scene);
+    expect(scene.stood).toHaveBeenCalledOnce();
+  });
+});
+
+describe("its programs, compiled ahead", () => {
+  it("keeps the disc off the screen until its programs are ready", async () => {
+    const waiting: (() => void)[] = [];
+    const ready = () => {
+      for (const go of waiting) go();
+    };
+    const scene = made();
+    scene.renderer.compileAsync.mockImplementation(
+      () =>
+        new Promise((done) => {
+          waiting.push(() => {
+            done(scene.stage);
+          });
+        }),
+    );
+    scene.cosmos.show(worlds(5));
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    const [mesh] = glows(scene);
+    expect(mesh?.parent?.visible).toBe(false);
+    expect(scene.renderer.compileAsync).toHaveBeenCalled();
+    ready();
+    await settled();
+    expect(mesh?.parent?.visible).toBe(true);
+  });
+
+  it("shows a new body only once its programs are ready", async () => {
+    const waiting: (() => void)[] = [];
+    const scene = made();
+    scene.renderer.compileAsync.mockImplementation(
+      () =>
+        new Promise((done) => {
+          waiting.push(() => {
+            done(scene.stage);
+          });
+        }),
+    );
+    scene.cosmos.show(worlds(5));
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    scene.cosmos.tick(HOME, 0);
+    const { list } = scene.cosmos.stats();
+    expect(list.length).toBeGreaterThan(0);
+    for (const { planet } of list) expect(planet.group.visible).toBe(false);
+    for (const go of waiting) go();
+    await settled();
+    scene.cosmos.tick(HOME, 0);
+    expect(scene.cosmos.stats().list.some(({ planet }) => planet.group.visible)).toBe(true);
   });
 });
 

@@ -42,7 +42,7 @@ const earth = vi.hoisted(() => ({
 }));
 
 const cosmos = vi.hoisted(() => ({
-  made: [] as { halved: () => boolean; moved: () => void }[],
+  made: [] as { halved: () => boolean; moved: () => void; stood: () => void }[],
   show: vi.fn<(worlds: unknown) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   resize: vi.fn<(height: number, ratio: number) => void>(),
@@ -55,7 +55,7 @@ const cosmos = vi.hoisted(() => ({
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
 vi.mock("./cosmos/cosmos.ts", () => ({
   Cosmos: class {
-    constructor(device: { halved: () => boolean; moved: () => void }) {
+    constructor(device: { halved: () => boolean; moved: () => void; stood: () => void }) {
       cosmos.made.push(device);
     }
     show = cosmos.show;
@@ -177,6 +177,17 @@ describe("the cosmos", () => {
     await vi.dynamicImportSettled();
     return scene;
   };
+
+  it("times the device again once the worlds stand, as once the Earth does", async () => {
+    const scene = startScene(options(), clock);
+    clock.run(2000);
+    expect(scene.stats().probing).toBe(false);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    cosmos.made[0]?.stood();
+    expect(scene.stats().probing).toBe(true);
+    scene.dispose();
+  });
 
   it("asks for nothing of it until a page does", async () => {
     const scene = startScene(options(), clock);
