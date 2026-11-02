@@ -1,4 +1,4 @@
-import { expect, type Page } from "./fixtures.ts";
+import { expect, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
 
 // The realism page (app/lab), as its journeys open and read it: a view, its numbers, where its worlds stand.
@@ -53,9 +53,9 @@ export const open = async (page: Page, query: string) => {
   await drawn(page);
 };
 
-// The canvas with the panel away, which sits over a corner: P hides it, as for a capture.
+// The canvas with the panel away, which sits over a corner: P hides it, as for a capture, and shows it again: pressed only while it shows.
 export const picture = async (page: Page) => {
-  await page.keyboard.press("p");
+  if (await page.getByRole("main").isVisible()) await page.keyboard.press("p");
   await expect(page.getByRole("main")).toBeHidden();
   return page.locator("canvas").screenshot();
 };
@@ -88,3 +88,15 @@ export const listen = (page: Page, wrong: string[]) => {
   });
   page.on("pageerror", (error) => wrong.push(error.message));
 };
+
+/** Ends each test of the describe it is called in red if its page said anything wrong (`listen`). */
+export function heldQuiet(): void {
+  const wrong: string[] = [];
+  test.beforeEach(({ page }) => {
+    wrong.length = 0;
+    listen(page, wrong);
+  });
+  test.afterEach(() => {
+    expect(wrong, "the console").toEqual([]);
+  });
+}

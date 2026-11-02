@@ -19,6 +19,8 @@ export interface Detail {
   /** The finest scale's share over the next one's: a blur lowers it, grain raises it, a world's own contrast leaves it. */
   readonly sharpness: number;
   readonly luma: number;
+  /** The energy of the lightness's steps along a latitude over across it: a giant's streaks stretched five times read about 0.1. */
+  readonly along: number;
 }
 /** Two pictures of one view, apart: per disc, the share of lit pixels moved, and the mean move of 8-pixel blocks and of pixels. */
 export interface Apart {
@@ -103,11 +105,18 @@ const detailsOf = (discs: readonly Circle[]) => {
     const at = (i: number, j: number) => luma(image, x0 + i, y0 + j);
     const half = (i: number, j: number) =>
       (at(2 * i, 2 * j) + at(2 * i + 1, 2 * j) + at(2 * i, 2 * j + 1) + at(2 * i + 1, 2 * j + 1)) / 4;
-    let total = 0;
-    for (let j = 0; j < y1 - y0; j++) for (let i = 0; i < x1 - x0; i++) total += at(i, j);
+    let [total, along, across] = [0, 0, 0];
+    for (let j = 0; j < y1 - y0; j++)
+      for (let i = 0; i < x1 - x0; i++)
+        [total, along, across] = [
+          total + at(i, j),
+          along + (at(i + 1, j) - at(i, j)) ** 2,
+          across + (at(i, j + 1) - at(i, j)) ** 2,
+        ];
     const full = variance(at, x1 - x0, y1 - y0);
     const coarse = variance(half, Math.floor((x1 - x0) / 2), Math.floor((y1 - y0) / 2));
-    return { variance: full, coarse, sharpness: full / coarse, luma: total / ((x1 - x0) * (y1 - y0)) };
+    const mean = total / ((x1 - x0) * (y1 - y0));
+    return { variance: full, coarse, sharpness: full / coarse, luma: mean, along: along / Math.max(across, 1e-6) };
   });
 };
 

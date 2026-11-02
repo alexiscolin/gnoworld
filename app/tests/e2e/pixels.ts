@@ -69,11 +69,12 @@ const install = async (base64s: readonly string[]) => {
   Reflect.set(globalThis, "__pixels", { images, image, labAt, luma, rgbAt, inside, block });
 };
 
-/** Decodes `pictures` on a page of their own, then runs `read` there on `input`: `read` reaches the tools as `globalThis.__pixels`. */
+/** Decodes `pictures` on a page of their own, then runs `read` there on `input`: `read` reaches the tools as `globalThis.__pixels`, and
+ * the functions `helpers` declares as the page's own. */
 export async function reading<Input, Output>(
   page: Page,
   pictures: readonly Buffer[],
-  [read, input]: readonly [(given: Input) => Output, Input],
+  [read, input, helpers = ""]: readonly [(given: Input) => Output, Input, string?],
 ): Promise<Output> {
   const reader = await page.context().newPage();
   try {
@@ -82,6 +83,7 @@ export async function reading<Input, Output>(
       install,
       pictures.map((picture) => picture.toString("base64")),
     );
+    if (helpers !== "") await reader.addScriptTag({ content: helpers });
     return (await reader.evaluate(read as (given: unknown) => unknown, input as unknown)) as Output;
   } finally {
     await reader.close();
