@@ -23,6 +23,13 @@ const STAR_LEAST = CELL / 10;
 const STAR_MOST = CELL / 2;
 const STAR_RUNGS = 10;
 
+/** The stations' cells (ADR-0002 §1, the team's and outside the rank): beside each other, up and left of the centre on arrival. */
+export const STATION_SEATS: readonly Seat[] = [
+  { ring: 2, cell: 6 },
+  { ring: 2, cell: 7 },
+  { ring: 2, cell: 8 },
+];
+
 export interface SystemPlace {
   readonly x: number;
   readonly y: number;
@@ -103,7 +110,7 @@ function placeOf(seed: number, { ring, cell }: Seat): SystemPlace {
 /** The places of a set of systems, by id: the same set, in any order, gives the same map. A repeated id counts once. */
 export function placeSystems(set: readonly SystemRef[]): Map<string, SystemPlace> {
   const systems = ranked(set);
-  const seats = seatInRings(raysOf(systems));
+  const seats = seatInRings(raysOf(systems), STATION_SEATS);
   const places = new Map<string, SystemPlace>();
   systems.forEach(({ id, seed }, rank) => {
     const seat = seats[rank];

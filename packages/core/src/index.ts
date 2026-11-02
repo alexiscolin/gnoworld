@@ -21,6 +21,7 @@ export {
   driftedPlaces,
   placeSystems,
   starSize,
+  STATION_SEATS,
   type SystemPlace,
   type SystemRef,
 } from "./cosmos/cosmos.ts";
