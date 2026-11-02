@@ -99,7 +99,7 @@ void main() {
     float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77 + 1.2 * fray;
     float edge = 0.03;
     if (banded > 0.5) {
-      z = noise(vec3(swirled.y * shape.bands * 0.3, minorOffset.xy)) / SPREAD;
+      z = noise(vec3(swirled.y * max(shape.bands * 0.3, 3.0), minorOffset.xy)) / SPREAD;
       edge = min(0.1, minorShare);
     }
     minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge, shareOf(vec2(z, 1.0)));

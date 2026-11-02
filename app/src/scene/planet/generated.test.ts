@@ -416,7 +416,7 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(/float z = \(patches\.x \/ patches\.y \+ [\d.]+ \* broad \+ [\d.]+ \* pole\)/);
     // A giant's minor is whole bands, from the latitude alone (7b6, F4245).
     expect(GENERATED_FRAGMENT).toMatch(
-      /z = noise\(vec3\(swirled\.y \* shape\.bands \* [\d.]+, minorOffset\.xy\)\) \/ SPREAD;/,
+      /z = noise\(vec3\(swirled\.y \* max\(shape\.bands \* [\d.]+, [\d.]+\), minorOffset\.xy\)\) \/ SPREAD;/,
     );
     expect(GENERATED_FRAGMENT).toMatch(/float edge = 0\.0[0-4]\d*;/);
     expect(GENERATED_FRAGMENT).toContain("minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge,");
