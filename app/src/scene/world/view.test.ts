@@ -189,6 +189,39 @@ describe("the world in its circle", () => {
     expect(colours).toEqual([]);
   });
 
+  it("says it failed when only the moons' small maps do not come (A2a-1)", async () => {
+    maps.load.mockImplementation((_url: string, how: { width?: number }) =>
+      how.width === 512
+        ? Promise.reject(new Error("404"))
+        : Promise.resolve(new Texture({ width: 4, height: 2, close: vi.fn() })),
+    );
+    const { said } = await opened();
+    expect(said).toEqual(["loading", "failed"]);
+  });
+
+  it("asks for a world that failed no more maps when the page places it again (A2a-2)", async () => {
+    maps.load.mockImplementation(() => Promise.reject(new Error("404")));
+    const { view } = await opened();
+    const asked = maps.load.mock.calls.length;
+    for (let again = 0; again < 5; again += 1) view.show({ circle: PLACE, id: ID }, () => undefined);
+    await settled();
+    expect(maps.load.mock.calls.length).toBe(asked);
+  });
+
+  it("compiles a seed's glow with the world: nothing is made on the wake's first frame (A2a-3)", async () => {
+    const { view, stage } = await opened();
+    const before = materials(stage).length;
+    view.read(
+      reading({
+        wake: true,
+        signs: { ...reading().signs, stage: "seed", size: 0.3, signal: 0.8 },
+        woken: reading().signs,
+      }),
+    );
+    view.tick(1);
+    expect(materials(stage).length).toBe(before);
+  });
+
   it("never stands a world the page left while it compiled, and takes its lens shift back (A2a-4)", async () => {
     const made = device();
     let compiled: () => void = () => undefined;
@@ -211,6 +244,19 @@ describe("the world in its circle", () => {
     expect(made.stage.children.filter((child) => child.children.length > 0)).toHaveLength(1);
     made.view.show(undefined, () => undefined);
     expect(made.camera.view?.enabled === true).toBe(false);
+  });
+
+  it("keeps the wake that ran when a lost context comes back: the world does not wake twice (A2a-6)", async () => {
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    for (let second = 0; second < 6; second += 0.5) view.tick(second);
+    const woken = view.stats().size;
+    view.restored();
+    await settled();
+    view.tick(7);
+    expect(view.stats().wake).toBe(0);
+    expect(view.stats().size).toBeCloseTo(woken, 6);
   });
 
   it("stands another world in place of the first when the page names another, and never the first late", async () => {

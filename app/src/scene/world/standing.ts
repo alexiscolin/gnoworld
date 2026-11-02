@@ -33,7 +33,7 @@ export class Standing {
     this.seed = planetSeed(asciiBytes(`gno.land/r/${id}`));
     this.look = worldLook(id);
     this.#maps = new BodyMaps(device, arrived, { width: CLOSE_WIDTH, failed });
-    this.#moonMaps = new BodyMaps(device, arrived, { width: MOON_WIDTH });
+    this.#moonMaps = new BodyMaps(device, arrived, { width: MOON_WIDTH, failed });
   }
 
   /** The world's own colour, its palette's middle, as the page writes a colour. */

@@ -4,7 +4,7 @@
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
-import { focalOf, standIn } from "../lens.ts";
+import { focalOf, projector, standIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
 import { MOTION } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
@@ -34,7 +34,7 @@ export class WorldView {
   readonly #sun = new Vector3();
   readonly #ringCaster = new Vector4();
   readonly #screen = { width: 1, height: 1, ratio: 1 };
-  readonly #sight = { project: this.#projected.bind(this), words: -Infinity, world: new Object3D(), disc: 0 };
+  readonly #sight: { project: ReturnType<typeof projector>; words: number; world: Object3D; disc: number };
   readonly #ringPlace = new Vector3();
   readonly #scale = new Vector3();
   #said: WorldSaid = () => undefined;
@@ -47,14 +47,16 @@ export class WorldView {
   readonly #waking = new Wake();
   #fit = REST;
   #shadows = 0;
+  // The world that could not come: placed again, it is not asked again. Another id, or a context restored, tries again.
+  #failed: string | undefined;
 
   constructor(device: EarthDevice) {
     this.#device = device;
+    this.#sight = { project: projector(device.camera, this.#screen), words: -Infinity, world: new Object3D(), disc: 0 };
   }
 
   #say(state: EarthState, colour?: string): void {
-    this.#state = state;
-    this.#said(state, colour);
+    this.#said((this.#state = state), colour);
   }
 
   /** Stands the world `place` names in its circle, another in place of the last, or takes it away. */
@@ -64,7 +66,7 @@ export class WorldView {
     if (place === undefined) {
       this.#drop();
       this.#say("gone");
-    } else if (this.#standing?.id !== place.id) {
+    } else if (this.#standing?.id !== place.id && this.#failed !== place.id) {
       this.#drop();
       this.#bring(place.id);
     } else this.#place();
@@ -78,10 +80,12 @@ export class WorldView {
       failed: () => {
         if (this.#standing !== standing || standing.body !== undefined) return;
         this.#drop();
+        this.#failed = id;
         this.#say("failed");
       },
     });
     this.#standing = standing;
+    this.#waking.reset();
     this.#say("loading");
     this.#stand(standing);
   }
@@ -112,7 +116,7 @@ export class WorldView {
     this.#standing?.dispose();
     if (this.#standing !== undefined) this.#device.camera.clearViewOffset();
     this.#standing = undefined;
-    this.#waking.reset();
+    this.#failed = undefined;
     this.#shadows = 0;
   }
 
@@ -192,11 +196,6 @@ export class WorldView {
     this.#shadows = body.setCasters(halved ? NO_CASTER : (moons?.casters ?? NO_CASTER), halved ? undefined : ring);
   }
 
-  #projected(at: Vector3, into: Vector3): Vector3 {
-    into.copy(at).project(this.#device.camera);
-    return into.set(((into.x + 1) * this.#screen.width) / 2, ((1 - into.y) * this.#screen.height) / 2, into.z);
-  }
-
   #disc(): number {
     const far = this.#rest.length();
     return (
@@ -207,10 +206,12 @@ export class WorldView {
 
   /** A context came back: a closed bitmap cannot be uploaded twice, so the maps come again. */
   restored(): void {
-    const id = this.#standing?.id;
+    const id = this.#standing?.id ?? this.#failed;
     if (id === undefined) return;
+    const waking = this.#waking.keep();
     this.#drop();
     this.#bring(id);
+    this.#waking.restore(waking);
   }
 
   dispose(): void {
@@ -223,7 +224,8 @@ export class WorldView {
     return statsOf({
       state: this.#state,
       standing,
-      centre: standing?.body === undefined ? undefined : this.#projected(standing.body.group.position, new Vector3()),
+      centre:
+        standing?.body === undefined ? undefined : this.#sight.project(standing.body.group.position, new Vector3()),
       disc: this.#disc(),
       fit: this.#fit,
       wake: this.#waking.left,

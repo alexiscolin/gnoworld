@@ -1,6 +1,6 @@
 // A body stood in the circle a page keeps for it, the Earth's or a world's, and the lens every body is placed through: a lens shift and not a moved sphere, for off the axis a sphere's
 // picture is no circle, and stands away from the one the page keeps.
-import type { PerspectiveCamera } from "three";
+import type { PerspectiveCamera, Vector3 } from "three";
 import type { Circle } from "./earth/device.ts";
 
 /** The screen, in the page's pixels. */
@@ -19,3 +19,11 @@ export function standIn(camera: PerspectiveCamera, screen: Screen, circle: Circl
   camera.setViewOffset(width, height, width / 2 - circle.x, height / 2 - circle.y, width, height);
   return Math.hypot(focalOf(camera, height) / circle.radius, 1);
 }
+
+/** What projects a point of the stage onto `screen`, in the page's pixels, through `camera`: made once, run on frames. */
+export const projector =
+  (camera: PerspectiveCamera, screen: Screen) =>
+  (at: Vector3, into: Vector3): Vector3 => {
+    into.copy(at).project(camera);
+    return into.set(((into.x + 1) * screen.width) / 2, ((1 - into.y) * screen.height) / 2, into.z);
+  };

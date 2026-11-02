@@ -26,6 +26,12 @@ const TUBE = 0.012;
 const RING_MOON = 0.06;
 const WAKE_REACH = 3.4;
 const FORWARD = new Vector3(0, 0, RING_MOON);
+const REST: WorldSigns = {
+  stage: "rest",
+  size: 1,
+  signal: 0,
+  lights: { extent: 0, level: 0, kind: "towns", grain: 1, fine: 1, offset: [0, 0, 0], turn: 0 },
+};
 // Over the air (order 1), under the rings: the overlay; the orbit, the moon's halo and the wake over all.
 const OVERLAY_ORDER = 1.5;
 const TOP_ORDER = 4;
@@ -62,6 +68,9 @@ export class WorldBody {
 
   constructor({ look, seed, maps, sphere }: BodyParts) {
     this.planet = this.#owner.add(createPlanet(look, maps.world, sphere));
+    // A seed's glow is made now, hidden, so it compiles with the world and nothing is made on the wake's first frame.
+    this.planet.setSigns({ ...REST, signal: 1 });
+    this.planet.setSigns(REST);
     if (look.rim !== null) this.planet.setLimb(LIMB_LIGHT);
     this.overlay = this.#owner.add(
       new ShaderMaterial({

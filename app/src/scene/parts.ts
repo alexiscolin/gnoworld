@@ -21,10 +21,12 @@ export class CosmosPart {
               new Loaded(device),
         ),
       owner,
-      (cosmos) => {
-        cosmos.keepClear(this.#box);
-        cosmos.show(this.#worlds);
-        came();
+      {
+        came: (cosmos) => {
+          cosmos.keepClear(this.#box);
+          cosmos.show(this.#worlds);
+          came();
+        },
       },
     );
   }
@@ -56,10 +58,16 @@ export class WorldDoor {
               new Loaded(device),
         ),
       owner,
-      (world) => {
-        world.show(this.#asked, this.#said);
-        world.moons(this.#marks);
-        came();
+      {
+        came: (world) => {
+          world.show(this.#asked, this.#said);
+          world.moons(this.#marks);
+          came();
+        },
+        // A page that still asks is told its world will not come, or it would keep the world's room for ever.
+        failed: () => {
+          if (this.#asked !== undefined) this.#said("failed");
+        },
       },
     );
   }

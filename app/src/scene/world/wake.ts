@@ -7,8 +7,11 @@ import type { WorldReading } from "./reading.ts";
 const GROW = 1.4;
 const RUN = 3;
 
+type Growing = { -readonly [Key in keyof WorldSigns]: WorldSigns[Key] };
+
 export class Wake {
   #from: number | undefined;
+  #growing: Growing | undefined;
   /** What is left of the wave, 1 as it starts and 0 once gone. */
   left = 0;
 
@@ -28,11 +31,25 @@ export class Wake {
     this.left = Math.max(0, 1 - age / RUN);
     const { signs, woken } = reading;
     if (grown >= 1) return woken;
-    return { ...signs, size: signs.size + (woken.size - signs.size) * grown, signal: signs.signal * (1 - grown) };
+    // Written into what the wake keeps: nothing is made on a frame.
+    const growing = (this.#growing ??= { ...signs });
+    Object.assign(growing, signs);
+    growing.size = signs.size + (woken.size - signs.size) * grown;
+    growing.signal = signs.signal * (1 - grown);
+    return growing;
   }
 
   reset(): void {
     this.#from = undefined;
     this.left = 0;
+  }
+
+  /** Where the wake stands, kept across a context restored: a world that woke never wakes twice. */
+  keep(): number | undefined {
+    return this.#from;
+  }
+
+  restore(from: number | undefined): void {
+    this.#from = from;
   }
 }
