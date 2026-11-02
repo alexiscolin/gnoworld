@@ -71,39 +71,35 @@ float cratersAt(vec3 p, float frequency, float pixel) {
   vec3 q = p * frequency;
   ivec3 base = ivec3(floor(q - 0.5));
   float depth = 0.0;
-  for (int z = 0; z <= 1; z++)
-    for (int y = 0; y <= 1; y++)
-      for (int x = 0; x <= 1; x++) {
-        ivec3 cell = base + ivec3(x, y, z);
-        uint h = hashOf(cell + 101);
-        if (float(h & 255u) / 255.0 >= shape.craters) continue;
-        vec3 centre = vec3(cell) + 0.35 + 0.3 * vec3(float((h >> 16u) & 255u), float((h >> 24u) & 255u), float((h >> 4u) & 15u) * 17.0) / 255.0;
-        float radius = 0.18 + 0.17 * float((h >> 8u) & 255u) / 255.0;
-        float d = length(q - centre) / radius;
-        float rim = max(0.05, 8.0 * pow(frequency * pixel / radius, 2.0));
-        depth += d < 1.0 ? d * d - 1.0 : 0.0;
-        depth += 0.4 * sqrt(0.05 / rim) * exp(-(d - 1.0) * (d - 1.0) / rim);
-      }
+  for (int k = 0; k < 8; k++) {
+    ivec3 cell = base + ivec3(k & 1, (k >> 1) & 1, k >> 2);
+    uint h = hashOf(cell + 101);
+    if (float(h & 255u) / 255.0 >= shape.craters) continue;
+    vec3 centre = vec3(cell) + 0.35 + 0.3 * vec3(float((h >> 16u) & 255u), float((h >> 24u) & 255u), float((h >> 4u) & 15u) * 17.0) / 255.0;
+    float radius = 0.18 + 0.17 * float((h >> 8u) & 255u) / 255.0;
+    float d = length(q - centre) / radius;
+    float rim = max(0.05, 8.0 * pow(frequency * pixel / radius, 2.0));
+    depth += d < 1.0 ? d * d - 1.0 : 0.0;
+    depth += 0.4 * sqrt(0.05 / rim) * exp(-(d - 1.0) * (d - 1.0) / rim);
+  }
   return depth * (1.0 - smoothstep(0.1, 0.2, frequency * pixel));
 }
 vec3 stormed(vec3 q) {
   vec3 cells = q * 2.5 + offset;
   ivec3 base = ivec3(floor(cells - 0.5));
-  for (int z = 0; z <= 1; z++)
-    for (int y = 0; y <= 1; y++)
-      for (int x = 0; x <= 1; x++) {
-        ivec3 cell = base + ivec3(x, y, z);
-        uint h = hashOf(cell + 211);
-        if (float(h & 255u) / 255.0 >= shape.storms * 0.4) continue;
-        vec3 centre = normalize((vec3(cell) + 0.5 + 0.25 * slopeAt(cell + 13) - offset) / 2.5);
-        if (ivec3(floor(centre * 2.5 + offset)) != cell) continue;
-        float radius = 0.05 + 0.13 * float((h >> 8u) & 255u) / 255.0;
-        vec3 apart = q - centre;
-        float d = length(vec3(apart.x, apart.y * 1.8, apart.z)) / radius;
-        if (d >= 1.0) continue;
-        float turn = (1.0 - d) * (1.0 - d) * 1.5 * (float((h >> 16u) & 1u) * 2.0 - 1.0);
-        q = q * cos(turn) + cross(centre, q) * sin(turn) + centre * dot(centre, q) * (1.0 - cos(turn));
-      }
+  for (int k = 0; k < 8; k++) {
+    ivec3 cell = base + ivec3(k & 1, (k >> 1) & 1, k >> 2);
+    uint h = hashOf(cell + 211);
+    if (float(h & 255u) / 255.0 >= shape.storms * 0.4) continue;
+    vec3 centre = normalize((vec3(cell) + 0.5 + 0.25 * slopeAt(cell + 13) - offset) / 2.5);
+    if (ivec3(floor(centre * 2.5 + offset)) != cell) continue;
+    float radius = 0.05 + 0.13 * float((h >> 8u) & 255u) / 255.0;
+    vec3 apart = q - centre;
+    float d = length(vec3(apart.x, apart.y * 1.8, apart.z)) / radius;
+    if (d >= 1.0) continue;
+    float turn = (1.0 - d) * (1.0 - d) * 1.5 * (float((h >> 16u) & 1u) * 2.0 - 1.0);
+    q = q * cos(turn) + cross(centre, q) * sin(turn) + centre * dot(centre, q) * (1.0 - cos(turn));
+  }
   return q;
 }
 float streaksAt(vec3 q, float pixel) {
@@ -146,10 +142,12 @@ float bandsAt(vec3 q, float pixel) {
 // warped noise's zero lines, never thinner than a pixel. A locked world: scorched glass facing its star, desert, a belt of life, ice.
 export const DETAIL = /* glsl */ `
 const float DETAIL_BLUR = 2.0;
+float levelOf(sampler2D map, Lookup at) {
+  return max(log2(max(length(at.dx), length(at.dy)) * float(textureSize(map, 0).x) + 1.0), 0.0);
+}
 vec3 detailOf(sampler2D map, Lookup at) {
   vec3 fine = read(map, at).rgb;
-  float level = log2(max(length(at.dx), length(at.dy)) * float(textureSize(map, 0).x) + 1.0);
-  vec3 smoothed = textureLod(map, at.uv, max(level, 0.0) + DETAIL_BLUR).rgb;
+  vec3 smoothed = textureLod(map, at.uv, levelOf(map, at) + DETAIL_BLUR).rgb;
   vec3 ratio = clamp(fine / max(smoothed, vec3(0.01)), 0.25, 3.0);
   float light = dot(fine, LUMA) / max(dot(smoothed, LUMA), 0.01);
   return mix(ratio, vec3(clamp(light, 0.25, 3.0)), recolour);
@@ -194,8 +192,7 @@ float skyAt(vec3 sky, float pixel) {
   return 0.736 * pow(shareOf(fbm(sky * 1.5 + minorOffset.yzx, 1.5, pixel, 0.0, 6.0).xy), 2.19);
 }
 float cloudGrain(Lookup at) {
-  float level = log2(max(length(at.dx), length(at.dy)) * float(textureSize(cloudMap, 0).x) + 1.0);
-  float smoothed = textureLod(cloudMap, at.uv, max(level, 0.0) + DETAIL_BLUR).r;
+  float smoothed = textureLod(cloudMap, at.uv, levelOf(cloudMap, at) + DETAIL_BLUR).r;
   return clamp(read(cloudMap, at).r / max(smoothed, 0.05), 0.5, 1.6);
 }
 vec3 eyeball(vec3 albedo, float tone, float day) {

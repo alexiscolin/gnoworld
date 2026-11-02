@@ -10,6 +10,8 @@ export class Eye {
   readonly at = { x: HOME.x, y: HOME.y, z: HOME.z };
   /** Where the worlds are seen from: the same, less the sky's endless cruise, which would leave them behind. */
   readonly worlds = { x: HOME.x, y: HOME.y, z: HOME.z };
+  /** Where the view rests, a mouse's lean with it but not the arrival's glide: the view at rest holds within it. */
+  readonly resting = { x: HOME.x, y: HOME.y, z: HOME.z };
   readonly turn = { yaw: 0, pitch: 0 };
   readonly #rest = { x: HOME.x, y: HOME.y, z: HOME.z };
   readonly #drift = { x: 0, y: 0, z: 0 };
@@ -23,6 +25,11 @@ export class Eye {
   /** Its time on the way, frozen with it. */
   get seconds(): number {
     return this.#seconds;
+  }
+
+  /** Where it stands, how it looks about and its clock, copied, as the scene's stats say them. */
+  said() {
+    return { eye: { ...this.at }, turn: { ...this.turn }, seconds: this.#seconds };
   }
 
   /** One frame on, `delta` ms after the last; `still` stops the clock where it stands. */
@@ -42,6 +49,9 @@ export class Eye {
     this.worlds.x = this.#rest.x + this.#glide.x + this.#leanX * LEAN;
     this.worlds.y = this.#rest.y + this.#glide.y + this.#leanY * LEAN;
     this.worlds.z = this.#rest.z + this.#glide.z;
+    this.resting.x = this.#rest.x + this.#leanX * LEAN;
+    this.resting.y = this.#rest.y + this.#leanY * LEAN;
+    this.resting.z = this.#rest.z;
   }
 
   /** Where the view rests from now on. */

@@ -7,7 +7,7 @@ interface Spot {
   y: number;
   radius: number;
 }
-interface CosmosStats {
+export interface CosmosStats {
   shown: boolean;
   bodies: number;
   stars: number;
@@ -18,8 +18,11 @@ interface CosmosStats {
   looks: number;
   dotPixels: number;
   earth: boolean;
-  screen: { sun: Spot; earth: Spot | undefined; bodies: Spot[] };
+  screen: { sun: Spot; earth: Spot | undefined; bodies: (Spot & { id: string; away: number })[] };
   nebulae: number;
+  worlds: number;
+  eye: { x: number; y: number; z: number };
+  web?: { points: number; lines: number; gold: number; share: number };
 }
 interface Stats {
   frames: number;
@@ -31,6 +34,8 @@ interface Stats {
   geometries: number;
   textures: number;
   eye: { x: number; y: number; z: number };
+  turn: { yaw: number; pitch: number };
+  seconds: number;
   cosmos: CosmosStats | undefined;
 }
 
@@ -102,5 +107,10 @@ export function shaderRefusals(page: Page): string[] {
 export const hideThePage = (page: Page) =>
   page.evaluate(() => {
     for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
+      if (
+        child instanceof HTMLElement &&
+        !(child instanceof HTMLCanvasElement) &&
+        child.querySelector("canvas") === null
+      )
+        child.style.visibility = "hidden";
   });

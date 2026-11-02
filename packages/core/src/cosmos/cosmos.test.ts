@@ -193,13 +193,12 @@ describe("the disc, with constant density", () => {
     expect(ratio).toBeLessThan(3.5);
   });
 
-  it("is thick: most systems within the disc's half thickness, some above and some below, none past the field's bound", () => {
+  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": a disc a cell thick or more, never a plane seen edge on.
+  it("is thick: systems stand over a cell above and below the plane, none past the field's bound and the disc's", () => {
     const places = [...placed(3_000).values()];
-    const outside = places.filter((p) => Math.abs(p.y) > DISC_HALF_THICKNESS);
-    expect(outside.length / places.length).toBeGreaterThan(0.03);
-    expect(outside.length / places.length).toBeLessThan(0.3);
-    expect(places.some((p) => p.y > DISC_HALF_THICKNESS)).toBe(true);
-    expect(places.some((p) => p.y < -DISC_HALF_THICKNESS)).toBe(true);
+    expect(places.filter((p) => p.y > CELL / 2).length / places.length).toBeGreaterThan(0.15);
+    expect(places.filter((p) => p.y < -CELL / 2).length / places.length).toBeGreaterThan(0.15);
+    expect(Math.max(...places.map((p) => p.y)) - Math.min(...places.map((p) => p.y))).toBeGreaterThan(2 * CELL);
     for (const p of places) expect(Math.abs(p.y)).toBeLessThanOrEqual(MAX_HEIGHT + DISC_HALF_THICKNESS);
   });
 
@@ -207,6 +206,33 @@ describe("the disc, with constant density", () => {
     const heights = [...placed(500).values()].map((p) => p.y - heightField(p.x, p.z));
     for (const lift of heights) expect(Math.abs(lift)).toBeLessThanOrEqual(DISC_HALF_THICKNESS);
     expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(DISC_HALF_THICKNESS);
+  });
+
+  it("lifts every system clear of the field, above or below it, 60% of the half thickness or more: none stands on it", () => {
+    for (const p of placed(2_000).values())
+      expect(Math.abs(p.y - heightField(p.x, p.z))).toBeGreaterThanOrEqual(0.6 * DISC_HALF_THICKNESS - 1e-9);
+  });
+
+  // The Earth stands beside the great star, on the plane: its three nearest systems and its own differ by a cell or more, so the arrival is
+  // never one band. The cells of a ring take turns up and down, so two neighbours on a ring never share a side.
+  it.each([3, 7, 100, 1_000, 10_000])(
+    "stands the Earth's three nearest systems at heights a cell apart or more, at %i systems",
+    (count) => {
+      const earth = { x: -6.73, z: 0.18 };
+      const nearest = [...placed(count).values()]
+        .sort((a, b) => Math.hypot(a.x - earth.x, a.z - earth.z) - Math.hypot(b.x - earth.x, b.z - earth.z))
+        .slice(0, 3)
+        .map(({ y }) => y);
+      expect(Math.max(0, ...nearest) - Math.min(0, ...nearest)).toBeGreaterThanOrEqual(CELL);
+    },
+  );
+
+  it("sets the neighbours of ring 1 on alternate sides of the field, by their cells", () => {
+    const ring = [...placed(200).values()].filter((place) => ringOf(place) === 1);
+    expect(ring).toHaveLength(6);
+    const around = ring.sort((a, b) => Math.atan2(a.z, a.x) - Math.atan2(b.z, b.x));
+    const sides = around.map((p) => Math.sign(p.y - heightField(p.x, p.z)));
+    for (let at = 0; at < sides.length; at += 1) expect(sides[at]).not.toBe(sides[(at + 1) % sides.length]);
   });
 
   it("never shows its lattice: positions inside a cell are spread, not on its corners", () => {
@@ -548,9 +574,9 @@ describe("a curated ecosystem is placed together", () => {
   });
 });
 
-// Golden: the map every device and every release draws, worked out apart from this code, in Python, a ray walked at a time. Changing one
-// of these numbers is a deliberate change of the map (the hash, the density, the field), never a side effect: update it in a commit that
-// says so (7d2's three reserved cells moved `varmeta`, `demo` and the `g1` system, and nothing else). A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
+// Golden: the map every device and every release draws, worked out apart from this code, in Python. Changing one is a deliberate change of
+// the map, said in its commit (7d2's reserved cells moved three systems; 7d6's thicker disc, "l'espace n'est pas en 2D", every height and
+// no x or z). A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
 describe("golden coordinates", () => {
   const set = [
     ...loose([
@@ -567,17 +593,17 @@ describe("golden coordinates", () => {
   ];
 
   it.each([
-    ["sys", [-13.78854132, 1.245973353, -15.045882698]],
-    ["varmeta", [-56.851332311, -1.103865795, -22.957775629]],
-    ["r3v4", [-15.785056512, -1.97168562, 8.74200839]],
-    ["onbloc", [-32.03706175, -1.541395906, 20.973674034]],
-    ["gnoswap", [20.901908777, -2.284912251, -10.340452521]],
-    ["nym-moultest123", [-39.693653406, 1.305684533, 6.851628079]],
-    ["samcrew", [-4.353961855, 1.030364738, 22.124125104]],
-    ["leon", [-16.048881854, -0.439412126, 37.742777871]],
-    ["demo", [-44.738462293, -2.245187493, -42.992562484]],
-    ["g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx", [-50.509277636, -0.22649227, -67.004075855]],
-    ["gnoland", [-42.920955358, -0.451738803, 35.785442824]],
+    ["sys", [-13.78854132, 4.456044163, -15.045882698]],
+    ["varmeta", [-56.851332311, -8.802359099, -22.957775629]],
+    ["r3v4", [-15.785056512, -10.295706705, 8.74200839]],
+    ["onbloc", [-32.03706175, 3.626536974, 20.973674034]],
+    ["gnoswap", [20.901908777, 4.661104088, -10.340452521]],
+    ["nym-moultest123", [-39.693653406, -10.504635061, 6.851628079]],
+    ["samcrew", [-4.353961855, 4.115375519, 22.124125104]],
+    ["leon", [-16.048881854, -7.792740136, 37.742777871]],
+    ["demo", [-44.738462293, 5.298726148, -42.992562484]],
+    ["g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx", [-50.509277636, -6.935624808, -67.004075855]],
+    ["gnoland", [-42.920955358, 2.151686889, 35.785442824]],
   ] as const)("puts %s at %j", (id, [x, y, z]) => {
     const place = placeSystems(set).get(id);
     expect(Math.abs((place?.x ?? NaN) - x)).toBeLessThan(1e-6);

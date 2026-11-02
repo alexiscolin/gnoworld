@@ -4,18 +4,38 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace } = vi.hoisted(() => ({ useSpace: vi.fn() }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace }));
+const { useSpace, useWorldsDrawn } = vi.hoisted(() => ({
+  useSpace: vi.fn(),
+  useWorldsDrawn: vi.fn<() => number | undefined>(() => undefined),
+}));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsDrawn }));
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267: the kicker says gno.world, and the one heading is the hero's line.
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-  expect(html).toMatch(/<h1\b[^>]*>2 worlds in Onyx<\/h1>/);
+  expect(html).toMatch(/<h1\b[^>]*>Worlds in Onyx<\/h1>/);
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
   expect(html).toContain('<a href="/w/govdao"');
   expect(html).toContain(">GovDAO</a>");
+});
+
+// 7d6: the hero counts what the cosmos draws, from the worlds' file the scene reads, never the page's list (hubs.json said 2 over 533).
+test("counts in its hero the worlds the cosmos draws, once the scene has told them, and no number before", async () => {
+  useWorldsDrawn.mockReturnValue(534);
+  const html = await render({ path: "/", Component: Home, loader }, "/");
+  expect(html).toMatch(/<h1\b[^>]*>534 worlds in Onyx<\/h1>/);
+  expect(html).toMatch(/data-hero="number"[^>]*>534</);
+  useWorldsDrawn.mockReturnValue(undefined);
+  expect(await render({ path: "/", Component: Home, loader }, "/")).not.toMatch(/data-hero="number"[^>]*>\d/);
+});
+
+test("counts another universe's worlds by its page's list: no cosmos is drawn there", async () => {
+  useWorldsDrawn.mockReturnValue(534);
+  const html = await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
+  expect(html).not.toContain("534");
+  useWorldsDrawn.mockReturnValue(undefined);
 });
 
 test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {
@@ -57,12 +77,6 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
 
 // Slice 5r (frames 1 to 8): the hero's big number, its line and two big actions; with no data, what is true.
 describe("home's hero", () => {
-  test("shows the number of worlds the data holds as its big number, its line saying what it counts", async () => {
-    const html = await render({ path: "/", Component: Home, loader }, "/");
-    expect(/data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1]).toBe("2");
-    expect(html).toMatch(/\b2 worlds\b/);
-  });
-
   test("claims nobody online while no source says so: no number of people, no sample (5m fills it)", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     expect(html).not.toMatch(/online|here now|talking/i);

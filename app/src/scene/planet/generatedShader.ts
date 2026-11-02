@@ -1,6 +1,6 @@
 // Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from 7b4's recipe, real maps lending
 // their fine contrast only, lit with the Earth's own light. Comments live here, out of the strings that ship (the scene's budget).
-import { FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
 import { DETAIL, FORMS, NOISE } from "./generatedParts.ts";
 import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { COMMON, PARTS, SHADE } from "./surfaceParts.ts";
@@ -9,33 +9,14 @@ import { SPIN } from "./surfaceShader.ts";
 // The recipe's surface as one struct, each field a value of `SURFACE` by its own name: `mix` is GLSL's own word, so no plain uniform.
 const UNIFORMS = /* glsl */ `
 struct Shape {
-  float scale; float lacunarity; float roughness; float warp; float erosion; float craters; float sea; float caps; float rifts;
-  float bands; float turbulence; float storms; float clouds; float drift; float detail; float halves; float mix; float octaves;
+  float scale, lacunarity, roughness, warp, erosion, craters, sea, caps, rifts;
+  float bands, turbulence, storms, clouds, drift, detail, halves, mix, octaves;
 };
 uniform Shape shape;
 uniform sampler2D minorMap;
-uniform vec3 offset;
-uniform vec3 minorOffset;
-uniform vec3 low;
-uniform vec3 mid;
-uniform vec3 high;
-uniform vec3 minorLow;
-uniform vec3 minorMid;
-uniform vec3 minorHigh;
-uniform vec3 seaShallow;
-uniform vec3 seaDeep;
-uniform vec3 glowColour;
-uniform float minorShare;
-uniform float warpAmount;
-uniform float warpFrequency;
-uniform float recolour;
-uniform float banded;
-uniform float locked;
-uniform float glowLevel;
-uniform float style;
-uniform vec3 sulfurLow;
-uniform vec3 sulfurMid;
-uniform vec3 sulfurHigh;
+uniform vec3 offset, minorOffset, low, mid, high, minorLow, minorMid, minorHigh, seaShallow, seaDeep, glowColour;
+uniform vec3 sulfurLow, sulfurMid, sulfurHigh;
+uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -127,11 +108,7 @@ void main() {
   if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
   if (banded > 0.5) albedo = mix(albedo, mid, shape.clouds * 0.3) * (1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel));
   albedo *= mix(vec3(1.0), detail, min(shape.detail * 2.0, 1.0)) * (1.0 + 0.25 * clamp(cratered, -1.0, 1.0));
-  if (style > 1.5) {
-    float caldera = smoothstep(0.9, 0.97, molten);
-    albedo = mix(albedo, vec3(0.3, 0.07, 0.02), 0.5 * smoothstep(0.84, 0.9, molten) * (1.0 - caldera));
-    albedo = mix(albedo, sulfurLow * 1.2, caldera);
-  }
+  if (style > 1.5) albedo = mix(albedo, sulfurLow * 1.2, smoothstep(0.9, 0.97, molten));
   if (shape.sea > 0.0) {
     float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
@@ -188,6 +165,7 @@ void main() {
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);
   gl_FragColor = vec4(colour, 1.0);
+  ${FARAWAY}
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

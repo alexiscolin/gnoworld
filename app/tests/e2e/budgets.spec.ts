@@ -38,8 +38,11 @@ const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 const SCENE_JS = 156 * 1024;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 17 * 1024; // 16 KiB again once 7d5 gives the nebulae a chunk of their own (Alexis, 2026-11-02).
+const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02).
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
+// The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
+const WHOLE = /\/assets\/web-[\w-]+\.js$/;
+const WHOLE_JS = 5 * 1024;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -192,6 +195,25 @@ test("the cosmos's chunk stays within its cap, and the scene's holds none of it"
   await hydrated(page);
   const there = await closureOf(page, (await scene).url());
   expect(await compressed(page, await ownOf(page, (await cosmos).url(), there))).toBeLessThanOrEqual(COSMOS_JS);
+});
+
+test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
+  const whole = page.waitForResponse((response) => WHOLE.test(response.url()));
+  const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  await page.locator("canvas[data-scene='on']").waitFor({ state: "attached" });
+  await page.evaluate(() => {
+    const view = Reflect.get(globalThis, "__gnoworldScene") as {
+      moveTo: (to: { x: number; y: number; z: number }) => void;
+      stats: () => { eye: { x: number; y: number; z: number } };
+    };
+    const { eye } = view.stats();
+    view.moveTo({ x: eye.x, y: eye.y, z: eye.z + 900 });
+  });
+  const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+  expect(await compressed(page, await ownOf(page, (await whole).url(), there))).toBeLessThanOrEqual(WHOLE_JS);
 });
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {

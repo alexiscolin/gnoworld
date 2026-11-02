@@ -4,11 +4,10 @@ import {
   CENTRE,
   EARTH_RADIUS,
   clearOf,
-  growthAt,
   leanFor,
+  orbitTime,
   orbitPlace,
   planetSeed,
-  spreadAt,
   toScene,
   worldPath,
   type ClearBox,
@@ -17,18 +16,19 @@ import {
   type ScreenSpot,
   type StarSystem,
 } from "@gnoworld/core";
-import { Group, SphereGeometry, Vector3 } from "three";
+import { Euler, Group, Quaternion, SphereGeometry, Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
 import type { Planet } from "../planet/planet.ts";
-import { angleAt, limbAt, sideOf } from "./far.ts";
+import { angleAt, fadeAt, limbAt, sideOf } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
 interface Body {
   readonly id: string;
-  readonly system: StarSystem;
-  readonly world: Orbiter;
+  // As the look that wants it has it: a postcard's plane and orbit at rest, its own anywhere else.
+  system: StarSystem;
+  world: Orbiter;
   readonly planet: Planet;
   readonly at: Vector3;
   readonly star: Vector3;
@@ -36,6 +36,8 @@ interface Body {
   readonly fromEye: number;
   /** Its programs are compiled: until then it waits off the screen. */
   ready: boolean;
+  /** It holds its place at rest: the close world, whose turn would sweep it across the view. */
+  still: boolean;
 }
 
 interface BodyView {
@@ -63,6 +65,10 @@ export class Bodies {
   readonly #screen = new Vector3();
   readonly #ahead = new Vector3();
   readonly #spot = { x: 0, y: 0, radius: 0 };
+  #depth = 0;
+  readonly #back = new Quaternion();
+  readonly #seen = new Vector3();
+  readonly #lean = new Euler(); // no pole towards the eye, a ring open 30 degrees at most, whatever the camera's turn
   readonly group = new Group();
   #last: Point | undefined;
   #seconds = 0;
@@ -83,19 +89,29 @@ export class Bodies {
     this.#view = sight;
   }
 
+  /** Shows the bodies or hides them; shown, the generated worlds' code is asked now, so it comes beside the first maps, not after them. */
+  show(shown: boolean): void {
+    this.group.visible = shown;
+    if (shown) this.#maps.kit();
+  }
+
   has(id: string): boolean {
     return this.#held.has(id);
   }
 
-  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here. */
-  stand(wanted: Wanted): void {
-    for (const [id, { planet }] of this.#held)
+  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; `still` holds its place. */
+  stand(wanted: Wanted, still?: string): void {
+    for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
-        planet.group.removeFromParent();
-        planet.dispose();
+        this.#free(body);
       }
-    for (const [id, [system, world]] of wanted) if (!this.#held.has(id)) this.#add(id, system, world);
+    for (const [id, [system, world]] of wanted) {
+      const held = this.#held.get(id);
+      if (held === undefined) this.#add(id, system, world);
+      else Object.assign(held, { system, world });
+    }
+    for (const body of this.#held.values()) body.still = body.id === still;
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
     if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
@@ -110,17 +126,8 @@ export class Bodies {
     const planet = kit.createWorld(drawn, set, this.#sphere);
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
-    const body: Body = {
-      id,
-      system,
-      world,
-      planet,
-      at: new Vector3(),
-      star: new Vector3(),
-      sun: new Vector3(),
-      fromEye,
-      ready: false,
-    };
+    const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, still: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -131,10 +138,11 @@ export class Bodies {
     renderer.compileAsync(planet.group, camera, stage).then(ready, ready);
   }
 
-  /** One frame on: each where its orbit has it, from `eye`, in doubles. */
+  /** One frame on: each where its orbit has it, from `eye`, in doubles, leant as the camera sees it. */
   tick(eye: Point, seconds: number): void {
     this.#last = eye;
     this.#seconds = seconds;
+    this.#back.copy(this.#device.camera.quaternion).invert();
     for (let at = 0; at < this.#shown.length; at += 1) {
       const body = this.#shown[at];
       if (body !== undefined) this.#pose(body, eye, seconds);
@@ -143,35 +151,33 @@ export class Bodies {
 
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
-    toScene(system.place, this.#onStage);
-    star.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
-    const away = star.length();
-    const spread = spreadAt(away);
-    const { place } = system;
-    orbitPlace(body, seconds, this.#place);
-    this.#place.x = place.x + (this.#place.x - place.x) * spread;
-    this.#place.z = place.z + (this.#place.z - place.z) * spread;
-    toScene(this.#place, this.#onStage);
-    at.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
-    planet.group.position.copy(at);
+    const away = this.#offEye(system.place, eye, star).length();
+    orbitPlace(body, body.still ? 0 : orbitTime(seconds), this.#place);
+    planet.group.position.copy(this.#offEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
     planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
     planet.setTime(seconds);
     if (planet.look.rim !== null) planet.setLimb(limbAt(away));
-    const radius = world.radius * growthAt(away);
-    const room = this.#room(at, radius);
-    planet.group.scale.setScalar(radius * room);
+    planet.setFar(fadeAt(at.length()));
+    const room = this.#room(at, world.radius);
+    planet.group.scale.setScalar(world.radius * room);
     planet.group.visible = body.ready && room > 0;
-    planet.group.rotation.x = leanFor(planet.look.lean, Math.atan2(at.y, -at.z));
+    const seen = this.#seen.copy(at).applyQuaternion(this.#back); // as the camera, turned to the Earth, sees it
+    this.#lean.set(leanFor(planet.look.lean, Math.atan2(seen.y, -seen.z)), 0, planet.look.tilt);
+    planet.group.quaternion.setFromEuler(this.#lean).premultiply(this.#device.camera.quaternion);
   }
 
   #spotOf(at: Vector3, radius: number): ScreenSpot {
     const { width, height, focal } = this.#view;
-    this.#screen.copy(at).project(this.#device.camera);
+    const { camera } = this.#device;
+    this.#screen.copy(at).project(camera);
     this.#spot.x = ((this.#screen.x + 1) * width) / 2;
     this.#spot.y = ((1 - this.#screen.y) * height) / 2;
-    this.#spot.radius = (radius * focal) / Math.max(-at.z, radius);
+    // Its depth along the view, the camera turned to the Earth.
+    const depth = -this.#ahead.copy(at).applyQuaternion(this.#back.copy(camera.quaternion).invert()).z;
+    this.#depth = depth;
+    this.#spot.radius = (radius * focal) / Math.max(depth, radius);
     return this.#spot;
   }
 
@@ -181,15 +187,23 @@ export class Bodies {
     return box === undefined ? 1 : clearOf(this.#spotOf(at, radius), box);
   }
 
+  // `place` on the map, from `eye` on the stage, into `out`.
+  #offEye(place: Point, eye: Point, out: Vector3): Vector3 {
+    toScene(place, this.#onStage);
+    return out.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
+  }
+
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
     const { box } = this.#view;
-    if (box === undefined) return 1;
-    toScene(place, this.#onStage);
-    this.#ahead.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
-    this.#spotOf(this.#ahead, 0);
-    this.#spot.radius = radius;
-    return clearOf(this.#spot, box);
+    return box === undefined ? 1 : clearOf({ ...this.#spotOf(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
+  }
+
+  /** Whether a round thing at `place` on the map, `radius` units across, shows on the screen from `eye`. */
+  inView(place: Point, radius: number, eye: Point): boolean {
+    const { x, y, radius: size } = this.#spotOf(this.#offEye(place, eye, this.#ahead), radius);
+    const { width, height } = this.#view;
+    return this.#depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
   }
 
   /** Where `at` stands on screen, for the journeys. */
@@ -198,12 +212,14 @@ export class Bodies {
     return { x, y, radius: drawn };
   }
 
+  #free({ planet }: Body): void {
+    planet.group.removeFromParent();
+    planet.dispose();
+  }
+
   /** Frees them all: the maps stay, with their owner. */
   drop(): void {
-    for (const { planet } of this.#held.values()) {
-      planet.group.removeFromParent();
-      planet.dispose();
-    }
+    for (const body of this.#held.values()) this.#free(body);
     this.#held.clear();
     this.#shown.length = 0;
   }
@@ -213,21 +229,14 @@ export class Bodies {
     return {
       sun: this.spotOf(new Vector3(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z), 0),
       earth: earth === undefined ? undefined : this.spotOf(earth, EARTH_RADIUS),
-      bodies: [...this.#held.values()].flatMap(({ at, planet }) =>
-        planet.group.visible ? [this.spotOf(at, planet.group.scale.x)] : [],
+      bodies: [...this.#held.values()].flatMap(({ id, at, planet }) =>
+        planet.group.visible ? [{ ...this.spotOf(at, planet.group.scale.x), id, away: at.length() }] : [],
       ),
     };
   }
 
   /** What stands, for the journeys. */
   list() {
-    return [...this.#held.values()].map(({ id, planet, at, star, sun }) => ({
-      id,
-      planet,
-      anchor: planet.look.anchor,
-      at,
-      star,
-      sun,
-    }));
+    return [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));
   }
 }

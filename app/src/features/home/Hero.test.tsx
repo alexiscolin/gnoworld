@@ -4,14 +4,17 @@ import { siteOf } from "../../places.ts";
 import { PLANTED } from "../../placesFixture.ts";
 import { Hero } from "./Hero.tsx";
 
-// The hero's big number counts the worlds of the universe the page is: all of them, none a sample. The real data holds one
-// world in Onyx and none in gno.land, so the site is planted, with two worlds in its default universe.
+// The hero's big number counts the worlds it is given: the page says how many (the cosmos's, or a universe's list). The real data
+// holds one world in Onyx and none in gno.land, so the site is planted, with two worlds in its default universe.
 const planted = siteOf(PLANTED);
-const heroOf = (id: string) => {
+const universeOf = (id: string) => {
   const universe = planted.universes.find((each) => each.id === id);
   if (universe === undefined) throw new RangeError(id);
-  return render({ path: "/", Component: () => <Hero universe={universe} /> }, "/");
+  return universe;
 };
+const heroWith = (id: string, worlds: number | undefined) =>
+  render({ path: "/", Component: () => <Hero universe={universeOf(id)} worlds={worlds} /> }, "/");
+const heroOf = (id: string) => heroWith(id, universeOf(id).worlds.length);
 const numberOf = (html: string) => /data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1];
 
 describe("the hero's big number, on a planted site", () => {
@@ -19,6 +22,18 @@ describe("the hero's big number, on a planted site", () => {
     const html = await heroOf("main");
     expect(numberOf(html)).toBe("2");
     expect(html).toMatch(/\b2 worlds\b/);
+  });
+
+  test("shows no number while none is known, and names the worlds without one", async () => {
+    const html = await heroWith("main", undefined);
+    expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
+    expect(html).toMatch(/<h1[^>]*>Worlds in Mainland<\/h1>/);
+  });
+
+  test("counts the number it is given, the cosmos's own", async () => {
+    const html = await heroWith("main", 534);
+    expect(numberOf(html)).toBe("534");
+    expect(html).toMatch(/<h1[^>]*>534 worlds in Mainland<\/h1>/);
   });
 
   test("counts one world in the singular, in the other universe", async () => {

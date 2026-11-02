@@ -1,11 +1,13 @@
 import {
   driftAt,
+  focusDistance,
   glideAt,
   HOME,
   NEBULA_IMAGES,
   NEBULA_LAYERS,
   NebulaField,
   nebulaLight,
+  nebulaTint,
   sheetOf,
   windowOf,
   type Nebula,
@@ -267,12 +269,15 @@ describe("its sheets", () => {
     expect(scene.nebulae.stats()).toEqual({ sheets, images: asked().length });
   });
 
+  // Its colour is the nebula's tint: the mood's, or frame 16's teal where it is cool (Alexis, 2026-11-02, decision 627), no longer the
+  // mood's alone as 7d4 drew it.
   it("cuts, turns, softens and colours each sheet as its nebula and its layer say", async () => {
     const scene = made();
     await awake(scene);
     scene.nebulae.advance(HOME, 1, 2);
     const window = { u: 0, v: 0, width: 0, height: 0 };
     const at = { x: 0, y: 0, z: 0 };
+    const tint = { red: 0, green: 0, blue: 0 };
     for (const [image, mesh] of meshes(scene).entries()) {
       if (!mesh.visible) continue;
       const expected = litFrom(HOME)
@@ -281,6 +286,7 @@ describe("its sheets", () => {
           NEBULA_LAYERS.map((layer) => {
             windowOf(nebula, layer, window);
             const half = sheetOf(nebula, layer, at);
+            nebulaTint(nebula, tint);
             return key([
               window.u,
               window.v,
@@ -289,9 +295,9 @@ describe("its sheets", () => {
               half,
               nebula.turn,
               layer.blur,
-              nebula.red,
-              nebula.green,
-              nebula.blue,
+              tint.red,
+              tint.green,
+              tint.blue,
             ]);
           }),
         );
@@ -354,7 +360,7 @@ describe("its sheets", () => {
   it("drifts with the sky's cruise while the clock runs, standing with the eye of the scenery", async () => {
     const scene = made();
     scene.nebulae.wake();
-    scene.nebulae.follow(HOME, 0);
+    scene.nebulae.follow(HOME, 0, focusDistance(HOME));
     await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
     const seconds = 600;
     const [drift, glide] = [
@@ -366,9 +372,9 @@ describe("its sheets", () => {
     // The scenery's eye, as eye.ts builds it: the worlds' eye and the cruise, which the worlds leave out.
     const scenery = { x: HOME.x + drift.x - glide.x, y: HOME.y + drift.y - glide.y, z: HOME.z + drift.z - glide.z };
     expect(Math.hypot(scenery.x - HOME.x, scenery.y - HOME.y, scenery.z - HOME.z)).toBeGreaterThan(300);
-    scene.nebulae.follow(HOME, seconds);
+    scene.nebulae.follow(HOME, seconds, focusDistance(HOME));
     await vi.advanceTimersByTimeAsync(AFTER_THE_WAIT);
-    scene.nebulae.follow(HOME, seconds);
+    scene.nebulae.follow(HOME, seconds, focusDistance(HOME));
     const at = { x: 0, y: 0, z: 0 };
     const expected = new Set<string>();
     for (const nebula of litFrom(scenery))

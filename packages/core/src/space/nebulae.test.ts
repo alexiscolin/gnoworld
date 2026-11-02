@@ -10,10 +10,12 @@ import {
   NebulaField,
   nebulaLight,
   nebulaShare,
+  nebulaTint,
   sheetOf,
   windowOf,
   type Nebula,
 } from "./nebulae.ts";
+import { wholeShare } from "./whole.ts";
 
 const far = 2 ** 40;
 const coordinate = fc.double({ min: -far, max: far, noNaN: true });
@@ -418,5 +420,97 @@ describe("its cost", () => {
           const eye = { x: nebula.x + aside, y: nebula.y, z: nebula.z + along };
           expect(cover(fieldAt(eye), eye)).toBeLessThanOrEqual(COVER_MOST);
         }
+  });
+});
+
+describe("the hand-over to the whole cosmos", () => {
+  it("gives the view to the worlds themselves at one distance: none to a cluster's, all from twice it, never both whole", () => {
+    expect(wholeShare(0)).toBe(0);
+    expect(wholeShare(CLUSTER_WIDTH)).toBe(0);
+    expect(wholeShare(CLUSTER_WIDTH * 1.5)).toBeCloseTo(0.5, 12);
+    expect(wholeShare(CLUSTER_WIDTH * 2)).toBe(1);
+    expect(wholeShare(1e9)).toBe(1);
+    for (let distance = 0; distance < 3000; distance += 0.5) {
+      const whole = wholeShare(distance);
+      expect(whole + nebulaShare(distance)).toBeLessThanOrEqual(1 + 1e-12);
+      // No dark gap between the two: past a cluster's distance one gives what the other takes.
+      if (distance >= CLUSTER_WIDTH) expect(whole + nebulaShare(distance)).toBeCloseTo(1, 12);
+      expect(Math.abs(wholeShare(distance + 0.5) - whole)).toBeLessThan(0.005);
+    }
+  });
+});
+
+// Frame 16's teal, top right (f0016.jpg, its pixels read with ffmpeg on 2026-11-02): mean sRGB (10, 44, 50), hue 190, its pixels' hues
+// 182 to 193 from the tenth to the ninetieth part. A cool nebula takes it, dark and discreet as there (Alexis, 2026-11-02).
+const FRAME_TEAL = { least: 182, most: 194 };
+const FRAME_MEAN = [10, 44, 50] as const;
+const encoded = (linear: number) => (linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055);
+const decoded = (byte: number) => {
+  const unit = byte / 255;
+  return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+};
+function hueOf(red: number, green: number, blue: number): number {
+  const [r, g, b] = [encoded(red), encoded(green), encoded(blue)];
+  const top = Math.max(r, g, b);
+  const span = top - Math.min(r, g, b);
+  if (span === 0) return 0;
+  const sector = top === r ? (g - b) / span : top === g ? 2 + (b - r) / span : 4 + (r - g) / span;
+  return (sector * 60 + 360) % 360;
+}
+
+describe("a nebula's colour", () => {
+  it("takes frame 16's teal where the mood is cool, never the grey-blue between its hues", () => {
+    const tint = { red: 0, green: 0, blue: 0 };
+    let cool = 0;
+    fc.assert(
+      fc.property(point, (eye) => {
+        for (const nebula of listed(fieldAt(eye))) {
+          nebulaTint(nebula, tint);
+          expect(Math.max(tint.red, tint.green, tint.blue)).toBeCloseTo(1, 9);
+          if (nebula.blue < 0.6 || nebula.blue - nebula.red < 0.5) continue;
+          cool += 1;
+          const hue = hueOf(tint.red, tint.green, tint.blue);
+          expect(hue).toBeGreaterThanOrEqual(FRAME_TEAL.least);
+          expect(hue).toBeLessThanOrEqual(FRAME_TEAL.most);
+          // At the frame's own light it is the frame's teal to the byte: its hue, its saturation, its green against its blue.
+          const brightest = Math.max(...FRAME_MEAN.map(decoded));
+          const bytes = [tint.red, tint.green, tint.blue].map((channel) =>
+            Math.round(encoded(channel * brightest) * 255),
+          );
+          expect(bytes).toEqual([...FRAME_MEAN]);
+        }
+      }),
+      { numRuns: 300 },
+    );
+    expect(cool).toBeGreaterThan(20);
+  });
+
+  it("keeps a warm nebula the mood's own colour, and moves no colour at once between the two", () => {
+    const tintOf = (red: number, green: number, blue: number) => {
+      const tint = { red: 0, green: 0, blue: 0 };
+      const brightest = Math.max(red, green, blue);
+      nebulaTint({ red: red / brightest, green: green / brightest, blue: blue / brightest }, tint);
+      return tint;
+    };
+    expect(tintOf(1, 0.35, 0.05)).toEqual({ red: 1, green: 0.35, blue: 0.05 });
+    expect(tintOf(1, 0.09, 0.2)).toEqual({ red: 1, green: 0.09, blue: 0.2 });
+    // From the mood's rose to its teal through mauve, in a hundred steps: each moves the colour a little.
+    const [rose, teal] = [
+      [0.1946, 0.0176, 0.0395],
+      [0.006, 0.0497, 0.0844],
+    ] as const;
+    let before = tintOf(...rose);
+    for (let step = 1; step <= 100; step += 1) {
+      const by = step / 100;
+      const after = tintOf(
+        rose[0] + (teal[0] - rose[0]) * by,
+        rose[1] + (teal[1] - rose[1]) * by,
+        rose[2] + (teal[2] - rose[2]) * by,
+      );
+      const moved =
+        Math.abs(after.red - before.red) + Math.abs(after.green - before.green) + Math.abs(after.blue - before.blue);
+      expect(moved).toBeLessThan(0.12);
+      before = after;
+    }
   });
 });

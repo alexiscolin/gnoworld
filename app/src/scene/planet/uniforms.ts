@@ -59,6 +59,7 @@ export function sharedUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     nightMap: { value: maps.night ?? maps.lights ?? maps.clouds },
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
+    faraway: { value: 0 },
     time: { value: 0 },
     cloudTime: { value: 0 },
     relief: { value: look.relief },

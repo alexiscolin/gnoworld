@@ -1,9 +1,10 @@
 // The nebulae (ADR-0002 §10, "Space views"): a telescope's view cut from a few real images, warped and recoloured, standing where the
 // mood's haze is. A lattice of cells, a cell holding one or none, everything about it from its cell's hash: a place keeps its nebula, and
 // nothing is listed or stored. Each stands as sheets one behind the other, so the eye moving parts them, the far ones softer.
-import { cellHash, nextState, unitOf, type Point } from "./cell.ts";
-import { MOOD_SCALE, moodAt, newMood } from "./mood.ts";
-import { smoothstep } from "./smooth.ts";
+import { cellHash, distanceOf, nextState, unitOf, type Point } from "./cell.ts";
+import { moodAt, newMood } from "./mood.ts";
+import { lerp, smoothstep } from "./smooth.ts";
+import { wholeShare } from "./whole.ts";
 
 /** The images, by their files' names under the textures. */
 export const NEBULA_IMAGES = ["carina", "veil", "cliffs"] as const;
@@ -78,11 +79,9 @@ const HAZE_WHOLE = 0.35;
 const LEAST = 1 / 255;
 // Past this, a cell's index is no longer a whole number: the lattice cannot count, and stands nothing.
 const FARTHEST = 2 ** 50;
-// The eye's distance to what it looks at: near a world, a system's, a cluster's, and where the whole cosmos takes over.
+// The eye's distance to what it looks at: near a world, and a system's.
 const WORLD = 3;
 const SYSTEM = 12;
-const CLUSTER = MOOD_SCALE;
-const GONE = 2 * MOOD_SCALE;
 // At a system's distance, the arrival's, the worlds are the subject and the nebulae lie low under the suns' glow; seen from a cluster's,
 // they are the view.
 const SYSTEM_SHARE = 0.35;
@@ -107,8 +106,6 @@ const blank = (): Nebula => ({
   blue: 0,
   strength: 0,
 });
-
-const awayOf = (at: Point, eye: Point): number => Math.hypot(at.x - eye.x, at.y - eye.y, at.z - eye.z);
 
 /** The nebulae around an eye, into a pool kept for good: a look makes nothing. */
 export class NebulaField {
@@ -146,7 +143,7 @@ export class NebulaField {
     at.y = (y + WALL + ROOM * unitOf(state)) * CELL;
     state = nextState(state);
     at.z = (z + WALL + ROOM * unitOf(state)) * CELL;
-    const away = awayOf(at, eye);
+    const away = distanceOf(at, eye);
     if (away > NEBULA_REACH + MARGIN) return;
     moodAt(this.#mood, at);
     if (this.#mood.haze <= 0) return;
@@ -196,7 +193,7 @@ export class NebulaField {
 
 /** How much of a nebula shows from `eye`: none at the reach, none from within its middle sheet, none too faint to see. */
 export function nebulaLight(nebula: Nebula, eye: Point): number {
-  const away = awayOf(nebula, eye);
+  const away = distanceOf(nebula, eye);
   const far = 1 - smoothstep(FADES_FROM * NEBULA_REACH, NEBULA_REACH, away);
   const light = nebula.strength * far * smoothstep(NEAR_GONE * nebula.size, NEAR_WHOLE * nebula.size, away);
   return light < LEAST ? 0 : light;
@@ -207,7 +204,29 @@ export function nebulaLight(nebula: Nebula, eye: Point): number {
 export const nebulaShare = (distance: number): number =>
   smoothstep(WORLD, SYSTEM, distance) *
   (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
-  (1 - smoothstep(CLUSTER, GONE, distance));
+  (1 - wholeShare(distance));
+
+// Frame 16's teal, top right (f0016.jpg, read on 2026-11-02): its mean, sRGB (10, 44, 50), in linear light, its brightest channel at 1.
+const TEAL = { red: 0.09516135842160993, green: 0.7896549257303476, blue: 1 };
+// How much bluer than red a mood is before its nebula is all teal: rose and mauve stay the mood's.
+const COOL_FROM = 0.1;
+const COOL_TO = 0.5;
+
+/** A nebula's colour, its brightest channel at 1: the mood's where it is warm, frame 16's teal where it is cool, never the grey-blue between
+ * the mood's cool hues (Alexis, 2026-11-02). */
+export function nebulaTint(
+  { red, green, blue }: Pick<Nebula, "red" | "green" | "blue">,
+  out: { red: number; green: number; blue: number },
+): void {
+  const cool = smoothstep(COOL_FROM, COOL_TO, blue - red);
+  out.red = lerp(red, TEAL.red, cool);
+  out.green = lerp(green, TEAL.green, cool);
+  out.blue = lerp(blue, TEAL.blue, cool);
+  const brightest = Math.max(out.red, out.green, out.blue);
+  out.red /= brightest;
+  out.green /= brightest;
+  out.blue /= brightest;
+}
 
 /** Where a layer's sheet stands, into `out`; its half-width. */
 export function sheetOf(nebula: Nebula, layer: NebulaLayer, out: { x: number; y: number; z: number }): number {

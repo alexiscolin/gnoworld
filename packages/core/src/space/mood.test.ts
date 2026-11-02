@@ -221,23 +221,25 @@ describe("heightField, a smooth field of position", () => {
     expect(new Set(samples.map((h) => h.toFixed(3))).size).toBeGreaterThan(1_000);
   });
 
-  it("stays near the plane most of the way, for the noise is cubed", () => {
+  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": the noise is no longer cubed, so the clusters stand clear of the plane, not near it.
+  it("lifts the clusters clear of the plane: most of the way a system's height is a cell's fifth or more", () => {
     const samples = Array.from({ length: 10_000 }, (_, i) =>
       Math.abs(heightField((i % 100) * CELL * 4, Math.floor(i / 100) * CELL * 4)),
     );
-    expect(samples.filter((h) => h < 2).length / samples.length).toBeGreaterThan(0.6);
+    expect(samples.filter((h) => h >= CELL / 5).length / samples.length).toBeGreaterThan(0.5);
+    expect(Math.max(...samples)).toBeGreaterThan(MAX_HEIGHT / 2);
   });
 
   // Worked out apart from this code, in Python's doubles: the same place stands at the same height on every device.
   it.each([
-    [0, 0, -0.44782901],
-    [10, 10, -0.447142927],
-    [123.5, -456.25, 1.531437438],
-    [-1500, 2200, 1.023914607],
-    [-37.5, -37.5, -0.332781449],
-    [800, 800, -7.274498829],
-    [1e5, -1e5, -3.687192924],
-    [1e9, -1e9, -6.784045412],
+    [0, 0, -3.060300447],
+    [10, 10, -3.058736835],
+    [123.5, -456.25, 4.610624404],
+    [-1500, 2200, 4.031635285],
+    [-37.5, -37.5, -2.771913631],
+    [800, 800, -7.750463656],
+    [1e5, -1e5, -6.179575062],
+    [1e9, -1e9, -7.572214482],
   ])("gives the field at (%j, %j) as %j", (x, z, expected) => {
     expect(Math.abs(heightField(x, z) - expected)).toBeLessThan(1e-6);
   });

@@ -2,7 +2,7 @@
 // It draws through one owner, and imports no React: the universe feature mounts it.
 import { type ClearBox, type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
-import type { CosmosWorld } from "./cosmos/cosmos.ts";
+import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
 import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
@@ -140,7 +140,7 @@ class LiveScene implements Scene {
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
     this.#earth.tick(this.#seconds);
-    this.#parts.tick(this.#eye.worlds, this.#eye.seconds, this.#seconds);
+    this.#parts.tick(this.#eye, this.#seconds);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);
@@ -193,8 +193,8 @@ class LiveScene implements Scene {
     this.#parts.world.moons(marks);
   }
 
-  cosmos(worlds: readonly CosmosWorld[] | undefined): void {
-    this.#parts.cosmos.show(worlds);
+  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+    this.#parts.cosmos.show(worlds, written);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
     this.#loop.redraw();
   }
@@ -215,7 +215,7 @@ class LiveScene implements Scene {
       ratio: this.#renderer.getPixelRatio(),
       probing: this.#probe.running,
       ...rendered(this.#renderer.info),
-      eye: { ...this.#eye.at },
+      ...this.#eye.said(),
       earth: this.#earth.stats(),
       ...this.#parts.stats(),
     };

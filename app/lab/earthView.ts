@@ -41,8 +41,6 @@ export async function earthView({ renderer, base, ratio }: Device): Promise<View
     drawn: [],
     stages: [],
     textures: [],
-    images: 0,
-    targetBytes: 0,
     look(_eyeX, _eyeY, aspect) {
       renderer.getSize(size);
       camera.aspect = aspect;

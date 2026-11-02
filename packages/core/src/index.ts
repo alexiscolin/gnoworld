@@ -33,11 +33,14 @@ export {
   GRAIN,
   ROOM,
   systemsOf,
+  worldSize,
   type Orbiter,
   type StarSystem,
   type WorldHeld,
 } from "./cosmos/system.ts";
+export { worldsDrawn } from "./cosmos/count.ts";
 export {
+  BODY_PIXELS,
   BOUNDS,
   dotLight,
   Drawn,
@@ -49,17 +52,30 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
+export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
-  clearOf,
-  GROWTH,
-  growthAt,
-  leanFor,
-  SPREAD,
-  spreadAt,
-  type ClearBox,
-  type ScreenSpot,
-} from "./frame/screen.ts";
-export { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
+  CENTRE,
+  DISC_TILT,
+  focusDistance,
+  focusOf,
+  onPlane,
+  orbitPlace,
+  toMap,
+  toScene,
+  type InPlane,
+} from "./frame/disc.ts";
+export { coveredShare, offLine } from "./frame/composition.ts";
+export {
+  FIELD_OF_VIEW,
+  HERO_ZONE,
+  postcardOf,
+  REST_DISTANCE,
+  REST_SCREENS,
+  restView,
+  STAR_HEART,
+  type RestView,
+  type Postcard,
+} from "./frame/rest.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -77,10 +93,11 @@ export {
   type RealmFunctions,
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseCounts } from "./planet/gauges.ts";
-export { auroraOf, BLOCK_MS, stormsOf } from "./planet/activity.ts";
+export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { worldIdOf } from "./cosmos/worldId.ts";
+export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";
 export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
@@ -144,9 +161,10 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
-export { textHash, unitOf, type Point } from "./space/cell.ts";
-export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
-export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
+export { driftAt, glideAt, HOME, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
+export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { smoothstep } from "./space/smooth.ts";
 export {
   NEBULA_IMAGES,
   NEBULA_LAYERS,
@@ -155,6 +173,7 @@ export {
   NebulaField,
   nebulaLight,
   nebulaShare,
+  nebulaTint,
   sheetOf,
   windowOf,
   type Nebula,
@@ -163,3 +182,4 @@ export {
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
 export { wrapTo } from "./space/torus.ts";
+export { wholeShare } from "./space/whole.ts";

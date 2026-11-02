@@ -1,6 +1,6 @@
 // The Earth and its Moon, hand-made (ADR-0002 §3): their real maps drawn as they are, through the light every world shares. Every other
 // world is generated (generatedShader.ts). A look is uniforms, never shader text.
-import { FIELD, LOOKUP } from "./chunks.ts";
+import { FARAWAY, FIELD, LOOKUP } from "./chunks.ts";
 import { COMMON, PARTS, SHADE } from "./surfaceParts.ts";
 
 /** How fast a world turns, in radians a second of its `time`. */
@@ -89,6 +89,7 @@ void main() {
   }
   colour = rimmed(colour, normal, view, day);
   gl_FragColor = vec4(colour, 1.0);
+  ${FARAWAY}
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

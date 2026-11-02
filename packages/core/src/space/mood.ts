@@ -29,8 +29,8 @@ const TONE = 1;
 const HAZE = 2;
 const DENSITY = 3;
 const HEIGHT = 4;
-// The noise is cubed, which keeps most of the plane near the disc: the slope is then at most
-// MAX_HEIGHT * 3 * (2 * 1.875 * sqrt(2)) / HEIGHT_SCALE = 0.49, under the 0.5 the tests hold.
+// The noise is no longer cubed, so the clusters stand clear of the plane (Alexis, 2026-11-02, "l'espace n'est pas en 2D"): the slope
+// is at most MAX_HEIGHT * (2 * 1.875 * sqrt(2)) / HEIGHT_SCALE = 0.16, under the 0.5 the tests hold.
 const HEIGHT_SCALE = 260;
 // prettier-ignore
 const RING = [
@@ -69,10 +69,9 @@ const field = (salt: number, at: Point, scale: number): number =>
 
 const ringAt = (hue: number, channel: number): number => RING[(hue % HUES) * 3 + channel] ?? 0;
 
-/** The height of the clusters at a position (ADR-0002 §10): smooth, within `MAX_HEIGHT`, mostly flat. */
+/** The height of the clusters at a position (ADR-0002 §10): smooth, within `MAX_HEIGHT`. */
 export function heightField(x: number, z: number): number {
-  const noise = lattice(HEIGHT, { x, y: 0, z }, HEIGHT_SCALE) * 2 - 1;
-  return noise * noise * noise * MAX_HEIGHT;
+  return (lattice(HEIGHT, { x, y: 0, z }, HEIGHT_SCALE) * 2 - 1) * MAX_HEIGHT;
 }
 
 /** A mood to read into: one a caller keeps, for a frame makes nothing. */

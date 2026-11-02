@@ -19,17 +19,10 @@ export interface Probed {
 
 function stats({ renderer, gpu, view, choice, frames }: Probed) {
   const shown = view();
-  const { view: name, method } = choice();
   const drawn =
     shown === undefined
-      ? { view: "", worlds: 0, images: 0, mapBytes: 0, targetBytes: 0 }
-      : {
-          view: name === "nebula" ? `nebula ${method}` : name,
-          worlds: shown.worlds.length,
-          images: shown.images,
-          mapBytes: mapBytes(shown.textures),
-          targetBytes: shown.targetBytes,
-        };
+      ? { view: "", worlds: 0, mapBytes: 0 }
+      : { view: choice().view, worlds: shown.worlds.length, mapBytes: mapBytes(shown.textures) };
   const { memory, render, programs } = renderer.info;
   return {
     ...drawn,

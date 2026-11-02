@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { driftAt, glideAt, turnAt } from "./drift.ts";
+import { driftAt, glideAt, orbitTime, swayAt, turnAt } from "./drift.ts";
 
 const spot = () => ({ x: 0, y: 0, z: 0 });
 const length = (a: { x: number; y: number; z: number }) => Math.hypot(a.x, a.y, a.z);
@@ -139,5 +139,57 @@ describe("turnAt", () => {
         expect(moved).toBeLessThan(0.7 * DEGREE);
       }),
     );
+  });
+});
+
+// 7d6, Alexis's "on devrait avoir de la profondeur": at rest the eye sways a little across the view, so the near worlds slide past the far.
+describe("swayAt", () => {
+  const sway = (seconds: number) => {
+    const out = { across: NaN, up: NaN };
+    swayAt(out, seconds);
+    return out;
+  };
+
+  it("starts at the view's own rest, which reduced motion keeps", () => {
+    expect(sway(0)).toEqual({ across: 0, up: 0 });
+  });
+
+  it("gives the same second the same sway, written whole into the spot it is given", () => {
+    const reused = { across: 9, up: 9 };
+    swayAt(reused, 3);
+    swayAt(reused, 41.5);
+    expect(reused).toEqual(sway(41.5));
+  });
+
+  it("stays within a unit of the rest across and half a unit up, so the view it composes holds", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 1e6, noNaN: true }), (seconds) => {
+        const { across, up } = sway(seconds);
+        expect(Math.abs(across)).toBeLessThanOrEqual(1);
+        expect(Math.abs(up)).toBeLessThanOrEqual(0.5);
+      }),
+    );
+  });
+
+  it("never stops for long: over any two seconds after the first it moves a tenth of a unit or more", () => {
+    for (let seconds = 1; seconds < 300; seconds += 1.7) {
+      const [a, b] = [sway(seconds), sway(seconds + 2)];
+      expect(Math.hypot(b.across - a.across, b.up - a.up)).toBeGreaterThan(0.1);
+    }
+  });
+
+  it("never jumps: a frame's step moves it a hundredth of a unit at most", () => {
+    for (let seconds = 0; seconds < 120; seconds += 0.37) {
+      const [a, b] = [sway(seconds), sway(seconds + 1 / 60)];
+      expect(Math.hypot(b.across - a.across, b.up - a.up)).toBeLessThan(0.01);
+    }
+  });
+});
+
+// Alexis's decision through the chief, 2026-11-02: the worlds turn at a fifth of their spin, so the eye's sway reads as depth.
+describe("orbitTime", () => {
+  it("is the clock every world turns by, bodies and points alike: a fifth of the seconds", () => {
+    expect(orbitTime(10)).toBeCloseTo(2, 12);
+    expect(orbitTime(0)).toBe(0);
   });
 });

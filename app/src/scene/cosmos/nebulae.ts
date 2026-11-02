@@ -2,14 +2,15 @@
 // eye; a frame brings them to the eye in doubles and lights them. Their images come once the worlds' maps had their turn, and each fades
 // in; near a world, and past a cluster's distance, they go out.
 import {
+  distanceOf,
   driftAt,
-  focusDistance,
   glideAt,
   NEBULA_IMAGES,
   NEBULA_LAYERS,
   NebulaField,
   nebulaLight,
   nebulaShare,
+  nebulaTint,
   sheetOf,
   windowOf,
   type Point,
@@ -37,6 +38,7 @@ export class Nebulae {
   readonly #images: readonly Sheets[];
   readonly #at = { x: 0, y: 0, z: 0 };
   readonly #window = { u: 0, v: 0, width: 0, height: 0 };
+  readonly #tint = { red: 0, green: 0, blue: 0 };
   readonly #drift = { x: 0, y: 0, z: 0 };
   readonly #glide = { x: 0, y: 0, z: 0 };
   readonly #scenery = { x: 0, y: 0, z: 0 };
@@ -123,11 +125,13 @@ export class Nebulae {
     image.count += 1;
     const half = sheetOf(nebula, look, this.#at);
     windowOf(nebula, look, this.#window);
+    nebulaTint(nebula, this.#tint);
     const { u, v, width, height } = this.#window;
+    const { red, green, blue } = this.#tint;
     for (let corner = sheet * 4; corner < sheet * 4 + 4; corner += 1) {
       image.sheet.setXYZW(corner, half, nebula.turn, look.blur, nebula.seed + layer * 7);
       image.window.setXYZW(corner, u, v, width, height);
-      image.light.setXYZW(corner, nebula.red, nebula.green, nebula.blue, 0);
+      image.light.setXYZW(corner, red, green, blue, 0);
     }
   }
 
@@ -147,16 +151,16 @@ export class Nebulae {
 
   /** A frame of the cosmos, `eye` the worlds': the nebulae are scenery, so they stand around the scenery's eye, which adds the sky's
    * cruise (eye.ts), and take their share from how far the worlds' eye is from what it looks at. */
-  follow(eye: Point, seconds: number): void {
+  follow(eye: Point, seconds: number, distance: number): void {
     driftAt(this.#drift, seconds);
     glideAt(this.#glide, seconds);
     const at = this.#scenery;
     at.x = eye.x + this.#drift.x - this.#glide.x;
     at.y = eye.y + this.#drift.y - this.#glide.y;
     at.z = eye.z + this.#drift.z - this.#glide.z;
-    const moved = Math.hypot(at.x - this.#placed.x, at.y - this.#placed.y, at.z - this.#placed.z);
+    const moved = distanceOf(at, this.#placed);
     if (!(moved < PLACE_STEP) && this.#placing === undefined) this.#placing = setTimeout(this.#standAround);
-    this.advance(at, nebulaShare(focusDistance(eye)), seconds);
+    this.advance(at, nebulaShare(distance), seconds);
   }
 
   // Off the frame: a look of its own, around where the scenery's eye has come.

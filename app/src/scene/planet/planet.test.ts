@@ -167,6 +167,28 @@ describe("a world's parts, on either program", () => {
     expect(read(planet.surface, "spin")).toEqual(wanted);
   });
 
+  // 7d6, Alexis's depth: a far world softer and a little dimmer, as frame 4's, its light the approved one; up close, nothing changes.
+  it("starts every part of a world crisp, and dims and softens it all by how far it stands", () => {
+    for (const planet of [generated("gas giant"), createPlanet(EARTH, fixed(), sphere)]) {
+      const parts = meshes(planet).map((part) => part.material as ShaderMaterial);
+      expect(parts.length).toBeGreaterThan(1);
+      for (const part of parts) expect(read(part, "faraway")).toBe(0);
+      planet.setFar(0.3);
+      for (const part of parts) expect(read(part, "faraway")).toBe(0.3);
+    }
+  });
+
+  it("dims a far world toward its own grey and darker, after its light, so the Earth's page at 0 draws as approved", () => {
+    for (const fragment of [...SURFACES, AIR_FRAGMENT, RING_FRAGMENT]) {
+      expect(fragment).toMatch(/uniform float faraway;/);
+      // The last thing done to the colour before the grade: a share of grey and a share of dark, each a product of `faraway`.
+      const [, last = ""] = /\n([^\n]*faraway[^\n]*)\n\s*#include <tonemapping_fragment>/.exec(fragment) ?? [];
+      expect(last).toMatch(
+        /gl_FragColor\.rgb\s*=\s*mix\(gl_FragColor\.rgb,\s*vec3\(dot\(gl_FragColor\.rgb, [^)]*\)+,\s*[\d.]+ \* faraway\) \* \(1\.0 - [\d.]+ \* faraway\);/,
+      );
+    }
+  });
+
   it("gives every part of a world the one sun, as a copy", () => {
     const planet = generated("temperate");
     const sun = new Vector3(1, 0, 0);

@@ -20,9 +20,9 @@ import {
 } from "./lab.ts";
 import { pixelHash } from "./pixels.ts";
 
-// 7b's realism page (app/lab): a world of each anchor and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
-// software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
-// The canvas is not pixel-compared (the plan, section 6).
+// 7b's realism page (app/lab): a world of each anchor, for Alexis's eye on a real GPU; the nebulae are the cosmos's (7d4, cosmos.spec.ts).
+// These journeys hold what a software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of
+// maps, inside its memory. The canvas is not pixel-compared (the plan, section 6).
 
 // Nine surface maps (the Earth's among them), the clouds and the ring's profile.
 const MAPS_AT_MOST = 11;
@@ -38,14 +38,7 @@ const NET_APART_24 = 55;
 // The gallery shows ADR-0002 §3's twelve as Alexis approved them; `gallery24` shows all 24.
 const TWELVE = ANCHORS.slice(0, 12);
 const NETS: readonly string[] = ["volcanic", "dark carbon", "lava world"];
-const NEBULA_AT_MOST = 40 * 1024 * 1024;
-const VIEWS = [
-  "?view=gallery",
-  "?view=close&world=1",
-  "?view=eclipse&world=1",
-  "?view=nebula&method=computed",
-  "?view=earth",
-];
+const VIEWS = ["?view=gallery", "?view=close&world=1", "?view=eclipse&world=1", "?view=earth"];
 
 const stages = (page: Page) => askLab<string[]>(page, "stages");
 // The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at INSTANT, at this base (41776567), before
@@ -202,19 +195,6 @@ test.describe("the realism page", () => {
     expect(blue).toBeGreaterThan(red);
   });
 
-  for (const method of ["computed", "image"])
-    test(`the nebula made as ${method} draws, and stays near-black at its corners`, async ({ page }) => {
-      await open(page, `?view=nebula&method=${method}`);
-      const found = await stats(page);
-      expect(found.view).toBe(`nebula ${method}`);
-      if (method === "image") expect(found.images).toBeGreaterThanOrEqual(1);
-      else expect(found.images).toBe(0);
-      expect(found.mapBytes + found.targetBytes).toBeLessThanOrEqual(NEBULA_AT_MOST);
-      const [middle = 0, ...corners] = await lit(page, [[0, height / 2 - 100, width, height / 2 + 100], ...CORNERS]);
-      expect(middle).toBeGreaterThan(4);
-      for (const corner of corners) expect(corner).toBeLessThan(16);
-    });
-
   test("the Earth view stays 0 px from the render Alexis approved, its Moon with it", async ({ page }) => {
     await page.clock.setFixedTime(INSTANT);
     await open(page, "?view=earth");
@@ -261,11 +241,6 @@ test.describe("the realism page", () => {
     await page.keyboard.press("3");
     await expect.poll(async () => (await stats(page)).view).toBe("eclipse");
     await drawn(page);
-    await page.keyboard.press("4");
-    await expect.poll(async () => (await stats(page)).view).toBe("nebula computed");
-    await page.keyboard.press("n");
-    await expect.poll(async () => (await stats(page)).view).toBe("nebula image");
-    await drawn(page);
     await page.keyboard.press("5");
     await expect.poll(async () => (await stats(page)).view).toBe("earth");
     await drawn(page);
@@ -273,13 +248,7 @@ test.describe("the realism page", () => {
     await expect.poll(async () => (await stats(page)).view).toBe("gallery");
   });
 
-  for (const query of [
-    "?view=bogus",
-    "?view=close&world=99",
-    "?view=close&world=-1",
-    "?view=close&world=abc",
-    "?view=nebula&method=x",
-  ])
+  for (const query of ["?view=bogus", "?view=close&world=99", "?view=close&world=-1", "?view=close&world=abc"])
     test(`a page asked for ${query} still draws one of its views`, async ({ page }) => {
       await open(page, query);
       expect((await stats(page)).worlds + (await stats(page)).calls).toBeGreaterThan(0);

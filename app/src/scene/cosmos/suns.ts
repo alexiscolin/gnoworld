@@ -21,6 +21,8 @@ interface SunLook {
   readonly glow: boolean;
   /** How much of it shows. */
   readonly shows: number;
+  /** How much of its halo: a star's falls with its distance to a point, a region's glow keeps it whole. */
+  readonly halo: number;
 }
 
 const CORNERS = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
@@ -30,9 +32,11 @@ const QUAD = [0, 1, 2, 0, 2, 3];
 const VERTEX = /* glsl */ `
 attribute vec3 aAt;
 attribute vec4 aSun;
+attribute float aHalo;
 uniform float uFocal;
 varying vec2 vPlace;
 varying vec3 vLight;
+varying float vHalo;
 void main() {
   vec4 at = modelViewMatrix * vec4(aAt, 1.0);
   float away = length(at.xyz);
@@ -40,6 +44,7 @@ void main() {
   float star = 1.0 - smoothstep(${(MIDDLE * 0.75).toFixed(1)}, ${MIDDLE.toFixed(1)}, away);
   float region = smoothstep(${(MIDDLE * 0.75).toFixed(1)}, ${MIDDLE.toFixed(1)}, away) * (1.0 - smoothstep(${(HAZE * 0.6).toFixed(1)}, ${HAZE.toFixed(1)}, away));
   vPlace = position.xy;
+  vHalo = aHalo;
   vLight = vec3(mix(star, region, glow) * aSun.w, aSun.y, aSun.w * aSun.w * aSun.w);
   at.xy += position.xy * max(aSun.x, 3.0 * away / uFocal);
   gl_Position = projectionMatrix * at;
@@ -47,9 +52,12 @@ void main() {
 }`;
 
 // Amber far out, cream nearer, white at the heart: the frame's three steps, each a falloff, so a sun has no edge. Its reach ends in nothing.
+// A sun with no halo keeps its cream core alone: a star point.
 const FRAGMENT = /* glsl */ `
+uniform float uFade;
 varying vec2 vPlace;
 varying vec3 vLight;
+varying float vHalo;
 void main() {
   float reach = length(vPlace);
   if (reach >= 1.0) discard;
@@ -60,8 +68,8 @@ void main() {
   float near = exp(-reach * reach * 34.0);
   float heart = exp(-reach * reach * 420.0);
   float edge = 1.0 - smoothstep(0.55, 1.0, reach);
-  vec3 light = amber * wide * 0.62 * edge + cream * near * 0.7 + vec3(1.0, 0.95, 0.88) * heart * 7.0 * vLight.z;
-  gl_FragColor = vec4(light * vLight.x, 1.0);
+  vec3 light = amber * wide * 0.62 * edge * vHalo + cream * near * 0.7 + vec3(1.0, 0.95, 0.88) * heart * 7.0 * vLight.z;
+  gl_FragColor = vec4(light * vLight.x * uFade, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -69,8 +77,11 @@ void main() {
 export class Suns {
   readonly #at: InstancedBufferAttribute;
   readonly #sun: InstancedBufferAttribute;
+  readonly #halo: InstancedBufferAttribute;
   readonly #geometry = new InstancedBufferGeometry();
   readonly #focal = { value: 1 };
+  /** How much of them shows: the whole cosmos takes the rest. */
+  readonly fade = { value: 1 };
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
     const size = (items: number) => {
@@ -80,16 +91,18 @@ export class Suns {
     };
     this.#at = size(3);
     this.#sun = size(4);
+    this.#halo = size(1);
     this.#geometry.setAttribute("position", new BufferAttribute(CORNERS, 3));
     this.#geometry.setIndex(QUAD);
     this.#geometry.setAttribute("aAt", this.#at);
     this.#geometry.setAttribute("aSun", this.#sun);
+    this.#geometry.setAttribute("aHalo", this.#halo);
     this.#geometry.instanceCount = 0;
     const material = new ShaderMaterial({
       blending: AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      uniforms: { uFocal: this.#focal },
+      uniforms: { uFocal: this.#focal, uFade: this.fade },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });
@@ -106,9 +119,10 @@ export class Suns {
   }
 
   /** Sets sun `index`. */
-  set(index: number, { x, y, z }: Point, { reach, warmth, glow, shows }: SunLook): void {
+  set(index: number, { x, y, z }: Point, { reach, warmth, glow, shows, halo }: SunLook): void {
     this.#at.setXYZ(index, x, y, z);
     this.#sun.setXYZW(index, reach, warmth, glow ? 1 : 0, shows);
+    this.#halo.setX(index, halo);
   }
 
   /** Shows the first `count`. */
@@ -116,5 +130,6 @@ export class Suns {
     this.#geometry.instanceCount = count;
     this.#at.needsUpdate = true;
     this.#sun.needsUpdate = true;
+    this.#halo.needsUpdate = true;
   }
 }

@@ -20,7 +20,6 @@ import { LIMB_LIGHT, type MapSet, type Planet } from "../src/scene/planet/planet
 import { signsOf, worldsOf, type Choice, type Shown, type ViewName } from "./choice.ts";
 import { earthView } from "./earthView.ts";
 import { layoutOf, type Layout } from "./layouts.ts";
-import { computedNebula, imageNebula, type Nebula } from "./nebula.ts";
 import { starField, starSprite } from "./sky.ts";
 
 export interface Device {
@@ -38,8 +37,6 @@ export interface View {
   readonly drawn: readonly Shown[];
   readonly stages: readonly Stage[];
   readonly textures: readonly Texture[];
-  readonly images: number;
-  readonly targetBytes: number;
   /** Where the eye is, -1 to 1 each way, and the screen's shape. */
   look(eyeX: number, eyeY: number, aspect: number): void;
   tick(seconds: number): void;
@@ -96,12 +93,6 @@ async function mapsFor(
   return { set, textures: [...loaded.values(), clouds, ring, ...(lights === undefined ? [] : [lights])] };
 }
 
-async function nebulaOf(choice: Choice, { renderer, base }: Device): Promise<Nebula | undefined> {
-  if (choice.view !== "nebula") return undefined;
-  if (choice.method === "computed") return computedNebula(renderer);
-  return imageNebula(await loadMap(mapUrl("carina", base), { kind: "colour", anisotropy: ANISOTROPY }));
-}
-
 // A stage holding `worlds` under one star, with the sky behind them.
 function staged(worlds: readonly Planet[], layout: Layout, sky: Object3D) {
   const stage = new Scene();
@@ -150,7 +141,6 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
     lit,
     flat: choice.flat,
   });
-  const nebula = await nebulaOf(choice, device);
   const signs = signsOf(choice, shown);
   const layout = layoutOf(
     choice.view,
@@ -162,35 +152,28 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
   const stage = staged(worlds, layout, stars);
   if (layout.sun === undefined) lightWorlds(worlds, shown);
   showSigns(worlds, signs);
-  if (nebula !== undefined) stage.add(nebula.mesh);
   const sprite = spriteOf(choice, layout);
   if (sprite !== undefined) stage.add(sprite);
-  const image = nebula?.texture;
-  const all = image === undefined ? textures : [...textures, image];
   return {
     stage,
     camera: layout.camera,
     worlds,
     drawn: shown,
     stages: signs.map(({ stage }) => stage),
-    textures: all,
-    images: image === undefined ? 0 : 1,
-    targetBytes: nebula?.targetBytes ?? 0,
+    textures,
     look(eyeX, eyeY, aspect) {
       layout.camera.aspect = aspect;
       layout.camera.position.x = eyeX * PAN;
       layout.camera.position.y = eyeY * PAN;
       layout.camera.updateProjectionMatrix();
       for (const [index, world] of worlds.entries()) layout.place(world, index, aspect);
-      nebula?.look(eyeX, eyeY, aspect);
     },
     tick(seconds) {
       for (const world of worlds) world.setTime(seconds);
     },
     dispose() {
       for (const world of worlds) world.dispose();
-      for (const texture of all) texture.dispose();
-      nebula?.dispose();
+      for (const texture of textures) texture.dispose();
       sphere.dispose();
       stars.geometry.dispose();
       stars.material.dispose();

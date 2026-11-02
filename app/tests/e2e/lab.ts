@@ -10,11 +10,9 @@ interface LabStats {
   worlds: number;
   frames: number;
   textures: number;
-  images: number;
   programs: number;
   calls: number;
   mapBytes: number;
-  targetBytes: number;
   renderer: string;
 }
 export interface Circle {

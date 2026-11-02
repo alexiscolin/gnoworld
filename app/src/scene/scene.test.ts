@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { driftAt, glideAt, HOME, turnAt } from "@gnoworld/core";
+import { driftAt, FIELD_OF_VIEW, glideAt, HOME, turnAt } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeClock } from "../../tests/fakeClock.ts";
@@ -46,7 +46,9 @@ const cosmos = vi.hoisted(() => ({
   show: vi.fn<(worlds: unknown) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   resize: vi.fn<(height: number, ratio: number) => void>(),
-  tick: vi.fn<(eye: { x: number; y: number; z: number }, seconds: number) => void>(),
+  tick: vi.fn<
+    (eye: { x: number; y: number; z: number }, seconds: number, resting?: { x: number; y: number; z: number }) => void
+  >(),
   restored: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
@@ -287,6 +289,22 @@ describe("the cosmos", () => {
     expect(eye?.x).toBeCloseTo(HOME.x + glide.x, 6);
     expect(eye?.y).toBeCloseTo(HOME.y + glide.y, 6);
     expect(eye?.z).toBeCloseTo(HOME.z + glide.z, 6);
+    scene.dispose();
+  });
+
+  // 7d6's review: the arrival's glide is no move of the view; the cosmos keeps the view at rest's bodies through it.
+  it("tells them where the view rests, a mouse's lean with it but not the arrival's glide", async () => {
+    const scene = await started();
+    frames(3, 16);
+    window.dispatchEvent(
+      Object.assign(new MouseEvent("pointermove", { clientX: 1000, clientY: 0 }), { pointerType: "mouse" }),
+    );
+    frames(100, 16);
+    const [eye, seconds, resting] = cosmos.tick.mock.lastCall ?? [];
+    if (eye === undefined || resting === undefined) throw new Error("no tick");
+    const glide = glideOf(seconds);
+    expect(Math.hypot(resting.x - eye.x + glide.x, resting.y - eye.y + glide.y, resting.z - HOME.z)).toBeLessThan(1e-6);
+    expect(resting.x - HOME.x).toBeGreaterThan(0.5);
     scene.dispose();
   });
 
@@ -966,6 +984,19 @@ describe("the eye", () => {
     expect(camera?.rotation.x).toBeCloseTo(turn.pitch, 8);
     expect(camera?.rotation.y).not.toBe(0);
     expect([camera?.position.x, camera?.position.y, camera?.position.z]).toEqual([0, 0, 0]);
+    scene.dispose();
+  });
+
+  // F4250's journey reads them: a globe that stays on its circle proves nothing while the eye stands still.
+  it("tells the journeys how the eye looks about and its clock, through the lens the view at rest is composed for", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(20_000);
+    const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
+    const turn = { yaw: NaN, pitch: NaN };
+    turnAt(turn, seconds);
+    expect(scene.stats().turn).toEqual(turn);
+    expect(scene.stats().seconds).toBe(seconds);
+    expect(three.renderer.render.mock.lastCall?.[1].fov).toBe(FIELD_OF_VIEW);
     scene.dispose();
   });
 

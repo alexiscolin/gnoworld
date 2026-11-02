@@ -22,15 +22,13 @@ import type { World } from "../src/scene/planet/generated.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
 export type ViewName =
-  "gallery" | "gallery24" | "real24" | "class24" | "variety" | "close" | "eclipse" | "nebula" | "earth" | "stages";
-export type Method = "computed" | "image";
+  "gallery" | "gallery24" | "real24" | "class24" | "variety" | "close" | "eclipse" | "earth" | "stages";
 export type Tier = "high" | "low";
 
 export interface Choice {
   readonly view: ViewName;
   readonly world: number;
   readonly seed: number;
-  readonly method: Method;
   readonly stage: Stage;
   /** The people here, in place of a stage's usual crowd. */
   readonly present: number | null;

@@ -38,3 +38,23 @@ export function turnAt(out: { yaw: number; pitch: number }, seconds: number): vo
   out.yaw = TURN * Math.sin(angle);
   out.pitch = TURN * (1 - Math.cos(angle));
 }
+
+// The pace the worlds turn at among the stars, a share of their spin: slow, so the eye's sway reads as depth, the near worlds sliding past
+// the far ones more than any turns (7d6).
+const ORBIT_PACE = 0.2;
+
+/** The clock every world turns by, bodies and points alike, `seconds` after the arrival: one place, so a world that becomes a body keeps
+ * its place on its orbit. */
+export const orbitTime = (seconds: number): number => seconds * ORBIT_PACE;
+
+/** How far the eye sways at rest, in world units, across the view and up it (7d6): the near worlds slide past the far ones. */
+export const SWAY = { across: 0.25, up: 0.12 } as const;
+// A slow figure eight, so its speed never falls to nothing: a tenth of a unit or more in two seconds at its slowest.
+const SWAY_SECONDS = 18;
+
+/** The eye's sway `seconds` after it arrived, into `out`, along the view's own axes: none at the start. */
+export function swayAt(out: { across: number; up: number }, seconds: number): void {
+  const angle = (2 * Math.PI * seconds) / SWAY_SECONDS;
+  out.across = SWAY.across * Math.sin(angle);
+  out.up = SWAY.up * Math.sin(2 * angle);
+}

@@ -166,7 +166,7 @@ describe("the hero's live line, by universe", () => {
     const fetcher = serve(file);
     const host = mount(
       <MemoryRouter>
-        <Hero universe={site.universeAt(path)} />
+        <Hero universe={site.universeAt(path)} worlds={undefined} />
       </MemoryRouter>,
     );
     await settle();

@@ -42,6 +42,8 @@ export interface Planet {
   setTime(seconds: number, clouds?: number): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
+  /** How soft and dim it stands for its distance, 0 to 1: none on a world seen close (7d6). */
+  setFar(share: number): void;
   /** Shows a world's stage. Its `size` is a factor for whoever scales the group: the view owns the group's scale. */
   setSigns(signs: WorldSigns): void;
   dispose(): void;
@@ -69,6 +71,7 @@ function airMaterial(rim: NonNullable<PlanetLook["rim"]>): ShaderMaterial {
       rimColour: { value: working(rim.colour) },
       rimThickness: { value: rim.thickness },
       limbLight: { value: 0 },
+      faraway: { value: 0 },
     },
   });
 }
@@ -90,6 +93,7 @@ function ringMaterial(rings: NonNullable<PlanetLook["rings"]>, map: Texture): Sh
       ringInner: { value: rings.inner },
       ringOuter: { value: rings.outer },
       ringOpacity: { value: rings.opacity },
+      faraway: { value: 0 },
     },
   });
 }
@@ -161,6 +165,10 @@ class LivePlanet implements Planet {
   setLimb(light: number): void {
     for (const { uniforms } of this.#parts)
       if (uniforms["limbLight"] !== undefined) uniforms["limbLight"].value = light;
+  }
+
+  setFar(share: number): void {
+    for (const { uniforms } of this.#parts) if (uniforms["faraway"] !== undefined) uniforms["faraway"].value = share;
   }
 
   setSigns({ lights, signal }: WorldSigns): void {

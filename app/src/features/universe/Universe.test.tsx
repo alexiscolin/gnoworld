@@ -12,15 +12,20 @@ const scene = vi.hoisted(() => ({
   dispose: vi.fn<() => void>(),
   earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
   world: vi.fn<(place: unknown, said: (state: string, colour?: string) => void) => void>(),
-  cosmos: vi.fn<(worlds: unknown) => void>(),
+  cosmos: vi.fn<(worlds: unknown, written?: string) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   read: vi.fn(),
+  counted: vi.fn<(count: number) => void>(),
   start: vi.fn(),
   load: vi.fn(),
 }));
 
 vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
 vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: scene.read }));
+vi.mock("./worldsCount.ts", async (original) => ({
+  ...(await original<typeof import("./worldsCount.ts")>()),
+  worldsDrawn: scene.counted,
+}));
 vi.mock("./EarthSigns.tsx", () => ({ PageSigns: () => <div data-signs="" /> }));
 
 const STRONG = "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)";
@@ -152,6 +157,37 @@ describe("the cosmos's worlds", () => {
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
     expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+  });
+
+  it("tells the page how many worlds the cosmos draws: the file's, each once, and the Earth", async () => {
+    scene.read.mockImplementation(() =>
+      Promise.resolve({ worlds: [...WORLDS, ...WORLDS, { id: "c/d", namespace: "c", realms: [] }] }),
+    );
+    rendered("cosmos");
+    await settle();
+    expect(scene.counted).toHaveBeenLastCalledWith(3);
+  });
+
+  it("tells the page no count when the file does not come", async () => {
+    scene.read.mockImplementation(() => Promise.resolve(undefined));
+    rendered("cosmos");
+    await settle();
+    expect(scene.counted).not.toHaveBeenCalled();
+  });
+
+  it("hands over the file's time with its worlds, whole, so the whole cosmos ages their calls", async () => {
+    const worlds = [
+      {
+        id: "a/b",
+        namespace: "a",
+        realms: [{ path: "gno.land/r/a/b", imports: ["gno.land/r/c/d"], callers: 3, calls: 40, lastHeight: 9000 }],
+      },
+    ];
+    scene.read.mockImplementation(() => Promise.resolve({ worlds, updated: "2026-11-01T00:00:00Z" }));
+    rendered("cosmos");
+    await settle();
+    expect(scene.cosmos).toHaveBeenLastCalledWith(worlds, "2026-11-01T00:00:00Z");
+    expect(scene.cosmos.mock.lastCall?.[0]).toBe(worlds);
   });
 
   it("stands the fixed places at once, whatever the file does: one that never answers draws them too", async () => {
