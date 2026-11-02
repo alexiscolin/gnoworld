@@ -117,7 +117,7 @@ Utsubo kept (code-confirmed above): tips 5, 30, 31, 33, 34, 36, 37, 38, 40, 41, 
 80 (the cap idea), 82, 94, 98, 100, 1-2-8 (fallback, `forceWebGL`), 27 (anisotropy). Écarté: 22/28 (KTX2: CSP); 32's r183 opacity (not in
 `BatchedMesh.js`); 11 `compileComputeAsync` (no compute here; exists, Renderer.js:1359); 12 occlusion (WebGPU `Renderer.js:2761`, unused);
 56 `SunLight` (no `SunLight` class found in `src/`); 53-56, 57-60 light budgets and CSM (not verifiable); 64-65 R3F (not used);
-73 pmndrs postprocessing (new dependency); 74 `'high-performance'`; 80 cap 2; 83 IntersectionObserver (app, not three);
+73 pmndrs postprocessing (new dependency); 74 `'high-performance'`; 83 IntersectionObserver (app, not three);
 97 timestamp tracking (experimental). The r186 mentions the article makes that held: 61 (PCFSoft removed), 11 (exists).
 webgpu-claude-skill (MIT, W) kept: `await renderer.init()` before use (Renderer.js:899, 2389); import from `three/webgpu`
 (package.json:18); device-loss recovery (Renderer.js:689); `forceWebGL` (WebGPURenderer.Nodes.js:25); `PI2` deprecated for

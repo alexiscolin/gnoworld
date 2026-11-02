@@ -1,5 +1,5 @@
 // The air: light scattered along each ray through a shell, not a painted rim, so a world lit from behind wears a thin ring of light and a
-// sunset along its terminator. Eight steps, in the world's own radii; it covers little of the screen unless the world is close.
+// sunset along its terminator. Eight steps a pixel, in the world's own radii, over the whole disc: the shell's front covers it, so a close world pays for all of it.
 
 export const AIR_VERTEX = /* glsl */ `
 varying vec3 vWorld;

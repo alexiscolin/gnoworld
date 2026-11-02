@@ -1204,7 +1204,7 @@ owner is a multisig of two admins on hardware wallets):
 a machine and never drain a battery, even open for hours beside the chat. The rules come
 from gno-golf's engine, measured there.
 - **The GPU:** the low-power adapter where there are two, so the fans stay off; no stencil.
-- **The pixel ratio** is capped at 1.25 on desktop and 1 on touch screens; Low takes 1 and
+- **The pixel ratio** is capped at 2 on desktop (§10) and 1 on touch screens; Low takes 1 and
   0.8. The cap is applied again when the window moves to another screen.
 - **The frame rate follows what happens, never above 60:**
   - 60 fps while flying or interacting;
@@ -1420,6 +1420,7 @@ This section overrides the text above where they differ. The reasons and the num
 - **Dependencies are not positions.** A world stays with its namespace's star; its dependencies show as lines on hover.
 - **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
 - **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
+- **The pixel ratio** is capped at 2 on a computer, not 1.25, and the worlds' maps are 4096 wide as the Earth's: a Retina screen drawn at 1.25 and 2048 maps magnified were blurred. It rests on one measure, 8.3 ms a frame on an M4 Pro, with the Auto probe as the net; a base laptop is not measured.
 - **The renderer** is `WebGLRenderer` for the demo, not ADR-0001's `WebGPURenderer`: the gate's software renderer then tests what people see, it weighs 88 KB less, and post-processing is ready. Moving later means rewriting the shaders in TSL.
 - **A universe's shape.** Systems sit in a thick disc, with clusters above and below it, their height from a smooth field of position. The placement of §3 holds: ring by ring, and placing one system depends on no other. Universes stay never shown together; far galaxies and doors between chains wait.
 - **The mood of space.** Colours, nebulae and density are a smooth field computed from a position: no list, no count, no border, nothing stored, and it means nothing on chain. The same place gives the same picture, and a star takes the mood of where it sits.
