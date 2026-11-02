@@ -15,6 +15,7 @@ const NEAR_SIDE = 1.15;
 const ROOM = CELL / 2;
 // A plane is seen at least this open at display, 30 degrees from its edge: its worlds read round their star, not on a line.
 const OPEN_LEAST = 0.5;
+const OFF_STAR = 3;
 // Of three bodies or more, no two gaps alike within this share: a regular figure reads as drawn on purpose.
 const ALIKE = 0.15;
 
@@ -47,9 +48,12 @@ const placeIn = ({ orbit, phase }: Orbiter, spread: number) => ({
   y: spread * orbit * Math.sin(phase),
 });
 
-// How much `worlds` widen their orbits so no two meet, seen at the least open: their places in the plane, apart enough when foreshortened.
+// How much `worlds` widen their orbits so no two meet, seen at the least open: their places in the plane, apart enough when foreshortened;
+// and each off its star, its centre `OFF_STAR` of its radii from it (f0004's worlds stand 3 to 4 of theirs from their star), or as far as
+// its cell lets it.
 function spreadOf(worlds: readonly Orbiter[]): number {
-  let spread = 1;
+  const off = ({ orbit, radius }: Orbiter) => Math.min(OFF_STAR * radius, ROOM - radius) / Math.max(orbit, 1e-9);
+  let spread = Math.max(1, ...worlds.map(off));
   for (const [at, one] of worlds.entries())
     for (const other of worlds.slice(at + 1)) {
       const [a, b] = [placeIn(one, 1), placeIn(other, 1)];

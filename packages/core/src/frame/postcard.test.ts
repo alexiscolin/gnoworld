@@ -74,6 +74,25 @@ describe("a postcard's worlds", () => {
     for (const { orbit, radius } of worlds) expect(orbit + radius).toBeLessThanOrEqual(CELL / 2);
   });
 
+  // 7d6's design review: a world of one sat on its star, its edge 12 px from the star's white heart (f0004's stand 50 to 73 px from theirs).
+  it("keeps each world off its star: its centre three of its radii from the star, or as far as its cell lets it", () => {
+    const large = postcardWorlds(systemOf([[1.5, 1.2, 0.4]]));
+    expect(large).toHaveLength(1);
+    expect(large[0]?.orbit).toBeCloseTo(CELL / 2 - 1.5, 12);
+    for (const system of [
+      systemOf([[1.05, 1.2, 0.4]]),
+      systemOf([
+        [0.6, 0.5, 0.2],
+        [0.4, 1.8, 2.1],
+        [0.3, 2.5, 4.4],
+      ]),
+    ]) {
+      const worlds = postcardWorlds(system);
+      expect(worlds.length).toBeGreaterThan(0);
+      for (const { orbit, radius } of worlds) expect(orbit).toBeGreaterThanOrEqual(3 * radius - 1e-9);
+    }
+  });
+
   it("draws nothing as a body of grain alone, and four at most", () => {
     expect(postcardWorlds(systemOf([[0.1, 1, 0]]))).toEqual([]);
     const many = systemOf(Array.from({ length: 12 }, (_, at) => [0.3 + at * 0.08, 0.8 + at * 0.1, at * 1.3]));

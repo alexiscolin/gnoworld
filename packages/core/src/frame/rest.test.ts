@@ -24,8 +24,10 @@ const files = {
   "300 systems of four": spread(300, 4),
 } as const satisfies Record<string, readonly WorldHeld[]>;
 
-// The three systems all stand beyond the great star: a view that lights the Earth has them behind the eye, so theirs stands it unlit.
+// The three systems all stand beyond the great star: a view that lights the Earth has them behind the eye, so theirs stands it unlit,
+// and, its worlds kept off their stars, stands one of them whole.
 const UNLIT = new Set<string>(["3 systems"]);
+const POSTCARDS: Partial<Record<keyof typeof files, number>> = { "3 systems": 1 };
 
 function spread(systems: number, each: number): WorldHeld[] {
   return Array.from({ length: systems * each }, (_, at) => ({
@@ -250,10 +252,12 @@ describe("the eye at rest", () => {
 describe("the postcards", () => {
   it.each(Object.entries(files))(
     "draws two neighbour systems whole, at every phase, at both screens, with %s",
-    (_, file) => {
+    (name, file) => {
       const { systems, view } = made(file);
       const neighbours = systems.filter((system) => system.worlds.length > 0).length;
-      expect(view.postcards).toHaveLength(Math.min(2, neighbours - (view.close === undefined ? 0 : 1)));
+      expect(view.postcards).toHaveLength(
+        POSTCARDS[name as keyof typeof files] ?? Math.min(2, neighbours - (view.close === undefined ? 0 : 1)),
+      );
       expect(new Set(view.postcards).size).toBe(view.postcards.length);
       expect(view.postcards).not.toContain(view.close?.system);
       for (const index of view.postcards) {
@@ -508,7 +512,9 @@ describe("what the drawn bodies leave clear", () => {
         const postcard = postcardOf(system, view.eye);
         for (const world of postcard.worlds) {
           const at = placeOf(postcard.system, world, 0);
-          expect(Math.hypot(...Object.values(minus(at, system.place))) + world.radius).toBeLessThanOrEqual(CELL / 2);
+          expect(Math.hypot(...Object.values(minus(at, system.place))) + world.radius).toBeLessThanOrEqual(
+            CELL / 2 + 1e-9,
+          );
         }
       }
     },

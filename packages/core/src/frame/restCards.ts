@@ -39,10 +39,11 @@ const cardOf = (held: Held, looks: readonly Look[]): Card => {
 
 const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y) >= a.radius + b.radius + MARGIN;
 
-// A postcard: its ball, at every phase, whole and covering nothing, clear of the Earth whatever their depths; the margin holds it through the
-// sway. No world of it hides behind the close world.
-function fits(looks: readonly Look[], { held, reach }: Card, close: Close | undefined): boolean {
+// A postcard: a body or more round its star; its ball, at every phase, whole and covering nothing, clear of the Earth whatever their
+// depths; the margin holds it through the sway. No world of it hides behind the close world.
+function fits(looks: readonly Look[], { held, reach, worlds }: Card, close: Close | undefined): boolean {
   const [first] = looks;
+  if (worlds.length === 0) return false;
   const place = held.system.place;
   const whole = looks.every((look) => {
     const ball = look.ball(place, reach);
