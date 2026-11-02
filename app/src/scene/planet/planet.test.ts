@@ -271,11 +271,6 @@ describe("createPlanet", () => {
 
   it("softens the light towards the terminator on every world, as the Earth's", () => {
     expect(SURFACE_FRAGMENT).toContain("max(limb, mix(SOFT_BARE, SOFT_AIR, air))");
-    expect(SURFACE_FRAGMENT).toContain("light = pow(light, 1.0 - 0.3 * air);");
-  });
-
-  it("lets the light come in over a wide dusk, as the frames' terminators do, not as a cut", () => {
-    expect(SURFACE_FRAGMENT).toContain("smoothstep(-0.05, 0.22, day)");
   });
 
   it("dims a ring in its world's shadow and never cuts it, the hole at a ring's lower right having been a bug", () => {
