@@ -399,21 +399,24 @@ describe("what the drawn bodies leave clear", () => {
   );
 
   it.each(Object.entries(files))(
-    "crowds no group denser than frame 4's, and no body on another, with %s",
+    "crowds no group denser than frame 4's in any box, the Earth among them, with %s",
     (_, file) => {
       const { systems, view } = made(file);
       for (const { width, height } of REST_SCREENS) {
         const see = cameraOf(view, { width, height });
-        const spots = drawn(systems, view)
-          .map(({ system, world }) => see(placeOf(system, world, 0), world.radius))
-          .filter((spot) => !offScreen(spot, width, height));
-        // Frame 4's densest group: four bodies in about 200 by 120 pixels, measured by the chief at 1728 by 1080.
-        for (const corner of spots) {
-          const inBox = spots.filter(
-            ({ x, y }) => x >= corner.x - 100 && x <= corner.x + 100 && y >= corner.y - 60 && y <= corner.y + 60,
-          );
-          expect(inBox.length).toBeLessThanOrEqual(4);
-        }
+        const spots = [
+          see(EARTH_PLACE, EARTH_RADIUS),
+          ...drawn(systems, view).map(({ system, world }) => see(placeOf(system, world, 0), world.radius)),
+        ].filter((spot) => !offScreen(spot, width, height));
+        // Frame 4's densest group: four bodies in about 200 by 120 pixels, measured by the chief at 1728 by 1080. Every box that holds a
+        // different set has a body's centre on its left edge and one on its top edge.
+        for (const left of spots)
+          for (const top of spots) {
+            const inBox = spots.filter(
+              ({ x, y }) => x >= left.x && x <= left.x + 200 && y >= top.y && y <= top.y + 120,
+            );
+            expect(inBox.length).toBeLessThanOrEqual(4);
+          }
       }
     },
   );
