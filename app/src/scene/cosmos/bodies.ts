@@ -10,7 +10,6 @@ import {
   planetSeed,
   spreadAt,
   toScene,
-  worldLook,
   worldPath,
   type ClearBox,
   type Orbiter,
@@ -22,7 +21,7 @@ import { Group, SphereGeometry, Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
-import { createPlanet, type Planet } from "../planet/planet.ts";
+import type { Planet } from "../planet/planet.ts";
 import { angleAt, limbAt, sideOf } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
@@ -103,10 +102,12 @@ export class Bodies {
   }
 
   #add(id: string, system: StarSystem, world: Orbiter): void {
-    const look = worldLook(id);
-    const set = this.#maps.setFor(look);
+    const kit = this.#maps.kit();
+    if (kit === undefined) return;
+    const drawn = kit.worldOf(id);
+    const set = this.#maps.setFor(drawn);
     if (set === undefined) return;
-    const planet = createPlanet(look, set, this.#sphere);
+    const planet = kit.createWorld(drawn, set, this.#sphere);
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const body: Body = {

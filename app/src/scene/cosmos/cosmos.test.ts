@@ -99,8 +99,10 @@ function made() {
 
 // A look runs off the frame, and maps load behind it: every task due is run, none guessed at.
 const settled = () => vi.advanceTimersByTimeAsync(100);
+// A body waits for the generated worlds' code, a chunk of its own, as it waits for its maps (7b5).
 const shown = async (made_: ReturnType<typeof made>, list: readonly CosmosWorld[] = worlds(30)) => {
   made_.cosmos.show(list);
+  await vi.dynamicImportSettled();
   made_.cosmos.tick(HOME, 0);
   await settled();
   made_.cosmos.tick(HOME, 0);

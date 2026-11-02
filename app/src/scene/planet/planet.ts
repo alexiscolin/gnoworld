@@ -1,5 +1,6 @@
-// One world, drawn from its look: a surface, its air if it has any, its rings if it has any. It owns its materials and the rings' mesh; the
-// maps and the sphere are shared by every world and stay with their owner, the part that loads them.
+// One world: a surface, its air if it has any, its rings if it has any. The Earth and its Moon draw their real maps (`createPlanet`), every
+// other world its recipe (generated.ts). It owns its materials and the rings' mesh; the maps and the sphere are shared by every world and
+// stay with their owner, the part that loads them.
 import type { PlanetLook, WorldSigns } from "@gnoworld/core";
 import {
   BufferGeometry,
@@ -19,9 +20,9 @@ import { AIR_FRAGMENT, AIR_VERTEX } from "./airShader.ts";
 import { RING_FRAGMENT, RING_VERTEX } from "./ringShader.ts";
 import { HALO_FRAGMENT, HALO_VERTEX } from "./signShaders.ts";
 import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
-import { setLights, setUniform, surfaceUniforms, working, type MapSet } from "./uniforms.ts";
+import { handMadeUniforms, setLights, setUniform, working, type HandMade, type MapSet } from "./uniforms.ts";
 
-export type { MapSet };
+export type { HandMade, MapSet };
 
 const RING_SEGMENTS = 256;
 const RING_FLAT = -Math.PI / 2;
@@ -44,6 +45,11 @@ export interface Planet {
   /** Shows a world's stage. Its `size` is a factor for whoever scales the group: the view owns the group's scale. */
   setSigns(signs: WorldSigns): void;
   dispose(): void;
+}
+
+interface Parts {
+  readonly maps: MapSet;
+  readonly sphere: BufferGeometry;
 }
 
 /** How hard the Earth lights the edge of its air: the bright limb of frame 39. */
@@ -110,17 +116,13 @@ class LivePlanet implements Planet {
   readonly group = new Group();
   readonly surface: ShaderMaterial;
 
-  constructor(look: PlanetLook, maps: MapSet, sphere: BufferGeometry) {
+  constructor(look: PlanetLook, surface: ShaderMaterial, { maps, sphere }: Parts) {
     this.look = look;
     this.#sphere = sphere;
     this.#hasLights = maps.lights !== undefined;
     this.group.rotation.x = look.lean;
     this.group.rotation.z = look.tilt;
-    this.surface = new ShaderMaterial({
-      vertexShader: SURFACE_VERTEX,
-      fragmentShader: SURFACE_FRAGMENT,
-      uniforms: surfaceUniforms(look, maps),
-    });
+    this.surface = surface;
     this.#add(new Mesh(sphere, this.surface));
     if (look.rim !== null) {
       const air = this.#add(new Mesh(sphere, airMaterial(look.rim)));
@@ -183,6 +185,18 @@ class LivePlanet implements Planet {
   }
 }
 
-/** A world drawn from `look`. It may be moved and scaled through its group, which stays at the look's tilt. */
-export const createPlanet = (look: PlanetLook, maps: MapSet, sphere: BufferGeometry): Planet =>
-  new LivePlanet(look, maps, sphere);
+/** A world of `look` on its own surface's material, which it then owns, with its air and rings. */
+export const planetFrom = (look: PlanetLook, surface: ShaderMaterial, parts: Parts): Planet =>
+  new LivePlanet(look, surface, parts);
+
+/** The Earth or its Moon, from its real map. It may be moved and scaled through its group, which stays at the look's tilt. */
+export const createPlanet = (look: HandMade, maps: MapSet, sphere: BufferGeometry): Planet =>
+  planetFrom(
+    look,
+    new ShaderMaterial({
+      vertexShader: SURFACE_VERTEX,
+      fragmentShader: SURFACE_FRAGMENT,
+      uniforms: handMadeUniforms(look, maps),
+    }),
+    { maps, sphere },
+  );

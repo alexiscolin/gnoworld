@@ -1,7 +1,7 @@
 // Variety is measured, not counted (ADR-0002 §3): a world's feature vector, and whether a glance would take two worlds for one. Its class,
-// its minor class while it shows, its palette's centre in Lab, what its surface shows in a still, its rings and its air; a colour
-// under 10 in Lab and a value under a tenth of its span are steps a glance misses. The golden over views is server/src/worlds/group.test.ts.
-import type { Anchor } from "./anchors.ts";
+// its minor class while it shows, its palette's centre in Lab, what its surface shows in a still, its rings, its air and the real maps
+// it takes its detail from; a colour under 10 in Lab and a value under a tenth of its span are steps a glance misses. The golden over views is server/src/worlds/group.test.ts.
+import type { Anchor, MapName } from "./anchors.ts";
 import type { PlanetLook } from "./look.ts";
 import type { Lab } from "./palette.ts";
 import type { Recipe } from "./recipe.ts";
@@ -16,6 +16,8 @@ export interface Features {
   readonly shape: readonly number[];
   readonly ringed: boolean;
   readonly air: number;
+  /** The real maps it takes its detail from, the dominant's and the minor's. */
+  readonly maps: readonly [MapName, MapName];
 }
 
 // A cloud's drift and an octave's ratio do not show in a still.
@@ -54,6 +56,7 @@ export function featuresOf(look: PlanetLook, recipe: Recipe): Features {
     }),
     ringed: look.rings !== null,
     air: look.rim?.thickness ?? 0,
+    maps: [look.map, recipe.minorMap],
   };
 }
 
@@ -70,7 +73,8 @@ export function alike(one: Features, other: Features): boolean {
   return (
     one.anchor === other.anchor &&
     one.ringed === other.ringed &&
-    (!shown || one.minor === other.minor) &&
+    one.maps[0] === other.maps[0] &&
+    (!shown || (one.minor === other.minor && one.maps[1] === other.maps[1])) &&
     dl * dl + da * da + db * db < SAME_COLOUR * SAME_COLOUR &&
     near(one.minorShare, other.minorShare, SAME_MINOR) &&
     near(one.air, other.air, SAME_AIR) &&

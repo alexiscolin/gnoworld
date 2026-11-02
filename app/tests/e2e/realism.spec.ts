@@ -1,11 +1,29 @@
 import { ANCHORS } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { brightness, colours } from "./geometry.ts";
+import {
+  askLab,
+  circles,
+  COMPUTER,
+  drawn,
+  lit,
+  listen,
+  looks,
+  noneOnAnother,
+  open,
+  PAGE,
+  picture,
+  SOFTWARE,
+  stats,
+  whole,
+  type Circle,
+} from "./lab.ts";
+import { pixelHash } from "./pixels.ts";
 
 // 7b's realism page (app/lab): a world of each anchor and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
 // software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
 // The canvas is not pixel-compared (the plan, section 6).
-const PAGE = "/lab/realism.html";
+
 // Nine surface maps (the Earth's among them), the clouds and the ring's profile.
 const MAPS_AT_MOST = 11;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
@@ -21,7 +39,6 @@ const NET_APART_24 = 55;
 const TWELVE = ANCHORS.slice(0, 12);
 const NETS: readonly string[] = ["volcanic", "dark carbon", "lava world"];
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
-const COMPUTER = { width: 1728, height: 1080 };
 const VIEWS = [
   "?view=gallery",
   "?view=close&world=1",
@@ -30,57 +47,11 @@ const VIEWS = [
   "?view=earth",
 ];
 
-interface LabStats {
-  view: string;
-  worlds: number;
-  frames: number;
-  textures: number;
-  images: number;
-  programs: number;
-  calls: number;
-  mapBytes: number;
-  targetBytes: number;
-  renderer: string;
-}
-interface Circle {
-  x: number;
-  y: number;
-  r: number;
-}
-
-const askLab = <T>(page: Page, what: "stats" | "circles" | "looks" | "stages") =>
-  page.evaluate((name) => {
-    const lab: unknown = Reflect.get(globalThis, "__lab");
-    return (lab as Record<typeof name, () => T>)[name]();
-  }, what);
-const stats = (page: Page) => askLab<LabStats>(page, "stats");
-const circles = (page: Page) => askLab<Circle[]>(page, "circles");
-const looks = (page: Page) => askLab<{ anchor: string }[]>(page, "looks");
 const stages = (page: Page) => askLab<string[]>(page, "stages");
-
-// What a software GPU may take to build a view with its 4096 maps, at a gate's load.
-const SOFTWARE = { timeout: 60_000 };
-const drawn = (page: Page) => expect(page.locator("canvas[data-drawn='true']")).toBeAttached(SOFTWARE);
-
-const open = async (page: Page, query: string) => {
-  await page.setViewportSize(COMPUTER);
-  // Under reduced motion the page draws once a change: a software GPU takes seconds a frame.
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  const answer = await page.goto(`${PAGE}${query}`);
-  const policy = answer?.headers()["content-security-policy"] ?? "";
-  expect(policy).toContain("script-src 'self'");
-  expect(policy).toContain("worker-src 'self'");
-  expect(policy).not.toContain("unsafe-eval");
-  expect(policy).not.toContain("blob:");
-  await drawn(page);
-};
-
-// With the panel away, which sits over a corner: P hides it, as for a capture.
-const lit = async (page: Page, boxes: [number, number, number, number][]) => {
-  await page.keyboard.press("p");
-  await expect(page.getByRole("main")).toBeHidden();
-  return brightness(page, await page.locator("canvas").screenshot(), boxes);
-};
+// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at INSTANT, at this base (41776567), before
+// 7b5 split the surface program in two. A hand-made world never moves.
+const EARTH_PIXELS = "a1fc799da0825909";
+const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
 
 const { width, height } = COMPUTER;
 const CORNER = 80;
@@ -129,23 +100,6 @@ const warmer = (anchor: string, before: readonly number[] = [], after: readonly 
   if (anchor !== "shattered") expect(gain(0), anchor).toBeGreaterThan(gain(2));
   expect(gain(1), anchor).toBeGreaterThan(gain(2));
 };
-const whole = (circle: Circle) => {
-  expect(circle.x - circle.r).toBeGreaterThanOrEqual(0);
-  expect(circle.y - circle.r).toBeGreaterThanOrEqual(0);
-  expect(circle.x + circle.r).toBeLessThanOrEqual(width);
-  expect(circle.y + circle.r).toBeLessThanOrEqual(height);
-};
-
-// Every world whole on the screen, big enough to read, and none on another.
-const apart = (places: readonly Circle[]) => {
-  for (const [index, place] of places.entries()) {
-    whole(place);
-    expect(place.r).toBeGreaterThan(60);
-    for (const other of places.slice(index + 1))
-      expect(Math.hypot(place.x - other.x, place.y - other.y)).toBeGreaterThan(place.r + other.r);
-  }
-};
-
 test.describe("the realism page", () => {
   // SwiftShader draws a world of each anchor in seconds at this size, and more at a gate's load.
   test.slow();
@@ -154,12 +108,7 @@ test.describe("the realism page", () => {
   const wrong: string[] = [];
   test.beforeEach(({ page }) => {
     wrong.length = 0;
-    page.on("console", (message) => {
-      // A screenshot reads the buffer back, which the driver remarks on; a software GPU has no parallel compile, which the Earth's build asks for.
-      const software = ["GPU stall", "KHR_parallel_shader_compile"].some((remark) => message.text().includes(remark));
-      if (["error", "warning"].includes(message.type()) && !software) wrong.push(message.text());
-    });
-    page.on("pageerror", (error) => wrong.push(error.message));
+    listen(page, wrong);
     page.on("response", (response) => {
       if (response.url().includes("/textures/") && response.status() !== 200) wrong.push(response.url());
     });
@@ -176,7 +125,7 @@ test.describe("the realism page", () => {
     expect((await looks(page)).map((look) => look.anchor)).toEqual(TWELVE);
     const places = await circles(page);
     expect(places).toHaveLength(TWELVE.length);
-    apart(places);
+    noneOnAnother(places);
     const lights = await lit(
       page,
       places.map(({ x, y, r }) => [
@@ -266,6 +215,12 @@ test.describe("the realism page", () => {
       for (const corner of corners) expect(corner).toBeLessThan(16);
     });
 
+  test("the Earth view stays 0 px from the render Alexis approved, its Moon with it", async ({ page }) => {
+    await page.clock.setFixedTime(INSTANT);
+    await open(page, "?view=earth");
+    expect(await pixelHash(page, await picture(page))).toBe(EARTH_PIXELS);
+  });
+
   test("the Earth view draws the Earth itself, lit from the right, with the night on its left", async ({ page }) => {
     await open(page, "?view=earth");
     expect((await stats(page)).view).toBe("earth");
@@ -300,8 +255,9 @@ test.describe("the realism page", () => {
     await page.keyboard.press("2");
     await expect.poll(async () => (await stats(page)).view).toBe("close");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByTestId("world")).toContainText("temperate");
+    // The caption is written as the view is first drawn: under four journeys a close view takes past the 5 s a caption is waited for.
     await drawn(page);
+    await expect(page.getByTestId("world")).toContainText("temperate");
     await page.keyboard.press("3");
     await expect.poll(async () => (await stats(page)).view).toBe("eclipse");
     await drawn(page);
@@ -447,7 +403,7 @@ test.describe("the realism page", () => {
     expect((await looks(page)).map((look) => look.anchor)).toEqual(ANCHORS);
     const places = await circles(page);
     expect(places).toHaveLength(ANCHORS.length);
-    apart(places);
+    noneOnAnother(places);
   });
 
   test("on the 24's view, a stage reads the same on every class, each in the Earth's warm family", async ({ page }) => {

@@ -15,7 +15,6 @@ export const MAX_WARP_FREQUENCY = 2.4;
 const MIN_WARP_FREQUENCY = 0.9;
 const TURN = Math.PI * 2;
 const OFFSET = 16;
-const MAX_SECOND_SHARE = 0.4;
 const MAX_TILT = 0.45;
 const MAX_LEAN = 0.25;
 const RING_LEAN = [0.3, 0.65] as const;
@@ -39,24 +38,22 @@ const DOMAIN = asciiBytes("gnoworld/planet/v1");
 
 export interface PlanetLook {
   readonly anchor: Anchor;
+  /** The real map whose fine contrast the dominant class's ground takes: detail only, never its shapes. */
   readonly map: MapName;
-  readonly second: MapName | null;
-  /** How much of the surface the second map takes, 0.4 at most: the dominant stays 60% or more. */
-  readonly secondShare: number;
   /** About the pole, then the two other axes, in radians. */
   readonly spin: Rgb;
   readonly tilt: number;
   /** How far its axis leans towards or away from the eye, so a ring is never seen edge on. */
   readonly lean: number;
+  /** How the real map is warped where it is read, and where the generated structure's noise starts. */
   readonly warp: { readonly amount: number; readonly frequency: number; readonly offset: Rgb };
+  /** Where the minor class's regions' noise starts, apart from the structure's. */
+  readonly minorOffset: Rgb;
+  /** The far dot's colours: the drawn palette is the recipe's. */
   readonly ramp: Ramp;
+  /** How much of the real map's own colour the palette replaces. */
   readonly recolour: number;
-  readonly contrast: number;
   readonly relief: number;
-  readonly caps: number;
-  readonly clouds: number;
-  readonly rifts: number;
-  readonly cracks: number;
   readonly locked: boolean;
   readonly sea: { readonly shallow: Rgb; readonly deep: Rgb } | null;
   readonly glow: { readonly colour: Rgb; readonly level: number } | null;
@@ -83,9 +80,9 @@ const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
   between([from[2], to[2]], share),
 ];
 
-// Words 0 to 5 turn and offset the map, word 6 mixes the palette; each byte from 14 on is one value of its own, in [0, 1], and a
-// byte may serve two values no anchor has together: rifts and cracks; caps and a banded world's contrast. Byte 13 serves word 6 and the
-// lean, and bytes 0 and 1 the spin and the light: all 32 are taken (F3476), and what comes after reads `moreSeed`.
+// Words 0 to 5 turn and offset the map, word 6 mixes the palette; each byte from 14 on is one value of its own, in [0, 1]. Byte 13 serves
+// word 6 and the lean, bytes 0 and 1 the spin and the light, byte 15 the recipe's minor share, and 18, 20 and 22 the minor's offset: all
+// 32 are taken (F3476), and what comes after reads `moreSeed`.
 const reader = (seed: Uint8Array) => ({
   word: (index: number): number => ((seed[index * 2] ?? 0) * 256 + (seed[index * 2 + 1] ?? 0)) / 65535,
   byte: (index: number): number => seedShare(seed, index),
@@ -127,7 +124,8 @@ function waters(row: AnchorRow, { byte }: Reader): Pick<PlanetLook, "sea" | "glo
   };
 }
 
-function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
+/** The look a seed gives as `anchor`, its bytes read as stated above. */
+export function seededLook(bytes: Uint8Array, anchor: Anchor): PlanetLook {
   const seed = reader(bytes);
   const { word, byte } = seed;
   const row = ROWS[anchor];
@@ -137,8 +135,6 @@ function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
   return {
     anchor,
     map: row.maps[Math.floor(byte(23) * 0.999 * row.maps.length)] ?? row.maps[0],
-    second: row.second ?? null,
-    secondShare: row.second === undefined ? 0 : byte(15) * MAX_SECOND_SHARE,
     spin: row.banded === true ? [turn, 0, 0] : [turn, word(1) * TURN, word(2) * TURN],
     tilt: (byte(16) * 2 - 1) * MAX_TILT,
     lean: leanOf(rings !== null, seed),
@@ -147,14 +143,10 @@ function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
       frequency: between([MIN_WARP_FREQUENCY, MAX_WARP_FREQUENCY], byte(30)),
       offset: [word(3) * OFFSET, word(4) * OFFSET, word(5) * OFFSET],
     },
+    minorOffset: [byte(18) * OFFSET, byte(20) * OFFSET, byte(22) * OFFSET],
     ramp,
     recolour: between(row.recolour, byte(19)),
-    contrast: between(row.contrast ?? [1, 1], byte(22)),
     relief: between(row.relief, byte(17)),
-    caps: between(row.caps ?? [0, 0], byte(22)),
-    clouds: between(row.clouds ?? [0, 0], byte(20)),
-    rifts: between(row.rifts ?? [0, 0], byte(18)),
-    cracks: between(row.cracks ?? [0, 0], byte(18)),
     locked: row.locked === true,
     ...waters(row, seed),
     rings,
@@ -162,7 +154,7 @@ function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
 }
 
 /** The look of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldLook`). */
-export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => lookOf(planetSeed(path), anchor);
+export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => seededLook(planetSeed(path), anchor);
 
 /** A world's path on gno.land, the bytes its seed reads: one rule for the look, the recipe and the scene. An id is ASCII by its schema. */
 export const worldPath = (id: string): Uint8Array => asciiBytes(`${REALM_PREFIX}${id}`);
@@ -170,5 +162,5 @@ export const worldPath = (id: string): Uint8Array => asciiBytes(`${REALM_PREFIX}
 /** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. */
 export function worldLook(id: string, nature: Nature | null = null): PlanetLook {
   const seed = planetSeed(worldPath(id));
-  return lookOf(seed, anchorOf(seed, nature));
+  return seededLook(seed, anchorOf(seed, nature));
 }

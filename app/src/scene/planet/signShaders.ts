@@ -18,12 +18,10 @@ uniform float lightTurn;
 uniform vec3 lightOffset;
 `;
 
-// Outside the shader, as a comment in it ships in the scene chunk: settledAt opens regions where the map's lights are densest, then out
+// Outside the shader, as a comment in it ships: settledAt opens regions where the map's lights are densest, then out
 // across the field; netOf is a golden net with a copper glow, soft under a few pixels; formOf is a class's shape; settlements is the whole
 // night, a net's world glowing copper between its cells as it settles, so a lit patch never floats on a black body.
 export const LIGHTS = /* glsl */ `
-const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);
-
 float settledAt(vec3 axis, float spill) {
   float ground = smoothstep(-0.7, 0.7, field(axis * lightGrain + lightOffset).x);
   float rank = 0.6 * (1.0 - smoothstep(0.0, 0.15, spill)) + 0.4 * ground - 0.1;
