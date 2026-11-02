@@ -11,15 +11,15 @@ fictional terrain, and the site lists Ceres and Eris as fictional.
 
 | File | Source | Size | Changes |
 |---|---|---|---|
-| `mars.webp` | `2k_mars.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `moon.webp` | `2k_moon.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `venus.webp` | `2k_venus_surface.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `jupiter.webp` | `2k_jupiter.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `ceres.webp` | `2k_ceres_fictional.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `eris.webp` | `2k_eris_fictional.jpg` | 2048 by 1024 | Re-encoded as WebP |
-| `neptune.webp` | `2k_neptune.jpg` | 1024 by 512 | Halved, re-encoded as WebP |
+| `mars.webp` | `8k_mars.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.85 |
+| `moon.webp` | `8k_moon.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.7 |
+| `venus.webp` | `8k_venus_surface.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.78 |
+| `jupiter.webp` | `8k_jupiter.jpg` (a 4096 by 2048 file, whatever its name) | 4096 by 2048 | Re-encoded as WebP at 0.85 |
+| `ceres.webp` | `4k_ceres_fictional.jpg` | 4096 by 2048 | Re-encoded as WebP at 0.7 |
+| `eris.webp` | `4k_eris_fictional.jpg` | 4096 by 2048 | Re-encoded as WebP at 0.75 |
+| `neptune.webp` | `2k_neptune.jpg` (the site has no larger) | 2048 by 1024 | Re-encoded as WebP at 0.85 |
 | `haze.webp` | `2k_venus_atmosphere.jpg` | 1024 by 512 | Halved, re-encoded as WebP |
-| `clouds.webp` | `2k_earth_clouds.jpg` | 2048 by 1024 | Re-encoded as WebP |
+| `clouds.webp` | `8k_earth_clouds.jpg` | 4096 by 2048 | Halved, re-encoded as WebP at 0.6 |
 | `ring.webp` | `2k_saturn_ring_alpha.png` | 1024 by 16 | Its alpha taken as grey, for that is the density; scaled, re-encoded as WebP |
 
 The shaders warp, recolour and mix them by each world's seed.
