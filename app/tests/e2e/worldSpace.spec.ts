@@ -217,6 +217,18 @@ test.describe("a world with nobody counted, at 390 px", () => {
   });
 });
 
+// The chat waits for the load and the door, never for ever: a door whose chunk never answers leaves the chat to come 2.5 s after the page is on
+// screen (F4306, the chief's call: a hung chunk, a refused WebGL or a slow network leaves no world without its chat).
+test.describe("the chat with the door held back", () => {
+  test("comes on bubble's page though the door's chunk never answers", async ({ page }) => {
+    await page.route(/\/assets\/mountUniverse-[\w-]+\.js$/, () => undefined);
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    await expect(page.locator("#chat").getByRole("heading", { name: "#bubble" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("#chat").getByText("Log in to write in this room.")).toBeVisible();
+  });
+});
+
 // The chat waits for the load and the door now (budgets.spec.ts, "a page that holds the door"): it must still come, work, and hold its
 // place while it comes, so nothing moves under the reader (the chief's conditions, 2026-11-02).
 for (const viewport of [COMPUTER, { width: 390, height: 844 }])

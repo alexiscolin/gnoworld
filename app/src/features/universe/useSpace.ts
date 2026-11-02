@@ -49,9 +49,26 @@ const pageLoaded = (signal: AbortSignal) =>
       );
   });
 
+// The longest the chat waits on the door and the load once its page is on screen: ADR-0002 §2's LCP budget, 2.5 s on a mid-range mobile
+// profile. Past it the first screen's budget is spent, so waiting protects nothing, and the door's chunk (5,950 B gzip, about 30 ms at
+// Lighthouse's 1.6 Mbit/s) is held, not slow: a hung chunk, a refused WebGL or a slow network leaves no world without its chat (F4306).
+const FIRST_SCREEN_MS = 2_500;
+
+const waited = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((done) => {
+    const timer = setTimeout(done, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+      },
+      { once: true },
+    );
+  });
+
 /** Shows space while the calling page is on screen, with the Earth, the worlds or one world in it if the page asks, and what its signs need of
  * the page. A world is named by its id: the same id is the same world. True once the first screen is done: the page has loaded and the door
- * has answered, whichever way. */
+ * has answered, whichever way, or 2.5 s after the page is on screen. */
 export function useSpace(body?: "earth" | "cosmos" | WorldShown, from?: Page): boolean {
   const [firstScreenDone, setFirstScreenDone] = useState(false);
   const world = typeof body === "object" ? body.world : undefined;
@@ -67,7 +84,10 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown, from?: Page): b
     const done = () => {
       if (!stop.signal.aborted) setFirstScreenDone(true);
     };
-    Promise.all([doorAnswered, pageLoaded(stop.signal)]).then(done, done);
+    Promise.race([Promise.all([doorAnswered, pageLoaded(stop.signal)]), waited(FIRST_SCREEN_MS, stop.signal)]).then(
+      done,
+      done,
+    );
     return () => {
       stop.abort();
     };
