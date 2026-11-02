@@ -191,6 +191,15 @@ describe("the nebulae around an eye", () => {
       expect(fieldAt(eye).count).toBe(0);
   });
 
+  it.each([1e19, -1e19, Infinity, -Infinity, NaN])("stands none, and ends, for an eye at %s", (farOut) => {
+    for (const eye of [
+      { x: farOut, y: 0, z: 0 },
+      { x: 0, y: farOut, z: 0 },
+      { x: 0, y: 0, z: farOut },
+    ])
+      expect(fieldAt(eye).count).toBe(0);
+  });
+
   it("keeps each one within reach, finite at any coordinate, never twice and never more than the bound", () => {
     fc.assert(
       fc.property(point, (eye) => {
