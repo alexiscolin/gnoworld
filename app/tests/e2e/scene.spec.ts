@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
-import { loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
+import { landed, loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -239,6 +239,8 @@ test.describe("the loop", () => {
     });
     await page.goto(HOME);
     await running(page);
+    // The home's dive over first (7d7): while it runs it asks each frame, and its bodies' maps come as it lands.
+    await landed(page);
     await page.clock.fastForward(61_000);
     expect(await servedOver(page, 2000)).toBeLessThanOrEqual(22);
   });
@@ -251,7 +253,8 @@ test.describe("the loop", () => {
     expect(await page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
     await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
     expect((await stats(page)).probing).toBe(false);
-    // The first layout owes its frame: at rest once that has passed.
+    // The first layout owes its frame, and the home's dissolve each of its own (7d7): at rest once those have passed.
+    await landed(page);
     await expect.poll(() => servedOver(page, 300)).toBe(0);
   });
 

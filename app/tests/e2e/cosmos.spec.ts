@@ -10,7 +10,7 @@ import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
-import { hideThePage, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
+import { hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -68,15 +68,6 @@ async function standing(page: Page, bodies = 2) {
     }, SLOW)
     .toBe(true);
 }
-
-// The home's dive over (7d7): under reduced motion the whole cosmos stood still, then dissolved into the view at rest.
-const landed = (page: Page) =>
-  expect
-    .poll(async () => {
-      const { along, veil } = (await cosmos(page)).dive;
-      return along === 1 && veil === 0;
-    }, SLOW)
-    .toBe(true);
 
 async function arrived(page: Page, query = HOME, size = COMPUTER) {
   await page.setViewportSize(size);
@@ -459,9 +450,6 @@ test("counts in the hero the worlds the cosmos draws", async ({ page }) => {
 // are the field of stars and the nebulae's dust: the approved arrival drew 47,438 on this file, this view 47,437 (7d6, SwiftShader).
 const DRAWS_AT_REST = 90;
 const POINTS_AT_REST = 48_000;
-// What the dive adds at most: the whole cosmos's points and lines, two draws, and its worlds' points.
-const DRAWS_IN_THE_DIVE = DRAWS_AT_REST + 2;
-const POINTS_IN_THE_DIVE = 1_000;
 for (const tier of ["high", "low"] as const)
   test(`holds the draw bound and a frame's cost at rest on the ${tier} tier`, async ({ page }) => {
     if (tier === "low")
@@ -480,8 +468,21 @@ for (const tier of ["high", "low"] as const)
     expect(textures).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
   });
 
+// The page's time held, to move only as a journey runs it: a frame at a time, each 16 ms after the last however slow the software GPU,
+// so the Auto probe keeps the tier it found. Held a little ahead of now, read again if the page went past it.
+async function held(page: Page) {
+  for (let tried = 0; ; tried += 1)
+    try {
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 250));
+      return;
+    } catch (error) {
+      if (tried > 4) throw error;
+    }
+}
+
 // The home's dive (7d7; Alexis, 2026-11-02), with motion on: from the whole cosmos down to the view at rest, the Earth at the centre all the
-// way. The software GPU draws few of its frames: each is read through the scene's stats as it comes, with what it cost to draw.
+// way. Each frame is read through the scene's stats as it comes, with what it cost to draw; with a `step`, the page's time is held and run
+// that many ms a reading.
 interface Dived {
   readonly along: number;
   readonly share: number;
@@ -491,22 +492,28 @@ interface Dived {
   readonly points: number;
   readonly textures: number;
 }
-async function dove(page: Page, size = COMPUTER, path = HOME): Promise<Dived[]> {
+async function dove(
+  page: Page,
+  { size = COMPUTER, path = HOME, step }: { size?: typeof COMPUTER; path?: string; step?: number } = {},
+): Promise<Dived[]> {
+  if (step !== undefined) await page.clock.install();
   await served(page, RECORDED);
   await page.setViewportSize(size);
   await page.goto(path);
   if (path === HOME) await hydrated(page);
   await running(page);
+  if (step !== undefined) await held(page);
   const seen: Dived[] = [];
   await expect
     .poll(
       async () => {
+        if (step !== undefined) await page.clock.runFor(step);
         const { cosmos: drawn, ...cost } = await stats(page);
         const one = drawn === undefined ? undefined : divedOf(drawn, cost);
         if (one !== undefined && (one.share > 0 || one.along > 0)) seen.push(one);
         return one?.along === 1 && seen.some(({ along }) => along < 1);
       },
-      { ...SLOW, intervals: [10] },
+      { timeout: step === undefined ? SLOW.timeout : 4 * SLOW.timeout, intervals: [10] },
     )
     .toBe(true);
   return seen;
@@ -528,8 +535,8 @@ for (const size of [COMPUTER, WIDE])
   test(`dives from the whole cosmos to the view at rest, the Earth at the centre all the way, at ${String(size.width)} by ${String(size.height)}`, async ({
     page,
   }) => {
-    const seen = await dove(page, size);
-    expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
+    const seen = await dove(page, { size });
+    // Read in real time, a few frames of it: its opening in the whole cosmos is read frame by frame below, the page's time held.
     expect(seen.some(({ share, along }) => share === 0 && along > 0 && along < 1)).toBe(true);
     for (const [at, { along }] of seen.entries()) expect(along).toBeGreaterThanOrEqual(seen[at - 1]?.along ?? 0);
     for (const { earth } of seen) centred(earth, size);
@@ -539,21 +546,32 @@ for (const size of [COMPUTER, WIDE])
     const landed_ = seen.at(-1);
     if (landed_ === undefined) throw new Error("no frame");
     expect(distanceOf(landed_.eye, rest)).toBeLessThan(0.3);
-    expect(distanceOf(seen[0]?.eye ?? rest, EARTH)).toBeGreaterThan(20 * distanceOf(landed_.eye, EARTH));
+    // It only comes in, the sway apart: each frame read stands no farther from the Earth than the one before.
+    for (const [at, { eye }] of seen.entries())
+      expect(distanceOf(eye, EARTH)).toBeLessThanOrEqual(distanceOf(seen[at - 1]?.eye ?? eye, EARTH) + 0.3);
   });
 
 // The draw bound and a frame's cost through the dive, on the High tier and a weak GPU's: what it adds to the view at rest is the whole
-// cosmos's two draws and its worlds' points, at most.
+// cosmos's two draws and its worlds' points, at most. Every frame of it, in a small window, so the software GPU draws them all in time.
+const SMALL = { width: 1024, height: 640 };
 for (const tier of ["high", "low"] as const)
   test(`holds the draw bound and a frame's cost through the dive on the ${tier} tier`, async ({ page }) => {
-    // The tier held: with motion on, the Auto probe would drop the gate's software GPU to Low.
-    await page.addInitScript((held) => {
-      localStorage.setItem("gnoworld:scene:tier", held);
-    }, tier);
-    const seen = await dove(page);
+    test.setTimeout(480_000);
+    // Low as a weak GPU's device remembers it; High as the Auto probe finds it, the page's time held.
+    if (tier === "low")
+      await page.addInitScript(() => {
+        localStorage.setItem("gnoworld:scene:tier", "low");
+      });
+    const seen = await dove(page, { size: SMALL, step: 16 });
     expect((await stats(page)).tier).toBe(tier);
-    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_IN_THE_DIVE);
-    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST + POINTS_IN_THE_DIVE);
+    expect(seen.length).toBeGreaterThan(300);
+    expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
+    // Measured on the recorded file, 344 frames (2026-11-03): 21 draws at most, 20 or 21 landed; 47,508 points at most, 47,465 landed.
+    const landedFrame = seen.at(-1);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 2);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_AT_REST);
+    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual((landedFrame?.points ?? 0) + 533);
+    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST);
     expect(Math.max(...seen.map(({ textures }) => textures))).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
   });
 
@@ -570,7 +588,7 @@ test("dissolves the whole cosmos into the view at rest under reduced motion, and
   await running(page);
   await hideThePage(page);
   // Held, the page's time moves only as the journey runs it, three frames at a time.
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  await held(page);
   const eyes = new Set<string>();
   let veil = 0;
   const until = async (wanted: (drawn: CosmosStats) => boolean) => {
@@ -619,7 +637,7 @@ for (const systems of [100, 1000, 10_000])
 
 // 7d7: the lab is the site's own scene, so it opens with the dive too, which Alexis judges on his own GPU.
 test("opens the release's page with the dive, from the whole cosmos to the view at rest", async ({ page }) => {
-  const seen = await dove(page, COMPUTER, "/lab/realism.html?view=cosmos");
+  const seen = await dove(page, { path: "/lab/realism.html?view=cosmos" });
   expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
   expect(seen.at(-1)?.along).toBe(1);
 });
@@ -908,6 +926,13 @@ const whole = async (page: Page) => {
   // What the eye looks at is the Earth (7d6): its distance from the cosmos's own eye says the share.
   expect(distanceOf((await cosmos(page)).eye, EARTH)).toBeGreaterThan(1000);
   await expect.poll(async () => (await cosmos(page)).web?.share ?? 0, SLOW).toBe(1);
+  // A frame drawn still out there: the dive compiled the whole cosmos already, so it takes the view on the frame that moved, which also
+  // marches the sky's picture (7d7).
+  const { frames } = await stats(page);
+  await page.evaluate((to) => {
+    (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
+  }, far);
+  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames);
 };
 
 // 7d7: the home opens in the whole cosmos, so its chunk is asked at the arrival, once, and the view at rest leaves it with nothing to draw.

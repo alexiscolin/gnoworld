@@ -1,7 +1,7 @@
 import { MOOD_STEP, moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { MOTES, SHELLS } from "../../../packages/core/src/space/stars.ts";
 import { expect, test, type Page } from "./fixtures.ts";
-import { hideThePage, loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
+import { hideThePage, landed, loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The scenery on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation). The canvas is
 // compared with itself, never with an approved picture: a GPU's output varies, a place's does not on one machine. Reduced motion holds
@@ -18,6 +18,8 @@ async function stillScene(page: Page, path = HOME) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(path);
   await running(page);
+  // The home opens with its dive (7d7): the arrival's sky is the one seen once it has landed.
+  if (path === HOME) await landed(page);
   await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
   await hideThePage(page);
 }
@@ -183,6 +185,7 @@ test.describe("the scenery on a computer", () => {
   test("moves when motion is allowed: the picture changes with the eye", async ({ page }) => {
     await page.goto(HOME);
     await opened(page);
+    await landed(page);
     await hideThePage(page);
     const start = (await stats(page)).eye;
     const first = await picture(page);
@@ -205,10 +208,10 @@ test.describe("the scenery on a computer", () => {
 
   test("comes back whole with a lost context: the sky, its volumes and its stars", async ({ page }) => {
     await stillScene(page);
-    // The Earth's maps come after the first frames: "before" is taken with it on stage and a frame drawn since.
+    // The Earth's maps come after the first frames: "before" is taken with it on stage and a frame drawn since, one the journey owes, for
+    // the home's dive has landed with it there (7d7).
     await expect.poll(async () => (await stats(page)).cosmos?.earth).toBe(true);
-    const drawn = (await stats(page)).frames;
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(drawn);
+    await goTo(page, (await stats(page)).eye);
     const before = await picture(page);
     await loseContext(page);
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
