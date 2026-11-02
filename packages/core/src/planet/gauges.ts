@@ -19,7 +19,12 @@ export interface UseCounts {
 /** `value` as a share, NaN counting for nothing. */
 export const share = (value: number): number => clamp01(value) || 0;
 
-const rung = (count: number, busiest: number) => share(Math.log1p(count) / Math.log1p(Math.max(busiest, QUIET_TOP)));
+/** `count` on a logarithmic scale up to `top`, 0 to 1, with no floor: the top reaches 1 whatever the counts; nothing to climb when `top` is
+ * none. */
+export const scaleOf = (count: number, top: number): number =>
+  top > 0 ? share(Math.log1p(count) / Math.log1p(top)) : 0;
+
+const rung = (count: number, busiest: number) => scaleOf(count, Math.max(busiest, QUIET_TOP));
 
 // The universe of the day is read at a high rank, not at its busiest world: one world of a thousand sybil callers would halve every other's
 // use (F4111). Nearest rank, each half apart.

@@ -161,8 +161,19 @@ describe("the world in its circle", () => {
     const { centre } = view.stats();
     expect(centre.x).toBeCloseTo(PLACE.x, 0);
     expect(centre.y).toBeCloseTo(PLACE.y, 0);
-    // At rest, frame 22's GovDAO against frame 104's busiest Bubble, which fills the circle (F4307 changed this test: it asked 0.7 to 1).
-    expect(centre.radius / PLACE.radius).toBeCloseTo(172 / 336, 1);
+    // With no count in its universe, the middle of frame 22's GovDAO and frame 104's Bubble, which fills the circle (F4307 changed this test:
+    // it asked 0.7 to 1 of the circle).
+    expect(centre.radius / PLACE.radius).toBeCloseTo((1 + 172 / 336) / 2, 1);
+  });
+
+  it("fills the circle for its universe's busiest and stands the quietest at frame 22's share (F4307)", async () => {
+    const { view } = await opened();
+    view.read(reading({ used: 1 }));
+    view.tick(1);
+    expect(view.stats().centre.radius / PLACE.radius).toBeCloseTo(1, 1);
+    view.read(reading({ used: 0 }));
+    view.tick(2);
+    expect(view.stats().centre.radius / PLACE.radius).toBeCloseTo(172 / 336, 1);
   });
 
   it("keeps the world on its circle as the eye turns about, its light turning with it", async () => {

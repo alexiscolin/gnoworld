@@ -9,6 +9,7 @@ import {
   planetSeed,
   presenceOf,
   referenceOf,
+  scaleOf,
   stormsOf,
   useOf as weighUse,
   worldLook,
@@ -45,6 +46,8 @@ export interface WorldReading {
   readonly storms: readonly [number, number, number];
   /** This visit wakes a seed. */
   readonly wake: boolean;
+  /** Its realms' use against its universe's, 0 to 1 on a log scale with no floor (F4307); none while the universe's file has no count. */
+  readonly used?: number;
 }
 
 interface Weighed {
@@ -102,6 +105,15 @@ function ageOf(world: FileWorld | undefined, now: number): number | null {
   return Number.isFinite(seen) && seen <= now ? (now - seen) / DAY : null;
 }
 
+// Whether a universe's file carries any count: the job writes none for a chain it could not read, and quiet is then not known.
+const counted = (file: Worlds) => file.worlds.some(({ realms }) => realms.some(({ callers }) => callers !== null));
+
+// The world's realms' use against its universe's percentile; none from no file, another universe's, or one with no count.
+function usedIn(file: Worlds | undefined, at: WorldNow, found: ReturnType<typeof inFile>): number | undefined {
+  if (file?.universe !== at.universe || !counted(file)) return undefined;
+  return scaleOf(found.ours === undefined ? 0 : realmUse(found.world), found.weights?.use.realm ?? 0);
+}
+
 // The world as the file has it, weighed against its universe: none from a file of another universe, or from no file.
 function inFile(file: Worlds | undefined, at: WorldNow) {
   const ours = file?.universe === at.universe ? file : undefined;
@@ -134,6 +146,7 @@ export function readingOf(file: Worlds | undefined, at: WorldNow): WorldReading 
   const look = worldLook(at.id);
   const seed = planetSeed(asciiBytes(`${WORLD_PATH}${at.id}`));
   const state = { vitality, present: heat, fresh };
+  const used = usedIn(file, at, found);
   return {
     look,
     signs: worldSigns(seed, look.anchor, state),
@@ -143,5 +156,6 @@ export function readingOf(file: Worlds | undefined, at: WorldNow): WorldReading 
     aurora: auroraIn(found, at.now),
     storms: stormsOf(at.lines, at.now),
     wake: fresh,
+    ...(used === undefined ? {} : { used }),
   };
 }

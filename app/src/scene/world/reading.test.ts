@@ -1,5 +1,6 @@
 import { anchorOf, asciiBytes, planetSeed, presenceOf, worldLook, worldSigns } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { readingOf, type WorldNow } from "./reading.ts";
 
@@ -53,6 +54,49 @@ const quiet = (more: Partial<WorldNow> = {}): WorldNow => ({
   visited: true,
   now: NOW,
   ...more,
+});
+
+// A universe of 40 namespaces whose busiest call at `top` callers, each world's callers its place on the way up, times `scale`.
+const universeOf = (scale: number, govdao: number) =>
+  fileOf(
+    { id: "gov/dao", namespace: "gov", realms: [realm("gno.land/r/gov/dao", { callers: govdao * scale })] },
+    ...Array.from({ length: 40 }, (_, at) => ({
+      id: `n${String(at)}/w`,
+      namespace: `n${String(at)}`,
+      realms: [realm(`gno.land/r/n${String(at)}/w`, { callers: at * 3 * scale })],
+    })),
+  );
+// The worlds' file the job wrote on 2026-11-01 for onyx (app/lab/worlds.json): 533 worlds, and no realm with a count.
+const RECORDED: Worlds = JSON.parse(
+  readFileSync(new URL("../../../lab/worlds.json", import.meta.url), "utf8"),
+) as Worlds;
+
+// A world's size by its use against its universe (F4307; ADR-0002 §3, on a log scale relative to the universe): its realms' callers against
+// the 95th percentile of its universe's namespaces, with no floor, so the busiest reach the top and the quietest the bottom whatever the
+// counts; none while the universe's file carries no count at all, for quiet cannot be told from unknown.
+describe("a world's use against its universe", () => {
+  it("puts the universe's busiest at the top and its quietest at the bottom, and the same ten times busier", () => {
+    for (const scale of [1, 10]) {
+      expect(readingOf(universeOf(scale, 500), quiet()).used, `the busiest, times ${String(scale)}`).toBe(1);
+      expect(readingOf(universeOf(scale, 0), quiet()).used, `the quietest, times ${String(scale)}`).toBe(0);
+      const middle = readingOf(universeOf(scale, 20), quiet()).used ?? -1;
+      expect(middle).toBeGreaterThan(0);
+      expect(middle).toBeLessThan(1);
+    }
+  });
+
+  it("reads no use from a universe whose file carries no count, as the real file of 2026-11-01, for GovDAO and for Bubble", () => {
+    expect(
+      RECORDED.worlds.every(({ realms }) => realms.every(({ callers, calls }) => callers === null && calls === null)),
+    ).toBe(true);
+    expect(readingOf(RECORDED, quiet()).used).toBeUndefined();
+    expect(readingOf(RECORDED, quiet({ id: "bubble", people: 2 })).used).toBeUndefined();
+    expect(readingOf(undefined, quiet()).used).toBeUndefined();
+  });
+
+  it("reads a world its universe's file does not list as the quietest once the file carries counts", () => {
+    expect(readingOf(universeOf(1, 500), quiet({ id: "bubble" })).used).toBe(0);
+  });
 });
 
 describe("readingOf", () => {

@@ -1,13 +1,15 @@
-// A world's share of the circle its page keeps, by its size, read on the frames (Alexis, 2026-11-02, F4307): the busiest fills it, as
-// frame 104's Bubble (336 px of radius at 1728 by 1080, 214 here); one at rest is frame 22's quieter GovDAO (172 px, 38 here); a seed is
-// a small heart under it. The page sizes the circle so that the busiest's ring stays clear of the plate's words and the dock.
-import { SIZE_BUSIEST } from "@gnoworld/core";
+// A world's share of the circle its page keeps (Alexis, 2026-11-02, F4307; ADR-0002 §3, the chief's reading): its use against its universe,
+// on a log scale. The universe's busiest fill it, as frame 104's Bubble (336 px of radius at 1728 by 1080); the quietest stand as frame 22's
+// GovDAO (172 px); while the universe's file has no count, the scale's middle, claiming neither; a seed is a small heart under the quietest.
+import { share } from "@gnoworld/core";
 
-/** A world at rest, frame 22's GovDAO against frame 104's Bubble. */
-const REST = 172 / 336;
+/** The universe's quietest, frame 22's GovDAO against frame 104's Bubble. */
+const QUIET = 172 / 336;
+/** Where a world stands while its universe's use is not known. */
+const UNKNOWN = 0.5;
 
-/** The share of its circle a world of `size` fills: its size times the rest's share up to rest, then on to the whole circle at the busiest. */
-export function fitOf(size: number): number {
-  if (size <= 1) return REST * Math.max(0, size);
-  return Math.min(1, REST + ((1 - REST) * (size - 1)) / (SIZE_BUSIEST - 1));
+/** The share of its circle a world of `size` fills, `used` its use against its universe (reading.ts), none when not known. */
+export function fitOf(size: number, used: number | undefined): number {
+  if (size < 1) return QUIET * Math.max(0, size);
+  return QUIET + (1 - QUIET) * (used === undefined ? UNKNOWN : share(used));
 }

@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness, colours } from "./geometry.ts";
 import { countShifts, keepsItsRoom, opened, shaderRefusals, shifted, stats } from "./sceneStage.ts";
@@ -191,18 +192,62 @@ for (const viewport of [
       const middle = circle.x + radius;
       expect(middle - RING * radius, "the busiest ring clear of the plate's words").toBeGreaterThanOrEqual(words - 1);
       expect(middle + RING * radius, "the busiest ring clear of the dock").toBeLessThanOrEqual(dock.x + 1);
-      // Within 10 px of the frames: their edges read to about 3 px, and a sphere's outline under perspective falls a little under its share.
-      if (viewport === COMPUTER) {
-        expect(Math.abs(radius - 336), "the busiest as frame 104's Bubble").toBeLessThan(10);
-        await expect
-          .poll(async () => Math.abs(((await world(page))?.centre.radius ?? 0) - 172), {
-            ...SLOW,
-            message: "at rest as frame 22's GovDAO",
-          })
-          .toBeLessThan(10);
-      }
+      // Within 10 px of frame 104: its edges read to about 3 px.
+      if (viewport === COMPUTER) expect(Math.abs(radius - 336), "the busiest as frame 104's Bubble").toBeLessThan(10);
     });
   });
+
+// A world's size by its use against its universe (F4307, ADR-0002 §3): GovDAO the universe's busiest fills its circle, its quietest stands at
+// frame 22's share, and the real file of 2026-11-01, which carries no count, leaves every world at the scale's middle, Bubble too. A sphere's
+// outline under perspective falls a little under its share: within 6% of it.
+const RECORDED_WORLDS = JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")) as {
+  worlds: { id: string; realms: { callers: number | null }[] }[];
+};
+// The real file's worlds, each realm calling at its place on the way up, GovDAO's at `govdao`.
+const counted = (govdao: number) =>
+  JSON.stringify({
+    ...RECORDED_WORLDS,
+    worlds: RECORDED_WORLDS.worlds.map((each, at) => ({
+      ...each,
+      realms: each.realms.map((realm) => ({ ...realm, callers: each.id === "gov/dao" ? govdao : at % 40 })),
+    })),
+  });
+const drawnShare = async (page: Page, path: string, file: string) => {
+  await page.route("**/worlds.json", (route) => route.fulfill({ body: file, contentType: "application/json" }));
+  await visit(page, path);
+  await drawn(page);
+  await opened(page);
+  const circle = await page.locator("[data-globe]").boundingBox();
+  const radius = (circle?.width ?? 0) / 2;
+  await expect.poll(async () => (await world(page))?.centre.radius ?? 0, SLOW).toBeGreaterThan(0);
+  return ((await world(page))?.centre.radius ?? 0) / radius;
+};
+
+test.describe("a world's size by its use against its universe, at 1728 by 1080", () => {
+  test.use({ viewport: COMPUTER });
+
+  for (const [what, path, file, share] of [
+    ["GovDAO, its universe's busiest, fills its circle", "/w/govdao?test-gpu", counted(5000), 1],
+    ["GovDAO, its universe's quietest, stands at frame 22's share", "/w/govdao?test-gpu", counted(0), 172 / 336],
+    [
+      "GovDAO stands at the scale's middle in the real file, which carries no count",
+      "/w/govdao?test-gpu",
+      JSON.stringify(RECORDED_WORLDS),
+      (1 + 172 / 336) / 2,
+    ],
+    [
+      "Bubble stands at the scale's middle in the real file, which carries no count",
+      "/w/bubble?test-gpu",
+      JSON.stringify(RECORDED_WORLDS),
+      (1 + 172 / 336) / 2,
+    ],
+  ] as const)
+    test(what, async ({ page }) => {
+      const drawnAt = await drawnShare(page, path, file);
+      expect(drawnAt).toBeLessThanOrEqual(share * 1.01);
+      expect(drawnAt).toBeGreaterThanOrEqual(share * 0.94);
+    });
+});
 
 // A window this wide lays the planet's room out from the first paint, or the plate jumps under the reader as the world comes (7e's review,
 // B2-2; the Earth's own journey holds the same for its globe).

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { nextVitality, presenceOf, referenceOf, useOf } from "./gauges.ts";
+import { nextVitality, presenceOf, referenceOf, scaleOf, useOf } from "./gauges.ts";
 
 // A world's two gauges (slice 7, 7b2; ADR-0002 §10): a vitality that remembers and moves a few percent a day, and the people present.
 const RISE = 0.03;
@@ -68,6 +68,19 @@ describe("nextVitality", () => {
         expect(next).toBeLessThanOrEqual(1);
       }),
     );
+  });
+});
+
+describe("scaleOf", () => {
+  it("climbs a logarithmic scale to its top with no floor, the same at any size, nothing when the top is none", () => {
+    for (const times of [1, 10, 1000]) {
+      expect(scaleOf(0, 100 * times)).toBe(0);
+      expect(scaleOf(100 * times, 100 * times)).toBe(1);
+      expect(scaleOf(400 * times, 100 * times)).toBe(1);
+    }
+    expect(scaleOf(9, 99)).toBeCloseTo(0.5, 12);
+    expect(scaleOf(5, 0)).toBe(0);
+    expect(scaleOf(Number.NaN, 10)).toBe(0);
   });
 });
 

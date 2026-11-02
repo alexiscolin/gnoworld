@@ -44,7 +44,7 @@ export class WorldView {
   #orbit: StatusOrbit | undefined;
   #marks: readonly MoonMark[] = [];
   readonly #waking = new Wake();
-  #fit = fitOf(1);
+  #fit = fitOf(1, undefined);
   #shadows = 0;
   // The world that could not come: placed again, it is not asked again. Another id, or a context restored, tries again.
   #failed: string | undefined;
@@ -175,7 +175,7 @@ export class WorldView {
   }
 
   #grow(body: WorldBody, signs: WorldSigns | undefined): void {
-    this.#fit = fitOf(signs?.size ?? 1);
+    this.#fit = fitOf(signs?.size ?? 1, this.#reading?.used);
     body.sized.scale.setScalar(this.#fit);
     body.setWake(this.#waking.left);
     if (signs !== undefined && this.#reading !== undefined) body.setSigns(signs, this.#reading);
