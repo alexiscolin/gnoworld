@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { driftAt, HOME, turnAt } from "@gnoworld/core";
+import { driftAt, glideAt, HOME, turnAt } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeClock } from "../../tests/fakeClock.ts";
@@ -23,6 +23,7 @@ const three = vi.hoisted(() => ({
     march: vi.fn<() => void>(),
     redraw: vi.fn<() => void>(),
     resize: vi.fn<(width: number, height: number, ratio: number) => void>(),
+    veil: vi.fn<(share: number) => void>(),
   },
   owner: { current: undefined as { signal: AbortSignal } | undefined },
 }));
@@ -40,7 +41,32 @@ const earth = vi.hoisted(() => ({
   views: [] as unknown[],
 }));
 
+const cosmos = vi.hoisted(() => ({
+  made: [] as { halved: () => boolean; moved: () => void; stood: () => void }[],
+  show: vi.fn<(worlds: unknown) => void>(),
+  keepClear: vi.fn<(box: unknown) => void>(),
+  resize: vi.fn<(height: number, ratio: number) => void>(),
+  tick: vi.fn<(eye: { x: number; y: number; z: number }, seconds: number) => void>(),
+  restored: vi.fn<() => void>(),
+  dispose: vi.fn<() => void>(),
+  stats: vi.fn<() => unknown>(),
+}));
+
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
+vi.mock("./cosmos/cosmos.ts", () => ({
+  Cosmos: class {
+    constructor(device: { halved: () => boolean; moved: () => void; stood: () => void }) {
+      cosmos.made.push(device);
+    }
+    show = cosmos.show;
+    keepClear = cosmos.keepClear;
+    resize = cosmos.resize;
+    tick = cosmos.tick;
+    restored = cosmos.restored;
+    dispose = cosmos.dispose;
+    stats = cosmos.stats;
+  },
+}));
 vi.mock("./space.ts", () => ({
   Space: vi.fn(function construct(_stage: unknown, owner: { signal: AbortSignal }) {
     three.owner.current = owner;
@@ -110,6 +136,12 @@ const options = (more: Partial<SceneOptions> = {}): SceneOptions => ({
   ...more,
 });
 
+const glideOf = (seconds = NaN) => {
+  const out = { x: 0, y: 0, z: 0 };
+  glideAt(out, seconds);
+  return out;
+};
+
 // One frame of `ms`, drawn: the screen's refresh is what spaces them in the browser.
 const frames = (count: number, ms: number) => {
   for (let at = 0; at < count; at += 1) clock.run(ms);
@@ -122,6 +154,7 @@ beforeEach(() => {
   clock = new FakeClock(60);
   earth.made.length = 0;
   earth.arriving = false;
+  cosmos.made.length = 0;
   three.create.mockReturnValue(three.renderer);
   canvas = document.createElement("canvas");
   sized(canvas, 1280, 800);
@@ -133,6 +166,202 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+});
+
+describe("the cosmos", () => {
+  const WORLDS = [{ id: "a/b", namespace: "a", realms: [] }];
+  // Its chunk comes when a page first asks for the worlds, and not before.
+  const started = async () => {
+    const scene = startScene(options(), clock);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    return scene;
+  };
+
+  it("times the device again once the worlds stand, as once the Earth does", async () => {
+    const scene = startScene(options(), clock);
+    clock.run(2000);
+    expect(scene.stats().probing).toBe(false);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    cosmos.made[0]?.stood();
+    expect(scene.stats().probing).toBe(true);
+    scene.dispose();
+  });
+
+  it("asks for nothing of it until a page does", async () => {
+    const scene = startScene(options(), clock);
+    await vi.dynamicImportSettled();
+    expect(cosmos.made).toHaveLength(0);
+    scene.cosmos(undefined);
+    await vi.dynamicImportSettled();
+    expect(cosmos.made).toHaveLength(0);
+    scene.dispose();
+  });
+
+  it("makes one, however often a page asks", async () => {
+    const scene = await started();
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.made).toHaveLength(1);
+    scene.dispose();
+  });
+
+  it("makes none for a scene already gone", async () => {
+    const scene = startScene(options(), clock);
+    scene.cosmos(WORLDS);
+    scene.dispose();
+    await vi.dynamicImportSettled();
+    expect(cosmos.made).toHaveLength(0);
+  });
+
+  it("gives it the box and the size asked before it came", async () => {
+    const scene = startScene(options(), clock);
+    const box = { left: 1, top: 2, right: 3, bottom: 4 };
+    scene.keepClear(box);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.keepClear).toHaveBeenLastCalledWith(box);
+    expect(cosmos.show).toHaveBeenLastCalledWith(WORLDS);
+    clock.run(100);
+    expect(cosmos.resize).toHaveBeenLastCalledWith(800, 1);
+    scene.dispose();
+  });
+
+  it("hands it what a page asks, and takes it away with nothing", async () => {
+    const scene = await started();
+    scene.cosmos(WORLDS);
+    expect(cosmos.show).toHaveBeenLastCalledWith(WORLDS);
+    scene.cosmos(undefined);
+    expect(cosmos.show).toHaveBeenLastCalledWith(undefined);
+    scene.dispose();
+  });
+
+  // Reduced motion rests the loop: only a frame owed moves the count.
+  const rested = async () => {
+    query(MOTION).matches = true;
+    const scene = await started();
+    frames(3, 16);
+    return scene;
+  };
+
+  it("veils the sky while the worlds stand: the warmth is the suns', with black between them", async () => {
+    const scene = await started();
+    const veiled = three.space.veil.mock.lastCall?.[0] ?? 1;
+    expect(veiled).toBeLessThan(0.7);
+    expect(veiled).toBeGreaterThan(0);
+    scene.cosmos(undefined);
+    expect(three.space.veil).toHaveBeenLastCalledWith(1);
+    scene.dispose();
+  });
+
+  it("hands them the box the page's text keeps, and owes a frame", async () => {
+    const scene = await rested();
+    const drawn = three.renderer.render.mock.calls.length;
+    const box = { left: 1, top: 2, right: 3, bottom: 4 };
+    scene.keepClear(box);
+    expect(cosmos.keepClear).toHaveBeenLastCalledWith(box);
+    frames(2, 16);
+    expect(three.renderer.render.mock.calls.length).toBe(drawn + 1);
+    scene.dispose();
+  });
+
+  it("owes a frame when a page asks", async () => {
+    const scene = await rested();
+    const drawn = three.renderer.render.mock.calls.length;
+    frames(3, 16);
+    expect(three.renderer.render.mock.calls.length).toBe(drawn);
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    expect(three.renderer.render.mock.calls.length).toBe(drawn + 1);
+    scene.dispose();
+  });
+
+  it("shows the worlds from the eye's rest and its arrival, not the sky's cruise, for they must not be left behind", async () => {
+    const scene = await started();
+    frames(200, 100);
+    const [eye, seconds] = cosmos.tick.mock.lastCall ?? [];
+    const glide = { x: 0, y: 0, z: 0 };
+    glideAt(glide, seconds ?? NaN);
+    expect(seconds).toBeGreaterThan(10);
+    expect(eye?.x).toBeCloseTo(HOME.x + glide.x, 6);
+    expect(eye?.y).toBeCloseTo(HOME.y + glide.y, 6);
+    expect(eye?.z).toBeCloseTo(HOME.z + glide.z, 6);
+    scene.dispose();
+  });
+
+  it("moves them with the view when it is sent elsewhere", async () => {
+    const scene = await started();
+    frames(1, 16);
+    scene.moveTo({ x: 10, y: 20, z: 30 });
+    frames(2, 16);
+    expect(cosmos.tick.mock.lastCall?.[0].x).toBeCloseTo(10 + glideOf(cosmos.tick.mock.lastCall?.[1]).x, 6);
+    scene.dispose();
+  });
+
+  it("leans them with a mouse, as it leans the sky", async () => {
+    const scene = await started();
+    frames(10, 16);
+    const rest = { ...cosmos.tick.mock.lastCall?.[0] };
+    window.dispatchEvent(
+      Object.assign(new MouseEvent("pointermove", { clientX: 1000, clientY: 0 }), { pointerType: "mouse" }),
+    );
+    frames(100, 16);
+    const leaned = cosmos.tick.mock.lastCall?.[0];
+    expect((leaned?.x ?? 0) - (rest.x ?? 0)).toBeGreaterThan(0.5);
+    scene.dispose();
+  });
+
+  it("freezes their clock under reduced motion: nothing orbits", async () => {
+    query(MOTION).matches = true;
+    const scene = await started();
+    frames(1, 16);
+    scene.moveTo(HOME);
+    frames(4, 100);
+    expect(cosmos.tick.mock.lastCall?.[1]).toBe(0);
+    scene.dispose();
+  });
+
+  it("sizes them with the canvas, and gives them back after a lost context", async () => {
+    const scene = await started();
+    clock.run(100);
+    expect(cosmos.resize).toHaveBeenLastCalledWith(800, 1);
+    canvas.dispatchEvent(new Event("webglcontextlost"));
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(cosmos.restored).toHaveBeenCalledOnce();
+    scene.dispose();
+  });
+
+  it("halves their maps by touch and by the low tier, asked each time", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.made[0]?.halved()).toBe(true);
+    scene.dispose();
+    const high = await started();
+    expect(cosmos.made[1]?.halved()).toBe(false);
+    high.dispose();
+  });
+
+  it("frees them with the scene, and says what it draws", async () => {
+    const told = { bodies: 7 };
+    cosmos.stats.mockReturnValue(told);
+    const scene = await started();
+    expect(scene.stats().cosmos).toBe(told);
+    scene.dispose();
+    expect(cosmos.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("asks a frame for what they owe, whatever the rate", async () => {
+    const scene = await rested();
+    const drawn = three.renderer.render.mock.calls.length;
+    frames(3, 16);
+    expect(three.renderer.render.mock.calls.length).toBe(drawn);
+    cosmos.made[0]?.moved();
+    frames(2, 16);
+    expect(three.renderer.render.mock.calls.length).toBe(drawn + 1);
+    scene.dispose();
+  });
 });
 
 describe("the renderer it starts", () => {

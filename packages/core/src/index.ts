@@ -21,19 +21,53 @@ export {
   driftedPlaces,
   placeSystems,
   starSize,
+  STATION_SEATS,
   type SystemPlace,
   type SystemRef,
 } from "./cosmos/cosmos.ts";
 export {
+  BELT_INNER,
+  EARTH_PLACE,
+  EARTH_RADIUS,
+  GNO_LAND,
+  GRAIN,
+  ROOM,
+  systemsOf,
+  type Orbiter,
+  type StarSystem,
+  type WorldHeld,
+} from "./cosmos/system.ts";
+export {
+  BOUNDS,
+  dotLight,
+  Drawn,
+  HAZE,
+  Ladder,
+  LANDMARKS,
+  MIDDLE,
+  onScreen,
+  screenRadius,
+  type LadderView,
+} from "./lod/ladder.ts";
+export {
+  clearOf,
+  GROWTH,
+  growthAt,
+  leanFor,
+  SPREAD,
+  spreadAt,
+  type ClearBox,
+  type ScreenSpot,
+} from "./frame/screen.ts";
+export { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
+export {
   anchorOf,
   ANCHORS,
   asciiBytes,
-  between,
   MAPS,
   natureOf,
   planetLook,
   planetSeed,
-  seedShare,
   worldLook,
   type Anchor,
   type MapName,
@@ -52,6 +86,7 @@ export {
   type WorldSigns,
   type WorldState,
 } from "./planet/signs.ts";
+export { between, seedShare } from "./planet/shares.ts";
 export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
@@ -97,8 +132,8 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
-export type { Point } from "./space/cell.ts";
-export { driftAt, HOME, turnAt } from "./space/drift.ts";
+export { textHash, unitOf, type Point } from "./space/cell.ts";
+export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";

@@ -4,7 +4,7 @@
 // package already known is never asked again. Every answer is capped, parsed and filtered; a name that does not fit the
 // file's schema is left out.
 import { isAddress } from "@gnoworld/core";
-import { ExportedName, ImportPath, WORLDS_CAPS } from "@gnoworld/schemas";
+import { ExportedName, ImportPath, WORLDS_CAPS } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
 import { abciQuery, Absent, isDown, kindOf, type Send } from "./remote.ts";
 

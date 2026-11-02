@@ -1,11 +1,14 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  anchorOf,
   ANCHORS,
+  asciiBytes,
   MAPS,
   MAX_WARP_FREQUENCY,
   planetLook,
   planetSeed,
+  worldLook,
   type Anchor,
   type MapName,
   type PlanetLook,
@@ -50,6 +53,33 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
 };
 
 const BANDED: readonly Anchor[] = ["gas giant", "ice giant", "cloud deck"];
+
+describe("a world's look, from its id", () => {
+  const paths = (count: number) => Array.from({ length: count }, (_, at) => `gno.land/r/n${String(at)}/home`);
+  const seedOf = (path: string) => planetSeed(asciiBytes(path));
+
+  it("spells a text's bytes for a seed: an id is ASCII by its schema", () => {
+    expect([...asciiBytes("a/z-0")]).toEqual([97, 47, 122, 45, 48]);
+  });
+
+  it("reads the world's look at its path on gno.land, the anchor from the seed", () => {
+    const id = "gnoswap/pool";
+    const seed = seedOf(`gno.land/r/${id}`);
+    expect(worldLook(id)).toEqual(planetLook(asciiBytes(`gno.land/r/${id}`), anchorOf(seed)));
+  });
+
+  it("gives every anchor some worlds, and keeps the strange ones rare: about one in ten (ADR-0002 §3)", () => {
+    const seen = new Map<Anchor, number>();
+    const seeds = paths(6000).map(seedOf);
+    for (const seed of seeds) seen.set(anchorOf(seed), (seen.get(anchorOf(seed)) ?? 0) + 1);
+    expect(new Set(seen.keys())).toEqual(new Set(ANCHORS));
+    const strange = (seen.get("tidally locked") ?? 0) + (seen.get("shattered") ?? 0);
+    expect(strange / seeds.length).toBeGreaterThan(0.07);
+    expect(strange / seeds.length).toBeLessThan(0.13);
+    const common = ANCHORS.filter((anchor) => anchor !== "tidally locked" && anchor !== "shattered");
+    for (const anchor of common) expect((seen.get(anchor) ?? 0) / seeds.length).toBeGreaterThan(0.06);
+  });
+});
 
 describe("planetSeed", () => {
   it("is sha256 of the domain and the path's bytes, side by side", () => {

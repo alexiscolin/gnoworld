@@ -7,6 +7,7 @@ import { loseContext, opened, restoreContext, running, stats } from "./sceneStag
 // compared with itself, never with an approved picture: a GPU's output varies, a place's does not on one machine. Reduced motion holds
 // the eye where a journey puts it, and owes one frame a move.
 const HOME = "/?test-gpu";
+const BARE = "/net/gnoland/?test-gpu";
 const COMPUTER = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 const FAR = 2 ** 40;
@@ -20,9 +21,9 @@ const hideThePage = (page: Page) =>
       if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
   });
 
-async function stillScene(page: Page) {
+async function stillScene(page: Page, path = HOME) {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(HOME);
+  await page.goto(path);
   await running(page);
   await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
   await hideThePage(page);
@@ -173,8 +174,9 @@ test.describe("the scenery on a computer", () => {
     }
   });
 
+  // On a universe's home with no worlds: the default one's draws its cosmos too, which stays where it is (7d2).
   test("costs the same draws at home and far away", async ({ page }) => {
-    await stillScene(page);
+    await stillScene(page, BARE);
     await goTo(page, { x: 4000, y: -700, z: 2500 });
     const home = await stats(page);
     await goTo(page, { x: FAR, y: -FAR, z: FAR });

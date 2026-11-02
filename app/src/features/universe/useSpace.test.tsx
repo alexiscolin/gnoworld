@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const universe = vi.hoisted(() => ({
-  draw: vi.fn<(shown: boolean | "earth", page?: unknown) => void>(),
+  draw: vi.fn<(shown: boolean | "earth" | "cosmos", page?: unknown) => void>(),
   mount: vi.fn(),
 }));
 
@@ -17,6 +17,16 @@ async function door() {
   const { useSpace } = await import("./useSpace.ts");
   return function Cosmos() {
     useSpace();
+    return null;
+  };
+}
+
+// The default universe's home: the same door, and its worlds to draw.
+async function worldsDoor() {
+  vi.resetModules();
+  const { useSpace } = await import("./useSpace.ts");
+  return function Worlds() {
+    useSpace("cosmos");
     return null;
   };
 }
@@ -212,6 +222,11 @@ describe("useSpace", () => {
     await visit(Cosmos);
     expect(universe.mount).toHaveBeenCalledTimes(1);
     expect(universe.draw).toHaveBeenLastCalledWith(true);
+  });
+
+  it("asks for the worlds where the page does", async () => {
+    await visit(await worldsDoor());
+    expect(universe.draw).toHaveBeenLastCalledWith("cosmos");
   });
 
   it("covers it when the page leaves, and keeps it", async () => {

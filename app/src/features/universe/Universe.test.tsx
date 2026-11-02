@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
+import type { Shown } from "./host.ts";
 import { createAppStore } from "../../store/index.ts";
 import { Universe } from "./Universe.tsx";
 
@@ -10,11 +11,15 @@ const scene = vi.hoisted(() => ({
   cover: vi.fn<(covered: boolean) => void>(),
   dispose: vi.fn<() => void>(),
   earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
+  cosmos: vi.fn<(worlds: unknown) => void>(),
+  keepClear: vi.fn<(box: unknown) => void>(),
+  read: vi.fn(),
   start: vi.fn(),
   load: vi.fn(),
 }));
 
 vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
+vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: scene.read }));
 vi.mock("./EarthSigns.tsx", () => ({ PageSigns: () => <div data-signs="" /> }));
 
 const STRONG = "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Max, Unspecified Version)";
@@ -23,6 +28,7 @@ const RENDERER_NAME = 37446;
 const VIEW = "View in space";
 const SORRY = "Space is not available here. Every place is in the list.";
 const lose = vi.fn();
+const WORLDS = [{ id: "a/b", namespace: "a", realms: [] }];
 
 interface Device {
   /** The GPU's name; null, no WebGL2 at all. */
@@ -90,12 +96,12 @@ const heading = (child: ReactNode) => (
 const left: (() => void)[] = [];
 
 // A root of its own: a test here draws the component again with another prop, or leaves it.
-function rendered(shown: boolean | "earth", wrap: (child: ReactNode) => ReactNode = (child) => child) {
+function rendered(shown: Shown, wrap: (child: ReactNode) => ReactNode = (child) => child) {
   const box = document.createElement("div");
   document.body.append(box);
   const root = createRoot(box);
   let mounted = true;
-  const rerender = (next: boolean | "earth") => {
+  const rerender = (next: Shown) => {
     act(() => {
       root.render(wrap(<Universe shown={next} />));
     });
@@ -115,7 +121,14 @@ function rendered(shown: boolean | "earth", wrap: (child: ReactNode) => ReactNod
 
 beforeEach(() => {
   vi.useFakeTimers();
-  scene.start.mockImplementation(() => ({ cover: scene.cover, dispose: scene.dispose, stats: () => ({}) }));
+  scene.start.mockImplementation(() => ({
+    cover: scene.cover,
+    cosmos: scene.cosmos,
+    keepClear: scene.keepClear,
+    dispose: scene.dispose,
+    stats: () => ({}),
+  }));
+  scene.read.mockImplementation(() => Promise.resolve({ worlds: WORLDS }));
   scene.load.mockImplementation(() => Promise.resolve({ startScene: scene.start }));
   localStorage.clear();
   device();
@@ -130,6 +143,129 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis, "__gnoworldScene");
   Reflect.deleteProperty(navigator, "connection");
   history.replaceState(null, "", "/");
+});
+
+describe("the cosmos's worlds", () => {
+  it("reads the file once the scene runs, and hands its worlds over", async () => {
+    rendered("cosmos");
+    await settle();
+    expect(scene.read).toHaveBeenCalledTimes(1);
+    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+  });
+
+  it("stands the fixed places at once, whatever the file does: one that never answers draws them too", async () => {
+    scene.read.mockImplementation(() => new Promise(() => undefined));
+    rendered("cosmos");
+    await settle();
+    expect(scene.read).toHaveBeenCalledTimes(1);
+    expect(scene.cosmos).toHaveBeenCalledTimes(1);
+    expect(scene.cosmos).toHaveBeenLastCalledWith([]);
+  });
+
+  it("keeps the fixed places when the file does not come", async () => {
+    scene.read.mockImplementation(() => Promise.resolve(undefined));
+    rendered("cosmos");
+    await settle();
+    expect(scene.cosmos).toHaveBeenCalledTimes(1);
+    expect(scene.cosmos).toHaveBeenLastCalledWith([]);
+  });
+
+  it("gives the read the page's signal, and aborts it once the page has gone for good", async () => {
+    const { unmount } = rendered("cosmos");
+    await settle();
+    const signal = (scene.read.mock.calls[0]?.[1] as { signal: AbortSignal }).signal;
+    expect(signal.aborted).toBe(false);
+    unmount();
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("asks for nothing on a phone until the reader asks for the scene, and then does", async () => {
+    device({ phone: true });
+    const { box } = rendered("cosmos");
+    await settle();
+    expect(scene.read).not.toHaveBeenCalled();
+    click(button(box, VIEW));
+    await settle();
+    expect(scene.read).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves another universe's space and the Earth's page without them", async () => {
+    rendered(true);
+    await settle();
+    expect(scene.start).toHaveBeenCalledTimes(1);
+    expect(scene.read).not.toHaveBeenCalled();
+    expect(scene.cosmos).not.toHaveBeenCalled();
+  });
+
+  it("takes them away on leaving, and reads no second time on the way back", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender(false);
+    await settle();
+    expect(scene.cosmos).toHaveBeenLastCalledWith(undefined);
+    rerender("cosmos");
+    await settle();
+    expect(scene.read).toHaveBeenCalledTimes(1);
+    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+  });
+
+  it("hands nothing over when the page left before the file came", async () => {
+    let arrive: (file: unknown) => void = () => undefined;
+    scene.read.mockImplementation(
+      () =>
+        new Promise((done) => {
+          arrive = done;
+        }),
+    );
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(scene.read).toHaveBeenCalledTimes(1);
+    rerender(false);
+    await settle();
+    arrive({ worlds: WORLDS });
+    await settle();
+    expect(scene.cosmos).not.toHaveBeenCalledWith(WORLDS);
+  });
+
+  it("tells the scene the box the page's text keeps, and again when the window changes", async () => {
+    const hero = document.createElement("div");
+    hero.dataset["clear"] = "";
+    hero.getBoundingClientRect = () => ({ left: 40, top: 660, right: 880, bottom: 1030 }) as DOMRect;
+    document.body.append(hero);
+    rendered("cosmos");
+    await settle();
+    expect(scene.keepClear).toHaveBeenLastCalledWith({ left: 40, top: 660, right: 880, bottom: 1030 });
+    hero.getBoundingClientRect = () => ({ left: 16, top: 400, right: 374, bottom: 800 }) as DOMRect;
+    window.dispatchEvent(new Event("resize"));
+    expect(scene.keepClear).toHaveBeenLastCalledWith({ left: 16, top: 400, right: 374, bottom: 800 });
+    hero.remove();
+  });
+
+  it("listens to the window no more once the worlds have gone", async () => {
+    const hero = document.createElement("div");
+    hero.dataset["clear"] = "";
+    document.body.append(hero);
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender(false);
+    await settle();
+    scene.keepClear.mockClear();
+    window.dispatchEvent(new Event("resize"));
+    expect(scene.keepClear).not.toHaveBeenCalled();
+    hero.remove();
+  });
+
+  it("shows the credits wherever the worlds' maps show", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    expect(all(box, "button").map(({ textContent }) => textContent)).toContain("Credits");
+  });
+
+  it("shows no credits on a bare space", async () => {
+    const { box } = rendered(true);
+    await settle();
+    expect(all(box, "button").map(({ textContent }) => textContent)).not.toContain("Credits");
+  });
 });
 
 describe("the canvas", () => {

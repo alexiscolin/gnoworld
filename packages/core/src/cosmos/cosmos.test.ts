@@ -8,6 +8,7 @@ import {
   driftedPlaces,
   placeSystems,
   starSize,
+  STATION_SEATS,
   type SystemPlace,
   type SystemRef,
 } from "./cosmos.ts";
@@ -129,7 +130,8 @@ describe.each([
   it("fills every ring well inside the rim: constant density, with no hole", () => {
     const rings = new Map<number, number>();
     for (const place of placed(count).values()) rings.set(ringOf(place), (rings.get(ringOf(place)) ?? 0) + 1);
-    for (let ring = 1; ring <= full * ideal(); ring += 1) expect(rings.get(ring)).toBe(6 * ring);
+    const kept = (ring: number) => STATION_SEATS.filter((seat) => seat.ring === ring).length;
+    for (let ring = 1; ring <= full * ideal(); ring += 1) expect(rings.get(ring)).toBe(6 * ring - kept(ring));
   });
 
   it("thins at the rim, within a third of the disc's size: no spoke runs out", () => {
@@ -548,7 +550,7 @@ describe("a curated ecosystem is placed together", () => {
 
 // Golden: the map every device and every release draws, worked out apart from this code, in Python, a ray walked at a time. Changing one
 // of these numbers is a deliberate change of the map (the hash, the density, the field), never a side effect: update it in a commit that
-// says so. A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
+// says so (7d2's three reserved cells moved `varmeta`, `demo` and the `g1` system, and nothing else). A tolerance of 1e-6 absorbs an engine's last bit of a sine, and nothing visible.
 describe("golden coordinates", () => {
   const set = [
     ...loose([
@@ -566,21 +568,44 @@ describe("golden coordinates", () => {
 
   it.each([
     ["sys", [-13.78854132, 1.245973353, -15.045882698]],
-    ["varmeta", [-37.856034868, -1.177724706, -16.56802431]],
+    ["varmeta", [-56.851332311, -1.103865795, -22.957775629]],
     ["r3v4", [-15.785056512, -1.97168562, 8.74200839]],
     ["onbloc", [-32.03706175, -1.541395906, 20.973674034]],
     ["gnoswap", [20.901908777, -2.284912251, -10.340452521]],
     ["nym-moultest123", [-39.693653406, 1.305684533, 6.851628079]],
     ["samcrew", [-4.353961855, 1.030364738, 22.124125104]],
     ["leon", [-16.048881854, -0.439412126, 37.742777871]],
-    ["demo", [-23.88491381, -2.324080886, -35.148323671]],
-    ["g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx", [-48.256894851, -0.39123538, -42.186987661]],
+    ["demo", [-44.738462293, -2.245187493, -42.992562484]],
+    ["g10ragdr3cjqkael8rslpw4y6rlelhev4h0fswcx", [-50.509277636, -0.22649227, -67.004075855]],
     ["gnoland", [-42.920955358, -0.451738803, 35.785442824]],
   ] as const)("puts %s at %j", (id, [x, y, z]) => {
     const place = placeSystems(set).get(id);
     expect(Math.abs((place?.x ?? NaN) - x)).toBeLessThan(1e-6);
     expect(Math.abs((place?.y ?? NaN) - y)).toBeLessThan(1e-6);
     expect(Math.abs((place?.z ?? NaN) - z)).toBeLessThan(1e-6);
+  });
+});
+
+describe("the stations' cells (ADR-0002 §1: the team's, always there, outside the rank)", () => {
+  const onRing = (places: Map<string, SystemPlace>, ring: number) =>
+    [...places.values()].filter((place) => ringOf(place) === ring).length;
+
+  it("keeps three cells on ring 2, in any set large enough to fill it", () => {
+    expect(STATION_SEATS).toHaveLength(3);
+    expect(STATION_SEATS.every(({ ring }) => ring === 2)).toBe(true);
+    for (const size of [200, 1000, 5000]) {
+      expect(onRing(placed(size), 1)).toBe(6);
+      expect(onRing(placed(size), 2)).toBe(12 - STATION_SEATS.length);
+      expect(onRing(placed(size), 3)).toBe(18);
+    }
+  });
+
+  it("keeps no system in the quarter of the map those cells stand in, on ring 2", () => {
+    const inZone = [...placed(1000).values()].filter(
+      (place) =>
+        ringOf(place) === 2 && place.x < -2 && place.z < -8 && horizontal(place) < 46 && horizontal(place) > 34,
+    );
+    expect(inZone).toHaveLength(0);
   });
 });
 

@@ -3,7 +3,7 @@
 // not refused, so an answer of exactly the limit may be cut: the prefix is then split on the next character and each part asked
 // on its own (F3517; the chain pages by prefix only, handler.go:196, pagination not implemented there). What comes back is data: capped,
 // and each line kept only if it is a realm path. ponytail: at most LIST_MAX_QUERIES requests; then the list is returned, marked partial.
-import { RealmPath } from "@gnoworld/schemas";
+import { RealmPath } from "@gnoworld/schemas/indexer";
 import { abciQuery, kindOf, type Kind, type Send } from "./remote.ts";
 
 export const LIST_MAX_PATHS = 10_000;

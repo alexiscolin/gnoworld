@@ -14,6 +14,8 @@ const CELLS_A_RING = 6;
 const NOBODY = 0x7fffffff;
 
 const cellOf = (turn: number, cells: number): number => Math.floor(turn * cells);
+// A cell's number over all rings: ring r starts after the 3r(r - 1) cells inside it.
+const slotOf = (ring: number, cell: number): number => 3 * ring * (ring - 1) + cell;
 
 // The first position past `from` whose turn leaves the cell of `from`.
 function endOfCell(sorted: Float64Array, from: number, cells: number): number {
@@ -85,8 +87,8 @@ class Waiting {
   }
 }
 
-/** A seat for each ray, the rays given by rank, best first. Two rays may be one: the better rank goes inward. */
-export function seatInRings(turns: readonly number[]): Seat[] {
+/** A seat for each ray, the rays given by rank, best first. Two rays may be one: the better rank goes inward. No system takes a `reserved` seat. */
+export function seatInRings(turns: readonly number[], reserved: readonly Seat[] = []): Seat[] {
   if (turns.some((turn) => !(turn >= 0 && turn < 1))) throw new RangeError("cosmos: a turn is at least 0 and under 1");
   const count = turns.length;
   const turnOf = (rank: number): number => turns[rank] ?? 0;
@@ -97,15 +99,19 @@ export function seatInRings(turns: readonly number[]): Seat[] {
     positions[rank] = position;
   });
   const waiting = new Waiting(byTurn);
+  const kept = new Set(reserved.map(({ ring, cell }) => slotOf(ring, cell)));
   const seats: Seat[] = [];
   for (let ring = 1, seated = 0; seated < count; ring += 1) {
     const cells = CELLS_A_RING * ring;
     for (let at = waiting.nextFrom(0); at < count;) {
       const end = endOfCell(sorted, at, cells);
-      const rank = waiting.best(at, end);
-      seats[rank] = { ring, cell: cellOf(sorted[at] ?? 0, cells) };
-      waiting.seat(positions[rank] ?? 0);
-      seated += 1;
+      const cell = cellOf(sorted[at] ?? 0, cells);
+      if (!kept.has(slotOf(ring, cell))) {
+        const rank = waiting.best(at, end);
+        seats[rank] = { ring, cell };
+        waiting.seat(positions[rank] ?? 0);
+        seated += 1;
+      }
       at = waiting.nextFrom(end);
     }
   }

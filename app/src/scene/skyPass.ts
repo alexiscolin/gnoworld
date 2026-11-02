@@ -78,13 +78,13 @@ export const marchMaterial = (uniforms: Record<string, { value: unknown }>): Sha
     fragmentShader: MARCH,
   });
 
-export const shownMaterial = (picture: Texture): ShaderMaterial =>
+export const shownMaterial = (picture: Texture, veil: { value: number }): ShaderMaterial =>
   new ShaderMaterial({
     blending: AdditiveBlending,
     depthTest: false,
     depthWrite: false,
     dithering: true,
-    uniforms: { uSky: { value: picture } },
+    uniforms: { uSky: { value: picture }, uVeil: veil },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
       void main() {
@@ -95,10 +95,11 @@ export const shownMaterial = (picture: Texture): ShaderMaterial =>
       #include <common>
       #include <dithering_pars_fragment>
       uniform sampler2D uSky;
+      uniform float uVeil;
       varying vec2 vUv;
       void main() {
         vec3 root = texture2D(uSky, vUv).rgb;
-        gl_FragColor = vec4(root * root, 1.0);
+        gl_FragColor = vec4(root * root * uVeil, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <dithering_fragment>

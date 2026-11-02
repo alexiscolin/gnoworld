@@ -70,6 +70,25 @@ interface Three {
   z: number;
 }
 
+describe("its veil", () => {
+  it("lets the sky through whole until a page veils it, and takes the share it is given", () => {
+    const { stage, space } = made();
+    expect(uniform(shown(stage), "uVeil")).toBe(1);
+    space.veil(0.4);
+    expect(uniform(shown(stage), "uVeil")).toBe(0.4);
+    space.veil(1);
+    expect(uniform(shown(stage), "uVeil")).toBe(1);
+  });
+
+  it("marches nothing for it: the picture is the same, shown fainter", () => {
+    const { space, gl, camera, asked } = made();
+    const before = asked.length;
+    space.veil(0.4);
+    space.march(gl, camera);
+    expect(asked).toHaveLength(before);
+  });
+});
+
 describe("what it puts on the stage", () => {
   it("is one sky and a few fields, whatever the place: the count is the sky's, not the universe's", () => {
     const { stage, space } = made();

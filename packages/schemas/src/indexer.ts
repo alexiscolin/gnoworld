@@ -25,3 +25,17 @@ export const RealmFactsAnswer = z.object({
   errors: z.optional(z.never()),
 });
 export type RealmFactsAnswer = z.infer<typeof RealmFactsAnswer>;
+
+// The worlds' file sits behind this door, not in the barrel: the store's chunk group takes the barrel's modules, and a world's first screen
+// would pay 446 B for a schema the universe alone reads. It is what the server's job writes from the indexers.
+export {
+  ChainCount,
+  DeployerName,
+  ExportedName,
+  ImportPath,
+  RealmPath,
+  WorldId,
+  Worlds,
+  WORLDS_CAPS,
+  WORLDS_MAX_BYTES,
+} from "./worlds.ts";

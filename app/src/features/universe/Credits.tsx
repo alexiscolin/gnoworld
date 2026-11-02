@@ -5,13 +5,14 @@ import { useState } from "react";
 import { CREDITS } from "../../scene/planet/credits.ts";
 import styles from "./Universe.module.css";
 
-export function Credits() {
+export function Credits({ overTicker = false }: { overTicker?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <button
         type="button"
         className={styles["credits"]}
+        data-over-ticker={overTicker ? "" : undefined}
         onClick={() => {
           setOpen(true);
         }}

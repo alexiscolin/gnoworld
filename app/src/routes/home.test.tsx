@@ -4,6 +4,9 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
+const { useSpace } = vi.hoisted(() => ({ useSpace: vi.fn() }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace }));
+
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267: the kicker says gno.world, and the one heading is the hero's line.
@@ -13,6 +16,15 @@ test("home links to each world by its name, at the world's path", async () => {
   expect(html).toContain(">Bubble</a>");
   expect(html).toContain('<a href="/w/govdao"');
   expect(html).toContain(">GovDAO</a>");
+});
+
+test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {
+  useSpace.mockClear();
+  await render({ path: "/", Component: Home, loader }, "/");
+  expect(useSpace).toHaveBeenLastCalledWith("cosmos");
+  useSpace.mockClear();
+  await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
+  expect(useSpace).toHaveBeenLastCalledWith(undefined);
 });
 
 const failing = {

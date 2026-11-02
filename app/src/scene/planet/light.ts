@@ -14,7 +14,10 @@ export function starAt(latitude: number, azimuth: number, out: Vector3): Vector3
   return out.set(Math.cos(latitude), Math.sin(latitude), 0).applyAxisAngle(POLE, azimuth);
 }
 
+/** How far a world's star stands from the eye, in radians, from its seed's first byte. */
+export const fromEyeOf = (seed: Uint8Array): number => between(FROM_EYE, seedShare(seed, 0));
+
 /** The star of a generated world, from its seed's first bytes: always from the right as the Earth's, its angle and height a little its own. */
 export function sideLight(seed: Uint8Array, out: Vector3): Vector3 {
-  return starAt(between(LATITUDE, seedShare(seed, 1)), between(FROM_EYE, seedShare(seed, 0)) - HALF_PI, out);
+  return starAt(between(LATITUDE, seedShare(seed, 1)), fromEyeOf(seed) - HALF_PI, out);
 }

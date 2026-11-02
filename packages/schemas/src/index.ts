@@ -21,17 +21,6 @@ export {
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
-export {
-  ChainCount,
-  DeployerName,
-  ExportedName,
-  ImportPath,
-  RealmPath,
-  WorldId,
-  Worlds,
-  WORLDS_CAPS,
-  WORLDS_MAX_BYTES,
-} from "./worlds.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";

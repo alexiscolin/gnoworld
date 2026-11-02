@@ -13,6 +13,7 @@ import {
 } from "react";
 import { Credits } from "./Credits.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
+import type { EarthState } from "../../scene/earth/device.ts";
 import { SceneHost, type EarthPage, type Shown } from "./host.ts";
 import styles from "./Universe.module.css";
 
@@ -55,6 +56,19 @@ function OnTheEarth({ host, page }: { host: SceneHost; page: EarthPage | undefin
   );
 }
 
+interface BesideProps {
+  readonly host: SceneHost;
+  readonly page: EarthPage | undefined;
+  readonly showsMaps: boolean;
+  readonly earth: EarthState;
+}
+
+// What stands with the running scene: wherever maps show, their credits.
+function Beside({ host, page, showsMaps, earth }: BesideProps) {
+  if (earth === "drawn") return <OnTheEarth host={host} page={page} />;
+  return showsMaps ? <Credits overTicker /> : null;
+}
+
 export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | undefined }) {
   const [host] = useState(() => new SceneHost());
   const status = useSyncExternalStore(host.subscribe, host.status);
@@ -90,7 +104,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | und
       <p role="status" className={styles["status"]}>
         {shown ? lineOf(status === "failed", earth === "failed") : null}
       </p>
-      {status === "on" && earth === "drawn" ? <OnTheEarth host={host} page={page} /> : null}
+      {status === "on" ? <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} /> : null}
     </>
   );
 }

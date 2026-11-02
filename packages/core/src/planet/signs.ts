@@ -5,7 +5,7 @@
 import type { Anchor, Rgb } from "./anchors.ts";
 import { moreSeed } from "./choice.ts";
 import { share } from "./gauges.ts";
-import { between, seedShare } from "./look.ts";
+import { between, seedShare } from "./shares.ts";
 
 export const STAGES = ["seed", "rest", "living", "inhabited", "busy", "beacon"] as const;
 export type Stage = (typeof STAGES)[number];

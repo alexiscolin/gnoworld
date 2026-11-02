@@ -2,7 +2,7 @@
 // file past a cap is shed, never refused, or one actor could stop the file for everyone for good. The least active world goes first
 // (calls ascending, a null count as none, then the most crowded namespace, then the heaviest): over the schema's count, whole
 // worlds; over the bytes, lists (functions and imports) first, then whole worlds. The others stay as they were, in the order they came.
-import { WORLDS_CAPS, type Worlds } from "@gnoworld/schemas";
+import { WORLDS_CAPS, type Worlds } from "@gnoworld/schemas/indexer";
 
 type WorldRow = Worlds["worlds"][number];
 type Head = Pick<Worlds, "version" | "universe" | "updated">;

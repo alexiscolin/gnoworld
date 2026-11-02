@@ -31,7 +31,9 @@ const float SHADED = 0.3;
 
 void main() {
   float reach = (vRadius - ringInner) / (ringOuter - ringInner);
-  float fine = 0.5 + 0.3 * sin(reach * 61.0) * sin(reach * 23.0 + 1.3) + 0.2 * sin(reach * 131.0 + 0.4) * (1.0 - smoothstep(0.002, 0.012, fwidth(reach)));
+  // Past what a pixel can hold the fine lines go, or they beat against the pixels as they turn: a ring seen small is its smooth mean.
+  float small = fwidth(reach);
+  float fine = 0.5 + 0.3 * sin(reach * 61.0) * sin(reach * 23.0 + 1.3) * (1.0 - smoothstep(0.008, 0.03, small)) + 0.2 * sin(reach * 131.0 + 0.4) * (1.0 - smoothstep(0.002, 0.012, small));
   float density = texture2D(ringMap, vec2(reach, 0.5)).r * ringOpacity * (0.52 + 0.48 * fine);
   vec3 at = (vWorld - vCentre) / vWorldRadius;
   float past = dot(at, sun) < 0.0 ? length(cross(at, sun)) : 2.0;

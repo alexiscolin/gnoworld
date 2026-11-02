@@ -18,24 +18,23 @@ uniform float lightTurn;
 uniform vec3 lightOffset;
 `;
 
+// Outside the shader, as a comment in it ships in the scene chunk: settledAt opens regions where the map's lights are densest, then out
+// across the field; netOf is a golden net with a copper glow, soft under a few pixels; formOf is a class's shape; settlements is the whole
+// night, a net's world glowing copper between its cells as it settles, so a lit patch never floats on a black body.
 export const LIGHTS = /* glsl */ `
-// The Earth's own lights, the frames' warm family: a form varies, a colour does not.
 const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);
 
-// Regions open as a world settles, first where the map's lights are densest, then out across the field: its cores grow into its towns.
 float settledAt(vec3 axis, float spill) {
   float ground = smoothstep(-0.7, 0.7, field(axis * lightGrain + lightOffset).x);
   float rank = 0.6 * (1.0 - smoothstep(0.0, 0.15, spill)) + 0.4 * ground - 0.1;
   return smoothstep(rank, rank + 0.15, settled * 1.15);
 }
 
-// A golden net with a copper glow along its lines, a soft glow once a cell is under a few pixels: a line would break into worms.
 float netOf(vec3 direction, vec2 seam, vec3 lit) {
   float wired = 0.3 + 0.36 * abs(field(direction * 4.0 + lightOffset).y) + 0.7 * lit.x;
   return mix(seam.x * wired + 0.16 * seam.y * seam.y, 0.1 + 0.4 * lit.y, smoothstep(0.25, 0.5, lit.z));
 }
 
-// The shape a class gives its lights, from the map's cities and its soft spill.
 float formOf(vec3 axis, vec3 direction, vec4 reads, vec3 lines) {
   float cities = reads.x;
   float spill = reads.y;
@@ -55,8 +54,6 @@ float formOf(vec3 axis, vec3 direction, vec4 reads, vec3 lines) {
   return (cities * 2.6 + spill * 1.2) * lightFine;
 }
 
-// A world's lights, on the arc its night comes on across, the Earth's level for level. The map holds one channel, squared here into light. A net
-// is gold, the same family a shade deeper, as frame 4's is; its line is as wide as two of its own pixels, so a wall grazing the sphere stays thin.
 vec3 settlements(vec3 axis, vec3 direction, vec3 flow, float day, float crack) {
   vec3 place = lightTurn == 0.0 ? direction : spin * normalize(turned(axis, lightTurn) + warpAmount * flow);
   Lookup at = lookupOf(place);
@@ -76,7 +73,6 @@ vec3 settlements(vec3 axis, vec3 direction, vec3 flow, float day, float crack) {
   float open = settledAt(axis, spill);
   float form = formOf(axis, direction, vec4(cities * cities, spill * spill * 2.5, day, pixel), vec3(seam, crack));
   vec3 tint = lightKind == ${code("seams")} ? CITY_LIGHT * CITY_LIGHT : CITY_LIGHT;
-  // A net's world glows copper between its cells as it settles, open or not: a lit patch never floats on a black body.
   vec3 ground = lightKind == ${code("seams")} ? CITY_LIGHT * CITY_LIGHT * CITY_LIGHT * 0.025 * settled : vec3(0.0);
   return (tint * form * open + ground) * lightLevel * night;
 }
@@ -94,6 +90,7 @@ void main() {
 `;
 
 // The colours of the "Uncharted signal" of frame 4: a pink heart in a deep red glow, no sun's and no heat's.
+// The heart (a comment here, not in the shader, which ships) covers the small body, whose edge falls near 0.92, so no limb shows through.
 export const HALO_FRAGMENT = /* glsl */ `
 uniform float signal;
 varying vec3 vNormal;
@@ -101,7 +98,6 @@ varying vec3 vView;
 void main() {
   float centre = abs(dot(normalize(vNormal), normalize(vView)));
   vec3 glow = mix(vec3(0.4, 0.05, 0.07), vec3(0.95, 0.56, 0.74), pow(centre, 30.0));
-  // The heart covers the small body, whose edge falls near 0.92, so no limb shows through.
   float cover = smoothstep(0.82, 0.92, centre);
   gl_FragColor = vec4(glow * (0.42 * pow(centre, 4.0) + 0.42 * pow(centre, 30.0)) * signal, cover);
   #include <tonemapping_fragment>

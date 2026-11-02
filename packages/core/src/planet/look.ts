@@ -5,6 +5,7 @@ import { ANCHORS, MAPS, type Anchor, type AnchorRow, type MapName, type Ramp, ty
 import { anchorOf, natureOf, type Nature, type RealmFunctions } from "./choice.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
+import { between, seedShare } from "./shares.ts";
 
 export { anchorOf, ANCHORS, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
 
@@ -76,10 +77,6 @@ export function planetSeed(path: Uint8Array): Uint8Array {
   return sha256(message);
 }
 
-/** `share` of the way across a span. */
-export const between = ([from, to]: readonly [number, number], share: number): number => from + (to - from) * share;
-/** Byte `index` of a seed, as a share. */
-export const seedShare = (seed: Uint8Array, index: number): number => (seed[index] ?? 0) / 255;
 const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
   between([from[0], to[0]], share),
   between([from[1], to[1]], share),

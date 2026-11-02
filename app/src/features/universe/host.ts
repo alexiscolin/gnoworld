@@ -9,12 +9,13 @@ import type { Scene } from "../../scene/scene.ts";
 import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
+import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
-/** Whether the page shows space, and the Earth in it. */
-export type Shown = boolean | "earth";
+/** Whether the page shows space, and the Earth or the default universe's worlds in it. */
+export type Shown = boolean | "earth" | "cosmos";
 
 /** What the Earth's signs need of the page: this root lies outside its store and its router. */
 export interface EarthPage {
@@ -58,6 +59,8 @@ export class SceneHost {
   #scene: Scene | undefined;
   #shown = false;
   #wantsEarth = false;
+  #wantsWorlds = false;
+  readonly #feed = new WorldsFeed();
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
   #decided = false;
@@ -137,10 +140,15 @@ export class SceneHost {
     }
   }
 
+  #syncWorlds(): void {
+    if (this.#scene !== undefined) this.#feed.sync(this.#scene, this.#wantsWorlds);
+  }
+
   /** The canvas is on the page; what this returns takes the scene away with it. */
   attach(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     return () => {
+      this.#feed.leave();
       this.#stopWatching();
       this.#scene?.dispose();
       this.#canvas = undefined;
@@ -151,8 +159,10 @@ export class SceneHost {
   show(shown: Shown): void {
     this.#shown = shown !== false;
     this.#wantsEarth = shown === "earth";
+    this.#wantsWorlds = shown === "cosmos";
     this.#scene?.cover(!this.#shown);
     this.#syncEarth();
+    this.#syncWorlds();
     if (this.#shown && !this.#decided) this.#decide();
   }
 
@@ -197,5 +207,6 @@ export class SceneHost {
     showJourneys(scene);
     this.#say("on");
     this.#syncEarth();
+    this.#syncWorlds();
   }
 }

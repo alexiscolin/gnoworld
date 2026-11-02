@@ -1,5 +1,5 @@
 // The Earth, its one Moon and the golden ring, as one group: what the view stands on the stage. It owns all of it, the maps included.
-import { Group, SphereGeometry, Vector3, type Euler, type Mesh, type Texture } from "three";
+import { Group, SphereGeometry, Vector3, type Euler, type Mesh, type Texture, type Object3D } from "three";
 import { Disposer } from "../disposer.ts";
 import { starAt } from "../planet/light.ts";
 import { freeMap } from "../planet/maps.ts";
@@ -14,6 +14,8 @@ import type { EarthDevice } from "./device.ts";
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
+// Frame 4's Moon, 13 pixels on a 47-pixel Earth: its own size would be two pixels at this distance.
+const FAR_MOON_RADIUS = 0.27;
 const ANISOTROPY = 16;
 
 export class Globe {
@@ -88,6 +90,13 @@ export class Globe {
     // In front of the Moon, so its halo lifts the dark side a little: a black half would read as a hole in the light.
     this.#orbit.glow.position.copy(this.#moonAt).setZ(this.#moonAt.z + MOON_RADIUS);
     this.#orbit.setHead(angle);
+  }
+
+  /** For an Earth of `radius` world units, seen small among the worlds: `line`, of the orbit's radius, for its ring. */
+  stand(radius: number, line: Object3D): void {
+    this.group.scale.setScalar(radius);
+    this.moon.group.scale.setScalar(FAR_MOON_RADIUS);
+    this.#orbit.setFine(line);
   }
 
   /** The orbit's point at `angle`, in the group's space. */

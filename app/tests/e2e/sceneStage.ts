@@ -1,6 +1,24 @@
 import { expect, type Page } from "./fixtures.ts";
 
 // What the scene's journeys share: the running scene, read in a test build, and its context lost and given back.
+interface Spot {
+  x: number;
+  y: number;
+  radius: number;
+}
+interface CosmosStats {
+  shown: boolean;
+  bodies: number;
+  stars: number;
+  dots: number;
+  glows: number;
+  rocks: number;
+  maps: number;
+  looks: number;
+  dotPixels: number;
+  earth: boolean;
+  screen: { sun: Spot; earth: Spot | undefined; bodies: Spot[] };
+}
 interface Stats {
   frames: number;
   tier: "high" | "low";
@@ -11,6 +29,7 @@ interface Stats {
   geometries: number;
   textures: number;
   eye: { x: number; y: number; z: number };
+  cosmos: CosmosStats | undefined;
 }
 
 export const stats = (page: Page) =>

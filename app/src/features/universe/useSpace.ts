@@ -47,9 +47,9 @@ const pageLoaded = (signal: AbortSignal) =>
       );
   });
 
-/** Shows space while the calling page is on screen, with the Earth in it if the page asks, and what the Earth's signs need of the page. True once
+/** Shows space while the calling page is on screen, with the Earth or the worlds in it if the page asks, and what the Earth's signs need of the page. True once
  * the first screen is done: the page has loaded and the door has answered, whichever way. */
-export function useSpace(body?: "earth", from?: EarthPage): boolean {
+export function useSpace(body?: "earth" | "cosmos", from?: EarthPage): boolean {
   const [firstScreenDone, setFirstScreenDone] = useState(false);
   useEffect(() => {
     show(body ?? true, from);

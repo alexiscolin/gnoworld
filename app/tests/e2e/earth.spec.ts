@@ -235,9 +235,10 @@ test.describe("a computer", () => {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 
+  // From a universe's home with no worlds: the default one's stands its own small Earth, whose maps stay with it (7d2).
   test("gives every map back when the reader leaves, and draws again on the way back", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/?test-gpu");
+    await page.goto("/net/gnoland/?test-gpu");
     await expect(page.locator("canvas[data-scene='on']")).toBeAttached(SLOW);
     await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(0);
     const before = await stats(page);
@@ -286,13 +287,14 @@ test.describe("a 16:9 window", () => {
 test.describe("the pages that hold no Earth", () => {
   test.use({ viewport: COMPUTER });
 
-  for (const path of ["/?test-gpu", "/list?test-gpu", "/w/bubble?test-gpu"])
+  // The default home holds the Earth among its worlds (7d2): another universe's home is the bare space.
+  for (const path of ["/net/gnoland/?test-gpu", "/list?test-gpu", "/w/bubble?test-gpu"])
     test(`${path} asks for none of its maps`, async ({ page }) => {
       const asked = mapsAsked(page);
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(path);
       await hydrated(page);
-      if (path.startsWith("/?")) {
+      if (path.startsWith("/net/")) {
         await running(page);
         await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(0);
       } else await page.evaluate(() => new Promise((done) => setTimeout(done, 300)));

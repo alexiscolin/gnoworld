@@ -8,8 +8,8 @@ import { seatInRings, type Seat } from "./rings.ts";
 // n^1.5 steps and the real one must not, so it is the oracle here and never the product.
 const cellOn = (turn: number, ring: number): number => Math.floor(turn * (6 * ring));
 
-function walked(turns: readonly number[]): Seat[] {
-  const taken = new Set<number>();
+function walked(turns: readonly number[], reserved: readonly Seat[] = []): Seat[] {
+  const taken = new Set(reserved.map(({ ring, cell }) => 3 * ring * (ring - 1) + cell));
   return turns.map((turn) => {
     for (let ring = 1; ; ring += 1) {
       const slot = 3 * ring * (ring - 1) + cellOn(turn, ring);
@@ -29,6 +29,33 @@ const crowded = fc.array(
   { maxLength: 200 },
 );
 const scattered = (count: number): number[] => Array.from({ length: count }, (_, at) => textHash(String(at)) / 2 ** 32);
+
+describe("a reserved cell", () => {
+  const KEPT = [
+    { ring: 1, cell: 3 },
+    { ring: 2, cell: 7 },
+  ];
+
+  it("seats nobody there: the ray goes on to the next ring", () => {
+    expect(seatInRings([0.5], KEPT)).toEqual([{ ring: 2, cell: 6 }]);
+    expect(seatInRings([0.5, 0.52], KEPT)).toEqual([
+      { ring: 2, cell: 6 },
+      { ring: 3, cell: 9 },
+    ]);
+  });
+
+  it("seats as a walk of the rays does, those cells taken before anyone comes", () => {
+    fc.assert(
+      fc.property(fc.oneof(rays, crowded), (turns) => {
+        expect(seatInRings(turns, KEPT)).toEqual(walked(turns, KEPT));
+      }),
+    );
+  });
+
+  it("leaves the other cells as they were: a ray that crosses none moves nowhere", () => {
+    expect(seatInRings([0.1, 0.9], KEPT)).toEqual(seatInRings([0.1, 0.9]));
+  });
+});
 
 describe("seatInRings, by hand", () => {
   it("seats nobody for no ray", () => {

@@ -77,6 +77,15 @@
     cursor: pointer;
   }
 
+  /* On the home it stands at the ticker's right end, as the frames' texture line does, over the news running under it. */
+  .credits[data-over-ticker] {
+    /* raw: over the ticker's own 2 */
+    z-index: 3;
+    /* raw: the ticker's 34 px */
+    block-size: 34px;
+    background: var(--color-space);
+  }
+
   /* Under the plate's breakpoint no margin holds it: it lies over the page's words. */
   @media (max-width: 1279px) {
     .credits {

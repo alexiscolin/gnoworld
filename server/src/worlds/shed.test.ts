@@ -1,4 +1,4 @@
-import { Worlds, WORLDS_CAPS } from "@gnoworld/schemas";
+import { Worlds, WORLDS_CAPS } from "@gnoworld/schemas/indexer";
 import { describe, expect, it } from "vitest";
 import { fitted } from "./shed.ts";
 
