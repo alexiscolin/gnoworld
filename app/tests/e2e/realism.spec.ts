@@ -11,11 +11,13 @@ import {
   noneOnAnother,
   open,
   PAGE,
+  picture,
   SOFTWARE,
   stats,
   whole,
   type Circle,
 } from "./lab.ts";
+import { pixelHash } from "./pixels.ts";
 
 // 7b's realism page (app/lab): a world of each anchor and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
 // software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
@@ -45,6 +47,10 @@ const VIEWS = [
 ];
 
 const stages = (page: Page) => askLab<string[]>(page, "stages");
+// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at INSTANT, at this base (41776567), before
+// 7b5 split the surface program in two. A hand-made world never moves.
+const EARTH_PIXELS = "a1fc799da0825909";
+const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
 
 const { width, height } = COMPUTER;
 const CORNER = 80;
@@ -212,6 +218,12 @@ test.describe("the realism page", () => {
       expect(middle).toBeGreaterThan(4);
       for (const corner of corners) expect(corner).toBeLessThan(16);
     });
+
+  test("the Earth view stays 0 px from the render Alexis approved, its Moon with it", async ({ page }) => {
+    await page.clock.setFixedTime(INSTANT);
+    await open(page, "?view=earth");
+    expect(await pixelHash(page, await picture(page))).toBe(EARTH_PIXELS);
+  });
 
   test("the Earth view draws the Earth itself, lit from the right, with the night on its left", async ({ page }) => {
     await open(page, "?view=earth");

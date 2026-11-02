@@ -54,7 +54,7 @@ export const open = async (page: Page, query: string) => {
 };
 
 // The canvas with the panel away, which sits over a corner: P hides it, as for a capture.
-const picture = async (page: Page) => {
+export const picture = async (page: Page) => {
   await page.keyboard.press("p");
   await expect(page.getByRole("main")).toBeHidden();
   return page.locator("canvas").screenshot();
