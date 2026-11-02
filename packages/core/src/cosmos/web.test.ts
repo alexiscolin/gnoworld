@@ -250,6 +250,21 @@ describe("pointTint", () => {
     return out;
   };
 
+  // The stills' rose-peach (inspi-nebula f01, f04, f07, read by the design review): hue 15 to 17, saturation 0.50, in sRGB.
+  it("reads at home as the stills' rose and peach, never the mood's orange: hue 14 to 21, saturation at most a half", () => {
+    const { red, green, blue } = tintAt({ x: 0, y: 0, z: 0 });
+    const bytes = [red, green, blue].map((channel) =>
+      channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055,
+    );
+    const [r = 0, g = 0, b = 0] = bytes;
+    const top = Math.max(r, g, b);
+    const hue = (60 * (g - b)) / (top - Math.min(r, g, b));
+    expect(top).toBe(r);
+    expect(hue).toBeGreaterThanOrEqual(14);
+    expect(hue).toBeLessThanOrEqual(21);
+    expect((top - Math.min(r, g, b)) / top).toBeLessThanOrEqual(0.5);
+  });
+
   it("is warm at home, rose and peach: red first, blue last, never a hard primary", () => {
     const { red, green, blue } = tintAt({ x: 0, y: 0, z: 0 });
     expect(red).toBeGreaterThan(green);

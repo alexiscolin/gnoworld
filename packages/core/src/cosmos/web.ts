@@ -5,7 +5,7 @@ import { textHash, type Point } from "../space/cell.ts";
 import { moodAt, newMood } from "../space/mood.ts";
 import { lerp } from "../space/smooth.ts";
 
-/** The most lines drawn, one draw whatever the file: twice the worlds a file may hold. */
+/** The most lines drawn, one draw whatever the file: more than twice the worlds a file may hold. */
 export const LINKS_MOST = 40_960;
 
 /** A world of the file, as its links read it: its realms' paths and what each imports. */
@@ -26,9 +26,11 @@ const GLOW = 3.2;
 const LEAST = 0.75;
 // The lens's opening, in world units: how fast a point nearer than the focus spreads.
 const APERTURE = 40;
-// Rose and peach (the post Alexis gave, 2026-11-02), in linear light: how much of it a world's point takes over the mood's colour.
-const PEACH = { red: 0.75, green: 0.3, blue: 0.22 };
+// Rose and peach (the post Alexis gave, 2026-11-02), in linear light: how much of it a world's point takes over the mood's colour, and how
+// much of its own grey it keeps, so the mood's amber reads as the stills' rose-peach, never saturated.
+const PEACH = { red: 0.8, green: 0.3, blue: 0.28 };
 const PEACH_SHARE = 0.5;
+const GREY = 0.15;
 // A dark mood is lifted to its full light no further than from this: where its hue turns, it turns as smoothly as the mood.
 const DARKEST = 0.25;
 
@@ -95,4 +97,8 @@ export function pointTint(at: Point, out: { red: number; green: number; blue: nu
   out.red = lerp(mood.red / brightest, PEACH.red, PEACH_SHARE);
   out.green = lerp(mood.green / brightest, PEACH.green, PEACH_SHARE);
   out.blue = lerp(mood.blue / brightest, PEACH.blue, PEACH_SHARE);
+  const grey = 0.2126 * out.red + 0.7152 * out.green + 0.0722 * out.blue;
+  out.red = lerp(out.red, grey, GREY);
+  out.green = lerp(out.green, grey, GREY);
+  out.blue = lerp(out.blue, grey, GREY);
 }
