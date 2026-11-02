@@ -103,13 +103,13 @@ describe("the worlds' feed", () => {
     worlds.leave();
   });
 
-  it("hands its worlds alone while who-is-here never answered, and asks it again only on the cosmos's next showing", async () => {
+  it("hands its worlds while who-is-here never answered, and asks it again only on the cosmos's next showing", async () => {
     feed.presence.mockResolvedValue({ ok: false, reason: "network" });
     const { cosmos, scene } = sceneOf();
     const worlds = new WorldsFeed();
     worlds.sync(scene, true);
     await settled();
-    expect(cosmos).toHaveBeenLastCalledWith(FILE.worlds, FILE.updated);
+    expect(cosmos.mock.lastCall?.slice(0, 2)).toEqual([FILE.worlds, FILE.updated]);
     await vi.advanceTimersByTimeAsync(5 * MINUTE);
     expect(feed.presence).toHaveBeenCalledTimes(1);
     worlds.leave();

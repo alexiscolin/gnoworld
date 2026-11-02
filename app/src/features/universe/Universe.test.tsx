@@ -151,12 +151,19 @@ afterEach(() => {
   history.replaceState(null, "", "/");
 });
 
+// The fixed places stand at the first call and in every one after: no file's world comes.
+const fixedPlacesAlone = () => {
+  expect(scene.cosmos.mock.calls[0]).toEqual([[]]);
+  for (const [worlds] of scene.cosmos.mock.calls) expect(worlds).toEqual([]);
+};
+
 describe("the cosmos's worlds", () => {
   it("reads the file once the scene runs, and hands its worlds over", async () => {
     rendered("cosmos");
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+    expect(scene.cosmos.mock.lastCall?.[0]).toBe(WORLDS);
+    expect(scene.cosmos.mock.lastCall?.[1]).toBeUndefined();
   });
 
   it("tells the page how many worlds the cosmos draws: the file's, each once, and the Earth", async () => {
@@ -186,8 +193,8 @@ describe("the cosmos's worlds", () => {
     scene.read.mockImplementation(() => Promise.resolve({ worlds, updated: "2026-11-01T00:00:00Z" }));
     rendered("cosmos");
     await settle();
-    expect(scene.cosmos).toHaveBeenLastCalledWith(worlds, "2026-11-01T00:00:00Z");
     expect(scene.cosmos.mock.lastCall?.[0]).toBe(worlds);
+    expect(scene.cosmos.mock.lastCall?.[1]).toBe("2026-11-01T00:00:00Z");
   });
 
   it("stands the fixed places at once, whatever the file does: one that never answers draws them too", async () => {
@@ -195,16 +202,14 @@ describe("the cosmos's worlds", () => {
     rendered("cosmos");
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos).toHaveBeenLastCalledWith([]);
+    fixedPlacesAlone();
   });
 
   it("keeps the fixed places when the file does not come", async () => {
     scene.read.mockImplementation(() => Promise.resolve(undefined));
     rendered("cosmos");
     await settle();
-    expect(scene.cosmos).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos).toHaveBeenLastCalledWith([]);
+    fixedPlacesAlone();
   });
 
   it("gives the read the page's signal, and aborts it once the page has gone for good", async () => {
@@ -243,7 +248,7 @@ describe("the cosmos's worlds", () => {
     rerender("cosmos");
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
-    expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+    expect(scene.cosmos.mock.lastCall?.[0]).toBe(WORLDS);
   });
 
   it("hands nothing over when the page left before the file came", async () => {
@@ -261,7 +266,7 @@ describe("the cosmos's worlds", () => {
     await settle();
     arrive({ worlds: WORLDS });
     await settle();
-    expect(scene.cosmos).not.toHaveBeenCalledWith(WORLDS);
+    expect(scene.cosmos.mock.calls.map(([worlds]) => worlds)).not.toContain(WORLDS);
   });
 
   it("tells the scene the box the page's text keeps, and again when the window changes", async () => {
