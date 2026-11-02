@@ -11,7 +11,13 @@ const MAPS_AT_MOST = 10;
 const MEMORY_AT_MOST = 120 * 1024 * 1024;
 const NEBULA_AT_MOST = 40 * 1024 * 1024;
 const COMPUTER = { width: 1728, height: 1080 };
-const VIEWS = ["?view=gallery", "?view=close&world=1", "?view=eclipse&world=1", "?view=nebula&method=computed"];
+const VIEWS = [
+  "?view=gallery",
+  "?view=close&world=1",
+  "?view=eclipse&world=1",
+  "?view=nebula&method=computed",
+  "?view=earth",
+];
 
 interface LabStats {
   view: string;
@@ -186,6 +192,18 @@ test.describe("the realism page", () => {
       for (const corner of corners) expect(corner).toBeLessThan(16);
     });
 
+  test("the Earth view draws the Earth itself, lit from the right, with the night on its left", async ({ page }) => {
+    await open(page, "?view=earth");
+    expect((await stats(page)).view).toBe("earth");
+    const [day = 0, night = 0, ...corners] = await lit(page, [
+      [Math.round(width * 0.54), Math.round(height * 0.45), Math.round(width * 0.6), Math.round(height * 0.55)],
+      [Math.round(width * 0.31), Math.round(height * 0.45), Math.round(width * 0.36), Math.round(height * 0.55)],
+      ...CORNERS,
+    ]);
+    expect(day).toBeGreaterThan(night + 20);
+    for (const corner of corners) expect(corner).toBeLessThan(16);
+  });
+
   test("the same path gives the same world on a second visit", async ({ page }) => {
     await open(page, "?view=close&world=4");
     const first = JSON.stringify(await looks(page));
@@ -217,6 +235,9 @@ test.describe("the realism page", () => {
     await expect.poll(async () => (await stats(page)).view).toBe("nebula computed");
     await page.keyboard.press("n");
     await expect.poll(async () => (await stats(page)).view).toBe("nebula image");
+    await drawn(page);
+    await page.keyboard.press("5");
+    await expect.poll(async () => (await stats(page)).view).toBe("earth");
     await drawn(page);
     await page.keyboard.press("1");
     await expect.poll(async () => (await stats(page)).view).toBe("gallery");

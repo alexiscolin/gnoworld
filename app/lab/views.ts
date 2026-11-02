@@ -1,6 +1,6 @@
 // The realism page's four views. Each builds what it shows and frees it all, so the memory a view reports is what it takes. A view loads only
 // its own maps: the gallery shows the whole set, the others two or three.
-import { ANCHORS, planetLook, type PlanetLook } from "@gnoworld/core";
+import { ANCHORS, planetLook, planetSeed, type PlanetLook } from "@gnoworld/core";
 import {
   PerspectiveCamera,
   Scene,
@@ -11,12 +11,15 @@ import {
   type Texture,
   type WebGLRenderer,
 } from "three";
+import { sideLight } from "../src/scene/planet/light.ts";
 import { loadMap, mapUrl } from "../src/scene/planet/maps.ts";
-import { createPlanet, type MapSet, type Planet } from "../src/scene/planet/planet.ts";
+import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../src/scene/planet/planet.ts";
+import { earthView } from "./earthView.ts";
+import { layoutOf, type Layout } from "./layouts.ts";
 import { computedNebula, imageNebula, type Nebula } from "./nebula.ts";
 import { starField, starSprite } from "./sky.ts";
 
-export type ViewName = "gallery" | "close" | "eclipse" | "nebula";
+export type ViewName = "gallery" | "close" | "eclipse" | "nebula" | "earth";
 export type Method = "computed" | "image";
 
 export interface Choice {
@@ -63,9 +66,6 @@ const NAMES = [
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const ANISOTROPY = 8;
-const GALLERY = { fov: 20, distance: 30, columns: 4, rows: 3, fill: 0.74 };
-const CLOSE = { fov: 30, distance: 5.75 };
-const FAR_PLANE = 4000;
 const PAN = 0.14;
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
@@ -105,56 +105,6 @@ async function mapsFor(looks: readonly PlanetLook[], base: string, anisotropy: n
   return { set, textures: [...loaded.values(), clouds, ring] };
 }
 
-interface Layout {
-  readonly camera: PerspectiveCamera;
-  readonly sun: Vector3;
-  place(planet: Planet, index: number, aspect: number): void;
-}
-
-function galleryLayout(): Layout {
-  const camera = new PerspectiveCamera(GALLERY.fov, 1.6, 1, FAR_PLANE);
-  camera.position.z = GALLERY.distance;
-  const height = 2 * GALLERY.distance * Math.tan((GALLERY.fov * Math.PI) / 360);
-  return {
-    camera,
-    sun: new Vector3(-0.5, 0.3, 0.81).normalize(),
-    place(planet, index, aspect) {
-      const width = height * aspect;
-      const column = index % GALLERY.columns;
-      const row = Math.floor(index / GALLERY.columns);
-      const cellWidth = width / GALLERY.columns;
-      const cellHeight = height / GALLERY.rows;
-      planet.group.position.set((column + 0.5) * cellWidth - width / 2, height / 2 - (row + 0.5) * cellHeight, 0);
-      planet.group.scale.setScalar((Math.min(cellWidth, cellHeight) / 2) * GALLERY.fill);
-    },
-  };
-}
-
-function closeLayout(sun: Vector3): Layout {
-  const camera = new PerspectiveCamera(CLOSE.fov, 1.6, 0.5, FAR_PLANE);
-  camera.position.z = CLOSE.distance;
-  return { camera, sun: sun.normalize(), place: () => undefined };
-}
-
-function nebulaLayout(): Layout {
-  const camera = new PerspectiveCamera(CLOSE.fov, 1.6, 0.5, FAR_PLANE);
-  camera.position.z = 22;
-  return {
-    camera,
-    sun: new Vector3(-0.8, 0.3, 0.52).normalize(),
-    place(planet, _, aspect) {
-      planet.group.position.set(3.2 * aspect, -2.3, 0);
-    },
-  };
-}
-
-function layoutOf(view: ViewName): Layout {
-  if (view === "gallery") return galleryLayout();
-  if (view === "close") return closeLayout(new Vector3(0.5, 0.26, 0.82));
-  if (view === "eclipse") return closeLayout(new Vector3(0.178, 0.1, -1));
-  return nebulaLayout();
-}
-
 async function nebulaOf(choice: Choice, { renderer, base }: Device): Promise<Nebula | undefined> {
   if (choice.view !== "nebula") return undefined;
   if (choice.method === "computed") return computedNebula(renderer);
@@ -166,14 +116,28 @@ function staged(worlds: readonly Planet[], layout: Layout, sky: Object3D) {
   const stage = new Scene();
   stage.add(sky);
   for (const world of worlds) {
-    world.setSun(layout.sun);
     stage.add(world.group);
+    if (layout.sun !== undefined) world.setSun(layout.sun);
   }
   return stage;
 }
 
+// The Earth's light for each world: its own star from its path's seed, and the bright limb of its air where it has one.
+function lightWorlds(worlds: readonly Planet[], choice: Choice): void {
+  for (const [index, world] of worlds.entries()) {
+    const at = choice.view === "gallery" ? index : choice.world;
+    world.setSun(sideLight(planetSeed(ascii(pathOf(at, choice.seed))), new Vector3()));
+    if (world.look.rim !== null) world.setLimb(LIMB_LIGHT);
+  }
+}
+
+// The one star's sprite, for the view that looks into it.
+const spriteOf = (choice: Choice, { camera, sun }: Layout) =>
+  choice.view === "eclipse" && sun !== undefined ? starSprite(camera, sun) : undefined;
+
 /** Builds a view: its maps first, then its worlds. */
 export async function buildView(choice: Choice, device: Device): Promise<View> {
+  if (choice.view === "earth") return earthView(device);
   const { renderer, base, ratio } = device;
   const looks = looksOf(choice);
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
@@ -184,16 +148,18 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
   const worlds = looks.map((look) => createPlanet(look, set, sphere));
   const stars = starField(ratio);
   const stage = staged(worlds, layout, stars);
+  if (layout.sun === undefined) lightWorlds(worlds, choice);
   if (nebula !== undefined) stage.add(nebula.mesh);
-  const sprite = choice.view === "eclipse" ? starSprite(layout.camera, layout.sun) : undefined;
+  const sprite = spriteOf(choice, layout);
   if (sprite !== undefined) stage.add(sprite);
-  const all = nebula?.texture === undefined ? textures : [...textures, nebula.texture];
+  const image = nebula?.texture;
+  const all = image === undefined ? textures : [...textures, image];
   return {
     stage,
     camera: layout.camera,
     worlds,
     textures: all,
-    images: nebula?.texture === undefined ? 0 : 1,
+    images: image === undefined ? 0 : 1,
     targetBytes: nebula?.targetBytes ?? 0,
     look(eyeX, eyeY, aspect) {
       layout.camera.aspect = aspect;

@@ -11,11 +11,16 @@ import { buildView, looksOf, pathOf, type Choice, type Method, type View, type V
 import "@gnoworld/ui/styles.css";
 import "./lab.css";
 
-const VIEWS: readonly ViewName[] = ["gallery", "close", "eclipse", "nebula"];
-const KEYS: Partial<Record<string, ViewName>> = { "1": "gallery", "2": "close", "3": "eclipse", "4": "nebula" };
+const VIEWS: readonly ViewName[] = ["gallery", "close", "eclipse", "nebula", "earth"];
+const KEYS: Partial<Record<string, ViewName>> = {
+  "1": "gallery",
+  "2": "close",
+  "3": "eclipse",
+  "4": "nebula",
+  "5": "earth",
+};
 // The grade 7a2 gives the renderer itself, once it lands.
 const EXPOSURE = 0.8;
-const MB = 1048576;
 // The nebula's foreground, unless a world is asked for: the gas giant.
 const GIANT = 6;
 
@@ -58,15 +63,12 @@ renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = EXPOSURE;
 renderer.setPixelRatio(ratio);
 const gpu = gpuName(renderer.getContext() as WebGL2RenderingContext);
-say("renderer", gpu);
 
 let choice = chosen(new URLSearchParams(location.search));
 let view: View | undefined;
 let building = 0;
 let eyeX = 0;
 let eyeY = 0;
-let last = performance.now();
-let average = 0;
 let frames = 0;
 
 // Resizing a canvas clears it and reallocates its buffers: only a real change of size may do it.
@@ -78,13 +80,10 @@ const aim = (current: View) => {
   current.look(eyeX, eyeY, canvas.clientWidth / canvas.clientHeight);
 };
 
-function report(current: View): void {
-  const maps = String(Math.round(mapBytes(current.textures) / MB));
-  const count = String(current.textures.length);
-  const targets = String(Math.round(current.targetBytes / MB));
-  say("memory", `maps ${maps} MB in ${count} textures, targets ${targets} MB`);
+function report(): void {
   const name = `${ANCHORS[choice.world] ?? ""}: ${pathOf(choice.world, choice.seed)}`;
-  say("world", choice.view === "gallery" ? "All twelve anchors" : name);
+  const names: Partial<Record<ViewName, string>> = { gallery: "All twelve anchors", earth: "The Earth" };
+  say("world", names[choice.view] ?? name);
   for (const button of document.querySelectorAll<HTMLButtonElement>("nav button"))
     button.setAttribute("aria-pressed", String(button.dataset["view"] === choice.view));
 }
@@ -93,10 +92,6 @@ function draw(current: View): void {
   renderer.render(current.stage, current.camera);
   canvas.dataset["drawn"] = "true";
   frames += 1;
-  const now = performance.now();
-  average += (now - last - average) * 0.05;
-  last = now;
-  say("frame", `${average.toFixed(1)} ms, ${String(renderer.info.render.calls)} draw calls`);
 }
 
 async function show(next: Choice): Promise<void> {
@@ -114,13 +109,13 @@ async function show(next: Choice): Promise<void> {
   fit();
   aim(built);
   built.tick(0);
-  report(built);
+  report();
   draw(built);
 }
 
 function step(change: Partial<Choice>): void {
   show({ ...choice, ...change }).catch((error: unknown) => {
-    say("frame", `failed: ${String(error)}`);
+    say("world", `failed: ${String(error)}`);
     throw error;
   });
 }

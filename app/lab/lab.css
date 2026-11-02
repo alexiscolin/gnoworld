@@ -54,7 +54,10 @@
   }
 
   .keys,
-  dt,
+  footer {
+    color: var(--color-text-muted);
+  }
+
   footer {
     color: var(--color-text-muted);
   }

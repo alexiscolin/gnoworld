@@ -3,8 +3,8 @@
 import { Vector3 } from "three";
 
 const POLE = new Vector3(0, 1, 0);
-// A generated world's star stands this far from the eye, in radians: past the Earth's 69 degrees, so half the disc or more is night.
-const FROM_EYE = [1.43, 1.88] as const;
+// A generated world's star stands this far from the eye, in radians: about the Earth's 69 degrees and a little past it, so the frames' third to a half of the disc is night.
+const FROM_EYE = [1.1, 1.4] as const;
 const LATITUDE = [-0.3, 0.34] as const;
 const HALF_PI = Math.PI / 2;
 
