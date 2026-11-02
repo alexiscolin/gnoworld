@@ -314,7 +314,35 @@ const BIN = new URL("../node_modules/@react-router/dev/bin.cjs", import.meta.url
 // StrykerJS runs the tests in a sandbox whose sources it has instrumented (hooks inside its mutant switches): the
 // compiler refuses them, and a build in a child process reaches no mutant. The build takes the real sources.
 const APP = new URL("..", import.meta.url).pathname.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/");
-const KEPT = ["src", "data", "public", "react-router.config.ts", "vite.config.ts", "package.json", "tsconfig.json"];
+const KEPT = [
+  "src",
+  "data",
+  "public",
+  "lab",
+  "lab.config.ts",
+  "react-router.config.ts",
+  "vite.config.ts",
+  "package.json",
+  "tsconfig.json",
+];
+
+// The image takes app/build/client whole, so what builds there ships: the realism page goes beside the site for the journeys alone.
+describe("the realism page", () => {
+  it("is built by nothing the image runs", () => {
+    const docker = readFileSync(join(APP, "..", "deploy", "web", "Dockerfile"), "utf8");
+    const builds = docker.split("\n").filter((line) => /^RUN .*\bbuild\b/.test(line));
+    expect(builds).toEqual(["RUN cd app && node_modules/.bin/react-router build"]);
+    expect(docker).not.toContain("lab.config");
+  });
+
+  it("is imported by nothing in the site", () => {
+    const source = join(APP, "src");
+    const importing = readdirSync(source, { recursive: true })
+      .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
+      .filter((name) => /from "(?:\.\.\/)+lab\//.test(readFileSync(join(source, name), "utf8")));
+    expect(importing).toEqual([]);
+  });
+});
 
 describe("react-router build", () => {
   let root = "";
