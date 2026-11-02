@@ -4,7 +4,7 @@
 import { REALM_PREFIX } from "../chain/realm.ts";
 import type { Anchor, MapName } from "./anchors.ts";
 import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
-import { asciiBytes, planetSeed } from "./look.ts";
+import { asciiBytes, planetSeed, worldPath } from "./look.ts";
 import { NO_TURN, paletteOf, turnOf, type Palette, type Turn } from "./palette.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
@@ -68,7 +68,7 @@ export const planetRecipe = (path: Uint8Array, anchor: Anchor): Recipe =>
 
 /** The recipe of a world by its id, at its anchor as `worldLook` reads it. An id is ASCII by its schema. */
 export function worldRecipe(id: string, nature: Nature | null = null): Recipe {
-  const path = asciiBytes(`${REALM_PREFIX}${id}`);
+  const path = worldPath(id);
   const seed = planetSeed(path);
   return recipeOf(seed, anchorOf(seed, nature), hueOf(path));
 }

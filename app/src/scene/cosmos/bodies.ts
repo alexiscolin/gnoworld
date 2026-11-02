@@ -1,7 +1,6 @@
 // The worlds drawn in full: the approved render, each from its look, at its size, around its star. A frame moves them and lights them from
 // where their star stands on screen, always at the Earth's angle from the eye: a world is never a flat disc nor a black one.
 import {
-  asciiBytes,
   CENTRE,
   EARTH_RADIUS,
   clearOf,
@@ -12,6 +11,7 @@ import {
   spreadAt,
   toScene,
   worldLook,
+  worldPath,
   type ClearBox,
   type Orbiter,
   type Point,
@@ -108,7 +108,7 @@ export class Bodies {
     if (set === undefined) return;
     const planet = createPlanet(look, set, this.#sphere);
     this.group.add(planet.group);
-    const fromEye = fromEyeOf(planetSeed(asciiBytes(`gno.land/r/${id}`)));
+    const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const body: Body = {
       id,
       system,

@@ -69,6 +69,7 @@ export {
   planetLook,
   planetSeed,
   worldLook,
+  worldPath,
   type Anchor,
   type MapName,
   type Nature,

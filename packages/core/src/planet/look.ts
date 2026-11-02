@@ -164,8 +164,11 @@ function lookOf(bytes: Uint8Array, anchor: Anchor): PlanetLook {
 /** The look of `path` as `anchor`: the lab names one, and a world takes the one its seed chose (`worldLook`). */
 export const planetLook = (path: Uint8Array, anchor: Anchor): PlanetLook => lookOf(planetSeed(path), anchor);
 
-/** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. An id is ASCII by its schema. */
+/** A world's path on gno.land, the bytes its seed reads: one rule for the look, the recipe and the scene. An id is ASCII by its schema. */
+export const worldPath = (id: string): Uint8Array => asciiBytes(`${REALM_PREFIX}${id}`);
+
+/** The look of a world by its id, at its path on gno.land: `nature`, read once, leans its class. */
 export function worldLook(id: string, nature: Nature | null = null): PlanetLook {
-  const seed = planetSeed(asciiBytes(`${REALM_PREFIX}${id}`));
+  const seed = planetSeed(worldPath(id));
   return lookOf(seed, anchorOf(seed, nature));
 }
