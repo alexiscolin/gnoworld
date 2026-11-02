@@ -33,6 +33,17 @@ afterEach(() => {
 });
 
 describe("a world's moons", () => {
+  it("gives a kept moon the orbit of its new place, so two moons never share one after a room change", () => {
+    const moons = moonsOf();
+    moons.set([mark("#a").moon, mark("#b").moon]);
+    moons.set([mark("#b").moon, mark("#c").moon]);
+    moons.tick(10, SUN);
+    moons.group.updateMatrixWorld(true);
+    const [b, c] = moons.group.children.map((child) => child.position.length());
+    expect(b).toBeDefined();
+    expect(Math.abs((b ?? 0) - (c ?? 0))).toBeGreaterThan(0.05);
+  });
+
   it("frees the moon of a room that leaves", () => {
     const moons = moonsOf();
     moons.set([mark("#a").moon, mark("#b").moon]);

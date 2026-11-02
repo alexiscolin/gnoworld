@@ -1,4 +1,12 @@
 // What a world's surface shader declares and the helpers it calls, apart from its main(): uniforms, then the parts the frames' look is made of.
+/** The ground turned about the pole by `angle`: a world's surface and what lies on its ground turn alike. */
+export const TURNED = /* glsl */ `vec3 turned(vec3 v, float angle) {
+  float c = cos(angle);
+  float s = sin(angle);
+  return vec3(c * v.x + s * v.z, v.y, c * v.z - s * v.x);
+}
+`;
+
 export const UNIFORMS = /* glsl */ `
 uniform mat4 modelMatrix;
 uniform sampler2D surface;
@@ -57,12 +65,7 @@ const float NIGHT = 0.007;
 const float NIGHT_GLOW = 0.07;
 const vec3 DEEP_BLUE = vec3(0.12, 0.22, 0.5);
 
-vec3 turned(vec3 v, float angle) {
-  float c = cos(angle);
-  float s = sin(angle);
-  return vec3(c * v.x + s * v.z, v.y, c * v.z - s * v.x);
-}
-
+${TURNED}
 float toneOf(vec3 colour) {
   return sqrt(dot(colour, LUMA));
 }

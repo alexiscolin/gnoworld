@@ -53,6 +53,18 @@ export function moonLookOf(room: string): PlanetLook {
   return planetLook(bytes, seedShare(planetSeed(bytes), 0) < 0.5 ? "rocky" : "ice");
 }
 
+// A moon's orbit by its place among the moons, so two never share one, and by its room, so it is its own: the place a list gives, again when
+// the list changes.
+function orbitOf(room: string, index: number): Omit<Moon, "mark" | "planet"> {
+  const seed = planetSeed(bytesOf(room));
+  return {
+    reach: FIRST_REACH + STEP_REACH * index,
+    lean: (seedShare(seed, 1) - 0.5) * 0.7,
+    roll: (index % 2 === 0 ? 1 : -1) * (ROLL[0] + (ROLL[1] - ROLL[0]) * seedShare(seed, 3)),
+    phase: seedShare(seed, 2) * Math.PI * 2,
+  };
+}
+
 export class OrbitingMoons {
   readonly group = new Group();
   readonly #sphere: BufferGeometry;
@@ -79,7 +91,7 @@ export class OrbitingMoons {
     marks.forEach((mark, index) => {
       const held = kept.get(mark.room);
       kept.delete(mark.room);
-      const moon = held === undefined ? this.#made(mark, index) : { ...held, mark };
+      const moon = held === undefined ? this.#made(mark, index) : { ...held, ...orbitOf(mark.room, index), mark };
       if (moon !== undefined) this.#moons.push(moon);
     });
     for (const { planet } of kept.values()) this.#drop(planet);
@@ -98,15 +110,7 @@ export class OrbitingMoons {
     if (maps === undefined) return undefined;
     const planet = createPlanet(look, maps, this.#sphere);
     this.group.add(planet.group);
-    const seed = planetSeed(bytesOf(mark.room));
-    return {
-      mark,
-      planet,
-      reach: FIRST_REACH + STEP_REACH * index,
-      lean: (seedShare(seed, 1) - 0.5) * 0.7,
-      roll: (index % 2 === 0 ? 1 : -1) * (ROLL[0] + (ROLL[1] - ROLL[0]) * seedShare(seed, 3)),
-      phase: seedShare(seed, 2) * Math.PI * 2,
-    };
+    return { mark, planet, ...orbitOf(mark.room, index) };
   }
 
   #drop(planet: Planet): void {
