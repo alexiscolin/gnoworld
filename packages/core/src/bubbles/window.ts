@@ -1,5 +1,10 @@
 // The messages a pick reads: the newest ones, each id once (docs/plans/slice-6.md §4).
+import { centreOf } from "./countries.ts";
 import type { BubbleMessage } from "./types.ts";
+
+/** Whether a line may reach the globe at all, a bubble or a count: public, its room joined, not hidden, its country known. */
+export const isOpen = (m: BubbleMessage): boolean =>
+  m.visibility === "public" && m.joined && m.hidden !== true && centreOf(m.country) !== undefined;
 
 export const newestFirst = (a: BubbleMessage, b: BubbleMessage): number =>
   b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

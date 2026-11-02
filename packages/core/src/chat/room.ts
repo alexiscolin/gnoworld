@@ -84,7 +84,7 @@ export const REPLY = ["+reply", "+draft/reply"];
 const EDIT = ["+gnoworld/edit"];
 // The speaker's country, a client's tag (ADR-0001 §7): any client may write anything there, so it is two capitals or none.
 const COUNTRY = ["+gnoworld/country"];
-const isCountryCode = (value: string): boolean => /^[A-Z]{2}$/.test(value);
+export const isCountryCode = (value: string): boolean => /^[A-Z]{2}$/.test(value);
 
 /** The first of these tags whose value `fits`, or none. */
 export function first(
@@ -271,5 +271,3 @@ export function topicAfter(topic: string | undefined, message: IrcMessage, room:
   if ((command === "332" || command === "TOPIC") && text !== undefined) return text || undefined;
   return topic;
 }
-
-export { isCountryCode };

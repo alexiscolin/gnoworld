@@ -410,7 +410,9 @@ Search is a ⌘K palette (a wide `Dialog` with a `Combobox`), not a drawer.
 Breakpoints:
 - 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
   are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
-  plate goes below the planet.
+  plate goes below the planet. The Earth alone keeps its chat a block of the page under the
+  globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
+  Credits.
 - 1200 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 

@@ -4,7 +4,7 @@ import { CENTRE, EARTH_PLACE, EARTH_RADIUS, toScene, type Point } from "@gnoworl
 import { Vector3, type Group } from "three";
 import { buildGlobe, type Globe } from "../earth/globe.ts";
 import { MOON_REST } from "../earth/orbit.ts";
-import type { EarthDevice } from "../earth/view.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 
 const MOON_RATE = 0.026;
@@ -68,7 +68,8 @@ export class Home {
     if (globe === undefined) return;
     toScene(EARTH_PLACE, this.#stage);
     globe.group.position.set(this.#stage.x - eye.x, this.#stage.y - eye.y, this.#stage.z - eye.z);
-    globe.setTurn(-SPIN * seconds);
+    const turn = -SPIN * seconds;
+    globe.setTurn(turn, turn);
     globe.setMoon(MOON_REST - MOON_RATE * seconds);
   }
 

@@ -2,6 +2,7 @@
 import type { ClearBox, Point, Tier } from "@gnoworld/core";
 import type { WebGLRenderer } from "three";
 import type { Cosmos, CosmosWorld } from "./cosmos/cosmos.ts";
+import type { Ground } from "./earth/marks.ts";
 import type { Circle, EarthState, EarthView } from "./earth/view.ts";
 
 export interface SceneOptions {
@@ -19,6 +20,8 @@ export interface Scene {
   moveTo(to: Point): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */
   earth(place: Circle | undefined, said: (state: EarthState) => void): void;
+  /** The ground the page's signs stand on. */
+  readonly ground: Ground;
   /** Stands these worlds and the fixed places, or takes them away. */
   cosmos(worlds: readonly CosmosWorld[] | undefined): void;
   /** The box of the page's text, in its pixels: no body stands under it. */

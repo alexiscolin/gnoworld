@@ -5,6 +5,7 @@ import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "th
 import type { CosmosWorld } from "./cosmos/cosmos.ts";
 import { CosmosDoor } from "./cosmos/door.ts";
 import { Disposer } from "./disposer.ts";
+import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { Eye } from "./eye.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
@@ -40,6 +41,7 @@ class LiveScene implements Scene {
   readonly #viewport: Viewport;
   readonly #earth: EarthView;
   readonly #cosmos: CosmosDoor;
+  readonly ground: Ground;
   readonly #probe: Probe;
   #tier: Tier;
   #covered = false;
@@ -69,9 +71,7 @@ class LiveScene implements Scene {
       camera: this.#camera,
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
-      moved: () => {
-        this.#loop.redraw();
-      },
+      moved: this.#redraw,
     };
     this.#earth = this.#owner.add(
       new EarthView({
@@ -84,6 +84,7 @@ class LiveScene implements Scene {
     this.#cosmos = new CosmosDoor(device, this.#owner, () => {
       this.#viewport.changed();
     });
+    this.ground = this.#earth;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -93,9 +94,7 @@ class LiveScene implements Scene {
       cosmos: this.#cosmos,
       touch: this.#touch,
       tier: () => this.#tier,
-      owed: () => {
-        this.#loop.redraw();
-      },
+      owed: this.#redraw,
     });
     this.#viewport.apply();
     this.#loop = new FrameLoop(clock, this.#draw);
@@ -112,9 +111,7 @@ class LiveScene implements Scene {
     const { signal } = this.#owner;
     watchPage(this.#loop, signal);
     watchScreen(this.#viewport.changed, signal);
-    watchAim((x, y) => {
-      this.#eye.aim(x, y);
-    }, signal);
+    watchAim(this.#eye.aim, signal);
     watchCanvas(
       canvas,
       {
@@ -155,6 +152,10 @@ class LiveScene implements Scene {
     if (this.#refused) this.#earth.refused();
     this.#refused = false;
     this.#probe.frame(delta, this.#earth.arriving);
+  };
+
+  readonly #redraw = (): void => {
+    this.#loop.redraw();
   };
 
   readonly #busy = (busy: boolean): void => {

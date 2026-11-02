@@ -38,6 +38,7 @@ const earth = vi.hoisted(() => ({
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
   arriving: false,
+  views: [] as unknown[],
 }));
 
 const cosmos = vi.hoisted(() => ({
@@ -77,6 +78,7 @@ vi.mock("./earth/view.ts", () => ({
   EarthView: class {
     constructor(device: { halved: () => boolean; moved: () => void; stood: () => void }) {
       earth.made.push(device);
+      earth.views.push(this);
     }
     get arriving() {
       return earth.arriving;
@@ -1135,6 +1137,12 @@ describe("the Earth", () => {
     const scene = startScene(options(), clock);
     scene.earth(PLACE, said);
     expect(earth.show).toHaveBeenCalledWith(PLACE, said);
+    scene.dispose();
+  });
+
+  it("hands the page the ground its signs stand on", () => {
+    const scene = startScene(options(), clock);
+    expect(scene.ground).toBe(earth.views.at(-1));
     scene.dispose();
   });
 

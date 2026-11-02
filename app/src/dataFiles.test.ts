@@ -12,7 +12,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EarthRooms } from "@gnoworld/schemas";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import places from "../data/earthRooms.json" with { type: "json" };
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
@@ -87,7 +89,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the ten files into their schemas' shapes", () => {
+  it("reads the eleven files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -96,6 +98,7 @@ describe("loadData", () => {
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
         "bubbles",
+        "earthRooms",
         "ecosystems",
         "events",
         "expedition",
@@ -217,6 +220,25 @@ describe("loadData", () => {
     } finally {
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// 7f2: the places of the Earth's side rooms, one row a room, checked when the app builds.
+describe("earthRooms.json", () => {
+  it("stops the build on a place off the globe, and names the file", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthRooms.json", [{ room: "#earth/lisbon", lat: 91, lon: 0 }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthRooms\.json: \[0\]\.lat/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("ships the side rooms that have a place, which the app reads as it is", () => {
+    expect(places.length).toBeGreaterThan(0);
+    expect(() => EarthRooms.parse(places)).not.toThrow();
   });
 });
 

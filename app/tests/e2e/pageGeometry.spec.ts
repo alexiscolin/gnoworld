@@ -278,6 +278,8 @@ test.describe("at the video's size", () => {
   test("the wide plate looks as approved, the header masked", async ({ page }) => {
     await page.goto("/earth");
     await hydrated(page);
+    // The dock's room holds the Earth's chat, whose people and lines are the server's: chatDock.spec.ts holds its look.
+    await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
     await expect(page).toHaveScreenshot("plate-wide-1728.png", { mask: [page.getByRole("banner")] });
   });
 

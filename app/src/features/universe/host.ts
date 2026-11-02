@@ -1,20 +1,28 @@
 // The scene's host in the page: it decides what a device gets, loads the 3D when that comes, and says how it went. No React, so the
 // component only reads its status (docs/ARCHITECTURE.md, "Effects only synchronize").
 import { PHONE_QUERY, sceneOffer } from "@gnoworld/core";
-import { readWorlds } from "../../lib/chain/realms.ts";
+import type { StoreApi } from "zustand/vanilla";
 import { savesData } from "../../lib/saveData.ts";
 import { rememberedTier, rememberLow } from "../../lib/sceneTier.ts";
-import type { CosmosWorld } from "../../scene/cosmos/cosmos.ts";
 import type { EarthState } from "../../scene/earth/view.ts";
 import type { Scene } from "../../scene/scene.ts";
+import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
+import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
 /** Whether the page shows space, and the Earth or the default universe's worlds in it. */
 export type Shown = boolean | "earth" | "cosmos";
+
+/** What the Earth's signs need of the page: this root lies outside its store and its router. */
+export interface EarthPage {
+  readonly store: StoreApi<AppState>;
+  /** Goes to an address of the page, by its router. */
+  readonly open: (href: string) => void;
+}
 
 const nothing = () => undefined;
 
@@ -52,11 +60,7 @@ export class SceneHost {
   #shown = false;
   #wantsEarth = false;
   #wantsWorlds = false;
-  #worlds: readonly CosmosWorld[] = [];
-  #worldsAsked = false;
-  #worldsShown = false;
-  readonly #leaving = new AbortController();
-  #clearing: AbortController | undefined;
+  readonly #feed = new WorldsFeed();
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
   #decided = false;
@@ -71,6 +75,9 @@ export class SceneHost {
   readonly status = () => this.#status;
 
   readonly earth = () => this.#earth;
+
+  /** The ground the signs stand on, once the scene runs. */
+  readonly ground = () => this.#scene?.ground;
 
   #tell(): void {
     this.#markPage();
@@ -133,47 +140,15 @@ export class SceneHost {
     }
   }
 
-  // The fixed places stand at once; the file joins them when it comes, if it does, and is read once.
   #syncWorlds(): void {
-    const scene = this.#scene;
-    if (scene === undefined || this.#wantsWorlds === this.#worldsShown) return;
-    this.#worldsShown = this.#wantsWorlds;
-    scene.cosmos(this.#wantsWorlds ? this.#worlds : undefined);
-    this.#clearing?.abort();
-    if (this.#wantsWorlds) this.#keepTextClear(scene);
-    if (this.#wantsWorlds && !this.#worldsAsked) this.#readWorlds(scene);
-  }
-
-  // The page's text keeps its room at any size: the box is measured on the page, as the globe's circle is.
-  #keepTextClear(scene: Scene): void {
-    const clearing = new AbortController();
-    this.#clearing = clearing;
-    const measure = () => {
-      const box = document.querySelector("[data-clear]")?.getBoundingClientRect();
-      if (box !== undefined) scene.keepClear({ left: box.left, top: box.top, right: box.right, bottom: box.bottom });
-    };
-    window.addEventListener("resize", measure, { signal: clearing.signal });
-    measure();
-  }
-
-  #readWorlds(scene: Scene): void {
-    this.#worldsAsked = true;
-    readWorlds(import.meta.env.BASE_URL, { signal: this.#leaving.signal }).then(
-      (file) => {
-        if (file === undefined) return;
-        this.#worlds = file.worlds;
-        if (this.#worldsShown) scene.cosmos(this.#worlds);
-      },
-      () => undefined,
-    );
+    if (this.#scene !== undefined) this.#feed.sync(this.#scene, this.#wantsWorlds);
   }
 
   /** The canvas is on the page; what this returns takes the scene away with it. */
   attach(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     return () => {
-      this.#leaving.abort();
-      this.#clearing?.abort();
+      this.#feed.leave();
       this.#stopWatching();
       this.#scene?.dispose();
       this.#canvas = undefined;

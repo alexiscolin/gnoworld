@@ -1,8 +1,8 @@
 // A country's pill on the globe (frames 39, 43 to 55; ADR-0002 §1): its last hour of public lines against the hour before. The activity API
 // counts rooms and knows no country, and the tag lives on each line, so the page counts what it holds. A sign means real data: few lines
 // make no trend.
-import { centreOf } from "./countries.ts";
 import type { BubbleMessage } from "./types.ts";
+import { isOpen } from "./window.ts";
 
 export interface Trend {
   readonly country: string;
@@ -18,16 +18,13 @@ export const MOST_TRENDS = 4;
 const byChange = (a: Trend, b: Trend): number =>
   Math.abs(b.percent) - Math.abs(a.percent) || (a.country < b.country ? -1 : 1);
 
-const counted = (m: BubbleMessage): boolean =>
-  m.visibility === "public" && m.joined && m.hidden !== true && centreOf(m.country) !== undefined;
-
 // Each country's lines of the last hour and the hour before, each id once.
 function hoursOf(messages: readonly BubbleMessage[], now: number): Map<string, [number, number]> {
   const hours = new Map<string, [number, number]>();
   const seen = new Set<string>();
   for (const m of messages) {
     const age = now - m.at;
-    if (age < 0 || age >= 2 * HOUR || seen.has(m.id) || !counted(m)) continue;
+    if (age < 0 || age >= 2 * HOUR || seen.has(m.id) || !isOpen(m)) continue;
     seen.add(m.id);
     const country = m.country ?? "";
     const counts = hours.get(country) ?? [0, 0];

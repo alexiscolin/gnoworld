@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   BubbleRules,
+  EarthRooms,
   DATA_CAPS,
   Ecosystems,
   EMBED_PREFIXES,
@@ -496,5 +497,51 @@ describe("BubbleRules", () => {
         },
       ),
     );
+  });
+});
+
+// 7f2: where the Earth's side rooms stand (ADR-0002 §10). A file of the team's, so a room is pinned by a reviewed change, and no room's name
+// reaches a place by chance.
+describe("EarthRooms", () => {
+  const row = { room: "#earth/lisbon", lat: 38.7, lon: -9.1 };
+
+  it("takes a side room of the Earth and a point of the globe", () => {
+    expect(EarthRooms.safeParse([row]).success).toBe(true);
+    expect(EarthRooms.safeParse([]).success).toBe(true);
+  });
+
+  it.each([
+    [90, 180],
+    [-90, -180],
+  ])("takes the globe's own edges, %d and %d", (lat, lon) => {
+    expect(EarthRooms.safeParse([{ ...row, lat, lon }]).success).toBe(true);
+  });
+
+  it.each([
+    ["the main room, which is the globe itself", { room: "#earth" }],
+    ["another world's room", { room: "#bubble/lisbon" }],
+    ["a word that only starts like the Earth's", { room: "#earthworks/lisbon" }],
+    ["a name that is no room's", { room: "#earth/Lisbon" }],
+    ["a room under a room", { room: "#earth/a/b" }],
+    ["no name at all", { room: "#earth/" }],
+    ["a name past a room's 32 characters", { room: `#earth/${"a".repeat(33)}` }],
+    ["a latitude past the pole", { lat: 90.5 }],
+    ["a longitude past the antimeridian", { lon: -180.5 }],
+    ["no number", { lat: "38" }],
+    ["a field more", { name: "Lisbon" }],
+  ])("refuses %s", (_name, over) => {
+    expect(EarthRooms.safeParse([{ ...row, ...over }]).success).toBe(false);
+  });
+
+  it("holds as many rows as a data file may, and no more", () => {
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, n) => ({ room: `#earth/r${String(n)}`, lat: 0, lon: 0 }));
+    expect(EarthRooms.safeParse(rows(DATA_CAPS.rows)).success).toBe(true);
+    expect(EarthRooms.safeParse(rows(DATA_CAPS.rows + 1)).success).toBe(false);
+  });
+
+  it("refuses a room pinned twice", () => {
+    const result = EarthRooms.safeParse([row, { ...row, lat: 0 }]);
+    expect(result.success).toBe(false);
   });
 });

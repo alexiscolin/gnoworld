@@ -20,6 +20,13 @@ describe("the Earth's page", () => {
     expect(html).toContain("gno.land");
   });
 
+  test("holds the chat's place in the page, the dock of the frames, in every universe: one Earth, one general chat", async () => {
+    const html = await render(route("/earth"), "/earth");
+    expect(html).toMatch(/id="chat"/);
+    const other = await render(route("/net/:network/earth"), "/net/gnoland/earth");
+    expect(other).toMatch(/id="chat"/);
+  });
+
   test("keeps the globe's place in the page, which only the scene fills", async () => {
     const html = await render(route("/earth"), "/earth");
     expect(html).toMatch(/<div[^>]*data-globe[^>]*data-earth="waiting"[^>]*><\/div>/);

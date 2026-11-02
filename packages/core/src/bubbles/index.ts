@@ -1,5 +1,5 @@
-// What slices 7j and 7f import of the Earth's bubbles: `@gnoworld/core/bubbles`, a subpath beside the main entry, so
-// the first screen does not carry them (docs/plans/slice-6.md §7). Nothing calls this entry yet.
+// What the Earth's signs and the chat import of the bubbles: `@gnoworld/core/bubbles`, a subpath beside the main entry, so the first
+// screen does not carry them (docs/plans/slice-6.md §7).
 export { centreOf, COUNTRIES, countryName } from "./countries.ts";
 export { cutText } from "./cut.ts";
 export { isFarSide, type LatLon } from "./farSide.ts";

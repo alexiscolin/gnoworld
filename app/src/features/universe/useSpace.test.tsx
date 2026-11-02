@@ -5,7 +5,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const universe = vi.hoisted(() => ({
-  draw: vi.fn<(shown: boolean | "earth" | "cosmos") => void>(),
+  draw: vi.fn<(shown: boolean | "earth" | "cosmos", page?: unknown) => void>(),
   mount: vi.fn(),
 }));
 
@@ -99,7 +99,117 @@ afterEach(() => {
   vi.doMock("./mountUniverse.tsx", () => ({ mountUniverse: universe.mount }));
 });
 
+// What the Earth's page holds back until its first screen is done: the chat, which budgets.spec.ts leaves out of it.
+describe("the end of the first screen", () => {
+  const readyState = (value: DocumentReadyState) => {
+    vi.spyOn(document, "readyState", "get").mockReturnValue(value);
+  };
+  let done = false;
+
+  async function pageThatWaits() {
+    vi.resetModules();
+    const { useSpace } = await import("./useSpace.ts");
+    return function Earth() {
+      done = useSpace("earth");
+      return null;
+    };
+  }
+
+  beforeEach(() => {
+    done = false;
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("waits for the page's load though the door has come", async () => {
+    readyState("loading");
+    await visit(await pageThatWaits());
+    expect(done).toBe(false);
+    await act(async () => {
+      window.dispatchEvent(new Event("load"));
+      await vi.dynamicImportSettled();
+    });
+    expect(done).toBe(true);
+  });
+
+  it("waits for the door though the page has loaded: the two are the first screen", async () => {
+    readyState("complete");
+    let arrive: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    vi.doMock("./mountUniverse.tsx", async () => {
+      await gate;
+      return { mountUniverse: universe.mount };
+    });
+    const Earth = await pageThatWaits();
+    const box = document.createElement("div");
+    const root = createRoot(box);
+    left.push(() => {
+      act(() => {
+        root.unmount();
+      });
+    });
+    await act(async () => {
+      root.render(<Earth />);
+      await Promise.resolve();
+    });
+    expect(done).toBe(false);
+    await act(async () => {
+      arrive();
+      await vi.waitFor(() => {
+        expect(universe.mount).toHaveBeenCalled();
+      });
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => {
+      expect(done).toBe(true);
+    });
+  });
+
+  it("goes on when the door does not come: the page does not wait for what failed", async () => {
+    readyState("complete");
+    universe.mount.mockImplementationOnce(() => {
+      throw new Error("the universe did not mount");
+    });
+    await visit(await pageThatWaits());
+    expect(done).toBe(true);
+  });
+
+  it("is done at once on a move inside the site, the door already there", async () => {
+    readyState("complete");
+    const Earth = await pageThatWaits();
+    const { leave } = await visit(Earth);
+    leave();
+    done = false;
+    await visit(Earth);
+    expect(done).toBe(true);
+  });
+
+  it("tells a page that has gone nothing", async () => {
+    readyState("loading");
+    const { leave } = await visit(await pageThatWaits());
+    leave();
+    window.dispatchEvent(new Event("load"));
+    await vi.dynamicImportSettled();
+    expect(done).toBe(false);
+  });
+});
+
 describe("useSpace", () => {
+  it("hands the universe the page's store and router with the Earth, for the signs on the globe", async () => {
+    vi.resetModules();
+    const { useSpace } = await import("./useSpace.ts");
+    const page = { store: {}, open: vi.fn() } as never;
+    function Earth() {
+      useSpace("earth", page);
+      return null;
+    }
+    await visit(Earth);
+    expect(universe.draw).toHaveBeenLastCalledWith("earth", page);
+  });
+
   it("writes nothing into the pre-rendered page, and asks for nothing there", async () => {
     const Cosmos = await door();
     expect(renderToString(<Cosmos />)).toBe("");

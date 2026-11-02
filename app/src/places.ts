@@ -9,6 +9,7 @@ import hubs from "../data/hubs.json" with { type: "json" };
 import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
+import type { ChatPlace } from "./features/chat/index.ts";
 
 /** A world or an ecosystem: what the site shows of it, with its one address. */
 export interface Listed {
@@ -220,3 +221,15 @@ function build(source: Source) {
 }
 
 export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
+
+/** What the chat's header, its column of worlds and its info panel say of a place in `universe`: `kicker` says where it is. */
+export const chatPlace = (
+  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage">,
+  universe: UniverseView,
+  kicker = `${universe.name} · ${place.name}`,
+): ChatPlace => ({
+  ...place,
+  kicker,
+  home: universe.home.path,
+  worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
+});

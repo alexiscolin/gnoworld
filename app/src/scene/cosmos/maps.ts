@@ -2,7 +2,7 @@
 // together. A map that does not come leaves its worlds as points; the rest stand.
 import type { MapName, PlanetLook } from "@gnoworld/core";
 import type { Texture } from "three";
-import type { EarthDevice } from "../earth/view.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import { freeMap, loadMap, mapUrl } from "../planet/maps.ts";
 import type { MapSet } from "../planet/planet.ts";
 

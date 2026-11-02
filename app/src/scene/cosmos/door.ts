@@ -2,7 +2,7 @@
 // One that does not come leaves the scenery as it is. What is asked before it comes waits here.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Disposer } from "../disposer.ts";
-import type { EarthDevice } from "../earth/view.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import type { Cosmos, CosmosWorld } from "./cosmos.ts";
 
 const loadCosmos = () => import("./cosmos.ts");

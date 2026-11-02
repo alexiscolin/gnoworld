@@ -16,7 +16,7 @@ import {
 } from "@gnoworld/core";
 import { Vector3 } from "three";
 import { Disposer } from "../disposer.ts";
-import type { EarthDevice } from "../earth/view.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import { Bodies } from "./bodies.ts";
 import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
