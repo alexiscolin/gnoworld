@@ -23,7 +23,7 @@ export async function loadEarthMaps(base: string, anisotropy: number, halved: bo
   const answers = await Promise.allSettled([
     loadMap(mapUrl("earth-day", base), { kind: "colour", anisotropy, width }),
     loadMap(mapUrl("earth-night", base), { kind: "colour", anisotropy, width }),
-    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy }),
+    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
     loadMap(mapUrl("moon", base), { kind: "colour", anisotropy, width: MOON_WIDTH }),
   ]);
   const [day, night, clouds, moon] = answers;

@@ -65,7 +65,11 @@ const NAMES = [
 ];
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
-const ANISOTROPY = 8;
+// The most a surface seen at a slant is read with; a GPU gives what it has.
+const ANISOTROPY = 16;
+// A map is decoded at this width: a gallery of twelve at 2048, a world seen close at the files' own 4096.
+const GALLERY_WIDTH = 2048;
+const CLOSE_WIDTH = 4096;
 const PAN = 0.14;
 
 const ascii = (text: string): Uint8Array => Uint8Array.from(text, (character) => character.charCodeAt(0));
@@ -82,15 +86,21 @@ const lookAt = (world: number, seed: number): PlanetLook =>
 export const looksOf = ({ view, world, seed }: Choice): PlanetLook[] =>
   view === "gallery" ? ANCHORS.map((_, index) => lookAt(index, seed)) : [lookAt(world, seed)];
 
-async function mapsFor(looks: readonly PlanetLook[], base: string, anisotropy: number) {
+async function mapsFor(
+  looks: readonly PlanetLook[],
+  base: string,
+  { anisotropy, width }: { anisotropy: number; width: number },
+) {
   const names = [...new Set(looks.flatMap((look) => [look.map, look.second]))];
   const loaded = new Map(
     await Promise.all(
-      names.map(async (name) => [name, await loadMap(mapUrl(name, base), { kind: "colour", anisotropy })] as const),
+      names.map(
+        async (name) => [name, await loadMap(mapUrl(name, base), { kind: "colour", anisotropy, width })] as const,
+      ),
     ),
   );
   const [clouds, ring] = await Promise.all([
-    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy }),
+    loadMap(mapUrl("clouds", base), { kind: "data", anisotropy, width }),
     loadMap(mapUrl("ring", base), { kind: "data", anisotropy }),
   ]);
   const set: MapSet = {
@@ -135,13 +145,15 @@ function lightWorlds(worlds: readonly Planet[], choice: Choice): void {
 const spriteOf = (choice: Choice, { camera, sun }: Layout) =>
   choice.view === "eclipse" && sun !== undefined ? starSprite(camera, sun) : undefined;
 
+const widthOf = (view: ViewName) => (view === "close" || view === "eclipse" ? CLOSE_WIDTH : GALLERY_WIDTH);
+
 /** Builds a view: its maps first, then its worlds. */
 export async function buildView(choice: Choice, device: Device): Promise<View> {
   if (choice.view === "earth") return earthView(device);
   const { renderer, base, ratio } = device;
   const looks = looksOf(choice);
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
-  const { set, textures } = await mapsFor(looks, base, anisotropy);
+  const { set, textures } = await mapsFor(looks, base, { anisotropy, width: widthOf(choice.view) });
   const nebula = await nebulaOf(choice, device);
   const layout = layoutOf(choice.view);
   const sphere: BufferGeometry = new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT);

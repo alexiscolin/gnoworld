@@ -14,7 +14,7 @@ import type { EarthDevice } from "./view.ts";
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
-const ANISOTROPY = 8;
+const ANISOTROPY = 16;
 
 export class Globe {
   readonly #owner = new Disposer();
