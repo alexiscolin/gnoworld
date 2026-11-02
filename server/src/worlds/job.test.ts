@@ -344,7 +344,7 @@ describe("runWorlds", () => {
       expect(written(file).worlds[0]?.nature).toBe("exchange");
     });
 
-    it("reads no nature from a last file written before natures whose lists were stripped: absent, never none", async () => {
+    it("reads the nature anew from a last file whose lists were shed before it had one: those realms are asked again", async () => {
       const file = fresh();
       await run(chainRoutes([VICTIM], { doc: (path) => docWith(path, ["Play", "Render"]) }), { file });
       const before = written(file);
@@ -354,15 +354,16 @@ describe("runWorlds", () => {
         realms: world.realms.map((one) => ({ ...one, functions: [], imports: [] })),
       }));
       writeFileSync(file, `${JSON.stringify({ ...before, worlds: stripped })}\n`);
-      await run(chainRoutes([VICTIM]), { file });
-      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+      const again = await run(chainRoutes([VICTIM], { doc: (path) => docWith(path, ["Play", "Render"]) }), { file });
+      expect(again.chain.asked.filter(({ kind }) => kind === "vm/qdoc").map(({ data }) => data)).toEqual([VICTIM]);
+      expect(written(file).worlds[0]?.nature).toBe("game");
     });
 
-    it("holds a world's nature back while a realm of it was read with no name at all", async () => {
+    it("reads a realm read this pass with no name at all as nameless, beside its world's others", async () => {
       const { file } = await run(
         chainRoutes([POOL, POOL1], { doc: (path) => (path === POOL1 ? docWith(path, []) : doc(path)) }),
       );
-      expect(written(file).worlds[0]).not.toHaveProperty("nature");
+      expect(written(file).worlds[0]?.nature).toBe("exchange");
     });
 
     it("reads a world no rule names as none, and keeps it so", async () => {

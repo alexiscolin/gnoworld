@@ -139,7 +139,9 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   const paths = sorted(new Set(keptPaths(known)));
   if (paths.length < known.length) settings.log("worlds_shed", { error: "realms" });
   if (isStopped()) return "stopped";
-  const facts = await readPackages({ send, rpc: universe.rpc, known: knownFacts(lastRealms), pace }, paths);
+  const knownBefore = knownFacts(lastRealms, lastWorlds);
+  const facts = await readPackages({ send, rpc: universe.rpc, known: knownBefore, pace }, paths);
+  const fresh = new Set([...facts.keys()].filter((path) => !knownBefore.has(path)));
   const earlierNames = namesOf(lastRealms);
   const unnamed = [...facts.values()].flatMap(({ deployer }) =>
     deployer === null || earlierNames.has(deployer) ? [] : [deployer],
@@ -149,7 +151,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   const asked = realmsOfPass(paths, Math.floor(settings.now() / EVERY_MS), settings.historyMax);
   const histories = await readHistories(reader, asked, settings);
   const news = compareLists([...lastRealms.keys()], list.paths);
-  return { lastWorlds, lastRealms, paths, news, facts, earlierNames, names, histories };
+  return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };
 }
 
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */

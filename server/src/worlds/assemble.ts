@@ -17,17 +17,28 @@ export interface Gathered {
   readonly paths: string[];
   readonly news: Comparison;
   readonly facts: ReadonlyMap<string, PackageFacts>;
+  /** The realms this pass read, beside those the last file knew. */
+  readonly fresh: ReadonlySet<string>;
   readonly earlierNames: ReadonlyMap<string, string>;
   readonly names: ReadonlyMap<string, string | null>;
   readonly histories: ReadonlyMap<string, History>;
 }
 
-// The facts of the realms the last file already read: a realm with no deployer, function and import was not read.
-export function knownFacts(lastRealms: ReadonlyMap<string, RealmRow>): Map<string, PackageFacts> {
+// The facts of the realms the last file already read: a realm with no deployer, function and import was not read, and nor, while its
+// world has no nature yet, was one with no name, whose lists the file may have shed (F4109): it is read again, once.
+export function knownFacts(
+  lastRealms: ReadonlyMap<string, RealmRow>,
+  lastWorlds: ReadonlyMap<string, WorldRow>,
+): Map<string, PackageFacts> {
+  const waiting = new Set(
+    [...lastWorlds.values()].flatMap(({ nature, realms }) =>
+      nature === undefined ? realms.map(({ path }) => path) : [],
+    ),
+  );
   const known = new Map<string, PackageFacts>();
   for (const [path, { deployer, functions, imports }] of lastRealms) {
-    if (deployer !== null || functions.length > 0 || imports.length > 0)
-      known.set(path, { deployer, functions, imports });
+    const named = functions.length > 0 || imports.length > 0;
+    if (named || (deployer !== null && !waiting.has(path))) known.set(path, { deployer, functions, imports });
   }
   return known;
 }
@@ -64,14 +75,14 @@ function rowOf(path: string, read: Gathered): RealmRow {
   };
 }
 
-// A world's nature (F4109): the last file's, else read from its realms' own names once every one of them holds some, before the file is
-// shed; a realm with no name may be one whose lists were shed, so the world waits. Kept once read, so neither a stranger's flood nor a
-// new realm moves a world's class.
+// A world's nature (F4109): the last file's, else read from its realms' own names once every one was read this pass or is known with
+// names, before the file is shed; a known realm with none may be one whose lists were shed, and knownFacts has it read again. Kept once
+// read, so a flood that sheds lists and a new realm move no class; a world the file dropped whole reads its nature anew when it returns.
 function natureFor(before: WorldRow | undefined, rows: readonly RealmRow[], read: Gathered): WorldRow["nature"] {
   if (before?.nature !== undefined) return before.nature;
   const named = rows.every(({ path }) => {
     const facts = read.facts.get(path);
-    return facts !== undefined && facts.functions.length + facts.imports.length > 0;
+    return facts !== undefined && (read.fresh.has(path) || facts.functions.length + facts.imports.length > 0);
   });
   return named ? natureOf(rows) : undefined;
 }
