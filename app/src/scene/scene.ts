@@ -1,10 +1,11 @@
 // The scene (docs/ARCHITECTURE.md, "The scene"), behind its lazy chunk: the renderer, its one loop, the Auto probe and what stops them.
 // It draws through one owner, and imports no React: the universe feature mounts it.
-import { judgeFrames, pixelRatioFor, PROBE_FRAMES, type ProbeVerdict, type Tier } from "@gnoworld/core";
+import { pixelRatioFor, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
+import { Probe } from "./probe.ts";
 import { createRenderer } from "./renderer.ts";
 import { MOTION, watchPage, watchScreen } from "./watch.ts";
 
@@ -52,10 +53,8 @@ class LiveScene implements Scene {
   readonly #camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR, FAR);
   readonly #loop: FrameLoop;
   readonly #earth: EarthView;
-  readonly #samples = new Float32Array(PROBE_FRAMES);
-  #sampled = 0;
+  readonly #probe: Probe;
   #tier: Tier;
-  #probing: boolean;
   #covered = false;
   #lost = false;
   #frames = 0;
@@ -69,7 +68,7 @@ class LiveScene implements Scene {
     const { canvas, remembered } = options;
     this.#options = options;
     this.#tier = remembered ?? "high";
-    this.#probing = remembered === undefined && !matchMedia(MOTION).matches;
+    this.#probe = new Probe(remembered === undefined && !matchMedia(MOTION).matches, this.#judged);
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
     this.#stage.background = new Color(DEEP_BLACK);
     this.#owner.add({
@@ -97,7 +96,7 @@ class LiveScene implements Scene {
         this.#loop.stop();
       },
     });
-    this.#loop.set({ busy: this.#probing });
+    this.#loop.set({ busy: this.#probe.running });
     this.#watch(canvas);
   }
 
@@ -128,7 +127,7 @@ class LiveScene implements Scene {
     this.#earth.tick(this.#seconds);
     this.#renderer.render(this.#stage, this.#camera);
     this.#frames += 1;
-    if (this.#probing && delta > 0) this.#sample(delta);
+    this.#probe.frame(delta);
     this.#holdRate();
   };
 
@@ -137,24 +136,16 @@ class LiveScene implements Scene {
     const { arriving } = this.#earth;
     if (arriving === this.#arriving) return;
     this.#arriving = arriving;
-    this.#loop.set({ busy: this.#probing || arriving });
+    this.#loop.set({ busy: this.#probe.running || arriving });
   }
 
-  #sample(delta: number): void {
-    this.#samples[this.#sampled] = delta;
-    this.#sampled += 1;
-    const verdict = judgeFrames(this.#samples, this.#sampled);
-    if (verdict !== "pending") this.#judged(verdict);
-  }
-
-  #judged(verdict: Exclude<ProbeVerdict, "pending">): void {
-    this.#probing = false;
+  readonly #judged = (verdict: Exclude<ProbeVerdict, "pending">): void => {
     this.#loop.set({ busy: this.#arriving });
     if (verdict === "keep") return;
     this.#tier = "low";
     this.#viewportChanged();
     if (verdict === "low") this.#options.remember();
-  }
+  };
 
   // Both clear the buffer, so they wait for the frame that draws it, and never fall between two frames.
   #applyViewport(): void {
@@ -204,7 +195,7 @@ class LiveScene implements Scene {
       frames: this.#frames,
       tier: this.#tier,
       ratio: this.#renderer.getPixelRatio(),
-      probing: this.#probing,
+      probing: this.#probe.running,
       calls: render.calls,
       geometries: memory.geometries,
       textures: memory.textures,
