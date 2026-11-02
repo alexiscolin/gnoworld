@@ -4,7 +4,7 @@
 import { moonSize, nextMoons, type Moons, type RoomCount } from "@gnoworld/core";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
-import { roomIds, shownRoom } from "../chat/index.ts";
+import { roomIds, roomLabel, roomParams, shownRoom } from "../chat/index.ts";
 import styles from "./WorldMoons.module.css";
 
 // A room taking a moon's place waits minutes, so the set is asked again now and then though nothing was said.
@@ -27,12 +27,10 @@ function currentOf({ store, slug, room }: WorldPage): string | undefined {
   return listed === undefined ? undefined : shownRoom(slug, listed, room);
 }
 
-const nameOf = ({ slug }: WorldPage, room: string) => (room === `#${slug}` ? slug : room.slice(`#${slug}/`.length));
-
+// A room's address on this page: the page's own path, which names the universe, and the chat's search for the room.
 function hrefOf(page: WorldPage, room: string): string {
-  return room === `#${page.slug}`
-    ? page.path
-    : `${page.path}?${new URLSearchParams({ room: nameOf(page, room) }).toString()}`;
+  const search = roomParams(room).toString();
+  return search === "" ? page.path : `${page.path}?${search}`;
 }
 
 // A page's moons, kept outside React: asked again on each change of the store and now and then, for their rules need the time to pass.
@@ -138,7 +136,7 @@ export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
                 page.open(hrefOf(page, room));
               }}
             >
-              {`#${nameOf(page, room)} · ${String(peopleOf(room))} here`}
+              {`${roomLabel(room)} · ${String(peopleOf(room))} here`}
             </a>
           </li>
         ))}
