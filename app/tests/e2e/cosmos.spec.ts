@@ -531,7 +531,8 @@ test("gives the release's page the nebulae, and their credits in its footer", as
 // The light the nebulae add, read as the same view twice, their images refused and then let through: the video's nebulae are coloured
 // dust and gas, never grey smoke (#19363C, #472819: saturation 0.6), and the warm glow under them keeps its shape.
 const BOX = 48;
-const ADDS_AT_MOST = 32;
+// Alexis, 2026-11-02: 36, the nebulae kept as he approved them; the view at rest looks towards a red nebula's bright side (7d6).
+const ADDS_AT_MOST = 36;
 const GREY_AT_MOST = 0.4;
 const boxes = () => {
   const found: [number, number, number, number][] = [];
