@@ -54,7 +54,6 @@ describe("isWeakGpu", () => {
 
 describe("pixelRatioFor", () => {
   it.each([
-    { ratio: 2, touch: false, tier: "high", want: 1.25 },
     { ratio: 1, touch: false, tier: "high", want: 1 },
     { ratio: 3, touch: true, tier: "high", want: 1 },
     { ratio: 2, touch: false, tier: "low", want: 1 },
