@@ -131,7 +131,7 @@ test.describe("a computer", () => {
 
   test("a page that does not show space asks for none of its code, and the first that does asks", async ({ page }) => {
     const asked = asks(page, DOOR);
-    await page.goto("/w/bubble?test-gpu");
+    await page.goto("/list?test-gpu");
     await hydrated(page);
     await page.evaluate(() => new Promise(requestAnimationFrame));
     expect(asked).toEqual([]);
@@ -171,17 +171,26 @@ test.describe("a computer", () => {
   });
 });
 
-// Every route, by its first visit: the cosmos of each universe shows space, and no other page asks for its code.
+// Every route, by its first visit: the cosmos of each universe, the Earth and a world's page (its planet, since 7e) show space, and no
+// other page asks for its code.
 test.describe("which pages show space", () => {
   test.use({ viewport: COMPUTER });
 
-  for (const path of ["/", "/net/onyx", "/net/gnoland", "/earth", "/net/gnoland/earth"])
+  for (const path of [
+    "/",
+    "/net/onyx",
+    "/net/gnoland",
+    "/earth",
+    "/net/gnoland/earth",
+    "/w/bubble",
+    "/net/onyx/w/bubble",
+  ])
     test(`${path} does`, async ({ page }) => {
       await page.goto(`${path}?test-gpu`);
       await running(page);
     });
 
-  for (const path of ["/list", "/w/bubble", "/net/onyx/w/bubble", "/nowhere"])
+  for (const path of ["/list", "/nowhere"])
     test(`${path} does not`, async ({ page }) => {
       const asked = asks(page, DOOR);
       await page.goto(`${path}?test-gpu`);
