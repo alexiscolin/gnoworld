@@ -49,6 +49,8 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
   shattered: { sea: false, glow: true, air: false, maps: ["moon"] },
 };
 
+const BANDED: readonly Anchor[] = ["gas giant", "ice giant", "cloud deck"];
+
 describe("planetSeed", () => {
   it("is sha256 of the domain and the path's bytes, side by side", () => {
     expect(hex(planetSeed(DAO))).toBe("e75b568b9186ba4ad2f34bde37cc25e55b749b2d3d0ab30a6c57566bad5ee30e");
@@ -113,7 +115,28 @@ describe("the twelve anchors", () => {
       expect(look.glow !== null, "a glow").toBe(glow);
       expect(look.rim !== null, "air").toBe(air);
       expect(maps).toContain(look.map);
-      expect(MAPS).toContain(look.second);
+      if (!sea) expect(MAPS).toContain(look.second);
+    }
+  });
+
+  it("keeps a world with a sea on the Earth's map alone: its land, ice and shores are the map's own", () => {
+    for (const anchor of ANCHORS)
+      for (const path of paths(100)) {
+        const look = planetLook(path, anchor);
+        if (look.sea === null) continue;
+        expect(look.map, anchor).toBe("earth-day");
+        expect(look.second, anchor).toBeNull();
+        expect(look.secondShare, anchor).toBe(0);
+        expect(look.caps, anchor).toBe(0);
+      }
+  });
+
+  it("carries nothing a pixel never reads: a look holds no limb, a sea no level, a banded world no relief", () => {
+    for (const anchor of ANCHORS) {
+      const look = planetLook(DAO, anchor);
+      expect(look).not.toHaveProperty("limb");
+      expect(look.sea ?? {}).not.toHaveProperty("level");
+      if (BANDED.includes(anchor)) expect(look.relief, anchor).toBe(0);
     }
   });
 
@@ -183,16 +206,13 @@ describe("planetLook", () => {
     expect(new Set(looks.map((look) => JSON.stringify(look.ramp))).size).toBeGreaterThan(150);
     expect(spread(looks.map((look) => look.warp.amount))).toBeGreaterThan(0.04);
     expect(spread(looks.map((look) => look.warp.frequency))).toBeGreaterThan(0.5);
-    expect(spread(looks.map((look) => look.secondShare))).toBeGreaterThan(0.15);
+    if (!READS[anchor].sea) expect(spread(looks.map((look) => look.secondShare))).toBeGreaterThan(0.15);
     expect(spread(looks.map((look) => look.tilt))).toBeGreaterThan(0.4);
-    expect(spread(looks.map((look) => look.relief))).toBeGreaterThan(0);
+    if (!BANDED.includes(anchor)) expect(spread(looks.map((look) => look.relief))).toBeGreaterThan(0);
     if (READS[anchor].maps.length > 1) expect(new Set(looks.map((look) => look.map)).size).toBe(2);
-    if (READS[anchor].air && !["ice giant", "gas giant", "cloud deck"].includes(anchor))
+    if (READS[anchor].air && !BANDED.includes(anchor))
       expect(spread(looks.map((look) => look.rim?.thickness ?? 0))).toBeGreaterThan(0);
-    if (READS[anchor].sea) {
-      expect(spread(looks.map((look) => look.sea?.level ?? 0))).toBeGreaterThan(0.05);
-      expect(spread(looks.map((look) => look.clouds))).toBeGreaterThan(0.1);
-    }
+    if (READS[anchor].sea) expect(spread(looks.map((look) => look.clouds))).toBeGreaterThan(0.1);
   });
 
   it("warps at low frequency alone: a higher one smears the map", () => {

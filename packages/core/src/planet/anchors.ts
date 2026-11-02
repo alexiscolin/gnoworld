@@ -26,13 +26,12 @@ export type MapName = (typeof MAPS)[number];
 
 export interface AnchorRow {
   readonly maps: readonly [MapName, ...MapName[]];
-  readonly second: MapName;
+  /** A world with a sea reads the Earth's map alone: its land, ice and shores are that map's. */
+  readonly second?: MapName;
   readonly palettes: readonly [Ramp, Ramp];
   readonly warp: Span;
   readonly recolour: Span;
   readonly relief: Span;
-  /** 0, a dusty limb that stays bright; 1, a cloudy one that darkens. */
-  readonly limb: number;
   /** Above 1, a faint map's bands and clouds are lifted around its own mean. */
   readonly contrast?: Span;
   readonly caps?: Span;
@@ -43,7 +42,7 @@ export interface AnchorRow {
   readonly rings?: number;
   readonly banded?: true;
   readonly locked?: true;
-  readonly sea?: { readonly level: Span; readonly shallow: Rgb; readonly deep: Rgb };
+  readonly sea?: { readonly shallow: Rgb; readonly deep: Rgb };
   readonly glow?: { readonly colour: Rgb; readonly level: Span };
   readonly rim?: { readonly colours: readonly [Rgb, Rgb]; readonly thickness: Span };
 }

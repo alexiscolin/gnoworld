@@ -91,7 +91,7 @@ async function mapsFor(
   base: string,
   { anisotropy, width }: { anisotropy: number; width: number },
 ) {
-  const names = [...new Set(looks.flatMap((look) => [look.map, look.second]))];
+  const names = [...new Set(looks.flatMap((look) => (look.second === null ? [look.map] : [look.map, look.second])))];
   const loaded = new Map(
     await Promise.all(
       names.map(

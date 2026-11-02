@@ -35,7 +35,7 @@ void main() {
   vec3 direction = spin * normalize(axis + warpAmount * flow);
   vec3 base = read(surface, lookupOf(direction)).rgb;
   float height = toneOf(base);
-  if (secondShare > 0.002 && blueSea < 0.5) {
+  if (secondShare > 0.002) {
     float patchy = smoothstep(0.42, 0.86, field(axis * 1.3 + warpOffset.zxy).x * 0.5 + 0.5 + secondShare * 0.6 - 0.2);
     vec3 elsewhere = spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy);
     base = mix(base, read(second, lookupOf(elsewhere)).rgb, patchy * 0.72);
@@ -49,7 +49,7 @@ void main() {
   vec3 albedo = ramped(base, tone);
 
   float wet = 0.0;
-  if (seaLevel >= 0.0) {
+  if (blueSea > 0.5) {
     // On the Earth's own map the sea is where the map is blue, as the Earth's is: whole oceans with their shores, not puddles of one tone.
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
     float depth = smoothstep(0.1, 0.4, tone);
@@ -64,7 +64,7 @@ void main() {
     wet = smoothstep(0.004, 0.02, base.b - max(base.r, base.g));
     albedo = max(mix(vec3(dot(albedo, LUMA)), albedo, 0.66), SEA_FLOOR * wet);
   }
-  if (caps > 0.0 && blueSea < 0.5) {
+  if (caps > 0.0) {
     float frozen = smoothstep(1.0 - caps, 1.0 - caps + 0.05, abs(axis.y) + 0.07 * flow.y + 0.16 * (tone - 0.5));
     albedo = mix(albedo, vec3(0.86, 0.9, 0.95), frozen);
   }
@@ -83,8 +83,8 @@ void main() {
   float facing = max(dot(normal, view), 0.001);
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
-  // The light falls off towards the terminator on every world, as the Earth's does, more where there is air, whatever the row says.
-  float shine = mix(dusty, soft, max(limb, mix(SOFT_BARE, SOFT_AIR, air))) * ringShade();
+  // The light falls off towards the terminator on every world, as the Earth's does, more where there is air.
+  float shine = mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();
   // The star's light keeps no colour of its own: a land dims in its own hue, with no brown band at the terminator.
   vec3 colour = albedo * shine + albedo * NIGHT;
 

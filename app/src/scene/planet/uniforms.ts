@@ -6,7 +6,7 @@ type Rgb = readonly [number, number, number];
 type Uniforms = Record<string, IUniform>;
 
 const NO_COLOUR: Rgb = [0, 0, 0];
-const NO_SEA = { level: -1, shallow: NO_COLOUR, deep: NO_COLOUR };
+const NO_SEA = { shallow: NO_COLOUR, deep: NO_COLOUR };
 const NO_GLOW = { level: 0, colour: NO_COLOUR };
 // The halo of the Earth's air, in its own colour lifted toward white, and how thick an air must be to draw it fully.
 const HAZE_LIFT = 0.45;
@@ -40,13 +40,12 @@ function signUniforms(look: PlanetLook): Uniforms {
   const rings = look.rings ?? NO_RINGS;
   return {
     air: { value: look.rim === null ? 0 : 1 },
-    blueSea: { value: look.map === "earth-day" ? 1 : 0 },
+    blueSea: { value: look.sea === null ? 0 : 1 },
     hazeColour: { value: working(haze(look.rim)) },
     hazeAmount: {
       value:
         look.rim === null ? 0 : HAZE_STRENGTH * Math.min(Math.max(look.rim.thickness / FULL_AIR, THINNEST_HAZE), 1),
     },
-    seaLevel: { value: sea.level },
     seaShallow: { value: working(sea.shallow) },
     seaDeep: { value: working(sea.deep) },
     glowLevel: { value: glow.level },
@@ -62,7 +61,8 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
   const { warp } = look;
   return {
     surface: { value: maps.map(look.map) },
-    second: { value: maps.map(look.second) },
+    // A sampler must hold something on every world, and a map the world has anyway uploads nothing more.
+    second: { value: maps.map(look.second ?? look.map) },
     cloudMap: { value: maps.clouds },
     ringMap: { value: maps.ring },
     // A sampler must hold something on every world: the flag keeps it unread.
@@ -83,7 +83,6 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     contrast: { value: look.contrast },
     cracks: { value: look.cracks },
     relief: { value: look.relief },
-    limb: { value: look.limb },
     caps: { value: look.caps },
     cloudCover: { value: look.clouds },
     rifts: { value: look.rifts },

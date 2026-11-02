@@ -25,7 +25,7 @@ const DOMAIN = Uint8Array.from("gnoworld/planet/v1", (character) => character.ch
 export interface PlanetLook {
   readonly anchor: Anchor;
   readonly map: MapName;
-  readonly second: MapName;
+  readonly second: MapName | null;
   /** How much of the surface the second map takes, 0.4 at most: the dominant stays 60% or more. */
   readonly secondShare: number;
   /** About the pole, then the two other axes, in radians. */
@@ -38,13 +38,12 @@ export interface PlanetLook {
   readonly recolour: number;
   readonly contrast: number;
   readonly relief: number;
-  readonly limb: number;
   readonly caps: number;
   readonly clouds: number;
   readonly rifts: number;
   readonly cracks: number;
   readonly locked: boolean;
-  readonly sea: { readonly level: number; readonly shallow: Rgb; readonly deep: Rgb } | null;
+  readonly sea: { readonly shallow: Rgb; readonly deep: Rgb } | null;
   readonly glow: { readonly colour: Rgb; readonly level: number } | null;
   readonly rim: { readonly colour: Rgb; readonly thickness: number } | null;
   readonly rings: {
@@ -71,7 +70,7 @@ const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
 ];
 
 // Words 0 to 5 turn and offset the map, word 6 mixes the palette; each byte from 14 on is one value of its own, in [0, 1], and a
-// byte may serve two values no anchor has together: a sea's level, rifts and cracks; caps and a banded world's contrast.
+// byte may serve two values no anchor has together: rifts and cracks; caps and a banded world's contrast.
 const reader = (seed: Uint8Array) => ({
   word: (index: number): number => ((seed[index * 2] ?? 0) * 256 + (seed[index * 2 + 1] ?? 0)) / 65535,
   byte: (index: number): number => (seed[index] ?? 0) / 255,
@@ -104,7 +103,7 @@ function ringsOf(row: AnchorRow, ramp: Ramp, { byte }: Reader): PlanetLook["ring
 function waters(row: AnchorRow, { byte }: Reader): Pick<PlanetLook, "sea" | "glow" | "rim"> {
   const { sea, glow, rim } = row;
   return {
-    sea: sea === undefined ? null : { level: between(sea.level, byte(18)), shallow: sea.shallow, deep: sea.deep },
+    sea: sea ?? null,
     glow: glow === undefined ? null : { colour: glow.colour, level: between(glow.level, byte(29)) },
     rim:
       rim === undefined
@@ -124,8 +123,8 @@ export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
   return {
     anchor,
     map: row.maps[Math.floor(byte(23) * 0.999 * row.maps.length)] ?? row.maps[0],
-    second: row.second,
-    secondShare: byte(15) * MAX_SECOND_SHARE,
+    second: row.second ?? null,
+    secondShare: row.second === undefined ? 0 : byte(15) * MAX_SECOND_SHARE,
     spin: row.banded === true ? [turn, 0, 0] : [turn, word(1) * TURN, word(2) * TURN],
     tilt: (byte(16) * 2 - 1) * MAX_TILT,
     lean: leanOf(rings !== null, seed),
@@ -138,7 +137,6 @@ export function planetLook(path: Uint8Array, anchor: Anchor): PlanetLook {
     recolour: between(row.recolour, byte(19)),
     contrast: between(row.contrast ?? [1, 1], byte(22)),
     relief: between(row.relief, byte(17)),
-    limb: row.limb,
     caps: between(row.caps ?? [0, 0], byte(22)),
     clouds: between(row.clouds ?? [0, 0], byte(20)),
     rifts: between(row.rifts ?? [0, 0], byte(18)),

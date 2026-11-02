@@ -77,12 +77,20 @@ describe("createPlanet", () => {
   });
 
   it("asks for the look's two maps, by name", () => {
-    const look = planetLook(DAO, "temperate");
+    const look = planetLook(DAO, "desert");
     const { set, textures } = fixed();
     const planet = createPlanet(look, set, sphere);
     expect(read(planet.surface, "surface")).toBe(textures.get(look.map));
-    expect(read(planet.surface, "second")).toBe(textures.get(look.second));
+    expect(read(planet.surface, "second")).toBe(textures.get(look.second ?? ""));
     expect(read(planet.surface, "cloudMap")).toBe(set.clouds);
+  });
+
+  it("binds a world's own map where it has no second, and asks for no other: a sampler must hold something, nothing uploads for it", () => {
+    const look = planetLook(DAO, "temperate");
+    const { set, textures } = fixed();
+    const planet = createPlanet(look, set, sphere);
+    expect(read(planet.surface, "second")).toBe(textures.get(look.map));
+    expect([...textures.keys()]).toEqual([look.map]);
   });
 
   it("shares one program among all twelve: the shader's text never holds a look", () => {
@@ -136,20 +144,32 @@ describe("createPlanet", () => {
     expect(read(surface, "warpAmount")).toBeLessThanOrEqual(look.warp.amount);
     expect(read(surface, "warpFrequency")).toBe(look.warp.frequency);
     expect(read(surface, "warpOffset")).toEqual(new Vector3(...look.warp.offset));
-    expect(read(surface, "secondShare")).toBe(look.secondShare);
     expect(read(surface, "cloudCover")).toBe(look.clouds);
     expect(read(surface, "relief")).toBe(look.relief);
-    expect(read(surface, "limb")).toBe(look.limb);
     expect(read(surface, "recolour")).toBe(look.recolour);
     expect(read(surface, "contrast")).toBe(look.contrast);
     expect(read(surface, "cracks")).toBe(look.cracks);
+  });
+
+  it("hands a dry world's second map its share, and its caps", () => {
+    const look = planetLook(DAO, "desert");
+    const { surface } = createPlanet(look, fixed().set, sphere);
+    expect(look.secondShare).toBeGreaterThan(0);
+    expect(look.caps).toBeGreaterThan(0);
+    expect(read(surface, "secondShare")).toBe(look.secondShare);
     expect(read(surface, "caps")).toBe(look.caps);
-    expect(read(surface, "seaLevel")).toBe(look.sea?.level);
+  });
+
+  it("gives the surface no uniform for what no pixel reads", () => {
+    const { surface } = createPlanet(planetLook(DAO, "temperate"), fixed().set, sphere);
+    expect(surface.uniforms).not.toHaveProperty("limb");
+    expect(surface.uniforms).not.toHaveProperty("seaLevel");
+    expect(SURFACE_FRAGMENT).not.toMatch(/\b(?:limb|seaLevel)\b/);
   });
 
   it("marks what a world lacks by value, for one program holds every world", () => {
     const surface = createPlanet(planetLook(DAO, "rocky"), fixed().set, sphere).surface;
-    expect(read(surface, "seaLevel")).toBe(-1);
+    expect(read(surface, "blueSea")).toBe(0);
     expect(read(surface, "glowLevel")).toBe(0);
     expect(read(surface, "locked")).toBe(0);
   });

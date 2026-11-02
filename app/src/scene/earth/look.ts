@@ -7,7 +7,7 @@ import { Matrix3 } from "three";
 export const GROUND_TO_MAP = new Matrix3().set(1, 0, 0, 0, 1, 0, 0, 0, -1);
 
 const AS_DRAWN = {
-  second: "moon",
+  second: null,
   secondShare: 0,
   spin: [0, 0, 0],
   warp: { amount: 0, frequency: 1, offset: [0, 0, 0] },
@@ -34,7 +34,6 @@ export const EARTH: PlanetLook = {
   tilt: -0.14,
   lean: 0.1,
   relief: 0,
-  limb: 1,
   clouds: 0.34,
   rim: { colour: [0.2, 0.32, 0.54], thickness: 0.05 },
 };
@@ -46,7 +45,6 @@ export const MOON: PlanetLook = {
   tilt: 0,
   lean: 0,
   relief: 0.02,
-  limb: 0,
   clouds: 0,
   rim: null,
 };
