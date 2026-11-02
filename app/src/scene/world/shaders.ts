@@ -130,3 +130,34 @@ void main() {
   #include <colorspace_fragment>
 }
 `;
+
+// The soft halo on a world's limb, brightest on the side its star lights: a plane facing the eye behind the world, which hides its middle.
+// `litSide` is the star's side on screen; the plane reaches HALO_REACH radii.
+export const HALO_REACH = 1.32;
+export const LIMB_HALO_FRAGMENT = /* glsl */ `
+uniform vec2 litSide;
+uniform vec3 rimColour;
+varying vec2 vPlace;
+void main() {
+  float far = length(vPlace) * ${String(HALO_REACH)};
+  float clear = smoothstep(0.97, 1.0, far);
+  float fade = exp(-(far - 1.0) * 10.0) * 0.5 + exp(-(far - 1.0) * 3.5) * 0.08;
+  float side = 0.2 + 0.8 * max(dot(normalize(vPlace + 1e-5), litSide), 0.0);
+  gl_FragColor = vec4(rimColour * clear * fade * side, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
+// The haze of the system's star, far behind the world on its lit side: a warm, low light, never a blinding one.
+export const STAR_HAZE_FRAGMENT = /* glsl */ `
+uniform vec2 litSide;
+varying vec2 vPlace;
+void main() {
+  float far = length(vPlace);
+  float light = (exp(-far * 3.0) * 0.16 + exp(-far * 14.0) * 0.22) * (1.0 - smoothstep(0.7, 1.0, far));
+  gl_FragColor = vec4(vec3(1.0, 0.8, 0.58) * light, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;

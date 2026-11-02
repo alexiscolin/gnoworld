@@ -13,12 +13,14 @@ import {
   Vector3,
   Vector4,
   type BufferGeometry,
+  type Quaternion,
 } from "three";
 import { Disposer } from "../disposer.ts";
 import { Ground } from "../earth/ground.ts";
 import { added, ORBIT_ROLL, ORBIT_TILT, ORBIT_RADIUS } from "../earth/orbit.ts";
 import { GLOW_FRAGMENT, GLOW_VERTEX, ORBIT_VERTEX } from "../earth/orbitShader.ts";
 import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
+import { WorldHalo } from "./halo.ts";
 import { OCCLUDERS_MAX, OVERLAY_FRAGMENT, OVERLAY_VERTEX, STATUS_FRAGMENT, WAKE_FRAGMENT } from "./shaders.ts";
 
 const OVER_GROUND = 1.004;
@@ -63,7 +65,8 @@ export class WorldBody {
   /** The plate painted again in the circle it opens for the world, as the Earth's. */
   readonly ground = this.#owner.add(new Ground());
   readonly #tube: Mesh<TorusGeometry, ShaderMaterial>;
-  readonly #halo: Mesh<PlaneGeometry, ShaderMaterial>;
+  readonly #moonGlow: Mesh<PlaneGeometry, ShaderMaterial>;
+  readonly #halo: WorldHalo;
   readonly #wake: Mesh<PlaneGeometry, ShaderMaterial>;
 
   constructor({ look, seed, maps, sphere }: BodyParts) {
@@ -105,13 +108,13 @@ export class WorldBody {
     );
     this.ringMoon = this.#owner.add(createPlanet(maps.moonLook, maps.moon, sphere));
     this.ringMoon.group.scale.setScalar(RING_MOON);
-    this.#halo = this.#top(
+    this.#moonGlow = this.#top(
       new Mesh(this.#owner.add(new PlaneGeometry(0.4, 0.4)), this.#owner.add(added(GLOW_VERTEX, GLOW_FRAGMENT, {}))),
     );
     this.orbit.rotation.set(ORBIT_TILT, 0, ORBIT_ROLL, "ZXY");
     this.orbit.add(this.#tube, this.ringMoon.group);
     this.orbit.visible = false;
-    this.#halo.visible = false;
+    this.#moonGlow.visible = false;
     this.#wake = this.#top(
       new Mesh(
         this.#owner.add(new PlaneGeometry(2, 2)),
@@ -120,7 +123,9 @@ export class WorldBody {
     );
     this.#wake.scale.setScalar(WAKE_REACH);
     this.#wake.visible = false;
-    this.sized.add(this.planet.group, this.orbit, this.#halo);
+    this.sized.add(this.planet.group, this.orbit, this.#moonGlow);
+    this.#halo = new WorldHalo(this.#owner, look);
+    this.sized.add(...this.#halo.meshes);
     this.group.add(this.ground.mesh, this.sized, this.#wake);
   }
 
@@ -129,8 +134,11 @@ export class WorldBody {
     return mesh;
   }
 
-  /** The one sun, a unit vector, for the world, its overlay and the ring's moon. */
-  setSun(sun: Vector3): void {
+  /** The one sun, a unit vector in the world's own frame, for its halo; then, turned by the eye's `turn`, for the world, its overlay and the
+   * ring's moon. */
+  setSun(sun: Vector3, turn: Quaternion): void {
+    this.#halo.setSide(sun);
+    sun.applyQuaternion(turn);
     this.planet.setSun(sun);
     this.ringMoon.setSun(sun);
     (this.overlay.uniforms["sun"]?.value as Vector3).copy(sun);
@@ -156,7 +164,7 @@ export class WorldBody {
   /** The ring for `orbit`, or none. The moon stands at its angle, in the orbit's own frame. */
   setRing(orbit: StatusOrbit | undefined): void {
     this.orbit.visible = orbit !== undefined;
-    this.#halo.visible = orbit !== undefined;
+    this.#moonGlow.visible = orbit !== undefined;
     if (orbit === undefined) return;
     const { uniforms } = this.#tube.material;
     if (uniforms["litTo"] !== undefined) uniforms["litTo"].value = orbit.moon;
@@ -164,7 +172,7 @@ export class WorldBody {
     const at = new Vector3(Math.cos(orbit.moon), 0, Math.sin(orbit.moon)).multiplyScalar(ORBIT_RADIUS);
     this.ringMoon.group.position.copy(at);
     // The halo faces the eye, so it stands outside the orbit's lean, in front of the moon.
-    this.#halo.position.copy(at).applyEuler(this.orbit.rotation).add(FORWARD);
+    this.#moonGlow.position.copy(at).applyEuler(this.orbit.rotation).add(FORWARD);
   }
 
   /** The bodies that cast on the world, each a centre in the stage's frame and a radius: its moons, and the ring's when it shows. */

@@ -416,6 +416,28 @@ describe("each sign on its data", () => {
   });
 });
 
+describe("its light (design review, 4 and 6)", () => {
+  it("gives the world a soft halo on its lit limb and its star's haze on the sun's side, behind it", async () => {
+    const { view, stage } = await opened();
+    view.tick(1);
+    const halo = materials(stage).find(
+      (material) => "litSide" in material.uniforms && "rimColour" in material.uniforms,
+    );
+    const haze = materials(stage).find(
+      (material) => "litSide" in material.uniforms && !("rimColour" in material.uniforms),
+    );
+    expect(halo).toBeDefined();
+    expect(haze).toBeDefined();
+    const side = value(haze, "litSide") as { x: number; y: number };
+    expect(Math.sign(side.x)).toBe(Math.sign(view.stats().sun.x));
+    let behind = Number.NaN;
+    stage.traverse((part) => {
+      if ((part as Partial<Mesh>).material === haze) behind = part.position.z;
+    });
+    expect(behind).toBeLessThan(0);
+  });
+});
+
 describe("real shadows on the one world seen close", () => {
   it("casts each moon's and the ring moon's shadow on the world, from where they stand, and none with no moon", async () => {
     const { view, stage } = await opened();

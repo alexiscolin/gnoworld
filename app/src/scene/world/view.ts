@@ -169,7 +169,7 @@ export class WorldView {
     const { quaternion } = this.#device.camera;
     body.group.position.copy(this.#rest).applyQuaternion(quaternion);
     body.group.quaternion.copy(quaternion);
-    body.setSun(sideLight(standing.seed, this.#sun).applyQuaternion(quaternion));
+    body.setSun(sideLight(standing.seed, this.#sun), quaternion);
     body.setTime(still ? 0 : seconds);
     standing.moons?.tick(still ? 0 : seconds, this.#sun);
     this.#pose(standing);
