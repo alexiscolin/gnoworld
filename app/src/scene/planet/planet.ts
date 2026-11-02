@@ -1,7 +1,8 @@
 // One world, drawn from its look: a surface, its air if it has any, its rings if it has any. It owns its materials and the rings' mesh; the
 // maps and the sphere are shared by every world and stay with their owner, the part that loads them.
-import type { PlanetLook } from "@gnoworld/core";
+import type { PlanetLook, WorldSigns } from "@gnoworld/core";
 import {
+  AdditiveBlending,
   BufferGeometry,
   CustomBlending,
   DoubleSide,
@@ -17,8 +18,9 @@ import {
 import { Disposer } from "../disposer.ts";
 import { AIR_FRAGMENT, AIR_VERTEX } from "./airShader.ts";
 import { RING_FRAGMENT, RING_VERTEX } from "./ringShader.ts";
+import { HALO_FRAGMENT, HALO_VERTEX } from "./signShaders.ts";
 import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
-import { surfaceUniforms, working, type MapSet } from "./uniforms.ts";
+import { setLights, surfaceUniforms, working, type MapSet } from "./uniforms.ts";
 
 export type { MapSet };
 
@@ -27,6 +29,8 @@ const RING_FLAT = -Math.PI / 2;
 // Over the surface, under the rings, for a ring in front of a world sits in front of its air.
 const AIR_ORDER = 1;
 const RING_ORDER = 2;
+// A seed's glow reaches this far past its small body, in front of it: frame 4's signal is a glow with a heart, not a ring round a disc.
+const HALO_REACH = 2.6;
 export interface Planet {
   readonly look: PlanetLook;
   readonly group: Group;
@@ -37,6 +41,8 @@ export interface Planet {
   setTime(seconds: number, clouds?: number): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
+  /** Shows a world's stage. Its `size` is a factor for whoever scales the group: the view owns the group's scale. */
+  setSigns(signs: WorldSigns): void;
   dispose(): void;
 }
 
@@ -82,15 +88,30 @@ function ringMaterial(rings: NonNullable<PlanetLook["rings"]>, map: Texture): Sh
   });
 }
 
+const haloMaterial = (): ShaderMaterial =>
+  new ShaderMaterial({
+    vertexShader: HALO_VERTEX,
+    fragmentShader: HALO_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    uniforms: { signal: { value: 0 } },
+  });
+
 class LivePlanet implements Planet {
   readonly #owner = new Disposer();
   readonly #parts: ShaderMaterial[] = [];
+  readonly #sphere: BufferGeometry;
+  readonly #hasLights: boolean;
+  #halo: Mesh<BufferGeometry, ShaderMaterial> | undefined;
   readonly look: PlanetLook;
   readonly group = new Group();
   readonly surface: ShaderMaterial;
 
   constructor(look: PlanetLook, maps: MapSet, sphere: BufferGeometry) {
     this.look = look;
+    this.#sphere = sphere;
+    this.#hasLights = maps.lights !== undefined;
     this.group.rotation.x = look.lean;
     this.group.rotation.z = look.tilt;
     this.surface = new ShaderMaterial({
@@ -136,6 +157,23 @@ class LivePlanet implements Planet {
   setLimb(light: number): void {
     for (const { uniforms } of this.#parts)
       if (uniforms["limbLight"] !== undefined) uniforms["limbLight"].value = light;
+  }
+
+  setSigns({ lights, signal }: WorldSigns): void {
+    if (this.#hasLights) setLights(this.surface.uniforms, lights);
+    if (signal <= 0 && this.#halo === undefined) return;
+    const halo = (this.#halo ??= this.#addHalo());
+    halo.visible = signal > 0;
+    const glow = halo.material.uniforms["signal"];
+    if (glow !== undefined) glow.value = signal;
+  }
+
+  // Made for the worlds that need one: a world at rest keeps the meshes the lab drew. No sun reaches it, so it stays out of `#parts`.
+  #addHalo(): Mesh<BufferGeometry, ShaderMaterial> {
+    const halo = new Mesh(this.#sphere, this.#owner.add(haloMaterial()));
+    halo.scale.setScalar(HALO_REACH);
+    this.group.add(halo);
+    return halo;
   }
 
   dispose(): void {

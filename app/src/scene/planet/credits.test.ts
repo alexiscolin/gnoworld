@@ -65,6 +65,7 @@ describe("the textures' credits", () => {
 
   it("notes that the worlds warp and recolour the Earth's day map, as CC BY 4.0 §3(a)(1)(b) asks", () => {
     expect(CREDITS[1]?.line).toContain("the day map warped and recoloured on temperate and ocean worlds");
+    expect(CREDITS[1]?.line).toContain("the night map warped on generated worlds");
   });
 
   it("gives the Earth's maps a row of their own", () => {

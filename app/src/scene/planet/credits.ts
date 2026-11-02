@@ -34,7 +34,7 @@ export const CREDITS: readonly Credit[] = [
     licenceUrl: CC_BY,
     source: "https://www.solarsystemscope.com/textures/",
     read: "2026-11-02",
-    line: "Earth: Solar System Scope, CC BY 4.0, based on NASA imagery; scaled to 4096 by 2048; the day map warped and recoloured on temperate and ocean worlds",
+    line: "Earth: Solar System Scope, CC BY 4.0, based on NASA imagery; scaled to 4096 by 2048; the day map warped and recoloured on temperate and ocean worlds, the night map warped on generated worlds",
   },
   {
     files: ["carina"],

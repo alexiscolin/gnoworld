@@ -1,6 +1,7 @@
 // A world's surface, one program for every world: a look is uniforms, never shader text (ADR-0002 §3, "a class is data"). The real map is
 // warped at low frequency, recoloured through a ramp, flooded, frozen or cracked, then lit: dusty on airless worlds, soft on cloudy ones.
 import { FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { PARTS, UNIFORMS } from "./surfaceParts.ts";
 
 /** How fast a world turns, in radians a second of its `time`. */
@@ -24,10 +25,12 @@ void main() {
 
 export const SURFACE_FRAGMENT = /* glsl */ `
 ${UNIFORMS}
+${LIGHT_UNIFORMS}
 ${FIELD}
 ${SEAMS}
 ${LOOKUP}
 ${PARTS}
+${LIGHTS}
 void main() {
   float angle = time * ${String(SPIN)};
   vec3 axis = turned(normalize(vLocal), angle);
@@ -108,8 +111,9 @@ void main() {
     vec3 spill = textureLod(nightMap, place.uv, 3.5).rgb;
     // The lights come on across the same arc the day goes out in.
     float dusk = 1.0 - smoothstep(-0.16, 0.4, day);
-    colour += (cities * 2.6 + spill * 0.9) * vec3(1.0, 0.8, 0.52) * dusk * (1.0 - 0.8 * overcast);
+    colour += (cities * 2.6 + spill * 0.9) * CITY_LIGHT * dusk * (1.0 - 0.8 * overcast);
   }
+  if (settled > 0.0) colour += settlements(axis, direction, flow, day, max(crack, rift)) * (1.0 - 0.8 * overcast);
   float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
   // Air lifts the day side's edge into its own colour; no air, a thin edge of sunlight only.
   if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);
