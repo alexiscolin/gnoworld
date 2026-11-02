@@ -16,6 +16,8 @@ export interface Mood {
 
 /** The field's lattice, in world units: about a cluster's width (a system's cell is 10). */
 export const MOOD_SCALE = 340;
+/** Clusters never rise past this above or below the disc. */
+export const MAX_HEIGHT = 8;
 /** The volume the sky reads: `MOOD_SIDE` points a side, `MOOD_STEP` apart. */
 export const MOOD_SIDE = 16;
 export const MOOD_STEP = 160;
@@ -26,6 +28,10 @@ const WORD = 2 ** 32;
 const TONE = 1;
 const HAZE = 2;
 const DENSITY = 3;
+const HEIGHT = 4;
+// The noise is cubed, which keeps most of the plane near the disc: the slope is then at most
+// MAX_HEIGHT * 3 * (2 * 1.875 * sqrt(2)) / HEIGHT_SCALE = 0.49, under the 0.5 the tests hold.
+const HEIGHT_SCALE = 260;
 // prettier-ignore
 const RING = [
   0.2541, 0.0497, 0.006,
@@ -62,6 +68,12 @@ const field = (salt: number, at: Point, scale: number): number =>
   lattice(salt, at, scale) * 0.7 + lattice(salt + 9, at, scale / 2.1) * 0.3;
 
 const ringAt = (hue: number, channel: number): number => RING[(hue % HUES) * 3 + channel] ?? 0;
+
+/** The height of the clusters at a position (ADR-0002 §10): smooth, within `MAX_HEIGHT`, mostly flat. */
+export function heightField(x: number, z: number): number {
+  const noise = lattice(HEIGHT, { x, y: 0, z }, HEIGHT_SCALE) * 2 - 1;
+  return noise * noise * noise * MAX_HEIGHT;
+}
 
 /** A mood to read into: one a caller keeps, for a frame makes nothing. */
 export const newMood = (): Mood => ({ red: 0, green: 0, blue: 0, haze: 0, density: 0 });

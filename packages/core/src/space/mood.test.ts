@@ -1,6 +1,16 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { MOOD_SCALE, moodAt, moodCells, newMood, MOOD_SIDE, MOOD_STEP, type Mood } from "./mood.ts";
+import {
+  heightField,
+  MAX_HEIGHT,
+  MOOD_SCALE,
+  moodAt,
+  moodCells,
+  newMood,
+  MOOD_SIDE,
+  MOOD_STEP,
+  type Mood,
+} from "./mood.ts";
 
 const read = (x: number, y: number, z: number): Mood => {
   const mood = newMood();
@@ -168,5 +178,67 @@ describe("moodCells", () => {
     two.follow({ x: MOOD_STEP * 3, y: MOOD_STEP * 90, z: 0 });
     two.follow({ x: MOOD_STEP * 40, y: 0, z: 0 });
     expect(two.data).toEqual(one.data);
+  });
+});
+
+describe("heightField, a smooth field of position", () => {
+  const CELL = 10;
+  const points = fc.tuple(
+    fc.double({ min: -1e5, max: 1e5, noNaN: true }),
+    fc.double({ min: -1e5, max: 1e5, noNaN: true }),
+  );
+
+  it("is a pure function, bounded by MAX_HEIGHT, at any coordinate", () => {
+    fc.assert(
+      fc.property(points, ([x, z]) => {
+        expect(heightField(x, z)).toBe(heightField(x, z));
+        expect(Math.abs(heightField(x, z))).toBeLessThanOrEqual(MAX_HEIGHT);
+      }),
+    );
+    expect(Number.isFinite(heightField(1e9, -1e9))).toBe(true);
+  });
+
+  it("changes by at most half the distance moved, for a step of up to a cell: a small step, a small change", () => {
+    fc.assert(
+      fc.property(
+        points,
+        fc.double({ min: 0, max: Math.PI * 2, noNaN: true }),
+        fc.double({ min: 0, max: CELL, noNaN: true }),
+        ([x, z], angle, d) => {
+          const moved = heightField(x + d * Math.cos(angle), z + d * Math.sin(angle));
+          expect(Math.abs(moved - heightField(x, z))).toBeLessThanOrEqual(0.5 * d + 1e-9);
+        },
+      ),
+    );
+  });
+
+  it("is no constant and no list: it rises and falls across the plane, with no jump, above and below zero", () => {
+    const samples = Array.from({ length: 4_000 }, (_, i) =>
+      heightField((i % 80) * CELL * 1.5, Math.floor(i / 80) * CELL * 1.5),
+    );
+    expect(Math.max(...samples)).toBeGreaterThan(2);
+    expect(Math.min(...samples)).toBeLessThan(-2);
+    expect(new Set(samples.map((h) => h.toFixed(3))).size).toBeGreaterThan(1_000);
+  });
+
+  it("stays near the plane most of the way, for the noise is cubed", () => {
+    const samples = Array.from({ length: 10_000 }, (_, i) =>
+      Math.abs(heightField((i % 100) * CELL * 4, Math.floor(i / 100) * CELL * 4)),
+    );
+    expect(samples.filter((h) => h < 2).length / samples.length).toBeGreaterThan(0.6);
+  });
+
+  // Worked out apart from this code, in Python's doubles: the same place stands at the same height on every device.
+  it.each([
+    [0, 0, -0.44782901],
+    [10, 10, -0.447142927],
+    [123.5, -456.25, 1.531437438],
+    [-1500, 2200, 1.023914607],
+    [-37.5, -37.5, -0.332781449],
+    [800, 800, -7.274498829],
+    [1e5, -1e5, -3.687192924],
+    [1e9, -1e9, -6.784045412],
+  ])("gives the field at (%j, %j) as %j", (x, z, expected) => {
+    expect(Math.abs(heightField(x, z) - expected)).toBeLessThan(1e-6);
   });
 });

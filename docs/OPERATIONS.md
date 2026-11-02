@@ -99,7 +99,9 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 
 A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2.0
 cores and 1,248 MB in all, at and under the 2 cores and 2 GB the test holds as a ceiling: Docker
-stops a container at its cap, not the host). To cut the public URL at once:
+stops a container at its cap, not the host). The limit lets one address 640 requests at once and 20 a
+second after that (F3665); `auth_basic` runs after it, so a burst with a wrong password costs about
+640 password checks, at the name in the file, before the 429s begin. To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|

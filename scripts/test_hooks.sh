@@ -4035,18 +4035,38 @@ grep -qi "merge.lock\|one merge check at a time" "$here/../docs/HARNESS.md" || f
 # A visitor's first load is twice its files at once (deploy/test.sh asks every file of the build twice): the burst of the visitors' zone must
 # hold twice the build's files, or a first visit gets a 429 (F3385: 44 of 220 requests at a burst of 160). Docker is not needed to see it.
 cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
-sed 's#zone=visitors burst=320#zone=visitors burst=4#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+sed 's#zone=visitors burst=640#zone=visitors burst=4#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 grep -q 'zone=visitors burst=4 ' "$nc/deploy/web/nginx.conf" || fail "the fixture did not plant a burst of 4"
 out=$(chk) && fail "check_nginx passed a burst of 4 for a build of 3 files, whose first load is 6 requests: $out"
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst that a first load overruns: $out"
 # The boundary (the red pass, finding 12): exactly twice the files holds, one under does not.
-sed 's#zone=visitors burst=320#zone=visitors burst=6#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+sed 's#zone=visitors burst=640#zone=visitors burst=6#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 out=$(chk) || fail "check_nginx refused a burst of 6, twice the 3 files of the build: $out"
-sed 's#zone=visitors burst=320#zone=visitors burst=5#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+sed 's#zone=visitors burst=640#zone=visitors burst=5#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 out=$(chk) && fail "check_nginx passed a burst of 5, under twice the 3 files of the build: $out"
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst of 5: $out"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 chk >/dev/null || fail "check_nginx refused the image's burst for a build of 3 files"
+# The table the burst lives in (F3665, Alexis, 2026-11-02): the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each
+# line is read from its start, for a comment proves nothing: the faults under it are what a loose grep passed (7d1's security review).
+burst_table() {
+	[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors ' "$1")" = 2 ] &&
+		[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors burst=640 nodelay;$' "$1")" = 2 ] &&
+		grep -Eq '^[[:space:]]*limit_req_zone \$proxy_protocol_addr zone=visitors:1m rate=20r/s;$' "$1"
+}
+burst_table "$here/../deploy/web/nginx.conf" || fail "the visitors' zone in deploy/web/nginx.conf is not two lines at a burst of 640 and 20 a second (F3665)"
+sed 's/burst=640 nodelay;/burst=64000 nodelay;/' "$nc/nginx.good" >"$nc/table.conf"
+printf '# limit_req zone=visitors burst=640 nodelay;\n# limit_req zone=visitors burst=640 nodelay;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table read two comments as its two lines"
+cp "$nc/nginx.good" "$nc/table.conf"
+printf '        limit_req zone=visitors burst=64000 nodelay;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table passed a third line at another burst"
+sed 's#rate=20r/s;#rate=2000r/s;#' "$nc/nginx.good" >"$nc/table.conf"
+printf '# limit_req_zone $proxy_protocol_addr zone=visitors:1m rate=20r/s;\n' >>"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table read a comment as its rate"
+sed 's/limit_req zone=visitors burst=640 nodelay;/limit_req zone=visitors burst=320 nodelay;/' "$nc/nginx.good" >"$nc/table.conf"
+burst_table "$nc/table.conf" && fail "the burst's table passed the old burst"
+rm "$nc/table.conf"
 fi
 
 if part bench_load; then
