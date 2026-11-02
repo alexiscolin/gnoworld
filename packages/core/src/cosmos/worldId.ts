@@ -5,7 +5,8 @@
 
 import { REALM_PREFIX } from "../chain/realm.ts";
 
-const GENERIC = ["x", "demo"];
+/** The folders under which a world is its whole path: one namespace there holds hundreds of unrelated realms. */
+export const GENERIC = ["x", "demo"];
 
 /** The world of a realm's path on gno.land. */
 export function worldIdOf(path: string): string {

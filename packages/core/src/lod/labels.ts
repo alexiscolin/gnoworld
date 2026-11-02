@@ -3,6 +3,7 @@
 // a count or a badge shows only what the data says. A name is plain text and never an address; a new world nobody here visited is an
 // uncharted signal, unnamed till charted.
 import { isAddress } from "../chain/evalName.ts";
+import { GENERIC } from "../cosmos/worldId.ts";
 import { firstGraphemes } from "../markdown/graphemes.ts";
 
 /** The most labels a view shows, the most of them far worlds, and the most graphemes of a name. */
@@ -58,10 +59,14 @@ function cut(name: string): string {
     : name;
 }
 
-/** A world's name from its id: its folders past an address, its whole id under a name; none where only an address names it. */
+/** A world's name from its id: its folders past an address, a generic folder first among them left out, its whole id under a name; none
+ * where only an address names it. */
 export function labelName(id: string): string | null {
-  const kept = id.split("/").filter((segment) => segment !== "" && !holdsAddress(segment));
-  return kept.length === 0 ? null : cut(kept.join("/"));
+  const segments = id.split("/");
+  const kept = segments.filter((segment) => segment !== "" && !holdsAddress(segment));
+  const [first = "", ...rest] = kept;
+  const named = kept.length < segments.length && rest.length > 0 && GENERIC.includes(first) ? rest : kept;
+  return named.length === 0 ? null : cut(named.join("/"));
 }
 
 // A name the data gives, on one line of plain text: no control or direction mark, no address, never blank.

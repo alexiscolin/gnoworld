@@ -17,8 +17,15 @@ const titleOf = (name: string) => chooseLabels([near("gov/dao", { name })])[0]?.
 describe("a world's name on its label", () => {
   it("is its folders past an address, never the address", () => {
     expect(labelName(`${ADDRESS}/minichess`)).toBe("minichess");
-    expect(labelName(`${OTHER}/x/fishbay`)).toBe("x/fishbay");
+    expect(labelName(`${OTHER}/x/fishbay`)).toBe("fishbay");
     expect(labelName(`demo/${ADDRESS}`)).toBe("demo");
+  });
+
+  it("drops a generic folder left first once the address before it goes, never the last word", () => {
+    expect(labelName(`${OTHER}/x/daily/streak`)).toBe("daily/streak");
+    expect(labelName(`${OTHER}/demo/games`)).toBe("games");
+    expect(labelName(`${OTHER}/x`)).toBe("x");
+    expect(labelName("x/daily")).toBe("x/daily");
   });
 
   it("is its whole id under a namespace that is a name", () => {
