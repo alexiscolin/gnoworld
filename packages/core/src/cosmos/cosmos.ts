@@ -4,6 +4,7 @@
 // outward, a little, and what moved drifts there over a season. Only the sines differ between engines, in a last bit no cell depends on.
 import { cellHash, nextState, textHash, unitOf } from "../space/cell.ts";
 import { heightField } from "../space/mood.ts";
+import { lerp } from "../space/smooth.ts";
 import { seatInRings, type Seat } from "./rings.ts";
 
 /** The unit of spacing, in scene units: two systems are never closer. */
@@ -17,6 +18,10 @@ const PITCH = 2 * CELL;
 // How far a system strays from its cell's centre: the lattice never shows, and with this two systems stay over a cell apart.
 const STRAY = 0.45 * CELL;
 const RINGS = 1;
+// A star's radius from what it holds: two at their closest never touch, for the largest is half a cell.
+const STAR_LEAST = CELL / 10;
+const STAR_MOST = CELL / 2;
+const STAR_RUNGS = 10;
 
 export interface SystemPlace {
   readonly x: number;
@@ -105,4 +110,14 @@ export function placeSystems(set: readonly SystemRef[]): Map<string, SystemPlace
     if (seat !== undefined) places.set(id, placeOf(seed, seat));
   });
   return places;
+}
+
+/** A star's radius, from the worlds its namespace holds: on a ladder of powers of two, read in a line between rungs, so one world more
+ * never makes it jump, and capped, so no star crowds its cell. */
+export function starSize(worlds: number): number {
+  if (!Number.isSafeInteger(worlds) || worlds < 1)
+    throw new RangeError("cosmos: a star holds a whole number of worlds, 1 or more");
+  const held = Math.min(worlds, 1 << STAR_RUNGS);
+  const rung = 31 - Math.clz32(held);
+  return lerp(STAR_LEAST, STAR_MOST, (rung + held / (1 << rung) - 1) / STAR_RUNGS);
 }

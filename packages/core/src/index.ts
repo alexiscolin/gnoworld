@@ -15,7 +15,14 @@ export {
   sameName,
   topicAfter,
 } from "./chat/room.ts";
-export { CELL, DISC_HALF_THICKNESS, placeSystems, type SystemPlace, type SystemRef } from "./cosmos/cosmos.ts";
+export {
+  CELL,
+  DISC_HALF_THICKNESS,
+  placeSystems,
+  starSize,
+  type SystemPlace,
+  type SystemRef,
+} from "./cosmos/cosmos.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";

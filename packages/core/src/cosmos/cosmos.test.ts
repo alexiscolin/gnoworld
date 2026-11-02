@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { heightField, MAX_HEIGHT } from "../space/mood.ts";
-import { CELL, DISC_HALF_THICKNESS, placeSystems, type SystemPlace, type SystemRef } from "./cosmos.ts";
+import { CELL, DISC_HALF_THICKNESS, placeSystems, starSize, type SystemPlace, type SystemRef } from "./cosmos.ts";
 
 // core/cosmos (slice 7, 7c and 7d1; ADR-0002 §3 and §10; F3520): systems take cells in rings by their rank in the set, a thick disc with
 // clusters above and below it, their height from a smooth field of position. Nothing piles up, an arrival moves others little and only
@@ -314,6 +314,56 @@ describe("a hundred arrivals move no system far", () => {
     const left = placeSystems(loose(ids(500).filter((id) => id !== "ns250")));
     expect(placeSystems(loose([...left.keys(), "ns250"]))).toEqual(placed(500));
   });
+});
+
+describe("starSize: a star by the worlds it holds", () => {
+  it.each([
+    [1, 1],
+    [2, 1.4],
+    [3, 1.6],
+    [4, 1.8],
+    [6, 2],
+    [8, 2.2],
+    [12, 2.4],
+    [512, 4.6],
+    [1000, 4.98125],
+    [1024, 5],
+    [1025, 5],
+    [1_000_000, 5],
+    [Number.MAX_SAFE_INTEGER, 5],
+  ])("holds %i worlds in a star of radius %d", (worlds, radius) => {
+    expect(starSize(worlds)).toBeCloseTo(radius, 9);
+  });
+
+  it("grows with what it holds, and never shrinks (property)", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 4096 }), (worlds) => {
+        expect(starSize(worlds + 1)).toBeGreaterThanOrEqual(starSize(worlds));
+      }),
+    );
+    expect(starSize(512)).toBeGreaterThan(starSize(511));
+  });
+
+  it("never jumps: one world more moves a star by at most the step from 1 to 2", () => {
+    for (let worlds = 1; worlds < 2048; worlds += 1) {
+      expect(starSize(worlds + 1) - starSize(worlds)).toBeLessThanOrEqual(0.4 + 1e-9);
+    }
+  });
+
+  it("gives two stars at their closest no touch, however much they hold", () => {
+    const largest = starSize(Number.MAX_SAFE_INTEGER);
+    expect(largest + largest).toBeLessThanOrEqual(closest(placed(1_000).values()));
+    expect(2 * largest).toBeLessThanOrEqual(CELL);
+  });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 60])(
+    "refuses %j worlds with a RangeError",
+    (worlds) => {
+      expect(() => starSize(worlds)).toThrow(
+        new RangeError("cosmos: a star holds a whole number of worlds, 1 or more"),
+      );
+    },
+  );
 });
 
 describe("a curated ecosystem is placed together", () => {
