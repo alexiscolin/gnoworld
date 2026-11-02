@@ -53,7 +53,7 @@ const strayOf = ({ distance, slant, turn }: Candidate) =>
 
 // The depth the bodies show: the farthest one's distance over the nearest's, the Earth among them, capped.
 function depthOf(look: Look, postcards: readonly Card[], close: Close | undefined): number {
-  const distances = [look.earth.away, ...spotsOf(look, postcards, close).map(({ away: far }) => far)];
+  const distances = [look.earth.away, ...spotsOf(look, postcards, { close }).map(({ away: far }) => far)];
   return Math.min(Math.max(...distances) / Math.min(...distances), DEPTH_MOST);
 }
 

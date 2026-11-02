@@ -52,14 +52,25 @@ function fits(looks: readonly Look[], { held, reach, worlds }: Card, close: Clos
   return whole && (close === undefined || first === undefined || clearOfClose(first.camera, close, { place, reach }));
 }
 
-/** The bodies drawn at rest that show on `look`'s screen. */
-export function spotsOf(look: Look, cards: readonly Card[], close: Close | undefined): Seen[] {
+/** The bodies drawn at rest that show on `look`'s screen, the postcards' `seconds` on their turn; the close world holds still. */
+export function spotsOf(
+  look: Look,
+  cards: readonly Card[],
+  { close, seconds = 0 }: { close?: Close | undefined; seconds?: number },
+): Seen[] {
   const drawn = cards.flatMap(({ system, worlds }) =>
-    worlds.map((world) => look.seen(placeOf(system, world, 0), world.radius)),
+    worlds.map((world) => look.seen(placeOf(system, world, seconds), world.radius)),
   );
   if (close !== undefined) drawn.push(look.seen(placeOf(close.held.system, close.world, 0), close.world.radius));
   return drawn.filter((at) => !look.off(at));
 }
+
+// Instants through the longest turn of `cards`' systems: the postcards turn at rest, so a view reads well through a whole turn.
+const INSTANTS = 8;
+const turnOf = (cards: readonly Card[]) => {
+  const longest = (2 * Math.PI) / Math.min(...cards.map(({ held }) => Math.abs(held.system.spin)), Infinity);
+  return Array.from({ length: INSTANTS }, (_, step) => (step * (Number.isFinite(longest) ? longest : 0)) / INSTANTS);
+};
 
 // The richer of two postcards, three bodies or more counting alike, then the nearer, as the Earth's nearest are held.
 const richer = (a: Card, b: Card) => Math.min(b.worlds.length, RICH) - Math.min(a.worlds.length, RICH);
@@ -83,7 +94,9 @@ export function postcardsOf(
       const spread = one === undefined || other === undefined || apart(one, other);
       const lights = [look.star, ...pair.map(({ held }) => look.seen(held.system.place))];
       const frame = { deep: close !== undefined, lights, width: look.width, height: look.height };
-      return spread && composed(spotsOf(look, pair, close), look.earth, frame);
+      return (
+        spread && turnOf(pair).every((seconds) => composed(spotsOf(look, pair, { close, seconds }), look.earth, frame))
+      );
     });
   const pairs = fit.flatMap((first, at) => fit.slice(at + 1).map((second) => [first, second]));
   if (wanted === 2) return pairs.find(reads);

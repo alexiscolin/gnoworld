@@ -565,15 +565,22 @@ describe("what the drawn bodies leave clear", () => {
   // recede, their sizes falling twice or more from the nearest to the farthest (the chief, 2026-11-02, after Alexis's references): a
   // tenth across a line with a close world, a fifth without. The unlit set's view is the last resort, which takes what fits however it reads.
   it.each(Object.entries(files).filter(([name]) => !UNLIT.has(name)))(
-    "reads in 3D: what stands on the screen is in no row that does not recede, with %s",
+    "reads in 3D through a whole turn: what stands on the screen is in no row that does not recede, with %s",
     (_, file) => {
       const { systems, view } = made(file);
-      for (const { width, height } of REST_SCREENS) {
+      const close = closeOf(systems, view);
+      // Sixteen instants of the longest postcard's turn (7d6's review: a row formed within a turn).
+      const instants = timesOf(systems, view).filter((_, step) => step % 6 === 0);
+      for (const [{ width, height }, seconds] of REST_SCREENS.flatMap((screen) =>
+        instants.map((at) => [screen, at] as const),
+      )) {
         const see = cameraOf(view, { width, height });
         const onScreen = ({ x, y }: Seen) => x >= 0 && x <= width && y >= 0 && y <= height;
         const bodies = [
           see(EARTH_PLACE, EARTH_RADIUS),
-          ...drawn(systems, view).map(({ system, world }) => see(placeOf(system, world, 0), world.radius)),
+          ...drawn(systems, view).map(({ system, world }) =>
+            see(placeOf(system, world, world === close ? 0 : seconds), world.radius),
+          ),
         ].filter(onScreen);
         const stars = [{ x: 0, y: 0, z: 0 }, ...view.postcards.map((index) => systems[index]?.place ?? EARTH_PLACE)]
           .map((place) => see(place))
