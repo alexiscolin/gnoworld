@@ -3,7 +3,7 @@
 import { labOf } from "@gnoworld/core";
 import { Vector3, type WebGLRenderer } from "three";
 import { mapBytes } from "../src/scene/planet/maps.ts";
-import { worldsOf, type Choice } from "./choice.ts";
+import type { Choice } from "./choice.ts";
 import type { View } from "./views.ts";
 
 export interface Probed {
@@ -82,7 +82,7 @@ function live({ renderer, view }: Probed): string[] {
 
 /** The page's reads, for the journeys. */
 export function probes(page: Probed) {
-  const shown = () => worldsOf(page.choice());
+  const shown = () => page.view()?.drawn ?? [];
   return {
     stats: () => stats(page),
     circles: () => circles(page),

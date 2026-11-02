@@ -33,6 +33,8 @@ export interface View {
   readonly stage: Scene;
   readonly camera: PerspectiveCamera;
   readonly worlds: readonly Planet[];
+  /** What each world was drawn from, in the order of `worlds`. */
+  readonly drawn: readonly Shown[];
   readonly stages: readonly Stage[];
   readonly textures: readonly Texture[];
   readonly images: number;
@@ -166,6 +168,7 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
     stage,
     camera: layout.camera,
     worlds,
+    drawn: shown,
     stages: signs.map(({ stage }) => stage),
     textures: all,
     images: image === undefined ? 0 : 1,

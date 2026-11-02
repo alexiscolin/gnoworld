@@ -235,7 +235,7 @@ test.describe("generated worlds", () => {
       expect(await askLab<string[]>(page, "ids")).toEqual([id]);
     });
 
-  for (const query of ["real=-1", "real=99", "real=1e9", "real=abc", "real=__proto__", "tier=x", "minor=x"])
+  for (const query of ["real=", "real=-1", "real=99", "real=1e9", "real=abc", "real=__proto__", "tier=x", "minor=x"])
     test(`a lab asked for "${query}" falls back to its own view`, async ({ page }) => {
       await open(page, `?view=close&world=2&${query}`);
       expect((await looks(page)).map(({ anchor }) => anchor)).toEqual([ANCHORS[2]]);

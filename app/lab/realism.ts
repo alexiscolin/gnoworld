@@ -60,8 +60,9 @@ function worldIn(query: URLSearchParams, view: ViewName): number {
 
 // One of the recorded file's 24 seen close: an index, or none.
 function realIn(query: URLSearchParams): number | null {
-  const index = Number(query.get("real"));
-  return query.has("real") && Number.isInteger(index) && index >= 0 && index < 24 ? index : null;
+  const asked = query.get("real");
+  const index = Number(asked);
+  return asked !== null && asked !== "" && Number.isInteger(index) && index >= 0 && index < 24 ? index : null;
 }
 
 function chosen(query: URLSearchParams): Choice {
