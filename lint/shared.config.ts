@@ -56,7 +56,7 @@ export const MODULE_STATE = {
 // What runs on a frame makes nothing (ADR-0002 §9, backlog row 7): a collector's pause is a dropped frame. By name, the loop's and what
 // it calls, in the scene and in core; a function a frame reaches joins this list as it is written. Three's own render is not held here.
 const FRAME_NAMES =
-  "tick|pose|orbitPlace|toScene|toMap|focusOf|glideAt|sideOf|clearOf|spreadAt|angleAt|wake|reschedule|cancel|readRate|draw|sample|advance|follow|march|visit|cellIn|write|light|unit|moodAt|lattice|field|side|ringAt|tintOf|densityAt|driftAt|turnAt|wrapTo|nearestCell|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|frameRate|isDue|carryOver|frameWait|judgeFrames|nebulaLight|nebulaShare|sheetOf|focusDistance";
+  "tick|pose|orbitPlace|toScene|toMap|focusOf|glideAt|sideOf|clearOf|spreadAt|angleAt|wake|reschedule|cancel|readRate|draw|sample|advance|follow|march|visit|cellIn|write|light|unit|moodAt|lattice|field|side|ringAt|tintOf|densityAt|driftAt|turnAt|wrapTo|nearestCell|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|frameRate|isDue|carryOver|frameWait|judgeFrames|nebulaLight|nebulaShare|sheetOf|focusDistance|diveAt|dived";
 const NAME = `/^(${FRAME_NAMES})$/`;
 const MEMBER = `:matches(MethodDefinition, PropertyDefinition, Property)[key.name=${NAME}]`;
 const MADE_HERE =
