@@ -130,7 +130,7 @@ void main() {
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
   if (shape.rifts > 0.0) {
-    float riven = smoothstep(0.0, 0.15, shape.rifts);
+    float riven = smoothstep(0.25, 0.5, shape.rifts);
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
     if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;

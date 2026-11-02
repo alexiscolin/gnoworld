@@ -382,6 +382,8 @@ describe("the generated program", () => {
     expect(body).toMatch(/for \(int k = 0; k < 8; k\+\+\)/);
     expect(body).toMatch(/dot\(at, /);
     expect(GENERATED_FRAGMENT).toMatch(/rift = lines\(ridge, at, /);
+    // Only a riven world shows them (rocky's rifts reach 0.2, desert's 0.4, ice's start at 0.4): thin arcs on the rest read as ink.
+    expect(GENERATED_FRAGMENT).toContain("float riven = smoothstep(0.25, 0.5, shape.rifts);");
     expect(GENERATED_FRAGMENT).toMatch(/albedo \*= 1\.0 \+ [\d.]+ \* max\(ridge, 0\.0\)/);
   });
 
