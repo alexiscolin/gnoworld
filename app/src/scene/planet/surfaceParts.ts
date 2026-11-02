@@ -37,6 +37,7 @@ uniform float ringInner;
 uniform float ringOuter;
 uniform float ringOpacity;
 uniform float nightLights;
+uniform float faraway;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorld;

@@ -1,15 +1,14 @@
-// The cosmos on the stage (ADR-0002 §3 and §10; frames 1 to 8, 16, 17): gno.land's great star and the Earth, a star a namespace, worlds as
-// the ladder says. The camera stays at the origin, so the disc and each body come to it, and a frame writes only that. A look runs off the
-// frame, past a step of the eye: it stands the bodies and writes the disc.
+// The cosmos on the stage (ADR-0002 §3 and §10; frames 1 to 8, 16, 17): gno.land's great star and the Earth, a star a namespace, the view at
+// rest's bodies (7d6). The camera stays at the origin and looks at the Earth, so the disc and each body come to it, and a frame writes only
+// that. A look runs off the frame, past a step of the eye: it stands the bodies and writes the disc.
 import {
   Drawn,
-  focusOf,
+  EARTH_PLACE,
   Ladder,
   systemsOf,
   toMap,
   worldsDrawn,
   type ClearBox,
-  type Orbiter,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
@@ -20,7 +19,8 @@ import { Bodies } from "./bodies.ts";
 import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
-import { Nebulae } from "./nebulae.ts";
+import { AtRest } from "./atRest.ts";
+import { LazyNebulae } from "./lazyNebulae.ts";
 
 /** A world of the file: what the scene reads of it. */
 export interface CosmosWorld {
@@ -44,14 +44,19 @@ export class Cosmos {
   readonly #bodies: Bodies;
   readonly #home: Home;
   readonly #ahead: Ahead;
-  readonly #nebulae: Nebulae;
+  readonly #nebulae: LazyNebulae;
   readonly #drawn = new Drawn();
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
   readonly #mapEye = { x: 0, y: 0, z: 0 };
-  readonly #focus = { x: 0, y: 0, z: 0 };
+  readonly #atRest = new AtRest(() => {
+    this.#looked.x = NaN;
+    this.#askLook();
+    this.#device.moved();
+  });
   #box: ClearBox | undefined;
   #systems: readonly StarSystem[] = [];
+  #worlds = 1;
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
@@ -67,7 +72,7 @@ export class Cosmos {
     this.#maps = new BodyMaps(device, this.#mapCame);
     this.#bodies = new Bodies(this.#maps, this.#owner, device);
     this.#home = new Home(device, this.#bodies.group);
-    this.#nebulae = new Nebulae(device, this.#owner);
+    this.#nebulae = new LazyNebulae(device, this.#owner);
     this.#ahead = new Ahead(device, this.#disc.group, () => {
       this.#setShown(this.#wanted);
       this.#device.moved();
@@ -98,10 +103,11 @@ export class Cosmos {
     }
     if (worlds !== this.#list) {
       this.#list = worlds;
-      this.#systems = systemsOf(
-        worlds.map((world) => ({ id: world.id, namespace: world.namespace, use: usageOf(world) })),
-      );
+      const held = worlds.map((world) => ({ id: world.id, namespace: world.namespace, use: usageOf(world) }));
+      this.#systems = systemsOf(held);
+      this.#worlds = worldsDrawn(held);
       this.#ladder = new Ladder(this.#systems);
+      this.#atRest.search(this.#systems);
     }
     this.#looked.x = NaN;
     this.#ahead.ask();
@@ -129,17 +135,20 @@ export class Cosmos {
     this.#looked.x = NaN;
   }
 
-  /** One frame on: the eye, in doubles, and the clock everything orbits by. */
+  /** One frame on: the eye, in doubles, and the clock everything orbits by. The eye sways about the view at rest's, and the camera keeps
+   * the Earth at the centre. */
   tick(eye: Point, seconds: number): void {
     if (!this.#wanted) return;
-    this.#eye.x = eye.x;
-    this.#eye.y = eye.y;
-    this.#eye.z = eye.z;
-    this.#disc.advance(eye, seconds);
-    this.#bodies.tick(eye, seconds);
-    this.#home.tick(eye, seconds);
-    this.#nebulae.follow(eye, seconds);
-    if (!(Math.hypot(eye.x - this.#looked.x, eye.y - this.#looked.y, eye.z - this.#looked.z) < STEP)) this.#askLook();
+    const { earth } = this.#atRest;
+    this.#atRest.place(eye, seconds, this.#eye);
+    this.#atRest.aim(this.#device.camera, this.#eye);
+    this.#disc.advance(this.#eye, seconds);
+    this.#bodies.tick(this.#eye, seconds);
+    this.#home.tick(this.#eye, seconds, this.#device.camera.quaternion);
+    // What the eye looks at is the Earth: its distance says how much of the nebulae shows.
+    this.#nebulae.follow(eye, seconds, Math.hypot(earth.x - this.#eye.x, earth.y - this.#eye.y, earth.z - this.#eye.z));
+    if (!(Math.hypot(this.#eye.x - this.#looked.x, this.#eye.y - this.#looked.y, this.#eye.z - this.#looked.z) < STEP))
+      this.#askLook();
   }
 
   #askLook(): void {
@@ -150,35 +159,25 @@ export class Cosmos {
     this.#timer = undefined;
     const ladder = this.#ladder;
     if (!this.#wanted || ladder === undefined || Number.isNaN(this.#eye.x)) return;
-    this.#looked.x = this.#eye.x;
-    this.#looked.y = this.#eye.y;
-    this.#looked.z = this.#eye.z;
+    Object.assign(this.#looked, this.#eye);
     this.#looks += 1;
     toMap(this.#eye, this.#mapEye);
-    focusOf(this.#mapEye, this.#focus);
-    ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: this.#focus }, this.#drawn);
-    this.#bodies.stand(this.#wantedBodies());
+    ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: EARTH_PLACE }, this.#drawn);
+    const sight = { eye: this.#mapEye, focal: this.#focal };
+    const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
+    this.#bodies.stand(bodies, close);
     this.#disc.paint({
+      ...sight,
+      ...worlds,
       systems: this.#systems,
       ladder,
       drawn: this.#drawn,
-      eye: this.#mapEye,
-      focal: this.#focal,
       isBody: (id) => this.#bodies.has(id),
+      inView: (place, radius) => this.#bodies.inView(place, radius, this.#eye),
       shows: (place, radius) => this.#bodies.shows(place, radius, this.#eye),
     });
     this.#device.moved();
   };
-
-  #wantedBodies(): Map<string, readonly [StarSystem, Orbiter]> {
-    const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
-    for (let at = 0; at < this.#drawn.bodyCount; at += 1) {
-      const system = this.#systems[this.#drawn.bodySystems[at] ?? -1];
-      const world = system?.worlds[this.#drawn.bodyWorlds[at] ?? -1];
-      if (system !== undefined && world !== undefined) wanted.set(world.id, [system, world]);
-    }
-    return wanted;
-  }
 
   // Five minutes covered: bodies, their maps and the cosmos's own Earth go; the way back stands them again.
   readonly #releaseMaps = (): void => {
@@ -225,7 +224,9 @@ export class Cosmos {
       list,
       screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
-      worlds: worldsDrawn(this.#list ?? []),
+      worlds: this.#worlds,
+      // Where the eye stands on the stage: the scene's, moved to the view at rest's and swayed.
+      eye: { ...this.#eye },
     };
   }
 }

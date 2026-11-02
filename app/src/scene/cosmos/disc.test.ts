@@ -1,4 +1,4 @@
-import { BOUNDS, Drawn, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
+import { BODY_PIXELS, BOUNDS, Drawn, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
 import { Points, Scene as Stage, type BufferAttribute, type BufferGeometry } from "three";
 import { describe, expect, it } from "vitest";
 import { Disposer } from "../disposer.ts";
@@ -13,6 +13,8 @@ const system = (at: number, worlds: number, belt: boolean): StarSystem => ({
   warmth: 0.5,
   spin: 0.1,
   belt,
+  tilt: 0,
+  node: 0,
   worlds: Array.from({ length: worlds }, (_, world) => ({
     id: `s${String(at)}/${String(world)}`,
     radius: 0.9,
@@ -31,9 +33,35 @@ function sighted(systems: readonly StarSystem[], fill: (drawn: Drawn) => void): 
     eye: { x: 0, y: 30, z: 0 },
     focal: 1158,
     isBody: () => false,
+    pointShare: () => 1,
+    needsHalo: (index) => index === 0,
+    inView: () => true,
     shows: () => 1,
   };
 }
+
+// What the suns' buffers hold: each sun's quad reach and its halo, in the order written.
+const sunsOf = (disc: Disc) => {
+  const suns = disc.group.children.find((child) => !(child instanceof Points)) as unknown as {
+    geometry: BufferGeometry & { instanceCount: number };
+  };
+  const look = suns.geometry.getAttribute("aSun") as BufferAttribute;
+  const halo = suns.geometry.getAttribute("aHalo") as BufferAttribute;
+  return Array.from({ length: suns.geometry.instanceCount }, (_, at) => ({
+    reach: look.getX(at),
+    halo: halo.getX(at),
+  }));
+};
+
+// Suns `away` from the eye, straight below it, each a system of its own; the first is the great star.
+const sunsAt = (aways: readonly number[], sight: Partial<Sight> = {}) => {
+  const systems = aways.map((away, at) => ({ ...system(at, 0, false), place: { x: 0, y: 30 - away, z: 0 } }));
+  const base = sighted(systems, (drawn) => {
+    for (const at of aways.keys()) drawn.stars[at] = at;
+    drawn.starCount = aways.length;
+  });
+  return sunsOf(painted({ ...base, ...sight }).disc);
+};
 
 const painted = (sight: Sight) => {
   const stage = new Stage();
@@ -95,6 +123,18 @@ describe("the disc's caps", () => {
     expect(lights.at(-1)).toBe(0);
   });
 
+  // Seen on Onyx's file (7d6): a postcard of eight worlds draws four as bodies, and its other four stood as white discs as large as they.
+  it("keeps a point a speck, half the least body's size at most, however near its world", () => {
+    const systems = [{ ...system(0, 2, false), place: { x: 0, y: 30 - 20, z: 0 } }];
+    const sight = sighted(systems, (drawn) => {
+      drawn.dotSystems[0] = 0;
+      drawn.dotWorlds[0] = 1;
+      drawn.dotCount = 1;
+    });
+    const { dots } = painted(sight);
+    expect((dots?.geometry.getAttribute("aSize") as BufferAttribute).getX(0)).toBeLessThanOrEqual(BODY_PIXELS / 2);
+  });
+
   it("tells a region's glow from a star in what it writes", () => {
     const systems = Array.from({ length: 4 }, (_, at) => ({
       ...system(at, 0, false),
@@ -113,5 +153,63 @@ describe("the disc's caps", () => {
     const look = suns.geometry.getAttribute("aSun") as BufferAttribute;
     expect(look.getZ(0)).toBe(0);
     expect(look.getZ(1)).toBe(1);
+  });
+});
+
+// Chief, 2026-11-02: seen from a low slant every sun up to the middle distance lines the horizon and their halos wash the sky out; frame 4
+// shows about seven halos, its other stars points.
+describe("the suns' halos", () => {
+  it("gives a halo to seven suns at most, the great star and the postcards' whatever their distance, then the nearest", () => {
+    const aways = [40, ...Array.from({ length: 29 }, (_, at) => 10 + at * 3)];
+    const suns = sunsAt(aways, { needsHalo: (index) => index === 0 || index === 29 });
+    const lit = suns.flatMap(({ halo }, at) => (halo > 0 ? [at] : []));
+    expect(lit).toHaveLength(7);
+    expect(suns[0]?.halo).toBe(1);
+    expect(suns[29]?.halo).toBe(1);
+    expect(lit.filter((at) => at !== 0 && at !== 29)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("counts only the suns in view: one off the screen takes no halo from one on it", () => {
+    const aways = [40, 12, 14, 16, 18, 20, 22, 24, 26, 28];
+    const suns = sunsAt(aways, { inView: (place) => place.y !== 30 - 12 });
+    expect(suns[1]?.halo).toBe(0);
+    expect(suns.filter(({ halo }) => halo > 0)).toHaveLength(7);
+    expect(suns[7]?.halo).toBeGreaterThan(0);
+    expect(suns[8]?.halo).toBe(0);
+  });
+
+  it("shrinks and dims a far sun's halo with its distance, down to a star point of a few pixels", () => {
+    const aways = [40, 20, 50, 80, 110, 140, 200];
+    const suns = sunsAt(aways);
+    const halos = suns.slice(1).map(({ halo }) => halo);
+    expect(halos[0]).toBe(1);
+    for (let at = 1; at < halos.length; at += 1) expect(halos[at]).toBeLessThanOrEqual(halos[at - 1] ?? 0);
+    expect(halos[2]).toBeLessThan(1);
+    expect(halos.at(-1)).toBe(0);
+    const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
+    expect(pixels.at(-1)).toBeLessThanOrEqual(12);
+    expect(pixels[1]).toBeGreaterThan(100);
+  });
+
+  // A star three units from the eye, the close world's, spread its amber over the whole screen: the approved arrival's widest was 769 pixels.
+  it("keeps a halo by the eye no wider than the approved arrival's widest, and asks whether its heart, not its reach, is in view", () => {
+    const asked: number[] = [];
+    const suns = sunsAt([40, 3], {
+      inView: (_, radius) => {
+        asked.push(radius);
+        return true;
+      },
+    });
+    expect(((suns[1]?.reach ?? NaN) * 1158) / 3).toBeLessThanOrEqual(800);
+    expect(asked).toEqual([(10 * 3) / 1158]);
+  });
+
+  it("keeps a region's glow whole: it is no sun's halo", () => {
+    const systems = [{ ...system(0, 0, false), place: { x: 0, y: -600, z: 0 } }];
+    const sight = sighted(systems, (drawn) => {
+      drawn.glows[0] = 0;
+      drawn.glowCount = 1;
+    });
+    expect(sunsOf(painted(sight).disc)[0]?.halo).toBe(1);
   });
 });

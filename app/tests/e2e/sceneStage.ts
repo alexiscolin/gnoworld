@@ -17,9 +17,10 @@ interface CosmosStats {
   looks: number;
   dotPixels: number;
   earth: boolean;
-  screen: { sun: Spot; earth: Spot | undefined; bodies: Spot[] };
+  screen: { sun: Spot; earth: Spot | undefined; bodies: (Spot & { id: string; away: number })[] };
   nebulae: number;
   worlds: number;
+  eye: { x: number; y: number; z: number };
 }
 interface Stats {
   frames: number;

@@ -10,7 +10,7 @@ import { seatInRings, type Seat } from "./rings.ts";
 /** The unit of spacing, in scene units: two systems are never closer. */
 export const CELL = 10;
 /** A system sits within this distance above or below the field. */
-export const DISC_HALF_THICKNESS = 2;
+export const DISC_HALF_THICKNESS = 8;
 
 const TURN = 2 * Math.PI;
 // Rings stand this far apart, and with 6 cells for each ring's number a ring's chord is never shorter.
@@ -22,6 +22,8 @@ const RINGS = 1;
 const STAR_LEAST = CELL / 10;
 const STAR_MOST = CELL / 2;
 const STAR_RUNGS = 10;
+// A system stands this share of the half thickness clear of the field at least, so none lies on it.
+const LEAST_LIFT = 0.6;
 
 /** The stations' cells (ADR-0002 §1, the team's and outside the rank): beside each other, up and left of the centre on arrival. */
 export const STATION_SEATS: readonly Seat[] = [
@@ -101,7 +103,9 @@ function placeOf(seed: number, { ring, cell }: Seat): SystemPlace {
   };
   const away = TURN * unit();
   const reach = STRAY * Math.sqrt(unit());
-  const lift = (unit() * 2 - 1) * DISC_HALF_THICKNESS;
+  // A ring's cells take turns above and below the field, so two neighbours on a ring never share a side (7d6, a disc in 3D).
+  const side = (ring + cell) % 2 === 0 ? 1 : -1;
+  const lift = side * DISC_HALF_THICKNESS * (LEAST_LIFT + (1 - LEAST_LIFT) * Math.abs(unit() * 2 - 1));
   const x = ring * PITCH * Math.cos(angle) + reach * Math.cos(away);
   const z = ring * PITCH * Math.sin(angle) + reach * Math.sin(away);
   return { x, y: heightField(x, z) + lift, z };

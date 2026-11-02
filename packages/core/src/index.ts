@@ -39,6 +39,7 @@ export {
 } from "./cosmos/system.ts";
 export { worldsDrawn } from "./cosmos/count.ts";
 export {
+  BODY_PIXELS,
   BOUNDS,
   dotLight,
   Drawn,
@@ -50,17 +51,29 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
+export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
-  clearOf,
-  GROWTH,
-  growthAt,
-  leanFor,
-  SPREAD,
-  spreadAt,
-  type ClearBox,
-  type ScreenSpot,
-} from "./frame/screen.ts";
-export { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
+  CENTRE,
+  DISC_TILT,
+  focusDistance,
+  focusOf,
+  onPlane,
+  orbitPlace,
+  toMap,
+  toScene,
+  type InPlane,
+} from "./frame/disc.ts";
+export { coveredShare, offLine } from "./frame/composition.ts";
+export {
+  FIELD_OF_VIEW,
+  HERO_ZONE,
+  postcardOf,
+  REST_DISTANCE,
+  REST_SCREENS,
+  restView,
+  STAR_HEART,
+  type RestView,
+} from "./frame/rest.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -142,8 +155,9 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { textHash, unitOf, type Point } from "./space/cell.ts";
-export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
+export { driftAt, glideAt, HOME, ORBIT_PACE, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { smoothstep } from "./space/smooth.ts";
 export {
   NEBULA_IMAGES,
   NEBULA_LAYERS,

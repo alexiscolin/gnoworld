@@ -11,9 +11,9 @@ export const GNO_LAND = "gno.land";
 export const ROOM = CELL / 2;
 /** Where a far belt starts: no world goes past it. */
 export const BELT_INNER = 0.84 * ROOM;
-/** A fixed place, beside the great star, and its size: frame 4's Earth. */
+/** A fixed place, beside the great star, and its size: frame 4's Earth, 47 pixels of radius at the rest's 30 units, 1,080 high. */
 export const EARTH_PLACE: Point = { x: -6.73, y: 0, z: 0.18 };
-export const EARTH_RADIUS = 1.457;
+export const EARTH_RADIUS = 1.2176;
 
 const WORLD_LEAST = 1.05;
 const WORLD_MOST = 1.7;
@@ -36,6 +36,9 @@ const CLUMP = 0.62;
 const BELTS = 1 / 3;
 const SPIN_LEAST = 0.05;
 const SPIN_SPAN = 0.1;
+// A plane leans 15 to 45 degrees off the disc's: none lies in it, and none stands face on to the rest's 15-degree slant (7d6).
+const TILT_LEAST = Math.PI / 12;
+const TILT_SPAN = Math.PI / 6;
 const SALT = 2;
 
 export { WORLD_MOST };
@@ -62,6 +65,9 @@ export interface StarSystem {
   readonly warmth: number;
   /** In radians a second. */
   readonly spin: number;
+  /** Its orbits' plane: leaning `tilt` radians off the disc's, about a line of nodes `node` radians round from the map's x. */
+  readonly tilt: number;
+  readonly node: number;
   readonly belt: boolean;
   /** The most used first: the first is its landmark. */
   readonly worlds: readonly Orbiter[];
@@ -157,6 +163,8 @@ function systemOf(id: string, place: SystemPlace, worlds: readonly WorldHeld[]):
     star,
     warmth: unit(0),
     spin: (SPIN_LEAST + SPIN_SPAN * unit(1)) * (unit(2) < 0.5 ? -1 : 1),
+    tilt: TILT_LEAST + TILT_SPAN * unit(5),
+    node: 2 * Math.PI * unit(6),
     belt: unit(3) < BELTS,
     worlds: orbitersOf(worlds, star, unit(4) * 2 * Math.PI),
   };
@@ -168,6 +176,8 @@ const greatStar = (): StarSystem => ({
   star: starSize(STAR_MOST),
   warmth: 0.45,
   spin: SPIN_LEAST,
+  tilt: 0,
+  node: 0,
   belt: false,
   worlds: [],
 });

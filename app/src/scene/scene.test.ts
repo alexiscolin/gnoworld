@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { driftAt, glideAt, HOME, turnAt } from "@gnoworld/core";
+import { driftAt, FIELD_OF_VIEW, glideAt, HOME, turnAt } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeClock } from "../../tests/fakeClock.ts";
@@ -970,7 +970,7 @@ describe("the eye", () => {
   });
 
   // F4250's journey reads them: a globe that stays on its circle proves nothing while the eye stands still.
-  it("tells the journeys how the eye looks about and its clock", () => {
+  it("tells the journeys how the eye looks about and its clock, through the lens the view at rest is composed for", () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(20_000);
     const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
@@ -978,6 +978,7 @@ describe("the eye", () => {
     turnAt(turn, seconds);
     expect(scene.stats().turn).toEqual(turn);
     expect(scene.stats().seconds).toBe(seconds);
+    expect(three.renderer.render.mock.lastCall?.[1].fov).toBe(FIELD_OF_VIEW);
     scene.dispose();
   });
 

@@ -16,7 +16,9 @@ import {
   type WorldHeld,
 } from "./system.ts";
 import { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
+import { REST_DISTANCE } from "../frame/rest.ts";
 import { worldsDrawn } from "./count.ts";
+import { screenRadius } from "../lod/ladder.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
 // its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one (F3563).
@@ -214,6 +216,42 @@ describe("systemsOf", () => {
     }
     expect(new Set(systems.map(({ warmth }) => warmth)).size).toBeGreaterThan(250);
   });
+
+  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": no two postcards lie in one plane. Real systems lie at any angle to their galaxy's
+  // disc; here 15 to 45 degrees, so none lies in the disc's plane and none stands face on to the arrival's 15-degree slant.
+  it("tilts each system's plane by its name, 15 to 45 degrees, about a line of nodes of its own", () => {
+    const systems = systemsOf(Array.from({ length: 400 }, (_, at) => held(`n${String(at)}`, 2)).flat()).filter(
+      ({ id }) => id !== GNO_LAND,
+    );
+    for (const { tilt, node } of systems) {
+      expect(tilt).toBeGreaterThanOrEqual((15 * Math.PI) / 180);
+      expect(tilt).toBeLessThanOrEqual((45 * Math.PI) / 180);
+      expect(node).toBeGreaterThanOrEqual(0);
+      expect(node).toBeLessThan(2 * Math.PI);
+    }
+    const tilts = systems.map(({ tilt }) => tilt);
+    expect(Math.max(...tilts) - Math.min(...tilts)).toBeGreaterThan((25 * Math.PI) / 180);
+    const nodes = new Array<number>(8).fill(0);
+    for (const { node } of systems) nodes[Math.floor((node / (2 * Math.PI)) * 8)] = 1;
+    expect(nodes.every((seen) => seen === 1)).toBe(true);
+    expect(systemsOf(held("a", 3))).toEqual(systemsOf(held("a", 3)));
+  });
+
+  // Worked out apart from this code, in Python's port of the hashes: a plane follows the namespace's name, in any file.
+  it.each([
+    ["sys", 0.640319647, 2.650263679],
+    ["gnoswap", 0.572701383, 6.270369922],
+    ["g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv", 0.587171751, 3.916503162],
+  ])("tilts %s's plane %f radians about a line of nodes %f round, alone or among others", (id, tilt, node) => {
+    for (const file of [held(id, 1), [...held("other", 4), ...held(id, 9), ...held("third", 2)]]) {
+      expect(named(systemsOf(file), id).tilt).toBeCloseTo(tilt, 8);
+      expect(named(systemsOf(file), id).node).toBeCloseTo(node, 8);
+    }
+  });
+
+  it("keeps gno.land's star untilted: it holds no generated world", () => {
+    expect(centreOf(systemsOf(held("a", 2)))).toMatchObject({ tilt: 0, node: 0 });
+  });
 });
 
 describe("focusOf", () => {
@@ -239,8 +277,8 @@ describe("focusOf", () => {
 });
 
 describe("focusDistance", () => {
-  it("is how far the eye stands from what it looks at: the arrival's 36 units", () => {
-    expect(focusDistance(HOME)).toBeCloseTo(36, 0);
+  it("is how far the eye stands from what it looks at: the rest's distance from the Earth", () => {
+    expect(focusDistance(HOME)).toBeCloseTo(REST_DISTANCE, 6);
   });
 
   it("agrees with focusOf from any eye above or under the disc", () => {
@@ -264,7 +302,7 @@ describe("the tilt's numbers", () => {
     toScene({ x: 0, y: 1, z: 0 }, out);
     expect(out.y - CENTRE.y).toBeCloseTo(Math.cos(DISC_TILT), 12);
     expect(out.z - CENTRE.z).toBeCloseTo(Math.sin(DISC_TILT), 12);
-    expect(DISC_TILT).toBeCloseTo(Math.PI / 3, 12);
+    expect(DISC_TILT).toBeCloseTo(Math.PI / 12, 12);
   });
 });
 
@@ -280,24 +318,46 @@ describe("orbitPlace", () => {
     return { system, world, at };
   };
 
-  it("holds a world on its circle in the disc's plane, around its star", () => {
+  it("holds a world on its circle in its system's own tilted plane, around its star", () => {
     const { system, world, at } = made();
+    // The plane's normal: the disc's up turned by the tilt about the line of nodes (Rodrigues' formula, worked by hand).
+    const normal = {
+      x: -Math.sin(system.node) * Math.sin(system.tilt),
+      y: Math.cos(system.tilt),
+      z: Math.cos(system.node) * Math.sin(system.tilt),
+    };
     for (const seconds of [0, 7, 90, 12_000]) {
       const { x, y, z } = at(seconds);
-      expect(Math.hypot(x - system.place.x, z - system.place.z)).toBeCloseTo(world.orbit, 9);
-      expect(y).toBe(system.place.y);
+      const [dx, dy, dz] = [x - system.place.x, y - system.place.y, z - system.place.z];
+      expect(Math.hypot(dx, dy, dz)).toBeCloseTo(world.orbit, 9);
+      expect(dx * normal.x + dy * normal.y + dz * normal.z).toBeCloseTo(0, 9);
     }
+    expect(Math.max(...[0, 20, 40, 60].map((seconds) => Math.abs(at(seconds).y - system.place.y)))).toBeGreaterThan(
+      world.orbit * Math.sin(system.tilt) * 0.3,
+    );
+  });
+
+  it("lays an untilted plane as the disc's, the way round it always ran", () => {
+    const { system, world } = made();
+    const out = { x: NaN, y: NaN, z: NaN };
+    orbitPlace({ system: { ...system, tilt: 0, node: 0 }, world }, 0, out);
+    expect(out.x - system.place.x).toBeCloseTo(world.orbit * Math.cos(world.phase), 9);
+    expect(out.y).toBeCloseTo(system.place.y, 9);
+    expect(out.z - system.place.z).toBeCloseTo(world.orbit * Math.sin(world.phase), 9);
   });
 
   it("gives a second the same place, turns the whole system together, and starts at its phase", () => {
     const { system, world, at } = made();
     expect(at(40)).toEqual(at(40));
-    expect(at(0).x - system.place.x).toBeCloseTo(world.orbit * Math.cos(world.phase), 9);
-    expect(at(0).z - system.place.z).toBeCloseTo(world.orbit * Math.sin(world.phase), 9);
+    // At its phase, along the line of nodes: (cos node, 0, sin node), the one line the tilt leaves in the disc's plane.
+    const start = at(-world.phase / system.spin);
+    expect(start.x - system.place.x).toBeCloseTo(world.orbit * Math.cos(system.node), 9);
+    expect(start.y - system.place.y).toBeCloseTo(0, 9);
+    expect(start.z - system.place.z).toBeCloseTo(world.orbit * Math.sin(system.node), 9);
     const other = system.worlds[1] ?? world;
     const gap = (seconds: number) => {
       const [a, b] = [at(seconds), at(seconds, other)];
-      return Math.hypot(a.x - b.x, a.z - b.z);
+      return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
     };
     expect(gap(500)).toBeCloseTo(gap(0), 9);
     expect(at(10)).not.toEqual(at(0));
@@ -340,12 +400,21 @@ describe("the disc on the stage", () => {
     expect(far.z).toBeLessThan(near.z);
   });
 
-  it("sees the disc from well above it: a world on it is lit from the side, never from the eye", () => {
+  it("stands the Earth straight ahead of where the eye rests, the rest's distance away, the disc 15 degrees below the eye", () => {
+    const earth = spot();
+    toScene(EARTH_PLACE, earth);
+    close({ x: earth.x - HOME.x, y: earth.y - HOME.y, z: earth.z - HOME.z }, { x: 0, y: 0, z: -REST_DISTANCE });
     const eye = spot();
     toMap(HOME, eye);
-    const elevation = Math.asin(eye.y / Math.hypot(eye.x, eye.y, eye.z));
-    expect(elevation).toBeGreaterThan(Math.PI / 4);
-    expect(elevation).toBeLessThan(Math.PI / 2);
+    expect(Math.asin(eye.y / Math.hypot(eye.x - EARTH_PLACE.x, eye.y, eye.z - EARTH_PLACE.z))).toBeCloseTo(
+      Math.PI / 12,
+      9,
+    );
+  });
+
+  it("gives the Earth frame 4's size where it rests: 47 pixels of radius on a screen 1,080 high", () => {
+    const focal = 540 / Math.tan((25 * Math.PI) / 180);
+    expect(screenRadius(EARTH_RADIUS, REST_DISTANCE, focal)).toBeCloseTo(47, 0);
   });
 
   it("stands the Earth, its ring and its Moon clear of the great star and of ring 1's rooms", () => {

@@ -9,6 +9,8 @@ import { pointCloud, type Cloud } from "./cloud.ts";
 interface DotLook {
   /** Its orbit's radius, its phase, its star's spin. */
   readonly orbit: readonly [number, number, number];
+  /** Its system's plane: the line of nodes, then the tilt, in radians. */
+  readonly plane: readonly [number, number];
   readonly tint: readonly [number, number, number];
   /** Its radius in pixels, and its light. */
   readonly size: readonly [number, number];
@@ -18,6 +20,7 @@ interface DotLook {
 const VERTEX = /* glsl */ `
 const vec2 SIDE = vec2(0.906, 0.423);
 attribute vec3 aOrbit;
+attribute vec2 aPlane;
 attribute vec3 aTint;
 attribute vec2 aSize;
 uniform float uSeconds;
@@ -27,7 +30,9 @@ varying float vLight;
 varying vec3 vStar;
 void main() {
   float angle = aOrbit.y + aOrbit.z * uSeconds;
-  vec3 out_ = vec3(cos(angle), 0.0, sin(angle));
+  vec2 node = vec2(cos(aPlane.x), sin(aPlane.x));
+  vec2 tilt = vec2(cos(aPlane.y), sin(aPlane.y));
+  vec3 out_ = cos(angle) * vec3(node.x, 0.0, node.y) + sin(angle) * vec3(-node.y * tilt.x, -tilt.y, node.x * tilt.x);
   vTint = aTint;
   vLight = aSize.y;
   vec2 side = normalize((mat3(modelViewMatrix) * -out_).xy + vec2(1.0e-4, 0.0));
@@ -53,7 +58,7 @@ void main() {
 }`;
 
 export class Dots {
-  readonly #cloud: Cloud<"position" | "aOrbit" | "aTint" | "aSize">;
+  readonly #cloud: Cloud<"position" | "aOrbit" | "aPlane" | "aTint" | "aSize">;
   readonly #seconds = { value: 0 };
   readonly #ratio = { value: 1 };
 
@@ -66,7 +71,11 @@ export class Dots {
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });
-    this.#cloud = pointCloud(parent, owner, { most, items: { position: 3, aOrbit: 3, aTint: 3, aSize: 2 }, material });
+    this.#cloud = pointCloud(parent, owner, {
+      most,
+      items: { position: 3, aOrbit: 3, aPlane: 2, aTint: 3, aSize: 2 },
+      material,
+    });
   }
 
   resize(ratio: number): void {
@@ -79,10 +88,11 @@ export class Dots {
   }
 
   /** Sets point `index`: around the star at `at`. */
-  set(index: number, { x, y, z }: Point, { orbit, tint, size }: DotLook): void {
-    const { position, aOrbit, aTint, aSize } = this.#cloud.attributes;
+  set(index: number, { x, y, z }: Point, { orbit, plane, tint, size }: DotLook): void {
+    const { position, aOrbit, aPlane, aTint, aSize } = this.#cloud.attributes;
     position.setXYZ(index, x, y, z);
     aOrbit.setXYZ(index, ...orbit);
+    aPlane.setXY(index, ...plane);
     aTint.setXYZ(index, ...tint);
     aSize.setXY(index, ...size);
   }

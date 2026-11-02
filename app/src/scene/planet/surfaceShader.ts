@@ -1,6 +1,6 @@
 // A world's surface, one program for every world: a look is uniforms, never shader text (ADR-0002 §3, "a class is data"). The real map is
 // warped at low frequency, recoloured through a ramp, flooded, frozen or cracked, then lit: dusty on airless worlds, soft on cloudy ones.
-import { FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
 import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { PARTS, UNIFORMS } from "./surfaceParts.ts";
 
@@ -134,6 +134,7 @@ void main() {
   }
   if (air > 0.5 && nightLights <= 0.0) colour += mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light);
   gl_FragColor = vec4(colour, 1.0);
+  ${FARAWAY}
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

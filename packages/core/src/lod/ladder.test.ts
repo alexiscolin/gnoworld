@@ -5,7 +5,7 @@ import { toMap } from "../frame/disc.ts";
 import { textHash, type Point } from "../space/cell.ts";
 import { HOME } from "../space/drift.ts";
 import { BOUNDS, dotLight, Drawn, HAZE, Ladder, LANDMARKS, MIDDLE, onScreen, screenRadius } from "./ladder.ts";
-import { clearOf, GROWTH, growthAt, leanFor, SPREAD, spreadAt } from "../frame/screen.ts";
+import { clearOf, leanFor } from "../frame/screen.ts";
 
 // The ladder of detail (ADR-0002 §3): what is drawn depends on the distance alone, never on the universe's size. From close to far a world
 // is a body, a point, then part of its star; a star a star, then part of a region's one glow, and past the haze nothing.
@@ -70,6 +70,8 @@ const crowd = (count: number, worlds: number, step = 3): StarSystem[] => {
     warmth: 0.5,
     spin: 0.1,
     belt: false,
+    tilt: 0,
+    node: 0,
     worlds: Array.from({ length: worlds }, (__, world) => ({
       id: `c${String(at)}/${String(world)}`,
       radius: 1,
@@ -456,39 +458,6 @@ describe("no pile-up, at any zoom", () => {
         for (const other of circles.slice(at + 1))
           expect(Math.hypot(one.x - other.x, one.y - other.y)).toBeGreaterThan(one.r + other.r);
     }
-  });
-});
-
-describe("spreadAt: from afar a system opens, its true place kept (the chief's reading of f0004)", () => {
-  it("leaves a system as it is, seen close", () => {
-    expect(spreadAt(0)).toBe(1);
-    expect(spreadAt(6)).toBe(1);
-  });
-
-  it("opens it wide from the arrival's distance on", () => {
-    expect(spreadAt(36)).toBe(SPREAD);
-    expect(spreadAt(5000)).toBe(SPREAD);
-    expect(SPREAD).toBeGreaterThan(2);
-  });
-
-  it("opens by degrees, so a zoom never jumps", () => {
-    fc.assert(
-      fc.property(fc.double({ min: 0, max: 60, noNaN: true }), (distance) => {
-        expect(spreadAt(distance + 0.01)).toBeGreaterThanOrEqual(spreadAt(distance));
-        expect(spreadAt(distance + 0.01) - spreadAt(distance)).toBeLessThan(0.01);
-      }),
-    );
-  });
-});
-
-describe("growthAt: the first plane reads large, as f0004's does", () => {
-  it("leaves a body its true size up close, and grows it from afar, by degrees", () => {
-    expect(growthAt(5)).toBe(1);
-    expect(growthAt(36)).toBe(GROWTH);
-    expect(GROWTH).toBeGreaterThan(1.3);
-    expect(GROWTH).toBeLessThan(SPREAD);
-    expect(growthAt(16)).toBeGreaterThan(1);
-    expect(growthAt(16)).toBeLessThan(GROWTH);
   });
 });
 

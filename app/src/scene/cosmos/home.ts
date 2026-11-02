@@ -1,7 +1,7 @@
 // The Earth among the worlds (frame 4), a fixed place beside the great star: the very globe of its page, small, its ring a thin line. It
-// stands apart from any file, and its star stands still from it, so its light is set once.
+// stands apart from any file. It turns with the camera, which looks at it, so it shows the same face from any view, lit from its star.
 import { CENTRE, EARTH_PLACE, EARTH_RADIUS, toScene, type Point } from "@gnoworld/core";
-import { BufferGeometry, LineBasicMaterial, LineLoop, Vector3, type Group } from "three";
+import { BufferGeometry, LineBasicMaterial, LineLoop, Quaternion, Vector3, type Group } from "three";
 import { buildGlobe, type Globe } from "../earth/globe.ts";
 import { MOON_FAR, ORBIT_RADIUS } from "../earth/orbit.ts";
 import type { EarthDevice } from "../earth/device.ts";
@@ -28,6 +28,8 @@ export class Home {
   readonly #device: EarthDevice;
   readonly #parent: Group;
   readonly #stage = { x: 0, y: 0, z: 0 };
+  readonly #toward = new Vector3();
+  readonly #back = new Quaternion();
   #globe: Globe | undefined;
   #line: LineLoop<BufferGeometry, LineBasicMaterial> | undefined;
   #building = false;
@@ -70,22 +72,26 @@ export class Home {
     this.#parent.add(globe.group);
     this.#line = ringLine();
     globe.stand(EARTH_RADIUS, this.#line);
-    toScene(EARTH_PLACE, this.#stage);
-    const { x, y, z } = this.#stage;
-    const toward = new Vector3(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z).normalize();
-    globe.aim(Math.asin(toward.y));
-    globe.setSun(Math.atan2(-toward.z, toward.x));
     this.#device.moved();
     if (!this.#said) this.#device.stood();
     this.#said = true;
   }
 
-  /** One frame on, from `eye`. */
-  tick(eye: Point, seconds: number): void {
+  /** One frame on, from `eye`, the camera turned `turned`. */
+  tick(eye: Point, seconds: number, turned: Quaternion): void {
     const globe = this.#globe;
     if (globe === undefined) return;
     toScene(EARTH_PLACE, this.#stage);
-    globe.group.position.set(this.#stage.x - eye.x, this.#stage.y - eye.y, this.#stage.z - eye.z);
+    const { x, y, z } = this.#stage;
+    globe.group.position.set(x - eye.x, y - eye.y, z - eye.z);
+    globe.group.quaternion.copy(turned);
+    // The great star, as the turned Earth sees it: its height is the sun's latitude, its way round the sun's azimuth.
+    const toward = this.#toward
+      .set(CENTRE.x - x, CENTRE.y - y, CENTRE.z - z)
+      .applyQuaternion(this.#back.copy(turned).invert());
+    toward.normalize();
+    globe.aim(Math.asin(toward.y));
+    globe.setSun(Math.atan2(-toward.z, toward.x));
     const turn = -SPIN * seconds;
     globe.setTurn(turn, turn);
     globe.setMoon(MOON_FAR - MOON_RATE * seconds);

@@ -1,5 +1,5 @@
-// The cosmos as a view (slice 7, 7d2), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file, a wheel to
-// leave and come back, a drag to go along the disc, as flights will once they land.
+// The cosmos as a view (slice 7, 7d2 and 7d6), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file, the
+// view at rest first. The camera keeps the Earth at the centre: a wheel backs away and comes back, a drag moves the eye round it.
 import { Worlds } from "@gnoworld/schemas/indexer";
 import { HOME } from "@gnoworld/core";
 import { CREDITS } from "../src/scene/planet/credits.ts";
@@ -28,8 +28,7 @@ let aside = 0;
 let along = 0;
 
 const go = () => {
-  const out = (away - 1) * LEFT;
-  scene.moveTo({ x: HOME.x + aside, y: HOME.y + 0.86 * out + along * 0.86, z: HOME.z + 0.5 * out + along * 0.5 });
+  scene.moveTo({ x: HOME.x + aside, y: HOME.y + along, z: HOME.z + (away - 1) * LEFT });
 };
 
 addEventListener("wheel", ({ deltaY }) => {
