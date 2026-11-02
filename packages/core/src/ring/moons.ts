@@ -66,16 +66,18 @@ interface Held {
   readonly people: People;
 }
 
-function risingOf(moons: Moons, { rooms, people }: Held, now: number): Map<string, number> {
-  const quietest = quietestOf(rooms, undefined, people);
+// Clearly busier than the moon it would take the place of: the quietest but yours. A free place asks only that someone be there.
+function risingOf(moons: Moons, { rooms, people }: Held, { current, now }: At): Map<string, number> {
+  const quietest = quietestOf(rooms, current, people);
   const bar = rooms.length < MOONS_MAX || quietest === undefined ? 0 : (people.get(quietest) ?? 0) * CLEARLY;
   const rising = new Map<string, number>();
   for (const [room, count] of people)
-    if (!rooms.includes(room) && count > bar && count > 0) rising.set(room, moons.rising.get(room) ?? now);
+    if (!rooms.includes(room) && count > bar) rising.set(room, moons.rising.get(room) ?? now);
   return rising;
 }
 
-// The one change a minute allows: a moon nobody is in leaves, and the busiest room due takes a free place or the quietest moon's.
+// The one change a minute allows: a moon nobody is in leaves, and the busiest room due takes a free place or the quietest moon's. A free
+// place asks for no hold: no moon leaves for it.
 function changed({ rooms, people }: Held, current: string | undefined, due: readonly string[]) {
   const empty = rooms.find((room) => room !== current && (people.get(room) ?? 0) === 0);
   const [next] = [...due].sort(busiestFirst(people));
@@ -88,7 +90,8 @@ function changed({ rooms, people }: Held, current: string | undefined, due: read
 /** The moons after `moons` for these rooms' counts, at `now`, the reader in `current`. */
 export function nextMoons(moons: Moons | undefined, counts: readonly RoomCount[], { current, now }: At): Moons {
   const people = peopleOf(counts);
-  if (moons === undefined) return arrival(people, current, now);
+  // Nothing stands but yours, a first look before the list came: an arrival still, for no moon would leave.
+  if (moons === undefined || moons.rooms.every((room) => room === current)) return arrival(people, current, now);
   const held = {
     rooms: withYours(
       moons.rooms.filter((room) => people.has(room)),
@@ -97,14 +100,13 @@ export function nextMoons(moons: Moons | undefined, counts: readonly RoomCount[]
     ),
     people,
   };
-  const rising = risingOf(moons, held, now);
+  const rising = risingOf(moons, held, { current, now });
   const kept = { rooms: held.rooms, changed: moons.changed, rising };
   if (now - moons.changed < MOON_SET_MS) return kept;
-  const due = [...rising].filter(([, since]) => now - since >= MOON_HOLD_MS).map(([room]) => room);
+  const free = held.rooms.length < MOONS_MAX;
+  const due = [...rising].filter(([, since]) => free || now - since >= MOON_HOLD_MS).map(([room]) => room);
   const swapped = changed(held, current, due);
-  if (swapped === undefined) return kept;
-  for (const room of swapped) rising.delete(room);
-  return { rooms: swapped, changed: now, rising };
+  return swapped === undefined ? kept : { rooms: swapped, changed: now, rising };
 }
 
 /** A moon's size for `people` against the busiest room's: a log scale from the smallest moon up, capped. */

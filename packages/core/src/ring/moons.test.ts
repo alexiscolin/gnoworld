@@ -163,6 +163,38 @@ describe("nextMoons", () => {
     expect(moved.rooms).toHaveLength(MOONS_MAX);
   });
 
+  it("never swaps a moon while the counts stand still, whatever room you are in (7e's review, A1-1)", () => {
+    const names = ["#a", "#b", "#c", "#d", "#e", "#f"];
+    fc.assert(
+      fc.property(
+        fc.array(fc.nat({ max: 40 }), { minLength: 6, maxLength: 6 }),
+        fc.constantFrom(...names),
+        (counts, current) => {
+          const still = rooms(...names.map((room, at) => [room, counts[at] ?? 0] as const));
+          let moons = nextMoons(undefined, still, { current, now: T0 });
+          const first = [...moons.rooms].sort().join();
+          for (let at = T0; at < T0 + 30 * 60_000; at += 20_000) moons = nextMoons(moons, still, { current, now: at });
+          expect([...moons.rooms].sort().join()).toBe(first);
+        },
+      ),
+    );
+  });
+
+  it("takes the busy rooms at once when the list comes after an empty first look (A1-2)", () => {
+    const empty = nextMoons(undefined, [], { current: undefined, now: T0 });
+    const listed = nextMoons(empty, rooms(["#w", 2], ["#w/a", 9], ["#w/b", 8], ["#w/c", 7]), {
+      current: "#w",
+      now: T0 + 1_000,
+    });
+    expect(listed.rooms).toHaveLength(MOONS_MAX);
+  });
+
+  it("fills a free place at the next change, without the hold a moon's place asks (A1-3)", () => {
+    const start = nextMoons(undefined, rooms(["#a", 9], ["#b", 8], ["#c", 0]), { current: undefined, now: T0 });
+    const busy = rooms(["#a", 9], ["#b", 8], ["#c", 3]);
+    expect(nextMoons(start, busy, { current: undefined, now: T0 + MOON_SET_MS }).rooms).toContain("#c");
+  });
+
   it("lets a moon nobody is in leave at the next change (A1-3)", () => {
     const start = nextMoons(undefined, rooms(["#a", 9], ["#b", 8]), { current: undefined, now: T0 });
     const quiet = rooms(["#a", 9], ["#b", 0]);
