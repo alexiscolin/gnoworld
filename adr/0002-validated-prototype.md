@@ -1421,11 +1421,11 @@ This section overrides the text above where they differ. The reasons and the num
 - **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
 - **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
 - **The renderer** is `WebGLRenderer` for the demo, not ADR-0001's `WebGPURenderer`: the gate's software renderer then tests what people see, it weighs 88 KB less, and post-processing is ready. Moving later means rewriting the shaders in TSL.
-- **A universe's shape.** Systems sit in a thick disc, with clusters above and below it, their height from a smooth field of position. The placement of §3 holds: ring by ring, and placing one system depends on no other. Universes stay never shown together; far galaxies and doors between chains wait.
+- **A universe's shape.** Systems sit in a thick disc, with clusters above and below it, their height from a smooth field of position. Systems take cells in rings by their rank in the set, so nothing piles up; an arrival moves others slowly, by §3's seasonal drift (Alexis, 2026-11-02, F3520). Universes stay never shown together; far galaxies and doors between chains wait.
 - **The mood of space.** Colours, nebulae and density are a smooth field computed from a position: no list, no count, no border, nothing stored, and it means nothing on chain. The same place gives the same picture, and a star takes the mood of where it sits.
 - **A system is a postcard.** Its star, nebula, rings and debris come from its address, with a good arrival angle. Debris is only a far belt, for dust is a sign; rings are wide, for the status is a thin tilted line with its moon; real shadows fall on the one world seen close alone.
 - **Coherence.** Fixed everywhere: deep black, one light a system, one image grade, the video's palette, the same labels. The video's frames are the reference for the look: a side light, a large dark night side, a bright rim and a soft halo; never flat frontal light, never pushed saturation (Alexis, 2026-11-02, on a real GPU). Free: star, nebula, planets, angle.
-- **Space views** like a telescope's nebula show from a cluster's distance down to a system's; near a world, space is near-black. Computed or from warped real images: slice 7's realism test decides, and an image's licence is read first.
+- **Space views** like a telescope's nebula show from a cluster's distance down to a system's; near a world, space is near-black. 3 or 4 warped real images for the big views, a computed field for the deep background, a smooth parallax on several levels; an image's licence is read first, and its credit shows.
 
 ## Consequences
 
