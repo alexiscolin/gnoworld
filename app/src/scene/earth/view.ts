@@ -10,6 +10,7 @@ import { buildGlobe, type Globe } from "./globe.ts";
 import { EARTH } from "./look.ts";
 import { eased, EyeTurn, GroundMarks, poseOf } from "./marks.ts";
 import type { Ground, GroundMark, LatLon, Pose, Screen } from "./marks.ts";
+import { standIn } from "./lens.ts";
 import { MOON_REST } from "./orbit.ts";
 import { earthStats, type EarthStats } from "./stats.ts";
 
@@ -128,19 +129,13 @@ export class EarthView implements Ground {
     this.#place();
   }
 
-  #focal(): number {
-    return this.#screen.height / 2 / Math.tan((this.#device.camera.fov * Math.PI) / 360);
-  }
-
-  // A lens shift and not a moved sphere: off the axis, a sphere's picture is no circle, and stands away from the one the page keeps.
   #place(): void {
     const globe = this.#globe;
     const circle = this.#circle;
     if (globe === undefined || circle === undefined) return;
     const { camera, moved } = this.#device;
-    const { width, height } = this.#screen;
-    camera.setViewOffset(width, height, width / 2 - circle.x, height / 2 - circle.y, width, height);
-    this.#rest.set(0, 0, -Math.hypot(this.#focal() / circle.radius, 1));
+    const { height } = this.#screen;
+    this.#rest.set(0, 0, -standIn(camera, this.#screen, circle));
     globe.ground.show(circle.plate);
     globe.ground.resize(height, this.#ratio);
     this.#pose(this.#age, this.#motion.matches ? ARRIVAL : this.#arrived);

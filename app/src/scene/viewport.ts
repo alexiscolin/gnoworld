@@ -13,7 +13,8 @@ export interface ViewportParts {
   readonly camera: PerspectiveCamera;
   readonly space: Sized & { detail(tier: Tier): void };
   readonly earth: Sized;
-  readonly cosmos: { resize(height: number, ratio: number): void };
+  /** The parts behind chunks of their own. */
+  readonly parts: Sized;
   readonly touch: boolean;
   readonly tier: () => Tier;
   /** The size is stale: a frame is owed. */
@@ -36,7 +37,7 @@ export class Viewport {
   }
 
   apply(): void {
-    const { canvas, renderer, camera, space, earth, cosmos, touch, tier } = this.#parts;
+    const { canvas, renderer, camera, space, earth, parts, touch, tier } = this.#parts;
     this.#stale = false;
     const ratio = pixelRatioFor(devicePixelRatio, touch, tier());
     renderer.setPixelRatio(ratio);
@@ -50,7 +51,7 @@ export class Viewport {
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     earth.resize(width, height, renderer.getPixelRatio());
-    cosmos.resize(height, renderer.getPixelRatio());
+    parts.resize(width, height, renderer.getPixelRatio());
   }
 
   readonly changed = (): void => {

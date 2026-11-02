@@ -3,7 +3,6 @@
 import { type ClearBox, type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import type { CosmosWorld } from "./cosmos/cosmos.ts";
-import { CosmosDoor } from "./cosmos/door.ts";
 import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
@@ -14,14 +13,13 @@ import { rendered, type Scene, type SceneOptions, type SceneStats } from "./scen
 import { createRenderer } from "./renderer.ts";
 import { Space } from "./space.ts";
 import { Viewport } from "./viewport.ts";
+import { Parts } from "./parts.ts";
 import { MOTION, watchAim, watchCanvas, watchPage, watchScreen } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
-const FIELD_OF_VIEW = 50;
-const NEAR = 0.1;
-const FAR = 2000;
+const LENS = { fieldOfView: 50, near: 0.1, far: 2000 } as const;
 // The sky beside the worlds: the warmth comes from the suns, with black between them (frame 4).
 const VEILED = 0.3;
 
@@ -33,14 +31,14 @@ class LiveScene implements Scene {
   readonly #touch = matchMedia(TOUCH).matches;
   readonly #renderer: WebGLRenderer;
   readonly #stage = new Stage();
-  readonly #camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR, FAR);
+  readonly #camera = new PerspectiveCamera(LENS.fieldOfView, 1, LENS.near, LENS.far);
   readonly #motion = matchMedia(MOTION);
   readonly #eye = new Eye();
   readonly #space: Space;
   readonly #loop: FrameLoop;
   readonly #viewport: Viewport;
   readonly #earth: EarthView;
-  readonly #cosmos: CosmosDoor;
+  readonly #parts: Parts;
   readonly ground: Ground;
   readonly #probe: Probe;
   #tier: Tier;
@@ -78,7 +76,7 @@ class LiveScene implements Scene {
       },
     };
     this.#earth = this.#owner.add(new EarthView(device));
-    this.#cosmos = new CosmosDoor(device, this.#owner, () => {
+    this.#parts = new Parts(device, this.#owner, () => {
       this.#viewport.changed();
     });
     this.ground = this.#earth;
@@ -88,7 +86,7 @@ class LiveScene implements Scene {
       camera: this.#camera,
       space: this.#space,
       earth: this.#earth,
-      cosmos: this.#cosmos,
+      parts: this.#parts,
       touch: this.#touch,
       tier: () => this.#tier,
       owed: this.#redraw,
@@ -120,7 +118,7 @@ class LiveScene implements Scene {
           this.#stopOrGo();
           if (!now) {
             this.#earth.restored();
-            this.#cosmos.restored();
+            this.#parts.restored();
           }
         },
       },
@@ -141,7 +139,7 @@ class LiveScene implements Scene {
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
     this.#earth.tick(this.#seconds);
-    this.#cosmos.tick(this.#eye.worlds, this.#eye.seconds);
+    this.#parts.tick(this.#eye.worlds, this.#eye.seconds);
     this.#renderer.info.reset();
     this.#space.march(this.#renderer, this.#camera);
     this.#renderer.render(this.#stage, this.#camera);
@@ -186,13 +184,13 @@ class LiveScene implements Scene {
   }
 
   cosmos(worlds: readonly CosmosWorld[] | undefined): void {
-    this.#cosmos.show(worlds);
+    this.#parts.cosmos.show(worlds);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
     this.#loop.redraw();
   }
 
   keepClear(box: ClearBox | undefined): void {
-    this.#cosmos.keepClear(box);
+    this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
   }
 
@@ -209,7 +207,7 @@ class LiveScene implements Scene {
       ...rendered(this.#renderer.info),
       eye: { ...this.#eye.at },
       earth: this.#earth.stats(),
-      cosmos: this.#cosmos.stats(),
+      ...this.#parts.stats(),
     };
   }
 }

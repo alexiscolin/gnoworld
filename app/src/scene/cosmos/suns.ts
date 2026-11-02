@@ -26,7 +26,8 @@ interface SunLook {
 const CORNERS = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]);
 const QUAD = [0, 1, 2, 0, 2, 3];
 
-const VERTEX = /* glsl */ `
+const VERTEX =
+  /* glsl */ `
 attribute vec3 aAt;
 attribute vec4 aSun;
 uniform float uFocal;
@@ -42,8 +43,9 @@ void main() {
   vLight = vec3(mix(star, region, glow) * aSun.w, aSun.y, aSun.w * aSun.w * aSun.w);
   at.xy += position.xy * max(aSun.x, 3.0 * away / uFocal);
   gl_Position = projectionMatrix * at;
+` +
   // Behind every body, as the frames have it: a world by a sun is dark against its light, never washed by it.
-  gl_Position.z = gl_Position.w * 0.99998;
+  `  gl_Position.z = gl_Position.w * 0.99998;
 }`;
 
 // Amber far out, cream nearer, white at the heart: the frame's three steps, each a falloff, so a sun has no edge. Its reach ends in nothing.
