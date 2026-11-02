@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { ANCHORS, worldLook, type Nature, type PlanetLook } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { groupWorlds, keptPaths } from "./group.ts";
@@ -128,5 +129,118 @@ describe("groupWorlds, hostile paths", () => {
         expect(Array.isArray(groupWorlds(paths))).toBe(true);
       }),
     );
+  });
+});
+
+// Variety is measured, not counted (ADR-0002 §3): each world has a feature vector, and a golden bounds the share of near-identical
+// neighbours in any view, on the recorded list and on a synthetic universe ten times larger.
+// A view of the cosmos holds about eight labelled worlds; every window of eight in id order keeps a system's worlds together.
+const VIEW = 8;
+const SAME_COLOUR = 6;
+const SAME_SURFACE = 0.04;
+// Measured on the code that lands, pinned so a change of rows or bytes shows: the found count exact, the shares as bounds a little over it.
+const GOLDEN = { found: 62, share: 0.025, worst: 0.22, nudged: { token: 0.022, dao: 0.075, game: 0.025 } };
+
+type Rgb = readonly [number, number, number];
+
+function labOf([red, green, blue]: Rgb): Rgb {
+  const linear = (channel: number) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  const [r, g, b] = [linear(red), linear(green), linear(blue)];
+  const curve = (value: number) => (value > 0.008856 ? Math.cbrt(value) : 7.787 * value + 16 / 116);
+  const x = curve((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+  const y = curve(0.2126 * r + 0.7152 * g + 0.0722 * b);
+  const z = curve((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+const distance = (one: Rgb, other: Rgb) => Math.hypot(one[0] - other[0], one[1] - other[1], one[2] - other[2]);
+
+// Two worlds alike at a glance: one class, one map, rings alike, the palette's centre under a just-seen step, the surface's numbers close.
+function nearIdentical(one: PlanetLook, other: PlanetLook): boolean {
+  return (
+    one.anchor === other.anchor &&
+    one.map === other.map &&
+    (one.rings === null) === (other.rings === null) &&
+    distance(labOf(one.ramp[1]), labOf(other.ramp[1])) < SAME_COLOUR &&
+    Math.abs(one.warp.amount - other.warp.amount) < SAME_SURFACE &&
+    Math.abs(one.secondShare - other.secondShare) < SAME_SURFACE * 4
+  );
+}
+
+type NatureOf = (id: string) => Nature | null;
+
+function closeness(ids: readonly string[], natureOf: NatureOf = () => null) {
+  const looks = ids.map((id) => worldLook(id, natureOf(id)));
+  const close = (at: number, other: number) => {
+    const [one, two] = [looks[at], looks[other]];
+    return one !== undefined && two !== undefined && nearIdentical(one, two) ? 1 : 0;
+  };
+  let pairs = 0;
+  let found = 0;
+  let worst = 0;
+  for (let start = 0; start + VIEW <= looks.length; start += 1) {
+    let inView = 0;
+    for (let one = start; one < start + VIEW; one += 1)
+      for (let two = one + 1; two < start + VIEW; two += 1) inView += close(one, two);
+    worst = Math.max(worst, inView);
+  }
+  for (let one = 0; one < looks.length; one += 1)
+    for (let two = one + 1; two < Math.min(one + VIEW, looks.length); two += 1) {
+      pairs += 1;
+      found += close(one, two);
+    }
+  return { share: found / pairs, worst: worst / ((VIEW * (VIEW - 1)) / 2), found };
+}
+
+const recordedIds = () => groupWorlds(ONYX).map((world) => world.id);
+const tenTimes = (ids: readonly string[]) =>
+  ids.flatMap((id) => Array.from({ length: 10 }, (_, n) => `${id}${String(n)}`));
+
+describe("neighbours (ADR-0002 §3)", () => {
+  it("draws every class from the recorded list, none past a fifth of it", () => {
+    const anchors = recordedIds().map((id) => worldLook(id).anchor);
+    expect(new Set(anchors)).toEqual(new Set(ANCHORS));
+    for (const anchor of ANCHORS)
+      expect(anchors.filter((one) => one === anchor).length / anchors.length, anchor).toBeLessThan(0.2);
+  });
+
+  it("keeps near-identical worlds a few in any view of the recorded list", () => {
+    const { share, worst, found } = closeness(recordedIds());
+    expect(found).toBe(GOLDEN.found);
+    expect(share).toBeLessThan(GOLDEN.share);
+    expect(worst).toBeLessThan(GOLDEN.worst);
+  });
+
+  it("keeps them a few in a universe ten times larger", () => {
+    const { share, worst } = closeness(tenTimes(recordedIds()));
+    expect(share).toBeLessThan(GOLDEN.share);
+    expect(worst).toBeLessThan(GOLDEN.worst);
+  });
+
+  // A system's worlds sit together and often share a nature, so the nudge gathers the very neighbours this measures: each nature for all, then one per namespace.
+  it.each(["token", "dao", "game"] as const)("holds when every world is a %s, the nudge at its worst", (nature) => {
+    const { share } = closeness(recordedIds(), () => nature);
+    expect(share).toBeLessThan(GOLDEN.nudged[nature]);
+  });
+
+  it("holds with a nature per namespace, in a universe ten times larger", () => {
+    const natures = [null, "token", "dao", "game"] as const;
+    const byNamespace: NatureOf = (id) => natures[(id.split("/")[0]?.length ?? 0) % natures.length] ?? null;
+    expect(closeness(tenTimes(recordedIds()), byNamespace).share).toBeLessThan(GOLDEN.share);
+  });
+
+  it("finds a world near-identical to itself, or the bound above would hold for nothing", () => {
+    const [id = ""] = recordedIds();
+    expect(nearIdentical(worldLook(id), worldLook(id))).toBe(true);
+    const world = worldLook(id);
+    const twin = { ...world, warp: { ...world.warp, amount: world.warp.amount + 1 } };
+    expect(nearIdentical(world, twin)).toBe(false);
+  });
+
+  it("gives names one digit apart no more alike a class than chance", () => {
+    const row = Array.from({ length: 400 }, (_, n) => `samcrew/game${String(n)}`);
+    const anchors = row.map((id) => worldLook(id).anchor);
+    const same = anchors.filter((anchor, at) => anchor === anchors[at + 1]).length;
+    expect(same / anchors.length).toBeLessThan(0.16);
   });
 });

@@ -25,15 +25,21 @@ export {
   type SystemRef,
 } from "./cosmos/cosmos.ts";
 export {
+  anchorOf,
   ANCHORS,
+  asciiBytes,
   between,
   MAPS,
+  natureOf,
   planetLook,
   planetSeed,
   seedShare,
+  worldLook,
   type Anchor,
   type MapName,
+  type Nature,
   type PlanetLook,
+  type RealmFunctions,
 } from "./planet/look.ts";
 export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
