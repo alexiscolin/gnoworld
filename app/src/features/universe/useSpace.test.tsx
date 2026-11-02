@@ -177,6 +177,15 @@ describe("the end of the first screen", () => {
     expect(done).toBe(true);
   });
 
+  it("goes on when the door's chunk cannot be fetched: the page does not wait for what failed", async () => {
+    readyState("complete");
+    vi.doMock("./mountUniverse.tsx", () => {
+      throw new Error("the door's chunk did not come");
+    });
+    await visit(await pageThatWaits());
+    expect(done).toBe(true);
+  });
+
   it("is done at once on a move inside the site, the door already there", async () => {
     readyState("complete");
     const Earth = await pageThatWaits();
