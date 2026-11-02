@@ -30,8 +30,11 @@ export interface LabelSignals {
 }
 
 /** How much a world is used: its realms, and their callers. */
-export const usageOf = ({ realms }: CosmosWorld): number =>
-  realms.reduce((sum, { callers }) => sum + (callers ?? 0), realms.length);
+export const usageOf = (world: CosmosWorld): number => callersOf(world) + world.realms.length;
+
+/** The callers the file counts in a world's realms; a realm whose callers it does not count adds none. */
+export const callersOf = ({ realms }: CosmosWorld): number =>
+  realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0);
 
 /** The worlds as the cosmos places them: a star a namespace, each world round it by its id and its use. */
 export const systemsFrom = (worlds: readonly CosmosWorld[]) =>

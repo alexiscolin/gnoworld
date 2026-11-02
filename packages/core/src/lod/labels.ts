@@ -88,7 +88,8 @@ function badgeOf({ rise, perHour = 0 }: Signals): string {
   return parts.filter((part) => part !== "").join(" · ");
 }
 
-const known = ({ here = 0, rise, use = 0, uncharted = false }: Signals) =>
+/** Whether real data names a world: people here, a rise, a use, or a new world unvisited. A far world with none asks for no label. */
+export const known = ({ here = 0, rise, use = 0, uncharted = false }: Signals): boolean =>
   here > 0 || rise !== undefined || use > 0 || uncharted;
 
 // Rise first, then people here, then use; a tie by id, so the order the asks come in moves nothing. Weighed once an ask.

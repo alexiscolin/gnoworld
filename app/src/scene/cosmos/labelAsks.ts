@@ -4,13 +4,14 @@
 import {
   daysSince,
   isFresh,
+  known,
   type Drawn,
   type LabelAsk,
   type Point,
   type Signals,
   type StarSystem,
 } from "@gnoworld/core";
-import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
+import { callersOf, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
 
 const NOTHING: LabelSignals = { present: new Map(), names: new Map(), visited: () => false, now: Number.NaN };
 
@@ -30,27 +31,24 @@ const heardOf = (here: Heard | undefined): Signals =>
     : { here: here.here, perHour: here.perHour, ...(here.rise === null ? {} : { rise: here.rise }) };
 
 function signalsOf(world: CosmosWorld | undefined, id: string, { present, visited, now }: LabelSignals): Signals {
-  const use = world?.realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) ?? 0;
+  const use = world === undefined ? 0 : callersOf(world);
   // This reader's visits are read only of a world under seven days old: an older one is never uncharted.
   const uncharted = isFresh(daysSince(world?.seen, now), false) && !visited(id);
   return { ...heardOf(present.get(id)), ...(use > 0 ? { use } : {}), ...(uncharted ? { uncharted: true } : {}) };
 }
 
-const named = ({ here = 0, rise, use = 0, uncharted = false }: Signals) =>
-  here > 0 || rise !== undefined || use > 0 || uncharted;
-
 type Known = Map<string, [CosmosWorld, Signals][]>;
 // The worlds data names, by namespace.
 function knownIn(list: readonly CosmosWorld[], signals: LabelSignals): Known {
-  const known: Known = new Map();
+  const named: Known = new Map();
   for (const world of list) {
     const said = signalsOf(world, world.id, signals);
-    const group = known.get(world.namespace);
-    if (!named(said)) continue;
-    if (group === undefined) known.set(world.namespace, [[world, said]]);
+    const group = named.get(world.namespace);
+    if (!known(said)) continue;
+    if (group === undefined) named.set(world.namespace, [[world, said]]);
     else group.push([world, said]);
   }
-  return known;
+  return named;
 }
 
 // Kept once a file: its worlds by id, and for each signals the worlds data names; a look then reads only those round the stars it draws.
