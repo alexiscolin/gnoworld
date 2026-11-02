@@ -56,7 +56,8 @@ test.describe("a world's page at the video's size", () => {
     await hydrated(page);
     const title = await box(page, "[data-look='plate'] h1");
     const line = await box(page, "[data-look='plate'] h1 + p");
-    const activity = await box(page, "[data-look='plate'] h1 + p + p");
+    // The activity's words by what they say: since b3aedf52 who is here keeps a place between the line and them.
+    const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
     const main = await box(page, "[data-look='plate'] a[href='#chat']");
     near(title.y, 172, "the title's top");
     near(line.y + 12.4, 316, "the line's first line's middle");
