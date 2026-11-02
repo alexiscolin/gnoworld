@@ -31,7 +31,8 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-const SCENE_JS = 150 * 1024;
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk.
+const SCENE_JS = 156 * 1024;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 const COSMOS_JS = 16 * 1024;
