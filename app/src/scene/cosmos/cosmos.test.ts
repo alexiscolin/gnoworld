@@ -2036,6 +2036,31 @@ describe("a system's arrival (7d3)", () => {
     expect(earth?.x).toBeCloseTo(WIDTH / 2, 1);
   });
 
+  it("keeps the arrival's star the main light when the eye leans away from it, past the view's reach", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = named(systems, GNOSWAP);
+    const { to } = await arrived(scene, GNOSWAP);
+    scene.cosmos.tick({ x: to.x + 12, y: to.y + 6, z: to.z }, 0);
+    await settled();
+    const { halo, indexOf } = sunsOf(scene);
+    expect(halo?.getX(indexOf(system.place))).toBe(1);
+  });
+
+  it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const { to } = await arrived(scene, GNOSWAP);
+    const look = onStage(arrival.look);
+    for (const seconds of [2.25, 4.5]) {
+      scene.cosmos.tick(to, seconds);
+      const eye = new Vector3().copy(scene.cosmos.stats().eye);
+      const offset = eye.clone().sub(onStage(arrival.eye));
+      expect(offset.length()).toBeGreaterThan(0.01);
+      expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
+    }
+  });
+
   it.each(["", "no/such", "__proto__", "constructor", "x".repeat(10_000)])(
     "goes back to the view at rest for a system the file does not hold: %#",
     async (id) => {
