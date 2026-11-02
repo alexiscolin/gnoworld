@@ -26,6 +26,7 @@ const WAITING: ReturnType<Searched["drawnFrom"]> = {
   planeOf: () => undefined,
   main: 0,
   hidden: new Set(),
+  near: false,
 };
 
 function plainRest(): RestView {

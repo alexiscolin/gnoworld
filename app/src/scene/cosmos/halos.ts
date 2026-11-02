@@ -8,6 +8,8 @@ const HALOS = 7;
 const POINT_PIXELS = 10;
 const HALO_PIXELS = 320;
 const OTHER_SUN = 0.5;
+// At a system's arrival its own star is the one light: the others a quarter of its size at most (7d3's design review).
+const ARRIVAL_SUN = 0.25;
 // A star's reach, from its size.
 const REACH = 7.5;
 const LEAST_REACH = 2;
@@ -71,7 +73,8 @@ export class Halos {
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-    const most = index === this.#main ? Infinity : OTHER_SUN * this.#mainSize * distance;
+    const most =
+      index === this.#main ? Infinity : (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize * distance;
     const full = Math.min(reachOf(system), (HALO_PIXELS * distance) / this.#focal, most);
     const point = Math.min(full, (POINT_PIXELS * distance) / this.#focal);
     return { reach: point + (full - point) * halo, halo };

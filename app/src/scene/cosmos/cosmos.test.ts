@@ -9,6 +9,7 @@ import {
   EARTH_PLACE,
   glideAt,
   GRAIN,
+  haloAt,
   orbitPlace,
   orbitTime,
   HOME,
@@ -2038,6 +2039,21 @@ describe("a system's arrival (7d3)", () => {
     expect(earth?.x).toBeCloseTo(WIDTH / 2, 1);
   });
 
+  // 7d3's review: the arrival's own star the one light; the great star keeps the halo its distance leaves it, the others a quarter.
+  it("leaves the great star at an arrival no more halo than its distance leaves it, and every other sun a quarter of the arrival star's size", async () => {
+    const { scene, systems, system, arrival } = await atGnoswap();
+    const { sun, halo, indexOf } = sunsOf(scene);
+    const great = indexOf({ x: 0, y: 0, z: 0 });
+    expect(great).toBeGreaterThanOrEqual(0);
+    // Not forced whole: at most what its distance leaves it, and nothing if six nearer suns took the halos.
+    expect(halo?.getX(great)).toBeLessThanOrEqual(haloAt(distanceOf({ x: 0, y: 0, z: 0 }, arrival.eye)) + 1e-9);
+    expect(halo?.getX(great)).toBeLessThan(1);
+    const size = (place: Point) => (sun?.getX(indexOf(place)) ?? NaN) / distanceOf(place, arrival.eye);
+    const own = size(system.place);
+    for (const other of systems)
+      if (other !== system && indexOf(other.place) >= 0) expect(size(other.place)).toBeLessThanOrEqual(own / 4 + 1e-9);
+  });
+
   it("keeps the arrival's star the main light when the eye leans away from it, past the view's reach", async () => {
     const scene = made();
     await shown(scene, ONYX);
@@ -2060,6 +2076,16 @@ describe("a system's arrival (7d3)", () => {
       const offset = eye.clone().sub(onStage(arrival.eye));
       expect(offset.length()).toBeGreaterThan(0.01);
       expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
+    }
+  });
+
+  it("lights an arrival's bodies as up close: each world its own angle from the eye", async () => {
+    const { scene } = await atGnoswap();
+    const { list } = scene.cosmos.stats();
+    expect(list.length).toBeGreaterThan(0);
+    for (const { id, at, sun } of list) {
+      const toEye = at.clone().negate().normalize();
+      expect(sun.angleTo(toEye)).toBeCloseTo(fromEyeOf(planetSeed(asciiBytes(`gno.land/r/${id}`))), 6);
     }
   });
 

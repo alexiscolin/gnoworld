@@ -91,8 +91,8 @@ function everywhere(systems: readonly StarSystem[], drawn: Drawn): Wanted {
 }
 
 /** What is drawn from `sight`: `shown`'s bodies, close world, points, halos and planes where the eye rests at it (`resting`, on the map, the
- * eye less the arrival's glide and the sway), the ladder's `drawn` anywhere else; the main light's system, and the specks left out for
- * they would stand on a body (7d3). */
+ * eye less the arrival's glide and the sway), the ladder's `drawn` anywhere else; the main light's system, the specks left out for they
+ * would stand on a body, and whether the bodies are lit as up close, as at a system's arrival (7d3). */
 export function drawnFrom(
   systems: readonly StarSystem[],
   { shown, drawn }: { shown: Shown; drawn: Drawn },
@@ -100,23 +100,27 @@ export function drawnFrom(
 ) {
   const { view, postcards, index: main } = shown;
   const [{ eye }, { resting }] = [view, sight];
+  // At an arrival its own star alone is needed: any other keeps the halo its distance leaves it.
+  const lead = (system: number) => system === main;
   if (Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH)
     return {
       bodies: everywhere(systems, drawn),
       close: undefined,
       pointShare: WHOLE,
-      needsHalo: (system: number) => system === 0 || system === main,
+      needsHalo: lead,
       planeOf: NO_PLANE,
       main,
       hidden: NONE_HIDDEN,
+      near: false,
     };
   return {
     bodies: restBodies(systems, { view, postcards }, sight),
     close: closeId(systems, view),
     pointShare: pointShares(view),
-    needsHalo: haloNeeds(view),
+    needsHalo: main === 0 ? haloNeeds(view) : lead,
     planeOf: (system: number) => postcards.get(system)?.system,
     main,
     hidden: new Set([...postcards.values()].flatMap(({ hidden }) => [...hidden])),
+    near: main !== 0,
   };
 }

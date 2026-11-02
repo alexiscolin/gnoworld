@@ -38,6 +38,8 @@ interface Body {
   ready: boolean;
   /** It holds its place at rest: the close world, whose turn would sweep it across the view. */
   still: boolean;
+  /** It is lit as up close, its own angle and its whole rim, wherever it stands: a system's arrival's (7d3). */
+  near: boolean;
 }
 
 interface BodyView {
@@ -100,7 +102,7 @@ export class Bodies {
   }
 
   /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; `still` holds its place. */
-  stand(wanted: Wanted, still?: string): void {
+  stand(wanted: Wanted, still?: string, near = false): void {
     for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
@@ -111,7 +113,7 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
-    for (const body of this.#held.values()) body.still = body.id === still;
+    for (const body of this.#held.values()) Object.assign(body, { still: body.id === still, near });
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
     if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
@@ -127,7 +129,7 @@ export class Bodies {
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
-    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, still: false };
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, still: false, near: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -156,9 +158,9 @@ export class Bodies {
     planet.group.position.copy(this.#offEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
-    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
+    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, body.near ? 0 : away)));
     planet.setTime(seconds);
-    if (planet.look.rim !== null) planet.setLimb(limbAt(away));
+    if (planet.look.rim !== null) planet.setLimb(limbAt(body.near ? 0 : away));
     planet.setFar(fadeAt(at.length()));
     const room = this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);

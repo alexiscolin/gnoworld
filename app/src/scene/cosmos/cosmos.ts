@@ -172,8 +172,8 @@ export class Cosmos {
     this.#whole.look(this.#mapEye, this.#focal);
     toMap(this.#resting, this.#restingMap);
     const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
-    const { bodies, close, hidden, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
-    this.#bodies.stand(bodies, close);
+    const { bodies, close, hidden, near, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
+    this.#bodies.stand(bodies, close, near);
     this.#disc.paint({
       ...sight,
       ...worlds,
