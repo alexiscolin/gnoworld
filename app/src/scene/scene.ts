@@ -172,10 +172,10 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  moveTo(to: Point): void {
+  readonly moveTo = (to: Point): void => {
     this.#eye.moveTo(to);
     this.#loop.redraw();
-  }
+  };
 
   earth(place: Circle | undefined, said: (state: EarthState) => void): void {
     this.#earth.show(place, said);
@@ -199,6 +199,12 @@ class LiveScene implements Scene {
   keepClear(box: ClearBox | undefined): void {
     this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
+  }
+
+  /** Comes to system `id`, as 7g's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+   * the system's arrival stands (7d3). */
+  arrive(id: string | undefined): void {
+    this.#parts.cosmos.arrive(id, this.moveTo);
   }
 
   dispose(): void {

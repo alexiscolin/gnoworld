@@ -43,6 +43,8 @@ export interface Sight {
   readonly planeOf: (system: number) => StarSystem | undefined;
   /** Whether the view needs a system's halo, by its index, whatever its distance: the great star's and the postcards' stars'. */
   readonly needsHalo: (system: number) => boolean;
+  /** The main light's system, by its index: the great star's (0) unless said, or a system's own at its arrival. */
+  readonly main?: number;
   /** Whether a round thing at a place on the map, of a radius in world units, shows on the screen. */
   readonly inView: (place: Point, radius: number) => boolean;
   /** How much of what stands at a place on the map, of a radius in pixels, the page's text leaves on screen. */

@@ -13,8 +13,11 @@ export class CosmosPart {
   #worlds: readonly CosmosWorld[] | undefined;
   #written: string | undefined;
   #box: ClearBox | undefined;
+  #arrival: Parameters<Cosmos["arrive"]> | undefined;
+  readonly #gone: AbortSignal;
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+    this.#gone = owner.signal;
     this.door = new Door(
       () =>
         import("./cosmos/cosmos.ts").then(
@@ -27,6 +30,7 @@ export class CosmosPart {
         came: (cosmos) => {
           cosmos.keepClear(this.#box);
           this.#tell(cosmos);
+          if (this.#arrival !== undefined) cosmos.arrive(...this.#arrival);
           came();
         },
       },
@@ -49,6 +53,13 @@ export class CosmosPart {
   keepClear(box: ClearBox | undefined): void {
     this.#box = box;
     this.door.part?.keepClear(box);
+  }
+
+  /** A system's arrival asked (7d3): told the cosmos now, or once it comes; nothing once the scene has gone. */
+  arrive(id: string | undefined, go: (eye: Point) => void): void {
+    if (this.#gone.aborted) return;
+    this.#arrival = [id, go];
+    this.door.part?.arrive(id, go);
   }
 }
 

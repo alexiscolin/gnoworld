@@ -4,7 +4,6 @@
 import {
   distanceOf,
   Drawn,
-  EARTH_PLACE,
   Ladder,
   systemsOf,
   toMap,
@@ -110,6 +109,11 @@ export class Cosmos {
     this.#device.moved();
   }
 
+  /** Comes to system `id` (7d3), or back to the view at rest: `go` is told the scene's eye that stands the eye at its arrival. */
+  arrive(id: string | undefined, go: (eye: Point) => void): void {
+    this.#atRest.arrive(id, go);
+  }
+
   /** The canvas's height in its CSS pixels, and the pixels to one of them. */
   resize(height: number, ratio: number): void {
     this.#height = height;
@@ -141,8 +145,8 @@ export class Cosmos {
     this.#disc.advance(this.#eye, seconds);
     this.#bodies.tick(this.#eye, seconds);
     this.#home.tick(this.#eye, seconds, this.#device.camera.quaternion);
-    // What the eye looks at is the Earth: its distance says how much of the nebulae shows, and how much of the view is the whole cosmos's.
-    const looking = distanceOf(this.#atRest.earth, this.#eye);
+    // What the eye looks at, the Earth or a system it came to: its distance says how much of the nebulae and of the whole cosmos shows.
+    const looking = distanceOf(this.#atRest.looked, this.#eye);
     this.#nebulae.follow(eye, seconds, looking);
     // Past a cluster's distance the worlds' points take the view at one distance: the disc gives up faster than they come, and the
     // bodies, which cannot fade, go as they start.
@@ -163,7 +167,7 @@ export class Cosmos {
     Object.assign(this.#looked, this.#eye);
     this.#looks += 1;
     toMap(this.#eye, this.#mapEye);
-    ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: EARTH_PLACE }, this.#drawn);
+    ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: this.#atRest.focus }, this.#drawn);
     this.#whole.look(this.#mapEye, this.#focal);
     toMap(this.#resting, this.#restingMap);
     const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
@@ -198,6 +202,7 @@ export class Cosmos {
   }
 
   dispose(): void {
+    this.#atRest.stop();
     this.#setShown(false);
     clearTimeout(this.#timer);
     clearTimeout(this.#release);
