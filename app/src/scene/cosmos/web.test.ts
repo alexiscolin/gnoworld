@@ -235,6 +235,29 @@ describe("the whole cosmos", () => {
     }
   });
 
+  // The review of 7d7: the gold is mixed channel by channel, each by the same share of the post's gold (1, 0.62, 0.18 in linear light);
+  // a channel left out kept the test above green, for it skips a channel that does not move.
+  it("mixes a live world's colour towards the post's gold by one share on every channel", () => {
+    const tintsAt = (last: ((at: number) => number | null) | undefined) => {
+      const { web, owner } = stood({ count: 30, ...(last === undefined ? {} : { last }) });
+      lookFrom(web, 900, { now: NOW + (RUN_BLOCKS / 2) * BLOCK_MS });
+      const found = rows(geometryOf(web, "Points"), ["position", "aCircle", "aTint"]);
+      owner.dispose();
+      return found;
+    };
+    const tintOf = (row: string | undefined) => (row?.split(" ")[2] ?? "").split(",").map(Number);
+    const quiet = tintsAt(undefined);
+    const live = tintsAt((at) => (at === 0 ? 50_000 : null));
+    const own = tintOf(quiet.find((row) => !live.includes(row)));
+    const mixed = tintOf(live.find((row) => !quiet.includes(row)));
+    const shares = [1, 0.62, 0.18].map(
+      (gold, channel) => ((mixed[channel] ?? NaN) - (own[channel] ?? NaN)) / (gold - (own[channel] ?? NaN)),
+    );
+    expect(shares[0]).toBeGreaterThan(0.05);
+    expect(shares[0]).toBeLessThan(0.95);
+    for (const share of shares) expect(share).toBeCloseTo(shares[0] ?? NaN, 4);
+  });
+
   it("holds its lines' bound whatever the file names: every world linked to every other", () => {
     const worlds: CosmosWorld[] = Array.from({ length: 300 }, (_, at) => ({
       id: `n${String(at % 30)}/w${String(at)}`,
