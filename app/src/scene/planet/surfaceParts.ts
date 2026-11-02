@@ -17,6 +17,7 @@ uniform vec3 seaDeep;
 uniform vec3 glowColour;
 uniform vec3 hazeColour;
 uniform float time;
+uniform float cloudTime;
 uniform float warpAmount;
 uniform float warpFrequency;
 uniform float secondShare;

@@ -1,5 +1,5 @@
 // The Earth, its one Moon and the golden ring, as one group: what the view stands on the stage. It owns all of it, the maps included.
-import { Group, SphereGeometry, Vector3, type Mesh, type Texture } from "three";
+import { Group, SphereGeometry, Vector3, type Euler, type Mesh, type Texture } from "three";
 import { Disposer } from "../disposer.ts";
 import { starAt } from "../planet/light.ts";
 import { freeMap } from "../planet/maps.ts";
@@ -9,7 +9,7 @@ import { Ground } from "./ground.ts";
 import { EARTH, GROUND_TO_MAP, MOON } from "./look.ts";
 import { loadEarthMaps, type EarthMaps } from "./maps.ts";
 import { createOrbit, type Orbit } from "./orbit.ts";
-import type { EarthDevice } from "./view.ts";
+import type { EarthDevice } from "./device.ts";
 
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
@@ -54,6 +54,16 @@ export class Globe {
     return { map: () => surface, clouds, ring: clouds, ...(night === undefined ? {} : { night }) };
   }
 
+  /** The Earth's lean, which every point of its ground takes. */
+  get lean(): Euler {
+    return this.#earth.group.rotation;
+  }
+
+  /** Leans the pole towards the eye by `lean` radians, for the next `setSun`. */
+  setLean(lean: number): void {
+    this.#earth.group.rotation.x = lean;
+  }
+
   /** The real sun's height over the equator, in radians, kept for every `setSun`. */
   aim(latitude: number): void {
     this.#latitude = latitude;
@@ -66,9 +76,9 @@ export class Globe {
     this.moon.setSun(this.#sun);
   }
 
-  /** Turns the ground by `turn` radians. */
-  setTurn(turn: number): void {
-    this.#earth.setTime(turn / SPIN);
+  /** Turns the ground by `turn` radians, the clouds drifting over it by `drift`: the eye's turn is no wind. */
+  setTurn(turn: number, drift: number): void {
+    this.#earth.setTime(turn / SPIN, drift / SPIN);
   }
 
   /** Puts the Moon at `angle` on its orbit, and the ring's wake behind it. */

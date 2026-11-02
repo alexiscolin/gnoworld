@@ -24,7 +24,8 @@ for (const width of WIDTHS) {
         // On a phone the chat sits above the plate: its height, which follows the room's lines, shifts the plate by a part of a
         // pixel and Playwright rounds the plate's box out, so the picture was 355 or 356 px high by the room's state. The chat
         // is taken out of the page (set by the DOM, a style tag is refused by the CSP), and the plate lies at a whole pixel.
-        if (world) await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
+        if (world || path.endsWith("/earth"))
+          await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
         await expect(
           world ? page.locator("[data-look='plate']") : page.getByRole("navigation", { name: "You are here" }),
         ).toBeVisible();

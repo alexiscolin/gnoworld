@@ -35,7 +35,7 @@ export {
   type MapName,
   type PlanetLook,
 } from "./planet/look.ts";
-export { groundDirection, subSolarPoint, type GroundPoint } from "./earth/sun.ts";
+export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
 export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";

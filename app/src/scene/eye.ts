@@ -45,8 +45,8 @@ export class Eye {
   }
 
   /** A mouse's place, -1 to 1 across the window. */
-  aim(x: number, y: number): void {
+  readonly aim = (x: number, y: number): void => {
     this.#aimX = x;
     this.#aimY = y;
-  }
+  };
 }

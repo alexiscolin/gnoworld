@@ -113,7 +113,8 @@ describe("countryTrends", () => {
   });
 
   it("counts a line once when two rooms hold its id", () => {
-    const one = hours("JP", [12, 10]);
-    expect(countryTrends([...one, ...one], NOW)).toEqual([{ country: "JP", percent: 20 }]);
+    const recent = hours("JP", [12, 0]);
+    const before = hours("JP", [0, 10]);
+    expect(countryTrends([...recent, ...recent, ...before], NOW)).toEqual([{ country: "JP", percent: 20 }]);
   });
 });

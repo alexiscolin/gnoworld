@@ -118,6 +118,22 @@ export const BubbleRules = z.strictObject({
   maxAgeSeconds: rule(30, 86_400),
 });
 
+const degrees = (limit: number) => z.number().check(z.gte(-limit), z.lte(limit));
+
+/** Where the Earth's side rooms stand (ADR-0002 §10): one point of the globe a room, by a reviewed row, so no room's name finds a place by
+ * chance. A room with none stays in the list; the main room is the globe itself. */
+export const EarthRooms = unique(
+  list(
+    z.strictObject({
+      room: z.string().check(z.regex(/^#earth\/[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength("#earth/".length + 32)),
+      lat: degrees(90),
+      lon: degrees(180),
+    }),
+  ),
+  "room",
+  (r: { room: string }) => r.room,
+);
+
 export const News = byId(
   z.strictObject({
     id: text(DATA_CAPS.key),

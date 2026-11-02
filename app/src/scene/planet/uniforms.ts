@@ -71,6 +71,7 @@ export function surfaceUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     spin: { value: spinOf(look.spin) },
     sun: { value: new Vector3(1, 0, 0) },
     time: { value: 0 },
+    cloudTime: { value: 0 },
     // The warp never stretches a map by more than a fifth, whatever its frequency: no streaks.
     warpAmount: { value: Math.min(warp.amount, MAX_STRETCH / warp.frequency) },
     warpFrequency: { value: warp.frequency },

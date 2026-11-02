@@ -1,10 +1,12 @@
 // The scene's host in the page: it decides what a device gets, loads the 3D when that comes, and says how it went. No React, so the
 // component only reads its status (docs/ARCHITECTURE.md, "Effects only synchronize").
 import { PHONE_QUERY, sceneOffer } from "@gnoworld/core";
+import type { StoreApi } from "zustand/vanilla";
 import { savesData } from "../../lib/saveData.ts";
 import { rememberedTier, rememberLow } from "../../lib/sceneTier.ts";
 import type { EarthState } from "../../scene/earth/view.ts";
 import type { Scene } from "../../scene/scene.ts";
+import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 
@@ -13,6 +15,13 @@ export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on
 
 /** Whether the page shows space, and the Earth in it. */
 export type Shown = boolean | "earth";
+
+/** What the Earth's signs need of the page: this root lies outside its store and its router. */
+export interface EarthPage {
+  readonly store: StoreApi<AppState>;
+  /** Goes to an address of the page, by its router. */
+  readonly open: (href: string) => void;
+}
 
 const nothing = () => undefined;
 
@@ -63,6 +72,9 @@ export class SceneHost {
   readonly status = () => this.#status;
 
   readonly earth = () => this.#earth;
+
+  /** The ground the signs stand on, once the scene runs. */
+  readonly ground = () => this.#scene?.ground;
 
   #tell(): void {
     this.#markPage();

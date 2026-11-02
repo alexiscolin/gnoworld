@@ -4,8 +4,8 @@ import { lazy, Suspense } from "react";
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
-import { pageOf, site, type World as WorldPlace } from "../places.ts";
-import { Chat, type ChatPlace } from "../features/chat/index.ts";
+import { chatPlace, pageOf, site } from "../places.ts";
+import { Chat } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Here } from "../features/world/index.ts";
 import styles from "./world.module.css";
@@ -26,18 +26,6 @@ export function clientLoader({ request }: { request: Request }) {
 
 export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
-}
-
-// What the chat's header, its column of worlds and its info panel say of the place.
-function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): ChatPlace {
-  return {
-    slug: world.slug,
-    name: world.name,
-    description: world.description,
-    kicker: `${universe.name} · ${world.name}`,
-    home: universe.home.path,
-    worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
-  };
 }
 
 export default function World() {
@@ -80,7 +68,7 @@ export default function World() {
       }
     >
       <div id="chat" className={styles["chat"]}>
-        <Chat world={world.slug} place={placeOf(world, universe)} />
+        <Chat world={world.slug} place={chatPlace(world, universe)} />
       </div>
     </Panel.Layout>
   );

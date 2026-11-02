@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { output } from "zod/mini";
 import {
   BubbleRules,
+  EarthRooms,
   Ecosystems,
   Events,
   Expedition,
@@ -27,6 +28,7 @@ const SCHEMAS = {
   expedition: Expedition,
   quests: Quests,
   bubbles: BubbleRules,
+  earthRooms: EarthRooms,
   news: News,
 };
 
@@ -35,7 +37,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The ten files of a directory, checked; throws every fault found in the first file that has one. */
+/** The eleven files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {

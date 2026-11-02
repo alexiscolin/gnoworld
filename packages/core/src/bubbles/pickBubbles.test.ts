@@ -109,9 +109,9 @@ describe("the caps", () => {
     expect(out.counts).toEqual([]);
   });
 
-  it("keeps a shown bubble the same while it shows, whatever the list now holds", () => {
+  it("keeps a shown bubble the same to its last millisecond, while its line is listed", () => {
     const first = pick([msg(1)]);
-    const out = pick([], ME, { shown: first.shown, now: NOW + SHOW - 1 });
+    const out = pick([msg(1)], ME, { shown: first.shown, now: NOW + SHOW - 1 });
     expect(first.bubbles).toHaveLength(1);
     expect(out.bubbles).toEqual(first.bubbles);
   });
@@ -185,7 +185,8 @@ describe("one bubble a speaker every delay", () => {
   });
 
   it("counts a speaker's accounts by name as Ergo folds it: Ann and ann are one", () => {
-    const out = pick([msg(2, { account: "ANN", country: "FR", at: NOW + 100 })], ME, {
+    const said = msg(1, { account: "ann", country: "JP" });
+    const out = pick([said, msg(2, { account: "ANN", country: "FR", at: NOW + 100 })], ME, {
       shown: first().shown,
       now: NOW + 1000,
     });
@@ -193,12 +194,15 @@ describe("one bubble a speaker every delay", () => {
     expect(ids(out.bubbles)).toEqual(["m1"]);
     expect(out.counts).toEqual([{ country: "FR", count: 1, far: false }]);
     expect(
-      ids(pick([msg(2, { account: "bob", country: "FR" })], ME, { shown: first().shown, now: NOW + 1000 }).bubbles),
+      ids(
+        pick([said, msg(2, { account: "bob", country: "FR" })], ME, { shown: first().shown, now: NOW + 1000 }).bubbles,
+      ),
     ).toEqual(["m1", "m2"]);
   });
 
   it("keys the delay by account: another account of the same text and country is another speaker", () => {
-    const out = pick([msg(2, { account: "bob", text: "hello 1", country: "FR" })], ME, {
+    const said = msg(1, { account: "ann", country: "JP" });
+    const out = pick([said, msg(2, { account: "bob", text: "hello 1", country: "FR" })], ME, {
       shown: first().shown,
       now: NOW + 1000,
     });
@@ -308,7 +312,7 @@ describe("your own message", () => {
       now: NOW + 100,
     });
     expect(ids(out.bubbles)).toEqual(["mine"]);
-    expect(pick([], ME, { shown: out.shown, now: NOW + 200 }).bubbles.map((b) => b.id)).toEqual(["mine"]);
+    expect(ids(pick([mine({ at: NOW + 100 })], ME, { shown: out.shown, now: NOW + 200 }).bubbles)).toEqual(["mine"]);
   });
 
   it("makes room by taking the oldest bubble's place when the screen is full of other countries", () => {
@@ -332,7 +336,10 @@ describe("your own message", () => {
 
   it("holds your country's place: nobody else of it is shown while yours is", () => {
     const first = pick([mine({ at: NOW })]);
-    const out = pick([msg(2, { country: "JP", at: NOW + 500 })], ME, { shown: first.shown, now: NOW + 1000 });
+    const out = pick([mine({ at: NOW }), msg(2, { country: "JP", at: NOW + 500 })], ME, {
+      shown: first.shown,
+      now: NOW + 1000,
+    });
     expect(ids(out.bubbles)).toEqual(["mine"]);
     expect(out.counts).toEqual([{ country: "JP", count: 1, far: false }]);
   });
@@ -556,21 +563,22 @@ describe("hostile accounts and a repeated message", () => {
 
 describe("a clock that steps back (finding 6)", () => {
   const BACK = NOW - 3_600_000;
-  const first = (): ReturnType<typeof pick> => pick([msg(1, { account: "ann", country: "JP" })]);
+  const said = msg(1, { account: "ann", country: "JP" });
+  const first = (): ReturnType<typeof pick> => pick([said]);
   /** The state after the first call that sees the clock gone back, which is the one the next calls are given. */
-  const stepped = (): readonly Bubble[] => pick([], ME, { shown: first().shown, now: BACK }).shown;
+  const stepped = (): readonly Bubble[] => pick([said], ME, { shown: first().shown, now: BACK }).shown;
 
   it("shows a bubble of the future for the show time from now at most, not for the step", () => {
-    const out = pick([], ME, { shown: first().shown, now: BACK });
+    const out = pick([said], ME, { shown: first().shown, now: BACK });
     expect(out.bubbles).toHaveLength(1);
     expect(out.bubbles[0]?.until).toBeLessThanOrEqual(BACK + SHOW);
-    expect(pick([], ME, { shown: out.shown, now: BACK + SHOW }).bubbles).toEqual([]);
+    expect(pick([said], ME, { shown: out.shown, now: BACK + SHOW }).bubbles).toEqual([]);
   });
 
   it("gives its country's place back with it, not an hour later", () => {
     const later = msg(2, { country: "JP", at: BACK + 10 });
-    expect(ids(pick([later], ME, { shown: stepped(), now: BACK + 1 }).bubbles)).toEqual(["m1"]);
-    expect(ids(pick([later], ME, { shown: stepped(), now: BACK + SHOW }).bubbles)).toEqual(["m2"]);
+    expect(ids(pick([said, later], ME, { shown: stepped(), now: BACK + 1 }).bubbles)).toEqual(["m1"]);
+    expect(ids(pick([said, later], ME, { shown: stepped(), now: BACK + SHOW }).bubbles)).toEqual(["m2"]);
   });
 
   it("counts its speaker's delay from the step back, so the speaker waits the delay and no more", () => {
@@ -804,23 +812,107 @@ describe("a bubble in the state at every call", () => {
     expect(pick([line], facing(BRAZIL), { shown: two.shown, now: NOW + SHOW }).bubbles).toEqual([]);
   });
 
-  it("keeps a bubble for its whole time when its line has left the list and the delay is shorter than the show (F3373)", () => {
+  it("keeps a bubble for its whole time when the delay is shorter than the show, its line listed (F3373)", () => {
     const rules: Rules = { ...RULES, showSeconds: 15, speakerDelaySeconds: 1 };
     const first = pickBubbles([msg(1)], NOW, ME, rules, []);
-    const at = (seconds: number) => pickBubbles([], NOW + seconds * 1000, ME, rules, first.shown);
+    const at = (seconds: number, list = [msg(1)]) => pickBubbles(list, NOW + seconds * 1000, ME, rules, first.shown);
     expect(ids(at(2).bubbles)).toEqual(["m1"]);
     expect(ids(at(14).bubbles)).toEqual(["m1"]);
     expect(at(15).bubbles).toEqual([]);
-    expect(at(15).shown).toEqual([]);
+    expect(at(15, []).shown).toEqual([]);
   });
 
   it("takes the oldest bubbles off when maxOnScreen is smaller than the screen it was given", () => {
-    const full = pick(many(RULES.maxOnScreen, (n) => ({ country: CODES[n] ?? "JP" })));
+    const listed = many(RULES.maxOnScreen, (n) => ({ country: CODES[n] ?? "JP" }));
+    const full = pick(listed);
     const rules: Rules = { ...RULES, maxOnScreen: 2 };
-    const out = pickBubbles([], NOW + 1000, ME, rules, full.shown);
+    const out = pickBubbles(listed, NOW + 1000, ME, rules, full.shown);
     expect(out.bubbles).toHaveLength(2);
-    const later = pickBubbles([], NOW + 2000, ME, { ...RULES, maxOnScreen: RULES.maxOnScreen }, out.shown);
+    const later = pickBubbles(listed, NOW + 2000, ME, { ...RULES, maxOnScreen: RULES.maxOnScreen }, out.shown);
     expect(ids(later.bubbles)).toEqual(ids(out.bubbles));
+  });
+});
+
+// F3366, by Alexis: a bubble stands for its line. What takes the line from the viewer takes the bubble at the next call,
+// whatever is left of its five seconds, and the line is not shown again.
+describe("a bubble leaves with its line (F3366)", () => {
+  const line = (over: Partial<BubbleMessage> = {}): BubbleMessage => msg(1, { country: "JP", ...over });
+  const mine = (over: Partial<BubbleMessage> = {}): BubbleMessage =>
+    msg(1, { id: "mine", account: "me", country: "JP", at: NOW - 100, ...over });
+  const later = NOW + 1000;
+
+  it.each([
+    ["a REDACT took it out of the list", () => []],
+    ["the room turned private", () => [line({ visibility: "private" })]],
+    ["the room became a direct message", () => [line({ visibility: "dm" })]],
+    ["the viewer left the room", () => [line({ joined: false })]],
+    ["the moderation hid it", () => [line({ hidden: true })]],
+  ])("takes the bubble off at once when %s", (_name, list) => {
+    const first = pick([line()]);
+    expect(ids(first.bubbles)).toEqual(["m1"]);
+    const out = pick(list(), ME, { shown: first.shown, now: later });
+    expect(out.bubbles).toEqual([]);
+    expect(out.counts).toEqual([]);
+  });
+
+  it("takes your own bubble off the same way: being yours keeps it from the far side, not from its line", () => {
+    const first = pick([mine()]);
+    expect(ids(first.bubbles)).toEqual(["mine"]);
+    expect(pick([], ME, { shown: first.shown, now: later }).bubbles).toEqual([]);
+    expect(pick([mine({ joined: false })], ME, { shown: first.shown, now: later }).bubbles).toEqual([]);
+  });
+
+  it("gives the country's place back at once, to the next line of that country", () => {
+    const first = pick([line()]);
+    const next = msg(2, { country: "JP", at: NOW + 500 });
+    expect(ids(pick([next], ME, { shown: first.shown, now: later }).bubbles)).toEqual(["m2"]);
+  });
+
+  it("does not bring the bubble back when the line comes back in a later list", () => {
+    const first = pick([line()]);
+    const gone = pick([line({ hidden: true })], ME, { shown: first.shown, now: later });
+    const back = pick([line()], ME, { shown: gone.shown, now: later + 1000 });
+    expect(back.bubbles).toEqual([]);
+    expect(back.counts).toEqual([]);
+  });
+
+  it("keeps the speaker waiting his delay: a bubble taken off still counts as said", () => {
+    const first = pick([line({ account: "ann" })]);
+    const gone = pick([], ME, { shown: first.shown, now: later });
+    const again = msg(2, { account: "ann", country: "FR", at: later + 100 });
+    const out = pick([again], ME, { shown: gone.shown, now: later + 200 });
+    expect(out.bubbles).toEqual([]);
+    expect(out.counts).toEqual([{ country: "FR", count: 1, far: false }]);
+  });
+
+  it("takes the bubble off when its author corrects the line: words taken back stop being read (7f2's review)", () => {
+    const first = pick([line({ text: "my phone is 555-1234" })]);
+    const out = pick([line({ text: "sorry, wrong room" })], ME, { shown: first.shown, now: later });
+    expect(out.bubbles).toEqual([]);
+    expect(pick([line({ text: "sorry, wrong room" })], ME, { shown: out.shown, now: later + 1000 }).bubbles).toEqual(
+      [],
+    );
+  });
+
+  it("keeps a bubble whose line kept its words, cut as it was cut", () => {
+    const text = "a".repeat(RULES.maxChars + 20);
+    const first = pick([line({ text })]);
+    expect(ids(pick([line({ text })], ME, { shown: first.shown, now: later }).bubbles)).toEqual(["m1"]);
+  });
+
+  it("uses one rule for a new bubble and a kept one: what cannot be picked cannot stay", () => {
+    const first = pick([line({ account: "ann" }), msg(2, { country: "FR", account: "bob" })]);
+    expect(first.bubbles).toHaveLength(2);
+    const noCode = pick([noCountry(line({ account: "ann" })), msg(2, { country: "FR", account: "bob" })], ME, {
+      shown: first.shown,
+      now: later,
+    });
+    expect(ids(noCode.bubbles)).toEqual(["m2"]);
+    const badCode = pick([line({ account: "ann", country: "jp" }), msg(2, { country: "FR", account: "bob" })], ME, {
+      shown: first.shown,
+      now: later,
+    });
+    expect(ids(badCode.bubbles)).toEqual(["m2"]);
   });
 });
 
@@ -948,6 +1040,30 @@ describe("for any input (property)", () => {
             expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(rule.speakerDelaySeconds * 1000);
       }),
       { numRuns: 60 },
+    );
+  });
+
+  it("never keeps on screen a bubble whose line the list no longer allows, whatever each tick's list holds (F3366)", () => {
+    const shuffled = fc.array(fc.array(fc.nat({ max: 59 }), { maxLength: 60 }), {
+      minLength: steps.length,
+      maxLength: steps.length,
+    });
+    fc.assert(
+      fc.property(fc.array(message, { maxLength: 60 }), viewer, shuffled, (messages, who, keptAt) => {
+        let shown: readonly Bubble[] = [];
+        steps.forEach((now, k) => {
+          const kept = (keptAt[k] ?? []).flatMap((at) => messages[at] ?? []);
+          const out = pickBubbles(kept, now, who, RULES, shown);
+          const held = new Map(kept.map((m) => [m.id, m]));
+          for (const b of out.bubbles) {
+            const source = held.get(b.id);
+            expect(source, "a bubble with no line").toBeDefined();
+            if (source !== undefined) expect(open(source)).toBe(true);
+          }
+          shown = out.shown;
+        });
+      }),
+      { numRuns: 40 },
     );
   });
 

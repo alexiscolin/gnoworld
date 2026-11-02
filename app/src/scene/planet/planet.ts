@@ -33,8 +33,8 @@ export interface Planet {
   readonly surface: ShaderMaterial;
   /** Where its star is, as a unit vector: one light a system. */
   setSun(direction: Vector3): void;
-  /** Turns the world and its clouds. The caller owns the clock. */
-  setTime(seconds: number): void;
+  /** Turns the ground to `seconds`, and the clouds over it to `clouds`, which the eye's own moves leave out. */
+  setTime(seconds: number, clouds?: number): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
   dispose(): void;
@@ -126,9 +126,11 @@ class LivePlanet implements Planet {
       (this.#parts[at]?.uniforms["sun"]?.value as Vector3).copy(direction);
   }
 
-  setTime(seconds: number): void {
+  setTime(seconds: number, clouds = seconds): void {
     const time = this.surface.uniforms["time"];
     if (time !== undefined) time.value = seconds;
+    const drift = this.surface.uniforms["cloudTime"];
+    if (drift !== undefined) drift.value = clouds;
   }
 
   setLimb(light: number): void {

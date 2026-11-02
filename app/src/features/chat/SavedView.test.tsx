@@ -70,7 +70,7 @@ describe("the saved messages' list", () => {
     expect([...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((found) => found[1])).toEqual([
       "/w/bubble",
       "/w/bubble?room=games",
-      "/w/earth?room=chat",
+      "/earth?room=chat",
     ]);
     expect(said(html)).toContain("Open in room");
   });

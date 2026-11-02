@@ -3,6 +3,7 @@
 import { type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
+import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { Eye } from "./eye.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
@@ -34,6 +35,8 @@ export interface Scene {
   moveTo(to: Point): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */
   earth(place: Circle | undefined, said: (state: EarthState) => void): void;
+  /** The ground the page's signs stand on. */
+  readonly ground: Ground;
   dispose(): void;
   stats(): SceneStats;
 }
@@ -64,6 +67,7 @@ class LiveScene implements Scene {
   readonly #loop: FrameLoop;
   readonly #viewport: Viewport;
   readonly #earth: EarthView;
+  readonly ground: Ground;
   readonly #probe: Probe;
   #tier: Tier;
   #covered = false;
@@ -94,14 +98,13 @@ class LiveScene implements Scene {
         camera: this.#camera,
         halved: () => this.#touch || this.#tier === "low",
         base: import.meta.env.BASE_URL,
-        moved: () => {
-          this.#loop.redraw();
-        },
+        moved: this.#redraw,
         stood: () => {
           this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
         },
       }),
     );
+    this.ground = this.#earth;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -110,9 +113,7 @@ class LiveScene implements Scene {
       earth: this.#earth,
       touch: this.#touch,
       tier: () => this.#tier,
-      owed: () => {
-        this.#loop.redraw();
-      },
+      owed: this.#redraw,
     });
     this.#viewport.apply();
     this.#loop = new FrameLoop(clock, this.#draw);
@@ -129,9 +130,7 @@ class LiveScene implements Scene {
     const { signal } = this.#owner;
     watchPage(this.#loop, signal);
     watchScreen(this.#viewport.changed, signal);
-    watchAim((x, y) => {
-      this.#eye.aim(x, y);
-    }, signal);
+    watchAim(this.#eye.aim, signal);
     watchCanvas(
       canvas,
       {
@@ -168,6 +167,10 @@ class LiveScene implements Scene {
     if (this.#refused) this.#earth.refused();
     this.#refused = false;
     this.#probe.frame(delta, this.#earth.arriving);
+  };
+
+  readonly #redraw = (): void => {
+    this.#loop.redraw();
   };
 
   readonly #busy = (busy: boolean): void => {
