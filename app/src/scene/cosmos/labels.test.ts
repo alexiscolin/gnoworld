@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { chooseLabels, LABEL_SLOTS, PLACE, toScene, type Label, type LabelAsk } from "@gnoworld/core";
+import { chooseLabels, LABEL_SLOTS, PLACE, toScene, type Label, type LabelAsk, type Point } from "@gnoworld/core";
 import { Vector3 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Labels, type Projector } from "./labels.ts";
@@ -9,6 +9,7 @@ import { Labels, type Projector } from "./labels.ts";
 const SCREEN = { width: 1728, height: 1080 };
 const projector = (box?: { left: number; top: number; right: number; bottom: number }, screen = SCREEN): Projector => {
   const spot = { x: 0, y: 0, radius: 0, depth: 0 };
+  const onStage = { x: 0, y: 0, z: 0 };
   return {
     sight: { ...screen, box },
     seen(at: Vector3, radius: number) {
@@ -17,6 +18,10 @@ const projector = (box?: { left: number; top: number; right: number; bottom: num
       spot.radius = radius * 20;
       spot.depth = -at.z;
       return spot;
+    },
+    fromEye(place: Point, eye: Point, out: Vector3) {
+      toScene(place, onStage);
+      return out.set(onStage.x - eye.x, onStage.y - eye.y, onStage.z - eye.z);
     },
   };
 };

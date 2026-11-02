@@ -1,6 +1,6 @@
 import { Drawn, systemsOf } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
+import { callersOf, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
 import { asksOf } from "./labelAsks.ts";
 
 // What a look asks labels for (slice 7, 7h): the Earth, the worlds the view draws as bodies, nearest first, and the worlds around the stars it
@@ -43,6 +43,7 @@ const ask = (patch: Partial<Parameters<typeof asksOf>[0]> = {}) =>
     bodies: [],
     list: LIST,
     signals: signals(),
+    callersOf,
     ...patch,
   });
 
@@ -121,9 +122,16 @@ describe("what a look asks labels for", () => {
       return drawn;
     };
     const held = signals();
-    asksOf({ systems, drawn: around("ns1"), bodies: [{ id: "ns2/world", away: 3 }], list: many, signals: held });
+    asksOf({
+      systems,
+      drawn: around("ns1"),
+      bodies: [{ id: "ns2/world", away: 3 }],
+      list: many,
+      signals: held,
+      callersOf,
+    });
     reads = 0;
-    const { asks } = asksOf({ systems, drawn: around("ns5", "ns7"), bodies: [], list: many, signals: held });
+    const { asks } = asksOf({ systems, drawn: around("ns5", "ns7"), bodies: [], list: many, signals: held, callersOf });
     expect(asks.map(({ id }) => id)).toEqual(["earth", "ns5/world", "ns7/world"]);
     expect(reads).toBeLessThanOrEqual(10);
   });

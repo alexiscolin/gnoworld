@@ -1,6 +1,6 @@
 // The cosmos's labels, the lazy chunk's way in (7h): a look asks core which worlds to label from what the view draws and what the data says,
 // and hands each label what it points at: the Earth, a body, a distant star. A frame moves them.
-import { chooseLabels, EARTH_RADIUS, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
+import { chooseLabels, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
 import { Vector3, type Group } from "three";
 import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
 import { asksOf } from "./labelAsks.ts";
@@ -10,6 +10,9 @@ import { Labels, type Anchor, type Chosen, type Projector } from "./labels.ts";
 export interface Seen {
   readonly projector: Projector & { anchorOf: (id: string) => Group | undefined };
   readonly earth: () => Vector3 | undefined;
+  /** The Earth's radius and how a world's callers are counted, handed by the cosmos: this chunk imports nothing that lives with it. */
+  readonly earthRadius: number;
+  readonly callersOf: (world: CosmosWorld) => number;
 }
 
 // Where nothing stands: the Earth's label waits there, hidden, until the globe has come.
@@ -32,7 +35,7 @@ export class CosmosLabels {
       get position() {
         return seen.earth() ?? NOWHERE;
       },
-      scale: { x: EARTH_RADIUS },
+      scale: { x: seen.earthRadius },
       get visible() {
         return seen.earth() !== undefined;
       },
@@ -56,7 +59,14 @@ export class CosmosLabels {
     const near = [...anchors].flatMap(([id, { position }]) =>
       id === "earth" ? [] : [{ id, away: position.length() }],
     );
-    const { asks, stars } = asksOf({ systems, drawn, bodies: near, list: this.#list, signals: this.#signals });
+    const { asks, stars } = asksOf({
+      systems,
+      drawn,
+      bodies: near,
+      list: this.#list,
+      signals: this.#signals,
+      callersOf: this.#seen.callersOf,
+    });
     const chosen = chooseLabels(asks).flatMap((label): Chosen[] => {
       const at: Anchor | Point | undefined = anchors.get(label.id) ?? stars.get(label.id);
       return at === undefined ? [] : [{ label, at }];

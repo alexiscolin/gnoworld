@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { Drawn } from "@gnoworld/core";
+import { Drawn, EARTH_RADIUS } from "@gnoworld/core";
 import { Vector3 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { callersOf } from "./cosmosWorld.ts";
 import { CosmosLabels, type Seen } from "./labelled.ts";
 
 // The labels' way in (7h): the Earth's label stands by the globe wherever it is, and hides while it has not come, wherever the projection
@@ -13,6 +14,7 @@ const projector: Seen["projector"] = {
   seen(at: Vector3, radius: number) {
     return { x: SCREEN.width / 2 + at.x * 20, y: SCREEN.height / 2 - at.y * 20, radius: radius * 20, depth: 10 - at.z };
   },
+  fromEye: (_place, _eye, out) => out,
   anchorOf: () => undefined,
 };
 const shown = () =>
@@ -32,7 +34,7 @@ afterEach(() => {
 describe("the labels' way in", () => {
   it("keeps the Earth's label hidden until the globe has come, then stands it by the globe", () => {
     const globe: { at?: Vector3 } = {};
-    const part = new CosmosLabels(document, { projector, earth: () => globe.at });
+    const part = new CosmosLabels(document, { projector, earth: () => globe.at, earthRadius: EARTH_RADIUS, callersOf });
     part.list([], undefined);
     part.look([], new Drawn(), []);
     part.tick({ x: 0, y: 0, z: 0 }, true);

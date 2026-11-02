@@ -4,6 +4,7 @@ import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
 import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
+import { LazyLabels } from "./cosmos/lazyLabels.ts";
 import { Door } from "./door.ts";
 import type { EarthDevice } from "./earth/device.ts";
 import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
@@ -26,6 +27,8 @@ export class CosmosPart {
       owner,
       {
         came: (cosmos) => {
+          // The labels' loader stands here, behind the cosmos's door, so the cosmos's chunk pays only for their calls (7h).
+          cosmos.labels = new LazyLabels(owner, cosmos.seen);
           cosmos.keepClear(this.#box);
           this.#tell(cosmos);
           came();

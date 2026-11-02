@@ -47,6 +47,9 @@ export class Home {
   }
 
   /** Where it stands from the eye, in the journeys' reading. */
+  /** The Earth's radius, for its label (7h). */
+  readonly radius = EARTH_RADIUS;
+
   get at(): Vector3 | undefined {
     return this.#globe?.group.position;
   }

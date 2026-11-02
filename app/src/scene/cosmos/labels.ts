@@ -2,7 +2,7 @@
 // made once, in a layer of their own over the canvas, hidden from readers, for the page's list says where each place is. Their words are
 // written as text, ten times a second at most; each frame moves them beside their bodies as core/lod settles them, clear of each other, of
 // the page's bands and of the bodies.
-import { LABEL_SLOTS, LabelLayout, settle, toScene, type ClearBox, type Point, type ScreenSpot } from "@gnoworld/core";
+import { LABEL_SLOTS, LabelLayout, settle, type ClearBox, type Point, type ScreenSpot } from "@gnoworld/core";
 import { Vector3 } from "three";
 import { fadeTo, moveTo, slotIn, wordsInto, type Anchor, type Chosen, type Slot } from "./labelSlot.ts";
 import styles from "./labels.module.css";
@@ -27,6 +27,8 @@ interface Sight {
 /** Where a round thing from the eye stands on screen, and its depth, on the screen it sees: the bodies' own projection. */
 export interface Projector {
   seen(at: Vector3, radius: number): ScreenSpot & { readonly depth: number };
+  /** `place` on the map, from `eye` on the stage, into `out`. */
+  fromEye(place: Point, eye: Point, out: Vector3): Vector3;
   readonly sight: Sight;
 }
 
@@ -37,7 +39,6 @@ export class Labels {
   readonly #slots: Slot[];
   readonly #projector: Projector;
   readonly #layout = new LabelLayout();
-  readonly #onStage = { x: 0, y: 0, z: 0 };
   readonly #star = new Vector3();
   #sight: Sight = { width: 0, height: 0, box: undefined };
   readonly #bands = new Float64Array(16);
@@ -146,7 +147,7 @@ export class Labels {
     layout.own[index] = -1;
     if (!shown || at === undefined || unseen(at)) return;
     const body = "position" in at;
-    const place = body ? at.position : this.#starFrom(at, eye);
+    const place = body ? at.position : this.#projector.fromEye(at, eye, this.#star);
     const { x, y, radius, depth } = this.#projector.seen(place, body ? at.scale.x : 0);
     if (!(depth > 0)) return;
     layout.active[index] = 1;
@@ -155,12 +156,6 @@ export class Labels {
     layout.radius[index] = Math.max(radius, STAR_PIXELS);
     layout.away[index] = place.length();
     if (body) this.#disc(index, radius);
-  }
-
-  // A distant star's place from the eye, in the vector kept for it.
-  #starFrom(at: Point, eye: Point): Vector3 {
-    toScene(at, this.#onStage);
-    return this.#star.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
   }
 
   // A body with no label of its own, kept clear of every label.

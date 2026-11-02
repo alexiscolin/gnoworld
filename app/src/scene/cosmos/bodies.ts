@@ -139,9 +139,9 @@ export class Bodies {
 
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
-    const away = this.#offEye(system.place, eye, star).length();
+    const away = this.fromEye(system.place, eye, star).length();
     orbitPlace(body, body.still ? 0 : orbitTime(seconds), this.#place);
-    planet.group.position.copy(this.#offEye(this.#place, eye, at));
+    planet.group.position.copy(this.fromEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
     planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
@@ -177,8 +177,8 @@ export class Bodies {
     return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
-  // `place` on the map, from `eye` on the stage, into `out`.
-  #offEye(place: Point, eye: Point, out: Vector3): Vector3 {
+  /** `place` on the map, from `eye` on the stage, into `out` (the labels' stars too, 7h). */
+  fromEye(place: Point, eye: Point, out: Vector3): Vector3 {
     toScene(place, this.#onStage);
     return out.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
   }
@@ -186,12 +186,12 @@ export class Bodies {
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
     const { box } = this.sight;
-    return box === undefined ? 1 : clearOf({ ...this.seen(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
+    return box === undefined ? 1 : clearOf({ ...this.seen(this.fromEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
   /** Whether a round thing at `place` on the map, `radius` units across, shows on the screen from `eye`. */
   inView(place: Point, radius: number, eye: Point): boolean {
-    const { x, y, radius: size, depth } = this.seen(this.#offEye(place, eye, this.#ahead), radius);
+    const { x, y, radius: size, depth } = this.seen(this.fromEye(place, eye, this.#ahead), radius);
     const { width, height } = this.sight;
     return depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
   }
