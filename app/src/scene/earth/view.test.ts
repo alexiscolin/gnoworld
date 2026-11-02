@@ -343,6 +343,35 @@ describe("leaving", () => {
   });
 });
 
+describe("a load the page left behind", () => {
+  it("never speaks over the visit that followed it", async () => {
+    let refuse: (reason: Error) => void = () => undefined;
+    maps.load.mockImplementationOnce(
+      () =>
+        new Promise((_done, no) => {
+          refuse = no;
+        }),
+    );
+    const { view, said } = opened();
+    view.show(undefined, (state) => said.push(state));
+    view.show(PLACE, (state) => said.push(state));
+    refuse(new Error("404"));
+    await settled();
+    expect(said).toEqual(["loading", "gone", "loading", "drawn"]);
+  });
+
+  it("uploads nothing more and compiles nothing once the page went between two maps", async () => {
+    const { view, renderer, said } = opened();
+    renderer.initTexture.mockImplementationOnce(() => {
+      view.show(undefined, (state) => said.push(state));
+    });
+    await settled();
+    expect(renderer.initTexture).toHaveBeenCalledTimes(1);
+    expect(renderer.compileAsync).not.toHaveBeenCalled();
+    expect(said).toEqual(["loading", "gone"]);
+  });
+});
+
 describe("a context that comes back", () => {
   it("loads the maps again, for a closed bitmap cannot be uploaded twice", async () => {
     const { view, said, stage } = opened();
