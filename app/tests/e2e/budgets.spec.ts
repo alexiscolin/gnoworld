@@ -43,6 +43,9 @@ const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of thei
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
+// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
+const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
+const LABELS_JS = 5 * 1024;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -209,6 +212,16 @@ test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and
   });
   const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
   expect(await compressed(page, await ownOf(page, (await whole).url(), there))).toBeLessThanOrEqual(WHOLE_JS);
+});
+
+test("the labels' chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
+  const labels = page.waitForResponse((response) => LABELS.test(response.url()));
+  const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+  expect(await compressed(page, await ownOf(page, (await labels).url(), there))).toBeLessThanOrEqual(LABELS_JS);
 });
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {

@@ -13,6 +13,20 @@ export interface CosmosWorld {
     readonly calls?: number | null;
     readonly lastHeight?: number | null;
   }[];
+  /** When the file first saw it, an ISO time, or null on a first pass. */
+  readonly seen?: string | null | undefined;
+}
+
+/** What is known of the worlds now, for the cosmos's labels (7h): who is here in each, by its id as the cosmos holds it, the names the data
+ * gives, this reader's visits, and when it was read. */
+export interface LabelSignals {
+  readonly present: ReadonlyMap<
+    string,
+    { readonly here: number; readonly perHour: number; readonly rise: number | null }
+  >;
+  readonly names: ReadonlyMap<string, string>;
+  readonly visited: (id: string) => boolean;
+  readonly now: number;
 }
 
 /** How much a world is used: its realms, and their callers. */

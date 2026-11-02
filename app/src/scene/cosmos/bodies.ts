@@ -65,8 +65,7 @@ export class Bodies {
   readonly #device: EarthDevice;
   readonly #screen = new Vector3();
   readonly #ahead = new Vector3();
-  readonly #spot = { x: 0, y: 0, radius: 0 };
-  #depth = 0;
+  readonly #spot = { x: 0, y: 0, radius: 0, depth: 0 };
   readonly #back = new Quaternion();
   readonly #seen = new Vector3();
   readonly #lean = new Euler(); // no pole towards the eye, a ring open 30 degrees at most, whatever the camera's turn
@@ -88,6 +87,10 @@ export class Bodies {
   /** The screen, in the page's pixels, its lens, and the box of the page's text. */
   view(sight: BodyView): void {
     this.#view = sight;
+  }
+
+  get sight(): BodyView {
+    return this.#view;
   }
 
   has(id: string): boolean {
@@ -161,7 +164,9 @@ export class Bodies {
     planet.group.quaternion.setFromEuler(this.#lean).premultiply(this.#device.camera.quaternion);
   }
 
-  #spotOf(at: Vector3, radius: number): ScreenSpot {
+  /** Where a round thing at `at` from the eye, `radius` units across, stands on screen, and its depth along the view: in a record kept
+   * here, read at once (the labels' projector, 7h). */
+  seen(at: Vector3, radius: number): ScreenSpot & { readonly depth: number } {
     const { width, height, focal } = this.#view;
     const { camera } = this.#device;
     this.#screen.copy(at).project(camera);
@@ -169,7 +174,7 @@ export class Bodies {
     this.#spot.y = ((1 - this.#screen.y) * height) / 2;
     // Its depth along the view, the camera turned to the Earth.
     const depth = -this.#ahead.copy(at).applyQuaternion(this.#back.copy(camera.quaternion).invert()).z;
-    this.#depth = depth;
+    this.#spot.depth = depth;
     this.#spot.radius = (radius * focal) / Math.max(depth, radius);
     return this.#spot;
   }
@@ -177,7 +182,7 @@ export class Bodies {
   // What the box of the page's text leaves of a body at `at`.
   #room(at: Vector3, radius: number): number {
     const { box } = this.#view;
-    return box === undefined ? 1 : clearOf(this.#spotOf(at, radius), box);
+    return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
   // `place` on the map, from `eye` on the stage, into `out`.
@@ -189,20 +194,25 @@ export class Bodies {
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
     const { box } = this.#view;
-    return box === undefined ? 1 : clearOf({ ...this.#spotOf(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
+    return box === undefined ? 1 : clearOf({ ...this.seen(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
   /** Whether a round thing at `place` on the map, `radius` units across, shows on the screen from `eye`. */
   inView(place: Point, radius: number, eye: Point): boolean {
-    const { x, y, radius: size } = this.#spotOf(this.#offEye(place, eye, this.#ahead), radius);
+    const { x, y, radius: size, depth } = this.seen(this.#offEye(place, eye, this.#ahead), radius);
     const { width, height } = this.#view;
-    return this.#depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
+    return depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
   }
 
   /** Where `at` stands on screen, for the journeys. */
   spotOf(at: Vector3, radius: number): ScreenSpot {
-    const { x, y, radius: drawn } = this.#spotOf(at, radius);
+    const { x, y, radius: drawn } = this.seen(at, radius);
     return { x, y, radius: drawn };
+  }
+
+  /** A body's object on the stage, by its world's id: where it stands and how large, for its label. */
+  anchorOf(id: string): Group | undefined {
+    return this.#held.get(id)?.planet.group;
   }
 
   #free({ planet }: Body): void {

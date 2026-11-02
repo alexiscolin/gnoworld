@@ -1,0 +1,84 @@
+/* The cosmos's labels (frame 4): a dark glass pill beside each body, its name in the text's white, its people in amber figures, its heat in
+   a pill of its own; an uncharted signal in violet within a dashed edge; a thin stem from the pill to the body. Over the canvas, under the
+   page, taking no pointer. The script moves each from the window's corner and fades it with depth. */
+@layer components {
+  /* The layer is the window's corner: each label is moved from it. */
+  .layer {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    /* raw: over the canvas's -1 and under the header's 1, as the Earth's signs */
+    z-index: 0;
+  }
+
+  .label {
+    /* raw: where the stem stands in from the pill's left edge, f0004's 12 px; the script writes it */
+    --_stem: 12px;
+
+    position: absolute;
+    inset: 0 auto auto 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-pill);
+    /* raw: f0004's pills, the night at 80% over the warm space behind them: no blur, which is not Baseline yet (F262) */
+    background: color-mix(in oklab, var(--color-surface) 80%, transparent);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
+    white-space: nowrap;
+    transition: opacity var(--motion-base) var(--ease-standard);
+  }
+
+  /* The stem, f0004's thin light line, 22 px from the pill to the body's outline, under the pill or over it. */
+  .label::after {
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: var(--_stem);
+    /* raw: one pixel wide and the gap's 22 px long, as core/lod's PLACE */
+    inline-size: 1px;
+    /* raw: the gap core/lod keeps between a label and its body */
+    block-size: 22px;
+    /* raw: f0004's stem, the muted grey at 60% */
+    background: color-mix(in oklab, var(--color-text-muted) 60%, transparent);
+    content: "";
+  }
+
+  .below::after {
+    inset-block: auto 100%;
+  }
+
+  .title {
+    color: var(--color-text);
+    font: var(--font-ui);
+  }
+
+  .count,
+  .badge {
+    padding-inline-start: var(--space-2xs);
+    color: var(--color-warm);
+    font: var(--font-data);
+  }
+
+  .count:empty,
+  .badge:empty {
+    display: none;
+  }
+
+  /* f0004's heat, "▲ 21% · 130/h": the warm figures in a pill of their own, inside the label. */
+  .badge {
+    /* layout: a step after the count, as f0004's, outside the badge's own fill */
+    margin-inline-start: var(--space-2xs);
+    padding: var(--space-3xs) var(--space-2xs);
+    border-radius: var(--radius-pill);
+    background: var(--color-warm-soft);
+  }
+
+  /* f0004's "Uncharted signal": a machine's word, violet, within a dashed edge. */
+  .uncharted {
+    border: var(--line-width) dashed var(--color-signal-line);
+    box-shadow: none;
+  }
+
+  .uncharted .count {
+    color: var(--color-signal);
+  }
+}

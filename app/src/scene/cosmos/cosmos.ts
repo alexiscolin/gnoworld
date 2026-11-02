@@ -11,7 +11,8 @@ import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
 import { AtRest } from "./atRest.ts";
-import { systemsFrom, type CosmosWorld } from "./cosmosWorld.ts";
+import { systemsFrom, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
+import { LazyLabels } from "./lazyLabels.ts";
 import { LazyNebulae } from "./lazyNebulae.ts";
 import { Whole } from "./whole.ts";
 
@@ -27,6 +28,7 @@ export class Cosmos {
   readonly #ahead: Ahead;
   readonly #nebulae: LazyNebulae;
   readonly #whole: Whole;
+  readonly #labels: LazyLabels;
   readonly #drawn = new Drawn();
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
@@ -61,6 +63,7 @@ export class Cosmos {
       this.#device.moved();
     });
     this.#whole = new Whole(device, this.#owner, this.#mapCame);
+    this.#labels = new LazyLabels(this.#owner, { projector: this.#bodies, earth: () => this.#home.at });
     this.#setShown(false);
     device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);
   }
@@ -78,9 +81,10 @@ export class Cosmos {
     this.#askLook();
   };
 
-  /** Stands `worlds` and the fixed places, or takes it all off the stage; `written`, the file's time, ages its calls. Asked again with the
-   * same list, it only comes back. */
-  show(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+  /** Stands `worlds` and the fixed places, or takes it all off the stage; `written`, the file's time, ages its calls; `signals`, what is
+   * known of the worlds now, names them. Asked again with the same list, it only comes back. */
+  show(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
+    this.#labels.list(worlds, signals);
     this.#setShown(worlds !== undefined);
     clearTimeout(this.#release);
     if (worlds === undefined) {
@@ -139,6 +143,7 @@ export class Cosmos {
     const whole = this.#whole.advance(this.#eye, seconds, looking);
     this.#disc.fade((1 - whole) ** 2, this.#ahead.done);
     this.#bodies.group.visible = whole === 0;
+    this.#labels.tick(this.#eye, whole === 0);
     if (!(distanceOf(this.#eye, this.#looked) < this.#whole.step)) this.#askLook();
   }
 
@@ -159,6 +164,7 @@ export class Cosmos {
     const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
     const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
     this.#bodies.stand(bodies, close);
+    this.#labels.look(this.#systems, this.#drawn, bodies.keys());
     this.#disc.paint({
       ...sight,
       ...worlds,
@@ -219,6 +225,7 @@ export class Cosmos {
       // Where the eye stands on the stage: the scene's, moved to the view at rest's and swayed.
       eye: { ...this.#eye },
       web: this.#whole.stats(),
+      labels: this.#labels.stats(),
     };
   }
 }

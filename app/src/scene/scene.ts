@@ -2,7 +2,7 @@
 // It draws through one owner, and imports no React: the universe feature mounts it.
 import { type ClearBox, type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
-import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
+import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
@@ -193,8 +193,8 @@ class LiveScene implements Scene {
     this.#parts.world.moons(marks);
   }
 
-  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
-    this.#parts.cosmos.show(worlds, written);
+  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
+    this.#parts.cosmos.show(worlds, written, signals);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
     this.#loop.redraw();
   }

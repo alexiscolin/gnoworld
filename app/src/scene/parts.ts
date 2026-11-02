@@ -2,7 +2,7 @@
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
-import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
+import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
 import { Door } from "./door.ts";
 import type { EarthDevice } from "./earth/device.ts";
@@ -12,6 +12,7 @@ export class CosmosPart {
   readonly door: Door<Cosmos>;
   #worlds: readonly CosmosWorld[] | undefined;
   #written: string | undefined;
+  #signals: LabelSignals | undefined;
   #box: ClearBox | undefined;
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
@@ -33,16 +34,18 @@ export class CosmosPart {
     );
   }
 
-  show(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+  show(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
     this.#worlds = worlds;
     this.#written = written;
+    this.#signals = signals ?? this.#signals;
     if (this.door.part !== undefined) this.#tell(this.door.part);
     if (worlds !== undefined) this.door.open();
   }
 
-  // The file's time goes with its worlds once there is one: it ages their calls.
+  // The file's time goes with its worlds once there is one: it ages their calls; and what is known of them, once said, names them.
   #tell(cosmos: Cosmos): void {
-    if (this.#written === undefined) cosmos.show(this.#worlds);
+    if (this.#signals !== undefined) cosmos.show(this.#worlds, this.#written, this.#signals);
+    else if (this.#written === undefined) cosmos.show(this.#worlds);
     else cosmos.show(this.#worlds, this.#written);
   }
 
