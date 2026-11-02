@@ -664,6 +664,24 @@ describe("the view at rest (7d6)", () => {
     expect(spot.radius).toBeGreaterThanOrEqual(2 * earth.radius);
   });
 
+  // The chief, 2026-11-02: the close world holds still, its postcards' worlds turn (7d6's review, lot 8: no test held it).
+  it("holds Onyx's close world still through the worlds' clock, while the postcards' worlds turn", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const { close } = restView(systems);
+    const id = close === undefined ? "" : (systems[close.system]?.worlds[close.world]?.id ?? "");
+    const placesAt = (seconds: number) => {
+      scene.cosmos.tick(HOME, seconds);
+      const { eye, list } = scene.cosmos.stats();
+      return new Map(list.map((body) => [body.id, body.at.clone().add(new Vector3(eye.x, eye.y, eye.z))]));
+    };
+    const [before, after] = [placesAt(0), placesAt(30)];
+    const moved = (body: string) => after.get(body)?.distanceTo(before.get(body) ?? new Vector3(NaN)) ?? NaN;
+    expect(moved(id)).toBeLessThan(1e-6);
+    expect([...before.keys()].filter((body) => body !== id && moved(body) > 1e-3).length).toBeGreaterThan(0);
+  });
+
   // Each point drawn, with its system and its world, read back from the buffers: a world is its system's of that orbit and phase.
   const pointsOf = (scene: ReturnType<typeof made>, systems: readonly StarSystem[]) => {
     const [points] = dots(scene);
