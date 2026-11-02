@@ -1,4 +1,5 @@
 import {
+  ARRIVAL_LEAN,
   arrivalOf,
   asciiBytes,
   beatAt,
@@ -10,6 +11,7 @@ import {
   glideAt,
   GRAIN,
   haloAt,
+  LEAN,
   orbitPlace,
   orbitTime,
   HOME,
@@ -2121,6 +2123,16 @@ describe("a system's arrival (7d3)", () => {
       for (const body of arrival.postcard.worlds)
         expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(0.5);
     }
+  });
+
+  it("leans half as far at an arrival as at home: the eye nearer what it looks at", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const { to } = await arrived(scene, GNOSWAP);
+    scene.cosmos.tick({ x: to.x + LEAN, y: to.y + LEAN, z: to.z }, 0);
+    const moved = new Vector3().copy(scene.cosmos.stats().eye).sub(onStage(arrival.eye));
+    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(moved.z).toBeCloseTo(0, 6);
   });
 
   it.each(["", "no/such", "__proto__", "constructor", "x".repeat(10_000)])(

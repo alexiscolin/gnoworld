@@ -1,7 +1,17 @@
 // Where the eye stands at rest among the worlds (slice 7d6): the view at rest's own eye, which the core placed from the data, about which the
 // eye sways, and the camera that keeps the Earth at the canvas's centre, the disc's horizon level; or, come to a system (7d3), its arrival's
 // eye and what it looks at. Plain numbers: this chunk holds no three.
-import { EARTH_PLACE, HOME, swayAt, toScene, type Point, type RestView, type StarSystem } from "@gnoworld/core";
+import {
+  ARRIVAL_LEAN,
+  EARTH_PLACE,
+  HOME,
+  LEAN,
+  swayAt,
+  toScene,
+  type Point,
+  type RestView,
+  type StarSystem,
+} from "@gnoworld/core";
 import { landingAt, type Asking, type Landing } from "./restArrival.ts";
 import type { PerspectiveCamera } from "three";
 
@@ -34,6 +44,8 @@ export class RestEye {
   readonly #sway = { across: 0, up: 0 };
   #asked: Asking | undefined;
   #went: Point | undefined;
+  // How much of the scene's eye's lean and glide off where it rests reaches the eye: all at home, half at an arrival, nearer what it sees.
+  #lean = 1;
 
   constructor() {
     toScene(EARTH_PLACE, this.#target);
@@ -78,6 +90,7 @@ export class RestEye {
 
   // The camera turned to what `landing` looks at, or the Earth with none, the eye swaying along its own axes; the scene's eye there.
   #land(landing: Landing | undefined): Point {
+    this.#lean = landing === undefined ? 1 : ARRIVAL_LEAN / LEAN;
     if (landing === undefined) {
       toScene(EARTH_PLACE, this.#target);
       this.#face(this.#rest);
@@ -94,9 +107,10 @@ export class RestEye {
   place(eye: Point, seconds: number, out: Spot): void {
     swayAt(this.#sway, seconds);
     const { across, up } = this.#sway;
-    out.x = eye.x + this.#offset.x + this.#across.x * across + this.#upward.x * up;
-    out.y = eye.y + this.#offset.y + this.#across.y * across + this.#upward.y * up;
-    out.z = eye.z + this.#offset.z + this.#across.z * across + this.#upward.z * up;
+    const [rest, lean] = [this.#went ?? eye, this.#lean];
+    out.x = rest.x + lean * (eye.x - rest.x) + this.#offset.x + this.#across.x * across + this.#upward.x * up;
+    out.y = rest.y + lean * (eye.y - rest.y) + this.#offset.y + this.#across.y * across + this.#upward.y * up;
+    out.z = rest.z + lean * (eye.z - rest.z) + this.#offset.z + this.#across.z * across + this.#upward.z * up;
   }
 
   /** Turns `camera`, at the origin, the eye at `eye`, to what it looks at. */
