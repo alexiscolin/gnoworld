@@ -48,6 +48,7 @@ void main() {
 
 // Amber far out, cream nearer, white at the heart: the frame's three steps, each a falloff, so a sun has no edge. Its reach ends in nothing.
 const FRAGMENT = /* glsl */ `
+uniform float uFade;
 varying vec2 vPlace;
 varying vec3 vLight;
 void main() {
@@ -61,7 +62,7 @@ void main() {
   float heart = exp(-reach * reach * 420.0);
   float edge = 1.0 - smoothstep(0.55, 1.0, reach);
   vec3 light = amber * wide * 0.62 * edge + cream * near * 0.7 + vec3(1.0, 0.95, 0.88) * heart * 7.0 * vLight.z;
-  gl_FragColor = vec4(light * vLight.x, 1.0);
+  gl_FragColor = vec4(light * vLight.x * uFade, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -71,6 +72,8 @@ export class Suns {
   readonly #sun: InstancedBufferAttribute;
   readonly #geometry = new InstancedBufferGeometry();
   readonly #focal = { value: 1 };
+  /** How much of them shows: the whole cosmos takes the rest. */
+  readonly fade = { value: 1 };
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
     const size = (items: number) => {
@@ -89,7 +92,7 @@ export class Suns {
       blending: AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      uniforms: { uFocal: this.#focal },
+      uniforms: { uFocal: this.#focal, uFade: this.fade },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });

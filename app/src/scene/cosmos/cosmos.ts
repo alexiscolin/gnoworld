@@ -23,8 +23,7 @@ import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
 import { Nebulae } from "./nebulae.ts";
 import { heldOf, type CosmosWorld } from "./cosmosWorld.ts";
-
-export type { CosmosWorld } from "./cosmosWorld.ts";
+import { Whole } from "./whole.ts";
 
 // How far the eye moves before a look: a point's size is out by a few percent at most.
 const STEP = 4;
@@ -39,6 +38,7 @@ export class Cosmos {
   readonly #home: Home;
   readonly #ahead: Ahead;
   readonly #nebulae: Nebulae;
+  readonly #whole: Whole;
   readonly #drawn = new Drawn();
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
@@ -66,6 +66,7 @@ export class Cosmos {
       this.#setShown(this.#wanted);
       this.#device.moved();
     });
+    this.#whole = new Whole(device, this.#owner, this.#mapCame);
     this.#setShown(false);
     device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);
   }
@@ -75,6 +76,7 @@ export class Cosmos {
     this.#disc.group.visible = shown && this.#ahead.done;
     this.#bodies.group.visible = shown;
     this.#nebulae.show(shown);
+    if (!shown) this.#whole.hide();
   }
 
   readonly #mapCame = (): void => {
@@ -82,8 +84,9 @@ export class Cosmos {
     this.#askLook();
   };
 
-  /** Stands `worlds` and the fixed places, or takes it all off the stage. Asked again with the same list, it only comes back. */
-  show(worlds: readonly CosmosWorld[] | undefined): void {
+  /** Stands `worlds` and the fixed places, or takes it all off the stage; `written`, the file's time, ages its calls. Asked again with the
+   * same list, it only comes back. */
+  show(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
     this.#setShown(worlds !== undefined);
     clearTimeout(this.#release);
     if (worlds === undefined) {
@@ -95,6 +98,7 @@ export class Cosmos {
       this.#systems = systemsOf(heldOf(worlds));
       this.#ladder = new Ladder(this.#systems);
     }
+    this.#whole.stand({ systems: this.#systems, worlds, written });
     this.#looked.x = NaN;
     this.#ahead.ask();
     this.#home.stand();
@@ -104,6 +108,7 @@ export class Cosmos {
   /** The canvas's height in its CSS pixels, and the pixels to one of them. */
   resize(height: number, ratio: number): void {
     this.#height = height;
+    this.#whole.resize(ratio);
     this.#focal = focalOf(this.#device.camera, height);
     this.#disc.resize(this.#focal, ratio);
     this.#frame();
@@ -131,6 +136,10 @@ export class Cosmos {
     this.#bodies.tick(eye, seconds);
     this.#home.tick(eye, seconds);
     this.#nebulae.follow(eye, seconds);
+    // Past a cluster's distance the worlds' points take the view at one distance: the disc and the bodies give up what they take.
+    const whole = this.#whole.advance(eye, seconds);
+    this.#disc.fade(1 - whole, this.#ahead.done);
+    this.#bodies.group.visible = whole < 1;
     if (!(distanceOf(eye, this.#looked) < STEP)) this.#askLook();
   }
 
@@ -142,13 +151,12 @@ export class Cosmos {
     this.#timer = undefined;
     const ladder = this.#ladder;
     if (!this.#wanted || ladder === undefined || Number.isNaN(this.#eye.x)) return;
-    this.#looked.x = this.#eye.x;
-    this.#looked.y = this.#eye.y;
-    this.#looked.z = this.#eye.z;
+    Object.assign(this.#looked, this.#eye);
     this.#looks += 1;
     toMap(this.#eye, this.#mapEye);
     focusOf(this.#mapEye, this.#focus);
     ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: this.#focus }, this.#drawn);
+    this.#whole.look(this.#mapEye, this.#focal, this.#eye);
     this.#bodies.stand(this.#wantedBodies());
     this.#disc.paint({
       systems: this.#systems,
@@ -202,7 +210,6 @@ export class Cosmos {
   /** What stands, for the journeys. */
   stats() {
     const shown = this.#wanted;
-    const list = this.#bodies.list();
     return {
       shown,
       bodies: shown ? this.#bodies.size : 0,
@@ -214,9 +221,10 @@ export class Cosmos {
       looks: this.#looks,
       dotPixels: shown ? this.#disc.dotPixels : 0,
       earth: this.#home.stood,
-      list,
+      list: this.#bodies.list(),
       screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
+      web: this.#whole.stats(),
     };
   }
 }

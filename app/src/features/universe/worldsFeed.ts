@@ -1,12 +1,13 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
 // read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
 import { readWorlds } from "../../lib/chain/realms.ts";
-import type { CosmosWorld } from "../../scene/cosmos/cosmos.ts";
+import type { CosmosWorld } from "../../scene/cosmos/cosmosWorld.ts";
 import type { Scene } from "../../scene/scene.ts";
 
 export class WorldsFeed {
   readonly #leaving = new AbortController();
   #worlds: readonly CosmosWorld[] = [];
+  #written: string | undefined;
   #asked = false;
   #shown = false;
   #clearing: AbortController | undefined;
@@ -15,10 +16,16 @@ export class WorldsFeed {
   sync(scene: Scene, wanted: boolean): void {
     if (wanted === this.#shown) return;
     this.#shown = wanted;
-    scene.cosmos(wanted ? this.#worlds : undefined);
+    this.#hand(scene, wanted ? this.#worlds : undefined);
     this.#clearing?.abort();
     if (wanted) this.#keepTextClear(scene);
     if (wanted && !this.#asked) this.#read(scene);
+  }
+
+  // The file's time goes with its worlds, once there is one: it ages their calls.
+  #hand(scene: Scene, worlds: readonly CosmosWorld[] | undefined): void {
+    if (this.#written === undefined) scene.cosmos(worlds);
+    else scene.cosmos(worlds, this.#written);
   }
 
   #keepTextClear(scene: Scene): void {
@@ -38,7 +45,8 @@ export class WorldsFeed {
       (file) => {
         if (file === undefined) return;
         this.#worlds = file.worlds;
-        if (this.#shown) scene.cosmos(this.#worlds);
+        this.#written = file.updated;
+        if (this.#shown) this.#hand(scene, this.#worlds);
       },
       () => undefined,
     );

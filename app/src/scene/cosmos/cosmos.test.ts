@@ -1,6 +1,7 @@
 import {
   BELT_INNER,
   BOUNDS,
+  focusDistance,
   GROWTH,
   growthAt,
   HOME,
@@ -10,6 +11,7 @@ import {
   systemsOf,
   toMap,
   toScene,
+  wholeShare,
   worldLook,
   type Point,
   type StarSystem,
@@ -24,18 +26,19 @@ import {
   PerspectiveCamera,
   Points,
   Scene as Stage,
+  ShaderMaterial,
   Texture,
   Vector3,
   type BufferAttribute,
   type BufferGeometry,
   type LineBasicMaterial,
-  type ShaderMaterial,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { MOON_FAR } from "../earth/orbit.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
-import { Cosmos, type CosmosWorld } from "./cosmos.ts";
+import { Cosmos } from "./cosmos.ts";
+import type { CosmosWorld } from "./cosmosWorld.ts";
 import { FAR_ANGLE, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
@@ -1075,5 +1078,147 @@ describe("its nebulae", () => {
     for (const image of nebulaImages()) expect(free).not.toContain(image);
     await vi.advanceTimersByTimeAsync(2000);
     for (const image of nebulaImages()) expect(free).toContain(image);
+  });
+});
+
+// Past a cluster's distance the worlds themselves are the nebula (ADR-0002 §10; Alexis, 2026-11-02): their soft points and the lines of
+// their imports take the view from the bodies, the suns and the nebulae at one distance, never both whole, and with no second place.
+describe("the whole cosmos", () => {
+  // The eye going out as the lab's wheel takes it: up and back from the arrival, the disc's centre ahead.
+  const out = (away: number) => ({ x: HOME.x, y: HOME.y + 0.866 * away, z: HOME.z + 0.5 * away });
+  const linked = (count: number): CosmosWorld[] =>
+    Array.from({ length: count }, (_, at) => ({
+      id: `n${String(at % 9)}/w${String(at)}`,
+      namespace: `n${String(at % 9)}`,
+      realms: [
+        {
+          callers: null,
+          path: `gno.land/r/n${String(at % 9)}/w${String(at)}`,
+          imports: at % 4 === 0 ? [`gno.land/r/n${String((at + 1) % 9)}/w${String(at + 1)}`] : [],
+          calls: null,
+          lastHeight: null,
+        },
+      ],
+    }));
+  const at = async (scene: ReturnType<typeof made>, eye: Point) => {
+    scene.cosmos.tick(eye, 0);
+    await settled();
+    scene.cosmos.tick(eye, 0);
+    await settled();
+  };
+  const fades = (scene: ReturnType<typeof made>) =>
+    parts(scene).flatMap((part) => {
+      if (!(part instanceof Mesh || part instanceof Points)) return [];
+      const material: unknown = part.material;
+      return material instanceof ShaderMaterial && "uFade" in material.uniforms
+        ? [Number(material.uniforms["uFade"].value)]
+        : [];
+    });
+  const seen = (scene: ReturnType<typeof made>) => {
+    const found: Object3D[] = [];
+    scene.stage.traverseVisible((part) => found.push(part));
+    return found;
+  };
+  const shownWith = (scene: ReturnType<typeof made>, name: string) =>
+    seen(scene).filter((part) => part instanceof Points && (part.geometry as BufferGeometry).hasAttribute(name));
+
+  it("asks for its chunk only once the eye leaves for it, never at the arrival", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, HOME);
+    expect(scene.cosmos.stats().web).toBeUndefined();
+    await at(scene, out(400));
+    expect(scene.cosmos.stats().web).toMatchObject({ points: 90, lines: 23 });
+  });
+
+  it("hands the view from the bodies, the suns and the nebulae to the worlds' points at one distance, never both whole", async () => {
+    const scene = made();
+    await shown(scene, linked(90));
+    await at(scene, out(400));
+    const shares: number[] = [];
+    const outward = [0, 100, 200, 300, 380, 450, 520, 600, 640, 700, 900, 1500];
+    // Out, then back in: nothing it hands over stays handed over.
+    for (const away of [...outward, ...[...outward].reverse()]) {
+      const eye = out(away);
+      await at(scene, eye);
+      const whole = wholeShare(focusDistance(eye));
+      const { web, bodies } = scene.cosmos.stats();
+      shares.push(web?.share ?? NaN);
+      expect(web?.share).toBeCloseTo(whole, 9);
+      // The disc's suns, points and rocks give up what the worlds' points take.
+      const disc = fades(scene);
+      expect(disc).toHaveLength(3);
+      for (const fade of disc) expect(fade + whole).toBeCloseTo(1, 9);
+      if (whole >= 1) {
+        expect(bodies).toBe(0);
+        expect(shownWith(scene, "aOrbit")).toHaveLength(0);
+        expect(
+          seen(scene).filter((part) => part instanceof Mesh && part.geometry instanceof InstancedBufferGeometry),
+        ).toHaveLength(0);
+      }
+      expect(shownWith(scene, "aCircle")).toHaveLength(whole > 0 ? 1 : 0);
+    }
+    expect(Math.min(...shares)).toBe(0);
+    expect(Math.max(...shares)).toBe(1);
+    expect(shares.some((share) => share > 0.1 && share < 0.9)).toBe(true);
+    expect(shares.at(-1)).toBe(0);
+    expect(scene.cosmos.stats().bodies).toBeGreaterThan(0);
+  });
+
+  it("stands no whole cosmos once the page has gone, though its chunk was on its way", async () => {
+    const hidden = made();
+    await shown(hidden, linked(90));
+    hidden.cosmos.tick(out(400), 0);
+    hidden.cosmos.show(undefined);
+    await settled();
+    await vi.dynamicImportSettled();
+    expect(shownWith(hidden, "aCircle")).toHaveLength(0);
+    const gone = made();
+    await shown(gone, linked(90));
+    gone.cosmos.tick(out(400), 0);
+    gone.owner.dispose();
+    await settled();
+    await vi.dynamicImportSettled();
+    expect(gone.stage.getObjectByName("web")).toBeUndefined();
+  });
+
+  it("stands each world where the ladder's points stand it: one place for a world, at any distance", async () => {
+    const scene = made();
+    const list = linked(90);
+    await shown(scene, list);
+    await at(scene, out(150));
+    const [ladder] = dots(scene);
+    if (ladder === undefined) throw new Error("no points");
+    const starsOf = (points: Points<BufferGeometry, ShaderMaterial>) => {
+      const position = points.geometry.getAttribute("position");
+      return new Set(
+        Array.from({ length: points.geometry.drawRange.count }, (_, index) =>
+          [position.getX(index), position.getY(index), position.getZ(index)].map((value) => value.toFixed(5)).join(","),
+        ),
+      );
+    };
+    const fromLadder = starsOf(ladder);
+    await at(scene, out(900));
+    const web = parts(scene).find(
+      (part): part is Points<BufferGeometry, ShaderMaterial> =>
+        part instanceof Points && (part.geometry as BufferGeometry).hasAttribute("aCircle"),
+    );
+    if (web === undefined) throw new Error("no whole cosmos");
+    expect(fromLadder.size).toBeGreaterThan(3);
+    for (const star of fromLadder) expect(starsOf(web).has(star)).toBe(true);
+    expect(web.parent?.rotation.x).toBe(ladder.parent?.rotation.x);
+  });
+
+  it("gives the whole cosmos the file's time: gold for a world called in the last run only", async () => {
+    const scene = made();
+    const list = linked(30).map((world, index) =>
+      index === 0 ? { ...world, realms: [{ ...world.realms[0], callers: null, calls: 40, lastHeight: 9000 }] } : world,
+    );
+    scene.cosmos.show(list, new Date(Date.now()).toISOString());
+    await at(scene, out(900));
+    expect(scene.cosmos.stats().web?.gold).toBe(1);
+    scene.cosmos.show(list, "2000-01-01T00:00:00Z");
+    await at(scene, out(901));
+    expect(scene.cosmos.stats().web?.gold).toBe(0);
   });
 });

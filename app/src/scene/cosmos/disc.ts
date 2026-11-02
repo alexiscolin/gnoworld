@@ -100,6 +100,14 @@ export class Disc {
     this.#belt.resize(ratio);
   }
 
+  /** How much of the disc shows, 0 to 1, the whole cosmos taking the rest, once its programs are `ready`: none, and it draws nothing. */
+  fade(level: number, ready: boolean): void {
+    this.group.visible = ready && level > 0;
+    this.#suns.fade.value = level;
+    this.#dots.fade.value = level;
+    this.#belt.fade.value = level;
+  }
+
   /** One frame on. */
   advance(eye: Point, seconds: number): void {
     this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);

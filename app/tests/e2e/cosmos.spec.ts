@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { BOUNDS } from "../../../packages/core/src/lod/ladder.ts";
 import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
-import { toScene } from "../../../packages/core/src/frame/disc.ts";
+import { focusDistance, toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, colours, near } from "./geometry.ts";
-import { hideThePage, opened, running, stats } from "./sceneStage.ts";
+import { hideThePage, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -33,7 +33,7 @@ const SLOW = { timeout: 90_000 };
 test.describe.configure({ timeout: 180_000 });
 
 const cosmos = async (page: Page) => (await stats(page)).cosmos ?? NOT_YET;
-const NOT_YET = {
+const NOT_YET: CosmosStats = {
   shown: false,
   bodies: 0,
   stars: 0,
@@ -58,6 +58,15 @@ async function arrived(page: Page, query = HOME) {
   await page.goto(query);
   await hydrated(page);
   await running(page);
+}
+
+// The release's lab page, its cosmos view standing, for Alexis's own GPU.
+async function inTheLab(page: Page) {
+  await page.setViewportSize(COMPUTER);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await standing(page);
 }
 
 // A place drawn: the look runs off the frame, so the count of looks says it has been taken.
@@ -243,11 +252,7 @@ for (const systems of [100, 1000, 10_000])
 test("gives the release's page the cosmos as a view, from the recorded file, for Alexis's own GPU", async ({
   page,
 }) => {
-  await page.setViewportSize(COMPUTER);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/lab/realism.html?view=cosmos");
-  await running(page);
-  await standing(page);
+  await inTheLab(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
 });
 
@@ -305,11 +310,7 @@ test("puts the nebulae out near a world: space is near-black there", async ({ pa
 });
 
 test("gives the release's page the nebulae, and their credits in its footer", async ({ page }) => {
-  await page.setViewportSize(COMPUTER);
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/lab/realism.html?view=cosmos");
-  await running(page);
-  await standing(page);
+  await inTheLab(page);
   await lit(page);
   for (const credit of CREDITS.filter(({ files }) => files.some((file) => NEBULA_IMAGES.some((name) => name === file))))
     await expect(page.locator("footer")).toContainText(credit.line);
@@ -391,4 +392,138 @@ test.describe("the nebulae's light", () => {
     for (const [channel, value] of (onEarth ?? []).entries())
       expect(Math.abs(value - (offEarth?.[channel] ?? NaN))).toBeLessThan(2);
   });
+});
+
+// The whole cosmos (ADR-0002 §10; Alexis, 2026-11-02): past a cluster's distance the worlds themselves are the nebula, a soft point for each
+// real world, a thin line for each real import between two, gold for real live activity only. Two draws of its own, whatever the file.
+const WHOLE_JS = /\/assets\/web-[\w-]+\.js$/;
+// The sky's own, the nebulae's three images and the whole cosmos's two: what a frame draws out there.
+const WHOLE_DRAWS_AT_MOST = 10;
+// The sky's stars and motes, whatever the file: 46,656 drawn on this window. Out there no point of the disc is.
+const SKY_POINTS_AT_MOST = 48 * 1024;
+const linkedFileOf = (count: number) => {
+  const namespaces = Math.max(1, Math.round(count / 5));
+  const id = (at: number) => `n${String(at % namespaces)}/w${String(at)}`;
+  return JSON.stringify({
+    version: 1,
+    universe: "onyx",
+    updated: "2026-11-01T00:00:00Z",
+    worlds: Array.from({ length: count }, (_, at) => ({
+      id: id(at),
+      namespace: `n${String(at % namespaces)}`,
+      realms: [
+        {
+          path: `gno.land/r/${id(at)}`,
+          deployer: null,
+          deployerName: null,
+          functions: [],
+          imports: at % 3 === 0 ? [`gno.land/r/${id((at + 7) % count)}`] : [],
+          calls: null,
+          callers: null,
+          lastHeight: null,
+        },
+      ],
+    })),
+  });
+};
+// Its pairs, counted apart from the code: every third world names the seventh on, each pair once whichever way.
+const linesOf = (count: number) => {
+  const pairs = new Set<string>();
+  for (let at = 0; at < count; at += 3) {
+    const to = (at + 7) % count;
+    if (to !== at) pairs.add([Math.min(at, to), Math.max(at, to)].join(" "));
+  }
+  return pairs.size;
+};
+const whole = async (page: Page) => {
+  const { eye } = await stats(page);
+  // Back along the view's axis, the disc in the middle.
+  const far = { x: eye.x, y: eye.y, z: eye.z + 1100 };
+  await moveTo(page, far);
+  expect(focusDistance(far)).toBeGreaterThan(1000);
+  await expect.poll(async () => (await cosmos(page)).web?.share ?? 0, SLOW).toBe(1);
+};
+
+test("asks nothing of the whole cosmos at the arrival", async ({ page }) => {
+  let asked = 0;
+  await page.route(WHOLE_JS, (route) => {
+    asked += 1;
+    return route.fallback();
+  });
+  await served(page, linkedFileOf(300));
+  await arrived(page);
+  await standing(page);
+  expect(asked).toBe(0);
+  expect((await cosmos(page)).web).toBeUndefined();
+});
+
+for (const count of [100, 1_000, 10_000, 20_000])
+  test(`draws the whole cosmos at ${String(count)} worlds: a point a world, a line a link, two draws`, async ({
+    page,
+  }) => {
+    await served(page, linkedFileOf(count));
+    await arrived(page);
+    await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+    await whole(page);
+    expect((await cosmos(page)).web).toMatchObject({ points: count, lines: linesOf(count), gold: 0 });
+    const { calls, points } = await stats(page);
+    expect(calls).toBeLessThanOrEqual(WHOLE_DRAWS_AT_MOST);
+    expect(points - count).toBeLessThanOrEqual(SKY_POINTS_AT_MOST);
+  });
+
+test("draws the recorded file whole: 533 soft points, no line and no gold, for it read no package and no call", async ({
+  page,
+}) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 0, gold: 0 });
+  await opened(page);
+  await hideThePage(page);
+  const shot = await page.locator("canvas").screenshot();
+  const [middle, corner] = await colours(page, shot, [
+    [COMPUTER.width / 2 - 60, COMPUTER.height / 2 - 60, COMPUTER.width / 2 + 60, COMPUTER.height / 2 + 60],
+    [4, 4, 40, 40],
+  ]);
+  // Warm at home, rose and peach, on near-black: the disc's middle in the middle of the view (about (15, 9, 6) on average there).
+  const [red = 0, green = 0, blue = 0] = middle ?? [];
+  expect(red).toBeGreaterThan(blue * 1.5);
+  expect(red + green + blue).toBeGreaterThan(15);
+  expect(Math.max(...(corner ?? [255]))).toBeLessThan(60);
+});
+
+test("lights gold the one world called in the last run, read from a file written now", async ({ page }) => {
+  const file = JSON.parse(linkedFileOf(300)) as {
+    updated: string;
+    worlds: { realms: { calls: number | null; lastHeight: number | null }[] }[];
+  };
+  file.updated = new Date().toISOString();
+  const [first] = file.worlds;
+  for (const realm of first?.realms ?? []) Object.assign(realm, { calls: 40, lastHeight: 9000 });
+  await served(page, JSON.stringify(file));
+  await arrived(page);
+  await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 300, gold: 1 });
+});
+
+test("costs the same two draws on a weak GPU's tier, at 20,000 worlds", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("gnoworld:scene:tier", "low");
+  });
+  await served(page, linkedFileOf(20_000));
+  await arrived(page);
+  await expect.poll(async () => (await stats(page)).tier, SLOW).toBe("low");
+  await expect.poll(async () => (await cosmos(page)).stars, SLOW).toBeGreaterThan(1);
+  await whole(page);
+  expect((await cosmos(page)).web).toMatchObject({ points: 20_000, lines: linesOf(20_000) });
+  expect((await stats(page)).calls).toBeLessThanOrEqual(WHOLE_DRAWS_AT_MOST);
+});
+
+test("gives the release's page the whole cosmos, with the links read on the chain for its sample", async ({ page }) => {
+  await inTheLab(page);
+  await whole(page);
+  // The 18 pairs of worlds the sample of 58 realms read on Onyx links (app/lab/imports.json, the part's state file).
+  expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 18, gold: 0 });
 });

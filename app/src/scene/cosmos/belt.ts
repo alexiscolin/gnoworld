@@ -25,6 +25,7 @@ void main() {
 }`;
 
 const FRAGMENT = /* glsl */ `
+uniform float uFade;
 varying vec3 vToStar;
 void main() {
   vec2 at = gl_PointCoord * 2.0 - 1.0;
@@ -32,7 +33,7 @@ void main() {
   float reach = dot(at, at);
   if (reach >= 1.0) discard;
   float lit = smoothstep(-0.1, 0.9, dot(vec3(at, sqrt(1.0 - reach)), vToStar));
-  gl_FragColor = vec4(vec3(0.3, 0.2, 0.13) * (0.3 + 1.4 * lit), 0.75 * (1.0 - reach));
+  gl_FragColor = vec4(vec3(0.3, 0.2, 0.13) * (0.3 + 1.4 * lit), 0.75 * (1.0 - reach) * uFade);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -49,13 +50,15 @@ const streamOf = (seed: number) => {
 export class Belt {
   readonly #cloud: Cloud<"position" | "aStar" | "aSize">;
   readonly #ratio = { value: 1 };
+  /** How much of them shows: the whole cosmos takes the rest. */
+  readonly fade = { value: 1 };
   #count = 0;
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
     const material = new ShaderMaterial({
       depthWrite: false,
       transparent: true,
-      uniforms: { uRatio: this.#ratio },
+      uniforms: { uRatio: this.#ratio, uFade: this.fade },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });

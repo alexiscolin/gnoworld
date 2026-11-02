@@ -24,7 +24,7 @@ if (panel !== null) panel.hidden = true;
 
 const scene = startScene({ canvas, remembered: undefined, remember: () => undefined, onLost: () => undefined });
 const file = linked(recorded, read);
-scene.cosmos(file.worlds);
+scene.cosmos(file.worlds, file.updated);
 Reflect.set(globalThis, "__gnoworldScene", scene);
 
 let away = 1;

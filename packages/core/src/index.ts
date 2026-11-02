@@ -77,7 +77,7 @@ export {
   type RealmFunctions,
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseCounts } from "./planet/gauges.ts";
-export { auroraOf, BLOCK_MS, stormsOf } from "./planet/activity.ts";
+export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { worldIdOf } from "./cosmos/worldId.ts";
@@ -147,7 +147,7 @@ export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
 export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
-export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export {
   NEBULA_IMAGES,
   NEBULA_LAYERS,

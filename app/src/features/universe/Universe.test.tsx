@@ -12,7 +12,7 @@ const scene = vi.hoisted(() => ({
   dispose: vi.fn<() => void>(),
   earth: vi.fn<(place: unknown, said: (state: string) => void) => void>(),
   world: vi.fn<(place: unknown, said: (state: string, colour?: string) => void) => void>(),
-  cosmos: vi.fn<(worlds: unknown) => void>(),
+  cosmos: vi.fn<(worlds: unknown, written?: string) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   read: vi.fn(),
   start: vi.fn(),
@@ -152,6 +152,21 @@ describe("the cosmos's worlds", () => {
     await settle();
     expect(scene.read).toHaveBeenCalledTimes(1);
     expect(scene.cosmos).toHaveBeenLastCalledWith(WORLDS);
+  });
+
+  it("hands over the file's time with its worlds, whole, so the whole cosmos ages their calls", async () => {
+    const worlds = [
+      {
+        id: "a/b",
+        namespace: "a",
+        realms: [{ path: "gno.land/r/a/b", imports: ["gno.land/r/c/d"], callers: 3, calls: 40, lastHeight: 9000 }],
+      },
+    ];
+    scene.read.mockImplementation(() => Promise.resolve({ worlds, updated: "2026-11-01T00:00:00Z" }));
+    rendered("cosmos");
+    await settle();
+    expect(scene.cosmos).toHaveBeenLastCalledWith(worlds, "2026-11-01T00:00:00Z");
+    expect(scene.cosmos.mock.lastCall?.[0]).toBe(worlds);
   });
 
   it("stands the fixed places at once, whatever the file does: one that never answers draws them too", async () => {

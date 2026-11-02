@@ -11,7 +11,7 @@ export interface Cloud<Name extends string> {
 }
 
 /** Room for `most` vertices, each with `items` numbers in each named attribute, none shown yet. Its geometry is the caller's to free. */
-function cloudOf<Name extends string>(most: number, items: Readonly<Record<Name, number>>): Cloud<Name> {
+export function cloudOf<Name extends string>(most: number, items: Readonly<Record<Name, number>>): Cloud<Name> {
   const geometry = new BufferGeometry();
   const names = Object.keys(items) as Name[];
   const attributes = Object.fromEntries(

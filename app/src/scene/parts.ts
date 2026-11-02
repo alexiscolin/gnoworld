@@ -1,7 +1,8 @@
 // The scene's parts behind chunks of their own, the cosmos and a world's page (door.ts), and what was asked of each before it came: a page
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
-import type { Cosmos, CosmosWorld } from "./cosmos/cosmos.ts";
+import type { Cosmos } from "./cosmos/cosmos.ts";
+import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
 import { Door } from "./door.ts";
 import type { EarthDevice } from "./earth/device.ts";
@@ -10,6 +11,7 @@ import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
 export class CosmosPart {
   readonly door: Door<Cosmos>;
   #worlds: readonly CosmosWorld[] | undefined;
+  #written: string | undefined;
   #box: ClearBox | undefined;
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
@@ -24,17 +26,24 @@ export class CosmosPart {
       {
         came: (cosmos) => {
           cosmos.keepClear(this.#box);
-          cosmos.show(this.#worlds);
+          this.#tell(cosmos);
           came();
         },
       },
     );
   }
 
-  show(worlds: readonly CosmosWorld[] | undefined): void {
+  show(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
     this.#worlds = worlds;
-    this.door.part?.show(worlds);
+    this.#written = written;
+    if (this.door.part !== undefined) this.#tell(this.door.part);
     if (worlds !== undefined) this.door.open();
+  }
+
+  // The file's time goes with its worlds once there is one: it ages their calls.
+  #tell(cosmos: Cosmos): void {
+    if (this.#written === undefined) cosmos.show(this.#worlds);
+    else cosmos.show(this.#worlds, this.#written);
   }
 
   keepClear(box: ClearBox | undefined): void {

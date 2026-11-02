@@ -16,7 +16,7 @@ interface DotLook {
 
 /** Which way a world stands from its star, its orbit's radius, phase and its star's spin given: the one place a world's point and its
  * lines take it, at any distance (GLSL). */
-const ORBITING = /* glsl */ `
+export const ORBITING = /* glsl */ `
 vec3 orbiting(vec3 orbit, float seconds) {
   float angle = orbit.y + orbit.z * seconds;
   return vec3(cos(angle), 0.0, sin(angle));
@@ -45,6 +45,7 @@ void main() {
 }`;
 
 const FRAGMENT = /* glsl */ `
+uniform float uFade;
 varying vec3 vTint;
 varying float vLight;
 varying vec3 vStar;
@@ -55,7 +56,7 @@ void main() {
   if (reach >= 1.0) discard;
   vec3 normal = vec3(at, sqrt(1.0 - reach));
   float lit = smoothstep(-0.16, 0.95, dot(normal, vStar));
-  gl_FragColor = vec4(vTint * (0.2 + 0.9 * lit) * vLight * (1.0 - smoothstep(0.45, 1.0, reach)), 1.0);
+  gl_FragColor = vec4(vTint * (0.2 + 0.9 * lit) * vLight * uFade * (1.0 - smoothstep(0.45, 1.0, reach)), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
@@ -64,13 +65,15 @@ export class Dots {
   readonly #cloud: Cloud<"position" | "aOrbit" | "aTint" | "aSize">;
   readonly #seconds = { value: 0 };
   readonly #ratio = { value: 1 };
+  /** How much of them shows: the whole cosmos takes the rest. */
+  readonly fade = { value: 1 };
 
   constructor(parent: Object3D, owner: Disposer, most: number) {
     const material = new ShaderMaterial({
       blending: AdditiveBlending,
       depthWrite: false,
       transparent: true,
-      uniforms: { uSeconds: this.#seconds, uRatio: this.#ratio },
+      uniforms: { uSeconds: this.#seconds, uRatio: this.#ratio, uFade: this.fade },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
     });
