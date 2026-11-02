@@ -374,6 +374,23 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(/albedo = mix\(albedo, riftTint, /);
   });
 
+  // Europa's lineae (the chief, 7b5's second look): long, gently curved arcs crossing at angles across the disc, few of them, each a dark
+  // band between two light ridges; the arcs are small circles about the world's own axes, broken into long runs.
+  it("draws rifts as long crossing arcs with a doubled profile", () => {
+    const band = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf("float lines("));
+    const body = band.slice(0, band.indexOf("\n}\n"));
+    expect(body).toMatch(/for \(int k = 0; k < 8; k\+\+\)/);
+    expect(body).toMatch(/dot\(at, /);
+    expect(GENERATED_FRAGMENT).toMatch(/rift = lines\(ridge, at, /);
+    expect(GENERATED_FRAGMENT).toMatch(/albedo \*= 1\.0 \+ [\d.]+ \* max\(ridge, 0\.0\)/);
+  });
+
+  // The minor's edge frays as a coast does (the chief): the ground's octaves between 8 and 2 pixels break it, never finer, so no speck.
+  it("frays the minor's edge with the ground's own finer octaves", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/fray = \(ground\.x - ground\.z\) \/ ground\.y;/);
+    expect(GENERATED_FRAGMENT).toMatch(/\* 0\.77 \+ [\d.]+ \* fray;/);
+  });
+
   // The minor through the structure (the chief; F4245): on a ground, the broad height (a finer term flips its edge into specks) and the
   // latitude, at a narrow edge; on a giant, whole bands, 60% of the way to the main class's lightness (darker, they dimmed the night's
   // lights under the grade's toe: realism.spec's belts; matched, a dark giant lost its detail); a glowing crust's own. Never a soft blob.

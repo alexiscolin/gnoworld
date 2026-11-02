@@ -172,8 +172,16 @@ vec3 bentBy(float height, vec3 normal) {
   return normalize(normal - slope);
 }
 float lines(out float ridge, vec3 at, float width, float pixel) {
-  float away = min(abs(noise(at)), 3.0 * abs(noise(at * 1.6 + 11.0)));
-  width *= 0.5 + 2.0 * smoothstep(-0.25, 0.25, noise(at * 0.4 + 7.0));
+  float away = 1.0;
+  for (int k = 0; k < 8; k++) {
+    if (float(k) >= 2.0 + 6.0 * shape.rifts) break;
+    ivec3 cell = ivec3(k, 977, 31) + ivec3(offset);
+    vec3 pole = normalize(slopeAt(cell) + vec3(0.001));
+    float bend = (float(hashOf(cell + 7) & 255u) / 255.0 - 0.5) * 1.2;
+    float run = smoothstep(-0.3, -0.1, noise(at * 0.8 + vec3(float(k) * 3.7)));
+    away = min(away, mix(1.0, abs(noise(at * 1.3 + vec3(float(k))) * 0.06 + dot(at, pole) - bend), run));
+  }
+  width *= 0.6 + 0.8 * smoothstep(-0.25, 0.25, noise(at * 2.0 + 7.0));
   float core = 1.0 - smoothstep(0.0, max(width, pixel), away);
   float edge = max(width, pixel);
   float margins = smoothstep(0.6 * edge, 1.2 * edge, away) * (1.0 - smoothstep(1.2 * edge, 2.4 * edge, away));

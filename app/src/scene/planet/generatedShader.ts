@@ -68,6 +68,7 @@ void main() {
 
   float height = 0.0;
   float broad = 0.0;
+  float fray = 0.0;
   float relieved = 0.0;
   float cratered = 0.0;
   float t;
@@ -82,6 +83,7 @@ void main() {
     cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(p, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
     broad = ground.z / ground.y;
+    fray = (ground.x - ground.z) / ground.y;
     height = ground.x / ground.y + cratered * 0.8;
     relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.04, 0.08, shape.scale * 4.0 * pixel));
   }
@@ -90,7 +92,7 @@ void main() {
     vec3 along = banded > 0.5 ? vec3(at.x, at.y * 3.0, at.z) : at;
     vec4 patches = fbm(along + minorOffset, shape.mix, pixel, 0.0, 3.0);
     float pole = (abs(axis.y) - 0.5) * 3.46 * sign(minorOffset.x - 8.0);
-    float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77;
+    float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77 + 1.2 * fray;
     if (banded > 0.5) z = (0.4 * patches.x / patches.y + (t - 0.5) * 3.5) * 0.93;
     minor = smoothstep(1.0 - minorShare - 0.03, 1.0 - minorShare + 0.03, shareOf(vec2(z, 1.0)));
   }
@@ -128,13 +130,14 @@ void main() {
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
   if (shape.rifts > 0.0) {
-    float riven = smoothstep(1.0 - shape.rifts, 1.2 - shape.rifts, shareOf(fbm(at * 1.3 + minorOffset.zxy, 1.5, pixel, 0.0, 2.0).xy));
+    float riven = smoothstep(0.0, 0.15, shape.rifts);
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
-    if (riven > 0.0) rift = lines(ridge, at * 2.1 + 0.35 * flow, 0.006 + 0.03 * shape.rifts, 2.3 * pixel) * riven;
+    if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
     relieved += 0.4 * ridge * riven;
     vec3 riftTint = mix(low * 0.6, vec3(0.42, 0.2, 0.11), smoothstep(0.12, 0.3, dot(mid, LUMA)));
     albedo = mix(albedo, riftTint, rift * 0.75);
+    albedo *= 1.0 + 0.3 * max(ridge, 0.0) * riven;
   }
 
   vec3 normal = normalize(vNormal);
