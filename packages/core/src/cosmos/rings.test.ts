@@ -168,24 +168,15 @@ describe("seatInRings, for any rays", () => {
   });
 });
 
-// The worst rays a walk can meet, which no plain walk survives: a ratio of two timings failed at load 20 (F3550), so these bounds stand over
-// 20 times the time measured. StrykerJS's instrumented code times nothing of the algorithm: there the time gives way, not the seats (F831).
+// The worst rays a walk can meet, 30 ms measured. No clock here, for two bounds on one failed at load 20 and 34 (F3551): the test's own
+// timeout is the bound, and a plain walk, at 7 billion steps, never reaches it.
 describe("its cost: n log n at most, whatever the rays", () => {
-  const instrumented = "__stryker__" in globalThis;
-  const timed = (work: () => void): number => {
-    const start = Date.now();
-    work();
-    return Date.now() - start;
-  };
-
-  it("seats 120,000 rays that are one ray, a ring each, in under a second: walking takes 7 billion steps", () => {
-    const one = new Array<number>(120_000).fill(0.25);
-    expect(instrumented || timed(() => seatInRings(one)) < 1000).toBe(true);
-    expect(seatInRings(one).at(-1)?.ring).toBe(120_000);
+  it("seats 120,000 rays that are one ray, a ring each", () => {
+    expect(seatInRings(new Array<number>(120_000).fill(0.25)).at(-1)?.ring).toBe(120_000);
   });
 
-  it("seats 120,000 rays on eight turns in under a second: each cell looked at seats one", () => {
+  it("seats 120,000 rays on eight turns: each cell looked at seats one", () => {
     const eight = Array.from({ length: 120_000 }, (_, at) => (at % 8) / 8);
-    expect(instrumented || timed(() => seatInRings(eight)) < 1000).toBe(true);
+    expect(seatInRings(eight).at(-1)?.ring).toBe(15_000);
   });
 });
