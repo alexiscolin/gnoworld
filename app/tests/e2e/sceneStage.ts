@@ -30,6 +30,8 @@ interface Stats {
   geometries: number;
   textures: number;
   eye: { x: number; y: number; z: number };
+  turn: { yaw: number; pitch: number };
+  seconds: number;
   cosmos: CosmosStats | undefined;
 }
 

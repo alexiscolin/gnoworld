@@ -208,6 +208,8 @@ class LiveScene implements Scene {
       probing: this.#probe.running,
       ...rendered(this.#renderer.info),
       eye: { ...this.#eye.at },
+      turn: { ...this.#eye.turn },
+      seconds: this.#eye.seconds,
       earth: this.#earth.stats(),
       cosmos: this.#cosmos.stats(),
     };

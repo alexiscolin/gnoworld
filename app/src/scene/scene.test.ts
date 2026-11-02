@@ -969,6 +969,18 @@ describe("the eye", () => {
     scene.dispose();
   });
 
+  // F4250's journey reads them: a globe that stays on its circle proves nothing while the eye stands still.
+  it("tells the journeys how the eye looks about and its clock", () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(20_000);
+    const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
+    const turn = { yaw: NaN, pitch: NaN };
+    turnAt(turn, seconds);
+    expect(scene.stats().turn).toEqual(turn);
+    expect(scene.stats().seconds).toBe(seconds);
+    scene.dispose();
+  });
+
   it("looks straight ahead under reduced motion", () => {
     query(MOTION).matches = true;
     const scene = startScene(options({ remembered: "low" }), clock);

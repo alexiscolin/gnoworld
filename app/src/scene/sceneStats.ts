@@ -40,6 +40,9 @@ export interface SceneStats {
   readonly geometries: number;
   readonly textures: number;
   readonly eye: Point;
+  /** How the eye looks about, and its clock, which reduced motion stands still. */
+  readonly turn: { readonly yaw: number; readonly pitch: number };
+  readonly seconds: number;
   readonly earth: ReturnType<EarthView["stats"]>;
   readonly cosmos: ReturnType<Cosmos["stats"]> | undefined;
 }

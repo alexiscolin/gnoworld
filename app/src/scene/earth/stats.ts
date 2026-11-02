@@ -47,10 +47,11 @@ const projected = (point: Vector3, { width, height, camera }: Screen) => {
   return { x: ((x + 1) / 2) * width, y: ((1 - y) / 2) * height };
 };
 
-// The edge of the disc, on the sphere's circle of contact with the eye's cone.
+// The edge of the disc, on the sphere's circle of contact with the eye's cone, in the camera's own axes: the camera may look about.
 function limbRadius(distance: number, screen: Screen): number {
-  const centre = projected(new Vector3(0, 0, -distance), screen);
-  const contact = new Vector3(Math.sqrt(1 - 1 / distance ** 2), 0, 1 / distance - distance);
+  const { quaternion } = screen.camera;
+  const centre = projected(new Vector3(0, 0, -distance).applyQuaternion(quaternion), screen);
+  const contact = new Vector3(Math.sqrt(1 - 1 / distance ** 2), 0, 1 / distance - distance).applyQuaternion(quaternion);
   return projected(contact, screen).x - centre.x;
 }
 
@@ -58,22 +59,32 @@ function limbRadius(distance: number, screen: Screen): number {
 export function earthStats(globe: Globe | undefined, status: Status, screen: Screen): EarthStats | undefined {
   if (globe === undefined) return status.state === "gone" ? undefined : { ...status, ...NOWHERE };
   screen.camera.updateMatrixWorld();
-  const centre = globe.group.position;
+  const { position: centre, quaternion } = globe.group;
   const onOrbit = Array.from({ length: ORBIT_SAMPLES }, (_, index) =>
-    projected(globe.orbitAt((index / ORBIT_SAMPLES) * TURN).add(centre), screen),
+    projected(
+      globe
+        .orbitAt((index / ORBIT_SAMPLES) * TURN)
+        .applyQuaternion(quaternion)
+        .add(centre),
+      screen,
+    ),
   );
   const moon = globe.moon.group.position;
+  const ahead = -centre.clone().applyQuaternion(screen.camera.quaternion.clone().invert()).z;
   return {
     ...status,
     ...projected(centre, screen),
-    radius: limbRadius(-centre.z, screen),
+    radius: limbRadius(ahead, screen),
     orbit: {
       left: Math.min(...onOrbit.map(({ x }) => x)),
       right: Math.max(...onOrbit.map(({ x }) => x)),
       top: Math.min(...onOrbit.map(({ y }) => y)),
       bottom: Math.max(...onOrbit.map(({ y }) => y)),
     },
-    moon: { ...projected(moon.clone().add(centre), screen), front: moon.z > 0 && moon.length() >= ORBIT_RADIUS - 1e-6 },
+    moon: {
+      ...projected(moon.clone().applyQuaternion(quaternion).add(centre), screen),
+      front: moon.z > 0 && moon.length() >= ORBIT_RADIUS - 1e-6,
+    },
     mapWidth: globe.mapWidth,
   };
 }

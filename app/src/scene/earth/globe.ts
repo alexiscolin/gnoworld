@@ -71,9 +71,11 @@ export class Globe {
     this.#latitude = latitude;
   }
 
-  /** Stands the sun at `azimuth` round the pole, in the ground's sense, past the Earth's lean. */
+  /** Stands the sun at `azimuth` round the pole, in the ground's sense, past the Earth's lean and the globe's own turn. */
   setSun(azimuth: number): void {
-    starAt(this.#latitude, azimuth, this.#sun).applyEuler(this.#earth.group.rotation);
+    starAt(this.#latitude, azimuth, this.#sun)
+      .applyEuler(this.#earth.group.rotation)
+      .applyQuaternion(this.group.quaternion);
     this.#earth.setSun(this.#sun);
     this.moon.setSun(this.#sun);
   }

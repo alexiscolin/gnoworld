@@ -133,6 +133,37 @@ test.describe("a computer", () => {
     expect(Math.abs(orbit.right - 1315)).toBeLessThanOrEqual(8);
   });
 
+  // F4250: every other journey here runs under reduced motion, so none saw the eye's slow look about move the globe off its circle.
+  // How far the eye turned from the first sample to the last, in radians.
+  const turned = (seen: readonly { yaw: number; pitch: number }[]) => {
+    const [first, last] = [seen[0], seen.at(-1)];
+    return first === undefined || last === undefined ? 0 : Math.hypot(last.yaw - first.yaw, last.pitch - first.pitch);
+  };
+
+  test("keeps the globe on frame 39's circle with motion on, as the eye looks slowly about", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto(EARTH);
+    await hydrated(page);
+    await painted(page);
+    const seen: { x: number; y: number; radius: number; yaw: number; pitch: number }[] = [];
+    // Past the globe's own arrival, which a software GPU draws in many slow frames: it settles on the circle, then the look about turns.
+    await expect.poll(async () => Math.abs((await earth(page)).x - 961), SLOW).toBeLessThanOrEqual(2);
+    for (let sample = 0; sample < 4; sample += 1) {
+      const { seconds } = await stats(page);
+      await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(seconds + 1);
+      const [{ x, y, radius }, { turn }] = [await earth(page), await stats(page)];
+      seen.push({ x, y, radius, ...turn });
+    }
+    for (const { x, y, radius } of seen) {
+      near(x, 961, "the globe's centre, across, with motion on");
+      near(y, 561, "the globe's centre, down, with motion on");
+      near(radius, 321, "the globe's radius, with motion on");
+    }
+    // The look about is a circle of 0.26 radians at 150 s a turn: three seconds of the scene's clock turn the eye about 0.03 radians, in
+    // yaw or in pitch as the circle goes, and the globe has had the time to leave.
+    expect(turned(seen)).toBeGreaterThan(0.02);
+  });
+
   test("keeps the plate's words clear of the ring", async ({ page }) => {
     await opened(page);
     const { orbit } = await earth(page);

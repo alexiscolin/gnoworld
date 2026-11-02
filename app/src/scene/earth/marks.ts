@@ -21,10 +21,11 @@ export interface Ground {
   face(place: LatLon): void;
 }
 
-/** Where the ground stands now: one object, written again on each frame. */
+/** Where the ground stands now: one object, written again on each frame. `frame` is the globe's own turn, with the camera. */
 export interface Pose {
   turn: number;
   lean: Euler;
+  frame: Quaternion;
   centre: Vector3;
   scale: number;
 }
@@ -33,6 +34,7 @@ export interface Pose {
 export function poseOf(pose: Pose, globe: { readonly lean: Euler; readonly group: Group }, turn: number): Pose {
   pose.turn = turn;
   pose.lean = globe.lean;
+  pose.frame = globe.group.quaternion;
   pose.centre = globe.group.position;
   pose.scale = globe.group.scale.x;
   return pose;
@@ -69,9 +71,9 @@ export class GroundMarks {
   }
 
   /** Tells each mark where it stands. */
-  place({ turn, lean, centre, scale }: Pose, { width, height, camera }: Screen): void {
+  place({ turn, lean, frame, centre, scale }: Pose, { width, height, camera }: Screen): void {
     for (const { mark, ground } of this.#held) {
-      const normal = this.#normal.copy(ground).applyAxisAngle(POLE, -turn).applyEuler(lean);
+      const normal = this.#normal.copy(ground).applyAxisAngle(POLE, -turn).applyEuler(lean).applyQuaternion(frame);
       const point = this.#point.copy(normal).multiplyScalar(scale).add(centre);
       const front = -normal.dot(point) / point.length() > CLEAR;
       point.project(camera);
@@ -80,8 +82,8 @@ export class GroundMarks {
   }
 
   /** The ground under the eye, in degrees: the eye sits at the origin. */
-  facing({ turn, lean, centre }: Pose): LatLon {
-    this.#tilt.setFromEuler(lean).invert();
+  facing({ turn, lean, frame, centre }: Pose): LatLon {
+    this.#tilt.setFromEuler(lean).premultiply(frame).invert();
     const { x, y, z } = this.#point
       .copy(centre)
       .negate()
