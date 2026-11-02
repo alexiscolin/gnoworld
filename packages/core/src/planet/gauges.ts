@@ -16,7 +16,7 @@ export interface UseCounts {
 }
 
 /** `value` as a share; what is no number counts for nothing. */
-const share = (value: number): number => (value > 0 ? Math.min(value, 1) : 0);
+export const share = (value: number): number => (value > 0 ? Math.min(value, 1) : 0);
 
 const rung = (count: number, busiest: number) => share(Math.log1p(count) / Math.log1p(Math.max(busiest, QUIET_TOP)));
 
