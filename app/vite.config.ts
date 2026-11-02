@@ -75,7 +75,8 @@ const CHUNKS = [
     name: "ui",
     test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row)\/)/,
   },
-  { name: "vendor", test: /node_modules/, minShareCount: 2 },
+  // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
+  { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
 ];
 
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
