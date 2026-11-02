@@ -26,6 +26,8 @@ export class CosmosLabels {
   constructor(document: Document, seen: Seen) {
     this.#seen = seen;
     this.#labels = new Labels(document, seen.projector);
+    // The journeys read where each label stands, in a test build; a production build holds no trace of it.
+    if (import.meta.env.VITE_GNOWORLD_TEST_GPU === "1") Reflect.set(globalThis, "__gnoworldLabels", this.#labels);
     this.#earth = {
       get position() {
         return seen.earth() ?? NOWHERE;
@@ -64,10 +66,6 @@ export class CosmosLabels {
 
   tick(eye: Point, shown: boolean): void {
     this.#labels.tick(eye, shown);
-  }
-
-  stats() {
-    return this.#labels.stats();
   }
 
   dispose(): void {

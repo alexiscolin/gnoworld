@@ -79,8 +79,12 @@ const onPage = (page: Page) =>
     }),
   );
 const shownOnPage = async (page: Page): Promise<Seen[]> => (await onPage(page)).filter(({ opacity }) => opacity > 0.05);
-const placed = async (page: Page): Promise<Placed[]> =>
-  ((await stats(page)).cosmos as unknown as { labels?: Placed[] } | undefined)?.labels ?? [];
+// Where each label stands, as the test build hands it to the journeys.
+const placed = (page: Page): Promise<Placed[]> =>
+  page.evaluate(() => {
+    const labels: unknown = Reflect.get(globalThis, "__gnoworldLabels");
+    return labels === undefined ? [] : (labels as { stats: () => Placed[] }).stats();
+  });
 // The labels a view at rest shows, once they stand: the bodies', and the Earth's once its globe has come.
 async function settled(page: Page, least = 4) {
   await expect.poll(async () => (await shownOnPage(page)).length, SLOW).toBeGreaterThanOrEqual(least);

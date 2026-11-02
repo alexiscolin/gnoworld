@@ -225,7 +225,6 @@ export class Cosmos {
       // Where the eye stands on the stage: the scene's, moved to the view at rest's and swayed.
       eye: { ...this.#eye },
       web: this.#whole.stats(),
-      labels: this.#labels.stats(),
     };
   }
 }

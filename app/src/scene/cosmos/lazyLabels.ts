@@ -61,8 +61,4 @@ export class LazyLabels {
   tick(eye: Point, shown: boolean): void {
     this.#part?.tick(eye, shown);
   }
-
-  stats() {
-    return this.#part?.stats();
-  }
 }
