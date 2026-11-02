@@ -2,15 +2,26 @@
 // two ways, for Alexis's eye on a real GPU. Not shipped: lab.config.ts builds it, and only the journeys and his link see it. Under reduced
 // motion it draws once a change, which is also what a software GPU's journeys want.
 import { ANCHORS, pixelRatioFor, STAGES, type Stage } from "@gnoworld/core";
-import { ACESFilmicToneMapping, Vector3, type WebGLRenderer } from "three";
+import { ACESFilmicToneMapping, type WebGLRenderer } from "three";
 import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
-import { mapBytes } from "../src/scene/planet/maps.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
-import { looksOf, pathOf, type Choice, type Method, type ViewName } from "./choice.ts";
+import { pathOf, type Choice, type Method, type Tier, type ViewName } from "./choice.ts";
+import { probes } from "./probes.ts";
 import { buildView, type View } from "./views.ts";
 
-const VIEWS: readonly ViewName[] = ["gallery", "gallery24", "close", "eclipse", "nebula", "earth", "stages"];
+const VIEWS: readonly ViewName[] = [
+  "gallery",
+  "gallery24",
+  "real24",
+  "class24",
+  "variety",
+  "close",
+  "eclipse",
+  "nebula",
+  "earth",
+  "stages",
+];
 const KEYS: Partial<Record<string, ViewName>> = {
   "1": "gallery",
   "2": "close",
@@ -18,7 +29,10 @@ const KEYS: Partial<Record<string, ViewName>> = {
   "4": "nebula",
   "5": "earth",
   "6": "stages",
+  "7": "real24",
   "8": "gallery24",
+  "9": "class24",
+  "0": "variety",
 };
 // The grade 7a2 gives the renderer itself, once it lands.
 const EXPOSURE = 0.8;
@@ -44,12 +58,29 @@ function worldIn(query: URLSearchParams, view: ViewName): number {
   return view === "nebula" ? GIANT : 0;
 }
 
+// One of the recorded file's 24 seen close: an index, or none.
+function realIn(query: URLSearchParams): number | null {
+  const index = Number(query.get("real"));
+  return query.has("real") && Number.isInteger(index) && index >= 0 && index < 24 ? index : null;
+}
+
 function chosen(query: URLSearchParams): Choice {
   const view = VIEWS.find((name) => name === query.get("view")) ?? "gallery";
   const method: Method = query.get("method") === "image" ? "image" : "computed";
   const stage = STAGES.find((name) => name === query.get("stage")) ?? "rest";
   const present = query.has("present") ? Number(query.get("present")) : null;
-  return { view, world: worldIn(query, view), seed: 0, method, stage, present };
+  const [minor, flat] = [query.get("minor") !== "off", query.get("maps") === "flat"];
+  return {
+    view,
+    world: worldIn(query, view),
+    seed: 0,
+    method,
+    stage,
+    present,
+    real: realIn(query),
+    minor,
+    flat,
+  };
 }
 
 // The next stage along the road, stopping at its ends.
@@ -66,7 +97,8 @@ const say = (id: string, text: string) => {
 need("footer").textContent = CREDITS.map((credit) => credit.line).join(" · ");
 
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const ratio = pixelRatioFor(devicePixelRatio, false, "high");
+const tier: Tier = new URLSearchParams(location.search).get("tier") === "low" ? "low" : "high";
+const ratio = pixelRatioFor(devicePixelRatio, false, tier);
 const renderer: WebGLRenderer = createRenderer(canvas, true);
 renderer.toneMapping = ACESFilmicToneMapping;
 renderer.toneMappingExposure = EXPOSURE;
@@ -79,6 +111,10 @@ let building = 0;
 let eyeX = 0;
 let eyeY = 0;
 let frames = 0;
+
+// What the journeys read of the page; C shows a frame's cost, for a real GPU, where a software one cannot tell (7b5's report).
+const FRAMES_MEASURED = 30;
+const lab = probes({ renderer, canvas, gpu, draw, view: () => view, choice: () => choice, frames: () => frames });
 
 // Resizing a canvas clears it and reallocates its buffers: only a real change of size may do it.
 function fit(): void {
@@ -94,6 +130,9 @@ function report(): void {
   const names: Partial<Record<ViewName, string>> = {
     gallery: "ADR-0002's twelve anchors",
     gallery24: "All 24 anchors",
+    real24: "24 worlds of the recorded file",
+    class24: `24 worlds of one class, ${ANCHORS[choice.world] ?? ""}`,
+    variety: "Eight classes in frame",
     earth: "The Earth",
   };
   say("world", `${names[choice.view] ?? name} · ${choice.view === "stages" ? "every stage" : choice.stage}`);
@@ -133,17 +172,28 @@ function step(change: Partial<Choice>): void {
   });
 }
 
+// Keys that change no view: P hides the panel, C reads a frame's cost.
+const asides: Partial<Record<string, () => void>> = {
+  p: () => {
+    panel.hidden = !panel.hidden;
+  },
+  c: () => {
+    say("world", `${lab.cost(FRAMES_MEASURED).toFixed(1)} ms a frame, ${String(FRAMES_MEASURED)} frames`);
+  },
+};
+
 function pressed({ key }: KeyboardEvent): void {
   const count = ANCHORS.length;
   const named = KEYS[key];
-  if (named !== undefined) step({ view: named });
+  const aside = asides[key];
+  if (aside !== undefined) aside();
+  else if (named !== undefined) step({ view: named });
   else if (key === "ArrowRight") step({ world: (choice.world + 1) % count });
   else if (key === "ArrowLeft") step({ world: (choice.world + count - 1) % count });
   else if (key === "s") step({ seed: choice.seed + 1 });
   else if (key === "[") step({ stage: stageBy(choice.stage, -1) });
   else if (key === "]") step({ stage: stageBy(choice.stage, 1) });
   else if (key === "n") step({ view: "nebula", method: choice.method === "image" ? "computed" : "image" });
-  else if (key === "p") panel.hidden = !panel.hidden;
 }
 
 function moved(event: PointerEvent): void {
@@ -159,46 +209,6 @@ function resized(): void {
   if (view === undefined) return;
   aim(view);
   if (still) draw(view);
-}
-
-function stats() {
-  const empty = { view: "", worlds: 0, images: 0, mapBytes: 0, targetBytes: 0 };
-  const shown =
-    view === undefined
-      ? empty
-      : {
-          view: choice.view === "nebula" ? `nebula ${choice.method}` : choice.view,
-          worlds: view.worlds.length,
-          images: view.images,
-          mapBytes: mapBytes(view.textures),
-          targetBytes: view.targetBytes,
-        };
-  const { memory, render, programs } = renderer.info;
-  return {
-    ...shown,
-    frames,
-    textures: memory.textures,
-    programs: programs?.length ?? 0,
-    calls: render.calls,
-    renderer: gpu,
-  };
-}
-
-function circles() {
-  if (view === undefined) return [];
-  const { camera } = view;
-  camera.updateMatrixWorld();
-  const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
-  const half = canvas.clientWidth / 2;
-  return view.worlds.map(({ group }) => {
-    const centre = group.position.clone().project(camera);
-    const edge = group.position.clone().addScaledVector(right, group.scale.x).project(camera);
-    return {
-      x: (centre.x + 1) * half,
-      y: ((1 - centre.y) * canvas.clientHeight) / 2,
-      r: (edge.x - centre.x) * half,
-    };
-  });
 }
 
 addEventListener("keydown", pressed);
@@ -219,6 +229,6 @@ if (!still)
     draw(view);
   });
 
-Reflect.set(globalThis, "__lab", { stats, circles, looks: () => looksOf(choice), stages: () => view?.stages ?? [] });
+Reflect.set(globalThis, "__lab", lab);
 
 step({});

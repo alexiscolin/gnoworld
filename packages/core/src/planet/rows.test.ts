@@ -6,16 +6,10 @@ import { ANCHORS, planetLook, planetSeed, type Anchor, type MapName, type Planet
 type Span = readonly [number, number];
 interface Row {
   readonly maps: readonly MapName[];
-  readonly second: MapName | null;
   readonly warp: Span;
   readonly recolour: Span;
   readonly relief: Span;
   readonly rings?: number;
-  readonly caps?: Span;
-  readonly clouds?: Span;
-  readonly contrast?: Span;
-  readonly cracks?: Span;
-  readonly rifts?: Span;
   readonly glow?: Span;
   readonly rim?: { readonly colours: readonly [number, number]; readonly thickness: Span };
 }
@@ -25,53 +19,42 @@ const FLAT: Span = [0, 0];
 const STATED: Record<Anchor, Row> = {
   rocky: {
     maps: ["moon", "ceres"],
-    second: "ceres",
     warp: [0.02, 0.1],
     recolour: [0.5, 0.9],
     relief: [0.018, 0.03],
     rings: 0.05,
   },
   temperate: {
-    maps: ["earth-day"],
-    second: null,
+    maps: ["venus", "mars"],
     warp: [0.08, 0.2],
     recolour: [0.75, 1],
     relief: [0.0042, 0.008],
-    clouds: [0.22, 0.4],
     rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   desert: {
     maps: ["mars", "ceres"],
-    second: "ceres",
     warp: [0.06, 0.2],
     recolour: [0.35, 0.8],
     relief: [0.014, 0.024],
-    caps: [0.02, 0.1],
-    clouds: [0, 0.12],
     rings: 0.04,
     rim: { colours: [0x6e4f35, 0x66402e], thickness: [0.018, 0.03] },
   },
   ocean: {
-    maps: ["earth-day"],
-    second: null,
+    maps: ["venus"],
     warp: [0.1, 0.24],
     recolour: [0.8, 1],
     relief: [0.008, 0.014],
-    clouds: [0.3, 0.48],
     rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   ice: {
     maps: ["eris"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.7, 1],
     relief: [0.012, 0.022],
-    cracks: [0.5, 1],
     rings: 0.04,
   },
   volcanic: {
     maps: ["venus"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
@@ -80,45 +63,36 @@ const STATED: Record<Anchor, Row> = {
   },
   "gas giant": {
     maps: ["jupiter"],
-    second: "jupiter",
     warp: [0.02, 0.08],
     recolour: [0.15, 0.75],
     relief: FLAT,
-    contrast: [1.2, 1.6],
     rings: 0.5,
     rim: { colours: [0x6b5c47, 0x615e54], thickness: [0.022, 0.03] },
   },
   "ice giant": {
     maps: ["neptune"],
-    second: "neptune",
     warp: [0.02, 0.08],
     recolour: [0.3, 0.9],
     relief: FLAT,
-    contrast: [2.6, 3.4],
     rings: 0.45,
     rim: { colours: [0x36547a, 0x477173], thickness: [0.03, 0.04] },
   },
   "cloud deck": {
     maps: ["haze"],
-    second: "haze",
     warp: [0.06, 0.16],
     recolour: [0.3, 0.8],
     relief: FLAT,
-    contrast: [2, 2.6],
     rim: { colours: [0x796643, 0x765430], thickness: [0.04, 0.05] },
   },
   "tidally locked": {
     maps: ["mars", "ceres"],
-    second: "ceres",
     warp: [0.06, 0.18],
     recolour: [0.55, 0.9],
     relief: [0.014, 0.024],
-    clouds: [0.05, 0.2],
     rim: { colours: [0x5c4d4f, 0x4d4f64], thickness: [0.02, 0.032] },
   },
   "dark carbon": {
     maps: ["ceres"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.022, 0.034],
@@ -126,17 +100,14 @@ const STATED: Record<Anchor, Row> = {
   },
   shattered: {
     maps: ["moon"],
-    second: "ceres",
     warp: [0.08, 0.2],
     recolour: [0.7, 1],
     relief: [0.02, 0.032],
-    rifts: [0.4, 0.8],
     glow: [0.3, 0.6],
   },
   // The twelve more (7b4) draw, until 7b5, on a kept anchor's row in their own colours: these are those rows, a few values moved.
   "nitrogen ice": {
     maps: ["eris"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.012, 0.022],
@@ -144,7 +115,6 @@ const STATED: Record<Anchor, Row> = {
   },
   "grooved ice": {
     maps: ["eris"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.012, 0.022],
@@ -152,35 +122,28 @@ const STATED: Record<Anchor, Row> = {
   },
   snowball: {
     maps: ["eris"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.85, 1],
     relief: [0.012, 0.022],
     rings: 0.04,
-    clouds: [0.05, 0.2],
     rim: { colours: SKY, thickness: [0.015, 0.025] },
   },
   hycean: {
-    maps: ["earth-day"],
-    second: null,
+    maps: ["venus"],
     warp: [0.1, 0.24],
     recolour: [0.8, 1],
     relief: [0.008, 0.014],
-    clouds: [0.3, 0.48],
     rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   archean: {
-    maps: ["earth-day"],
-    second: null,
+    maps: ["venus", "mars"],
     warp: [0.16, 0.24],
     recolour: [0.75, 1],
     relief: [0.0042, 0.008],
-    clouds: [0.22, 0.4],
     rim: { colours: [0x7a5226, 0x80592c], thickness: [0.04, 0.05] },
   },
   "lava world": {
     maps: ["venus"],
-    second: "moon",
     warp: [0.04, 0.14],
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
@@ -189,7 +152,6 @@ const STATED: Record<Anchor, Row> = {
   },
   "two-faced": {
     maps: ["moon", "ceres"],
-    second: "ceres",
     warp: [0.02, 0.1],
     recolour: [0.85, 1],
     relief: [0.018, 0.03],
@@ -197,51 +159,41 @@ const STATED: Record<Anchor, Row> = {
   },
   "water cloud giant": {
     maps: ["jupiter"],
-    second: "jupiter",
     warp: [0.02, 0.08],
     recolour: [0.7, 1],
     relief: FLAT,
-    contrast: [1.2, 1.6],
     rings: 0.5,
     rim: { colours: [0x6b5c47, 0x615e54], thickness: [0.022, 0.03] },
   },
   "azure giant": {
     maps: ["neptune"],
-    second: "neptune",
     warp: [0.02, 0.08],
     recolour: [0.85, 1],
     relief: FLAT,
-    contrast: [2.6, 3.4],
     rings: 0.05,
     rim: { colours: [0x36547a, 0x477173], thickness: [0.03, 0.04] },
   },
   "dark giant": {
     maps: ["jupiter"],
-    second: "jupiter",
     warp: [0.02, 0.08],
     recolour: [0.9, 1],
     relief: FLAT,
-    contrast: [1, 1.2],
     rings: 0.05,
     rim: { colours: [0x6b5c47, 0x615e54], thickness: [0.022, 0.03] },
   },
   "hot giant": {
     maps: ["jupiter"],
-    second: "jupiter",
     warp: [0.02, 0.08],
     recolour: [0.85, 1],
     relief: FLAT,
-    contrast: [1.2, 1.6],
     rings: 0.05,
     rim: { colours: [0x6b5c47, 0x615e54], thickness: [0.022, 0.03] },
   },
   "sub-Neptune": {
     maps: ["neptune"],
-    second: "neptune",
     warp: [0.02, 0.08],
     recolour: [0.85, 1],
     relief: FLAT,
-    contrast: [1, 1.3],
     rings: 0.05,
     rim: { colours: [0x36547a, 0x477173], thickness: [0.03, 0.04] },
   },
@@ -264,20 +216,14 @@ type Byte = ReturnType<typeof bytesOf>;
 function holdsMaps(look: PlanetLook, row: Row, path: Uint8Array) {
   const first = (planetSeed(path)[23] ?? Number.NaN) < 128;
   expect(look.map).toBe(row.maps[first || row.maps.length === 1 ? 0 : 1]);
-  expect(look.second).toBe(row.second);
 }
 
 function holdsSurface(look: PlanetLook, row: Row, byte: Byte) {
-  near(look.secondShare, row.second === null ? 0 : byte(15) * 0.4);
   near(look.warp.amount, within(row.warp, byte(14)));
   near(look.warp.frequency, within([0.9, 2.4], byte(30)));
   near(look.recolour, within(row.recolour, byte(19)));
   near(look.relief, within(row.relief, byte(17)));
-  near(look.contrast, within(row.contrast ?? [1, 1], byte(22)));
-  near(look.caps, within(row.caps ?? FLAT, byte(22)));
-  near(look.clouds, within(row.clouds ?? FLAT, byte(20)));
-  near(look.rifts, within(row.rifts ?? FLAT, byte(18)));
-  near(look.cracks, within(row.cracks ?? FLAT, byte(18)));
+  for (const [axis, at] of [18, 20, 22].entries()) near(look.minorOffset[axis as 0 | 1 | 2], byte(at) * 16);
   near(look.tilt, (byte(16) * 2 - 1) * 0.45);
 }
 

@@ -22,7 +22,7 @@ export interface Circle {
   y: number;
   r: number;
 }
-type Asked = "stats" | "circles" | "looks" | "stages";
+type Asked = "stats" | "circles" | "looks" | "stages" | "ids" | "minors" | "mids" | "live" | "cost";
 
 export const askLab = <T>(page: Page, what: Asked, ...rest: number[]) =>
   page.evaluate(
@@ -77,4 +77,14 @@ export const noneOnAnother = (places: readonly Circle[], smallest = 60) => {
     for (const other of places.slice(index + 1))
       expect(Math.hypot(place.x - other.x, place.y - other.y)).toBeGreaterThan(place.r + other.r);
   }
+};
+
+/** What the page says wrong, kept in `wrong`: a shader that fails to compile only reaches the console. A screenshot reads the buffer back,
+ * which the driver remarks on, and a software GPU has no parallel compile, which the Earth's build asks for: neither is wrong. */
+export const listen = (page: Page, wrong: string[]) => {
+  page.on("console", (message) => {
+    const software = ["GPU stall", "KHR_parallel_shader_compile"].some((remark) => message.text().includes(remark));
+    if (["error", "warning"].includes(message.type()) && !software) wrong.push(message.text());
+  });
+  page.on("pageerror", (error) => wrong.push(error.message));
 };

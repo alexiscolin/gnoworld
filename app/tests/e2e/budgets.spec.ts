@@ -36,6 +36,11 @@ const SCENE_JS = 150 * 1024;
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 const COSMOS_JS = 17 * 1024; // 16 KiB again once 7d5 gives the nebulae a chunk of their own (Alexis, 2026-11-02).
 const THREE_MARK = "isWebGLRenderer";
+// Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
+// the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
+const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
+const GENERATED_JS = 8 * 1024; // 6,489 B measured on 7b5 (zlib, level 6); a proposal for the chief, no cap raised.
+const GENERATED_MARK = "minorShare";
 
 // The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
 // `import("./x.js")`), from the roots that are no other's import, the chunk that comes late apart.
@@ -157,4 +162,21 @@ test("the scene's chunk holds three, and stays within its cap", async ({ page })
   const url = (await scene).url();
   expect(await (await page.request.get(url)).text()).toContain(THREE_MARK);
   expect(await compressed(page, [url])).toBeLessThanOrEqual(SCENE_JS);
+});
+
+test("the generated worlds' chunk comes with the cosmos's worlds, within its own cap, and no other chunk holds it", async ({
+  page,
+}) => {
+  const chunks = [SCENE, COSMOS, GENERATED].map((chunk) =>
+    page.waitForResponse((response) => chunk.test(response.url())),
+  );
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const [sceneUrl = "", cosmosUrl = "", generatedUrl = ""] = await Promise.all(
+    chunks.map(async (response) => (await response).url()),
+  );
+  expect(await (await page.request.get(generatedUrl)).text()).toContain(GENERATED_MARK);
+  for (const url of [sceneUrl, cosmosUrl])
+    expect(await (await page.request.get(url)).text()).not.toContain(GENERATED_MARK);
+  expect(await compressed(page, [generatedUrl])).toBeLessThanOrEqual(GENERATED_JS);
 });

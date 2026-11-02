@@ -1,0 +1,101 @@
+// What the journeys read of the realism page, as `globalThis.__lab`: its numbers, where its worlds stand on screen, what a frame of a view
+// costs, which uniforms a world's program keeps, and the worlds it shows.
+import { labOf } from "@gnoworld/core";
+import { Vector3, type WebGLRenderer } from "three";
+import { mapBytes } from "../src/scene/planet/maps.ts";
+import { worldsOf, type Choice } from "./choice.ts";
+import type { View } from "./views.ts";
+
+export interface Probed {
+  readonly renderer: WebGLRenderer;
+  readonly canvas: HTMLCanvasElement;
+  readonly gpu: string;
+  readonly draw: (view: View) => void;
+  readonly view: () => View | undefined;
+  readonly choice: () => Choice;
+  readonly frames: () => number;
+}
+
+function stats({ renderer, gpu, view, choice, frames }: Probed) {
+  const shown = view();
+  const { view: name, method } = choice();
+  const drawn =
+    shown === undefined
+      ? { view: "", worlds: 0, images: 0, mapBytes: 0, targetBytes: 0 }
+      : {
+          view: name === "nebula" ? `nebula ${method}` : name,
+          worlds: shown.worlds.length,
+          images: shown.images,
+          mapBytes: mapBytes(shown.textures),
+          targetBytes: shown.targetBytes,
+        };
+  const { memory, render, programs } = renderer.info;
+  return {
+    ...drawn,
+    frames: frames(),
+    textures: memory.textures,
+    programs: programs?.length ?? 0,
+    calls: render.calls,
+    renderer: gpu,
+  };
+}
+
+function circles({ canvas, view }: Probed) {
+  const shown = view();
+  if (shown === undefined) return [];
+  const { camera } = shown;
+  camera.updateMatrixWorld();
+  const right = new Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  const half = canvas.clientWidth / 2;
+  return shown.worlds.map(({ group }) => {
+    const centre = group.position.clone().project(camera);
+    const edge = group.position.clone().addScaledVector(right, group.scale.x).project(camera);
+    return { x: (centre.x + 1) * half, y: ((1 - centre.y) * canvas.clientHeight) / 2, r: (edge.x - centre.x) * half };
+  });
+}
+
+// What a frame of the view costs, in milliseconds: drawn `count` times, the GPU waited for by a read of one pixel.
+function cost({ renderer, view, draw }: Probed, count: number): number {
+  const shown = view();
+  if (shown === undefined) return 0;
+  const gl = renderer.getContext();
+  const pixel = new Uint8Array(4);
+  draw(shown);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  const start = performance.now();
+  for (let at = 0; at < count; at += 1) draw(shown);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  return (performance.now() - start) / count;
+}
+
+// The uniforms the first world's surface program keeps once compiled: its compiler leaves out what no pixel reads.
+function live({ renderer, view }: Probed): string[] {
+  const surface = view()?.worlds[0]?.surface;
+  if (surface === undefined) return [];
+  const held = renderer.properties.get(surface) as { currentProgram?: { program: WebGLProgram } };
+  const program = held.currentProgram?.program;
+  if (program === undefined) return [];
+  const gl = renderer.getContext();
+  const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number;
+  return Array.from({ length: count }, (_, at) => gl.getActiveUniform(program, at)?.name ?? "");
+}
+
+/** The page's reads, for the journeys. */
+export function probes(page: Probed) {
+  const shown = () => worldsOf(page.choice());
+  return {
+    stats: () => stats(page),
+    circles: () => circles(page),
+    cost: (count: number) => cost(page, count),
+    live: () => live(page),
+    looks: () => shown().map(({ look }) => look),
+    ids: () => shown().map(({ id }) => id),
+    minors: () => shown().map(({ recipe }) => recipe.minorShare),
+    // What a glance takes for a world's colour: its sea's where the sea holds most of it, its palette's centre elsewhere.
+    mids: () =>
+      shown().map(({ look, recipe }) =>
+        look.sea !== null && recipe.surface.sea >= 0.5 ? labOf(look.sea.deep) : recipe.palette.lab[1],
+      ),
+    stages: () => page.view()?.stages ?? [],
+  };
+}

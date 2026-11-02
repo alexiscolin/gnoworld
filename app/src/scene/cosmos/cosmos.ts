@@ -95,6 +95,8 @@ export class Cosmos {
       this.#release = setTimeout(this.#releaseMaps, RELEASE_MS);
       return;
     }
+    // The generated worlds' code is asked as the cosmos shows, so it comes beside the first maps, not after them.
+    this.#maps.kit();
     if (worlds !== this.#list) {
       this.#list = worlds;
       this.#systems = systemsOf(

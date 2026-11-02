@@ -3,6 +3,7 @@ import {
   asciiBytes,
   LIGHT_KINDS,
   planetLook,
+  planetRecipe,
   planetSeed,
   worldSigns,
   type Anchor,
@@ -21,8 +22,11 @@ import {
   Vector3,
 } from "three";
 import { describe, expect, it, vi } from "vitest";
-import { createPlanet, type MapSet } from "./planet.ts";
+import { createWorld } from "./generated.ts";
+import { GENERATED_FRAGMENT } from "./generatedShader.ts";
+import type { MapSet } from "./planet.ts";
 import { LIGHTS, lightCode } from "./signShaders.ts";
+import { PARTS, SHADE } from "./surfaceParts.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
 // A world's signs on its render (slice 7, 7b2): a world at rest carries none, so the program, the meshes and every uniform are the ones
@@ -38,7 +42,8 @@ const mapSet = (extra: Partial<MapSet> = {}): MapSet => {
   const shared = new Texture();
   return { map: () => shared, clouds: new Texture(), ring: new Texture(), ...extra };
 };
-const planetOf = (look: PlanetLook, maps = mapSet({ lights: new Texture() })) => createPlanet(look, maps, sphere);
+const planetOf = (look: PlanetLook, maps = mapSet({ lights: new Texture() })) =>
+  createWorld({ look, recipe: planetRecipe(PATH, look.anchor) }, maps, sphere);
 const signsAt = (anchor: Anchor, state: WorldState) => worldSigns(SEED, anchor, state);
 const uniform = (material: ShaderMaterial, name: string): unknown => material.uniforms[name]?.value;
 const snapshot = (material: ShaderMaterial): [string, unknown][] =>
@@ -94,18 +99,11 @@ describe("a world's signs on its render", () => {
     expect(uniform(planet.surface, "settled")).toBe(0);
   });
 
-  it("reads a world's lights from the map it is given, and stays off the Earth's own branch", () => {
+  it("reads a world's lights from the map it is given; no generated world has the Earth's own branch", () => {
     const lights = new Texture();
     const planet = planetOf(planetLook(PATH, "ice"), mapSet({ lights }));
     expect(uniform(planet.surface, "nightMap")).toBe(lights);
-    expect(uniform(planet.surface, "nightLights")).toBe(0);
-  });
-
-  it("lets the Earth's night stand: its own map and flag come first", () => {
-    const night = new Texture();
-    const planet = planetOf(planetLook(PATH, "ice"), mapSet({ night, lights: new Texture() }));
-    expect(uniform(planet.surface, "nightMap")).toBe(night);
-    expect(uniform(planet.surface, "nightLights")).toBe(1);
+    expect(planet.surface.uniforms).not.toHaveProperty("nightLights");
   });
 
   it("draws no lights without their map: a sampler holding clouds would read as cities", () => {
@@ -171,28 +169,30 @@ describe("a world's signs on its render", () => {
   // The light Alexis approved (21b00fc8), word for word: the terminator's arc, the softening towards it, the night a world keeps, its
   // rim and the blue night of its air. 7b5 draws every world's surface anew, on purpose, so the pin holds the light, not the surface.
   it("keeps the approved light word for word, whatever the surface under it", () => {
-    for (const line of [
-      "smoothstep(-0.16, 0.95, dot(",
-      "  float facing = max(dot(normal, view), 0.001);\n",
-      "  float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);\n",
-      "  float soft = pow(light, 0.9) * pow(facing, 0.28);\n",
-      "mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();\n",
-      "colour = albedo * shine + albedo * NIGHT;\n",
-      "  float glitter = pow(gleam, 60.0) * 0.05;\n",
-      "  float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);\n",
-      "  if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);\n",
-      "  else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);\n",
-      "mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light)",
-    ])
-      expect(SURFACE_FRAGMENT, line).toContain(line);
-    // The Earth's own lights read CITY_LIGHT at rest, so its value is the approved one.
-    expect(LIGHTS).toContain("const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);");
+    for (const shader of [SHADE, SURFACE_FRAGMENT, GENERATED_FRAGMENT])
+      for (const line of [
+        "smoothstep(-0.16, 0.95, dot(",
+        "  float facing = max(dot(normal, view), 0.001);\n",
+        "  float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);\n",
+        "  float soft = pow(light, 0.9) * pow(facing, 0.28);\n",
+        "mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();\n",
+        "colour = albedo * shine + albedo * NIGHT;\n",
+        "  float glitter = pow(gleam, 60.0) * 0.05;\n",
+        "  float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);\n",
+        "  if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);\n",
+        "  else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);\n",
+        "mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light)",
+      ])
+        expect(shader, line).toContain(line);
+    // The Earth's own lights and every world's read CITY_LIGHT, so its value is the approved one.
+    expect(PARTS).toContain("const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);");
+    expect(LIGHTS).toContain("CITY_LIGHT");
   });
 
   it("reads no light unless a world has some: `settled` is a uniform, so at rest not one of its reads runs", () => {
-    expect(SURFACE_FRAGMENT).toContain("if (settled > 0.0)");
-    expect(SURFACE_FRAGMENT.lastIndexOf("settlements(")).toBeGreaterThan(
-      SURFACE_FRAGMENT.indexOf("if (settled > 0.0)"),
+    expect(GENERATED_FRAGMENT).toContain("if (settled > 0.0)");
+    expect(GENERATED_FRAGMENT.lastIndexOf("settlements(")).toBeGreaterThan(
+      GENERATED_FRAGMENT.indexOf("if (settled > 0.0)"),
     );
   });
 

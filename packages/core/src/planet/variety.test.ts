@@ -53,6 +53,7 @@ describe("featuresOf", () => {
     expect(features.centre).toEqual(recipe.palette.lab[1]);
     expect(features.ringed).toBe(look.rings !== null);
     expect(features.air).toBe(look.rim?.thickness ?? 0);
+    expect(features.maps).toEqual([look.map, recipe.minorMap]);
   });
 
   it("puts each shown value on its whole span, 0 to 1, and leaves out what a still cannot show", () => {
@@ -114,6 +115,21 @@ describe("alike", () => {
     expect(alike(withMinor(0.041, "ice"), withMinor(0.02, "ocean"))).toBe(false);
     expect(alike(withMinor(0.02, "ice"), withMinor(0.041, "ocean"))).toBe(false);
     expect(alike(withMinor(0.3, "ice"), withMinor(0.3 + 0.4 * SAME_SHAPE * 1.1, "ice"))).toBe(false);
+  });
+
+  // F4218: what is drawn, not only the recipe: a real map lends its detail, so two worlds on two maps are two worlds.
+  it("parts two worlds that lend their detail from two real maps, the dominant's or the minor's", () => {
+    const [map, minorMap] = desert().maps;
+    expect(alike(desert(), { ...desert(), maps: [map === "mars" ? "ceres" : "mars", minorMap] })).toBe(false);
+    const otherMinor = minorMap === "moon" ? "eris" : "moon";
+    const shown: Features = { ...desert(), minorShare: 0.3 };
+    expect(alike(shown, { ...shown, maps: [map, otherMinor] })).toBe(false);
+    const hidden: Features = { ...desert(), minorShare: 0.02 };
+    expect(alike(hidden, { ...hidden, maps: [map, otherMinor] })).toBe(true);
+    const barely: Features = { ...desert(), minorShare: 0.04 };
+    expect(alike(barely, { ...barely, maps: [map, otherMinor] })).toBe(false);
+    const under: Features = { ...desert(), minorShare: 0.039 };
+    expect(alike(under, { ...under, maps: [map, otherMinor] })).toBe(true);
   });
 
   it("reads both ways", () => {

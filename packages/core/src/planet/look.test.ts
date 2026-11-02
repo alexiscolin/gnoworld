@@ -8,12 +8,14 @@ import {
   MAX_WARP_FREQUENCY,
   planetLook,
   planetSeed,
+  seededLook,
   worldLook,
   type Anchor,
   type MapName,
   type PlanetLook,
 } from "./look.ts";
-import { labOf } from "./palette.ts";
+import { labOf, NO_TURN } from "./palette.ts";
+import { planetRecipe, seededRecipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 
 // core/planet, its realism part (slice 7, 7b; ADR-0002 §3): a look is a pure function of a path, through
@@ -41,9 +43,9 @@ const spread = (values: number[]) => Math.max(...values) - Math.min(...values);
 // only a far belt, for dust is a sign).
 const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: readonly MapName[] }> = {
   rocky: { sea: false, glow: false, air: false, maps: ["moon", "ceres"] },
-  temperate: { sea: true, glow: false, air: true, maps: ["earth-day"] },
+  temperate: { sea: true, glow: false, air: true, maps: ["venus", "mars"] },
   desert: { sea: false, glow: false, air: true, maps: ["mars", "ceres"] },
-  ocean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
+  ocean: { sea: true, glow: false, air: true, maps: ["venus"] },
   ice: { sea: false, glow: false, air: false, maps: ["eris"] },
   volcanic: { sea: false, glow: true, air: true, maps: ["venus"] },
   "gas giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
@@ -55,8 +57,8 @@ const READS: Record<Anchor, { sea: boolean; glow: boolean; air: boolean; maps: r
   "nitrogen ice": { sea: false, glow: false, air: false, maps: ["eris"] },
   "grooved ice": { sea: false, glow: false, air: false, maps: ["eris"] },
   snowball: { sea: false, glow: false, air: true, maps: ["eris"] },
-  hycean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
-  archean: { sea: true, glow: false, air: true, maps: ["earth-day"] },
+  hycean: { sea: true, glow: false, air: true, maps: ["venus"] },
+  archean: { sea: true, glow: false, air: true, maps: ["venus", "mars"] },
   "lava world": { sea: false, glow: true, air: true, maps: ["venus"] },
   "two-faced": { sea: false, glow: false, air: false, maps: ["moon", "ceres"] },
   "water cloud giant": { sea: false, glow: false, air: true, maps: ["jupiter"] },
@@ -76,7 +78,6 @@ const BANDED: readonly Anchor[] = [
   "hot giant",
   "sub-Neptune",
 ];
-const CRACKED: readonly Anchor[] = ["ice"];
 
 describe("a world's look, from its id", () => {
   const paths = (count: number) => Array.from({ length: count }, (_, at) => `gno.land/r/n${String(at)}/home`);
@@ -182,20 +183,7 @@ describe("the anchors", () => {
       expect(look.glow !== null, "a glow").toBe(glow);
       expect(look.rim !== null, "air").toBe(air);
       expect(maps).toContain(look.map);
-      if (!sea) expect(MAPS).toContain(look.second);
     }
-  });
-
-  it("keeps a world with a sea on the Earth's map alone: its land, ice and shores are the map's own", () => {
-    for (const anchor of ANCHORS)
-      for (const path of paths(100)) {
-        const look = planetLook(path, anchor);
-        if (look.sea === null) continue;
-        expect(look.map, anchor).toBe("earth-day");
-        expect(look.second, anchor).toBeNull();
-        expect(look.secondShare, anchor).toBe(0);
-        expect(look.caps, anchor).toBe(0);
-      }
   });
 
   it("carries nothing a pixel never reads: a look holds no limb, a sea no level, a banded world no relief", () => {
@@ -207,23 +195,8 @@ describe("the anchors", () => {
     }
   });
 
-  it("locks one world alone, rifts one alone and cracks Europa's alone", () => {
-    for (const anchor of ANCHORS) {
-      const look = planetLook(DAO, anchor);
-      expect(look.locked).toBe(anchor === "tidally locked");
-      expect(look.rifts > 0).toBe(anchor === "shattered");
-      expect(look.cracks > 0).toBe(CRACKED.includes(anchor));
-    }
-  });
-
-  // look.ts reads rifts and cracks from one byte, and caps and a banded world's contrast from another: no anchor may have both of a pair.
-  it("gives no anchor both values of a shared byte", () => {
-    for (const anchor of ANCHORS)
-      for (const path of paths(20)) {
-        const look = planetLook(path, anchor);
-        expect(look.rifts > 0 && look.cracks > 0, anchor).toBe(false);
-        expect(look.caps > 0 && look.contrast > 1, anchor).toBe(false);
-      }
+  it("locks one world alone", () => {
+    for (const anchor of ANCHORS) expect(planetLook(DAO, anchor).locked).toBe(anchor === "tidally locked");
   });
 });
 
@@ -352,13 +325,11 @@ describe("planetLook", () => {
     expect(new Set(looks.map((look) => JSON.stringify(look.ramp))).size).toBeGreaterThan(150);
     expect(spread(looks.map((look) => look.warp.amount))).toBeGreaterThan(0.04);
     expect(spread(looks.map((look) => look.warp.frequency))).toBeGreaterThan(0.5);
-    if (!READS[anchor].sea) expect(spread(looks.map((look) => look.secondShare))).toBeGreaterThan(0.15);
     expect(spread(looks.map((look) => look.tilt))).toBeGreaterThan(0.4);
     if (!BANDED.includes(anchor)) expect(spread(looks.map((look) => look.relief))).toBeGreaterThan(0);
     if (READS[anchor].maps.length > 1) expect(new Set(looks.map((look) => look.map)).size).toBe(2);
     if (READS[anchor].air && !BANDED.includes(anchor))
       expect(spread(looks.map((look) => look.rim?.thickness ?? 0))).toBeGreaterThan(0);
-    if (READS[anchor].sea) expect(spread(looks.map((look) => look.clouds))).toBeGreaterThan(0.1);
   });
 
   it("warps at low frequency alone: a higher one smears the map", () => {
@@ -370,16 +341,6 @@ describe("planetLook", () => {
         expect(frequency).toBeLessThanOrEqual(MAX_WARP_FREQUENCY);
         expect(amount).toBeGreaterThanOrEqual(0);
         expect(amount).toBeLessThanOrEqual(0.3);
-      }),
-    );
-  });
-
-  it("keeps the dominant map at 60% or more", () => {
-    fc.assert(
-      fc.property(anyPath, anyAnchor, (path, anchor) => {
-        const { secondShare } = planetLook(path, anchor);
-        expect(secondShare).toBeGreaterThanOrEqual(0);
-        expect(secondShare).toBeLessThanOrEqual(0.4);
       }),
     );
   });
@@ -415,14 +376,6 @@ describe("planetLook", () => {
     const leans = paths(100).map((path) => planetLook(path, "gas giant").lean);
     expect(leans.some((lean) => lean > 0)).toBe(true);
     expect(leans.some((lean) => lean < 0)).toBe(true);
-  });
-
-  it("lifts the faint bands of a banded world's map", () => {
-    for (const path of paths(50)) {
-      expect(planetLook(path, "rocky").contrast).toBeGreaterThanOrEqual(1);
-      expect(planetLook(path, "ice giant").contrast).toBeGreaterThan(planetLook(path, "gas giant").contrast);
-      expect(planetLook(path, "cloud deck").contrast).toBeGreaterThan(planetLook(path, "rocky").contrast);
-    }
   });
 
   it("keeps every colour in range and plausible, never neon", () => {
@@ -482,7 +435,7 @@ describe("planetLook", () => {
     fc.assert(
       fc.property(anyPath, anyAnchor, (path, anchor) => {
         const look = planetLook(path, anchor);
-        if (look.clouds > 0 || look.sea !== null) expect(look.rim).not.toBeNull();
+        if (planetRecipe(path, anchor).surface.clouds > 0 || look.sea !== null) expect(look.rim).not.toBeNull();
       }),
     );
   });
@@ -495,5 +448,96 @@ describe("planetLook", () => {
         );
         expect(numbers).not.toContain("unset");
       }
+  });
+});
+
+// What 7b5 draws (ADR-0002 §3): the recipe carries the surface, so the look keeps only what is still drawn from it, every byte of the
+// seed still feeds a value before anything hashes it again (F3476), and no generated world shows the Earth's map (F4223).
+describe("a look, as 7b5 draws it", () => {
+  const RETIRED = ["second", "secondShare", "contrast", "caps", "clouds", "rifts", "cracks"];
+  const flipped = (seed: Uint8Array, at: number): Uint8Array =>
+    seed.map((byte, index) => (index === at ? byte ^ 0x80 : byte));
+
+  it("holds nothing the recipe now draws in its place", () => {
+    for (const anchor of ANCHORS)
+      for (const name of RETIRED) expect(planetLook(DAO, anchor), `${anchor} ${name}`).not.toHaveProperty(name);
+  });
+
+  it("places the minor class's regions by an offset of their own, from three bytes no other value reads", () => {
+    const seed = planetSeed(DAO);
+    const look = seededLook(seed, "rocky");
+    expect(look.minorOffset).toEqual([18, 20, 22].map((at) => ((seed[at] ?? 0) / 255) * 16));
+  });
+
+  // Each byte, the values of the look it moves, as look.ts states them (byte 15 is the recipe's minor share, apart).
+  const READ_BY: Record<number, readonly string[]> = {
+    0: ["spin"],
+    1: ["spin"],
+    2: ["spin"],
+    3: ["spin"],
+    4: ["spin"],
+    5: ["spin"],
+    6: ["warp"],
+    7: ["warp"],
+    8: ["warp"],
+    9: ["warp"],
+    10: ["warp"],
+    11: ["warp"],
+    12: ["ramp", "rings"],
+    13: ["ramp", "rings", "lean"],
+    14: ["warp"],
+    15: [],
+    16: ["tilt"],
+    17: ["relief"],
+    18: ["minorOffset"],
+    19: ["recolour"],
+    20: ["minorOffset"],
+    21: ["rim"],
+    22: ["minorOffset"],
+    23: ["map"],
+    24: ["rings", "lean"],
+    25: ["rings"],
+    26: ["rings"],
+    27: ["rings"],
+    28: ["rings"],
+    29: ["glow"],
+    30: ["warp"],
+    31: ["rim"],
+  };
+  const movedBy = (seed: Uint8Array, at: number): Set<string> => {
+    const moved = new Set<string>();
+    for (const anchor of ANCHORS) {
+      const [before, after] = [seededLook(seed, anchor), seededLook(flipped(seed, at), anchor)];
+      for (const key of Object.keys(before) as (keyof PlanetLook)[])
+        if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) moved.add(key);
+    }
+    return moved;
+  };
+
+  // A ring's bytes move a look only where it has rings, so the seeds are many enough for some to.
+  it("takes all 32 bytes of the seed before hashing again, each into the values it is stated to feed (F3476)", () => {
+    const seeds = paths(16).map((path) => planetSeed(path));
+    for (let at = 0; at < 32; at += 1) {
+      const moved = new Set<string>();
+      for (const seed of seeds) for (const key of movedBy(seed, at)) moved.add(key);
+      for (const key of moved) expect(READ_BY[at] ?? [], `byte ${String(at)} moves ${key}`).toContain(key);
+      if (at !== 15) expect(moved.size, `byte ${String(at)} feeds nothing`).toBeGreaterThan(0);
+    }
+    for (const seed of seeds) {
+      expect(seededRecipe(flipped(seed, 15), "rocky", NO_TURN).minorShare).not.toBe(
+        seededRecipe(seed, "rocky", NO_TURN).minorShare,
+      );
+      for (const at of [18, 20, 22]) expect([...movedBy(seed, at)], `byte ${String(at)}`).toEqual(["minorOffset"]);
+    }
+  });
+
+  it("draws the Earth's map on no world but the Earth: its coasts would show through any warp (F4223)", () => {
+    for (const anchor of ANCHORS) {
+      expect(ROWS[anchor].maps, anchor).not.toContain("earth-day");
+      for (const path of paths(40)) {
+        expect(planetLook(path, anchor).map, anchor).not.toBe("earth-day");
+        expect(planetRecipe(path, anchor).minorMap, anchor).not.toBe("earth-day");
+      }
+    }
   });
 });

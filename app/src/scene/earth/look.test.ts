@@ -11,10 +11,9 @@ const longitudeOnMap = (direction: readonly [number, number, number]) => {
 };
 
 describe("the Earth", () => {
-  it("is drawn as it is: its map is never warped, recoloured or mixed with another", () => {
+  it("is drawn as it is: its map is never warped or recoloured", () => {
     expect(EARTH.warp.amount).toBe(0);
     expect(EARTH.recolour).toBe(0);
-    expect(EARTH.secondShare).toBe(0);
   });
 
   it("wears an atmosphere and the clouds, and no ring of its own: the golden one is an orbit", () => {

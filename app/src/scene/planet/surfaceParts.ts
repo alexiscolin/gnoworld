@@ -1,61 +1,42 @@
-// What a world's surface shader declares and the helpers it calls, apart from its main(): uniforms, then the parts the frames' look is made of.
-export const UNIFORMS = /* glsl */ `
+// What both surface programs declare and call, apart from their main(): the Earth's (real maps as they are) and every other world's
+// (generated, generatedShader.ts). The light is one, word for word on both: Alexis approved it on the Earth (21b00fc8).
+
+/** The uniforms and varyings both surface programs read. */
+export const COMMON = /* glsl */ `
 uniform mat4 modelMatrix;
 uniform sampler2D surface;
-uniform sampler2D second;
 uniform sampler2D cloudMap;
 uniform sampler2D ringMap;
 uniform sampler2D nightMap;
 uniform mat3 spin;
 uniform vec3 sun;
-uniform vec3 warpOffset;
-uniform vec3 rampLow;
-uniform vec3 rampMid;
-uniform vec3 rampHigh;
-uniform vec3 seaShallow;
-uniform vec3 seaDeep;
-uniform vec3 glowColour;
 uniform vec3 hazeColour;
 uniform float time;
 uniform float cloudTime;
-uniform float warpAmount;
-uniform float warpFrequency;
-uniform float secondShare;
-uniform float recolour;
-uniform float contrast;
 uniform float relief;
-uniform float caps;
-uniform float cloudCover;
-uniform float rifts;
-uniform float cracks;
-uniform float locked;
 uniform float air;
-uniform float blueSea;
 uniform float hazeAmount;
-uniform float glowLevel;
 uniform float ringInner;
 uniform float ringOuter;
 uniform float ringOpacity;
-uniform float nightLights;
 varying vec3 vLocal;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying vec3 vSun;
 `;
 
+// The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun. What a world
+// keeps in its night, so its dark side is a shape against the sky and not a hole in it. The warm family every city light keeps.
 export const PARTS = /* glsl */ `
-const float TEXEL = 0.0032;
-const float REACH = 0.012;
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
-// The frames' sea, in the working space; how far the light is softened, and the edge an airless world keeps in the sun.
 const vec3 SEA_FLOOR = vec3(0.017, 0.032, 0.095);
 const float SOFT_AIR = 1.0;
 const float SOFT_BARE = 0.55;
 const float EDGE = 0.4;
-// What a world keeps in its night, so its dark side is a shape against the sky and not a hole in it.
 const float NIGHT = 0.007;
 const float NIGHT_GLOW = 0.07;
 const vec3 DEEP_BLUE = vec3(0.12, 0.22, 0.5);
+const vec3 CITY_LIGHT = vec3(1.0, 0.8, 0.52);
 
 vec3 turned(vec3 v, float angle) {
   float c = cos(angle);
@@ -67,27 +48,6 @@ float toneOf(vec3 colour) {
   return sqrt(dot(colour, LUMA));
 }
 
-vec3 ramped(vec3 colour, float tone) {
-  vec3 stop = tone < 0.5 ? mix(rampLow, rampMid, tone * 2.0) : mix(rampMid, rampHigh, tone * 2.0 - 1.0);
-  float light = max(dot(colour, LUMA), 0.001);
-  return mix(colour, stop * mix(vec3(1.0), colour / light, 0.22), recolour);
-}
-
-// A slope read from the map beside each point, a pixel away and no nearer than a texel, so the detail a pixel can carry is shaded and no
-// finer: the same slope at any size, soft-clipped so a crater's rim never becomes a line.
-vec3 bumped(vec3 axis, vec3 flow, float height, float angle) {
-  vec3 normal = normalize(vNormal);
-  if (relief < 0.004) return normal;
-  vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), axis));
-  vec3 north = cross(axis, east);
-  float reach = clamp(length(fwidth(axis)), TEXEL, REACH);
-  float toEast = toneOf(read(surface, lookupOf(spin * normalize(axis + east * reach + warpAmount * flow))).rgb);
-  float toNorth = toneOf(read(surface, lookupOf(spin * normalize(axis + north * reach + warpAmount * flow))).rgb);
-  vec3 slope = (east * (toEast - height) + north * (toNorth - height)) / reach;
-  slope /= 1.0 + 0.35 * length(slope);
-  return normalize(normal - relief * mat3(modelMatrix) * turned(slope, -angle) / length(modelMatrix[0].xyz));
-}
-
 float ringShade() {
   if (ringOuter <= 0.0 || abs(vSun.y) < 0.001) return 1.0;
   float along = -vLocal.y / vSun.y;
@@ -96,18 +56,41 @@ float ringShade() {
   if (reach <= 0.0 || reach >= 1.0) return 1.0;
   return 1.0 - 0.85 * ringOpacity * textureLod(ringMap, vec2(reach, 0.5), 0.0).r;
 }
+`;
 
-// A line is never thinner than a pixel, or it crawls as the world turns.
-float lines(vec3 at, float width) {
-  float away = min(seams(at), seams(at * 2.3 + 11.0) * 2.0);
-  return 1.0 - smoothstep(0.0, max(width, 1.1 * fwidth(away)), away);
+// The light Alexis approved: the day fading into the night over a wide arc, softened towards the terminator, more with air; no colour of
+// the star's own; the sea's glint; clouds and their shadows; air lifting the day side's edge into its colour, or a thin edge of sunlight
+// where there is none; and a night with air keeping a deep blue and the ground's faint form.
+export const SHADE = /* glsl */ `
+vec3 litBy(vec3 albedo, float wet, vec3 bent, vec3 normal, vec3 view, out float light, out float shine) {
+  light = smoothstep(-0.16, 0.95, dot(bent, sun));
+  float facing = max(dot(normal, view), 0.001);
+  float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
+  float soft = pow(light, 0.9) * pow(facing, 0.28);
+  shine = mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();
+  vec3 colour = albedo * shine + albedo * NIGHT;
+  float gleam = max(dot(normal, normalize(sun + view)), 0.0);
+  float glitter = pow(gleam, 60.0) * 0.05;
+  colour += wet * glitter * smoothstep(0.0, 0.1, light) * vec3(1.0, 0.94, 0.84);
+  return colour;
 }
 
-// One side always faces its star: scorched glass at the centre, desert, a thin belt of life, then ice to the far side.
-vec3 eyeball(vec3 albedo, float tone, float day) {
-  vec3 ice = mix(vec3(0.46, 0.58, 0.74), vec3(0.93, 0.96, 0.99), tone);
-  vec3 cold = mix(ice, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.0, 0.4, day));
-  vec3 warm = mix(cold, albedo, smoothstep(0.2, 0.7, day));
-  return mix(warm, albedo * vec3(0.3, 0.2, 0.16), smoothstep(0.78, 0.97, day));
+vec3 clouded(vec3 colour, vec3 high, float low, float shine, vec3 tint, out float cover) {
+  cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
+  float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
+  colour *= 1.0 - 0.36 * shadowed;
+  return mix(colour, tint * shine + 0.0015, cover * 0.9);
+}
+
+vec3 rimmed(vec3 colour, vec3 normal, vec3 view, float day) {
+  float facing = max(dot(normal, view), 0.001);
+  float rim = pow(1.0 - facing, 2.4) * smoothstep(-0.05, 0.4, day);
+  if (air > 0.5) colour = mix(colour, hazeColour, rim * hazeAmount);
+  else colour += EDGE * pow(1.0 - facing, 5.0) * smoothstep(0.02, 0.5, day);
+  return colour;
+}
+
+vec3 nightAir(vec3 colour, vec3 albedo, float light) {
+  return colour + mix(hazeColour * 0.35, DEEP_BLUE, 0.65) * (0.35 + dot(albedo, LUMA)) * NIGHT_GLOW * (1.0 - light);
 }
 `;

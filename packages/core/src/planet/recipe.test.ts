@@ -30,8 +30,8 @@ const TURN = Math.PI * 2;
 // byte read twice (a correlation near 1) still fails.
 const MANY = 2000;
 const FEW_BOUND = 0.25;
-// One byte, one value read twice on purpose: today's second map's share is the minor class's share in the recipe 7b5 draws.
-const LINKED = [["minor share", "second share"]];
+// No byte is read twice on purpose since 7b5 retired the second map's share (F3476).
+const LINKED: readonly (readonly string[])[] = [];
 
 type Span = readonly [number, number];
 const word = (bytes: Uint8Array, index: number) =>
@@ -57,12 +57,8 @@ function lookPlaces(places: Map<string, number>, look: PlanetLook): void {
   place("warp frequency", look.warp.frequency, [0.9, 2.4]);
   place("recolour", look.recolour, row.recolour);
   place("relief", look.relief, row.relief);
-  place("contrast", look.contrast, row.contrast);
-  place("today's caps", look.caps, row.caps);
-  place("today's clouds", look.clouds, row.clouds);
-  place("today's rifts", look.rifts, row.rifts);
-  place("cracks", look.cracks, row.cracks);
-  if (row.second !== undefined) place("second share", look.secondShare, [0, 0.4]);
+  for (const [axis, name] of ["minor offset x", "minor offset y", "minor offset z"].entries())
+    place(name, look.minorOffset[axis as 0 | 1 | 2], [0, 16]);
   if (look.rim !== null) place("air", look.rim.thickness, row.rim?.thickness);
   if (look.glow !== null) place("glow", look.glow.level, row.glow?.level);
   if (look.rings !== null) place("ring opacity", look.rings.opacity, [0.34, 0.72]);
