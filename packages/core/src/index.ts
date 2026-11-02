@@ -37,6 +37,7 @@ export {
   type StarSystem,
   type WorldHeld,
 } from "./cosmos/system.ts";
+export { worldsDrawn } from "./cosmos/count.ts";
 export {
   BOUNDS,
   dotLight,

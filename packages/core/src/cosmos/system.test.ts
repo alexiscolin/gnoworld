@@ -16,6 +16,7 @@ import {
   type WorldHeld,
 } from "./system.ts";
 import { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
+import { worldsDrawn } from "./count.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
 // its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one (F3563).
@@ -166,6 +167,20 @@ describe("systemsOf", () => {
 
   it("counts a world named twice once", () => {
     expect(named(systemsOf([...held("a", 3), ...held("a", 3)]), "a").worlds).toHaveLength(3);
+  });
+
+  // 7d6: the hero's number is what the cosmos draws, counted as `systemsOf` holds the worlds, and the Earth beside them.
+  it("counts the worlds the cosmos draws as its systems hold them, and the Earth", () => {
+    for (const file of [[], held("a", 3), [...held("a", 3), ...held("a", 3), ...held("b", 2)], mixedUse("c", 127)]) {
+      const held_ = systemsOf(file).reduce((sum, { worlds }) => sum + worlds.length, 0);
+      expect(worldsDrawn(file)).toBe(held_ + 1);
+    }
+    expect(
+      worldsDrawn([
+        { id: "x", namespace: "a b" },
+        { id: "b x", namespace: "a" },
+      ]),
+    ).toBe(3);
   });
 
   it("tells gno.land's star from a namespace named gnoland: a slug holds no dot", () => {

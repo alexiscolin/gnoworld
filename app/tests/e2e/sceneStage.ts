@@ -19,6 +19,7 @@ interface CosmosStats {
   earth: boolean;
   screen: { sun: Spot; earth: Spot | undefined; bodies: Spot[] };
   nebulae: number;
+  worlds: number;
 }
 interface Stats {
   frames: number;

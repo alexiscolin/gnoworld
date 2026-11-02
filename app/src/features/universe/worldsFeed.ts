@@ -1,8 +1,10 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
 // read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
+import { worldsDrawn as counted } from "@gnoworld/core";
 import { readWorlds } from "../../lib/chain/realms.ts";
 import type { CosmosWorld } from "../../scene/cosmos/cosmos.ts";
 import type { Scene } from "../../scene/scene.ts";
+import { worldsDrawn } from "./worldsCount.ts";
 
 export class WorldsFeed {
   readonly #leaving = new AbortController();
@@ -38,6 +40,7 @@ export class WorldsFeed {
       (file) => {
         if (file === undefined) return;
         this.#worlds = file.worlds;
+        worldsDrawn(counted(file.worlds));
         if (this.#shown) scene.cosmos(this.#worlds);
       },
       () => undefined,

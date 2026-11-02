@@ -5,7 +5,7 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Hero, Ticker, tickerItems, useClock, Worlds } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useSpace } from "../features/universe/index.ts";
+import { useSpace, useWorldsDrawn } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
 
@@ -26,11 +26,12 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
   const now = useClock();
-  // Universes are never shown together: the worlds' file is the default one's.
+  // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's (7d6).
   useSpace(universe.isDefault ? "cosmos" : undefined);
+  const drawn = useWorldsDrawn();
   return (
     <>
-      <Hero universe={universe} />
+      <Hero universe={universe} worlds={universe.isDefault ? drawn : universe.worlds.length} />
       <Worlds>
         <PlaceLinks places={universe.worlds} />
       </Worlds>

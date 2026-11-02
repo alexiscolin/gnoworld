@@ -816,6 +816,16 @@ describe("hidden, and gone", () => {
   });
 });
 
+describe("what the hero counts (7d6)", () => {
+  it("counts the worlds it draws: the file's, each once, and the Earth", async () => {
+    const scene = made();
+    await shown(scene, [...worlds(4), ...worlds(4)]);
+    expect(scene.cosmos.stats().worlds).toBe(13);
+    await shown(scene, []);
+    expect(scene.cosmos.stats().worlds).toBe(1);
+  });
+});
+
 describe("its maps", () => {
   it("asks a body's maps only: never the whole set for a few worlds", async () => {
     const scene = made();

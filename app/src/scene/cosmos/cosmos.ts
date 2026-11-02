@@ -7,6 +7,7 @@ import {
   Ladder,
   systemsOf,
   toMap,
+  worldsDrawn,
   type ClearBox,
   type Orbiter,
   type Point,
@@ -224,6 +225,7 @@ export class Cosmos {
       list,
       screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
+      worlds: worldsDrawn(this.#list ?? []),
     };
   }
 }
