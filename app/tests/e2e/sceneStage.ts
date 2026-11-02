@@ -1,4 +1,5 @@
-import { expect, type Page } from "./fixtures.ts";
+import { expect, hydrated, type Page } from "./fixtures.ts";
+import { box } from "./geometry.ts";
 
 // What the scene's journeys share: the running scene, read in a test build, and its context lost and given back.
 interface Spot {
@@ -51,6 +52,20 @@ export const countShifts = (page: Page) =>
   });
 
 export const shifted = (page: Page) => page.evaluate(() => Number(Reflect.get(globalThis, "__shift")));
+
+/** A page whose body in space has its room laid out from the first paint: the plate's title stays where it was drawn while the body comes
+ * (`come`), and the page barely shifts. Under reduced motion, so only the layout moves. */
+export async function keepsItsRoom(page: Page, path: string, come: (page: Page) => Promise<void>) {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await countShifts(page);
+  await page.goto(path);
+  await hydrated(page);
+  const before = await box(page, "h1");
+  await come(page);
+  const after = await box(page, "h1");
+  expect(after.y).toBe(before.y);
+  expect(await shifted(page)).toBeLessThan(0.1);
+}
 
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 

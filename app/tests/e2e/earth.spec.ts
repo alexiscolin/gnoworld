@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, near } from "./geometry.ts";
-import { countShifts, loseContext, restoreContext, running, shaderRefusals, shifted, stats } from "./sceneStage.ts";
+import { keepsItsRoom, loseContext, restoreContext, running, shaderRefusals, stats } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
@@ -352,14 +352,19 @@ test.describe("a shader the driver refuses", () => {
   test.use({ viewport: COMPUTER, serviceWorkers: "block" });
 
   test("leaves the page whole, says so, and keeps the plate shut: no hole with no word", async ({ page }) => {
-    await page.route(/\/assets\/scene-[\w-]+\.js$/, async (route) => {
+    // The line is broken in whichever of the scene's chunks holds it: a second lazy part split the scene's shared code out of its chunk (7e).
+    let broken = 0;
+    await page.route(/\/assets\/[\w-]+\.js$/, async (route) => {
       const answer = await route.fetch();
-      await route.fulfill({ response: answer, body: (await answer.text()).replace("float facing =", "flot facing =") });
+      const text = await answer.text();
+      if (text.includes("float facing =")) broken += 1;
+      await route.fulfill({ response: answer, body: text.replace("float facing =", "flot facing =") });
     });
     const refused: string[] = [];
     page.on("pageerror", ({ message }) => refused.push(message));
     await givenUp(page);
     expect(refused.join()).toContain("a shader was refused");
+    expect(broken, "one chunk held the line").toBe(1);
   });
 });
 
@@ -367,15 +372,7 @@ test.describe("a window that loads the scene by itself, under the plate's breakp
   test.use({ viewport: { width: 1100, height: 800 } });
 
   test("keeps the globe's room from the first paint: the plate does not jump", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await countShifts(page);
-    await page.goto(EARTH);
-    await hydrated(page);
-    const before = await box(page, "h1");
-    await painted(page);
-    const after = await box(page, "h1");
-    expect(after.y).toBe(before.y);
-    expect(await shifted(page)).toBeLessThan(0.1);
+    await keepsItsRoom(page, EARTH, painted);
   });
 });
 

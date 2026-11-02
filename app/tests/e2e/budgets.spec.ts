@@ -39,6 +39,9 @@ const SCENE_JS = 156 * 1024;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 const COSMOS_JS = 16 * 1024;
+// A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
+const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
+const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
 
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
@@ -69,6 +72,13 @@ const without = (page: Page, urls: readonly string[], skip: readonly string[]) =
     },
     [[...urls], skip, STATIC_IMPORT.source] as const,
   );
+
+// What a late chunk brings: it and every chunk it imports statically that was not there already. A chunk weighed alone would let a split
+// carry its code out of every cap (7e's review, B2-1).
+async function ownOf(page: Page, late: string, there: readonly string[]): Promise<string[]> {
+  const brought = new Set(there);
+  return (await closureOf(page, late)).filter((each) => !brought.has(each));
+}
 
 // A script and every script it imports statically, read file by file by the test, not the page: a page that draws the scene on a software GPU
 // is too busy to read twenty files in time.
@@ -107,12 +117,7 @@ async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) 
   );
   expect(chunk, "the chat's chunk is asked after the load").toBeGreaterThanOrEqual(loaded);
   expect(chunk, "the chat's chunk is asked after the door came").toBeGreaterThanOrEqual(door);
-  const late = [...scripts].find((url) => CHAT.test(url));
-  expect(
-    await compressed(page, late === undefined ? [] : [late]),
-    "the late chat stays within its cap",
-  ).toBeLessThanOrEqual(LATE_CHAT_JS);
-  return late;
+  return [...scripts].find((url) => CHAT.test(url));
 }
 
 for (const path of PAGES) {
@@ -147,6 +152,12 @@ for (const path of PAGES) {
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
     const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
     const firstScreen = await without(page, [...scripts], late);
+    const lateChunk = late.find((url) => CHAT.test(url));
+    if (lateChunk !== undefined)
+      expect(
+        await compressed(page, await ownOf(page, lateChunk, firstScreen)),
+        "the late chat stays within its cap",
+      ).toBeLessThanOrEqual(LATE_CHAT_JS);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),
@@ -171,9 +182,20 @@ for (const path of PAGES) {
 
 test("the cosmos's chunk stays within its cap, and the scene's holds none of it", async ({ page }) => {
   const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
   await page.goto("/?test-gpu");
   await hydrated(page);
-  expect(await compressed(page, [(await cosmos).url()])).toBeLessThanOrEqual(COSMOS_JS);
+  const there = await closureOf(page, (await scene).url());
+  expect(await compressed(page, await ownOf(page, (await cosmos).url(), there))).toBeLessThanOrEqual(COSMOS_JS);
+});
+
+test("a world's part of the scene stays within its cap", async ({ page }) => {
+  const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/w/bubble?test-gpu");
+  await hydrated(page);
+  const there = await closureOf(page, (await scene).url());
+  expect(await compressed(page, await ownOf(page, (await part).url(), there))).toBeLessThanOrEqual(WORLD_JS);
 });
 
 // The scene weighs its chunk and every chunk it imports statically that the door did not bring already: a part of three split into a chunk
