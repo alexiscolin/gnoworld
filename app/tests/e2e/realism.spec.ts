@@ -1,6 +1,6 @@
 import { ANCHORS } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
-import { brightness } from "./geometry.ts";
+import { brightness, colours } from "./geometry.ts";
 
 // 7b's realism page (app/lab): twelve worlds and one nebula made both ways, for Alexis's eye on a real GPU. These journeys hold what a
 // software GPU can prove: it draws, under the site's CSP (the fixtures fail on a violation), on a small set of maps, inside its memory.
@@ -147,6 +147,14 @@ test.describe("the realism page", () => {
     expect(found.mapBytes).toBeLessThanOrEqual(MEMORY_AT_MOST);
   });
 
+  for (const query of ["?view=close&world=1", "?view=eclipse&world=1"])
+    test(`a close view's 4096 maps stay inside it too, on ${query}`, async ({ page }) => {
+      await open(page, query);
+      const found = await stats(page);
+      expect(found.mapBytes).toBeGreaterThan(0);
+      expect(found.mapBytes).toBeLessThanOrEqual(MEMORY_AT_MOST);
+    });
+
   test("a world close up holds the frame, with near-black space around it", async ({ page }) => {
     await open(page, "?view=close&world=1");
     expect((await stats(page)).worlds).toBe(1);
@@ -177,6 +185,14 @@ test.describe("the realism page", () => {
     ]);
     expect(disc).toBeLessThan(10);
     expect(rim).toBeGreaterThan(disc + 20);
+    // What the ceiling of 10 is for: a night with air keeps a deep blue and the ground's faint form, no hole in the sky.
+    const [night] = await colours(page, await page.locator("canvas").screenshot(), [
+      [round(x - r / 4), round(y - r / 4), round(x + r / 4), round(y + r / 4)],
+    ]);
+    if (night === undefined) throw new Error("no disc");
+    const [red, , blue] = night;
+    expect(disc).toBeGreaterThan(1);
+    expect(blue).toBeGreaterThan(red);
   });
 
   for (const method of ["computed", "image"])
