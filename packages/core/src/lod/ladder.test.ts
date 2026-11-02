@@ -107,9 +107,62 @@ describe("the draw bound", () => {
     const drawn = look(ladder, eye);
     expect(drawn.bodyCount).toBe(BOUNDS.bodies);
     expect(drawn.starCount).toBe(BOUNDS.stars);
-    expect(drawn.dotCount).toBe(BOUNDS.dots);
+    expect(drawn.dotCount).toBe(Math.min(BOUNDS.dots, BOUNDS.stars * 20));
     const least = Math.min(...list.map((system) => distanceTo(system, eye)));
     expect(distanceTo(pick(list, drawn.bodySystems[0] ?? -1), eye)).toBeCloseTo(least, 9);
+  });
+
+  it("fills every cap nearest first: a far crowd never takes what a near world needs (F3568)", () => {
+    const near = universe(60);
+    const eye = { x: 0, y: 40, z: 0 };
+    const far = systemsOf(
+      Array.from({ length: 20_000 }, (_, at) => ({ id: `big/w${String(at)}`, namespace: "big", use: 1 })),
+    ).filter(({ id }) => id === "big");
+    const big = { ...pick(far, 0), place: { x: 0, y: 0, z: 290 } };
+    const list = [...near, big];
+    const drawn = look(new Ladder(list), eye);
+    const lit = near.filter((system) => distanceTo(system, eye) <= MIDDLE * 0.6);
+    const shown = new Set(Array.from({ length: drawn.dotCount }, (_, at) => drawn.dotSystems[at]));
+    const bodies = new Set(bodiesOf(drawn).map(({ system }) => system));
+    for (const system of lit)
+      if (system.worlds.length > 1)
+        expect(shown.has(list.indexOf(system)) || bodies.has(list.indexOf(system))).toBe(true);
+    const stars = Array.from({ length: drawn.starCount }, (_, at) =>
+      distanceTo(pick(list, drawn.stars[at] ?? -1), eye),
+    );
+    expect(stars).toEqual([...stars].sort((a, b) => a - b));
+  });
+
+  it("keeps the nearest stars when their cap binds", () => {
+    const list = crowd(4000, 1);
+    const eye = { x: 90, y: 20, z: 90 };
+    const drawn = look(new Ladder(list), eye);
+    const kept = Array.from({ length: drawn.starCount }, (_, at) => distanceTo(pick(list, drawn.stars[at] ?? -1), eye));
+    const all = list.map((system) => distanceTo(system, eye)).sort((a, b) => a - b);
+    expect(Math.max(...kept)).toBeCloseTo(all[BOUNDS.stars - 1] ?? NaN, 9);
+  });
+
+  it("keeps the nearest glows when their cap binds", () => {
+    const ladder = new Ladder(crowd(160_000, 0, 60));
+    const eye = { x: 12_000, y: 100, z: 12_000 };
+    const drawn = look(ladder, eye);
+    const kept = Array.from({ length: drawn.glowCount }, (_, at) => {
+      const { x, y, z } = ladder.region(drawn.glows[at] ?? -1);
+      return Math.hypot(x - eye.x, y - eye.y, z - eye.z);
+    });
+    const all: number[] = [];
+    for (let at = 0; ; at += 1) {
+      try {
+        const { x, y, z } = ladder.region(at);
+        const away = Math.hypot(x - eye.x, y - eye.y, z - eye.z);
+        if (away > MIDDLE * 0.75 && away <= HAZE) all.push(away);
+      } catch {
+        break;
+      }
+    }
+    all.sort((a, b) => a - b);
+    expect(all.length).toBeGreaterThan(BOUNDS.glows);
+    expect(Math.max(...kept)).toBeCloseTo(all[BOUNDS.glows - 1] ?? NaN, 9);
   });
 
   it("holds the glows' cap over regions no map makes", () => {

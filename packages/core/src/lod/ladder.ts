@@ -4,6 +4,7 @@
 import type { Point } from "../space/cell.ts";
 import { smoothstep } from "../space/smooth.ts";
 import type { StarSystem } from "../cosmos/system.ts";
+import { Nearest } from "./nearest.ts";
 
 /** The most drawn: the budget of slice 7's bench. */
 export const BOUNDS = { bodies: 40, stars: 1024, dots: 4096, glows: 256, rocks: 480 } as const;
@@ -16,6 +17,8 @@ export const HAZE = 1600;
 
 const REGION = 160;
 const NEAR_MOST = 128;
+// The most points one star's worlds take of the bound.
+const DOTS_A_STAR = 1024;
 // A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world.
 const BODY_PIXELS = 6;
 // A point's radius in pixels never falls under this: a pixel across, and it goes out by `MIDDLE`.
@@ -76,6 +79,8 @@ export class Ladder {
   readonly #regions: Region[] = [];
   readonly #regionAt = new Map<number, number>();
   readonly #nearAway = new Float64Array(NEAR_MOST);
+  readonly #stars: Nearest;
+  readonly #glows: Nearest;
   // How many of a system's worlds are bodies, first ones first.
   readonly #bodies: Int32Array;
   /** How many systems the last look asked about. */
@@ -84,6 +89,7 @@ export class Ladder {
   constructor(systems: readonly StarSystem[]) {
     this.#systems = systems;
     this.#bodies = new Int32Array(systems.length);
+    this.#stars = new Nearest(systems.length);
     const held = new Map<number, number[]>();
     systems.forEach(({ place }, at) => {
       const key = keyOf(cellOf(place.x), cellOf(place.z));
@@ -96,6 +102,7 @@ export class Ladder {
       this.#regionAt.set(key, this.#regions.length);
       this.#regions.push(this.#regionOf(cell));
     }
+    this.#glows = new Nearest(this.#regions.length);
   }
 
   #regionOf(cell: readonly number[]): Region {
@@ -135,10 +142,8 @@ export class Ladder {
       const { place } = this.#systems[at] ?? { place: eye };
       this.visited += 1;
       this.#bodies[at] = 0;
-      if (apart(place, eye) <= MIDDLE && drawn.starCount < BOUNDS.stars) {
-        drawn.stars[drawn.starCount] = at;
-        drawn.starCount += 1;
-      }
+      const fromEye = apart(place, eye);
+      if (fromEye <= MIDDLE) this.#stars.offer(at, fromEye);
       const away = apart(place, focus);
       if (away <= LANDMARKS) this.#keepNear(at, away, drawn);
     }
@@ -177,11 +182,13 @@ export class Ladder {
     }
   }
 
+  // By star, nearest first, a share each: a crowd never takes what a near world needs.
   #addDots(drawn: Drawn): void {
     for (let index = 0; index < drawn.starCount; index += 1) {
       const at = drawn.stars[index] ?? 0;
-      const count = this.#systems[at]?.worlds.length ?? 0;
-      for (let world = this.#bodies[at] ?? 0; world < count && drawn.dotCount < BOUNDS.dots; world += 1) {
+      const first = this.#bodies[at] ?? 0;
+      const count = Math.min(this.#systems[at]?.worlds.length ?? 0, first + DOTS_A_STAR);
+      for (let world = first; world < count && drawn.dotCount < BOUNDS.dots; world += 1) {
         drawn.dotSystems[drawn.dotCount] = at;
         drawn.dotWorlds[drawn.dotCount] = world;
         drawn.dotCount += 1;
@@ -196,13 +203,11 @@ export class Ladder {
       for (let dz = -reach; dz <= reach; dz += 1) {
         const at = this.#regionAt.get(keyOf(x + dx, z + dz));
         const region = at === undefined ? undefined : this.#regions[at];
-        if (at === undefined || region === undefined || drawn.glowCount === BOUNDS.glows) continue;
+        if (at === undefined || region === undefined) continue;
         const away = apart(region, eye);
-        if (away > MIDDLE * 0.75 && away <= HAZE) {
-          drawn.glows[drawn.glowCount] = at;
-          drawn.glowCount += 1;
-        }
+        if (away > MIDDLE * 0.75 && away <= HAZE) this.#glows.offer(at, away);
       }
+    drawn.glowCount = this.#glows.drain(drawn.glows, BOUNDS.glows);
   }
 
   /** What is drawn from a view, into `drawn`. */
@@ -213,6 +218,8 @@ export class Ladder {
     drawn.dotCount = 0;
     drawn.nearCount = 0;
     this.visited = 0;
+    this.#stars.clear();
+    this.#glows.clear();
     const reach = Math.ceil(MIDDLE / REGION);
     const [x, z] = [cellOf(view.eye.x), cellOf(view.eye.z)];
     for (let dx = -reach; dx <= reach; dx += 1)
@@ -220,6 +227,7 @@ export class Ladder {
         const cell = this.#cells.get(keyOf(x + dx, z + dz));
         if (cell !== undefined) this.#askCell(cell, view, drawn);
       }
+    drawn.starCount = this.#stars.drain(drawn.stars, BOUNDS.stars);
     this.#addLandmarks(view, drawn);
     this.#addOthers(view, drawn);
     this.#addDots(drawn);
