@@ -13,7 +13,7 @@ import {
   type WorldState,
 } from "@gnoworld/core";
 
-export type ViewName = "gallery" | "close" | "eclipse" | "nebula" | "earth" | "stages";
+export type ViewName = "gallery" | "gallery24" | "close" | "eclipse" | "nebula" | "earth" | "stages";
 export type Method = "computed" | "image";
 
 export interface Choice {
@@ -39,6 +39,18 @@ const NAMES = [
   "dusk",
   "soot",
   "shard",
+  "plume",
+  "groove",
+  "frost",
+  "deep",
+  "dawn",
+  "magma",
+  "janus",
+  "pearl",
+  "azure",
+  "coal",
+  "kiln",
+  "mist",
 ];
 const STATES: Record<Stage, WorldState> = {
   seed: { vitality: 0.1, present: 0.3, fresh: true },
@@ -49,13 +61,17 @@ const STATES: Record<Stage, WorldState> = {
   beacon: { vitality: 0.95, present: 0.9, fresh: false },
 };
 
+// The gallery Alexis approved shows ADR-0002 §3's twelve, as it was; its own view shows all 24 (7b4).
+const TWELVE = 12;
+const many = (view: ViewName): boolean => view === "gallery" || view === "gallery24";
+
 /** The path of a world on the page: another seed, another world of the same anchor. */
 export const pathOf = (world: number, seed: number): string =>
   `gno.land/r/${NAMES[world] ?? "atlas"}${seed === 0 ? "" : String(seed)}/home`;
 
 /** The bytes of a choice's `index`th world. */
 export const pathBytes = ({ view, world, seed }: Choice, index: number): Uint8Array =>
-  asciiBytes(pathOf(view === "gallery" ? index : world, seed));
+  asciiBytes(pathOf(many(view) ? index : world, seed));
 
 /** The look of the page's `world`th anchor. */
 const lookAt = (world: number, seed: number): PlanetLook =>
@@ -63,7 +79,8 @@ const lookAt = (world: number, seed: number): PlanetLook =>
 
 /** The looks a choice shows. */
 export function looksOf({ view, world, seed }: Choice): PlanetLook[] {
-  if (view === "gallery") return ANCHORS.map((_, index) => lookAt(index, seed));
+  if (view === "gallery") return ANCHORS.slice(0, TWELVE).map((_, index) => lookAt(index, seed));
+  if (view === "gallery24") return ANCHORS.map((_, index) => lookAt(index, seed));
   return view === "stages" ? STAGES.map(() => lookAt(world, seed)) : [lookAt(world, seed)];
 }
 

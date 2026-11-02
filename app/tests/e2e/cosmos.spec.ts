@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { BOUNDS } from "../../../packages/core/src/lod/ladder.ts";
+import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
+import { toScene } from "../../../packages/core/src/frame/disc.ts";
+import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, colours, near } from "./geometry.ts";
-import { opened, running, stats } from "./sceneStage.ts";
+import { hideThePage, opened, running, stats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -42,6 +45,7 @@ const NOT_YET = {
   dotPixels: 0,
   earth: false,
   screen: { sun: { x: 0, y: 0, radius: 0 }, earth: undefined, bodies: [] },
+  nebulae: 0,
 };
 const served = (page: Page, body: string, status = 200) =>
   page.route("**/worlds.json", (route) => route.fulfill({ status, body, contentType: "application/json" }));
@@ -120,10 +124,7 @@ test("shows warm suns on near-black: the great sun's glow, deep black in the cor
   await arrived(page);
   await standing(page);
   await opened(page);
-  await page.evaluate(() => {
-    for (const child of document.body.children)
-      if (child instanceof HTMLElement && child.querySelector("canvas") === null) child.style.visibility = "hidden";
-  });
+  await hideThePage(page);
   const { screen } = await cosmos(page);
   const [x, y] = [Math.round(screen.sun.x), Math.round(screen.sun.y)];
   const shot = await page.locator("canvas").screenshot();
@@ -248,4 +249,146 @@ test("gives the release's page the cosmos as a view, from the recorded file, for
   await running(page);
   await standing(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
+});
+
+// The nebulae: real images, warped and recoloured, in layers behind the worlds (ADR-0002 §10, "Space views"), seen from a system's
+// distance to a cluster's, near-black near a world, each with its credit wherever it shows.
+const NEBULA = new RegExp(`/textures/(${NEBULA_IMAGES.join("|")})\\.webp$`);
+const lit = (page: Page) => expect.poll(async () => (await cosmos(page)).nebulae, SLOW).toBeGreaterThan(0);
+
+test("lights nebulae from real images behind the arrival, with their credits beside them", async ({ page }) => {
+  const images = new Set<string>();
+  page.on("request", (request) => {
+    const name = NEBULA.exec(request.url())?.[1];
+    if (name !== undefined) images.add(name);
+  });
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  expect(images.size).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Credits" }).click();
+  for (const name of images) {
+    const credit = CREDITS.find(({ files }) => files.includes(name));
+    expect(credit).toBeDefined();
+    await expect(page.getByRole("dialog")).toContainText(credit?.line ?? "no credit");
+  }
+});
+
+test("keeps the corners near-black and the draw bound with the nebulae lit", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  await opened(page);
+  const { calls } = await stats(page);
+  expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
+  await hideThePage(page);
+  const shot = await page.locator("canvas").screenshot();
+  // The top left, and the bottom left under the hero; the right holds a sun and the Credits.
+  const corners = await colours(page, shot, [
+    [4, 4, 40, 40],
+    [4, COMPUTER.height - 40, 40, COMPUTER.height - 4],
+  ]);
+  for (const corner of corners) expect(Math.max(...corner)).toBeLessThan(60);
+});
+
+test("puts the nebulae out near a world: space is near-black there", async ({ page }) => {
+  await served(page, RECORDED);
+  await arrived(page);
+  await standing(page);
+  await lit(page);
+  const near = { x: 0, y: 0, z: 0 };
+  toScene({ x: 0, y: 2, z: 0 }, near);
+  await moveTo(page, near);
+  await expect.poll(async () => (await cosmos(page)).nebulae, SLOW).toBe(0);
+});
+
+test("gives the release's page the nebulae, and their credits in its footer", async ({ page }) => {
+  await page.setViewportSize(COMPUTER);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await standing(page);
+  await lit(page);
+  for (const credit of CREDITS.filter(({ files }) => files.some((file) => NEBULA_IMAGES.some((name) => name === file))))
+    await expect(page.locator("footer")).toContainText(credit.line);
+});
+
+// The light the nebulae add, read as the same view twice, their images refused and then let through: the video's nebulae are coloured
+// dust and gas, never grey smoke (#19363C, #472819: saturation 0.6), and the warm glow under them keeps its shape.
+const BOX = 48;
+const ADDS_AT_MOST = 32;
+const GREY_AT_MOST = 0.4;
+const boxes = () => {
+  const found: [number, number, number, number][] = [];
+  for (let y = 0; y + BOX <= COMPUTER.height; y += BOX)
+    for (let x = 0; x + BOX <= COMPUTER.width; x += BOX) found.push([x, y, x + BOX, y + BOX]);
+  return found;
+};
+type Colour = readonly [number, number, number];
+
+// Each box's added light: never past the bound, and coloured wherever the scene leaves it room to show; how many showed it.
+function addedLight(before: readonly Colour[], after: readonly Colour[]): number {
+  let shown = 0;
+  for (const [at, [red, green, blue]] of after.entries()) {
+    const [r0, g0, b0] = before[at] ?? [NaN, NaN, NaN];
+    const added = [red - r0, green - g0, blue - b0];
+    const top = Math.max(...added);
+    expect(top, `box ${String(at)}`).toBeLessThanOrEqual(ADDS_AT_MOST);
+    // Where the scene is near white already, the light it adds is cut at 255: no colour can show there.
+    if (top < 6 || Math.max(r0, g0, b0) >= 200) continue;
+    shown += 1;
+    expect((top - Math.min(...added)) / top, `box ${String(at)} is grey`).toBeGreaterThanOrEqual(GREY_AT_MOST);
+  }
+  return shown;
+}
+
+// A box inside the Earth's disc, the middle third of it.
+async function earthDisc(page: Page): Promise<[number, number, number, number]> {
+  const { earth } = (await cosmos(page)).screen;
+  if (earth === undefined) throw new Error("no Earth on screen");
+  const third = Math.round(earth.radius / 3);
+  const [x, y] = [Math.round(earth.x), Math.round(earth.y)];
+  return [x - third, y - third, x + third, y + third];
+}
+
+// The arrival drawn and still, its page hidden, as a picture.
+async function stillPicture(page: Page) {
+  await standing(page);
+  await opened(page);
+  await hideThePage(page);
+  return page.locator("canvas").screenshot();
+}
+
+test.describe("the nebulae's light", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("recolours each nebula to the mood it stands in, and never washes out the glow behind it", async ({ page }) => {
+    let refused = true;
+    let asked = 0;
+    await page.route(NEBULA, (route) => {
+      asked += 1;
+      return refused ? route.fulfill({ status: 404 }) : route.fallback();
+    });
+    await served(page, RECORDED);
+    await arrived(page);
+    await expect.poll(() => asked, SLOW).toBeGreaterThan(0);
+    const without = await stillPicture(page);
+    expect((await cosmos(page)).nebulae).toBe(0);
+    refused = false;
+    await page.reload();
+    await hydrated(page);
+    await running(page);
+    await lit(page);
+    const withNebulae = await stillPicture(page);
+    expect(
+      addedLight(await colours(page, without, boxes()), await colours(page, withNebulae, boxes())),
+    ).toBeGreaterThan(10);
+    // Behind every body: the Earth's disc takes nothing of them.
+    const disc = await earthDisc(page);
+    const [[onEarth], [offEarth]] = [await colours(page, withNebulae, [disc]), await colours(page, without, [disc])];
+    for (const [channel, value] of (onEarth ?? []).entries())
+      expect(Math.abs(value - (offEarth?.[channel] ?? NaN))).toBeLessThan(2);
+  });
 });

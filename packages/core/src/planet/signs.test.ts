@@ -13,7 +13,7 @@ import {
   type WorldState,
 } from "./signs.ts";
 
-// A world's stages and the signs that show them (slice 7, 7b2; ADR-0002 §10): a stage reads the same on all twelve classes, each in its
+// A world's stages and the signs that show them (slice 7, 7b2; ADR-0002 §10): a stage reads the same on every class, each in its
 // own form, and a sign keeps what it means, where it shows and how it grows. A world at rest with nobody here carries no sign at all: it
 // is the render Alexis approved, drawn as the lab draws it.
 const seedOf = (path: string) => planetSeed(asciiBytes(path));
@@ -50,8 +50,20 @@ const WAY: Record<Anchor, { kind: LightKind; grain: Span; fine: Span }> = {
   "tidally locked": { kind: "dusk", grain: [1.6, 2.6], fine: [0.2, 0.34] },
   "dark carbon": { kind: "seams", grain: [1, 1.8], fine: [5.5, 7.5] },
   shattered: { kind: "towns", grain: [1.2, 2], fine: [0.4, 0.7] },
+  "nitrogen ice": { kind: "towns", grain: [1.3, 2.1], fine: [0.6, 0.95] },
+  "grooved ice": { kind: "towns", grain: [1.1, 1.9], fine: [0.55, 0.9] },
+  snowball: { kind: "towns", grain: [1.5, 2.3], fine: [0.65, 1] },
+  hycean: { kind: "pools", grain: [1.2, 2.2], fine: [3.6, 4.6] },
+  archean: { kind: "coasts", grain: [1.3, 2.1], fine: [0.8, 0.95] },
+  "lava world": { kind: "seams", grain: [1.5, 2.5], fine: [4.4, 6] },
+  "two-faced": { kind: "towns", grain: [1.2, 2], fine: [0.5, 0.9] },
+  "water cloud giant": { kind: "belts", grain: [1.1, 1.9], fine: [20, 36] },
+  "azure giant": { kind: "belts", grain: [1, 1.6], fine: [30, 48] },
+  "dark giant": { kind: "belts", grain: [1.1, 1.7], fine: [28, 44] },
+  "hot giant": { kind: "belts", grain: [1.4, 2.4], fine: [16, 26] },
+  "sub-Neptune": { kind: "pools", grain: [1.6, 2.6], fine: [4.4, 5.4] },
 };
-const SEA: readonly Anchor[] = ["temperate", "ocean"];
+const SEA: readonly Anchor[] = ["temperate", "ocean", "archean"];
 const between = ([from, to]: Span, share: number) => from + (to - from) * share;
 const TURN = Math.PI * 2;
 // A world's form reads the second hash past the bytes its class takes (0 to 2): 3 the grain, 4 the fineness, 5 to 7 the offset, 8 the turn.
@@ -163,11 +175,42 @@ describe("a world at rest", () => {
     expect(awake.stage).toBe("rest");
     expect(awake.size).toBe(1);
     expect(awake.lights.extent).toBeGreaterThan(0);
-    expect(awake.lights.extent).toBeLessThan(worldSigns(DAO, "rocky", AT.inhabited).lights.extent);
+    const beacon = worldSigns(DAO, "rocky", { vitality: 0.95, present: 0.5, fresh: false });
+    expect(awake.lights).toEqual(beacon.lights);
+  });
+
+  // F4110 (Alexis, 2026-11-02): night lights mean people here now and nothing else; a stage shows through its size.
+  it("lights a night side with the people here alone: a vitality moves neither how far nor how bright", () => {
+    fc.assert(
+      fc.property(fc.tuple(unit, unit, unit, anyAnchor), ([vitality, other, present, anchor]) => {
+        const one = worldSigns(DAO, anchor, { vitality, present, fresh: false }).lights;
+        const two = worldSigns(DAO, anchor, { vitality: other, present, fresh: false }).lights;
+        expect(two.extent).toBe(one.extent);
+        expect(two.level).toBe(one.level);
+      }),
+    );
+  });
+
+  it("shows no light on a settled world with nobody here, at any stage", () => {
+    fc.assert(
+      fc.property(unit, anyAnchor, (vitality, anchor) => {
+        expect(worldSigns(DAO, anchor, { vitality, present: 0, fresh: false }).lights.extent).toBe(0);
+      }),
+    );
+    for (const stage of ["living", "inhabited", "busy", "beacon"] as const)
+      expect(worldSigns(DAO, "rocky", { ...AT[stage], present: 0 }).lights.extent, stage).toBe(0);
+  });
+
+  it("spreads its lights as far as the people here reach: more people, more of the night side", () => {
+    const extent = (present: number) => worldSigns(DAO, "ice", { ...AT.living, present }).lights.extent;
+    expect(extent(0.05)).toBeCloseTo(0.05, 12);
+    expect(extent(0.3)).toBeCloseTo(0.3, 12);
+    expect(extent(0.9)).toBeCloseTo(0.9, 12);
+    expect(extent(1)).toBe(1);
   });
 });
 
-describe("a stage reads the same on all twelve classes", () => {
+describe("a stage reads the same on every class", () => {
   it.each([...STAGES])("%s: one size, one share of lights, one level, one signal", (stage) => {
     const readings = ANCHORS.map((anchor) => {
       const { stage: read, size, signal, lights } = worldSigns(DAO, anchor, AT[stage]);
@@ -177,7 +220,9 @@ describe("a stage reads the same on all twelve classes", () => {
     for (const reading of readings) expect(reading).toEqual(readings[0]);
   });
 
-  it("and each class shows it its own way", () => {
+  it("and each class shows it its own way, no two in the same form", () => {
+    const forms = ANCHORS.map((anchor) => JSON.stringify(WAY[anchor]));
+    expect(new Set(forms).size).toBe(ANCHORS.length);
     expect(Object.keys(WAY).sort()).toEqual([...ANCHORS].sort());
     for (const anchor of ANCHORS)
       for (const path of ["a", "b", "c"])
@@ -185,19 +230,15 @@ describe("a stage reads the same on all twelve classes", () => {
     expect(new Set(Object.values(WAY).map(({ kind }) => kind))).toEqual(new Set(LIGHT_KINDS));
   });
 
-  it("grows stage by stage on every class: matter and lights, never a step back", () => {
+  // Its lights are the people's (F4110), held by their own tests: AT's crowds grow with the stages and would hold them for nothing here.
+  it("grows stage by stage on every class: matter, never a step back", () => {
     for (const anchor of ANCHORS) {
       const climb = (["rest", "living", "inhabited", "busy", "beacon"] as const).map((stage) =>
-        worldSigns(DAO, anchor, AT[stage]),
+        worldSigns(DAO, anchor, { ...AT[stage], present: 0.5 }),
       );
-      for (const [index, signs] of climb.slice(1).entries()) {
-        const before = climb[index];
-        expect(signs.lights.extent, anchor).toBeGreaterThan(before?.lights.extent ?? 1);
-        expect(signs.size, anchor).toBeGreaterThan(before?.size ?? 9);
-      }
+      for (const [index, signs] of climb.slice(1).entries())
+        expect(signs.size, anchor).toBeGreaterThan(climb[index]?.size ?? 9);
       expect(climb.at(-1)?.size, "a beacon stands out as matter").toBeGreaterThan(1.4);
-      expect(climb.at(-1)?.lights.extent, "a beacon is lit all over").toBeGreaterThan(0.9);
-      expect(climb[1]?.lights.extent, "a living world shows at once").toBeGreaterThan(0.15);
     }
   });
 });
@@ -275,7 +316,7 @@ describe("a sign keeps its meaning and varies its form", () => {
   });
 
   it("keeps a sea world's lights on its land: its night map is read where its day map is", () => {
-    for (const anchor of ["temperate", "ocean"] as const)
+    for (const anchor of SEA)
       for (const path of ["a", "b", "c"]) expect(worldSigns(seedOf(path), anchor, AT.busy).lights.turn).toBe(0);
   });
 
@@ -366,21 +407,23 @@ describe("a sign keeps its meaning and varies its form", () => {
 describe("what the signs are worth", () => {
   const at = (vitality: number, present: number, fresh = false) => worldSigns(DAO, "ice", { vitality, present, fresh });
 
+  // F4110: with nobody here, no vitality lights any of a world's surface.
   it.each([
     [0.3, 1, 0],
-    [0.4, 1 + 0.6 / 7, 1 / 7],
-    [0.65, 1.3, 0.5],
-    [1, 1.6, 1],
+    [0.4, 1 + 0.6 / 7, 0],
+    [0.65, 1.3, 0],
+    [1, 1.6, 0],
   ])("a vitality of %f gives a radius of %f and lights over %f of its surface", (vitality, size, extent) => {
     const signs = at(vitality, 0);
     expect(signs.size).toBeCloseTo(size, 12);
     expect(signs.lights.extent).toBeCloseTo(extent, 12);
   });
 
-  it("wakes a world at rest over an eighth of its surface at most, and adds nothing to a settled world's reach", () => {
-    expect(at(0.1, 1).lights.extent).toBeCloseTo(0.12, 12);
-    expect(at(0.8, 1).lights.extent).toBeCloseTo(5 / 7, 12);
-    expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.06, 12);
+  it("lights as much of a world's surface as the share of people here, at rest or settled", () => {
+    expect(at(0.1, 1).lights.extent).toBe(1);
+    expect(at(0.8, 1).lights.extent).toBe(1);
+    expect(at(0.1, 0.5).lights.extent).toBeCloseTo(0.5, 12);
+    expect(at(0.95, 0.05).lights.extent).toBeCloseTo(0.05, 12);
   });
 
   it("lights a world from 0.35 with nobody here to 1 at the most people", () => {

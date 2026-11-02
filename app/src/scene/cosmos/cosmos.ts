@@ -15,10 +15,12 @@ import {
 import { Disposer } from "../disposer.ts";
 import { focalOf } from "../lens.ts";
 import type { EarthDevice } from "../earth/device.ts";
+import { Ahead } from "./ahead.ts";
 import { Bodies } from "./bodies.ts";
 import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
+import { Nebulae } from "./nebulae.ts";
 
 /** A world of the file: what the scene reads of it. */
 export interface CosmosWorld {
@@ -41,6 +43,8 @@ export class Cosmos {
   readonly #maps: BodyMaps;
   readonly #bodies: Bodies;
   readonly #home: Home;
+  readonly #ahead: Ahead;
+  readonly #nebulae: Nebulae;
   readonly #drawn = new Drawn();
   readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
@@ -51,8 +55,6 @@ export class Cosmos {
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
-  #compiling = false;
-  #compiled = false;
   #looks = 0;
   #focal = 1;
   #height = 1;
@@ -65,27 +67,20 @@ export class Cosmos {
     this.#maps = new BodyMaps(device, this.#mapCame);
     this.#bodies = new Bodies(this.#maps, this.#owner, device);
     this.#home = new Home(device, this.#bodies.group);
+    this.#nebulae = new Nebulae(device, this.#owner);
+    this.#ahead = new Ahead(device, this.#disc.group, () => {
+      this.#setShown(this.#wanted);
+      this.#device.moved();
+    });
     this.#setShown(false);
-    device.stage.add(this.#disc.group, this.#bodies.group);
+    device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);
   }
 
   #setShown(shown: boolean): void {
     this.#wanted = shown;
-    this.#disc.group.visible = shown && this.#compiled;
+    this.#disc.group.visible = shown && this.#ahead.done;
     this.#bodies.group.visible = shown;
-  }
-
-  // The disc's programs compile before it shows: a first-time compile on a frame stalls the arrival.
-  #compile(): void {
-    if (this.#compiling) return;
-    this.#compiling = true;
-    const { renderer, camera, stage } = this.#device;
-    const ready = () => {
-      this.#compiled = true;
-      this.#setShown(this.#wanted);
-      this.#device.moved();
-    };
-    renderer.compileAsync(this.#disc.group, camera, stage).then(ready, ready);
+    this.#nebulae.show(shown);
   }
 
   readonly #mapCame = (): void => {
@@ -109,7 +104,7 @@ export class Cosmos {
       this.#ladder = new Ladder(this.#systems);
     }
     this.#looked.x = NaN;
-    this.#compile();
+    this.#ahead.ask();
     this.#home.stand();
     this.#device.moved();
   }
@@ -143,6 +138,7 @@ export class Cosmos {
     this.#disc.advance(eye, seconds);
     this.#bodies.tick(eye, seconds);
     this.#home.tick(eye, seconds);
+    this.#nebulae.follow(eye, seconds);
     if (!(Math.hypot(eye.x - this.#looked.x, eye.y - this.#looked.y, eye.z - this.#looked.z) < STEP)) this.#askLook();
   }
 
@@ -188,6 +184,7 @@ export class Cosmos {
   readonly #releaseMaps = (): void => {
     this.#bodies.drop();
     this.#maps.free();
+    this.#nebulae.free();
     this.#home.drop();
   };
 
@@ -227,6 +224,7 @@ export class Cosmos {
       earth: this.#home.stood,
       list,
       screen: this.#bodies.screen(this.#eye, this.#home.at),
+      nebulae: shown ? this.#nebulae.stats().sheets : 0,
     };
   }
 }

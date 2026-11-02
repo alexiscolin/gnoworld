@@ -45,7 +45,28 @@ full and legible; no endorsement implied; changes noted after the credit; no log
 Credit: NASA, ESA, N. Smith (University of California, Berkeley), and The Hubble Heritage Team (STScI/AURA). The shader recolours and
 warps it.
 
+| File | Source | Size | Changes |
+|---|---|---|---|
+| `veil.webp` | The Veil Nebula, heic1520a, https://esahubble.org/images/heic1520a/, its "Large JPEG" (10681 by 7121) | 2048 by 1024 | Cropped to 2:1 (10681 by 5340 from the top's 900th row), worked at 4096 by 2048; its stars taken out in one pass: a grey opening (square and diamond erosions in turn, then as many dilations, reach 4) replaces the image only where a point stood above it by 40 of 255, through a mask dilated 3 times and blurred (sigma 3); scaled, re-encoded as WebP at 0.85, 309 KB |
+
+Credit: NASA, ESA, Hubble Heritage Team.
+
+## ESA/Webb, CC BY 4.0
+
+https://esawebb.org/copyright/, read on 2026-11-02: images "released under the Creative Commons Attribution 4.0 International license"; the
+credit listed under each image, in full and legible; no endorsement implied; changes mentioned after the credit; no logos.
+
+| File | Source | Size | Changes |
+|---|---|---|---|
+| `cliffs.webp` | "Cosmic Cliffs" in the Carina Nebula, weic2205a, https://esawebb.org/images/weic2205a/, its "Large JPEG" (14575 by 8441) | 2048 by 1024 | Cropped to 2:1 (11682 by 5841 from 1450, 2600), worked at 4096 by 2048; its stars taken out in three passes as the Veil's, reach 3, 8, 18 above 40, 28, 22 of 255; scaled, re-encoded as WebP at 0.85, 131 KB. Diffraction spikes go with the opening; the brightest star keeps a soft disc |
+
+Credit: NASA, ESA, CSA, and STScI. The shader recolours and warps both.
+
 ## How to remake one
 
 `ffmpeg` here has no WebP encoder and `sips` cannot write it, so a canvas in Chromium encodes them: `OffscreenCanvas.convertToBlob({
 type: "image/webp", quality })`, at 0.8 to 0.9.
+
+The nebulae's star removal is ffmpeg's: a pass is `erosion` and `dilation` filters alternating `coordinates=255` and `coordinates=90`,
+then `blend=all_mode=difference` against the original, a `lut` threshold, three `dilation`s and a `gblur` for the mask, and
+`maskedmerge` of the original with the opened picture, all in `gbrp`.

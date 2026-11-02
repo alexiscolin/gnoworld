@@ -59,7 +59,7 @@ export {
   type ClearBox,
   type ScreenSpot,
 } from "./frame/screen.ts";
-export { CENTRE, DISC_TILT, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
+export { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "./frame/disc.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -69,6 +69,7 @@ export {
   planetLook,
   planetSeed,
   worldLook,
+  worldPath,
   type Anchor,
   type MapName,
   type Nature,
@@ -80,6 +81,13 @@ export { auroraOf, BLOCK_MS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { worldIdOf } from "./cosmos/worldId.ts";
+export { REALM_PREFIX } from "./chain/realm.ts";
+export { NATURES } from "./planet/choice.ts";
+export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export { labOf, type Lab, type Palette } from "./planet/palette.ts";
+export { SURFACE, type SurfaceName } from "./planet/spans.ts";
+export { FINEST, type Surface } from "./planet/surface.ts";
+export { alike, featuresOf, type Features } from "./planet/variety.ts";
 export {
   isFresh,
   LIGHT_KINDS,
@@ -139,6 +147,19 @@ export { PHONE_QUERY } from "./frame/phone.ts";
 export { textHash, unitOf, type Point } from "./space/cell.ts";
 export { driftAt, glideAt, HOME, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
+export {
+  NEBULA_IMAGES,
+  NEBULA_LAYERS,
+  NEBULA_REACH,
+  NEBULAE_MOST,
+  NebulaField,
+  nebulaLight,
+  nebulaShare,
+  sheetOf,
+  windowOf,
+  type Nebula,
+  type NebulaLayer,
+} from "./space/nebulae.ts";
 export { tilingNoise } from "./space/noise.ts";
 export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
 export { wrapTo } from "./space/torus.ts";

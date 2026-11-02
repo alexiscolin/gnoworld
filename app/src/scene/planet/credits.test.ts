@@ -1,4 +1,4 @@
-import { MAPS } from "@gnoworld/core";
+import { MAPS, NEBULA_IMAGES } from "@gnoworld/core";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -27,10 +27,14 @@ describe("the textures' credits", () => {
       "https://www.solarsystemscope.com/textures/",
       "https://www.solarsystemscope.com/textures/",
       "https://esahubble.org/images/heic0707a/",
+      "https://esahubble.org/images/heic1520a/",
+      "https://esawebb.org/images/weic2205a/",
     ]);
     expect(CREDITS[0]?.line).toContain("warped and recoloured");
     expect(CREDITS[1]?.line).toContain("scaled to 4096 by 2048");
     expect(CREDITS[2]?.line).toContain("cropped, stars removed, recoloured and warped");
+    expect(CREDITS[3]?.line).toContain("cropped, stars removed, recoloured and warped");
+    expect(CREDITS[4]?.line).toContain("cropped, stars removed, recoloured and warped");
   });
 
   it("names every file in the folder, and no file that is not there", () => {
@@ -82,6 +86,25 @@ describe("the textures' credits", () => {
       "NASA, ESA, N. Smith (University of California, Berkeley), and The Hubble Heritage Team (STScI/AURA)",
     );
     expect(hubble?.line).toContain("stars removed");
+  });
+
+  it("gives the Veil and the Cosmic Cliffs a row each, and notes what was done to them, as ESA/Hubble's and ESA/Webb's terms ask", () => {
+    for (const name of ["veil", "cliffs"]) {
+      const credit = CREDITS.find((row) => row.files.includes(name));
+      expect(credit?.files, name).toEqual([name]);
+      expect(credit?.line, name).toContain("cropped, stars removed, recoloured and warped");
+    }
+    const veil = CREDITS.find((credit) => credit.files.includes("veil"));
+    expect(veil?.author).toBe("ESA/Hubble");
+    expect(veil?.line).toContain("NASA, ESA, Hubble Heritage Team");
+    expect(veil?.source).toBe("https://esahubble.org/images/heic1520a/");
+    const webb = CREDITS.find((credit) => credit.author === "ESA/Webb");
+    expect(webb?.line).toContain("NASA, ESA, CSA, and STScI");
+    expect(webb?.source).toBe("https://esawebb.org/images/weic2205a/");
+  });
+
+  it("credits every image a nebula is cut from", () => {
+    for (const name of NEBULA_IMAGES) expect(CREDITS.flatMap((credit) => credit.files)).toContain(name);
   });
 });
 

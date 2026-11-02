@@ -16,8 +16,9 @@ void main() {
 }
 `;
 
-export const RING_FRAGMENT =
-  /* glsl */ `
+// Past what a pixel can hold the fine lines go, or they beat against the pixels as they turn: a ring seen small is its smooth mean. The
+// world's shadow dims the ring, never cuts it: the rest is what the ice scatters (a hole in a ring was a bug).
+export const RING_FRAGMENT = /* glsl */ `
 uniform sampler2D ringMap;
 uniform vec3 sun;
 uniform vec3 ringTint;
@@ -32,16 +33,12 @@ const float SHADED = 0.3;
 
 void main() {
   float reach = (vRadius - ringInner) / (ringOuter - ringInner);
-` +
-  // Past what a pixel can hold the fine lines go, or they beat against the pixels as they turn: a ring seen small is its smooth mean.
-  `  float small = fwidth(reach);
+  float small = fwidth(reach);
   float fine = 0.5 + 0.3 * sin(reach * 61.0) * sin(reach * 23.0 + 1.3) * (1.0 - smoothstep(0.008, 0.03, small)) + 0.2 * sin(reach * 131.0 + 0.4) * (1.0 - smoothstep(0.002, 0.012, small));
   float density = texture2D(ringMap, vec2(reach, 0.5)).r * ringOpacity * (0.52 + 0.48 * fine);
   vec3 at = (vWorld - vCentre) / vWorldRadius;
   float past = dot(at, sun) < 0.0 ? length(cross(at, sun)) : 2.0;
-` +
-  // The world's shadow dims the ring, never cuts it: the rest is what the ice scatters (a hole in a ring was a bug).
-  `  float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));
+  float lit = mix(SHADED, 1.0, smoothstep(0.9, 1.1, past));
   vec3 view = normalize(cameraPosition - vWorld);
   float behind = smoothstep(0.1, 1.0, -dot(view, sun));
   vec3 colour = mix(ringTint, vec3(0.72, 0.68, 0.62), 0.45) * lit * (0.56 + behind * 1.1) * (0.74 + 0.5 * fine);
