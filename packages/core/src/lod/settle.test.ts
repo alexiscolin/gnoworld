@@ -210,21 +210,20 @@ describe("no overlap", () => {
     expect(layout.side[0]).toBe(0);
   });
 
-  it(`keeps clear of all ${String(BOXES_MOST)} boxes and ${String(DISCS_MOST)} discs it holds, and of none past them`, () => {
-    const boxes = Array.from({ length: BOXES_MOST + 2 }, (_, index) => [index * 100, 0, index * 100 + 50, 300]);
-    const discs = Array.from({ length: DISCS_MOST }, (_, index) => [100 + index * 90, 900, 30]);
-    const layout = new LabelLayout();
-    for (const [index, box] of boxes.entries()) if (index < BOXES_MOST) layout.boxes.set(box, 4 * index);
-    layout.boxCount = BOXES_MOST + 2;
-    for (const [index, disc] of discs.entries()) layout.discs.set(disc, 3 * index);
-    layout.discCount = DISCS_MOST;
-    expect(() => {
-      settle(layout);
-    }).not.toThrow();
-    const full = layoutOf([{ x: 1530, y: 860, radius: 10 }], { discs: [[1470, 820, 40]] });
-    settle(full);
-    expect(full.shown[0]).toBe(1);
-    expect(offDisc(rectOf(full, 0), [1470, 820, 40], PLACE.air)).toBe(true);
+  it(`keeps clear of its last box and its last disc as of its first: ${String(BOXES_MOST)} boxes, ${String(DISCS_MOST)} discs`, () => {
+    const far = [0, 0, 1, 1];
+    const lastBox = layoutOf([{ x: 864, y: 540, radius: 54 }], {
+      boxes: [...Array.from({ length: BOXES_MOST - 1 }, () => far), [700, 400, 1100, 480]],
+    });
+    settle(lastBox);
+    expect(lastBox.shown[0]).toBe(1);
+    expect(lastBox.side[0]).toBeGreaterThanOrEqual(2);
+    const lastDisc = layoutOf([{ x: 864, y: 540, radius: 54 }], {
+      discs: [...Array.from({ length: DISCS_MOST - 1 }, () => [0, 0, 1]), [900, 450, 30]],
+    });
+    settle(lastDisc);
+    expect(lastDisc.shown[0]).toBe(1);
+    expect(lastDisc.side[0]).not.toBe(0);
   });
 
   it("holds whatever stands where: shown labels clear of each other, the boxes, the discs and the screen's edge, each beside its body", () => {

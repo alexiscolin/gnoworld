@@ -123,6 +123,11 @@ describe("which worlds a view labels", () => {
     expect(ids([EARTH, far("none/known", {}), far("used/once", { use: 5 })])).toEqual(["earth", "used/once"]);
   });
 
+  it("keeps its far slots for worlds it can name: worlds only an address names never take them", () => {
+    const unnamed = [OTHER, ADDRESS, `${ADDRESS}/${OTHER}`].map((id) => far(id, { here: 50 }));
+    expect(ids([EARTH, ...unnamed, far("alice/dao", { here: 5 })])).toEqual(["earth", "alice/dao"]);
+  });
+
   it("labels no world only an address names, near or far", () => {
     expect(ids([EARTH, near(ADDRESS), far(OTHER, { here: 9 })])).toEqual(["earth"]);
   });
