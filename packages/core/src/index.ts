@@ -159,13 +159,12 @@ export {
   type Reaction,
   type Shown,
 } from "./chat/reactions.ts";
-export { inlines, inWord, markdown, mentions, mentionsRoom } from "./markdown/markdown.ts";
+export { inlines, inWord, markdown, mentions, mentionsRoom, type Block, type Inline } from "./markdown/markdown.ts";
 export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
 export { originOf } from "./markdown/address.ts";
 export { PAGE_MAX_BYTES, page, type FormField, type Page, type PageBlock, type PageOptions } from "./markdown/page.ts";
-export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
