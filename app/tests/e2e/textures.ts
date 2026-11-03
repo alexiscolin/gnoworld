@@ -122,24 +122,29 @@ function rowsOf(discs: readonly Circle[]): number[] {
   });
 }
 
-// Land is a lit pixel (luma over 25) whose blue does not lead its red and green, as sea's does, and no cloud (pale, past L* 55, under 8 of
-// chroma): a cloud is neither land nor sea. Its pieces join by their sides.
-function landOf(discs: readonly Circle[]): Land[] {
+// A lit pixel (luma over 25) inside 0.9 of a disc's radius: cloud where it is pale (past L* 55, under 8 of chroma), which is neither land
+// nor sea; sea where its blue leads its red and green; else land.
+function kindOf({ x, y, r }: Circle, px: number, py: number): "sea" | "land" | "cloud" | null {
   const { image, luma, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
-  const cloud = (px: number, py: number) => {
-    const [lightness, a, b] = labAt(image, px, py);
-    return lightness > 55 && Math.hypot(a, b) < 8;
-  };
-  return discs.map(({ x, y, r }) => {
+  if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) return null;
+  const [lightness, a, b] = labAt(image, px, py);
+  if (lightness > 55 && Math.hypot(a, b) < 8) return "cloud";
+  const [red, green, blue] = rgbAt(image, px, py);
+  return blue > red + 8 && blue >= green ? "sea" : "land";
+}
+
+// Land's pieces join by their sides.
+function landOf(discs: readonly Circle[]): Land[] {
+  return discs.map((disc) => {
+    const { x, y, r } = disc;
     const [x0, y0, w] = [Math.ceil(x - r), Math.ceil(y - r), Math.floor(2 * r)];
     const [land, seen] = [new Uint8Array(w * w), new Uint8Array(w * w)];
     let lit = 0;
     for (let i = 0; i < w * w; i++) {
-      const [px, py] = [x0 + (i % w), y0 + Math.floor(i / w)];
-      const [red, green, blue] = rgbAt(image, px, py);
-      if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25 || cloud(px, py)) continue;
+      const kind = kindOf(disc, x0 + (i % w), y0 + Math.floor(i / w));
+      if (kind === null || kind === "cloud") continue;
       lit += 1;
-      land[i] = blue > red + 8 && blue >= green ? 0 : 1;
+      land[i] = kind === "land" ? 1 : 0;
     }
     const sizes = [...land.keys()]
       .filter((i) => land[i] === 1)
@@ -164,4 +169,4 @@ export const grain = (page: Page, picture: Buffer, discs: readonly Circle[]): Pr
 export const rows = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<number[]> =>
   reading(page, [picture], [rowsOf, discs, [fineIn, dayBox].map(String).join("\n")]);
 export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
-  reading(page, [picture], [landOf, discs]);
+  reading(page, [picture], [landOf, discs, String(kindOf)]);
