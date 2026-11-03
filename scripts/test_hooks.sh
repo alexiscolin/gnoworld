@@ -1040,14 +1040,46 @@ hidden >/dev/null || fail "check_docs refused a root whose characters all show (
 : >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
 hidden >/dev/null && fail "check_docs passed a file it cannot read"
 chmod 644 "$h/src/locked.ts"
-# Every format character, the ends of each range the brief names included, and none of their neighbours that show.
-python3 -I - "$h/table.txt" "$h/table.want" <<'PY'
+# What is hidden is a table, not the Python's Unicode (F5083): Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
+# Node's ICU gives them, range by range, and the version hidden.py names.
+node -e '
+const set = /^[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]$/u;
+const out = [process.versions.unicode];
+for (let c = 0, start = -1; c <= 0x110000; c++) {
+  const hit = c <= 0x10ffff && set.test(String.fromCodePoint(c));
+  if (hit && start < 0) start = c;
+  if (!hit && start >= 0) { out.push(start.toString(16) + " " + (c - 1).toString(16)); start = -1; }
+}
+console.log(out.join("\n"));' >"$h/table.node" || fail "node could not list Unicode's hidden characters"
+python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import hidden; print(hidden.UNICODE); print("\n".join(f"{a:x} {b:x}" for a, b in hidden.TABLE))' "$here" >"$h/table.py"
+diff "$h/table.node" "$h/table.py" >"$h/diff" || fail "hidden.py's TABLE is not Unicode's hidden characters as the pinned Node gives them (<):
+$(cat "$h/diff")"
+rm "$h/table.node" "$h/table.py"
+# Each end of the table's ranges and a point inside some (an unassigned tag, a variation selector) after a letter, and none
+# of their neighbours. U+FE0E and U+FE0F, which pick an emoji's look, pass right after a character that shows and is no
+# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits (F5086).
+python3 -I - "$h/table.txt" "$h/sel.txt" "$h/table.want" "$here" <<'PY'
 import sys
-refused = [*range(0x200B, 0x2010), *range(0x202A, 0x202F), *range(0x2066, 0x206A), 0xFEFF, 0x061C, 0x00AD, *range(0x2060, 0x2065), 0x206A, 0x206F, 0xE0001, 0xE0020, 0xE007F]
-shown = [0x00A0, 0x200A, 0x2010, 0xFE0F, 0xE0100]  # two spaces, a hyphen, two variation selectors (an emoji's)
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[4])
+from hidden import TABLE
+inside = lambda p: any(a <= p <= b for a, b in TABLE)
+refused = sorted({p for a, b in TABLE for p in (a, b)} | {0x2065, 0xFE05, 0xE0080, 0xE0100})
+shown = sorted({p for a, b in TABLE for p in (a - 1, b + 1) if not inside(p)} | {0x00A0, 0x200A, 0x2010})
 points = refused + shown
 open(sys.argv[1], "w", encoding="utf-8").write("".join(f"x{chr(p)}\n" for p in points))
-open(sys.argv[2], "w").write("".join(f"  table.txt:{n}:2: U+{p:04X}\n" for n, p in enumerate(points, 1) if p in refused))
+heart, emoji, cap = chr(0x2764), chr(0x1F600), chr(0xFE0F) + chr(0x20E3)
+lines = [  # (line, the columns it refuses)
+    (heart + chr(0xFE0F) + " ok", []), (emoji + chr(0xFE0E), []), ("1" + cap + " #" + cap + " *" + cap, []),
+    ("a" + chr(0xFE0F), [2]), (heart + chr(0xFE0F) + chr(0xFE0F), [3]), (chr(0xFE0F) + "x", [1]), ("1" + chr(0xFE0F) + "x", [2]),
+    (heart + chr(0xFE00), [2]), (chr(0x4E00) + chr(0xE0100), [2]), (chr(0x200D) + chr(0xFE0F), [1, 2]),
+]
+open(sys.argv[2], "w", encoding="utf-8").write("".join(text + "\n" for text, _ in lines))
+# One that starts a text follows nothing, whatever the text ends with.
+open(sys.argv[2].replace("sel.txt", "start.txt"), "w", encoding="utf-8").write(chr(0xFE0F) + "a" + chr(0xE9))
+want = [f"  table.txt:{n}:2: U+{p:04X}" for n, p in enumerate(points, 1) if p in refused] + ["  start.txt:1:1: U+FE0F"]
+want += [f"  sel.txt:{n}:{col}: U+{ord(text[col - 1]):04X}" for n, (text, cols) in enumerate(lines, 1) for col in cols]
+open(sys.argv[3], "w").write("".join(f"{w}\n" for w in sorted(want)))
 PY
 printf '// a header\nconst x = "ab\342\200\256cd"; // gitleaks:allow noqa eslint-disable-line prettier-ignore @ts-ignore nolint\n' >"$h/src/a.ts"
 printf 'package x\n\nvar s = "\342\201\246"\n' >"$h/r/x/x.gno"
@@ -1083,11 +1115,11 @@ cat >"$h/want" <<'EOF'
 EOF
 out=$(hidden) && fail "check_docs accepted hidden characters: $out"
 printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character" || fail "check_docs did not say why it refused hidden characters: $out"
-printf '%s\n' "$out" | grep ': U+' | grep -v '^  table\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
+printf '%s\n' "$out" | grep ': U+' | grep -Ev '^  (table|sel|start)\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
 diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
 $(cat "$h/diff")"
-printf '%s\n' "$out" | grep '^  table\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' >"$h/table.got"
-diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's format characters, one a line, against the wanted ones (<):
+printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
+diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
 $(cat "$h/diff")"
 # The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
 # file of the folder but git's own and the installed packages', and still refuses.

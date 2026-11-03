@@ -1260,11 +1260,22 @@ def hidden_mutants():
     """check_docs refuses a hidden character (hidden.py's rule) in every file git tracks or would (F5053), and the listing
     it reads."""
     yield from swaps("scripts/hidden.py", "hidden", (
-        ('unicodedata.category(c) != "Cf"', "True", "refuses a format character"),
+        ("for m in HIDDEN.finditer(text):", "for m in []:", "refuses a hidden character"),
+        ("(0x2028, 0x202E)", "(0x202A, 0x202E)", "refuses the line and paragraph separators (F5086)"),
+        ("(0xE0000, 0xE0FFF)", "(0xE0001, 0xE007F)", "refuses the tags' whole block, its unassigned code points too (F5083)"),
+        ('UNICODE = "17.0"', 'UNICODE = "16.0"', "names the Unicode its table is"),
+        ('f"{chr(a)}-{chr(b)}"', 'f"{chr(a)}"', "refuses every code point of a range"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if ord(c) in LOOKS:", "refuses a selector that picks no look (F5086)"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if False:", "keeps a selector that picks an emoji's look"),
+        ("return i > 0 and (", "return (", "refuses a selector that starts a text"),
+        ("not text[i - 1].isascii() and ", "", "refuses a selector after an ASCII character"),
+        (" and not HIDDEN.match(text[i - 1])", "", "refuses a second selector in a row"),
+        ("or KEYCAP.match(text, i - 1) is not None", "or False", "keeps a keycap's selector"),
+        ('"[0-9#*]"', '"[0-9]"', "keeps a # or * keycap's selector"),
         ("out, line, seen = [], 1, 0", "out, line, seen = [], 0, 0", "counts lines from 1"),
         ("        seen = m.start()\n", "", "counts the lines before each hidden character once"),
         ('column = m.start() - text.rfind("\\n", 0, m.start())', 'column = m.start() - text.rfind("\\n", 0, m.start()) - 1', "counts columns from 1"),
-        ("{unicodedata.name(c)}", "", "names the hidden character"),
+        ('name = unicodedata.name(c, "")', 'name = ""', "names the hidden character"),
     ))
     yield from swaps("scripts/check_docs.py", "check_docs", (
         ('IMAGES = (".png", ".jpg")', 'IMAGES = (".jpg",)', "reads no .png"),
