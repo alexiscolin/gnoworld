@@ -463,6 +463,13 @@ describe("the generated program", () => {
     );
   });
 
+  // A world of continents' land pushed by its noise as far as half a radius came out sheared into parallel strokes (7b8's design review,
+  // seed 5 close): an archipelago's waves, a fifth of a radius, pushed two and a half times their length. Its land takes 0.15 at most.
+  it("pushes a world of continents' land 0.15 of a radius at most by its noise, never sheared into strokes", () => {
+    expect(GENERATED_FRAGMENT).toContain("vec3 p = at + shape.warp * bend + offset;");
+    expect(GENERATED_FRAGMENT).toMatch(/vec4 land = fbm\(at \+ min\(shape\.warp, 0\.15\) \* bend \+ offset, /);
+  });
+
   // Sharp coasts with islands (7b8; Alexis, 2026-11-03, "côtes nettes et îles"): every octave of the ground down to the pixel breaks the
   // coast, weighed up near the sea's level, where it can move it, so gulfs, peninsulas and islands cut it at every zoom; the shallow
   // shelf follows the coast within a few hundredths of the sea's share, never a wide halo.

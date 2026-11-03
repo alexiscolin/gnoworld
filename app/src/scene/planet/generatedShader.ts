@@ -62,7 +62,8 @@ void main() {
     swirled = shape.storms > 0.0 ? stormed(at) : at;
     t = clamp(bandsAt(swirled, pixel), 0.0, 1.0);
   } else {
-    vec3 p = at + shape.warp * field(at * 1.1 + offset.yzx) + offset;
+    vec3 bend = field(at * 1.1 + offset.yzx);
+    vec3 p = at + shape.warp * bend + offset;
     vec4 ground = fbm(p, shape.scale, pixel, shape.erosion, shape.octaves);
     vec3 round = at + offset;
     float big = shape.craters > 0.0 ? cratersAt(round, shape.scale * 4.0, pixel) : 0.0;
@@ -73,7 +74,7 @@ void main() {
     height = ground.x / ground.y + cratered * 0.8;
     relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.012, 0.03, shape.scale * 4.0 * pixel));
     if (continents) {
-      vec4 land = fbm(p, 0.6 + 4.4 * (1.0 - shape.gather), pixel, 0.0, 3.0);
+      vec4 land = fbm(at + min(shape.warp, 0.15) * bend + offset, 0.6 + 4.4 * (1.0 - shape.gather), pixel, 0.0, 3.0);
       float lean = 0.9 * smoothstep(0.6, 1.0, shape.gather);
       float rough = 0.5 - 0.2 * shape.gather;
       float spread = sqrt(1.0 + lean * lean / 3.0 + rough * rough);
