@@ -1501,6 +1501,12 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
   beforeAll(async () => {
     await import("./Rail.tsx");
   });
+  // A world the file counts callers for: a trend beside the Earth.
+  beforeEach(() => {
+    scene.read.mockImplementation(() =>
+      Promise.resolve({ worlds: [{ id: "a/b", namespace: "a", realms: [{ path: "gno.land/r/a/b", callers: 3 }] }] }),
+    );
+  });
   const page = () => ({ open: vi.fn<(href: string) => void>(), places: { earth: "/earth", worlds: [] } });
   const railLinks = () => all(document.body, "nav[aria-label='Worlds'] li a").map((link) => link.textContent);
   // The rail's chunk comes once the cosmos runs: the scene, its worlds, then the chunk the page asks for them.
@@ -1515,21 +1521,21 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
   it("stands beside the cosmos once the scene runs and its worlds are known, the Earth first", async () => {
     mount(<Universe shown="cosmos" page={page()} />);
     await railed();
-    expect(railLinks()).toEqual(["Earth"]);
+    expect(railLinks()).toEqual(["Earth", "b"]);
     expect(scene.railDrawn).toHaveBeenCalled();
   });
 
   it("asks the scene for its planets' portraits", async () => {
     mount(<Universe shown="cosmos" page={page()} />);
     await railed();
-    expect(scene.portraits).toHaveBeenCalledWith(["earth"], expect.any(Number));
+    expect(scene.portraits).toHaveBeenCalledWith(["earth", "a/b"], expect.any(Number));
   });
 
   it("goes to a world's page through the page's router", async () => {
     const cosmos = page();
     mount(<Universe shown="cosmos" page={cosmos} />);
     await railed();
-    click(one(document.body, "nav[aria-label='Worlds'] li a"));
+    click(all(document.body, "nav[aria-label='Worlds'] li a")[0]);
     expect(cosmos.open).toHaveBeenCalledWith("/earth");
   });
 
@@ -1559,7 +1565,7 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
       root.render(<Universe shown="cosmos" page={page()} />);
     });
     await railed();
-    expect(railLinks()).toEqual(["Earth"]);
+    expect(railLinks()).toEqual(["Earth", "b"]);
     act(() => {
       root.render(<Universe shown="earth" />);
     });
