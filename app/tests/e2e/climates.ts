@@ -16,12 +16,13 @@ interface Band {
   readonly green: number;
 }
 /** Tropics (15 to 35 degrees), middle (40 to 60) and high (60 on); the land in full light (luma over 25, kindOf's): its mean colour, its
- * mean chroma and its green share. */
+ * mean chroma, its green share and its green part's mean L* (null under 30 pixels). */
 export interface Climate {
   readonly bands: readonly [Band, Band, Band];
   readonly land: Lab | null;
   readonly chroma: number;
   readonly green: number;
+  readonly greenLight: number | null;
 }
 // The helpers the reading page declares, as it holds them: an imported function is a property of the import's binding once compiled.
 interface Held {
@@ -44,13 +45,14 @@ function bandFrom([lit = 0, ground = 0, l = 0, a = 0, b = 0, green = 0]: readonl
   };
 }
 
-// The land in full light from its sums of weight, L*, a*, b*, chroma and green weight.
-function litFrom([weight = 0, l = 0, a = 0, b = 0, chroma = 0, green = 0]: readonly number[]) {
+// The land in full light from its sums of weight, L*, a*, b*, chroma, green weight and green L*.
+function litFrom([weight = 0, l = 0, a = 0, b = 0, chroma = 0, green = 0, greenL = 0]: readonly number[]) {
   const mean = (sum: number) => sum / Math.max(weight, 1);
   return {
     land: weight < 30 ? null : ([mean(l), mean(a), mean(b)] as const),
     chroma: mean(chroma),
     green: mean(green),
+    greenLight: green < 30 ? null : greenL / green,
   };
 }
 
@@ -63,7 +65,8 @@ function summed(points: readonly (readonly [number, number, number, number, numb
     const hue = (Math.atan2(b, a) * 180) / Math.PI;
     const green = Number(kind === 2 && Math.hypot(a, b) >= 3 && hue >= 95 && hue <= 150);
     held().added(sums[bandOf(sine)], [1, Number(kind === 2), l, a, b, green], weight);
-    if (kind === 2 && luma(image, x, y) > 25) held().added(sums[3], [1, l, a, b, Math.hypot(a, b), green], weight);
+    if (kind === 2 && luma(image, x, y) > 25)
+      held().added(sums[3], [1, l, a, b, Math.hypot(a, b), green, green * l], weight);
   }
   const [tropics, middle, high] = sums.map(bandFrom);
   return { bands: [tropics, middle, high] as Climate["bands"], ...litFrom(sums[3] ?? []) };

@@ -37,6 +37,9 @@ const HUES = { range: [47, 144], spread: 25, grey: 4 } as const;
 // Low-key: the median world's chroma no more than the Earth's view's (6.4) times its map's forest over its desert (28.5 over 16.3, a green
 // world against the Earth's arid face), none past frame 4's median world (12.9, its ten worlds in f0004). 81e07949: 13.3, 24.0.
 const SATURATION = { forestOverDesert: 28.5 / 16.3, frame4: 12.9 } as const;
+// The Earth's plains (the design review, high and medium): its view's green land 13.2 L* over its sea, its map's land 54% green; the
+// median world's green land half as much over its sea at least, and as green within three quarters (914df134: 2.4 L* and 33%).
+const PLAINS = { lighter: 0.5, green: 0.75 } as const;
 // Never the Earth (7b7; Alexis, 2026-11-03, 16:4x), its coasts and shapes now compared too, at its own zoom: a world reads apart by its
 // sea, its land or its clouds a glance off (textures.ts's GLANCE), or its coast or its shape a quarter off the Earth's.
 const SHAPE_APART = 0.25;
@@ -67,6 +70,8 @@ interface Earth {
   readonly chroma: number;
   readonly map: Climate;
   readonly land: LandDetail;
+  /** Its view's green land's L* over its sea's. */
+  readonly greenOverSea: number;
 }
 // The Earth's measures, once a worker: its view is the same on every visit, its map one file.
 let earthRead: Earth | undefined;
@@ -83,7 +88,8 @@ async function earthOf(page: Page): Promise<Earth> {
   ];
   const map = await mapClimateOn(page, await (await page.request.get("/textures/earth-day.webp")).body());
   if (shore === undefined || face === undefined || lit === undefined || land === undefined) throw new Error("no Earth");
-  earthRead = { shore, face, chroma: lit.chroma, map, land };
+  if (lit.greenLight === null || face.sea === null) throw new Error("no green land or sea on the Earth");
+  earthRead = { shore, face, chroma: lit.chroma, map, land, greenOverSea: lit.greenLight - face.sea[0] };
   return earthRead;
 }
 
@@ -111,15 +117,21 @@ async function seventyTwo(page: Page, light = "") {
 const climatesOf = async (page: Page) =>
   (
     await Promise.all(
-      (await seventyTwo(page)).map(async ({ shot, places, poles, surfaces, minors }) =>
-        (
+      (await seventyTwo(page)).map(async ({ shot, places, poles, surfaces, minors }) => {
+        const faces = await facesOn(page, shot, places);
+        return (
           await climatesOn(
             page,
             shot,
             places.map((place, at) => [place, poles[at] ?? [0, 0, 0]] as const),
           )
-        ).map((climate, at) => ({ climate, caps: surfaces[at]?.caps ?? 0, minor: minors[at] ?? 0 })),
-      ),
+        ).map((climate, at) => ({
+          climate,
+          sea: faces[at]?.sea ?? null,
+          caps: surfaces[at]?.caps ?? 0,
+          minor: minors[at] ?? 0,
+        }));
+      }),
     )
   ).flat();
 
@@ -271,6 +283,34 @@ test.describe("temperate worlds varied and real at the coast", () => {
     expect(read.greener, "deserts about the tropics, greener between").toBeGreaterThanOrEqual(GREENER);
     expect(read.drier, "a drier seed, barer land").toBeGreaterThanOrEqual(TILT.drier);
     expect(read.colder, "a colder seed, barer between").toBeGreaterThanOrEqual(TILT.colder);
+  });
+
+  test("a temperate world's plains are green as the Earth's and lighter than its sea, never lost in it", async ({
+    page,
+  }) => {
+    const earth = await earthOf(page);
+    const worlds = await climatesOf(page);
+    const lighter = worlds.flatMap(({ climate: { greenLight }, sea }) =>
+      greenLight === null || sea === null ? [] : [greenLight - sea[0]],
+    );
+    const read = {
+      lighter: quantile(lighter, 0.5),
+      green: quantile(
+        worlds.map(({ climate }) => climate.green),
+        0.5,
+      ),
+    };
+    test.info().annotations.push({
+      type: "plains",
+      description: JSON.stringify({
+        earth: { greenOverSea: earth.greenOverSea, green: earth.map.green },
+        read,
+        lighter,
+      }),
+    });
+    expect(lighter.length, "worlds showing green land and sea").toBeGreaterThanOrEqual(48);
+    expect(read.lighter, "green land lighter than its sea").toBeGreaterThanOrEqual(PLAINS.lighter * earth.greenOverSea);
+    expect(read.green, "land as green as the Earth's").toBeGreaterThanOrEqual(PLAINS.green * earth.map.green);
   });
 
   test("a temperate world's land is the Earth's own hues, low-key: no more saturated than the Earth's or frame 4's worlds", async ({

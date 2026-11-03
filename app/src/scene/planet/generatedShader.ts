@@ -116,9 +116,9 @@ void main() {
   if (continents) {
     float lat = abs(axis.y) + 0.2 * flow.x + 0.1 * broad;
     float cold = lat + 0.15 * t + 1.8 * shape.caps;
-    float dry = 1.0 - smoothstep(0.06, 0.22, abs(lat - 0.42)) + 2.5 * minorShare - 0.6 + 0.45 * flow.z + 0.35 * t;
+    float dry = 1.0 - smoothstep(0.06, 0.22, abs(lat - 0.42)) + 2.5 * minorShare - 0.7 + 0.45 * flow.z + 0.35 * t;
     minor = max(smoothstep(0.5, 0.8, dry), smoothstep(1.1, 1.2, cold));
-    tint = clamp(0.15 + 0.9 * dry, 0.0, 1.0);
+    tint = clamp(0.5 + 0.6 * dry, 0.0, 1.0);
     bare = 1.0 - smoothstep(0.6, 1.0, cold);
   }
   vec3 major = rampOf(low, mid, high, tint);
