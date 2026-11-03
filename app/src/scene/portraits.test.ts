@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Group, SphereGeometry, Vector3, Vector4 } from "three";
+import { Group, PerspectiveCamera, SphereGeometry, Vector3, Vector4 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EARTH, GROUND_TO_MAP } from "./earth/look.ts";
 import { MAP_WIDTH, PER_FRAME, portraitsOf, SUN, type PortraitDevice } from "./portraits.ts";
@@ -64,6 +64,7 @@ vi.mock("./planet/planet.ts", async (actual) => ({
 function deviceOf(ratio = 2, { scissorTest = false } = {}) {
   const lent: (() => void)[] = [];
   const stood: number[] = [];
+  const lenses: PerspectiveCamera[] = [];
   const viewport = new Vector4(0, 0, 1728, 1080);
   const scissor = new Vector4(0, 0, 1728, 1080);
   const gl = {
@@ -87,8 +88,9 @@ function deviceOf(ratio = 2, { scissorTest = false } = {}) {
     getScissorTest: () => scissorTest,
     setScissorTest: vi.fn(),
     // What stands on the stage as each is drawn: the stage itself changes after.
-    render: vi.fn((stage: Group) => {
+    render: vi.fn((stage: Group, lens: PerspectiveCamera) => {
       stood.push(stage.children.length);
+      lenses.push(lens);
     }),
     getContext: () => gl,
     capabilities: { getMaxAnisotropy: () => 8 },
@@ -108,7 +110,7 @@ function deviceOf(ratio = 2, { scissorTest = false } = {}) {
   const frame = () => {
     for (const draw of lent.splice(0)) draw();
   };
-  return { device, renderer, gl, lent, frame, viewport, scissor, stood, gone };
+  return { device, renderer, gl, lent, frame, viewport, scissor, stood, lenses, gone };
 }
 
 const pictures = vi.hoisted(() => ({ put: [] as { data: Uint8ClampedArray }[], encoded: [] as string[] }));
@@ -241,6 +243,32 @@ describe("the rail's portraits", () => {
     const night = pixel(0, 0)[0];
     expect(pixel(0, 3)).toEqual([255, night, night, 255]);
     expect(pixel(0, 0)).toEqual([night, night, 255, 255]);
+  });
+
+  it("fills its picture to the edge, so no black ring shows round the planet in its disc (the design review, 7i)", async () => {
+    const { device, frame, lenses } = deviceOf();
+    const asked = portraitsOf(device, ["gov/dao"], 100);
+    await settle();
+    frame();
+    await asked;
+    const [lens] = lenses;
+    if (lens === undefined) throw new Error("nothing drawn");
+    // The planet's edge, a sphere of 1, as a share of the picture's half side, from the eye's distance and the lens.
+    const reach = Math.tan(Math.asin(1 / lens.position.z)) / Math.tan((lens.fov * Math.PI) / 360);
+    expect(reach).toBeGreaterThanOrEqual(1);
+    expect(reach).toBeLessThan(1.05);
+  });
+
+  it("lifts each portrait's night to a floor, as frame 4's planets' dark sides are never black, and keeps its light", async () => {
+    const { device, frame } = deviceOf(1);
+    const asked = portraitsOf(device, ["gov/dao"], 4);
+    await settle();
+    frame();
+    await asked;
+    const [red = 0, green, blue, alpha] = [...(pictures.put[0]?.data.slice(0, 4) ?? [])];
+    expect(red).toBeGreaterThanOrEqual(20);
+    expect(red).toBeLessThanOrEqual(40);
+    expect([green, blue, alpha]).toEqual([red, 255, 255]);
   });
 
   it("draws the other worlds when one's planet cannot be made", async () => {

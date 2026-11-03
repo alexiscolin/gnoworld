@@ -16,11 +16,14 @@ export const SUN = new Vector3(-0.55, 0.3, 0.78).normalize();
 const EARTH = "earth";
 const EARTH_MAPS = ["earth-day", "earth-night", "clouds"];
 const ANISOTROPY = 4;
-// The eye's distance, and the lens that fits the planet and its thin air to the picture's side from there.
+// The eye's distance, and the lens that fits the planet to the picture's side from there, a hair past it: the thumb's disc clips the edge,
+// so no black shows round it.
 const AWAY = 10;
-const FIT = 1.06;
+const FIT = 0.98;
 const FIELD = (2 * Math.atan(FIT / Math.sqrt(AWAY * AWAY - FIT * FIT)) * 180) / Math.PI;
 const QUALITY = 0.9;
+// What frame 4's planets keep on their night side, out of 255: their dark edges are never black (#201e1d to #292524).
+const NIGHT = 26;
 
 type PortraitRenderer = Pick<
   WebGLRenderer,
@@ -140,7 +143,7 @@ function draw(renderer: PortraitRenderer, easel: Easel, batch: readonly Planet[]
   return true;
 }
 
-// The rows the GPU reads from the bottom, the right way up, as a JPEG: none where the page cannot draw one.
+// The rows the GPU reads from the bottom, the right way up, the night lifted to its floor, as a JPEG: none where the page cannot draw one.
 function encoded(pixels: Uint8Array, side: number): string | undefined {
   const canvas = document.createElement("canvas");
   canvas.width = side;
@@ -150,6 +153,8 @@ function encoded(pixels: Uint8Array, side: number): string | undefined {
   const image = context.createImageData(side, side);
   const row = 4 * side;
   for (let y = 0; y < side; y += 1) image.data.set(pixels.subarray(y * row, (y + 1) * row), (side - 1 - y) * row);
+  for (let at = 0; at < image.data.length; at += 1)
+    if (at % 4 !== 3) image.data[at] = NIGHT + ((image.data[at] ?? 0) * (255 - NIGHT)) / 255;
   context.putImageData(image, 0, 0);
   return canvas.toDataURL("image/jpeg", QUALITY);
 }
