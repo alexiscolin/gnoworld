@@ -76,6 +76,11 @@ describe("gnomcpTools: gnomcp's reads, narrowed", () => {
     }
   });
 
+  it("describes every field it offers, its profile included", () => {
+    const Fields = z.object({ properties: z.record(z.string(), z.object({ description: z.string().min(1) })) });
+    for (const tool of tools().offered()) expect(() => Fields.parse(tool.input_schema)).not.toThrow();
+  });
+
   it("accepts a valid call of each read", () => {
     const allowed = tools();
     for (const name of NAMES) {

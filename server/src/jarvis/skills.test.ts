@@ -98,6 +98,28 @@ describe("loadSkills: what it gives", () => {
     });
   });
 
+  it("describes load_skill and each of its fields", () => {
+    const { tool } = loadSkills(folder(TWO()));
+    expect(tool.description).toMatch(/skills/);
+    const Fields = z.object({ properties: z.record(z.string(), z.object({ description: z.string().min(1) })) });
+    expect(Object.keys(Fields.parse(z.toJSONSchema(tool.args)).properties)).toEqual(["skill", "reference"]);
+  });
+
+  it("offers each reference once, by its name's code units, whichever skill holds it", () => {
+    const files = {
+      "a/SKILL.md": skill("a"),
+      "a/references/zeta.md": "# Zeta\n",
+      "a/references/notes.md": "# A's notes\n",
+      "b/SKILL.md": skill("b"),
+      "b/references/mid.md": "# Mid\n",
+      "b/references/notes.md": "# B's notes\n",
+    };
+    const { tool } = loadSkills(folder(files));
+    expect(z.toJSONSchema(tool.args, { io: "input" })).toMatchObject({
+      properties: { reference: { enum: ["mid.md", "notes.md", "zeta.md"] } },
+    });
+  });
+
   it("has no reference to offer when no skill has one", () => {
     const { tool } = loadSkills(folder({ "concierge/SKILL.md": skill("concierge") }));
     expect(z.toJSONSchema(tool.args, { io: "input" })).toMatchObject({
@@ -159,9 +181,9 @@ describe("loadSkills: its digest", () => {
     expect(loadSkills(root).digest).not.toBe(before);
   });
 
-  // A known answer, so a Mac and a Linux image agree: the files in the order of their paths' code units (`a-b` before `ab`,
-  // `LICENSE` before `references/`, where a locale's order differs), each as its path, a NUL, its length in bytes in
-  // decimal, a NUL, then its bytes. Computed apart, with Python's hashlib.
+  // A known answer, so a Mac and a Linux image agree: the files by their paths' code units (`a-b/` before `a/`, which the
+  // walk reads first, and `LICENSE` before `references/`, where a locale's order differs), each its path, a NUL, its
+  // length in bytes in decimal, a NUL, then its bytes. Computed apart, with Python's hashlib.
   it("is the known SHA-256 of a fixed folder", () => {
     const root = folder({
       "ab/references/x.md": "X\n",
@@ -169,8 +191,9 @@ describe("loadSkills: its digest", () => {
       "ab/SKILL.md": "---\nname: ab\ndescription: B.\n---\n",
       "ab/LICENSE": "L\n",
       "a-b/SKILL.md": "---\nname: a-b\ndescription: A.\n---\n",
+      "a/SKILL.md": "---\nname: a\ndescription: C.\n---\n",
     });
-    expect(loadSkills(root).digest).toBe("283f2beb7a20665239f29182caad46f1cea447e0fe8f854800273321817642db");
+    expect(loadSkills(root).digest).toBe("29d3834c2bb7353576276a5f40e96317882299564582248e7b87d6219234e53d");
   });
 });
 
@@ -217,6 +240,8 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
     ["translation/skill.md", skill("translation"), "translation/skill.md: not a skill's file"],
     ["concierge/scripts/run.md", "# Run\n", "concierge/scripts: not a skill's file"],
     ["gno/references/run.sh", "echo planted\n", "gno/references/run.sh: not a reference"],
+    ["gno/references/notes.md.sh", "echo planted\n", "gno/references/notes.md.sh: not a reference"],
+    ["gno/references/notes.mdx", "# Notes\n", "gno/references/notes.mdx: not a reference"],
     ["gno/references/deep/more.md", "# More\n", "gno/references/deep: not a reference"],
     ["gno/references/Notes.md", "# Notes\n", "gno/references/Notes.md: not a reference"],
     ["gno/references/..md", "# Up\n", "gno/references/..md: not a reference"],
@@ -381,6 +406,14 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
   it("refuses a file that is no UTF-8 text", () => {
     const files = { ...TWO(), "gno/references/audit.md": Uint8Array.from([0x23, 0x20, 0xff, 0x0a]) };
     expect(failure(folder(files))).toBe("skills: gno/references/audit.md: not UTF-8 text");
+    // The decoder's own error rides along, for whoever reads the crash.
+    let cause: unknown;
+    try {
+      loadSkills(folder(files));
+    } catch (error) {
+      cause = error instanceof Error ? error.cause : undefined;
+    }
+    expect(cause).toBeInstanceOf(TypeError);
     const surrogate = { ...TWO(), "gno/references/audit.md": Uint8Array.from([0xed, 0xa0, 0x80]) };
     expect(failure(folder(surrogate))).toBe("skills: gno/references/audit.md: not UTF-8 text");
   });
