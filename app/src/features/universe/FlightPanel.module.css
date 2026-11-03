@@ -30,6 +30,8 @@
     display: grid;
     /* layout: the target's column widest, the time's narrowest */
     grid-template-columns: 4fr 3fr 3fr 2fr;
+    /* layout: a step between columns, so four-digit figures never meet the next (frame 18's "1,158 km/s") */
+    column-gap: var(--space-2xs);
     /* layout: a step under the phase, no margin under the list */
     margin-block: var(--space-s) 0;
   }
@@ -45,8 +47,8 @@
     /* layout: a value a small step under its name, with no indent of the list's */
     margin: var(--space-2xs) 0 0;
     color: var(--color-text);
-    /* raw: frame 18's figures, 24 px light, between the room's title (22) and the plate's (28) */
-    font: 300 1.5rem/1 var(--family-sans);
+    /* frame 18's figures, light, their digits 16 px tall: Geist at the room's title size */
+    font: var(--font-title-room);
   }
 
   /* The bar: the track a line, the flight's share of it mint, from the left. */

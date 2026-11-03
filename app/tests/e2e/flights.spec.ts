@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, near } from "./geometry.ts";
 import { landed, running, stats, type FlightStats } from "./sceneStage.ts";
@@ -16,6 +17,7 @@ const TARGET_LEFT = 610;
 const BAR = { x: 610, y: 205, width: 511 };
 const SLOW = { timeout: 90_000 };
 const PHASES = ["Course plotted · leaving orbit", "In transit", "Entering orbit"];
+const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 
 test.describe.configure({ timeout: 240_000 });
 
@@ -35,6 +37,10 @@ interface PanelSeen {
   shownAt: number;
   goneAt: number;
   drawnAt: number;
+  // The narrowest room between a value's words and the next column, and the figures ever cut short, through the whole flight.
+  tightest: number;
+  cut: string[];
+  widest: string;
 }
 
 const flightOf = async (page: Page): Promise<FlightStats | undefined> => (await stats(page)).flight;
@@ -61,6 +67,9 @@ const watchPanel = (page: Page) =>
       shownAt: NaN,
       goneAt: NaN,
       drawnAt: NaN,
+      tightest: Infinity,
+      cut: [],
+      widest: "",
     };
     Reflect.set(globalThis, "__panelSeen", seen);
     const boxOf = (element: Element | null) => {
@@ -75,6 +84,22 @@ const watchPanel = (page: Page) =>
       seen.bar = boxOf(panel.querySelector("[data-along]"));
       seen.named = panel.querySelector("dd")?.textContent ?? "";
     };
+    // A value's words end where they end, or where its column cuts them; the target alone may be cut (frame 89).
+    const wordsEnd = (value: Element) => {
+      const words = document.createRange();
+      words.selectNodeContents(value);
+      return Math.min(words.getBoundingClientRect().right, value.getBoundingClientRect().right);
+    };
+    const room = (panel: Element) => {
+      const values = [...panel.querySelectorAll("dd")];
+      values.slice(1).forEach((value, index) => {
+        const before = values[index];
+        if (before !== undefined)
+          seen.tightest = Math.min(seen.tightest, value.getBoundingClientRect().left - wordsEnd(before));
+        if (value.scrollWidth > value.clientWidth) seen.cut.push(value.textContent);
+        if (value.textContent.length > seen.widest.length) seen.widest = value.textContent;
+      });
+    };
     const gone = () => {
       if (!Number.isNaN(seen.shownAt) && Number.isNaN(seen.goneAt)) seen.goneAt = performance.now();
     };
@@ -87,6 +112,7 @@ const watchPanel = (page: Page) =>
         return;
       }
       if (Number.isNaN(seen.shownAt)) first(panel);
+      room(panel);
       const phase = panel.querySelector("[data-phase]")?.textContent ?? "";
       if (seen.phases.at(-1) !== phase) seen.phases.push(phase);
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
@@ -136,6 +162,21 @@ test("stands the flight panel where the frames stand it, under the header in the
   near(seen.target?.x ?? NaN, TARGET_LEFT, "the target's left");
   nearBox(seen.bar, BAR, "the bar");
   expect(seen.phases).toEqual(PHASES);
+});
+
+// Frame 18's figures stand apart at four digits, "1,158 km/s" and its time: never run together, never cut. A far star of the recorded worlds
+// file (samcrew's, past 2,000 km/s on its way), as the great star's way is too short for four digits.
+test("keeps the panel's figures apart and whole at four digits", async ({ page }) => {
+  await page.route("**/worlds.json", (route) => route.fulfill({ body: RECORDED, contentType: "application/json" }));
+  await home(page);
+  await watchPanel(page);
+  await fly(page, { kind: "star", id: "samcrew" });
+  await expect.poll(async () => (await flightOf(page))?.flights, SLOW).toBe(1);
+  await flown(page);
+  const seen = await panelSeen(page);
+  expect(seen.widest).toMatch(/^\d,\d{3} km\/s$/);
+  expect(seen.cut).toEqual([]);
+  expect(seen.tightest, `the widest figure seen: ${seen.widest}`).toBeGreaterThanOrEqual(8);
 });
 
 test("keeps the panel in a phone's gutters, under its header", async ({ page }) => {
