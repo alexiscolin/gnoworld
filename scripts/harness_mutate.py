@@ -58,7 +58,7 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
@@ -1257,16 +1257,19 @@ def mutate_mutants():
 
 
 def hidden_mutants():
-    """check_docs refuses a hidden character in every file git tracks or would (F5053), and the listing it reads."""
-    yield from swaps("scripts/check_docs.py", "check_docs", (
+    """check_docs refuses a hidden character (hidden.py's rule) in every file git tracks or would (F5053), and the listing
+    it reads."""
+    yield from swaps("scripts/hidden.py", "hidden", (
         ('unicodedata.category(c) != "Cf"', "True", "refuses a format character"),
-        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".jpg",)', "reads no .png"),
-        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".png",)', "reads no .jpg"),
-        ('decode("utf-8", "surrogateescape")', 'decode("utf-8", "ignore")', "counts a byte that is no UTF-8 as a character"),
         ("out, line, seen = [], 1, 0", "out, line, seen = [], 0, 0", "counts lines from 1"),
         ("        seen = m.start()\n", "", "counts the lines before each hidden character once"),
         ('column = m.start() - text.rfind("\\n", 0, m.start())', 'column = m.start() - text.rfind("\\n", 0, m.start()) - 1', "counts columns from 1"),
         ("{unicodedata.name(c)}", "", "names the hidden character"),
+    ))
+    yield from swaps("scripts/check_docs.py", "check_docs", (
+        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".jpg",)', "reads no .png"),
+        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".png",)', "reads no .jpg"),
+        ('decode("utf-8", "surrogateescape")', 'decode("utf-8", "ignore")', "counts a byte that is no UTF-8 as a character"),
         ("hidden_in(p.relative_to(root).as_posix(), text)", "hidden_in(p.name, text)", "names the file by its path"),
         ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
         ("if hidden_chars or missing", "if missing", "fails on a hidden character"),

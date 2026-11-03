@@ -357,6 +357,7 @@ costs context in every session.
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
+| `scripts/hidden.py` | the characters no text holds raw: check_docs's rule, in a file of its own to be shared |
 | `scripts/mutate.py` | the realms' mutation check |
 | `scripts/patch_coverage.py`, `scripts/prove_fix.py`, `scripts/check_regressions.py`, `scripts/batch_size.py` | the no-regression net |
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |

@@ -10,10 +10,10 @@ import pathlib
 import re
 import subprocess
 import sys
-import unicodedata
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+from hidden import hidden_in
 from repo_files import git, listed, tracked
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
@@ -59,25 +59,8 @@ def lost_rules(root):
     return out
 
 
-# A format character (Unicode's category Cf: a bidi control, a zero-width one, a BOM, a tag) shows nothing, or changes how
-# the text around it reads: code that reads otherwise than it runs, words a reader never sees but a model does (F5053). A
-# file that needs one writes it as an escape. An image is no text; any other file is read, a NUL byte or no UTF-8 included.
+# An image is no text; any other file is read, a NUL byte or no UTF-8 included, for what hidden.py names (F5053).
 IMAGES = (".png", ".jpg")
-NON_ASCII = re.compile(r"[^\x00-\x7f]")
-
-
-def hidden_in(where, text):
-    """Each format character of text, as `<where>:<line>:<column>: U+<hex> <name>`."""
-    out, line, seen = [], 1, 0
-    for m in NON_ASCII.finditer(text):
-        c = m.group()
-        if unicodedata.category(c) != "Cf":
-            continue
-        line += text.count("\n", seen, m.start())
-        seen = m.start()
-        column = m.start() - text.rfind("\n", 0, m.start())
-        out.append(f"{where}:{line}:{column}: U+{ord(c):04X} {unicodedata.name(c)}")
-    return out
 
 
 def messages(root):
