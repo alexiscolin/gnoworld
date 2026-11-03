@@ -13,11 +13,17 @@ const tools = allowlist(
 const turn = untrustedBlocks();
 const LINE = `| ${"Proposal 42: fund the gnoland builders".padEnd(60, ".")} | ${String.fromCodePoint(0xe9)}t${String.fromCodePoint(0xe9)} |\n`;
 const PAGE = LINE.repeat(Math.ceil((64 * 1024) / Buffer.byteLength(LINE)));
+const HUGE = LINE.repeat(Math.ceil((16 * 1024 * 1024) / Buffer.byteLength(LINE)));
 
 describe("jarvis's locks", () => {
   bench("check a gno_render call, then block its 64 KiB result [1 ms]", () => {
     const call = tools.check("gno_render", { profile: "onyx", realm: "gno.land/r/gov/dao", path: "proposals" });
     if (!call.ok) throw new Error("the bench's call was refused");
     if (!turn.wrap(call.name, PAGE).includes('cut_at_byte="')) throw new Error("the bench's page was not cut");
+  });
+
+  // A block reads only what fits of a text: a result of 16 MiB costs what one of 64 KiB does.
+  bench("block a 16 MiB result, read only as far as its 16 KiB [1 ms]", () => {
+    if (!turn.wrap("gno_read", HUGE).includes('cut_at_byte="')) throw new Error("the bench's result was not cut");
   });
 });
