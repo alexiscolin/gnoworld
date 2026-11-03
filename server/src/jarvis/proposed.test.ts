@@ -95,6 +95,8 @@ describe("checkProposal", () => {
     "struct{a int}",
     "<untyped> bigint",
     "[x]uint8",
+    "[][]uint8",
+    "[4][]uint8",
     "[]uint8 ",
     "uint8x",
     "",

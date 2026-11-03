@@ -132,11 +132,13 @@ describe("a message's facts", () => {
 });
 
 describe("a source's facts", () => {
-  it("resolves a link to a path against gnoweb's origin, and finds one in a heading, a quote, a list, a mark and an image", () => {
+  it("resolves a link to a path against gnoweb's origin, and finds one in a heading, a quote, a heading in a quote, a list, a mark and an image", () => {
     const source = [
       "# The [board](/r/demo/boards)",
       "",
       "> quoted https://gno.land/r/demo/quote",
+      "",
+      "> ## [deep](/r/demo/deep)",
       "",
       "- listed https://gno.land/r/demo/list",
       "",
@@ -150,6 +152,7 @@ describe("a source's facts", () => {
     ].join("\n");
     expect([...sourceFactsOf(source, ORIGIN).links].sort()).toEqual([
       "https://gno.land/r/demo/boards",
+      "https://gno.land/r/demo/deep",
       "https://gno.land/r/demo/list",
       "https://gno.land/r/demo/quote",
       "https://gno.land/r/demo/strong",
