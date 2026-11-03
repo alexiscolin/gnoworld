@@ -16,13 +16,14 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
   },
   // The Earth's own plants off its day map, wet to dry: a forest greyed to frame 4's chroma, Europe's and India's farmland, Kenya's
   // savanna; the same forest, the cerrado, Mongolia's steppe. Most green land is farmland, lighter than the sea, as the Earth's (7b8).
+  // Its sea Alexis's teal, lit as light as the Earth's navy, a thin shelf lighter still (7b8).
   temperate: {
     maps: ["venus", "mars"],
     palettes: [ramp(0x3d472a, 0x626a40, 0x847e5e), ramp(0x3d472a, 0x6e6846, 0x948469)],
     warp: [0.08, 0.2],
     recolour: [0.75, 1],
     relief: [0.0042, 0.008],
-    sea: { shallow: rgb(0x064e59), deep: rgb(0x00262e) },
+    sea: { shallow: rgb(0x126c7e), deep: rgb(0x004556) },
     rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   desert: {

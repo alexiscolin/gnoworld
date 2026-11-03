@@ -9,6 +9,7 @@ import { shoresOn, type Shore } from "./coasts.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, type Circle } from "./lab.ts";
 import { landDetailsOn, type LandDetail } from "./landDetail.ts";
+import { seaLightsOn } from "./seaLight.ts";
 import { facesApart, facesOn, GLANCE, type Face } from "./textures.ts";
 
 // Coasts at a close world's zoom (radius 350 px, the Earth's view 356), the median world's: the coast's length over its smoothed copy's,
@@ -47,6 +48,10 @@ const SHAPE_APART = 0.25;
 // its energy and its finest share at least 0.8 of the Earth's land where the day box reads it (southern India, 175 and 0.50), as the day
 // box's own share (generated.spec); b9379cef: 54, 45, 87 and 103 on seeds 0, 2, 3 and 5.
 const LAND_DETAIL = { share: 0.8, seeds: 6, blocks: 500 } as const;
+// The lit sea as the Earth's (the chief, 2026-11-04: "the seas are near black", the lands pasted on them): on seeds 0 to 7 close, the sea
+// of the lit half, its median within a sixth of the Earth's lightness there (19.2 L*) and a colour, half its chroma (25.0) at least;
+// 35de26ea: 15.1 L* and 8.3. Alexis's teal keeps its hue: "never the Earth" reads it with the coasts.
+const LIT_SEA = { seeds: 8, lightness: 1 / 6, chroma: 0.5 } as const;
 const WORLD = ANCHORS.indexOf("temperate");
 const PARTS = 4;
 const PER_PART = 16;
@@ -72,6 +77,8 @@ interface Earth {
   readonly land: LandDetail;
   /** Its view's green land's L* over its sea's. */
   readonly greenOverSea: number;
+  /** Its lit half's sea, in Lab (seaLight.ts). */
+  readonly sea: readonly [number, number, number];
 }
 // The Earth's measures, once a worker: its view is the same on every visit, its map one file.
 let earthRead: Earth | undefined;
@@ -80,16 +87,17 @@ async function earthOf(page: Page): Promise<Earth> {
   await page.clock.setFixedTime(EARTH_INSTANT);
   await open(page, "?view=earth");
   const shot = await picture(page);
-  const [[shore], [face], [lit], [land]] = [
+  const [[shore], [face], [lit], [land], [sea]] = [
     await shoresOn(page, shot, [EARTH_VIEW]),
     await facesOn(page, shot, [EARTH_VIEW]),
     await climatesOn(page, shot, [[EARTH_VIEW, [0, 1, 0]]]),
     await landDetailsOn(page, shot, [[EARTH_VIEW, true]]),
+    await seaLightsOn(page, shot, [EARTH_VIEW]),
   ];
   const map = await mapClimateOn(page, await (await page.request.get("/textures/earth-day.webp")).body());
   if (shore === undefined || face === undefined || lit === undefined || land === undefined) throw new Error("no Earth");
-  if (lit.greenLight === null || face.sea === null) throw new Error("no green land or sea on the Earth");
-  earthRead = { shore, face, chroma: lit.chroma, map, land, greenOverSea: lit.greenLight - face.sea[0] };
+  if (lit.greenLight === null || face.sea === null || !sea) throw new Error("no green land or sea on the Earth");
+  earthRead = { shore, face, chroma: lit.chroma, map, land, greenOverSea: lit.greenLight - face.sea[0], sea };
   return earthRead;
 }
 
@@ -211,6 +219,36 @@ test.describe("temperate worlds varied and real at the coast", () => {
         LAND_DETAIL.share * earth.sharpness,
       );
     }
+  });
+
+  test("a temperate world's lit sea is as light as the Earth's, in its own teal, never a dark hole", async ({
+    page,
+  }) => {
+    const { sea: earth } = await earthOf(page);
+    const read: (readonly [number, number, number])[] = [];
+    for (let seed = 0; seed < LIT_SEA.seeds; seed += 1) {
+      await open(page, `?view=close&world=${String(WORLD)}&seed=${String(seed)}`);
+      const [place] = await circles(page);
+      if (place === undefined) throw new Error("no world");
+      const [sea] = await seaLightsOn(page, await picture(page), [place]);
+      if (sea) read.push(sea);
+    }
+    const lightness = quantile(
+      read.map(([l]) => l),
+      0.5,
+    );
+    const chroma = quantile(
+      read.map(([, a, b]) => Math.hypot(a, b)),
+      0.5,
+    );
+    test.info().annotations.push({ type: "sea", description: JSON.stringify({ earth, read, lightness, chroma }) });
+    expect(read.length, "seas read").toBeGreaterThanOrEqual(LIT_SEA.seeds - 1);
+    expect(Math.abs(lightness / earth[0] - 1), "as light as the Earth's lit sea").toBeLessThanOrEqual(
+      LIT_SEA.lightness,
+    );
+    expect(chroma, "a sea's colour, never a grey hole").toBeGreaterThanOrEqual(
+      LIT_SEA.chroma * Math.hypot(earth[1], earth[2]),
+    );
   });
 
   test("temperate worlds take every shape from their seed: one supercontinent, several continents, an archipelago", async ({
