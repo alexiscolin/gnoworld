@@ -11,10 +11,11 @@ unset GIT_NO_REPLACE_OBJECTS
 # `outside` and `installed` run them as in Alexis's shell (F076, F129).
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-# No git config from around this file reaches its throwaway repositories (F5012, section `unsigned`): Alexis's global one
-# signs every commit with a key the sandbox cannot read; a system file, or what `git -c` hands a hook, could as well.
+# No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
+# one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
+# could as well, and GIT_CONFIG would send `git config` out of the repository.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
-unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
 rp="$here"/review_pass.py # review_pass and pre_push both use it
@@ -663,20 +664,21 @@ grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not sa
 fi
 
 if part unsigned; then
-# No git config from around this file reaches its throwaway repositories (F5012): Alexis's global one signs every commit
-# with a key Claude Code's sandbox cannot read, which failed 36 sections there. Planted: one config whose signer always
-# fails, reaching git by each way there is: a global or a system file, a HOME's or an XDG folder's, and what `git -c`
-# hands a hook, in either of its forms.
-us="$t/unsigned" && mkdir -p "$us/home" "$us/xdg/git" "$us/scripts" "$us/.githooks"
+# No git config from around this file reaches its throwaway repositories (F5012, F5022): Alexis's global one signs every
+# commit with a key Claude Code's sandbox cannot read, which failed 36 sections there. Planted: one config whose signer always
+# fails, reaching git by each way there is: a global or a system file, a HOME's or an XDG folder's, what `git -c` hands a hook
+# in either of its forms, and a template folder, which `git init` copies into each repository; and GIT_CONFIG, which sends
+# `git config` to a file outside the repository.
+us="$t/unsigned" && mkdir -p "$us/home" "$us/xdg/git" "$us/template" "$us/repos" "$us/scripts" "$us/.githooks"
 printf '#!/bin/sh\necho "$*" >>"%s/signed"\nexit 1\n' "$us" >"$us/signer" && chmod +x "$us/signer"
 printf '[commit]\n\tgpgsign = true\n[gpg]\n\tformat = openpgp\n\tprogram = %s\n' "$us/signer" >"$us/signs"
-cp "$us/signs" "$us/home/.gitconfig" && cp "$us/signs" "$us/xdg/git/config"
-git init -q "$us/repo"
-# Each way alone makes a commit call the signer, and fail: the plant proves something.
+cp "$us/signs" "$us/home/.gitconfig" && cp "$us/signs" "$us/xdg/git/config" && cp "$us/signs" "$us/template/config"
+# Each way alone makes a commit in a new repository call the signer, and fail: the plant proves something.
 signs() { # $1: the way; then env's arguments for it, where no other way reaches git
 	way=$1 && shift && rm -f "$us/signed"
 	env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null HOME="$us/nohome" XDG_CONFIG_HOME="$us/noxdg" env "$@" \
-		git -C "$us/repo" commit -q --allow-empty -m x 2>/dev/null && fail "a commit passed though $way signs: the plant proves nothing"
+		sh -c 'git init -q "$1" && git -C "$1" commit -q --allow-empty -m x' - "$us/repos/$way" 2>/dev/null &&
+		fail "a commit passed though $way signs: the plant proves nothing"
 	[ -s "$us/signed" ] || fail "git did not call the signer $way names: the plant proves nothing"
 }
 signs "a global file" GIT_CONFIG_GLOBAL="$us/signs"
@@ -685,16 +687,21 @@ signs "HOME's .gitconfig" -u GIT_CONFIG_GLOBAL HOME="$us/home"
 signs "XDG's git/config" -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME="$us/xdg"
 signs "git -c's parameters" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'"
 signs "git -c's count" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs"
-# All at once around a copy of this file, whose one planted section commits in a throwaway repository: it passes, unsigned.
-# The section also wants the two file variables exported as /dev/null, which a system file it cannot plant needs.
-printf 'if part commits; then\n[ "$(printenv GIT_CONFIG_GLOBAL):$(printenv GIT_CONFIG_SYSTEM)" = /dev/null:/dev/null ] || fail "git does not get the config files this file sets"\ngit init -q "$t/c" && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\nfi\n' >"$us/planted"
+signs "a template folder" GIT_TEMPLATE_DIR="$us/template"
+git init -q "$us/repos/file" && GIT_CONFIG="$us/elsewhere-alone" git -C "$us/repos/file" config planted.key yes
+[ -s "$us/elsewhere-alone" ] || fail "GIT_CONFIG did not send git config to its file: the plant proves nothing"
+# All at once around a copy of this file, whose one planted section sets a config and commits in a throwaway repository: it
+# passes, unsigned, the setting in the repository. The section also wants the two file variables exported as /dev/null, which a
+# system file it cannot plant needs.
+printf 'if part commits; then\n[ "$(printenv GIT_CONFIG_GLOBAL):$(printenv GIT_CONFIG_SYSTEM)" = /dev/null:/dev/null ] || fail "git does not get the config files this file sets"\ngit init -q "$t/c" && git -C "$t/c" config planted.key yes && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\n[ "$(git config --file "$t/c/.git/config" planted.key)" = yes ] || fail "git config wrote outside the throwaway repository"\nfi\n' >"$us/planted"
 sed "/^part() {/r $us/planted" "$0" >"$us/scripts/test_hooks.sh"
 grep -qx 'if part commits; then' "$us/scripts/test_hooks.sh" || fail "the planted section is not in the copy of test_hooks.sh"
 rm -f "$us/signed"
 out=$(env HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" GIT_CONFIG_GLOBAL="$us/signs" GIT_CONFIG_SYSTEM="$us/signs" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'" \
-	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
-	fail "a throwaway repository took the git config around test_hooks.sh, which signs (F5012): $out"
-[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012)"
+	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs" GIT_TEMPLATE_DIR="$us/template" GIT_CONFIG="$us/elsewhere" \
+	ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) || fail "a throwaway repository took the git config around test_hooks.sh (F5012, F5022): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012, F5022)"
+[ ! -e "$us/elsewhere" ] || fail "a throwaway repository's git config went to the GIT_CONFIG file around test_hooks.sh (F5022)"
 # Then with neither file variable around it, as in Alexis's shell: a value this file sets but does not export would never reach
 # git, and HOME's .gitconfig would sign again (F5021).
 out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||

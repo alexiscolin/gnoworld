@@ -688,8 +688,10 @@ def mutants():
                     "hooks", "the hook suite refuses a section its runner does not list (F160)")
     for find, replace, way in (("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_SYSTEM=/dev/null\n", "a global file"),
                                ("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_GLOBAL=/dev/null\n", "a system file"),
-                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\n", "unset GIT_CONFIG_COUNT\n", "git -c's parameters"),
-                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\n", "unset GIT_CONFIG_PARAMETERS\n", "git -c's count")):
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's parameters"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's count"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_TEMPLATE_DIR\n", "GIT_CONFIG's file (F5022)"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG\n", "a template folder (F5022)")):
         yield from each("scripts/test_hooks.sh", find, replace, "hooks", f"the hook suite's throwaway repositories ignore the git config of {way} (F5012)")
     yield from each("scripts/test_hooks.sh", "export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n",
                     "hooks", "the hook suite exports its git config files to git, which a plain assignment never reaches (F5021)")
