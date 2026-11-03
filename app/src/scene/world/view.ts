@@ -24,6 +24,8 @@ export type WorldSaid = (state: EarthState, colour?: string) => void;
 export interface WorldPlace {
   readonly circle: Circle;
   readonly id: string;
+  /** Keeps this reader's visit, once its appearance starts. */
+  readonly remember: () => void;
 }
 
 export class WorldView {
@@ -63,6 +65,7 @@ export class WorldView {
   show(place: WorldPlace | undefined, said: WorldSaid): void {
     this.#said = said;
     this.#circle = place?.circle;
+    this.#waking.remember = place?.remember;
     if (place === undefined) {
       this.#drop();
       this.#say("gone");
