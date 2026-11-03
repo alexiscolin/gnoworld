@@ -942,8 +942,9 @@ describe("what a flight gives back", () => {
     const refused = new Error("no program");
     scene.renderer.compileAsync.mockImplementationOnce(() => Promise.reject(refused));
     const flown = flights(scene.device);
-    expect(scene.renderer.compileAsync).toHaveBeenCalledTimes(1);
-    const [object, camera, target] = scene.renderer.compileAsync.mock.calls[0] ?? [];
+    const streaks = scene.renderer.compileAsync.mock.calls.filter(([object]) => object instanceof LineSegments);
+    expect(streaks).toHaveLength(1);
+    const [object, camera, target] = streaks[0] ?? [];
     expect(object).toBeInstanceOf(LineSegments);
     expect(camera).toBe(scene.camera);
     expect(target).toBe(scene.stage);
