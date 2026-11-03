@@ -3,6 +3,7 @@
 // The worlds' arrival is the cosmos's own dive (7d7): they take the lean alone. A flight's way adds to both (7g).
 import { driftAt, HOME, LEAN, turnAt, type Point } from "@gnoworld/core";
 import type { CosmosSight } from "./flight/goal.ts";
+import { tuned } from "./tuning.ts";
 
 const LEAN_MS = 900;
 
@@ -46,11 +47,13 @@ export class Eye {
       this.#leanY += (this.#aimY - this.#leanY) * eased;
     }
     const { travel } = this;
-    this.at.x = this.#rest.x + this.#drift.x + this.#leanX * LEAN + travel.x;
-    this.at.y = this.#rest.y + this.#drift.y + this.#leanY * LEAN + travel.y;
+    // The workshop's lean, in the lab alone (tuning.ts): a site's build reads LEAN, as the line folds.
+    const lean = import.meta.env.GNOWORLD_TUNING === "1" ? tuned("eye.lean", LEAN) : LEAN;
+    this.at.x = this.#rest.x + this.#drift.x + this.#leanX * lean + travel.x;
+    this.at.y = this.#rest.y + this.#drift.y + this.#leanY * lean + travel.y;
     this.at.z = this.#rest.z + this.#drift.z + travel.z;
-    this.worlds.x = this.#rest.x + this.#leanX * LEAN + travel.x;
-    this.worlds.y = this.#rest.y + this.#leanY * LEAN + travel.y;
+    this.worlds.x = this.#rest.x + this.#leanX * lean + travel.x;
+    this.worlds.y = this.#rest.y + this.#leanY * lean + travel.y;
     this.worlds.z = this.#rest.z + travel.z;
   }
 

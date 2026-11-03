@@ -10,7 +10,7 @@ declare global {
 }
 
 /** The values the panel may set, by a name it lists them under and a build is searched for. */
-export const TUNABLES = ["grade.exposure"] as const;
+export const TUNABLES = ["grade.exposure", "eye.lean", "eye.arrivalLean"] as const;
 export type Tunable = (typeof TUNABLES)[number];
 
 // Its names stay in any build that keeps it, as the build test looks for them.
