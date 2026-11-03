@@ -10,6 +10,7 @@ import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
 import { lazyPart } from "./lazyPart.ts";
 import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
+import { firstArrival, HomeOpening } from "./Opening.tsx";
 import type { Rail } from "./Rail.tsx";
 import styles from "./Universe.module.css";
 
@@ -106,11 +107,13 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
   const earth = useSyncExternalStore(host.subscribe, host.earth);
   const world = useSyncExternalStore(host.subscribe, host.world);
   const flight = useSyncExternalStore(host.subscribe, host.flown.flight);
+  const [first] = useState(firstArrival);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => (canvasRef.current === null ? undefined : host.attach(canvasRef.current)), [host]);
   useEffect(() => {
     host.show(shown, page);
-  }, [host, shown, page]);
+    first.at(shown);
+  }, [host, first, shown, page]);
   return (
     <>
       <canvas
@@ -137,6 +140,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
       <p role="status" className={styles["status"]}>
         {shown ? lineOf(status === "failed", earth === "failed") : null}
       </p>
+      <HomeOpening first={first} host={host} canvas={canvasRef} />
       {status === "on" ? (
         <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
       ) : null}

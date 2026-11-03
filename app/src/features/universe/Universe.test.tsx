@@ -1578,3 +1578,81 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
     box.remove();
   });
 });
+
+// ADR-0003 §1: the home's opening, over the dive, on a newcomer's first arrival on the cosmos alone; never on a return, nor where the reader
+// came first to another place (a shared link), nor where no dive runs.
+describe("the home's opening (ADR-0003)", () => {
+  const words = () => document.querySelector("[data-opening]");
+
+  it("shows over a newcomer's first arrival on the cosmos while the scene loads, and as it runs", async () => {
+    const arrive = slowChunk();
+    const { box } = rendered("cosmos");
+    expect(words()).not.toBeNull();
+    arrive();
+    await settle();
+    expect(on(box)).toBe(true);
+    expect(words()).not.toBeNull();
+  });
+
+  it.each([
+    ["entered a place", "gnoworld:entered"],
+    ["saw the opening once", "gnoworld:opened"],
+  ])("shows nothing to a reader who %s", async (_, key) => {
+    localStorage.setItem(key, "1");
+    rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+  });
+
+  it.each<Shown>(["earth", { world: "gov/dao", name: "GovDAO" }, true])(
+    "shows nothing where the first place shown is %j, even once the cosmos shows",
+    async (first) => {
+      const { rerender } = rendered(first);
+      await settle();
+      rerender("cosmos");
+      await settle();
+      expect(words()).toBeNull();
+    },
+  );
+
+  // F4502: where no dive runs the device keeps its first visit for the next one.
+  it("waits for View in space on a phone, keeping the first visit till then, then shows over its dive", async () => {
+    device({ phone: true });
+    const { box } = rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBeNull();
+    click(button(box, VIEW));
+    expect(words()).not.toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBe("1");
+  });
+
+  it("shows nothing where the scene cannot run, and keeps the first visit for a device that can", async () => {
+    device({ gpu: null });
+    rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBeNull();
+  });
+
+  it("goes once the scene failed, its words having shown while it loaded: nothing shows twice", async () => {
+    scene.load.mockImplementation(() => Promise.reject(new Error("the chunk did not come")));
+    rendered("cosmos");
+    expect(words()).not.toBeNull();
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBe("1");
+  });
+
+  it("goes for good as the page leaves the cosmos", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(words()).not.toBeNull();
+    rerender("earth");
+    await settle();
+    expect(words()).toBeNull();
+    rerender("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+  });
+});
