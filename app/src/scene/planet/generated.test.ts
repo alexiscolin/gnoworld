@@ -17,7 +17,7 @@ import { createWorld, styleOf, worldOf, worldUniforms, type World } from "./gene
 import { GENERATED_FRAGMENT } from "./generatedShader.ts";
 import type { MapSet, Planet } from "./planet.ts";
 import { SHADE } from "./surfaceParts.ts";
-import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
+import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
 import { working } from "./uniforms.ts";
 
 // Every world but the Earth, drawn from its recipe (slice 7, 7b5; ADR-0002 §3, "a class is data"): one program for all of them, each
@@ -156,6 +156,19 @@ describe("a generated world, drawn from its recipe", () => {
     expect(read(drawn(worldAt("rocky")).surface, "banded")).toBe(0);
   });
 
+  // A uniform the program does not declare is dropped without a word; the program then fails to compile, which only a journey sees.
+  it("declares every uniform a world hands its program", () => {
+    for (const anchor of ANCHORS)
+      for (const name of Object.keys(worldUniforms(worldAt(anchor), fixed().set)))
+        expect(`${SURFACE_VERTEX}\n${GENERATED_FRAGMENT}`, name).toMatch(new RegExp(`uniform \\w+ [^;]*\\b${name}\\b`));
+  });
+
+  // Ganymede's lanes (7b6's held details, 7b7): grooved ice alone cuts grooves, by a value its look hands the one program.
+  it("marks grooved ice's lanes by value, on that class alone", () => {
+    for (const anchor of ANCHORS)
+      expect(read(drawn(worldAt(anchor)).surface, "grooved"), anchor).toBe(anchor === "grooved ice" ? 1 : 0);
+  });
+
   it("marks a glow, a lock and a sea by value, as the look gives them", () => {
     const volcanic = worldAt("volcanic");
     const lava = drawn(volcanic).surface;
@@ -166,8 +179,11 @@ describe("a generated world, drawn from its recipe", () => {
     expect(read(drawn(worldAt("tidally locked")).surface, "locked")).toBe(1);
     expect(read(drawn(worldAt("rocky")).surface, "locked")).toBe(0);
     const ocean = worldAt("ocean");
-    if (ocean.look.sea === null) throw new Error("an ocean world has a sea");
-    expect(read(drawn(ocean).surface, "seaDeep")).toEqual(working(ocean.look.sea.deep));
+    if (ocean.recipe.sea === null) throw new Error("an ocean world has a sea");
+    // Its sea as the recipe turns it by its system's hue (Alexis, 2026-11-03, "bleu-vert variant").
+    expect(read(drawn(ocean).surface, "seaShallow")).toEqual(linear(ocean.recipe.sea.linear[0]));
+    expect(read(drawn(ocean).surface, "seaDeep")).toEqual(linear(ocean.recipe.sea.linear[1]));
+    expect(read(drawn(worldAt("rocky")).surface, "seaDeep")).toEqual(linear([0, 0, 0]));
   });
 
   it("gives the same path the same world, every time it is drawn (golden)", () => {
@@ -249,6 +265,11 @@ describe("a generated world, drawn from its recipe", () => {
 });
 
 describe("the generated program", () => {
+  const bodyOf = (signature: string) => {
+    const from = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf(signature));
+    return from.slice(0, from.indexOf("\n}\n"));
+  };
+
   it("lights every world with the Earth's own light: one chunk, in both programs", () => {
     expect(SHADE.length).toBeGreaterThan(500);
     expect(GENERATED_FRAGMENT).toContain(SHADE);
@@ -283,6 +304,41 @@ describe("the generated program", () => {
       GENERATED_FRAGMENT.indexOf("float bandsAt("),
     );
     expect(streaks).toMatch(/weight \+= faded;/);
+  });
+
+  // Ganymede's grooves (7b6's held details, 7b7; F4323: never a contour map): bright lanes along the seams of large cells, narrow
+  // beside a cell, each a bundle of fine dark grooves along its seam, faded out before they are a few pixels apart; a second net turned
+  // so the sets cross at angles; the rifts' arcs give way to them, and the broad relief is softer there (F4238's 2x2 steps).
+  it("cuts a grooved world's grooves in narrow lanes of two nets that cross, faded before they alias", () => {
+    const start = GENERATED_FRAGMENT.indexOf("if (grooved > 0.5) {");
+    expect(start).toBeGreaterThan(0);
+    const block = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
+    expect(block.match(/groovesAt\(/g)).toHaveLength(2);
+    expect(block).toMatch(/groovesAt\(turned\(at, [1-5]\.\d+\) \+ /);
+    expect(block).toMatch(
+      /albedo \*= mix\(0\.\d+, 1\.\d+, max\(lane, other\)\) \* \(1\.0 - 0\.[2-5]\d* \* min\(grooves, 1\.0\)\);/,
+    );
+    const grooves = bodyOf("float groovesAt(");
+    expect(grooves).toMatch(/float away = seams\(/);
+    expect(grooves).toMatch(/lane = 1\.0 - smoothstep\(0\.[0-2]\d*, 0\.[0-3]\d*, away\);/);
+    expect(grooves).toMatch(/\* lane \* \(1\.0 - smoothstep\([\d.]+, [\d.]+, [1-9][\d.]* \* frequency \* pixel\)\);/);
+    // Never op-art (7b7's design review): the spacing wanders from lane to lane, each groove's width along it.
+    expect(grooves).toMatch(/float wave = away \* [\d.]+ \+ (0\.[5-9]|1\.\d)\d* \* noise\(/);
+    expect(grooves).toMatch(/smoothstep\([\d.]+ \+ [\d.]+ \* noise\([^)]*\), [\d.]+, abs\(fract\(wave\) - 0\.5\)\)/);
+    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal);");
+  });
+
+  // F4239: a giant's streaks stretched five times across a latitude read as hairs a pixel tall, their octaves past a pixel; Alexis chose
+  // the soft version (2026-11-03, 15:2x): each octave stretched twice at most, less as it nears the pixel, faded by its stretched wave,
+  // at today's contrast, with no thin filament.
+  it("stretches a giant's streaks twice at most, less near the pixel, never five times (F4239)", () => {
+    const streaks = bodyOf("float streaksAt(");
+    expect(streaks).toMatch(/float stretch = max\(2\.0 - [\d.]+ \* float\(i\), 1\.0\);/);
+    expect(streaks).toMatch(/noise\(vec3\(q\.x, q\.y \* stretch, q\.z\) \* frequency/);
+    expect(streaks).toContain("if (stretch * frequency * pixel > 0.5) break;");
+    expect(streaks).toContain("float faded = amplitude * (1.0 - smoothstep(0.3, 0.5, stretch * frequency * pixel));");
+    expect(streaks).not.toMatch(/q\.y \* 5\.0|fwidth/);
+    expect(GENERATED_FRAGMENT).toContain("(1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel))");
   });
 
   // F4229: every finer noise fades by the pixel, the vents' crackle and the bands' second term too, or a small world sparkles.
@@ -354,8 +410,20 @@ describe("the generated program", () => {
     const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
     expect(GENERATED_FRAGMENT).toMatch(/molten = shareOf\(vec2\([\d.]+ \* crackle - height, /);
     expect(glow).toMatch(/: smoothstep\(hot - [\d.]+, hot \+ [\d.]+, molten\);/);
-    expect(glow).toMatch(/float heat = mix\(vents, rift \* [^;]*, smoothstep\([\d.]+, [\d.]+, shape\.craters\)\);/);
+    expect(glow).toMatch(/float heat = mix\(vents, burning \* [^;]*, smoothstep\([\d.]+, [\d.]+, shape\.craters\)\);/);
     expect(glow).not.toMatch(/seam/);
+  });
+
+  // An old crust's fractures (the chief, 7b5's pass2: Music's veins, never neon tubes; 7b6's held details, 7b7): cracks along the seams
+  // of cells, a few to a radius, which glow only where they are wider than a pixel and a half; a riven world that does not glow keeps
+  // its long crossing arcs.
+  it("breaks an old crust's fractures along the seams of cells, glowing on their wider parts only", () => {
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(riven > 0\.0 && glowLevel > 0\.0\) \{\n {6}vec2 crack = crackAt\(at \+ offset, [1-5]\.0 \+ shape\.scale, vec2\(0\.0[1-9]\d*, 0\.[01]\d* \+ 0\.[01]\d* \* shape\.rifts\), pixel\);/,
+    );
+    // No arm tapers to a point, and the glow keeps to a crack's middle, its profile squared: 7b7's design review saw starfish and smears.
+    expect(GENERATED_FRAGMENT).toMatch(/burning = rift \* rift \* smoothstep\([1-9][\d.]*, [\d.]+, crack\.y\);/);
+    expect(GENERATED_FRAGMENT).toMatch(/\} else if \(riven > 0\.0\) rift = lines\(ridge, at, /);
   });
 
   // The concentric marbling (the chief: real24's fourth world): erosion carved the two largest octaves too, whose few long creases the
@@ -399,7 +467,7 @@ describe("the generated program", () => {
     expect(body).toMatch(/dot\(at, /);
     expect(GENERATED_FRAGMENT).toMatch(/rift = lines\(ridge, at, /);
     // Only a riven world shows them (rocky's rifts reach 0.2, desert's 0.4, ice's start at 0.4): thin arcs on the rest read as ink.
-    expect(GENERATED_FRAGMENT).toContain("float riven = smoothstep(0.25, 0.5, shape.rifts);");
+    expect(GENERATED_FRAGMENT).toContain("float riven = smoothstep(0.25, 0.5, shape.rifts) * (1.0 - grooved);");
     expect(GENERATED_FRAGMENT).toMatch(/albedo \*= 1\.0 \+ [\d.]+ \* max\(ridge, 0\.0\)/);
   });
 
@@ -419,6 +487,8 @@ describe("the generated program", () => {
       /z = noise\(vec3\(swirled\.y \* max\(shape\.bands \* [\d.]+, [\d.]+\), minorOffset\.xy\)\) \/ SPREAD;/,
     );
     expect(GENERATED_FRAGMENT).toMatch(/float edge = 0\.0[0-4]\d*;/);
+    // A giant's band minor covers its share: its soft edge half its share wide, so a minor that barely shows moves little (7b7).
+    expect(GENERATED_FRAGMENT).toContain("edge = min(0.1, 0.5 * minorShare);");
     expect(GENERATED_FRAGMENT).toContain("minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge,");
     // A dark ground's minor takes its main class's lightness, as a glowing world's does; a giant's keeps 0.6 of it (7b6).
     expect(GENERATED_FRAGMENT).toMatch(
@@ -463,8 +533,26 @@ describe("the generated program", () => {
   it("draws each style from its uniform: veins glowing on the night side too, a sulfur crust with calderas", () => {
     const start = GENERATED_FRAGMENT.indexOf("if (glowLevel > 0.0) {\n    float hot");
     const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
-    expect(glow).toMatch(/if \(style > 0\.5 && style < 1\.5\) [^;]*veinsAt\(/);
+    expect(glow).toMatch(/if \(style > 0\.5 && style < 1\.5\) glow = veinsOf\(at \+ offset, /);
+    expect(GENERATED_FRAGMENT).not.toMatch(/veinsAt\(|goldOf\(/);
     expect(GENERATED_FRAGMENT).toMatch(/if \(style > 1\.5\) albedo = rampOf\(sulfurLow, sulfurMid, sulfurHigh, tint\)/);
+  });
+
+  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, gold to orange, never white; each vein a crack along the seams
+  // of cells, its width wandering between two bounds, and a crack under a pixel wide fades out whole, never a hairline that breaks up.
+  it("draws a veined world's veins as two nets of cracks, gold to orange, each faded out whole under a pixel", () => {
+    const crack = bodyOf("vec2 crackAt(");
+    expect(crack).toMatch(/float away = seams\(/);
+    expect(crack).toMatch(/float wide = mix\(width\.x, width\.y, smoothstep\(/);
+    expect(crack).toMatch(/float seen = [1-9]\d*\.0 \* frequency \* pixel;/);
+    expect(crack).toContain(
+      "return vec2((1.0 - smoothstep(0.0, max(wide, seen), away)) * smoothstep(0.5, 1.5, wide / seen), wide / seen);",
+    );
+    const veins = bodyOf("vec3 veinsOf(");
+    expect(veins.match(/crackAt\(/g)).toHaveLength(2);
+    expect(veins).toMatch(/vec2 main = crackAt\(p, [\d.]+ \+ shape\.scale, vec2\(0\.1\d*, 0\.[3-5]\d*\), pixel\);/);
+    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x\);/);
+    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[3-7]\d*, 0\.[01]\d*\), heat\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

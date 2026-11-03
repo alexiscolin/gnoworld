@@ -1,6 +1,7 @@
 // Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from 7b4's recipe, real maps lending
 // their fine contrast only, lit with the Earth's own light. Comments live here, out of the strings that ship (the scene's budget).
 import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { CRACKS } from "./generatedCracks.ts";
 import { DETAIL, FORMS, NOISE } from "./generatedParts.ts";
 import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { COMMON, PARTS, SHADE } from "./surfaceParts.ts";
@@ -16,7 +17,7 @@ uniform Shape shape;
 uniform sampler2D minorMap;
 uniform vec3 offset, minorOffset, low, mid, high, minorLow, minorMid, minorHigh, seaShallow, seaDeep, glowColour;
 uniform vec3 sulfurLow, sulfurMid, sulfurHigh;
-uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style;
+uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -29,6 +30,7 @@ ${LOOKUP}
 ${PARTS}
 ${NOISE}
 ${FORMS}
+${CRACKS}
 ${DETAIL}
 ${SHADE}
 ${LIGHTS}
@@ -81,7 +83,7 @@ void main() {
     float edge = 0.03;
     if (banded > 0.5) {
       z = noise(vec3(swirled.y * max(shape.bands * 0.3, 3.0), minorOffset.xy)) / SPREAD;
-      edge = min(0.1, minorShare);
+      edge = min(0.1, 0.5 * minorShare);
     }
     minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge, shareOf(vec2(z, 1.0)));
   }
@@ -117,13 +119,24 @@ void main() {
     float pole = abs(axis.y) + 0.3 * (t - 0.5) + 0.15 * flow.y;
     albedo = mix(albedo, mix(vec3(0.86, 0.9, 0.95), high, 0.35) * detail, smoothstep(1.0 - shape.caps, 1.0 - shape.caps + 0.06, pole));
   }
+  if (grooved > 0.5) {
+    float lane;
+    float other;
+    float grooves = groovesAt(at, 0.9 + 0.3 * shape.scale, pixel, lane) + groovesAt(turned(at, 1.9) + 4.0, 1.4 + 0.3 * shape.scale, pixel, other);
+    albedo *= mix(0.72, 1.08, max(lane, other)) * (1.0 - 0.35 * min(grooves, 1.0));
+  }
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
+  float burning = 0.0;
   if (shape.rifts > 0.0) {
-    float riven = smoothstep(0.25, 0.5, shape.rifts);
+    float riven = smoothstep(0.25, 0.5, shape.rifts) * (1.0 - grooved);
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
-    if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
+    if (riven > 0.0 && glowLevel > 0.0) {
+      vec2 crack = crackAt(at + offset, 3.0 + shape.scale, vec2(0.02, 0.14 + 0.16 * shape.rifts), pixel);
+      rift = crack.x * riven;
+      burning = rift * rift * smoothstep(1.5, 6.0, crack.y);
+    } else if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
     relieved += 0.4 * ridge * riven;
     vec3 riftTint = mix(low * 0.6, vec3(0.42, 0.2, 0.11), smoothstep(0.12, 0.3, dot(mid, LUMA)));
     albedo = mix(albedo, riftTint, rift * 0.75);
@@ -135,7 +148,7 @@ void main() {
   if (locked > 0.5) albedo = eyeball(albedo, t, day);
   vec3 view = normalize(cameraPosition - vWorld);
   float world = length(modelMatrix[0].xyz);
-  vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world, normal);
+  vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world * (1.0 - 0.3 * grooved), normal);
   float near = 1.0 - smoothstep(0.004, 0.008, pixel);
   if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet) * near, angle);
   float light;
@@ -157,10 +170,10 @@ void main() {
   if (glowLevel > 0.0) {
     float hot = 1.0 - (1.0 - glowLevel) * 0.2;
     float vents = style > 1.5 ? smoothstep(0.985, 0.995, molten) : smoothstep(hot - 0.11, hot + 0.06, molten);
-    float heat = mix(vents, rift * smoothstep(0.1, 0.8, flow.z + 0.4), smoothstep(0.08, 0.2, shape.craters));
+    float heat = mix(vents, burning * (0.75 + 0.25 * smoothstep(0.1, 0.8, flow.z + 0.4)), smoothstep(0.08, 0.2, shape.craters));
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
     vec3 glow = mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
-    if (style > 0.5 && style < 1.5) glow = goldOf(veinsAt(at, pixel), burn);
+    if (style > 0.5 && style < 1.5) glow = veinsOf(at + offset, pixel, burn);
     colour += glow;
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);

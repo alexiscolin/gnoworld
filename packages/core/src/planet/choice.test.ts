@@ -12,7 +12,9 @@ import {
   type Nature,
   type RealmFunctions,
 } from "./look.ts";
+import { labOf, type Lab } from "./palette.ts";
 import { planetRecipe, worldRecipe } from "./recipe.ts";
+import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 
 // Which of the 24 a world is (slice 7, 7b2 and 7b4; ADR-0002 §3). All 32 bytes of the seed are taken (F3476), so the choice reads a second
@@ -175,10 +177,33 @@ describe("anchorOf", () => {
   });
 });
 
-// The minor class (slice 7, 7b4; ADR-0002 §3): any other anchor, by the others' weights, on the second hash's bytes 26 and 27 read as one
-// word, so a small weight keeps its share where a byte would round it away.
+// The minor class (7b4; ADR-0002 §3), a colour of gas or rock (Alexis, 2026-11-03, "les retirer"): its dominant's kind, no sea world's,
+// no green past a grey, no saturated blue under a world not blue itself, under a sea world within 25 of its lightness; by those anchors'
+// weights, on the second hash's bytes 26 and 27 as a word.
+const centreOf = (anchor: Anchor, ramp: 0 | 1): Lab => labOf(ROWS[anchor].palettes[ramp][1]);
+const hueOf = ([, a, b]: Lab) => (Math.atan2(b, a) * 180) / Math.PI;
+// Olive and moss, and a sea's blue, as drawn: a ramp's centre keeps the 12 degrees a system's hue may turn it away from them.
+const green = (lab: Lab, margin = 0) =>
+  Math.hypot(lab[1], lab[2]) >= 8 && hueOf(lab) >= 105 - margin && hueOf(lab) <= 160 + margin;
+const blue = (lab: Lab, margin = 0) =>
+  Math.hypot(lab[1], lab[2]) >= 12 && hueOf(lab) >= -160 - margin && hueOf(lab) <= -60 + margin;
+const bluish = (anchor: Anchor) => blue(centreOf(anchor, 0));
+// Under a sea world or a dark giant (its minor matched in light at 0.6 only), a minor keeps near its dominant's light, ramp by ramp:
+// a jump reads as a hole, a pit or a pock (7b7).
+const held = (dominant: Anchor) =>
+  ROWS[dominant].sea !== undefined || (ROWS[dominant].banded === true && centreOf(dominant, 0)[0] < 20);
+const fitting = (minor: Anchor, dominant: Anchor) =>
+  minor !== dominant &&
+  (ROWS[minor].banded === true) === (ROWS[dominant].banded === true) &&
+  ROWS[minor].sea === undefined &&
+  ([0, 1] as const).every(
+    (ramp) =>
+      !green(centreOf(minor, ramp), 12) &&
+      (bluish(dominant) || !blue(centreOf(minor, ramp), 12)) &&
+      (!held(dominant) || Math.abs(centreOf(minor, ramp)[0] - centreOf(dominant, ramp)[0]) <= 25),
+  );
 const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
-  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant);
+  const others = WEIGHTS.filter(([anchor]) => fitting(anchor, dominant));
   const total = others.reduce((sum, [, weight]) => sum + weight, 0);
   let left = Math.floor(((byteOf(more, 26) * 256 + byteOf(more, 27)) * total) / 65536);
   for (const [anchor, weight] of others) {
@@ -189,7 +214,7 @@ const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
 };
 
 describe("the minor class", () => {
-  it("draws any other anchor by its weight among the others, on the second hash's bytes 26 and 27", () => {
+  it("draws another anchor of its own kind and a gas's or a rock's colour, by its weight among those, on the second hash's bytes 26 and 27", () => {
     for (const [at, seed] of seeds(2000).entries()) {
       const dominant = ANCHORS[at % ANCHORS.length] ?? "rocky";
       const path = asciiBytes(`gno.land/r/n${String(at)}/home`);
@@ -207,8 +232,10 @@ describe("the minor class", () => {
     const expected = new Map(
       ANCHORS.map((minor) => {
         const weightOf = (anchor: Anchor) => WEIGHTS.find(([one]) => one === anchor)?.[1] ?? 0;
-        const share = ANCHORS.filter((dominant) => dominant !== minor).reduce(
-          (sum, dominant) => sum + (weightOf(dominant) / 256) * (weightOf(minor) / (256 - weightOf(dominant))),
+        const among = (dominant: Anchor) =>
+          ANCHORS.filter((one) => fitting(one, dominant)).reduce((sum, one) => sum + weightOf(one), 0);
+        const share = ANCHORS.filter((dominant) => fitting(minor, dominant)).reduce(
+          (sum, dominant) => sum + (weightOf(dominant) / 256) * (weightOf(minor) / among(dominant)),
           0,
         );
         return [minor, share];
@@ -217,6 +244,45 @@ describe("the minor class", () => {
     for (const anchor of ANCHORS)
       expect(Math.abs((counts.get(anchor) ?? 0) / total - (expected.get(anchor) ?? 0)), anchor).toBeLessThan(0.01);
   }, 30_000);
+
+  // The security review's nit: a class with no fitting minor would fall back to rocky, perhaps itself.
+  it("leaves every class a minor to draw, never itself", () => {
+    for (const dominant of ANCHORS) {
+      expect(
+        ANCHORS.some((minor) => fitting(minor, dominant)),
+        dominant,
+      ).toBe(true);
+      for (let at = 0; at < 200; at += 1)
+        expect(planetRecipe(asciiBytes(`gno.land/r/k${String(at)}/home`), dominant).minor, dominant).not.toBe(dominant);
+    }
+  });
+
+  // A world of continents (a sea under 0.8, as the program splits them) keeps its own map under its minor: a rock's craters would ring
+  // its continents (7b7's design review); an archipelago's islands keep the minor's map, their only fine detail.
+  it("keeps a world of continents' own map under its minor", () => {
+    for (const dominant of ANCHORS)
+      for (let at = 0; at < 50; at += 1) {
+        const { minor, minorMap, surface } = planetRecipe(asciiBytes(`gno.land/r/m${String(at)}/home`), dominant);
+        const continents = surface.sea > 0 && surface.sea < 0.8;
+        expect(minorMap, `${dominant} takes ${minor}`).toBe(ROWS[continents ? dominant : minor].maps[0]);
+      }
+  });
+
+  // F4327, F4330 (7b6's design review): olive minors on gas giants read as moss, a bright blue one on a dark world as an ocean.
+  it("brings no green to any world, never a sea world's colours, and no saturated blue to a world not blue itself, as drawn", () => {
+    for (const [at, dominant] of [...ANCHORS, ...ANCHORS, ...ANCHORS].entries())
+      for (let seed = 0; seed < 40; seed += 1) {
+        const { minor, minorPalette } = planetRecipe(
+          asciiBytes(`gno.land/r/m${String(at)}x${String(seed)}/home`),
+          dominant,
+        );
+        const drawn = minorPalette.lab[1];
+        expect(ROWS[minor].banded === true, `${dominant} takes ${minor}`).toBe(ROWS[dominant].banded === true);
+        expect(ROWS[minor].sea, `${dominant} takes ${minor}`).toBeUndefined();
+        expect(green(drawn), `${dominant} takes ${minor}: ${drawn.join(", ")}`).toBe(false);
+        if (!bluish(dominant)) expect(blue(drawn), `${dominant} takes ${minor}: ${drawn.join(", ")}`).toBe(false);
+      }
+  });
 });
 
 describe("a world's nature nudges its class", () => {

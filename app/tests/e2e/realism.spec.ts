@@ -6,6 +6,7 @@ import {
   circles,
   COMPUTER,
   drawn,
+  EARTH_INSTANT,
   lit,
   listen,
   looks,
@@ -41,10 +42,9 @@ const NETS: readonly string[] = ["volcanic", "dark carbon", "lava world"];
 const VIEWS = ["?view=gallery", "?view=close&world=1", "?view=eclipse&world=1", "?view=earth"];
 
 const stages = (page: Page) => askLab<string[]>(page, "stages");
-// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at INSTANT, at this base (41776567), before
-// 7b5 split the surface program in two. A hand-made world never moves.
+// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at EARTH_INSTANT, at this base (41776567),
+// before 7b5 split the surface program in two. A hand-made world never moves.
 const EARTH_PIXELS = "a1fc799da0825909";
-const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
 
 const { width, height } = COMPUTER;
 const CORNER = 80;
@@ -196,7 +196,7 @@ test.describe("the realism page", () => {
   });
 
   test("the Earth view stays 0 px from the render Alexis approved, its Moon with it", async ({ page }) => {
-    await page.clock.setFixedTime(INSTANT);
+    await page.clock.setFixedTime(EARTH_INSTANT);
     await open(page, "?view=earth");
     expect(await pixelHash(page, await picture(page))).toBe(EARTH_PIXELS);
   });

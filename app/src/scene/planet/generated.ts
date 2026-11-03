@@ -44,8 +44,8 @@ export const styleOf = ({ look }: World): number =>
 export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<string, IUniform> {
   const [low, mid, high] = recipe.palette.linear;
   const [minorLow, minorMid, minorHigh] = recipe.minorPalette.linear;
-  const sea = look.sea ?? { shallow: NO_COLOUR, deep: NO_COLOUR };
   const { warp } = look;
+  const [shallow, deep] = recipe.sea?.linear ?? [NO_COLOUR, NO_COLOUR];
   return {
     ...sharedUniforms(look, maps),
     shape: { value: { ...recipe.surface } },
@@ -58,11 +58,12 @@ export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<str
     minorLow: { value: linear(minorLow) },
     minorMid: { value: linear(minorMid) },
     minorHigh: { value: linear(minorHigh) },
-    seaShallow: { value: working(sea.shallow) },
-    seaDeep: { value: working(sea.deep) },
+    seaShallow: { value: linear(shallow) },
+    seaDeep: { value: linear(deep) },
     glowColour: { value: working(look.glow?.colour ?? NO_COLOUR) },
     glowLevel: { value: look.glow?.level ?? 0 },
     style: { value: styleOf({ look, recipe }) },
+    grooved: { value: look.anchor === "grooved ice" ? 1 : 0 },
     sulfurLow: { value: working(SULFUR[0]) },
     sulfurMid: { value: working(SULFUR[1]) },
     sulfurHigh: { value: working(SULFUR[2]) },

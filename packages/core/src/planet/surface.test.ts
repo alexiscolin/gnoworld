@@ -89,7 +89,7 @@ const DEFAULTS: Record<"every" | "ground" | "gas", Partial<Record<SurfaceName, S
 };
 const STATED: Record<Anchor, Partial<Record<SurfaceName, Span>>> = {
   rocky: { craters: [0.55, 1], erosion: [0, 0.25], rifts: [0, 0.2] },
-  temperate: { sea: [0.55, 0.78], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
+  temperate: { sea: [0.45, 0.65], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
   desert: { erosion: [0.2, 0.7], craters: [0.15, 0.6], caps: [0, 0.12], clouds: [0, 0.15], rifts: [0, 0.4] },
   ocean: { sea: [0.8, 0.95], erosion: [0.3, 0.8], craters: [0, 0.03], caps: [0, 0.15], clouds: [0.3, 0.65] },
   ice: { craters: [0, 0.25], erosion: [0, 0.3], rifts: [0.4, 1] },
@@ -147,14 +147,15 @@ describe("a class's structure", () => {
   it.each([...ANCHORS])("%s has a sea only with a sea's colours, and clouds only with air", (anchor) => {
     const look = planetLook(paths(1)[0] ?? new Uint8Array(), anchor);
     if (look.sea === null) expect(spanOf(anchor, "sea")).toEqual([0, 0]);
-    else expect(spanOf(anchor, "sea")[0]).toBeGreaterThan(0.5);
+    else expect(spanOf(anchor, "sea")[0]).toBeGreaterThanOrEqual(0.45);
     if (look.rim === null) expect(spanOf(anchor, "clouds")).toEqual([0, 0]);
   });
 
   it("reads as its class: a rock is cratered, an Earth has seas, a giant has bands, a Europa has rifts", () => {
     expect(spanOf("rocky", "craters")[0]).toBeGreaterThanOrEqual(0.5);
-    expect(spanOf("temperate", "sea")[0]).toBeGreaterThanOrEqual(0.5);
-    expect(spanOf("temperate", "sea")[1]).toBeLessThanOrEqual(0.8);
+    // More land than the Earth's, never the Earth (Alexis, 2026-11-03, 16:4x): a sea of 0.45 to 0.65.
+    expect(spanOf("temperate", "sea")[0]).toBeGreaterThanOrEqual(0.45);
+    expect(spanOf("temperate", "sea")[1]).toBeLessThanOrEqual(0.65);
     expect(spanOf("ocean", "sea")[0]).toBeGreaterThanOrEqual(0.8);
     expect(spanOf("gas giant", "bands")[0]).toBeGreaterThanOrEqual(10);
     expect(spanOf("ice giant", "bands")[1]).toBeLessThan(spanOf("gas giant", "bands")[0]);
@@ -240,6 +241,18 @@ describe("a world's mix of two classes (ADR-0002 §3)", () => {
 
   it("gives every pair its chance: every minor under a dominant, over a few thousand worlds", () => {
     const minors = new Set(paths(3000, "pair").map((path) => planetRecipe(path, "volcanic").minor));
-    expect([...minors].sort()).toEqual(ANCHORS.filter((anchor) => anchor !== "volcanic").sort());
+    // A dark rock takes a rock's colours only (Alexis, 2026-11-03, 16:4x): no gas, no sea world, nothing green, no saturated blue.
+    const rocks = [
+      "rocky",
+      "desert",
+      "ice",
+      "tidally locked",
+      "dark carbon",
+      "shattered",
+      "nitrogen ice",
+      "grooved ice",
+      "lava world",
+    ];
+    expect([...minors].sort()).toEqual([...rocks, "two-faced"].sort());
   });
 });

@@ -1,5 +1,6 @@
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
+import { dayBox } from "./portraits.ts";
 import { reading, type Tools } from "./pixels.ts";
 
 // How a world's ground is ordered on a still: in 24-pixel tiles of its lit ground, the structure tensor of the lightness with its broad
@@ -12,6 +13,18 @@ export interface Grain {
   /** Of the bright tiles, the share whose lightness echoes across them at 6 to 10 px. */
   readonly period: number;
 }
+/** A world's face as a glance takes it: the mean Lab colour of its sea and of its land (null where it shows none), and the shares of its
+ * lit disc under cloud, sea and land. */
+export interface Face {
+  readonly sea: readonly [number, number, number] | null;
+  readonly land: readonly [number, number, number] | null;
+  readonly clouds: number;
+  readonly shares: { readonly sea: number; readonly land: number };
+}
+/** A part a world shows covers a tenth of its lit disc at least, a share's glance step (core's variety.ts): on a few pixels it reads
+ * nothing. */
+const SHOWN = 0.1;
+export const shownPart = (face: Face, part: "sea" | "land") => (face.shares[part] >= SHOWN ? face[part] : null);
 export interface Land {
   readonly share: number;
   /** The share of the land in its largest piece. */
@@ -25,14 +38,16 @@ interface Tile {
   readonly echo: number;
 }
 
-// Each pixel of a tile less the mean of the 9 by 9 around it: the broad shading out.
-function fineIn(left: number, top: number): Float64Array {
+// Each pixel of a tile less the mean of the square `reach` pixels around it, 9 by 9 unless asked: the broad shading out.
+function fineIn(left: number, top: number, reach = 4): Float64Array {
   const { image, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  const side = 2 * reach + 1;
   return Float64Array.from({ length: 24 * 24 }, (_, i) => {
     const [x, y] = [left + (i % 24), top + Math.floor(i / 24)];
     let sum = 0;
-    for (let at = 0; at < 81; at++) sum += luma(image, x + (at % 9) - 4, y + Math.floor(at / 9) - 4);
-    return luma(image, x, y) - sum / 81;
+    for (let at = 0; at < side * side; at++)
+      sum += luma(image, x + (at % side) - reach, y + Math.floor(at / side) - reach);
+    return luma(image, x, y) - sum / (side * side);
   });
 }
 
@@ -100,24 +115,48 @@ function grainOf(discs: readonly Circle[]): Grain[] {
 
 const HELPERS = [fineIn, echoOf, tileOf].map(String).join("\n");
 
-// Land is a lit pixel (luma over 25) whose blue does not lead its red and green, as sea's does, and no cloud (pale, past L* 55, under 8 of
-// chroma): a cloud is neither land nor sea. Its pieces join by their sides.
-function landOf(discs: readonly Circle[]): Land[] {
+// How far a disc's finest detail (fineIn at a reach of 2, a 5 by 5 mean) follows from one row to the next, a correlation over the close
+// detail's box in 24-pixel tiles: hairs a pixel or two tall along a latitude, a giant's fivefold streak, break it.
+function rowsOf(discs: readonly Circle[]): number[] {
+  return discs.map((disc) => {
+    const [x0, x1, y0, y1] = dayBox(disc);
+    let [n, one, next, both, ones, nexts] = [0, 0, 0, 0, 0, 0];
+    for (let tile = 0; tile < Math.floor((x1 - x0) / 24) * Math.floor((y1 - y0) / 24); tile++) {
+      const across = Math.floor((x1 - x0) / 24);
+      const fine = fineIn(x0 + 24 * (tile % across), y0 + 24 * Math.floor(tile / across), 2);
+      for (let i = 0; i < 24 * 23; i++) {
+        const [a, b] = [fine[i] ?? 0, fine[i + 24] ?? 0];
+        [n, one, next, both, ones, nexts] = [n + 1, one + a, next + b, both + a * b, ones + a * a, nexts + b * b];
+      }
+    }
+    const [ma, mb] = [one / n, next / n];
+    return (both / n - ma * mb) / Math.max(Math.sqrt((ones / n - ma * ma) * (nexts / n - mb * mb)), 1e-9);
+  });
+}
+
+// A lit pixel (luma over 25) inside 0.9 of a disc's radius: cloud where it is pale (past L* 55, under 8 of chroma), which is neither land
+// nor sea; sea where its blue leads its red and green; else land.
+function kindOf({ x, y, r }: Circle, px: number, py: number): "sea" | "land" | "cloud" | null {
   const { image, luma, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
-  const cloud = (px: number, py: number) => {
-    const [lightness, a, b] = labAt(image, px, py);
-    return lightness > 55 && Math.hypot(a, b) < 8;
-  };
-  return discs.map(({ x, y, r }) => {
+  if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) return null;
+  const [lightness, a, b] = labAt(image, px, py);
+  if (lightness > 55 && Math.hypot(a, b) < 8) return "cloud";
+  const [red, green, blue] = rgbAt(image, px, py);
+  return blue > red + 8 && blue >= green ? "sea" : "land";
+}
+
+// Land's pieces join by their sides.
+function landOf(discs: readonly Circle[]): Land[] {
+  return discs.map((disc) => {
+    const { x, y, r } = disc;
     const [x0, y0, w] = [Math.ceil(x - r), Math.ceil(y - r), Math.floor(2 * r)];
     const [land, seen] = [new Uint8Array(w * w), new Uint8Array(w * w)];
     let lit = 0;
     for (let i = 0; i < w * w; i++) {
-      const [px, py] = [x0 + (i % w), y0 + Math.floor(i / w)];
-      const [red, green, blue] = rgbAt(image, px, py);
-      if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25 || cloud(px, py)) continue;
+      const kind = kindOf(disc, x0 + (i % w), y0 + Math.floor(i / w));
+      if (kind === null || kind === "cloud") continue;
       lit += 1;
-      land[i] = blue > red + 8 && blue >= green ? 0 : 1;
+      land[i] = kind === "land" ? 1 : 0;
     }
     const sizes = [...land.keys()]
       .filter((i) => land[i] === 1)
@@ -139,5 +178,35 @@ function landOf(discs: readonly Circle[]): Land[] {
 
 export const grain = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Grain[]> =>
   reading(page, [picture], [grainOf, discs, HELPERS]);
+export const rows = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<number[]> =>
+  reading(page, [picture], [rowsOf, discs, [fineIn, dayBox].map(String).join("\n")]);
+function facesOf(discs: readonly Circle[]): Face[] {
+  const { image, labAt, inside } = Reflect.get(globalThis, "__pixels") as Tools;
+  const mean = ([l, a, b, n]: readonly number[]) =>
+    (n ?? 0) === 0 ? null : ([(l ?? 0) / (n ?? 1), (a ?? 0) / (n ?? 1), (b ?? 0) / (n ?? 1)] as const);
+  return discs.map((disc) => {
+    const sums = { sea: [0, 0, 0, 0], land: [0, 0, 0, 0] };
+    let [lit, clouds] = [0, 0];
+    for (const [px, py] of inside(disc, 0.9)) {
+      const kind = kindOf(disc, px, py);
+      if (kind === null) continue;
+      [lit, clouds] = [lit + 1, clouds + Number(kind === "cloud")];
+      if (kind === "cloud") continue;
+      const [l, a, b] = labAt(image, px, py);
+      const [sl = 0, sa = 0, sb = 0, n = 0] = sums[kind];
+      sums[kind] = [sl + l, sa + a, sb + b, n + 1];
+    }
+    const share = ([, , , n = 0]: readonly number[]) => n / Math.max(lit, 1);
+    return {
+      sea: mean(sums.sea),
+      land: mean(sums.land),
+      clouds: clouds / Math.max(lit, 1),
+      shares: { sea: share(sums.sea), land: share(sums.land) },
+    };
+  });
+}
+
+export const facesOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Face[]> =>
+  reading(page, [picture], [facesOf, discs, String(kindOf)]);
 export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
-  reading(page, [picture], [landOf, discs]);
+  reading(page, [picture], [landOf, discs, String(kindOf)]);

@@ -4,6 +4,10 @@ import { brightness } from "./geometry.ts";
 // The realism page (app/lab), as its journeys open and read it: a view, its numbers, where its worlds stand.
 export const PAGE = "/lab/realism.html";
 export const COMPUTER = { width: 1728, height: 1080 };
+/** What the hand-made Earth's view draws: earthView.ts's circle, a third of the screen's height at its centre. */
+export const EARTH_VIEW = { x: COMPUTER.width / 2, y: COMPUTER.height / 2, r: COMPUTER.height * 0.33 } as const;
+/** The instant realism.spec pins the Earth at, so its clouds and its light read the same on every visit. */
+export const EARTH_INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
 
 interface LabStats {
   view: string;
@@ -20,7 +24,7 @@ export interface Circle {
   y: number;
   r: number;
 }
-type Asked = "stats" | "circles" | "looks" | "stages" | "ids" | "minors" | "mids" | "live" | "cost" | "styles";
+type Asked = "stats" | "circles" | "looks" | "stages" | "ids" | "minors" | "centres" | "live" | "cost" | "styles";
 
 export const askLab = <T>(page: Page, what: Asked, ...rest: number[]) =>
   page.evaluate(

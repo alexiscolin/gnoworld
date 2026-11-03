@@ -43,7 +43,7 @@ const GAS: Spans = { bands: [8, 24], turbulence: [0.2, 0.8], storms: [0, 0.6] };
 
 const SPANS: Record<Anchor, Spans> = {
   rocky: { craters: [0.55, 1], erosion: [0, 0.25], rifts: [0, 0.2] },
-  temperate: { sea: [0.55, 0.78], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
+  temperate: { sea: [0.45, 0.65], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
   desert: { erosion: [0.2, 0.7], craters: [0.15, 0.6], caps: [0, 0.12], clouds: [0, 0.15], rifts: [0, 0.4] },
   ocean: { sea: [0.8, 0.95], erosion: [0.3, 0.8], craters: [0, 0.03], caps: [0, 0.15], clouds: [0.3, 0.65] },
   ice: { craters: [0, 0.25], erosion: [0, 0.3], rifts: [0.4, 1] },
