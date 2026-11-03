@@ -34,11 +34,14 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk.
-const SCENE_JS = 156 * 1024;
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk. 160,000 B since
+// the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03).
+const SCENE_JS = 160_000;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02).
+// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B since the rail's portraits share the maps'
+// chunks with it (Alexis, 2026-11-03).
+const COSMOS_JS = 16_512;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
