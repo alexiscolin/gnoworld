@@ -3,7 +3,7 @@
 // crossfade. Their own chunk, with camera-controls, asked once the scene runs. The camera stays at the origin: a flight writes the eye's way,
 // what it looks at and how far the page's body stands, and the panel hears it ten times a second at most.
 import { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt } from "@gnoworld/core";
-import { Dissolve } from "../dissolve.ts";
+import { Dissolve, veilAhead } from "../dissolve.ts";
 import type { FlightDevice, FlightGoal, FlightSaid } from "./goal.ts";
 import { listen } from "./keys.ts";
 import { planWay } from "./plan.ts";
@@ -23,6 +23,7 @@ export class Flights {
   readonly #device: FlightDevice;
   readonly #leaving = new AbortController();
   readonly #streaks = new Streaks();
+  readonly #ahead = veilAhead();
   readonly #way: Way;
   readonly #was = { x: 0, y: 0, z: 0 };
   readonly #moved = { x: 0, y: 0, z: 0 };
@@ -52,9 +53,14 @@ export class Flights {
   constructor(device: FlightDevice) {
     this.#device = device;
     this.#way = new Way();
-    device.stage.add(this.#streaks.mesh);
-    // A compile that fails ahead is said, and leaves the first crossing to compile its streaks.
-    device.renderer.compileAsync(this.#streaks.mesh, device.camera, device.stage).catch(reportError);
+    device.stage.add(this.#streaks.mesh, this.#ahead);
+    // Compiled ahead, each shown for the call alone, for three compiles what is visible (WebGLRenderer.compile walks traverseVisible); a
+    // compile that fails ahead is said, and leaves the first crossing to compile it.
+    for (const mesh of [this.#streaks.mesh, this.#ahead]) {
+      mesh.visible = true;
+      device.renderer.compileAsync(mesh, device.camera, device.stage).catch(reportError);
+      mesh.visible = false;
+    }
     listen(this, device, this.#leaving.signal);
   }
 
@@ -201,6 +207,9 @@ export class Flights {
     this.#dropVeil();
     this.land();
     this.#streaks.dispose();
+    this.#ahead.removeFromParent();
+    this.#ahead.geometry.dispose();
+    this.#ahead.material.dispose();
     this.#way.dispose();
   }
 

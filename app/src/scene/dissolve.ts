@@ -8,6 +8,7 @@ import {
   Mesh,
   ShaderMaterial,
   Vector2,
+  type ShaderMaterialParameters,
   type Scene as Stage,
   type WebGLRenderer,
 } from "three";
@@ -15,6 +16,50 @@ import {
 // a lazy chunk splits the scene's chunk in two.
 const CORNERS = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
 const OVER = 10;
+
+// The veil over the whole screen, its picture and its fade in `uniforms`, drawn after everything else: each dissolve's, and the one kept
+// compiled ahead for the flights (7g), one program three keeps while any of them stands.
+function veilOf(uniforms: NonNullable<ShaderMaterialParameters["uniforms"]>): Mesh<BufferGeometry, ShaderMaterial> {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(CORNERS, 3));
+  const mesh = new Mesh(
+    geometry,
+    new ShaderMaterial({
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      toneMapped: false,
+      uniforms,
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = position.xy * 0.5 + 0.5;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D uPicture;
+        uniform float uVeil;
+        uniform float uZoom;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = vec4(texture2D(uPicture, (vUv - 0.5) / uZoom + 0.5).rgb, uVeil);
+        }`,
+    }),
+  );
+  mesh.name = "dissolve";
+  mesh.frustumCulled = false;
+  mesh.renderOrder = OVER;
+  mesh.visible = false;
+  return mesh;
+}
+
+/** A veil never laid, for the flights to compile ahead and keep while they stand: a page's veil is of its program, and finds it compiled
+ * (lot B's review). Its owner frees it. */
+export function veilAhead(): Mesh<BufferGeometry, ShaderMaterial> {
+  const mesh = veilOf({ uPicture: { value: null }, uVeil: { value: 0 }, uZoom: { value: 1 } });
+  mesh.name = "veil ahead";
+  return mesh;
+}
 
 export class Dissolve {
   readonly #stage: Stage;
@@ -29,36 +74,7 @@ export class Dissolve {
     this.#stage = stage;
     this.#before = stage.onAfterRender.bind(stage);
     stage.onAfterRender = this.#copy;
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new BufferAttribute(CORNERS, 3));
-    this.#mesh = new Mesh(
-      geometry,
-      new ShaderMaterial({
-        depthTest: false,
-        depthWrite: false,
-        transparent: true,
-        toneMapped: false,
-        uniforms: { uPicture: this.#picture, uVeil: this.#veil, uZoom: this.#zoom },
-        vertexShader: /* glsl */ `
-          varying vec2 vUv;
-          void main() {
-            vUv = position.xy * 0.5 + 0.5;
-            gl_Position = vec4(position.xy, 0.0, 1.0);
-          }`,
-        fragmentShader: /* glsl */ `
-          uniform sampler2D uPicture;
-          uniform float uVeil;
-          uniform float uZoom;
-          varying vec2 vUv;
-          void main() {
-            gl_FragColor = vec4(texture2D(uPicture, (vUv - 0.5) / uZoom + 0.5).rgb, uVeil);
-          }`,
-      }),
-    );
-    this.#mesh.name = "dissolve";
-    this.#mesh.frustumCulled = false;
-    this.#mesh.renderOrder = OVER;
-    this.#mesh.visible = false;
+    this.#mesh = veilOf({ uPicture: this.#picture, uVeil: this.#veil, uZoom: this.#zoom });
     stage.add(this.#mesh);
   }
 

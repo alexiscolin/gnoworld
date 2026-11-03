@@ -18,6 +18,7 @@ import {
   Mesh,
   PerspectiveCamera,
   Scene as Stage,
+  ShaderMaterial,
   Vector2,
   Vector3,
   type BufferGeometry,
@@ -637,6 +638,53 @@ describe("the cosmos shown again with no flight bringing it", () => {
     frame(flown, scene);
     expect(flown.stats().flying).toBe(true);
     expect(away(scene.eye.travel, ZERO)).toBeGreaterThan(0);
+  });
+});
+
+// Three compiles only what is visible (WebGLRenderer.compile walks traverseVisible, three 0.187): the streaks, hidden from the start, were
+// never compiled ahead. Both they and a veil are shown for the call alone; the veil is kept for the flights' life, so each page's veil,
+// of the same program, finds it compiled and three never drops it (lot B's review, F3716).
+describe("the shaders compiled ahead", () => {
+  const compiling = (scene: Rig) => {
+    const compiled: { name: string; visible: boolean; object: Object3D }[] = [];
+    scene.renderer.compileAsync.mockImplementation((object) => {
+      compiled.push({ name: object.name, visible: object.visible, object });
+      return Promise.resolve(object);
+    });
+    return compiled;
+  };
+
+  it("compiles the streaks and a veil as the flights start, each shown for the call alone, and hides both again", () => {
+    const scene = rig();
+    const compiled = compiling(scene);
+    flights(scene.device);
+    expect(compiled.map(({ name, visible }) => ({ name, visible }))).toEqual([
+      { name: "streaks", visible: true },
+      { name: "veil ahead", visible: true },
+    ]);
+    expect(compiled.every(({ object }) => !object.visible)).toBe(true);
+  });
+
+  it("lays a page's veil of the program compiled ahead, kept while each veil goes, and freed with the flights", () => {
+    const scene = rig();
+    const compiled = compiling(scene);
+    const flown = flights(scene.device);
+    const ahead = compiled.find(({ name }) => name === "veil ahead")?.object;
+    if (!(ahead instanceof Mesh)) throw new Error("no veil compiled ahead");
+    const { material: kept } = ahead as Mesh<BufferGeometry, ShaderMaterial>;
+    const freed = freedOn(kept);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    flown.ready();
+    frame(flown, scene);
+    const veil = scene.stage.children.find(({ name }) => name === "dissolve");
+    if (!(veil instanceof Mesh)) throw new Error("no veil laid");
+    const { material: laid } = veil as Mesh<BufferGeometry, ShaderMaterial>;
+    expect([laid.vertexShader, laid.fragmentShader]).toEqual([kept.vertexShader, kept.fragmentShader]);
+    run(flown, scene, 4);
+    expect(veilOn(scene.stage)).toBe(false);
+    expect(freed.value).toBe(false);
+    flown.dispose();
+    expect(freed.value).toBe(true);
   });
 });
 
