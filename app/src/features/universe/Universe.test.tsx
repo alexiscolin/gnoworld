@@ -1546,6 +1546,19 @@ describe("the views of space and the system the eye rests at", () => {
     expect(arrive).toHaveBeenCalledTimes(2);
   });
 
+  // 7v's review (F4456): most namespaces are addresses, shown whole and in capitals; the readable name where there is one, else the address
+  // as a line shows it.
+  it("names a system by its namespace's own name, and an address one by its short form", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    const address = "g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv";
+    act(() => {
+      resting()(address);
+    });
+    const crumb = one(box, "nav[aria-label='Where you are']");
+    expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "g1magl…e8hlv"]);
+  });
+
   it("tells the page where the eye rests, for the hero to give the system the screen, and nowhere once the scene went", async () => {
     const { unmount } = rendered("cosmos");
     await settle();
