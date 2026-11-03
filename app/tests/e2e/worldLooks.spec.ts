@@ -18,9 +18,9 @@ const NET = { junctions: 50, endsPerJunction: 0.4, glow: [0.33, 0.8], width: [0.
 // No asterisks of fine veins inside a cell (Alexis, 2026-11-03, "corriger et retirer"): 7b7's net read 565 and 572 junctions, most of them
 // its fine net's stars; one gated near its main veins 307 to 375. Music's own 186, a little over doubled.
 const MOST_JUNCTIONS = 420;
-// The core the brief asks, #ffc870 (luma 205), gold to orange: its blue over red 0.44 sets the bound, never white (Music's own top 2%,
-// #fcd3b2, reads 0.70 through the video's compression); 7b5's #b8853a, luma 138.
-const CORE = { luma: 0.8 * 205, blueOverRed: 0.6, greenOverRed: [0.6, 0.9] } as const;
+// The core cream as Music's (Alexis, 2026-11-03, "crème comme Music"): Music's brightest tenth #e6b997 to #eabd9b, blue over red 0.66, its
+// top 2% #fcd3b2, 0.70 (through the video's compression); 7b7's gold #f5c575 read 0.48, 7b5's #b8853a luma 138.
+const CORE = { luma: 0.8 * 205, blueOverRed: [0.55, 0.75], greenOverRed: [0.6, 0.9] } as const;
 // Music's cells between its veins (lines.ts's cells, on the same disc of f0004.jpg): its darkest quarter at luma 18.1, its red over its
 // blue by 59.2, a dark maroon; half of each at least, as generated.spec.ts holds Music's veins (7b6's patch: #070304, black).
 const CELLS = { floor: 18.1 / 2, warmth: 59.2 / 2 } as const;
@@ -116,7 +116,7 @@ test.describe("the generated worlds polished", () => {
 
   heldQuiet();
 
-  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores gold", async ({
+  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores cream", async ({
     page,
   }) => {
     await styled(page, 1, async (place) => {
@@ -135,7 +135,8 @@ test.describe("the generated worlds polished", () => {
       expect(net.widthSpread, "their width varies").toBeGreaterThanOrEqual(NET.widthSpread);
       const [red, green, blue] = core.colour;
       expect(core.luma, "a hot core").toBeGreaterThanOrEqual(CORE.luma);
-      expect(blue / red, "gold, never white").toBeLessThanOrEqual(CORE.blueOverRed);
+      expect(blue / red, "cream, as Music's").toBeGreaterThanOrEqual(CORE.blueOverRed[0]);
+      expect(blue / red, "never white").toBeLessThanOrEqual(CORE.blueOverRed[1]);
       expect(green / red, "gold to orange").toBeGreaterThanOrEqual(CORE.greenOverRed[0]);
       expect(green / red, "gold to orange").toBeLessThanOrEqual(CORE.greenOverRed[1]);
     });

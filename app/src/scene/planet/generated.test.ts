@@ -596,9 +596,9 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(/if \(style > 1\.5\) albedo = rampOf\(sulfurLow, sulfurMid, sulfurHigh, tint\)/);
   });
 
-  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, gold to orange, never white; each vein a crack along the seams
+  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, orange to cream, never white; each vein a crack along the seams
   // of cells, its width wandering between two bounds, and a crack under a pixel wide fades out whole, never a hairline that breaks up.
-  it("draws a veined world's veins as two nets of cracks, gold to orange, each faded out whole under a pixel", () => {
+  it("draws a veined world's veins as two nets of cracks, orange to cream, each faded out whole under a pixel", () => {
     const crack = bodyOf("vec2 crackAt(");
     expect(crack).toMatch(/float away = seams\(/);
     expect(crack).toMatch(/float wide = mix\(width\.x, width\.y, smoothstep\(/);
@@ -612,7 +612,8 @@ describe("the generated program", () => {
     // The fine net draws only near a main vein, within its halo's reach, never asterisks inside a cell (Alexis, 2026-11-03, "retirer").
     expect(veins).toMatch(/float near = pow\(main\.x, 0\.\d+\);/);
     expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x \* near\);/);
-    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[3-7]\d*, 0\.[01]\d*\), heat\)/);
+    // Cream at their hottest, as Music's (Alexis, 2026-11-03, "crème comme Music"): its brightest tenth #e6b997, linear 1, 0.62, 0.39.
+    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[5-7]\d*, 0\.[2-4]\d*\), heat\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

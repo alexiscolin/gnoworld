@@ -50,9 +50,10 @@ const APPROVED_HOT = [0.0387, 0.0605] as const;
 const APPROVED_RED_OVER_HOT = [0.75, 0.84] as const;
 const PALE_AT_MOST = 0.01;
 // The veins of the video's frame 4 "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; pixels.ts's glows): 55.2% of its disc,
-// 62.8% of its night half; its brightest pixels gold (blue 0.57 of red), never white. A veined world holds half of each at least.
+// 62.8% of its night half, a veined world half of each at least; cream as Music's (Alexis, 2026-11-03), 4.5% of its disc white by glows'
+// rule (luma past 170, blue two thirds of red or more), a quarter past it at most: no whiter (7b7's gold read 0.5% at most).
 const MUSIC = [0.552, 0.628] as const;
-const NEVER_WHITE = 0.005;
+const MUSIC_WHITE = 1.25 * 0.045;
 // Io's sulfur crust as the chief described it, yellow to orange and bright, a few hot spots: set from that description, no image of Io
 // measured. Lab hue of the lit ground in degrees, its chroma, its lightness, and its white share at most (lit sulfur is bright, not white).
 const SULFUR = { hue: [55, 100], chroma: 25, lightness: 35, white: 0.01 } as const;
@@ -263,7 +264,7 @@ test.describe("generated worlds", () => {
     for (const veins of of(1)) {
       expect(veins.glow, "veins over the disc").toBeGreaterThanOrEqual(MUSIC[0] / 2);
       expect(veins.night, "veins on the night side").toBeGreaterThanOrEqual(MUSIC[1] / 2);
-      expect(veins.white, "gold, never white").toBeLessThanOrEqual(NEVER_WHITE);
+      expect(veins.white, "cream, never whiter than Music's").toBeLessThanOrEqual(MUSIC_WHITE);
     }
     for (const sulfur of of(2)) {
       const [lightness, a, b] = sulfur.lab;
