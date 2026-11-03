@@ -448,6 +448,40 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, "jupiter", payers.Get(alice.String()))
 }
 
+// F5057: until the end it was paid for, a taken-down rental is closed, or its
+// world rented, by its payer only, who so gets its storage deposit back: the one
+// taking it down, like anyone else, waits for that end, as for any rental.
+func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	pay(3 * p0)
+	Rent(cross(cur), "venus", "hello", 3)
+	at(t0 + oneDay)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	Takedown(cross(cur), "venus", "r2")
+	at(t0 + 3*oneDay - 1)
+	for _, who := range []address{mod, adm, carol} {
+		testing.SetRealm(testing.NewUserRealm(who))
+		uassert.AbortsWithMessage(t, cur, "this world's rental has not ended", func() { Close(cross(cur), "mars") }, who.String())
+		offer(chain.Coins{{"ugnot", p0}})
+		uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "hello", 1) }, who.String())
+	}
+	uassert.Equal(t, 4*p0, held)
+
+	testing.SetRealm(testing.NewUserRealm(alice))
+	Close(cross(cur), "mars") // its payer, before that end
+	uassert.Equal(t, 2*p0, held)
+
+	at(t0 + 3*oneDay) // venus's paid end: anyone may close it now
+	testing.SetRealm(testing.NewUserRealm(carol))
+	Close(cross(cur), "venus")
+	uassert.Equal(t, 0, held)
+	uassert.Equal(t, 0, rentals.Size())
+}
+
 // D12: the whole days not yet begun come back to the payer at once; the day
 // under way counts as begun from its first second.
 func TestTakedownRefundsTheWholeDaysNotBegun(cur realm, t *testing.T) {
