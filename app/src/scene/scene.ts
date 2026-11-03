@@ -176,8 +176,9 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  readonly moveTo = (to: Point): void => {
+  readonly moveTo = (to: Point, lens?: number): void => {
     this.#eye.moveTo(to);
+    this.#viewport.view(lens);
     this.#loop.redraw();
   };
 
@@ -198,7 +199,7 @@ class LiveScene implements Scene {
     if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
     this.#parts.cosmos.show(worlds, written, signals);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
-    this.#viewport.lens(worlds === undefined ? LENS.fieldOfView : LENS.home);
+    this.#viewport.cosmos(worlds !== undefined);
     this.#loop.redraw();
   }
 

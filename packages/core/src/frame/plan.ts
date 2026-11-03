@@ -23,6 +23,9 @@ import {
 
 /** The most worlds a Plan draws, the largest first: past them its others are dust. */
 const PLAN_MOST = 12;
+// A Plan's own lens, in degrees (the chief, 2026-11-04): a chart, its orbits round their star, where the home's 42.5 degrees put the outer
+// ellipse's centre 122 px under it; the offset falls with the lens's tangent, 17 px here at the video's screen (7v's design review, F4470).
+const PLAN_LENS = 7;
 // Seen 30 degrees over the plane: its orbits read as ellipses half as high as wide, the mock-up's.
 const SLANT = 30 * DEGREE;
 const TURNS = 24;
@@ -82,7 +85,7 @@ function readable(
   camera: ReturnType<typeof cameraTowards>,
   heart = STAR_HEART,
 ): boolean {
-  return looksFrom(camera).every((look) => {
+  return looksFrom(camera, PLAN_LENS).every((look) => {
     const star = look.seen(system.place);
     const spots = worlds.map((world) => look.seen(placeOf(system, world, 0), world.radius));
     const boxes = spots.map(({ x, y, radius }) => ({
@@ -116,7 +119,11 @@ export function planOf(system: StarSystem): Arrival {
   const [screen] = REST_SCREENS;
   // The eye's distance in units of the outer orbit, then the orbits in the system's units: the Plan stands in its system's room.
   const room = Math.max(...system.worlds.map(({ orbit }) => orbit), 1);
-  const distance = (focalOf(screen.height) * (1 + LARGEST) * room) / ((SPAN / 2) * screen.width);
+  const distance = (focalOf(screen.height, PLAN_LENS) * (1 + LARGEST) * room) / ((SPAN / 2) * screen.width);
+  // Its plane kept level: the camera's up is the plane's own normal, so no tilt of the system rolls its orbits on the screen; read off the
+  // plane here, for the depth's module would split out of the view at rest's chunk to come with the Plan's.
+  const up = { x: NaN, y: NaN, z: NaN };
+  onPlane({ place: ORIGIN, tilt: system.tilt, node: system.node }, { along: 0, across: 0, up: 1 }, up);
   const first = unitOf(textHash(`plan ${system.id}`));
   const cameras = Array.from({ length: TURNS }, (_, at) => {
     const turn = 2 * Math.PI * (first + at / TURNS);
@@ -126,11 +133,11 @@ export function planOf(system: StarSystem): Arrival {
       { along: Math.cos(SLANT) * Math.cos(turn), across: Math.cos(SLANT) * Math.sin(turn), up: Math.sin(SLANT) },
       way,
     );
-    return cameraTowards(along(system.place, way, distance), system.place);
+    return cameraTowards(along(system.place, way, distance), system.place, up);
   });
   const inRoom = (size: number) =>
     planOrbits(worlds, size).map((world) => ({ ...world, orbit: world.orbit * room, radius: world.radius * room }));
-  let [placed, camera] = [inRoom(LEAST), cameras[0] ?? cameraTowards(system.place, system.place)];
+  let [placed, camera] = [inRoom(LEAST), cameras[0] ?? cameraTowards(system.place, system.place, up)];
   for (let size = LARGEST; size >= LEAST; size *= SHRINK) {
     const tried = inRoom(size);
     const found = cameras.find((one) => readable({ system: still, worlds: tried }, one));
@@ -146,14 +153,17 @@ export function planOf(system: StarSystem): Arrival {
     eye: camera.eye,
     look: system.place,
     postcard: { system: still, worlds: placed, depth: placed.map(() => 1), hidden },
+    lens: PLAN_LENS,
+    up,
   };
 }
 
-// The Earth's Plan: 30 degrees over the disc, the Earth 80 pixels in radius on the video's screen; its projects 2.4 to 9 Earth radii out, growing
-// gaps, each a quarter of the Earth across, a golden turn apart round it.
+// The Earth's Plan: 30 degrees over the disc, the Earth 80 pixels in radius on the video's screen; its projects 2.4 to 7.5 Earth radii out,
+// growing gaps, each a quarter of the Earth across, a golden turn apart round it. Out to 9, its outer ellipse stood 26 px off the Earth
+// through the Plan's lens, its offset the square of its reach on screen (7v's design review, F4470).
 const PLAN_EARTH = 80;
 const PLAN_FIRST = 2.4;
-const PLAN_LAST = 9;
+const PLAN_LAST = 7.5;
 const PLAN_SIZE = 0.25;
 const GOLDEN = 2.399963229728653;
 // The Earth's disc and a name's air round it, in pixels, that no project stands in; the whole is turned as a system's is, tried in order.
@@ -164,7 +174,7 @@ const CLEAR = PLAN_EARTH + 30;
 export function earthPlanOf(projects: readonly Pick<Project, "name">[]): Arrival {
   const earth = { ...earthSystemOf(projects), spin: 0 };
   const last = Math.max(earth.worlds.length - 1, 1);
-  const distance = (focalOf(REST_SCREENS[0].height) * EARTH_RADIUS) / PLAN_EARTH;
+  const distance = (focalOf(REST_SCREENS[0].height, PLAN_LENS) * EARTH_RADIUS) / PLAN_EARTH;
   const camera = cameraOf({ distance, slant: SLANT, turn: 0 });
   const turned = (turn: number) =>
     earth.worlds.map((world, at) => ({
@@ -181,6 +191,7 @@ export function earthPlanOf(projects: readonly Pick<Project, "name">[]): Arrival
     eye: camera.eye,
     look: EARTH_PLACE,
     postcard: { system: earth, worlds, depth: worlds.map(() => 1), hidden: new Set() },
+    lens: PLAN_LENS,
   };
 }
 

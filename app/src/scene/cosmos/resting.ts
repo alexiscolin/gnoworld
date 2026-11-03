@@ -99,10 +99,10 @@ export class Resting {
   // are laid once the depth's chunk comes, a Plan has none.
   readonly #came = (asking: Asking, to: Point): void => {
     if (asking !== this.#asking) return;
-    asking.go(to);
+    const landing = this.#eye.landing;
+    asking.go(to, landing?.lens);
     this.#found();
     this.#viewRocks = [];
-    const landing = this.#eye.landing;
     const postcard = landing?.postcards.get(landing.index);
     if (landing === undefined || landing.plan !== undefined || postcard === undefined) return;
     loadDeep().then(

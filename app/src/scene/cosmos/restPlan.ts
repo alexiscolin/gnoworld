@@ -17,7 +17,7 @@ import type { Landing } from "./restArrival.ts";
 // A Plan as a landing, its worlds named and linked as given, their places and orbits laid for the labels' chunk to draw as they are: the
 // Earth's stands by no system of the file, its index none of theirs.
 const landingOf = (
-  { eye, look, postcard }: Arrival,
+  { eye, look, postcard, lens, up }: Arrival,
   index: number,
   { names, links }: { names: ReadonlyMap<string, string>; links: ReadonlyMap<string, string> },
 ): Landing => ({
@@ -26,6 +26,8 @@ const landingOf = (
   look,
   postcards: new Map([[index, postcard]]),
   plan: plannedOf(postcard, { names, links }),
+  lens,
+  up,
 });
 
 /** The Plan of the system of `systems` named `id`, or the Earth's with none; none for a name the file does not hold. */

@@ -24,11 +24,14 @@ import {
   type Seen,
 } from "./restLook.ts";
 
-/** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there. */
+/** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there; a view
+ * seen through a lens of its own says it, in degrees, and the up it keeps, a Plan's (7v): the home's lens and the map's up where none. */
 export interface Arrival {
   readonly eye: Point;
   readonly look: Point;
   readonly postcard: Postcard;
+  readonly lens?: number;
+  readonly up?: Point;
 }
 
 // The lean lives beside the mouse's, where the view at rest's eye reads it without this module.

@@ -2,6 +2,7 @@
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
+import type { Asking } from "./cosmos/restArrival.ts";
 import type { CosmosSight } from "./flight/flights.ts";
 import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
@@ -17,7 +18,7 @@ export class CosmosPart {
   #written: string | undefined;
   #signals: LabelSignals | undefined;
   #box: ClearBox | undefined;
-  #arrival: readonly [id: string | undefined, go: (eye: Point) => void] | undefined;
+  #arrival: readonly [id: string | undefined, go: Asking["go"]] | undefined;
   // How the reader looks at what the eye looks at: from above, its orbits drawn, or as space (7v).
   #plan = false;
   readonly #gone: AbortSignal;
@@ -84,14 +85,14 @@ export class CosmosPart {
 
   /** A system's arrival asked (7d3), in the view the reader chose (7v): told the cosmos now, or once it comes; nothing once the scene has
    * gone. */
-  arrive(id: string | undefined, go: (eye: Point) => void): void {
+  arrive(id: string | undefined, go: Asking["go"]): void {
     if (this.#gone.aborted) return;
     this.#arrival = [id, go];
     this.door.part?.arrive(id, go, this.#plan);
   }
 
   /** The reader's view, from above or as space: what the eye looks at, a system or the Earth at rest, asked again in it. */
-  see(plan: boolean, go: (eye: Point) => void): void {
+  see(plan: boolean, go: Asking["go"]): void {
     this.#plan = plan;
     const [id] = this.#arrival ?? [undefined];
     this.arrive(id, this.#arrival?.[1] ?? go);
@@ -167,7 +168,7 @@ export class Parts {
   }
 
   /** The scene's ways to a system and to how what the eye looks at is seen (7d3, 7v), bound to its eye's `go` and its page's `said`. */
-  viewsOf(go: (eye: Point) => void, said: ((id: string | undefined) => void) | undefined) {
+  viewsOf(go: Asking["go"], said: ((id: string | undefined) => void) | undefined) {
     return {
       arrive: (id: string | undefined): void => {
         this.cosmos.arrive(id, go);

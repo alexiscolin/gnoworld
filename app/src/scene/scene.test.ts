@@ -69,7 +69,13 @@ const cosmos = vi.hoisted(() => ({
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
   arrive:
-    vi.fn<(id: string | undefined, go: (eye: { x: number; y: number; z: number }) => void, plan: boolean) => void>(),
+    vi.fn<
+      (
+        id: string | undefined,
+        go: (eye: { x: number; y: number; z: number }, lens?: number) => void,
+        plan: boolean,
+      ) => void
+    >(),
 }));
 
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
@@ -445,6 +451,47 @@ describe("the cosmos", () => {
     scene.cosmos(WORLDS);
     await vi.dynamicImportSettled();
     expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function), false);
+    scene.dispose();
+  });
+
+  // 7v's design review (F4470; the chief: 7 degrees): a Plan is a chart, its orbits round their star, where the home's lens put its outer
+  // ellipse's centre 122 px under it. The eye's move to a view seen through a lens of its own sets it; the dynamic view and the view at rest
+  // look through the home's again.
+  it("looks through a Plan's own lens where the eye comes to one, and through the home's at a dynamic view and at rest", async () => {
+    const scene = await started();
+    const fov = () => (three.renderer.render.mock.lastCall?.[1] as { fov?: number } | undefined)?.fov;
+    // The eye the cosmos sends to its last asked view, through `lens` where it says one.
+    const land = (to: { x: number; y: number; z: number }, lens?: number) => {
+      const go = cosmos.arrive.mock.lastCall?.[1];
+      if (go === undefined) throw new Error("no view asked");
+      go(to, lens);
+      frames(2, 16);
+    };
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    scene.see(true);
+    land({ x: 10, y: 20, z: 30 }, 7);
+    expect(fov()).toBe(7);
+    expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
+    // The file's words come again each minute: the Plan keeps its lens.
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    expect(fov()).toBe(7);
+    scene.see(false);
+    land({ x: 1, y: 2, z: 3 });
+    expect(fov()).toBe(FIELD_OF_VIEW);
+    scene.arrive(undefined);
+    land({ x: 4, y: 5, z: 6 }, 7);
+    land({ x: 4, y: 5, z: 6 });
+    expect(fov()).toBe(FIELD_OF_VIEW);
+    // Once the cosmos goes, the scene's own lens; when it comes again, the home's till a view says otherwise.
+    land({ x: 4, y: 5, z: 6 }, 7);
+    scene.cosmos(undefined);
+    frames(2, 16);
+    expect(fov()).toBe(50);
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    expect(fov()).toBe(FIELD_OF_VIEW);
     scene.dispose();
   });
 

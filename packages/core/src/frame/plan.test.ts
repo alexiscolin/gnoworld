@@ -12,6 +12,7 @@ import {
 import type { Point } from "../space/cell.ts";
 import { normalOf } from "./depth.ts";
 import { orbitPlace } from "./disc.ts";
+import { arrivalOf, type Arrival } from "./arrival.ts";
 import { earthPlanOf, planOf, plannedOf } from "./plan.ts";
 import { cameraTowards, DEGREE, dot, Look, minus, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
@@ -50,7 +51,7 @@ const bodied = (name: SetName) => SETS[name]().filter(({ worlds }) => worlds.som
 const seenOn = (system: StarSystem) => {
   const plan = planOf(system);
   return REST_SCREENS.map((screen) => {
-    const look = new Look(cameraTowards(plan.eye, plan.look), screen);
+    const look = new Look(cameraTowards(plan.eye, plan.look, plan.up), screen, plan.lens);
     const { system: plane, worlds } = plan.postcard;
     return {
       look,
@@ -227,7 +228,7 @@ describe("the Earth's Plan", () => {
         Math.asin(dot(way, normalOf(plan.postcard.system)) / Math.hypot(way.x, way.y, way.z)) / DEGREE,
       ).toBeCloseTo(30, 6);
       for (const screen of REST_SCREENS) {
-        const look = new Look(cameraTowards(plan.eye, plan.look), screen);
+        const look = new Look(cameraTowards(plan.eye, plan.look, plan.up), screen, plan.lens);
         const earth = look.seen(EARTH_PLACE, EARTH_RADIUS);
         expect(earth.x).toBeCloseTo(screen.width / 2, 6);
         expect(earth.radius).toBeGreaterThanOrEqual(60);
@@ -252,6 +253,68 @@ describe("the Earth's Plan", () => {
       }
     },
   );
+});
+
+// 7v's design review (F4470; the chief: 7 degrees, for Alexis's "une vue à plat"): at the home's 42.5 degree lens perspective put a Plan's
+// outer ellipse's centre 122 px under its star, and its system's own tilt rolled it 13 degrees. A Plan is seen through a lens of its own,
+// its plane level, each orbit round its star; a system's dynamic view keeps the home's.
+describe("a Plan's own lens", () => {
+  const SCREENS = [
+    { width: 1728, height: 1080 },
+    { width: 1280, height: 800 },
+  ] as const;
+  // The outer orbit's ring on `screen`, from the Plan's eye through its own lens: its star, its box's centre, and its long axis's angle off
+  // the screen's across, from its points' spread, which a level plane seen square holds at none, whatever the points' step.
+  const outerOn = (plan: Arrival, screen: (typeof SCREENS)[number]) => {
+    const look = new Look(cameraTowards(plan.eye, plan.look, plan.up), screen, plan.lens);
+    const { rings } = plannedOf(plan.postcard, { names: new Map(), links: new Map() });
+    const spots = (rings.at(-1) ?? []).map(({ x, y, z }) =>
+      look.seen({ x: plan.look.x + x, y: plan.look.y + y, z: plan.look.z + z }),
+    );
+    const [xs, ys] = [spots.map(({ x }) => x), spots.map(({ y }) => y)];
+    const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    const [mx, my] = [mean(xs), mean(ys)];
+    const [xx, yy, xy] = [
+      mean(xs.map((x) => (x - mx) ** 2)),
+      mean(ys.map((y) => (y - my) ** 2)),
+      mean(xs.map((x, at) => (x - mx) * ((ys[at] ?? NaN) - my))),
+    ];
+    return {
+      star: look.seen(plan.look),
+      centre: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
+      roll: Math.atan2(2 * xy, xx - yy) / 2 / DEGREE,
+    };
+  };
+  const round = (plan: Arrival) => {
+    expect(plan.lens).toBe(7);
+    for (const screen of SCREENS) {
+      const { star, centre, roll } = outerOn(plan, screen);
+      expect(Math.hypot(centre.x - star.x, centre.y - star.y)).toBeLessThan(20);
+      expect(Math.abs(roll)).toBeLessThan(1);
+    }
+  };
+
+  it.each(Object.keys(SETS) as SetName[])(
+    "sits each outer orbit of %s round its star within 20 px, its plane level, through 7 degrees, at 1,728 and 1,280",
+    (name) => {
+      for (const system of bodied(name)) round(planOf(system));
+    },
+  );
+
+  it.each([
+    ["one project", ONE],
+    ["the first twelve of forty", many(40)],
+  ])("sits the Earth's outer orbit round it within 20 px, with %s", (_name, projects) => {
+    round(earthPlanOf(projects));
+  });
+
+  it("leaves a system's dynamic view the home's lens and the map's up", () => {
+    const systems = onyx();
+    for (const system of bodied("the recorded Onyx file").slice(0, 6)) {
+      const arrival = arrivalOf(system, systems);
+      expect([arrival.lens, arrival.up]).toEqual([undefined, undefined]);
+    }
+  });
 });
 
 // What a Plan draws besides its worlds (7v): each world's place, held still, and its orbit as a ring round the star, on the map, so the

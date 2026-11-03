@@ -109,7 +109,7 @@ export class AtRest {
   /** Comes to system `id`, or back to the view at rest with none or one the file does not hold, in its Plan where `plan` (7v), the Earth's
    * at rest: once its view is known, `go` is told the scene's eye that stands the eye there, and again only if a new file moves it. A later
    * ask wins. */
-  readonly arrive = (id: string | undefined, go: (eye: Point) => void, plan = false): void => {
+  readonly arrive = (id: string | undefined, go: Asking["go"], plan = false): void => {
     this.#asking = { id, go, plan };
     this.#rest?.arrive(this.#asking);
   };

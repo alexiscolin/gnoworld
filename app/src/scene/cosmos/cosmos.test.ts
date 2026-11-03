@@ -151,7 +151,7 @@ function made(width = WIDTH, height = HEIGHT, eye?: { look: Point | undefined })
   const device = { renderer, stage, camera, halved: () => false, base: "/", moved, stood, veil };
   const cosmos = owner.add(new Cosmos(eye === undefined ? device : { ...device, eye }));
   cosmos.resize(height, 1);
-  return { stage, camera, owner, moved, renderer, cosmos, stood };
+  return { stage, camera, owner, moved, renderer, cosmos, stood, height };
 }
 
 // A look runs off the frame, and maps load behind it: every task due is run, none guessed at.
@@ -2936,13 +2936,17 @@ describe("a flight's star (7g)", () => {
 });
 
 describe("a system's arrival (7d3)", () => {
-  // Comes to system `id`, in its Plan if asked (7v): the scene's eye the cosmos asks for, given back to it as the scene's frame would.
+  // Comes to system `id`, in its Plan if asked (7v): the scene's eye the cosmos asks for, given back to it as the scene's frame would,
+  // through the lens it asks, a Plan's own, the home's where none (7v's design review, F4470).
   const arrived = async (scene: ReturnType<typeof made>, id: string | undefined, plan = false) => {
-    const go = vi.fn<(eye: Point) => void>();
+    const go = vi.fn<(eye: Point, lens?: number) => void>();
     scene.cosmos.arrive(id, go, plan);
     await settled();
-    const to = go.mock.lastCall?.[0];
+    const [to, lens] = go.mock.lastCall ?? [];
     if (to === undefined) throw new Error("no arrival");
+    scene.camera.fov = lens ?? FIELD_OF_VIEW;
+    scene.camera.updateProjectionMatrix();
+    scene.cosmos.resize(scene.height, 1);
     scene.cosmos.tick(to, 0);
     await settled();
     scene.cosmos.tick(to, 0);

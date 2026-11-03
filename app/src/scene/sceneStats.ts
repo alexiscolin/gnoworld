@@ -26,8 +26,8 @@ export interface Scene {
   cover(covered: boolean): void;
   /** Flies to a star of the cosmos, back to its view at rest, or to the place a page shows next, before the page changes it (7g). */
   fly(goal: FlightGoal): void;
-  /** Where the view rests, in world units of any size. */
-  moveTo(to: Point): void;
+  /** Where the view rests, in world units of any size, through the lens a view of the cosmos asks, the home's where none (7v). */
+  moveTo(to: Point, lens?: number): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */
   earth(place: Circle | undefined, said: (state: EarthState) => void): void;
   /** The ground the page's signs stand on. */

@@ -112,10 +112,16 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
   return out;
 };
 
-/** A camera at `eye`, on the map, looking at `target`, the disc's up kept up. */
-export function cameraTowards(eye: Point, target: Point): Camera {
+const MAP_UP: Point = { x: 0, y: 1, z: 0 };
+
+/** A camera at `eye`, on the map, looking at `target`, `upright` kept up: the disc's, or a Plan's own plane's (7v). */
+export function cameraTowards(eye: Point, target: Point, upright: Point = MAP_UP): Camera {
   const ahead = direction(minus(target, eye));
-  const right = direction({ x: -ahead.z, y: 0, z: ahead.x });
+  const right = direction({
+    x: ahead.y * upright.z - ahead.z * upright.y,
+    y: ahead.z * upright.x - ahead.x * upright.z,
+    z: ahead.x * upright.y - ahead.y * upright.x,
+  });
   const up = {
     x: right.y * ahead.z - right.z * ahead.y,
     y: right.z * ahead.x - right.x * ahead.z,
@@ -133,8 +139,9 @@ export const swayed = (
   target: Point = EARTH_PLACE,
 ): Camera => cameraTowards(along(along(eye, right, across), up, upward), target);
 
-/** The focal length of a screen `height` pixels high, in pixels. */
-export const focalOf = (height: number): number => height / 2 / Math.tan((FIELD_OF_VIEW * DEGREE) / 2);
+/** The focal length of a screen `height` pixels high, in pixels, through `fieldOfView` degrees, the home's unless said. */
+export const focalOf = (height: number, fieldOfView = FIELD_OF_VIEW): number =>
+  height / 2 / Math.tan((fieldOfView * DEGREE) / 2);
 
 const scratch = { x: 0, y: 0, z: 0 };
 
@@ -156,11 +163,12 @@ export class Look {
   readonly star: Seen;
   readonly #focal: number;
 
-  constructor(camera: Camera, { width, height }: Screen) {
+  /** Through `fieldOfView` degrees, the home's lens unless the view has one of its own (a Plan's, 7v). */
+  constructor(camera: Camera, { width, height }: Screen, fieldOfView = FIELD_OF_VIEW) {
     this.camera = camera;
     this.width = width;
     this.height = height;
-    this.#focal = focalOf(height);
+    this.#focal = focalOf(height, fieldOfView);
     this.earth = this.seen(EARTH_PLACE, EARTH_RADIUS);
     this.star = this.seen({ x: 0, y: 0, z: 0 });
   }
@@ -237,5 +245,6 @@ export class Look {
   }
 }
 
-/** The camera on each screen the view is composed for. */
-export const looksFrom = (camera: Camera): Look[] => REST_SCREENS.map((screen) => new Look(camera, screen));
+/** The camera on each screen the view is composed for, through `fieldOfView` degrees, the home's unless said. */
+export const looksFrom = (camera: Camera, fieldOfView = FIELD_OF_VIEW): Look[] =>
+  REST_SCREENS.map((screen) => new Look(camera, screen, fieldOfView));

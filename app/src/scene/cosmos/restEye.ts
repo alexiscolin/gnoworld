@@ -66,8 +66,13 @@ export class RestEye {
   constructor(device: Pick<EarthDevice, "eye">) {
     this.#device = device;
     toScene(EARTH_PLACE, this.looked);
+    this.#upFor(undefined);
+  }
+
+  // The camera's up on the stage: a Plan's plane's own, so no tilt of its system rolls its orbits (7v's design review, F4470), else the map's.
+  #upFor(landing: Landing | undefined): void {
     const [top, centre] = [spot(), spot()];
-    toScene({ x: 0, y: 1, z: 0 }, top);
+    toScene(landing?.up ?? { x: 0, y: 1, z: 0 }, top);
     toScene({ x: 0, y: 0, z: 0 }, centre);
     Object.assign(this.#up, { x: top.x - centre.x, y: top.y - centre.y, z: top.z - centre.z });
   }
@@ -128,6 +133,7 @@ export class RestEye {
   // The camera turned to what `landing` looks at, or the Earth with none, the eye swaying along its own axes; the scene's eye there.
   #land(landing: Landing | undefined): Point {
     this.#lean = landing === undefined ? 1 : ARRIVAL_LEAN / LEAN;
+    this.#upFor(landing);
     if (landing === undefined) {
       toScene(EARTH_PLACE, this.looked);
       this.#face(this.#rest);
