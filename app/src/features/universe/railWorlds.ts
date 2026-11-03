@@ -4,7 +4,7 @@ import { chooseRail, daysSince, type RailAsk, type RailWorld } from "@gnoworld/c
 import { createStore } from "zustand/vanilla";
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { signalsOf } from "../../scene/cosmos/labelAsks.ts";
-import { EARTH, pagesOf, type WorldPlaces } from "./worldPages.ts";
+import { EARTH, pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
 import type { Known } from "./worldsFeed.ts";
 
 /** The least time between two orders of the rail. */
