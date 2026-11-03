@@ -10,6 +10,14 @@ const { useSpace, useWorldsCount, useNewcomer } = vi.hoisted(() => ({
   useNewcomer: vi.fn<() => boolean>(() => false),
 }));
 vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useNewcomer }));
+// Every event of the data waits for its date (7t no longer shows those): one dated beside them, so the ticker's tests still see an event.
+const { DATED } = vi.hoisted(() => ({
+  DATED: { id: "dated-call", title: "A dated call", start: "2026-11-15T10:00:00Z", link: "https://gno.land/dated" },
+}));
+vi.mock("../../data/events.json", async (original) => {
+  const { default: rows } = await original<{ default: unknown[] }>();
+  return { default: [...rows, DATED] };
+});
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -218,13 +226,22 @@ describe("home's live line", () => {
 });
 
 describe("home's ticker", () => {
-  test("holds each placeholder news and event of the data as a link to its address", async () => {
+  // 7t: an event waiting for its date is no longer shown; the dated news are, and the chain's trends join them once the page runs.
+  test("holds each dated news of the data as a link to its address, and no event that waits for its date", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     expect(html).toContain("data-ticker");
-    for (const { title, link } of [...sample("news.json"), ...sample("events.json")]) {
+    for (const { title, link } of sample("news.json")) {
       expect(html, title).toContain(escaped(title));
       expect(html, link).toContain(`href="${link}"`);
     }
+    const waiting = sample("events.json").filter(({ title }) => title !== DATED.title);
+    expect(waiting.length).toBeGreaterThan(0);
+    for (const { title } of waiting) expect(html, title).not.toContain(escaped(title));
+  });
+
+  test("writes no trend into the page: the chain's are read once it runs", async () => {
+    const html = await render({ path: "/", Component: Home, loader }, "/");
+    expect(html).not.toMatch(/data-kind="(trending|rising|new)"/);
   });
 
   test("is drawn under /net/gnoland too: the lists are the site's, not a universe's", async () => {
@@ -241,7 +258,8 @@ describe("home's ticker", () => {
     const before = await written("2026-10-31T12:00:00Z");
     const after = await written("2100-01-01T00:00:00Z");
     expect(after).toBe(before);
-    for (const { title } of sample("events.json")) expect(after, title).toContain(escaped(title));
+    expect(after).toContain(escaped(DATED.title));
+    for (const { title } of sample("news.json")) expect(after, title).toContain(escaped(title));
   });
 });
 

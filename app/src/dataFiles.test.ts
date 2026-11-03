@@ -890,8 +890,8 @@ describe("the ticker's placeholders", () => {
   });
 
   it("hold no date that was made up: an event waiting for its date starts at the one far-off sentinel, which the ticker never shows", () => {
-    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the event in the strip and
-    // the gate off the calendar. A real start replaces it with the content; this test then lists the event's id out.
+    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the gate off the calendar, and the
+    // ticker shows no event that starts there (7t). A real start replaces it with the content; this test then lists the event's id out.
     for (const row of events) {
       expect(row.title, row.id).toMatch(/date to be confirmed/i);
       expect(row.start ?? "", row.id).toMatch(/^2099-12-\d\dT00:00:00Z$/);

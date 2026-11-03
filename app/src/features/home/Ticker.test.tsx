@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from "react-dom/server";
+import dataEvents from "../../../data/events.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Ticker } from "./Ticker.tsx";
@@ -58,6 +59,24 @@ describe("tickerItems", () => {
     const items = tickerItems(rows, [], NOW);
     expect(items).toHaveLength(6);
     expect(items[0]?.id).toBe("n8");
+  });
+
+  // 7t: an event that waits for its date starts at the data's far-off sentinel (dataFiles.test.ts), and is no longer shown.
+  it("shows no event that waits for its date, and keeps one dated far ahead but before the sentinel", () => {
+    const items = tickerItems(
+      [],
+      [
+        event("tbc", "2099-12-31T00:00:00Z"),
+        event("tbc2", "2099-01-01T00:00:00Z"),
+        event("far", "2098-12-31T23:59:59Z"),
+      ],
+      NOW,
+    );
+    expect(items.map((item) => item.id)).toEqual(["far"]);
+  });
+
+  it("shows none of the data's events while each waits for its date", () => {
+    expect(tickerItems([], dataEvents, NOW)).toEqual([]);
   });
 
   it("does not change what it is given", () => {
