@@ -44,6 +44,11 @@ EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]
 # A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
 # realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
 SECONDS_A_COPY = 1.5
+LEAST = 60
+# gno's timer starts once it has loaded the copies (gnovm/cmd/gno/test.go at chain/onyx, Load before the timer): a run
+# still going GRACE seconds past its limit has hung where no timer counts, and is stopped with no verdict (F5084). 60 s
+# is more than loading takes: 200 seal copies took 6.81 s to load and test, alone.
+GRACE = 60
 
 MUST = re.compile(r"^\s*must[A-Z]\w*\(.*\)\s*$")
 IF = re.compile(r"^(\s*if )(?:(.*); )?(.*) \{\s*$")
@@ -153,8 +158,13 @@ def flips(path):
         yield f"{path}: {line} [{text} -> {new}{f' #{k}' if seen[line, text, new] > 1 else ''}]", mutated, droppable
 
 
+class Stopped(Exception):
+    """A gno test run stopped GRACE seconds past its limit: its package has no verdict, and the check fails by its name."""
+
+
 def run(pkg, packages, cases):
-    """gno test's output for the untouched package (m0) and each case (m1…), a (file, source) pair."""
+    """gno test's output for the untouched package (m0) and each case (m1…), a (file, source) pair; Stopped when gno did
+    not end GRACE seconds past its limit."""
     gno = os.path.abspath(os.environ["GNO"])  # gno runs from temporary folders
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy("gnowork.toml", tmp)
@@ -169,9 +179,12 @@ def run(pkg, packages, cases):
         # -timeout: a mutant that loops forever fails the check instead of hanging the commit; gno's timeout ends the
         # whole run, so the mutants still running get no result. One run for all the copies, its limit grown with them:
         # a slow mutant takes the time the fast ones leave, and each run of its own would start gno's workers again.
-        limit = max(60, math.ceil(SECONDS_A_COPY * len(dirs)))
-        out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
-                             timeout=limit + 60)
+        limit = max(LEAST, math.ceil(SECONDS_A_COPY * len(dirs)))
+        try:
+            out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
+                                 timeout=limit + GRACE)
+        except subprocess.TimeoutExpired:
+            raise Stopped(f"FAIL  gno test did not end {GRACE} s past its own time limit of {limit} s, and was stopped: in {pkg}, no mutant has a verdict")
         return out.stdout + out.stderr
 
 
@@ -194,12 +207,18 @@ def main():
         cases = [(f"{f}: {label}", f, src, False) for f in sources for label, src in mutants(f)]
         flipped = [(label, f, src, drop) for f in sources for label, src, drop in flips(f)]
         cases += flipped
-        out = run(pkg, packages, [(f, src) for _, f, src, _ in cases])
+        for label, *_ in cases:  # each key is seen, judged or not: a package with no verdict calls none of its gaps stale
+            seen[label] = seen.get(label, 0) + 1
+        try:
+            out = run(pkg, packages, [(f, src) for _, f, src, _ in cases])
+        except Stopped as stopped:
+            print(stopped)
+            failed = True
+            continue
         if verdict(out, 0) != "survives":
             sys.exit(f"FAIL  control: {pkg}'s untouched copy does not pass\n{out}")
         dropped = 0
         for i, (label, _, _, droppable) in enumerate(cases, 1):
-            seen[label] = seen.get(label, 0) + 1
             got, want = verdict(out, i), "survives" if label in GAPS else "killed"
             if got == "does not compile" and droppable and label not in GAPS:
                 dropped += 1

@@ -550,6 +550,13 @@ printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does 
 out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
+# A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
+# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale (F5084).
+# The constants are made small so it is stopped in 2 s.
+printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
+out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
+[ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
+	fail "mutate.py did not fail by name, alone, a gno that never ended (F5084): $out"
 # The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
 # one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
 # rounded up), 80 have 120, each package in one run.

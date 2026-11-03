@@ -1250,7 +1250,10 @@ def mutate_mutants():
         ('    if re.search(rf"^m{i}/\\S+:\\d+:\\d+: .*\\(code=", out, re.M):\n', "    if False:\n", "tells a mutant that does not compile"),
         ('        if verdict(out, 0) != "survives":\n', "        if False:\n", "fails an untouched copy that fails"),
         ("SECONDS_A_COPY = 1.5", "SECONDS_A_COPY = 1.4", "gives a copy 1.5 s of its run's time (F5051)"),
-        ("max(60, math.ceil(", "max(0, math.ceil(", "gives a run 60 s at least"),
+        ("LEAST = 60", "LEAST = 0", "gives a run 60 s at least"),
+        ("        except subprocess.TimeoutExpired:\n", "        except ZeroDivisionError:\n", "fails by name a gno that does not end (F5084)"),
+        ("            print(stopped)\n", "            pass\n", "says which package's gno did not end"),
+        ("            failed = True\n            continue\n", "            continue\n", "fails a package whose gno did not end"),
         ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
         ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
     ))
