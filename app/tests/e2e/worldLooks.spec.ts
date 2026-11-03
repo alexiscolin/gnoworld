@@ -9,7 +9,7 @@ import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, pic
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
-import { facesOn, grain, landOn, rows, shownPart, type Face } from "./textures.ts";
+import { facesApart, facesOn, GLANCE, grain, landOn, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
@@ -64,12 +64,7 @@ const CONTINENT = 0.7;
 const LAND = [0.3, 0.6] as const;
 const ALL_SEA = 0.05;
 // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre ... unique et bien reconnaissable"): its sea's
-// or its land's colour 10 or more from the Earth's in Lab, or its cloud cover a tenth or more apart, each a step a glance takes (core's
-// variety.ts: a colour under 10 and a value under a tenth of its span read alike). The Earth: its close view at realism.spec's instant.
-const GLANCE = { colour: 10, clouds: 0.1 } as const;
-// Two faces apart in a part both show; a part one of them does not show sets them apart in nothing.
-const apartIn = (one: Face["sea"], other: Face["sea"]) =>
-  one === null || other === null ? 0 : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
+// or its land's colour or its cloud cover a glance apart (textures.ts's GLANCE). The Earth: its close view at realism.spec's instant.
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -266,11 +261,7 @@ test.describe("the generated worlds polished", () => {
       if (seed > 0) await nextSeed(page);
       worlds.push(...(await facesOn(page, await picture(page), await circles(page))));
     }
-    const apart = worlds.map((face) => ({
-      sea: apartIn(shownPart(face, "sea"), shownPart(earth, "sea")),
-      land: apartIn(shownPart(face, "land"), shownPart(earth, "land")),
-      clouds: Math.abs(face.clouds - earth.clouds),
-    }));
+    const apart = worlds.map((face) => facesApart(face, earth));
     const nearest = Math.min(...apart.map(({ sea, land }) => Math.max(sea, land)));
     test.info().annotations.push({ type: "faces", description: JSON.stringify({ earth, nearest, apart }) });
     for (const [at, { sea, land, clouds }] of apart.entries())

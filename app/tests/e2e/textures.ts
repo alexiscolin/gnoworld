@@ -25,6 +25,17 @@ export interface Face {
  * nothing. */
 const SHOWN = 0.1;
 export const shownPart = (face: Face, part: "sea" | "land") => (face.shares[part] >= SHOWN ? face[part] : null);
+/** A step a glance takes (core's variety.ts): a colour 10 or more apart in Lab, a share a tenth or more apart. */
+export const GLANCE = { colour: 10, clouds: 0.1 } as const;
+// Two faces apart in a part both show; a part one of them does not show sets them apart in nothing.
+const apartIn = (one: Face["sea"], other: Face["sea"]) =>
+  one === null || other === null ? 0 : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
+/** How far a face lies from another: its sea's and its land's colours in Lab, where both show them, and its cloud cover. */
+export const facesApart = (face: Face, other: Face) => ({
+  sea: apartIn(shownPart(face, "sea"), shownPart(other, "sea")),
+  land: apartIn(shownPart(face, "land"), shownPart(other, "land")),
+  clouds: Math.abs(face.clouds - other.clouds),
+});
 export interface Land {
   readonly share: number;
   /** The share of the land in its largest piece. */
@@ -134,16 +145,24 @@ function rowsOf(discs: readonly Circle[]): number[] {
   });
 }
 
-// A lit pixel (luma over 25) inside 0.9 of a disc's radius: cloud where it is pale (past L* 55, under 8 of chroma), which is neither land
-// nor sea; sea where its blue leads its red and green; else land.
-function kindOf({ x, y, r }: Circle, px: number, py: number): "sea" | "land" | "cloud" | null {
-  const { image, luma, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
-  if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) return null;
+// A pixel by its colour: cloud where it is pale (past L* 55, under 8 of chroma), which is neither land nor sea; sea where its blue leads its
+// red and green; else land.
+function colourKind(px: number, py: number): "sea" | "land" | "cloud" {
+  const { image, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
   const [lightness, a, b] = labAt(image, px, py);
   if (lightness > 55 && Math.hypot(a, b) < 8) return "cloud";
   const [red, green, blue] = rgbAt(image, px, py);
   return blue > red + 8 && blue >= green ? "sea" : "land";
 }
+
+// A lit pixel (luma over 25) inside 0.9 of a disc's radius, by its colour.
+function kindOf({ x, y, r }: Circle, px: number, py: number): "sea" | "land" | "cloud" | null {
+  const { image, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) return null;
+  return colourKind(px, py);
+}
+// kindOf with what it calls, as a reading page's helpers.
+const KINDS = [colourKind, kindOf].map(String).join("\n");
 
 // Land's pieces join by their sides.
 function landOf(discs: readonly Circle[]): Land[] {
@@ -207,6 +226,6 @@ function facesOf(discs: readonly Circle[]): Face[] {
 }
 
 export const facesOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Face[]> =>
-  reading(page, [picture], [facesOf, discs, String(kindOf)]);
+  reading(page, [picture], [facesOf, discs, KINDS]);
 export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
-  reading(page, [picture], [landOf, discs, String(kindOf)]);
+  reading(page, [picture], [landOf, discs, KINDS]);
