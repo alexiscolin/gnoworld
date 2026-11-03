@@ -6,7 +6,7 @@ import { all, mount, nth, one } from "../../../tests/mount.tsx";
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { MAGNIFIED, REACH } from "./railDock.ts";
 import { Rail, PORTRAIT_SIZE, type RailSource } from "./Rail.tsx";
-import type { RailPlaces } from "./railWorlds.ts";
+import { RAIL_MINUTE, type RailPlaces } from "./railWorlds.ts";
 import { Portraits } from "./worldsFeed.ts";
 
 // The rail (frame 4, 7i): the Earth and the worlds of the moment as links, one stop in the tab order, the arrows moving among them, "See
@@ -554,6 +554,25 @@ describe("the rail's magnification", () => {
     frames();
     expect(one(box, "nav[aria-label='Worlds'] ul").style.getPropertyValue("translate")).toBe("0 0px");
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("measures its worlds at rest again when they change while their planets are grown", () => {
+    const { source, tell } = sourceOf();
+    const { box } = rail(source);
+    const middle = flowing(box);
+    point(box, 160 + 98 * 2 + 32);
+    act(() => {
+      vi.advanceTimersByTime(RAIL_MINUTE);
+    });
+    tell({ worlds: [...WORLDS, world("new/one")], signals: SIGNALS });
+    expect(worlds(box)).toHaveLength(6);
+    const pointed = 160 + 98 * 5 + 32;
+    point(box, pointed);
+    frames();
+    expect(magnification(nth(worlds(box), 5))).toBeGreaterThan(1.5);
+    expect(Math.abs(middle(5) - pointed)).toBeLessThanOrEqual(3);
+    leave(box);
+    expect(one(box, "nav[aria-label='Worlds'] ul").style.getPropertyValue("translate")).toBe("0 0px");
   });
 
   it("asks no frame once the planets stand still under a resting pointer", () => {

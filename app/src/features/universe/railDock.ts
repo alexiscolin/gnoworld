@@ -1,17 +1,13 @@
 // The rail's dock (ADR-0002 §1's rail, "magnified like a dock under the pointer"): the planet at the pointer, or the one the keyboard is on,
 // grows most and its neighbours less by their distance, each easing there frame by frame, and no frame is asked once all stand still. As a
-// dock's, distances are read on the column at rest, measured while nothing is grown, and the column shifts so the pointed planet stays
-// under the pointer. Never under reduced motion, nor for a finger or where nothing hovers, a touch screen.
+// dock's, distances are read on the column at rest, measured with nothing grown nor shifted, and the column shifts so the pointed planet
+// stays under the pointer. Never under reduced motion, nor for a finger or where nothing hovers, a touch screen.
 
 /** How much the planet at the pointer grows, and how far from it, in pixels, its neighbours still do. */
 export const MAGNIFIED = 1.55;
 export const REACH = 230;
 const EASE = 0.2;
 const STILL = 0.002;
-// Less than this, a planet's size has stopped changing: what the page reads back wavers below it.
-const STEADY = 1e-4;
-// Less than this, in pixels, the column has stopped moving.
-const SETTLED = 0.05;
 const QUIET = "(prefers-reduced-motion: reduce), (pointer: coarse)";
 
 // How much a planet `distance` pixels from the pointer grows: the most at it, smoothly none from `REACH` on.
@@ -25,17 +21,29 @@ interface Rest {
   readonly planet: number;
 }
 
-// The links at rest, read while nothing is grown and the list stands unshifted.
-function restOf(list: HTMLElement, links: readonly HTMLElement[]): Rest[] {
+// The links at rest, read with every planet at its size and the list unshifted, then put back as they stood; and the list's top within
+// its column's content, which `scroller` scrolls.
+function restOf(
+  list: HTMLElement,
+  scroller: HTMLElement,
+  links: readonly HTMLElement[],
+): { rests: Rest[]; lead: number } {
+  const planets = links.map((link) =>
+    link.firstElementChild instanceof HTMLElement ? link.firstElementChild : undefined,
+  );
+  const grown = planets.map((planet) => planet?.style.getPropertyValue("--_mag") ?? "");
+  const shifted = list.style.getPropertyValue("translate");
+  for (const planet of planets) planet?.style.removeProperty("--_mag");
+  list.style.removeProperty("translate");
   const top = list.getBoundingClientRect().top;
-  return links.map((link) => {
+  const rests = links.map((link, at) => {
     const box = link.getBoundingClientRect();
-    return {
-      offset: box.top - top,
-      height: box.height,
-      planet: link.firstElementChild?.getBoundingClientRect().height ?? 0,
-    };
+    return { offset: box.top - top, height: box.height, planet: planets[at]?.getBoundingClientRect().height ?? 0 };
   });
+  const lead = top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+  planets.forEach((planet, at) => planet?.style.setProperty("--_mag", grown[at] ?? ""));
+  list.style.setProperty("translate", shifted);
+  return { rests, lead };
 }
 
 // The link the place `at` falls in at rest, or the nearest; its index, or -1 with none.
@@ -49,10 +57,12 @@ function heldAt(rests: readonly Rest[], top: number, at: number): number {
   return nearest;
 }
 
-// The column as a frame reads it: its links, each at rest, and the list's top as if it stood unshifted, which moves with its scroll.
+// The column as a frame reads it: its links, each at rest, the list's top within the column's content, and its top on the page as if it
+// stood unshifted, read off the column, which the list's shift never moves, so it moves with the scroll alone.
 interface Column {
   readonly links: readonly HTMLElement[];
   readonly rests: readonly Rest[];
+  readonly lead: number;
   readonly top: number;
 }
 
@@ -77,8 +87,7 @@ function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, at
     const target =
       at === undefined || rest === undefined ? 1 : magnifiedAt(Math.abs(at - top - rest.offset - rest.height / 2));
     const now = sizes.get(link) ?? 1;
-    const eased = Math.abs(target - now) < STILL ? target : now + (target - now) * EASE;
-    const next = Math.abs(eased - now) < STEADY ? now : eased;
+    const next = Math.abs(target - now) < STILL ? target : now + (target - now) * EASE;
     moving ||= next !== now;
     sizes.set(link, next);
     if (link.firstElementChild instanceof HTMLElement)
@@ -90,19 +99,21 @@ function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, at
 /** Grows the planets of `list`'s links, each by the `--_mag` written on it (ui's PlanetThumb), and shifts the list as a dock's, until
  * `signal` ends. */
 export function dock(list: HTMLElement, signal: AbortSignal): void {
+  // The column the list scrolls in: a list with none is no rail's.
+  const scroller = list.parentElement;
+  if (scroller === null) return;
   const sizes = new WeakMap<Element, number>();
-  let column: Column = { links: [], rests: [], top: 0 };
+  let column: Column = { links: [], rests: [], lead: 0, top: 0 };
   let pointer: number | undefined;
   let focused: Element | undefined;
   // The place the column holds still: the last one aimed at, while the planets shrink back.
   let [anchor, shift, frame] = [0, 0, 0];
-  // The links at rest, measured again while nothing is grown, or once the list holds other links.
+  // The links at rest, measured once the list holds other links: a link's height is its own, 98 px at least, whatever its name's font.
   const read = (): Column => {
     const links = [...list.querySelectorAll<HTMLElement>("li > a")];
-    const still = links.every((link) => (sizes.get(link) ?? 1) === 1) && shift === 0;
     const same = links.length === column.links.length && links.every((link, at) => link === column.links[at]);
-    const rests = still || !same ? restOf(list, links) : column.rests;
-    return { links, rests, top: list.getBoundingClientRect().top + shift };
+    const { rests, lead } = same ? column : restOf(list, scroller, links);
+    return { links, rests, lead, top: scroller.getBoundingClientRect().top + lead - scroller.scrollTop };
   };
   const step = () => {
     frame = 0;
@@ -110,12 +121,10 @@ export function dock(list: HTMLElement, signal: AbortSignal): void {
     const { rests, top } = column;
     const focus = rests[column.links.findIndex((link) => link === focused)];
     const at = matchMedia(QUIET).matches ? undefined : (pointer ?? (focus && top + focus.offset + focus.height / 2));
-    let moving = grow(column, sizes, at);
+    const moving = grow(column, sizes, at);
     anchor = at ?? anchor;
-    const next = shift + driftOf(column, anchor);
-    moving ||= Math.abs(next - shift) >= SETTLED;
-    // The shift as written, in hundredths of a pixel: the top read back next frame is the page's, not a rounding of it.
-    shift = Math.abs(next) < SETTLED ? 0 : Math.round(next * 100) / 100;
+    // The drift is read off the page once the planets have their sizes, so one shift puts the anchor back under the pointer.
+    shift += driftOf(column, anchor);
     list.style.setProperty("translate", `0 ${String(-shift)}px`);
     if (moving) frame = requestAnimationFrame(step);
   };
