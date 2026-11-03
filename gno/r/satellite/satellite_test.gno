@@ -180,6 +180,46 @@ func TestRentTextIsOneToFortyCodePointsWithNoControl(cur realm, t *testing.T) {
 	}
 }
 
+// S1: no text steers or hides what it shows. Render's sanitizer strips bidi and
+// zero-width characters only in part, and the Rent event carries the text raw.
+// Refused: control, format (bidi marks, zero-width, word joiner, soft hyphen,
+// tags), line and paragraph separators, other default-ignorable code points
+// (Hangul fillers, the grapheme joiner). Built from code points: never raw in a source.
+func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	for _, c := range []rune{
+		0x061c, 0x200b, 0x200d, 0x200e, 0x202e, 0x2060, 0x2066, 0x00ad, 0xfeff, 0xe0069, 0xe0001,
+		0x2028, 0x2029, 0x3164, 0xffa0, 0x115f, 0x034f,
+	} {
+		offer(chain.Coins{{"ugnot", p0}})
+		uassert.AbortsWithMessage(t, cur, "not a satellite's text", func() { Rent(cross(cur), "mars", "ab"+string(c)+"cd", 1) }, string(c))
+	}
+	uassert.Equal(t, 0, rentals.Size())
+
+	// A variation selector shows: emoji keep it.
+	heart := string(rune(0x2764)) + string(rune(0xfe0f))
+	pay(p0)
+	Rent(cross(cur), "mars", heart, 1)
+	_, got, _, _ := Rental("mars")
+	uassert.Equal(t, heart, got)
+}
+
+// S2: a satellite shows something: spaces alone are no text.
+func TestRentRefusesABlankText(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	for _, text := range []string{" ", "   ", string(rune(0x00a0)), string(rune(0x3000)) + " ", strings.Repeat(" ", 40)} {
+		offer(chain.Coins{{"ugnot", p0}})
+		uassert.AbortsWithMessage(t, cur, "not a satellite's text", func() { Rent(cross(cur), "mars", text, 1) }, text)
+	}
+	uassert.Equal(t, 0, rentals.Size())
+	pay(p0)
+	Rent(cross(cur), "mars", " a ", 1)
+	_, got, _, _ := Rental("mars")
+	uassert.Equal(t, " a ", got)
+}
+
 // D5: three live satellites per address; an ended one no longer counts, and
 // the next rent closes it.
 func TestRentFourthLiveSatelliteRefused(cur realm, t *testing.T) {

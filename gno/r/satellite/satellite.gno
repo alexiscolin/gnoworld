@@ -251,18 +251,22 @@ func isSlug(s string, limit int) bool {
 	return true
 }
 
-// isText reports whether s is valid UTF-8 of 1 to maxText code points, none a
-// control character (D7): code points, so the realm and the app count alike.
+// isText reports whether s is valid UTF-8 of at most maxText code points, one at
+// least not a space, each printable (a letter, mark, number, punctuation, symbol
+// or the ASCII space) and not default-ignorable: nothing that steers or hides what
+// shows, as a bidi mark, a zero-width, a tag or a filler (D7, widened by the
+// security review's S1 and S2). Code points, so the realm and the app count alike.
 func isText(s string) bool {
 	if !utf8.ValidString(s) {
 		return false
 	}
-	n := 0
+	n, shown := 0, false
 	for _, c := range s {
-		if unicode.IsControl(c) {
+		if !unicode.IsPrint(c) || unicode.Is(unicode.Other_Default_Ignorable_Code_Point, c) {
 			return false
 		}
+		shown = shown || c != ' '
 		n++
 	}
-	return n >= 1 && n <= maxText
+	return shown && n <= maxText
 }
