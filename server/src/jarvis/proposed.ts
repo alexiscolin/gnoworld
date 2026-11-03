@@ -9,18 +9,15 @@ import type { FunctionList } from "@gnoworld/schemas/functions";
 type NoneReason = "shape" | "missing" | "read" | "arguments" | "type";
 export type Checked = { ok: true; proposal: ProposedAction } | { ok: false; reason: NoneReason };
 
-type Params = NonNullable<NonNullable<FunctionList>[number]["Params"]>;
-
 // A write function's first parameter is `cur realm`, which `vm/qfuncs` writes as the realm type's base, its methods in order
 // (keeper.go:1795 and uverse.go:110 at gno's chain/onyx, printed by running that code): no type of a realm's can name
 // `.seal`, so nothing else reads so.
-function isWrite(params: Params): boolean {
-  const realm = [
+function realmType(): string {
+  return [
     "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool;",
     "IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string;",
     "Previous func() .uverse.realm; String func() string; Sub func(string) .uverse.realm; Subpath func() string}",
   ].join(" ");
-  return params[0]?.Type === realm;
 }
 
 // What a call carries from text, as `vm/qfuncs` writes the type: gno's convert.go converts the primitives, `[]byte` and
@@ -36,10 +33,10 @@ export function checkProposal(proposal: unknown, functions: FunctionList): Check
   const parsed = ProposedAction.safeParse(proposal);
   if (!parsed.success) return { ok: false, reason: "shape" };
   const { function: name, args } = parsed.data;
-  const found = (functions ?? []).find(({ FuncName }) => FuncName === name);
+  const found = functions?.find(({ FuncName }) => FuncName === name);
   if (found === undefined) return { ok: false, reason: "missing" };
-  const params = found.Params ?? [];
-  if (!isWrite(params)) return { ok: false, reason: "read" };
+  const params = found.Params;
+  if (params?.[0]?.Type !== realmType()) return { ok: false, reason: "read" };
   const wanted = new Set(params.slice(1).map(({ Name }) => Name));
   const given = Object.keys(args);
   if (given.length !== wanted.size || !given.every((key) => wanted.has(key))) return { ok: false, reason: "arguments" };

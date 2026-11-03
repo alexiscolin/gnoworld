@@ -35,7 +35,7 @@ function numbersIn(text: string): Set<string> {
   const values = new Map<string, string>();
   const found = new Set<string>();
   for (const [run] of text.normalize("NFKC").matchAll(number))
-    found.add(run.replace(/\P{Nd}+/gu, ",").replace(/[^\d,]/gu, (digit) => valueOf(digit, values)));
+    found.add(run.replace(/\P{Nd}/gu, ",").replace(/[^\d,]/gu, (digit) => valueOf(digit, values)));
   return found;
 }
 
@@ -84,7 +84,7 @@ function* pageInlines(blocks: readonly PageBlock[]): Generator<Inline> {
 export function sourceFactsOf(source: string, origin: string): SourceFacts {
   const read = page(source, { origin });
   return {
-    links: linksIn(read.kind === "page" ? pageInlines(read.blocks) : []),
+    links: read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>(),
     numbers: numbersIn(source),
     addresses: g1Words(source),
   };
@@ -95,22 +95,21 @@ export interface DigestFacts extends Facts {
   readonly actions: readonly ProposedAction[];
 }
 
-// A block's parts: texts a reader sees, figures (numbers alone), addresses taken whole, and its action.
+// A block's parts: texts a reader sees (a chart's points one a line), addresses taken whole, and its action.
 interface Parts {
   texts: string[];
-  figures: string[];
   links: string[];
   action?: ProposedAction;
 }
 
-const parts = (texts: string[], more: Partial<Parts> = {}): Parts => ({ texts, figures: [], links: [], ...more });
+const parts = (texts: string[], more: Partial<Parts> = {}): Parts => ({ texts, links: [], ...more });
 
 function partsOf(block: DigestBlock): Parts {
   switch (block.type) {
     case "facts":
       return parts(block.facts.flatMap(({ label, value }) => [label, value]));
     case "chart":
-      return parts([block.label], { figures: block.points.map(String) });
+      return parts([block.label, block.points.join("\n")]);
     case "links":
       return parts(
         block.links.map(({ label }) => label),
@@ -135,14 +134,13 @@ export function digestFacts(digest: Digest): DigestFacts {
   const actions: ProposedAction[] = [];
   let room = false;
   for (const block of digest.blocks) {
-    const { texts, figures, links: whole, action } = partsOf(block);
+    const { texts, links: whole, action } = partsOf(block);
     for (const found of texts.map(factsOf)) {
       addAll(links, found.links);
       addAll(addresses, found.addresses);
       addAll(numbers, found.numbers);
       room ||= found.room;
     }
-    addAll(numbers, numbersIn(figures.join("\n")));
     addAll(links, whole);
     if (action !== undefined) actions.push(action);
   }
