@@ -205,11 +205,15 @@ func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	uassert.Equal(t, heart, got)
 }
 
-// S2: a satellite shows something: spaces alone are no text.
+// S2: a satellite shows something: spaces, marks and the Braille blank alone are
+// no text (F5041: a lone variation selector, U+180B or U+2800 passed).
 func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
-	for _, text := range []string{" ", "   ", string(rune(0x00a0)), string(rune(0x3000)) + " ", strings.Repeat(" ", 40)} {
+	for _, text := range []string{
+		" ", "   ", string(rune(0x00a0)), string(rune(0x3000)) + " ", strings.Repeat(" ", 40),
+		string(rune(0x2800)), string(rune(0xfe0f)), " " + string(rune(0xfe0f)), string(rune(0x180b)), string(rune(0x0301)) + " ",
+	} {
 		offer(chain.Coins{{"ugnot", p0}})
 		uassert.AbortsWithMessage(t, cur, "not a satellite's text", func() { Rent(cross(cur), "mars", text, 1) }, text)
 	}

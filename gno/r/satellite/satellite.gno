@@ -26,6 +26,7 @@ const (
 	maxText    = 40          // code points in a satellite's text (D7)
 	startPrice = 1000000     // ugnot a day at deploy (D3)
 	daysText   = "1, 3 or 7" // the days a rental lasts, as Rent checks them
+	blank      = 0x2800      // the Braille blank: a symbol that shows nothing
 )
 
 // Strings, not structs: storage is billed per object (A1:801-804).
@@ -252,11 +253,11 @@ func isSlug(s string, limit int) bool {
 	return true
 }
 
-// isText reports whether s is valid UTF-8 of at most maxText code points, one at
-// least not a space, each printable (a letter, mark, number, punctuation, symbol
-// or the ASCII space) and not default-ignorable: nothing that steers or hides what
-// shows, as a bidi mark, a zero-width, a tag or a filler (D7, widened by the
-// security review's S1 and S2). Code points, so the realm and the app count alike.
+// isText reports whether s is valid UTF-8 of at most maxText code points, each
+// printable (a letter, mark, number, punctuation, symbol or the ASCII space) and
+// not default-ignorable, so nothing steers or hides what shows (a bidi mark, a
+// zero-width, a tag, a filler), and one at least shows: not a space, a mark or the
+// Braille blank (D7, widened by S1, S2 and F5041). Code points, as the app counts.
 func isText(s string) bool {
 	if !utf8.ValidString(s) {
 		return false
@@ -266,7 +267,7 @@ func isText(s string) bool {
 		if !unicode.IsPrint(c) || unicode.Is(unicode.Other_Default_Ignorable_Code_Point, c) {
 			return false
 		}
-		shown = shown || c != ' '
+		shown = shown || c != ' ' && c != blank && !unicode.IsMark(c)
 		n++
 	}
 	return shown && n <= maxText
