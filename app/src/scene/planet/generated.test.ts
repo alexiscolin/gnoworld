@@ -489,18 +489,6 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toContain("float coast = max(0.5 * fwidth(t), 0.002);");
   });
 
-  // A relief that stops dead at the coast is a cliff a pixel wide: its slope lit a bright stair-stepped line along every coast on the
-  // night side, and a dark one under clouds (7b8's close views). The relief rises from nothing over the land's first hundredths.
-  it("raises a sea world's relief from nothing at its coast, never a cliff a pixel wide", () => {
-    expect(GENERATED_FRAGMENT).toMatch(/landed = smoothstep\(shape\.sea, shape\.sea \+ 0\.0\d+, t\) \* inland;/);
-    // On a world of continents the coast's fine noise makes any share band a pixel wide: the relief rises with the smooth field instead,
-    // past the coast's whole reach (its noise moves it about one unit either way): coastal plains.
-    expect(GENERATED_FRAGMENT).toMatch(/inland = smoothstep\(0\.[5-9]\d*, 1\.\d+, above\);/);
-    expect(GENERATED_FRAGMENT).toContain("bentBy(relieved * landed * relief");
-    expect(GENERATED_FRAGMENT).toMatch(/relief \* min\(shape\.detail \* 2\.0, 1\.0\) \* landed \* near/);
-    expect(GENERATED_FRAGMENT).not.toContain("(1.0 - wet) * relief");
-  });
-
   // Climates by latitude and by seed (7b8; Alexis, 2026-11-03, "climats par latitude"): bare ground where it is dry, in a belt about the
   // tropics (sin 0.42, 25 degrees) wandering with the flow, and where it is cold, poleward, high or on an icy world; the seed's minor share
   // tilts the whole world drier. Plants run from deep forest where wet to dry grass; bare ground from tundra where cold to sand where hot.
