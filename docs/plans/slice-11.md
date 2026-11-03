@@ -38,7 +38,7 @@ ADR-0002 §9's realm row: `gno test`, the mutation check, `gno-audit`. Failing f
 Creates `gno/r/satellite/` (module `gno.land/r/gnoworld/satellite`, D1), `gno/p/signing/` (the statement prefix and the weak-key blocklist, D9), `gno/tools/satvec/` and a Go package it shares with `gno/tools/sealvec` (seeded test keys, the prefix, the vectors' decoding helpers). Changes `gno/r/seal/` (imports the shared package; its vectors regenerated, byte for byte what the gate compares) and `gno/tools/sealvec/`, `scripts/mutate.py` and its tests (Alexis, 2026-11-03). Tier 1: every file under `gno/r/` and `gno/p/`; the harness: `scripts/mutate.py`.
 - **11a, the mutation check's flips** (`scripts/mutate.py`, its probe and harness tests): first failing tests that plant a surviving flip and a stale `GAPS` line; then the flips on every `.gno` source line, not only guards. Seal's new survivors are killed by seal tests when a vector exists, or listed in `GAPS` with their reason. First, because 11b's tests must face the flips.
 - **11b, the realm** (`gno/r/satellite/`, `gno/p/signing/`, `gno/tools/`, seal's imports): from 11a's merge. What seal and sealvec share moves first, in a refactor commit of its own, seal's tests and mutation results unchanged: nothing of seal is copied.
-They follow each other, one pane at a time: the account's usage limit is shared with the Mac Studio.
+They run side by side in two herdr panes (Alexis, 2026-11-03): 11b first writes only new files (the shared packages, the vectors tool, its failing tests) and launches no agent, then merges 11a's work and goes on; two agents at most at once, as the account's usage limit is shared with the Mac Studio.
 
 ## 8. Dependencies
 
