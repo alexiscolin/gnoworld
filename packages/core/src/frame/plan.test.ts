@@ -147,6 +147,21 @@ describe("a system's Plan", () => {
     },
   );
 
+  // The design review's second pass (F4470): gnoland's discs stood wider than the gaps between their rings (r 46 to 52 against 54 and 59
+  // px), so which ring a world was on could not be told; gnoswap's two inner rings 14 px apart. A disc's width between neighbours at least.
+  it.each(Object.keys(SETS) as SetName[])("keeps each ring of %s a disc's width or more from the next", (name) => {
+    for (const system of bodied(name)) {
+      const worlds = planOf(system).postcard.worlds;
+      worlds.slice(1).forEach((world, at) => {
+        const inside = worlds[at];
+        if (inside === undefined) return;
+        expect(world.orbit - inside.orbit).toBeGreaterThanOrEqual(
+          2 * Math.max(world.radius, inside.radius) * (1 - 1e-9),
+        );
+      });
+    }
+  });
+
   // A crowd is mostly grain (three clear bodies of 172): Onyx's g1ut6uspuh holds 21 worlds of a body's size.
   it("draws exactly twelve of a system with more", () => {
     const many = bodied("the recorded Onyx file").filter(

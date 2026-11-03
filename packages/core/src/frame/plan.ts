@@ -35,10 +35,11 @@ const TURNS = 24;
 // Its outer orbit spans this share of the narrower screen's width; its largest world this share of that orbit.
 const SPAN = 0.78;
 const LARGEST = 0.14;
-// The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii, the room for a name between.
+// The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii: a disc's width and air, so which
+// ring a world is on reads (the design review's second pass, F4470); growing a tenth a ring outward.
 const INNER = 0.24;
-const GAP = 1.0;
-const GROW = 1.15;
+const GAP = 2.2;
+const GROW = 1.1;
 // The sizes tried, from the largest down, a tenth smaller each time.
 const LEAST = 0.02;
 const SHRINK = 0.9;
