@@ -499,6 +499,15 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).not.toMatch(/\b(landed|inland)\b/);
   });
 
+  // A world of continents' land off its coasts read a fifth to four fifths of the Earth's fine detail (7b8, seeds 0 to 5; the chief,
+  // 2026-11-03): its real map's fine contrast now tints it whole, and the map's grain shades it at three times its relief.
+  it("gives a world of continents' land its map's whole fine contrast and its grain three times its relief", () => {
+    expect(GENERATED_FRAGMENT).toContain("if (continents) albedo *= detail;");
+    expect(GENERATED_FRAGMENT).toMatch(
+      /relief \* \(continents \? 3\.0 : min\(shape\.detail \* 2\.0, 1\.0\)\) \* \(1\.0 - wet\) \* near, angle\);/,
+    );
+  });
+
   // Climates by latitude and by seed (7b8; Alexis, 2026-11-03, "climats par latitude"): bare ground where it is dry, in a belt about the
   // tropics (sin 0.42, 25 degrees) wandering with the flow, and where it is cold, poleward, high or on an icy world; the seed's minor share
   // tilts the whole world drier. Plants run from deep forest where wet to dry grass; bare ground from tundra where cold to sand where hot.

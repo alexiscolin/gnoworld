@@ -8,6 +8,7 @@ import { climatesOn, mapClimateOn, type Climate, type Pole } from "./climates.ts
 import { shoresOn, type Shore } from "./coasts.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, type Circle } from "./lab.ts";
+import { landDetailsOn, type LandDetail } from "./landDetail.ts";
 import { facesApart, facesOn, GLANCE, type Face } from "./textures.ts";
 
 // Coasts at a close world's zoom (radius 350 px, the Earth's view 356), the median world's: the coast's length over its smoothed copy's,
@@ -39,6 +40,10 @@ const SATURATION = { forestOverDesert: 28.5 / 16.3, frame4: 12.9 } as const;
 // Never the Earth (7b7; Alexis, 2026-11-03, 16:4x), its coasts and shapes now compared too, at its own zoom: a world reads apart by its
 // sea, its land or its clouds a glance off (textures.ts's GLANCE), or its coast or its shape a quarter off the Earth's.
 const SHAPE_APART = 0.25;
+// The land's own fine detail off its coasts and clouds (the chief, 2026-11-03: the interiors lost theirs), on seeds 0 to 5 close, each:
+// its energy and its finest share at least 0.8 of the Earth's land where the day box reads it (southern India, 175 and 0.50), as the day
+// box's own share (generated.spec); b9379cef: 54, 45, 87 and 103 on seeds 0, 2, 3 and 5.
+const LAND_DETAIL = { share: 0.8, seeds: 6, blocks: 500 } as const;
 const WORLD = ANCHORS.indexOf("temperate");
 const PARTS = 4;
 const PER_PART = 16;
@@ -61,6 +66,7 @@ interface Earth {
   readonly face: Face;
   readonly chroma: number;
   readonly map: Climate;
+  readonly land: LandDetail;
 }
 // The Earth's measures, once a worker: its view is the same on every visit, its map one file.
 let earthRead: Earth | undefined;
@@ -69,14 +75,15 @@ async function earthOf(page: Page): Promise<Earth> {
   await page.clock.setFixedTime(EARTH_INSTANT);
   await open(page, "?view=earth");
   const shot = await picture(page);
-  const [[shore], [face], [lit]] = [
+  const [[shore], [face], [lit], [land]] = [
     await shoresOn(page, shot, [EARTH_VIEW]),
     await facesOn(page, shot, [EARTH_VIEW]),
     await climatesOn(page, shot, [[EARTH_VIEW, [0, 1, 0]]]),
+    await landDetailsOn(page, shot, [[EARTH_VIEW, true]]),
   ];
   const map = await mapClimateOn(page, await (await page.request.get("/textures/earth-day.webp")).body());
-  if (shore === undefined || face === undefined || lit === undefined) throw new Error("no Earth");
-  earthRead = { shore, face, chroma: lit.chroma, map };
+  if (shore === undefined || face === undefined || lit === undefined || land === undefined) throw new Error("no Earth");
+  earthRead = { shore, face, chroma: lit.chroma, map, land };
   return earthRead;
 }
 
@@ -169,6 +176,30 @@ test.describe("temperate worlds varied and real at the coast", () => {
         ).toContain(true);
       }
     });
+
+  test("a temperate world's land holds the Earth's fine detail off its coasts, on six seeds, each", async ({
+    page,
+  }) => {
+    const { land: earth } = await earthOf(page);
+    expect(earth.blocks, "the Earth's land in its day box").toBeGreaterThanOrEqual(LAND_DETAIL.blocks);
+    const read: LandDetail[] = [];
+    for (let seed = 0; seed < LAND_DETAIL.seeds; seed += 1) {
+      await open(page, `?view=close&world=${String(WORLD)}&seed=${String(seed)}`);
+      const [place] = await circles(page);
+      if (place === undefined) throw new Error("no world");
+      read.push(...(await landDetailsOn(page, await picture(page), [[place, false]])));
+    }
+    test.info().annotations.push({ type: "land", description: JSON.stringify({ earth, read }) });
+    for (const [seed, land] of read.entries()) {
+      expect(land.blocks, `seed ${String(seed)}: land to read`).toBeGreaterThanOrEqual(LAND_DETAIL.blocks);
+      expect(land.energy, `seed ${String(seed)}: the Earth's fine detail`).toBeGreaterThanOrEqual(
+        LAND_DETAIL.share * earth.energy,
+      );
+      expect(land.sharpness, `seed ${String(seed)}: as sharp`).toBeGreaterThanOrEqual(
+        LAND_DETAIL.share * earth.sharpness,
+      );
+    }
+  });
 
   test("temperate worlds take every shape from their seed: one supercontinent, several continents, an archipelago", async ({
     page,

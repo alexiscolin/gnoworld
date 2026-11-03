@@ -128,6 +128,7 @@ void main() {
   if (style > 1.5) albedo = rampOf(sulfurLow, sulfurMid, sulfurHigh, tint);
   if (banded > 0.5) albedo = mix(albedo, mid, shape.clouds * 0.3) * (1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel));
   albedo *= mix(vec3(1.0), detail, min(shape.detail * 2.0, 1.0)) * (1.0 + 0.25 * clamp(cratered, -1.0, 1.0));
+  if (continents) albedo *= detail;
   if (style > 1.5) albedo = mix(albedo, sulfurLow * 1.2, smoothstep(0.9, 0.97, molten));
   if (shape.sea > 0.0) {
     float depth = continents ? smoothstep(0.0, 0.05, (shape.sea - shore) / shape.sea) : smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
@@ -168,7 +169,7 @@ void main() {
   float world = length(modelMatrix[0].xyz);
   vec3 bent = normalize(mix(bentBy(relieved * relief * world * (1.0 - 0.3 * grooved), normal), normal, wet));
   float near = 1.0 - smoothstep(0.004, 0.008, pixel);
-  if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet) * near, angle);
+  if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * (continents ? 3.0 : min(shape.detail * 2.0, 1.0)) * (1.0 - wet) * near, angle);
   float light;
   float shine;
   vec3 colour = litBy(albedo, wet, bent, normal, view, light, shine);
