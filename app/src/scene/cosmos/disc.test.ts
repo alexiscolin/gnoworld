@@ -273,6 +273,16 @@ describe("the suns' halos", () => {
     for (const [at, { reach }] of suns.entries()) expect((reach * 1158) / (aways[at] ?? NaN)).toBeCloseTo(10, 6);
   });
 
+  // The design review's second pass (F4470): in gnoland's Plan another system's star stood on an orbit by coins, its glow 50 px, and read as
+  // that world's sun. A Plan is a chart: its own star keeps its halo, every other is its point.
+  it("draws every other star as its point in a Plan, its own with its halo", () => {
+    const aways = [40, 7, 20];
+    const suns = sunsAt(aways, { main: 0, needsHalo: (index) => index === 0, chart: true });
+    expect(suns.map(({ halo }) => halo)).toEqual([1, 0, 0]);
+    expect(((suns[0]?.reach ?? NaN) * 1158) / 40).toBeGreaterThan(10);
+    for (const at of [1, 2]) expect(((suns[at]?.reach ?? NaN) * 1158) / (aways[at] ?? NaN)).toBeCloseTo(10, 6);
+  });
+
   it("keeps a region's glow whole: it is no sun's halo", () => {
     const systems = [{ ...system(0, 0, false), place: { x: 0, y: -600, z: 0 } }];
     const sight = sighted(systems, (drawn) => {

@@ -234,6 +234,7 @@ export function drawnFrom(
     still: still?.index,
     limb: limbOf(sight),
     main,
+    chart: shown.plan !== undefined,
     hidden: new Set([...postcards.values()].flatMap(({ hidden }) => [...hidden])),
     near: main !== 0,
   };

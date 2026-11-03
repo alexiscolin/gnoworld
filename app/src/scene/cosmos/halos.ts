@@ -24,6 +24,8 @@ export interface HaloSight {
   readonly inView: (place: Point, radius: number) => boolean;
   /** The main light's system, by its index: the great star (0) unless said, a system's own at its arrival (7d3). */
   readonly main?: number;
+  /** A Plan, a chart: every star but its own is its point (the design review's second pass, F4470). */
+  readonly chart?: boolean;
 }
 
 // Under the ceiling, a sun's own size eased so it nears it and never reaches it: two suns at different distances never draw one size, the
@@ -42,6 +44,7 @@ export class Halos {
   #mainSize = Infinity;
   #main = 0;
   #lit = true;
+  #chart = false;
   #focal = 1;
 
   /** Chooses which of `sight`'s drawn stars keep a halo. */
@@ -68,9 +71,10 @@ export class Halos {
 
   // The main light, the great star unless the view says: its size on screen, the widest halo kept; none for a view with no light of its
   // own, the Earth's Plan, a chart the great star blinded (7v's design review, F4469): there every star is its point.
-  #lead({ systems, eye, focal, main = 0 }: HaloSight): void {
+  #lead({ systems, eye, focal, main = 0, chart = false }: HaloSight): void {
     this.#focal = focal;
     this.#main = main;
+    this.#chart = chart;
     this.#lit = systems[main] !== undefined;
     this.#mainSize = mainSize(systems[main], eye, focal);
   }
@@ -78,7 +82,8 @@ export class Halos {
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-    if (!this.#lit) return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
+    if (!this.#lit || (this.#chart && index !== this.#main))
+      return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
     const ceiling = (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize * distance;
     const full =
       index === this.#main
