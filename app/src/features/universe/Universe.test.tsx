@@ -1336,6 +1336,33 @@ describe("flights between places (7g)", () => {
     globe.remove();
   });
 
+  // The scene's flight says its first figures as it starts (Flights.fly), before the host has taken the next page: the next page's box,
+  // put in as the route changes, must be marked for its own body alone (lot C's review, F3704).
+  it("marks the next page's box for its own body alone when the flight it asks speaks at once", async () => {
+    fly.mockImplementation(() => {
+      onFlight()?.(said);
+    });
+    const box = () => {
+      document.querySelector("[data-globe]")?.remove();
+      const globe = document.body.appendChild(document.createElement("div"));
+      globe.setAttribute("data-globe", "");
+      return globe;
+    };
+    box();
+    const { rerender } = rendered("earth");
+    await settle();
+    const world = box();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+    expect(world.dataset["earth"]).toBeUndefined();
+    const earth = box();
+    rerender("earth");
+    expect(fly).toHaveBeenCalledTimes(2);
+    expect(earth.dataset["world"]).toBeUndefined();
+    earth.remove();
+    fly.mockReset();
+  });
+
   it("flies nowhere before the scene runs, to the place it is at, or from a page that covers space", async () => {
     const { rerender } = rendered("cosmos");
     rerender({ world: "gov/dao", name: "GovDAO" });

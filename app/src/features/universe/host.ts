@@ -81,14 +81,19 @@ export class SceneHost {
 
   readonly world = () => this.#world;
 
-  /** What the page knows of the scene's flights, and what their panel shows (7g). */
+  /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and nothing of the page is marked,
+   * for a flight speaks as it starts, before the next page is taken. */
   readonly flown = new Flown(() => {
-    this.#tell();
+    this.#heard();
   });
+
+  #heard(): void {
+    for (const listener of this.#listeners) listener();
+  }
 
   #tell(): void {
     this.#markPage();
-    for (const listener of this.#listeners) listener();
+    this.#heard();
   }
 
   #say(status: SceneStatus): void {
