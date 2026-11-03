@@ -13,12 +13,15 @@ import {
   type StarSystem,
 } from "@gnoworld/core";
 import {
+  FramebufferTexture,
   LineSegments,
+  Mesh,
   PerspectiveCamera,
   Scene as Stage,
   Vector2,
   Vector3,
-  type FramebufferTexture,
+  type BufferGeometry,
+  type Material,
   type Object3D,
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -634,6 +637,95 @@ describe("the cosmos shown again with no flight bringing it", () => {
     frame(flown, scene);
     expect(flown.stats().flying).toBe(true);
     expect(away(scene.eye.travel, ZERO)).toBeGreaterThan(0);
+  });
+});
+
+// However a flight's veil ends, what it made is freed: the copied frame, its mesh's geometry and its material; and the flights once gone
+// copy nothing on the renderer that went with them (lot B's review, F3719).
+describe("what a flight's veil makes, freed however it ends", () => {
+  const partsOf = (scene: Rig) => {
+    const mesh = scene.stage.children.find(({ name }) => name === "dissolve");
+    if (!(mesh instanceof Mesh)) throw new Error("no veil on the stage");
+    const { geometry, material } = mesh as Mesh<BufferGeometry, Material>;
+    return [freedOn(geometry), freedOn(material)];
+  };
+  type End = (flown: Flights, scene: Rig) => void;
+  const ends: [string, End][] = [
+    [
+      "it runs its course",
+      (flown, scene) => {
+        run(flown, scene, 4);
+      },
+    ],
+    [
+      "Escape lands the flight",
+      (flown, scene) => {
+        escape();
+        frame(flown, scene);
+      },
+    ],
+    [
+      "a press lands it",
+      (flown, scene) => {
+        press();
+        frame(flown, scene);
+      },
+    ],
+    [
+      "the flights are disposed mid-way",
+      (flown) => {
+        flown.dispose();
+      },
+    ],
+  ];
+
+  it.each(ends)("frees the copy, its geometry and its material when %s", (_, end) => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    flown.ready();
+    frame(flown, scene);
+    const parts = partsOf(scene);
+    end(flown, scene);
+    expect(parts.map(({ value }) => value)).toEqual([true, true]);
+    expect(scene.copies.every((copy) => scene.freed.has(copy))).toBe(true);
+    expect(veilOn(scene.stage)).toBe(false);
+  });
+
+  it("frees the first flight's veil when a new flight replaces it, and lays the new one's", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    frame(flown, scene);
+    const parts = partsOf(scene);
+    flown.fly({ kind: "cosmos", name: "Cosmos" });
+    expect(parts.map(({ value }) => value)).toEqual([true, true]);
+    expect(scene.copies).toHaveLength(2);
+    expect(scene.freed.has(scene.copies[0] ?? new FramebufferTexture(1, 1))).toBe(true);
+    expect(veilOn(scene.stage)).toBe(true);
+  });
+
+  it("frees a crossfade's copy under reduced motion when the flights are disposed mid-fade", () => {
+    const scene = rig();
+    scene.still.value = true;
+    const flown = flights(scene.device);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    frame(flown, scene);
+    const parts = partsOf(scene);
+    flown.dispose();
+    expect(parts.map(({ value }) => value)).toEqual([true, true]);
+    expect(scene.copies.every((copy) => scene.freed.has(copy))).toBe(true);
+    expect(veilOn(scene.stage)).toBe(false);
+  });
+
+  it("copies nothing once disposed: a flight asked then renders nothing", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.dispose();
+    scene.renderer.render.mockClear();
+    flown.fly({ kind: "body", name: "GovDAO" });
+    expect(scene.renderer.render).not.toHaveBeenCalled();
+    expect(scene.copies).toHaveLength(0);
   });
 });
 
