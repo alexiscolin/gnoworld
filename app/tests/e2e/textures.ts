@@ -13,6 +13,13 @@ export interface Grain {
   /** Of the bright tiles, the share whose lightness echoes across them at 6 to 10 px. */
   readonly period: number;
 }
+/** A world's face as a glance takes it: the mean Lab colour of its sea and of its land (null where it shows none), and its lit share
+ * under cloud. */
+export interface Face {
+  readonly sea: readonly [number, number, number] | null;
+  readonly land: readonly [number, number, number] | null;
+  readonly clouds: number;
+}
 export interface Land {
   readonly share: number;
   /** The share of the land in its largest piece. */
@@ -168,5 +175,27 @@ export const grain = (page: Page, picture: Buffer, discs: readonly Circle[]): Pr
   reading(page, [picture], [grainOf, discs, HELPERS]);
 export const rows = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<number[]> =>
   reading(page, [picture], [rowsOf, discs, [fineIn, dayBox].map(String).join("\n")]);
+function facesOf(discs: readonly Circle[]): Face[] {
+  const { image, labAt, inside } = Reflect.get(globalThis, "__pixels") as Tools;
+  const mean = ([l, a, b, n]: readonly number[]) =>
+    (n ?? 0) === 0 ? null : ([(l ?? 0) / (n ?? 1), (a ?? 0) / (n ?? 1), (b ?? 0) / (n ?? 1)] as const);
+  return discs.map((disc) => {
+    const sums = { sea: [0, 0, 0, 0], land: [0, 0, 0, 0] };
+    let [lit, clouds] = [0, 0];
+    for (const [px, py] of inside(disc, 0.9)) {
+      const kind = kindOf(disc, px, py);
+      if (kind === null) continue;
+      [lit, clouds] = [lit + 1, clouds + Number(kind === "cloud")];
+      if (kind === "cloud") continue;
+      const [l, a, b] = labAt(image, px, py);
+      const [sl = 0, sa = 0, sb = 0, n = 0] = sums[kind];
+      sums[kind] = [sl + l, sa + a, sb + b, n + 1];
+    }
+    return { sea: mean(sums.sea), land: mean(sums.land), clouds: clouds / Math.max(lit, 1) };
+  });
+}
+
+export const facesOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Face[]> =>
+  reading(page, [picture], [facesOf, discs, String(kindOf)]);
 export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
   reading(page, [picture], [landOf, discs, String(kindOf)]);

@@ -2,10 +2,20 @@
 // Lab, turned by its system's hue. The generated worlds' chunk draws it (app/src/scene/planet/generated.ts), so neither the scene's
 // chunk nor the cosmos's carries it. Only + - * / reach a value. Tier 1 (docs/REVIEW.md).
 import { REALM_PREFIX } from "../chain/realm.ts";
-import type { Anchor, MapName } from "./anchors.ts";
+import type { Anchor, MapName, Rgb } from "./anchors.ts";
 import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
 import { asciiBytes, planetSeed, worldPath } from "./look.ts";
-import { labOf, NO_TURN, paletteOf, turnOf, type Lab, type Palette, type Turn } from "./palette.ts";
+import {
+  labOf,
+  linearOf,
+  NO_TURN,
+  paletteOf,
+  turnedLab,
+  turnOf,
+  type Lab,
+  type Palette,
+  type Turn,
+} from "./palette.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { seedShare } from "./shares.ts";
@@ -20,6 +30,8 @@ export interface Recipe {
   readonly surface: Surface;
   readonly palette: Palette;
   readonly minorPalette: Palette;
+  /** Its sea's shallow and deep colours turned by its system's hue, in Lab and as linear sRGB; none on a world without a sea. */
+  readonly sea: { readonly lab: readonly [Lab, Lab]; readonly linear: readonly [Rgb, Rgb] } | null;
 }
 
 const MAX_MINOR = 0.4;
@@ -78,6 +90,14 @@ function fitsUnder(dominant: Anchor): (minor: Anchor) => boolean {
     ROWS[minor].palettes.every(([, centre]) => fits(labOf(centre)));
 }
 
+// A world's sea turns by its system's hue as its palettes do (Alexis, 2026-11-03, "bleu-vert variant").
+function seaOf(anchor: Anchor, turn: Turn): Recipe["sea"] {
+  const sea = ROWS[anchor].sea;
+  if (sea === undefined) return null;
+  const [shallow, deep] = [turnedLab(labOf(sea.shallow), turn), turnedLab(labOf(sea.deep), turn)];
+  return { lab: [shallow, deep], linear: [linearOf(shallow), linearOf(deep)] };
+}
+
 /** The recipe a seed gives as `anchor`, turned by its system's hue. */
 export function seededRecipe(seed: Uint8Array, anchor: Anchor, turn: Turn): Recipe {
   const more = moreSeed(seed);
@@ -95,6 +115,7 @@ export function seededRecipe(seed: Uint8Array, anchor: Anchor, turn: Turn): Reci
     surface: surfaceOf(more, anchor),
     palette: paletteOf(ROWS[anchor].palettes, grade),
     minorPalette: paletteOf(ROWS[minor].palettes, grade),
+    sea: seaOf(anchor, turn),
   };
 }
 

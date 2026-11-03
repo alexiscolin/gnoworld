@@ -5,11 +5,11 @@
 
 import { ANCHORS, type Anchor } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
-import { askLab, circles, drawn, heldQuiet, open, picture, type Circle } from "./lab.ts";
+import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, type Circle } from "./lab.ts";
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, wholeRows } from "./surfaces.ts";
-import { grain, landOn, rows } from "./textures.ts";
+import { facesOn, grain, landOn, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
@@ -58,6 +58,12 @@ const CALDERA = [0.2, 0.5] as const;
 const CONTINENT = 0.7;
 const LAND = [0.3, 0.6] as const;
 const ALL_SEA = 0.05;
+// A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre ... unique et bien reconnaissable"): its sea's
+// or its land's colour 10 or more from the Earth's in Lab, or its cloud cover a tenth or more apart, each a step a glance takes (core's
+// variety.ts: a colour under 10 and a value under a tenth of its span read alike). The Earth: its close view at realism.spec's instant.
+const GLANCE = { colour: 10, clouds: 0.1 } as const;
+const apartIn = (one: Face["sea"], other: Face["sea"]) =>
+  one === null || other === null ? Infinity : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -214,6 +220,34 @@ test.describe("the generated worlds polished", () => {
       expect(floor.darkest / floor.median, "never punched black").toBeGreaterThanOrEqual(CALDERA[0]);
       expect(floor.darkest / floor.median, "calderas there").toBeLessThanOrEqual(CALDERA[1]);
     });
+  });
+
+  // Each seed of the lab names 24 other systems, so their seas turn another way: four seeds, 96 worlds, read for the worst.
+  test("no temperate world reads as the Earth, over its sea's whole turn: its sea, land or clouds a glance apart", async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(EARTH_INSTANT);
+    await open(page, "?view=earth");
+    const [earth] = await facesOn(page, await picture(page), [EARTH_VIEW]);
+    if (earth === undefined) throw new Error("no Earth");
+    await open(page, ofClass("temperate"));
+    const worlds: Face[] = [];
+    for (let seed = 0; seed < 4; seed += 1) {
+      if (seed > 0) await nextSeed(page);
+      worlds.push(...(await facesOn(page, await picture(page), await circles(page))));
+    }
+    const apart = worlds.map(({ sea, land, clouds }) => ({
+      sea: apartIn(sea, earth.sea),
+      land: apartIn(land, earth.land),
+      clouds: Math.abs(clouds - earth.clouds),
+    }));
+    const nearest = Math.min(...apart.map(({ sea, land }) => Math.max(sea, land)));
+    test.info().annotations.push({ type: "faces", description: JSON.stringify({ earth, nearest, apart }) });
+    for (const [at, { sea, land, clouds }] of apart.entries())
+      expect(
+        sea >= GLANCE.colour || land >= GLANCE.colour || clouds >= GLANCE.clouds,
+        `world ${String(at)}: sea ${sea.toFixed(1)}, land ${land.toFixed(1)}, clouds ${clouds.toFixed(2)} from the Earth's`,
+      ).toBe(true);
   });
 
   test("24 temperate worlds hold continents, as the Earth does, not islands (F4243)", async ({ page }) => {

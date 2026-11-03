@@ -404,12 +404,14 @@ describe("planetLook", () => {
       }
   });
 
-  it("gives a temperate world and an ocean world the frames' seas, a shallow blue over a deep one", () => {
+  // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre"): its sea is a deep teal, 20 or more
+  // in Lab from the frames' navy, which the ocean keeps.
+  it("gives an ocean world the frames' seas, and a temperate world a teal sea of its own, never the Earth's navy", () => {
     const byte = ([red, green, blue]: readonly number[]) =>
       (red ?? 0) * 255 * 65536 + (green ?? 0) * 255 * 256 + (blue ?? 0) * 255;
     const seaOf = (anchor: Anchor) => planetLook(DAO, anchor).sea;
-    expect(byte(seaOf("temperate")?.shallow ?? [])).toBeCloseTo(0x1f4a80, 6);
-    expect(byte(seaOf("temperate")?.deep ?? [])).toBeCloseTo(0x0b2250, 6);
+    expect(byte(seaOf("temperate")?.shallow ?? [])).toBeCloseTo(0x064e59, 6);
+    expect(byte(seaOf("temperate")?.deep ?? [])).toBeCloseTo(0x00262e, 6);
     expect(byte(seaOf("ocean")?.shallow ?? [])).toBeCloseTo(0x1b5c8f, 6);
     expect(byte(seaOf("ocean")?.deep ?? [])).toBeCloseTo(0x0a2a5c, 6);
   });

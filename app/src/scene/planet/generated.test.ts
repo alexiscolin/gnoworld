@@ -179,8 +179,10 @@ describe("a generated world, drawn from its recipe", () => {
     expect(read(drawn(worldAt("tidally locked")).surface, "locked")).toBe(1);
     expect(read(drawn(worldAt("rocky")).surface, "locked")).toBe(0);
     const ocean = worldAt("ocean");
-    if (ocean.look.sea === null) throw new Error("an ocean world has a sea");
-    expect(read(drawn(ocean).surface, "seaDeep")).toEqual(working(ocean.look.sea.deep));
+    if (ocean.recipe.sea === null) throw new Error("an ocean world has a sea");
+    // Its sea as the recipe turns it by its system's hue (Alexis, 2026-11-03, "bleu-vert variant").
+    expect(read(drawn(ocean).surface, "seaDeep")).toEqual(linear(ocean.recipe.sea.linear[1]));
+    expect(read(drawn(worldAt("rocky")).surface, "seaDeep")).toEqual(linear([0, 0, 0]));
   });
 
   it("gives the same path the same world, every time it is drawn (golden)", () => {

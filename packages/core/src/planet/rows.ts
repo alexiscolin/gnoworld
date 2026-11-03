@@ -20,7 +20,7 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     warp: [0.08, 0.2],
     recolour: [0.75, 1],
     relief: [0.0042, 0.008],
-    sea: { shallow: rgb(0x1f4a80), deep: rgb(0x0b2250) },
+    sea: { shallow: rgb(0x064e59), deep: rgb(0x00262e) },
     rim: { colours: SKY, thickness: [0.04, 0.05] },
   },
   desert: {

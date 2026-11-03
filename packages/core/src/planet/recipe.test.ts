@@ -14,8 +14,8 @@ import {
   type Anchor,
   type PlanetLook,
 } from "./look.ts";
-import { labOf, type Lab } from "./palette.ts";
-import { planetRecipe, worldRecipe, type Recipe } from "./recipe.ts";
+import { labOf, turnOf, type Lab } from "./palette.ts";
+import { planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
 
@@ -191,6 +191,56 @@ describe("a world's recipe", () => {
         const recipe = worldRecipe(id, nature);
         expect(recipe, `${id} ${String(nature)}`).toEqual(planetRecipe(worldPath(id), worldLook(id, nature).anchor));
       }
+  });
+});
+
+// A world's sea turns by its system's hue, as its palettes do (Alexis, 2026-11-03, "bleu-vert variant"): two systems give two seas, one
+// path always the same, its lightness and chroma kept. A temperate world's teal stays a glance (10 in Lab, core's variety.ts) from the
+// frames' navy, which the Earth's sea is and the ocean keeps, at either end of the turn.
+describe("a world's sea", () => {
+  const NAVY = [labOf([0x1f / 255, 0x4a / 255, 0x80 / 255]), labOf([0x0b / 255, 0x22 / 255, 0x50 / 255])] as const;
+  const hue = ([, a, b]: Lab) => Math.atan2(b, a);
+  const turned = (one: Lab, other: Lab) =>
+    Math.abs(Math.atan2(Math.sin(hue(one) - hue(other)), Math.cos(hue(one) - hue(other))));
+
+  it("turns by its system's hue, 12 degrees at most, its lightness and chroma kept: two systems, two seas", () => {
+    for (const anchor of ANCHORS) {
+      const row = ROWS[anchor].sea;
+      const seas = Array.from(
+        { length: 40 },
+        (_, at) => planetRecipe(asciiBytes(`gno.land/r/sea${String(at)}/home`), anchor).sea,
+      );
+      if (row === undefined) {
+        expect(
+          seas.every((sea) => sea === null),
+          anchor,
+        ).toBe(true);
+        continue;
+      }
+      expect(new Set(seas.map((sea) => sea?.lab[1].join())).size, anchor).toBeGreaterThan(20);
+      for (const sea of seas)
+        for (const [at, plain] of [labOf(row.shallow), labOf(row.deep)].entries()) {
+          const drawn = sea?.lab[at] ?? [0, 0, 0];
+          expect(drawn[0], anchor).toBeCloseTo(plain[0], 9);
+          expect(Math.hypot(drawn[1], drawn[2]), anchor).toBeCloseTo(Math.hypot(plain[1], plain[2]), 6);
+          expect(turned(drawn, plain), anchor).toBeLessThanOrEqual(MOST_TURN + 1e-9);
+        }
+    }
+    const path = asciiBytes("gno.land/r/sea0/home");
+    expect(planetRecipe(path, "temperate").sea).toEqual(planetRecipe(path, "temperate").sea);
+  });
+
+  it("keeps a temperate world's teal a glance from the frames' navy at either end of the turn", () => {
+    for (const share of [0, 1]) {
+      const sea = seededRecipe(planetSeed(asciiBytes("gno.land/r/sea/home")), "temperate", turnOf(share)).sea;
+      for (const [at, navy] of NAVY.entries()) {
+        const drawn = sea?.lab[at] ?? navy;
+        expect(
+          Math.hypot(...drawn.map((value, axis) => value - (navy[axis] ?? 0))),
+          String(share),
+        ).toBeGreaterThanOrEqual(10);
+      }
+    }
   });
 });
 
