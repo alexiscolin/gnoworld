@@ -43,6 +43,8 @@ interface PanelSeen {
   widest: string;
   // The page's plate as each phase of the panel came in: frames 19, 36 and 101 fly with no plate.
   plates: string[];
+  // The panel's border and its bar's track as drawn, and the strong line token as the page resolves it.
+  lines: { border: string; track: string; strong: string };
 }
 
 const flightOf = async (page: Page): Promise<FlightStats | undefined> => (await stats(page)).flight;
@@ -73,6 +75,7 @@ const watchPanel = (page: Page) =>
       cut: [],
       widest: "",
       plates: [],
+      lines: { border: "", track: "", strong: "" },
     };
     Reflect.set(globalThis, "__panelSeen", seen);
     const boxOf = (element: Element | null) => {
@@ -86,6 +89,15 @@ const watchPanel = (page: Page) =>
       seen.target = boxOf(panel.querySelector("dd"));
       seen.bar = boxOf(panel.querySelector("[data-along]"));
       seen.named = panel.querySelector("dd")?.textContent ?? "";
+      const probe = document.body.appendChild(document.createElement("i"));
+      probe.style.color = "var(--color-line-strong)";
+      const bar = panel.querySelector("[data-along]");
+      seen.lines = {
+        border: getComputedStyle(panel).boxShadow,
+        track: bar === null ? "" : getComputedStyle(bar).backgroundColor,
+        strong: getComputedStyle(probe).color,
+      };
+      probe.remove();
     };
     // A value's words end where they end, or where its column cuts them; the target alone may be cut (frame 89).
     const wordsEnd = (value: Element) => {
@@ -169,6 +181,9 @@ test("stands the flight panel where the frames stand it, under the header in the
   near(seen.target?.x ?? NaN, TARGET_LEFT, "the target's left");
   nearBox(seen.bar, BAR, "the bar");
   expect(seen.phases).toEqual(PHASES);
+  // Frames 89 and 142 draw the border and the track at about #3c3b40 over black: the strong line, not the plain one (F3709).
+  expect(seen.lines.track).toBe(seen.lines.strong);
+  expect(seen.lines.border).toContain(seen.lines.strong);
 });
 
 // Frame 18's figures stand apart at four digits, "1,158 km/s" and its time: never run together, never cut. A far star of the recorded worlds

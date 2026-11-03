@@ -15,7 +15,7 @@
     border-radius: var(--radius-box);
     /* raw: the panels' night at 86% over the scene (docs/design/coherence.md), no blur, which is not Baseline yet (F262) */
     background: color-mix(in oklab, var(--color-surface) 86%, transparent);
-    box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
     pointer-events: none;
     translate: -50% 0;
   }
@@ -60,7 +60,7 @@
     margin-block-start: var(--space-s);
     /* raw: frame 18's bar, two pixels */
     block-size: 2px;
-    background: var(--color-line);
+    background: var(--color-line-strong);
   }
 
   .bar::before {
