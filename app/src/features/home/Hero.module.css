@@ -182,6 +182,11 @@
       flex-wrap: wrap;
     }
 
+    .actions {
+      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px (F4642) */
+      flex-wrap: wrap;
+    }
+
     .action {
       /* raw: 48 px tall and 20 at the sides on a phone (the prototype's line 772) */
       block-size: 48px;

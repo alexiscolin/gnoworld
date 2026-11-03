@@ -441,6 +441,31 @@ for (const width of [390, 1280, 1728] as const) {
   });
 }
 
+// F4642: at 320 px "Join the chat" ran past the window's right edge (7v's pictures): the hero's calls wrap to a second row before they leave
+// the page's 16 px gutter, and at 390 px they share a row, as the approved hero-390 draws them.
+for (const width of [320, 390] as const)
+  test(`the hero's calls stand inside the page's 16 px gutter at ${String(width)} px, wrapping before they overflow`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    await hydrated(page);
+    // The line's face changes its width, and so whether it wraps: the calls are measured in the page's own fonts.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await expect(page.locator("[data-hero='actions'] a")).toHaveCount(2);
+    const first = await box(page, "[data-hero='actions'] a >> nth=0");
+    const second = await box(page, "[data-hero='actions'] a >> nth=1");
+    for (const [at, call] of [first, second].entries()) {
+      expect(call.x, `call ${String(at)}'s left`).toBeGreaterThanOrEqual(16 - 0.5);
+      expect(call.x + call.width, `call ${String(at)}'s right`).toBeLessThanOrEqual(width - 16 + 0.5);
+    }
+    if (width === 320) expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+    else near(second.y, first.y, "the calls' row");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
 // F3274: the bar of the three views stands over the foot of a phone's page; the page leaves it the room, so at the page's end
 // nothing of it lies under the bar (the prototype reserves it: lines 770 to 774).
 test.describe("the views' bar on a phone", () => {
