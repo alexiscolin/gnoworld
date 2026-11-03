@@ -64,14 +64,34 @@ async function flushWorker(page: Page, worker: Worker): Promise<void> {
   }).toPass();
 }
 
-// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
-// The directives a page's documents reported, written to its console, which outlives a navigation.
+// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f). The directives a page's documents
+// reported, written to its console, which outlives a navigation.
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
   planted: boolean;
   violations: string[];
   homeReads: undefined;
+  refusing: boolean;
+  refusals: string[];
 }>({
   planted: [false, { option: true }],
+  refusing: [false, { option: true }],
+  // A shader the scene refused fails every journey that plants none (`refusing`): the scene reports each as a page error (scene.ts's
+  // onShaderError), three logs any other. No journey heard the scene's own report before 7v, when the build broke them all.
+  refusals: [
+    async ({ context, refusing }, use) => {
+      const seen: string[] = [];
+      context.on("weberror", (error) => {
+        const { message } = error.error();
+        if (message.includes("a shader was refused")) seen.push(message);
+      });
+      context.on("console", (message) => {
+        if (message.text().includes("THREE.WebGLProgram")) seen.push(message.text());
+      });
+      await use(seen);
+      if (!refusing) expect(seen, "a shader the scene refused, which no journey planted").toEqual([]);
+    },
+    { auto: true },
+  ],
   // The home's one read, answered as a settled site would: a file with no price and a block three minutes old (the server's timer
   // writes both), so no page fails a request it did not mean to and the age words stay still. The home asks no chain: a journey
   // that reads one routes its own. A journey that asks otherwise routes its own file.

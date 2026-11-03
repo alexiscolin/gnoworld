@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { landed, running, shaderRefusals, stats } from "./sceneStage.ts";
+import { landed, running, stats } from "./sceneStage.ts";
 
 // A system's two views and the Earth's (7v; Alexis, 2026-11-03, the mock-ups he approved and the GUI board's option B), on the gate's software
 // GPU, from Onyx's recorded file: the header's two icons and V for how one looks, the Plan's names under its worlds, a first click naming
@@ -37,7 +37,6 @@ const names = (page: Page) => page.locator("[data-plan] a");
 test("offers space's two views in the header's pill, V toggling them, and the Earth's Plan at rest naming gnosh.ai", async ({
   page,
 }) => {
-  const refused = shaderRefusals(page);
   await home(page);
   expect(await pressed(page)).toEqual(["true", "false"]);
   await page.keyboard.press("v");
@@ -56,7 +55,6 @@ test("offers space's two views in the header's pill, V toggling them, and the Ea
   expect(await pressed(page)).toEqual(["true", "false"]);
   await expect(names(page)).toHaveCount(0, SLOW);
   // Every shader compiles, three's and ours, their spaces stripped at build.
-  expect(refused).toEqual([]);
 });
 
 test("names the system the eye comes to, '← Cosmos › gnoswap', gives it the screen, and goes back a step from the crumb", async ({

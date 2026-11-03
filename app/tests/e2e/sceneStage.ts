@@ -126,18 +126,6 @@ export const restoreContext = (page: Page) =>
     (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
   });
 
-/** Every shader the driver refused while the page runs: the scene reports each as a page error (scene.ts's onShaderError, since 7f's
- * fix, so three logs none of them), and three logs any other (7v's security review: the console alone heard none). */
-export function shaderRefusals(page: Page): string[] {
-  const refused: string[] = [];
-  page.on("console", (message) => {
-    if (message.text().includes("THREE.WebGLProgram")) refused.push(message.text());
-  });
-  page.on("pageerror", ({ message }) => {
-    if (message.includes("a shader was refused")) refused.push(message);
-  });
-  return refused;
-}
 /** Hides the page's text over the canvas, so a journey reads what the scene drew. */
 export const hideThePage = (page: Page) =>
   page.evaluate(() => {

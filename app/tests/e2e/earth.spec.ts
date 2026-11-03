@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, near } from "./geometry.ts";
-import { keepsItsRoom, loseContext, restoreContext, running, shaderRefusals, stats } from "./sceneStage.ts";
+import { keepsItsRoom, loseContext, restoreContext, running, stats } from "./sceneStage.ts";
 
 // The Earth (frames 37 to 42) on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any violation).
 // Reduced motion draws once a change: a software GPU takes seconds a frame, and nothing here depends on the arrival. The canvas is not
@@ -69,10 +69,8 @@ test.describe("a computer", () => {
   test("draws the Earth on its page, its maps from the site, with no CSP violation and no shader refused", async ({
     page,
   }) => {
-    const refused = shaderRefusals(page);
     const asked = mapsAsked(page);
     await opened(page);
-    expect(refused).toEqual([]);
     expect(asked.sort()).toEqual([
       "/textures/clouds.webp",
       "/textures/earth-day.webp",
@@ -378,11 +376,12 @@ test.describe("a texture that does not come", () => {
   });
 });
 
-// A software GPU refuses nothing, so the fault is planted in the chunk the worker would otherwise answer for.
+// A software GPU refuses nothing, so the fault is planted in the chunk the worker would otherwise answer for; the journey says it plants a
+// refusal, which every other journey fails on (fixtures.ts, 7v), and the fixture's own record must hear it.
 test.describe("a shader the driver refuses", () => {
-  test.use({ viewport: COMPUTER, serviceWorkers: "block" });
+  test.use({ viewport: COMPUTER, serviceWorkers: "block", refusing: true });
 
-  test("leaves the page whole, says so, and keeps the plate shut: no hole with no word", async ({ page }) => {
+  test("leaves the page whole, says so, and keeps the plate shut: no hole with no word", async ({ page, refusals }) => {
     // The line is broken in whichever of the scene's chunks holds it: a second lazy part split the scene's shared code out of its chunk (7e),
     // and the build strips the shaders' spaces (7v), so `float facing=`.
     let broken = 0;
@@ -392,10 +391,8 @@ test.describe("a shader the driver refuses", () => {
       if (text.includes("float facing=")) broken += 1;
       await route.fulfill({ response: answer, body: text.replace("float facing=", "flot facing=") });
     });
-    const refused: string[] = [];
-    page.on("pageerror", ({ message }) => refused.push(message));
     await givenUp(page);
-    expect(refused.join()).toContain("a shader was refused");
+    expect(refusals.join()).toContain("a shader was refused");
     expect(broken, "one chunk held the line").toBe(1);
   });
 });
