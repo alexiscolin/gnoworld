@@ -14,7 +14,6 @@ import {
 } from "@gnoworld/core";
 import {
   FramebufferTexture,
-  LineSegments,
   Mesh,
   PerspectiveCamera,
   Scene as Stage,
@@ -990,10 +989,10 @@ describe("what a flight gives back", () => {
     const refused = new Error("no program");
     scene.renderer.compileAsync.mockImplementationOnce(() => Promise.reject(refused));
     const flown = flights(scene.device);
-    const streaks = scene.renderer.compileAsync.mock.calls.filter(([object]) => object instanceof LineSegments);
+    const streaks = scene.renderer.compileAsync.mock.calls.filter(([object]) => object.name === "streaks");
     expect(streaks).toHaveLength(1);
     const [object, camera, target] = streaks[0] ?? [];
-    expect(object).toBeInstanceOf(LineSegments);
+    expect(object?.name).toBe("streaks");
     expect(camera).toBe(scene.camera);
     expect(target).toBe(scene.stage);
     await Promise.resolve();
@@ -1021,7 +1020,8 @@ describe("what a flight gives back", () => {
   it("takes its streaks off the stage and frees them, frees its veil, and hears no key once disposed", () => {
     const scene = rig();
     const flown = new Flights(scene.device);
-    const streaks = scene.stage.children.find((child): child is LineSegments => child instanceof LineSegments);
+    const streaks = scene.stage.children.find(({ name }) => name === "streaks") as
+      { geometry: BufferGeometry; material: Material | Material[] } | undefined;
     const material = streaks?.material;
     const [geometry, shader] = [freedOn(streaks?.geometry), freedOn(Array.isArray(material) ? undefined : material)];
     flown.fly({ kind: "body", name: "GovDAO" });
