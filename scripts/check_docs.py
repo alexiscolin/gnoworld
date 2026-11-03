@@ -3,8 +3,11 @@
 # .claude/**/*.md (the ADRs, plans and ARCHITECTURE describe the future too), and checks
 # every `scripts/`, `.claude/`, `docs/`, `adr/` or `.githooks/` path written in backticks.
 # Paths with a template variable or under .claude/tmp/ are skipped. It also checks the findings
-# ledger, docs/review/findings.md (docs/REVIEW.md), and the runbook's alerts and known limits.
+# ledger, docs/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
+# that no file git tracks or would, as staged or in the work tree, no name, link or commit message
+# of the branch holds a hidden character (F5053, F5087, F5089).
 # Usage: check_docs.py [root]
+import os
 import pathlib
 import re
 import subprocess
@@ -12,7 +15,8 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
-from repo_files import listed
+from hidden import hidden_in, hidden_in_data
+from repo_files import git, listed, listing
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
@@ -54,6 +58,79 @@ def lost_rules(root):
     claude = root / "CLAUDE.md"
     if not claude.is_file() or not CARD_ITEM.search(claude.read_text()):
         out.append("CLAUDE.md: the review card has no item `8. Risk and undo:`")
+    return out
+
+
+# An image is no text: a file whose suffix names one and that starts with its format's own bytes is not read (a text so
+# named is). Any other file is UTF-8 text read for what hidden.py names (F5053), or is refused: a binary of another format
+# (a font, a video) wants its suffix and first bytes here first (F5082).
+IMAGES = {".png": b"\x89PNG\r\n\x1a\n", ".jpg": b"\xff\xd8\xff"}
+
+
+def messages(root):
+    """(short sha, message) of each commit since the branch left origin/main (F5079): none outside a repository (the
+    pre-commit's staged copy) or with no origin/main to say where the branch starts. A git that cannot run, or fails, raises:
+    for-each-ref answers nothing for a missing ref, so a failure is never taken for one."""
+    if not (root / ".git").exists():
+        return []
+    if not git("-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/remotes/origin/main"):
+        return []
+    log = git("-C", str(root), "log", "-z", "--format=%h%x00%B", "refs/remotes/origin/main..HEAD").split("\0")
+    return list(zip(log[0::2], log[1::2]))
+
+
+def staged(root):
+    """{path: (bytes, whether a link)} of each blob the index holds, what a commit takes (F5087), a link's target its bytes:
+    none outside a repository (the pre-commit's staged copy, whose files are the index's). A gitlink (a submodule) holds no
+    text. A git that cannot run, or fails, raises."""
+    if not (root / ".git").exists():
+        return {}
+    entries = [entry.split("\t", 1) for entry in git("-C", str(root), "ls-files", "-z", "--stage").split("\0") if entry]
+    blobs = [(info.split()[0], info.split()[1], path) for info, path in entries if not info.startswith("160000 ")]
+    batch = subprocess.run(["git", "-C", str(root), "cat-file", "--batch"], input="".join(f"{sha}\n" for _, sha, _ in blobs).encode(),
+                           capture_output=True, check=True).stdout
+    held, at = {}, 0
+    for mode, _, path in blobs:  # each `<sha> blob <size>`, the bytes, a newline
+        start = batch.index(b"\n", at) + 1
+        end = start + int(batch[at:start].split()[2])
+        held[path], at = (batch[start:end], mode == "120000"), end + 1
+    return held
+
+
+def text_of(where, path, data):
+    """hidden_in_data of a file's bytes, but none of an image's."""
+    suffix = pathlib.PurePosixPath(path).suffix
+    return [] if suffix in IMAGES and data.startswith(IMAGES[suffix]) else hidden_in_data(where, data)
+
+
+def hidden(root):
+    """Each hidden character, and each file that is no UTF-8 text: of what a commit takes, the index's copy of each file and
+    link; of the work tree's copy where it differs, and of what git would track; of every name (F5089); and of the branch's
+    commit messages."""
+    out = []
+    try:
+        held = staged(root)
+    except (OSError, subprocess.CalledProcessError) as e:
+        held = {}
+        out.append(f"git cannot read the index, so nothing staged is proven clean: {e}")
+    for path, (data, link) in held.items():
+        out += text_of(path + " (link)" * link, path, data)
+    names = set(held)
+    for p in listing(root):
+        path, link = p.relative_to(root).as_posix(), p.is_symlink()
+        names.add(path)
+        if not (link or p.is_file()):
+            continue
+        data = os.fsencode(os.readlink(p)) if link else p.read_bytes()
+        if held.get(path) != (data, link):
+            out += text_of(path + " (link)" * link + " (work tree)" * (path in held), path, data)
+    for path in sorted(names):
+        out += hidden_in(f"the name {ascii(path)}", path)
+    try:
+        for sha, message in messages(root):
+            out += hidden_in(f"commit {sha}", message)
+    except (OSError, subprocess.CalledProcessError) as e:
+        out.append(f"git cannot read the branch's commit messages, so none is proven clean: {e}")
     return out
 
 
@@ -146,5 +223,10 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
-if missing or problems or orphans or unnamed or lost or rules:
+hidden_chars = hidden(root)
+if hidden_chars:
+    print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
+          " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
+          " bytes, IMAGES):", *hidden_chars, sep="\n  ", file=sys.stderr)
+if hidden_chars or missing or problems or orphans or unnamed or lost or rules:
     sys.exit(1)

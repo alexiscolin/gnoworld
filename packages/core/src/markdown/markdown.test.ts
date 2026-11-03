@@ -268,8 +268,8 @@ describe("markdown: links, https alone", () => {
     "[x](https://evil.example\\@gno.land)",
     "[x](https://a.example\\path)",
     "[x](https://a.example/\u0000)",
-    "[x](https://a​b.example)",
-    "[x](https://a.example/‮)",
+    "[x](https://a\u200bb.example)",
+    "[x](https://a.example/\u202e)",
     '[x](https://a.example/"onclick=x)',
     "[x](https://café.example)",
     "[x](https://@@)",
@@ -311,7 +311,7 @@ describe("markdown: links, https alone", () => {
     "[x](javascript:https://a.example/x)",
     "https://user:pw@evil.example",
     "https://gno.land@evil.example/",
-    "https://a​b.example",
+    "https://a\u200bb.example",
   ])("links no address hidden in another (%j)", plain);
 
   test("ends a link's address at a space: what follows is text, the bare part a link", () => {
@@ -908,8 +908,8 @@ describe("markdown: whatever comes", () => {
     "https://u:p@a.example",
     "https://a.example/z",
     "\u0000",
-    "‮",
-    "​",
+    "\u202e",
+    "\u200b",
     "\r\n",
     "&#106;",
     '<a href="javascript:x">',

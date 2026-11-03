@@ -11,6 +11,11 @@ unset GIT_NO_REPLACE_OBJECTS
 # `outside` and `installed` run them as in Alexis's shell (F076, F129).
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+# No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
+# one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
+# could as well, and GIT_CONFIG would send `git config` out of the repository.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
 rp="$here"/review_pass.py # review_pass and pre_push both use it
@@ -250,6 +255,341 @@ sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fa
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
 fi
 
+if part mutate; then
+# mutate.py, the realms' mutation check (ADR-0001 §14, backlog row 11): every guard removed and every operator or number
+# flipped must fail a test. First its flips, read and never compiled: comments, strings and runes stay as they are, only whole
+# operators flip (never a part of `++`, `+=` or `<<`), integers shift by one and other numbers never; a key names its line and
+# its flip, and the occurrence when the same flip of the same text comes more than once, so a line moved elsewhere keeps it.
+[ -x "${GNO:-}" ] || fail "the mutate section runs the gno check.sh exports as GNO: ${GNO:-unset}"
+mu="$t/mutate" && mkdir -p "$mu/read" "$mu/moved"
+cat >"$mu/read/listing.gno" <<'EOF'
+package listing
+
+// a < b in a comment, and 1 + 2
+/* a block
+comment: x == y, 3 - 4 */
+func f(a, b int, s string) {
+	_ = "a < b, 5 + 6" + s + `raw: c >= d,
+7 - 8`
+	_ = "a \"<\" b" + s
+	_ = "http://x/*y" + s
+	_ = '+' - b // a rune, and a comment that switches no flip off: a || b
+	_ = '"' + '\'' - b
+	_ = a /* c <= d */ <= b
+	_ = a /* don't " */ - b
+	// don't stop at this quote: "
+	n >>= 1
+	n <<= 1
+	n &^= 1
+	n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9
+	n++
+	n += 2
+	n--
+	n -= 3
+	_ = n<<1 | n>>2 &^ 1
+	_ = a >= b == true
+	_ = a != b && a > b || a < b
+	_ = n + n
+	_ = n + n
+	_ = -n
+	var arr [32]byte
+	_ = arr[0]
+	_ = `\` + s
+	_ = x[0x1E+1]
+	_ = _1 + é1 + .5
+}
+EOF
+printf 'package last\n\nvar x = 1 + 2' >"$mu/read/last.gno" # a last line without its newline
+printf 'package end\n\nvar x = 1 // a last comment without its newline' >"$mu/read/end.gno"
+sed 's|^package listing$|package listing\
+\
+// a line above moves every other|' "$mu/read/listing.gno" >"$mu/moved/listing.gno"
+# mutate.py runs its check only as a script (`if __name__ == "__main__"`): imported, it gives its flips and runs nothing.
+python3 -I - "$here" "$mu" <<'PY' || fail "mutate.py flipped what it should not, missed a flip, or never ended reading (above)"
+import os, signal, sys
+signal.alarm(20)  # a reader that loops (a last comment without its newline) fails here, not hangs the gate
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+import mutate
+def read(folder):
+    os.chdir(os.path.join(sys.argv[2], folder))
+    src = open("listing.gno").read()
+    return src, {label: (new, drop) for label, new, drop in mutate.flips("listing.gno")}
+src, got = read("read")
+lines = {
+    '_ = "a < b, 5 + 6" + s + `raw: c >= d,': ["+ -> - #1", "+ -> - #2"],
+    '_ = "a \\"<\\" b" + s': ["+ -> -"],
+    '_ = "http://x/*y" + s': ["+ -> -"],
+    "_ = '+' - b // a rune, and a comment that switches no flip off: a || b": ["- -> +"],
+    "_ = '\"' + '\\'' - b": ["+ -> -", "- -> +"],
+    "_ = a /* c <= d */ <= b": ["<= -> <"],
+    "_ = a /* don't \" */ - b": ["- -> +"],
+    "n >>= 1": ["1 -> 2", "1 -> 0"],
+    "n <<= 1": ["1 -> 2", "1 -> 0"],
+    "n &^= 1": ["1 -> 2", "1 -> 0"],
+    "n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9": [f"+ -> - #{k}" for k in range(1, 10)]
+    + ["0x1F -> 0x20", "0x1F -> 0x1e", "0b101 -> 0b110", "0b101 -> 0b100", "0o17 -> 0o20", "0o17 -> 0o16", "017 -> 020", "017 -> 016", "1_000 -> 1001", "1_000 -> 999"],
+    "n += 2": ["2 -> 3", "2 -> 1"],
+    "n -= 3": ["3 -> 4", "3 -> 2"],
+    "_ = n<<1 | n>>2 &^ 1": ["1 -> 2 #1", "1 -> 0 #1", "1 -> 2 #2", "1 -> 0 #2", "2 -> 3", "2 -> 1"],
+    "_ = a >= b == true": [">= -> >", "== -> !="],
+    "_ = a != b && a > b || a < b": ["!= -> ==", "&& -> ||", "> -> >=", "|| -> &&", "< -> <="],
+    "_ = n + n": ["+ -> - #1", "+ -> - #2"],
+    "_ = -n": ["- -> +"],
+    "var arr [32]byte": ["32 -> 33", "32 -> 31"],
+    "_ = arr[0]": ["0 -> 1", "0 -> (-1)"],
+    "_ = `\\` + s": ["+ -> -"],
+    "_ = x[0x1E+1]": ["0x1E -> 0x1f", "0x1E -> 0x1d", "+ -> -", "1 -> 2", "1 -> 0"],
+    "_ = _1 + é1 + .5": ["+ -> - #1", "+ -> - #2"],
+}
+want = {f"listing.gno: {line} [{flip}]" for line, flips in lines.items() for flip in flips}
+assert set(got) == want, f"flips missing: {sorted(want - set(got))}; flips that should not be: {sorted(set(got) - want)}"
+# Each mutant changes its own line only, and only that token; a comparison or a logic operator changes no type, so its
+# flip always compiles, while a `+`, a `-` or a number may not (a string's `+`, an array's size).
+def changed(label):
+    old, new = src.split("\n"), got[label][0].split("\n")
+    assert len(old) == len(new), label
+    diff = [(a, b) for a, b in zip(old, new) if a != b]
+    assert len(diff) == 1, f"{label}: {diff}"
+    return diff[0][1]
+for label in got:
+    changed(label)
+    flipped = label[label.rindex(" [") + 2 : label.rindex(" -> ")]
+    assert got[label][1] == (flipped in ("+", "-") or flipped[0].isdigit()), f"{label}: may it be dropped? {got[label][1]}"
+assert changed("listing.gno: _ = a /* c <= d */ <= b [<= -> <]") == "\t_ = a /* c <= d */ < b"
+assert changed("listing.gno: _ = arr[0] [0 -> (-1)]") == "\t_ = arr[(-1)]"
+assert changed("listing.gno: n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9 [017 -> 020]") == "\tn := 0x1F + 0b101 + 0o17 + 020 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9"
+assert changed("listing.gno: _ = n<<1 | n>>2 &^ 1 [1 -> 0 #2]") == "\t_ = n<<1 | n>>2 &^ 0"
+first, second = (i for i, line in enumerate(src.split("\n")) if line == "\t_ = n + n")
+assert got["listing.gno: _ = n + n [+ -> - #2]"][0].split("\n")[second] == "\t_ = n - n", "#2 is the second line of that text"
+assert got["listing.gno: _ = n + n [+ -> - #1]"][0].split("\n")[first] == "\t_ = n - n", "#1 is the first line of that text"
+assert set(read("moved")[1]) == want, "a line moved changed a flip's key"
+os.chdir(os.path.join(sys.argv[2], "read"))
+last = {label for label, _, _ in mutate.flips("last.gno")}
+assert last == {f"last.gno: var x = 1 + 2 [{flip}]" for flip in ("+ -> -", "1 -> 2", "1 -> 0", "2 -> 3", "2 -> 1")}, f"a last line without its newline: {sorted(last)}"
+end = {label for label, _, _ in mutate.flips("end.gno")}
+assert end == {f"end.gno: var x = 1 // a last comment without its newline [{flip}]" for flip in ("1 -> 2", "1 -> 0")}, sorted(end)
+# A verdict reads its own mutant's lines, never m10's for m1: a flip m1 that survives beside an m10 that does not compile
+# must not be dropped as one that does not compile, nor a mutant with no result read as m10's.
+out = "m10/x.gno:1:1: e (code=gnoTypeCheckError)\nok      ./m1 \t0.10s\nFAIL    ./m10 \t0.00s\n"
+assert (mutate.verdict(out, 1), mutate.verdict(out, 10)) == ("survives", "does not compile"), (mutate.verdict(out, 1), mutate.verdict(out, 10))
+assert mutate.verdict("ok      ./m10 \t0.10s\n", 1) == "no result", "m10's pass read as m1's"
+assert mutate.verdict("FAIL    ./m10 \t0.10s\n", 1) == "no result", "m10's failure read as m1's"
+assert mutate.verdict("m1/x.gno:1:1: e (code=gnoTypeCheckError)\nFAIL    ./m1 \t0.00s\n", 1) == "does not compile"
+assert mutate.verdict("FAIL    ./m1 \t0.00s\n", 1) == "killed"
+PY
+# Then the check, on a planted workspace and the real gno: a package whose every mutant is killed or a known gap passes,
+# printing each verdict and the flips that do not compile; a guard's printed line and verdicts stay what they were before the
+# flips, and its key is that line, which names its file as a flip's does (F5018).
+for w in a b; do
+	mkdir -p "$mu/$w/r/planted" && : >"$mu/$w/gnowork.toml"
+	printf 'module = "gno.land/r/test/planted"\ngno = "0.9"\n' >"$mu/$w/r/planted/gnomod.toml"
+	cat >"$mu/$w/r/planted/planted.gno" <<'EOF'
+package planted
+
+import "strconv"
+
+func Max(a, b int) int {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
+func Label(n int) string { return "n" + strconv.Itoa(n-1) }
+
+func Pick(n int) int {
+	mustPositive(n)
+	if n > 3 || n == 2 {
+		panic("out of range")
+	}
+	return n
+}
+
+func mustPositive(n int) {
+	if n < 1 {
+		panic("not positive")
+	}
+}
+
+func Do(bad bool) int {
+	if bad {
+		panic("bad")
+	}
+	return 1
+}
+EOF
+	cat >"$mu/$w/r/planted/planted_test.gno" <<'EOF'
+package planted
+
+import "testing"
+
+func panics(f func()) (yes bool) {
+	defer func() { yes = recover() != nil }()
+	f()
+	return
+}
+
+func TestPlanted(t *testing.T) {
+	if Max(2, 1) != 2 || Max(1, 2) != 2 || Label(3) != "n2" || Do(false) != 1 {
+		t.Fatal("a value")
+	}
+	if Pick(1) != 1 || Pick(3) != 3 {
+		t.Fatal("Pick refused a good n")
+	}
+	if !panics(func() { Pick(0) }) || !panics(func() { Pick(2) }) || !panics(func() { Pick(4) }) {
+		t.Fatal("Pick took a bad n")
+	}
+}
+EOF
+done
+# b adds a package whose guard, removed, leaves a variable unused: a guard that does not compile is still an error; and an
+# untested sum, whose `+` and number flips compile and survive: never dropped, so they fail.
+mkdir -p "$mu/b/r/broken" && printf 'module = "gno.land/r/test/broken"\ngno = "0.9"\n' >"$mu/b/r/broken/gnomod.toml"
+printf 'package broken\n\nfunc Check(n int) int {\n\tk := n\n\tmustSmall(k)\n\treturn n\n}\n\nfunc mustSmall(k int) {\n\tif k > 9 {\n\t\tpanic("big")\n\t}\n}\n\nfunc Spare(n int) int { return n + 5 }\n' >"$mu/b/r/broken/broken.gno"
+printf 'package broken\n\nimport "testing"\n\nfunc panics(f func()) (yes bool) {\n\tdefer func() { yes = recover() != nil }()\n\tf()\n\treturn\n}\n\nfunc TestCheck(t *testing.T) {\n\tif Check(9) != 9 || !panics(func() { Check(10) }) {\n\t\tt.Fatal("check")\n\t}\n}\n' >"$mu/b/r/broken/broken_test.gno"
+gapped() { # $1: the copy of mutate.py to write, $2: its GAPS as JSON, $3: its EXTRA as JSON, none (not seal's) when absent
+	python3 -I - "$here/mutate.py" "$1" "$2" "${3:-[]}" <<'PY' || fail "the planted copy of mutate.py could not be written: GAPS or EXTRA is gone"
+import ast, json, sys
+src = open(sys.argv[1]).read()
+lines = src.split("\n")
+spans = {t.id: (n.lineno, n.end_lineno) for n in ast.parse(src).body if isinstance(n, ast.Assign) for t in n.targets if isinstance(t, ast.Name)}
+new = {"GAPS": f"GAPS = {json.loads(sys.argv[3])!r}", "EXTRA": f"EXTRA = {json.loads(sys.argv[4])!r}"}
+for name in sorted(new, key=lambda name: -spans[name][0]):
+    lines[spans[name][0] - 1 : spans[name][1]] = [new[name]]
+open(sys.argv[2], "w").write("\n".join(lines))
+PY
+}
+checked() { (cd "$mu/$1" && shift && env "$@" python3 -I "$mu/check.py" 2>&1); } # $1: the workspace; then the environment
+P=r/planted/planted.gno
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+out=$(checked a GNO="$GNO") || fail "mutate.py failed a package whose every mutant is killed or a known gap: $out"
+cat >"$mu/a.want" <<EOF
+ok    killed: $P: mustPositive(n)
+ok    killed: $P: n > 3
+ok    killed: $P: n == 2
+ok    killed: $P: if n < 1 {
+ok    survives: $P: if bad {  (known gap: planted guard gap)
+ok    survives: $P: if a >= b { [>= -> >]  (known gap: equivalent: a equals b)
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [- -> +]
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [1 -> 2]
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [1 -> 0]
+ok    killed: $P: if n > 3 || n == 2 { [> -> >=]
+ok    killed: $P: if n > 3 || n == 2 { [3 -> 4]
+ok    killed: $P: if n > 3 || n == 2 { [3 -> 2]
+ok    killed: $P: if n > 3 || n == 2 { [|| -> &&]
+ok    killed: $P: if n > 3 || n == 2 { [== -> !=]
+ok    killed: $P: if n > 3 || n == 2 { [2 -> 3]
+ok    killed: $P: if n > 3 || n == 2 { [2 -> 1]
+ok    killed: $P: if n < 1 { [< -> <=]
+ok    killed: $P: if n < 1 { [1 -> 2]
+ok    killed: $P: if n < 1 { [1 -> 0]
+ok    killed: $P: return 1 [1 -> 2]
+ok    killed: $P: return 1 [1 -> 0]
+ok    1 of 17 flips do not compile, dropped: r/planted
+EOF
+sort "$mu/a.want" >"$mu/a.want.sorted" && printf '%s\n' "$out" | sort >"$mu/a.got.sorted"
+diff "$mu/a.want.sorted" "$mu/a.got.sorted" >"$mu/a.diff" || fail "mutate.py's verdicts on the planted package, against the wanted ones (<):
+$(cat "$mu/a.diff")"
+# A survivor outside GAPS fails, guard or flip, a `+` or a number's as well; so does a gap a test now kills, guard or flip, a
+# gap that does not compile, a key that names no mutant left, and a guard or an EXTRA line that does not compile. A flip in
+# GAPS is never dropped: it must keep surviving.
+gapped "$mu/check.py" '{"r/planted/planted.gno: gone(x)": "stale guard", "r/planted/planted.gno: gone [< -> <=]": "stale flip", "r/planted/planted.gno: mustPositive(n)": "now killed", "r/planted/planted.gno: if n < 1 { [< -> <=]": "now killed", "r/planted/planted.gno: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -]": "does not compile"}' \
+	'[["r/planted/planted.gno", "return \"n\" + strconv", "return \"n\" - strconv"]]'
+out=$(checked b GNO="$GNO") && fail "mutate.py passed survivors, stale keys and a guard that does not compile: $out"
+B=r/broken/broken.gno
+for line in "FAIL  survives: $P: if bad { (expected killed)" "FAIL  survives: $P: if a >= b { [>= -> >] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [+ -> -] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [5 -> 6] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [5 -> 4] (expected killed)" \
+	"FAIL  killed: $P: mustPositive(n) (expected survives)" "FAIL  killed: $P: if n < 1 { [< -> <=] (expected survives)" \
+	"FAIL  does not compile: $P: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -] (expected survives)" \
+	"FAIL  does not compile: $B: mustSmall(k) (expected killed)" "FAIL  does not compile: $P: return \"n\" + strconv (expected killed)" \
+	"FAIL  GAPS lists a mutant that no longer exists: $P: gone(x)" "FAIL  GAPS lists a mutant that no longer exists: $P: gone [< -> <=]"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
+$out"
+done
+# No count is printed for a package that drops no flip (r/broken's all compile; planted's one is in GAPS).
+printf '%s\n' "$out" | grep -q "flips do not compile" && fail "mutate.py dropped a flip GAPS lists: $out"
+# The command it runs failing (F116): a gno whose every mutant fails to compile cannot pass the check by dropping them all,
+# as a comparison or a logic flip always compiles; a gno that stops before a mutant's result, fails the untouched copy, or
+# times out on a mutant that loops forever (gno's -timeout ends the whole run, and no GAPS entry can hold such a flip),
+# fails it. Like gno, the fake exits 1 when a package fails, which each of its modes has.
+cat >"$mu/fakegno" <<'EOF'
+#!/bin/sh
+echo "$*" >>"$(dirname "$0")/fakegno.runs"
+for d in "$@"; do
+	case $FAKE:$d in
+	control:./m0) printf 'FAIL    ./m0 \t0.01s\n' ;;
+	*:./m0) printf 'ok      ./m0 \t0.01s\n' ;;
+	compile:./m*) printf '%s/planted.gno:1:1: planted (code=gnoTypeCheckError)\nFAIL    %s \t0.00s\n' "${d#./}" "$d" ;;
+	timeout:./m22) printf 'panic: test timed out after 60s\n' >&2 && exit 2 ;;
+	timeout:./m*) printf 'FAIL    %s \t0.00s\n' "$d" ;;
+	survive:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
+	esac
+done
+exit 1
+EOF
+chmod +x "$mu/fakegno"
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+out=$(checked a GNO="$mu/fakegno" FAKE=compile) && fail "mutate.py passed when no mutant compiled: $out"
+# One gno run judges a package's guards and flips together: the untouched copy and its 5 guards and 17 flips, each once.
+[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] || fail "mutate.py ran gno other than once for one package: $(cat "$mu/fakegno.runs")"
+[ "$(tr ' ' '\n' <"$mu/fakegno.runs" | grep '^\./m' | sort)" = "$(i=0; while [ $i -le 22 ]; do echo "./m$i"; i=$((i + 1)); done | sort)" ] ||
+	fail "mutate.py's one gno run did not judge the control and its 22 mutants each once: $(cat "$mu/fakegno.runs")"
+[ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout 60s" ] || fail "mutate.py's run of 23 copies has not 60 s, the least (34.5 rounded up is less): $(cat "$mu/fakegno.runs")"
+for line in "FAIL  does not compile: $P: if n > 3 || n == 2 { [> -> >=] (expected killed)" "FAIL  does not compile: $P: mustPositive(n) (expected killed)" \
+	"FAIL  does not compile: $P: if a >= b { [>= -> >] (expected survives)" "ok    12 of 17 flips do not compile, dropped: r/planted"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
+$out"
+done
+out=$(checked a GNO="$mu/fakegno" FAKE=crash) && fail "mutate.py passed when gno gave no mutant's result: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 2] (expected killed)" || fail "mutate.py did not fail a flip with no result: $out"
+out=$(checked a GNO="$mu/fakegno" FAKE=control) && fail "mutate.py passed when the untouched copy failed: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does not pass" || fail "mutate.py did not name the failed control: $out"
+out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
+# A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
+# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale (F5084).
+# The constants are made small so it is stopped in 2 s.
+printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
+out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
+[ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
+	fail "mutate.py did not fail by name, alone, a gno that never ended (F5084): $out"
+# The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
+# one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
+# rounded up), 80 have 120, each package in one run.
+mkdir -p "$mu/d/r/many" && : >"$mu/d/gnowork.toml" && printf 'module = "gno.land/r/test/many"\ngno = "0.9"\n' >"$mu/d/r/many/gnomod.toml"
+gapped "$mu/check.py" '{}'
+for copies in 40:60 41:62 80:120; do
+	i=1 && printf 'package many\n' >"$mu/d/r/many/many.gno"
+	while [ $i -lt "${copies%:*}" ]; do printf '\nfunc F%s(bad bool) {\n\tif bad {\n\t\tpanic("bad")\n\t}\n}\n' "$i" >>"$mu/d/r/many/many.gno" && i=$((i + 1)); done
+	: >"$mu/fakegno.runs"
+	checked d GNO="$mu/fakegno" FAKE=survive >/dev/null || : # every guard survives the fake: only its run is read
+	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
+		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
+done
+# One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
+# line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
+for p in one two; do
+	mkdir -p "$mu/c/r/$p" && printf 'module = "gno.land/r/test/%s"\ngno = "0.9"\n' "$p" >"$mu/c/r/$p/gnomod.toml"
+	printf 'package %s\n\nfunc Do(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' "$p" >"$mu/c/r/$p/$p.gno"
+done
+printf '\nfunc Again(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' >>"$mu/c/r/two/two.gno"
+: >"$mu/c/gnowork.toml"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one"}'
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let a gap given for r/one excuse the same guard in r/two: $out"
+printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (known gap: one gap, given for r/one)" || fail "mutate.py did not keep r/one's gap: $out"
+[ "$(printf '%s\n' "$out" | grep -cxF "FAIL  survives: r/two/two.gno: if bad { (expected killed)")" = 2 ] || fail "mutate.py did not fail r/two's two untested guards: $out"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
+# The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
+out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
+out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"
+fi
+
 if part commit_msg; then
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
 # subjects; no attribution line. It runs as installed, beside its rule files (F129).
@@ -342,6 +682,52 @@ refused "fix(server): x" && fail "a fix that only deletes a test was refused, wh
 mkdir -p "$t/no-repo" && printf 'fix(server): x\n' >"$t/msg"
 (cd "$t/no-repo" && GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
 grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not say git failed: $(cat "$t/err")"
+fi
+
+if part unsigned; then
+# No git config from around this file reaches its throwaway repositories (F5012, F5022): Alexis's global one signs every
+# commit with a key Claude Code's sandbox cannot read, which failed 36 sections there. Planted: one config whose signer always
+# fails, reaching git by each way there is: a global or a system file, a HOME's or an XDG folder's, what `git -c` hands a hook
+# in either of its forms, and a template folder, which `git init` copies into each repository; and GIT_CONFIG, which sends
+# `git config` to a file outside the repository.
+us="$t/unsigned" && mkdir -p "$us/home" "$us/xdg/git" "$us/template" "$us/repos" "$us/scripts" "$us/.githooks"
+printf '#!/bin/sh\necho "$*" >>"%s/signed"\nexit 1\n' "$us" >"$us/signer" && chmod +x "$us/signer"
+printf '[commit]\n\tgpgsign = true\n[gpg]\n\tformat = openpgp\n\tprogram = %s\n' "$us/signer" >"$us/signs"
+cp "$us/signs" "$us/home/.gitconfig" && cp "$us/signs" "$us/xdg/git/config" && cp "$us/signs" "$us/template/config"
+# Each way alone makes a commit in a new repository call the signer, and fail: the plant proves something.
+signs() { # $1: the way; then env's arguments for it, where no other way reaches git
+	way=$1 && shift && rm -f "$us/signed"
+	env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null HOME="$us/nohome" XDG_CONFIG_HOME="$us/noxdg" env "$@" \
+		sh -c 'git init -q "$1" && git -C "$1" commit -q --allow-empty -m x' - "$us/repos/$way" 2>/dev/null &&
+		fail "a commit passed though $way signs: the plant proves nothing"
+	[ -s "$us/signed" ] || fail "git did not call the signer $way names: the plant proves nothing"
+}
+signs "a global file" GIT_CONFIG_GLOBAL="$us/signs"
+signs "a system file" GIT_CONFIG_SYSTEM="$us/signs"
+signs "HOME's .gitconfig" -u GIT_CONFIG_GLOBAL HOME="$us/home"
+signs "XDG's git/config" -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME="$us/xdg"
+signs "git -c's parameters" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'"
+signs "git -c's count" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs"
+signs "a template folder" GIT_TEMPLATE_DIR="$us/template"
+git init -q "$us/repos/file" && GIT_CONFIG="$us/elsewhere-alone" git -C "$us/repos/file" config planted.key yes
+[ -s "$us/elsewhere-alone" ] || fail "GIT_CONFIG did not send git config to its file: the plant proves nothing"
+# All at once around a copy of this file, whose one planted section sets a config and commits in a throwaway repository: it
+# passes, unsigned, the setting in the repository. The section also wants the two file variables exported as /dev/null, which a
+# system file it cannot plant needs.
+printf 'if part commits; then\n[ "$(printenv GIT_CONFIG_GLOBAL):$(printenv GIT_CONFIG_SYSTEM)" = /dev/null:/dev/null ] || fail "git does not get the config files this file sets"\ngit init -q "$t/c" && git -C "$t/c" config planted.key yes && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\n[ "$(git config --file "$t/c/.git/config" planted.key)" = yes ] || fail "git config wrote outside the throwaway repository"\nfi\n' >"$us/planted"
+sed "/^part() {/r $us/planted" "$0" >"$us/scripts/test_hooks.sh"
+grep -qx 'if part commits; then' "$us/scripts/test_hooks.sh" || fail "the planted section is not in the copy of test_hooks.sh"
+rm -f "$us/signed"
+out=$(env HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" GIT_CONFIG_GLOBAL="$us/signs" GIT_CONFIG_SYSTEM="$us/signs" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'" \
+	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs" GIT_TEMPLATE_DIR="$us/template" GIT_CONFIG="$us/elsewhere" \
+	ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) || fail "a throwaway repository took the git config around test_hooks.sh (F5012, F5022): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012, F5022)"
+[ ! -e "$us/elsewhere" ] || fail "a throwaway repository's git config went to the GIT_CONFIG file around test_hooks.sh (F5022)"
+# Then with neither file variable around it, as in Alexis's shell: a value this file sets but does not export would never reach
+# git, and HOME's .gitconfig would sign again (F5021).
+out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
+	fail "a throwaway repository took the git config of HOME around test_hooks.sh, which signs (F5021): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of HOME's git config (F5021)"
 fi
 
 if part pre_commit; then
@@ -644,6 +1030,178 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
+# A hidden character (F5053), a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
+# file git tracks or would, prose and the prototype's docs included, fails, named by its file, line, column and code point;
+# no comment allows it. Written as an escape it passes, as an accent or an emoji does; an image is no text, and what git
+# ignores is not read. printf writes each from its UTF-8 bytes, so this file holds none.
+h="$t/hidden" && mkdir -p "$h/src" "$h/r/x" "$h/docs/prototype" "$h/.claude/rules" "$h/ignored" "$h/node_modules/x" "$h/app/node_modules" && good_rules "$h"
+git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
+hidden() { python3 -I "$docs" "$h" 2>&1; }
+printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
+printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
+# An image is known by its suffix and its format's first bytes, as each real one starts (F5082).
+printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
+# A file deleted from the work tree but still in the index is not read.
+printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
+# So is a source the alerts check reads (listed(), which lists only what is there).
+mkdir -p "$h/server/src" && printf 'gone\n' >"$h/server/src/gone.ts" && git -C "$h" add server/src/gone.ts && git -C "$h" commit -qm gone2 && rm "$h/server/src/gone.ts"
+hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
+# A file it cannot read fails, never passes unread.
+: >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
+hidden >/dev/null && fail "check_docs passed a file it cannot read"
+chmod 644 "$h/src/locked.ts"
+# What is hidden is a table, not the Python's Unicode (F5083): Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
+# Node's ICU gives them, range by range, and the version hidden.py names.
+node -e '
+const set = /^[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]$/u;
+const out = [process.versions.unicode];
+for (let c = 0, start = -1; c <= 0x110000; c++) {
+  const hit = c <= 0x10ffff && set.test(String.fromCodePoint(c));
+  if (hit && start < 0) start = c;
+  if (!hit && start >= 0) { out.push(start.toString(16) + " " + (c - 1).toString(16)); start = -1; }
+}
+console.log(out.join("\n"));' >"$h/table.node" || fail "node could not list Unicode's hidden characters"
+python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import hidden; print(hidden.UNICODE); print("\n".join(f"{a:x} {b:x}" for a, b in hidden.TABLE))' "$here" >"$h/table.py"
+diff "$h/table.node" "$h/table.py" >"$h/diff" || fail "hidden.py's TABLE is not Unicode's hidden characters as the pinned Node gives them (<):
+$(cat "$h/diff")"
+rm "$h/table.node" "$h/table.py"
+# Each end of the table's ranges and a point inside some (an unassigned tag, a variation selector) after a letter, and none
+# of their neighbours. U+FE0E and U+FE0F, which pick an emoji's look, pass right after a character that shows and is no
+# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits (F5086).
+python3 -I - "$h/table.txt" "$h/sel.txt" "$h/table.want" "$here" <<'PY'
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[4])
+from hidden import TABLE
+inside = lambda p: any(a <= p <= b for a, b in TABLE)
+refused = sorted({p for a, b in TABLE for p in (a, b)} | {0x2065, 0xFE05, 0xE0080, 0xE0100})
+shown = sorted({p for a, b in TABLE for p in (a - 1, b + 1) if not inside(p)} | {0x00A0, 0x200A, 0x2010})
+points = refused + shown
+open(sys.argv[1], "w", encoding="utf-8").write("".join(f"x{chr(p)}\n" for p in points))
+heart, emoji, cap = chr(0x2764), chr(0x1F600), chr(0xFE0F) + chr(0x20E3)
+lines = [  # (line, the columns it refuses)
+    (heart + chr(0xFE0F) + " ok", []), (emoji + chr(0xFE0E), []), ("1" + cap + " #" + cap + " *" + cap, []),
+    ("a" + chr(0xFE0F), [2]), (heart + chr(0xFE0F) + chr(0xFE0F), [3]), (chr(0xFE0F) + "x", [1]), ("1" + chr(0xFE0F) + "x", [2]),
+    (heart + chr(0xFE00), [2]), (chr(0x4E00) + chr(0xE0100), [2]), (chr(0x200D) + chr(0xFE0F), [1, 2]),
+]
+open(sys.argv[2], "w", encoding="utf-8").write("".join(text + "\n" for text, _ in lines))
+# One that starts a text follows nothing, whatever the text ends with.
+open(sys.argv[2].replace("sel.txt", "start.txt"), "w", encoding="utf-8").write(chr(0xFE0F) + "a" + chr(0xE9))
+want = [f"  table.txt:{n}:2: U+{p:04X}" for n, p in enumerate(points, 1) if p in refused] + ["  start.txt:1:1: U+FE0F"]
+want += [f"  sel.txt:{n}:{col}: U+{ord(text[col - 1]):04X}" for n, (text, cols) in enumerate(lines, 1) for col in cols]
+open(sys.argv[3], "w").write("".join(f"{w}\n" for w in sorted(want)))
+PY
+printf '// a header\nconst x = "ab\342\200\256cd"; // gitleaks:allow noqa eslint-disable-line prettier-ignore @ts-ignore nolint\n' >"$h/src/a.ts"
+printf 'package x\n\nvar s = "\342\201\246"\n' >"$h/r/x/x.gno"
+printf 'ab\342\200\213c\n' >"$h/docs/prototype/notes.md"
+printf '\357\273\277# a file with a BOM\n' >"$h/README"
+printf 'x\342\200\215y\n' >"$h/src/joined.ts"
+printf '\330\234 a mark\n' >"$h/notes.txt"
+printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
+printf '# co\302\255de\n' >"$h/a.py"
+# What is no UTF-8 text is refused whole, from its first byte that is a NUL or no UTF-8: its characters cannot be read, as
+# UTF-16 writes U+202E as `2E 20` (F5088), and a binary cannot write one as an escape (F5082). So is a text named as an
+# image, which Vite's `?raw` reads.
+printf '\000\342\200\256\n' >"$h/blob.txt"
+printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
+printf '\377\376a\000\056\040b\000\n\000' >"$h/u16.md" && printf 'a\000\056\040b\000\n\000' >"$h/u16raw.md"
+python3 -I -c 'import os, sys; open(sys.argv[1], "wb").write(os.urandom(65536))' "$h/font.woff2"
+printf 'a\342\200\256\n' >"$h/text.png"
+printf 'a\014b\342\200\256\nc\342\200\213d\342\200\215\n\303\251\360\237\230\200\342\200\256\n' >"$h/multi.txt"
+printf '\342\200\256\n' >"$h/$(printf 'caf\303\251 notes.md')" && printf '\342\200\256\n' >"$h/q\"uote.md"
+for f in ignored/x.ts node_modules/x/y.js app/node_modules/z.js; do printf 'const x = "\342\200\256";\n' >"$h/$f"; done
+git -C "$h" add README && git -C "$h" commit -qm base
+cat >"$h/want" <<'EOF'
+  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE
+  r/x/x.gno:3:10: U+2066 LEFT-TO-RIGHT ISOLATE
+  docs/prototype/notes.md:1:3: U+200B ZERO WIDTH SPACE
+  README:1:1: U+FEFF ZERO WIDTH NO-BREAK SPACE
+  src/joined.ts:1:2: U+200D ZERO WIDTH JOINER
+  notes.txt:1:1: U+061C ARABIC LETTER MARK
+  .claude/rules/x.md:1:11: U+E0041 TAG LATIN CAPITAL LETTER A
+  a.py:1:5: U+00AD SOFT HYPHEN
+  text.png:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:1:4: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:2:2: U+200B ZERO WIDTH SPACE
+  multi.txt:2:4: U+200D ZERO WIDTH JOINER
+  multi.txt:3:3: U+202E RIGHT-TO-LEFT OVERRIDE
+  café notes.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+  q"uote.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+EOF
+out=$(hidden) && fail "check_docs accepted hidden characters: $out"
+printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character" || fail "check_docs did not say why it refused hidden characters: $out"
+printf '%s\n' "$out" | grep ': U+' | grep -Ev '^  (table|sel|start)\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
+diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
+$(cat "$h/diff")"
+for no in blob.txt:1 latin.txt:4 u16.md:1 u16raw.md:2; do
+	printf '%s\n' "$out" | grep -qxF "  ${no%:*}: no UTF-8 text, from its byte ${no#*:} (a NUL, or a byte that is no UTF-8)" || fail "check_docs did not refuse ${no%:*} as no UTF-8 text from its byte ${no#*:}: $out"
+done
+printf '%s\n' "$out" | grep -q '^  font\.woff2: no UTF-8 text, from its byte [0-9]* ' || fail "check_docs did not refuse a binary it knows no format of: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^  font\.woff2:')" = 1 ] || fail "check_docs named a binary's bytes as characters: $out"
+printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
+diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
+$(cat "$h/diff")"
+# The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
+# file of the folder but git's own and the installed packages', and still refuses.
+mkdir -p "$t/nogit" "$t/badgit" && printf '#!/bin/sh\nexit 1\n' >"$t/badgit/git" && chmod +x "$t/badgit/git"
+printf '\342\200\256\n' >"$h/.git/planted"
+py=$(command -v python3)
+for path in "$t/nogit" "$t/badgit:$PATH"; do
+	out=$(PATH=$path "$py" -I "$docs" "$h" 2>&1) && fail "check_docs accepted a hidden character with PATH=$path: $out"
+	printf '%s\n' "$out" | grep -qxF "  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs, with PATH=$path, did not name the hidden character: $out"
+	printf '%s\n' "$out" | grep -qF "  .git/" && fail "check_docs, with PATH=$path, read git's own folder: $out"
+	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
+done
+# A commit message is text the repository keeps too, which scripts parse (a `Removed-test:` line shown as one name, read as
+# another): each message since the branch left origin/main is read, named by its commit (F5079); a message main holds
+# already is not, nor any with no origin/main to compare with. With no git, or a git that fails, nothing proves the messages
+# clean: it fails, never takes the failure for a branch with no origin/main.
+m="$t/messages" && mkdir -p "$m" && good_rules "$m" && git -C "$m" init -q && git -C "$m" add -A
+git -C "$m" commit -qm "$(printf 'docs: on main\n\nzero\342\200\213width')" && git -C "$m" update-ref refs/remotes/origin/main HEAD
+messages() { python3 -I "$docs" "$m" 2>&1; }
+messages >/dev/null || fail "check_docs read a message main holds already"
+git -C "$m" commit -q --allow-empty -m "$(printf 'test: the branch\n\nRemoved-test: a\342\200\256b - why')"
+out=$(messages) && fail "check_docs accepted a commit message holding a hidden character: $out"
+printf '%s\n' "$out" | grep -qxF "  commit $(git -C "$m" rev-parse --short HEAD):3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the message's hidden character: $out"
+# Every message of the branch, not its newest only (F5081): a clean commit on top hides nothing.
+older=$(git -C "$m" rev-parse --short HEAD) && git -C "$m" commit -q --allow-empty -m "test: a clean top"
+out=$(messages) && fail "check_docs accepted a hidden character in a message under a clean one (F5081): $out"
+printf '%s\n' "$out" | grep -qxF "  commit $older:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the older message's hidden character: $out"
+out=$(PATH="$t/nogit" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with no git to read them: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say git cannot read the messages: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
+git -C "$m" update-ref -d refs/remotes/origin/main
+messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
+# What a commit takes is the index's copy (F5087): a hidden character staged under a clean work tree's copy is named, and
+# one in the work tree's copy under a clean staged one, as `(work tree)`. A `.gitattributes` encoding keeps the work tree in
+# another text than the one git stores (F5088): UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
+# text too, a link deleted or pointing nowhere included (F5089); a gitlink (a submodule) holds none.
+x="$t/staged" && mkdir -p "$x/docs" && good_rules "$x" && git -C "$x" init -q
+staged() { python3 -I "$docs" "$x" 2>&1; }
+printf 'a\342\200\256b\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'ab\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character staged under a clean work tree (F5087): $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the staged copy's hidden character: $out"
+printf '%s\n' "$out" | grep -qF "(work tree)" && fail "check_docs named a work tree's copy that holds none: $out"
+printf 'ab\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'a\342\200\256b\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character in the work tree under a clean staged copy: $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md (work tree):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the work tree's hidden character: $out"
+printf 'ab\n' >"$x/docs/s.md"
+staged >/dev/null || fail "check_docs refused a staged and a work tree copy that hold none"
+printf '*.txt working-tree-encoding=UTF-7\n' >"$x/.gitattributes" && printf 'a+IC4-b\n' >"$x/e.txt" && git -C "$x" add .gitattributes e.txt
+out=$(staged) && fail "check_docs passed U+202E that git stores while the work tree writes it in UTF-7 (F5088): $out"
+printf '%s\n' "$out" | grep -qxF "  e.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name what git stores under UTF-7: $out"
+git -C "$x" rm -qf e.txt .gitattributes
+printf 'x\n' >"$x/$(printf 'a\342\200\256b.md')" && printf 'x\n' >"$x/$(printf 'c\342\200\256d.md')"
+ln -s "$(printf 'c\342\200\256d.md')" "$x/link.md" && ln -s "$(printf 'e\342\200\256f')" "$x/staged-link" && git -C "$x" add staged-link && rm "$x/staged-link"
+git -C "$x" update-index --add --cacheinfo "160000,$(printf '%040d' 1),sub"
+out=$(staged) && fail "check_docs passed a hidden character in a name or a link's target (F5089): $out"
+for line in "the name 'a\\u202eb.md':1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "link.md (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "staged-link (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE"; do
+	printf '%s\n' "$out" | grep -qxF "  $line" || fail "check_docs did not say $line: $out"
+done
+printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
 fi
 
 if part harness_mutate; then
@@ -1427,7 +1985,7 @@ if part pre_commit; then
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 [ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
@@ -1439,6 +1997,13 @@ mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && 
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
+# A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
+printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
+precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
+# What it reads is what the commit takes, the staged copy, not the work tree's (F5087).
+printf 'ab\n' >"$c2/docs/hidden.md"
+precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
+git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
@@ -1696,9 +2261,9 @@ for h in $hook_names; do
 	git -C "$i" commit -qm "no $h"
 done
 git -C "$i" checkout -q main
-# As in Alexis's shell, with no mark of merge.sh and no hooks path of his own: from the root, or
-# from a folder below it.
-alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_CONFIG_GLOBAL=/dev/null GIT_MERGE_AUTOEDIT=no "$@"; }
+# As in Alexis's shell, with no mark of merge.sh and, as everywhere in this file, no git config of
+# his own (no hooks path): from the root, or from a folder below it.
+alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_MERGE_AUTOEDIT=no "$@"; }
 in_i() { (cd "$i" && alexis "$@"); }
 in_docs() { (cd "$i/docs" && alexis "$@"); }
 mark_i() { (cd "$i" && . .git/hooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); }
@@ -2962,7 +3527,7 @@ regr_fixture() { # $1: a folder
 	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
 	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
 	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
-	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
 	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
 }
 logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
@@ -4219,6 +4784,13 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
+# A gap whose key holds ` - ` (a flip of `a - b`) is named by its line all the same (F5000): every cut before a ` - ` that a
+# reason follows is read as an item, not the first alone.
+git -C "$rg" reset -q --hard "$base" && printf 'GAPS = {\n    "r/x.gno: d := a - b [- -> +]": "equivalent",\n}\n' >"$rg/scripts/mutate.py"
+git -C "$rg" add scripts/mutate.py && git -C "$rg" commit -qm "a gap on a - b"
+out=$(reg) && fail "check_regressions passed a gap no commit names: $out"
+git -C "$rg" commit -q --allow-empty -m "says why" -m "Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - d is never read"
+out=$(reg) || fail "check_regressions refused a gap holding ' - ' that a commit names (F5000): $out"
 # An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
 # gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
 git -C "$rg" reset -q --hard "$base"

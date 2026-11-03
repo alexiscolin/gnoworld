@@ -903,6 +903,13 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
    everyone.
 9. **Session guards cannot be unit-tested.** The `testing` stdlib has no way to fake a
    session, so a realm's "not under a session" check only gets tested on a live chain.
+10. **A deployer-owned realm's events, gas and storage cannot be filetested.** `gno test`
+   at `chain/onyx` deploys an imported realm from the empty address
+   (`gnovm/pkg/test/imports.go:213`), and `testing.SetRealm` skips an empty address, so a
+   filetest can never act as the deployer: the slot realm's owner cannot unpause it there,
+   so no filetest rents, and its `Events:`, `Gas:` and `Storage:` stay unpinned. Unit tests
+   cannot read events at all. Found by slice 11c (F5052, five tries with their errors);
+   until gno lets a filetest deploy as a chosen address, they are checked at deploy.
 
 ## Alternatives considered
 

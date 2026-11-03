@@ -58,14 +58,14 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring,unsigned",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
+    "scripts/repo_files.py": {"hooks": "check_docs,worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -560,7 +560,11 @@ def mutants():
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
-    yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+?) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
+    yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
+    yield from each("scripts/check_regressions.py", 'rf"{key}: (.+) - \\S.*"', 'rf"{key}: (.+?) - \\S.*"', "hooks", "check_regressions reads an item holding ' - ' (F5000)")
+    yield from each("scripts/check_regressions.py", '{m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \\S.*", line.strip()))}',
+                    '{m.group(1)[: cut.start()].strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+)", line.strip())) for cut in re.finditer(r" - (?=\\S)", m.group(1)) if cut.start()}',
+                    "hooks", "check_regressions names one item a line (F5023)")
     yield from each("scripts/check_regressions.py", "e for e in after - before if", "e for e in set() if", "hooks", "check_regressions gaps and ignores")
     yield from each("scripts/check_regressions.py", ".strip() in gone.get(current, set())", ".strip() in set()", "hooks", "check_regressions switched to fails")
     yield from each("scripts/check_regressions.py", 'elif path.endswith(("_test.gno", "_test.go")):', "elif False:", "hooks", "check_regressions gno and Go tests")
@@ -685,6 +689,15 @@ def mutants():
     yield from each(".claude/settings.json", ',\n        ".mcp.json"\n', "\n", "hooks", "the sandbox keeps commands out of .mcp.json (F158)")
     yield from each("scripts/test_hooks.sh", """if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\\n' "$sections" | grep -c .)" ]; then""", "if false; then",
                     "hooks", "the hook suite refuses a section its runner does not list (F160)")
+    for find, replace, way in (("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_SYSTEM=/dev/null\n", "a global file"),
+                               ("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_GLOBAL=/dev/null\n", "a system file"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's parameters"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's count"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_TEMPLATE_DIR\n", "GIT_CONFIG's file (F5022)"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG\n", "a template folder (F5022)")):
+        yield from each("scripts/test_hooks.sh", find, replace, "hooks", f"the hook suite's throwaway repositories ignore the git config of {way} (F5012)")
+    yield from each("scripts/test_hooks.sh", "export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n",
+                    "hooks", "the hook suite exports its git config files to git, which a plain assignment never reaches (F5021)")
     yield from each(".githooks/commit-msg", '--config "$(dirname "$0")/$config"', '--config "scripts/$config"', "hooks", "commit-msg scans with its own rules, not the working tree's (F129)")
     yield from each(".githooks/pre-push", 'sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" ||', "true ||", "hooks", "pre-push wants the hooks of the main it pushes installed (F129)")
     yield from each(ck, 'if [ "$runs_from" != "$git_dir/hooks" ]; then', "if false; then", "hooks", "check.sh refuses hooks taken from elsewhere (F129)")
@@ -1071,6 +1084,8 @@ def mutants():
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
     yield from design_mutants()
+    yield from mutate_mutants()
+    yield from hidden_mutants()
 
 
 def swaps(path, name, rows):
@@ -1189,6 +1204,120 @@ def design_mutants():
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /all checks passed/;", "wants the pass line as the last line, with its time"),
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /^all checks passed in \\d+ s/m;", "reads only the last line"),
         ("    passed: false,\n    failingLane: g.failingLane", "    passed: true,\n    failingLane: g.failingLane", "fails a merge check whose last line is no pass line"),
+    ))
+
+
+def mutate_mutants():
+    """The realms' mutation check flips operators and numbers (backlog row 11, slice-11a): each flip, each step over what is
+    not code, each rule on a flip that does not compile, and the verdicts guards and flips share."""
+    pairs = ((">=", ">"), (">", ">="), ("<=", "<"), ("<", "<="), ("==", "!="), ("!=", "=="), ("&&", "||"), ("||", "&&"), ("+", "-"), ("-", "+"))
+    yield from swaps("scripts/mutate.py", "mutate.py", [(f'"{a}": "{b}"', f'"{a}": "{a}"', f"flips {a} into {b}") for a, b in pairs])
+    yield from swaps("scripts/mutate.py", "mutate.py", (
+        ("[shifted(text, 1), shifted(text, -1)]", "[shifted(text, 1)]", "shifts a number down"),
+        ("[shifted(text, 1), shifted(text, -1)]", "[shifted(text, -1)]", "shifts a number up"),
+        ('        if src.startswith("//", i):\n', "        if False:\n", "steps over a line comment"),
+        ('        elif src.startswith("/*", i):\n', "        elif False:\n", "steps over a block comment"),
+        ("        elif c in \"\\\"'`\":\n", "        elif c == '\"':\n", "steps over runes and raw strings"),
+        ('j += 2 if src[j] == "\\\\" and c != "`" else 1', "j += 1", "reads a string's escapes"),
+        ("op = next((o for o in OPERATORS if src.startswith(o, i)), c)", "op = c", "flips whole operators only"),
+        ("            if INTEGER.fullmatch(src[i:j]):\n", "            if True:\n", "shifts integers only"),
+        ('(src[j] in "+-" and src[j - 1] in exponent)', "False", "reads an exponent's sign as the number's"),
+        ('        return f"({value})"\n', "        return str(value)\n", "writes a negative number in parentheses"),
+        ('    return prefix + {16: f"{value:x}", 2: f"{value:b}", 8: f"{value:o}", 10: str(value)}[base]\n', "    return str(value)\n", "writes a number in its own base"),
+        ("{f' #{k}' if seen[line, text, new] > 1 else ''}", "", "numbers the same flip of the same text"),
+        ('        yield f"{path}: {line} [', '        yield f"{line} [', "names the file in a flip's key"),
+        ('cases = [(f"{f}: {label}", f, src, False)', "cases = [(label, f, src, False)", "names the file in a guard's key (F5018)"),
+        ('text not in FLIP or text in ("+", "-")', "True", "drops no comparison or logic flip"),
+        ('text not in FLIP or text in ("+", "-")', "text not in FLIP", "drops a + or - flip that does not compile"),
+        ("        cases += flipped\n", "", "runs the flips"),
+        ('            if got == "does not compile" and droppable and label not in GAPS:\n', '            if got == "does not compile" and droppable:\n', "never drops a flip GAPS lists"),
+        ("        if dropped:\n", "        if False:\n", "counts the flips it drops"),
+        ('        if "test timed out after" in out:\n', "        if False:\n", "says gno timed out on a mutant that loops"),
+        ("            seen[label] = seen.get(label, 0) + 1\n", "", "sees the mutants GAPS names"),
+        ("    for stale in GAPS.keys() - seen.keys():\n", "    for stale in []:\n", "fails a stale GAPS key"),
+        ("if seen.get(key, 0) > 1", "if False", "fails a GAPS key that names two mutants"),
+        ('j += 2 if src[j] == "\\\\" and c != "`" else 1', 'j += 2 if src[j] == "\\\\" else 1', "reads no escape in a raw string"),
+        ('"pP" if src[i : i + 2].lower() == "0x" else "eE"', '"eEpP"', "reads a hex number's e as a digit"),
+        ("len(src) if stop < 0 else stop", "stop", "keys a last line without its newline"),
+        ("i = n if i < 0 else i", "i = i if i < 0 else i", "ends a last comment without its newline"),
+        ('elif c.isalpha() or c == "_":', "elif c.isalpha():", "reads a name that starts with _"),
+        ('(c == "." and src[i + 1 : i + 2].isdigit())', "False", "reads a number that starts with a dot"),
+        ('rf"^m{i}/\\S+:', 'rf"^m{i}\\S+:', "tells m1's compile errors from m10's"),
+        ('rf"^ok\\s+\\./m{i}\\s"', 'rf"^ok\\s+\\./m{i}"', "tells m1's pass from m10's"),
+        ('rf"^FAIL\\s+\\./m{i}\\s"', 'rf"^FAIL\\s+\\./m{i}"', "tells m1's failure from m10's"),
+        ("            ok = got == want\n", "            ok = True\n", "fails a survivor or a killed gap"),
+        ('if not f.endswith(("_test.gno", "_filetest.gno"))', "if True", "mutates no test"),
+        ('    if re.search(rf"^m{i}/\\S+:\\d+:\\d+: .*\\(code=", out, re.M):\n', "    if False:\n", "tells a mutant that does not compile"),
+        ('        if verdict(out, 0) != "survives":\n', "        if False:\n", "fails an untouched copy that fails"),
+        ("SECONDS_A_COPY = 1.5", "SECONDS_A_COPY = 1.4", "gives a copy 1.5 s of its run's time (F5051)"),
+        ("LEAST = 60", "LEAST = 0", "gives a run 60 s at least"),
+        ("        except subprocess.TimeoutExpired:\n", "        except ZeroDivisionError:\n", "fails by name a gno that does not end (F5084)"),
+        ("            print(stopped)\n", "            pass\n", "says which package's gno did not end"),
+        ("            failed = True\n            continue\n", "            continue\n", "fails a package whose gno did not end"),
+        ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
+        ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
+    ))
+
+
+def hidden_mutants():
+    """check_docs refuses a hidden character (hidden.py's rule) in every file git tracks or would (F5053), and the listing
+    it reads."""
+    yield from swaps("scripts/hidden.py", "hidden", (
+        ("for m in HIDDEN.finditer(text):", "for m in []:", "refuses a hidden character"),
+        ("(0x2028, 0x202E)", "(0x202A, 0x202E)", "refuses the line and paragraph separators (F5086)"),
+        ("(0xE0000, 0xE0FFF)", "(0xE0001, 0xE007F)", "refuses the tags' whole block, its unassigned code points too (F5083)"),
+        ('UNICODE = "17.0"', 'UNICODE = "16.0"', "names the Unicode its table is"),
+        ('f"{chr(a)}-{chr(b)}"', 'f"{chr(a)}"', "refuses every code point of a range"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if ord(c) in LOOKS:", "refuses a selector that picks no look (F5086)"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if False:", "keeps a selector that picks an emoji's look"),
+        ("return i > 0 and (", "return (", "refuses a selector that starts a text"),
+        ("not text[i - 1].isascii() and ", "", "refuses a selector after an ASCII character"),
+        (" and not HIDDEN.match(text[i - 1])", "", "refuses a second selector in a row"),
+        ("or KEYCAP.match(text, i - 1) is not None", "or False", "keeps a keycap's selector"),
+        ('"[0-9#*]"', '"[0-9]"', "keeps a # or * keycap's selector"),
+        ("out, line, seen = [], 1, 0", "out, line, seen = [], 0, 0", "counts lines from 1"),
+        ("        seen = m.start()\n", "", "counts the lines before each hidden character once"),
+        ('column = m.start() - text.rfind("\\n", 0, m.start())', 'column = m.start() - text.rfind("\\n", 0, m.start()) - 1', "counts columns from 1"),
+        ('name = unicodedata.name(c, "")', 'name = ""', "names the hidden character"),
+        ('bad = data.find(b"\\0")', "bad = -1", "refuses a text holding a NUL (F5088)"),
+        ("bad = e.start if bad < 0 else min(bad, e.start)", 'bad, text = -1, data.decode("utf-8", "replace")', "refuses a text with a byte that is no UTF-8 (F5088)"),
+        ("min(bad, e.start)", "bad", "names a text's first byte that is no UTF-8"),
+        ('        return [f"{where}: no UTF-8 text', '        return hidden_in(where, data.decode("utf-8", "surrogateescape")) + [f"{where}: no UTF-8 text', "reads no character of what is no UTF-8 text (F5082)"),
+        ("{bad + 1}", "{bad}", "counts bytes from 1"),
+    ))
+    yield from swaps("scripts/check_docs.py", "check_docs", (
+        ('".png": b"\\x89PNG\\r\\n\\x1a\\n", ', "", "reads no .png"),
+        ('".jpg": b"\\xff\\xd8\\xff"', '".jpeg": b"\\xff\\xd8\\xff"', "reads no .jpg"),
+        ("if suffix in IMAGES and data.startswith(IMAGES[suffix])", "if suffix in IMAGES", "reads a text named as an image"),
+        ("path, link = p.relative_to(root).as_posix(), p.is_symlink()", "path, link = p.name, p.is_symlink()", "names the file by its path"),
+        ('    if not (root / ".git").exists():\n        return {}', "    if True:\n        return {}", "reads the index's copy, what a commit takes (F5087)"),
+        ("    for path, (data, link) in held.items():\n", "    for path, (data, link) in []:\n", "reads each blob the index holds"),
+        ('if not info.startswith("160000 ")', "if True", "reads no gitlink as a file"),
+        ('(batch[start:end], mode == "120000")', "(batch[start:end], False)", "names a staged link as one"),
+        ('" (link)" * link + " (work tree)" * (path in held)', '" (link)" * link', "names the work tree's copy as one"),
+        ("        if held.get(path) != (data, link):\n", "        if True:\n", "reads the work tree's copy only where it differs"),
+        ("        if held.get(path) != (data, link):\n", "        if False:\n", "reads the work tree's copy where it differs"),
+        ("os.fsencode(os.readlink(p)) if link else p.read_bytes()", "p.read_bytes()", "reads a link's target, not what it points to (F5089)"),
+        ("        names.add(path)\n", "", "reads the name of each path git would track"),
+        ('        out += hidden_in(f"the name {ascii(path)}", path)\n', "        pass\n", "reads every name (F5089)"),
+        ("{ascii(path)}", "{path}", "writes a name's hidden character as its escape"),
+        ('        held = {}\n        out.append(f"git cannot read the index', '        held = {}\n        (f"git cannot read the index', "fails when git cannot read the index"),
+        ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
+        ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
+        ('    if not (root / ".git").exists():\n        return []', "    if True:\n        return []", "reads the branch's commit messages (F5079)"),
+        ('"refs/remotes/origin/main..HEAD"', '"HEAD"', "reads no message main holds already"),
+        ('"refs/remotes/origin/main..HEAD"', '"-1", "refs/remotes/origin/main..HEAD"', "reads each message of the branch, not its newest only (F5081)"),
+        ('"refs/remotes/origin/main"):\n        return []', '"refs/remotes/origin/main") and False:\n        return []', "reads no message with no origin/main"),
+        ('if not git("-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/remotes/origin/main"):',
+         'if subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "origin/main^{commit}"]).returncode:',
+         "takes no failing git for a branch with no origin/main"),
+        ("subprocess.CalledProcessError) as e:\n        out.append(", "subprocess.CalledProcessError) as e:\n        (", "fails when git cannot read the messages"),
+    ))
+    yield from swaps("scripts/repo_files.py", "repo_files", (
+        ('"ls-files", "-z", "--cached"', '"ls-files", "--cached"', "lists names git quotes none of (-z)"),
+        ('{"node_modules", ".git"}', '{"node_modules"}', "walks none of git's own folder"),
+        ('{"node_modules", ".git"}', '{".git"}', "walks no installed package"),
+        ("    return [p for p in listing(root) if p.is_file()]\n", "    return listing(root)\n", "lists no file deleted from the work tree"),
     ))
 
 

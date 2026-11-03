@@ -22,4 +22,25 @@ const (
 	leaf2 = "28RXmuKzqykyE/QruFJwbqmVw7XDmH+KqfquUASss89GFpFFVPLe3hyFeaIIfaw1inklCBRdA1R1pgFOMpnYegAAAAAAAAACVMMH3f9nfkYVss91X9OrK1VVOIPBpuvWnrE2cUeMMW9kZWFs"
 	aunts1 = "fm0cz7zib+LVSvcs3+7UXeilK0plr2Pxor9WQ4n7hcx7oUPcaWt33oak+6+HS3qGQboWWH648xCAILK9YXoVSg=="
 	rootHex = "653d091d29839ee17e52cea8b2bc0194e24562eb2ea9eec096cc4ce866966acc"
+	pageRoot = "9jCDB54D6pKICkgJEpYq6r/TlSItGFIhelxF6M67FnA="
+	pageRootHex = "f63083079e03ea92880a480912962aeabfd395222d1852217a5c45e8cebb1670"
+	pageBindSig = "1y64IkC1QM0Cpg1azmvQKr7XZKcOCjIz3+tmYCTaMzTqaYW4QhX6Q3hX+7VzFyZGkaKWPMtPaBNwQPhfv54bAw=="
 )
+
+// Seals of pageRoot with n = 1, each {a, b, sigA, sigB}, a < b, sorted by a; pageBindSig binds page[0]'s a to bob.
+var page = [...][4]string{
+	{"A7iqUiV4H5Rbt7Wh+f4CHPOn0laqRHAd/TMUjW/aywg=", "2p2pBMm6LM/o8MRK2hZfJoV12LYhPTZHccymxLcD+9A=", "kwT/Bcj/EzIPOVf2tXAfhZF8uTFPgf/BXmtY2yQbQj8E1uSRJX+Uw+IxXWJbbjY7xwoFYKm3ofBTAUDw4sDVAw==", "TECuxrd63oYcgSHfa+t4/Wof5XUAQxIXzKHpziZRb9ApoGPAQOnlyJOZloE9Z3orE2Fqix75VuC4XdZy8Ws0Aw=="},
+	{"IcUb89wIS7yU1G/ngK+WjkHZh6l86d/mNr7kiBzjG8A=", "chwvZloQRaxqGDQeQliJtGZ+zpxl0DueLbxMus/722w=", "o7COlbW+sI8F/KnuhQBm2bk3Zgs2oQK8T2qAmHTLlbuAZAstuH+duzYjQXHtpzSq6uF+Z5evLs5rL27LcT8fDQ==", "tbRZgmd5SJRixM7aDkyAMtXuLppF6XrAcV+XJI2Iu94jvSKMcKwORPtKsLBn+/LAMZLKdMWf9K0m6IDkO+2kCA=="},
+	{"K/8c3EAFcIcPOqzs8dLVeUoreVhQkZpJbhlqiBqfuZk=", "mPCt7ENiO46OS9idFUvSOeVIudjnTnBrMWYj5tK4tjg=", "y/nqh9oJm58yZT0w4i+gapkKFdMuKWAc7S9oGqRfrKUaeOev0ozyvPftYSWpaiOtbcfdzukdvGNYIIS5pr4cCg==", "mP4a1tqPBVA04AFM4mHDcgRZQ8XcI8rpZrJZ3NYnw1oBndNZTqSTWR8aVue5G08dWjjn2IB+OYsO53/YmQFDAw=="},
+	{"NrlAuMJPq5PRn6BTtGGW5XpaftCodVYittd7RNWg06E=", "gtaTCLyfnCrYEdJP861B3DKOopqX+fD2w3+06vyOCKo=", "XWOZxQzNYsyelMS40aR0m3eN2hy9cMSsYiYsruzuBrEWN37hMydRHCgjhLR5UqvK9HnmawsTnTdQ+yXJMP/ADg==", "XcHSAOYwoC1+LjwlXqOWvcDsE6131yMRj0KxPzCOVCAIYF03b/as5QF6zMYxDNDU9Dp3MGGG2kjZsuJU8mC/BQ=="},
+	{"PunP4ocsT8on9WeDA8VOG3XLtJc95Je93/Hm6aTZcl4=", "nuVlPTr2D3lfdsLVUBKR1WO1q9Ul8URKGuTAIJ9FPnQ=", "BZbQBCvADDhNkmW+UFfylDiDuGbYZbUYmiAVx6W+gllOwiCnt2jjIL1oIVTidwB34EDyHuGJTAcuVu2pbxhVAw==", "utWBcmctX15bPcO1cgWw5R+fbUyJyKvsWrII1ZW78ipCbdx1PgMnHCwvjMD2tnnF2Ud1cIjnP5phoeMin22jDw=="},
+	{"TNZr5YRwURMYgquPqTr6WBWOyUYW4K9CsuQsiRyHT/8=", "dXfHwf+Ps5NQTor0lI02+QTFfRBnKKWu2BJj6cWOarY=", "nhgDkzG2PYgi9pXKipJ3Uqxz8tosbh/nvBDreYko2S68ruIE5ntkTFEuW3Ukn11n0ZxoKlhexMws35Zjb1EcCw==", "vsA4HCCqIQFkuwLyjLvFB1l7RfKM1tvzUPJ6UA2i9QqWKLxZGjHWZaZWzeRtZWQk+ovefemD/0+M7YV7rqBbDw=="},
+	{"U9ObIsZqMN19QKUCbR+FmtCpxHHkJPX2vjnz1Vt434w=", "ZyKHyKadv40c41kOshbM9iQa3oIPXygue1De+NGo1hU=", "iOJ+wPWPRbivbi97qN/LRrC3z4o8IcaWKbloRner0ywdh4fk+q5XizSXtzWEUmikjczAzHMaHK/R8fRGdWwXAA==", "1WGy81GE9lQp70UqL0s+phJYktgYevOUADPD++eb/hXtTFDz0OlQzcaZ+4L02XiYRYOpiDX1i+TWbSv1N69LDw=="},
+	{"VDW94f3EaZBTmkOrLUHwaJexd+JS9AFylfrkJGlWLdA=", "itkYzoOAV7riwuyh65whXV4A9Ai3nxV07tSYLcCHr/0=", "f4IALKsR/5TW5yMuK5PXGmLWizkcWNkISMKIqAdpvVjZ78Y74kJXY/W3WrjR7jce40BELyEXdP1WitKq+MjhBw==", "etmtCziilXU6VTXNwUaH00/Vp+Iou1M/lVmAScj2qvq8UCR2WVe9FeXZ6oW8/3F7csmjHF3p6+t5j1gItk6SBg=="},
+	{"YrLtN/+mHSHkjgV23+PKZ+jzz4/alOWX049olx+4UkU=", "4Oi3G/ifKgkFpCzZhq1VDHcG0zmIE6OYK+PyqrbclUA=", "ZtUURX5O2w8OC2NuGhSerP0rUMXS7P7OPSQ74iz4fVFB0Wd/cJZH1A42m9OJLh0ReB6M0CDduivxOjF8ohVbBQ==", "4mcdTBCvepPqQs2wifjTjGCThmnDaxpKXWUYm8R6rScNA5tjk/lQ3jKJh0K6+ZrGISbeLYOyOKBwHMuJND5ZBQ=="},
+	{"Z2Xz+pJ4Bb/0o6C/8C0VIMlLtDcSFF9s4kuOMzWyFMg=", "h2VwskW9gEpViAReJTW7awHG7iacyy8Zjgmbn37WCnc=", "PVxf5gIAycc44pJxgXQUUgPJVyCShUUauSMZx8+WxvB9i0FShcrW+d+fZtkjvlMCbib5VVgQiSkZOqtYZNrjCw==", "TiK/GIT03vda2tDQiBPEMUAZv6N8vcXpF20N1CZaYY0gCh8nK/gDiLOnJN1/ZJRGqhJequiuhhmbaxVR1v0ZBQ=="},
+	{"mdyjM6zqpVfOCY9SlAXvmGq7yscx2cfxydPCeWg+3cw=", "xcG8zfOau2i+XJYTw4mNRv8O0vkRbJJYrookrDGXPPw=", "t4LKNOyiSqeGMaRdchApSt3nc+8uIGWHSY73EKPCRXpLbH/cpdxcAHoo+9sjfRQpiDAZRjWVpt98ELIFwRApCA==", "JafZ5zrujUENojtLhcbuepzjs6gOrRTRVyMYtJGC4AWmpNdhpRUuhK+563F/ojPNV4UmNnOm3ylfEZgVv1QbCg=="},
+}
+
+// A seal of root with n = 2, {a, b, sigA, sigB}, a < b; neither key is bound.
+var sealOfTwo = [4]string{"tlXD9HFBWHBI5zWjokqHMrCcuo7rQwyxEVI4FyjKwzs=", "39f5unD1ygRpAX6EALFHeMlhGiuBR90P9AHmaU2WTtQ=", "VcrK9BzvdWkZu3P2nn5t/hgJvUZNOGZMcGCaCpj1PKxuBc9617dHaUJqVVNzrSHvFBrH+yaFVTzAbVFX0FwrBA==", "q2iMpfuHsTPfCRlms0BbhuplGRubY5p67dojoBgDn1m4dP3NhsJ23GUS9mtPQnEY32+J6HcPzENNU8AEOqa7DQ=="}
