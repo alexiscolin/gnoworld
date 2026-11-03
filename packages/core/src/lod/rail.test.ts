@@ -60,8 +60,30 @@ describe("the rail's order", () => {
     expect(sections(asks)).toEqual(["earth", "seed", "seed", "seed"]);
   });
 
-  it("leaves out a world with nobody here, no rise and nothing new: a sign always means real data", () => {
-    expect(ids([EARTH, world("quiet", {}), world("used", { use: 40 }), trend("empty", 0)])).toEqual(["earth"]);
+  it("puts a seed of unknown age after the seeds it knows the age of", () => {
+    expect(ids([EARTH, world("unknown", { uncharted: true }), seed("known", 5)])).toEqual([
+      "earth",
+      "known",
+      "unknown",
+    ]);
+  });
+
+  it("leaves out a world with nobody here, no caller, no rise and nothing new: a sign always means real data", () => {
+    expect(ids([EARTH, world("quiet", {}), world("unused", { use: 0 }), trend("empty", 0)])).toEqual(["earth"]);
+  });
+
+  it("puts the worlds with people here before those with callers alone, which follow by their callers", () => {
+    const asks = [EARTH, world("busy", { use: 900 }), trend("few", 1), world("used", { use: 40 }), trend("many", 12)];
+    expect(ids(asks)).toEqual(["earth", "many", "few", "busy", "used"]);
+    expect(sections(asks)).toEqual(["earth", "trend", "trend", "trend", "trend"]);
+  });
+
+  it("ranks two worlds as busy by their callers, the more called first", () => {
+    expect(ids([EARTH, world("a", { here: 4, use: 2 }), world("b", { here: 4, use: 30 })])).toEqual([
+      "earth",
+      "b",
+      "a",
+    ]);
   });
 
   it("lists each world once", () => {
@@ -130,22 +152,33 @@ describe("the rail's cap", () => {
       id: fc.constantFrom(...IDS),
       kind: fc.constant("far" as const),
       signals: fc.record(
-        { here: fc.nat({ max: 500 }), rise: fc.double({ min: 0.21, max: 20, noNaN: true }), uncharted: fc.boolean() },
+        {
+          here: fc.nat({ max: 500 }),
+          use: fc.nat({ max: 5000 }),
+          rise: fc.double({ min: 0.21, max: 20, noNaN: true }),
+          uncharted: fc.boolean(),
+        },
         { requiredKeys: [] },
       ),
       days: fc.nat({ max: 6 }),
     });
     const order = ["earth", "trend", "rising", "seed"];
-    const scoreOf = ({ signals, days = 0 }: RailAsk, section: string) =>
-      ({ trend: signals?.here, rising: signals?.rise, seed: -days })[section] ?? 0;
-    const isTrend = ({ signals }: RailAsk) =>
-      signals?.uncharted !== true && signals?.rise === undefined && (signals?.here ?? 0) > 0;
-    // Within a section, no world stands just below one it is clearly ahead of.
+    // A trend's group (people here before callers alone) and what the hold weighs in it.
+    const scoreOf = ({ signals = {}, days = 0 }: RailAsk, section: string): readonly [number, number] => {
+      if (section === "rising") return [0, signals.rise ?? 0];
+      return section === "seed" ? [0, -days] : (signals.here ?? 0) > 0 ? [0, signals.here ?? 0] : [1, signals.use ?? 0];
+    };
+    const isTrend = ({ signals = {} }: RailAsk) =>
+      signals.uncharted !== true && signals.rise === undefined && ((signals.here ?? 0) > 0 || (signals.use ?? 0) > 0);
+    // Within a section, people before callers alone, and no world just below one of its group it is clearly ahead of.
     const held = (rail: readonly RailWorld[], asks: ReadonlyMap<string, RailAsk>, section: string) => {
       const scores = rail
         .filter((each) => each.section === section)
         .map(({ id }) => scoreOf(asks.get(id) ?? EARTH, section));
-      return scores.every((score, at) => at === 0 || !(score > AHEAD * (scores[at - 1] ?? 0)));
+      return scores.every(([group, score], at) => {
+        const [upper = 0, above = 0] = scores[at - 1] ?? [];
+        return at === 0 || group > upper || (group === upper && !(score > AHEAD * above));
+      });
     };
     fc.assert(
       fc.property(
@@ -188,6 +221,18 @@ describe("the rail's order held", () => {
     const shown = ["earth", "a", "b", "c", "d"];
     const asks = [EARTH, trend("a", 30), trend("b", 10), trend("c", 9), trend("d", 26)];
     expect(ids(asks, shown)).toEqual(["earth", "a", "d", "b", "c"]);
+  });
+
+  it("holds the worlds with callers alone by their callers, and never lifts one above a world with people", () => {
+    const shown = ["earth", "few", "a", "b"];
+    const asks = [EARTH, trend("few", 1), world("a", { use: 100 }), world("b", { use: 120 })];
+    expect(ids(asks, shown)).toEqual(["earth", "few", "a", "b"]);
+    expect(ids([EARTH, trend("few", 1), world("a", { use: 100 }), world("b", { use: 900 })], shown)).toEqual([
+      "earth",
+      "few",
+      "b",
+      "a",
+    ]);
   });
 
   it("holds the rising worlds as it holds the trends", () => {

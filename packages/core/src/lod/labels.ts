@@ -103,9 +103,11 @@ function ranked([a, one]: Weighed, [b, other]: Weighed): number {
   for (let at = 0; at < one.length; at += 1) if (one[at] !== other[at]) return (other[at] ?? 0) - (one[at] ?? 0);
   return a.id < b.id ? -1 : 1;
 }
-const best = (asks: readonly LabelAsk[]) =>
+/** The most popular first: the most rise, then the most people here, then the most callers; a tie by id. The labels' far worlds and the
+ * rail's trends and rising worlds alike (7i). */
+export const mostPopular = <Ask extends LabelAsk>(asks: readonly Ask[]): Ask[] =>
   asks
-    .map(weighed)
+    .map((ask) => [ask, weighed(ask)[1]] as const)
     .sort(ranked)
     .map(([ask]) => ask);
 
@@ -114,8 +116,8 @@ function farOf(asks: readonly LabelAsk[], taken: ReadonlySet<string>): LabelAsk[
   const far = asks.filter(
     (ask) => ask.kind === "far" && !taken.has(ask.id) && known(ask.signals ?? {}) && titleOf(ask) !== null,
   );
-  const fresh = best(far.filter(({ signals }) => signals?.uncharted === true));
-  const popular = best(far.filter(({ signals }) => signals?.uncharted !== true));
+  const fresh = mostPopular(far.filter(({ signals }) => signals?.uncharted === true));
+  const popular = mostPopular(far.filter(({ signals }) => signals?.uncharted !== true));
   return [...popular.slice(0, FAR_MOST - Math.min(fresh.length, 1)), ...fresh].slice(0, FAR_MOST);
 }
 
