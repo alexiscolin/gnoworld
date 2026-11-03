@@ -141,7 +141,8 @@ The chief checked every claim against the code, the decisions and the frames.
 Where the decision left a choice, 7o made it as follows; each can be changed on its own.
 
 - **The newcomer.** The draft said "Start here" would use the visits the labels already read. They cannot: the device keeps a world's visit
-  only when a seed wakes, so a world older than seven days is never kept, and the Earth's page keeps none (Verified). The device keeps
+  only once its appearance has started there (at 7o only when a seed woke; any world's since 7w, as its grid starts since F4533), a page
+  left before its world lands keeps none, and the Earth's page keeps none (Verified). The device keeps
   instead the first place its reader entered, in any universe: the Earth's page, a world's or a realm's. Until then the reader is new: the
   Earth's label says "Start here" and the buttons are the first visit's. A device that keeps nothing (storage refused) reads every visit as a
   first.
