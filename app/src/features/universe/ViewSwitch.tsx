@@ -28,10 +28,7 @@ export function ViewSwitch() {
       OPEN,
       (event) => {
         const href: unknown = event instanceof CustomEvent ? event.detail : undefined;
-        if (typeof href === "string" && isOwnPage(href))
-          Promise.resolve(navigate(href)).catch((error: unknown) => {
-            reportError(error);
-          });
+        if (typeof href === "string" && isOwnPage(href)) Promise.resolve(navigate(href)).catch(reportError);
       },
       { signal: controller.signal },
     );

@@ -1,9 +1,10 @@
+import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last on 2026-10-31), 3 MB in all, the worker's
+// hydrated; its steps in docs/decisions.md, the last on 2026-11-04: 174 KiB for the phone's view switch), 3 MB in all, the worker's
 // precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 173 * 1024;
+const FIRST_SCREEN_JS = 174 * 1024;
 const TOTAL = 3 * 1024 * 1024;
 
 const compressed = (page: Page, urls: readonly string[]) =>
@@ -34,13 +35,15 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk. Lowered to
-// 158,208 B once the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk; 160,000 B for
+// the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03). Lowered to 158,208 B once
+// the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
 const SCENE_JS = 158_208;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03).
-const COSMOS_JS = 16.5 * 1024;
+// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
+// chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
+const COSMOS_JS = 17 * 1024;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
@@ -52,9 +55,9 @@ const REST = /\/assets\/restSearch-[\w-]+\.js$/;
 const REST_JS = 10.5 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
-// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
-// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth; 6.5 KiB with
-// 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
+// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them; first
+// the part's 5,960 B, 6 KiB once the rail shared their ranking, titles, reading and band (Alexis, 2026-11-03: two chunks of their own, the
+// price of sharing), 6.5 KiB with 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
 const LABELS_JS = 6.5 * 1024;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
@@ -63,6 +66,13 @@ const LABELS_JS = 6.5 * 1024;
 const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
 const FLIGHTS_JS = 18 * 1024;
 const FLIGHTS_MARK = "camera-controls:";
+// The rail (7i) and its planets' portraits: chunks of their own, asked once the cosmos's worlds stand on a computer, outside the scene's and
+// the cosmos's caps. Their first caps are the part's (the chief, 2026-11-03): 6,408 B and 1,712 B measured, and about a tenth.
+const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
+const RAIL_JS = 7 * 1024;
+const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
+const PORTRAITS_JS = 1900;
+const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
 // chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
 // (Alexis, 2026-11-03).
@@ -92,7 +102,9 @@ const THREE_MARK = "isWebGLRenderer";
 // Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
 // the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
-const GENERATED_JS = 8 * 1024; // 7,780 B at 7b5's end (zlib, level 6; 6,489 before its look pass); the chief's to set.
+// 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
+// cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave.
+const GENERATED_JS = 10 * 1024;
 const GENERATED_MARK = "minorShare";
 
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
@@ -348,6 +360,21 @@ for (const [name, chunk, cap] of [
     const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
     expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
   });
+
+test("the rail's and its portraits' chunks come once the cosmos's worlds stand, each within its own cap, apart from the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await page.route("**/worlds.json", (route) =>
+    route.fulfill({ body: RECORDED_WORLDS, contentType: "application/json" }),
+  );
+  const asked = (chunk: RegExp) => page.waitForResponse((response) => chunk.test(response.url()));
+  const [rail, portraits, cosmos, scene] = [asked(RAIL), asked(PORTRAITS), asked(COSMOS), asked(SCENE)];
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+  expect(await compressed(page, await ownOf(page, (await rail).url(), there))).toBeLessThanOrEqual(RAIL_JS);
+  expect(await compressed(page, await ownOf(page, (await portraits).url(), there))).toBeLessThanOrEqual(PORTRAITS_JS);
+});
 
 test("the flights' chunk holds camera-controls, comes once the scene runs, within its own cap, and the scene's holds none of it", async ({
   page,

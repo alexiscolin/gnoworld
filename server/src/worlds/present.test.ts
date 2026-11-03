@@ -171,6 +171,32 @@ describe("who is here", () => {
     ]);
   });
 
+  it("hands the server's own readers the counts it serves, the ticker's trends among them (7t)", async () => {
+    const { present, ask } = setup();
+    present.seen("#earth", ["gnoworld", "ada"]);
+    const held = present.current();
+    expect(held).toEqual(Presence.parse(JSON.parse((await ask()).body)));
+    expect(held.worlds.find(({ world }) => world === "earth")?.here).toBe(1);
+    present.seen("#bubble", ["gnoworld", "bo"]);
+    vi.advanceTimersByTime(1000);
+    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(1);
+  });
+
+  it("builds what it hands out under the answer's own rule: once a minute, or a second after a change, however often it is asked", () => {
+    const { present, listed } = setup();
+    present.seen("#earth", ["gnoworld", "ada"]);
+    present.current();
+    const built = listed.mock.calls.length;
+    for (let ask = 0; ask < 50; ask += 1) present.current();
+    expect(listed.mock.calls.length).toBe(built);
+    present.seen("#bubble", ["gnoworld", "bo"]);
+    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(0);
+    vi.advanceTimersByTime(999);
+    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(1);
+  });
+
   it("answers counts alone, no name of anyone, public and kept a minute by any cache", async () => {
     const { present, ask } = setup();
     present.seen("#earth", ["gnoworld", "ada-lovelace"]);

@@ -59,7 +59,7 @@ const STATED: Record<Anchor, Row> = {
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
     glow: [0.5, 0.58],
-    rim: { colours: [0x734d26, 0x6e562b], thickness: [0.016, 0.026] },
+    rim: { colours: [0xedc3ad, 0xedc3ad], thickness: [0.016, 0.026] },
   },
   "gas giant": {
     maps: ["jupiter"],
@@ -148,7 +148,7 @@ const STATED: Record<Anchor, Row> = {
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
     glow: [0.6, 0.72],
-    rim: { colours: [0x734d26, 0x6e562b], thickness: [0.016, 0.026] },
+    rim: { colours: [0xedc3ad, 0xedc3ad], thickness: [0.016, 0.026] },
   },
   "two-faced": {
     maps: ["moon", "ceres"],

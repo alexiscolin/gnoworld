@@ -53,6 +53,12 @@ function worldIn(query: URLSearchParams): number {
   return valid ? world : 0;
 }
 
+// The seed asked, a whole number from 0; S then counts on from it.
+function seedIn(query: URLSearchParams): number {
+  const seed = Number(query.get("seed"));
+  return Number.isInteger(seed) && seed > 0 ? seed : 0;
+}
+
 // One of the recorded file's 24 seen close: an index, or none.
 function realIn(query: URLSearchParams): number | null {
   const asked = query.get("real");
@@ -64,16 +70,18 @@ function chosen(query: URLSearchParams): Choice {
   const view = VIEWS.find((name) => name === query.get("view")) ?? "gallery";
   const stage = STAGES.find((name) => name === query.get("stage")) ?? "rest";
   const present = query.has("present") ? Number(query.get("present")) : null;
-  const [minor, flat] = [query.get("minor") !== "off", query.get("maps") === "flat"];
+  const off = (name: string) => query.get(name) === "off";
   return {
     view,
     world: worldIn(query),
-    seed: 0,
+    seed: seedIn(query),
     stage,
     present,
     real: realIn(query),
-    minor,
-    flat,
+    minor: !off("minor"),
+    clouds: !off("clouds"),
+    front: query.get("light") === "front",
+    flat: query.get("maps") === "flat",
   };
 }
 

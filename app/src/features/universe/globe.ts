@@ -4,6 +4,7 @@ import { readWorlds } from "../../lib/chain/realms.ts";
 import { readFlag, writeFlag } from "../../lib/flags.ts";
 import type { Circle, EarthState } from "../../scene/earth/device.ts";
 import type { WorldAsk, WorldPage } from "../../scene/world/part.ts";
+import type { Shown } from "./host.ts";
 
 const VISITED = "gnoworld:visited:";
 
@@ -69,6 +70,13 @@ export function markGlobe(kind: "earth" | "world", body: EarthState, status: str
 export function markFlown(flying: boolean): void {
   const globe = document.querySelector<HTMLElement>("[data-globe]");
   if (globe !== null) globe.dataset["flown"] = flying ? "flying" : "landed";
+}
+
+/** Marks the hero's calls with whether the cosmos stands, the scene running on the home, where the Earth's label can say "Start here": a
+ * newcomer's calls take the first visit's look then alone, so a page with no cosmos keeps its filled call (ADR-0003 §3). */
+export function markCalls(status: string, shown: Shown): void {
+  const calls = document.querySelector<HTMLElement>("[data-hero='actions']");
+  if (calls !== null) calls.dataset["cosmos"] = status === "on" && shown === "cosmos" ? "standing" : "none";
 }
 
 /** Tints the page with a world's own colour where the globe's sibling takes it, as the Earth's blue is; none gives the page its blue back. */

@@ -12,6 +12,18 @@
     gap: 22px;
     /* The hero's own box takes no click from the page behind it; its words and actions do. */
     pointer-events: none;
+    /* raw: the hero comes back in the opening's own 600 ms as its words leave (Opening.module.css) */
+    transition: opacity 600ms var(--ease-standard);
+  }
+
+  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
+     page's reading, and shows again as the keyboard reaches it. */
+  .hero[data-yield="opening"]:not(:focus-within) {
+    opacity: 0;
+  }
+
+  .hero[data-yield="opening"]:not(:focus-within) > * {
+    pointer-events: none;
   }
 
   .hero > * {
@@ -45,13 +57,20 @@
   }
 
   .line {
-    /* layout: the page's heading, in the line's own size: no margin, no heading size */
-    margin-block: 0;
     /* raw: the line's own grey and 17 px (the prototype's #hero .heroCap) */
     color: #c8d0de;
     /* raw: the prototype's and the frames' own value */
     font: 400 17px/1.5 var(--family-sans);
     letter-spacing: normal;
+  }
+
+  /* The page's heading is the line's count, inline in it, in the line's own size: no margin, no heading size (ADR-0003, 2a). */
+  .heading {
+    display: inline;
+    /* layout: a heading with no margin of its own, inline in the line */
+    margin-block: 0;
+    font: inherit;
+    letter-spacing: inherit;
   }
 
   .actions {
@@ -79,10 +98,10 @@
     /* raw: 24 px at each side, 20 on a phone (the prototype's lines 543 and 772) */
     padding-inline: 24px;
     /* the action's edge is a ring inside its box, so a solid one needs none */
-    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    box-shadow: inset 0 0 0 var(--line-width) var(--_ring, var(--color-line-strong));
     border-radius: var(--radius-pill);
     /* raw: the night at 50% over the scene, as the prototype's 0.5 */
-    background: color-mix(in oklab, var(--color-surface) 50%, transparent);
+    background: var(--_fill, color-mix(in oklab, var(--color-surface) 50%, transparent));
     /* raw: 15 px, 500 (the prototype's #hero .cta .link) */
     font: 500 15px/1 var(--family-sans);
     text-decoration: none;
@@ -90,8 +109,9 @@
   }
 
   .action[data-emphasis="solid"] {
-    box-shadow: none;
-    background: var(--color-primary);
+    --_ring: transparent;
+    --_fill: var(--color-primary);
+
     color: var(--color-ink);
   }
 
@@ -116,6 +136,13 @@
     text-decoration: none;
   }
 
+  /* ADR-0003, 2d: the list's kicker, over its first link. */
+  .worlds > p {
+    /* layout: the kicker's own line, its first link's line box under it (mock-ups 2 to 4: 13 px between) */
+    margin-block: 0;
+    color: var(--color-text-muted);
+  }
+
   .worlds a:hover {
     color: var(--color-text);
   }
@@ -138,6 +165,12 @@
     content: "000";
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .hero {
+      transition: none;
+    }
+  }
+
   @media (max-width: 899px) {
     .row {
       /* layout: the actions go under the line when the phone is too narrow for both */
@@ -156,6 +189,26 @@
     }
   }
 
+  /* On a first visit beside the cosmos the Earth's "Start here" is the one filled call: Go explore an outline, Join the chat for the return
+     (ADR-0003 §3). Where no cosmos stands, a phone that did not ask for space or a scene that does not run, the filled call stays. */
+  .actions[data-first][data-cosmos="standing"] .action {
+    --_ring: initial;
+    --_fill: initial;
+
+    color: inherit;
+  }
+
+  .actions[data-first][data-cosmos="standing"] [data-call="chat"] {
+    display: none;
+  }
+
+  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
+  @media (min-width: 900px) {
+    .worlds[data-rail="standing"] {
+      display: none;
+    }
+  }
+
   /* Over the page only where it holds: a screen of 800 px high, the list of worlds above it in the room that is left. */
   @media (min-width: 900px) and (min-height: 800px) {
     .hero {
@@ -169,8 +222,8 @@
       margin-block-start: 0;
       padding-block-end: 0;
       position: fixed;
-      /* raw: under the header's 96 px, and 16 more */
-      inset-block-start: 112px;
+      /* raw: the kicker at mock-ups 2 to 4's 98 px, under the header's 96, its first link where it was */
+      inset-block-start: 101px;
       inset-inline-start: var(--space-xl);
       /* raw: the room above the hero (the header, the hero at its tallest and the margins), whatever the list's length */
       max-block-size: calc(100dvb - 520px);

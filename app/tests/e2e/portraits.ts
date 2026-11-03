@@ -1,6 +1,7 @@
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
+import { correlation } from "../../../packages/core/src/testing.ts";
 
 // What a glance takes from a world on a still (ADR-0002 §3, "variety is measured"; F4218: on what is drawn): the mean colour of its lit
 // ground in CIE Lab, how much its lightness varies, and its texture's energy at four scales, each over its own lightness. A close view's
@@ -81,30 +82,39 @@ const portraitsOf = (discs: readonly Circle[]) => {
   });
 };
 
-// The day side's box of a world lit from the right, as the Earth's is read: the Laplacian's variance at full size and at half.
+/** The day side's box of a world lit from the right, as the Earth's is read: left, right, top, bottom. */
+export function dayBox({ x, y, r }: Circle): [number, number, number, number] {
+  return [Math.round(x + 0.1 * r), Math.round(x + 0.5 * r), Math.round(y - 0.3 * r), Math.round(y + 0.3 * r)];
+}
+
+/** The Laplacian of a picture's `value` at (i, j): four times it less its four neighbours. */
+export function laplacian(value: (i: number, j: number) => number, i: number, j: number): number {
+  return 4 * value(i, j) - value(i - 1, j) - value(i + 1, j) - value(i, j - 1) - value(i, j + 1);
+}
+/** A picture's `value` at half size: each the mean of the 2 by 2 block at (2i, 2j). */
+export function halved(value: (i: number, j: number) => number): (i: number, j: number) => number {
+  return (i, j) =>
+    (value(2 * i, 2 * j) + value(2 * i + 1, 2 * j) + value(2 * i, 2 * j + 1) + value(2 * i + 1, 2 * j + 1)) / 4;
+}
+
+// The day side's box: the Laplacian's variance at full size and at half.
 const detailsOf = (discs: readonly Circle[]) => {
   const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
   const [image] = images;
   if (image === undefined) throw new Error("no picture");
-  return discs.map(({ x, y, r }) => {
-    const [x0, x1, y0, y1] = [x + 0.1 * r, x + 0.5 * r, y - 0.3 * r, y + 0.3 * r].map(Math.round) as [
-      number,
-      number,
-      number,
-      number,
-    ];
+  return discs.map((disc) => {
+    const [x0, x1, y0, y1] = dayBox(disc);
     const variance = (value: (i: number, j: number) => number, w: number, h: number) => {
       let [n, s, q] = [0, 0, 0];
       for (let j = 1; j < h - 1; j++)
         for (let i = 1; i < w - 1; i++) {
-          const lap = 4 * value(i, j) - value(i - 1, j) - value(i + 1, j) - value(i, j - 1) - value(i, j + 1);
+          const lap = laplacian(value, i, j);
           [n, s, q] = [n + 1, s + lap, q + lap * lap];
         }
       return q / n - (s / n) ** 2;
     };
     const at = (i: number, j: number) => luma(image, x0 + i, y0 + j);
-    const half = (i: number, j: number) =>
-      (at(2 * i, 2 * j) + at(2 * i + 1, 2 * j) + at(2 * i, 2 * j + 1) + at(2 * i + 1, 2 * j + 1)) / 4;
+    const half = halved(at);
     let [total, along, across] = [0, 0, 0];
     for (let j = 0; j < y1 - y0; j++)
       for (let i = 0; i < x1 - x0; i++)
@@ -150,7 +160,7 @@ const apartOf = (discs: readonly Circle[]) => {
 export const portraits = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Portrait[]> =>
   reading(page, [picture], [portraitsOf, places]);
 export const details = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Detail[]> =>
-  reading(page, [picture], [detailsOf, places]);
+  reading(page, [picture], [detailsOf, places, [dayBox, laplacian, halved].map(String).join("\n")]);
 export const apart = (
   page: Page,
   [before, after]: readonly [Buffer, Buffer],
@@ -165,19 +175,14 @@ const SAME_ENERGY = Math.log(1.3);
 const SAME_PICTURE = 0.8;
 const CELLS_TO_JUDGE = 32;
 
-function correlation(one: readonly (number | null)[], other: readonly (number | null)[]): number {
+// Two grids' correlation over the cells both read; 1, the same picture, where too few cells or a flat grid tell nothing.
+function gridsAlike(one: readonly (number | null)[], other: readonly (number | null)[]): number {
   const both = one.flatMap((value, at) => {
     const twin = other[at];
     return value === null || twin === null || twin === undefined ? [] : [[value, twin] as const];
   });
-  if (both.length < CELLS_TO_JUDGE) return 1;
-  const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  const [ma, mb] = [mean(both.map(([a]) => a)), mean(both.map(([, b]) => b))];
-  const [ab, aa, bb] = both.reduce(
-    ([x, y, z], [a, b]) => [x + (a - ma) * (b - mb), y + (a - ma) ** 2, z + (b - mb) ** 2],
-    [0, 0, 0],
-  );
-  return aa === 0 || bb === 0 ? 1 : ab / Math.sqrt(aa * bb);
+  const read = correlation(both);
+  return both.length < CELLS_TO_JUDGE || Number.isNaN(read) ? 1 : read;
 }
 
 export function alikeOnScreen(one: Portrait, other: Portrait): boolean {
@@ -186,7 +191,7 @@ export function alikeOnScreen(one: Portrait, other: Portrait): boolean {
     Math.hypot(dl, da, db) < SAME_COLOUR &&
     Math.abs(one.spread - other.spread) < SAME_SPREAD &&
     one.energy.every((value, at) => Math.abs(Math.log(value / (other.energy[at] ?? 0))) < SAME_ENERGY) &&
-    correlation(one.grid, other.grid) > SAME_PICTURE
+    gridsAlike(one.grid, other.grid) > SAME_PICTURE
   );
 }
 

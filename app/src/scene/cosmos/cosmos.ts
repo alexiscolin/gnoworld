@@ -11,7 +11,7 @@ import { Disc } from "./disc.ts";
 import { Home } from "./home.ts";
 import { BodyMaps } from "./maps.ts";
 import { AtRest } from "./atRest.ts";
-import { callersOf, heldOf, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
+import { heldOf, type CosmosWorld, type LabelSignals } from "./cosmosWorld.ts";
 import type { CosmosLabels, Seen } from "./labelled.ts";
 import { LazyNebulae } from "./lazyNebulae.ts";
 import { Whole } from "./whole.ts";
@@ -65,7 +65,7 @@ export class Cosmos {
       this.#device.moved();
     });
     this.#whole = new Whole(device, this.#owner, this.#mapCame);
-    this.seen = { projector: this.#bodies, earth: () => this.#home.at, earthRadius: this.#home.radius, callersOf };
+    this.seen = { projector: this.#bodies, earth: () => this.#home.at, earthRadius: this.#home.radius };
     this.#setShown(false);
     device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);
   }
@@ -174,7 +174,7 @@ export class Cosmos {
     this.#whole.look(this.#mapEye, this.#focal);
     const sight = { eye: this.#mapEye, focal: this.#focal };
     const { bodies, hidden, near, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
-    this.#bodies.stand(bodies, worlds.chart === true ? "chart" : near ? "near" : "rest");
+    this.#bodies.stand(bodies, worlds.chart ? "chart" : near ? "near" : "rest");
     this.labels?.look(this.#systems, this.#drawn, bodies.keys());
     this.#disc.paint({
       ...sight,

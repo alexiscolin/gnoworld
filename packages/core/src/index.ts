@@ -56,6 +56,7 @@ export {
 } from "./lod/ladder.ts";
 export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
 export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
+export { callersIn, chooseRail, RAIL, type RailAsk, type RailWorld } from "./lod/rail.ts";
 export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
@@ -78,8 +79,7 @@ export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep
 export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt, rocksOf } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";
-export { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, stopNear, stopNearIn, wayAt } from "./frame/flight.ts";
-export type { Figures, FlightPhase } from "./frame/flight.ts";
+export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export {
   FIELD_OF_VIEW,
@@ -114,7 +114,7 @@ export { worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";
-export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export { CONTINENTS_SEA, planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
 export { labOf, type Lab, type Palette } from "./planet/palette.ts";
 export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";

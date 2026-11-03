@@ -14,9 +14,11 @@ import {
   type Anchor,
   type PlanetLook,
 } from "./look.ts";
-import { labOf, type Lab } from "./palette.ts";
-import { planetRecipe, worldRecipe, type Recipe } from "./recipe.ts";
+import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
+import { BARE, CONTINENTS_SEA, ofContinents, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
+import { sha256 } from "./sha256.ts";
+import { correlation } from "../testing.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
 
 const EACH = 500;
@@ -98,14 +100,6 @@ function universe(): Map<string, number>[] {
       return places;
     }),
   );
-}
-
-function correlation(pairs: readonly (readonly [number, number])[]): number {
-  const mean = (at: 0 | 1) => pairs.reduce((sum, pair) => sum + pair[at], 0) / pairs.length;
-  const [mx, my] = [mean(0), mean(1)];
-  let [xy, xx, yy] = [0, 0, 0];
-  for (const [x, y] of pairs) [xy, xx, yy] = [xy + (x - mx) * (y - my), xx + (x - mx) ** 2, yy + (y - my) ** 2];
-  return xy / Math.sqrt(xx * yy);
 }
 
 function evenly(name: string, values: readonly number[]): void {
@@ -190,6 +184,153 @@ describe("a world's recipe", () => {
         const id = `ns${String(at % 7)}/world${String(at)}`;
         const recipe = worldRecipe(id, nature);
         expect(recipe, `${id} ${String(nature)}`).toEqual(planetRecipe(worldPath(id), worldLook(id, nature).anchor));
+      }
+  });
+});
+
+// A world's sea turns by its system's hue, as its palettes do (Alexis, 2026-11-03, "bleu-vert variant"): two systems give two seas, one
+// path always the same, its lightness and chroma kept. A temperate world's teal stays a glance (10 in Lab, core's variety.ts) from the
+// frames' navy, which the Earth's sea is and the ocean keeps, at either end of the turn.
+describe("a world's sea", () => {
+  const NAVY = [labOf([0x1f / 255, 0x4a / 255, 0x80 / 255]), labOf([0x0b / 255, 0x22 / 255, 0x50 / 255])] as const;
+  const hue = ([, a, b]: Lab) => Math.atan2(b, a);
+  const turned = (one: Lab, other: Lab) =>
+    Math.abs(Math.atan2(Math.sin(hue(one) - hue(other)), Math.cos(hue(one) - hue(other))));
+
+  it("turns by its system's hue, 12 degrees at most, its lightness and chroma kept: two systems, two seas", () => {
+    for (const anchor of ANCHORS) {
+      const row = ROWS[anchor].sea;
+      const seas = Array.from(
+        { length: 40 },
+        (_, at) => planetRecipe(asciiBytes(`gno.land/r/sea${String(at)}/home`), anchor).sea,
+      );
+      if (row === undefined) {
+        expect(
+          seas.every((sea) => sea === null),
+          anchor,
+        ).toBe(true);
+        continue;
+      }
+      expect(new Set(seas.map((sea) => sea?.lab[1].join())).size, anchor).toBeGreaterThan(20);
+      for (const sea of seas)
+        for (const [at, plain] of [labOf(row.shallow), labOf(row.deep)].entries()) {
+          const drawn = sea?.lab[at] ?? [0, 0, 0];
+          expect(drawn[0], anchor).toBeCloseTo(plain[0], 9);
+          expect(Math.hypot(drawn[1], drawn[2]), anchor).toBeCloseTo(Math.hypot(plain[1], plain[2]), 6);
+          expect(turned(drawn, plain), anchor).toBeLessThanOrEqual(MOST_TURN + 1e-9);
+        }
+    }
+    const path = asciiBytes("gno.land/r/sea0/home");
+    expect(planetRecipe(path, "temperate").sea).toEqual(planetRecipe(path, "temperate").sea);
+  });
+
+  // Each colour turned as its palettes are, by the same cos and sin, shallow and deep alike, and handed linear as its Lab says.
+  it("turns both of a sea's colours by the system's very turn, and hands them as their Lab colours", () => {
+    for (const anchor of ANCHORS.filter((one) => ROWS[one].sea !== undefined))
+      for (const share of [0, 0.3, 1]) {
+        const turn = turnOf(share);
+        const { sea } = seededRecipe(planetSeed(asciiBytes(`gno.land/r/${anchor}/home`)), anchor, turn);
+        const row = ROWS[anchor].sea;
+        if (sea === null || row === undefined) throw new Error(`${anchor} has a sea`);
+        for (const [at, colour] of [row.shallow, row.deep].entries()) {
+          const [l, a, b] = labOf(colour);
+          const turned: Lab = [l, a * turn.cos - b * turn.sin, a * turn.sin + b * turn.cos];
+          const drawn = sea.lab[at] ?? [0, 0, 0];
+          expect(Math.hypot(...drawn.map((value, axis) => value - (turned[axis] ?? 0))), anchor).toBeLessThan(1e-9);
+          expect(sea.linear[at], `${anchor} ${String(at)}`).toEqual(linearOf(sea.lab[at] ?? turned));
+        }
+      }
+  });
+
+  it("keeps a temperate world's teal a glance from the frames' navy at either end of the turn", () => {
+    for (const share of [0, 1]) {
+      const sea = seededRecipe(planetSeed(asciiBytes("gno.land/r/sea/home")), "temperate", turnOf(share)).sea;
+      for (const [at, navy] of NAVY.entries()) {
+        const drawn = sea?.lab[at] ?? navy;
+        expect(
+          Math.hypot(...drawn.map((value, axis) => value - (navy[axis] ?? 0))),
+          String(share),
+        ).toBeGreaterThanOrEqual(10);
+      }
+    }
+  });
+});
+
+// Temperate worlds real (7b8; Alexis, 2026-11-03, "surtout naturel"): a world of continents grows the Earth's own plants and bares its
+// own ground, read off its day map (earth-day.webp; 13-pixel means): forests (hue 114 to 122) to steppes (84), the Sahara's sand (L* 85),
+// the outback's ochre (59), cold steppes (75); its greens' mean chroma 25.1, the low-key bound ("toujours en retenue").
+describe("a world of continents", () => {
+  const EARTH_MOST = 25.1;
+  const DEGREE = Math.PI / 180;
+  const hueOf = ([, a, b]: Lab) => Math.atan2(b, a) / DEGREE;
+  const lights = ([low, mid, high]: readonly [Lab, Lab, Lab]) => [low[0], mid[0], high[0]] as const;
+  const temperate = (count: number) =>
+    Array.from({ length: count }, (_, at) =>
+      planetRecipe(asciiBytes(`gno.land/r/t${String(at % 50)}/w${String(at)}`), "temperate"),
+    );
+
+  it("grows the Earth's plants, deep forest to dry grass, never more saturated than the Earth's own greens", () => {
+    for (const { palette } of temperate(500)) {
+      for (const colour of palette.lab) {
+        expect(hueOf(colour)).toBeGreaterThanOrEqual(75 - 12);
+        expect(hueOf(colour)).toBeLessThanOrEqual(124 + 12);
+        expect(chroma(colour)).toBeLessThanOrEqual(EARTH_MOST);
+      }
+      const [low, mid, high] = lights(palette.lab);
+      expect(low).toBeLessThan(mid);
+      expect(mid).toBeLessThan(high);
+      expect(low, "a deep forest").toBeLessThanOrEqual(35);
+      expect(high, "a dry grass").toBeGreaterThanOrEqual(45);
+    }
+  });
+
+  it("bares its ground in the Earth's tundra, ochre and sand, graded and turned as its plants", () => {
+    for (const ramp of BARE) {
+      for (const colour of ramp) {
+        expect(hueOf(labOf(colour))).toBeGreaterThanOrEqual(55);
+        expect(hueOf(labOf(colour))).toBeLessThanOrEqual(105);
+        expect(chroma(labOf(colour))).toBeLessThanOrEqual(EARTH_MOST);
+      }
+      const [tundra, ochre, sand] = [labOf(ramp[0]), labOf(ramp[1]), labOf(ramp[2])];
+      expect(hueOf(tundra), "a cold steppe").toBeGreaterThanOrEqual(70);
+      expect(hueOf(ochre), "an ochre").toBeLessThanOrEqual(65);
+      expect(sand[0], "a sand").toBeGreaterThanOrEqual(75);
+    }
+    for (const share of [0, 0.4, 1])
+      for (let at = 0; at < 40; at += 1) {
+        const seed = planetSeed(asciiBytes(`gno.land/r/bare${String(at)}/home`));
+        const more = sha256(seed);
+        const grade = {
+          blend: word(seed, 6),
+          lightness: lerp(...LIGHTNESS, (more[28] ?? 0) / 255),
+          chroma: lerp(...CHROMA, (more[29] ?? 0) / 255),
+          turn: turnOf(share),
+        };
+        const { minorPalette, palette } = seededRecipe(seed, "temperate", grade.turn);
+        expect(minorPalette).toEqual(paletteOf(BARE, grade));
+        expect(palette).toEqual(paletteOf(ROWS.temperate.palettes, grade));
+      }
+  });
+
+  // The reviewer's R9: one rule for what a world of continents is, the program's too (its sea under an ocean's 0.8).
+  it("takes a world for one of continents from a sea of more than none to under an ocean's", () => {
+    expect(CONTINENTS_SEA).toBe(0.8);
+    expect([0, 0.0001, 0.45, 0.7999, 0.8, 1].map((sea) => ofContinents({ sea }))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("leaves every other world's minor in its own class's palette", () => {
+    for (const anchor of ANCHORS.filter((one) => one !== "temperate"))
+      for (let at = 0; at < 30; at += 1) {
+        const path = asciiBytes(`gno.land/r/other${String(at)}/home`);
+        const recipe = planetRecipe(path, anchor);
+        expect(recipe.minorPalette, anchor).toEqual(planetRecipe(path, recipe.minor).palette);
       }
   });
 });

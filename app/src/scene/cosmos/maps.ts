@@ -3,7 +3,7 @@
 // leaves its worlds as points, and an image its nebulae unshown, till a later fetch brings it (F4409); the rest stand.
 import type { Texture } from "three";
 import type { EarthDevice } from "../earth/device.ts";
-import { freeMap, loadMap, mapUrl } from "../planet/maps.ts";
+import { freeMap, loadMap, mapUrl, type MapLoad } from "../planet/maps.ts";
 import type { World } from "../planet/generated.ts";
 import type { MapSet } from "../planet/planet.ts";
 
@@ -25,6 +25,22 @@ interface BodyMapsOptions {
   readonly failed?: () => void;
   /** The generated worlds' code; a test injects its own. */
   readonly code?: () => Promise<Kit>;
+}
+
+/** How a map of the bodies' set loads at `width`: the clouds' and the rings' are data on one channel, the rings' at their own size. */
+export function namedLoad(name: string, width: number): Pick<MapLoad, "kind" | "width"> {
+  if (name === "ring") return { kind: "data" };
+  return { kind: name === "clouds" ? "data" : "colour", width };
+}
+
+/** The maps a generated world reads. */
+export const mapNamesOf = ({ look, recipe }: World): string[] => [look.map, recipe.minorMap, "clouds", "ring"];
+
+/** A generated world's maps from those `held`, once all it reads are there; none till then. */
+export function mapSetOf(world: World, held: ReadonlyMap<string, Texture>): MapSet | undefined {
+  const [clouds, ring] = [held.get("clouds"), held.get("ring")];
+  if (clouds === undefined || ring === undefined || mapNamesOf(world).some((name) => !held.has(name))) return undefined;
+  return { map: (name) => held.get(name) ?? clouds, clouds, ring };
 }
 
 export class BodyMaps {
@@ -77,12 +93,9 @@ export class BodyMaps {
   }
 
   /** What `world` needs, if it is all here; what is not is asked for. */
-  setFor({ look, recipe }: World): MapSet | undefined {
-    const names = [look.map, recipe.minorMap, "clouds", "ring"];
-    for (const name of names) this.#fetch(name);
-    const [clouds, ring] = [this.#maps.get("clouds"), this.#maps.get("ring")];
-    if (clouds === undefined || ring === undefined || names.some((name) => !this.#maps.has(name))) return undefined;
-    return { map: (name) => this.#maps.get(name) ?? clouds, clouds, ring };
+  setFor(world: World): MapSet | undefined {
+    for (const name of mapNamesOf(world)) this.#fetch(name);
+    return mapSetOf(world, this.#maps);
   }
 
   /** A map by its name, asked if it was not: until it came, none. */
@@ -96,10 +109,12 @@ export class BodyMaps {
     this.#asked.add(name);
     const { renderer, base, halved } = this.#device;
     const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
-    const kind = name === "clouds" || name === "ring" ? "data" : "colour";
-    const sized = name === "ring" ? {} : { width: halved() ? this.#width / 2 : this.#width };
     const { signal } = this.#loading;
-    loadMap(mapUrl(name, base), { kind, anisotropy, signal, ...sized }).then(
+    loadMap(mapUrl(name, base), {
+      ...namedLoad(name, halved() ? this.#width / 2 : this.#width),
+      anisotropy,
+      signal,
+    }).then(
       (map) => {
         if (signal.aborted) {
           freeMap(map);

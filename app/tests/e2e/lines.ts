@@ -6,6 +6,7 @@
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
+import { correlation } from "../../../packages/core/src/testing.ts";
 
 type Kind = "veins" | "fractures";
 interface Net {
@@ -85,27 +86,16 @@ function thinned(mask: Uint8Array, w: number): Uint8Array {
   return m;
 }
 
+// The distance of each pixel of the mask to its edge, by sides (1) and corners (the root of 2): one sweep forward, one back.
 function distances(mask: Uint8Array, w: number): Float32Array {
   const d = Float32Array.from(mask, (value) => (value > 0 ? 1e9 : 0));
-  const sweep = (i: number, steps: readonly (readonly [number, number])[]) => {
-    for (const [step, cost] of steps) d[i] = Math.min(d[i] ?? 0, (d[i + step] ?? 1e9) + cost);
+  const cost = (step: number) => (Math.abs(step) === 1 || Math.abs(step) === w ? 1 : Math.SQRT2);
+  const sweep = (i: number, sign: number) => {
+    for (const step of [1, w, w + 1, w - 1].map((one) => sign * one))
+      d[i] = Math.min(d[i] ?? 0, (d[i + step] ?? 1e9) + cost(step));
   };
-  for (let i = 0; i < d.length; i++)
-    if ((d[i] ?? 0) > 0)
-      sweep(i, [
-        [-1, 1],
-        [-w, 1],
-        [-w - 1, Math.SQRT2],
-        [-w + 1, Math.SQRT2],
-      ]);
-  for (let i = d.length - 1; i >= 0; i--)
-    if ((d[i] ?? 0) > 0)
-      sweep(i, [
-        [1, 1],
-        [w, 1],
-        [w + 1, Math.SQRT2],
-        [w - 1, Math.SQRT2],
-      ]);
+  for (let i = 0; i < d.length; i++) if ((d[i] ?? 0) > 0) sweep(i, -1);
+  for (let i = d.length - 1; i >= 0; i--) if ((d[i] ?? 0) > 0) sweep(i, 1);
   return d;
 }
 
@@ -150,16 +140,6 @@ function spreadOf(values: readonly number[]): number {
   return Math.sqrt(meanOf(values.map((value) => (value - mean) ** 2))) / Math.max(mean, 1e-6);
 }
 
-function correlationOf(one: readonly number[], other: readonly number[]): number {
-  const [a, b] = [meanOf(one), meanOf(other)];
-  const [ab, aa, bb] = [
-    meanOf(one.map((value, at) => (value - a) * ((other[at] ?? b) - b))),
-    meanOf(one.map((value) => (value - a) ** 2)),
-    meanOf(other.map((value) => (value - b) ** 2)),
-  ];
-  return aa === 0 || bb === 0 ? 0 : ab / Math.sqrt(aa * bb);
-}
-
 function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lines[] {
   const { image, luma } = Reflect.get(globalThis, "__pixels") as Tools;
   return discs.map((disc) => {
@@ -167,7 +147,10 @@ function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lin
     const s = thinned(mask, w);
     const middle = [...s.keys()].filter((i) => s[i] === 1 && inside[i] === 1);
     const rings = middle.map((i) => around(s, w, i));
-    const ends = rings.filter((n) => crossing(n) === 1 && n.reduce((sum, value) => sum + value, 0) <= 2).length;
+    // An end where a line leaves the read circle is the circle's, not the line's: only ends 2 px inside it count.
+    const inner = (i: number) => Math.hypot(x0 + (i % w) - disc.x, y0 + Math.floor(i / w) - disc.y) < 0.85 * disc.r - 2;
+    const lone = (n: readonly number[]) => crossing(n) === 1 && n.reduce((total, value) => total + value, 0) <= 2;
+    const ends = middle.filter((i, at) => lone(rings[at] ?? []) && inner(i)).length;
     const forks = middle.filter((_, at) => crossing(rings[at] ?? []) >= 3);
     const touching = (one: number, other: number) =>
       Math.abs((one % w) - (other % w)) <= 1 && Math.abs(Math.floor(one / w) - Math.floor(other / w)) <= 1;
@@ -184,7 +167,9 @@ function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lin
       width: meanOf(widths),
       widthSpread: spreadOf(widths),
       lightSpread: spreadOf(lights),
-      widthLight: correlationOf(widths, lights),
+      widthLight: (Reflect.get(globalThis, "correlation") as typeof correlation)(
+        widths.map((width, at) => [width, lights[at] ?? 0] as const),
+      ),
     };
   });
 }
@@ -201,7 +186,7 @@ const HELPERS = [
   straightOf,
   meanOf,
   spreadOf,
-  correlationOf,
+  correlation,
 ]
   .map(String)
   .join("\n");
@@ -209,3 +194,27 @@ const HELPERS = [
 /** Each disc's glowing lines as a net: `veins` reads gold to orange glow, `fractures` any warm glow. */
 export const lines = (page: Page, picture: Buffer, asked: { discs: readonly Circle[]; kind: Kind }): Promise<Lines[]> =>
   reading(page, [picture], [linesOf, asked, HELPERS]);
+
+/** The ground between a glowing world's lines, inside 0.85 of its radius: the luma of its darkest quarter, and its mean red over its
+ * mean blue as a difference (a dark maroon's warmth). */
+export interface Cells {
+  readonly floor: number;
+  readonly warmth: number;
+}
+
+function cellsOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Cells[] {
+  const { image, luma, rgbAt } = Reflect.get(globalThis, "__pixels") as Tools;
+  return discs.map((disc) => {
+    const { mask, inside, w, x0, y0 } = netOf(disc, kind);
+    const off = [...inside.keys()].filter((i) => inside[i] === 1 && mask[i] === 0);
+    const lumas = off.map((i) => luma(image, x0 + (i % w), y0 + Math.floor(i / w))).sort((one, other) => one - other);
+    const warmth = off.reduce((sum, i) => {
+      const [red, , blue] = rgbAt(image, x0 + (i % w), y0 + Math.floor(i / w));
+      return sum + red - blue;
+    }, 0);
+    return { floor: lumas[Math.floor(lumas.length / 4)] ?? 0, warmth: warmth / Math.max(off.length, 1) };
+  });
+}
+
+export const cells = (page: Page, picture: Buffer, asked: { discs: readonly Circle[]; kind: Kind }): Promise<Cells[]> =>
+  reading(page, [picture], [cellsOf, asked, HELPERS]);

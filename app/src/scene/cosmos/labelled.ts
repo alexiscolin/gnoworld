@@ -11,9 +11,8 @@ import { Labels, type Anchor, type Chosen, type Projector } from "./labels.ts";
 export interface Seen {
   readonly projector: Projector & { anchorOf: (id: string) => Group | undefined; group?: Group };
   readonly earth: () => Vector3 | undefined;
-  /** The Earth's radius and how a world's callers are counted, handed by the cosmos: this chunk imports nothing that lives with it. */
+  /** The Earth's radius, handed by the cosmos: this chunk imports nothing that lives with it. */
   readonly earthRadius: number;
-  readonly callersOf: (world: CosmosWorld) => number;
 }
 
 // Where nothing stands: the Earth's label waits there, hidden, until the globe has come.
@@ -82,7 +81,6 @@ export class CosmosLabels {
       bodies: near,
       list: this.#list,
       signals: this.#signals,
-      callersOf: this.#seen.callersOf,
     });
     const chosen = chooseLabels(asks).flatMap((label): Chosen[] => {
       const at: Anchor | Point | undefined = anchors.get(label.id) ?? stars.get(label.id);

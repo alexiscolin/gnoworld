@@ -86,14 +86,16 @@ export function turnOf(share: number): Turn {
   return { cos: (1 - tangent * tangent) / across, sin: (2 * tangent) / across };
 }
 
+/** A Lab colour turned in the a-b plane, its lightness and chroma kept. */
+export const turnedLab = ([l, a, b]: Lab, { cos, sin }: Turn): Lab => [l, a * cos - b * sin, a * sin + b * cos];
+
 function graded(from: Lab, to: Lab, { blend, lightness, chroma, turn }: Grade): Lab {
   const [l, a, b] = [0, 1, 2].map((at) => (from[at] ?? 0) + ((to[at] ?? 0) - (from[at] ?? 0)) * blend) as [
     number,
     number,
     number,
   ];
-  const [ca, cb] = [a * chroma, b * chroma];
-  return [Math.min(LIGHTEST, l * lightness), ca * turn.cos - cb * turn.sin, ca * turn.sin + cb * turn.cos];
+  return turnedLab([Math.min(LIGHTEST, l * lightness), a * chroma, b * chroma], turn);
 }
 
 /** A palette from an anchor's two real ramps: never past their chroma, for the grade only lowers it and a turn keeps it. */

@@ -15,6 +15,7 @@ import {
 } from "react";
 import rules from "../../../data/bubbles.json" with { type: "json" };
 import places from "../../../data/earthRooms.json" with { type: "json" };
+import { followed } from "../../lib/followed.ts";
 import type { Ground } from "../../scene/earth/marks.ts";
 import type { EarthPage } from "./host.ts";
 import { marksOf, useUnderRing } from "./signMarks.ts";
@@ -72,9 +73,7 @@ function TrendSign({ trend }: { trend: Trend }) {
 
 function PinSign({ pin, open }: { pin: Pin; open: (href: string) => void }) {
   const opened = (event: MouseEvent) => {
-    if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
-    event.preventDefault();
-    open(pin.href);
+    followed(event, pin.href, open);
   };
   return (
     <Mark at={pin} className={styles["anchor"]} data-mark="spot">

@@ -35,15 +35,25 @@ export interface Present {
   /** Who the reconciler found in a room, by nick. */
   seen: (room: string, nicks: readonly string[]) => void;
   routes: Hono;
+  /** What the route serves, built under the same rule, for the server's own readers (7t's trends). */
+  current: () => Presence;
   /** Records once more and keeps nothing after. */
   stop: () => void;
 }
+
+// The answer as served, with the time it was built; none before the first ask.
+interface Answer {
+  readonly at: number;
+  readonly value: Presence;
+  readonly body: string;
+}
+const UNBUILT: Answer = { at: Number.NEGATIVE_INFINITY, value: { worlds: [] }, body: "" };
 
 export function startPresent({ file, now, open, rooms, rates, log }: Options): Present {
   const presence = makePresence({ file, now });
   const read = new Map<string, { at: number; nicks: ReadonlySet<string> }>();
   let stopped = false;
-  let answer = { at: Number.NEGATIVE_INFINITY, body: "" };
+  let answer = UNBUILT;
   let changed = true;
   // Each world with a room a guest sees, by name, the first `PRESENCE_ANSWER_MAX`, and those rooms.
   const worlds = (): [string, string[]][] => {
@@ -73,32 +83,35 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
     changed = true;
     if (!presence.save()) log("alert", { error: "presence_write" });
   };
-  const build = (at: number): string => {
-    const answered: Presence = {
-      worlds: worlds().map(([world, names]) => {
-        const here = hereIn(names, at);
-        const perHour = [...rates(names, at).values()].reduce((sum, rate) => sum + rate, 0) * 60;
-        return {
-          world,
-          here: here ?? 0,
-          perHour,
-          rise: here === undefined ? null : riseOf(here, presence.history(world), at),
-        };
-      }),
-    };
-    return JSON.stringify(answered);
+  const build = (at: number): Presence => ({
+    worlds: worlds().map(([world, names]) => {
+      const here = hereIn(names, at);
+      const perHour = [...rates(names, at).values()].reduce((sum, rate) => sum + rate, 0) * 60;
+      return {
+        world,
+        here: here ?? 0,
+        perHour,
+        rise: here === undefined ? null : riseOf(here, presence.history(world), at),
+      };
+    }),
+  });
+  // The answer, built again once a minute, or a second after a change.
+  const current = (): Answer => {
+    const at = now();
+    if (at - answer.at >= ANSWER_MS || (changed && at - answer.at >= CHANGED_MS)) {
+      const value = build(at);
+      answer = { at, value, body: JSON.stringify(value) };
+      changed = false;
+    }
+    return answer;
   };
   const timer = setInterval(record, PRESENT_MS);
   const routes = new Hono();
   routes.get("/", (c) => {
-    const at = now();
-    if (at - answer.at >= ANSWER_MS || (changed && at - answer.at >= CHANGED_MS)) {
-      answer = { at, body: build(at) };
-      changed = false;
-    }
+    const { body } = current();
     c.header("cache-control", "public, max-age=60");
     c.header("content-type", "application/json");
-    return c.body(answer.body);
+    return c.body(body);
   });
   return {
     seen(room, nicks) {
@@ -108,6 +121,7 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
       changed = true;
     },
     routes,
+    current: () => current().value,
     stop() {
       if (stopped) return;
       stopped = true;

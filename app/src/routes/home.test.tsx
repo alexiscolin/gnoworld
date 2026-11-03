@@ -4,14 +4,23 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace, useWorldsCount, useResting } = vi.hoisted(() => ({
+const { useSpace, useWorldsCount, useResting, useNewcomer } = vi.hoisted(() => ({
   useSpace: vi.fn(),
   useWorldsCount: vi.fn<(wanted: boolean) => number | null | undefined>(() => undefined),
   useResting: vi.fn<() => string | undefined>(() => undefined),
+  useNewcomer: vi.fn<() => boolean>(() => false),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting, useNewcomer }));
 afterEach(() => {
   useResting.mockReturnValue(undefined);
+});
+// Every event of the data waits for its date (7t no longer shows those): one dated beside them, so the ticker's tests still see an event.
+const { DATED } = vi.hoisted(() => ({
+  DATED: { id: "dated-call", title: "A dated call", start: "2026-11-15T10:00:00Z", link: "https://gno.land/dated" },
+}));
+vi.mock("../../data/events.json", async (original) => {
+  const { default: rows } = await original<{ default: unknown[] }>();
+  return { default: [...rows, DATED] };
 });
 
 test("home links to each world by its name, at the world's path", async () => {
@@ -69,10 +78,62 @@ test("asks the worlds' count for its hero's number on the default universe's hom
 test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {
   useSpace.mockClear();
   await render({ path: "/", Component: Home, loader }, "/");
-  expect(useSpace).toHaveBeenLastCalledWith("cosmos");
+  expect(useSpace.mock.lastCall?.[0]).toBe("cosmos");
   useSpace.mockClear();
   await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
-  expect(useSpace).toHaveBeenLastCalledWith(undefined);
+  expect(useSpace).toHaveBeenLastCalledWith(undefined, undefined);
+});
+
+// 7i: the rail beside the cosmos links each world to its page, the Earth's and the hubs' as the page lists them, through the page's router.
+test("hands the cosmos the places its rail links to and the page's router", async () => {
+  useSpace.mockClear();
+  await render({ path: "/", Component: Home, loader }, "/");
+  const page = useSpace.mock.lastCall?.[1] as { places: unknown; open: unknown } | undefined;
+  expect(page?.places).toEqual({
+    earth: "/earth",
+    worlds: [
+      expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
+      expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
+    ],
+  });
+  expect(page?.open).toBeTypeOf("function");
+});
+
+// 7i: where the rail stands it stands for the page's list of worlds, which steps aside (Hero.module.css).
+test("marks its list of worlds as the one a rail stands for", async () => {
+  const html = await render({ path: "/", Component: Home, loader }, "/");
+  expect(html).toMatch(/<nav aria-label="Worlds"[^>]*data-rail="none"/);
+});
+
+// ADR-0003 §2, 2d: a kicker names the page's list of worlds, inside it, so it steps aside with it where the rail stands (7i).
+test("names its list of worlds with a Worlds kicker, inside the list's own box and before its links", async () => {
+  const html = await render({ path: "/", Component: Home, loader }, "/");
+  const list = /<nav aria-label="Worlds"[^>]*>(.*?)<\/nav>/s.exec(html)?.[1] ?? "";
+  expect(list).toMatch(/^<p class="label [^"]*">Worlds<\/p><ul/);
+  expect(list).toContain('href="/w/bubble"');
+});
+
+// ADR-0003 §3: one filled call at a time, as the device says the reader is new (F4501); on the default universe's home alone, where the
+// cosmos's labels say "Start here" (F4508).
+describe("home's actions for a newcomer", () => {
+  const actionsOf = (html: string) => /<div [^>]*data-hero="actions"[^>]*>/.exec(html)?.[0] ?? "";
+  afterEach(() => {
+    useNewcomer.mockReturnValue(false);
+  });
+
+  test("marks the hero's actions as a first visit's while the device says the reader is new", async () => {
+    useNewcomer.mockReturnValue(true);
+    expect(actionsOf(await render({ path: "/", Component: Home, loader }, "/"))).toContain("data-first");
+    useNewcomer.mockReturnValue(false);
+    expect(actionsOf(await render({ path: "/", Component: Home, loader }, "/"))).not.toContain("data-first");
+  });
+
+  test("leaves another universe's actions unmarked, for no label of its says Start here", async () => {
+    useNewcomer.mockReturnValue(true);
+    expect(actionsOf(await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland"))).not.toContain(
+      "data-first",
+    );
+  });
 });
 
 const failing = {
@@ -131,13 +192,14 @@ describe("home's hero", () => {
     expect(html).not.toMatch(/NaN|undefined|\b1 world\b/);
   });
 
-  test("offers two big actions, the universe's Earth and the places' list, in that order", async () => {
+  // ADR-0003 §3: Go explore, whose address is the Earth's and whose click flies to the busiest world, then Join the chat, the Earth's room.
+  test("offers two big actions, Go explore and Join the chat, both addressed to the universe's Earth, in that order", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     // The actions' own container: what follows its mark: its first two links.
     const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
-    expect([...hero.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1]).slice(0, 2)).toEqual([
-      "/earth",
-      "/list",
+    expect([...hero.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]])).toEqual([
+      ["/earth", "Go explore"],
+      ["/earth", "Join the chat"],
     ]);
   });
 
@@ -146,7 +208,7 @@ describe("home's hero", () => {
     const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
     expect([...hero.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1]).slice(0, 2)).toEqual([
       "/net/gnoland/earth",
-      "/list",
+      "/net/gnoland/earth",
     ]);
   });
 });
@@ -181,13 +243,22 @@ describe("home's live line", () => {
 });
 
 describe("home's ticker", () => {
-  test("holds each placeholder news and event of the data as a link to its address", async () => {
+  // 7t: an event waiting for its date is no longer shown; the dated news are, and the chain's trends join them once the page runs.
+  test("holds each dated news of the data as a link to its address, and no event that waits for its date", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     expect(html).toContain("data-ticker");
-    for (const { title, link } of [...sample("news.json"), ...sample("events.json")]) {
+    for (const { title, link } of sample("news.json")) {
       expect(html, title).toContain(escaped(title));
       expect(html, link).toContain(`href="${link}"`);
     }
+    const waiting = sample("events.json").filter(({ title }) => title !== DATED.title);
+    expect(waiting.length).toBeGreaterThan(0);
+    for (const { title } of waiting) expect(html, title).not.toContain(escaped(title));
+  });
+
+  test("writes no trend into the page: the chain's are read once it runs", async () => {
+    const html = await render({ path: "/", Component: Home, loader }, "/");
+    expect(html).not.toMatch(/data-kind="(trending|rising|new)"/);
   });
 
   test("is drawn under /net/gnoland too: the lists are the site's, not a universe's", async () => {
@@ -204,7 +275,8 @@ describe("home's ticker", () => {
     const before = await written("2026-10-31T12:00:00Z");
     const after = await written("2100-01-01T00:00:00Z");
     expect(after).toBe(before);
-    for (const { title } of sample("events.json")) expect(after, title).toContain(escaped(title));
+    expect(after).toContain(escaped(DATED.title));
+    for (const { title } of sample("news.json")) expect(after, title).toContain(escaped(title));
   });
 });
 

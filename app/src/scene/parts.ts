@@ -11,6 +11,8 @@ import { Door } from "./door.ts";
 import type { FlightGoal, Flights, FlightScene } from "./flight/flights.ts";
 import type { EarthDevice } from "./earth/device.ts";
 import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
+import type { PortraitDevice } from "./portraits.ts";
+import type { Scene } from "./sceneStats.ts";
 
 export class CosmosPart {
   readonly door: Door<Cosmos>;
@@ -150,8 +152,24 @@ export class Parts {
   readonly cosmos: CosmosPart;
   readonly world: WorldDoor;
   readonly flights: Door<Flights>;
+  // What the next frame draws first, before the scene's own: the rail's portraits (7i).
+  readonly #lent: (() => void)[] = [];
+  readonly portraits: Scene["portraits"];
 
-  constructor(device: EarthDevice & FlightScene, owner: Disposer, came: () => void) {
+  constructor(device: EarthDevice & FlightScene & Pick<PortraitDevice, "renderer">, owner: Disposer, came: () => void) {
+    const { renderer, base, halved, moved } = device;
+    const portrait = {
+      renderer,
+      base,
+      halved,
+      signal: owner.signal,
+      lend: (draw: () => void) => {
+        this.#lent.push(draw);
+        moved();
+      },
+    };
+    this.portraits = (ids, size, signal) =>
+      import("./portraits.ts").then(({ portraitsFor }) => portraitsFor(portrait, ids, { size, signal }));
     this.cosmos = new CosmosPart(device, owner, came);
     this.world = new WorldDoor(device, owner, came);
     this.flights = new Door(
@@ -193,6 +211,8 @@ export class Parts {
   /** The cosmos moves with the eye, and its dive by the scene's clock, which runs under reduced motion too (7d7); a world's page turns
    * by it. */
   tick({ worlds, seconds }: { readonly worlds: Point; readonly seconds: number }, clock: number): void {
+    for (let at = 0; at < this.#lent.length; at += 1) this.#lent[at]?.();
+    this.#lent.length = 0;
     this.world.door.part?.tick(clock);
     this.cosmos.door.part?.tick(worlds, seconds, clock);
   }

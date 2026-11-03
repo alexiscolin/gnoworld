@@ -8,7 +8,7 @@ import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
-import { useSpace } from "../features/universe/index.ts";
+import { useEntered, useSpace } from "../features/universe/index.ts";
 import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
 import { hubWorldOf } from "../lib/hubWorld.ts";
 import { useAppStore } from "../storeContext.tsx";
@@ -57,6 +57,8 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const [ring, setRing] = useState<Ring>();
+  // A world's page is a place entered (ADR-0003 §4).
+  useEntered();
   const chatDue = useWorldSpace(world, universe.id, ring);
   const realm = world.realms?.[0];
   const realmPath =

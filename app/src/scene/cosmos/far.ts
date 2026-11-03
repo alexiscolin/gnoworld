@@ -45,7 +45,9 @@ export const fadeAt = (distance: number): number => SOFTEST * smoothstep(CRISP, 
 // A system's view's world is crisp before its star and to this share of the eye's distance to it, then by degrees as soft and dim as the
 // 14:09 mock-up's farthest, 70% of its light on the screen, which `faraway` 0.85 gives gnoswap's two farthest, at 1.33 and 1.35 (68% and
 // 72%, measured; the mock-up's next, 85%, at 1.2) (F4468).
-const [BEHIND_CRISP, BEHIND_SOFT, BEHIND_SOFTEST] = [1.05, 1.35, 0.85];
+const BEHIND_CRISP = 1.05;
+const BEHIND_SOFT = 1.35;
+const BEHIND_SOFTEST = 0.85;
 
 /** How soft and dim a world of a system's view stands at `distance` from the eye, its star `star` from it: as any body there, and more
  * by degrees behind its star. */

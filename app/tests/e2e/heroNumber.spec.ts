@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { COUNTED, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 import { countShifts, running, shifted, stats } from "./sceneStage.ts";
 
@@ -8,14 +8,9 @@ import { countShifts, running, shifted, stats } from "./sceneStage.ts";
 // The host serves neither file (the job writes them): each test serves Onyx's recorded file and its count.
 const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 const NUMBER = "[data-hero='number']";
-// The recorded file's 533 worlds, each once in its namespace, and the Earth: written out, so a counting fault cannot move it with the page.
+// The recorded file's 533 worlds, each once in its namespace, and the Earth: written out, so a counting fault cannot move it with the page
+// nor with the count the fixtures serve.
 const COUNT = "534";
-const COUNTED = JSON.stringify({
-  version: 1,
-  universe: "onyx",
-  updated: "2026-11-01T12:00:00.000Z",
-  count: Number(COUNT),
-});
 
 // Serves the recorded file and its count, and counts the requests for each; a held count answers only once `release` is called, and a
 // missing one is the host's 404, as a deployment's before the job's first pass.

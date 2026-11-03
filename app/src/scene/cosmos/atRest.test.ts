@@ -58,3 +58,71 @@ describe("the dive's chunk (the security review of 7d7)", () => {
     expect(told.moved).not.toHaveBeenCalled();
   });
 });
+
+// ADR-0003 §1: the page's opening leaves as the camera lands, and under reduced motion as the dissolve begins: the scene's canvas says it.
+describe("the dive's landing, as the page hears it", () => {
+  const diveWith = (along: () => number, veil = () => 0) => ({
+    Dive: class {
+      get along() {
+        return along();
+      }
+      get veil() {
+        return veil();
+      }
+      waiting = false;
+      shown = 1;
+      advance = vi.fn();
+      dispose = vi.fn();
+    },
+  });
+  // The scene's canvas, as its renderer holds it: what it is told, by name.
+  const canvas = () => {
+    const said = new Map<string, string>();
+    return { said, domElement: { setAttribute: (name: string, value: string) => said.set(name, value) } };
+  };
+  const madeOn = async (renderer?: ReturnType<typeof canvas>) => {
+    const { AtRest } = await import("./atRest.ts");
+    const told = renderer === undefined ? device() : { ...device(), renderer };
+    return new AtRest(told, new Disposer(), vi.fn());
+  };
+
+  it("marks the scene's canvas once the camera came to rest, and not before", async () => {
+    const at = { along: 0.4 };
+    vi.doMock("./restSearch.ts", () => diveWith(() => at.along));
+    const shown = canvas();
+    const atRest = await madeOn(shown);
+    atRest.dive(false);
+    await vi.dynamicImportSettled();
+    atRest.advance(1, true, 1);
+    expect(shown.said.get("data-dive")).toBeUndefined();
+    at.along = 0.99;
+    atRest.advance(1.5, true, 1.5);
+    expect(shown.said.get("data-dive")).toBeUndefined();
+    at.along = 1;
+    atRest.advance(2, true, 2);
+    expect(shown.said.get("data-dive")).toBe("landed");
+  });
+
+  it("marks it as the dissolve begins under reduced motion, its picture still showing", async () => {
+    vi.doMock("./restSearch.ts", () =>
+      diveWith(
+        () => 1,
+        () => 0.6,
+      ),
+    );
+    const shown = canvas();
+    const atRest = await madeOn(shown);
+    atRest.dive(true);
+    await vi.dynamicImportSettled();
+    atRest.advance(1, true, 1);
+    expect(shown.said.get("data-dive")).toBe("landed");
+  });
+
+  it("fails on no stage without a canvas", async () => {
+    vi.doMock("./restSearch.ts", () => diveWith(() => 1));
+    const atRest = await madeOn();
+    atRest.dive(false);
+    await vi.dynamicImportSettled();
+    expect(() => atRest.advance(1, true, 1)).not.toThrow();
+  });
+});

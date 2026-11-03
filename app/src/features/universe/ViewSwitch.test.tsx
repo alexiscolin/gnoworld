@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, mount, one } from "../../../tests/mount.tsx";
 import { OPEN } from "../../scene/openEvent.ts";
 import { views } from "./views.ts";
@@ -31,9 +31,14 @@ const key = (init: KeyboardEventInit, target: EventTarget = document.body) => {
   });
 };
 
+// A navigation that fails is reported (`reportError`), which jsdom does not have.
+beforeEach(() => {
+  vi.stubGlobal("reportError", vi.fn());
+});
 afterEach(() => {
   views.see("dynamic");
   views.rest(undefined);
+  vi.unstubAllGlobals();
 });
 
 describe("the views of space", () => {

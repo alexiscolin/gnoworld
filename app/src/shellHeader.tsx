@@ -13,11 +13,12 @@ import styles from "./shellHeader.module.css";
 
 export function ShellHeader({ universe }: { universe: UniverseView }) {
   const current = site.viewAt(universe, useLocation().pathname);
-  // The list has no page of its own in a universe: it is the one page of the site.
-  const views: { view: View; label: string; path: string }[] = [
-    { view: "earth", label: "Earth", path: universe.earth.path },
-    { view: "cosmos", label: "Cosmos", path: universe.home.path },
-    { view: "list", label: "List", path: "/list" },
+  // The list has no page of its own in a universe: it is the one page of the site. Each view says what it holds to a screen reader alone;
+  // nothing is drawn under the tabs (ADR-0003, 2c).
+  const views: { view: View; label: string; path: string; holds: string }[] = [
+    { view: "earth", label: "Earth", path: universe.earth.path, holds: "where everyone talks" },
+    { view: "cosmos", label: "Cosmos", path: universe.home.path, holds: "every world" },
+    { view: "list", label: "List", path: "/list", holds: "every world, as text" },
   ];
   return (
     <header className={styles["header"]}>
@@ -31,6 +32,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             to={view.path}
             className={styles["view"]}
             aria-current={view.view === current ? "page" : undefined}
+            aria-description={view.holds}
           >
             {view.label}
           </Link>

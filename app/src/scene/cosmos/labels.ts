@@ -2,7 +2,16 @@
 // made once, in a layer of their own over the canvas, hidden from readers, for the page's list says where each place is. Their words are
 // written as text, ten times a second at most; each frame moves them beside their bodies as core/lod settles them, clear of each other, of
 // the page's bands and of the bodies.
-import { LABEL_SLOTS, LabelLayout, settle, type ClearBox, type Point, type ScreenSpot } from "@gnoworld/core";
+import {
+  LABEL_SLOTS,
+  LabelLayout,
+  PLACE,
+  RAIL,
+  settle,
+  type ClearBox,
+  type Point,
+  type ScreenSpot,
+} from "@gnoworld/core";
 import { Vector3 } from "three";
 import { fadeTo, moveTo, slotIn, wordsInto, type Anchor, type Chosen, type Slot } from "./labelSlot.ts";
 import styles from "./labels.module.css";
@@ -11,12 +20,12 @@ import { watchScene } from "./sceneRuns.ts";
 export type { Anchor, Chosen };
 
 const WORDS_MS = 100;
-// The bands the page keeps at 1,080 high, frames 4 and 17: the header's 9%, the ticker's 34 px, and the rail's, from 6 px of air before the
-// rail's own edge (x 1,585 at 1,728 px in frame 4, 7h2's measure), which a label slides left of: 7i's rail reads it.
+// The bands the page keeps at 1,080 high, frames 4 and 17: the header's 9%, the ticker's 34 px, and the rail's: its footprint (core's RAIL,
+// which the rail takes its width from) and the labels' air before it, 149 px at 1,728, which a label slides left of.
 const HEADER = 0.09;
 const TICKER = 34;
-const RAIL_BAND = 149;
-const RAIL_FROM = 900;
+const RAIL_BAND = RAIL.footprint + PLACE.air;
+const RAIL_FROM = RAIL.from;
 // A distant star's room on screen, in pixels, whatever its distance.
 const STAR_PIXELS = 4;
 

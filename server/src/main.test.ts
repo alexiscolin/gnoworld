@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
-import { Presence } from "@gnoworld/schemas/indexer";
+import { Presence, Trends } from "@gnoworld/schemas/indexer";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet } from "./testing/signer.ts";
@@ -519,6 +519,40 @@ describe("the server's process", { timeout: 30_000 }, () => {
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
+  });
+
+  it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
+    for (const env of [settings(), { ...settings(), DATABASE: ":memory:" }]) {
+      const port = await listening(start(env));
+      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/trends`);
+      expect(answer.status).toBe(200);
+      expect(answer.headers.get("cache-control")).toBe("public, max-age=60");
+      expect(Trends.parse(await answer.json())).toEqual({ items: [] });
+    }
+  });
+
+  it("names at /api/trends the hub that rises against its own 14 days, from who is here in its rooms (7t)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    // Bubble's last 47 hours held one person each: six now is a rise of 5 on its usual hour (core's riseOf).
+    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+    const past = Array.from({ length: 47 }, (_, back) => ({ at: hour - (back + 1) * 3_600_000, people: 1 })).reverse();
+    writeFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), JSON.stringify({ bubble: past }));
+    const port = await listening(start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper }));
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^NAMES #bubble$/);
+    peer.say(":ergo.test 324 gnoworld #bubble +nt");
+    peer.say(":ergo.test 347 gnoworld #bubble :End");
+    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld ada bo cy dee eve fay");
+    peer.say(":ergo.test 366 gnoworld #bubble :End");
+    await expect
+      .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
+        timeout: 10_000,
+      })
+      .toMatchObject([{ kind: "rising", world: "bubble", rise: 5 }]);
   });
 
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {

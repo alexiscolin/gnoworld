@@ -2,7 +2,6 @@
 import { Drawn, EARTH_RADIUS, plannedOf } from "@gnoworld/core";
 import { Group, InstancedBufferGeometry, Mesh, Vector3 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { callersOf } from "./cosmosWorld.ts";
 import { CosmosLabels, type Seen } from "./labelled.ts";
 
 // The labels' way in (7h): the Earth's label stands by the globe wherever it is, and hides while it has not come, wherever the projection
@@ -34,7 +33,7 @@ afterEach(() => {
 describe("the labels' way in", () => {
   it("keeps the Earth's label hidden until the globe has come, then stands it by the globe", () => {
     const globe: { at?: Vector3 } = {};
-    const part = new CosmosLabels(document, { projector, earth: () => globe.at, earthRadius: EARTH_RADIUS, callersOf });
+    const part = new CosmosLabels(document, { projector, earth: () => globe.at, earthRadius: EARTH_RADIUS });
     part.list([], undefined);
     part.look([], new Drawn(), []);
     part.tick({ x: 0, y: 0, z: 0 }, true);
@@ -59,7 +58,6 @@ describe("the home's rocks through the labels' way in", () => {
       projector: group === undefined ? projector : { ...projector, group },
       earth: () => undefined,
       earthRadius: EARTH_RADIUS,
-      callersOf,
     });
 
   it("draws the rocks a look lays among the bodies once their chunk came, and moves them with the eye", async () => {
@@ -173,7 +171,6 @@ describe("a system's Plan through the labels' way in", () => {
       projector: { ...projector, group },
       earth: () => new Vector3(0, 0, -20),
       earthRadius: EARTH_RADIUS,
-      callersOf,
     });
     part.list(list, signals);
     part.look([system], planned(), []);
@@ -196,7 +193,6 @@ describe("a system's Plan through the labels' way in", () => {
       projector: { ...projector, group: new Group() },
       earth: () => undefined,
       earthRadius: EARTH_RADIUS,
-      callersOf,
     });
     const paths = [
       "gno.land/p/demo/avl",
@@ -232,7 +228,6 @@ describe("a system's Plan through the labels' way in", () => {
       projector: { ...projector, group: new Group() },
       earth: () => undefined,
       earthRadius: EARTH_RADIUS,
-      callersOf,
     });
     part.list(list, signals);
     part.look([system], planned(), []);
@@ -250,7 +245,6 @@ describe("a system's Plan through the labels' way in", () => {
       projector: { ...projector, group: new Group() },
       earth: () => undefined,
       earthRadius: EARTH_RADIUS,
-      callersOf,
     });
     part.list(list, signals);
     part.look([system], planned(), []);

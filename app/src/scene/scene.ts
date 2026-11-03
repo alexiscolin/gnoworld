@@ -51,6 +51,7 @@ class LiveScene implements Scene {
    * the system's arrival stands (7d3); and how what the eye looks at is seen (7v). */
   readonly arrive: Scene["arrive"];
   readonly see: Scene["see"];
+  readonly portraits: Scene["portraits"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -90,9 +91,8 @@ class LiveScene implements Scene {
     });
     this.ground = this.#earth;
     this.fly = this.#parts.fly;
-    const views = this.#parts.viewsOf(this.moveTo, options.onSystem);
-    this.arrive = views.arrive;
-    this.see = views.see;
+    ({ arrive: this.arrive, see: this.see } = this.#parts.viewsOf(this.moveTo, options.onSystem));
+    this.portraits = this.#parts.portraits;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,

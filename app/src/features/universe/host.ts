@@ -14,7 +14,7 @@ import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
 import { Heard } from "./heard.ts";
 import { restsAt, tellScene } from "./views.ts";
-import { WorldsFeed } from "./worldsFeed.ts";
+import { WorldsFeed, type CosmosPage } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
@@ -28,7 +28,7 @@ export interface WorldShown {
 /** Whether the page shows space, and the Earth, the default universe's worlds or one world in it. */
 export type Shown = boolean | "earth" | "cosmos" | WorldShown;
 
-export type { WorldPage };
+export type { CosmosPage, WorldPage };
 
 /** What the Earth's signs need of the page: this root lies outside its store and its router. */
 export interface EarthPage {
@@ -50,10 +50,11 @@ export class SceneHost {
   #wantsEarth = false;
   #wantsWorlds = false;
   #wantsWorld: string | undefined;
-  #page: EarthPage | WorldPage | undefined;
+  #page: EarthPage | WorldPage | CosmosPage | undefined;
   #world: EarthState = "gone";
   #watched: string | undefined;
-  readonly #feed = new WorldsFeed();
+  /** The cosmos's worlds, read once it shows, and what is known of them: what the rail reads too (7i). */
+  readonly feed = new WorldsFeed();
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
   #decided = false;
@@ -167,14 +168,14 @@ export class SceneHost {
   }
 
   #syncWorlds(): void {
-    if (this.#scene !== undefined) this.#feed.sync(this.#scene, this.#wantsWorlds);
+    if (this.#scene !== undefined) this.feed.sync(this.#scene, this.#wantsWorlds);
   }
 
   /** The canvas is on the page; what this returns takes the scene away with it. */
   attach(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
     return () => {
-      this.#feed.leave();
+      this.feed.leave();
       this.#stopWatching();
       tintPage(undefined);
       this.#unsee();
@@ -184,7 +185,7 @@ export class SceneHost {
   }
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
-  show(shown: Shown, page?: EarthPage | WorldPage): void {
+  show(shown: Shown, page?: EarthPage | WorldPage | CosmosPage): void {
     this.flown.between(this.#scene, shown);
     this.#shown = shown !== false;
     this.#page = page;
@@ -224,7 +225,7 @@ export class SceneHost {
               this.#say(lost ? "failed" : "on");
             },
             onFlight: this.flown.said,
-            onSystem: restsAt(this.#feed.worldsIn),
+            onSystem: restsAt(this.feed.worldsIn),
           }),
         );
       })

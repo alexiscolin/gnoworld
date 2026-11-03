@@ -24,8 +24,11 @@ const WAITING: ReturnType<Resting["drawn"]> = {
   near: false,
 };
 
-// The stage it draws on, a frame owed, the scene's eye as a flight leaves it, and the dissolve the flights lend the dive (7g).
-type AtRestDevice = { readonly stage: Stage; readonly moved: () => void } & Pick<EarthDevice, "eye" | "veil">;
+// The stage it draws on, a frame owed, the scene's eye as a flight leaves it, the dissolve the flights lend the dive (7g), and the canvas,
+// which tells the page the dive landed.
+type AtRestDevice = { readonly stage: Stage; readonly moved: () => void } & Pick<EarthDevice, "eye" | "veil"> & {
+    readonly renderer?: Pick<EarthDevice["renderer"], "domElement">;
+  };
 
 export class AtRest {
   /** Where the eye stands on the stage this frame: the scene's, moved to the view at rest's and swayed, or on its way down to it. */
@@ -91,8 +94,15 @@ export class AtRest {
     if (dive === undefined) return 0;
     this.#device.moved();
     dive.advance(clock, ready && this.#rest !== undefined);
-    if (dive.along === 1 && dive.veil === 0) this.#still = undefined;
+    if (dive.along === 1) this.#landed(dive.veil);
     return dive.shown;
+  }
+
+  // The camera at rest, or under reduced motion the dissolve begun: the page's opening gives way (ADR-0003 §1), told by the canvas; the dive
+  // ends once its dissolve's picture went.
+  #landed(veil: number): void {
+    this.#device.renderer?.domElement?.setAttribute("data-dive", "landed");
+    if (veil === 0) this.#still = undefined;
   }
 
   /** Whether the dive runs: the bodies pass behind the page's text on the way down at their own size, as frame 1's do behind the hero's

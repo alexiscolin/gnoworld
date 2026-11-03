@@ -36,6 +36,10 @@ export interface Choice {
   readonly real: number | null;
   /** Off, every minor class is taken out: what the journeys hold a world's own class to. */
   readonly minor: boolean;
+  /** Off, every world's clouds are taken out: what the journeys read a world's land under. */
+  readonly clouds: boolean;
+  /** On, every world is lit from the eye, its whole face in the light. */
+  readonly front: boolean;
   /** On, every real map is a grey: what a world owes its maps, which must be detail alone. */
   readonly flat: boolean;
 }
@@ -98,12 +102,17 @@ const VARIETY: readonly Anchor[] = [
 export const pathOf = (world: number, seed: number): string =>
   `gno.land/r/${NAMES[world] ?? "atlas"}${seed === 0 ? "" : String(seed)}/home`;
 
-// A recipe as the choice shows it: with its minor class, or with none.
-const minorIn = (recipe: Recipe, minor: boolean): Recipe => (minor ? recipe : { ...recipe, minorShare: 0 });
+type Shows = Pick<Choice, "minor" | "clouds">;
+// A recipe as the choice shows it: with its minor class and its clouds, or without.
+const shownRecipe = (recipe: Recipe, { minor, clouds }: Shows): Recipe => ({
+  ...recipe,
+  minorShare: minor ? recipe.minorShare : 0,
+  surface: clouds ? recipe.surface : { ...recipe.surface, clouds: 0 },
+});
 
-const madeUp = (index: number, anchor: Anchor, { seed, minor }: Pick<Choice, "seed" | "minor">): Shown => {
-  const path = asciiBytes(pathOf(index, seed));
-  return { path, id: null, look: planetLook(path, anchor), recipe: minorIn(planetRecipe(path, anchor), minor) };
+const madeUp = (index: number, anchor: Anchor, choice: Pick<Choice, "seed"> & Shows): Shown => {
+  const path = asciiBytes(pathOf(index, choice.seed));
+  return { path, id: null, look: planetLook(path, anchor), recipe: shownRecipe(planetRecipe(path, anchor), choice) };
 };
 
 // The recorded file's worlds in an order of the seed's own, so another seed shows another 24.
@@ -119,11 +128,11 @@ interface Recorded {
   readonly id: string;
   readonly nature: Parameters<typeof worldLook>[1];
 }
-const real = ({ id, nature }: Recorded, minor: boolean): Shown => ({
+const real = ({ id, nature }: Recorded, shows: Shows): Shown => ({
   path: worldPath(id),
   id,
   look: worldLook(id, nature),
-  recipe: minorIn(worldRecipe(id, nature), minor),
+  recipe: shownRecipe(worldRecipe(id, nature), shows),
 });
 
 // The views of many made-up worlds, each its own path: ADR-0002 §3's twelve, all 24, one class 24 times, eight classes.
@@ -140,11 +149,11 @@ function manyOf(choice: Choice): Shown[] | undefined {
 export function worldsOf(choice: Choice): Shown[] {
   const many = manyOf(choice);
   if (many !== undefined) return many;
-  const { view, world, seed, real: index, minor } = choice;
+  const { view, world, seed, real: index } = choice;
   const recordedAll = view === "real24" || index !== null ? recordedWorlds(seed) : [];
-  if (view === "real24") return recordedAll.map((each) => real(each, minor));
+  if (view === "real24") return recordedAll.map((each) => real(each, choice));
   const one = index === null ? undefined : recordedAll[index];
-  const shown = one === undefined ? madeUp(world, ANCHORS[world] ?? "rocky", choice) : real(one, minor);
+  const shown = one === undefined ? madeUp(world, ANCHORS[world] ?? "rocky", choice) : real(one, choice);
   return view === "stages" ? STAGES.map(() => shown) : [shown];
 }
 

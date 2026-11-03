@@ -82,14 +82,14 @@ export class Halos {
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-    if (!this.#lit || (this.#chart && index !== this.#main))
-      return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
+    const dot = (POINT_PIXELS * distance) / this.#focal;
+    if (!this.#lit || (this.#chart && index !== this.#main)) return { reach: dot, halo: 0 };
     const ceiling = (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize * distance;
     const full =
       index === this.#main
         ? Math.min(reachOf(system), (HALO_PIXELS * distance) / this.#focal)
         : under(reachOf(system), ceiling);
-    const point = Math.min(full, (POINT_PIXELS * distance) / this.#focal);
+    const point = Math.min(full, dot);
     return { reach: point + (full - point) * halo, halo };
   }
 }

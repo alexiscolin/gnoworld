@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { nextVitality, presenceOf, referenceOf, scaleOf, useOf } from "./gauges.ts";
+import { callersIn, nextVitality, presenceOf, referenceOf, scaleOf, useOf } from "./gauges.ts";
 
 // A world's two gauges (slice 7, 7b2; ADR-0002 §10): a vitality that remembers and moves a few percent a day, and the people present.
 const RISE = 0.03;
@@ -68,6 +68,14 @@ describe("nextVitality", () => {
         expect(next).toBeLessThanOrEqual(1);
       }),
     );
+  });
+});
+
+describe("callersIn", () => {
+  it("adds the callers a worlds' file counts in each realm, a realm it does not count adding none", () => {
+    expect(callersIn([{ callers: 3 }, { callers: null }, { callers: 40 }])).toBe(43);
+    expect(callersIn([])).toBe(0);
+    expect(callersIn([{ callers: null }])).toBe(0);
   });
 });
 

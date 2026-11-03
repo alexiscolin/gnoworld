@@ -11,6 +11,10 @@ export const LABELS_MOST = 8;
 export const FAR_MOST = 3;
 export const NAME_MOST = 24;
 
+/** The page's rail (7i), at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (frame 4: x 1,585
+ * at 1,728 px, 7h2's measure). The labels keep it and their air clear; the rail takes its width from it. */
+export const RAIL = { from: 900, footprint: 143 } as const;
+
 const UNCHARTED = "Uncharted signal";
 const GO_AND_LOOK = "go and look";
 
@@ -68,7 +72,8 @@ function givenName(name: string | undefined): string | null {
   return plain === "" || looksLikeAddress(plain) ? null : cut(plain);
 }
 
-function titleOf({ id, kind, name, signals }: LabelAsk): string | null {
+/** A world's title on its label and on the rail: the Earth's, a new world's as an uncharted signal, else its name; none for an address. */
+export function titleOf({ id, kind, name, signals }: LabelAsk): string | null {
   if (kind === "earth") return "Earth";
   if (signals?.uncharted === true) return UNCHARTED;
   return givenName(name) ?? labelName(id);
@@ -102,9 +107,11 @@ function ranked([a, one]: Weighed, [b, other]: Weighed): number {
   for (let at = 0; at < one.length; at += 1) if (one[at] !== other[at]) return (other[at] ?? 0) - (one[at] ?? 0);
   return a.id < b.id ? -1 : 1;
 }
-const best = (asks: readonly LabelAsk[]) =>
+/** The most popular first: the most rise, then the most people here, then the most callers; a tie by id. The labels' far worlds and the
+ * rail's trends and rising worlds alike (7i). */
+export const mostPopular = <Ask extends LabelAsk>(asks: readonly Ask[]): Ask[] =>
   asks
-    .map(weighed)
+    .map((ask) => [ask, weighed(ask)[1]] as const)
     .sort(ranked)
     .map(([ask]) => ask);
 
@@ -113,8 +120,8 @@ function farOf(asks: readonly LabelAsk[], taken: ReadonlySet<string>): LabelAsk[
   const far = asks.filter(
     (ask) => ask.kind === "far" && !taken.has(ask.id) && known(ask.signals ?? {}) && titleOf(ask) !== null,
   );
-  const fresh = best(far.filter(({ signals }) => signals?.uncharted === true));
-  const popular = best(far.filter(({ signals }) => signals?.uncharted !== true));
+  const fresh = mostPopular(far.filter(({ signals }) => signals?.uncharted === true));
+  const popular = mostPopular(far.filter(({ signals }) => signals?.uncharted !== true));
   return [...popular.slice(0, FAR_MOST - Math.min(fresh.length, 1)), ...fresh].slice(0, FAR_MOST);
 }
 

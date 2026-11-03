@@ -3,21 +3,27 @@
 // at cbb0a480, are what each test moves from. SwiftShader's picture is never the verdict on beauty: the design reviewer reads the
 // frames, and judges "no regular figure on any world" beside the straight runs held here.
 
-import { ANCHORS, type Anchor } from "@gnoworld/core";
+import { ANCHORS, type Anchor, type PlanetLook } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
-import { askLab, circles, drawn, heldQuiet, open, picture, type Circle } from "./lab.ts";
-import { lines } from "./lines.ts";
-import { apart, details } from "./portraits.ts";
-import { cores, darkest, lightness, wholeRows } from "./surfaces.ts";
-import { grain, landOn } from "./textures.ts";
+import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, type Circle } from "./lab.ts";
+import { cells, lines } from "./lines.ts";
+import { apart } from "./portraits.ts";
+import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
+import { facesApart, facesOn, GLANCE, grain, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
 // 0.069 of the radius wide, their width's spread 0.65 and 0.48. 7b5's worm loops: 1.30 ends a junction, glow 0.26, 0.006 r wide.
 const NET = { junctions: 50, endsPerJunction: 0.4, glow: [0.33, 0.8], width: [0.03, 0.1], widthSpread: 0.3 } as const;
-// The core the brief asks, #ffc870 (luma 205), gold to orange: its blue over red 0.44 sets the bound, never white (Music's own top 2%,
-// #fcd3b2, reads 0.70 through the video's compression); 7b5's #b8853a, luma 138.
-const CORE = { luma: 0.8 * 205, blueOverRed: 0.6, greenOverRed: [0.6, 0.9] } as const;
+// No asterisks of fine veins inside a cell (Alexis, 2026-11-03, "corriger et retirer"): 7b7's net read 565 and 572 junctions, most of them
+// its fine net's stars; one gated near its main veins 307 to 375. Music's own 186, a little over doubled.
+const MOST_JUNCTIONS = 420;
+// The core cream as Music's (Alexis, 2026-11-03, "crème comme Music"): Music's brightest tenth #e6b997 to #eabd9b, blue over red 0.66, its
+// top 2% #fcd3b2, 0.70 (through the video's compression); 7b7's gold #f5c575 read 0.48, 7b5's #b8853a luma 138.
+const CORE = { luma: 0.8 * 205, blueOverRed: [0.55, 0.75], greenOverRed: [0.6, 0.9] } as const;
+// Music's cells between its veins (lines.ts's cells, on the same disc of f0004.jpg): its darkest quarter at luma 18.1, its red over its
+// blue by 59.2, a dark maroon; half of each at least, as generated.spec.ts holds Music's veins (7b6's patch: #070304, black).
+const CELLS = { floor: 18.1 / 2, warmth: 59.2 / 2 } as const;
 // A shattered crust's fractures (the chief, 7b5's pass2: neon tubes, straight lines making triangles): Music's veins, read as lines,
 // run straight on 7% to 12% of their 60 px windows, their light's spread 0.31 to 0.39, following their width by 0.47 to 0.60; 7b5's
 // arcs run straight on 82%, their light's spread 0.16 (a tube's even light), following their width by 0.33.
@@ -29,8 +35,9 @@ const MINOR = { move: 5, far: 0.1, shown: 0.1, worlds: 6 } as const;
 // ordered tiles 45 degrees or more from their commonest way, and a tenth echoing at 6 to 10 px. 7b5's smudged grooved world (caeda94b)
 // reads 0.04 and 0.04; the Earth 0.46 and 0.05, a rocky world 0.43 and 0.01, a desert 0.02 and 0.08: none holds both (7b6's report).
 const GROOVES = { crossing: 0.25, period: 0.1 } as const;
-// A giant's fine steps along a latitude over across it (F4239): Jupiter on frame 104 (a box clear of its grid, 1020 to 1125 by 470
-// to 627) reads 0.78; 7b5's fivefold streaks 0.10 to 0.29; a third of Jupiter's at least.
+// The fivefold streak (F4239): hairs a pixel or two tall along a latitude, so a giant's finest detail no longer follows from one row to
+// the next (textures.ts's rows). Frame 104's Jupiter reads 0.81 on its box clear of the grid (1020 to 1125 by 470 to 627), today's eight
+// giants 0.20 at most, the soft version Alexis chose (2026-11-03, 15:2x) 0.35 at least.
 const GIANTS: readonly Anchor[] = [
   "gas giant",
   "ice giant",
@@ -41,19 +48,20 @@ const GIANTS: readonly Anchor[] = [
   "hot giant",
   "sub-Neptune",
 ];
-const ALONG_AT_LEAST = 0.78 / 3;
+const ROWS_FOLLOW = 0.3;
 // A giant's minor as whole bands (F4245): of what the minor moves in colour, the share in strips mostly moved, along its bands' lean
 // (surfaces.ts). The median over 24 gas giants: 7b5's pieces 0.57; whole bands, its worlds' edges and limbs read, about 0.8.
 const WHOLE_BANDS = 0.75;
 // Io's calderas dark but never punched black: the well-lit ground's 0.5th percentile over its median no darker than a cratered
 // ground's darkest (rocky 0.27, the Earth 0.29) by more than a quarter, and calderas there (7b5's Io 0.115, luma 17 in 150).
 const CALDERA = [0.2, 0.5] as const;
-// Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
-// (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
-// world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
-const CONTINENT = 0.7;
-const LAND = [0.3, 0.6] as const;
-const ALL_SEA = 0.05;
+// A glowing world's air past its limb reads red past blue, as frame 4's Music's limb (#edc3ad, red 64 past blue; Alexis, 2026-11-03,
+// "réchauffer"); every other world's keeps its cool light, both by 2 at least. 7b6's brown airs read -6.9 and -10.1, the others -8.7 or less.
+const WARM_LIMB = 2;
+// The air's ring brighter than space past it, or a ring not drawn would read as no colour at all.
+const AIR_LIGHT = 20;
+// A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre ... unique et bien reconnaissable"): its sea's
+// or its land's colour or its cloud cover a glance apart (textures.ts's GLANCE). The Earth: its close view at realism.spec's instant.
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -108,7 +116,7 @@ test.describe("the generated worlds polished", () => {
 
   heldQuiet();
 
-  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores gold", async ({
+  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores cream", async ({
     page,
   }) => {
     await styled(page, 1, async (place) => {
@@ -118,6 +126,7 @@ test.describe("the generated worlds polished", () => {
       if (net === undefined || core === undefined) throw new Error("no measure");
       test.info().annotations.push({ type: "veins", description: JSON.stringify({ net, core }) });
       expect(net.junctions, "a net").toBeGreaterThanOrEqual(NET.junctions);
+      expect(net.junctions, "no asterisks inside a cell").toBeLessThanOrEqual(MOST_JUNCTIONS);
       expect(net.ends / net.junctions, "cells close: veins end seldom").toBeLessThanOrEqual(NET.endsPerJunction);
       expect(net.glow, "veins over the disc").toBeGreaterThanOrEqual(NET.glow[0]);
       expect(net.glow, "dark cells between them").toBeLessThanOrEqual(NET.glow[1]);
@@ -126,9 +135,22 @@ test.describe("the generated worlds polished", () => {
       expect(net.widthSpread, "their width varies").toBeGreaterThanOrEqual(NET.widthSpread);
       const [red, green, blue] = core.colour;
       expect(core.luma, "a hot core").toBeGreaterThanOrEqual(CORE.luma);
-      expect(blue / red, "gold, never white").toBeLessThanOrEqual(CORE.blueOverRed);
+      expect(blue / red, "cream, as Music's").toBeGreaterThanOrEqual(CORE.blueOverRed[0]);
+      expect(blue / red, "never white").toBeLessThanOrEqual(CORE.blueOverRed[1]);
       expect(green / red, "gold to orange").toBeGreaterThanOrEqual(CORE.greenOverRed[0]);
       expect(green / red, "gold to orange").toBeLessThanOrEqual(CORE.greenOverRed[1]);
+    });
+  });
+
+  test("a veined volcanic world's cells glow dark maroon between its veins, never black, as Music's", async ({
+    page,
+  }) => {
+    await styled(page, 1, async (place) => {
+      const [between] = await cells(page, await picture(page), { discs: [place], kind: "veins" });
+      if (between === undefined) throw new Error("no measure");
+      test.info().annotations.push({ type: "cells", description: JSON.stringify(between) });
+      expect(between.floor, "never black").toBeGreaterThanOrEqual(CELLS.floor);
+      expect(between.warmth, "a dark maroon").toBeGreaterThanOrEqual(CELLS.warmth);
     });
   });
 
@@ -171,12 +193,14 @@ test.describe("the generated worlds polished", () => {
   });
 
   for (const giant of GIANTS)
-    test(`a ${giant} seen close holds its fine detail without the fivefold streak (F4239)`, async ({ page }) => {
+    test(`a ${giant} seen close holds no fivefold streak: its finest detail follows from row to row (F4239)`, async ({
+      page,
+    }) => {
       await open(page, close(giant));
       const place = await placeOf(page);
-      const [read] = await details(page, await picture(page), [place]);
-      test.info().annotations.push({ type: "along", description: String(read?.along) });
-      expect(read?.along).toBeGreaterThanOrEqual(ALONG_AT_LEAST);
+      const [follows] = await rows(page, await picture(page), [place]);
+      test.info().annotations.push({ type: "rows", description: String(follows) });
+      expect(follows).toBeGreaterThanOrEqual(ROWS_FOLLOW);
     });
 
   test("a giant's minor is whole bands, never pieces, and still shows (F4245)", async ({ page }) => {
@@ -186,6 +210,30 @@ test.describe("the generated worlds polished", () => {
     expect(median(rows), "whole bands").toBeGreaterThanOrEqual(WHOLE_BANDS);
     const shown = (await apart(page, pictures, places)).filter(({ moved }) => moved > MINOR.shown);
     expect(shown.length, "worlds that show their minor").toBeGreaterThanOrEqual(MINOR.worlds);
+  });
+
+  test("a glowing world's air is warm, as frame 4's Music's limb; every other world's keeps its own cool light", async ({
+    page,
+  }) => {
+    // One close view per class, 24 pages one after another: about 90 s at a gate's load, past test.slow()'s 90.
+    test.setTimeout(240_000);
+    const read: { anchor: string; glows: boolean; warmth: number }[] = [];
+    for (const anchor of ANCHORS) {
+      await open(page, close(anchor));
+      const [look] = await askLab<PlanetLook[]>(page, "looks");
+      if (look === undefined || look.rim === null) continue;
+      const [limb] = await limbs(page, await picture(page), [await placeOf(page)]);
+      if (limb === undefined) throw new Error(`${anchor}: no limb`);
+      expect(limb.luma, `${anchor}: its air drawn`).toBeGreaterThanOrEqual(AIR_LIGHT);
+      const [red, , blue] = limb.colour;
+      read.push({ anchor, glows: look.glow !== null, warmth: red - blue });
+    }
+    test.info().annotations.push({ type: "limbs", description: JSON.stringify(read) });
+    const glowing = read.filter(({ glows }) => glows).map(({ warmth }) => warmth);
+    const others = read.filter(({ glows }) => !glows).map(({ warmth }) => warmth);
+    expect(glowing, "the volcanic and the lava world").toHaveLength(2);
+    expect(Math.min(...glowing), "a glowing world's air").toBeGreaterThanOrEqual(WARM_LIMB);
+    expect(Math.max(...others), "every other air").toBeLessThanOrEqual(-WARM_LIMB);
   });
 
   test("Io's calderas are dark ground, never punched black", async ({ page }) => {
@@ -198,14 +246,27 @@ test.describe("the generated worlds polished", () => {
     });
   });
 
-  test("24 temperate worlds hold continents, as the Earth does, not islands (F4243)", async ({ page }) => {
+  // Each seed of the lab names 24 other systems, so their seas turn another way: four seeds, 96 worlds, read for the worst.
+  test("no temperate world reads as the Earth, over its sea's whole turn: its sea, land or clouds a glance apart", async ({
+    page,
+  }) => {
+    await page.clock.setFixedTime(EARTH_INSTANT);
+    await open(page, "?view=earth");
+    const [earth] = await facesOn(page, await picture(page), [EARTH_VIEW]);
+    if (earth === undefined) throw new Error("no Earth");
     await open(page, ofClass("temperate"));
-    const land = await landOn(page, await picture(page), await circles(page));
-    test.info().annotations.push({ type: "land", description: JSON.stringify(land) });
-    expect(median(land.map(({ largest }) => largest)), "one large piece").toBeGreaterThanOrEqual(CONTINENT);
-    expect(median(land.map(({ share }) => share)), "land").toBeGreaterThanOrEqual(LAND[0]);
-    expect(median(land.map(({ share }) => share)), "and sea").toBeLessThanOrEqual(LAND[1]);
-    for (const [at, { share }] of land.entries())
-      expect(share, `world ${String(at)}: some land`).toBeGreaterThan(ALL_SEA);
+    const worlds: Face[] = [];
+    for (let seed = 0; seed < 4; seed += 1) {
+      if (seed > 0) await nextSeed(page);
+      worlds.push(...(await facesOn(page, await picture(page), await circles(page))));
+    }
+    const apart = worlds.map((face) => facesApart(face, earth));
+    const nearest = Math.min(...apart.map(({ sea, land }) => Math.max(sea, land)));
+    test.info().annotations.push({ type: "faces", description: JSON.stringify({ earth, nearest, apart }) });
+    for (const [at, { sea, land, clouds }] of apart.entries())
+      expect(
+        sea >= GLANCE.colour || land >= GLANCE.colour || clouds >= GLANCE.clouds,
+        `world ${String(at)}: sea ${sea.toFixed(1)}, land ${land.toFixed(1)}, clouds ${clouds.toFixed(2)} from the Earth's`,
+      ).toBe(true);
   });
 });

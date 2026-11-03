@@ -121,6 +121,9 @@ function scattered(id: string, { orbit, phase }: Pick<Orbiter, "orbit" | "phase"
   };
 }
 
+// A world's radius, and its own size where its system's room makes the radius another: a Plan draws it so (7v's design review, F4470).
+const sized = (own: number, radius: number) => (own === radius ? { radius } : { radius, own });
+
 function latticeOf(
   worlds: readonly WorldHeld[],
   slots: number,
@@ -136,13 +139,7 @@ function latticeOf(
     const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
     const placed = { orbit, phase: start + slot * GOLDEN };
     const own = worldSize(use);
-    const radius = Math.min(own, most);
-    return {
-      id,
-      radius,
-      ...(own === radius ? {} : { own }),
-      ...(crowd ? scattered(id, placed, { start, outer }) : placed),
-    };
+    return { id, ...sized(own, Math.min(own, most)), ...(crowd ? scattered(id, placed, { start, outer }) : placed) };
   });
 }
 
@@ -160,8 +157,7 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
     if (rank >= CLEAR_BODIES) return world;
     const nearest = Math.min(...clear.filter((other) => other !== world).map((other) => gap(world, other)));
     const { own = world.radius, ...kept } = world;
-    const radius = Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM);
-    return { ...kept, radius, ...(own === radius ? {} : { own }) };
+    return { ...kept, ...sized(own, Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM)) };
   });
 }
 

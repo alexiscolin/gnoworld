@@ -45,6 +45,8 @@ export interface Scene {
   arrive(id: string | undefined): void;
   /** Shows what the eye looks at from above, its orbits drawn (the Plan), or as space, its default (7v): a system or the Earth at rest. */
   see(plan: boolean): void;
+  /** Portraits of the worlds `ids` for the rail (7i), `size` page pixels a side, drawn in frames of its own, by their ids. */
+  portraits(ids: readonly string[], size: number, signal: AbortSignal): Promise<ReadonlyMap<string, string>>;
   dispose(): void;
   stats(): SceneStats;
 }

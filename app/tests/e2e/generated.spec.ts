@@ -1,7 +1,19 @@
-import { ANCHORS, SURFACE, worldLook, type Lab } from "@gnoworld/core";
+import { ANCHORS, asciiBytes, planetRecipe, SURFACE, worldLook, type Lab } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
-import { askLab, circles, COMPUTER, listen, looks, noneOnAnother, open, picture, stats, type Circle } from "./lab.ts";
+import {
+  askLab,
+  circles,
+  EARTH_INSTANT,
+  EARTH_VIEW,
+  listen,
+  looks,
+  noneOnAnother,
+  open,
+  picture,
+  stats,
+} from "./lab.ts";
 import { glows } from "./pixels.ts";
+import { facesOn, shownPart } from "./textures.ts";
 import {
   alikeOnScreen,
   alikePairs,
@@ -24,6 +36,15 @@ const ALIKE_AT_MOST = 2;
 const DETAIL_SHARE = 0.8;
 const GRAIN = 3;
 const ROUNDING = 2.3;
+// A temperate world close on six seeds, each at the Earth's level, never one chosen (the chief, 2026-11-03; 7b8's coasts lost it on two).
+const TEMPERATE_SEEDS = 6;
+// A giant seen close as Alexis chose it (2026-11-03, 15:2x, "la version douce", reports/7b7-compare/): no streak, soft, about a third of
+// frame 104's Jupiter's fine detail (0.119 to 0.312 against 0.354, the same measure on its box clear of the grid), so 0.28 of Jupiter's at
+// least; no variance floor, for at the pixel a soft giant no longer differs from rounding (1.8 to 6.9 on 11 of 15 views).
+const GIANT_SHARPNESS = 0.1;
+// A class drawn as bands, as the program reads it (generated.ts's `banded`).
+const isGiant = (anchor: string) =>
+  ANCHORS.some((one) => one === anchor && planetRecipe(asciiBytes(one), one).surface.bands > 0);
 // The volcanic character Alexis approved (2026-11-02), a dark crust with white-hot vents red at their edges, as the approved lab measures
 // it (41776567, pixels.ts's glows): the gallery's 6.05% white-hot and 4.56% red, the close view's 3.87% and 3.24%, nothing pale. Its
 // style's median holds in that span, red over white-hot within half and twice theirs (0.75, 0.84).
@@ -31,16 +52,13 @@ const APPROVED_HOT = [0.0387, 0.0605] as const;
 const APPROVED_RED_OVER_HOT = [0.75, 0.84] as const;
 const PALE_AT_MOST = 0.01;
 // The veins of the video's frame 4 "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; pixels.ts's glows): 55.2% of its disc,
-// 62.8% of its night half; its brightest pixels gold (blue 0.57 of red), never white. A veined world holds half of each at least.
+// 62.8% of its night half, a veined world half of each at least; cream as Music's (Alexis, 2026-11-03), 4.5% of its disc white by glows'
+// rule (luma past 170, blue two thirds of red or more), a quarter past it at most: no whiter (7b7's gold read 0.5% at most).
 const MUSIC = [0.552, 0.628] as const;
-const NEVER_WHITE = 0.005;
+const MUSIC_WHITE = 1.25 * 0.045;
 // Io's sulfur crust as the chief described it, yellow to orange and bright, a few hot spots: set from that description, no image of Io
 // measured. Lab hue of the lit ground in degrees, its chroma, its lightness, and its white share at most (lit sulfur is bright, not white).
 const SULFUR = { hue: [55, 100], chroma: 25, lightness: 35, white: 0.01 } as const;
-// The instant realism.spec pins the Earth at: its detail is measured on that same picture.
-const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
-// What the hand-made Earth's view draws: earthView.ts's circle, a third of the screen's height at its centre.
-const EARTH_CIRCLE: Circle = { x: COMPUTER.width / 2, y: COMPUTER.height / 2, r: COMPUTER.height * 0.33 };
 // A real map lends its fine contrast only: with every map grey, a world's 8-pixel blocks move a tenth of its lightness at most.
 const BLOCKS_MOVE = 0.1;
 // A class's colour reads from afar on three discs of four at least: its minor takes 40% of a world, and may face the eye.
@@ -69,16 +87,19 @@ const nonDegenerate = (all: readonly Portrait[]) => {
 const hue = ([, a, b]: readonly number[]) => Math.atan2(b ?? 0, a ?? 0);
 const chroma = ([, a, b]: readonly number[]) => Math.hypot(a ?? 0, b ?? 0);
 const turned = (one: number, other: number) => Math.abs(Math.atan2(Math.sin(one - other), Math.cos(one - other)));
+// A colour read as its palette's: within 45 degrees of its hue, or both grey.
+const near = (lab: readonly number[], mid: readonly number[]) =>
+  chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
 
 // The Earth's detail, measured once a worker: its view is the same on every visit.
 let earthDetail: Detail | undefined;
 const earthOf = async (page: Page): Promise<Detail> => {
   if (earthDetail !== undefined) return earthDetail;
-  await page.clock.setFixedTime(INSTANT);
+  await page.clock.setFixedTime(EARTH_INSTANT);
   await open(page, "?view=earth");
   const [day, night] = await details(page, await picture(page), [
-    EARTH_CIRCLE,
-    { ...EARTH_CIRCLE, x: EARTH_CIRCLE.x - 0.6 * EARTH_CIRCLE.r },
+    EARTH_VIEW,
+    { ...EARTH_VIEW, x: EARTH_VIEW.x - 0.6 * EARTH_VIEW.r },
   ]);
   if (day === undefined || night === undefined) throw new Error("no Earth");
   expect(day.luma, "the Earth's box lies on its lit side").toBeGreaterThan(night.luma + 10);
@@ -91,16 +112,21 @@ const closeDetail = async (page: Page, query: string) => {
   await open(page, query);
   const [place] = await circles(page);
   if (place === undefined) throw new Error("no world");
-  expect(Math.abs(place.r / EARTH_CIRCLE.r - 1), "the Earth's size on screen").toBeLessThan(0.03);
+  expect(Math.abs(place.r / EARTH_VIEW.r - 1), "the Earth's size on screen").toBeLessThan(0.03);
   const [day] = await details(page, await picture(page), [place]);
+  const [{ anchor } = { anchor: "" }] = await looks(page);
   if (day === undefined) throw new Error("no measure");
   test.info().annotations.push({
     type: "detail",
-    description: JSON.stringify({ day, earth, raw: day.variance / earth.variance }),
+    description: JSON.stringify({ day, earth, raw: day.variance / earth.variance, anchor }),
   });
-  expect(day.sharpness, "as sharp as the Earth").toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
-  expect(day.sharpness, "no grain").toBeLessThanOrEqual(GRAIN);
-  expect(day.variance, "detail, not rounding").toBeGreaterThan(4 * ROUNDING);
+  expect(day.sharpness, `${query}: no grain`).toBeLessThanOrEqual(GRAIN);
+  if (isGiant(anchor)) {
+    expect(day.sharpness, `${query}: a soft giant's detail`).toBeGreaterThanOrEqual(GIANT_SHARPNESS);
+    return;
+  }
+  expect(day.sharpness, `${query}: as sharp as the Earth`).toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
+  expect(day.variance, `${query}: detail, not rounding`).toBeGreaterThan(4 * ROUNDING);
 };
 
 // The real file's 24, read once a worker: the lab's own choice of them, which `real=` must follow.
@@ -170,12 +196,22 @@ test.describe("generated worlds", () => {
       test(`24 ${anchor} worlds read as their class, each lit enough to read`, async ({ page }) => {
         await open(page, classView(index));
         expect(new Set((await looks(page)).map((look) => look.anchor))).toEqual(new Set([anchor]));
-        const all = await portraitsOf(page);
+        const [shot, places] = [await picture(page), await circles(page)];
+        const all = await portraits(page, shot, places);
         nonDegenerate(all);
-        const mids = await askLab<Lab[]>(page, "mids");
+        const faces = await facesOn(page, shot, places);
+        const centres = await askLab<{ land: Lab; sea: readonly Lab[] | null }[]>(page, "centres");
+        // A world with a sea reads as its class by its sea and its land apart, each part it shows (textures.ts's SHOWN) near its own
+        // colours, and one part at least (Alexis, 2026-11-03, "mer et terres à part"): half sea and half land, its mean reads neither.
         const reading = all.filter(({ lab }, at) => {
-          const mid = mids[at] ?? [0, 0, 0];
-          return chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
+          const { land, sea } = centres[at] ?? { land: [0, 0, 0] as const, sea: null };
+          const face = faces[at];
+          if (sea === null || face === undefined) return near(lab, land);
+          const [water, ground] = [shownPart(face, "sea"), shownPart(face, "land")];
+          if (water === null && ground === null) return false;
+          return (
+            (water === null || sea.some((colour) => near(water, colour))) && (ground === null || near(ground, land))
+          );
         });
         expect(reading.length, `${anchor} reads as its own palette`).toBeGreaterThanOrEqual(READ_AS_CLASS);
         const [alike, spread] = [alikePairs(all).length, textureSpread(all)];
@@ -230,7 +266,7 @@ test.describe("generated worlds", () => {
     for (const veins of of(1)) {
       expect(veins.glow, "veins over the disc").toBeGreaterThanOrEqual(MUSIC[0] / 2);
       expect(veins.night, "veins on the night side").toBeGreaterThanOrEqual(MUSIC[1] / 2);
-      expect(veins.white, "gold, never white").toBeLessThanOrEqual(NEVER_WHITE);
+      expect(veins.white, "cream, never whiter than Music's").toBeLessThanOrEqual(MUSIC_WHITE);
     }
     for (const sulfur of of(2)) {
       const [lightness, a, b] = sulfur.lab;
@@ -283,7 +319,9 @@ test.describe("generated worlds", () => {
 
   for (const index of ANCHORS.keys())
     test(`a ${ANCHORS[index] ?? ""} world seen close holds the Earth's fine detail`, async ({ page }) => {
-      await closeDetail(page, `?view=close&world=${String(index)}`);
+      const seeds = ANCHORS[index] === "temperate" ? TEMPERATE_SEEDS : 1;
+      for (let seed = 0; seed < seeds; seed += 1)
+        await closeDetail(page, `?view=close&world=${String(index)}&seed=${String(seed)}`);
     });
 
   for (let index = 0; index < VIEW_OF_24; index += 1)

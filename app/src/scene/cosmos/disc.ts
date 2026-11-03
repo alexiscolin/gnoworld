@@ -185,9 +185,9 @@ export class Disc {
     const distance = away(system.place, sight.eye);
     const grain = world.radius < GRAIN;
     const share = unitOf(textHash(world.id));
-    const size = grain
-      ? Math.min(onScreen(world.radius * shown, distance, sight.focal), DUST) * (0.5 + 0.5 * share)
-      : Math.min(onScreen(world.radius * shown, distance, sight.focal), most);
+    const size =
+      Math.min(onScreen(world.radius * shown, distance, sight.focal), grain ? DUST : most) *
+      (grain ? 0.5 + 0.5 * share : 1);
     if (!grain) {
       this.#sizes += size;
       this.#sized += 1;

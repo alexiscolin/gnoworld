@@ -182,9 +182,14 @@ export class Bodies {
     return this.#spot;
   }
 
-  // What the box of the page's text leaves of a body at `at`: none at a system's view, where the page's text, the hero, gives way (7v).
+  // The box of the page's text, at the view at rest alone: at a system's view the page's text, the hero, gives way (7v).
+  get #box(): ClearBox | undefined {
+    return this.#view === "rest" ? this.sight.box : undefined;
+  }
+
+  // What the box of the page's text leaves of a body at `at`.
   #room(at: Vector3, radius: number): number {
-    const box = this.#view === "rest" ? this.sight.box : undefined;
+    const box = this.#box;
     return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
@@ -196,7 +201,7 @@ export class Bodies {
 
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
-    const box = this.#view === "rest" ? this.sight.box : undefined;
+    const box = this.#box;
     return box === undefined ? 1 : clearOf({ ...this.seen(this.fromEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
