@@ -46,8 +46,8 @@ interface HandMaps {
   readonly night?: Texture;
 }
 
-// The Earth on its day, night and clouds, its rim lit by hand.
-function earthPlanet(
+/** The Earth on its day, night and clouds, its rim lit by hand: the globe's, and the rail's portrait of it (7i). */
+export function earthPlanet(
   { day, clouds, night }: Pick<EarthMaps, "day" | "clouds" | "night">,
   sphere: BufferGeometry,
 ): Planet {

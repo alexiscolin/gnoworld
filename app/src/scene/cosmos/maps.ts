@@ -24,17 +24,17 @@ interface BodyMapsOptions {
   readonly code?: () => Promise<Kit>;
 }
 
-// How a map of the bodies' set loads at `width`: the clouds' and the rings' are data on one channel, the rings' at their own size.
-function namedLoad(name: string, width: number): Pick<MapLoad, "kind" | "width"> {
+/** How a map of the bodies' set loads at `width`: the clouds' and the rings' are data on one channel, the rings' at their own size. */
+export function namedLoad(name: string, width: number): Pick<MapLoad, "kind" | "width"> {
   if (name === "ring") return { kind: "data" };
   return { kind: name === "clouds" ? "data" : "colour", width };
 }
 
-// The maps a generated world reads.
-const mapNamesOf = ({ look, recipe }: World): string[] => [look.map, recipe.minorMap, "clouds", "ring"];
+/** The maps a generated world reads. */
+export const mapNamesOf = ({ look, recipe }: World): string[] => [look.map, recipe.minorMap, "clouds", "ring"];
 
-// A generated world's maps from those `held`, once all it reads are there; none till then.
-function mapSetOf(world: World, held: ReadonlyMap<string, Texture>): MapSet | undefined {
+/** A generated world's maps from those `held`, once all it reads are there; none till then. */
+export function mapSetOf(world: World, held: ReadonlyMap<string, Texture>): MapSet | undefined {
   const [clouds, ring] = [held.get("clouds"), held.get("ring")];
   if (clouds === undefined || ring === undefined || mapNamesOf(world).some((name) => !held.has(name))) return undefined;
   return { map: (name) => held.get(name) ?? clouds, clouds, ring };

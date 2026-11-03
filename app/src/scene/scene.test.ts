@@ -71,6 +71,24 @@ const cosmos = vi.hoisted(() => ({
   arrive: vi.fn<(id: string | undefined, go: (eye: { x: number; y: number; z: number }) => void) => void>(),
 }));
 
+// The rail's portraits (7i), a chunk of their own: the device they are handed, and what they hand back.
+interface PortraitDeviceSeen {
+  readonly renderer: unknown;
+  readonly base: string;
+  readonly halved: () => boolean;
+  readonly lend: (draw: () => void) => void;
+  readonly signal: AbortSignal;
+}
+const portrait = vi.hoisted(() => ({
+  asked: [] as { device: PortraitDeviceSeen; ids: readonly string[]; size: number }[],
+}));
+vi.mock("./portraits.ts", () => ({
+  portraitsOf: (device: PortraitDeviceSeen, ids: readonly string[], size: number) => {
+    portrait.asked.push({ device, ids, size });
+    return Promise.resolve(new Map(ids.map((id) => [id, `data:image/jpeg;base64,${id}`])));
+  },
+}));
+
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
 vi.mock("./cosmos/cosmos.ts", () => ({
   Cosmos: class {
@@ -1556,6 +1574,71 @@ describe("flights (7g)", () => {
     expect(flight.ready).not.toHaveBeenCalled();
     earth.made[0]?.stood();
     expect(flight.ready).toHaveBeenCalledTimes(1);
+    scene.dispose();
+  });
+});
+
+describe("the rail's portraits", () => {
+  beforeEach(() => {
+    portrait.asked.length = 0;
+  });
+
+  it("hands its own renderer to the portraits' chunk, and back the pictures it drew", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    const drawn = await scene.portraits(["gov/dao", "earth"], 100);
+    expect(portrait.asked.map(({ ids, size }) => [ids, size])).toEqual([[["gov/dao", "earth"], 100]]);
+    expect(portrait.asked[0]?.device.renderer).toBe(three.renderer);
+    expect(portrait.asked[0]?.device.base).toBe(import.meta.env.BASE_URL);
+    expect([...drawn.keys()]).toEqual(["gov/dao", "earth"]);
+    scene.dispose();
+  });
+
+  it("halves the portraits' maps where it halves its own, and only there", async () => {
+    const low = startScene(options({ remembered: "low" }), clock);
+    await low.portraits(["gov/dao"], 100);
+    expect(portrait.asked[0]?.device.halved()).toBe(true);
+    low.dispose();
+    const high = startScene(options(), clock);
+    await high.portraits(["gov/dao"], 100);
+    expect(portrait.asked[1]?.device.halved()).toBe(false);
+    high.dispose();
+  });
+
+  it("tells the portraits when it goes, so they let go what waits for its frame", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    await scene.portraits(["gov/dao"], 100);
+    const signal = portrait.asked[0]?.device.signal;
+    expect(signal?.aborted).toBe(false);
+    scene.dispose();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("runs what is lent at the start of its next frame, before it draws its own, and once", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(1000);
+    await scene.portraits(["gov/dao"], 100);
+    const order: string[] = [];
+    three.renderer.render.mockImplementation(() => order.push("scene"));
+    portrait.asked[0]?.device.lend(() => order.push("portrait"));
+    expect(clock.pending.frames + clock.pending.timers).toBeGreaterThan(0);
+    clock.run(1000);
+    expect(order[0]).toBe("portrait");
+    expect(order[1]).toBe("scene");
+    expect(order.filter((each) => each === "portrait")).toHaveLength(1);
+    three.renderer.render.mockReset();
+    scene.dispose();
+  });
+
+  it("runs every draw lent before a frame, in the order lent", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    clock.run(1000);
+    await scene.portraits(["a"], 100);
+    await scene.portraits(["b"], 100);
+    const order: string[] = [];
+    portrait.asked[0]?.device.lend(() => order.push("a"));
+    portrait.asked[1]?.device.lend(() => order.push("b"));
+    clock.run(1000);
+    expect(order).toEqual(["a", "b"]);
     scene.dispose();
   });
 });

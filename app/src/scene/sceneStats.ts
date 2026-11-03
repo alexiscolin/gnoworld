@@ -41,6 +41,8 @@ export interface Scene {
   keepClear(box: ClearBox | undefined): void;
   /** Comes to the system named `id`, its postcard at its arrival, or back to the view at rest with none (7d3). */
   arrive(id: string | undefined): void;
+  /** Portraits of the worlds `ids` for the rail (7i), `size` page pixels a side, drawn in frames of its own, by their ids. */
+  portraits(ids: readonly string[], size: number): Promise<ReadonlyMap<string, string>>;
   dispose(): void;
   stats(): SceneStats;
 }
