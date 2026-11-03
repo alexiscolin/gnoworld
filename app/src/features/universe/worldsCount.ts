@@ -30,31 +30,30 @@ export const useWorldsDrawn = (): number | undefined =>
 
 // The count's read under way, whoever asked it; one that brought nothing is let go, for the next home to ask again. Out of the hook: the
 // React Compiler refuses a hook that writes a module's variable, even from its effect.
-let reading: Promise<number | undefined> | undefined;
+let reading: Promise<void> | undefined;
 
-function ask(): Promise<number | undefined> {
+function ask(): Promise<void> {
   reading ??= readWorldsCount(import.meta.env.BASE_URL).then((file) => {
     if (file === undefined) reading = undefined;
     else if (drawnWorlds === undefined) worldsDrawn(file.count);
-    return file?.count;
   });
   return reading;
 }
 
 /** How many worlds the cosmos draws, while `wanted`: the page reads their count once a visit, whether the scene runs or not. Nothing while it
- * comes; null once this page's read has brought none, until a read brings it. */
+ * comes; null once this page's read has ended with none known, until a read brings it. A read that brought one has told the store first. */
 export function useWorldsCount(wanted: boolean): number | null | undefined {
   const count = useWorldsDrawn();
-  const [none, setNone] = useState(false);
+  const [ended, setEnded] = useState(false);
   useEffect(() => {
     if (wanted && count === undefined)
       ask().then(
-        (brought) => {
-          if (brought === undefined) setNone(true);
+        () => {
+          setEnded(true);
         },
         () => undefined,
       );
   }, [wanted, count]);
   if (!wanted) return undefined;
-  return count ?? (none ? null : undefined);
+  return count ?? (ended ? null : undefined);
 }
