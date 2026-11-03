@@ -211,6 +211,7 @@ func TestWithdrawNeverTakesHeldPayments(cur realm, t *testing.T) {
 	Takedown(cross(cur), "mars", "r1")
 	uassert.Equal(t, p0, bal(alice))
 	uassert.AbortsWithMessage(t, cur, "withdraw 1 to 0 ugnot", func() { Withdraw(cross(cur), carol, 1) })
+	at(t0 + 3*oneDay) // the end it was paid for
 	Close(cross(cur), "mars")
 	Withdraw(cross(cur), carol, 2*p0)
 	uassert.Equal(t, 0, bal(self))

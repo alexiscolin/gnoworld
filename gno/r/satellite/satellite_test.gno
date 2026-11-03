@@ -435,8 +435,9 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, "No satellite over this world.\n", Render("mars"))
 	uassert.Equal(t, 4*p0, held) // two days begun each, until closed
 
+	at(t0 + 3*oneDay) // the end it was paid for
 	testing.SetRealm(testing.NewUserRealm(carol))
-	Close(cross(cur), "mars") // at once: its end is now
+	Close(cross(cur), "mars")
 	uassert.Equal(t, 2*p0, held)
 
 	testing.SetRealm(testing.NewUserRealm(alice))
