@@ -1,8 +1,9 @@
 // The rail (frames 4 and 16; ADR-0002 §1's rail and §10; 7i): the Earth and the worlds of the moment down the right edge, each its planet and
 // its name, 25 at most, then See all; one stop in the tab order, the arrows among the worlds; each planet its own portrait once the scene
 // drew it, ui's drawn disc till then. Where it stands, the page's plain list of worlds steps aside: the rail stands for it.
+import { RAIL } from "@gnoworld/core";
 import { PlanetThumb } from "@gnoworld/ui";
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
 import { followed } from "../../lib/followed.ts";
 import { nextLine } from "../../lib/nextLine.ts";
 import { dock } from "./railDock.ts";
@@ -13,6 +14,8 @@ import styles from "./Rail.module.css";
 /** A portrait's side, in the page's pixels: a 64 px planet as the dock magnifies it. */
 export const PORTRAIT_SIZE = 100;
 const EVERY_PLACE = "/list";
+// The rail's footprint, which the labels keep clear (core's RAIL): its width comes from it.
+const FOOTPRINT = { "--_footprint": `${String(RAIL.footprint)}px` } as CSSProperties;
 
 /** What the rail reads: the worlds and what is known of them, and the scene's portraits of their planets, which outlive the rail. */
 export interface RailSource {
@@ -129,7 +132,7 @@ export function Rail({
   // The world last reached keeps the tab stop, or the first once the list is shorter than its place.
   const tabStop = stop < entries.length ? stop : 0;
   return (
-    <nav aria-label="Worlds" className={styles["rail"]} ref={railRef}>
+    <nav aria-label="Worlds" className={styles["rail"]} style={FOOTPRINT} ref={railRef}>
       <div className={styles["column"]}>
         <ul className={styles["worlds"]} onKeyDown={moved}>
           {entries.map(({ id, title, section, href }, at) => (

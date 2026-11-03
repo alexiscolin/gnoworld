@@ -1,13 +1,12 @@
 /* The rail (frames 4 and 16): a dark glass column at the right edge, from under the header to over the ticker, its planets one under the
    other, 98 px apart, each with its name in the label style under it; the column scrolls past the panel's foot, which fades it, and See all
-   ends it. Its width and its place come from the band the labels keep for it (labels.ts), which the rail writes on itself. */
+   ends it. Its width comes from its footprint, which the labels keep clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
     /* raw: frame 4's 25 px between the rail and the window's right edge */
     --_edge: 25px;
-    /* The labels' band and their air (labels.ts, core's PLACE), written by the rail: unset, the rail takes its content's width. */
-    --_band: initial;
-    --_air: initial;
+    /* The rail's footprint from the window's right edge (core's RAIL), written by the rail: unset, the rail takes its content's width. */
+    --_footprint: initial;
 
     position: fixed;
     /* raw: frame 4's rail from 98 px to 1,022 px of 1,080: under the header, over the ticker and its air */
@@ -15,8 +14,8 @@
     inset-inline-end: var(--_edge);
     /* raw: over the labels' layer (0) and the canvas (-1), as the flight panel is */
     z-index: 1;
-    /* layout: the band less the labels' air and the rail's own edge (x 1,585 to 1,703 at 1,728 px) */
-    inline-size: calc(var(--_band) - var(--_air) - var(--_edge));
+    /* layout: the footprint less the rail's own edge (x 1,585 to 1,703 at 1,728 px) */
+    inline-size: calc(var(--_footprint) - var(--_edge));
     border-radius: var(--radius-l);
     /* raw: the panels' night over the scene, darker than the flight panel's glass: frame 4's column dims the suns behind it */
     background: color-mix(in oklab, var(--color-surface) 62%, transparent);
