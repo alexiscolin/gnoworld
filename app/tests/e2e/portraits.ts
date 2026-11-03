@@ -1,3 +1,4 @@
+import { correlation } from "@gnoworld/core";
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
@@ -174,19 +175,14 @@ const SAME_ENERGY = Math.log(1.3);
 const SAME_PICTURE = 0.8;
 const CELLS_TO_JUDGE = 32;
 
-function correlation(one: readonly (number | null)[], other: readonly (number | null)[]): number {
+// Two grids' correlation over the cells both read; 1, the same picture, where too few cells or a flat grid tell nothing.
+function gridsAlike(one: readonly (number | null)[], other: readonly (number | null)[]): number {
   const both = one.flatMap((value, at) => {
     const twin = other[at];
     return value === null || twin === null || twin === undefined ? [] : [[value, twin] as const];
   });
-  if (both.length < CELLS_TO_JUDGE) return 1;
-  const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
-  const [ma, mb] = [mean(both.map(([a]) => a)), mean(both.map(([, b]) => b))];
-  const [ab, aa, bb] = both.reduce(
-    ([x, y, z], [a, b]) => [x + (a - ma) * (b - mb), y + (a - ma) ** 2, z + (b - mb) ** 2],
-    [0, 0, 0],
-  );
-  return aa === 0 || bb === 0 ? 1 : ab / Math.sqrt(aa * bb);
+  const read = correlation(both);
+  return both.length < CELLS_TO_JUDGE || Number.isNaN(read) ? 1 : read;
 }
 
 export function alikeOnScreen(one: Portrait, other: Portrait): boolean {
@@ -195,7 +191,7 @@ export function alikeOnScreen(one: Portrait, other: Portrait): boolean {
     Math.hypot(dl, da, db) < SAME_COLOUR &&
     Math.abs(one.spread - other.spread) < SAME_SPREAD &&
     one.energy.every((value, at) => Math.abs(Math.log(value / (other.energy[at] ?? 0))) < SAME_ENERGY) &&
-    correlation(one.grid, other.grid) > SAME_PICTURE
+    gridsAlike(one.grid, other.grid) > SAME_PICTURE
   );
 }
 

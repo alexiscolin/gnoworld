@@ -3,6 +3,7 @@
 // noise's zero lines never do, and a hairline breaking into dots ends everywhere. A junction is where three lines or more leave a pixel
 // of the middle line (its crossing number), never a staircase's corner. The helpers run in the reading page, declared there.
 
+import { correlation } from "@gnoworld/core";
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
@@ -139,16 +140,6 @@ function spreadOf(values: readonly number[]): number {
   return Math.sqrt(meanOf(values.map((value) => (value - mean) ** 2))) / Math.max(mean, 1e-6);
 }
 
-function correlationOf(one: readonly number[], other: readonly number[]): number {
-  const [a, b] = [meanOf(one), meanOf(other)];
-  const [ab, aa, bb] = [
-    meanOf(one.map((value, at) => (value - a) * ((other[at] ?? b) - b))),
-    meanOf(one.map((value) => (value - a) ** 2)),
-    meanOf(other.map((value) => (value - b) ** 2)),
-  ];
-  return aa === 0 || bb === 0 ? 0 : ab / Math.sqrt(aa * bb);
-}
-
 function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lines[] {
   const { image, luma } = Reflect.get(globalThis, "__pixels") as Tools;
   return discs.map((disc) => {
@@ -176,7 +167,9 @@ function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lin
       width: meanOf(widths),
       widthSpread: spreadOf(widths),
       lightSpread: spreadOf(lights),
-      widthLight: correlationOf(widths, lights),
+      widthLight: (Reflect.get(globalThis, "correlation") as typeof correlation)(
+        widths.map((width, at) => [width, lights[at] ?? 0] as const),
+      ),
     };
   });
 }
@@ -193,7 +186,7 @@ const HELPERS = [
   straightOf,
   meanOf,
   spreadOf,
-  correlationOf,
+  correlation,
 ]
   .map(String)
   .join("\n");

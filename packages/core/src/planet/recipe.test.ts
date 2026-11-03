@@ -18,6 +18,7 @@ import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
 import { BARE, CONTINENTS_SEA, ofContinents, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
+import { correlation } from "../testing.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
 
 const EACH = 500;
@@ -99,14 +100,6 @@ function universe(): Map<string, number>[] {
       return places;
     }),
   );
-}
-
-function correlation(pairs: readonly (readonly [number, number])[]): number {
-  const mean = (at: 0 | 1) => pairs.reduce((sum, pair) => sum + pair[at], 0) / pairs.length;
-  const [mx, my] = [mean(0), mean(1)];
-  let [xy, xx, yy] = [0, 0, 0];
-  for (const [x, y] of pairs) [xy, xx, yy] = [xy + (x - mx) * (y - my), xx + (x - mx) ** 2, yy + (y - my) ** 2];
-  return xy / Math.sqrt(xx * yy);
 }
 
 function evenly(name: string, values: readonly number[]): void {

@@ -3,7 +3,7 @@
 // a hash each, never a chosen few), the Earth's own number beside it (its view at realism.spec's instant at a close world's zoom; its day
 // map, unlit, by latitude). Each main bound failed on 81e07949, whose numbers the comments give; "held" marks one that passed there too.
 
-import { ANCHORS, type Surface } from "@gnoworld/core";
+import { ANCHORS, correlation, type Surface } from "@gnoworld/core";
 import { climatesOn, mapClimateOn, type Climate, type Pole } from "./climates.ts";
 import { shoresOn, type Shore } from "./coasts.ts";
 import { expect, test, type Page } from "./fixtures.ts";
@@ -61,13 +61,6 @@ const ENOUGH = 64;
 const quantile = (values: readonly number[], at: number) =>
   [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(at * values.length))] ?? 0;
 const hueOf = ([, a, b]: readonly number[]) => (Math.atan2(b ?? 0, a ?? 0) * 180) / Math.PI;
-function correlation(pairs: readonly (readonly [number, number])[]): number {
-  const mean = (at: 0 | 1) => pairs.reduce((sum, pair) => sum + pair[at], 0) / Math.max(pairs.length, 1);
-  const [mx, my] = [mean(0), mean(1)];
-  let [xy, xx, yy] = [0, 0, 0];
-  for (const [x, y] of pairs) [xy, xx, yy] = [xy + (x - mx) * (y - my), xx + (x - mx) ** 2, yy + (y - my) ** 2];
-  return xx === 0 || yy === 0 ? 0 : xy / Math.sqrt(xx * yy);
-}
 
 interface Earth {
   readonly shore: Shore;
