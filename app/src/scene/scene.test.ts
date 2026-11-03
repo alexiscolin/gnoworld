@@ -48,6 +48,7 @@ interface FlightDeviceSeen {
 }
 const flight = vi.hoisted(() => ({
   made: [] as FlightDeviceSeen[],
+  cosmos: [] as { readonly sight: unknown }[],
   fly: vi.fn<(goal: unknown) => void>(),
   ready: vi.fn<() => void>(),
   advance: vi.fn<(delta: number) => void>(),
@@ -88,8 +89,9 @@ vi.mock("./cosmos/cosmos.ts", () => ({
   },
 }));
 vi.mock("./flight/flights.ts", () => ({
-  flightsOn: (device: FlightDeviceSeen) => {
+  flightsOn: (device: FlightDeviceSeen, cosmos: { readonly sight: unknown }) => {
     flight.made.push(device);
+    flight.cosmos.push(cosmos);
     return {
       fly: flight.fly,
       ready: flight.ready,
@@ -1455,6 +1457,22 @@ describe("the Earth", () => {
 });
 
 describe("flights (7g)", () => {
+  // A page without the cosmos: its eye still holds the last sight, which a click would aim with (lot B's review, F3718).
+  it("gives the flights no sight of a cosmos the page does not show, though the eye still holds the last one", async () => {
+    const scene = startScene(options(), clock);
+    await vi.dynamicImportSettled();
+    const [device] = flight.made;
+    const held = flight.cosmos.at(-1);
+    if (device === undefined || held === undefined) throw new Error("no flights' chunk");
+    const sight = { systems: () => [] };
+    Object.assign(device.eye, { sight });
+    scene.cosmos([]);
+    expect(held.sight).toBe(sight);
+    scene.cosmos(undefined);
+    expect(held.sight).toBeUndefined();
+    scene.dispose();
+  });
+
   const opened = async () => {
     const scene = startScene(options(), clock);
     await vi.dynamicImportSettled();

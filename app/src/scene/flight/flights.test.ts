@@ -346,8 +346,12 @@ describe("the jump to a star", () => {
 });
 
 describe("aiming at a star", () => {
-  it("goes to the star nearest a click on space within 24 pixels, and to none 30 pixels off", () => {
-    const scene = rig();
+  // The scene's camera always turns to the Earth: a projection that left the turn out passed on the identity (lot A's review, F3710).
+  it.each([
+    ["looking straight ahead", { yaw: 0, pitch: 0 }],
+    ["turned as the camera turns to the Earth", { yaw: 0.6, pitch: -0.25 }],
+  ])("goes to the star nearest a click on space within 24 pixels, and to none 30 pixels off, %s", (_, turn) => {
+    const scene = rig(turn);
     const flown = flights(scene.device);
     const spots = starsOnScreen(scene);
     const lone = spots.find((spot) =>
@@ -516,6 +520,22 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     document.body.append(make());
     escape();
     expect(flown.stats().flying).toBe(false);
+  });
+
+  // A chained flight that started its look from the Earth snapped the camera on its first frame (lot A's review, F3713).
+  it("starts a new flight looking where the eye looks, the camera turning less than 0.05 radians on its first frame", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "star", id: pick(scene, 3).id });
+    run(flown, scene, 0.8);
+    const facing = () => {
+      const [from, look] = [scene.placed(), scene.eye.look ?? scene.placed()];
+      return new Vector3(look.x - from.x, look.y - from.y, look.z - from.z).normalize();
+    };
+    const before = facing();
+    flown.fly({ kind: "star", id: pick(scene, 9).id });
+    frame(flown, scene);
+    expect(before.angleTo(facing())).toBeLessThan(0.05);
   });
 
   it("starts a new flight from where the eye is, with no jump", () => {
@@ -815,6 +835,21 @@ describe("what a flight gives back", () => {
     flown.fly({ kind: "star", id: pick(scene).id });
     run(flown, scene, 4);
     expect(flown.stats().flying).toBe(false);
+  });
+
+  // A listener left on the window kept a disposed scene alive: none is reached once the flights are gone (lot A's review, F3712).
+  it("lets go of the window's keys, presses and clicks once disposed: none of them reads the cosmos or the look", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.dispose();
+    const cosmos = vi.spyOn(scene.device, "cosmos");
+    const look = vi.fn<() => Point | undefined>(() => HOME);
+    Object.defineProperty(scene.eye, "look", { get: look, configurable: true });
+    escape();
+    press();
+    click(document.body, WIDTH / 2, HEIGHT / 2);
+    expect(cosmos).not.toHaveBeenCalled();
+    expect(look).not.toHaveBeenCalled();
   });
 
   it("takes its streaks off the stage and frees them, frees its veil, and hears no key once disposed", () => {
