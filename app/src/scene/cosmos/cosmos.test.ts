@@ -3403,13 +3403,16 @@ describe("a system's arrival (7d3)", () => {
     }
   });
 
+  // Each way as far as the view's room says (the design review's second pass, F4468): gnoswap's leans a quarter as far to the right, where
+  // its pool left under the ticker.
   it("leans half as far at an arrival as at home: the eye nearer what it looks at", async () => {
     const { scene, arrival } = await atGnoswap();
     const { to } = await arrived(scene, GNOSWAP);
     scene.cosmos.tick({ x: to.x + LEAN, y: to.y + LEAN, z: to.z }, 0);
     const moved = new Vector3().copy(scene.cosmos.stats().eye).sub(onStage(arrival.eye));
-    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN, 6);
-    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(arrival.room?.right).toBeLessThan(1);
+    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN * (arrival.room?.right ?? 1), 6);
+    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN * (arrival.room?.up ?? 1), 6);
     expect(moved.z).toBeCloseTo(0, 6);
   });
 

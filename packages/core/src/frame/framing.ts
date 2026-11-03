@@ -6,7 +6,17 @@ import { drawnOf, type Postcard } from "./postcard.ts";
 import type { Point } from "../space/cell.ts";
 import { ARRIVAL_LEAN } from "../space/drift.ts";
 import { CENTRE, toMap } from "./disc.ts";
-import { along, CARD_ZONE, cameraTowards, placeOf, STAR_HEART, type Camera, type Look, type Seen } from "./restLook.ts";
+import {
+  along,
+  CARD_ZONE,
+  cameraTowards,
+  looksFrom,
+  placeOf,
+  STAR_HEART,
+  type Camera,
+  type Look,
+  type Seen,
+} from "./restLook.ts";
 
 // The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more at rest (the depth's own,
 // depth.ts) and 1.35 through the sway, where of Onyx's six systems that stand six worlds none held 1.5 at every corner (F4468); a tenth of
@@ -53,6 +63,35 @@ export function leaned(camera: Camera, [across, up]: readonly [number, number], 
   const by: Point = { x: 0, y: 0, z: 0 };
   toMap({ x: CENTRE.x + across * ARRIVAL_LEAN, y: CENTRE.y + up * ARRIVAL_LEAN, z: CENTRE.z }, by);
   return cameraTowards(along(camera.eye, by, 1), at);
+}
+
+/** How far a mouse may lean the eye across and up the stage, as shares of the dynamic view's lean. */
+export interface LeanRoom {
+  readonly right: number;
+  readonly left: number;
+  readonly up: number;
+  readonly down: number;
+}
+
+/** How far a mouse may lean the eye from `camera` each way, keeping the nearest world of `card` in the frame's room: the whole lean, else a
+ * fifth less at a time, none under a fifth; each way on its own, then each corner both its ways less till it holds. */
+export function roomOf(camera: Camera, card: Card): LeanRoom {
+  const room = { right: 1, left: 1, up: 1, down: 1 };
+  // The nearest keeps a seventh of itself each way under the header and over the ticker, 34 px of 1,080 (gnoswap's pool, cut by the foot,
+  // keeps a third at rest), on each screen: a mouse's lean moved it under the ticker (F4468).
+  const kept = (across: number, up: number) =>
+    looksFrom(leaned(camera, [across, up], card.system.place)).every((look) => {
+      const [near] = seenOf(look, card).worlds;
+      return near === undefined || leastShown(look, near, 1 - 34 / 1080) >= 0.15;
+    });
+  for (const [across, up] of LEANS) {
+    const [x, y] = [across < 0 ? "left" : "right", up < 0 ? "down" : "up"] as const;
+    let share = 1;
+    while (share > 0 && !kept(across * room[x] * share, up * room[y] * share)) share = share > 0.2 ? share * 0.8 : 0;
+    room[x] *= across === 0 ? 1 : share;
+    room[y] *= up === 0 ? 1 : share;
+  }
+  return room;
 }
 
 const offHeart = (spot: Seen, star: Seen) => Math.hypot(spot.x - star.x, spot.y - star.y) - spot.radius >= STAR_HEART;

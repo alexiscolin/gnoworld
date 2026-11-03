@@ -785,6 +785,51 @@ describe("a system's dynamic view's rocks (7v)", () => {
     expect(laid).toBeGreaterThanOrEqual(0.8 * cases.length);
   });
 
+  // The least share of its nearest a view's leans keep each way in the frame's room on `screen`, under the header and over the ticker (34
+  // px of 1,080), each way of the lean as far as the view's room says; none where its top goes under the header.
+  const leanKept = (arrival: Arrival, screen: (typeof REST_SCREENS)[number]) => {
+    const room = arrival.room ?? { right: 1, left: 1, up: 1, down: 1 };
+    const [top, bottom] = [0.09 * screen.height, screen.height - (34 * screen.height) / 1080];
+    const shares = LEANED.map(([across, upward]) => {
+      const by = { x: NaN, y: NaN, z: NaN };
+      const [x, y] = [across * (across >= 0 ? room.right : room.left), upward * (upward >= 0 ? room.up : room.down)];
+      toMap({ x: CENTRE.x + x * ARRIVAL_LEAN, y: CENTRE.y + y * ARRIVAL_LEAN, z: CENTRE.z }, by);
+      const [near] = nearestFirst(cameraOf(arrival, screen, by), arrival);
+      if (near === undefined) return 1;
+      const shown = (Math.min(near.right, screen.width) - Math.max(near.left, 0)) / (near.right - near.left);
+      const up = (Math.min(near.bottom, bottom) - Math.max(near.top, top)) / (near.bottom - near.top);
+      return near.top >= top - 1e-9 ? Math.min(shown, up) : 0;
+    });
+    return Math.min(...shares);
+  };
+
+  // The design review's second pass (F4468; the chief): at a mouse's lean to the right gnoswap's pool left under the ticker, a sliver. Each
+  // way of a view's lean, across and up, is clamped so its nearest keeps a seventh of itself each way in the frame's room at every corner.
+  it(
+    "clamps each view's lean so its nearest stays in the frame's room, never under the ticker or the header, Onyx's too",
+    () => {
+      const onyx = systemsOf(
+        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
+          id,
+          namespace,
+          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
+        })),
+      );
+      let clamped = 0;
+      for (const { system, systems } of [...allCases(), ...onyx.map((one) => ({ system: one, systems: onyx }))]) {
+        const arrival = arrivalOf(system, systems);
+        if (Object.values(arrival.room ?? {}).some((share) => share < 1)) clamped += 1;
+        for (const screen of REST_SCREENS) {
+          const [rest] = nearestFirst(cameraOf(arrival, screen), arrival);
+          if (rest !== undefined && cutByFrame(rest, screen, 0))
+            expect(leanKept(arrival, screen), system.id).toBeGreaterThanOrEqual(0.15 - 1e-9);
+        }
+      }
+      expect(clamped).toBeGreaterThan(0);
+    },
+    WHOLE_SEARCHES,
+  );
+
   // The chief, after the design review's second pass (F4468, the mock-up wins): the nearest is cut where two others stand whole beside it;
   // a view of two stands both whole rather than one cut beside one (14 of the mixed set's views and 2 of Onyx's cut so before).
   it(

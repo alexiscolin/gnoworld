@@ -7,7 +7,7 @@ import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { SWAY_CORNERS } from "../space/drift.ts";
 import { onPlane } from "./disc.ts";
 import { HALO_FAR, haloAt } from "./halo.ts";
-import { frames, leaned, LEANS, seenOf, type Card } from "./framing.ts";
+import { frames, leaned, LEANS, roomOf, seenOf, type Card, type LeanRoom } from "./framing.ts";
 import { postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
 import {
   along,
@@ -32,6 +32,8 @@ export interface Arrival {
   readonly lens?: number;
   readonly up?: Point;
   readonly lean?: number;
+  /** How far a mouse may lean the eye each way across and up the stage, as shares of the view's lean (F4468): all where none. */
+  readonly room?: LeanRoom;
 }
 
 // The lean lives beside the mouse's, where the view at rest's eye reads it without this module.
@@ -147,8 +149,10 @@ function firstHolding(system: StarSystem, worlds: readonly Orbiter[], asked: Ask
       const camera = cameraOf(still, angle, reach * distance);
       const shape = shapeOf(still, worlds, camera);
       if (shape.worlds.length !== worlds.length || Math.abs(camera.ahead.y) > STEEP) continue;
-      if (holds(camera, shape, asked))
-        return { eye: camera.eye, look: system.place, postcard: postcardFrom(still, worlds, camera) };
+      if (holds(camera, shape, asked)) {
+        const postcard = postcardFrom(still, worlds, camera);
+        return { eye: camera.eye, look: system.place, postcard, room: roomOf(camera, shape) };
+      }
     }
   return undefined;
 }
