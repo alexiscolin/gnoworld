@@ -1,9 +1,18 @@
 // The Earth, its one Moon and the golden ring, as one group: what the view stands on the stage. It owns all of it, the maps included.
-import { Group, SphereGeometry, Vector3, type Euler, type Mesh, type Texture, type Object3D } from "three";
+import {
+  Group,
+  SphereGeometry,
+  Vector3,
+  type BufferGeometry,
+  type Euler,
+  type Mesh,
+  type Object3D,
+  type Texture,
+} from "three";
 import { Disposer } from "../disposer.ts";
 import { starAt } from "../planet/light.ts";
 import { freeMap } from "../planet/maps.ts";
-import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
+import { createPlanet, LIMB_LIGHT, type HandMade, type Planet } from "../planet/planet.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { Ground } from "./ground.ts";
 import { EARTH, GROUND_TO_MAP, MOON } from "./look.ts";
@@ -17,6 +26,35 @@ const MOON_RADIUS = 0.085;
 // Frame 4's Moon, 13 pixels on a 47-pixel Earth: its own size would be two pixels at this distance.
 const FAR_MOON_RADIUS = 0.27;
 const ANISOTROPY = 16;
+
+// The Earth or its Moon on its own map, turned as the ground is. One surface a set: no ring is drawn here, and the shader never reads what
+// the flag keeps shut.
+function handMade(look: HandMade, { surface, clouds, night }: HandMaps, sphere: BufferGeometry): Planet {
+  const planet = createPlanet(
+    look,
+    { map: () => surface, clouds, ring: clouds, ...(night === undefined ? {} : { night }) },
+    sphere,
+  );
+  const spin = planet.surface.uniforms["spin"];
+  if (spin !== undefined) spin.value = GROUND_TO_MAP;
+  return planet;
+}
+
+interface HandMaps {
+  readonly surface: Texture;
+  readonly clouds: Texture;
+  readonly night?: Texture;
+}
+
+// The Earth on its day, night and clouds, its rim lit by hand.
+function earthPlanet(
+  { day, clouds, night }: Pick<EarthMaps, "day" | "clouds" | "night">,
+  sphere: BufferGeometry,
+): Planet {
+  const earth = handMade(EARTH, { surface: day, clouds, night }, sphere);
+  earth.setLimb(LIMB_LIGHT);
+  return earth;
+}
 
 export class Globe {
   readonly #owner = new Disposer();
@@ -40,20 +78,12 @@ export class Globe {
     this.mapWidth = (maps.day.image as { width: number }).width;
     const sphere = this.#owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
     const { clouds } = maps;
-    this.#earth = this.#owner.add(createPlanet(EARTH, this.#set(maps.day, clouds, maps.night), sphere));
-    this.#earth.setLimb(LIMB_LIGHT);
-    this.moon = this.#owner.add(createPlanet(MOON, this.#set(maps.moon, clouds), sphere));
+    this.#earth = this.#owner.add(earthPlanet(maps, sphere));
+    this.moon = this.#owner.add(handMade(MOON, { surface: maps.moon, clouds }, sphere));
     this.moon.group.scale.setScalar(MOON_RADIUS);
-    for (const { surface } of [this.#earth, this.moon])
-      if (surface.uniforms["spin"] !== undefined) surface.uniforms["spin"].value = GROUND_TO_MAP;
     this.#orbit = this.#owner.add(createOrbit());
     this.ground = this.#owner.add(new Ground());
     this.group.add(this.ground.mesh, this.#earth.group, this.#orbit.group, this.moon.group, this.#orbit.glow);
-  }
-
-  // One surface a set: no ring is drawn here, and the shader never reads what the flag keeps shut.
-  #set(surface: Texture, clouds: Texture, night?: Texture): MapSet {
-    return { map: () => surface, clouds, ring: clouds, ...(night === undefined ? {} : { night }) };
   }
 
   /** The Earth's lean, which every point of its ground takes. */
