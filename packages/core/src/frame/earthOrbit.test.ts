@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EARTH_PLACE, EARTH_RADIUS, GRAIN } from "../cosmos/system.ts";
+import { worldLook } from "../planet/look.ts";
 import { earthLinksOf, earthSystemOf } from "./earthOrbit.ts";
 
 // What turns round the Earth (7v; Alexis, 2026-11-03): the Earth is no namespace; round it turn the projects the team adds by hand, even with
@@ -52,6 +53,19 @@ describe("what turns round the Earth", () => {
     expect(earthSystemOf([...SIX.slice(1), ...ONE]).worlds.find(({ id }) => id === first?.id)).toEqual(first);
     const places = earthSystemOf(SIX).worlds.map(({ orbit, phase }) => `${orbit.toFixed(2)} ${phase.toFixed(2)}`);
     expect(new Set(places).size).toBe(SIX.length);
+  });
+
+  // 7v's review (F4453): a world's look reads its id as ASCII and throws past it, so "Café" made every look at the home throw.
+  it("gives a project of any name an id of ASCII alone, which a world's look reads, and its link the same id", () => {
+    const names = ["Café", "gnō", "Gnosh — AI", "日本"];
+    const earth = earthSystemOf(names.map((name) => ({ name })));
+    expect(new Set(earth.worlds.map(({ id }) => id)).size).toBe(names.length);
+    for (const { id } of earth.worlds) {
+      expect(id).toMatch(/^~earth\/[\x21-\x7e]+$/);
+      expect(() => worldLook(id)).not.toThrow();
+    }
+    const links = earthLinksOf(names.map((name) => ({ name, url: "https://p.example" })));
+    expect([...links.keys()]).toEqual(earth.worlds.map(({ id }) => id));
   });
 
   // Its light is the great star's, the map's origin, not its own place: the Earth is no star (7v's review).

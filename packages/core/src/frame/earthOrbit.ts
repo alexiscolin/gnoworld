@@ -19,8 +19,9 @@ const SMALLEST = 0.25;
 const LARGEST = 0.32;
 // The most projects a view of the Earth stands, the file's first: a Plan's twelve (plan.ts).
 const MOST = 12;
-// A project's id: a tilde stands in no realm's path, so no namespace `earth` of a chain shares it.
-const idOf = (name: string) => `~earth/${name}`;
+// A project's id: a tilde stands in no realm's path, so no namespace `earth` of a chain shares it; its name escaped to ASCII, which a
+// world's look reads (7v's review, F4453).
+const idOf = (name: string) => `~earth/${encodeURIComponent(name)}`;
 
 /** The Earth as what turns round it: its place, the disc's plane, lit by the great star, and each of the file's first twelve projects a
  * small body at the place its name gives. */
