@@ -9,7 +9,7 @@ import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, pic
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
-import { facesApart, facesOn, GLANCE, grain, landOn, rows, type Face } from "./textures.ts";
+import { facesApart, facesOn, GLANCE, grain, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
@@ -57,12 +57,6 @@ const CALDERA = [0.2, 0.5] as const;
 const WARM_LIMB = 2;
 // The air's ring brighter than space past it, or a ring not drawn would read as no colour at all.
 const AIR_LIGHT = 20;
-// Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
-// (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
-// world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
-const CONTINENT = 0.7;
-const LAND = [0.3, 0.6] as const;
-const ALL_SEA = 0.05;
 // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre ... unique et bien reconnaissable"): its sea's
 // or its land's colour or its cloud cover a glance apart (textures.ts's GLANCE). The Earth: its close view at realism.spec's instant.
 
@@ -269,16 +263,5 @@ test.describe("the generated worlds polished", () => {
         sea >= GLANCE.colour || land >= GLANCE.colour || clouds >= GLANCE.clouds,
         `world ${String(at)}: sea ${sea.toFixed(1)}, land ${land.toFixed(1)}, clouds ${clouds.toFixed(2)} from the Earth's`,
       ).toBe(true);
-  });
-
-  test("24 temperate worlds hold continents, as the Earth does, not islands (F4243)", async ({ page }) => {
-    await open(page, ofClass("temperate"));
-    const land = await landOn(page, await picture(page), await circles(page));
-    test.info().annotations.push({ type: "land", description: JSON.stringify(land) });
-    expect(median(land.map(({ largest }) => largest)), "one large piece").toBeGreaterThanOrEqual(CONTINENT);
-    expect(median(land.map(({ share }) => share)), "land").toBeGreaterThanOrEqual(LAND[0]);
-    expect(median(land.map(({ share }) => share)), "and sea").toBeLessThanOrEqual(LAND[1]);
-    for (const [at, { share }] of land.entries())
-      expect(share, `world ${String(at)}: some land`).toBeGreaterThan(ALL_SEA);
   });
 });

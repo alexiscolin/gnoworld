@@ -11,7 +11,7 @@ import { SPIN } from "./surfaceShader.ts";
 const UNIFORMS = /* glsl */ `
 struct Shape {
   float scale, lacunarity, roughness, warp, erosion, craters, sea, caps, rifts;
-  float bands, turbulence, storms, clouds, drift, detail, halves, mix, octaves;
+  float bands, turbulence, storms, clouds, drift, detail, halves, mix, gather, octaves;
 };
 uniform Shape shape;
 uniform sampler2D minorMap;
@@ -44,7 +44,8 @@ void main() {
   Lookup place = lookupOf(direction);
   vec3 own = detailOf(surface, place);
   vec3 other = own;
-  if (minorShare > 0.002 && banded < 0.5) {
+  bool continents = shape.sea > 0.0 && shape.sea < 0.8;
+  if (minorShare > 0.002 && banded < 0.5 && !continents) {
     Lookup elsewhere = lookupOf(spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy));
     other = detailOf(minorMap, elsewhere);
   }
@@ -66,17 +67,20 @@ void main() {
     float big = shape.craters > 0.0 ? cratersAt(round, shape.scale * 4.0, pixel) : 0.0;
     cratered = shape.craters > 0.0 ? big + 0.5 * cratersAt(round, shape.scale * 13.0, pixel) : 0.0;
     t = shareOf(ground.wy);
-    if (shape.sea > 0.0 && shape.sea < 0.8) {
-      vec4 land = fbm(p, shape.scale, pixel, 0.0, 3.0);
-      t = shareOf(vec2(0.92 * land.w / land.y + 0.4 * ground.w / ground.y, 1.0));
-    }
     broad = ground.z / ground.y;
     fray = (ground.x - ground.z) / ground.y;
     height = ground.x / ground.y + cratered * 0.8;
     relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.012, 0.03, shape.scale * 4.0 * pixel));
+    if (continents) {
+      vec4 land = fbm(p, 0.6 + 4.4 * (1.0 - shape.gather), pixel, 0.0, 3.0);
+      float coarse = land.w / land.y - 0.18 + 0.9 * smoothstep(0.6, 1.0, shape.gather) * dot(at, normalize(offset - 8.0));
+      float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702;
+      float near = 1.0 - smoothstep(0.0, above > 0.0 ? 0.5 : 1.1, abs(above));
+      t = shareOf(vec2(coarse + (0.5 - 0.2 * shape.gather + 0.5 * near) * ground.w / ground.y + 2.5 * near * fray, 1.0));
+    }
   }
   float minor = 0.0;
-  if (minorShare > 0.002) {
+  if (minorShare > 0.002 && !continents) {
     vec4 patches = fbm(at + minorOffset, shape.mix, pixel, 0.0, 3.0);
     float pole = (abs(axis.y) - 0.5) * 3.46 * sign(minorOffset.x - 8.0);
     float z = (patches.x / patches.y + 0.7 * broad + 0.4 * pole) * 0.77 + 1.2 * fray;
@@ -96,14 +100,24 @@ void main() {
     molten = shareOf(vec2(0.35 * crackle - height, 1.3));
   }
   float wet = 0.0;
+  float shore = t;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
     wet = 1.0 - smoothstep(shape.sea - coast, shape.sea + coast, t);
     t = clamp((t - shape.sea) / max(1.0 - shape.sea, 0.001), 0.0, 1.0);
   }
   float tint = mix(0.7, t, 0.8);
+  float bare = tint;
+  if (continents) {
+    float lat = abs(axis.y) + 0.2 * flow.x + 0.1 * broad;
+    float cold = lat + 0.15 * t + 1.8 * shape.caps;
+    float dry = 1.0 - smoothstep(0.06, 0.22, abs(lat - 0.42)) + 2.5 * minorShare - 0.6 + 0.45 * flow.z + 0.35 * t;
+    minor = max(smoothstep(0.5, 0.8, dry), smoothstep(1.1, 1.2, cold));
+    tint = clamp(0.15 + 0.9 * dry, 0.0, 1.0);
+    bare = 1.0 - smoothstep(0.6, 1.0, cold);
+  }
   vec3 major = rampOf(low, mid, high, tint);
-  vec3 second = rampOf(minorLow, minorMid, minorHigh, tint);
+  vec3 second = rampOf(minorLow, minorMid, minorHigh, bare);
   float matched = max(step(0.001, glowLevel), banded > 0.5 ? 0.6 : 1.0 - smoothstep(0.028, 0.036, dot(mid, LUMA)));
   second *= mix(1.0, dot(major, LUMA) / max(dot(second, LUMA), 1e-4), matched);
   vec3 albedo = mix(major, second, minor);
@@ -112,7 +126,7 @@ void main() {
   albedo *= mix(vec3(1.0), detail, min(shape.detail * 2.0, 1.0)) * (1.0 + 0.25 * clamp(cratered, -1.0, 1.0));
   if (style > 1.5) albedo = mix(albedo, sulfurLow * 1.2, smoothstep(0.9, 0.97, molten));
   if (shape.sea > 0.0) {
-    float depth = smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
+    float depth = continents ? smoothstep(0.0, 0.05, (shape.sea - shore) / shape.sea) : smoothstep(0.0, 0.6, (shape.sea - shareOf(vec2(height, 1.0))) / shape.sea);
     albedo = mix(albedo, mix(seaShallow, seaDeep, depth), wet);
   }
   if (shape.caps > 0.0) {

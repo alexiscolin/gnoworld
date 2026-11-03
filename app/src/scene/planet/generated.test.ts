@@ -163,6 +163,14 @@ describe("a generated world, drawn from its recipe", () => {
         expect(`${SURFACE_VERTEX}\n${GENERATED_FRAGMENT}`, name).toMatch(new RegExp(`uniform \\w+ [^;]*\\b${name}\\b`));
   });
 
+  it("declares every surface value in the program's own struct, under its own name", () => {
+    const struct = GENERATED_FRAGMENT.slice(
+      GENERATED_FRAGMENT.indexOf("struct Shape {"),
+      GENERATED_FRAGMENT.indexOf("};"),
+    );
+    for (const name of [...NAMES, "gather"]) expect(struct, name).toMatch(new RegExp(`float [^;]*\\b${name}\\b`));
+  });
+
   // Ganymede's lanes (7b6's held details, 7b7): grooved ice alone cuts grooves, by a value its look hands the one program.
   it("marks grooved ice's lanes by value, on that class alone", () => {
     for (const anchor of ANCHORS)
@@ -369,9 +377,11 @@ describe("the generated program", () => {
     expect(sky.slice(0, sky.indexOf("\n}\n"))).toMatch(/\), 2\.19\);/);
   });
 
-  // F4233: no minor, or a banded world, reads no minor's map.
+  // F4233: no minor, or a banded world, reads no minor's map; nor a world of continents, whose bare ground its climate places (7b8).
   it("reads the minor's map only where a minor shows on a ground", () => {
-    expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && banded < 0\.5\) \{[^}]*detailOf\(minorMap/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(minorShare > 0\.002 && banded < 0\.5 && !continents\) \{[^}]*detailOf\(minorMap/,
+    );
   });
 
   // F4238: relief shaded from screen derivatives comes out in 2x2 blocks wherever it holds detail under a few pixels: the relief keeps
@@ -438,7 +448,55 @@ describe("the generated program", () => {
   // F4335: an ocean world's continents would leave its close view open sea: a sea of 0.8 or more keeps its archipelagos, the ground's
   // own field; a temperate world's sea (0.55 to 0.78) gathers its land in continents.
   it("gathers land in continents only where the sea leaves room for them", () => {
-    expect(GENERATED_FRAGMENT).toContain("if (shape.sea > 0.0 && shape.sea < 0.8) {");
+    expect(GENERATED_FRAGMENT).toContain("bool continents = shape.sea > 0.0 && shape.sea < 0.8;");
+    expect(GENERATED_FRAGMENT).toMatch(/if \(continents\) \{\n {6}vec4 land = fbm\(/);
+  });
+
+  // Temperate worlds varied (7b8; Alexis, 2026-11-03, "formes variées"): the same sea makes one supercontinent, a few continents or an
+  // archipelago, by the seed's gather: its continents' scale, coarse to fine, and past 0.6 of it the land leaning to one side of the world.
+  it("gathers a world's continents at its seed's scale, an archipelago to one supercontinent", () => {
+    expect(GENERATED_FRAGMENT).toMatch(
+      /vec4 land = fbm\(p, 0\.[4-8]\d* \+ [2-4]\.\d+ \* \(1\.0 - shape\.gather\), pixel, 0\.0, 3\.0\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float coarse = land\.w \/ land\.y - 0\.\d+ \+ [0-2]\.\d+ \* smoothstep\(0\.[5-8]\d*, 1\.0, shape\.gather\) \* dot\(at, normalize\(offset - 8\.0\)\);/,
+    );
+  });
+
+  // Sharp coasts with islands (7b8; Alexis, 2026-11-03, "côtes nettes et îles"): every octave of the ground down to the pixel breaks the
+  // coast, weighed up near the sea's level, where it can move it, so gulfs, peninsulas and islands cut it at every zoom; the shallow
+  // shelf follows the coast within a few hundredths of the sea's share, never a wide halo.
+  it("breaks a coast with the ground's octaves to the pixel, weighed up near the sea's level, its shelf kept to the coast", () => {
+    expect(GENERATED_FRAGMENT).toContain("float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702;");
+    // Narrower on the land's side, so the coast's noise raises islands off it more than lakes in it.
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float near = 1\.0 - smoothstep\(0\.0, above > 0\.0 \? 0\.\d+ : 1\.\d+, abs\(above\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /t = shareOf\(vec2\(coarse \+ \([^;]* \* near\) \* ground\.w \/ ground\.y \+ [1-9][\d.]* \* near \* fray, 1\.0\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toContain("float shore = t;");
+    expect(GENERATED_FRAGMENT).toMatch(
+      /continents \? smoothstep\(0\.0, 0\.0\d+, \(shape\.sea - shore\) \/ shape\.sea\)/,
+    );
+  });
+
+  // Climates by latitude and by seed (7b8; Alexis, 2026-11-03, "climats par latitude"): bare ground where it is dry, in a belt about the
+  // tropics (sin 0.42, 25 degrees) wandering with the flow, and where it is cold, poleward, high or on an icy world; the seed's minor share
+  // tilts the whole world drier. Plants run from deep forest where wet to dry grass; bare ground from tundra where cold to sand where hot.
+  it("lays a world of continents' climate by latitude, its bare ground where dry or cold, never in pasted patches", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && !continents\) \{\n {4}vec4 patches/);
+    expect(GENERATED_FRAGMENT).toMatch(/float lat = abs\(axis\.y\) \+ [\d.]+ \* flow\.x \+ [\d.]+ \* broad;/);
+    expect(GENERATED_FRAGMENT).toMatch(/float cold = lat \+ [\d.]+ \* t \+ [1-9][\d.]* \* shape\.caps;/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float dry = 1\.0 - smoothstep\([\d.]+, [\d.]+, abs\(lat - 0\.4\d*\)\) \+ [\d.]+ \* minorShare/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /minor = max\(smoothstep\([\d.]+, [\d.]+, dry\), smoothstep\([\d.]+, [\d.]+, cold\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(/tint = clamp\([\d.]+ \+ [\d.]+ \* dry, 0\.0, 1\.0\);/);
+    expect(GENERATED_FRAGMENT).toMatch(/bare = 1\.0 - smoothstep\([\d.]+, [\d.]+, cold\);/);
+    expect(GENERATED_FRAGMENT).toContain("vec3 second = rampOf(minorLow, minorMid, minorHigh, bare);");
   });
 
   it("carves only the finer octaves, their crease rounded", () => {

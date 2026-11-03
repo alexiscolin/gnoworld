@@ -5,7 +5,7 @@ import { reading, type Tools } from "./pixels.ts";
 
 // How a world's ground is ordered on a still: in 24-pixel tiles of its lit ground, the structure tensor of the lightness with its broad
 // shading taken out (how much of a tile runs one way, and which way), and along that way the lightness's own echo (an autocorrelation:
-// parallel grooves echo at their spacing); and its land (neither sea nor dark) as pieces.
+// parallel grooves echo at their spacing); and its face, its sea's and its land's colours (coasts.ts reads its land in pieces).
 export interface Grain {
   /** Of the bright tiles (a grooved world's lanes) coherent past 0.5, the share whose direction stands 45 degrees or more from their
    * commonest. */
@@ -36,11 +36,6 @@ export const facesApart = (face: Face, other: Face) => ({
   land: apartIn(shownPart(face, "land"), shownPart(other, "land")),
   clouds: Math.abs(face.clouds - other.clouds),
 });
-export interface Land {
-  readonly share: number;
-  /** The share of the land in its largest piece. */
-  readonly largest: number;
-}
 interface Tile {
   readonly coherence: number;
   readonly angle: number;
@@ -147,7 +142,7 @@ function rowsOf(discs: readonly Circle[]): number[] {
 
 // A pixel by its colour: cloud where it is pale (past L* 55, under 8 of chroma), which is neither land nor sea; sea where its blue leads its
 // red and green; else land.
-function colourKind(px: number, py: number): "sea" | "land" | "cloud" {
+export function colourKind(px: number, py: number): "sea" | "land" | "cloud" {
   const { image, rgbAt, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
   const [lightness, a, b] = labAt(image, px, py);
   if (lightness > 55 && Math.hypot(a, b) < 8) return "cloud";
@@ -161,39 +156,8 @@ function kindOf({ x, y, r }: Circle, px: number, py: number): "sea" | "land" | "
   if ((px - x) ** 2 + (py - y) ** 2 > (0.9 * r) ** 2 || luma(image, px, py) <= 25) return null;
   return colourKind(px, py);
 }
-// kindOf with what it calls, as a reading page's helpers.
-const KINDS = [colourKind, kindOf].map(String).join("\n");
-
-// Land's pieces join by their sides.
-function landOf(discs: readonly Circle[]): Land[] {
-  return discs.map((disc) => {
-    const { x, y, r } = disc;
-    const [x0, y0, w] = [Math.ceil(x - r), Math.ceil(y - r), Math.floor(2 * r)];
-    const [land, seen] = [new Uint8Array(w * w), new Uint8Array(w * w)];
-    let lit = 0;
-    for (let i = 0; i < w * w; i++) {
-      const kind = kindOf(disc, x0 + (i % w), y0 + Math.floor(i / w));
-      if (kind === null || kind === "cloud") continue;
-      lit += 1;
-      land[i] = kind === "land" ? 1 : 0;
-    }
-    const sizes = [...land.keys()]
-      .filter((i) => land[i] === 1)
-      .map((start) => {
-        let size = 0;
-        const stack = seen[start] === 1 ? [] : [start];
-        seen[start] = 1;
-        for (let at = stack.pop(); at !== undefined; at = stack.pop()) {
-          size += 1;
-          for (const next of [at - 1, at + 1, at - w, at + w])
-            if (land[next] === 1 && seen[next] !== 1) [seen[next], stack[stack.length]] = [1, next];
-        }
-        return size;
-      });
-    const total = sizes.reduce((sum, size) => sum + size, 0);
-    return { share: total / Math.max(lit, 1), largest: Math.max(0, ...sizes) / Math.max(total, 1) };
-  });
-}
+/** kindOf with what it calls, as a reading page's helpers. */
+export const KINDS = [colourKind, kindOf].map(String).join("\n");
 
 export const grain = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Grain[]> =>
   reading(page, [picture], [grainOf, discs, HELPERS]);
@@ -227,5 +191,3 @@ function facesOf(discs: readonly Circle[]): Face[] {
 
 export const facesOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Face[]> =>
   reading(page, [picture], [facesOf, discs, KINDS]);
-export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
-  reading(page, [picture], [landOf, discs, KINDS]);
