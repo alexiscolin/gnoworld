@@ -3,10 +3,12 @@
 // sees the same rocks, the nearer larger, and slide with the eye as it moves; never over the Earth, a body or the room of its label. In the
 // depth's chunk: it reads the view through the judge `deep.ts` makes of it.
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { SWAY } from "../space/drift.ts";
+import { SWAY, SWAY_CORNERS } from "../space/drift.ts";
+import type { Arrival } from "./arrival.ts";
 import { gap, type Judge } from "./deep.ts";
+import type { Lent } from "./lent.ts";
 import type { RestView } from "./rest.ts";
-import type { Look, Seen } from "./restLook.ts";
+import { STAR_HEART, type Look, type Seen } from "./restLook.ts";
 
 // One near, 4 to 6 units ahead, 30 to 60 pixels in radius on the video's screen, its centre 0.2 to 0.95 of that inside the frame's left or
 // bottom edge, so the frame cuts some of it, the ticker's band no more (the design review of 7p, after the references). Then pebbles, a
@@ -15,6 +17,8 @@ const MOST = 7;
 const TRIES = 60;
 const MARGIN = 16;
 const APART = 6;
+// The farthest a pebble stands at the home, its near rock's nearest at a fourth of it.
+const FARTHEST = 16;
 // A label's room round its body, as core's `settle.ts` stands it (PLACE): a pill 200 pixels wide at most and 32 high, its stem 12 in from
 // the end over the body, 22 off its outline, above or below.
 const LABEL = { wide: 200, high: 32, stem: 12, gap: 22 } as const;
@@ -38,8 +42,12 @@ export interface Laid {
   readonly turn: number;
 }
 
-/** The rocks of the home's view at rest `view`, read through its `judge` once its depth stands, from the view's own seed, on the map. */
-export function rocksOf(view: RestView, judge: Judge): Laid[] {
+// What the rocks read of a view: its screens at rest and swayed, its lens, what stands on each, the search's functions.
+type Seeing = Pick<Judge, "looks" | "swayed" | "focal" | "balls" | "spots" | "lent">;
+
+/** The rocks of the home's view at rest `view`, read through its `judge` once its depth stands, from the view's own seed, on the map; or of
+ * any view seen so, a system's dynamic one (7v), its depths `scale` of the home's so they stand in front of its nearer worlds. */
+export function rocksOf(view: Pick<RestView, "eye">, judge: Seeing, scale = 1): Laid[] {
   const { looks, swayed, balls, focal, spots } = judge;
   const [first] = looks;
   if (first === undefined) return [];
@@ -77,7 +85,7 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
   };
   // The near one, its centre inside the frame's left edge or its bottom edge by 0.2 to 0.95 of its radius.
   for (let tried = 0; tried < 3 * TRIES; tried += 1) {
-    const size = [4 + 2 * next(), 30 + 30 * next()] as const;
+    const size = [(4 + 2 * next()) * scale, 30 + 30 * next()] as const;
     const [off, along] = [size[1] * (0.2 + 0.75 * next()), next()];
     const [x, y] = next() < 0.5 ? [off, height * (0.12 + 0.85 * along)] : [width * (0.03 + 0.85 * along), height - off];
     if (tryAt([x, y, ...size], true)) break;
@@ -86,7 +94,7 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
   const from = rocks.length;
   for (let place = 0; place < 4 && rocks.length - from < 3; place += 1) {
     [rocks.length, seen.length] = [from, from];
-    const [x, y, depth] = [width * (0.1 + 0.8 * next()), height * (0.15 + 0.7 * next()), 8 + 8 * next()];
+    const [x, y, depth] = [width * (0.1 + 0.8 * next()), height * (0.15 + 0.7 * next()), (8 + 8 * next()) * scale];
     for (let tried = 0; tried < TRIES && rocks.length < MOST; tried += 1) {
       const [reach, angle, nearer] = [100 * Math.sqrt(next()), 2 * Math.PI * next(), 0.85 + 0.3 * next()];
       const pixels = (3 + 9 * next() ** 2) / nearer;
@@ -94,4 +102,37 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
     }
   }
   return rocks;
+}
+
+/** The rocks of a system's dynamic view (7v; Alexis, 2026-11-03, "the ambient rocks" among its depth cues), from its own seed as the home's:
+ * off each world it draws and its label's room, and off its own star's heart, which stands as one more room at the screen's centre. */
+export function rocksAt(arrival: Arrival, lent: Lent): Laid[] {
+  const { cameraTowards, drawnOf, focalOf, looksFrom, placeOf, swayed } = lent;
+  const camera = cameraTowards(arrival.eye, arrival.look);
+  const looks = looksFrom(camera);
+  const { system } = arrival.postcard;
+  const worlds = drawnOf(arrival.postcard);
+  const balls = looks.map((look) => [
+    look.seen(system.place, (STAR_HEART * look.seen(system.place).depth) / focalOf(look.height)),
+    ...worlds.map((world) => look.seen(placeOf(system, world, 0), world.radius)),
+  ]);
+  // The home's farthest pebble, 16 units ahead and a few in front of its close world: here, in front of the nearest world's ground.
+  const nearest = Math.min(
+    ...worlds.map((world) => {
+      const { x, y, z } = placeOf(system, world, 0);
+      return Math.hypot(x - arrival.eye.x, y - arrival.eye.y, z - arrival.eye.z) - world.radius;
+    }),
+  );
+  return rocksOf(
+    arrival,
+    {
+      looks,
+      swayed: SWAY_CORNERS.flatMap((sway) => looksFrom(swayed(camera, sway, arrival.look))),
+      focal: focalOf(looks[0]?.height ?? 1),
+      balls,
+      spots: balls[0] ?? [],
+      lent,
+    },
+    Math.min(1, (0.8 * nearest) / FARTHEST),
+  );
 }

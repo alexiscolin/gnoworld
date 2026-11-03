@@ -16,13 +16,17 @@ import { ARRIVAL_LEAN, arrivalOf, type Arrival } from "./arrival.ts";
 import { composed } from "./composition.ts";
 import { CENTRE, onPlane, orbitPlace, toMap } from "./disc.ts";
 import { haloAt } from "./halo.ts";
+import { LENT } from "./lent.ts";
+import { outlineOf } from "./outline.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import { postcardWorlds } from "./postcard.ts";
 import { REST_SCREENS, STAR_HEART } from "./rest.ts";
+import { rocksAt } from "./rocks.ts";
 import { away, DEGREE, dot, focalOf, minus, type Seen } from "./restLook.ts";
 
-// A system's arrival (7d3, ADR-0002 §10, "A system is a postcard"): where the eye comes to rest when it comes to a system, and what it looks
-// at. These read it through a camera of their own: at the arrival's eye, looking at its look, the map's up kept up, swayed as the scene sways.
+// A system's arrival, its dynamic view (7v; 7d3's before, ADR-0002 §10): where the eye rests at a system, looking at its star, read through a
+// camera of their own, the map's up kept up, swayed as the scene sways. Alexis, 2026-11-03: centred on its sun, its worlds at many depths,
+// the near one cut by the frame, held still so it stays so.
 
 // Namespaces of one to six worlds, their uses spread: rich and plain systems, belted or not, near the centre and far out.
 function mixed(systems: number, each = (system: number) => 1 + ((system * 7) % 6)): WorldHeld[] {
@@ -121,21 +125,39 @@ function cameraOf(
       height / 2 - (focal * dot(from, up)) / depth,
       (focal * size) / Math.max(depth, 1e-9),
     ];
-    const box = { left: x - radius, right: x + radius, top: y - radius, bottom: y + radius };
+    // A ball's true outline, an oval off the view's axis, as the view is composed with (outline.ts).
+    const box = outlineOf({ across: dot(from, right), up: dot(from, up), depth, radius: size }, focal, [width, height]);
     return { x, y, radius, depth, away: Math.hypot(from.x, from.y, from.z), ...box };
   };
 }
 
-// The postcard's worlds where they stand `seconds` on, in its plane as drawn.
-const placesOf = ({ postcard: { system, worlds } }: Arrival, seconds: number) =>
-  worlds.map((world) => {
+// The postcard's worlds where they stand, in its plane as drawn, at their drawn size: they hold still (7v).
+const placesOf = ({ postcard: { system, worlds, depth } }: Arrival) =>
+  worlds.map((world, at) => {
     const out = { x: NaN, y: NaN, z: NaN };
-    orbitPlace({ system, world }, seconds, out);
-    return { at: out, radius: world.radius };
+    orbitPlace({ system, world }, 0, out);
+    return { at: out, radius: world.radius * (depth[at] ?? NaN) };
   });
-// Eight instants through a turn: the postcard's worlds turn at rest.
-const turnOf = ({ postcard: { system } }: Arrival) =>
-  Array.from({ length: 8 }, (_, step) => (step * 2 * Math.PI) / 8 / Math.abs(system.spin));
+// Its worlds as `see` sees them, the nearest first: the near one, cut by the frame, and the others.
+const nearestFirst = (see: ReturnType<typeof cameraOf>, arrival: Arrival) =>
+  placesOf(arrival)
+    .map(({ at, radius }) => see(at, radius))
+    .sort((a, b) => a.away - b.away);
+// Whether a body there is cut by the frame's sides or foot, its head under the header, `least` of it shown each way.
+const cutByFrame = (seen: Seen, { width, height }: { width: number; height: number }, least: number) => {
+  const shown = (Math.min(seen.right, width) - Math.max(seen.left, 0)) / (seen.right - seen.left);
+  const up = (Math.min(seen.bottom, height) - seen.top) / (seen.bottom - seen.top);
+  const cut = seen.left < 0 || seen.right > width || seen.bottom > height;
+  return seen.depth > 0 && cut && seen.top >= 0.09 * height && shown >= least && up >= least;
+};
+// The round its star and whole worlds take on the screen: the near one reaches the frame's edge and is no part of it.
+const roundOf = (see: ReturnType<typeof cameraOf>, arrival: Arrival, star: Seen) => {
+  const others = nearestFirst(see, arrival).slice(1);
+  return {
+    ...star,
+    radius: Math.max(STAR_HEART, ...others.map((one) => Math.hypot(one.x - star.x, one.y - star.y) + one.radius)),
+  };
+};
 // How far its worlds reach from its star, its far belt with them: what the arrival frames.
 const reachOf = ({ postcard: { system, worlds } }: Arrival) =>
   Math.max(system.belt ? ROOM : 0, ...worlds.map(({ orbit, radius }) => orbit + radius));
@@ -144,41 +166,54 @@ const normalOf = ({ tilt, node }: StarSystem) => ({
   y: Math.cos(tilt),
   z: Math.cos(node) * Math.sin(tilt),
 });
-// Where the star stands off the screen's middle: a third of the way in or so.
-const SIDE_LEAST = 0.12;
-const SIDE_MOST = 0.3;
+
+// Each runs every case's whole search two or three times: 2.5 s alone at load 60, past 5 s in the gate's parallel run (7v). Their own time
+// is no cost bound; `holds in a file of 10,000 worlds` is.
+const WHOLE_SEARCHES = 20_000;
 
 describe("a system's arrival: the same address, the same postcard", () => {
-  it("gives a system the same arrival each time it is asked, in the same set, in any order", () => {
-    for (const { system, systems } of allCases()) {
-      const arrival = arrivalOf(system, systems);
-      expect(arrivalOf(system, systems)).toEqual(arrival);
-      expect(arrivalOf(system, [...systems].reverse())).toEqual(arrival);
-    }
-  });
-
-  it("reads only what stands near: the systems more than 160 units off change nothing", () => {
-    for (const { system, systems } of allCases()) {
-      const near = systems.filter((other) => away(other.place, system.place) <= 160);
-      expect(arrivalOf(system, near)).toEqual(arrivalOf(system, systems));
-    }
-  });
-
-  it("draws the worlds the view at rest would, each at its own phase and size, four at most, as no figure at any count", () => {
-    for (const { system, systems } of allCases()) {
-      const { postcard } = arrivalOf(system, systems);
-      expect(postcard.worlds.length).toBeLessThanOrEqual(4);
-      // Fewer than the postcard's own, the same rules choose them again: never a cut of a larger one's spread.
-      expect(postcard.worlds).toEqual(postcardWorlds(system, postcard.worlds.length));
-      if (system.worlds.some(({ radius }) => radius >= GRAIN)) expect(postcard.worlds.length).toBeGreaterThan(0);
-      for (const world of postcard.worlds) {
-        const own = system.worlds.find(({ id }) => id === world.id);
-        expect(world.radius).toBe(own?.radius);
-        expect(world.phase).toBe(own?.phase);
+  it(
+    "gives a system the same arrival each time it is asked, in the same set, in any order",
+    () => {
+      for (const { system, systems } of allCases()) {
+        const arrival = arrivalOf(system, systems);
+        expect(arrivalOf(system, systems)).toEqual(arrival);
+        expect(arrivalOf(system, [...systems].reverse())).toEqual(arrival);
       }
-    }
-  });
+    },
+    WHOLE_SEARCHES,
+  );
 
+  it(
+    "reads only what stands near: the systems more than 160 units off change nothing",
+    () => {
+      for (const { system, systems } of allCases()) {
+        const near = systems.filter((other) => away(other.place, system.place) <= 160);
+        expect(arrivalOf(system, near)).toEqual(arrivalOf(system, systems));
+      }
+    },
+    WHOLE_SEARCHES,
+  );
+
+  it(
+    "draws the worlds the view at rest would, each at its own phase and size, four at most, as no figure at any count",
+    () => {
+      for (const { system, systems } of allCases()) {
+        const { postcard } = arrivalOf(system, systems);
+        expect(postcard.worlds.length).toBeLessThanOrEqual(4);
+        // Fewer than the postcard's own, the same rules choose them again: never a cut of a larger one's spread.
+        expect(postcard.worlds).toEqual(postcardWorlds(system, postcard.worlds.length));
+        for (const world of postcard.worlds) {
+          const own = system.worlds.find(({ id }) => id === world.id);
+          expect(world.radius).toBe(own?.radius);
+          expect(world.phase).toBe(own?.phase);
+        }
+      }
+    },
+    WHOLE_SEARCHES,
+  );
+
+  // The near world must stand at the frame's edge, which narrows the angles a system's worlds allow: forty twins come to ten ways or more.
   it("gives addresses their own angles: of forty systems alike but for their names, few are seen alike", () => {
     const [template] = SETS["80 mixed systems"]().filter(({ worlds }) => worlds.length === 3);
     if (template === undefined) throw new Error("no system of three");
@@ -187,88 +222,148 @@ describe("a system's arrival: the same address, the same postcard", () => {
       const way = unit(minus(arrivalOf(system, [system]).eye, system.place));
       return `${way.x.toFixed(1)} ${way.y.toFixed(1)} ${way.z.toFixed(1)}`;
     });
-    expect(new Set(ways).size).toBeGreaterThanOrEqual(24);
+    expect(new Set(ways).size).toBeGreaterThanOrEqual(10);
   });
 });
 
+// 7v (Alexis, 2026-11-03): the arrival is the system's dynamic view, its star centred, its worlds held still, the nearest cut by the frame.
 describe("a system's arrival: a good angle", () => {
-  // Each world whole under the header through the turn, and the belt's far edge on the screen, seen through `see`.
-  const wholeThrough = (
-    see: ReturnType<typeof cameraOf>,
-    arrival: Arrival,
-    { width, height }: (typeof REST_SCREENS)[number],
-  ) => {
-    for (const seconds of turnOf(arrival))
-      for (const { at, radius } of placesOf(arrival, seconds)) {
-        const seen = see(at, radius);
-        expect(seen.depth).toBeGreaterThan(radius);
-        expect(seen.left).toBeGreaterThanOrEqual(0);
-        expect(seen.right).toBeLessThanOrEqual(width);
-        // Under the header's band, a tenth of the height.
-        expect(seen.top).toBeGreaterThanOrEqual(0.09 * height);
-        expect(seen.bottom).toBeLessThanOrEqual(height);
+  it.each(ROWS)("on %s, centres %s's star on both screens, at rest and through its sway", (name, id) => {
+    const { system, systems } = caseOf(name, id);
+    const arrival = arrivalOf(system, systems);
+    expect(arrival.look).toEqual(system.place);
+    for (const screen of REST_SCREENS)
+      for (const moved of movesOf(arrival)) {
+        const star = cameraOf(arrival, screen, moved)(system.place);
+        expect(star.depth).toBeGreaterThan(0);
+        expect(star.x).toBeCloseTo(screen.width / 2, 6);
+        expect(star.y).toBeCloseTo(screen.height / 2, 6);
       }
-    if (!arrival.postcard.system.belt) return;
-    for (let step = 0; step < 24; step += 1) {
-      const [rim, angle] = [{ x: NaN, y: NaN, z: NaN }, (step * Math.PI) / 12];
-      onPlane(arrival.postcard.system, { along: ROOM * Math.cos(angle), across: ROOM * Math.sin(angle), up: 0 }, rim);
-      const { x, y } = see(rim);
-      expect(x).toBeGreaterThanOrEqual(0);
-      expect(x).toBeLessThanOrEqual(width);
-      expect(y).toBeGreaterThanOrEqual(0);
-      expect(y).toBeLessThanOrEqual(height);
+  });
+
+  it.each(ROWS)("on %s, holds %s's worlds still, so its near one stays cut by the frame", (name, id) => {
+    const { system, systems } = caseOf(name, id);
+    expect(arrivalOf(system, systems).postcard.system.spin).toBe(0);
+  });
+
+  // The near world, as the mock-up Alexis approved draws it (2026-11-03, 14:09): cut by the frame, large, its head never under the header;
+  // where no angle cuts it, every world whole round the star instead, so the view keeps two worlds rather than one cut alone.
+  it.each(ROWS)(
+    "on %s, cuts %s's nearest world by the frame, 1.5 times every other's size or more, or stands it whole as the others",
+    (name, id) => {
+      const { system, systems } = caseOf(name, id);
+      const arrival = arrivalOf(system, systems);
+      expect(arrival.postcard.worlds.length).toBeLessThanOrEqual(4);
+      const cutAtRest = REST_SCREENS.map((screen) => {
+        const [near] = nearestFirst(cameraOf(arrival, screen), arrival);
+        return near !== undefined && cutByFrame(near, screen, 0.3);
+      });
+      for (const [at, screen] of REST_SCREENS.entries())
+        for (const moved of movesOf(arrival)) {
+          const [near, ...others] = nearestFirst(cameraOf(arrival, screen, moved), arrival);
+          const swayed = moved.x !== 0 || moved.y !== 0 || moved.z !== 0;
+          if (near !== undefined) nearHolds([near, others], screen, { cut: cutAtRest[at] === true, swayed });
+        }
+    },
+  );
+
+  // The nearest world, cut by the frame where the view cut it at rest, else whole as the others.
+  function nearHolds(
+    [near, others]: readonly [Seen, readonly Seen[]],
+    screen: (typeof REST_SCREENS)[number],
+    { cut, swayed }: { cut: boolean; swayed: boolean },
+  ) {
+    if (!cut) {
+      expect(near.left).toBeGreaterThanOrEqual(24);
+      expect(near.right).toBeLessThanOrEqual(screen.width - 24);
+      expect(near.top).toBeGreaterThanOrEqual(0.09 * screen.height);
+      expect(near.bottom).toBeLessThanOrEqual(screen.height - 24);
+      return;
     }
-  };
+    expect(cutByFrame(near, screen, swayed ? 0.25 : 0.3)).toBe(true);
+    expect(near.radius).toBeGreaterThanOrEqual(0.1 * screen.height);
+    expect(near.radius).toBeLessThanOrEqual(0.5 * screen.height);
+    for (const other of others) expect(near.radius).toBeGreaterThanOrEqual(1.5 * other.radius - 1e-9);
+  }
+
+  it.each(Object.keys(SETS) as SetName[])(
+    "on %s, cuts the nearest world by the frame in four views in five or more",
+    (name) => {
+      const systems = SETS[name]();
+      const views = systems
+        .filter(({ worlds }) => worlds.some(({ radius }) => radius >= GRAIN))
+        .map((system) => arrivalOf(system, systems));
+      const cut = views.filter((arrival) => {
+        const [near] = nearestFirst(cameraOf(arrival, REST_SCREENS[0]), arrival);
+        return near !== undefined && cutByFrame(near, REST_SCREENS[0], 0.3);
+      });
+      expect(cut.length).toBeGreaterThanOrEqual(0.8 * views.length);
+    },
+  );
 
   it.each(ROWS)(
-    "on %s, frames %s whole on both screens, its far belt with it, through its turn and its sway",
+    "on %s, frames %s's other worlds whole under the header on both screens, through its sway",
     (name, id) => {
       const { system, systems } = caseOf(name, id);
       const arrival = arrivalOf(system, systems);
       for (const screen of REST_SCREENS)
-        for (const moved of movesOf(arrival)) wholeThrough(cameraOf(arrival, screen, moved), arrival, screen);
+        for (const moved of movesOf(arrival)) {
+          const seen = nearestFirst(cameraOf(arrival, screen, moved), arrival);
+          expect(seen).toHaveLength(arrival.postcard.worlds.length);
+          for (const other of seen.slice(1)) {
+            expect(other.left).toBeGreaterThanOrEqual(24);
+            expect(other.right).toBeLessThanOrEqual(screen.width - 24);
+            expect(other.top).toBeGreaterThanOrEqual(0.09 * screen.height);
+            expect(other.bottom).toBeLessThanOrEqual(screen.height - 24);
+          }
+        }
     },
   );
 
-  // A mouse at the window's edge leans the eye (half the home's at an arrival): most arrivals hold through it, the others at rest and through
+  // Every system with a world of a body's size comes to a view with one or more (7d3's guarantee), every one whose postcard can draw two with
+  // two or more, and nine in ten with every world their postcard can draw.
+  it.each(Object.keys(SETS) as SetName[])(
+    "on %s, draws every system with a world of a body's size, two of it where its postcard can, nine in ten every world it can",
+    (name) => {
+      const systems = SETS[name]();
+      const bodied = systems.filter(({ worlds }) => worlds.some(({ radius }) => radius >= GRAIN));
+      const views = bodied.map((system) => [system, arrivalOf(system, systems).postcard.worlds.length] as const);
+      for (const [system, count] of views)
+        expect(count, system.id).toBeGreaterThanOrEqual(Math.min(2, postcardWorlds(system).length));
+      const whole = views.filter(([system, count]) => count === postcardWorlds(system).length);
+      expect(whole.length).toBeGreaterThanOrEqual(0.9 * views.length);
+    },
+  );
+
+  // A mouse at the window's edge leans the eye (half the home's at an arrival): most views hold through it, the others at rest and through
   // the sway, rather than lose a world.
-  it("holds nine arrivals in ten or more whole and clear through a mouse's lean", () => {
-    const cases = allCases();
+  it("holds seven views in ten or more through a mouse's lean: the others whole and off the star's heart, the near one on the screen", () => {
+    const cases = allCases().filter(({ system, systems }) => arrivalOf(system, systems).postcard.worlds.length > 0);
     const holding = cases.filter(({ system, systems }) => {
       const arrival = arrivalOf(system, systems);
       return REST_SCREENS.every((screen) =>
         movesOf(arrival, true).every((moved) => {
           const see = cameraOf(arrival, screen, moved);
           const star = see(system.place);
-          return placesOf(arrival, 0).every(({ at, radius }) => {
-            const seen = see(at, radius);
-            const inside =
-              seen.left >= 0 &&
-              seen.right <= screen.width &&
-              seen.top >= 0.09 * screen.height &&
-              seen.bottom <= screen.height;
-            return inside && Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius >= STAR_HEART;
-          });
+          const [near, ...others] = nearestFirst(see, arrival);
+          const heart = (seen: Seen) => Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius >= STAR_HEART;
+          const shows = near !== undefined && near.right > 0 && near.left < screen.width && near.top < screen.height;
+          return (
+            shows &&
+            others.every(
+              (seen) =>
+                heart(seen) &&
+                seen.left >= 0 &&
+                seen.right <= screen.width &&
+                seen.top >= 0.09 * screen.height &&
+                seen.bottom <= screen.height,
+            )
+          );
         }),
       );
     });
-    expect(holding.length).toBeGreaterThanOrEqual(0.9 * cases.length);
+    expect(holding.length).toBeGreaterThanOrEqual(0.7 * cases.length);
   });
-
-  it.each(ROWS)(
-    "on %s, stands %s's star a third of the way in or so: never centred for the camera, never at the edge",
-    (name, id) => {
-      const { system, systems } = caseOf(name, id);
-      const arrival = arrivalOf(system, systems);
-      for (const screen of REST_SCREENS) {
-        const star = cameraOf(arrival, screen)(system.place);
-        expect(star.depth).toBeGreaterThan(0);
-        expect(Math.abs(star.x - screen.width / 2)).toBeGreaterThanOrEqual(SIDE_LEAST * screen.width);
-        expect(Math.abs(star.x - screen.width / 2)).toBeLessThanOrEqual(SIDE_MOST * screen.width);
-        expect(Math.abs(star.y - screen.height / 2)).toBeLessThanOrEqual(0.25 * screen.height);
-      }
-    },
-  );
 
   it.each(ROWS)(
     "on %s, sees %s from above its plane at a slant: never face on, never edge on, never from under it",
@@ -291,7 +386,8 @@ describe("a system's arrival: a good angle", () => {
     const { system, systems } = caseOf(name, id);
     const arrival = arrivalOf(system, systems);
     const [distance, reach] = [away(arrival.eye, system.place), reachOf(arrival)];
-    expect((distance + reach) / (distance - reach)).toBeGreaterThanOrEqual(1.4);
+    if (arrival.postcard.worlds.length > 0) expect((distance + reach) / (distance - reach)).toBeGreaterThanOrEqual(1.4);
+    else expect(arrival.postcard.worlds).toEqual([]);
   });
 
   it.each(ROWS)("on %s, keeps %s's star's heart clear on arrival, through its sway: no world on it", (name, id) => {
@@ -301,29 +397,26 @@ describe("a system's arrival: a good angle", () => {
       for (const moved of movesOf(arrival)) {
         const see = cameraOf(arrival, screen, moved);
         const star = see(system.place);
-        for (const { at, radius } of placesOf(arrival, 0)) {
+        expect(star.depth).toBeGreaterThan(0);
+        for (const { at, radius } of placesOf(arrival)) {
           const seen = see(at, radius);
           expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
         }
       }
   });
 
-  // What gives a planetarium away (part-pipeline.md, Alexis 2026-11-02), as 7d6's `composed` reads it: a crowd, one on another, a row. The
-  // first picture judges the star with its worlds; through the turn the worlds alone, for a world, its star and another line up as they turn.
+  // What gives a planetarium away (part-pipeline.md, Alexis 2026-11-02), as 7d6's `composed` reads it: a crowd, one on another, a row, the
+  // star among the marks; a near world may cover a farther one by half at most, which is depth.
   it.each(ROWS)(
-    "on %s, reads %s as the view at rest's rules would: its first picture with its star, its worlds alone through its turn",
+    "on %s, reads %s as the view at rest's rules would, its star with its worlds: no crowd, pile or row",
     (name, id) => {
       const { system, systems } = caseOf(name, id);
       const arrival = arrivalOf(system, systems);
       for (const screen of REST_SCREENS) {
         const see = cameraOf(arrival, screen);
-        const star = see(system.place);
-        const judged = (seconds: number, lights: readonly Seen[]) => {
-          const [first, ...rest] = placesOf(arrival, seconds).map(({ at, radius }) => see(at, radius));
-          return first === undefined || composed(rest, first, { deep: false, lights, ...screen });
-        };
-        expect(judged(0, [star])).toBe(true);
-        for (const seconds of turnOf(arrival)) expect(judged(seconds, [])).toBe(true);
+        const [near, ...others] = nearestFirst(see, arrival);
+        const frame = { deep: false, lights: [see(system.place)], ...screen };
+        expect(near === undefined || others.length === 0 || composed(others, near, frame)).toBe(true);
       }
     },
   );
@@ -335,7 +428,7 @@ describe("a system's arrival: a good angle", () => {
       const arrival = arrivalOf(system, systems);
       for (const screen of REST_SCREENS) {
         const see = cameraOf(arrival, screen);
-        const [earth, ball] = [see(EARTH_PLACE, EARTH_RADIUS), see(system.place, reachOf(arrival))];
+        const [earth, ball] = [see(EARTH_PLACE, EARTH_RADIUS), roundOf(see, arrival, see(system.place))];
         if (earth.depth <= 0) continue;
         expect(Math.hypot(earth.x - ball.x, earth.y - ball.y)).toBeGreaterThanOrEqual(earth.radius + ball.radius);
       }
@@ -357,15 +450,16 @@ describe("a system's arrival: a good angle", () => {
       const arrival = arrivalOf(system, [system]);
       for (const screen of REST_SCREENS) {
         const see = cameraOf(arrival, screen);
-        const [earth, ball] = [see(EARTH_PLACE, EARTH_RADIUS), see(place, reachOf(arrival))];
+        const [earth, ball] = [see(EARTH_PLACE, EARTH_RADIUS), roundOf(see, arrival, see(place))];
         if (earth.depth > 0)
           expect(Math.hypot(earth.x - ball.x, earth.y - ball.y)).toBeGreaterThanOrEqual(earth.radius + ball.radius);
       }
     }
   });
 
-  // Where no angle holds, as among neighbours packed closer than a cell: its star alone, its far belt framed whole, never from straight above.
-  it("frames a system no angle holds by its star and its far belt, whole on both screens, the map's up still up", () => {
+  // Where no angle holds, as among neighbours packed closer than a cell: its star alone at the centre, its far belt framed whole, never from
+  // straight above.
+  it("frames a system no angle holds by its star at the centre and its far belt, whole on both screens, the map's up still up", () => {
     const [template] = SETS["80 mixed systems"]().filter(({ worlds }) => worlds.length === 2);
     if (template === undefined) throw new Error("no system of two");
     const system = { ...template, id: "packed", belt: true, place: { x: 400, y: 0, z: 400 } };
@@ -377,7 +471,19 @@ describe("a system's arrival: a good angle", () => {
     const arrival = arrivalOf(system, [system, ...packed]);
     expect(arrival.postcard.worlds).toEqual([]);
     expect(Math.abs(unit(minus(arrival.look, arrival.eye)).y)).toBeLessThanOrEqual(Math.sin(60 * DEGREE));
-    for (const screen of REST_SCREENS) wholeThrough(cameraOf(arrival, screen), arrival, screen);
+    for (const screen of REST_SCREENS) {
+      const see = cameraOf(arrival, screen);
+      expect(see(system.place).x).toBeCloseTo(screen.width / 2, 6);
+      for (let step = 0; step < 24; step += 1) {
+        const [rim, angle] = [{ x: NaN, y: NaN, z: NaN }, (step * Math.PI) / 12];
+        onPlane(arrival.postcard.system, { along: ROOM * Math.cos(angle), across: ROOM * Math.sin(angle), up: 0 }, rim);
+        const { x, y } = see(rim);
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(screen.width);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(screen.height);
+      }
+    }
   });
 
   it("stands the eye outside every other system's room", () => {
@@ -393,7 +499,7 @@ describe("a system's arrival: a good angle", () => {
     for (const { system, systems } of allCases()) {
       const arrival = arrivalOf(system, systems);
       const see = cameraOf(arrival, REST_SCREENS[0]);
-      const ball = see(system.place, reachOf(arrival));
+      const ball = roundOf(see, arrival, see(system.place));
       for (const other of systems) {
         const star = see(other.place);
         if (other === system || star.depth <= 0 || haloAt(star.away) < 0.75) continue;
@@ -402,7 +508,7 @@ describe("a system's arrival: a good angle", () => {
     }
   });
 
-  it("varies the angle from one system to the next: from all round the map, its star left and right, at several slants and distances", () => {
+  it("varies the angle from one system to the next: from all round the map, at several slants and distances", () => {
     const arrivals = allCases().map(({ system, systems }) => [system, arrivalOf(system, systems)] as const);
     const flat = arrivals.map(([system, { eye }]) => {
       const way = unit(minus(eye, system.place));
@@ -413,29 +519,16 @@ describe("a system's arrival: a good angle", () => {
       flat.reduce((sum, angle) => sum + Math.sin(angle), 0),
     );
     expect(mean / flat.length).toBeLessThanOrEqual(0.35);
-    const [screen] = REST_SCREENS;
-    const left = arrivals.filter(([system, arrival]) => cameraOf(arrival, screen)(system.place).x < screen.width / 2);
-    expect(left.length).toBeGreaterThanOrEqual(0.25 * arrivals.length);
-    expect(arrivals.length - left.length).toBeGreaterThanOrEqual(0.25 * arrivals.length);
     // Slants spread over the range, not a few set ones: a whole degree apart, a dozen at least.
     const slants = arrivals.map(([system, arrival]) =>
       Math.round(Math.asin(dot(unit(minus(arrival.eye, system.place)), normalOf(arrival.postcard.system))) / DEGREE),
     );
     expect(new Set(slants).size).toBeGreaterThanOrEqual(12);
-    // The star's place spreads across and up the screen: never one band.
-    const stars = arrivals.map(([system, arrival]) => cameraOf(arrival, screen)(system.place));
-    const aside = stars.map(({ x }) => Math.abs(x - screen.width / 2) / screen.width);
-    expect(Math.max(...aside) - Math.min(...aside)).toBeGreaterThanOrEqual(0.06);
-    // The header's band turns away more stars set high than low: the heights still spread, above the middle and below it.
-    const lifted = stars.map(({ y }) => (y - screen.height / 2) / screen.height);
-    expect(Math.max(...lifted) - Math.min(...lifted)).toBeGreaterThanOrEqual(0.12);
-    expect(lifted.some((up) => up < 0)).toBe(true);
-    expect(lifted.some((down) => down > 0)).toBe(true);
     const fills = arrivals.map(([system, arrival]) => (reachOf(arrival) / away(arrival.eye, system.place)).toFixed(2));
     expect(new Set(fills).size).toBeGreaterThanOrEqual(3);
   });
 
-  it("shows a system of grain alone by its star, whole and a third of the way in", () => {
+  it("shows a system of grain alone by its star, whole and at the centre", () => {
     const grain: StarSystem = {
       id: "dust",
       place: { x: 300, y: 4, z: -220 },
@@ -452,8 +545,8 @@ describe("a system's arrival: a good angle", () => {
     const [screen] = REST_SCREENS;
     const star = cameraOf(arrival, screen)(grain.place);
     expect(star.depth).toBeGreaterThan(ROOM);
-    expect(Math.abs(star.x - screen.width / 2)).toBeGreaterThanOrEqual(SIDE_LEAST * screen.width);
-    expect(Math.abs(star.x - screen.width / 2)).toBeLessThanOrEqual(SIDE_MOST * screen.width);
+    expect(star.x).toBeCloseTo(screen.width / 2, 6);
+    expect(star.y).toBeCloseTo(screen.height / 2, 6);
   });
 
   it("holds in a file of 10,000 worlds: the eye outside every room, four bodies at most, the same in any order", () => {
@@ -472,7 +565,7 @@ describe("a system's arrival: a good angle", () => {
 });
 
 // Alexis, 2026-11-03, option B (part 7p): a system's arrival reads in depth as the view at rest's postcards do, the nearer of its bodies
-// drawn larger, 1.5 times its neighbour or more through its turn, none at one height on arrival, none dropped to a dot.
+// drawn larger, 1.5 times its neighbour or more, none at one height, none dropped to a dot; its worlds hold still (7v).
 describe("a system's arrival in depth (7p)", () => {
   // Each body at its drawn share of its size, where it stands `seconds` on, seen from the arrival's eye on the video's screen.
   const seenAt = (arrival: Arrival, seconds: number) => {
@@ -485,26 +578,21 @@ describe("a system's arrival in depth (7p)", () => {
     });
   };
 
-  it.each(ROWS)(
-    "on %s, draws %s's bodies 1.5 times apart in size or more through its turn, the nearer the larger",
-    (name, id) => {
-      const { system, systems } = caseOf(name, id);
-      const arrival = arrivalOf(system, systems);
-      expect(arrival.postcard.depth).toHaveLength(arrival.postcard.worlds.length);
-      for (const seconds of turnOf(arrival)) {
-        const seen = seenAt(arrival, seconds);
-        seen.forEach((one, at) => {
-          for (const other of seen.slice(at + 1))
-            expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(1.5);
-        });
-      }
-      const byDepth = seenAt(arrival, 0).sort((a, b) => a.depth - b.depth);
-      byDepth.forEach((near, at) => {
-        const far = byDepth[at + 1];
-        if (far !== undefined) expect(near.radius).toBeGreaterThan(far.radius);
-      });
-    },
-  );
+  it.each(ROWS)("on %s, draws %s's bodies 1.5 times apart in size or more, the nearer the larger", (name, id) => {
+    const { system, systems } = caseOf(name, id);
+    const arrival = arrivalOf(system, systems);
+    expect(arrival.postcard.depth).toHaveLength(arrival.postcard.worlds.length);
+    const seen = seenAt(arrival, 0);
+    seen.forEach((one, at) => {
+      for (const other of seen.slice(at + 1))
+        expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(1.5);
+    });
+    const byDepth = seenAt(arrival, 0).sort((a, b) => a.depth - b.depth);
+    byDepth.forEach((near, at) => {
+      const far = byDepth[at + 1];
+      if (far !== undefined) expect(near.radius).toBeGreaterThan(far.radius);
+    });
+  });
 
   // At one height: less than a tenth of the screen's height apart up it, and less than 40 degrees off level (rest.test.ts).
   it.each(ROWS)("on %s, stands no two of %s's neighbouring bodies at one height on arrival", (name, id) => {
@@ -530,6 +618,7 @@ describe("a system's arrival in depth (7p)", () => {
       const { system, systems } = caseOf(name, id);
       const arrival = arrivalOf(system, systems);
       const { system: plane, worlds, depth } = arrival.postcard;
+      expect(worlds.length).toBeLessThanOrEqual(4);
       for (const screen of REST_SCREENS) {
         const see = cameraOf(arrival, screen);
         const star = see(system.place);
@@ -543,15 +632,15 @@ describe("a system's arrival in depth (7p)", () => {
     },
   );
 
-  it.each(ROWS)("on %s, drops none of %s's bodies to a dot through its turn", (name, id) => {
+  it.each(ROWS)("on %s, drops none of %s's bodies to a dot", (name, id) => {
     const { system, systems } = caseOf(name, id);
-    const arrival = arrivalOf(system, systems);
-    for (const seconds of turnOf(arrival))
-      for (const { radius } of seenAt(arrival, seconds))
-        expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
+    const seen = seenAt(arrivalOf(system, systems), 0);
+    expect(seen.length).toBeLessThanOrEqual(4);
+    for (const { radius } of seen) expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
   });
 
-  // The bodies each arrival drew before the depth (7p, measured on b582d1aa), by its system's id: none is dropped to get there.
+  // The bodies each arrival drew before the dynamic view (7p's, measured on cd7e9729), by its system's id: one in ten at most draws fewer,
+  // where no angle stands a near world beside all 7d3 drew whole (7v: 5 of 80 and 2 of 23; most draw more, 2 where 7d3 drew 1).
   const BEFORE: Record<SetName, string> = {
     "80 mixed systems":
       "n0:1 n1:1 n10:1 n11:2 n12:1 n13:1 n14:1 n15:2 n16:2 n17:1 n18:1 n19:1 n2:1 n20:1 n21:1 n22:2 n23:2 n24:1 n25:1 n26:1 n27:2 " +
@@ -561,13 +650,19 @@ describe("a system's arrival in depth (7p)", () => {
     "crowds and singles":
       "busy:2 mid:1 n0:1 n1:1 n10:1 n11:2 n12:1 n13:1 n14:1 n15:2 n16:2 n17:1 n18:1 n19:1 n2:1 n3:2 n4:1 n5:2 n6:1 n7:1 n8:1 n9:2 test:2",
   };
-  it.each(Object.keys(SETS) as SetName[])("draws as many bodies at each arrival on %s as before the depth", (name) => {
-    const systems = SETS[name]();
-    const counts = systems
-      .filter(({ worlds }) => worlds.length > 0)
-      .map((system) => `${system.id}:${String(arrivalOf(system, systems).postcard.worlds.length)}`);
-    expect(counts.join(" ")).toBe(BEFORE[name]);
-  });
+  it.each(Object.keys(SETS) as SetName[])(
+    "draws as many bodies at each arrival on %s as 7d3's did, nine in ten",
+    (name) => {
+      const systems = SETS[name]();
+      const before = new Map(
+        BEFORE[name].split(" ").map((row) => [row.split(":")[0], Number(row.split(":")[1])] as const),
+      );
+      const fewer = systems
+        .filter(({ worlds }) => worlds.length > 0)
+        .filter((system) => arrivalOf(system, systems).postcard.worlds.length < (before.get(system.id) ?? 0));
+      expect(fewer.length).toBeLessThanOrEqual(0.1 * systems.length);
+    },
+  );
 });
 
 // Debris is only a far belt, for dust is a sign (ADR-0002 §10): a rock near a world would read as that world crumbling.
@@ -592,5 +687,55 @@ describe("a system's arrival: no debris near a planet", () => {
 
   it("leaves the rocks a band, not a line: three tenths of a unit wide or more, inside the system's room", () => {
     expect(ROOM - ROCKS_FROM).toBeGreaterThanOrEqual(0.3 - 1e-9);
+  });
+});
+
+// Alexis, 2026-11-03 (7v): the ambient rocks are a depth cue of a system's dynamic view, as of the home's (7p): decor in front, from the
+// view's own seed, off every world it draws, its label's room, and its star's heart.
+describe("a system's dynamic view's rocks (7v)", () => {
+  // In front: nearer the eye than any world it draws; off a world's label's room (core's settle.ts PLACE, as rocks.ts keeps it); clear of
+  // the star's heart; a few pixels to sixty across; at rest and through the sway.
+  const LABEL = { wide: 200, high: 32, stem: 12, gap: 22 };
+  // Every rock clear on `screen` with the eye `moved`.
+  function rocksClear(
+    arrival: Arrival,
+    rocks: ReturnType<typeof rocksAt>,
+    [screen, moved]: readonly [(typeof REST_SCREENS)[number], Point],
+  ) {
+    const see = cameraOf(arrival, screen, moved);
+    const [star, worlds] = [see(arrival.look), nearestFirst(see, arrival)];
+    for (const rock of rocks) rockClear(see(rock.place, rock.radius), rock.radius, { star, worlds });
+  }
+  function rockClear(seen: Seen, radius: number, { star, worlds }: { star: Seen; worlds: readonly Seen[] }) {
+    expect(seen.depth).toBeGreaterThan(0);
+    expect(seen.radius).toBeLessThanOrEqual(70);
+    expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
+    for (const world of worlds) {
+      expect(seen.away + radius).toBeLessThan(world.away);
+      const label =
+        Math.abs(seen.x - world.x) < LABEL.wide - LABEL.stem + seen.radius &&
+        Math.abs(seen.y - world.y) < world.radius + LABEL.gap + LABEL.high + seen.radius;
+      expect(Math.hypot(seen.x - world.x, seen.y - world.y) - seen.radius - world.radius >= 0 && !label).toBe(true);
+    }
+  }
+  it("lays a few rocks in front of most dynamic views, off every world drawn, its label's room and its star's heart", () => {
+    const cases = allCases();
+    let laid = 0;
+    for (const { system, systems } of cases) {
+      const arrival = arrivalOf(system, systems);
+      const rocks = rocksAt(arrival, LENT);
+      expect(rocks.length).toBeLessThanOrEqual(7);
+      if (rocks.length > 0) laid += 1;
+      for (const screen of REST_SCREENS)
+        for (const moved of movesOf(arrival)) rocksClear(arrival, rocks, [screen, moved]);
+    }
+    expect(laid).toBeGreaterThanOrEqual(0.8 * cases.length);
+  });
+
+  it("lays the same rocks for the same view", () => {
+    for (const { system, systems } of allCases().slice(0, 20)) {
+      const arrival = arrivalOf(system, systems);
+      expect(rocksAt(arrival, LENT)).toEqual(rocksAt(arrival, LENT));
+    }
   });
 });

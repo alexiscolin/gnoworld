@@ -39,6 +39,8 @@ export class Resting {
   #rocks: readonly Rock[] = [];
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
+  // A system's dynamic view's rocks (7v), once the depth's chunk laid them for the landing it came to.
+  #viewRocks: readonly Rock[] = [];
 
   /** `found` is told once a file's view has come, or a system's arrival; `device`'s eye is the one a flight turns (7g). Till then the view is
    * the scene's own, at its home. */
@@ -90,11 +92,24 @@ export class Resting {
     if (asking !== undefined) this.#eye.arrive(this.#systems, asking, this.#came);
   }
 
-  // The eye moved to `asking`'s arrival: the scene is told, unless it was asked again since, or the cosmos is gone.
+  // The eye moved to `asking`'s arrival: the scene is told, unless it was asked again since, or the cosmos is gone; a dynamic view's rocks
+  // are laid once the depth's chunk comes.
   readonly #came = (asking: Asking, to: Point): void => {
     if (asking !== this.#asking) return;
     asking.go(to);
     this.#found();
+    this.#viewRocks = [];
+    const landing = this.#eye.landing;
+    const postcard = landing?.postcards.get(landing.index);
+    if (landing === undefined || postcard === undefined) return;
+    loadDeep().then(
+      ({ rocksOfView }) => {
+        if (this.#eye.landing !== landing) return;
+        this.#viewRocks = rocksOfView({ eye: landing.view.eye, look: landing.look, postcard }, LENT);
+        this.#found();
+      },
+      () => undefined,
+    );
   };
 
   /** What the eye looks at, on the stage and on the map: the Earth, or what a system's arrival looks at. */
@@ -125,13 +140,17 @@ export class Resting {
   /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it, the ladder's `drawn` anywhere else. */
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
     toMap(this.#resting, this.#restingMap);
-    const shown = this.#eye.landing ?? {
-      view: this.view,
-      postcards: this.#postcards,
-      index: 0,
-      deep: this.#deep,
-      rocks: this.#rocks,
-    };
+    const landing = this.#eye.landing;
+    const shown =
+      landing === undefined
+        ? {
+            view: this.view,
+            postcards: this.#postcards,
+            index: 0,
+            deep: this.#deep,
+            rocks: this.#rocks,
+          }
+        : { ...landing, rocks: this.#viewRocks };
     return drawnFrom(systems, { shown, drawn }, { ...sight, resting: this.#restingMap });
   }
 }

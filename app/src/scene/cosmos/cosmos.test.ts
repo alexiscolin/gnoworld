@@ -234,9 +234,11 @@ function debrisClear(
     const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
     if (found === undefined) throw new Error("a rock with no star");
     const { system, worlds: drawnWorlds } = drawnOf(found);
+    // A system held still (7v) stands one instant.
+    const steps = system.spin === 0 ? 1 : 16;
     for (const world of drawnWorlds)
-      for (let step = 0; step < 16; step += 1) {
-        const seconds = (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
+      for (let step = 0; step < steps; step += 1) {
+        const seconds = system.spin === 0 ? 0 : (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
         expect(rock.distanceTo(turned(system, world, seconds)) - world.radius).toBeGreaterThanOrEqual(DEBRIS_CLEAR);
         judged += 1;
       }
@@ -3211,8 +3213,8 @@ describe("a system's arrival (7d3)", () => {
   });
 
   // Alexis, 2026-11-03 ("roches d'ambiance", through the chief): a few rocks at the home's view at rest, decor laid in space, which the
-  // labels' chunk draws from what each look leaves (7p); a system's arrival has none.
-  it("lays a few rocks at Onyx's home for the labels' chunk to draw, and none at a system's arrival", async () => {
+  // labels' chunk draws from what each look leaves (7p). Alexis, 2026-11-03 (7v): a depth cue of a system's dynamic view too.
+  it("lays a few rocks at Onyx's home and at a system's dynamic view for the labels' chunk to draw", async () => {
     const scene = made();
     const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
     scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
@@ -3221,7 +3223,31 @@ describe("a system's arrival (7d3)", () => {
     expect(rocks().length).toBeGreaterThanOrEqual(3);
     expect(rocks().length).toBeLessThanOrEqual(7);
     await arrived(scene, GNOSWAP);
-    expect(rocks()).toEqual([]);
+    expect(rocks().length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Alexis, 2026-11-03 (7v): a system's dynamic view, its worlds' grain as at the home's.
+  const ownPoints = (scene: ReturnType<typeof made>, system: StarSystem) =>
+    pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): at a system's own view too, each speck 2 px across at most, none on a world's path.
+  it("draws g1magld5's grain as fine dust at its dynamic view, 2 px across at most, none on its worlds' paths (F3594)", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    await arrived(scene, system.id);
+    const { postcard } = arrivalOf(system, systems);
+    const grains = new Set(system.worlds.filter(({ radius }) => radius < GRAIN).map(({ orbit }) => orbit.toFixed(4)));
+    const dust = ownPoints(scene, system).filter(({ orbit }) => grains.has(orbit.toFixed(4)));
+    expect(dust.length).toBeGreaterThan(0);
+    for (const speck of dust) {
+      expect(speck.size).toBeLessThanOrEqual(1);
+      postcard.worlds.forEach(({ orbit, radius }, at) => {
+        expect(Math.abs(speck.orbit - orbit)).toBeGreaterThanOrEqual(radius * (postcard.depth[at] ?? NaN));
+      });
+    }
   });
 
   it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {

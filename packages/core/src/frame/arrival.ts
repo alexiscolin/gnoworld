@@ -1,7 +1,7 @@
-// A system's arrival (slice 7d3; ADR-0002 §10, "A system is a postcard"): where the eye rests when it comes to a system, and what it looks
-// at. Built on the view at rest's rules (7d6): `postcardWorlds`' worlds, judged on the screens that view is composed for by `composed`. The
-// address picks the slant, the side and the height the star stands at and the order the angles are tried in, so the same address gives the
-// same postcard and two systems are seldom seen alike; the eye stands near enough that the system's near side reads larger than its far.
+// A system's dynamic view (part 7v; Alexis, 2026-11-03, "exactement cette idée"), the view a system shows by default: its star at the
+// screen's centre, its worlds round it at many depths, the nearest cut by the frame and the largest, the others whole, each 1.5 times the
+// next farther; no orbit is drawn. Its worlds hold still, so the near one stays cut as the view at rest's close world does. The address
+// picks the slant and the turn the angles are tried in, so the same address gives the same view. Built on 7d3's postcards (7p's depth).
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { ARRIVAL_LEAN, SWAY_CORNERS } from "../space/drift.ts";
@@ -9,7 +9,6 @@ import { composed } from "./composition.ts";
 import { CENTRE, onPlane, toMap } from "./disc.ts";
 import { HALO_FAR, haloAt } from "./halo.ts";
 import { drawnOf, postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
-import { instantsOf, spotsOf } from "./restCards.ts";
 import {
   along,
   away,
@@ -17,6 +16,7 @@ import {
   DEGREE,
   focalOf,
   looksFrom,
+  placeOf,
   STAR_HEART,
   swayed,
   type Camera,
@@ -24,7 +24,7 @@ import {
   type Seen,
 } from "./restLook.ts";
 
-/** Where the eye rests when it comes to a system, what it looks at, both on the map, and the system as drawn there. */
+/** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there. */
 export interface Arrival {
   readonly eye: Point;
   readonly look: Point;
@@ -34,29 +34,34 @@ export interface Arrival {
 // The lean lives beside the mouse's, where the view at rest's eye reads it without this module.
 export { ARRIVAL_LEAN } from "../space/drift.ts";
 
-// Slants over the system's plane, in degrees, from the least, over a span, tried a fourth of it apart: never face on (rings round the
-// star), never edge on (a row).
+// Slants over the system's plane, in degrees: a postcard's plane is seen 30 degrees open at the least (postcard.ts), never face on.
 const SLANT_LEAST = 32;
-const SLANT_SPAN = 24;
+const SLANT_SPAN = 22;
 const SLANT_TRIES = 4;
-const TURNS = 16;
-// The share of the screen's height its ball takes, and how far its star stands off the middle and up or down, in heights.
-// Through the home's lens, 1.2 times narrower (7d9), the least fill is 1.2 times 7d3's 45% at 50 degrees, so the eye stands as near and the
-// near side reads as much larger; the most is 66%, past which a set the tests hold no longer frames whole.
-const FILL = [0.54, 0.66] as const;
-const ASIDE = [0.27, 0.36] as const;
-const LIFT = 0.16;
+const TURNS = 36;
+const STRIDE = 11;
+// How far the eye stands from the star, in the reach of its worlds: near, so its near side reads far larger than its far side.
+const DISTANCES = [1.1, 1.25, 1.45, 1.7, 2];
+// Where no angle cuts it, the view stands back to hold its nearest world whole as well.
+const WHOLE_DISTANCES = [2.2, 2.7, 3.3, 4];
+// The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more (the depth's own, depth.ts),
+// half the height across at most.
+const SHOWN_AT_REST = 0.3;
+const SHOWN_SWAYED = 0.25;
+const NEAR_OVER = 1.5;
+const NEAR_MOST = 0.5;
+const MARGIN = 24;
+const HEADER = 0.09;
 // The view looks no steeper than this up or down the map: its up stays up.
 const STEEP = Math.sin(60 * DEGREE);
-const MARGIN = 24;
-// A system of grain alone is framed by its star.
+// A system of grain alone is framed by its star; one no angle holds stands its ball 60% of the screen's height.
 const LEAST_REACH = 2.5;
-// What the arrival reads of its set: another system's room round the eye, and any star that keeps three quarters of its halo or more (64
-// units off or nearer), which on the postcard would read as a second sun. The eye stands 29 units off at most, so nothing farther than that
-// past a halo's reach counts.
+const FILL = 0.6;
+// What the view reads of its set: another system's room round the eye, and any star that keeps three quarters of its halo or more, which
+// would read as a second sun; the eye stands within twice a system's room of its star, so nothing past a halo's reach counts.
 const OUTSIDE = ROOM + 1;
 const SECOND_SUN = 0.75;
-const NEAR = HALO_FAR + 30;
+const NEAR = HALO_FAR + 2 * ROOM;
 // A mouse's lean on the map: the eight edges of the stage's across and up, at an arrival's lean.
 const LEANS: readonly Point[] = [
   [1, 1],
@@ -73,55 +78,79 @@ const LEANS: readonly Point[] = [
   return out;
 });
 
-/** What an address picks: how much of the screen its system takes, where its star stands, the slant and turn the angles start from. */
+/** What an address picks: the slant and the turn the angles start from. */
 interface Chosen {
-  readonly fill: number;
-  readonly aside: number;
-  readonly lift: number;
   readonly first: number;
   readonly slant: number;
 }
 
 function chosenOf(id: string): Chosen {
-  let state = textHash(`arrival ${id}`);
-  const next = () => {
-    state = nextState(state);
-    return unitOf(state);
-  };
-  const side = next() < 0.5 ? -1 : 1;
-  return {
-    fill: FILL[0] + (FILL[1] - FILL[0]) * next(),
-    aside: side * (ASIDE[0] + (ASIDE[1] - ASIDE[0]) * next()),
-    lift: LIFT * (2 * next() - 1),
-    first: next(),
-    slant: SLANT_SPAN * next(),
-  };
+  const state = textHash(`arrival ${id}`);
+  return { first: unitOf(nextState(state)), slant: unitOf(nextState(nextState(state))) };
 }
 
-/** A system as one camera is judged on it: its star, the ball its worlds and belt fill, its card, the instants of its turn, what stands near. */
-interface Held {
-  readonly place: Point;
-  readonly reach: number;
-  readonly card: Pick<Postcard, "system" | "worlds">;
-  readonly instants: readonly number[];
-  readonly near: readonly StarSystem[];
+type Card = Pick<Postcard, "system" | "worlds" | "depth">;
+
+/** A system's worlds as one camera sees them, at their drawn size: the nearest first; and its star. */
+function seenOf(look: Look, card: Card): { star: Seen; worlds: Seen[] } {
+  const worlds = drawnOf(card).map((world) => look.seen(placeOf(card.system, world, 0), world.radius));
+  return { star: look.seen(card.system.place), worlds: worlds.sort((a, b) => a.away - b.away) };
 }
 
-const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y);
+// Whether a body there is cut by the frame's sides or its foot, never its head, which the header holds: `least` of it shown each way.
+function cutByFrame(look: Look, at: Seen, least: number): boolean {
+  const { width, height } = look;
+  const [wide, high] = [at.right - at.left, at.bottom - at.top];
+  const shown = (Math.min(at.right, width) - Math.max(at.left, 0)) / wide;
+  const up = (Math.min(at.bottom, height) - at.top) / high;
+  const cut = at.left < 0 || at.right > width || at.bottom > height;
+  return at.depth > 0 && cut && at.top >= HEADER * height && shown >= least && up >= least;
+}
 
-// On one screen from one eye: the ball whole under the header, no world on the star's heart.
-function sees(look: Look, { place, reach, card }: Held): boolean {
-  const star = look.seen(place);
+const offHeart = (spot: Seen, star: Seen) => Math.hypot(spot.x - star.x, spot.y - star.y) - spot.radius >= STAR_HEART;
+
+// On one screen: the nearest world cut by the frame, half the height across at most, 1.5 times every other's size or more, or where `cut`
+// is not asked whole as the others; off the star's heart; the others whole under the header and off it; at rest, in no crowd, pile or row
+// (7d6's rules).
+function frames(look: Look, card: Card, how: { atRest: boolean; cut: boolean }): boolean {
+  const { star, worlds } = seenOf(look, card);
+  const [near, ...others] = worlds;
+  if (near === undefined || !leads(look, [near, others], how)) return false;
+  if (!offHeart(near, star) || !others.every((spot) => look.whole(spot, MARGIN) && offHeart(spot, star))) return false;
+  const { atRest } = how;
+  const frame = { deep: false, lights: [star], width: look.width, height: look.height };
+  return !atRest || others.length === 0 || composed(others, near, frame);
+}
+
+// The nearest world as the view asks it: cut by the frame and the largest, or whole as the others.
+function leads(
+  look: Look,
+  [near, others]: readonly [Seen, readonly Seen[]],
+  { atRest, cut }: { atRest: boolean; cut: boolean },
+) {
+  if (!cut) return look.whole(near, MARGIN);
   return (
-    look.whole(look.ball(place, reach), MARGIN) &&
-    spotsOf(look, [card], {}).every((spot) => apart(spot, star) - spot.radius >= STAR_HEART)
+    cutByFrame(look, near, atRest ? SHOWN_AT_REST : SHOWN_SWAYED) &&
+    near.radius <= NEAR_MOST * look.height &&
+    others.every(({ radius }) => near.radius >= NEAR_OVER * radius)
   );
 }
 
-// From the eye at rest: the Earth and every star that keeps a good share of its halo off the ball.
-function alone(look: Look, { place, reach, near }: Held): boolean {
-  const ball = look.ball(place, reach);
+// The round its star and whole worlds take on the screen: the near world, cut by the frame, reaches its edge, and is no part of it.
+function roundOf(look: Look, card: Card): Seen {
+  const { star, worlds } = seenOf(look, card);
+  const reach = Math.max(
+    STAR_HEART,
+    ...worlds.slice(1).map((spot) => Math.hypot(spot.x - star.x, spot.y - star.y) + spot.radius),
+  );
+  return { ...star, radius: reach };
+}
+
+// From the eye at rest: the Earth off the system's round, and every star that keeps a good share of its halo off it.
+function alone(look: Look, card: Card, near: readonly StarSystem[]): boolean {
+  const ball = roundOf(look, card);
   const { earth } = look;
+  const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y);
   if (earth.depth > 0 && apart(earth, ball) < earth.radius + ball.radius) return false;
   return near.every((other) => {
     const seen = look.seen(other.place);
@@ -129,37 +158,32 @@ function alone(look: Look, { place, reach, near }: Held): boolean {
   });
 }
 
-// As the view at rest's rules read it: the first picture with its star, the worlds alone through their turn, for a world, its star and
-// another line up as they turn (composition.ts).
-function reads(look: Look, { place, card, instants }: Held): boolean {
-  const star = look.seen(place);
-  const judged = (seconds: number, lights: readonly Seen[]) => {
-    const [first, ...rest] = spotsOf(look, [card], { seconds });
-    return (
-      first === undefined || composed(rest, first, { deep: false, lights, width: look.width, height: look.height })
-    );
-  };
-  return judged(0, [star]) && instants.every((seconds) => judged(seconds, []));
+interface Asked {
+  readonly pick: Chosen;
+  readonly around: readonly StarSystem[];
+  readonly leaning: boolean;
+  readonly cut: boolean;
 }
 
-// The eye outside every other room; at rest alone with its star, read well, whole and clear; whole and clear through the sway, and
-// through a mouse's lean where `leaning`.
-const holds = (camera: Camera, look: Point, held: Held & { readonly leaning: boolean }): boolean =>
-  held.near.every((other) => away(other.place, camera.eye) >= OUTSIDE) &&
-  looksFrom(camera).every((each) => alone(each, held) && sees(each, held) && reads(each, held)) &&
-  SWAY_CORNERS.every((sway) => looksFrom(swayed(camera, sway, look)).every((each) => sees(each, held))) &&
-  (!held.leaning ||
-    LEANS.every((lean) =>
-      looksFrom(cameraTowards(along(camera.eye, lean, 1), look)).every((each) => sees(each, held)),
-    ));
+// The eye outside every other room; at rest alone and framed; framed through the sway, and through a mouse's lean where `leaning`.
+function holds(camera: Camera, card: Card, { around, leaning, cut }: Asked) {
+  const { system } = card;
+  const looked = (moved: Camera, atRest: boolean) =>
+    looksFrom(moved).every((look) => frames(look, card, { atRest, cut }));
+  return (
+    around.every((other) => away(other.place, camera.eye) >= OUTSIDE) &&
+    looksFrom(camera).every((look) => alone(look, card, around)) &&
+    looked(camera, true) &&
+    SWAY_CORNERS.every((sway) => looked(swayed(camera, sway, system.place), false)) &&
+    (!leaning || LEANS.every((lean) => looked(cameraTowards(along(camera.eye, lean, 1), system.place), false)))
+  );
+}
 
-// The eye `slant` over the system's plane and `turn` round its normal, framing a ball `reach` round the star, and what it looks at: beside
-// the star, so the star stands `aside` of the middle and `lift` above or below it.
-function tryOf(
-  system: StarSystem,
-  [slant, turn]: readonly [number, number],
-  { reach, pick }: { reach: number; pick: Chosen },
-) {
+const reachOf = (system: StarSystem, worlds: readonly Orbiter[]) =>
+  Math.max(system.belt ? ROOM : 0, ...worlds.map(({ orbit, radius }) => orbit + radius)) || LEAST_REACH;
+
+// The eye `slant` over the system's plane, `turn` round its normal, `distance` from its star, looking at it.
+function cameraOf(system: StarSystem, [slant, turn]: readonly [number, number], distance: number): Camera {
   const way = { x: NaN, y: NaN, z: NaN };
   const across = Math.cos(slant);
   onPlane(
@@ -167,65 +191,66 @@ function tryOf(
     { along: across * Math.cos(turn), across: across * Math.sin(turn), up: Math.sin(slant) },
     way,
   );
-  const focal = focalOf(1);
-  const distance = reach * (1 + (2 * focal) / pick.fill);
-  const eye = along(system.place, way, distance);
-  const straight = cameraTowards(eye, system.place);
-  const shift = distance / focal;
-  const look = along(along(system.place, straight.right, -pick.aside * shift), straight.up, -pick.lift * shift);
-  return { camera: cameraTowards(eye, look), look };
+  return cameraTowards(along(system.place, way, distance), system.place);
 }
 
-const reachOf = (system: StarSystem, worlds: readonly Orbiter[]) =>
-  Math.max(system.belt ? ROOM : 0, ...worlds.map(({ orbit, radius }) => orbit + radius)) || LEAST_REACH;
-
-// The angles in the address's order: its slants a fourth of the span apart, each all round from its turn.
+// The angles in the address's order: its slants a fourth of the span apart, each all round from its turn, a stride of turns apart, so the
+// first that holds is seldom the same for two addresses whose systems are alike.
 function anglesOf(pick: Chosen): (readonly [number, number])[] {
   return Array.from({ length: SLANT_TRIES * TURNS }, (_, at) => {
-    const slant = SLANT_LEAST + ((pick.slant + (Math.floor(at / TURNS) * SLANT_SPAN) / SLANT_TRIES) % SLANT_SPAN);
-    return [slant * DEGREE, 2 * Math.PI * (pick.first + (at % TURNS) / TURNS)] as const;
+    const slant =
+      SLANT_LEAST + ((pick.slant * SLANT_SPAN + (Math.floor(at / TURNS) * SLANT_SPAN) / SLANT_TRIES) % SLANT_SPAN);
+    return [slant * DEGREE, 2 * Math.PI * (pick.first + ((at * STRIDE) % TURNS) / TURNS)] as const;
   });
 }
 
-interface Asked {
-  readonly pick: Chosen;
-  readonly near: readonly StarSystem[];
-  readonly leaning: boolean;
-}
-
-// The first angle, in the address's order, from which `worlds` read as the rules ask; none if no angle holds.
-function firstHolding(system: StarSystem, worlds: readonly Orbiter[], { pick, near, leaning }: Asked) {
+// The first angle and distance, in the address's order, from which `worlds`, held still, read as the view asks; none if none does.
+function firstHolding(system: StarSystem, worlds: readonly Orbiter[], asked: Asked) {
+  const still = { ...system, spin: 0 };
   const reach = reachOf(system, worlds);
-  const instants = instantsOf([system.spin]);
-  for (const angle of anglesOf(pick)) {
-    const { camera, look } = tryOf(system, angle, { reach, pick });
-    // Judged as drawn (7p): its plane turned so no two stand at one height, its worlds at their drawn size, their own at the least;
-    // refused where no turn can.
-    const shape = shapeOf(system, worlds, camera);
-    const card = { system: shape.system, worlds: drawnOf(shape, 1) };
-    const held = { place: system.place, reach, card, instants, near, leaning };
-    if (shape.worlds.length === worlds.length && Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
-      return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera) };
-  }
+  for (const angle of anglesOf(asked.pick))
+    for (const distance of asked.cut ? DISTANCES : WHOLE_DISTANCES) {
+      const camera = cameraOf(still, angle, reach * distance);
+      const shape = shapeOf(still, worlds, camera);
+      if (shape.worlds.length !== worlds.length || Math.abs(camera.ahead.y) > STEEP) continue;
+      if (holds(camera, shape, asked))
+        return { eye: camera.eye, look: system.place, postcard: postcardFrom(still, worlds, camera) };
+    }
   return undefined;
 }
 
-/** `system`'s arrival among `systems`: the most of its postcard's worlds that some angle reads well, chosen again at each count, from the
- * first such angle its address gives; one that holds through a mouse's lean first, else one that holds at rest and through the sway. A
- * system none reads well with stands by its star and its far belt alone, from its first angle that does not look down the map. */
+// The counts and ways tried, in order: the most worlds with the nearest cut by the frame, down to two; the most whole, down to two; one, cut,
+// then whole. Two worlds whole read deeper than one cut alone.
+function triesOf(most: number): (readonly [count: number, cut: boolean])[] {
+  const down = (cut: boolean) => Array.from({ length: Math.max(most - 1, 0) }, (_, at) => [most - at, cut] as const);
+  return [...down(true), ...down(false), [1, true], [1, false]];
+}
+
+/** `system`'s dynamic view among `systems`: the most of its postcard's worlds an angle reads as the view asks, its nearest cut where one
+ * allows (`triesOf`), from the first angle its address gives that holds through a mouse's lean, else at rest and through the sway; a system
+ * none reads well with, by its star and far belt alone, from its first angle that does not look down the map. */
 export function arrivalOf(system: StarSystem, systems: readonly StarSystem[]): Arrival {
   const pick = chosenOf(system.id);
   // ponytail: one pass over the set an arrival, asked once a system and off the frame: 20,000 distances.
-  const near = systems.filter((other) => other.id !== system.id && away(other.place, system.place) <= NEAR);
-  for (let count = postcardWorlds(system).length; count >= 0; count -= 1)
+  const around = systems.filter((other) => other.id !== system.id && away(other.place, system.place) <= NEAR);
+  const most = postcardWorlds(system).length;
+  for (const [count, cut] of most === 0 ? [] : triesOf(most))
     for (const leaning of [true, false]) {
-      const found = firstHolding(system, postcardWorlds(system, count), { pick, near, leaning });
+      const found = firstHolding(system, postcardWorlds(system, count), { pick, around, leaning, cut });
       if (found !== undefined) return found;
     }
+  // Framed whole by its star and far belt, as 7d3 framed it: the ball's height a share of the screen's.
+  const still = { ...system, spin: 0 };
   const reach = reachOf(system, []);
-  const tries = anglesOf(pick).map((angle) => tryOf(system, angle, { reach, pick }));
-  const [first] = tries;
-  const { camera, look } =
-    tries.find((tried) => Math.abs(tried.camera.ahead.y) <= STEEP) ?? first ?? tryOf(system, [0, 0], { reach, pick });
-  return { eye: camera.eye, look, postcard: postcardFrom(system, [], camera.eye) };
+  const cameras = anglesOf(pick).map((angle) => cameraOf(still, angle, reach * (1 + (2 * focalOf(1)) / FILL)));
+  const camera =
+    cameras.find(
+      (one) =>
+        Math.abs(one.ahead.y) <= STEEP &&
+        around.every((other) => away(other.place, one.eye) >= OUTSIDE) &&
+        looksFrom(one).every((look) => alone(look, { system: still, worlds: [], depth: [] }, around)),
+    ) ??
+    cameras.find((one) => Math.abs(one.ahead.y) <= STEEP) ??
+    cameraOf(still, [SLANT_LEAST * DEGREE, 0], reach * 2);
+  return { eye: camera.eye, look: system.place, postcard: postcardFrom(still, [], camera.eye) };
 }
