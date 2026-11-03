@@ -6,15 +6,15 @@ import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
 const { useSpace, useWorldsCount } = vi.hoisted(() => ({
   useSpace: vi.fn(),
-  useWorldsCount: vi.fn<(wanted: boolean) => number | undefined>(() => undefined),
+  useWorldsCount: vi.fn<(wanted: boolean) => number | null | undefined>(() => undefined),
 }));
 vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount }));
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
-  // F3267: the kicker says gno.world, and the one heading is the hero's line.
+  // F3267: the kicker says gno.world, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-  expect(headingOf(html)).toBe("Worlds in Onyx");
+  expect(headingOf(html)).toBe(" worlds in Onyx");
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
   expect(html).toContain('<a href="/w/govdao"');
@@ -29,6 +29,20 @@ test("counts in its hero the worlds the cosmos draws, once their file has come, 
   expect(html).toMatch(/data-hero="number"[^>]*>534</);
   useWorldsCount.mockReturnValue(undefined);
   expect(await render({ path: "/", Component: Home, loader }, "/")).not.toMatch(/data-hero="number"[^>]*>\d/);
+});
+
+// 7n: the line keeps the figure's room while the number comes, so the actions beside it do not slide; a read that brought none falls back.
+test("keeps the line's figure while its number comes, and names the worlds without one once none came", async () => {
+  useWorldsCount.mockReturnValue(undefined);
+  const coming = await render({ path: "/", Component: Home, loader }, "/");
+  expect(coming).toMatch(/data-hero="figure"[^>]*><\/span>/);
+  expect(headingOf(coming)).toBe(" worlds in Onyx");
+  useWorldsCount.mockReturnValue(null);
+  const none = await render({ path: "/", Component: Home, loader }, "/");
+  expect(none).not.toContain('data-hero="figure"');
+  expect(headingOf(none)).toBe("Worlds in Onyx");
+  expect(none).not.toMatch(/data-hero="number"[^>]*>\d/);
+  useWorldsCount.mockReturnValue(undefined);
 });
 
 test("counts another universe's worlds by its page's list: no cosmos is drawn there", async () => {

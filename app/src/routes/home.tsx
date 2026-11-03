@@ -32,7 +32,11 @@ export default function Home() {
   useSpace(universe.isDefault ? "cosmos" : undefined);
   return (
     <>
-      <Hero universe={universe} worlds={universe.isDefault ? drawn : universe.worlds.length} />
+      <Hero
+        universe={universe}
+        worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
+        coming={drawn === undefined}
+      />
       <Worlds>
         <PlaceLinks places={universe.worlds} />
       </Worlds>

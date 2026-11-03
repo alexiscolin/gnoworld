@@ -219,7 +219,7 @@ async function pageAsked() {
   await import("./signals.ts");
   const { useWorldsCount } = await import("./worldsFile.ts");
   const { WorldsFeed: Feed } = await import("./worldsFeed.ts");
-  const seen: (number | undefined)[] = [];
+  const seen: (number | null | undefined)[] = [];
   function Home() {
     seen.push(useWorldsCount(true));
     return null;

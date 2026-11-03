@@ -12,8 +12,8 @@ const universeOf = (id: string) => {
   if (universe === undefined) throw new RangeError(id);
   return universe;
 };
-const heroWith = (id: string, worlds: number | undefined) =>
-  render({ path: "/", Component: () => <Hero universe={universeOf(id)} worlds={worlds} /> }, "/");
+const heroWith = (id: string, worlds: number | undefined, coming = false) =>
+  render({ path: "/", Component: () => <Hero universe={universeOf(id)} worlds={worlds} coming={coming} /> }, "/");
 const heroOf = (id: string) => heroWith(id, universeOf(id).worlds.length);
 const numberOf = (html: string) => /data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1];
 
@@ -28,6 +28,19 @@ describe("the hero's big number, on a planted site", () => {
     const html = await heroWith("main", undefined);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
     expect(headingOf(html)).toBe("Worlds in Mainland");
+  });
+
+  // 7n: the number comes after the page, and the actions beside the line must not slide when it does (frames 2 to 8 never move).
+  test("keeps its figure's room in the line while the number comes: an empty figure, then the words", async () => {
+    const html = await heroWith("main", undefined, true);
+    expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
+    expect(html).toMatch(/<h1[^>]*><span [^>]*data-hero="figure"[^>]*><\/span> worlds in Mainland<\/h1>/);
+  });
+
+  test("sets the number in the line's figure once it has come", async () => {
+    const html = await heroWith("main", 534, false);
+    expect(html).toMatch(/data-hero="figure"[^>]*>534<\/span>/);
+    expect(headingOf(html)).toBe("534 worlds in Mainland");
   });
 
   test("counts the number it is given, the cosmos's own", async () => {

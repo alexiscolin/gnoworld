@@ -53,7 +53,11 @@ for (const width of [390, 1280]) {
       file.release();
       await expect(page.locator(NUMBER)).toHaveText(COUNT);
       expect((await box(page, NUMBER)).height).toBe(number.height);
-      expect((await box(page, "[data-hero='actions']")).y).toBe(actions.y);
+      const after = await box(page, "[data-hero='actions']");
+      expect(after.y).toBe(actions.y);
+      expect(after.x, "the actions beside the line do not slide: a 3-digit count fills the figure's room").toBe(
+        actions.x,
+      );
       expect(await shifted(page)).toBeLessThan(0.01);
     });
   });

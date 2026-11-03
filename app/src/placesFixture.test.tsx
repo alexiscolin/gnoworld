@@ -153,8 +153,9 @@ describe("a universe's index", () => {
     for (const path of ["/", "/net/onyx/"]) {
       const html = await page("home", path);
       expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-      // The default universe's count is the cosmos's, which the browser reads once the scene runs (7d6): none in the build.
-      expect(headingOf(html), path).toBe("Worlds in Onyx");
+      // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+      // the line's figure's room for it.
+      expect(headingOf(html), path).toBe(" worlds in Onyx");
     }
   });
 

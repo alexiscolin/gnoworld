@@ -46,7 +46,7 @@ const settled = () =>
 async function visit() {
   vi.resetModules();
   const file = await import("./worldsFile.ts");
-  const seen: (number | undefined)[] = [];
+  const seen: (number | null | undefined)[] = [];
   function Home({ wanted }: { wanted: boolean }) {
     seen.push(file.useWorldsCount(wanted));
     return null;
@@ -149,6 +149,19 @@ describe("the hero's number, from the worlds' file", () => {
     const leave = open();
     await settled();
     expect(read).toHaveBeenCalledTimes(2);
+    expect(seen.at(-1)).toBe(3);
+    leave();
+  });
+
+  it("says none came once the page's read brought nothing, so the line can name the worlds without a figure", async () => {
+    read.mockResolvedValueOnce(undefined).mockResolvedValue(fileOf());
+    const { open, seen, worldsFile } = await visit();
+    const leave = open();
+    expect(seen.at(-1)).toBeUndefined();
+    await settled();
+    expect(seen.at(-1)).toBeNull();
+    await worldsFile(new AbortController().signal);
+    await settled();
     expect(seen.at(-1)).toBe(3);
     leave();
   });

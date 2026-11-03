@@ -7,7 +7,16 @@ import type { UniverseView } from "../../places.ts";
 import styles from "./Hero.module.css";
 import { Live } from "./Live.tsx";
 
-export function Hero({ universe, worlds }: { universe: UniverseView; worlds: number | undefined }) {
+/** `coming`: no number yet, but one is on its way (the worlds' file is being read). */
+export function Hero({
+  universe,
+  worlds,
+  coming = false,
+}: {
+  universe: UniverseView;
+  worlds: number | undefined;
+  coming?: boolean;
+}) {
   return (
     <div className={styles["hero"]} data-clear="">
       <Kicker dot="warm">{universe.isDefault ? "gno.world" : universe.name}</Kicker>
@@ -16,10 +25,18 @@ export function Hero({ universe, worlds }: { universe: UniverseView; worlds: num
         {worlds ?? "\u2007"}
       </p>
       <div className={styles["row"]}>
+        {/* The line keeps its figure's room while the number comes, so the actions beside it stay put (7n); with none, it names the worlds. */}
         <h1 className={styles["line"]} tabIndex={-1}>
-          {worlds === undefined
-            ? `Worlds in ${universe.name}`
-            : `${String(worlds)} ${worlds === 1 ? "world" : "worlds"} in ${universe.name}`}
+          {worlds === undefined && !coming ? (
+            `Worlds in ${universe.name}`
+          ) : (
+            <>
+              <span className={styles["figure"]} data-hero="figure">
+                {worlds}
+              </span>
+              {` ${worlds === 1 ? "world" : "worlds"} in ${universe.name}`}
+            </>
+          )}
         </h1>
         <div className={styles["actions"]} data-hero="actions">
           <Link to={universe.earth.path} className={styles["action"]} data-emphasis="solid">
