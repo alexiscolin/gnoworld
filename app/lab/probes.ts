@@ -1,6 +1,5 @@
 // What the journeys read of the realism page, as `globalThis.__lab`: its numbers, where its worlds stand on screen, what a frame of a view
 // costs, which uniforms a world's program keeps, and the worlds it shows.
-import { labOf } from "@gnoworld/core";
 import { Vector3, type WebGLRenderer } from "three";
 import { styleOf } from "../src/scene/planet/generated.ts";
 import { mapBytes } from "../src/scene/planet/maps.ts";
@@ -85,11 +84,8 @@ export function probes(page: Probed) {
     looks: () => shown().map(({ look }) => look),
     ids: () => shown().map(({ id }) => id),
     minors: () => shown().map(({ recipe }) => recipe.minorShare),
-    // What a glance takes for a world's colour: its sea's where the sea holds most of it, its palette's centre elsewhere.
-    mids: () =>
-      shown().map(({ look, recipe }) =>
-        look.sea !== null && recipe.surface.sea >= 0.5 ? labOf(look.sea.deep) : recipe.palette.lab[1],
-      ),
+    // What a glance takes for a world's colours: its land palette's centre, and its sea's two colours where it has a sea.
+    centres: () => shown().map(({ recipe }) => ({ land: recipe.palette.lab[1], sea: recipe.sea?.lab ?? null })),
     styles: () => shown().map((world) => styleOf(world)),
     stages: () => page.view()?.stages ?? [],
   };

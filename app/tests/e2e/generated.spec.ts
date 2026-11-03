@@ -13,6 +13,7 @@ import {
   stats,
 } from "./lab.ts";
 import { glows } from "./pixels.ts";
+import { facesOn } from "./textures.ts";
 import {
   alikeOnScreen,
   alikePairs,
@@ -83,6 +84,11 @@ const nonDegenerate = (all: readonly Portrait[]) => {
 const hue = ([, a, b]: readonly number[]) => Math.atan2(b ?? 0, a ?? 0);
 const chroma = ([, a, b]: readonly number[]) => Math.hypot(a ?? 0, b ?? 0);
 const turned = (one: number, other: number) => Math.abs(Math.atan2(Math.sin(one - other), Math.cos(one - other)));
+// A part a world shows: a tenth of its lit disc, a share's glance step (core's variety.ts).
+const SHOWN = 0.1;
+// A colour read as its palette's: within 45 degrees of its hue, or both grey.
+const near = (lab: readonly number[], mid: readonly number[]) =>
+  chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
 
 // The Earth's detail, measured once a worker: its view is the same on every visit.
 let earthDetail: Detail | undefined;
@@ -189,12 +195,20 @@ test.describe("generated worlds", () => {
       test(`24 ${anchor} worlds read as their class, each lit enough to read`, async ({ page }) => {
         await open(page, classView(index));
         expect(new Set((await looks(page)).map((look) => look.anchor))).toEqual(new Set([anchor]));
-        const all = await portraitsOf(page);
+        const [shot, places] = [await picture(page), await circles(page)];
+        const all = await portraits(page, shot, places);
         nonDegenerate(all);
-        const mids = await askLab<Lab[]>(page, "mids");
+        const faces = await facesOn(page, shot, places);
+        const centres = await askLab<{ land: Lab; sea: readonly Lab[] | null }[]>(page, "centres");
+        // A world with a sea reads as its class by its sea and its land apart, each part it shows on a tenth of its lit disc near its
+        // own colours (Alexis, 2026-11-03, "mer et terres à part"): half sea and half land, its mean hue reads neither.
         const reading = all.filter(({ lab }, at) => {
-          const mid = mids[at] ?? [0, 0, 0];
-          return chroma(mid) < GREY ? chroma(lab) < GREY * 2 : turned(hue(lab), hue(mid)) < SAME_HUE;
+          const { land, sea } = centres[at] ?? { land: [0, 0, 0] as const, sea: null };
+          const face = faces[at];
+          if (sea === null || face === undefined) return near(lab, land);
+          const water =
+            face.sea === null || face.shares.sea < SHOWN || sea.some((colour) => near(face.sea ?? [], colour));
+          return water && (face.land === null || face.shares.land < SHOWN || near(face.land, land));
         });
         expect(reading.length, `${anchor} reads as its own palette`).toBeGreaterThanOrEqual(READ_AS_CLASS);
         const [alike, spread] = [alikePairs(all).length, textureSpread(all)];

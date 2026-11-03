@@ -24,7 +24,7 @@ export interface Circle {
   y: number;
   r: number;
 }
-type Asked = "stats" | "circles" | "looks" | "stages" | "ids" | "minors" | "mids" | "live" | "cost" | "styles";
+type Asked = "stats" | "circles" | "looks" | "stages" | "ids" | "minors" | "centres" | "live" | "cost" | "styles";
 
 export const askLab = <T>(page: Page, what: Asked, ...rest: number[]) =>
   page.evaluate(

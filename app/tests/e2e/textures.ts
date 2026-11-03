@@ -13,12 +13,13 @@ export interface Grain {
   /** Of the bright tiles, the share whose lightness echoes across them at 6 to 10 px. */
   readonly period: number;
 }
-/** A world's face as a glance takes it: the mean Lab colour of its sea and of its land (null where it shows none), and its lit share
- * under cloud. */
+/** A world's face as a glance takes it: the mean Lab colour of its sea and of its land (null where it shows none), and the shares of its
+ * lit disc under cloud, sea and land. */
 export interface Face {
   readonly sea: readonly [number, number, number] | null;
   readonly land: readonly [number, number, number] | null;
   readonly clouds: number;
+  readonly shares: { readonly sea: number; readonly land: number };
 }
 export interface Land {
   readonly share: number;
@@ -191,7 +192,13 @@ function facesOf(discs: readonly Circle[]): Face[] {
       const [sl = 0, sa = 0, sb = 0, n = 0] = sums[kind];
       sums[kind] = [sl + l, sa + a, sb + b, n + 1];
     }
-    return { sea: mean(sums.sea), land: mean(sums.land), clouds: clouds / Math.max(lit, 1) };
+    const share = ([, , , n = 0]: readonly number[]) => n / Math.max(lit, 1);
+    return {
+      sea: mean(sums.sea),
+      land: mean(sums.land),
+      clouds: clouds / Math.max(lit, 1),
+      shares: { sea: share(sums.sea), land: share(sums.land) },
+    };
   });
 }
 
