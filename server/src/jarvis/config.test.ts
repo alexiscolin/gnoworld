@@ -69,7 +69,8 @@ describe("loadJarvisConfig", () => {
   });
 
   it("takes a database's path of 1024 characters, the longest", () => {
-    expect(loadJarvisConfig({ ...ENV, JARVIS_DATABASE: "d".repeat(1024) }).database).toBe("d".repeat(1024));
+    const longest = `/${"d".repeat(1023)}`;
+    expect(loadJarvisConfig({ ...ENV, JARVIS_DATABASE: longest }).database).toBe(longest);
   });
 
   it("reads each cap at its lowest and its highest", () => {

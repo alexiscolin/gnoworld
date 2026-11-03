@@ -140,7 +140,7 @@ describe("cost", () => {
       cache_read_input_tokens: 18_000,
       cache_creation_input_tokens: 0,
       cache_creation: split(0, 0),
-      inference_geo: "us",
+      inference_geo: "global",
       output_tokens_details: { thinking_tokens: 400 },
       server_tool_use: { web_fetch_requests: 0, web_search_requests: 0 },
       service_tier: "standard",
