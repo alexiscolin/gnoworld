@@ -14,11 +14,14 @@ interface Fields {
   room?: string;
   // A line's id, which Ergo sets and every reader of its room sees.
   msgid?: string;
+  // A tool Jarvis's allowlist names, or its fixed word for a name the model made up, and why a call was refused.
+  tool?: string;
+  reason?: string;
 }
 export type Log = (event: string, fields?: Fields) => void;
 
 export function logger(pepper: string, write: (line: string) => void): Log {
-  return (event, { account, method, route, status, port, error, ms, room, msgid } = {}) => {
+  return (event, { account, method, route, status, port, error, ms, room, msgid, tool, reason } = {}) => {
     const hashed = account === undefined ? undefined : createHmac("sha256", pepper).update(account).digest("hex");
     const line = {
       time: new Date().toISOString(),
@@ -31,6 +34,8 @@ export function logger(pepper: string, write: (line: string) => void): Log {
       ms,
       room,
       msgid,
+      tool,
+      reason,
       account: hashed,
     };
     write(`${JSON.stringify(line)}\n`);

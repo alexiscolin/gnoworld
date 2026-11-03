@@ -65,6 +65,14 @@ describe("logger", () => {
     expect(accounts[3]).not.toBe(accounts[0]);
   });
 
+  it("writes a tool's name and a refusal's reason as they are, before the account: Jarvis's checks are ours (10b)", () => {
+    const { log, lines } = capture();
+    log("jarvis_tool_refused", { tool: "gno_call", reason: "unknown_tool", account: ADDRESS });
+    expect(lines[0]?.replace(/^\{"time":"[^"]+",/, "{")).toBe(
+      `{"event":"jarvis_tool_refused","tool":"gno_call","reason":"unknown_tool","account":"${createHmac("sha256", PEPPER).update(ADDRESS).digest("hex")}"}\n`,
+    );
+  });
+
   it("writes a duration in milliseconds as a number", () => {
     const { log, lines } = capture();
     log("moderation_backlog", { ms: 30_000 });
