@@ -4,8 +4,10 @@
 # every `scripts/`, `.claude/`, `docs/`, `adr/` or `.githooks/` path written in backticks.
 # Paths with a template variable or under .claude/tmp/ are skipped. It also checks the findings
 # ledger, docs/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
-# that no file git tracks or would holds a hidden character (F5053).
+# that no file git tracks or would, as staged or in the work tree, no name, link or commit message
+# of the branch holds a hidden character (F5053, F5087, F5089).
 # Usage: check_docs.py [root]
+import os
 import pathlib
 import re
 import subprocess
@@ -14,7 +16,7 @@ import sys
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
 from hidden import hidden_in, hidden_in_data
-from repo_files import git, listed, tracked
+from repo_files import git, listed, listing
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
@@ -77,14 +79,53 @@ def messages(root):
     return list(zip(log[0::2], log[1::2]))
 
 
+def staged(root):
+    """{path: (bytes, whether a link)} of each blob the index holds, what a commit takes (F5087), a link's target its bytes:
+    none outside a repository (the pre-commit's staged copy, whose files are the index's). A gitlink (a submodule) holds no
+    text. A git that cannot run, or fails, raises."""
+    if not (root / ".git").exists():
+        return {}
+    entries = [entry.split("\t", 1) for entry in git("-C", str(root), "ls-files", "-z", "--stage").split("\0") if entry]
+    blobs = [(info.split()[0], info.split()[1], path) for info, path in entries if not info.startswith("160000 ")]
+    batch = subprocess.run(["git", "-C", str(root), "cat-file", "--batch"], input="".join(f"{sha}\n" for _, sha, _ in blobs).encode(),
+                           capture_output=True, check=True).stdout
+    held, at = {}, 0
+    for mode, _, path in blobs:  # each `<sha> blob <size>`, the bytes, a newline
+        start = batch.index(b"\n", at) + 1
+        end = start + int(batch[at:start].split()[2])
+        held[path], at = (batch[start:end], mode == "120000"), end + 1
+    return held
+
+
+def text_of(where, path, data):
+    """hidden_in_data of a file's bytes, but none of an image's."""
+    suffix = pathlib.PurePosixPath(path).suffix
+    return [] if suffix in IMAGES and data.startswith(IMAGES[suffix]) else hidden_in_data(where, data)
+
+
 def hidden(root):
-    """Each format character of the files git tracks or would, and of the branch's commit messages."""
+    """Each hidden character, and each file that is no UTF-8 text: of what a commit takes, the index's copy of each file and
+    link; of the work tree's copy where it differs, and of what git would track; of every name (F5089); and of the branch's
+    commit messages."""
     out = []
-    for p in tracked(root):
-        data = p.read_bytes()
-        if p.suffix in IMAGES and data.startswith(IMAGES[p.suffix]):
+    try:
+        held = staged(root)
+    except (OSError, subprocess.CalledProcessError) as e:
+        held = {}
+        out.append(f"git cannot read the index, so nothing staged is proven clean: {e}")
+    for path, (data, link) in held.items():
+        out += text_of(path + " (link)" * link, path, data)
+    names = set(held)
+    for p in listing(root):
+        path, link = p.relative_to(root).as_posix(), p.is_symlink()
+        names.add(path)
+        if not (link or p.is_file()):
             continue
-        out += hidden_in_data(p.relative_to(root).as_posix(), data)
+        data = os.fsencode(os.readlink(p)) if link else p.read_bytes()
+        if held.get(path) != (data, link):
+            out += text_of(path + " (link)" * link + " (work tree)" * (path in held), path, data)
+    for path in sorted(names):
+        out += hidden_in(f"the name {ascii(path)}", path)
     try:
         for sha, message in messages(root):
             out += hidden_in(f"commit {sha}", message)

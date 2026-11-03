@@ -115,16 +115,20 @@ def worktree(rev):
             git("worktree", "remove", "--force", tree)
 
 
-def tracked(root):
-    """The files git would track under root (so .gitignore holds), or every file but git's own and the installed packages
-    when root is not in a repository or git cannot list it; a file deleted but still in the index is left out. Names come
+def listing(root):
+    """The paths git would track under root (so .gitignore holds), one deleted but still in the index included, or every
+    path but git's own and the installed packages' when root is not in a repository or git cannot list it. Names come
     NUL-ended (-z), so git quotes none, whatever its characters (a quoted name is no file: F1545)."""
     try:
-        paths = [root / name for name in git("-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if name]
+        return [root / name for name in git("-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if name]
     except (OSError, subprocess.CalledProcessError):
         # Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it borrows.
-        paths = [p for p in root.rglob("*") if not {"node_modules", ".git"} & set(p.relative_to(root).parts)]
-    return [p for p in paths if p.is_file()]
+        return [p for p in root.rglob("*") if not {"node_modules", ".git"} & set(p.relative_to(root).parts)]
+
+
+def tracked(root):
+    """listing()'s files: a file deleted but still in the index is left out, and a link stands for what it points to."""
+    return [p for p in listing(root) if p.is_file()]
 
 
 def listed(root, suffixes, skip=frozenset()):

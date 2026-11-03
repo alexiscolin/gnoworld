@@ -1036,6 +1036,8 @@ printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
 printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
 # A file deleted from the work tree but still in the index is not read.
 printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
+# So is a source the alerts check reads (listed(), which lists only what is there).
+mkdir -p "$h/server/src" && printf 'gone\n' >"$h/server/src/gone.ts" && git -C "$h" add server/src/gone.ts && git -C "$h" commit -qm gone2 && rm "$h/server/src/gone.ts"
 hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
 # A file it cannot read fails, never passes unread.
 : >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
@@ -1164,6 +1166,35 @@ out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs pas
 printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
 git -C "$m" update-ref -d refs/remotes/origin/main
 messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
+# What a commit takes is the index's copy (F5087): a hidden character staged under a clean work tree's copy is named, and
+# one in the work tree's copy under a clean staged one, as `(work tree)`. A `.gitattributes` encoding keeps the work tree in
+# another text than the one git stores (F5088): UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
+# text too, a link deleted or pointing nowhere included (F5089); a gitlink (a submodule) holds none.
+x="$t/staged" && mkdir -p "$x/docs" && good_rules "$x" && git -C "$x" init -q
+staged() { python3 -I "$docs" "$x" 2>&1; }
+printf 'a\342\200\256b\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'ab\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character staged under a clean work tree (F5087): $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the staged copy's hidden character: $out"
+printf '%s\n' "$out" | grep -qF "(work tree)" && fail "check_docs named a work tree's copy that holds none: $out"
+printf 'ab\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'a\342\200\256b\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character in the work tree under a clean staged copy: $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md (work tree):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the work tree's hidden character: $out"
+printf 'ab\n' >"$x/docs/s.md"
+staged >/dev/null || fail "check_docs refused a staged and a work tree copy that hold none"
+printf '*.txt working-tree-encoding=UTF-7\n' >"$x/.gitattributes" && printf 'a+IC4-b\n' >"$x/e.txt" && git -C "$x" add .gitattributes e.txt
+out=$(staged) && fail "check_docs passed U+202E that git stores while the work tree writes it in UTF-7 (F5088): $out"
+printf '%s\n' "$out" | grep -qxF "  e.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name what git stores under UTF-7: $out"
+git -C "$x" rm -qf e.txt .gitattributes
+printf 'x\n' >"$x/$(printf 'a\342\200\256b.md')" && printf 'x\n' >"$x/$(printf 'c\342\200\256d.md')"
+ln -s "$(printf 'c\342\200\256d.md')" "$x/link.md" && ln -s "$(printf 'e\342\200\256f')" "$x/staged-link" && git -C "$x" add staged-link && rm "$x/staged-link"
+git -C "$x" update-index --add --cacheinfo "160000,$(printf '%040d' 1),sub"
+out=$(staged) && fail "check_docs passed a hidden character in a name or a link's target (F5089): $out"
+for line in "the name 'a\\u202eb.md':1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "link.md (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "staged-link (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE"; do
+	printf '%s\n' "$out" | grep -qxF "  $line" || fail "check_docs did not say $line: $out"
+done
+printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
 fi
 
 if part harness_mutate; then
@@ -1962,6 +1993,9 @@ precommit || fail "pre-commit stopped a docs-only commit with no secret"
 # A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
 printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
 precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
+# What it reads is what the commit takes, the staged copy, not the work tree's (F5087).
+printf 'ab\n' >"$c2/docs/hidden.md"
+precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
 git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
