@@ -4,6 +4,7 @@
 import { data, useLoaderData, type MetaArgs } from "react-router";
 import { PlaceError } from "../features/errors/index.ts";
 import { RealmView } from "../features/realms/index.ts";
+import { useEntered } from "../features/universe/index.ts";
 import { realmMeta } from "../meta.ts";
 import { realmAt } from "../realmAt.ts";
 
@@ -19,6 +20,8 @@ export function meta({ loaderData }: MetaArgs<typeof clientLoader>) {
 
 export default function Realm() {
   const found = useLoaderData<typeof clientLoader>();
+  // A realm's view is a world's page, a place entered: the rail and the labels link a world with no hub there (ADR-0003 §4).
+  useEntered();
   return <RealmView {...found} />;
 }
 
