@@ -257,8 +257,8 @@ describe("a system's arrival: a good angle", () => {
     expect(arrivalOf(system, systems).postcard.system.spin).toBe(0);
   });
 
-  // The near world, as the mock-up Alexis approved draws it (2026-11-03, 14:09): cut by the frame, large, its head never under the header;
-  // where no angle cuts it, every world whole round the star instead, so the view keeps two worlds rather than one cut alone.
+  // The near world, as the mock-up Alexis approved draws it (2026-11-03, 14:09): cut by the frame, large, its head never under the header,
+  // two others whole beside it at the least (the chief, after the design review's second pass); else every world whole round the star.
   it.each(ROWS)(
     "on %s, cuts %s's nearest world by the frame, 1.5 times every other's size or more, or stands it whole as the others",
     (name, id) => {
@@ -784,6 +784,29 @@ describe("a system's dynamic view's rocks (7v)", () => {
     }
     expect(laid).toBeGreaterThanOrEqual(0.8 * cases.length);
   });
+
+  // The chief, after the design review's second pass (F4468, the mock-up wins): the nearest is cut where two others stand whole beside it;
+  // a view of two stands both whole rather than one cut beside one (14 of the mixed set's views and 2 of Onyx's cut so before).
+  it(
+    "never cuts the nearest beside a single other: a view of two stands both whole, Onyx's too",
+    () => {
+      const onyx = systemsOf(
+        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
+          id,
+          namespace,
+          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
+        })),
+      );
+      for (const { system, systems } of [...allCases(), ...onyx.map((one) => ({ system: one, systems: onyx }))]) {
+        const arrival = arrivalOf(system, systems);
+        if (arrival.postcard.worlds.length !== 2) continue;
+        const [near] = nearestFirst(cameraOf(arrival, REST_SCREENS[0]), arrival);
+        if (near === undefined) continue;
+        expect(cutByFrame(near, REST_SCREENS[0], 0), system.id).toBe(false);
+      }
+    },
+    WHOLE_SEARCHES,
+  );
 
   // The design review's second pass (F4468, the mock-up's rocks in front): at a system the hero gives way and its card stands at the top left,
   // yet the rocks kept the hero's room and stood on the card; gnoswap's seven were all pebbles there, no near one in front.

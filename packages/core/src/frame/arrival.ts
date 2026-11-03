@@ -169,11 +169,13 @@ function firstHolding(system: StarSystem, worlds: readonly Orbiter[], asked: Ask
   return undefined;
 }
 
-// The counts and ways tried, in order: the most worlds with the nearest cut by the frame, down to two; the most whole, down to two; one, cut,
-// then whole. Two worlds whole read deeper than one cut alone.
+// The counts and ways tried, in order: the most worlds with the nearest cut by the frame and two others whole at the least, down to three,
+// as the mock-up Alexis approved draws it (the chief, after the design review's second pass); the most whole, down to two; two, one cut,
+// then one whole.
 function triesOf(most: number): (readonly [count: number, cut: boolean])[] {
-  const down = (cut: boolean) => Array.from({ length: Math.max(most - 1, 0) }, (_, at) => [most - at, cut] as const);
-  return [...down(true), ...down(false), [1, true], [1, false]];
+  const down = (cut: boolean, least: number) =>
+    Array.from({ length: Math.max(most - least + 1, 0) }, (_, at) => [most - at, cut] as const);
+  return [...down(true, 3), ...down(false, 2), [2, true], [1, true], [1, false]];
 }
 
 /** `system`'s dynamic view among `systems`: the most of its postcard's worlds an angle reads as the view asks, its nearest cut where one
