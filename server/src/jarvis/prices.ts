@@ -66,16 +66,12 @@ export function cost(model: string, usage: unknown): number | undefined {
   return input * rates.input + output * rates.output + read * rates.read + written;
 }
 
-/** The most a call can cost with its retries, each attempt billed, in nano-dollars: a RangeError on a wrong bound. */
-export function worstCost(
-  model: Model,
-  { inputBytes, maxTokens, attempts }: { inputBytes: number; maxTokens: number; attempts: number },
-): number {
+/** The most one attempt of a call can cost, in nano-dollars: a RangeError on a bound that is not a count (D69). */
+export function worstCost(model: Model, { inputBytes, maxTokens }: { inputBytes: number; maxTokens: number }): number {
   if (!Number.isSafeInteger(inputBytes) || inputBytes < 0) throw new RangeError("inputBytes: a count of bytes");
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) throw new RangeError("maxTokens: a count of tokens, from 1");
-  if (![1, 2, 3].includes(attempts)) throw new RangeError("attempts: one, and two retries at most");
   // No prompt has more tokens than its UTF-8 bytes: each byte is the dearest input token of the card they can reach.
   const rates = ratesOf(model, inputBytes);
   const dearest = Math.max(rates.input, rates.read, rates.fiveMinutes, rates.hour);
-  return attempts * (inputBytes * dearest + maxTokens * rates.output);
+  return inputBytes * dearest + maxTokens * rates.output;
 }

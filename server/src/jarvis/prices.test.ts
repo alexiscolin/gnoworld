@@ -209,31 +209,23 @@ describe("cost", () => {
 
 describe("worstCost", () => {
   it("prices every input byte as an hour's cache write and every allowed output token", () => {
-    expect(worstCost("claude-sonnet-5-5", { inputBytes: 1_000, maxTokens: 100, attempts: 1 })).toBe(
+    expect(worstCost("claude-sonnet-5-5", { inputBytes: 1_000, maxTokens: 100 })).toBe(
       1_000 * nano(4) + 100 * nano(10),
     );
-    expect(worstCost("claude-opus-5-5", { inputBytes: 1_000, maxTokens: 10, attempts: 1 })).toBe(
-      1_000 * nano(8) + 10 * nano(20),
-    );
+    expect(worstCost("claude-opus-5-5", { inputBytes: 1_000, maxTokens: 10 })).toBe(1_000 * nano(8) + 10 * nano(20));
   });
 
   it("prices Haiku 5.5 at its other card once the bytes can pass 100K tokens", () => {
-    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_000, maxTokens: 1_000, attempts: 1 })).toBe(
+    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_000, maxTokens: 1_000 })).toBe(
       100_000 * nano(0.2) + 1_000 * nano(0.5),
     );
-    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_001, maxTokens: 1_000, attempts: 1 })).toBe(
+    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_001, maxTokens: 1_000 })).toBe(
       100_001 * nano(1) + 1_000 * nano(2.5),
     );
   });
 
-  it("bounds a call with its retries: each attempt may be billed (red pass, its third design note)", () => {
-    const once = 1_000 * nano(4) + 100 * nano(10);
-    expect(worstCost("claude-sonnet-5-5", { inputBytes: 1_000, maxTokens: 100, attempts: 2 })).toBe(2 * once);
-    expect(worstCost("claude-sonnet-5-5", { inputBytes: 1_000, maxTokens: 100, attempts: 3 })).toBe(3 * once);
-  });
-
   it("takes no input byte and one output token, the least", () => {
-    expect(worstCost("claude-sonnet-5-5", { inputBytes: 0, maxTokens: 1, attempts: 1 })).toBe(nano(10));
+    expect(worstCost("claude-sonnet-5-5", { inputBytes: 0, maxTokens: 1 })).toBe(nano(10));
   });
 
   it.each([
@@ -248,13 +240,7 @@ describe("worstCost", () => {
       "maxTokens: a count of tokens, from 1",
     ],
   ])("refuses %s, naming the bound: a bound must be a count", (_, bounds, message) => {
-    expect(() => worstCost("claude-sonnet-5-5", { ...bounds, attempts: 1 })).toThrow(new RangeError(message));
-  });
-
-  it.each([0, 4, 1.5, Number.NaN])("refuses %d attempts: one, and two retries at most (ADR-0002 §5)", (attempts) => {
-    expect(() => worstCost("claude-sonnet-5-5", { inputBytes: 10, maxTokens: 10, attempts })).toThrow(
-      new RangeError("attempts: one, and two retries at most"),
-    );
+    expect(() => worstCost("claude-sonnet-5-5", { ...bounds })).toThrow(new RangeError(message));
   });
 
   it("is never below the cost of an answer within its bounds, on every model", () => {
@@ -280,9 +266,7 @@ describe("worstCost", () => {
           });
           // No prompt has more tokens than its UTF-8 bytes; an answer priced at nothing fails the property.
           const priced = cost(model, answer) ?? Number.POSITIVE_INFINITY;
-          expect(worstCost(model, { inputBytes: prompt + spare, maxTokens, attempts: 1 })).toBeGreaterThanOrEqual(
-            priced,
-          );
+          expect(worstCost(model, { inputBytes: prompt + spare, maxTokens })).toBeGreaterThanOrEqual(priced);
         },
       ),
     );
