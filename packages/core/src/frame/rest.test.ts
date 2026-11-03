@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { EARTH_PLACE, EARTH_RADIUS, GRAIN, systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
+import {
+  EARTH_PLACE,
+  EARTH_RADIUS,
+  GRAIN,
+  systemsOf,
+  type Orbiter,
+  type StarSystem,
+  type WorldHeld,
+} from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitTime, SWAY } from "../space/drift.ts";
 import { orbitPlace } from "./disc.ts";
@@ -43,6 +51,16 @@ function spread(systems: number, each: number): WorldHeld[] {
 
 function crowd(namespace: string, count: number): WorldHeld[] {
   return Array.from({ length: count }, (_, at) => ({ id: `${namespace}/w${String(at)}`, namespace, use: at % 9 }));
+}
+
+// Sixty single worlds and thirty systems of six: poor and rich systems mixed.
+function richMix(): WorldHeld[] {
+  const rich = Array.from({ length: 180 }, (_, at) => ({
+    id: `rich${String(at % 30)}/w${String(at)}`,
+    namespace: `rich${String(at % 30)}`,
+    use: 1 + (at % 5) * 40,
+  }));
+  return [...spread(60, 1), ...rich];
 }
 
 interface Seen {
@@ -172,7 +190,6 @@ const made = (file: readonly WorldHeld[]) => {
   const systems = systemsOf(file);
   return { systems, view: restView(systems) };
 };
-
 describe("what the view is composed for", () => {
   // Alexis, 2026-11-03 ("tout pourrait être un peu plus gros"), 1.2 times by the chief: the home's lens, which the scene's camera takes
   // while the cosmos shows, magnifies 1.2 times the app camera's 50 degrees.
@@ -339,12 +356,7 @@ describe("the postcards", () => {
   // 7d6's review (lots 3 and 4): the search's order, a close world before the postcards' bodies. No other set decides it: here the best view
   // with no close world draws five bodies in its postcards (measured with the close world's score at 0), this one four.
   it("takes a close world first, then the richest postcard of the Earth's 24 nearest, with poor and rich systems mixed", () => {
-    const rich = Array.from({ length: 180 }, (_, at) => ({
-      id: `rich${String(at % 30)}/w${String(at)}`,
-      namespace: `rich${String(at % 30)}`,
-      use: 1 + (at % 5) * 40,
-    }));
-    const { systems, view } = made([...spread(60, 1), ...rich]);
+    const { systems, view } = made(richMix());
     const counted = (system: StarSystem | undefined) =>
       system === undefined ? 0 : Math.min(3, postcardOf(system, view.eye).worlds.length);
     const awayOf = ({ place }: StarSystem) => Math.hypot(...Object.values(minus(place, EARTH_PLACE)));
@@ -419,6 +431,120 @@ describe("the postcards", () => {
       }
     },
   );
+});
+
+// Alexis, 2026-11-03 ("pas 2 planètes de la même taille au même niveau, c'est pas naturel"), option B: a postcard's worlds read in depth
+// by their drawn size, the nearer larger, 1.5 times its neighbour or more through its turn, none at one height, none dropped to a dot.
+describe("the postcards in depth (7p)", () => {
+  // 7d9's sets beside the view's own: the rule as briefed left one body per postcard in each.
+  const sets = {
+    ...files,
+    "54 of four": spread(54, 4),
+    "104 of eight": spread(104, 8),
+    "rich mix": richMix(),
+  } as const satisfies Record<string, readonly WorldHeld[]>;
+  // The bodies each postcard drew before the depth (7p, measured on b582d1aa): none is dropped to get there.
+  const BEFORE: Record<keyof typeof sets, readonly number[]> = {
+    "one system": [1],
+    "3 systems": [1],
+    "7 systems": [1, 1],
+    "100 systems": [2, 1],
+    "1,000 systems": [1, 1],
+    "10,000 systems": [1, 1],
+    "crowds and singles": [1, 1],
+    "one namespace of 20,000": [1, 1],
+    "300 systems of four": [2, 2],
+    "54 of four": [2, 2],
+    "104 of eight": [3, 3],
+    "rich mix": [3, 1],
+  };
+  const rows = Object.keys(sets) as (keyof typeof sets)[];
+  // Each postcard's bodies as drawn, at a share of their size, in its plane as drawn, and eight instants of its turn.
+  const cardsOf = (name: keyof typeof sets) => {
+    const { systems, view } = made(sets[name]);
+    return view.postcards.map((index) => {
+      const system = systems[index];
+      if (system === undefined) throw new Error("no postcard");
+      const { system: plane, worlds, depth } = postcardOf(system, view.eye);
+      const drawn = worlds.map((world, at) => ({ ...world, radius: world.radius * (depth[at] ?? NaN) }));
+      const turn = (2 * Math.PI) / Math.abs(system.spin);
+      const instants = Array.from({ length: 8 }, (_, step) => (step * turn) / 8);
+      return { view, plane, worlds, drawn, instants };
+    });
+  };
+  const seenOf = (
+    { view, plane, drawn }: { view: RestView; plane: StarSystem; drawn: readonly Orbiter[] },
+    seconds: number,
+  ) => {
+    const see = cameraOf(view, REST_SCREENS[0]);
+    return drawn.map((world) => see(placeOf(plane, world, seconds), world.radius));
+  };
+
+  it.each(rows)(
+    "draws each postcard's bodies 1.5 times apart in size or more, at rest and through its turn, with %s",
+    (name) => {
+      for (const { view, plane, worlds, drawn, instants } of cardsOf(name))
+        for (const seconds of instants) {
+          const seen = seenOf({ view, plane, drawn }, seconds);
+          expect(seen).toHaveLength(worlds.length);
+          seen.forEach((one, at) => {
+            for (const other of seen.slice(at + 1))
+              expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(
+                1.5,
+              );
+          });
+        }
+    },
+  );
+
+  it.each(rows)("draws the nearer of a postcard's bodies the larger at rest, with %s", (name) => {
+    for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+      const byDepth = seenOf({ view, plane, drawn }, 0).sort((a, b) => a.depth - b.depth);
+      expect(byDepth).toHaveLength(worlds.length);
+      byDepth.forEach((near, at) => {
+        const far = byDepth[at + 1];
+        if (far !== undefined) expect(near.radius).toBeGreaterThan(far.radius);
+      });
+    }
+  });
+
+  // Two neighbours stand at one height when their centres are less than a tenth of the screen's height apart up the screen and their line
+  // stands less than 40 degrees off level: a far postcard's bodies stand closer than a tenth of the height, and read apart by their slant.
+  it.each(rows)("stands no two neighbouring bodies of a postcard at one height at rest, with %s", (name) => {
+    const { height } = REST_SCREENS[0];
+    for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+      const seen = seenOf({ view, plane, drawn }, 0);
+      expect(seen).toHaveLength(worlds.length);
+      for (const one of seen) {
+        const others = seen.filter((other) => other !== one);
+        const [nearest] = others.sort(
+          (a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y),
+        );
+        if (nearest === undefined) continue;
+        const [across, up] = [Math.abs(nearest.x - one.x), Math.abs(nearest.y - one.y)];
+        expect(up >= 0.1 * height || up >= Math.tan((40 * Math.PI) / 180) * across).toBe(true);
+      }
+    }
+  });
+
+  it.each(rows)(
+    "drops no body of a postcard to a dot: each a body's least size on screen or more through its turn, with %s",
+    (name) => {
+      for (const { view, plane, drawn, instants } of cardsOf(name))
+        for (const seconds of instants)
+          for (const { radius } of seenOf({ view, plane, drawn }, seconds))
+            expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
+    },
+  );
+
+  it.each(rows)("draws as many bodies in each postcard as before the depth, with %s", (name) => {
+    const { systems, view } = made(sets[name]);
+    const counts = view.postcards.map((index) => {
+      const system = systems[index];
+      return system === undefined ? 0 : postcardOf(system, view.eye).worlds.length;
+    });
+    expect(counts).toEqual(BEFORE[name]);
+  });
 });
 
 // The bodies drawn at rest: the postcards' four largest worlds of a body's size, spread round their star, and the close world.

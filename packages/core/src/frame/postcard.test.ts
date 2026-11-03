@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { CELL } from "../cosmos/cosmos.ts";
-import { BELT_INNER, GRAIN, systemsOf, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, EARTH_PLACE, GRAIN, systemsOf, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { BODY_PIXELS } from "../lod/ladder.ts";
+import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
-import { postcardFrom, postcardOf, postcardWorlds } from "./postcard.ts";
+import { postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
+import { cameraTowards, Look, placeOf as restPlaceOf, REST_SCREENS } from "./restLook.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
 const systemOf = (
@@ -240,5 +243,94 @@ describe("a postcard's plane", () => {
     const { system } = postcardOf(leaning, eye);
     expect(openness(system, eye)).toBeCloseTo(0.5, 9);
     expect(system.tilt).toBeLessThanOrEqual(Math.PI / 2);
+  });
+});
+
+// Alexis, 2026-11-03, option B (part 7p): a postcard reads in depth by its worlds' drawn sizes, its plane turned about the eye's line, as open
+// as it was, till no two neighbours stand at one height. Measured here on the video's screen, through the home's lens.
+describe("a postcard in depth", () => {
+  const screen = REST_SCREENS[0];
+  const lookFrom = (eye: Point) => new Look(cameraTowards(eye, EARTH_PLACE), screen);
+  const seenOf = (postcard: Postcard, eye: Point, seconds = 0) =>
+    postcard.worlds.map((world, at) =>
+      lookFrom(eye).seen(restPlaceOf(postcard.system, world, seconds), world.radius * (postcard.depth[at] ?? NaN)),
+    );
+  const turnOf = ({ spin }: StarSystem) =>
+    Array.from({ length: 8 }, (_, step) => (step * 2 * Math.PI) / Math.abs(spin) / 8);
+  const levelOf = (one: { x: number; y: number }, other: { x: number; y: number }) =>
+    Math.abs(one.y - other.y) < 0.1 * screen.height &&
+    Math.abs(one.y - other.y) < Math.tan((40 * Math.PI) / 180) * Math.abs(one.x - other.x);
+  const opennessOf = ({ place, tilt, node }: StarSystem, eye: Point) => {
+    const normal = [-Math.sin(node) * Math.sin(tilt), Math.cos(tilt), Math.cos(node) * Math.sin(tilt)];
+    const view = [place.x - eye.x, place.y - eye.y, place.z - eye.z];
+    const length = Math.hypot(...view);
+    return Math.abs(view.reduce((sum, value, at) => sum + value * (normal[at] ?? 0), 0)) / length;
+  };
+
+  it("draws a lone body at its own size", () => {
+    const { depth } = postcardOf(systemOf([[0.5, 1.5, 0]]), { x: 0, y: 8, z: 40 });
+    expect(depth).toEqual([1]);
+  });
+
+  it("draws the nearer of two like worlds the larger, 1.5 times the farther or more through its turn", () => {
+    const system = systemOf([
+      [0.5, 2.5, 0.3],
+      [0.5, 3.4, 2.4],
+    ]);
+    const eye = { x: 2, y: 9, z: 36 };
+    const postcard = postcardOf(system, eye);
+    expect(postcard.worlds.map(({ id }) => id)).toEqual(["s/0", "s/1"]);
+    for (const seconds of turnOf(system)) {
+      const [one, other] = seenOf(postcard, eye, seconds);
+      if (one === undefined || other === undefined) throw new Error("no pair");
+      expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(1.5);
+    }
+    const [one, other] = seenOf(postcard, eye);
+    if (one === undefined || other === undefined) throw new Error("no pair");
+    expect(one.depth < other.depth).toBe(one.radius > other.radius);
+    expect(Math.max(...postcard.depth)).toBe(1);
+  });
+
+  it("turns its plane about the eye's line, as open as it was, till its two bodies stand at two heights", () => {
+    // Flat, seen from the front a little above: its two worlds a little off its line of nodes stand nearly level, opened as it is.
+    const system = systemOf([
+      [0.5, 2.5, 0.25],
+      [0.4, 3.2, 0.25 + Math.PI],
+    ]);
+    const eye = { x: 0, y: 6, z: 40 };
+    const plain = postcardFrom(system, [], eye).system;
+    const levelled = postcardOf(system, eye);
+    const [one, other] = seenOf(levelled, eye);
+    if (one === undefined || other === undefined) throw new Error("no pair");
+    expect(levelOf(one, other)).toBe(false);
+    expect(levelled.system).not.toEqual(plain);
+    expect(opennessOf(levelled.system, eye)).toBeCloseTo(opennessOf(plain, eye), 9);
+    expect(levelled.worlds).toEqual(postcardWorlds(system));
+  });
+
+  it("draws no body where no turn of its plane stands its two at two heights: both on its line of nodes", () => {
+    const system = systemOf([
+      [0.5, 2.5, 0],
+      [0.4, 3.2, Math.PI],
+    ]);
+    expect(postcardWorlds(system)).toHaveLength(2);
+    const { worlds, depth } = postcardOf(system, { x: 0, y: 6, z: 40 });
+    expect(worlds).toEqual([]);
+    expect(depth).toEqual([]);
+  });
+
+  it("lifts a far postcard's bodies so its smallest stays a body through its turn, the nearer still the larger", () => {
+    const system = systemOf([
+      [0.4, 1.0, 0.2],
+      [0.35, 1.8, 2.1],
+      [0.3, 2.5, 4.4],
+    ]);
+    const eye = { x: 10, y: 40, z: 140 };
+    const postcard = postcardOf(system, eye);
+    expect(postcard.worlds).toHaveLength(3);
+    expect(Math.max(...postcard.depth)).toBeGreaterThan(1);
+    for (const seconds of turnOf(system))
+      for (const { radius } of seenOf(postcard, eye, seconds))
+        expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
   });
 });

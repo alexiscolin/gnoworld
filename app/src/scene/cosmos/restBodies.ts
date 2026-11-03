@@ -4,6 +4,7 @@
 import {
   BODY_PIXELS,
   distanceOf as away,
+  drawnOf,
   EARTH_PLACE,
   EARTH_RADIUS,
   GRAIN,
@@ -86,15 +87,19 @@ function restBodies(
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
-  const offer = (system: StarSystem, world: Orbiter) => {
-    if (world.radius < GRAIN) return;
+  // A world too small for a body is a speck by its own size, whatever a postcard draws it at (7p).
+  const offer = (system: StarSystem, world: Orbiter, own = world.radius) => {
+    if (own < GRAIN) return;
     const { x, y, z } = system.place;
     const away = Math.hypot(x - sight.eye.x, y - sight.eye.y, z - sight.eye.z);
     if (screenRadius(world.radius, away, sight.focal) >= BODY_PIXELS) wanted.set(world.id, [system, world]);
   };
-  // A postcard's bodies stand spread round its star, in its plane as drawn, from the eye at rest: the same view, the same spread. The
-  // close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
-  for (const { system, worlds } of postcards.values()) for (const world of worlds) offer(system, world);
+  // A postcard's bodies stand spread round its star, in its plane as drawn, each at its drawn size (7p), from the eye at rest: the same
+  // view, the same spread. The close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
+  for (const card of postcards.values())
+    drawnOf(card).forEach((world, at) => {
+      offer(card.system, world, card.worlds[at]?.radius);
+    });
   if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
   return wanted;
 }

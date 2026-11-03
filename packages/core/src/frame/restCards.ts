@@ -2,7 +2,7 @@
 // keeps, apart from each other and from the Earth, each with its bodies spread round its star as the eye sees it.
 import type { Orbiter, StarSystem } from "../cosmos/system.ts";
 import { composed } from "./composition.ts";
-import { postcardFrom } from "./postcard.ts";
+import { drawnOf, shapeOf } from "./postcard.ts";
 import { clearOfClose } from "./restClose.ts";
 import { placeOf, type Close, type Held, type Look, type Seen } from "./restLook.ts";
 
@@ -28,13 +28,26 @@ export interface Ask {
   readonly unlit?: boolean;
 }
 
+const reachOf = (held: Held, worlds: readonly Orbiter[]) =>
+  Math.max(held.reach, ...worlds.map(({ orbit, radius }) => orbit + radius));
+
+// At its worlds' own size, the eye not asked: a card drawn no smaller, which fits only where this does, is shaped only then (7p).
+const plainOf = (held: Held): Card => ({
+  held,
+  system: held.system,
+  worlds: held.postcard,
+  reach: reachOf(held, held.postcard),
+});
+
+// Its worlds at their drawn size (7p), their own at the least: the view is judged on both.
 const cardOf = (held: Held, looks: readonly Look[]): Card => {
   const [look] = looks;
-  const { system, worlds } =
+  const card =
     look === undefined
-      ? { system: held.system, worlds: [] }
-      : postcardFrom(held.system, held.postcard, look.camera.eye);
-  return { held, system, worlds, reach: Math.max(held.reach, ...worlds.map(({ orbit, radius }) => orbit + radius)) };
+      ? { system: held.system, worlds: [], depth: [] }
+      : shapeOf(held.system, held.postcard, look.camera);
+  const worlds = drawnOf(card, 1);
+  return { held, system: card.system, worlds, reach: reachOf(held, worlds) };
 };
 
 const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y) >= a.radius + b.radius + MARGIN;
@@ -84,7 +97,7 @@ export function postcardsOf(
   { near, close, lenient = false, most = 2 }: Ask,
 ): Card[] | undefined {
   const fit = near
-    .filter((held) => held !== close?.held)
+    .filter((held) => held !== close?.held && fits(looks, plainOf(held), close))
     .map((held) => cardOf(held, looks))
     .filter((card) => fits(looks, card, close))
     .sort(richer);

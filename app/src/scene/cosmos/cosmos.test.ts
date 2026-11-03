@@ -3038,6 +3038,25 @@ describe("a system's arrival (7d3)", () => {
       for (const body of bodies) expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(body.radius);
   });
 
+  // Alexis, 2026-11-03 (reports/alexis-1213-same-level.png): the lower postcard's agents and streak stood 1.17 times apart, 92 pixels apart
+  // in height. Option B: the nearer drawn larger, 1.5 times its neighbour or more, never at one height; the view keeps its framing
+  // (decisions of 2026-11-02): the close world, two postcards of two bodies and one, the Earth at the centre.
+  it("draws Onyx's postcards in depth at rest, the nearer larger and at another height, in the view it framed", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const { screen } = scene.cosmos.stats();
+    const bodies = new Map(screen.bodies.map((body) => [body.id.split("/").at(-1), body]));
+    for (const framed of ["agents", "gnoslinger", "minichess", "streak"]) expect(bodies.has(framed)).toBe(true);
+    const [agents, streak] = [bodies.get("agents"), bodies.get("streak")];
+    if (agents === undefined || streak === undefined) throw new Error("no postcard pair");
+    const [near, far] = agents.away < streak.away ? [agents, streak] : [streak, agents];
+    expect(near.radius / far.radius).toBeGreaterThanOrEqual(1.5);
+    const [across, up] = [Math.abs(agents.x - streak.x), Math.abs(agents.y - streak.y)];
+    expect(up >= 0.1 * HEIGHT || up >= Math.tan((40 * Math.PI) / 180) * across).toBe(true);
+    expect(screen.earth?.x).toBeCloseTo(WIDTH / 2, 0);
+    expect(screen.earth?.y).toBeCloseTo(HEIGHT / 2, 0);
+  });
+
   it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
     const { scene, arrival } = await atGnoswap();
     const { to } = await arrived(scene, GNOSWAP);

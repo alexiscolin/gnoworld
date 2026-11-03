@@ -3,9 +3,10 @@
 // spin, with a third of the smaller one's width between them; never past its own cell, and never a regular figure. A plane seen near its
 // edge is opened towards the eye, at display only.
 import { CELL } from "../cosmos/cosmos.ts";
-import { BELT_INNER, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, EARTH_PLACE, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
-import { normalOf, withNormal } from "./depth.ts";
+import { depthOf, levelled, normalOf, withNormal } from "./depth.ts";
+import { cameraTowards, type Camera } from "./restLook.ts";
 
 // Frame 4's densest group is four bodies; a postcard's are chosen among its eight largest.
 const POSTCARD_BODIES = 4;
@@ -26,11 +27,13 @@ const ALIKE = 0.15;
 // turns as one, so what stands clear at rest stays clear.
 const SPECK_CLEAR = 0.5;
 
-/** A postcard as drawn: its system, its plane opened towards the eye if need be, the worlds it draws as bodies, and those of its specks it
+/** A postcard as drawn: its system, its plane opened towards the eye if need be and turned about the eye's line so no two neighbours stand
+ * at one height, the worlds it draws as bodies, the share of its size each is drawn at by its nearness (7p), and those of its specks it
  * leaves out, for they would stand on a body's ground (7d3). */
 export interface Postcard {
   readonly system: StarSystem;
   readonly worlds: readonly Orbiter[];
+  readonly depth: readonly number[];
   readonly hidden: ReadonlySet<string>;
 }
 
@@ -120,12 +123,32 @@ function hiddenOf(system: StarSystem, worlds: readonly Orbiter[]): Set<string> {
   return new Set(system.worlds.filter((world) => !bodies.has(world.id) && near(world)).map(({ id }) => id));
 }
 
-/** `worlds`, as `postcardWorlds` gives them, as a postcard from the eye at rest `eye`: its plane opened if need be. */
-export const postcardFrom = (system: StarSystem, worlds: readonly Orbiter[], eye: Point): Postcard => ({
-  system: opened(system, eye),
-  worlds,
-  hidden: hiddenOf(system, worlds),
-});
+/** `worlds`, as `postcardWorlds` gives them, as a postcard's shape from `sight`, the eye at rest looking at the Earth or a camera, on the
+ * video's screen: its plane opened if need be and turned till no two neighbours stand at one height, each world drawn at its share; none
+ * if no turn stands them apart, which refuses the postcard to that eye. */
+export function shapeOf(
+  system: StarSystem,
+  worlds: readonly Orbiter[],
+  sight: Point | Camera,
+): Omit<Postcard, "hidden"> {
+  const camera = "ahead" in sight ? sight : cameraTowards(sight, EARTH_PLACE);
+  const open = opened(system, camera.eye);
+  const plane = levelled(open, worlds, camera);
+  return plane === undefined
+    ? { system: open, worlds: [], depth: [] }
+    : { system: plane, worlds, depth: depthOf(plane, worlds, camera) };
+}
+
+/** `worlds` as a postcard from `sight`: its shape, and the specks it leaves out. */
+export function postcardFrom(system: StarSystem, worlds: readonly Orbiter[], sight: Point | Camera): Postcard {
+  const shape = shapeOf(system, worlds, sight);
+  return { ...shape, hidden: hiddenOf(system, shape.worlds) };
+}
+
+/** `postcard`'s worlds at their drawn size; with `least` 1, at their own size at the least, as a view is judged, so what held at their own
+ * size still holds. */
+export const drawnOf = ({ worlds, depth }: Pick<Postcard, "worlds" | "depth">, least = 0): Orbiter[] =>
+  worlds.map((world, at) => ({ ...world, radius: world.radius * Math.max(least, depth[at] ?? 1) }));
 
 /** A postcard as drawn from the eye at rest `eye`. */
 export const postcardOf = (system: StarSystem, eye: Point): Postcard =>

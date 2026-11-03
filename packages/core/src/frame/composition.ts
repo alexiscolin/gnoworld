@@ -136,6 +136,21 @@ function aRow(all: readonly Seen[], { deep, lights, width, height }: Frame): boo
   return lined || evenRow(shown) || evenRow(stars);
 }
 
+// Two neighbours stand at one height under a tenth of the screen's height apart and under 40 degrees off level (the chief's reading of
+// Alexis's rule, 2026-11-03: a far postcard's bodies stand nearer than a tenth of the height, and read apart by their slant).
+const ONE_HEIGHT = 0.1;
+const LEVEL = Math.tan((40 * Math.PI) / 180);
+
+/** Whether two places stand at one height on a screen `height` pixels high. */
+export const atOneHeight = (
+  one: { x: number; y: number },
+  other: { x: number; y: number },
+  height: number,
+): boolean => {
+  const up = Math.abs(one.y - other.y);
+  return up < ONE_HEIGHT * height && up < LEVEL * Math.abs(one.x - other.x);
+};
+
 /** Whether the bodies on screen, `spots`, and the Earth read as the view must, judged in `frame`: spread, apart, in no row that does not
  * recede, and deep with a close world. */
 export function composed(spots: readonly Seen[], earth: Seen, frame: Frame): boolean {

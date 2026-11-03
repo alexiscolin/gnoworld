@@ -8,7 +8,7 @@ import { ARRIVAL_LEAN, SWAY_CORNERS } from "../space/drift.ts";
 import { composed } from "./composition.ts";
 import { CENTRE, onPlane, toMap } from "./disc.ts";
 import { HALO_FAR, haloAt } from "./halo.ts";
-import { postcardFrom, postcardWorlds, type Postcard } from "./postcard.ts";
+import { drawnOf, postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
 import { instantsOf, spotsOf } from "./restCards.ts";
 import {
   along,
@@ -199,10 +199,13 @@ function firstHolding(system: StarSystem, worlds: readonly Orbiter[], { pick, ne
   const instants = instantsOf([system.spin]);
   for (const angle of anglesOf(pick)) {
     const { camera, look } = tryOf(system, angle, { reach, pick });
-    const card = { system: postcardFrom(system, worlds, camera.eye).system, worlds };
+    // Judged as drawn (7p): its plane turned so no two stand at one height, its worlds at their drawn size, their own at the least;
+    // refused where no turn can.
+    const shape = shapeOf(system, worlds, camera);
+    const card = { system: shape.system, worlds: drawnOf(shape, 1) };
     const held = { place: system.place, reach, card, instants, near, leaning };
-    if (Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
-      return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera.eye) };
+    if (shape.worlds.length === worlds.length && Math.abs(camera.ahead.y) <= STEEP && holds(camera, look, held))
+      return { eye: camera.eye, look, postcard: postcardFrom(system, worlds, camera) };
   }
   return undefined;
 }
