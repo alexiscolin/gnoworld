@@ -1256,6 +1256,10 @@ def mutate_mutants():
         ("            failed = True\n            continue\n", "            continue\n", "fails a package whose gno did not end"),
         ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
         ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
+        ('            if got == "survives" and label not in GAPS:  #', "            if False:  #", "judges a survivor again alone, where its filetests see it (F5050)"),
+        ('            if got == "survives" and label not in GAPS:  #', '            if got == "survives":  #', "judges no gap again alone (F5050)"),
+        ("                except Stopped:\n", "                except ZeroDivisionError:\n", "names a survivor whose run alone never ends"),
+        ('                    got = "stopped"\n', "                    pass\n", "says a survivor's run alone stopped, not that it survived"),
     ))
 
 

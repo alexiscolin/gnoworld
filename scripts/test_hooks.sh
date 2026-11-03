@@ -518,6 +518,7 @@ printf '%s\n' "$out" | grep -q "flips do not compile" && fail "mutate.py dropped
 cat >"$mu/fakegno" <<'EOF'
 #!/bin/sh
 echo "$*" >>"$(dirname "$0")/fakegno.runs"
+[ "$FAKE:$#" = "hangalone:4" ] && exec sleep 30 # a run of one copy never ends
 for d in "$@"; do
 	case $FAKE:$d in
 	control:./m0) printf 'FAIL    ./m0 \t0.01s\n' ;;
@@ -525,7 +526,7 @@ for d in "$@"; do
 	compile:./m*) printf '%s/planted.gno:1:1: planted (code=gnoTypeCheckError)\nFAIL    %s \t0.00s\n' "${d#./}" "$d" ;;
 	timeout:./m22) printf 'panic: test timed out after 60s\n' >&2 && exit 2 ;;
 	timeout:./m*) printf 'FAIL    %s \t0.00s\n' "$d" ;;
-	survive:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
+	survive:./m* | hangalone:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
 	esac
 done
 exit 1
@@ -579,26 +580,32 @@ done
 printf '\nfunc Again(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' >>"$mu/c/r/two/two.gno"
 : >"$mu/c/gnowork.toml"
 gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one"}'
+: >"$mu/fakegno.runs"
 out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let a gap given for r/one excuse the same guard in r/two: $out"
 printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (known gap: one gap, given for r/one)" || fail "mutate.py did not keep r/one's gap: $out"
 [ "$(printf '%s\n' "$out" | grep -cxF "FAIL  survives: r/two/two.gno: if bad { (expected killed)")" = 2 ] || fail "mutate.py did not fail r/two's two untested guards: $out"
+# A survivor GAPS does not list is judged again alone (F5050, below): r/two's two, each in a run of its own, never r/one's gap.
+[ "$(grep -c '' "$mu/fakegno.runs")" = 4 ] && [ "$(grep -c ' \./m0$' "$mu/fakegno.runs")" = 2 ] ||
+	fail "mutate.py did not judge again alone each survivor GAPS does not list, and only those: $(cat "$mu/fakegno.runs")"
 gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
 out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
-# A filetest kills nothing (F5050): it imports its package by path, which the workspace of copies resolves to the untouched
-# copy, m0, whichever copy holds the filetest. So a guard only a filetest catches survives, while that filetest, run on the
-# mutant alone, kills it: such a guard gets a unit test, or goes in GAPS with its reason.
-mkdir -p "$mu/f/r/only" "$mu/g/r/only" && : >"$mu/f/gnowork.toml" && : >"$mu/g/gnowork.toml"
-for w in f g; do
-	printf 'module = "gno.land/r/test/only"\ngno = "0.9"\n' >"$mu/$w/r/only/gnomod.toml"
-	printf 'package main\n\nimport "gno.land/r/test/only"\n\nfunc main() {\n\tprintln(only.Do(true))\n}\n\n// Error:\n// bad\n' >"$mu/$w/r/only/z_only_filetest.gno"
-done
+# In the run of every copy, a test in the package runs against its own copy, but a filetest against the first copy of its
+# module in the workspace, the untouched m0 (F5050). So a mutant that run lets survive, GAPS not listing it, is judged again
+# alone, in a workspace of its own copy: the guard of a package with no unit test, which only its filetest catches, is
+# killed. A gap is not judged again, and a run alone that never ends is said by name.
+mkdir -p "$mu/f/r/only" && : >"$mu/f/gnowork.toml" && printf 'module = "gno.land/r/test/only"\ngno = "0.9"\n' >"$mu/f/r/only/gnomod.toml"
 printf 'package only\n\nfunc Do(bad bool) string {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn "done"\n}\n' >"$mu/f/r/only/only.gno"
-printf 'package only\n\nfunc Do(bad bool) string {\n\tif false && (bad) {\n\t\tpanic("bad")\n\t}\n\treturn "done"\n}\n' >"$mu/g/r/only/only.gno"
-(cd "$mu/g" && "$GNO" test ./r/only/ >/dev/null 2>&1) && fail "the filetest, run on the guard's mutant alone, does not kill it: the case below proves nothing"
+printf 'package main\n\nimport "gno.land/r/test/only"\n\nfunc main() {\n\tprintln(only.Do(true))\n}\n\n// Error:\n// bad\n' >"$mu/f/r/only/z_only_filetest.gno"
 gapped "$mu/check.py" '{}'
-out=$(checked f GNO="$GNO") && fail "mutate.py passed a guard only a filetest catches: a filetest killed a mutant, so F5050 is gone; say so in mutate.py and docs/HARNESS.md: $out"
-[ "$out" = "FAIL  survives: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not keep the guard only a filetest catches as its one survivor (F5050): $out"
+out=$(checked f GNO="$GNO") || fail "mutate.py let survive a guard only a filetest catches (F5050): $out"
+[ "$out" = "ok    killed: r/only/only.gno: if bad {" ] || fail "mutate.py did not kill, alone, the guard only a filetest catches (F5050): $out"
+gapped "$mu/check.py" '{"r/only/only.gno: if bad {": "a gap"}'
+out=$(checked f GNO="$GNO") || fail "mutate.py judged a gap again alone: $out"
+[ "$out" = "ok    survives: r/only/only.gno: if bad {  (known gap: a gap)" ] || fail "mutate.py did not keep a gap as a gap: $out"
+gapped "$mu/check.py" '{}'
+out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
+[ "$out" = "FAIL  stopped: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not name the survivor whose run alone never ended: $out"
 # The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
 out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
 out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"
