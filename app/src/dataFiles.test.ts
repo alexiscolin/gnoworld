@@ -883,7 +883,7 @@ describe("the ticker's placeholders", () => {
     expect(text).toMatch(/testnet/i);
   });
 
-  it("show a community call whose date is to be confirmed, in its own words", () => {
+  it("hold a community call whose date is to be confirmed, in its own words, which the ticker does not show", () => {
     const call = events.find((row) => row.id === "sample-event-community-call");
     expect(call?.title).toMatch(/community call/i);
     expect(call?.title).toMatch(/date to be confirmed/i);
