@@ -15,7 +15,7 @@ import { heldOf } from "../../src/scene/cosmos/cosmosWorld.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
-import { hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
+import { held, hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -480,18 +480,6 @@ for (const tier of ["high", "low"] as const)
     expect(drawn.bodies).toBeLessThanOrEqual(2 * 12 + 1);
     expect(textures).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
   });
-
-// The page's time held, to move only as a journey runs it: a frame at a time, each 16 ms after the last however slow the software GPU,
-// so the Auto probe keeps the tier it found. Held a little ahead of now, read again if the page went past it.
-async function held(page: Page) {
-  for (let tried = 0; ; tried += 1)
-    try {
-      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 250));
-      return;
-    } catch (error) {
-      if (tried > 4) throw error;
-    }
-}
 
 // The home's dive (7d7; Alexis, 2026-11-02), with motion on: from the whole cosmos down to the view at rest, the Earth at the centre all the
 // way. Each frame is read through the scene's stats as it comes, with what it cost to draw; with a `step`, the page's time is held and run

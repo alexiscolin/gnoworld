@@ -91,6 +91,18 @@ export async function keepsItsRoom(page: Page, path: string, come: (page: Page) 
   expect(await shifted(page)).toBeLessThan(0.1);
 }
 
+// The page's time held, to move only as a journey runs it: a frame at a time, each 16 ms after the last however slow the software GPU,
+// so the Auto probe keeps the tier it found. Held a little ahead of now, read again if the page went past it. The clock is installed first.
+export async function held(page: Page) {
+  for (let tried = 0; ; tried += 1)
+    try {
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 250));
+      return;
+    } catch (error) {
+      if (tried > 4) throw error;
+    }
+}
+
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
 /** The home's dive over (7d7): its cosmos came and stands at rest, the dissolve's picture gone. Until then the camera looks at the Earth
