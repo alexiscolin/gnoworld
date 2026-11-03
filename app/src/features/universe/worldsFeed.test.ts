@@ -161,6 +161,30 @@ describe("the worlds' feed", () => {
     expect(worlds.data()?.signals.present.size).toBeGreaterThan(0);
   });
 
+  it("tells the rail what it knew as not yet heard when the cosmos shows again, till the server answers anew (7i)", async () => {
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+    worlds.sync(scene, false);
+    let answer: (value: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBe(true);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+  });
+
   it("hands the labels who is here, keyed as the cosmos holds each world, with the hubs' names and this reader's visits", async () => {
     const { cosmos, scene } = sceneOf();
     localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");

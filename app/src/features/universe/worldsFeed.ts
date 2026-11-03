@@ -81,6 +81,8 @@ export class WorldsFeed {
     this.#scene = scene;
     if (wanted === this.#shown) return;
     this.#shown = wanted;
+    // What was heard before the cosmos was covered is old once it shows again: the server's next answer is the first again.
+    if (wanted) this.#heard = false;
     this.#hand(scene, wanted ? this.#worlds : undefined);
     this.#clearing?.abort();
     this.#polling?.abort();
