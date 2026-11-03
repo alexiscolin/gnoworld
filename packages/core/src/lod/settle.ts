@@ -48,6 +48,8 @@ export class LabelLayout {
   /** Centre and radius of each disc kept clear. */
   readonly discs = new Float64Array(3 * DISCS_MOST);
   discCount = 0;
+  /** The left edge of the band the page keeps for its rail, which a pill slides left of, its stem still over its body; none, no rail. */
+  railLeft = Infinity;
 }
 
 // What a side would give, and the body it stands by, written here: a frame makes nothing.
@@ -70,11 +72,13 @@ function read(layout: LabelLayout, slot: number): void {
   body.high = (layout.height[slot] ?? 0) * body.scale;
 }
 
-// Where `side` stands the label of `body`, into `tried`, or false where its stem cannot reach the body.
-function standAt(screenWidth: number, side: number): boolean {
+// Where `side` stands the label of `body`, into `tried`, or false where its stem cannot reach the body: within the screen's margin and
+// left of the rail's band, with the air a box keeps.
+function standAt({ screenWidth, railLeft }: LabelLayout, side: number): boolean {
   const { x, y, radius, wide, high, scale } = body;
   const start = side % 2 === 0 ? x - PLACE.stem * scale : x - wide + PLACE.stem * scale;
-  const left = Math.min(Math.max(start, PLACE.margin), screenWidth - PLACE.margin - wide);
+  const right = Math.min(screenWidth - PLACE.margin, railLeft - PLACE.air);
+  const left = Math.min(Math.max(start, PLACE.margin), right - wide);
   const stemAt = Math.min(Math.max(x, left + PLACE.stemLeast * scale), left + wide - PLACE.stemLeast * scale);
   if (!(Math.abs(stemAt - x) <= radius) || !(wide > 0)) return false;
   const outline = Math.sqrt(radius * radius - (stemAt - x) * (stemAt - x));
@@ -138,7 +142,7 @@ function fits(layout: LabelLayout, slot: number): boolean {
 }
 
 function tryAt(layout: LabelLayout, slot: number, side: number): boolean {
-  if (!standAt(layout.screenWidth, side) || !fits(layout, slot)) return false;
+  if (!standAt(layout, side) || !fits(layout, slot)) return false;
   layout.left[slot] = tried.left;
   layout.top[slot] = tried.top;
   layout.stem[slot] = tried.stem;
