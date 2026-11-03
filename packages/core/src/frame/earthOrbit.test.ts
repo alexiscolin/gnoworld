@@ -54,6 +54,11 @@ describe("what turns round the Earth", () => {
     expect(new Set(places).size).toBe(SIX.length);
   });
 
+  // Its light is the great star's, the map's origin, not its own place: the Earth is no star (7v's review).
+  it("lights each project from the great star", () => {
+    expect(earthSystemOf(ONE).litBy).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
   it("holds no project when the file holds none", () => {
     expect(earthSystemOf([]).worlds).toEqual([]);
   });

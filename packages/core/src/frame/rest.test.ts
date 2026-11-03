@@ -1513,6 +1513,16 @@ describe("the Earth's projects at rest (7v)", () => {
     expect(judge.spots.length).toBe(spots + placed.worlds.length);
   });
 
+  // The first clear place, not any (7v's review): gnosh.ai alone stands clear at its own in these two views, so it is kept there.
+  it.each(["1,000 systems", "300 systems of four"] as const)(
+    "keeps a project at its own place where it stands clear, with %s",
+    (name) => {
+      const { systems, view } = made(sets[name]);
+      const own = earthSystemOf([{ name: "gnosh.ai" }]);
+      expect(projectsOf(judgeOf(systems, view, LENT), own).worlds).toEqual(own.worlds);
+    },
+  );
+
   it("stands none where no screen is composed, and none of a file of none", () => {
     const { systems, view } = made(sets["rich mix"]);
     const judge = judgeOf(systems, view, LENT);

@@ -3303,9 +3303,11 @@ describe("a system's arrival (7d3)", () => {
     const earth = screen.earth?.radius ?? NaN;
     const eye = new Vector3().copy(scene.cosmos.stats().eye);
     const own = new Map(earthSystemOf(orbiting).worlds.map((world) => [world.id, world]));
-    for (const { id, at } of projects) {
+    for (const { id, at, star } of projects) {
       const body = screen.bodies.find((each) => each.id === id);
       expect(body?.radius).toBeLessThan(earth / 2);
+      // Lit by the great star, the map's origin: the Earth is no star (7v's review).
+      expect(star.distanceTo(onStage({ x: 0, y: 0, z: 0 }).sub(eye))).toBeLessThan(1e-6);
       // At its own orbit round the Earth, held still where the view's judge found it clear (deep.ts, projectsOf).
       expect(at.distanceTo(onStage(EARTH_PLACE).sub(eye))).toBeCloseTo(own.get(id)?.orbit ?? NaN, 6);
     }
