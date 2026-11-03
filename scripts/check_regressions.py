@@ -30,8 +30,10 @@ IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.confi
 
 
 def declared(lines, key):
-    """The items a commit names on a `Key: <item> - why` line; a line without its reason names nothing."""
-    return {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+?) - \S.*", line.strip()))}
+    """The items a commit names on a `Key: <item> - why` line; a line without its reason names nothing. An item may hold ` - `
+    itself (a gap on `a - b`, F5000), so each cut before a ` - ` that a reason follows is read as one."""
+    return {m.group(1)[: cut.start()].strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+)", line.strip()))
+            for cut in re.finditer(r" - (?=\S)", m.group(1)) if cut.start()}
 
 
 def removed_tests(before, after, excused):
@@ -329,6 +331,11 @@ def self_test():
     log = ["docs: explain why the mutation break follows the score", "Removed-test: a > xy - another test",
            "Removed-test: a > z", "Lowered-floor: mutation break - see the plan", "Removed-test: a > y - merged into x"]
     assert declared(log, "Lowered-floor") == {"mutation break"} and declared(log, "Removed-test") == {"a > xy", "a > y"}
+    # An item may hold ` - ` itself (F5000): a gap on `a - b`, a test so named. A line without its reason still names nothing.
+    spaced = ["Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - equivalent: d is never read", "Removed-test: a > a - b - merged"]
+    assert "gap scripts/mutate.py r/x.gno: d := a - b [- -> +]" in declared(spaced, "Lowered-floor")
+    assert removed_tests({"a > a - b"}, set(), declared(spaced, "Removed-test")) == [], "a test named with ` - ` could not be declared"
+    assert "gap scripts/mutate.py r/x.gno: d := a - b [- -> +]" not in declared(["Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +]"], "Lowered-floor")
     assert removed_tests({"a > x", "a > y", "a > z"}, set(), declared(log, "Removed-test")) == ["a > x", "a > z"]
     vitest = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 100, branches: 95 },\n}'
     before = floors(vitest, '{"thresholds": {"break": 80}}')

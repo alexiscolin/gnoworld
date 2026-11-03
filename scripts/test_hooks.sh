@@ -4257,6 +4257,13 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
+# A gap whose key holds ` - ` (a flip of `a - b`) is named by its line all the same (F5000): every cut before a ` - ` that a
+# reason follows is read as an item, not the first alone.
+git -C "$rg" reset -q --hard "$base" && printf 'GAPS = {\n    "r/x.gno: d := a - b [- -> +]": "equivalent",\n}\n' >"$rg/scripts/mutate.py"
+git -C "$rg" add scripts/mutate.py && git -C "$rg" commit -qm "a gap on a - b"
+out=$(reg) && fail "check_regressions passed a gap no commit names: $out"
+git -C "$rg" commit -q --allow-empty -m "says why" -m "Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - d is never read"
+out=$(reg) || fail "check_regressions refused a gap holding ' - ' that a commit names (F5000): $out"
 # An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
 # gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
 git -C "$rg" reset -q --hard "$base"
