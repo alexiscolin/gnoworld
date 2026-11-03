@@ -1,5 +1,4 @@
 import { Cluster } from "../compositions/index.ts";
-import kicker from "../Kicker/Kicker.module.css";
 import { Anchor } from "../link.tsx";
 import styles from "./Breadcrumb.module.css";
 
@@ -17,7 +16,7 @@ export function Breadcrumb({ label, items }: BreadcrumbProps) {
   const last = items.length - 1;
   return (
     <nav aria-label={label} className={["label", styles["trail"]].join(" ")}>
-      <span className={[kicker["dot"], styles["world"]].join(" ")} aria-hidden="true" />
+      <span className={["dot", styles["world"]].join(" ")} aria-hidden="true" />
       <Cluster as="ol" space="2xs">
         {items.map((item, index) => (
           <li key={item.href ?? item.label}>

@@ -25,6 +25,29 @@
     text-transform: none;
   }
 
+  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are (7v). */
+  .dot {
+    display: inline-block;
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    margin-inline-end: var(--space-2xs);
+    border-radius: var(--radius-pill);
+    background: var(--_dot);
+    vertical-align: middle;
+  }
+
+  .dot[data-tone="warm"] {
+    --_dot: var(--color-warm);
+  }
+
+  .dot[data-tone="mine"] {
+    --_dot: var(--color-mine);
+  }
+
+  .dot[data-tone="signal"] {
+    --_dot: var(--color-signal);
+  }
+
   /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
   .truncate {
     min-inline-size: 0;
