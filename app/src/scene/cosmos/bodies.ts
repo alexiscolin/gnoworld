@@ -38,6 +38,8 @@ interface Body {
   ready: boolean;
   /** It stood at a look once compiled, which took its point away: from then it shows, never over its point (7d9). */
   shown: boolean;
+  /** It is lit as up close, its own angle and its whole rim, wherever it stands: a system's arrival's (7d3). */
+  near: boolean;
 }
 
 interface BodyView {
@@ -64,26 +66,21 @@ export class Bodies {
   readonly #device: EarthDevice;
   readonly #screen = new Vector3();
   readonly #ahead = new Vector3();
-  readonly #spot = { x: 0, y: 0, radius: 0 };
-  #depth = 0;
+  readonly #spot = { x: 0, y: 0, radius: 0, depth: 0 };
   readonly #back = new Quaternion();
   readonly #seen = new Vector3();
   readonly #lean = new Euler(); // no pole towards the eye, a ring open 30 degrees at most, whatever the camera's turn
   readonly group = new Group();
   #last: Point | undefined;
   #seconds = 0;
-  #view: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
+  /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
+  sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
   /** The device's `moved` is told once a body's programs are compiled: a look then stands it in place of its point. */
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
     this.#maps = maps;
     this.#device = device;
     this.#sphere = owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
-  }
-
-  /** The screen, in the page's pixels, its lens, and the box of the page's text. */
-  view(sight: BodyView): void {
-    this.#view = sight;
   }
 
   /** Shows the bodies or hides them; shown, the generated worlds' code is asked now, so it comes beside the first maps, not after them. */
@@ -98,7 +95,7 @@ export class Bodies {
   }
 
   /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; what is compiled shows from now. */
-  stand(wanted: Wanted): void {
+  stand(wanted: Wanted, near = false): void {
     for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
@@ -109,7 +106,7 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
-    for (const body of this.#held.values()) body.shown = body.ready;
+    for (const body of this.#held.values()) Object.assign(body, { shown: body.ready, near });
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
     if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
@@ -125,7 +122,7 @@ export class Bodies {
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
-    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false };
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false, near: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -149,14 +146,14 @@ export class Bodies {
 
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
-    const away = this.#offEye(system.place, eye, star).length();
+    const away = this.fromEye(system.place, eye, star).length();
     orbitPlace(body, orbitTime(seconds), this.#place);
-    planet.group.position.copy(this.#offEye(this.#place, eye, at));
+    planet.group.position.copy(this.fromEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
-    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
+    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, body.near ? 0 : away)));
     planet.setTime(seconds);
-    if (planet.look.rim !== null) planet.setLimb(limbAt(away));
+    if (planet.look.rim !== null) planet.setLimb(limbAt(body.near ? 0 : away));
     planet.setFar(fadeAt(at.length()));
     const room = this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
@@ -166,51 +163,60 @@ export class Bodies {
     planet.group.quaternion.setFromEuler(this.#lean).premultiply(this.#device.camera.quaternion);
   }
 
-  #spotOf(at: Vector3, radius: number): ScreenSpot {
-    const { width, height, focal } = this.#view;
+  /** Where a round thing at `at` from the eye, `radius` units across, stands on screen, and its depth along the view: in a record kept
+   * here, read at once (the labels' projector, 7h). */
+  seen(at: Vector3, radius: number): ScreenSpot & { readonly depth: number } {
+    const { width, height, focal } = this.sight;
     const { camera } = this.#device;
     this.#screen.copy(at).project(camera);
     this.#spot.x = ((this.#screen.x + 1) * width) / 2;
     this.#spot.y = ((1 - this.#screen.y) * height) / 2;
     // Its depth along the view, the camera turned to the Earth.
     const depth = -this.#ahead.copy(at).applyQuaternion(this.#back.copy(camera.quaternion).invert()).z;
-    this.#depth = depth;
+    this.#spot.depth = depth;
     this.#spot.radius = (radius * focal) / Math.max(depth, radius);
     return this.#spot;
   }
 
   // What the box of the page's text leaves of a body at `at`.
   #room(at: Vector3, radius: number): number {
-    const { box } = this.#view;
-    return box === undefined ? 1 : clearOf(this.#spotOf(at, radius), box);
+    const { box } = this.sight;
+    return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
-  // `place` on the map, from `eye` on the stage, into `out`.
-  #offEye(place: Point, eye: Point, out: Vector3): Vector3 {
+  /** `place` on the map, from `eye` on the stage, into `out` (the labels' stars too, 7h). */
+  fromEye(place: Point, eye: Point, out: Vector3): Vector3 {
     toScene(place, this.#onStage);
     return out.set(this.#onStage.x - eye.x, this.#onStage.y - eye.y, this.#onStage.z - eye.z);
   }
 
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
-    const { box } = this.#view;
-    return box === undefined ? 1 : clearOf({ ...this.#spotOf(this.#offEye(place, eye, this.#ahead), 0), radius }, box);
+    const { box } = this.sight;
+    return box === undefined ? 1 : clearOf({ ...this.seen(this.fromEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
   /** Whether a round thing at `place` on the map, `radius` units across, shows on the screen from `eye`. */
   inView(place: Point, radius: number, eye: Point): boolean {
-    const { x, y, radius: size } = this.#spotOf(this.#offEye(place, eye, this.#ahead), radius);
-    const { width, height } = this.#view;
-    return this.#depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
+    const { x, y, radius: size, depth } = this.seen(this.fromEye(place, eye, this.#ahead), radius);
+    const { width, height } = this.sight;
+    return depth > 0 && x + size > 0 && x - size < width && y + size > 0 && y - size < height;
   }
 
   /** Where `at` stands on screen, for the journeys. */
   spotOf(at: Vector3, radius: number): ScreenSpot {
-    const { x, y, radius: drawn } = this.#spotOf(at, radius);
+    const { x, y, radius: drawn } = this.seen(at, radius);
     return { x, y, radius: drawn };
   }
 
+  /** A body's object on the stage, by its world's id: where it stands and how large, for its label. */
+  anchorOf(id: string): Group | undefined {
+    return this.#held.get(id)?.planet.group;
+  }
+
+  // Hidden as it goes: whatever still points at its object (a label) sees it gone.
   #free({ planet }: Body): void {
+    planet.group.visible = false;
     planet.group.removeFromParent();
     planet.dispose();
   }

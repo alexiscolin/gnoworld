@@ -40,3 +40,5 @@ export {
   WORLDS_CAPS,
   WORLDS_MAX_BYTES,
 } from "./worlds.ts";
+// Who is here (7h) behind the same door: only the universe's feed reads it, after the first screen.
+export { Presence, PRESENCE_ANSWER_MAX } from "./presence.ts";

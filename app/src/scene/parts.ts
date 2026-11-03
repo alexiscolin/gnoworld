@@ -2,8 +2,9 @@
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
-import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
+import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
+import { LazyLabels } from "./cosmos/lazyLabels.ts";
 import { Door } from "./door.ts";
 import type { EarthDevice } from "./earth/device.ts";
 import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
@@ -12,11 +13,15 @@ export class CosmosPart {
   readonly door: Door<Cosmos>;
   #worlds: readonly CosmosWorld[] | undefined;
   #written: string | undefined;
+  #signals: LabelSignals | undefined;
   #box: ClearBox | undefined;
+  #arrival: Parameters<Cosmos["arrive"]> | undefined;
+  readonly #gone: AbortSignal;
   // The home's dive, once asked: under reduced motion or not.
   #still: boolean | undefined;
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+    this.#gone = owner.signal;
     this.door = new Door(
       () =>
         import("./cosmos/cosmos.ts").then(
@@ -27,9 +32,12 @@ export class CosmosPart {
       owner,
       {
         came: (cosmos) => {
+          // The labels' loader stands here, behind the cosmos's door, so the cosmos's chunk pays only for their calls (7h).
+          cosmos.labels = new LazyLabels(owner, cosmos.seen);
           cosmos.keepClear(this.#box);
           if (this.#still !== undefined) cosmos.dive(this.#still);
           this.#tell(cosmos);
+          if (this.#arrival !== undefined) cosmos.arrive(...this.#arrival);
           came();
         },
       },
@@ -43,22 +51,31 @@ export class CosmosPart {
     this.door.part?.dive(still);
   }
 
-  show(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+  show(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
     this.#worlds = worlds;
     this.#written = written;
+    this.#signals = signals ?? this.#signals;
     if (this.door.part !== undefined) this.#tell(this.door.part);
     if (worlds !== undefined) this.door.open();
   }
 
-  // The file's time goes with its worlds once there is one: it ages their calls.
+  // The file's time goes with its worlds once there is one: it ages their calls; and what is known of them, once said, names them.
   #tell(cosmos: Cosmos): void {
-    if (this.#written === undefined) cosmos.show(this.#worlds);
+    if (this.#signals !== undefined) cosmos.show(this.#worlds, this.#written, this.#signals);
+    else if (this.#written === undefined) cosmos.show(this.#worlds);
     else cosmos.show(this.#worlds, this.#written);
   }
 
   keepClear(box: ClearBox | undefined): void {
     this.#box = box;
     this.door.part?.keepClear(box);
+  }
+
+  /** A system's arrival asked (7d3): told the cosmos now, or once it comes; nothing once the scene has gone. */
+  arrive(id: string | undefined, go: (eye: Point) => void): void {
+    if (this.#gone.aborted) return;
+    this.#arrival = [id, go];
+    this.door.part?.arrive(id, go);
   }
 }
 

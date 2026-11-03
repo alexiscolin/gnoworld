@@ -2,7 +2,7 @@
 // It draws through one owner, and imports no React: the universe feature mounts it.
 import { type ClearBox, type Point, type ProbeVerdict, type Tier } from "@gnoworld/core";
 import { Color, PerspectiveCamera, Scene as Stage, type WebGLRenderer } from "three";
-import type { CosmosWorld } from "./cosmos/cosmosWorld.ts";
+import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
@@ -58,8 +58,10 @@ class LiveScene implements Scene {
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
     this.#renderer.debug.onShaderError = this.#shaderRefused;
     this.#stage.background = new Color(DEEP_BLACK);
+    // Last, once every part let go: the loop stops, the renderer goes.
     this.#owner.add({
       dispose: () => {
+        this.#loop.stop();
         this.#renderer.forceContextLoss();
         this.#renderer.dispose();
       },
@@ -95,11 +97,6 @@ class LiveScene implements Scene {
     });
     this.#viewport.apply();
     this.#loop = new FrameLoop(clock, this.#draw);
-    this.#owner.add({
-      dispose: () => {
-        this.#loop.stop();
-      },
-    });
     this.#loop.set({ busy: this.#probe.running });
     this.#watch(canvas);
   }
@@ -176,10 +173,10 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  moveTo(to: Point): void {
+  readonly moveTo = (to: Point): void => {
     this.#eye.moveTo(to);
     this.#loop.redraw();
-  }
+  };
 
   earth(place: Circle | undefined, said: (state: EarthState) => void): void {
     this.#earth.show(place, said);
@@ -194,9 +191,9 @@ class LiveScene implements Scene {
     this.#parts.world.moons(marks);
   }
 
-  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string): void {
+  cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
     if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
-    this.#parts.cosmos.show(worlds, written);
+    this.#parts.cosmos.show(worlds, written, signals);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
     this.#viewport.lens(worlds === undefined ? LENS.fieldOfView : LENS.home);
     this.#loop.redraw();
@@ -205,6 +202,12 @@ class LiveScene implements Scene {
   keepClear(box: ClearBox | undefined): void {
     this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
+  }
+
+  /** Comes to system `id`, as 7g's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+   * the system's arrival stands (7d3). */
+  arrive(id: string | undefined): void {
+    this.#parts.cosmos.arrive(id, this.moveTo);
   }
 
   dispose(): void {

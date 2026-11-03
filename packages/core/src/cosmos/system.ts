@@ -9,8 +9,10 @@ import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos
 export const GNO_LAND = "gno.land";
 /** How far a system reaches from its star: two systems stand a cell apart at the least. */
 export const ROOM = CELL / 2;
-/** Where a far belt starts: no world goes past it. */
+/** Where a far belt's room starts: no world goes past it, a postcard's widened ones included (7d3). */
 export const BELT_INNER = 0.84 * ROOM;
+/** Where its rocks start: half a unit past it, so no rock stands near a world's ground, for dust is a sign (ADR-0002 §10). */
+export const ROCKS_FROM = BELT_INNER + 0.5;
 /** A fixed place, beside the great star, and its size: frame 4's Earth, 47 pixels of radius at the rest's 30 units, 1,080 high. */
 export const EARTH_PLACE: Point = { x: -6.73, y: 0, z: 0.18 };
 export const EARTH_RADIUS = 1.2176;

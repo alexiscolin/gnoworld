@@ -55,7 +55,7 @@ function fits(looks: readonly Look[], { held, reach, worlds }: Card, close: Clos
 /** The bodies drawn at rest that show on `look`'s screen, the postcards' `seconds` on their turn; the close world holds still. */
 export function spotsOf(
   look: Look,
-  cards: readonly Card[],
+  cards: readonly Pick<Card, "system" | "worlds">[],
   { close, seconds = 0 }: { close?: Close | undefined; seconds?: number },
 ): Seen[] {
   const drawn = cards.flatMap(({ system, worlds }) =>
@@ -65,12 +65,14 @@ export function spotsOf(
   return drawn.filter((at) => !look.off(at));
 }
 
-// Instants through the longest turn of `cards`' systems: the postcards turn at rest, so a view reads well through a whole turn.
+// Instants through the longest turn of systems spinning at `spins`: postcards turn at rest, so a view reads well through a whole turn.
 const INSTANTS = 8;
-const turnOf = (cards: readonly Card[]) => {
-  const longest = (2 * Math.PI) / Math.min(...cards.map(({ held }) => Math.abs(held.system.spin)), Infinity);
+/** Eight instants through the longest turn of systems that spin at `spins`, in seconds. */
+export const instantsOf = (spins: readonly number[]): number[] => {
+  const longest = (2 * Math.PI) / Math.min(...spins.map((spin) => Math.abs(spin)), Infinity);
   return Array.from({ length: INSTANTS }, (_, step) => (step * (Number.isFinite(longest) ? longest : 0)) / INSTANTS);
 };
+const turnOf = (cards: readonly Card[]) => instantsOf(cards.map(({ held }) => held.system.spin));
 
 // The richer of two postcards, three bodies or more counting alike, then the nearer, as the Earth's nearest are held.
 const richer = (a: Card, b: Card) => Math.min(b.worlds.length, RICH) - Math.min(a.worlds.length, RICH);

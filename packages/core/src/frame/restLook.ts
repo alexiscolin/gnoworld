@@ -91,7 +91,12 @@ const direction = (a: Point): Point => {
   const length = Math.hypot(a.x, a.y, a.z);
   return { x: a.x / length, y: a.y / length, z: a.z / length };
 };
-const along = (a: Point, b: Point, by: number): Point => ({ x: a.x + b.x * by, y: a.y + b.y * by, z: a.z + b.z * by });
+/** `a` moved `by` along `b`. */
+export const along = (a: Point, b: Point, by: number): Point => ({
+  x: a.x + b.x * by,
+  y: a.y + b.y * by,
+  z: a.z + b.z * by,
+});
 
 /** The eye `distance` from the Earth, `slant` radians over the disc and `turn` radians round from the map's z towards its x, into `out`. */
 export function eyeInto({ distance, slant, turn }: Candidate, out: { x: number; y: number; z: number }): void {
@@ -107,9 +112,9 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
   return out;
 };
 
-/** A camera at `eye`, on the map, looking at the Earth, the disc's up kept up. */
-export function cameraFrom(eye: Point): Camera {
-  const ahead = direction(minus(EARTH_PLACE, eye));
+/** A camera at `eye`, on the map, looking at `target`, the disc's up kept up. */
+export function cameraTowards(eye: Point, target: Point): Camera {
+  const ahead = direction(minus(target, eye));
   const right = direction({ x: -ahead.z, y: 0, z: ahead.x });
   const up = {
     x: right.y * ahead.z - right.z * ahead.y,
@@ -119,9 +124,14 @@ export function cameraFrom(eye: Point): Camera {
   return { eye, ahead, right, up };
 }
 
-/** The eye moved `across` and `upward` along `camera`'s own axes, looking at the Earth still: its sway. */
-export const swayed = ({ eye, right, up }: Camera, [across, upward]: readonly [number, number]): Camera =>
-  cameraFrom(along(along(eye, right, across), up, upward));
+const cameraFrom = (eye: Point): Camera => cameraTowards(eye, EARTH_PLACE);
+
+/** The eye moved `across` and `upward` along `camera`'s own axes, looking at `target` still, the Earth unless said: its sway. */
+export const swayed = (
+  { eye, right, up }: Camera,
+  [across, upward]: readonly [number, number],
+  target: Point = EARTH_PLACE,
+): Camera => cameraTowards(along(along(eye, right, across), up, upward), target);
 
 /** The focal length of a screen `height` pixels high, in pixels. */
 export const focalOf = (height: number): number => height / 2 / Math.tan((FIELD_OF_VIEW * DEGREE) / 2);

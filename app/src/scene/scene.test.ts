@@ -51,6 +51,7 @@ const cosmos = vi.hoisted(() => ({
   restored: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
+  arrive: vi.fn<(id: string | undefined, go: (eye: { x: number; y: number; z: number }) => void) => void>(),
 }));
 
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
@@ -67,6 +68,7 @@ vi.mock("./cosmos/cosmos.ts", () => ({
     restored = cosmos.restored;
     dispose = cosmos.dispose;
     stats = cosmos.stats;
+    arrive = cosmos.arrive;
   },
 }));
 vi.mock("./space.ts", () => ({
@@ -371,6 +373,41 @@ describe("the cosmos", () => {
     scene.moveTo({ x: 10, y: 20, z: 30 });
     frames(2, 16);
     expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
+    scene.dispose();
+  });
+
+  // 7d3: a system's arrival, as 7g's flights will land on it.
+  it("comes to a system: the cosmos is asked, and the view rests where it says the system's arrival stands", async () => {
+    const scene = await started();
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    scene.arrive("gnoswap");
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function));
+    const drawn = three.renderer.render.mock.calls.length;
+    cosmos.arrive.mock.lastCall?.[1]({ x: 10, y: 20, z: 30 });
+    frames(2, 16);
+    expect(three.renderer.render.mock.calls.length).toBeGreaterThan(drawn);
+    expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
+    scene.arrive(undefined);
+    expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function));
+    scene.dispose();
+  });
+
+  it("asks nothing of a cosmos it has let go", async () => {
+    const scene = await started();
+    scene.dispose();
+    scene.arrive("gnoswap");
+    expect(cosmos.arrive).not.toHaveBeenCalled();
+  });
+
+  it("tells a cosmos that comes later the system it was asked for", async () => {
+    const scene = startScene(options(), clock);
+    scene.arrive("gnoswap");
+    await vi.dynamicImportSettled();
+    expect(cosmos.arrive).not.toHaveBeenCalled();
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function));
     scene.dispose();
   });
 

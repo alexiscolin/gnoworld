@@ -2,6 +2,7 @@
 // its realms' calls its aurora, its rooms' lines its storms, the worlds' file its matter. Today's use stands in for the vitality, for nothing
 // stores one yet (the chief's decision, 2026-11-02). A file of another universe is no file.
 import {
+  daysSince,
   isFresh,
   planetSeed,
   presenceOf,
@@ -53,8 +54,6 @@ interface Weighed extends Universe {
   readonly use: { readonly social: number; readonly realm: number };
 }
 
-const DAY = 86_400_000;
-
 const realmUse = ({ realms }: FileWorld) => realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0);
 
 // The universe's weights, once a file: its percentile of use and of calls, and its newest call, the chain's height at the file's writing.
@@ -66,12 +65,6 @@ function weigh(file: Worlds): Weighed {
   const made = { use, ...universeOf(file) };
   weighed.set(file, made);
   return made;
-}
-
-// How many days ago the file first saw the world; none when it never did, or says a time to come.
-function ageOf(world: FileWorld | undefined, now: number): number | null {
-  const seen = typeof world?.seen === "string" ? Date.parse(world.seen) : Number.NaN;
-  return Number.isFinite(seen) && seen <= now ? (now - seen) / DAY : null;
 }
 
 // Whether a universe's file carries any count: the job writes none for a chain it could not read, and quiet is then not known.
@@ -104,7 +97,7 @@ export function readingOf(file: Worlds | undefined, at: WorldNow): WorldReading 
     reference,
   );
   const heat = presenceOf(at.people, 0);
-  const fresh = isFresh(ageOf(found.ours === undefined ? undefined : found.world, at.now), at.visited);
+  const fresh = isFresh(daysSince(found.ours === undefined ? undefined : found.world.seen, at.now), at.visited);
   const look = worldLook(at.id);
   const seed = planetSeed(worldPath(at.id));
   const state = { vitality, present: heat, fresh };

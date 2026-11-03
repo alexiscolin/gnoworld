@@ -1,6 +1,7 @@
 // The data files' schemas (slice 5's 5c; ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
+import { Slug } from "./slug.ts";
 import { z } from "./zod.ts";
 
 /** The most a data file may hold: rows in a list, and each kind of string, in characters. */
@@ -18,7 +19,7 @@ export const DATA_CAPS = {
 const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
 
 /** A name in a path, and the id of a universe: lower case, digits, single hyphens. */
-const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(DATA_CAPS.key));
+const Key = Slug.check(z.maxLength(DATA_CAPS.key));
 
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
 const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
@@ -77,10 +78,10 @@ const RealmPath = z
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
 const World = z.strictObject({
-  slug: Slug,
+  slug: Key,
   name: text(DATA_CAPS.name),
   description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
-  universe: Slug,
+  universe: Key,
   /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
   realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
 });
@@ -88,9 +89,9 @@ const World = z.strictObject({
 export const Hubs = inUniverse(World);
 export const Stations = inUniverse(World);
 export const Ecosystems = inUniverse(
-  z.strictObject({ slug: Slug, name: text(DATA_CAPS.name), description: text(DATA_CAPS.description), universe: Slug }),
+  z.strictObject({ slug: Key, name: text(DATA_CAPS.name), description: text(DATA_CAPS.description), universe: Key }),
 );
-export const Genres = bySlug(z.strictObject({ slug: Slug, name: text(DATA_CAPS.name) }));
+export const Genres = bySlug(z.strictObject({ slug: Key, name: text(DATA_CAPS.name) }));
 export const Events = byId(
   z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), start: z.iso.datetime(), link: Link }),
 );
@@ -145,7 +146,7 @@ export const News = byId(
 );
 
 const Universe = z.strictObject({
-  id: Slug,
+  id: Key,
   name: text(DATA_CAPS.name),
   chainId: text(DATA_CAPS.key),
   rpc: Link,

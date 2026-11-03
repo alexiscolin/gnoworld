@@ -13,22 +13,22 @@ import type { Command } from "./irc/lines.ts";
 import type { Log } from "./log.ts";
 import { act } from "./moderation/act.ts";
 import { makeProgress, type Progress } from "./moderation/catchup.ts";
-import { checkAgain, makeChecker, type Verdict } from "./moderation/check.ts";
-import { makeMutes } from "./moderation/mute.ts";
-import { moderationClient, type Answer } from "./moderation/provider.ts";
+import { checkAgain, type Verdict } from "./moderation/check.ts";
+import { checkerFor, strikesFor } from "./moderation/checker.ts";
+import type { Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
-import { makeStrike } from "./moderation/strikes.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
-import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
-import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
+import { listed, mayRead, staffOf, type World } from "./rooms/types.ts";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
+import { startPresent } from "./worlds/present.ts";
 
 export interface Chat {
   activity: Hono;
@@ -45,6 +45,8 @@ export interface Chat {
   mayPin: (room: string, who: string) => boolean;
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
+  // Who is here in each world (7h), where the server keeps its history.
+  presence?: Hono;
   stop: () => Promise<void>;
 }
 
@@ -73,6 +75,8 @@ interface Options {
   session?: (token: string | undefined) => string | undefined;
   // How long after a refused hide (the line not yet in Ergo's history) it is asked again (F2462).
   redactRetryMs?: number;
+  // The file who-is-here keeps its history in (7h); none keeps none.
+  presence?: string;
 }
 
 interface Steps {
@@ -114,24 +118,6 @@ function moderate({ db, check, send, stream, progress, strike }: Steps): (said: 
 // A world's rooms at most, its main room aside (3l).
 const ROOMS_PER_WORLD = 20;
 
-// The check of each line: its world's rules, then OpenAI when a key is set, or the alert that none is.
-function checkerFor(db: DatabaseSync, { worlds, moderation }: Settings, options: Options): Steps["check"] {
-  const { log, pepper, now = Date.now } = options;
-  const key = moderation.openaiKey;
-  if (key === undefined && options.provider === undefined) log("alert", { error: "moderation_off" });
-  return makeChecker({
-    db,
-    rulesOf: (room) => worlds.get(roomWorld(db, room) ?? "")?.rules,
-    publicRoom: (room) => publicRoom({ worlds }, room),
-    provider: options.provider ?? (key === undefined ? undefined : moderationClient({ key: key.reveal(), log })),
-    thresholds: moderation.thresholds,
-    pepper,
-    log,
-    now,
-    newAccountMs: moderation.newAccountHours * 60 * 60_000,
-  });
-}
-
 // A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
 const unknownChannels =
   (db: DatabaseSync, log: Log) =>
@@ -157,8 +143,17 @@ function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => und
   });
 }
 
+// Who is here (7h), in the rooms a guest may see: none without its file.
+function presentFor(
+  db: DatabaseSync,
+  file: string | undefined,
+  parts: Omit<Parameters<typeof startPresent>[0], "file" | "rooms">,
+) {
+  return file === undefined ? undefined : startPresent({ ...parts, file, rooms: () => listRooms(db) });
+}
+
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo, moderation } = settings;
+  const { worlds, ergo } = settings;
   const { log, pepper, now = Date.now } = options;
   ensureRooms(db, [...worlds.keys()], now());
   ensureNamed(db, typedRooms(worlds), now());
@@ -166,27 +161,26 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const stream = makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
-  const { mute } = moderation;
-  const mutes = makeMutes({
-    db,
-    send,
-    roomsOf: (world) => worldRooms(db, world),
-    now,
-    forMs: mute.minutes * 60_000,
-    max: mute.max,
-  });
-  const strike = makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) });
+  const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
   const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
+  const activity = makeActivity();
+  const visible = listedTo(settings, keeper);
+  const present = presentFor(db, options.presence, {
+    open: (room) => visible(room, undefined),
+    rates: activity.rates,
+    now,
+    log,
+  });
   const reconciler = reconcilerFor(db, settings, {
+    seen: present?.seen,
     keeper,
     send,
     state: (room) => link?.state(room) ?? Promise.resolve(undefined),
     log,
   });
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
-  const activity = makeActivity();
   const kept = pinsFor(db, settings, { link: () => link, now, log });
   const link: Link | undefined =
     ergo === undefined
@@ -216,7 +210,6 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           log,
         });
-  const visible = listedTo(settings, keeper);
   return {
     activity: activityRoutes(activity, { db, now, visible, session: options.session }),
     roomList: listRoutes({ db, roles: settings, visible, session: options.session }),
@@ -228,9 +221,11 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
+    ...(present === undefined ? {} : { presence: present.routes }),
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);
+      present?.stop();
       // Nothing more starts once stopping: a line left waiting is caught up at the next start.
       queue.stop();
       await link?.stop();

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { ROCKS } from "./belt.ts";
 import { Disc, type Sight } from "./disc.ts";
+import { limbOf } from "./restBodies.ts";
 
 // What a look writes, from a record no map makes: so each cap is seen binding, and nothing past it reaches a buffer.
 const system = (at: number, worlds: number, belt: boolean): StarSystem => ({
@@ -32,6 +33,7 @@ function sighted(systems: readonly StarSystem[], fill: (drawn: Drawn) => void): 
     drawn,
     eye: { x: 0, y: 30, z: 0 },
     focal: 1158,
+    limb: limbOf({ eye: { x: 0, y: 30, z: 0 }, focal: 1158 }),
     isBody: () => false,
     pointShare: () => 1,
     needsHalo: (index) => index === 0,
@@ -279,7 +281,15 @@ describe("a star's point by the Earth's limb", () => {
     // The one in front of the Earth and the one 87.8 units off are left out of the halos' choice, so they stand with none, as g1ut6usp's
     // did behind seven nearer suns.
     const inView = (place: { readonly x: number }) => place.x !== places[2]?.x && place.x !== places[5]?.x;
-    const suns = sunsOf(painted({ ...base, eye, needsHalo: (index) => index === 0 || index === 3, inView }).disc);
+    const suns = sunsOf(
+      painted({
+        ...base,
+        eye,
+        limb: limbOf({ eye, focal: 1158 }),
+        needsHalo: (index) => index === 0 || index === 3,
+        inView,
+      }).disc,
+    );
     expect(suns.map(({ halo }) => halo > 0)).toEqual([true, false, false, true, false, false]);
     expect(suns.map(({ light }) => light)).toEqual([1, 0, 1, 1, 1, 0]);
   });

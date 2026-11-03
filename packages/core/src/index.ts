@@ -31,6 +31,7 @@ export {
   EARTH_RADIUS,
   GNO_LAND,
   GRAIN,
+  ROCKS_FROM,
   ROOM,
   systemsOf,
   worldSize,
@@ -52,6 +53,9 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
+export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
+export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
+export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
   CENTRE,
@@ -66,6 +70,8 @@ export {
 } from "./frame/disc.ts";
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
+export { arrivalOf, type Arrival } from "./frame/arrival.ts";
+export { HALO_FAR, haloAt } from "./frame/halo.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,
@@ -107,6 +113,7 @@ export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";
 export { alike, featuresOf, type Features } from "./planet/variety.ts";
 export {
+  daysSince,
   isFresh,
   LIGHT_KINDS,
   STAGES,
@@ -163,7 +170,8 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
-export { driftAt, glideAt, HOME, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
+export { beatAt } from "./space/beat.ts";
+export { ARRIVAL_LEAN, driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { smoothstep } from "./space/smooth.ts";
 export {

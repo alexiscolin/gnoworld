@@ -1,0 +1,212 @@
+// @vitest-environment jsdom
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { callersOf, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
+import { Drawn } from "@gnoworld/core";
+import { asksOf } from "../../scene/cosmos/labelAsks.ts";
+import type { Scene } from "../../scene/scene.ts";
+import { WorldsFeed } from "./worldsFeed.ts";
+
+// What the cosmos is told (7h): its worlds once the file comes, then who is here, keyed as the cosmos holds each world (a hub's world is its
+// first realm's, gov/dao for the slug govdao), with the hubs' names and this reader's visits, asked again each minute while the cosmos
+// shows and never while it is covered or gone.
+const feed = vi.hoisted(() => ({ read: vi.fn(), presence: vi.fn() }));
+vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: feed.read }));
+vi.mock("../../lib/api/presence.ts", () => ({ pagePresenceApi: () => ({ read: feed.presence }) }));
+
+const FILE = {
+  version: 1,
+  universe: "onyx",
+  updated: "2026-11-03T10:00:00Z",
+  worlds: [{ id: "gov/dao", namespace: "gov", realms: [] }],
+};
+const ANSWER = {
+  worlds: [
+    { world: "earth", here: 3, perHour: 30, rise: null },
+    { world: "govdao", here: 9, perHour: 12, rise: 0.5 },
+    { world: "bubble", here: 0, perHour: 0, rise: null },
+  ],
+};
+const MINUTE = 60_000;
+const NOW = Date.parse("2026-11-03T12:00:00.000Z");
+
+const sceneOf = () => {
+  const cosmos = vi.fn<(worlds: unknown, written?: string, signals?: LabelSignals) => void>();
+  return { cosmos, keepClear: vi.fn(), scene: { cosmos, keepClear: vi.fn() } as unknown as Scene };
+};
+const lastSignals = (cosmos: ReturnType<typeof sceneOf>["cosmos"]) => cosmos.mock.lastCall?.[2];
+// The signals' chunk and the reads resolve in turns of the microtask queue: a few turns settle them.
+const settled = async () => {
+  for (let turn = 0; turn < 20; turn += 1) await vi.advanceTimersByTimeAsync(0);
+};
+
+beforeAll(async () => {
+  await import("./signals.ts");
+});
+beforeEach(() => {
+  vi.useFakeTimers({ now: NOW });
+  feed.read.mockResolvedValue(FILE);
+  feed.presence.mockResolvedValue({ ok: true, value: ANSWER });
+  localStorage.clear();
+});
+afterEach(() => {
+  vi.useRealTimers();
+  vi.clearAllMocks();
+});
+
+describe("the worlds' feed", () => {
+  it("hands the labels who is here, keyed as the cosmos holds each world, with the hubs' names and this reader's visits", async () => {
+    const { cosmos, scene } = sceneOf();
+    localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    const signals = lastSignals(cosmos);
+    expect(cosmos.mock.lastCall?.slice(0, 2)).toEqual([FILE.worlds, FILE.updated]);
+    expect(Object.fromEntries(signals?.present ?? [])).toEqual({
+      earth: { here: 3, perHour: 30, rise: null },
+      "gov/dao": { here: 9, perHour: 12, rise: 0.5 },
+      bubble: { here: 0, perHour: 0, rise: null },
+    });
+    expect(signals?.names.get("gov/dao")).toBe("GovDAO");
+    expect(signals?.visited("gov/dao")).toBe(true);
+    expect(signals?.visited("games/go")).toBe(false);
+    worlds.leave();
+  });
+
+  it("asks again each minute while the cosmos shows, and never while it is covered or gone", async () => {
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    expect(feed.presence).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(2);
+    worlds.sync(scene, false);
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(2);
+    worlds.sync(scene, true);
+    await settled();
+    expect(feed.presence).toHaveBeenCalledTimes(3);
+    worlds.leave();
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("asks nothing while the tab is hidden, and asks at once when it shows again (F3783)", async () => {
+    const hidden = (value: boolean) => {
+      Object.defineProperty(document, "hidden", { configurable: true, value });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    hidden(true);
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(1);
+    hidden(false);
+    await settled();
+    expect(feed.presence).toHaveBeenCalledTimes(2);
+    worlds.leave();
+    Reflect.deleteProperty(document, "hidden");
+  });
+
+  it("drops the counts but keeps the names and visits when who-is-here fails after it came", async () => {
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    feed.presence.mockResolvedValue({ ok: false, reason: "unavailable" });
+    await vi.advanceTimersByTimeAsync(MINUTE);
+    const signals = lastSignals(cosmos);
+    expect(signals?.present.size).toBe(0);
+    expect(signals?.names.get("gov/dao")).toBe("GovDAO");
+    worlds.leave();
+  });
+
+  it("hands its worlds while who-is-here never answered, and asks it again only on the cosmos's next showing", async () => {
+    feed.presence.mockResolvedValue({ ok: false, reason: "network" });
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    expect(cosmos.mock.lastCall?.slice(0, 2)).toEqual([FILE.worlds, FILE.updated]);
+    expect(lastSignals(cosmos)?.present.size).toBe(0);
+    expect(lastSignals(cosmos)?.now).toBe(NOW);
+    await vi.advanceTimersByTimeAsync(5 * MINUTE);
+    expect(feed.presence).toHaveBeenCalledTimes(1);
+    worlds.leave();
+  });
+
+  it("names the hubs and calls a new world uncharted while who-is-here never answers (F3778)", async () => {
+    const fresh = { id: "games/new", namespace: "games", realms: [], seen: new Date(NOW - 86_400_000).toISOString() };
+    feed.read.mockResolvedValue({ ...FILE, worlds: [...FILE.worlds, fresh] });
+    feed.presence.mockReturnValue(new Promise(() => undefined));
+    localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    const signals = lastSignals(cosmos);
+    expect(signals?.names).toEqual(
+      new Map([
+        ["bubble", "Bubble"],
+        ["gov/dao", "GovDAO"],
+      ]),
+    );
+    expect(signals?.present.size).toBe(0);
+    expect(signals?.now).toBe(NOW);
+    expect(signals?.visited("gov/dao")).toBe(true);
+    const bodies = [
+      { id: "games/new", away: 3 },
+      { id: "gov/dao", away: 4 },
+    ];
+    const { asks } = asksOf({
+      systems: [],
+      drawn: new Drawn(),
+      bodies,
+      callersOf,
+      list: cosmos.mock.lastCall?.[0] as typeof FILE.worlds,
+      signals,
+    });
+    expect(asks.slice(1)).toEqual([
+      { id: "games/new", kind: "near", signals: { uncharted: true } },
+      { id: "gov/dao", kind: "near", name: "GovDAO", signals: {} },
+    ]);
+    worlds.leave();
+  });
+
+  it.each([
+    [
+      "covered",
+      (worlds: WorldsFeed, scene: Scene) => {
+        worlds.sync(scene, false);
+      },
+    ],
+    [
+      "gone",
+      (worlds: WorldsFeed) => {
+        worlds.leave();
+      },
+    ],
+  ])("lets go of who-is-here read after the cosmos was %s: no worlds handed, no timer (F3780)", async (_, away) => {
+    let answer: (said: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    const before = cosmos.mock.calls.length;
+    away(worlds, scene);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(cosmos.mock.calls.slice(before).filter(([handed]) => handed !== undefined)).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+    worlds.leave();
+  });
+});

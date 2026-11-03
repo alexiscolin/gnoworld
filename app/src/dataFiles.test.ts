@@ -414,7 +414,7 @@ describe("react-router build", () => {
       const holding = () =>
         readdirSync(client, { recursive: true })
           .filter((name) => /\.(?:js|html|data)$/.test(name))
-          .filter((name) => /test-gpu|__gnoworldScene/.test(readFileSync(join(client, name), "utf8")));
+          .filter((name) => /test-gpu|__gnoworld(?:Scene|Labels)/.test(readFileSync(join(client, name), "utf8")));
       try {
         const production = build(dir);
         expect(production.status, `${production.stdout}${production.stderr}`).toBe(0);

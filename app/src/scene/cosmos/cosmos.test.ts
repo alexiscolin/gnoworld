@@ -1,5 +1,8 @@
 import {
+  ARRIVAL_LEAN,
+  arrivalOf,
   asciiBytes,
+  beatAt,
   BELT_INNER,
   BOUNDS,
   CENTRE,
@@ -12,9 +15,13 @@ import {
   evenRow,
   FIELD_OF_VIEW,
   GRAIN,
+  haloAt,
+  LEAN,
   orbitPlace,
   orbitTime,
   HOME,
+  BLOCK_MS,
+  MOOD_SCALE,
   NEBULA_IMAGES,
   nebulaShare,
   offLine,
@@ -22,6 +29,7 @@ import {
   planetSeed,
   postcardOf,
   restView,
+  ROCKS_FROM,
   ROOM,
   softPoint,
   systemsOf,
@@ -185,6 +193,47 @@ const ONYX: readonly CosmosWorld[] = recorded.worlds;
 const systemOf = (systems: readonly StarSystem[], id: string) =>
   systems.find(({ worlds: list }) => list.some((world) => world.id === id));
 const rocks = (from: { stage: Stage }) => pointsWith(from, "aStar");
+// Each rock the belt draws, and its star's place, on the map.
+const rocksOf = (from: { stage: Stage }, count: number) => {
+  const [belt] = rocks(from);
+  if (belt === undefined) return [];
+  const [stars, places] = [belt.geometry.getAttribute("aStar"), belt.geometry.getAttribute("position")];
+  return Array.from({ length: count }, (_, at) => ({
+    star: new Vector3(stars.getX(at), stars.getY(at), stars.getZ(at)),
+    rock: new Vector3(places.getX(at), places.getY(at), places.getZ(at)),
+  }));
+};
+// Where `world` stands in `system`'s plane, `seconds` on its turn, on the map.
+const turned = (system: StarSystem, world: Orbiter, seconds: number) => {
+  const out = { x: NaN, y: NaN, z: NaN };
+  orbitPlace({ system, world }, seconds, out);
+  return new Vector3(out.x, out.y, out.z);
+};
+// Half a unit: debris is only a far belt (ADR-0002 §10), and a rock this near a world's ground would read as that world crumbling.
+const DEBRIS_CLEAR = 0.5;
+// Every rock `scene` draws, against every world of its system as drawn, `drawnOf` giving each system's plane and worlds, through a turn.
+function debrisClear(
+  scene: ReturnType<typeof made>,
+  systems: readonly StarSystem[],
+  drawnOf: (system: StarSystem) => { system: StarSystem; worlds: readonly Orbiter[] },
+) {
+  let judged = 0;
+  for (const { star, rock } of rocksOf(scene, scene.cosmos.stats().rocks)) {
+    // In its band: from ROCKS_FROM to the room's edge, a little off the plane.
+    expect(rock.distanceTo(star)).toBeGreaterThanOrEqual(ROCKS_FROM - 1e-6);
+    expect(rock.distanceTo(star)).toBeLessThanOrEqual(Math.hypot(ROOM, 0.15) + 1e-6);
+    const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
+    if (found === undefined) throw new Error("a rock with no star");
+    const { system, worlds: drawnWorlds } = drawnOf(found);
+    for (const world of drawnWorlds)
+      for (let step = 0; step < 16; step += 1) {
+        const seconds = (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
+        expect(rock.distanceTo(turned(system, world, seconds)) - world.radius).toBeGreaterThanOrEqual(DEBRIS_CLEAR);
+        judged += 1;
+      }
+  }
+  return judged;
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -484,7 +533,8 @@ describe("what it draws", () => {
         .map(({ phase }) => phase.toFixed(4)),
     );
     const sizes = new Set<string>();
-    expect(count).toBeGreaterThan(100);
+    // A postcard's specks that would stand on one of its bodies are left out (7d3): 91 of the crowd's 120 points stand.
+    expect(count).toBeGreaterThan(80);
     for (let at = 0; at < count; at += 1) {
       if (!grains.has(orbit.getY(at).toFixed(4))) continue;
       expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
@@ -529,6 +579,32 @@ describe("what it draws", () => {
       expect(Math.abs(rock.clone().sub(star).dot(normal))).toBeLessThanOrEqual(0.31);
     }
   });
+
+  // 7d3: a postcard's worlds, widened at display, stood in its far belt's rocks (10 of Onyx's 31 belted systems).
+  it.each([
+    ["Onyx", ONYX],
+    ["30 systems", worlds(30)],
+  ] as const)(
+    "leaves no debris near a planet on %s: every rock half a unit or more off every world its system draws, at any turn",
+    async (_, list) => {
+      const scene = made();
+      await shown(scene, list);
+      const systems = held(list);
+      const view = restView(systems);
+      const drawnOf = (system: StarSystem) => {
+        if (!view.postcards.includes(systems.indexOf(system))) return { system, worlds: system.worlds };
+        // A postcard's bodies widened round its star, its specks at their own orbits, all in its plane as drawn.
+        const postcard = postcardOf(system, view.eye);
+        return { system: postcard.system, worlds: [...postcard.worlds, ...system.worlds] };
+      };
+      expect(debrisClear(scene, systems, drawnOf)).toBeGreaterThan(0);
+      // A band, not a line: the rocks spread across it.
+      const reach = rocksOf(scene, scene.cosmos.stats().rocks).map(({ star, rock }) => rock.distanceTo(star));
+      const mean = reach.reduce((sum, at) => sum + at, 0) / reach.length;
+      const spread = Math.sqrt(reach.reduce((sum, at) => sum + (at - mean) ** 2, 0) / reach.length);
+      expect(spread).toBeGreaterThanOrEqual((ROOM - ROCKS_FROM) / 4);
+    },
+  );
 
   it("turns each point in its system's plane: the plane's tilt and line of nodes go with it", async () => {
     const scene = made();
@@ -1277,6 +1353,17 @@ describe("a look costs a step, never a frame", () => {
     expect(shared).not.toHaveBeenCalled();
     expect(scene.cosmos.stats().maps).toBe(kept);
     shared.mockRestore();
+  });
+
+  it("hides a body it frees at once, so nothing that points at its object takes it for one still drawn (7h)", async () => {
+    const scene = made();
+    await shown(scene);
+    const group = scene.cosmos.stats().list[0]?.planet.group;
+    if (group === undefined) throw new Error("no body");
+    expect(group.visible).toBe(true);
+    scene.cosmos.tick({ x: HOME.x + 5000, y: HOME.y, z: HOME.z }, 1);
+    await settled();
+    expect(group.visible).toBe(false);
   });
 
   it("poses a new body at once: one that stood at the eye a frame would fill the screen", async () => {
@@ -2696,5 +2783,450 @@ describe("the whole cosmos", () => {
       expect(plain.cosmos.stats().dive).toEqual({ along: 1, veil: 0 });
       expect(earthShown(plain)).toBe(true);
     });
+  });
+});
+
+describe("a system's arrival (7d3)", () => {
+  // Comes to system `id`: the scene's eye the cosmos asks for, given back to it as the scene's frame would.
+  const arrived = async (scene: ReturnType<typeof made>, id: string | undefined) => {
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.arrive(id, go);
+    await settled();
+    const to = go.mock.lastCall?.[0];
+    if (to === undefined) throw new Error("no arrival");
+    scene.cosmos.tick(to, 0);
+    await settled();
+    scene.cosmos.tick(to, 0);
+    await settled();
+    return { to, go };
+  };
+  const onStage = (at: Point) => {
+    const out = { x: NaN, y: NaN, z: NaN };
+    toScene(at, out);
+    return new Vector3(out.x, out.y, out.z);
+  };
+  const named = (systems: readonly StarSystem[], id: string) => {
+    const found = systems.find((system) => system.id === id);
+    if (found === undefined) throw new Error(`no system ${id}`);
+    return found;
+  };
+  // Onyx's gnoswap: sixteen worlds and a far belt, 90 units from the Earth.
+  const GNOSWAP = "gnoswap";
+  const atGnoswap = async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = named(systems, GNOSWAP);
+    await arrived(scene, GNOSWAP);
+    return { scene, systems, system, arrival: arrivalOf(system, systems) };
+  };
+  // The farthest belted system of a large file, past a cluster's distance from the Earth.
+  const farthest = (systems: readonly StarSystem[]) => {
+    const [far] = systems
+      .filter(({ belt, worlds: list }) => belt && list.length > 0)
+      .sort((a, b) => distanceOf(b.place, EARTH_PLACE) - distanceOf(a.place, EARTH_PLACE));
+    if (far === undefined) throw new Error("no belted system");
+    return far;
+  };
+  const sunsOf = (scene: ReturnType<typeof made>) => {
+    const [mesh] = glows(scene);
+    if (mesh === undefined) throw new Error("no suns");
+    const [at, sun, halo] = ["aAt", "aSun", "aHalo"].map((name) => mesh.geometry.getAttribute(name));
+    const indexOf = (place: Point) =>
+      Array.from({ length: mesh.geometry.instanceCount }, (_, index) => index).find(
+        (index) =>
+          Math.hypot(
+            (at?.getX(index) ?? NaN) - place.x,
+            (at?.getY(index) ?? NaN) - place.y,
+            (at?.getZ(index) ?? NaN) - place.z,
+          ) < 1e-4,
+      ) ?? -1;
+    return { mesh, sun, halo, indexOf };
+  };
+
+  it("stands the eye at the system's arrival", async () => {
+    const { scene, arrival } = await atGnoswap();
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(arrival.eye))).toBeLessThan(1e-6);
+  });
+
+  it("stands its postcard's worlds as the bodies, and no other", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const ids = scene.cosmos.stats().list.map(({ id }) => id);
+    expect(ids.sort()).toEqual(arrival.postcard.worlds.map(({ id }) => id).sort());
+  });
+
+  it("turns the camera to what the arrival looks at, the map's up kept up", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const eye = new Vector3().copy(scene.cosmos.stats().eye);
+    const ahead = new Vector3(0, 0, -1).applyQuaternion(scene.camera.quaternion);
+    expect(ahead.angleTo(onStage(arrival.look).sub(eye))).toBeLessThan(1e-6);
+    // No roll: the camera's right lies flat on the map.
+    const right = new Vector3(1, 0, 0).applyQuaternion(scene.camera.quaternion);
+    expect(right.dot(onStage({ x: 0, y: 1, z: 0 }).sub(onStage({ x: 0, y: 0, z: 0 })))).toBeCloseTo(0, 9);
+  });
+
+  it("lights each body from its own star", async () => {
+    const { scene, system } = await atGnoswap();
+    const eye = new Vector3().copy(scene.cosmos.stats().eye);
+    const { list } = scene.cosmos.stats();
+    expect(list.length).toBeGreaterThan(0);
+    for (const body of list) expect(body.star.distanceTo(onStage(system.place).sub(eye))).toBeLessThan(1e-6);
+  });
+
+  it("makes its star the main light: a whole halo, the widest on the screen, the great star half its size at most", async () => {
+    const { scene, systems, system, arrival } = await atGnoswap();
+    const { sun, halo, indexOf } = sunsOf(scene);
+    const size = (place: Point) => {
+      const index = indexOf(place);
+      return index < 0 ? 0 : (sun?.getX(index) ?? NaN) / distanceOf(place, arrival.eye);
+    };
+    expect(halo?.getX(indexOf(system.place))).toBe(1);
+    const own = size(system.place);
+    expect(own).toBeGreaterThan(0);
+    // Read from a Float32 attribute, as the GPU holds it: to a float's precision.
+    for (const other of systems)
+      if (other !== system) expect(size(other.place)).toBeLessThanOrEqual((own / 2) * (1 + 1e-6));
+  });
+
+  it("lays its far belt clear of its worlds: every rock half a unit or more off every world it draws, at any turn", async () => {
+    const { scene, systems, system, arrival } = await atGnoswap();
+    expect(system.belt).toBe(true);
+    const drawnOf = (found: StarSystem) =>
+      found === system
+        ? { system: arrival.postcard.system, worlds: [...arrival.postcard.worlds, ...system.worlds] }
+        : { system: found, worlds: found.worlds };
+    const own = rocksOf(scene, scene.cosmos.stats().rocks).filter(
+      ({ star }) => star.distanceTo(new Vector3().copy(system.place)) < 1e-4,
+    );
+    expect(own.length).toBeGreaterThan(0);
+    expect(debrisClear(scene, systems, drawnOf)).toBeGreaterThan(0);
+  });
+
+  it("looks around the system it came to, however far from the Earth: its belt laid, the disc whole, no whole cosmos asked", async () => {
+    const scene = made();
+    const list = worlds(3000, 3);
+    await shown(scene, list);
+    const systems = held(list);
+    const far = farthest(systems);
+    expect(distanceOf(far.place, EARTH_PLACE)).toBeGreaterThan(MOOD_SCALE);
+    await arrived(scene, far.id);
+    expect(scene.cosmos.stats().web).toBeUndefined();
+    expect(sunsOf(scene).mesh.material.uniforms["uFade"]?.value).toBe(1);
+    const own = rocksOf(scene, scene.cosmos.stats().rocks).filter(
+      ({ star }) => star.distanceTo(new Vector3().copy(far.place)) < 1e-4,
+    );
+    expect(own.length).toBeGreaterThan(0);
+    expect(scene.cosmos.stats().list.length).toBe(arrivalOf(far, systems).postcard.worlds.length);
+  });
+
+  it("goes back to the view at rest when asked no system: the scene's eye at home, the view's own bodies", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const home = new Set(scene.cosmos.stats().list.map(({ id }) => id));
+    await arrived(scene, GNOSWAP);
+    const { to } = await arrived(scene, undefined);
+    expect(to).toEqual(HOME);
+    expect(new Set(scene.cosmos.stats().list.map(({ id }) => id))).toEqual(home);
+    const { earth } = scene.cosmos.stats().screen;
+    expect(earth?.x).toBeCloseTo(WIDTH / 2, 1);
+  });
+
+  // 7d3's review: the arrival's own star the one light; the great star keeps the halo its distance leaves it, the others a quarter.
+  it("leaves the great star at an arrival no more halo than its distance leaves it, and every other sun a quarter of the arrival star's size", async () => {
+    const { scene, systems, system, arrival } = await atGnoswap();
+    const { sun, halo, indexOf } = sunsOf(scene);
+    const great = indexOf({ x: 0, y: 0, z: 0 });
+    expect(great).toBeGreaterThanOrEqual(0);
+    // Not forced whole: at most what its distance leaves it, and nothing if six nearer suns took the halos.
+    expect(halo?.getX(great)).toBeLessThanOrEqual(haloAt(distanceOf({ x: 0, y: 0, z: 0 }, arrival.eye)) + 1e-9);
+    expect(halo?.getX(great)).toBeLessThan(1);
+    const size = (place: Point) => (sun?.getX(indexOf(place)) ?? NaN) / distanceOf(place, arrival.eye);
+    const own = size(system.place);
+    for (const other of systems)
+      if (other !== system && indexOf(other.place) >= 0) expect(size(other.place)).toBeLessThanOrEqual(own / 4 + 1e-9);
+  });
+
+  it("keeps the arrival's star the main light when the eye leans away from it, past the view's reach", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = named(systems, GNOSWAP);
+    const { to } = await arrived(scene, GNOSWAP);
+    scene.cosmos.tick({ x: to.x + 12, y: to.y + 6, z: to.z }, 0);
+    await settled();
+    const { halo, indexOf } = sunsOf(scene);
+    expect(halo?.getX(indexOf(system.place))).toBe(1);
+  });
+
+  it("lights an arrival's bodies as up close: each world its own angle from the eye", async () => {
+    const { scene } = await atGnoswap();
+    const { list } = scene.cosmos.stats();
+    expect(list.length).toBeGreaterThan(0);
+    for (const { id, at, sun } of list) {
+      const toEye = at.clone().negate().normalize();
+      expect(sun.angleTo(toEye)).toBeCloseTo(fromEyeOf(planetSeed(asciiBytes(`gno.land/r/${id}`))), 6);
+    }
+  });
+
+  // The points the disc writes: each one's star, its orbit and phase, and its size in pixels.
+  const pointsOf = (scene: ReturnType<typeof made>) => {
+    const [points] = dots(scene);
+    if (points === undefined) return [];
+    const read = (name: string, at: number, axis: "getX" | "getY" | "getZ") =>
+      points.geometry.getAttribute(name)[axis](at);
+    return Array.from({ length: scene.cosmos.stats().dots }, (_, at) => ({
+      star: { x: read("position", at, "getX"), y: read("position", at, "getY"), z: read("position", at, "getZ") },
+      orbit: read("aOrbit", at, "getX"),
+      phase: read("aOrbit", at, "getY"),
+      size: read("aSize", at, "getX"),
+    }));
+  };
+  // Two worlds' distance in their system's plane, from their orbits and phases.
+  const inPlane = (a: { orbit: number; phase: number }, b: { orbit: number; phase: number }) =>
+    Math.hypot(
+      a.orbit * Math.cos(a.phase) - b.orbit * Math.cos(b.phase),
+      a.orbit * Math.sin(a.phase) - b.orbit * Math.sin(b.phase),
+    );
+
+  it("draws its other worlds as whole points, none on a body's ground", async () => {
+    const { scene, system, arrival } = await atGnoswap();
+    const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+    expect(own.length).toBeGreaterThan(0);
+    for (const point of own) {
+      const world = system.worlds.find(
+        (each) => Math.abs(each.orbit - point.orbit) < 1e-4 && Math.abs(each.phase - point.phase) < 1e-4,
+      );
+      if (world !== undefined && world.radius >= GRAIN) expect(point.size).toBeGreaterThanOrEqual(2);
+      for (const body of arrival.postcard.worlds)
+        expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  // Alexis, 2026-11-03 (reports/alexis-0816-postcard.png): pebbles round agents on the home's lower postcard, g1magld5's 124 grains on
+  // orbits from 1.61 to 3.28, agents widened to 3.25 among them.
+  it("keeps g1magld5's grain a body's width off agents and streak in Onyx's view at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    const { worlds: bodies } = postcardOf(system, restView(systems).eye);
+    expect(bodies.map(({ id }) => id.split("/").at(-1))).toEqual(["agents", "streak"]);
+    const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+    expect(own.length).toBeGreaterThan(40);
+    for (const point of own)
+      for (const body of bodies) expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(body.radius);
+  });
+
+  it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const { to } = await arrived(scene, GNOSWAP);
+    const look = onStage(arrival.look);
+    for (const seconds of [2.25, 4.5]) {
+      scene.cosmos.tick(to, seconds);
+      const eye = new Vector3().copy(scene.cosmos.stats().eye);
+      const offset = eye.clone().sub(onStage(arrival.eye));
+      expect(offset.length()).toBeGreaterThan(0.01);
+      expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
+    }
+  });
+
+  it("leans half as far at an arrival as at home: the eye nearer what it looks at", async () => {
+    const { scene, arrival } = await atGnoswap();
+    const { to } = await arrived(scene, GNOSWAP);
+    scene.cosmos.tick({ x: to.x + LEAN, y: to.y + LEAN, z: to.z }, 0);
+    const moved = new Vector3().copy(scene.cosmos.stats().eye).sub(onStage(arrival.eye));
+    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(moved.z).toBeCloseTo(0, 6);
+  });
+
+  it.each(["", "no/such", "__proto__", "constructor", "x".repeat(10_000)])(
+    "goes back to the view at rest for a system the file does not hold: %#",
+    async (id) => {
+      const scene = made();
+      await shown(scene, ONYX);
+      const home = new Set(scene.cosmos.stats().list.map(({ id: world }) => world));
+      const { to, go } = await arrived(scene, id);
+      expect(go).toHaveBeenCalledTimes(1);
+      expect(to).toEqual(HOME);
+      expect(new Set(scene.cosmos.stats().list.map(({ id: world }) => world))).toEqual(home);
+    },
+  );
+
+  it("keeps an arrival asked before the file came, and comes once it does", async () => {
+    const scene = made();
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.arrive(GNOSWAP, go);
+    await settled();
+    expect(go).not.toHaveBeenCalled();
+    await shown(scene, ONYX);
+    expect(go).toHaveBeenCalledTimes(1);
+    const arrival = arrivalOf(named(held(ONYX), GNOSWAP), held(ONYX));
+    scene.cosmos.tick(go.mock.lastCall?.[0] ?? HOME, 0);
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(arrival.eye))).toBeLessThan(1e-6);
+  });
+
+  it("comes to the last system asked: one asked before it, its chunk still on its way, never moves the eye", async () => {
+    const scene = made();
+    const [first, last] = [vi.fn<(eye: Point) => void>(), vi.fn<(eye: Point) => void>()];
+    scene.cosmos.show(ONYX);
+    scene.cosmos.arrive(GNOSWAP, first);
+    scene.cosmos.arrive("gnoland", last);
+    await settled();
+    await vi.dynamicImportSettled();
+    await settled();
+    expect(first).not.toHaveBeenCalled();
+    expect(last).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves no eye once it is gone, though the arrival was asked before its chunk came", async () => {
+    const scene = made();
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.show(ONYX);
+    scene.cosmos.arrive(GNOSWAP, go);
+    scene.owner.dispose();
+    await vi.dynamicImportSettled();
+    await settled();
+    expect(go).not.toHaveBeenCalled();
+  });
+
+  it("holds the eye where it is when the same file comes again: the same arrival, no move", async () => {
+    const { scene } = await atGnoswap();
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.arrive(GNOSWAP, go);
+    await settled();
+    expect(go).toHaveBeenCalledTimes(1);
+    scene.cosmos.show([...ONYX]);
+    await vi.dynamicImportSettled();
+    await settled();
+    expect(go).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the sun's beat (7d3)", () => {
+  const WRITTEN = "2026-11-03T06:00:00.000Z";
+  const written = Date.parse(WRITTEN);
+  const beat = (scene: ReturnType<typeof made>) => {
+    const [mesh] = glows(scene);
+    return Number(mesh?.material.uniforms["uBeat"]?.value);
+  };
+  // A frame at `now`, the wall's time, the scene's clock at `seconds`: the beat follows the chain's time, and moves only while the clock runs.
+  const frameAt = (
+    scene: ReturnType<typeof made>,
+    now: number,
+    { seconds, eye = HOME }: { seconds: number; eye?: Point },
+  ) => {
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    scene.cosmos.tick(eye, seconds);
+  };
+  // The file shown with its time, as the home's feed hands it, read ten minutes after its writing.
+  const READ = written + 600_000;
+  const timed = async (scene: ReturnType<typeof made>, list: readonly CosmosWorld[], read = READ) => {
+    vi.spyOn(Date, "now").mockReturnValue(read);
+    scene.cosmos.show(list, WRITTEN);
+    await vi.dynamicImportSettled();
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+  };
+  // The beat's top in a block forty blocks on, read in the test that runs: a mutant of the beat moves it.
+  const peakOf = () =>
+    Array.from({ length: 400 }, (_, at) => written + 40 * BLOCK_MS + at * 10).reduce((best, now) =>
+      beatAt(written, now, READ) > beatAt(written, best, READ) ? now : best,
+    );
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("lifts the great star's light once a block from the file's time, a fifth at most, and rests between", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const lifts: number[] = [];
+    for (let step = 0; step < 80; step += 1) {
+      const now = written + 8000 + step * 50;
+      frameAt(scene, now, { seconds: 1 + step / 30 });
+      const expected = beatAt(written, now, READ);
+      if (expected === 0) expect(beat(scene)).toBe(0);
+      else lifts.push(beat(scene) / expected);
+    }
+    expect(lifts.length).toBeGreaterThan(5);
+    for (const lift of lifts) expect(lift).toBeCloseTo(lifts[0] ?? NaN, 9);
+    expect(lifts[0]).toBeGreaterThan(0.1);
+    expect(lifts[0]).toBeLessThanOrEqual(0.2);
+  });
+
+  it("beats nothing while the scene's clock stands still, as under reduced motion: no orbit turns, no sun swells", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const peak = peakOf();
+    frameAt(scene, peak, { seconds: 0 });
+    expect(beat(scene)).toBe(0);
+    frameAt(scene, peak, { seconds: 0.5 });
+    expect(beat(scene)).toBeGreaterThan(0);
+    frameAt(scene, peak, { seconds: 0.5 });
+    expect(beat(scene)).toBe(0);
+  });
+
+  it("gives none from a file shown more than an hour after its writing, and beats on hours later from one shown fresh", async () => {
+    const stale = made();
+    await timed(stale, worlds(30), written + 2 * 3_600_000);
+    frameAt(stale, peakOf() + 2 * 3_600_000, { seconds: 1 });
+    expect(beat(stale)).toBe(0);
+    const fresh = made();
+    await timed(fresh, worlds(30));
+    frameAt(fresh, peakOf() + 5 * 3_600_000, { seconds: 1 });
+    expect(beat(fresh)).toBeGreaterThan(0.1);
+  });
+
+  it("asks no frame of its own: it rides the frames the scene draws for its orbits", async () => {
+    const scene = made();
+    await timed(scene, worlds(30));
+    const asked = scene.moved.mock.calls.length;
+    for (let step = 0; step < 40; step += 1) frameAt(scene, written + 8000 + step * 100, { seconds: 1 + step / 30 });
+    expect(scene.moved.mock.calls.length).toBe(asked);
+  });
+
+  // The suns' shader lifts the one at the map's very centre: the great star, and no other.
+  const atTheCentre = (scene: ReturnType<typeof made>) => {
+    const [mesh] = glows(scene);
+    const at = mesh?.geometry.getAttribute("aAt");
+    return Array.from({ length: mesh?.geometry.instanceCount ?? 0 }, (_, index) => index).filter(
+      (index) => at?.getX(index) === 0 && at.getY(index) === 0 && at.getZ(index) === 0,
+    );
+  };
+
+  it("stands the great star alone at the map's centre among the suns: the one its beat lifts", async () => {
+    const scene = made();
+    await shown(scene, worlds(30));
+    expect(atTheCentre(scene)).toHaveLength(1);
+    expect(held(worlds(30)).filter(({ place: { x, y, z } }) => x === 0 && y === 0 && z === 0)).toHaveLength(1);
+  });
+
+  it("gives no beat from a file with no time: no time, no chain to beat for", async () => {
+    const scene = made();
+    await shown(scene, worlds(30));
+    for (const [step, into] of [0, 100, 250, 900].entries()) {
+      frameAt(scene, written + into, { seconds: 1 + step });
+      expect(beat(scene)).toBe(0);
+    }
+  });
+
+  it("lifts no sun where the great star is not drawn: none stands at the map's centre", async () => {
+    const scene = made();
+    const list = worlds(3000, 3);
+    await timed(scene, list);
+    const systems = held(list);
+    const [far] = [...systems].sort((a, b) => distanceOf(b.place, EARTH_PLACE) - distanceOf(a.place, EARTH_PLACE));
+    if (far === undefined) throw new Error("no system");
+    const go = vi.fn<(eye: Point) => void>();
+    scene.cosmos.arrive(far.id, go);
+    await settled();
+    const to = go.mock.lastCall?.[0] ?? HOME;
+    scene.cosmos.tick(to, 0);
+    await settled();
+    frameAt(scene, peakOf(), { seconds: 1, eye: to });
+    expect(atTheCentre(scene)).toHaveLength(0);
   });
 });

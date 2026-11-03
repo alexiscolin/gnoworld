@@ -15,15 +15,16 @@ export const typedRooms = (worlds: ReadonlyMap<string, World>) =>
 export function reconcilerFor(
   db: DatabaseSync,
   roles: Typed,
-  parts: Pick<Parameters<typeof makeReconciler>[0], "send" | "state" | "log"> & { keeper: Rooms },
+  parts: Pick<Parameters<typeof makeReconciler>[0], "send" | "state" | "log" | "seen"> & { keeper: Rooms },
 ) {
-  const { keeper, send, state, log } = parts;
+  const { keeper, send, state, log, seen } = parts;
   return makeReconciler({
     rooms: () => listRooms(db).map(({ name }) => name),
     desired: (room) => desired(roles, room, { archived: keeper.archived(room) }),
     state,
     send,
     log,
+    seen,
   });
 }
 
