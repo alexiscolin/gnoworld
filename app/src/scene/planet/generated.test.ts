@@ -181,6 +181,7 @@ describe("a generated world, drawn from its recipe", () => {
     const ocean = worldAt("ocean");
     if (ocean.recipe.sea === null) throw new Error("an ocean world has a sea");
     // Its sea as the recipe turns it by its system's hue (Alexis, 2026-11-03, "bleu-vert variant").
+    expect(read(drawn(ocean).surface, "seaShallow")).toEqual(linear(ocean.recipe.sea.linear[0]));
     expect(read(drawn(ocean).surface, "seaDeep")).toEqual(linear(ocean.recipe.sea.linear[1]));
     expect(read(drawn(worldAt("rocky")).surface, "seaDeep")).toEqual(linear([0, 0, 0]));
   });

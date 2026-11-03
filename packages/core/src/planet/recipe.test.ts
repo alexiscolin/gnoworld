@@ -14,7 +14,7 @@ import {
   type Anchor,
   type PlanetLook,
 } from "./look.ts";
-import { labOf, turnOf, type Lab } from "./palette.ts";
+import { labOf, linearOf, turnOf, type Lab } from "./palette.ts";
 import { planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
@@ -228,6 +228,24 @@ describe("a world's sea", () => {
     }
     const path = asciiBytes("gno.land/r/sea0/home");
     expect(planetRecipe(path, "temperate").sea).toEqual(planetRecipe(path, "temperate").sea);
+  });
+
+  // Each colour turned as its palettes are, by the same cos and sin, shallow and deep alike, and handed linear as its Lab says.
+  it("turns both of a sea's colours by the system's very turn, and hands them as their Lab colours", () => {
+    for (const anchor of ANCHORS.filter((one) => ROWS[one].sea !== undefined))
+      for (const share of [0, 0.3, 1]) {
+        const turn = turnOf(share);
+        const { sea } = seededRecipe(planetSeed(asciiBytes(`gno.land/r/${anchor}/home`)), anchor, turn);
+        const row = ROWS[anchor].sea;
+        if (sea === null || row === undefined) throw new Error(`${anchor} has a sea`);
+        for (const [at, colour] of [row.shallow, row.deep].entries()) {
+          const [l, a, b] = labOf(colour);
+          const turned: Lab = [l, a * turn.cos - b * turn.sin, a * turn.sin + b * turn.cos];
+          const drawn = sea.lab[at] ?? [0, 0, 0];
+          expect(Math.hypot(...drawn.map((value, axis) => value - (turned[axis] ?? 0))), anchor).toBeLessThan(1e-9);
+          expect(sea.linear[at], `${anchor} ${String(at)}`).toEqual(linearOf(sea.lab[at] ?? turned));
+        }
+      }
   });
 
   it("keeps a temperate world's teal a glance from the frames' navy at either end of the turn", () => {
