@@ -6,6 +6,7 @@ import { LABEL_SLOTS, LabelLayout, settle, type ClearBox, type Point, type Scree
 import { Vector3 } from "three";
 import { fadeTo, moveTo, slotIn, wordsInto, type Anchor, type Chosen, type Slot } from "./labelSlot.ts";
 import styles from "./labels.module.css";
+import { watchScene } from "./sceneRuns.ts";
 
 export type { Anchor, Chosen };
 
@@ -59,18 +60,10 @@ export class Labels {
     this.#layer.dataset["labels"] = "";
     this.#slots = Array.from({ length: LABEL_SLOTS }, () => slotIn(this.#layer, document));
     document.body.append(this.#layer);
-    this.#mirror(document.querySelector("canvas[data-scene]"));
-  }
-
-  // The layer shows only while the scene's canvas runs: a lost context or a covered page stops the frames that would hide it.
-  #mirror(canvas: Element | null): void {
-    if (canvas === null) return;
-    const running = () => {
-      this.#layer.hidden = canvas.getAttribute("data-scene") !== "on";
-    };
-    this.#watching = new MutationObserver(running);
-    this.#watching.observe(canvas, { attributes: true, attributeFilter: ["data-scene"] });
-    running();
+    // The layer shows only while the scene's canvas runs.
+    this.#watching = watchScene(document, (running) => {
+      this.#layer.hidden = !running;
+    });
   }
 
   // The screen, in the page's pixels, and the box of the page's text: its bands written once a change.
