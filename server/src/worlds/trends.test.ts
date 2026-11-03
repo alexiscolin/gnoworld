@@ -80,8 +80,8 @@ describe("the busiest world", () => {
   it("counts nothing for a realm whose count fell, an indexer read again, rather than take it from the world's gains", () => {
     const trends = makeTrends();
     trends.passed(file(T1, WORLDS), calls({ [POOL]: 50, [POOL1]: 1, [ROUTER]: 10 }));
-    trends.passed(file(T2, WORLDS), calls({ [POOL]: 20, [POOL1]: 5, [ROUTER]: 13 }));
-    expect(busiestOf(trends.chain())).toMatchObject({ world: "gnoswap/pool", calls: 4 });
+    trends.passed(file(T2, WORLDS), calls({ [POOL]: 20, [POOL1]: 8, [ROUTER]: 16 }));
+    expect(busiestOf(trends.chain())).toMatchObject({ world: "gnoswap/pool", calls: 7 });
   });
 
   it(`is none when the two passes stand more than ${String(WINDOW_MOST_MS / HOUR)} h apart: a stopped job is no hour's trend`, () => {
@@ -127,11 +127,11 @@ describe("the busiest world", () => {
     };
     const trends = makeTrends();
     trends.passed(counted(T1), calls({ [POOL]: 1 }));
-    trends.passed(counted(T2), calls({ [POOL]: 3 }));
+    trends.passed(counted(T2), calls({ [POOL]: 8 }));
     const after = reads;
     for (let ask = 0; ask < 100; ask += 1) trends.chain();
     expect(reads).toBe(after);
-    expect(busiestOf(trends.chain())).toMatchObject({ calls: 2 });
+    expect(busiestOf(trends.chain())).toMatchObject({ calls: 7 });
   });
 
   it("names the world as the cosmos's labels do, and passes over a world only an address names", () => {
@@ -139,16 +139,16 @@ describe("the busiest world", () => {
     const worlds = [world(address, [`gno.land/r/${address}`]), world("gnoswap/router", [ROUTER])];
     const trends = makeTrends();
     trends.passed(file(T1, worlds), calls({ [`gno.land/r/${address}`]: 1, [ROUTER]: 1 }));
-    trends.passed(file(T2, worlds), calls({ [`gno.land/r/${address}`]: 90, [ROUTER]: 2 }));
-    expect(busiestOf(trends.chain())).toMatchObject({ world: "gnoswap/router", title: "router", calls: 1 });
+    trends.passed(file(T2, worlds), calls({ [`gno.land/r/${address}`]: 90, [ROUTER]: 7 }));
+    expect(busiestOf(trends.chain())).toMatchObject({ world: "gnoswap/router", title: "router", calls: 6 });
   });
 
   it("compares with the pass just before, never an older one", () => {
     const trends = makeTrends();
     trends.passed(file(T1, WORLDS), calls({ [ROUTER]: 0 }));
     trends.passed(file(T2, WORLDS), calls({ [ROUTER]: 50 }));
-    trends.passed(file(T2 + 30 * MINUTE, WORLDS), calls({ [ROUTER]: 52 }));
-    expect(busiestOf(trends.chain())).toMatchObject({ calls: 2, since: at(T2) });
+    trends.passed(file(T2 + 30 * MINUTE, WORLDS), calls({ [ROUTER]: 57 }));
+    expect(busiestOf(trends.chain())).toMatchObject({ calls: 7, since: at(T2) });
   });
 });
 
