@@ -1,0 +1,25 @@
+/* A world's label opened by the page's doors (ADR-0003, 2e): "Enter →" after its words, mock-up 3's, over its neighbours. The label is the
+   scene's (scene/cosmos/labels.module.css), its words in a row, so the words come after the name, its people and its heat. */
+@layer components {
+  .open {
+    /* raw: how far it grew to its left, which the doors write on the label as they measure it; none by default */
+    --_open: 0px;
+
+    /* raw: over its neighbours, in the labels' own layer */
+    z-index: 1;
+    /* Grown to its left; the stem stays on the body (labels.module.css). */
+    translate: var(--_open) 0;
+  }
+
+  .open::before {
+    order: 1;
+    /* raw: the muted dot before Enter, 8 px in (mock-up 3) */
+    padding-inline-start: calc(2 * var(--space-xs));
+    /* raw: the dot, 3 px across, centred in the 8 px before Enter, a little under the middle of the words */
+    background: radial-gradient(circle, var(--color-text-muted) 1.5px, transparent 2px) var(--space-xs) 60% / 4px 4px
+      no-repeat;
+    color: var(--color-text);
+    font: var(--font-action);
+    content: "Enter →";
+  }
+}

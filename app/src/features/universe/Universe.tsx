@@ -78,9 +78,28 @@ interface BesideProps {
 // The rail (7i), its code asked once the cosmos runs on a computer: a chunk that does not come leaves the page's list of worlds.
 const RailPart = lazyPart<ComponentProps<typeof Rail>>(() => import("./Rail.tsx").then(({ Rail: rail }) => rail));
 
-// What stands beside the cosmos: its maps' credits, and on a computer the rail, read once as the host decides a phone.
+// The labels' doors, a chunk asked once the cosmos runs, as its labels are: none of it is the first screen's, and a chunk that does not come
+// leaves the labels as words.
+const loadDoors = () => import("./labelDoors.ts");
+
+// What stands beside the cosmos: its maps' credits, its labels as doors to their worlds (ADR-0003, 2b and 2e), and on a computer the rail,
+// read once as the host decides a phone.
 function OnTheCosmos({ host, page }: { host: SceneHost; page: CosmosPage | undefined }) {
   const [computer] = useState(() => !matchMedia(PHONE_QUERY).matches);
+  useEffect(() => {
+    if (page === undefined) return undefined;
+    const leaving = new AbortController();
+    // A chunk that comes once the cosmos left hears nothing: its listeners take a signal already aborted.
+    loadDoors().then(
+      ({ labelDoors }) => {
+        labelDoors(page, host.feed.data, leaving.signal);
+      },
+      () => undefined,
+    );
+    return () => {
+      leaving.abort();
+    };
+  }, [host, page]);
   return (
     <>
       <Credits overTicker />

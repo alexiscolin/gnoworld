@@ -1849,3 +1849,59 @@ describe("the home's opening (ADR-0003)", () => {
     expect(words()).toBeNull();
   });
 });
+
+// ADR-0003 §2, 2b and 2e: the labels are doors while the cosmos shows, through the page's router, and no longer once it left.
+describe("the labels' doors (ADR-0003)", () => {
+  const page = () => ({ open: vi.fn<(href: string) => void>(), places: { earth: "/earth", worlds: [] } });
+  const earthLabel = () => {
+    const layer = document.createElement("div");
+    layer.dataset["labels"] = "";
+    const label = document.createElement("div");
+    label.dataset["world"] = "earth";
+    layer.append(label);
+    document.body.append(layer);
+    return label;
+  };
+
+  it("enters the Earth through the page's router at a click on its label, while the cosmos shows", async () => {
+    const cosmos = page();
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    act(() => {
+      root.render(<Universe shown="cosmos" page={cosmos} />);
+    });
+    await settle();
+    const label = earthLabel();
+    click(label);
+    expect(cosmos.open).toHaveBeenCalledWith("/earth");
+    act(() => {
+      root.render(<Universe shown="earth" />);
+    });
+    await settle();
+    click(label);
+    expect(cosmos.open).toHaveBeenCalledTimes(1);
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+    label.parentElement?.remove();
+  });
+
+  // F4526: a world's label goes to the page of the world the feed's file holds, its first realm's view for one with no hub.
+  it("enters a world's page by the feed's file, its first realm's view", async () => {
+    // A world beside the Earth stands the rail, whose column is watched for its size.
+    stubObserver();
+    scene.read.mockImplementation(() =>
+      Promise.resolve({ worlds: [{ id: "a/b", namespace: "a", realms: [{ path: "gno.land/r/a/b", callers: 1 }] }] }),
+    );
+    const cosmos = page();
+    mount(<Universe shown="cosmos" page={cosmos} />);
+    await settle();
+    const label = earthLabel();
+    label.dataset["world"] = "a/b";
+    click(label);
+    expect(cosmos.open).toHaveBeenCalledWith("/r/a/b");
+    label.parentElement?.remove();
+  });
+});

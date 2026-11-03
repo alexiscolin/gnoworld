@@ -8,8 +8,9 @@ import type { CosmosSight } from "./goal.ts";
 // Within this many pixels of a star's centre, a click aims at it.
 const REACH = 24;
 // What a click aims through, and so at nothing in space: the page's controls, its fields and its words.
+// A label of the cosmos is a door to its world (ADR-0003, 2e), never space.
 const NOT_SPACE =
-  "a, button, input, select, textarea, summary, label, dialog, [role], [contenteditable]:not([contenteditable='false']), p, h1, h2, h3, h4, h5, h6, li, dt, dd, section, aside, header, nav, form";
+  "a, button, input, select, textarea, summary, label, dialog, [role], [contenteditable]:not([contenteditable='false']), p, h1, h2, h3, h4, h5, h6, li, dt, dd, section, aside, header, nav, form, [data-labels]";
 
 const seat = new Vector3();
 

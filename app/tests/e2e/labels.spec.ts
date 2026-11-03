@@ -229,15 +229,22 @@ test("draws a farther world's label no larger and no brighter than a nearer one'
   expect(Math.min(...sizes) * least).toBeGreaterThanOrEqual(11);
 });
 
-test("lets every click through to the cosmos: its labels take no pointer", async ({ page }) => {
+// ADR-0003, 2e: a shown label is a door to its world; a hidden one takes no pointer, so every other click goes through to the cosmos.
+test("lets every click through to the cosmos but where a shown label stands: a hidden label takes no pointer", async ({
+  page,
+}) => {
   await served(page);
   await presence(page, []);
   await arrived(page);
   await settled(page);
   const pointers = await page.$$eval("[data-labels] > *", (labels) =>
-    labels.map((label) => getComputedStyle(label).pointerEvents),
+    labels.map(
+      (label) => [Number(getComputedStyle(label).opacity) > 0, getComputedStyle(label).pointerEvents] as const,
+    ),
   );
-  expect(pointers).toEqual(Array.from({ length: 8 }, () => "none"));
+  expect(pointers).toHaveLength(8);
+  for (const [shown, pointer] of pointers) expect(pointer).toBe(shown ? "auto" : "none");
+  expect(pointers.some(([shown]) => shown)).toBe(true);
 });
 
 test("stands its labels with motion on too, once the arrival's glide ends", async ({ page }) => {
