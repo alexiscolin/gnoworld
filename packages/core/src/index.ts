@@ -40,7 +40,7 @@ export {
   type WorldHeld,
 } from "./cosmos/system.ts";
 export { worldsDrawn } from "./cosmos/count.ts";
-export type { Rock } from "./lod/drawn.ts";
+export type { Planned, Rock } from "./lod/drawn.ts";
 export {
   BODY_PIXELS,
   BOUNDS,
@@ -73,6 +73,7 @@ export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
 export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
+export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
 export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt, rocksOf } from "./frame/rocks.ts";
