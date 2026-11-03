@@ -322,6 +322,9 @@ describe("the generated program", () => {
     expect(grooves).toMatch(/float away = seams\(/);
     expect(grooves).toMatch(/lane = 1\.0 - smoothstep\(0\.[0-2]\d*, 0\.[0-3]\d*, away\);/);
     expect(grooves).toMatch(/\* lane \* \(1\.0 - smoothstep\([\d.]+, [\d.]+, [1-9][\d.]* \* frequency \* pixel\)\);/);
+    // Never op-art (7b7's design review): the spacing wanders from lane to lane, each groove's width along it.
+    expect(grooves).toMatch(/float wave = away \* [\d.]+ \+ (0\.[5-9]|1\.\d)\d* \* noise\(/);
+    expect(grooves).toMatch(/smoothstep\([\d.]+ \+ [\d.]+ \* noise\([^)]*\), [\d.]+, abs\(fract\(wave\) - 0\.5\)\)/);
     expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal);");
   });
 

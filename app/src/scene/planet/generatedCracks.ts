@@ -16,8 +16,8 @@ float groovesAt(vec3 p, float frequency, float pixel, out float lane) {
   vec3 q = p * frequency + 0.3 * field(p * 1.7 + offset);
   float away = seams(q) + 0.04 * noise(q * 1.9);
   lane = 1.0 - smoothstep(0.18, 0.28, away);
-  float wave = away * 15.0 + 0.4 * noise(q * 1.3);
-  return smoothstep(0.22, 0.4, abs(fract(wave) - 0.5)) * lane * (1.0 - smoothstep(0.25, 0.35, 30.0 * frequency * pixel));
+  float wave = away * 15.0 + 0.9 * noise(q * 0.9);
+  return smoothstep(0.22 + 0.12 * noise(q * 4.0 + 5.0), 0.4, abs(fract(wave) - 0.5)) * lane * (1.0 - smoothstep(0.25, 0.35, 30.0 * frequency * pixel));
 }
 vec3 veinsOf(vec3 p, float pixel, float burn) {
   vec2 main = crackAt(p, 4.0 + shape.scale, vec2(0.14, 0.4), pixel);
