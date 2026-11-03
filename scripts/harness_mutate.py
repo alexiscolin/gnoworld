@@ -1248,6 +1248,10 @@ def mutate_mutants():
         ('if not f.endswith(("_test.gno", "_filetest.gno"))', "if True", "mutates no test"),
         ('    if re.search(rf"^m{i}/\\S+:\\d+:\\d+: .*\\(code=", out, re.M):\n', "    if False:\n", "tells a mutant that does not compile"),
         ('        if verdict(out, 0) != "survives":\n', "        if False:\n", "fails an untouched copy that fails"),
+        ("SECONDS_A_COPY = 1.5", "SECONDS_A_COPY = 1.4", "gives a copy 1.5 s of its run's time (F5051)"),
+        ("max(60, math.ceil(", "max(0, math.ceil(", "gives a run 60 s at least"),
+        ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
+        ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
     ))
 
 

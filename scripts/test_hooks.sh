@@ -537,6 +537,7 @@ out=$(checked a GNO="$mu/fakegno" FAKE=compile) && fail "mutate.py passed when n
 [ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] || fail "mutate.py ran gno other than once for one package: $(cat "$mu/fakegno.runs")"
 [ "$(tr ' ' '\n' <"$mu/fakegno.runs" | grep '^\./m' | sort)" = "$(i=0; while [ $i -le 22 ]; do echo "./m$i"; i=$((i + 1)); done | sort)" ] ||
 	fail "mutate.py's one gno run did not judge the control and its 22 mutants each once: $(cat "$mu/fakegno.runs")"
+[ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout 60s" ] || fail "mutate.py's run of 23 copies has not 60 s, the least (34.5 rounded up is less): $(cat "$mu/fakegno.runs")"
 for line in "FAIL  does not compile: $P: if n > 3 || n == 2 { [> -> >=] (expected killed)" "FAIL  does not compile: $P: mustPositive(n) (expected killed)" \
 	"FAIL  does not compile: $P: if a >= b { [>= -> >] (expected survives)" "ok    12 of 17 flips do not compile, dropped: r/planted"; do
 	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
@@ -549,6 +550,19 @@ printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does 
 out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
+# The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
+# one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
+# rounded up), 80 have 120, each package in one run.
+mkdir -p "$mu/d/r/many" && : >"$mu/d/gnowork.toml" && printf 'module = "gno.land/r/test/many"\ngno = "0.9"\n' >"$mu/d/r/many/gnomod.toml"
+gapped "$mu/check.py" '{}'
+for copies in 40:60 41:62 80:120; do
+	i=1 && printf 'package many\n' >"$mu/d/r/many/many.gno"
+	while [ $i -lt "${copies%:*}" ]; do printf '\nfunc F%s(bad bool) {\n\tif bad {\n\t\tpanic("bad")\n\t}\n}\n' "$i" >>"$mu/d/r/many/many.gno" && i=$((i + 1)); done
+	: >"$mu/fakegno.runs"
+	checked d GNO="$mu/fakegno" FAKE=survive >/dev/null || : # every guard survives the fake: only its run is read
+	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
+		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
+done
 # One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
 # line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
 for p in one two; do

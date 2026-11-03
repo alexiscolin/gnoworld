@@ -8,10 +8,11 @@ turns one `>=`, `>`, `<=`, `<`, `==`, `!=`, `&&`, `||`, `+` or `-` of a source's
 code (never its comments, strings or runes) into its partner, or shifts one
 integer literal by one, up or down. A package's mutants are copies of it in one
 temporary workspace, next to an untouched copy that must pass, all tested by one
-`gno test` run. A mutant that does not compile is an error of this script, never
-a kill; but a `+`, `-` or number flip that does not compile (a string's `+`, an
-array's size) is dropped and counted, unless GAPS lists it. A comparison or logic
-flip changes no type, so one that does not compile means a broken run.
+`gno test` run, whose time limit grows with its copies (F5051). A mutant that
+does not compile is an error of this script, never a kill; but a `+`, `-` or
+number flip that does not compile (a string's `+`, an array's size) is dropped and
+counted, unless GAPS lists it. A comparison or logic flip changes no type, so one
+that does not compile means a broken run.
 
 GAPS holds the mutants no test catches yet, with the reason. They must keep
 surviving, so closing a gap means deleting its line here. A key names its file:
@@ -22,6 +23,7 @@ mutant (the same guard line twice in a file) fails: one gap, one mutant. A flip
 that loops forever times the whole run out, and no gap can hold it: bound its loop.
 Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
 import glob
+import math
 import os
 import re
 import shutil
@@ -39,6 +41,9 @@ GAPS = {
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
 EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]
+# A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
+# realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
+SECONDS_A_COPY = 1.5
 
 MUST = re.compile(r"^\s*must[A-Z]\w*\(.*\)\s*$")
 IF = re.compile(r"^(\s*if )(?:(.*); )?(.*) \{\s*$")
@@ -162,8 +167,11 @@ def run(pkg, packages, cases):
                     f.write(src)
         dirs = [f"./m{i}" for i in range(len(cases) + 1)]
         # -timeout: a mutant that loops forever fails the check instead of hanging the commit; gno's timeout ends the
-        # whole run, so the mutants still running get no result.
-        out = subprocess.run([gno, "test", "-timeout", "60s", *dirs], cwd=tmp, capture_output=True, text=True, timeout=600)
+        # whole run, so the mutants still running get no result. One run for all the copies, its limit grown with them:
+        # a slow mutant takes the time the fast ones leave, and each run of its own would start gno's workers again.
+        limit = max(60, math.ceil(SECONDS_A_COPY * len(dirs)))
+        out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
+                             timeout=limit + 60)
         return out.stdout + out.stderr
 
 
