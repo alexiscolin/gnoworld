@@ -3062,10 +3062,10 @@ describe("a system's arrival (7d3)", () => {
     expect(screen.earth?.y).toBeCloseTo(HEIGHT / 2, 0);
   });
 
-  // Alexis, 2026-11-03 ("la perspective doit être partout"): beside the close world, the Earth and the postcards, real worlds of other
-  // nearby systems drawn as bodies at their own size, far, so the frame's sizes span about ten times, where they spanned 7.5 (149 px for
-  // the close world to gnoslinger's 20).
-  it("draws Onyx's view at rest in depth: real worlds of other systems as bodies, its sizes spanning eight times or more", async () => {
+  // Alexis, 2026-11-03 ("la perspective doit être partout"): the frame's sizes span about ten times, where they spanned 7.5 (149 px for the
+  // close world to gnoslinger's 20). Onyx draws no depth body under the review's rules: its disc, seen low, stands its candidates' stars on
+  // one band, and each would row with them, stand on the great star's glow or twin a neighbour (the chief's option A, 2026-11-03).
+  it("draws Onyx's view at rest in depth, its sizes spanning eight times or more, and each depth body the core finds", async () => {
     const scene = made();
     await shown(scene, ONYX);
     const systems = held(ONYX);
@@ -3073,7 +3073,6 @@ describe("a system's arrival (7d3)", () => {
     const deep = deepOf(systems, view, judgeOf(systems, view, LENT)).map(
       ({ system, world }) => systems[system]?.worlds[world]?.id,
     );
-    expect(deep.length).toBeGreaterThanOrEqual(2);
     const { screen } = scene.cosmos.stats();
     const ids = screen.bodies.map(({ id }) => id);
     for (const id of deep) expect(ids).toContain(id);
