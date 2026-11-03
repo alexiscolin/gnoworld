@@ -50,6 +50,10 @@ class LiveScene implements Scene {
   #seconds = 0;
   #refused = false;
   readonly fly: Scene["fly"];
+  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+   * the system's arrival stands (7d3); and how what the eye looks at is seen (7v). */
+  readonly arrive: Scene["arrive"];
+  readonly see: Scene["see"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -89,6 +93,9 @@ class LiveScene implements Scene {
     });
     this.ground = this.#earth;
     this.fly = this.#parts.fly;
+    const views = this.#parts.viewsOf(this.moveTo, options.onSystem);
+    this.arrive = views.arrive;
+    this.see = views.see;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -201,12 +208,6 @@ class LiveScene implements Scene {
   keepClear(box: ClearBox | undefined): void {
     this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
-  }
-
-  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
-   * the system's arrival stands (7d3). */
-  arrive(id: string | undefined): void {
-    this.#parts.cosmos.arrive(id, this.moveTo);
   }
 
   dispose(): void {

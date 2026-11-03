@@ -18,6 +18,8 @@ export interface SceneOptions {
   readonly onLost: (lost: boolean) => void;
   /** What the flight panel shows of a flight under way, ten times a second at most; nothing once it landed (7g). */
   readonly onFlight?: (flight: FlightSaid | undefined) => void;
+  /** The system the eye is asked to, by its id, and none back at rest (7v): the page's crumb back. */
+  readonly onSystem?: (id: string | undefined) => void;
 }
 
 export interface Scene {
@@ -41,6 +43,8 @@ export interface Scene {
   keepClear(box: ClearBox | undefined): void;
   /** Comes to the system named `id`, its postcard at its arrival, or back to the view at rest with none (7d3). */
   arrive(id: string | undefined): void;
+  /** Shows what the eye looks at from above, its orbits drawn (the Plan), or as space, its default (7v): a system or the Earth at rest. */
+  see(plan: boolean): void;
   dispose(): void;
   stats(): SceneStats;
 }

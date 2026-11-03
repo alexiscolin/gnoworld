@@ -68,7 +68,8 @@ const cosmos = vi.hoisted(() => ({
   restored: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
-  arrive: vi.fn<(id: string | undefined, go: (eye: { x: number; y: number; z: number }) => void) => void>(),
+  arrive:
+    vi.fn<(id: string | undefined, go: (eye: { x: number; y: number; z: number }) => void, plan: boolean) => void>(),
 }));
 
 vi.mock("./renderer.ts", () => ({ createRenderer: three.create }));
@@ -418,14 +419,14 @@ describe("the cosmos", () => {
     scene.cosmos(WORLDS);
     frames(2, 16);
     scene.arrive("gnoswap");
-    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function));
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function), false);
     const drawn = three.renderer.render.mock.calls.length;
     cosmos.arrive.mock.lastCall?.[1]({ x: 10, y: 20, z: 30 });
     frames(2, 16);
     expect(three.renderer.render.mock.calls.length).toBeGreaterThan(drawn);
     expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
     scene.arrive(undefined);
-    expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function));
+    expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function), false);
     scene.dispose();
   });
 
@@ -443,7 +444,39 @@ describe("the cosmos", () => {
     expect(cosmos.arrive).not.toHaveBeenCalled();
     scene.cosmos(WORLDS);
     await vi.dynamicImportSettled();
-    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function));
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function), false);
+    scene.dispose();
+  });
+
+  // 7v (Alexis, 2026-11-03): the reader's view, Dynamic or Plan, the same at every scale: the system the scene came to, or the Earth at rest,
+  // asked again in the view the reader chose, told a cosmos that comes later too.
+  it("shows what it looks at in its Plan when asked, and back, a system or the Earth at rest, and tells a later cosmos", async () => {
+    const scene = await started();
+    scene.cosmos(WORLDS);
+    frames(2, 16);
+    scene.see(true);
+    expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function), true);
+    scene.arrive("gnoswap");
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function), true);
+    scene.see(false);
+    expect(cosmos.arrive).toHaveBeenLastCalledWith("gnoswap", expect.any(Function), false);
+    scene.dispose();
+    const later = startScene(options(), clock);
+    later.see(true);
+    later.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function), true);
+    later.dispose();
+  });
+
+  it("tells the page the system its eye is asked to, and none once back at rest", () => {
+    const onSystem = vi.fn<(id: string | undefined) => void>();
+    const scene = startScene(options({ onSystem }), clock);
+    scene.arrive("gnoswap");
+    expect(onSystem).toHaveBeenLastCalledWith("gnoswap");
+    scene.arrive(undefined);
+    expect(onSystem).toHaveBeenLastCalledWith(undefined);
+    expect(onSystem).toHaveBeenCalledTimes(2);
     scene.dispose();
   });
 
