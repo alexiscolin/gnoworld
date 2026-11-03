@@ -66,8 +66,10 @@ packages/schemas/            Zod schemas for every boundary, shared the same way
 server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file (3g)
   src/                       `main`, `app`, `config`, `log`, `db`, `limit`, `visitor`, `net` (slice 3's 3a),
                              then one folder per role, from the merge that needs it: login/ ergo/ irc/ roles/ rooms/
-                             activity/ moderation/ stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), admin/ (12)
-  jarvis/                    the harness, its skills (SKILL.md folders) and its evals
+                             activity/ moderation/ stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), admin/ (12),
+                             jarvis/ (10: the loop, its locks, limits and checks, the `jarvis` container's entry)
+  jarvis/skills/             Jarvis's skills, one SKILL.md folder each, read by its loader only (ADR-0002 §5)
+evals/                       Jarvis's evals (promptfoo, cases as plain JSON), a workspace of its own, never in an image
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
