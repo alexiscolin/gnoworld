@@ -40,13 +40,17 @@ function sectionOf({ kind, signals = {} }: RailAsk): RailSection | null {
   return here > 0 || use > 0 ? "trend" : null;
 }
 
-// What the hold weighs: the rise, the people here or else the callers, a seed's youth.
-function heldOf(world: RailWorld, { signals = {}, days = 0 }: RailAsk): Held {
+// What the hold weighs: the rise, or the people here, or else the callers.
+function heldOf(world: RailWorld, { signals = {} }: RailAsk): Held {
   const { rise = 0, here = 0, use = 0 } = signals;
   if (world.section === "rising") return { world, group: 0, score: rise };
-  if (world.section === "seed") return { world, group: 0, score: -days };
   return here > 0 ? { world, group: 0, score: here } : { world, group: 1, score: use };
 }
+
+// Whether `lower` is clearly ahead of `upper`: more, and by AHEAD times. A score below zero is never ahead of a larger one, so every swap
+// leaves the order nearer sorted and the swaps end.
+const ahead = (lower: Held, upper: Held) =>
+  lower.group === upper.group && lower.score > upper.score && lower.score > AHEAD * upper.score;
 
 // Those shown before in their order, the others after them as ranked, people before callers; then a world goes above the one over it only
 // when clearly ahead in its group.
@@ -61,7 +65,7 @@ function steady(chosen: readonly Held[], shown: ReadonlyMap<string, number>): He
     moved = false;
     for (let below = 1; below < order.length; below += 1) {
       const [upper, lower] = [order[below - 1], order[below]];
-      if (upper?.group !== lower?.group || !lower || !upper || !(lower.score > AHEAD * upper.score)) continue;
+      if (!upper || !lower || !ahead(lower, upper)) continue;
       [order[below - 1], order[below]] = [lower, upper];
       moved = true;
     }
@@ -69,40 +73,46 @@ function steady(chosen: readonly Held[], shown: ReadonlyMap<string, number>): He
   return order;
 }
 
-// An ask with the title it shows.
-type Titled = RailAsk & { readonly title: string };
-
 // The newest seeds first, one of unknown age last; a tie by id.
-const youngest = (asks: readonly Titled[]) =>
+const youngest = (asks: readonly RailAsk[]) =>
   [...asks].sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity) || (a.id < b.id ? -1 : 1));
 
-// Each world in its section with its title, from its first ask; a world only an address names is none.
-function sectionsOf(asks: readonly RailAsk[]): Map<RailSection, Titled[]> {
-  const sections = new Map<RailSection, Titled[]>();
+// Each world in its section, from its first ask.
+function sectionsOf(asks: readonly RailAsk[]): Map<RailSection, RailAsk[]> {
+  const sections = new Map<RailSection, RailAsk[]>();
   const taken = new Set<string>();
   for (const ask of asks) {
     if (taken.has(ask.id)) continue;
     taken.add(ask.id);
     const section = sectionOf(ask);
-    const title = section === null ? null : titleOf(ask);
-    if (section === null || title === null) continue;
+    if (section === null) continue;
     const list = sections.get(section) ?? [];
-    list.push({ ...ask, title });
+    list.push(ask);
     sections.set(section, list);
   }
   return sections;
+}
+
+// The first `most` of `ranked` that have a title, in its order: a world only an address names is left out, and no title is made for a
+// world past the cap (a file holds up to 20,000).
+function kept(ranked: readonly RailAsk[], section: RailSection, most: number): Held[] {
+  const held: Held[] = [];
+  for (const ask of ranked) {
+    if (held.length >= most) break;
+    const title = titleOf(ask);
+    if (title !== null) held.push(heldOf({ id: ask.id, title, section }, ask));
+  }
+  return held;
 }
 
 /** The rail's worlds in their order, from `asks` in any order; `shown`, the ids it shows now, which holds their order. */
 export function chooseRail(asks: readonly RailAsk[], shown: readonly string[] = []): RailWorld[] {
   const sections = sectionsOf(asks);
   const position = new Map(shown.map((id, at) => [id, at]));
-  const held = (list: readonly Titled[], section: RailSection) =>
-    list.map((ask) => heldOf({ id: ask.id, title: ask.title, section }, ask));
-  const earth = held((sections.get("earth") ?? []).slice(0, 1), "earth");
-  const rising = steady(held(mostPopular(sections.get("rising") ?? []).slice(0, RISING_MOST), "rising"), position);
-  const seeds = held(youngest(sections.get("seed") ?? []).slice(0, SEEDS_MOST), "seed");
+  const earth = kept(sections.get("earth") ?? [], "earth", 1);
+  const rising = steady(kept(mostPopular(sections.get("rising") ?? []), "rising", RISING_MOST), position);
+  const seeds = kept(youngest(sections.get("seed") ?? []), "seed", SEEDS_MOST);
   const room = RAIL_MOST - earth.length - rising.length - seeds.length;
-  const trends = steady(held(mostPopular(sections.get("trend") ?? []).slice(0, room), "trend"), position);
+  const trends = steady(kept(mostPopular(sections.get("trend") ?? []), "trend", room), position);
   return [...earth, ...trends, ...rising, ...seeds].map(({ world }) => world);
 }
