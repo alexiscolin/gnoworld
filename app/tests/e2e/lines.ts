@@ -156,7 +156,10 @@ function linesOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Lin
     const s = thinned(mask, w);
     const middle = [...s.keys()].filter((i) => s[i] === 1 && inside[i] === 1);
     const rings = middle.map((i) => around(s, w, i));
-    const ends = rings.filter((n) => crossing(n) === 1 && n.reduce((sum, value) => sum + value, 0) <= 2).length;
+    // An end where a line leaves the read circle is the circle's, not the line's: only ends 2 px inside it count.
+    const inner = (i: number) => Math.hypot(x0 + (i % w) - disc.x, y0 + Math.floor(i / w) - disc.y) < 0.85 * disc.r - 2;
+    const lone = (n: readonly number[]) => crossing(n) === 1 && n.reduce((total, value) => total + value, 0) <= 2;
+    const ends = middle.filter((i, at) => lone(rings[at] ?? []) && inner(i)).length;
     const forks = middle.filter((_, at) => crossing(rings[at] ?? []) >= 3);
     const touching = (one: number, other: number) =>
       Math.abs((one % w) - (other % w)) <= 1 && Math.abs(Math.floor(one / w) - Math.floor(other / w)) <= 1;

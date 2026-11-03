@@ -609,7 +609,9 @@ describe("the generated program", () => {
     const veins = bodyOf("vec3 veinsOf(");
     expect(veins.match(/crackAt\(/g)).toHaveLength(2);
     expect(veins).toMatch(/vec2 main = crackAt\(p, [\d.]+ \+ shape\.scale, vec2\(0\.1\d*, 0\.[3-5]\d*\), pixel\);/);
-    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x\);/);
+    // The fine net draws only near a main vein, within its halo's reach, never asterisks inside a cell (Alexis, 2026-11-03, "retirer").
+    expect(veins).toMatch(/float near = pow\(main\.x, 0\.\d+\);/);
+    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x \* near\);/);
     expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[3-7]\d*, 0\.[01]\d*\), heat\)/);
   });
 

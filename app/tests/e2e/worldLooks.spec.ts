@@ -15,6 +15,9 @@ import { facesApart, facesOn, GLANCE, grain, rows, type Face } from "./textures.
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
 // 0.069 of the radius wide, their width's spread 0.65 and 0.48. 7b5's worm loops: 1.30 ends a junction, glow 0.26, 0.006 r wide.
 const NET = { junctions: 50, endsPerJunction: 0.4, glow: [0.33, 0.8], width: [0.03, 0.1], widthSpread: 0.3 } as const;
+// No asterisks of fine veins inside a cell (Alexis, 2026-11-03, "corriger et retirer"): 7b7's net read 565 and 572 junctions, most of them
+// its fine net's stars; one gated near its main veins 307 to 375. Music's own 186, a little over doubled.
+const MOST_JUNCTIONS = 420;
 // The core the brief asks, #ffc870 (luma 205), gold to orange: its blue over red 0.44 sets the bound, never white (Music's own top 2%,
 // #fcd3b2, reads 0.70 through the video's compression); 7b5's #b8853a, luma 138.
 const CORE = { luma: 0.8 * 205, blueOverRed: 0.6, greenOverRed: [0.6, 0.9] } as const;
@@ -123,6 +126,7 @@ test.describe("the generated worlds polished", () => {
       if (net === undefined || core === undefined) throw new Error("no measure");
       test.info().annotations.push({ type: "veins", description: JSON.stringify({ net, core }) });
       expect(net.junctions, "a net").toBeGreaterThanOrEqual(NET.junctions);
+      expect(net.junctions, "no asterisks inside a cell").toBeLessThanOrEqual(MOST_JUNCTIONS);
       expect(net.ends / net.junctions, "cells close: veins end seldom").toBeLessThanOrEqual(NET.endsPerJunction);
       expect(net.glow, "veins over the disc").toBeGreaterThanOrEqual(NET.glow[0]);
       expect(net.glow, "dark cells between them").toBeLessThanOrEqual(NET.glow[1]);
