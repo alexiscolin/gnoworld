@@ -2,21 +2,13 @@
 // mounted once it came, so a page that does not show it only covers it. The places' links stay in the page, with or without the 3D.
 import { PHONE_QUERY } from "@gnoworld/core";
 import { Button } from "@gnoworld/ui";
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ComponentProps,
-  type ComponentType,
-} from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from "react";
 import { Credits } from "./Credits.tsx";
 import { FlightPanel } from "./FlightPanel.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
 import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
+import { lazyPart } from "./lazyPart.ts";
 import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
 import type { Rail } from "./Rail.tsx";
 import styles from "./Universe.module.css";
@@ -38,19 +30,13 @@ function lineOf(failed: boolean, earthFailed: boolean) {
 
 // The signs on the globe, their code asked once there is a globe: none of it is the first screen's, and a chunk that does not come leaves the
 // Earth as it is.
-const Signs = lazy<ComponentType<ComponentProps<typeof PageSigns>>>(() =>
-  import("./EarthSigns.tsx").then(
-    ({ PageSigns: signs }) => ({ default: signs }),
-    () => ({ default: () => null }),
-  ),
+const Signs = lazyPart<ComponentProps<typeof PageSigns>>(() =>
+  import("./EarthSigns.tsx").then(({ PageSigns: signs }) => signs),
 );
 
 // A world's rooms as moons, their code asked once a world stands: a chunk that does not come leaves the world without them.
-const Moons = lazy<ComponentType<ComponentProps<typeof WorldMoons>>>(() =>
-  import("./WorldMoons.tsx").then(
-    ({ WorldMoons: moons }) => ({ default: moons }),
-    () => ({ default: () => null }),
-  ),
+const Moons = lazyPart<ComponentProps<typeof WorldMoons>>(() =>
+  import("./WorldMoons.tsx").then(({ WorldMoons: moons }) => moons),
 );
 
 // What stands on a world once it is drawn: its moons' links, where the page holds a world.
@@ -87,12 +73,7 @@ interface BesideProps {
 }
 
 // The rail (7i), its code asked once the cosmos runs on a computer: a chunk that does not come leaves the page's list of worlds.
-const RailPart = lazy<ComponentType<ComponentProps<typeof Rail>>>(() =>
-  import("./Rail.tsx").then(
-    ({ Rail: rail }) => ({ default: rail }),
-    () => ({ default: () => null }),
-  ),
-);
+const RailPart = lazyPart<ComponentProps<typeof Rail>>(() => import("./Rail.tsx").then(({ Rail: rail }) => rail));
 
 // What stands beside the cosmos: its maps' credits, and on a computer the rail, read once as the host decides a phone.
 function OnTheCosmos({ host, page }: { host: SceneHost; page: CosmosPage | undefined }) {
