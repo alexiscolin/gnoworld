@@ -489,6 +489,16 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toContain("float coast = max(0.5 * fwidth(t), 0.002);");
   });
 
+  // A relief stopped dead at the coast lit a stair-stepped line along every coast on the night side (7b8); flattening the coastal plains
+  // to hide it took their fine detail too (the chief, 2026-11-03). The height runs on across the coast, and the water alone lies flat.
+  it("keeps a sea world's relief to its coast, its water alone flat: no plain flattened, no cliff at the coast", () => {
+    expect(GENERATED_FRAGMENT).toContain(
+      "vec3 bent = normalize(mix(bentBy(relieved * relief * world * (1.0 - 0.3 * grooved), normal), normal, wet));",
+    );
+    expect(GENERATED_FRAGMENT).toMatch(/bent = grained\(bent, [^;]* \* \(1\.0 - wet\) \* near, angle\);/);
+    expect(GENERATED_FRAGMENT).not.toMatch(/\b(landed|inland)\b/);
+  });
+
   // Climates by latitude and by seed (7b8; Alexis, 2026-11-03, "climats par latitude"): bare ground where it is dry, in a belt about the
   // tropics (sin 0.42, 25 degrees) wandering with the flow, and where it is cold, poleward, high or on an icy world; the seed's minor share
   // tilts the whole world drier. Plants run from deep forest where wet to dry grass; bare ground from tundra where cold to sand where hot.
