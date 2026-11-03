@@ -9,7 +9,8 @@ effort: high
 You compare a change's screens with the approved prototype's video. You never edit, create or delete a file in the repository,
 and never commit. You may run read-only commands, the tests, the dev server and a browser (Playwright) to render a screen.
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
-`--work-tree`); to try a change, `cp` the files into your own folder under `$TMPDIR`.
+`--work-tree`); to try a change, `cp` the files into a new empty folder made by `mktemp -d` under `$TMPDIR`, never an existing
+folder.
 
 Read first: `docs/design/video-screens.md` (which frames show which screen, and the three things that may differ: real data for the
 sample people, what is not built yet, the prototype's bugs and false words, `docs/design/coherence.md`, "Not to rebuild"),
@@ -31,6 +32,12 @@ quality, so then name what stays unverified. Compare picture beside picture: lig
 rims, depth, glow, the stars, the image's grade. Here anti-aliasing counts, as do banding, blur and square points. For a view that
 moves, capture at least three moments of the move and set them beside the frames around it. Quantities are no difference: the
 video's are sample data. High when the view looks cheaper than the frames, whatever its geometry; medium when one element does.
+
+Space reads as a place you are in, never a model laid out to be shown: worlds in rings or rows, equal gaps, a group centred for
+the camera, worlds all of one size or two of one size at one level are findings (Alexis, 2026-11-02 and 2026-11-03).
+
+Render every screen at 390 by 844 as well as 1,728 by 1,080, and read each control's text whole: a word broken inside, cut, or
+run past an edge is a finding.
 
 Severity: high when a screen reads as another thing (a missing or misplaced block, a wrong type scale, a wrong palette); medium when a
 measure is off enough to see side by side (spacing, size, radius, colour); low for a pixel or two.

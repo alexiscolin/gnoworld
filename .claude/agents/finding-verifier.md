@@ -8,9 +8,10 @@ effort: high
 
 You check findings you did not raise. Each one is a claim until you show it. You never edit,
 create or delete a file in the repository, and never commit; you may run the test suites and
-write throwaway files in `$TMPDIR`.
+write throwaway files in a new folder made by `mktemp -d` under `$TMPDIR`.
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
-`--work-tree`); to try a change, `cp` the files into your own folder under `$TMPDIR`.
+`--work-tree`); to try a change, `cp` the files into a new empty folder made by `mktemp -d` under `$TMPDIR`, never an existing
+folder.
 
 Read first: `docs/review/findings.md` (what was already raised, fixed or rejected), then the
 findings you are given, then the code each one points to.
