@@ -337,6 +337,32 @@ test("a world's part of the scene stays within its cap", async ({ page }) => {
   expect(await compressed(page, await ownOf(page, (await part).url(), there))).toBeLessThanOrEqual(WORLD_JS);
 });
 
+// The shaders' spaces stripped at build (Alexis, 2026-11-03): three's own, which the scene's chunk ships, read as a compiler reads them, in the
+// site's build and the lab's beside it, which the journeys walk.
+test("ships the scene's shaders stripped of their spaces, in the site's build and the lab's", async ({ page }) => {
+  for (const [path, pattern] of [
+    ["/?test-gpu", SCENE],
+    ["/lab/realism.html?view=cosmos", /\/lab\/assets\/[\w-]+\.js$/],
+  ] as const) {
+    const texts: string[] = [];
+    page.on("response", (response) => {
+      if (pattern.test(response.url())) texts.push(response.url());
+    });
+    await page.goto(path);
+    await expect
+      .poll(
+        async () => {
+          const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+          return bodies.some((text) => text.includes("gl_FragColor=vec4("));
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+    const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+    for (const text of bodies) expect(text).not.toMatch(/gl_FragColor = |\n[ \t]+(?:vec[234]|float|uniform|varying) /);
+  }
+});
+
 // The scene weighs its chunk and every chunk it imports statically that the door did not bring already: a part of three split into a chunk
 // of its own is still the scene's (7e: two lazy parts made rolldown split the scene's shared modules out of it).
 test("the scene's chunk holds three, and stays within its cap", async ({ page }) => {
