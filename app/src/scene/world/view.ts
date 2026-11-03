@@ -4,7 +4,7 @@
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
-import { focalOf, projector, standIn } from "../lens.ts";
+import { discOf, projector, standIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
 import { MOTION } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
@@ -196,11 +196,7 @@ export class WorldView {
   }
 
   #disc(): number {
-    const far = this.#rest.length();
-    return (
-      (focalOf(this.#device.camera, this.#screen.height) * this.#fit) /
-      Math.sqrt(Math.max(far * far - this.#fit * this.#fit, 1e-9))
-    );
+    return discOf(this.#device.camera, this.#screen.height, { far: this.#rest.length(), radius: this.#fit });
   }
 
   /** A context came back: a closed bitmap cannot be uploaded twice, so the maps come again. */

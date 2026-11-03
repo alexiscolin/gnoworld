@@ -13,6 +13,13 @@ export interface Screen {
 export const focalOf = (camera: PerspectiveCamera, height: number): number =>
   height / 2 / Math.tan((camera.fov * Math.PI) / 360);
 
+/** How wide a sphere of `radius`, `far` ahead through `camera`, stands on a screen `height` high: the radius of its disc, in its pixels. */
+export const discOf = (
+  camera: PerspectiveCamera,
+  height: number,
+  { far, radius }: { far: number; radius: number },
+): number => (focalOf(camera, height) * radius) / Math.sqrt(Math.max(far * far - radius * radius, 1e-9));
+
 /** Shifts `camera`'s lens so the screen's middle falls on `circle`, and gives how far ahead a sphere of radius 1 fills it. */
 export function standIn(camera: PerspectiveCamera, screen: Screen, circle: Circle): number {
   const { width, height } = screen;
