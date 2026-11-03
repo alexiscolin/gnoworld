@@ -416,9 +416,10 @@ describe("the generated program", () => {
   // its long crossing arcs.
   it("breaks an old crust's fractures along the seams of cells, glowing on their wider parts only", () => {
     expect(GENERATED_FRAGMENT).toMatch(
-      /if \(riven > 0\.0 && glowLevel > 0\.0\) \{\n {6}vec2 crack = crackAt\(at \+ offset, [1-5]\.0 \+ shape\.scale, vec2\(0\.0, 0\.[01]\d* \+ 0\.[01]\d* \* shape\.rifts\), pixel\);/,
+      /if \(riven > 0\.0 && glowLevel > 0\.0\) \{\n {6}vec2 crack = crackAt\(at \+ offset, [1-5]\.0 \+ shape\.scale, vec2\(0\.0[1-9]\d*, 0\.[01]\d* \+ 0\.[01]\d* \* shape\.rifts\), pixel\);/,
     );
-    expect(GENERATED_FRAGMENT).toMatch(/burning = rift \* smoothstep\([1-9][\d.]*, [\d.]+, crack\.y\);/);
+    // No arm tapers to a point, and the glow keeps to a crack's middle, its profile squared: 7b7's design review saw starfish and smears.
+    expect(GENERATED_FRAGMENT).toMatch(/burning = rift \* rift \* smoothstep\([1-9][\d.]*, [\d.]+, crack\.y\);/);
     expect(GENERATED_FRAGMENT).toMatch(/\} else if \(riven > 0\.0\) rift = lines\(ridge, at, /);
   });
 

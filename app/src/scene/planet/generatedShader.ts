@@ -133,9 +133,9 @@ void main() {
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
     if (riven > 0.0 && glowLevel > 0.0) {
-      vec2 crack = crackAt(at + offset, 3.0 + shape.scale, vec2(0.0, 0.14 + 0.16 * shape.rifts), pixel);
+      vec2 crack = crackAt(at + offset, 3.0 + shape.scale, vec2(0.02, 0.14 + 0.16 * shape.rifts), pixel);
       rift = crack.x * riven;
-      burning = rift * smoothstep(1.5, 6.0, crack.y);
+      burning = rift * rift * smoothstep(1.5, 6.0, crack.y);
     } else if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
     relieved += 0.4 * ridge * riven;
     vec3 riftTint = mix(low * 0.6, vec3(0.42, 0.2, 0.11), smoothstep(0.12, 0.3, dot(mid, LUMA)));
