@@ -38,12 +38,16 @@ const heardOf = (here: Heard | undefined): Signals =>
     ? {}
     : { here: here.here, perHour: here.perHour, ...(here.rise === null ? {} : { rise: here.rise }) };
 
-function signalsOf(world: CosmosWorld | undefined, id: string, { signals, callersOf }: Reading): Signals {
-  const { present, visited, now } = signals;
-  const use = world === undefined ? 0 : callersOf(world);
+// Who is here in world `id` now, its rise, and whether it is new to this reader.
+function heardIn(world: CosmosWorld | undefined, id: string, { present, visited, now }: LabelSignals): Signals {
   // This reader's visits are read only of a world under seven days old: an older one is never uncharted.
   const uncharted = isFresh(daysSince(world?.seen, now), false) && !visited(id);
-  return { ...heardOf(present.get(id)), ...(use > 0 ? { use } : {}), ...(uncharted ? { uncharted: true } : {}) };
+  return { ...heardOf(present.get(id)), ...(uncharted ? { uncharted: true } : {}) };
+}
+
+function signalsOf(world: CosmosWorld | undefined, id: string, { signals, callersOf }: Reading): Signals {
+  const use = world === undefined ? 0 : callersOf(world);
+  return { ...heardIn(world, id, signals), ...(use > 0 ? { use } : {}) };
 }
 
 type Known = Map<string, [CosmosWorld, Signals][]>;
