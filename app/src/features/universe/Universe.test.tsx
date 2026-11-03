@@ -1590,6 +1590,17 @@ describe("the hero's calls beside the cosmos (ADR-0003)", () => {
     return actions;
   };
 
+  it("marks them while the cosmos stands, and takes the mark away as the page leaves it", async () => {
+    const actions = calls();
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("standing");
+    rerender("earth");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("none");
+    actions.remove();
+  });
+
   it.each([
     ["the scene cannot run", () => device({ gpu: null })],
     ["a phone did not ask for space", () => device({ phone: true })],

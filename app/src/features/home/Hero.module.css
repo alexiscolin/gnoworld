@@ -171,22 +171,22 @@
     }
   }
 
-  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. There the cosmos's
-     labels stand by themselves, so on a first visit the Earth's "Start here" is the one filled call: Go explore an outline, Join the chat
-     for the return (ADR-0003 §3). */
+  /* On a first visit beside the cosmos the Earth's "Start here" is the one filled call: Go explore an outline, Join the chat for the return
+     (ADR-0003 §3). Where no cosmos stands, a phone that did not ask for space or a scene that does not run, the filled call stays. */
+  .actions[data-first][data-cosmos="standing"] .action {
+    --_ring: initial;
+    --_fill: initial;
+
+    color: inherit;
+  }
+
+  .actions[data-first][data-cosmos="standing"] [data-call="chat"] {
+    display: none;
+  }
+
+  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
   @media (min-width: 900px) {
     .worlds[data-rail="standing"] {
-      display: none;
-    }
-
-    .actions[data-first] .action {
-      --_ring: initial;
-      --_fill: initial;
-
-      color: inherit;
-    }
-
-    .actions[data-first] [data-call="chat"] {
       display: none;
     }
   }

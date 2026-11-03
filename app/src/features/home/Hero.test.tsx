@@ -125,6 +125,11 @@ describe("the hero's actions for a newcomer", () => {
     expect(html).toContain(">Join the chat");
   });
 
+  // F4518: the first visit's look holds only where the cosmos stands, which the universe marks (Universe.test); the build writes none.
+  test("writes its actions as standing beside no cosmos, which the universe marks once it stands", async () => {
+    expect(actionsOf(await heroOf("main"))).toContain('data-cosmos="none"');
+  });
+
   test("leaves the actions unmarked for a reader who came back, and by default", async () => {
     expect(actionsOf(await heroOf("main"))).not.toContain("data-first");
     const back = await render(

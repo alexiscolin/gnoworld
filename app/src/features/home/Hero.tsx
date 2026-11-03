@@ -53,7 +53,13 @@ export function Hero({
           {worlds === 0 ? null : TALK}
         </div>
         {/* The video's pair (frame 4): Go explore filled, then Join the chat, the Earth's general room. */}
-        <div className={styles["actions"]} data-hero="actions" data-first={newcomer ? "" : undefined}>
+        {/* The universe marks whether the cosmos stands beside them, where the Earth's label says "Start here" to a newcomer. */}
+        <div
+          className={styles["actions"]}
+          data-hero="actions"
+          data-first={newcomer ? "" : undefined}
+          data-cosmos="none"
+        >
           <GoExplore places={{ earth: universe.earth.path, worlds: universe.worlds }} className={styles["action"]} />
           <Link to={universe.earth.path} className={styles["action"]} data-call="chat">
             Join the chat

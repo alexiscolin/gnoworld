@@ -8,6 +8,7 @@ import { FlightPanel } from "./FlightPanel.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
 import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
+import { markCalls } from "./globe.ts";
 import { lazyPart } from "./lazyPart.ts";
 import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
 import { firstArrival, HomeOpening } from "./Opening.tsx";
@@ -114,6 +115,9 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
     host.show(shown, page);
     first.at(shown);
   }, [host, first, shown, page]);
+  useEffect(() => {
+    markCalls(status, shown);
+  }, [status, shown]);
   return (
     <>
       <canvas
