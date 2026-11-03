@@ -2,6 +2,7 @@
 // tab stop, a line, the arrows moving among them; a line pointed at or holding the focus shows its bar.
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
+import { nextLine } from "../../lib/nextLine.ts";
 
 // The place of the line a list's event happened in, a link in its words included; -1 outside a line.
 function itemAt(list: HTMLElement, target: EventTarget | null): number {
@@ -15,22 +16,9 @@ function itemAt(list: HTMLElement, target: EventTarget | null): number {
 const lineAt = (lines: readonly Line[], list: HTMLElement, target: EventTarget | null): Line | undefined =>
   lines[itemAt(list, target)];
 
-// The arrows, Home and End on a line move the focus among the lines, round the ends (WAI-ARIA's roving focus, as
-// the design system's tabs and menu do); a key on a line's bar or its menu, or held with a modifier, is theirs.
-const MOVES = ["ArrowUp", "ArrowDown", "Home", "End"];
-
-/** A key pressed, with its modifiers. */
-type Press = Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">;
-
-/** The line `press` moves the focus to among `count`, from the one `at` reads (-1: none, a key on a bar or a menu);
- * none for any other key. Every key the list, a bar, a menu or a dialog hears comes here: the key is read first. */
-export function nextLine(press: Press, count: number, at: () => number): number | undefined {
-  if (!MOVES.includes(press.key) || press.altKey || press.ctrlKey || press.metaKey || press.shiftKey) return undefined;
-  const from = at();
-  if (from === -1) return undefined;
-  const steps: Record<string, number> = { ArrowUp: from - 1, ArrowDown: from + 1, Home: 0, End: count - 1 };
-  return ((steps[press.key] ?? from) + count) % count;
-}
+// The arrows, Home and End on a line move the focus among the lines, round the ends (lib/nextLine.ts, as the design system's tabs and menu
+// do); a key on a line's bar or its menu, or held with a modifier, is theirs.
+export { nextLine };
 
 /** The list's one tab stop: the line last chosen while the list holds it, else the one marked New (`fresh`, the
  * keyboard's way to the first news) while it does, else the newest; none in an empty list. */
