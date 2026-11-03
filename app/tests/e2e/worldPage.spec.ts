@@ -63,7 +63,8 @@ test.describe("a world's page at the video's size", () => {
     near(line.y + 12.4, 316, "the line's first line's middle");
     near(line.x, 100, "the line's left");
     near(activity.y, 371, "the activity words' top");
-    near(main.y, 398, "the actions' top");
+    // Frame 26: the actions' top 30 px under the chart's last words' ink (544 to 574); a label's box ends 2 px under its ink.
+    near(main.y - (activity.y + activity.height), 574 - 544 - 2, "the actions under the words");
     expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
   });
 
@@ -124,18 +125,21 @@ test.describe("who is here right now", () => {
     return plate;
   };
 
-  // Frame 26 draws "38 here" where Bubble's activity words stand while nobody is counted, its digits from 372 to 405 px: the page's
-  // figure, 44 px at line height 1, stands its box at 364, where it stood in the held place (7e). The fact comes there, the words under it,
-  // from the plate's breakpoint (1,280 px) to the video's size.
+  // Frame 26 draws "38 here" under its one line, its digits from 372 to 405 px, the line's middle at 316: the page's figure, 44 px at line
+  // height 1, stands its box 8 px over its digits, so 364 - (316 + half a line) under the line's last line, whatever its count of lines
+  // (7w's design review: Bubble's two lines had put it there by chance). The fact comes there, the words under it, from 1,280 px.
   for (const width of [1280, 1728] as const)
     test(`stands where frame 26 draws it once someone is counted, the activity's words under it, at ${String(width)} px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 1080 });
       await connected(page);
+      const line = page.locator("[data-look='plate'] h1 + p");
+      const half = Number.parseFloat(await line.evaluate((node) => getComputedStyle(node).lineHeight)) / 2;
+      const words = await box(page, "[data-look='plate'] h1 + p");
       const figure = await box(page, "[data-look='plate'] [data-value]");
       const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
-      near(figure.y, 364, "the figure's top");
+      near(figure.y - (words.y + words.height), 364 - (316 + half), "the figure under the line");
       expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
     });
 
