@@ -55,9 +55,10 @@ const REST_JS = 9 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
-// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
+// Its first value was the part's (5,960 B); 6 KiB since the rail shares the labels' ranking, titles and reading and their band (Alexis,
+// 2026-11-03): sharing them made two chunks of their own, the price of sharing rather than copying.
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 5960;
+const LABELS_JS = 6 * 1024;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
 // cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
 // camera-controls' own warning, which no minifier renames.
