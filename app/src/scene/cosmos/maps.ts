@@ -117,8 +117,10 @@ export class BodyMaps {
     );
   }
 
-  // A map that did not come is asked again later, a frame owed so its world asks it, till its fetches run out.
+  // A map that did not come is asked again later, a frame owed so its world asks it, till its fetches run out; never once the maps were
+  // freed, which a failure itself may do (a world's page drops the world).
   #again(name: string, signal: AbortSignal): void {
+    if (signal.aborted) return;
     const failures = (this.#failures.get(name) ?? 0) + 1;
     this.#failures.set(name, failures);
     if (failures >= FETCHES) return;

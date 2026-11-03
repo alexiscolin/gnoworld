@@ -156,6 +156,25 @@ describe("a body map that does not come", () => {
     expect(fetches("rocky")).toBe(3);
   });
 
+  // 7v's review (F4455): a world's page frees the maps when a fetch fails (its view drops the world), before the map's next fetch is set:
+  // the wait set after the free still came, fetched every map again and stood a body nothing frees.
+  it("sets no next fetch when the failure itself freed the maps (F4455)", async () => {
+    vi.useFakeTimers();
+    loading.mockRejectedValue(new Error("offline"));
+    const arrived = vi.fn();
+    const held: { maps?: BodyMaps } = {};
+    const maps = new BodyMaps(fetching, arrived, {
+      failed: () => {
+        held.maps?.free();
+      },
+    });
+    held.maps = maps;
+    maps.named("rocky");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(arrived).not.toHaveBeenCalled();
+    expect(fetches("rocky")).toBe(1);
+  });
+
   it("is fetched again from the start once the maps were freed, and nothing waits after the free (F4409)", async () => {
     vi.useFakeTimers();
     loading.mockRejectedValue(new Error("offline"));
