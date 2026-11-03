@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
-import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
+import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
 const { useSpace, useWorldsCount } = vi.hoisted(() => ({
@@ -14,7 +14,7 @@ test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267: the kicker says gno.world, and the one heading is the hero's line.
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-  expect(html).toMatch(/<h1\b[^>]*>Worlds in Onyx<\/h1>/);
+  expect(headingOf(html)).toBe("Worlds in Onyx");
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
   expect(html).toContain('<a href="/w/govdao"');
@@ -25,7 +25,7 @@ test("home links to each world by its name, at the world's path", async () => {
 test("counts in its hero the worlds the cosmos draws, once their file has come, and no number before", async () => {
   useWorldsCount.mockReturnValue(534);
   const html = await render({ path: "/", Component: Home, loader }, "/");
-  expect(html).toMatch(/<h1\b[^>]*>534 worlds in Onyx<\/h1>/);
+  expect(headingOf(html)).toBe("534 worlds in Onyx");
   expect(html).toMatch(/data-hero="number"[^>]*>534</);
   useWorldsCount.mockReturnValue(undefined);
   expect(await render({ path: "/", Component: Home, loader }, "/")).not.toMatch(/data-hero="number"[^>]*>\d/);
@@ -106,7 +106,7 @@ describe("home's hero", () => {
   test("a universe with no world shows 0, in the plural, and nothing it does not hold", async () => {
     const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
     expect(/data-hero="number"[^>]*>\s*(?:<[^>]*>\s*)*([^<\s]+)/.exec(html)?.[1]).toBe("0");
-    expect(html).toMatch(/\b0 worlds\b/);
+    expect(headingOf(html)).toMatch(/^0 worlds in /);
     expect(html).not.toMatch(/NaN|undefined|\b1 world\b/);
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { render } from "../../../tests/render.tsx";
+import { headingOf, render } from "../../../tests/render.tsx";
 import { siteOf } from "../../places.ts";
 import { PLANTED } from "../../placesFixture.ts";
 import { Hero } from "./Hero.tsx";
@@ -21,26 +21,25 @@ describe("the hero's big number, on a planted site", () => {
   test("counts the worlds of the universe, in the plural", async () => {
     const html = await heroOf("main");
     expect(numberOf(html)).toBe("2");
-    expect(html).toMatch(/\b2 worlds\b/);
+    expect(headingOf(html)).toBe("2 worlds in Mainland");
   });
 
   test("shows no number while none is known, and names the worlds without one", async () => {
     const html = await heroWith("main", undefined);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
-    expect(html).toMatch(/<h1[^>]*>Worlds in Mainland<\/h1>/);
+    expect(headingOf(html)).toBe("Worlds in Mainland");
   });
 
   test("counts the number it is given, the cosmos's own", async () => {
     const html = await heroWith("main", 534);
     expect(numberOf(html)).toBe("534");
-    expect(html).toMatch(/<h1[^>]*>534 worlds in Mainland<\/h1>/);
+    expect(headingOf(html)).toBe("534 worlds in Mainland");
   });
 
   test("counts one world in the singular, in the other universe", async () => {
     const html = await heroOf("lab");
     expect(numberOf(html)).toBe("1");
-    expect(html).toMatch(/\b1 world\b/);
-    expect(html).not.toMatch(/\b1 worlds\b/);
+    expect(headingOf(html)).toBe("1 world in Lab");
   });
 
   test("points its two actions at the universe's own Earth and at the list", async () => {
@@ -66,6 +65,7 @@ describe("the hero's parts", () => {
   test("makes the line the page's one heading, and sets it beside the actions, in one row", async () => {
     const html = await heroOf("main");
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toMatch(/<h1[^>]*>2 worlds in Mainland<\/h1><div[^>]*data-hero="actions">/);
+    expect(headingOf(html)).toBe("2 worlds in Mainland");
+    expect(html).toMatch(/<\/h1><div[^>]*data-hero="actions">/);
   });
 });

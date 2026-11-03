@@ -36,6 +36,11 @@ export async function routeError(route: RouteObject, path: string): Promise<unkn
   return Object.values(context.errors ?? {})[0];
 }
 
+/** The words of the page's first heading, its inner tags dropped: what it says, whatever marks its parts. */
+export function headingOf(html: string): string | undefined {
+  return /<h1\b[^>]*>(.*?)<\/h1>/s.exec(html)?.[1]?.replace(/<[^>]*>/g, "");
+}
+
 /** The way home a page that failed offers: the primary link to the universe. */
 export const BACK_HOME = /<a [^>]*href="\/"[^>]*>Back to the universe<\/a>/;
 
