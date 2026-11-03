@@ -21,6 +21,8 @@ export interface EarthDevice {
     readonly capabilities: Pick<WebGLRenderer["capabilities"], "getMaxAnisotropy">;
     compileAsync: WebGLRenderer["compileAsync"];
     initTexture: WebGLRenderer["initTexture"];
+    /** The scene's canvas, which tells the page what the page reads of it: the home's dive landed (ADR-0003 §1). */
+    readonly domElement?: Pick<HTMLCanvasElement, "setAttribute">;
   };
   readonly stage: Scene;
   readonly camera: PerspectiveCamera;
