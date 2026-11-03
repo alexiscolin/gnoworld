@@ -2,38 +2,22 @@
 // draws orbits, an ellipse round the star for each world's, in one draw; and each world's name under it, in the file's words, a link to its
 // page where it has one, an amber dot where people are. A first click names a world, a second goes there: the page's router for the site's
 // own pages, a tab of its own for a hand-made project's address. All a Plan needs is here, so the chunks every home loads pay none of it.
-import { REALM_PREFIX, type Planned, type Point } from "@gnoworld/core";
-import { RealmPath } from "@gnoworld/schemas";
+import type { Planned, Point } from "@gnoworld/core";
 import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, LineSegments, Vector3, type Object3D } from "three";
-import { isOwnPage } from "../../pagePath.ts";
 import { OPEN } from "../openEvent.ts";
-import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
 import type { Projector } from "./labels.ts";
 import labelStyles from "./labels.module.css";
 import styles from "./orbits.module.css";
+import { external, linkable, namedOf, type Named, type Words } from "./planWords.ts";
 import { watchScene } from "./sceneRuns.ts";
 
-/** A Plan as its names show it: in the file's words, linked to the worlds' pages, who is here in each world. */
-export type Named = Planned & { readonly here: ReadonlySet<string> };
-
-/** What the file says of the worlds a Plan shows: their realms, who is here, their names. */
-export interface Words {
-  readonly worlds: readonly CosmosWorld[];
-  readonly signals: LabelSignals | undefined;
-}
+export type { Words } from "./planWords.ts";
 
 // The names a step under their worlds' outlines.
 const UNDER = 8;
 // The mock-up's orbits: the text's muted grey at a sixth.
 const LINE = { color: 0xc8d0de, opacity: 0.16 };
 
-// A project's own address: https, a host, no space; a world's: a page of the site's own. Any other is no link.
-const external = (href: string) => /^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/.test(href);
-const linkable = (href: string | undefined): href is string =>
-  href !== undefined && (external(href) || isOwnPage(href));
-// A world's page, its first realm's view, where the file's path is a realm's of gno.land; none for any other path.
-const realmPage = (path: string | undefined) =>
-  path !== undefined && RealmPath.safeParse(path).success ? `/r/${path.slice(REALM_PREFIX.length)}` : undefined;
 // The site's router follows a world to its page: the page's views listen (features/universe/ViewSwitch.tsx).
 const openPage = (href: string) => {
   window.dispatchEvent(new CustomEvent(OPEN, { detail: href }));
@@ -47,20 +31,6 @@ const warmDot = (document: Document) => {
   dot.setAttribute("aria-hidden", "true");
   return dot;
 };
-
-/** `plan` in the file's `words`: a world's page where the Plan knows none, who is here, the name the page gives. */
-export function namedOf(plan: Planned, { worlds, signals }: Words): Named {
-  const pages = new Map(worlds.map(({ id, realms }) => [id, realmPage(realms[0]?.path)] as const));
-  const links = new Map(
-    plan.worlds.flatMap(({ id }) => {
-      const href = plan.links.get(id) ?? pages.get(id);
-      return href === undefined ? [] : [[id, href] as const];
-    }),
-  );
-  const here = new Set(plan.worlds.filter(({ id }) => (signals?.present.get(id)?.here ?? 0) > 0).map(({ id }) => id));
-  const names = new Map(plan.worlds.map(({ id }) => [id, signals?.names.get(id) ?? plan.names.get(id) ?? id]));
-  return { ...plan, names, links, here };
-}
 
 export class Orbits {
   readonly #lines: LineSegments<BufferGeometry, LineBasicMaterial>;
