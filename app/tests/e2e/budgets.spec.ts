@@ -62,10 +62,10 @@ const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
 const ARRIVAL_JS = 1680;
 // The view at rest in depth (7p): its far bodies and the home's rocks, found in a chunk the view at rest's names; the rocks drawn by one the
-// labels' name, its program (an attribute no minifier renames) in no chunk the cosmos or the scene loads first. First caps: their sizes when
-// set, 1,995 B and 1,204 B, and about a tenth (7p, 2026-11-03).
+// labels' name, its program (an attribute no minifier renames) in no chunk the cosmos or the scene loads first. First caps: their sizes, and
+// about a tenth: 1,204 B for the rocks; 2,387 B for the depth once judged through its turn, off rows and the glow (7p's review).
 const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 2200;
+const DEEP_JS = 2600;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
