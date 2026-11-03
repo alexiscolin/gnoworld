@@ -17,10 +17,9 @@
   .trail .world {
     --_dot: var(--world);
 
-    /* raw: the dot is 7 px and glows 10 px in the world's colour (the prototype's .kicker i) */
-    inline-size: 7px;
-    /* raw: the prototype's and the frames' own value */
-    block-size: 7px;
+    /* raw: the dot is 7 px and glows 10 px in the world's colour (the prototype's .kicker i): its size the utility's own token, which an
+       element's value reaches across the layers */
+    --size-dot: 7px;
     /* raw: the prototype's and the frames' own value */
     box-shadow: 0 0 10px var(--world);
   }
