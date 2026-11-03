@@ -12,6 +12,19 @@ interface Options {
   limit?: number;
 }
 
+// What a reader cannot see, or a terminal acts on: scripts/hidden.py's set (Default_Ignorable_Code_Point, Cf, Zl, Zp),
+// without its emoji exception, and every control character; tab and new line are a text's lines.
+const hidden = () => /[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}\p{Cc}]/gu;
+const isLine = (character: string) => character === "\t" || character === "\n";
+const pointOf = (character: string) =>
+  `U+${Number(character.codePointAt(0)).toString(16).toUpperCase().padStart(4, "0")}`;
+
+/** The first hidden or control character of a text but tab and new line, named by its code point (`U+202E`), or none. */
+export function hiddenIn(text: string): string | undefined {
+  for (const [character] of text.matchAll(hidden())) if (!isLine(character)) return pointOf(character);
+  return undefined;
+}
+
 export interface Untrusted {
   /** The rule the turn states before its blocks, naming their markers. */
   readonly rule: string;

@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, type Stats } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { hiddenIn } from "./untrusted.ts";
 
 interface Limits {
   readonly file: number;
@@ -109,8 +110,7 @@ function fileOf(folder: Folder, path: string, stats: Stats): string {
   return folder.read(path, stats);
 }
 
-// UTF-8 whose byte order mark is kept, so it is refused with the rest: scripts/hidden.py's set, without its emoji
-// exception, and every control character but tab and new line.
+// UTF-8 whose byte order mark is kept, so it is refused with the rest of what hides in a text.
 function textOf(path: string, bytes: Buffer): string {
   let text: string;
   try {
@@ -118,11 +118,8 @@ function textOf(path: string, bytes: Buffer): string {
   } catch (cause) {
     throw new Error(`skills: ${path}: not UTF-8 text`, { cause });
   }
-  const hidden = /[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]|[^\P{Cc}\t\n]/u.exec(text)?.[0];
-  if (hidden !== undefined) {
-    const point = Number(hidden.codePointAt(0)).toString(16).toUpperCase().padStart(4, "0");
-    throw failure(path, `holds U+${point}, a hidden or control character`);
-  }
+  const hidden = hiddenIn(text);
+  if (hidden !== undefined) throw failure(path, `holds ${hidden}, a hidden or control character`);
   return text;
 }
 
