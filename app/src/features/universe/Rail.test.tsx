@@ -218,6 +218,17 @@ describe("the rail's keyboard", () => {
     }
   });
 
+  it("takes an arrow it moves the focus by from the page, so the column does not scroll too", () => {
+    const { box } = rail();
+    const first = nth(worlds(box), 0);
+    first.focus();
+    const arrow = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+    act(() => {
+      first.dispatchEvent(arrow);
+    });
+    expect(arrow.defaultPrevented).toBe(true);
+  });
+
   it("gives the tab stop back to the first world when the list shrinks under it", () => {
     const { source, tell } = sourceOf();
     const { box } = rail(source);
@@ -394,6 +405,33 @@ describe("the rail's magnification", () => {
     });
     frames();
   };
+  // A layout that answers the dock as a page's would: a link 85 px of planet, gap and name, 98 at least, its planet 64 px times its --_mag,
+  // the list shifted by the translate the dock writes.
+  const flowing = (box: HTMLElement) => {
+    const list = one(box, "nav[aria-label='Worlds'] ul");
+    const links = worlds(box);
+    const shift = () => Number(/(-?[\d.]+)px/.exec(list.style.getPropertyValue("translate"))?.[1] ?? 0);
+    const heights = () => links.map((link) => Math.max(98, 85 + 64 * (magnification(link) - 1)));
+    list.getBoundingClientRect = () => new DOMRect(1585, 160 + shift(), 118, 500);
+    links.forEach((link, at) => {
+      const top = () =>
+        160 +
+        shift() +
+        heights()
+          .slice(0, at)
+          .reduce((sum, height) => sum + height, 0);
+      link.getBoundingClientRect = () => new DOMRect(1585, top(), 118, heights()[at] ?? 98);
+      const planet = link.firstElementChild;
+      if (planet !== null) {
+        planet.getBoundingClientRect = () =>
+          new DOMRect(1612, top(), 64 * magnification(link), 64 * magnification(link));
+      }
+    });
+    return links.map((link) => () => {
+      const { top, height } = link.firstElementChild?.getBoundingClientRect() ?? new DOMRect();
+      return top + height / 2;
+    });
+  };
   const reach = (box: HTMLElement, at: number) => {
     act(() => {
       nth(worlds(box), at).focus();
@@ -440,6 +478,60 @@ describe("the rail's magnification", () => {
     const early = magnification(nth(worlds(box), 0));
     expect(early).toBeGreaterThan(1);
     expect(early).toBeLessThan(MAGNIFIED - 0.1);
+  });
+
+  it("keeps the planet under the pointer under it as the planets above it grow, its middle at the pointer", () => {
+    const { box } = rail();
+    const middles = flowing(box);
+    const pointed = 160 + 98 * 2 + 32;
+    point(box, pointed);
+    frames();
+    const sizes = worlds(box).map(magnification);
+    expect(nth(sizes, 2)).toBe(Math.max(...sizes));
+    expect(Math.abs(nth(middles, 2)() - pointed)).toBeLessThanOrEqual(3);
+    expect(nth(sizes, 2)).toBeGreaterThan(1.5);
+  });
+
+  it("asks no frame once the planets stand still under a resting pointer", () => {
+    const { box } = rail();
+    flowing(box);
+    point(box, 160 + 98 * 2 + 32);
+    frames();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("aims again when the column scrolls under a resting pointer", () => {
+    const { box } = rail();
+    flowing(box);
+    point(box, 160 + 98 * 2 + 32);
+    frames();
+    act(() => {
+      one(box, "nav[aria-label='Worlds'] ul").parentElement?.dispatchEvent(new Event("scroll"));
+    });
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+  });
+
+  it("grows nothing under a finger, though the screen's main pointer is fine", () => {
+    const { box } = rail();
+    lay(box);
+    const touch = new MouseEvent("pointermove", { bubbles: true, clientY: 160 + 49 });
+    Object.defineProperty(touch, "pointerType", { value: "touch" });
+    act(() => {
+      one(box, "nav[aria-label='Worlds'] ul").dispatchEvent(touch);
+    });
+    frames();
+    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
+  });
+
+  it("lets the planet the keyboard left go back to its size", () => {
+    const { box } = rail();
+    lay(box);
+    reach(box, 3);
+    act(() => {
+      nth(worlds(box), 3).dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }));
+    });
+    frames();
+    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
   });
 
   it("lets every planet back to its size when the pointer leaves", () => {
