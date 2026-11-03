@@ -121,6 +121,30 @@ describe("a body map that does not come", () => {
     expect(maps.named("rocky")).toBe(map);
   });
 
+  // 7v's review: the waits, 2 s then twice that, and a count the free starts again, were held by no test.
+  it("waits 2 s before the next fetch, then 4 s, and counts three fetches again after a free (F4409)", async () => {
+    vi.useFakeTimers();
+    loading.mockRejectedValue(new Error("offline"));
+    const arrived = vi.fn();
+    const maps = new BodyMaps(fetching, arrived);
+    maps.named("rocky");
+    await vi.advanceTimersByTimeAsync(1_900);
+    expect(arrived).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    maps.named("rocky");
+    await vi.advanceTimersByTimeAsync(3_900);
+    expect(arrived).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(arrived).toHaveBeenCalledTimes(2);
+    maps.free();
+    for (let tries = 0; tries < 10; tries += 1) {
+      maps.named("rocky");
+      await vi.advanceTimersByTimeAsync(20_000);
+    }
+    expect(fetches("rocky")).toBe(2 + 3);
+  });
+
   it("is given up after three fetches failed, however often it is asked (F4409)", async () => {
     vi.useFakeTimers();
     loading.mockRejectedValue(new Error("offline"));
