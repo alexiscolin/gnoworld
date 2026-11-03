@@ -221,6 +221,8 @@ test.describe("the generated worlds polished", () => {
   test("a glowing world's air is warm, as frame 4's Music's limb; every other world's keeps its own cool light", async ({
     page,
   }) => {
+    // One close view per class, 24 pages one after another: about 90 s at a gate's load, past test.slow()'s 90.
+    test.setTimeout(240_000);
     const read: { anchor: string; glows: boolean; warmth: number }[] = [];
     for (const anchor of ANCHORS) {
       await open(page, close(anchor));
