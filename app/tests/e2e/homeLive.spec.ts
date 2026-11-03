@@ -207,8 +207,9 @@ test.describe("the home at the video's size", () => {
     const strip = await box(page, "[data-ticker]");
     const live = await box(page, "[data-hero='markets']");
     expect(live.y + live.height).toBeLessThanOrEqual(strip.y);
+    // Go explore goes to the busiest world, the Earth when nobody is anywhere (ADR-0003 §3): the click leaves the home for a place.
     await page.getByRole("link", { name: /go explore/i }).click();
-    await expect(page).toHaveURL(/\/earth$/);
+    await expect(page).toHaveURL(/\/(earth|w\/[\w-]+)$/);
   });
 
   test("has no accessibility violation, the live line and the ticker included", async ({ page }) => {

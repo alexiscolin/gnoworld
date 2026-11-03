@@ -298,10 +298,12 @@ test.describe("at the video's size", () => {
     near(first.height, 52, "an action's height");
     near(second.x - (first.x + first.width), 10, "the gap between the actions");
     expect(await style(page, "[data-hero='actions'] a", "font-size")).toBe("15px");
-    // The line is the row's first cell, 28 px before the actions, on their middle line (frame 6).
-    const line = await box(page, "h1");
+    // The line is the row's first cell, 28 px before the actions, on their middle line (frame 6): the page's heading and what a world is
+    // after it (ADR-0003, 2a), in the line's own size.
+    const line = await box(page, "[data-hero='line']");
     near(first.x - (line.x + line.width), 28, "the gap between the line and the actions");
     near(line.y + line.height / 2, first.y + first.height / 2, "the line's middle against the actions'");
+    expect(await style(page, "[data-hero='line']", "font-size")).toBe("17px");
     expect(await style(page, "h1", "font-size")).toBe("17px");
     // 22 px between the kicker, the number and the row (the prototype's #hero gap).
     const label = await box(page, "main p.label");
