@@ -81,11 +81,11 @@ const ROCKS_JS = 1325;
 const ROCKS_MARK = "aRock";
 // A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
 // which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps: their
-// sizes when set, 2,019 B and 1,888 B, and about a tenth.
+// sizes when set, 2,019 B, and 2,147 B once the review's fixes landed (the canvas's watch, the names kept in place), and about a tenth.
 const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
 const PLAN_JS = 2220;
 const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
-const ORBITS_JS = 2080;
+const ORBITS_JS = 2360;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
