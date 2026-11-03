@@ -4,11 +4,12 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace, useWorldsCount } = vi.hoisted(() => ({
+const { useSpace, useWorldsCount, useNewcomer } = vi.hoisted(() => ({
   useSpace: vi.fn(),
   useWorldsCount: vi.fn<(wanted: boolean) => number | null | undefined>(() => undefined),
+  useNewcomer: vi.fn<() => boolean>(() => false),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useNewcomer }));
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -100,6 +101,29 @@ test("names its list of worlds with a Worlds kicker, inside the list's own box a
   expect(list).toContain('href="/w/bubble"');
 });
 
+// ADR-0003 §3: one filled call at a time, as the device says the reader is new (F4501); on the default universe's home alone, where the
+// cosmos's labels say "Start here" (F4508).
+describe("home's actions for a newcomer", () => {
+  const actionsOf = (html: string) => /<div [^>]*data-hero="actions"[^>]*>/.exec(html)?.[0] ?? "";
+  afterEach(() => {
+    useNewcomer.mockReturnValue(false);
+  });
+
+  test("marks the hero's actions as a first visit's while the device says the reader is new", async () => {
+    useNewcomer.mockReturnValue(true);
+    expect(actionsOf(await render({ path: "/", Component: Home, loader }, "/"))).toContain("data-first");
+    useNewcomer.mockReturnValue(false);
+    expect(actionsOf(await render({ path: "/", Component: Home, loader }, "/"))).not.toContain("data-first");
+  });
+
+  test("leaves another universe's actions unmarked, for no label of its says Start here", async () => {
+    useNewcomer.mockReturnValue(true);
+    expect(actionsOf(await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland"))).not.toContain(
+      "data-first",
+    );
+  });
+});
+
 const failing = {
   path: "/",
   Component: Home,
@@ -143,13 +167,14 @@ describe("home's hero", () => {
     expect(html).not.toMatch(/NaN|undefined|\b1 world\b/);
   });
 
-  test("offers two big actions, the universe's Earth and the places' list, in that order", async () => {
+  // ADR-0003 §3: Go explore, whose address is the Earth's and whose click flies to the busiest world, then Join the chat, the Earth's room.
+  test("offers two big actions, Go explore and Join the chat, both addressed to the universe's Earth, in that order", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     // The actions' own container: what follows its mark: its first two links.
     const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
-    expect([...hero.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1]).slice(0, 2)).toEqual([
-      "/earth",
-      "/list",
+    expect([...hero.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]])).toEqual([
+      ["/earth", "Go explore"],
+      ["/earth", "Join the chat"],
     ]);
   });
 
@@ -158,7 +183,7 @@ describe("home's hero", () => {
     const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
     expect([...hero.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1]).slice(0, 2)).toEqual([
       "/net/gnoland/earth",
-      "/list",
+      "/net/gnoland/earth",
     ]);
   });
 });

@@ -67,9 +67,21 @@ describe("the hero's big number, on a planted site", () => {
     expect(headingOf(html)).toBe("1 world in Lab");
   });
 
-  test("points its two actions at the universe's own Earth and at the list", async () => {
+  // ADR-0003 §3: the video's pair, "Go explore" then "Join the chat" (frame 4); "See the list" repeated the List tab. Go explore's address is
+  // the Earth's, which a new tab opens; its click flies to the busiest world.
+  test("points its two actions, Go explore then Join the chat, at the universe's own Earth", async () => {
     const html = await heroOf("lab");
-    expect([...html.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1])).toEqual(["/net/lab/earth", "/list"]);
+    expect([...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]])).toEqual([
+      ["/net/lab/earth", "Go explore"],
+      ["/net/lab/earth", "Join the chat"],
+    ]);
+    expect(html).not.toContain("See the list");
+  });
+
+  test("fills Go explore alone, and outlines Join the chat", async () => {
+    const html = await heroOf("main");
+    expect(html).toMatch(/<a [^>]*data-emphasis="solid"[^>]*>Go explore/);
+    expect(html).toMatch(/<a (?![^>]*data-emphasis)[^>]*data-call="chat"[^>]*>Join the chat/);
   });
 });
 
@@ -95,6 +107,31 @@ describe("the hero's line", () => {
   // Nothing fake (ADR-0003, Constraints): a universe that holds no world has no place to talk to speak of.
   test("says nothing of places to talk in a universe that holds no world", async () => {
     expect(lineOf(await heroWith("main", 0))).toBe("0 worlds in Mainland");
+  });
+});
+
+// ADR-0003 §3, one filled call at a time: on a first visit "Start here" in the Earth's label is the one, so the actions are marked for it,
+// and the stylesheet outlines Go explore and keeps Join the chat for the return where the cosmos's labels stand (from 900 px).
+describe("the hero's actions for a newcomer", () => {
+  const actionsOf = (html: string) => /<div [^>]*data-hero="actions"[^>]*>/.exec(html)?.[0] ?? "";
+
+  test("marks the actions as a first visit's for a newcomer, keeping both links in the page", async () => {
+    const html = await render(
+      { path: "/", Component: () => <Hero universe={universeOf("main")} worlds={2} newcomer /> },
+      "/",
+    );
+    expect(actionsOf(html)).toContain("data-first");
+    expect(html).toContain(">Go explore");
+    expect(html).toContain(">Join the chat");
+  });
+
+  test("leaves the actions unmarked for a reader who came back, and by default", async () => {
+    expect(actionsOf(await heroOf("main"))).not.toContain("data-first");
+    const back = await render(
+      { path: "/", Component: () => <Hero universe={universeOf("main")} worlds={2} newcomer={false} /> },
+      "/",
+    );
+    expect(actionsOf(back)).not.toContain("data-first");
   });
 });
 

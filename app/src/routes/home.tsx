@@ -5,7 +5,7 @@ import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Hero, Ticker, tickerItems, useClock, Worlds } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useSpace, useWorldsCount } from "../features/universe/index.ts";
+import { useNewcomer, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
 
@@ -38,12 +38,15 @@ export default function Home() {
     places: { earth: universe.earth.path, worlds: universe.worlds },
   };
   useSpace(universe.isDefault ? "cosmos" : undefined, universe.isDefault ? rail : undefined);
+  // The first visit's one filled call is the Earth's "Start here", which only the default universe's cosmos labels (ADR-0003 §3).
+  const newcomer = useNewcomer();
   return (
     <>
       <Hero
         universe={universe}
         worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
         coming={drawn === undefined}
+        newcomer={universe.isDefault && newcomer}
       />
       <Worlds>
         <PlaceLinks places={universe.worlds} />

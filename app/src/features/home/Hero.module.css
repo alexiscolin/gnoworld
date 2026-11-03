@@ -86,10 +86,10 @@
     /* raw: 24 px at each side, 20 on a phone (the prototype's lines 543 and 772) */
     padding-inline: 24px;
     /* the action's edge is a ring inside its box, so a solid one needs none */
-    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    box-shadow: inset 0 0 0 var(--line-width) var(--_ring, var(--color-line-strong));
     border-radius: var(--radius-pill);
     /* raw: the night at 50% over the scene, as the prototype's 0.5 */
-    background: color-mix(in oklab, var(--color-surface) 50%, transparent);
+    background: var(--_fill, color-mix(in oklab, var(--color-surface) 50%, transparent));
     /* raw: 15 px, 500 (the prototype's #hero .cta .link) */
     font: 500 15px/1 var(--family-sans);
     text-decoration: none;
@@ -97,8 +97,9 @@
   }
 
   .action[data-emphasis="solid"] {
-    box-shadow: none;
-    background: var(--color-primary);
+    --_ring: transparent;
+    --_fill: var(--color-primary);
+
     color: var(--color-ink);
   }
 
@@ -170,9 +171,22 @@
     }
   }
 
-  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
+  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. There the cosmos's
+     labels stand by themselves, so on a first visit the Earth's "Start here" is the one filled call: Go explore an outline, Join the chat
+     for the return (ADR-0003 §3). */
   @media (min-width: 900px) {
     .worlds[data-rail="standing"] {
+      display: none;
+    }
+
+    .actions[data-first] .action {
+      --_ring: initial;
+      --_fill: initial;
+
+      color: inherit;
+    }
+
+    .actions[data-first] [data-call="chat"] {
       display: none;
     }
   }

@@ -4,21 +4,25 @@ import { Icon, Kicker } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { UniverseView } from "../../places.ts";
+import { GoExplore } from "./GoExplore.tsx";
 import styles from "./Hero.module.css";
 import { Live } from "./Live.tsx";
 
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
 const TALK = ". Each one is a place to talk.";
 
-/** `coming`: no number yet, but one is on its way (the worlds' count is being read). */
+/** `coming`: no number yet, but one is on its way (the worlds' count is being read). `newcomer`: the reader has entered no place yet, so the
+ * Earth's label says "Start here", the one filled call (ADR-0003 §3). */
 export function Hero({
   universe,
   worlds,
   coming = false,
+  newcomer = false,
 }: {
   universe: UniverseView;
   worlds: number | undefined;
   coming?: boolean;
+  newcomer?: boolean;
 }) {
   return (
     <div className={styles["hero"]} data-clear="">
@@ -48,13 +52,11 @@ export function Hero({
           </h1>
           {worlds === 0 ? null : TALK}
         </div>
-        <div className={styles["actions"]} data-hero="actions">
-          <Link to={universe.earth.path} className={styles["action"]} data-emphasis="solid">
-            Go explore
-            <Icon name="arrow" />
-          </Link>
-          <Link to="/list" className={styles["action"]}>
-            See the list
+        {/* The video's pair (frame 4): Go explore filled, then Join the chat, the Earth's general room. */}
+        <div className={styles["actions"]} data-hero="actions" data-first={newcomer ? "" : undefined}>
+          <GoExplore places={{ earth: universe.earth.path, worlds: universe.worlds }} className={styles["action"]} />
+          <Link to={universe.earth.path} className={styles["action"]} data-call="chat">
+            Join the chat
             <Icon name="arrow" />
           </Link>
         </div>
