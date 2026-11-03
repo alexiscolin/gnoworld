@@ -531,6 +531,30 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  it("names at /api/trends the hub that rises against its own 14 days, from who is here in its rooms (7t)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    // Bubble's last 47 hours held one person each: six now is a rise of 5 on its usual hour (core's riseOf).
+    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+    const past = Array.from({ length: 47 }, (_, back) => ({ at: hour - (back + 1) * 3_600_000, people: 1 })).reverse();
+    writeFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), JSON.stringify({ bubble: past }));
+    const port = await listening(start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper }));
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^NAMES #bubble$/);
+    peer.say(":ergo.test 324 gnoworld #bubble +nt");
+    peer.say(":ergo.test 347 gnoworld #bubble :End");
+    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld ada bo cy dee eve fay");
+    peer.say(":ergo.test 366 gnoworld #bubble :End");
+    await expect
+      .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
+        timeout: 10_000,
+      })
+      .toMatchObject([{ kind: "rising", world: "bubble", rise: 5 }]);
+  });
+
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
     const port = await listening(start({ ...settings(), DATABASE: ":memory:" }));
     expect((await fetch(`http://127.0.0.1:${String(port)}/api/presence`)).status).toBe(404);

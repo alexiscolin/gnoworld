@@ -97,10 +97,20 @@ describe("the busiest world", () => {
   });
 
   it("breaks a tie by the world's id, so two servers say the same", () => {
+    const reversed = WORLDS.toReversed();
     const trends = makeTrends();
-    trends.passed(file(T1, WORLDS), calls({ [ROUTER]: 1, [BLOG]: 1 }));
-    trends.passed(file(T2, WORLDS), calls({ [ROUTER]: 6, [BLOG]: 6 }));
+    trends.passed(file(T1, reversed), calls({ [ROUTER]: 1, [BLOG]: 1 }));
+    trends.passed(file(T2, reversed), calls({ [ROUTER]: 6, [BLOG]: 6 }));
     expect(busiestOf(trends.chain())).toMatchObject({ world: "alexis/blog" });
+  });
+
+  it("is none when the second pass's time is not after the first's: a clock stepped back is no window", () => {
+    for (const second of [T1, T1 - MINUTE]) {
+      const trends = makeTrends();
+      trends.passed(file(T1, WORLDS), calls({ [POOL]: 10 }));
+      trends.passed(file(second, WORLDS), calls({ [POOL]: 20 }));
+      expect(busiestOf(trends.chain())).toBeUndefined();
+    }
   });
 
   it("reads the file it was given once, as the pass ends, however often its trends are asked (the route asks at each request)", () => {
@@ -183,7 +193,7 @@ describe("the new world", () => {
     trends.passed(file(T2, worlds), calls({}));
     expect(newestOf(trends.chain())).toMatchObject({ world: "gnoswap/pool" });
     const even = makeTrends();
-    even.passed(file(T2, [worlds[0] ?? world("x", []), world("gnoswap/router", [ROUTER], { seen })]), calls({}));
+    even.passed(file(T2, [world("gnoswap/router", [ROUTER], { seen }), worlds[0] ?? world("x", [])]), calls({}));
     expect(newestOf(even.chain())).toMatchObject({ world: "alexis/blog" });
   });
 
