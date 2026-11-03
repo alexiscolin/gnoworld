@@ -10,7 +10,7 @@ import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
 import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
-import { circleOf, tintPage, worldAsk } from "./globe.ts";
+import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
@@ -89,20 +89,10 @@ export class SceneHost {
     this.#tell();
   }
 
-  // The page's stylesheet keeps the globe's room and opens the plate from this: "waiting" while the scene may yet come, so a window that
-  // loads it by itself does not jump; "none" where nothing will. A lost context takes both away. The Earth's page and a world's alike.
+  // The Earth's page and a world's alike.
   #markPage(): void {
-    const wanted = this.#wantsEarth || this.#wantsWorld !== undefined;
-    const globe = wanted ? document.querySelector<HTMLElement>("[data-globe]") : null;
-    if (globe === null) return;
-    const state = this.#bodyState(this.#wantsEarth ? this.#earth : this.#world);
-    globe.dataset[this.#wantsEarth ? "earth" : "world"] = state;
-    if (state !== "drawn") tintPage(undefined);
-  }
-
-  #bodyState(body: EarthState): EarthState | "waiting" | "none" {
-    if (this.#status === "on" && (body === "loading" || body === "drawn")) return body;
-    return this.#status === "off" || this.#status === "loading" ? "waiting" : "none";
+    if (this.#wantsEarth || this.#wantsWorld !== undefined)
+      markGlobe(this.#wantsEarth ? "earth" : "world", this.#wantsEarth ? this.#earth : this.#world, this.#status);
   }
 
   readonly #worldSaid = (state: EarthState, colour?: string): void => {
