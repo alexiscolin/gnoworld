@@ -2,6 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   BubbleRules,
+  EarthOrbit,
   EarthRooms,
   DATA_CAPS,
   Ecosystems,
@@ -543,5 +544,38 @@ describe("EarthRooms", () => {
   it("refuses a room pinned twice", () => {
     const result = EarthRooms.safeParse([row, { ...row, lat: 0 }]);
     expect(result.success).toBe(false);
+  });
+});
+
+// What turns round the Earth (7v; Alexis, 2026-11-03): projects the team adds by hand, even with no realm, each a name and its own address,
+// and a world's page where it has one; a file the team reviews, the admin console after (slice 12).
+describe("EarthOrbit", () => {
+  const row = { name: "gnosh.ai", url: "https://gnosh.ai" };
+
+  it("accepts a project by its name and address, a world's slug beside them, and the empty list", () => {
+    expect(EarthOrbit.safeParse([row]).success).toBe(true);
+    expect(EarthOrbit.safeParse([{ ...row, slug: "bubble" }]).success).toBe(true);
+    expect(EarthOrbit.safeParse([]).success).toBe(true);
+  });
+
+  it.each([
+    ["an address that is not https", { url: "http://gnosh.ai" }],
+    ["a script for an address", { url: "javascript:alert(1)" }],
+    ["an address with credentials", { url: "https://user:secret@gnosh.ai" }],
+    ["an address with a space", { url: "https://gnosh.ai/a b" }],
+    ["an address past 2,048 characters", { url: `https://gnosh.ai/${"a".repeat(2048)}` }],
+    ["no name", { name: "" }],
+    ["a name past 80 characters", { name: "a".repeat(81) }],
+    ["a slug that is no slug", { slug: "Bubble" }],
+    ["a field more", { realm: "gno.land/r/gnosh" }],
+  ])("refuses %s", (_name, over) => {
+    expect(EarthOrbit.safeParse([{ ...row, ...over }]).success).toBe(false);
+  });
+
+  it("refuses a project named twice, and holds as many rows as a data file may", () => {
+    expect(EarthOrbit.safeParse([row, { ...row, url: "https://gnosh.ai/other" }]).success).toBe(false);
+    const rows = (count: number) => Array.from({ length: count }, (_, n) => ({ ...row, name: `p${String(n)}` }));
+    expect(EarthOrbit.safeParse(rows(DATA_CAPS.rows)).success).toBe(true);
+    expect(EarthOrbit.safeParse(rows(DATA_CAPS.rows + 1)).success).toBe(false);
   });
 });

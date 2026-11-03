@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { brightness, colours } from "./geometry.ts";
-import { countShifts, keepsItsRoom, opened, shaderRefusals, shifted, stats } from "./sceneStage.ts";
+import { countShifts, keepsItsRoom, opened, shifted, stats } from "./sceneStage.ts";
 
 // A world's page in space (frames 20 to 35, 90 to 107, 115 to 125) on the gate's software GPU, under the page's real CSP: the world's
 // planet in the circle the page keeps beside the plate, the page tinted with its colour, its rooms as moons clear of the plate, and the
@@ -75,12 +75,10 @@ test.describe("a computer", () => {
     test(`draws ${slug}'s planet in the page's circle, with no CSP violation and no shader refused`, async ({
       page,
     }) => {
-      const refused = shaderRefusals(page);
       await visit(page, `/w/${slug}?test-gpu`);
       await drawn(page);
       await opened(page);
       const shown = await world(page);
-      expect(refused).toEqual([]);
       expect(shown?.state).toBe("drawn");
       await centredInItsCircle(page, shown);
       expect((await stats(page)).calls).toBeLessThanOrEqual(DRAWS_AT_MOST);

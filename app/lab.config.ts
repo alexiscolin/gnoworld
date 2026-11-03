@@ -1,6 +1,8 @@
 import { renameSync } from "node:fs";
 import { join } from "node:path";
 import { defineConfig, type Plugin } from "vite";
+import { glslSpaces } from "./src/glsl.ts";
+import { parsed } from "./vite.config.ts";
 
 // The realism page (lab/realism.html), built beside the site for the journeys and on its own for Alexis's eye. LAB_HOSTS names the
 // addresses `vite preview` may answer, exactly. LAB_STATIC, an absolute folder, builds a static `index.html` with relative paths.
@@ -22,7 +24,8 @@ export default defineConfig({
   root: "lab",
   base: "./",
   publicDir: "../public",
-  plugins: folder === undefined ? [] : [asIndex],
+  // The shaders the journeys walk here are stripped as the site's are (src/glsl.ts).
+  plugins: [glslSpaces(parsed), ...(folder === undefined ? [] : [asIndex])],
   build: {
     outDir: folder ?? (built === undefined ? "../build/client/lab" : join(built, "client", "lab")),
     emptyOutDir: true,

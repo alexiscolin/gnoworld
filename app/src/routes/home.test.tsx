@@ -4,12 +4,16 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace, useWorldsCount, useNewcomer } = vi.hoisted(() => ({
+const { useSpace, useWorldsCount, useResting, useNewcomer } = vi.hoisted(() => ({
   useSpace: vi.fn(),
   useWorldsCount: vi.fn<(wanted: boolean) => number | null | undefined>(() => undefined),
+  useResting: vi.fn<() => string | undefined>(() => undefined),
   useNewcomer: vi.fn<() => boolean>(() => false),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useNewcomer }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting, useNewcomer }));
+afterEach(() => {
+  useResting.mockReturnValue(undefined);
+});
 // Every event of the data waits for its date (7t no longer shows those): one dated beside them, so the ticker's tests still see an event.
 const { DATED } = vi.hoisted(() => ({
   DATED: { id: "dated-call", title: "A dated call", start: "2026-11-15T10:00:00Z", link: "https://gno.land/dated" },
@@ -161,6 +165,19 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
 });
 
 // Slice 5r (frames 1 to 8): the hero's big number, its line and two big actions; with no data, what is true.
+// 7v (Alexis, 2026-11-03): at a system's view the screen is the system's, its crumb at the top left where the list of worlds stands (the
+// design review: the crumb was drawn over it): both give way, and come back at rest.
+test("gives the screen to a system the eye rests at: no hero and no list of worlds then, both back at rest", async () => {
+  useResting.mockReturnValue("gnoswap");
+  const there = await render({ path: "/", Component: Home, loader }, "/");
+  expect(there).not.toContain("data-hero=");
+  expect(there).not.toContain('<a href="/w/bubble"');
+  useResting.mockReturnValue(undefined);
+  const home = await render({ path: "/", Component: Home, loader }, "/");
+  expect(home).toContain("data-hero=");
+  expect(home).toContain('<a href="/w/bubble"');
+});
+
 describe("home's hero", () => {
   test("claims nobody online while no source says so: no number of people, no sample (5m fills it)", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");

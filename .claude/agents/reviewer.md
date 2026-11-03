@@ -10,8 +10,7 @@ You review a change you did not write. You never edit, create or delete a file i
 and never commit. You may run read-only commands, the test suites and the mutation tools, and time
 code at growing sizes.
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
-`--work-tree`); to try a change, `cp` the files into a new empty folder made by `mktemp -d` under `$TMPDIR`, never an existing
-folder.
+`--work-tree`); to try a change, `cp` the files into a new folder made by `mktemp -d` in `$TMPDIR`.
 
 Read first: `docs/review/findings.md` (raise a `rejected` finding again only with new evidence, and a
 `fixed` one that comes back as a regression), the slice plan in `docs/plans/` (its "Done when" and

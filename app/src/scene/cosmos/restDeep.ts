@@ -1,29 +1,48 @@
-// The view at rest in depth across its frame (7p), in a chunk of its own the view at rest's asks once a file's view came: the real worlds of
-// other nearby systems it draws as bodies, and the home's rocks, decor laid in front of everything, on the stage for the chunk that draws
-// them, which imports nothing of core's. It reads the view with the functions the view at rest's chunk lends, so nothing is split out of it.
+// The view at rest in depth across its frame (7p), in a chunk of its own the view at rest's asks once a file's view came: the Earth's
+// projects (7v) and the real worlds of other nearby systems it draws as bodies, and the home's rocks, decor laid in front of everything, on
+// the stage for the chunk that draws them. It reads the view with the functions the view at rest's chunk lends, so nothing is split out.
 import {
   CENTRE,
   deepOf,
+  earthSystemOf,
   judgeOf,
+  projectsOf,
+  rocksAt,
   rocksOf,
   toScene,
+  type Arrival,
   type Lent,
+  type Point,
   type RestView,
   type Rock,
   type StarSystem,
 } from "@gnoworld/core";
+import projects from "../../../data/earthOrbit.json" with { type: "json" };
+import { SMALL_RING } from "../earth/orbit.ts";
 
-/** `view`'s depth over `systems`, read with the view at rest's `lent` functions: its bodies, by their system's index and their own, and its
- * rocks on the stage, each lit by the great star. */
-export function inDepth(systems: readonly StarSystem[], view: RestView, lent: Lent) {
-  const judge = judgeOf(systems, view, lent);
-  const bodies = deepOf(systems, view, judge);
-  const rocks = rocksOf(view, judge).map(({ place, ...rock }): Rock => {
+type Laid = ReturnType<typeof rocksOf>[number];
+
+// Rocks laid on the map, on the stage, each lit from `star` on the stage.
+const staged = (laid: readonly Laid[], star: Point): Rock[] =>
+  laid.map(({ place, ...rock }) => {
     const at = { x: 0, y: 0, z: 0 };
     toScene(place, at);
-    const [x, y, z] = [CENTRE.x - at.x, CENTRE.y - at.y, CENTRE.z - at.z];
+    const [x, y, z] = [star.x - at.x, star.y - at.y, star.z - at.z];
     const length = Math.hypot(x, y, z);
     return { ...rock, place: at, toStar: { x: x / length, y: y / length, z: z / length } };
   });
-  return { bodies, rocks };
+
+/** `view`'s depth over `systems`, read with the view at rest's `lent` functions: the Earth's projects where they stand clear, first, then
+ * its bodies, by their system's index and their own, and its rocks on the stage, each lit by the great star. */
+export function inDepth(systems: readonly StarSystem[], view: RestView, lent: Lent) {
+  const judge = judgeOf(systems, view, lent);
+  const earth = projectsOf(judge, earthSystemOf(projects), SMALL_RING);
+  return { earth, bodies: deepOf(systems, view, judge), rocks: staged(rocksOf(view, judge), CENTRE) };
+}
+
+/** A system's dynamic view's rocks (7v), on the stage, each lit by the system's own star. */
+export function rocksOfView(arrival: Arrival, lent: Lent): Rock[] {
+  const star = { x: 0, y: 0, z: 0 };
+  toScene(arrival.look, star);
+  return staged(rocksAt(arrival, lent), star);
 }

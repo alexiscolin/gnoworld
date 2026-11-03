@@ -1,6 +1,19 @@
-import { CENTRE, deepOf, judgeOf, LENT, restView, rocksOf, systemsOf, toScene } from "@gnoworld/core";
+import {
+  CENTRE,
+  deepOf,
+  earthSystemOf,
+  judgeOf,
+  LENT,
+  projectsOf,
+  restView,
+  rocksOf,
+  systemsOf,
+  toScene,
+} from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import recorded from "../../../lab/worlds.json" with { type: "json" };
+import projects from "../../../data/earthOrbit.json" with { type: "json" };
+import { SMALL_RING } from "../earth/orbit.ts";
 import { heldOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { inDepth } from "./restDeep.ts";
 
@@ -10,11 +23,14 @@ const ONYX: readonly CosmosWorld[] = recorded.worlds;
 const systems = () => systemsOf(heldOf(ONYX));
 
 describe("the view at rest's depth chunk", () => {
-  it("gives the core's bodies and the home's rocks, each on the stage where it stands on the map, lit from the great star", () => {
+  // The Earth's projects (7v) are placed first: the depth's worlds and the rocks keep off them.
+  it("gives the Earth's projects, the core's bodies and the home's rocks, each on the stage where it stands on the map, lit from the great star", () => {
     const held = systems();
     const view = restView(held);
-    const { bodies, rocks } = inDepth(held, view, LENT);
+    const { earth, bodies, rocks } = inDepth(held, view, LENT);
     const judge = judgeOf(held, view, LENT);
+    expect(earth).toEqual(projectsOf(judge, earthSystemOf(projects), SMALL_RING));
+    expect(earth.worlds.map(({ id }) => id)).toEqual(["~earth/gnosh.ai"]);
     expect(bodies).toEqual(deepOf(held, view, judge));
     const onMap = rocksOf(view, judge);
     expect(rocks.length).toBe(onMap.length);

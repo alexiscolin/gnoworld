@@ -16,6 +16,9 @@ export const REST_SCREENS = [
 ] as const;
 /** The hero's room, as shares of the screen: left of `right`, under `top`. */
 export const HERO_ZONE = { right: 0.45, top: 0.58 } as const;
+/** A system's card's room at its views (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
+ * screen), as shares of the screen: left of `right`, over `bottom`. */
+export const CARD_ZONE = { right: 0.25, bottom: 0.2 } as const;
 /** The great star's heart, in pixels: no body stands on it. */
 export const STAR_HEART = 40;
 
@@ -112,10 +115,16 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
   return out;
 };
 
-/** A camera at `eye`, on the map, looking at `target`, the disc's up kept up. */
-export function cameraTowards(eye: Point, target: Point): Camera {
+const MAP_UP: Point = { x: 0, y: 1, z: 0 };
+
+/** A camera at `eye`, on the map, looking at `target`, `upright` kept up: the disc's, or a Plan's own plane's (7v). */
+export function cameraTowards(eye: Point, target: Point, upright: Point = MAP_UP): Camera {
   const ahead = direction(minus(target, eye));
-  const right = direction({ x: -ahead.z, y: 0, z: ahead.x });
+  const right = direction({
+    x: ahead.y * upright.z - ahead.z * upright.y,
+    y: ahead.z * upright.x - ahead.x * upright.z,
+    z: ahead.x * upright.y - ahead.y * upright.x,
+  });
   const up = {
     x: right.y * ahead.z - right.z * ahead.y,
     y: right.z * ahead.x - right.x * ahead.z,
@@ -133,8 +142,9 @@ export const swayed = (
   target: Point = EARTH_PLACE,
 ): Camera => cameraTowards(along(along(eye, right, across), up, upward), target);
 
-/** The focal length of a screen `height` pixels high, in pixels. */
-export const focalOf = (height: number): number => height / 2 / Math.tan((FIELD_OF_VIEW * DEGREE) / 2);
+/** The focal length of a screen `height` pixels high, in pixels, through `fieldOfView` degrees, the home's unless said. */
+export const focalOf = (height: number, fieldOfView = FIELD_OF_VIEW): number =>
+  height / 2 / Math.tan((fieldOfView * DEGREE) / 2);
 
 const scratch = { x: 0, y: 0, z: 0 };
 
@@ -156,11 +166,12 @@ export class Look {
   readonly star: Seen;
   readonly #focal: number;
 
-  constructor(camera: Camera, { width, height }: Screen) {
+  /** Through `fieldOfView` degrees, the home's lens unless the view has one of its own (a Plan's, 7v). */
+  constructor(camera: Camera, { width, height }: Screen, fieldOfView = FIELD_OF_VIEW) {
     this.camera = camera;
     this.width = width;
     this.height = height;
-    this.#focal = focalOf(height);
+    this.#focal = focalOf(height, fieldOfView);
     this.earth = this.seen(EARTH_PLACE, EARTH_RADIUS);
     this.star = this.seen({ x: 0, y: 0, z: 0 });
   }
@@ -207,14 +218,19 @@ export class Look {
     return Math.hypot(at.x - to.x, at.y - to.y) - at.radius - reach;
   }
 
-  /** Whether a body there, `margin` pixels round, leaves clear the Earth from in front, the great star's heart and the hero. */
-  clear(at: Seen, margin: number): boolean {
+  /** Whether a body there, `margin` pixels round, leaves clear the Earth from in front, the great star's heart and the page's text: the
+   * hero, or at a system's view, where the hero gives way, its card (7v). */
+  clear(at: Seen, margin: number, page: "hero" | "card" = "hero"): boolean {
     if (at.depth <= 0) return true;
     const { earth, star, width, height } = this;
-    const hero =
-      at.x - at.radius < HERO_ZONE.right * width + margin && at.y + at.radius > HERO_ZONE.top * height - margin;
+    const left = at.x - at.radius < (page === "hero" ? HERO_ZONE.right : CARD_ZONE.right) * width + margin;
+    const onPage =
+      left &&
+      (page === "hero"
+        ? at.y + at.radius > HERO_ZONE.top * height - margin
+        : at.y - at.radius < CARD_ZONE.bottom * height + margin);
     const onEarth = at.away < earth.away && this.#gap(at, earth, earth.radius) < margin;
-    return !hero && !onEarth && this.#gap(at, star, STAR_HEART) >= margin;
+    return !onPage && !onEarth && this.#gap(at, star, STAR_HEART) >= margin;
   }
 
   /** Whether a body there stands whole on the screen, under the header, `margin` pixels in. */
@@ -237,5 +253,6 @@ export class Look {
   }
 }
 
-/** The camera on each screen the view is composed for. */
-export const looksFrom = (camera: Camera): Look[] => REST_SCREENS.map((screen) => new Look(camera, screen));
+/** The camera on each screen the view is composed for, through `fieldOfView` degrees, the home's unless said. */
+export const looksFrom = (camera: Camera, fieldOfView = FIELD_OF_VIEW): Look[] =>
+  REST_SCREENS.map((screen) => new Look(camera, screen, fieldOfView));

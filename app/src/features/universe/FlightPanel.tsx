@@ -5,6 +5,7 @@ import type { FlightPhase } from "@gnoworld/core";
 import type { CSSProperties } from "react";
 import type { FlightSaid } from "../../scene/flight/flights.ts";
 import styles from "./FlightPanel.module.css";
+import universe from "./Universe.module.css";
 
 const PHASES: Record<FlightPhase, string> = {
   leaving: "Course plotted · leaving orbit",
@@ -20,7 +21,7 @@ export function FlightPanel({ flight }: { flight: FlightSaid | undefined }) {
   const { target, phase, distance, speed, eta, along } = flight;
   const bar = { "--_along": share(along) } as CSSProperties;
   return (
-    <section className={styles["panel"]} data-flight="" aria-hidden="true">
+    <section className={`${universe["underHeader"] ?? ""} ${styles["panel"] ?? ""}`} data-flight="" aria-hidden="true">
       <p className={`label ${String(styles["phase"])}`} data-phase="">
         {PHASES[phase]}
       </p>

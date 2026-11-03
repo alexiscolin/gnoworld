@@ -52,8 +52,9 @@ export const SWAY = { across: 0.25, up: 0.12 } as const;
 /** How far a mouse at the window's edge leans the view, in world units, across and up the stage (eye.ts): enough to part the motes from
  * the stars. */
 export const LEAN = 3;
-/** How far a mouse leans the eye at a system's arrival: half the home's, for the eye stands nearer what it looks at (7d3's review). */
-export const ARRIVAL_LEAN = LEAN / 2;
+/** How far a mouse leans the eye at a system's dynamic view, its arrival: under half the home's, for the eye stands nearer what it looks at
+ * (7d3's review), and six worlds hold through it (7v's design review, F4468: at half, 71 views of 103 held, at this 75). */
+export const ARRIVAL_LEAN = LEAN / 2.2;
 /** The sway's four corners, across and up: what a view must hold with motion on. */
 export const SWAY_CORNERS: readonly (readonly [number, number])[] = [
   [SWAY.across, SWAY.up],

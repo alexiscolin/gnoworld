@@ -72,8 +72,9 @@ const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r
 const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
 
-/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters. */
-const RealmPath = z
+/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters; the
+ * cosmos's Plan links a world to its realm's view only by such a path (7v). */
+export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
@@ -123,6 +124,14 @@ const degrees = (limit: number) => z.number().check(z.gte(-limit), z.lte(limit))
 
 /** Where the Earth's side rooms stand (ADR-0002 §10): one point of the globe a room, by a reviewed row, so no room's name finds a place by
  * chance. A room with none stays in the list; the main room is the globe itself. */
+/** What turns round the Earth (7v; Alexis, 2026-11-03): a project the team adds by hand, even with no realm, by its name and its own
+ * address, and the hub whose page it links to where it has one; a name once. */
+export const EarthOrbit = unique(
+  list(z.strictObject({ name: text(DATA_CAPS.name), url: Link, slug: z.optional(Key) })),
+  "name",
+  (r: { name: string }) => r.name,
+);
+
 export const EarthRooms = unique(
   list(
     z.strictObject({

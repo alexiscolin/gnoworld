@@ -25,6 +25,41 @@
     text-transform: none;
   }
 
+  /* A dot before words, in its tone: a kicker's (frame 45), a Plan's world where people are (7v). */
+  .dot {
+    display: inline-block;
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    margin-inline-end: var(--space-2xs);
+    border-radius: var(--radius-pill);
+    background: var(--_dot);
+    vertical-align: middle;
+  }
+
+  .dot[data-tone="warm"] {
+    --_dot: var(--color-warm);
+  }
+
+  .dot[data-tone="mine"] {
+    --_dot: var(--color-mine);
+  }
+
+  .dot[data-tone="signal"] {
+    --_dot: var(--color-signal);
+  }
+
+  /* A bar of controls over the page and the scene: a pill with a line round it, four pixels in, the night at 45% behind it (the prototype's
+     #hnav .links): the header's views, and space's two views apart from them on a phone (F4691). No blur until the scene has a sky. */
+  .control-bar {
+    box-sizing: border-box;
+    /* raw: four pixels between the pill's edge and its controls */
+    padding: 4px;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45) */
+    background: color-mix(in oklab, var(--color-surface) 45%, transparent);
+  }
+
   /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
   .truncate {
     min-inline-size: 0;

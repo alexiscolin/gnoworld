@@ -17,14 +17,12 @@ import { SPIN } from "../planet/surfaceShader.ts";
 import { Ground } from "./ground.ts";
 import { EARTH, GROUND_TO_MAP, MOON } from "./look.ts";
 import { loadEarthMaps, type EarthMaps } from "./maps.ts";
-import { createOrbit, type Orbit } from "./orbit.ts";
+import { createOrbit, FAR_MOON_RADIUS, type Orbit } from "./orbit.ts";
 import type { EarthDevice } from "./device.ts";
 
 const SPHERE_WIDTH = 160;
 const SPHERE_HEIGHT = 120;
 const MOON_RADIUS = 0.085;
-// Frame 4's Moon, 13 pixels on a 47-pixel Earth: its own size would be two pixels at this distance.
-const FAR_MOON_RADIUS = 0.27;
 const ANISOTROPY = 16;
 
 // The Earth or its Moon on its own map, turned as the ground is. One surface a set: no ring is drawn here, and the shader never reads what

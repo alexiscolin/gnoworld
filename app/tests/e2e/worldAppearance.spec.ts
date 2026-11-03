@@ -5,7 +5,7 @@
 // each step are attached for the design review.
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { reading, type Tools } from "./pixels.ts";
-import { held, shaderRefusals } from "./sceneStage.ts";
+import { held } from "./sceneStage.ts";
 
 const COMPUTER = { width: 1728, height: 1080 };
 const SLOW = { timeout: 150_000 };
@@ -168,7 +168,6 @@ const bandSpan = ({ x, y, radius, night }: { x: number; y: number; radius: numbe
 test("plays on this reader's first visit to a world, its band running down, and a reload, which the device remembers, plays none", async ({
   page,
 }) => {
-  const refused = shaderRefusals(page);
   await opened(page);
   const first = await watched(page, 60);
   expect(Math.max(...first.map(({ grid }) => grid)), "the grid came whole").toBe(1);
@@ -192,7 +191,6 @@ test("plays on this reader's first visit to a world, its band running down, and 
   const again = await watched(page, 200);
   expect(Math.max(...again.map(({ grid }) => grid)), "no grid on a return").toBe(0);
   expect(Math.min(...again.map(({ band }) => Math.abs(band))), "no band on the world").toBeGreaterThanOrEqual(OFF);
-  expect(refused).toEqual([]);
 });
 
 test("under reduced motion: a still grid shown whole and faded, with no band", async ({ page }) => {

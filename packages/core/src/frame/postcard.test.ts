@@ -4,7 +4,7 @@ import { BELT_INNER, EARTH_PLACE, GRAIN, systemsOf, type Orbiter, type StarSyste
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
-import { easedOf, postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
+import { drawnOf, easedOf, postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
 import { cameraTowards, Look, placeOf as restPlaceOf, REST_SCREENS } from "./restLook.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -173,18 +173,21 @@ describe("a postcard's worlds at a count", () => {
   });
 });
 
-// 7d3's review: a postcard's specks, its worlds too small for a body, stand at their own orbits in its plane while its bodies are widened;
-// one that would stand on a body's ground, or against it, is not drawn: within the body's own width, half a unit at the least (Alexis's
-// pebbles round Onyx's agents, 2026-11-03). A system turns as one, so what stands clear at rest stays clear.
+// 7d3's review: a postcard's specks stand at their own orbits while its bodies are widened; none within a body's width of its ground, half a
+// unit at the least (Alexis's pebbles, 2026-11-03), and no grain on a body's path, its drawn width each side of its orbit ("Poussière fine",
+// F3594). A system turns as one, so what stands clear at rest stays clear.
 describe("a postcard's specks", () => {
   const clearOf = ({ radius }: Orbiter) => Math.max(0.5, radius);
+  // A grain, a real world too small for a body: a world of a body's size the postcard does not draw is no pebble.
+  const onPath = (speck: Orbiter, body: Orbiter) =>
+    speck.radius < GRAIN && Math.abs(speck.orbit - body.orbit) < body.radius;
   const placed = (system: StarSystem, world: Orbiter) => {
     const out = { x: NaN, y: NaN, z: NaN };
     orbitPlace({ system, world }, 0, out);
     return out;
   };
 
-  it("leaves out each speck that would stand within a body's width of its ground, half a unit at the least, and only those", () => {
+  it("leaves out each speck on a body's path round its star or within a body's width of its ground, and only those (F3594)", () => {
     const crowds = systemsOf(
       ["a", "b", "c", "d", "e"].flatMap((namespace, at) =>
         Array.from({ length: 12 + at * 40 }, (_, world) => ({
@@ -194,10 +197,12 @@ describe("a postcard's specks", () => {
         })),
       ),
     );
-    let hidden = 0;
+    let [hidden, pathed, kept] = [0, 0, 0];
     for (const system of crowds.filter(({ worlds }) => worlds.length > 0)) {
-      const { system: drawn, worlds, hidden: left } = postcardOf(system, { x: 0, y: 60, z: 0 });
+      const card = postcardOf(system, { x: 0, y: 60, z: 0 });
+      const { system: drawn, worlds, hidden: left } = card;
       const bodies = new Set(worlds.map(({ id }) => id));
+      const seen = drawnOf(card);
       for (const speck of system.worlds.filter(({ id }) => !bodies.has(id))) {
         const near = worlds.some(
           (body) =>
@@ -207,11 +212,16 @@ describe("a postcard's specks", () => {
               body.radius <
             clearOf(body),
         );
-        expect(left.has(speck.id)).toBe(near);
+        const path = seen.some((body) => onPath(speck, body));
+        expect(left.has(speck.id), speck.id).toBe(near || path);
         if (near) hidden += 1;
+        if (path && !near) pathed += 1;
+        if (!near && !path) kept += 1;
       }
     }
     expect(hidden).toBeGreaterThan(0);
+    expect(pathed).toBeGreaterThan(0);
+    expect(kept).toBeGreaterThan(0);
     expect(GRAIN).toBeGreaterThan(0);
   });
 });

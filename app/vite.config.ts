@@ -4,7 +4,8 @@ import { reactCompilerPreset } from "@vitejs/plugin-react";
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { build, defineConfig, type Plugin } from "vite";
+import { build, defineConfig, parseSync, type Plugin } from "vite";
+import { glslSpaces } from "./src/glsl.ts";
 import { precached } from "./src/sw/precache.ts";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script, with the
@@ -79,12 +80,16 @@ const CHUNKS = [
   { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
 ];
 
+/** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
+export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
+
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
   plugins: [
     dataFiles,
     reactRouter(),
     babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
+    glslSpaces(parsed),
     serviceWorker,
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },

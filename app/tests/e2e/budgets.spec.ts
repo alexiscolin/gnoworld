@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last on 2026-10-31), 3 MB in all, the worker's
+// hydrated; its steps in docs/decisions.md, the last on 2026-11-04: 174 KiB for the phone's view switch), 3 MB in all, the worker's
 // precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 173 * 1024;
+const FIRST_SCREEN_JS = 174 * 1024;
 const TOTAL = 3 * 1024 * 1024;
 
 const compressed = (page: Page, urls: readonly string[]) =>
@@ -35,30 +35,31 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk. 160,000 B since
-// the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03).
-const SCENE_JS = 160_000;
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk; 160,000 B for
+// the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03). Lowered to 158,208 B once
+// the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
+const SCENE_JS = 158_208;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B since the rail's portraits share the maps'
-// chunks with it (Alexis, 2026-11-03).
-const COSMOS_JS = 16_512;
+// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
+// chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
+const COSMOS_JS = 17 * 1024;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
-// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
-// once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B). The view at rest's is
-// 10 KiB since 7p judges the postcards in depth in the search, 10,066 B on 7d9's tree (Alexis, 2026-11-03, docs/decisions.md).
+// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks once
+// its cosmos shows, first capped a tenth or so over their weight (7d7: 6,771 B and 3,492 B). The view at rest's: 10 KiB since 7p's depth,
+// 10.5 KiB with 7v's views (Alexis, 2026-11-03, docs/decisions.md).
 const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const REST_JS = 10 * 1024;
+const REST_JS = 10.5 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
-// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
-// Its first value was the part's (5,960 B); 6 KiB since the rail shares the labels' ranking, titles and reading and their band (Alexis,
-// 2026-11-03): sharing them made two chunks of their own, the price of sharing rather than copying.
+// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them; first
+// the part's 5,960 B, 6 KiB once the rail shared their ranking, titles, reading and band (Alexis, 2026-11-03: two chunks of their own, the
+// price of sharing), 6.5 KiB with 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 6 * 1024;
+const LABELS_JS = 6.5 * 1024;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
 // cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
 // camera-controls' own warning, which no minifier renames.
@@ -72,22 +73,29 @@ const RAIL_JS = 7 * 1024;
 const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
 const PORTRAITS_JS = 1900;
 const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
-// A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g2's flights
-// will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
-// set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
+// A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
+// chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
+// (Alexis, 2026-11-03).
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const ARRIVAL_JS = 1680;
-// The view at rest in depth (7p): its far bodies and the home's rocks, found in a chunk the view at rest's names; the rocks drawn by one the
-// labels' name, its program (an attribute no minifier renames) in no chunk the cosmos or the scene loads first. First caps: their sizes, and
-// about a tenth: 1,204 B for the rocks; 2,534 B for the depth with its review's fixes, the rocks' near one and cluster (7p).
+const ARRIVAL_JS = 2 * 1024;
+// The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
+// program (an attribute no minifier renames) in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B);
+// the depth 3.5 KiB with the dynamic views' rocks and the Earth's projects (7v; Alexis, 2026-11-03).
 const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 2790;
+const DEEP_JS = 3.5 * 1024;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
 const ROCKS_MARK = "aRock";
+// A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
+// which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps, each its
+// size once its reviews' fixes landed and about a tenth: 2,248 B (the design review's lens, level and spacing, F4470) and 2,147 B.
+const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
+const PLAN_JS = 2470;
+const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
+const ORBITS_JS = 2360;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -278,34 +286,60 @@ async function homeScene(page: Page): Promise<string> {
   return (await asked).url();
 }
 
-// A late chunk the view at rest's names by `named`, within `cap` apart from the view at rest's, the cosmos's and the scene's.
-async function restLateWithin(page: Page, named: RegExp, cap: number): Promise<void> {
+// A late chunk the view at rest's names by `named`, within `cap` apart from the view at rest's, the cosmos's and the scene's, and the
+// labels' where `labels` says so.
+async function restLateWithin(
+  page: Page,
+  { named, cap, labels = false }: { named: RegExp; cap: number; labels?: boolean },
+): Promise<void> {
   const scene = await homeScene(page);
   const cosmos = await namedIn(page, scene, COSMOS_NAMED);
   const rest = await namedIn(page, cosmos, REST_NAMED);
-  const there = (await Promise.all([scene, cosmos, rest].map((url) => closureOf(page, url)))).flat();
+  const before = labels ? [scene, cosmos, rest, await namedIn(page, scene, LABELS_NAMED)] : [scene, cosmos, rest];
+  const there = (await Promise.all(before.map((url) => closureOf(page, url)))).flat();
   expect(await compressed(page, await ownOf(page, await namedIn(page, rest, named), there))).toBeLessThanOrEqual(cap);
+}
+
+// The chunks the labels' names come after: the scene's, the cosmos's and the labels' own, and all they import.
+async function labelsThere(page: Page) {
+  const scene = await homeScene(page);
+  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
+  const labels = await namedIn(page, scene, LABELS_NAMED);
+  const there = (await Promise.all([scene, cosmos, labels].map((url) => closureOf(page, url)))).flat();
+  return { scene, cosmos, labels, there };
 }
 
 test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, ARRIVAL_NAMED, ARRIVAL_JS);
+  await restLateWithin(page, { named: ARRIVAL_NAMED, cap: ARRIVAL_JS });
 });
 
 test("the view at rest's depth chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, DEEP_NAMED, DEEP_JS);
+  await restLateWithin(page, { named: DEEP_NAMED, cap: DEEP_JS });
+});
+
+test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await restLateWithin(page, { named: PLAN_NAMED, cap: PLAN_JS, labels: true });
+});
+
+test("the Plan's orbits' chunk stays within its cap, apart from the labels', the cosmos's and the scene's", async ({
+  page,
+}) => {
+  const { labels, there } = await labelsThere(page);
+  expect(
+    await compressed(page, await ownOf(page, await namedIn(page, labels, ORBITS_NAMED), there)),
+  ).toBeLessThanOrEqual(ORBITS_JS);
 });
 
 test("the rocks' chunk stays within its cap, apart from the labels', the cosmos's and the scene's, which hold none of it", async ({
   page,
 }) => {
-  const scene = await homeScene(page);
-  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
-  const labels = await namedIn(page, scene, LABELS_NAMED);
-  const there = (await Promise.all([scene, cosmos, labels].map((url) => closureOf(page, url)))).flat();
+  const { scene, cosmos, labels, there } = await labelsThere(page);
   const rocks = await namedIn(page, labels, ROCKS_NAMED);
   expect(await compressed(page, await ownOf(page, rocks, there))).toBeLessThanOrEqual(ROCKS_JS);
   for (const url of [...(await closureOf(page, scene)), ...(await closureOf(page, cosmos))])
@@ -364,6 +398,32 @@ test("a world's part of the scene stays within its cap", async ({ page }) => {
   await hydrated(page);
   const there = await closureOf(page, (await scene).url());
   expect(await compressed(page, await ownOf(page, (await part).url(), there))).toBeLessThanOrEqual(WORLD_JS);
+});
+
+// The shaders' spaces stripped at build (Alexis, 2026-11-03): three's own, which the scene's chunk ships, read as a compiler reads them, in the
+// site's build and the lab's beside it, which the journeys walk.
+test("ships the scene's shaders stripped of their spaces, in the site's build and the lab's", async ({ page }) => {
+  for (const [path, pattern] of [
+    ["/?test-gpu", SCENE],
+    ["/lab/realism.html?view=cosmos", /\/lab\/assets\/[\w-]+\.js$/],
+  ] as const) {
+    const texts: string[] = [];
+    page.on("response", (response) => {
+      if (pattern.test(response.url())) texts.push(response.url());
+    });
+    await page.goto(path);
+    await expect
+      .poll(
+        async () => {
+          const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+          return bodies.some((text) => text.includes("gl_FragColor=vec4("));
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+    const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+    for (const text of bodies) expect(text).not.toMatch(/gl_FragColor = |\n[ \t]+(?:vec[234]|float|uniform|varying) /);
+  }
 });
 
 // The scene weighs its chunk and every chunk it imports statically that the door did not bring already: a part of three split into a chunk

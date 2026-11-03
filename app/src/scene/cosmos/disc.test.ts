@@ -139,6 +139,29 @@ describe("the disc's caps", () => {
     expect((dots?.geometry.getAttribute("aSize") as BufferAttribute).getX(0)).toBeLessThanOrEqual(BODY_PIXELS / 2);
   });
 
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): the specks beside a postcard's worlds left an orange trail, grains of 3 to 6 px; each is 2 px
+  // across at most, however near. Lit on its star's side by the points' own light (dots.ts), which the picture for Alexis shows.
+  it("draws a grain as fine dust, 2 px across at most however near its star (F3594)", () => {
+    const sizes = [2, 8, 20].map((away) => {
+      const dusty = { ...system(0, 3, false), place: { x: 0, y: 30 - away, z: 0 } };
+      const systems = [{ ...dusty, worlds: dusty.worlds.map((world) => ({ ...world, radius: 0.29 })) }];
+      const sight = sighted(systems, (drawn) => {
+        for (const world of [0, 1, 2]) {
+          drawn.dotSystems[world] = 0;
+          drawn.dotWorlds[world] = world;
+        }
+        drawn.dotCount = 3;
+      });
+      const size = painted(sight).dots?.geometry.getAttribute("aSize") as BufferAttribute | undefined;
+      return [0, 1, 2].map((at) => size?.getX(at) ?? NaN);
+    });
+    // Thin, never gone: a third of a pixel across at the least, as far as its world's light reaches.
+    for (const size of sizes.flat()) {
+      expect(size).toBeGreaterThanOrEqual(1 / 6);
+      expect(size).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("tells a region's glow from a star in what it writes", () => {
     const systems = Array.from({ length: 4 }, (_, at) => ({
       ...system(at, 0, false),
@@ -239,6 +262,25 @@ describe("the suns' halos", () => {
     const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
     for (let at = 2; at < pixels.length; at += 1) expect(pixels[at]).toBeLessThan(pixels[at - 1] ?? -Infinity);
     for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
+  });
+
+  // 7v's design review (F4469): the Earth's Plan, a chart with no light of its own, looked into the great star 6.7 units off, a white disc
+  // 260 px wide that put gnosh.ai's name at 1.6:1. Where the view's main light is none of its systems, every star is its point, no halo.
+  it("draws every star as its point, with no halo, where the view has no light of its own, as the Earth's Plan", () => {
+    const aways = [7, 20, 3];
+    const suns = sunsAt(aways, { main: -1, needsHalo: () => false });
+    expect(suns.map(({ halo }) => halo)).toEqual([0, 0, 0]);
+    for (const [at, { reach }] of suns.entries()) expect((reach * 1158) / (aways[at] ?? NaN)).toBeCloseTo(10, 6);
+  });
+
+  // The design review's second pass (F4470): in gnoland's Plan another system's star stood on an orbit by coins, its glow 50 px, and read as
+  // that world's sun. A Plan is a chart: its own star keeps its halo, every other is its point.
+  it("draws every other star as its point in a Plan, its own with its halo", () => {
+    const aways = [40, 7, 20];
+    const suns = sunsAt(aways, { main: 0, needsHalo: (index) => index === 0, chart: true });
+    expect(suns.map(({ halo }) => halo)).toEqual([1, 0, 0]);
+    expect(((suns[0]?.reach ?? NaN) * 1158) / 40).toBeGreaterThan(10);
+    for (const at of [1, 2]) expect(((suns[at]?.reach ?? NaN) * 1158) / (aways[at] ?? NaN)).toBeCloseTo(10, 6);
   });
 
   it("keeps a region's glow whole: it is no sun's halo", () => {

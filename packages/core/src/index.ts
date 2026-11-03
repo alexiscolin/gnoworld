@@ -40,7 +40,7 @@ export {
   type WorldHeld,
 } from "./cosmos/system.ts";
 export { worldsDrawn } from "./cosmos/count.ts";
-export type { Rock } from "./lod/drawn.ts";
+export type { Planned, Rock } from "./lod/drawn.ts";
 export {
   BODY_PIXELS,
   BOUNDS,
@@ -73,12 +73,13 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { deepOf, judgeOf, type Deep, type Judge } from "./frame/deep.ts";
+export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
+export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
+export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
-export { rocksOf } from "./frame/rocks.ts";
+export { rocksAt, rocksOf } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";
-export { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, stopNear, stopNearIn, wayAt } from "./frame/flight.ts";
-export type { Figures, FlightPhase } from "./frame/flight.ts";
+export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export {
   FIELD_OF_VIEW,
@@ -160,13 +161,12 @@ export {
   type Reaction,
   type Shown,
 } from "./chat/reactions.ts";
-export { inlines, inWord, markdown, mentions, mentionsRoom } from "./markdown/markdown.ts";
+export { inlines, inWord, markdown, mentions, mentionsRoom, type Block, type Inline } from "./markdown/markdown.ts";
 export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
 export { originOf } from "./markdown/address.ts";
 export { PAGE_MAX_BYTES, page, type FormField, type Page, type PageBlock, type PageOptions } from "./markdown/page.ts";
-export type { Block, Inline } from "./markdown/markdown.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
