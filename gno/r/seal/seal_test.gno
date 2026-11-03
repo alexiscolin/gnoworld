@@ -1,9 +1,11 @@
 package seal
 
 import (
+	"chain/runtime"
 	"crypto/merkle"
 	"encoding/base64"
 	"encoding/hex"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -118,4 +120,45 @@ func TestRotationRevokes(cur realm, t *testing.T) {
 	uassert.AbortsWithMessage(t, cur, "key rotated out", func() {
 		Seal(cross(cur), k32(root), 3, k32(pubA), s64(sealSigA), k32(pubB), s64(sealSigB), false)
 	})
+}
+
+// The tests below run after those above, on the state they leave: alice holds pubA2, and root has one kept seal, (pubA, pubB, 3).
+
+// Binding again the key one already holds is no takeover: only another address is refused.
+func TestRebindSameAddress(cur realm, t *testing.T) {
+	testing.SetRealm(testing.NewUserRealm(alice))
+	Bind(cross(cur), k32(pubA2), s64(bindSigA2))
+	uassert.Equal(t, hex.EncodeToString(raw(pubA2)), KeyOf(alice))
+}
+
+// One message is enough for a seal.
+func TestSealOfOneMessage(cur realm, t *testing.T) {
+	testing.SetRealm(testing.NewUserRealm(bob))
+	p := page[0]
+	Seal(cross(cur), k32(root), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), false)
+}
+
+// Kept reads back exactly what Seal stored, and zeros for a pair that never sealed.
+func TestKeptReadsBack(t *testing.T) {
+	n, h, ok := Kept(k32(root), k32(pubA), k32(pubB))
+	uassert.True(t, ok)
+	uassert.Equal(t, 3, n)
+	uassert.Equal(t, runtime.ChainHeight(), h)
+	n, h, ok = Kept(k32(root), k32(pubA), k32(pubC))
+	uassert.False(t, ok)
+	uassert.Equal(t, 0, n)
+	uassert.Equal(t, int64(0), h)
+}
+
+// Render shows each kept seal's block, count and pair, the bound key by its address and the other by its hex, ten at most.
+func TestRenderPage(cur realm, t *testing.T) {
+	line := "\n- block " + strconv.FormatInt(runtime.ChainHeight(), 10) + ", 3 messages: " + alice.String() + " and `" + hex.EncodeToString(raw(pubB)) + "` (unbound key)\n"
+	out := Render("root/" + rootHex)
+	uassert.True(t, strings.Contains(out, line), out)
+	testing.SetRealm(testing.NewUserRealm(bob))
+	for _, p := range page {
+		Seal(cross(cur), k32(root), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), true)
+	}
+	out = Render("root/" + rootHex)
+	uassert.Equal(t, 10, strings.Count(out, "\n- block "), out)
 }
