@@ -1,7 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EarthDevice } from "../earth/device.ts";
 import * as generated from "../planet/generated.ts";
+import { loadMap } from "../planet/maps.ts";
 import { BodyMaps } from "./maps.ts";
+
+vi.mock("../planet/maps.ts", async (actual) => ({
+  ...(await actual<typeof import("../planet/maps.ts")>()),
+  loadMap: vi.fn(),
+}));
 
 // The generated worlds' code, a chunk of its own (7b5): a fetch that fails once leaves the worlds as points, and is asked again the next
 // time a world wants it, as the app's other chunks are (F1763), never left failed for the page's life (F4231).
@@ -62,5 +68,35 @@ describe("the generated worlds' code", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(failed).toHaveBeenCalledOnce();
+  });
+});
+
+// F4409 (7p): a body map whose fetch failed stayed asked, never fetched again until the maps were freed, so its world's body never came.
+describe("a body map that does not come", () => {
+  const loading = vi.mocked(loadMap);
+  const fetching = {
+    renderer: { capabilities: { getMaxAnisotropy: () => 8 }, initTexture: vi.fn(), compileAsync: vi.fn() },
+    base: "/",
+    halved: () => false,
+  } as unknown as EarthDevice;
+  const fetches = (name: string) => loading.mock.calls.filter(([url]) => url.includes(name)).length;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    loading.mockReset();
+  });
+
+  it("is fetched again from the start once the maps were freed, and nothing waits after the free (F4409)", async () => {
+    vi.useFakeTimers();
+    loading.mockRejectedValue(new Error("offline"));
+    const arrived = vi.fn();
+    const maps = new BodyMaps(fetching, arrived);
+    maps.named("rocky");
+    await vi.advanceTimersByTimeAsync(100);
+    maps.free();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(arrived).not.toHaveBeenCalled();
+    maps.named("rocky");
+    expect(fetches("rocky")).toBe(2);
   });
 });
