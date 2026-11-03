@@ -333,7 +333,11 @@ describe("the rail's planets", () => {
     const { source, portraits } = sourceOf();
     rail(source);
     expect(portraits).toHaveBeenCalledTimes(1);
-    expect(portraits).toHaveBeenCalledWith(["earth", "gov/dao", "games/go", "art/hall"], PORTRAIT_SIZE);
+    expect(portraits).toHaveBeenCalledWith(
+      ["earth", "gov/dao", "games/go", "art/hall"],
+      PORTRAIT_SIZE,
+      expect.any(AbortSignal),
+    );
     expect(PORTRAIT_SIZE).toBeGreaterThanOrEqual(Math.ceil(64 * MAGNIFIED));
   });
 
@@ -371,7 +375,7 @@ describe("the rail's planets", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(portraits).toHaveBeenLastCalledWith(["new/one"], PORTRAIT_SIZE);
+    expect(portraits).toHaveBeenLastCalledWith(["new/one"], PORTRAIT_SIZE, expect.any(AbortSignal));
     expect(portraits).toHaveBeenCalledTimes(2);
   });
 

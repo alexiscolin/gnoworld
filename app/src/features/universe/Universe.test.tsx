@@ -1529,7 +1529,7 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
   it("asks the scene for its planets' portraits", async () => {
     mount(<Universe shown="cosmos" page={page()} />);
     await railed();
-    expect(scene.portraits).toHaveBeenCalledWith(["earth", "a/b"], expect.any(Number));
+    expect(scene.portraits).toHaveBeenCalledWith(["earth", "a/b"], expect.any(Number), expect.any(AbortSignal));
   });
 
   it("goes to a world's page through the page's router", async () => {

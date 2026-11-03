@@ -24,14 +24,21 @@ export interface Known {
   readonly unheard?: true;
 }
 
+type Draw = (
+  ids: readonly string[],
+  size: number,
+  signal: AbortSignal,
+) => Promise<ReadonlyMap<string, string>> | undefined;
+
 /** The planets' portraits for the rail (7i): each world asked of the scene once for as long as the page lives, drawn or not, so a return
- * to the cosmos asks none again; none asked while no scene can draw them. */
+ * to the cosmos asks none again; none asked while no scene can draw them; and what the cosmos covered stopped, asked again on the return. */
 export class Portraits {
-  readonly #draw: (ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>> | undefined;
+  readonly #draw: Draw;
   readonly #asked = new Set<string>();
   readonly #drawn = createStore<ReadonlyMap<string, string>>(() => new Map());
+  #asking = new AbortController();
 
-  constructor(draw: (ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>> | undefined) {
+  constructor(draw: Draw) {
     this.#draw = draw;
   }
 
@@ -41,15 +48,29 @@ export class Portraits {
 
   ask(ids: readonly string[], size: number): void {
     const fresh = ids.filter((id) => !this.#asked.has(id));
-    const drawing = fresh.length === 0 ? undefined : this.#draw(fresh, size);
+    const { signal } = this.#asking;
+    const drawing = fresh.length === 0 ? undefined : this.#draw(fresh, size, signal);
     if (drawing === undefined) return;
     for (const id of fresh) this.#asked.add(id);
+    // A world a stopped drawing did not draw is asked again on the return.
+    const left = (drawn: ReadonlyMap<string, string>) => {
+      if (signal.aborted) for (const id of fresh) if (!drawn.has(id)) this.#asked.delete(id);
+    };
     drawing.then(
       (drawn) => {
         this.#drawn.setState((before) => new Map([...before, ...drawn]), true);
+        left(drawn);
       },
-      () => undefined,
+      () => {
+        left(new Map());
+      },
     );
+  }
+
+  /** Stops what is being drawn: the cosmos is covered, and lends the scene's frames to nothing it shows. */
+  stop(): void {
+    this.#asking.abort();
+    this.#asking = new AbortController();
   }
 }
 
@@ -74,15 +95,17 @@ export class WorldsFeed {
   readonly data = this.#known.getState;
 
   /** The planets' portraits the scene drew for the rail, kept as long as the page lives. */
-  readonly portraits = new Portraits((ids, size) => this.#scene?.portraits(ids, size));
+  readonly portraits = new Portraits((ids, size, signal) => this.#scene?.portraits(ids, size, signal));
 
   /** Says whether the page wants the worlds on `scene`. */
   sync(scene: Scene, wanted: boolean): void {
     this.#scene = scene;
     if (wanted === this.#shown) return;
     this.#shown = wanted;
-    // What was heard before the cosmos was covered is old once it shows again: the server's next answer is the first again.
+    // What was heard before the cosmos was covered is old once it shows again: the server's next answer is the first again. Covered, the
+    // portraits being drawn stop.
     if (wanted) this.#heard = false;
+    else this.portraits.stop();
     this.#hand(scene, wanted ? this.#worlds : undefined);
     this.#clearing?.abort();
     this.#polling?.abort();

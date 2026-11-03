@@ -1585,7 +1585,7 @@ describe("the rail's portraits", () => {
 
   it("hands its own renderer to the portraits' chunk, and back the pictures it drew", async () => {
     const scene = startScene(options({ remembered: "low" }), clock);
-    const drawn = await scene.portraits(["gov/dao", "earth"], 100);
+    const drawn = await scene.portraits(["gov/dao", "earth"], 100, new AbortController().signal);
     expect(portrait.asked.map(({ ids, size }) => [ids, size])).toEqual([[["gov/dao", "earth"], 100]]);
     expect(portrait.asked[0]?.device.renderer).toBe(three.renderer);
     expect(portrait.asked[0]?.device.base).toBe(import.meta.env.BASE_URL);
@@ -1595,28 +1595,39 @@ describe("the rail's portraits", () => {
 
   it("halves the portraits' maps where it halves its own, and only there", async () => {
     const low = startScene(options({ remembered: "low" }), clock);
-    await low.portraits(["gov/dao"], 100);
+    await low.portraits(["gov/dao"], 100, new AbortController().signal);
     expect(portrait.asked[0]?.device.halved()).toBe(true);
     low.dispose();
     const high = startScene(options(), clock);
-    await high.portraits(["gov/dao"], 100);
+    await high.portraits(["gov/dao"], 100, new AbortController().signal);
     expect(portrait.asked[1]?.device.halved()).toBe(false);
     high.dispose();
   });
 
   it("tells the portraits when it goes, so they let go what waits for its frame", async () => {
     const scene = startScene(options({ remembered: "low" }), clock);
-    await scene.portraits(["gov/dao"], 100);
+    await scene.portraits(["gov/dao"], 100, new AbortController().signal);
     const signal = portrait.asked[0]?.device.signal;
     expect(signal?.aborted).toBe(false);
     scene.dispose();
     expect(signal?.aborted).toBe(true);
   });
 
+  it("tells an ask's portraits when the ask is let go, the scene still on (F3804)", async () => {
+    const scene = startScene(options({ remembered: "low" }), clock);
+    const asking = new AbortController();
+    await scene.portraits(["gov/dao"], 100, asking.signal);
+    const signal = portrait.asked[0]?.device.signal;
+    expect(signal?.aborted).toBe(false);
+    asking.abort();
+    expect(signal?.aborted).toBe(true);
+    scene.dispose();
+  });
+
   it("runs what is lent at the start of its next frame, before it draws its own, and once", async () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(1000);
-    await scene.portraits(["gov/dao"], 100);
+    await scene.portraits(["gov/dao"], 100, new AbortController().signal);
     const order: string[] = [];
     three.renderer.render.mockImplementation(() => order.push("scene"));
     portrait.asked[0]?.device.lend(() => order.push("portrait"));
@@ -1632,8 +1643,8 @@ describe("the rail's portraits", () => {
   it("runs every draw lent before a frame, in the order lent", async () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(1000);
-    await scene.portraits(["a"], 100);
-    await scene.portraits(["b"], 100);
+    await scene.portraits(["a"], 100, new AbortController().signal);
+    await scene.portraits(["b"], 100, new AbortController().signal);
     const order: string[] = [];
     portrait.asked[0]?.device.lend(() => order.push("a"));
     portrait.asked[1]?.device.lend(() => order.push("b"));

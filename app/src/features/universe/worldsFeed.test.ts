@@ -31,7 +31,15 @@ const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 
 const sceneOf = () => {
   const cosmos = vi.fn<(worlds: unknown, written?: string, signals?: LabelSignals) => void>();
-  return { cosmos, keepClear: vi.fn(), scene: { cosmos, keepClear: vi.fn() } as unknown as Scene };
+  const portraits = vi.fn<
+    (ids: readonly string[], size: number, signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+  >(() => new Promise(() => undefined));
+  return {
+    cosmos,
+    portraits,
+    keepClear: vi.fn(),
+    scene: { cosmos, keepClear: vi.fn(), portraits } as unknown as Scene,
+  };
 };
 const lastSignals = (cosmos: ReturnType<typeof sceneOf>["cosmos"]) => cosmos.mock.lastCall?.[2];
 // The signals' chunk and the reads resolve in turns of the microtask queue: a few turns settle them.
@@ -54,6 +62,45 @@ afterEach(() => {
 });
 
 describe("the rail's portraits", () => {
+  it("stops what it draws when told, keeps what it drew, and asks again for the rest (F3804)", async () => {
+    let finish: (drawn: ReadonlyMap<string, string>) => void = () => undefined;
+    const draw = vi.fn<
+      (ids: readonly string[], size: number, signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+    >(
+      () =>
+        new Promise((done) => {
+          finish = done;
+        }),
+    );
+    const portraits = new Portraits(draw);
+    portraits.ask(["a", "b"], 100);
+    const asked = draw.mock.calls[0]?.[2];
+    expect(asked?.aborted).toBe(false);
+    portraits.stop();
+    expect(asked?.aborted).toBe(true);
+    finish(new Map([["a", "data:image/jpeg;base64,A"]]));
+    await settled();
+    expect(portraits.drawn().get("a")).toBe("data:image/jpeg;base64,A");
+    portraits.ask(["a", "b"], 100);
+    expect(draw.mock.lastCall?.[0]).toEqual(["b"]);
+    expect(draw.mock.lastCall?.[2].aborted).toBe(false);
+  });
+
+  it("stops the portraits' drawing once the cosmos is covered (F3804)", async () => {
+    const { portraits, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    worlds.portraits.ask(["gov/dao"], 100);
+    const signal = portraits.mock.calls[0]?.[2];
+    expect(signal?.aborted).toBe(false);
+    worlds.sync(scene, false);
+    expect(signal?.aborted).toBe(true);
+  });
+
   it("asks the scene for each world once for as long as the page lives, drawn or not, and keeps what it drew", async () => {
     const draw = vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>();
     draw.mockResolvedValueOnce(new Map([["a", "data:image/jpeg;base64,A"]]));
@@ -66,7 +113,7 @@ describe("the rail's portraits", () => {
     expect([...portraits.drawn()]).toEqual([["a", "data:image/jpeg;base64,A"]]);
     portraits.ask(["b", "c"], 100);
     await settled();
-    expect(draw).toHaveBeenLastCalledWith(["c"], 100);
+    expect(draw).toHaveBeenLastCalledWith(["c"], 100, expect.any(AbortSignal));
     expect([...portraits.drawn().keys()]).toEqual(["a"]);
   });
 
@@ -84,7 +131,7 @@ describe("the rail's portraits", () => {
     worlds.sync(scene, true);
     worlds.portraits.ask(["a", "b"], 100);
     await settled();
-    expect(drawn).toHaveBeenCalledWith(["a", "b"], 100);
+    expect(drawn).toHaveBeenCalledWith(["a", "b"], 100, expect.any(AbortSignal));
     expect(worlds.portraits.drawn().get("b")).toBe("data:image/jpeg;base64,B");
   });
 });
