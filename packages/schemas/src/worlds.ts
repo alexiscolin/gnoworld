@@ -1,22 +1,15 @@
 // The file the server's worlds job writes and every client reads (slice 7, 7c): the chain's realms grouped into worlds, each realm
 // with what was read of its package and its history. All of it came from a chain or an indexer, so every text is capped and
 // checked, every count is a whole number, and a null is a fact not read, never a zero.
+import { RealmPath, WorldId } from "./realmPath.ts";
 import { Moment, Slug, WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";
 
+export { RealmPath, WorldId } from "./realmPath.ts";
 export { WORLDS_CAPS } from "./worldsHead.ts";
 
 /** The most bytes the job writes and a client accepts: 4 MiB, a few times the recorded chain's file. */
 export const WORLDS_MAX_BYTES = 4 * 1024 * 1024;
-
-/** A realm of gno.land by its path: gno's grammar for a segment (`[a-z][a-z0-9]*` joined by `_` or `-`, mempackage.go at v1.5.0), `_test` left out, at most 256 characters, its namespace at most 128 (a Slug). */
-export const RealmPath = z.string().check(
-  z.maxLength(WORLDS_CAPS.path),
-  z.regex(/^gno\.land\/r\/[a-z0-9][a-z0-9]*(?:[_-][a-z0-9]+)*(?:\/[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*)*$/),
-  z.refine((path) => !path.endsWith("_test"), { message: "no test path" }),
-  // The namespace is a world's namespace, a Slug: at most `name` characters.
-  z.refine((path) => (path.split("/")[2] ?? "").length <= WORLDS_CAPS.name, { message: "a namespace of at most 128" }),
-);
 
 /** A count or a height read from a chain: a whole number from 0, at most 10^12. */
 export const ChainCount = z
@@ -54,11 +47,6 @@ const Realm = z.strictObject({
 
 /** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
 export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
-
-/** A world by its id: a namespace, and for most worlds the folders that name it. */
-export const WorldId = z
-  .string()
-  .check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
 
 // A key it does not know is dropped, never kept nor refused: a reader older than the job that wrote the file, an open tab or a server
 // rolled back, still reads every world, and nothing it cannot check reaches the app.
