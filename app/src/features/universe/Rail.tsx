@@ -72,7 +72,8 @@ function useRail(source: RailSource, places: RailPlaces) {
   const entries = useSyncExternalStore(order.subscribe, order.entries);
   const drawn = useSyncExternalStore(source.portraits.subscribe, source.portraits.drawn);
   const railRef = useRef<HTMLElement>(null);
-  const standing = known !== undefined && entries.length > 0;
+  // A rail of the Earth alone stands not, and leaves the page its list of hubs (Alexis, 2026-11-03).
+  const standing = known !== undefined && entries.some(({ section }) => section !== "earth");
   useEffect(() => {
     if (known !== undefined) order.read(known);
   }, [order, known]);

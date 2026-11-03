@@ -590,6 +590,13 @@ describe("the page's plain list of worlds", () => {
     expect(list.dataset["rail"]).toBe("none");
   });
 
+  it("stays, and the rail stands not, while the rail would hold the Earth alone (Alexis, B2-5)", () => {
+    const earthAlone = { ...SIGNALS, present: new Map([["earth", { here: 3, perHour: 0, rise: null }]]) };
+    const { box } = rail(sourceOf({ worlds: [], signals: earthAlone }).source);
+    expect(box.querySelector("nav")).toBeNull();
+    expect(list.dataset["rail"]).toBe("none");
+  });
+
   it("comes back when the rail is taken off the page", () => {
     const box = document.createElement("div");
     document.body.append(box);
