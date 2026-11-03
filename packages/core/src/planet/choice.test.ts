@@ -177,9 +177,9 @@ describe("anchorOf", () => {
   });
 });
 
-// The minor class (slice 7, 7b4; ADR-0002 §3): another anchor that brings a colour of gas or rock (Alexis, 2026-11-03, 16:4x, "les
-// retirer": no olive or moss on a giant, no sea's blue on a dark world): its dominant's kind, never a sea world's, no ramp's centre green
-// past a grey, no saturated blue under a world not blue itself; by those anchors' weights, on the second hash's bytes 26 and 27 as a word.
+// The minor class (7b4; ADR-0002 §3), a colour of gas or rock (Alexis, 2026-11-03, "les retirer"): its dominant's kind, no sea world's,
+// no green past a grey, no saturated blue under a world not blue itself, under a sea world within 25 of its lightness; by those anchors'
+// weights, on the second hash's bytes 26 and 27 as a word.
 const centreOf = (anchor: Anchor, ramp: 0 | 1): Lab => labOf(ROWS[anchor].palettes[ramp][1]);
 const hueOf = ([, a, b]: Lab) => (Math.atan2(b, a) * 180) / Math.PI;
 // Olive and moss, and a sea's blue, as drawn: a ramp's centre keeps the 12 degrees a system's hue may turn it away from them.
@@ -193,7 +193,10 @@ const fitting = (minor: Anchor, dominant: Anchor) =>
   (ROWS[minor].banded === true) === (ROWS[dominant].banded === true) &&
   ROWS[minor].sea === undefined &&
   ([0, 1] as const).every(
-    (ramp) => !green(centreOf(minor, ramp), 12) && (bluish(dominant) || !blue(centreOf(minor, ramp), 12)),
+    (ramp) =>
+      !green(centreOf(minor, ramp), 12) &&
+      (bluish(dominant) || !blue(centreOf(minor, ramp), 12)) &&
+      (ROWS[dominant].sea === undefined || Math.abs(centreOf(minor, ramp)[0] - centreOf(dominant, 0)[0]) <= 25),
   );
 const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
   const others = WEIGHTS.filter(([anchor]) => fitting(anchor, dominant));

@@ -62,15 +62,20 @@ const BLUE = [
 ] as const;
 
 // A minor brings a colour of gas or rock (Alexis, 2026-11-03, "les retirer": no olive or moss on a giant, no sea's blue on a dark world):
-// its dominant's kind, never a sea world's, no ramp's centre green past a grey, and no saturated blue under a world not blue itself.
+// its dominant's kind, never a sea world's, no ramp's centre green past a grey, and no saturated blue under a world not blue itself. Under
+// a world with a sea, a land's colour: within 25 of its dominant's lightness, so no ice reads as cloud or sea and no pit as black.
 function fitsUnder(dominant: Anchor): (minor: Anchor) => boolean {
-  const blue = within(labOf(ROWS[dominant].palettes[0][1]), BLUE, 12);
+  const own = labOf(ROWS[dominant].palettes[0][1]);
+  const blue = within(own, BLUE, 12);
+  const sea = ROWS[dominant].sea !== undefined;
+  const fits = (centre: Lab) =>
+    !within(centre, GREEN, 8) &&
+    (blue || !within(centre, BLUE, 12)) &&
+    (!sea || (centre[0] - own[0]) * (centre[0] - own[0]) <= 25 * 25);
   return (minor) =>
     (ROWS[minor].banded === true) === (ROWS[dominant].banded === true) &&
     ROWS[minor].sea === undefined &&
-    ROWS[minor].palettes.every(
-      ([, centre]) => !within(labOf(centre), GREEN, 8) && (blue || !within(labOf(centre), BLUE, 12)),
-    );
+    ROWS[minor].palettes.every(([, centre]) => fits(labOf(centre)));
 }
 
 /** The recipe a seed gives as `anchor`, turned by its system's hue. */
