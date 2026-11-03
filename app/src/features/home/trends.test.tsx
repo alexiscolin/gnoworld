@@ -181,6 +181,13 @@ describe("useTrends", () => {
       await Promise.resolve();
     });
     return {
+      // The same home drawn again, wanting the trends or not: /net/onyx and /net/gnoland are one route's page.
+      want: async (now: boolean) => {
+        await act(async () => {
+          root.render(<Home wanted={now} />);
+          await Promise.resolve();
+        });
+      },
       leave: () => {
         act(() => {
           root.unmount();
@@ -217,6 +224,23 @@ describe("useTrends", () => {
     const home = await opened(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(shown.at(-1)).toEqual([]);
+    home.leave();
+  });
+
+  // F4564 (7t's lot 2 review): the home stays mounted from /net/onyx to /net/gnoland, the universe the server reads and one it does not.
+  it("gives no trend once it no longer wants them, and asks again when it wants them anew", async () => {
+    const fetch = answer(JSON.stringify(ANSWER));
+    vi.stubGlobal("fetch", fetch);
+    const home = await opened(true);
+    await vi.waitFor(() => {
+      expect(shown.at(-1)).toEqual(ANSWER.items);
+    });
+    await home.want(false);
+    expect(shown.at(-1)).toEqual([]);
+    await home.want(true);
+    await vi.waitFor(() => {
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
     home.leave();
   });
 
