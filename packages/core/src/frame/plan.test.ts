@@ -210,6 +210,17 @@ describe("a system's Plan", () => {
     },
   );
 
+  // The system's card at the top left (7v, the GUI board's option B): no world of a Plan, nor its name's room, in its room, a fourth across
+  // and a fifth down.
+  it.each(Object.keys(SETS) as SetName[])("keeps the system's card's room clear of %s's worlds and names", (name) => {
+    for (const system of bodied(name))
+      for (const { look, worlds } of seenOn(system))
+        for (const { seen } of worlds)
+          expect(
+            seen.x - Math.max(seen.radius, NAME.half) < 0.25 * look.width && seen.y - seen.radius < 0.2 * look.height,
+          ).toBe(false);
+  });
+
   // The mock-up's worlds stand 22 to 92 pixels in radius at 1,728 by 1,080: the most used of a Plan of six or fewer are 30 or more.
   it("draws the largest world of a Plan of six or fewer 30 pixels in radius or more, on Onyx", () => {
     const small = bodied("the recorded Onyx file").filter(
