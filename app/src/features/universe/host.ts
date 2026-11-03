@@ -12,6 +12,7 @@ import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
+import { Heard } from "./heard.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
@@ -40,7 +41,7 @@ const nothing = () => undefined;
 const COLOUR = /^#[0-9a-f]{6}$/;
 
 export class SceneHost {
-  readonly #listeners = new Set<() => void>();
+  readonly #heard = new Heard();
   #status: SceneStatus = "off";
   #canvas: HTMLCanvasElement | undefined;
   #scene: Scene | undefined;
@@ -56,12 +57,7 @@ export class SceneHost {
   #watching: AbortController | undefined;
   #decided = false;
 
-  readonly subscribe = (listener: () => void) => {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
-  };
+  readonly subscribe = this.#heard.subscribe;
 
   readonly status = () => this.#status;
 
@@ -83,17 +79,11 @@ export class SceneHost {
 
   /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and the page's body is not marked,
    * for a flight speaks as it starts, before the next page is taken. */
-  readonly flown = new Flown(() => {
-    this.#heard();
-  });
-
-  #heard(): void {
-    for (const listener of this.#listeners) listener();
-  }
+  readonly flown = new Flown(this.#heard.tell);
 
   #tell(): void {
     this.#markPage();
-    this.#heard();
+    this.#heard.tell();
   }
 
   #say(status: SceneStatus): void {
