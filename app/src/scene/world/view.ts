@@ -4,7 +4,7 @@
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
-import { projector, standIn } from "../lens.ts";
+import { broughtTo, projector, standIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
 import { MOTION } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
@@ -166,10 +166,7 @@ export class WorldView {
     this.#grow(body, this.#waking.signsAt(this.#reading, seconds, still));
     // The eye looks about slowly: the world turns with it, so it stays in its circle, lit from the same side of the screen.
     const { quaternion } = this.#device.camera;
-    body.group.position
-      .copy(this.#rest)
-      .multiplyScalar(this.#device.arrival?.approach ?? 1)
-      .applyQuaternion(quaternion);
+    broughtTo(body.group.position, this.#rest, this.#device.arrival).applyQuaternion(quaternion);
     body.group.quaternion.copy(quaternion);
     body.setSun(sideLight(standing.seed, this.#sun), quaternion);
     body.setTime(still ? 0 : seconds);

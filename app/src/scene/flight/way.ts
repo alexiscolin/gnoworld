@@ -22,8 +22,10 @@ CameraControls.install({
 
 /** How far a page's flight crosses, in world units. */
 const PAGE_WAY = 60;
-// How far a page's next body starts, as a share of where it stands at rest: a dot at first.
-const FAR_BODY = 30;
+// Where a page's next body starts, as a share of its distance at rest: five times as far, and one and a half to its left, so it grows and
+// crosses the frame on the way in, as frame 101's world does, the share left of both easing out as the square of the way left.
+const FAR_BODY = 5;
+const ASIDE = -1.5;
 const TURN = 2 * Math.PI;
 
 /** Where an eye stands and what it looks at, on the stage, and which way is up there. */
@@ -36,7 +38,7 @@ export interface Look {
 /** What a way writes: the eye's travel and look, how far the page's body stands, and the camera it goes along. */
 export interface Ride {
   readonly eye: { readonly travel: { x: number; y: number; z: number }; look: Point | undefined };
-  readonly arrival: { approach: number };
+  readonly arrival: { approach: number; aside: number };
   readonly camera: PerspectiveCamera;
 }
 
@@ -133,7 +135,9 @@ export class Way {
     travel.x = from.x + this.#forward.x * left;
     travel.y = from.y + this.#forward.y * left;
     travel.z = from.z + this.#forward.z * left;
-    ride.arrival.approach = this.#kind === "ahead" ? 1 + (FAR_BODY - 1) * (1 - by) : 1;
+    const coming = this.#kind === "ahead" ? (1 - by) ** 2 : 0;
+    ride.arrival.approach = 1 + (FAR_BODY - 1) * coming;
+    ride.arrival.aside = ASIDE * coming;
   }
 
   /** Writes `ride` at the way's end, exactly. */
@@ -144,6 +148,7 @@ export class Way {
     travel.z = this.#end.z;
     ride.eye.look = this.#lookAtEnd ? this.#look.fromArray(this.#to.target) : undefined;
     ride.arrival.approach = 1;
+    ride.arrival.aside = 0;
   }
 
   dispose(): void {

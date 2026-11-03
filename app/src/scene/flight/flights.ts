@@ -12,7 +12,7 @@ export type { CosmosSight, FlightDevice, FlightGoal, FlightSaid, FlightScene } f
  * this chunk holds, lent to the dive. */
 export function flightsOn(scene: FlightScene, cosmos: { readonly sight: CosmosSight | undefined }): Flights {
   const motion = matchMedia(MOTION);
-  const arrival = { approach: 1 };
+  const arrival = { approach: 1, aside: 0 };
   scene.arrival = arrival;
   scene.veil = (stage) => new Dissolve(stage);
   const { renderer, stage, camera, eye, said, moved } = scene;

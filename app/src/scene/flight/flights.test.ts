@@ -97,7 +97,7 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
     stage,
     camera,
     eye,
-    arrival: { approach: 1 },
+    arrival: { approach: 1, aside: 0 },
     said: (flight) => {
       said.push(flight === undefined ? undefined : { ...flight });
     },
@@ -632,6 +632,35 @@ describe("a page's flight", () => {
     expect(way.normalize().dot(forward)).toBeCloseTo(1, 6);
     expect(scene.eye.look).toBeUndefined();
     expect(flying(scene.said)[0]?.target).toBe("GovDAO");
+  });
+
+  // Frame 101 at 42% of the bar: the world banded and large, coming in from the side; frame 36's Earth grown near the end. The body comes
+  // from five times its distance and from the left, so it grows and crosses the frame on the way, not in its last few percent; the page
+  // it left is gone in the first quarter (the design review's first high, F3706).
+  it("brings the next body from five times its distance and from its left, half grown half way, the page it left gone in a quarter", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    flown.ready();
+    const frames: { along: number; approach: number; aside: number; veil: number }[] = [];
+    run(flown, scene, {
+      seconds: 3.5,
+      each: () => {
+        const { approach, aside } = scene.device.arrival;
+        frames.push({ along: flown.stats().along, approach, aside, veil: flown.stats().veil });
+      },
+    });
+    const [first, last] = [frames[0], frames.at(-1)];
+    expect(first?.approach).toBeLessThanOrEqual(5);
+    expect(first?.aside).toBeLessThan(-1);
+    const half = frames.find(({ along }) => along >= 0.5);
+    expect(half?.approach).toBeLessThanOrEqual(2);
+    expect(half?.aside).toBeGreaterThan(first?.aside ?? 0);
+    const asides = frames.map(({ aside }) => aside);
+    expect(asides).toEqual([...asides].sort((a, b) => a - b));
+    expect(last).toMatchObject({ approach: 1, aside: 0 });
+    expect(frames.filter(({ along }) => along >= 0.25).every(({ veil }) => veil === 0)).toBe(true);
+    expect(frames.some(({ along, veil }) => along < 0.25 && veil > 0)).toBe(true);
   });
 
   it("waits in transit while the next body is not drawn, two seconds at most, then lands", () => {

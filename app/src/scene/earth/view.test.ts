@@ -1270,4 +1270,36 @@ describe("brought by a flight (7g)", () => {
     expect(view.stats()?.x).toBeCloseTo(PLACE.x, 0);
     expect(view.stats()?.y).toBeCloseTo(PLACE.y, 0);
   });
+
+  it("stands to the side of its place by a share of its distance while a flight brings it in from there", async () => {
+    const stage = new Stage();
+    const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
+    const renderer = {
+      capabilities: { getMaxAnisotropy: () => 16 },
+      initTexture: vi.fn(),
+      compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
+    };
+    const arrival = { approach: 1, aside: 0 };
+    const view = new EarthView({
+      renderer,
+      stage,
+      camera,
+      halved: () => false,
+      base: "/",
+      moved: vi.fn(),
+      stood: vi.fn(),
+      arrival,
+    });
+    view.resize(WIDTH, HEIGHT, 1);
+    view.show(PLACE, () => undefined);
+    await settled();
+    for (let at = 0; at < 3; at += 0.05) view.tick(at);
+    const [globe] = stage.children;
+    if (globe === undefined) throw new Error("no globe");
+    const place = globe.position.clone();
+    arrival.aside = -1.5;
+    view.tick(3);
+    expect(globe.position.x).toBeCloseTo(place.x - 1.5 * place.length(), 6);
+    expect(globe.position.z).toBeCloseTo(place.z, 6);
+  });
 });

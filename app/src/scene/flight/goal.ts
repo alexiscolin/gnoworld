@@ -51,8 +51,8 @@ export interface FlightDevice {
   readonly camera: PerspectiveCamera;
   /** The scene's eye: a flight writes its way and its look. */
   readonly eye: Pick<Eye, "travel" | "look">;
-  /** How far the page's body stands, as a share of its place at rest. */
-  readonly arrival: { approach: number };
+  /** How far the page's body stands, as a share of its place at rest, and how far to its side, as a share of its distance. */
+  readonly arrival: { approach: number; aside: number };
   readonly said: (flight: FlightSaid | undefined) => void;
   /** A flight, or its veil, needs the loop's full rate, or no more. */
   readonly busy: (flying: boolean) => void;

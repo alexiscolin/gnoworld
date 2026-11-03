@@ -544,4 +544,38 @@ describe("brought by a flight (7g)", () => {
     expect(far.length()).toBeLessThan(camera.far);
     expect(far.clone().normalize().dot(near.clone().normalize())).toBeCloseTo(1, 9);
   });
+
+  it("stands to the side of its place by a share of its distance while a flight brings it in from there", async () => {
+    const stage = new Stage();
+    const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
+    const renderer = {
+      capabilities: { getMaxAnisotropy: () => 16 },
+      initTexture: vi.fn(),
+      compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
+    };
+    const arrival = { approach: 1, aside: 0 };
+    const view = new WorldView({
+      renderer,
+      stage,
+      camera,
+      halved: () => false,
+      base: "/",
+      moved: vi.fn(),
+      stood: vi.fn(),
+      arrival,
+    });
+    view.resize(WIDTH, HEIGHT, 1);
+    view.show({ circle: PLACE, id: ID }, () => undefined);
+    view.read(reading());
+    await settled();
+    view.tick(0);
+    const world = stage.children.find((child) => child.children.length > 0);
+    if (world === undefined) throw new Error("no world");
+    const place = world.position.clone();
+    arrival.aside = -1.5;
+    view.tick(0);
+    expect(world.position.x).toBeCloseTo(place.x - 1.5 * place.length(), 6);
+    expect(world.position.y).toBeCloseTo(place.y, 6);
+    expect(world.position.z).toBeCloseTo(place.z, 6);
+  });
 });

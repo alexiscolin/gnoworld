@@ -14,8 +14,9 @@ import { Way } from "./way.ts";
 const WAIT = 2;
 const LONGEST_FRAME = 0.25;
 const SAID_EVERY = 0.1;
-// A page's flight lays the frame it leaves over the next, gone by this far along, and grown by this much as the eye goes through it.
-const VEIL_UNTIL = 0.45;
+// A page's flight lays the frame it leaves over the next, gone by this far along, and grown by this much as the eye goes through it: a
+// quarter, so the next body coming in is seen whole (the design review, F3706).
+const VEIL_UNTIL = 0.25;
 const VEIL_ZOOM = 0.6;
 
 export class Flights {

@@ -32,8 +32,9 @@ export interface EarthDevice {
   readonly moved: () => void;
   /** The globe came on the stage. */
   readonly stood: () => void;
-  /** How far a page's body stands as a flight brings it, a share of where it stands at rest: 1 once it landed (7g). */
-  readonly arrival?: { readonly approach: number };
+  /** How far a page's body stands as a flight brings it, a share of where it stands at rest, and how far to its side, a share of its
+   * distance, negative to the left: 1 and 0 once it landed (7g). */
+  readonly arrival?: { readonly approach: number; readonly aside?: number };
   /** The scene's eye as a flight leaves it: what it looks at, none as at rest; and the cosmos as a flight reads it, which the view at
    * rest's eye hands it (7g). */
   readonly eye?: { readonly look: Point | undefined; sight?: CosmosSight | undefined };
