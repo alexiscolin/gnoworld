@@ -12,6 +12,8 @@ import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
+import { Heard } from "./heard.ts";
+import { restsAt, tellScene } from "./views.ts";
 import { WorldsFeed, type CosmosPage } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
@@ -40,7 +42,7 @@ const nothing = () => undefined;
 const COLOUR = /^#[0-9a-f]{6}$/;
 
 export class SceneHost {
-  readonly #listeners = new Set<() => void>();
+  readonly #heard = new Heard();
   #status: SceneStatus = "off";
   #canvas: HTMLCanvasElement | undefined;
   #scene: Scene | undefined;
@@ -56,13 +58,10 @@ export class SceneHost {
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
   #decided = false;
+  // What stops telling the scene the reader's view once it goes (7v).
+  #unsee = (): void => undefined;
 
-  readonly subscribe = (listener: () => void) => {
-    this.#listeners.add(listener);
-    return () => {
-      this.#listeners.delete(listener);
-    };
-  };
+  readonly subscribe = this.#heard.subscribe;
 
   readonly status = () => this.#status;
 
@@ -84,17 +83,11 @@ export class SceneHost {
 
   /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and the page's body is not marked,
    * for a flight speaks as it starts, before the next page is taken. */
-  readonly flown = new Flown(() => {
-    this.#heard();
-  });
-
-  #heard(): void {
-    for (const listener of this.#listeners) listener();
-  }
+  readonly flown = new Flown(this.#heard.tell);
 
   #tell(): void {
     this.#markPage();
-    this.#heard();
+    this.#heard.tell();
   }
 
   #say(status: SceneStatus): void {
@@ -185,6 +178,7 @@ export class SceneHost {
       this.feed.leave();
       this.#stopWatching();
       tintPage(undefined);
+      this.#unsee();
       this.#scene?.dispose();
       this.#canvas = undefined;
     };
@@ -231,6 +225,7 @@ export class SceneHost {
               this.#say(lost ? "failed" : "on");
             },
             onFlight: this.flown.said,
+            onSystem: restsAt(this.feed.worldsIn),
           }),
         );
       })
@@ -240,9 +235,17 @@ export class SceneHost {
       .finally(settled);
   }
 
+  /** A step back from the system the eye rests at, to the cosmos's view at rest (7v): the crumb's first step, and Escape. */
+  readonly back = (): void => {
+    this.#scene?.arrive(undefined);
+  };
+
   #started(scene: Scene): void {
     this.#scene = scene;
     scene.cover(!this.#shown);
+    // A scene started again (a failed load, then View in space) is told in place of the last: one telling a host.
+    this.#unsee();
+    this.#unsee = tellScene(scene);
     showJourneys(scene);
     this.#say("on");
     this.#syncEarth();

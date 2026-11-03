@@ -12,16 +12,13 @@ import { Probe } from "./probe.ts";
 import { rendered, type Scene, type SceneOptions, type SceneStats } from "./sceneStats.ts";
 import { createRenderer } from "./renderer.ts";
 import { Space } from "./space.ts";
-import { Viewport } from "./viewport.ts";
+import { LENS, Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import { MOTION, watchScene } from "./watch.ts";
 
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
-// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
-// barrel into this chunk; the lens test ties the two.
-const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
 // The sky beside the worlds: the warmth comes from the suns, with black between them (frame 4).
 const VEILED = 0.3;
 
@@ -50,6 +47,10 @@ class LiveScene implements Scene {
   #seconds = 0;
   #refused = false;
   readonly fly: Scene["fly"];
+  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+   * the system's arrival stands (7d3); and how what the eye looks at is seen (7v). */
+  readonly arrive: Scene["arrive"];
+  readonly see: Scene["see"];
   readonly portraits: Scene["portraits"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
@@ -90,6 +91,7 @@ class LiveScene implements Scene {
     });
     this.ground = this.#earth;
     this.fly = this.#parts.fly;
+    ({ arrive: this.arrive, see: this.see } = this.#parts.viewsOf(this.moveTo, options.onSystem));
     this.portraits = this.#parts.portraits;
     this.#viewport = new Viewport({
       canvas,
@@ -174,8 +176,9 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  readonly moveTo = (to: Point): void => {
+  readonly moveTo = (to: Point, lens?: number): void => {
     this.#eye.moveTo(to);
+    this.#viewport.view(lens);
     this.#loop.redraw();
   };
 
@@ -196,19 +199,13 @@ class LiveScene implements Scene {
     if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
     this.#parts.cosmos.show(worlds, written, signals);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
-    this.#viewport.lens(worlds === undefined ? LENS.fieldOfView : LENS.home);
+    this.#viewport.cosmos(worlds !== undefined);
     this.#loop.redraw();
   }
 
   keepClear(box: ClearBox | undefined): void {
     this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
-  }
-
-  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
-   * the system's arrival stands (7d3). */
-  arrive(id: string | undefined): void {
-    this.#parts.cosmos.arrive(id, this.moveTo);
   }
 
   dispose(): void {

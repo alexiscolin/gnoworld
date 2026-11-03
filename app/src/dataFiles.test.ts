@@ -12,8 +12,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EarthRooms } from "@gnoworld/schemas";
+import { EarthOrbit, EarthRooms } from "@gnoworld/schemas";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import orbiting from "../data/earthOrbit.json" with { type: "json" };
 import places from "../data/earthRooms.json" with { type: "json" };
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
@@ -90,7 +91,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the eleven files into their schemas' shapes", () => {
+  it("reads the twelve files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -99,6 +100,7 @@ describe("loadData", () => {
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
         "bubbles",
+        "earthOrbit",
         "earthRooms",
         "ecosystems",
         "events",
@@ -221,6 +223,37 @@ describe("loadData", () => {
     } finally {
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// 7v: what turns round the Earth, the projects the team adds by hand (Alexis, 2026-11-03), checked when the app builds.
+describe("earthOrbit.json", () => {
+  it("stops the build on a project's address that is not https, and names the file", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthOrbit.json", [{ name: "gnosh.ai", url: "http://gnosh.ai" }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthOrbit\.json: \[0\]\.url/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // A project's slug names the world whose page it links to: one no hub of the file holds would link to no page.
+  it("stops the build on a project whose slug names no hub", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthOrbit.json", [{ name: "gnosh.ai", url: "https://gnosh.ai", slug: "mars" }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthOrbit\.json: \[0\]\.slug: no hub of hubs\.json is named "mars"/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("ships gnosh.ai, Alexis's own link, among the projects", () => {
+    expect(orbiting).toContainEqual({ name: "gnosh.ai", url: "https://gnosh.ai" });
+    expect(() => EarthOrbit.parse(orbiting)).not.toThrow();
   });
 });
 

@@ -3,6 +3,10 @@
 import { pixelRatioFor, type Tier } from "@gnoworld/core";
 import type { PerspectiveCamera, WebGLRenderer } from "three";
 
+// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
+// barrel into the scene's chunk; the lens test ties the two.
+export const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
+
 interface Sized {
   resize(width: number, height: number, ratio: number): void;
 }
@@ -24,6 +28,8 @@ export interface ViewportParts {
 export class Viewport {
   readonly #parts: ViewportParts;
   #stale = false;
+  #cosmos = false;
+  #viewed: number | undefined;
   #width = 0;
   #height = 0;
 
@@ -54,7 +60,21 @@ export class Viewport {
     parts.resize(width, height, renderer.getPixelRatio());
   }
 
-  /** Looks through `degrees` up and down, the home's lens or the scene's: each part sizes itself for it on the frame that draws it. */
+  /** Looks at the cosmos through the lens a view of it asked, the home's where none, or, with no cosmos, through the scene's own. */
+  cosmos(shown: boolean): void {
+    this.#cosmos = shown;
+    if (!shown) this.#viewed = undefined;
+    this.lens(shown ? (this.#viewed ?? LENS.home) : LENS.fieldOfView);
+  }
+
+  /** The eye came to a view of the cosmos seen through `degrees`, a Plan's own (7v's design review, F4470), or the home's with none: kept
+   * while the cosmos shows, as its words come again each minute. */
+  view(degrees: number | undefined): void {
+    this.#viewed = degrees;
+    if (this.#cosmos) this.lens(degrees ?? LENS.home);
+  }
+
+  /** Looks through `degrees` up and down: each part sizes itself for it on the frame that draws it. */
   lens(degrees: number): void {
     if (this.#parts.camera.fov === degrees) return;
     this.#parts.camera.fov = degrees;

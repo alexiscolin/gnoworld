@@ -6,6 +6,7 @@ export { ActivityRooms } from "./activity.ts";
 export { Address, ADDRESS_PROBLEMS, shortAddress, toAddress, type AddressProblem } from "./address.ts";
 export {
   BubbleRules,
+  EarthOrbit,
   EarthRooms,
   Ecosystems,
   EMBED_PREFIXES,
@@ -15,6 +16,7 @@ export {
   Hubs,
   News,
   Quests,
+  RealmPath,
   Stations,
   Universes,
 } from "./data.ts";

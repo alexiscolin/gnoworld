@@ -193,6 +193,10 @@ export class WorldsFeed {
     );
   }
 
+  /** How many worlds of the file a namespace holds, each once, as its system draws them: a system's crumb counts them (7v). */
+  readonly worldsIn = (namespace: string): number =>
+    new Set(this.#worlds.filter((world) => world.namespace === namespace).map(({ id }) => id)).size;
+
   /** The page's scene has gone for good. */
   leave(): void {
     this.#leaving.abort();

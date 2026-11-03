@@ -55,6 +55,8 @@ export interface WorldHeld {
 export interface Orbiter {
   readonly id: string;
   readonly radius: number;
+  /** Its own size, its use's, where its system's room makes its radius another: a Plan draws it so (7v's design review, F4470). */
+  readonly own?: number;
   readonly orbit: number;
   readonly phase: number;
 }
@@ -62,6 +64,8 @@ export interface Orbiter {
 export interface StarSystem {
   readonly id: string;
   readonly place: SystemPlace;
+  /** Where its worlds' light comes from, when not from its own place: the Earth's projects are lit by the great star (7v). */
+  readonly litBy?: Point;
   readonly star: number;
   /** From red to white, 0 to 1. */
   readonly warmth: number;
@@ -117,6 +121,9 @@ function scattered(id: string, { orbit, phase }: Pick<Orbiter, "orbit" | "phase"
   };
 }
 
+// A world's radius, and its own size where its system's room makes the radius another: a Plan draws it so (7v's design review, F4470).
+const sized = (own: number, radius: number) => (own === radius ? { radius } : { radius, own });
+
 function latticeOf(
   worlds: readonly WorldHeld[],
   slots: number,
@@ -131,11 +138,8 @@ function latticeOf(
     const slot = places.get(id) ?? 0;
     const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
     const placed = { orbit, phase: start + slot * GOLDEN };
-    return {
-      id,
-      radius: Math.min(worldSize(use), most),
-      ...(crowd ? scattered(id, placed, { start, outer }) : placed),
-    };
+    const own = worldSize(use);
+    return { id, ...sized(own, Math.min(own, most)), ...(crowd ? scattered(id, placed, { start, outer }) : placed) };
   });
 }
 
@@ -152,7 +156,8 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
   return all.map((world, rank) => {
     if (rank >= CLEAR_BODIES) return world;
     const nearest = Math.min(...clear.filter((other) => other !== world).map((other) => gap(world, other)));
-    return { ...world, radius: Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM) };
+    const { own = world.radius, ...kept } = world;
+    return { ...kept, ...sized(own, Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM)) };
   });
 }
 

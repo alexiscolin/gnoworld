@@ -13,7 +13,8 @@ import { orbitTime, SWAY } from "../space/drift.ts";
 import { orbitPlace } from "./disc.ts";
 import { CELL } from "../cosmos/cosmos.ts";
 import { composed, coveredShare, evenRow } from "./composition.ts";
-import { deepOf, judgeOf } from "./deep.ts";
+import { deepOf, judgeOf, projectsOf } from "./deep.ts";
+import { earthSystemOf } from "./earthOrbit.ts";
 import { LENT } from "./lent.ts";
 import { rocksOf } from "./rocks.ts";
 import { DIVE, diveAt } from "./dive.ts";
@@ -1408,5 +1409,152 @@ describe("the close world", () => {
         });
       }
     }
+  });
+});
+
+// The chief, 2026-11-03 (7v): the home's view at rest is the Earth's dynamic view, the projects the team adds by hand small bodies by the
+// Earth. Turning, gnosh.ai made a row at like gaps with gnoslinger and agents in Onyx's view: each stands still, at the first twelfth of a
+// turn from its own place that the view's judge finds clear, and stands in that judge before the depth's worlds are chosen.
+describe("the Earth's projects at rest (7v)", () => {
+  const sets = {
+    "100 systems": files["100 systems"],
+    "1,000 systems": files["1,000 systems"],
+    "300 systems of four": files["300 systems of four"],
+    "crowds and singles": files["crowds and singles"],
+    "rich mix": richMix(),
+  } as const satisfies Record<string, readonly WorldHeld[]>;
+  const rows = Object.keys(sets) as (keyof typeof sets)[];
+  const projects = Array.from({ length: 12 }, (_, at) => ({ name: `p${String(at)}` }));
+  const STEP = (2 * Math.PI) / 12;
+  // The small Earth's ring as the globe draws it (app/src/scene/earth/orbit.ts): 1.9 Earth radii across, leant, rolled, its Moon 0.27 of
+  // the Earth across, resting at the ring's left end.
+  const RING = { reach: 1.9, tilt: -0.618, roll: -0.1, moon: 0.27, rest: 3.736 };
+  // The view's own marks on a screen through `see`: the Earth, the close world held still, the postcards' bodies at their share.
+  const ownOf = (
+    { systems, view }: { systems: readonly StarSystem[]; view: RestView },
+    see: ReturnType<typeof cameraOf>,
+    seconds: number,
+  ) => {
+    const close = closeOf(systems, view);
+    const closeSystem = systems[view.close?.system ?? -1];
+    return [
+      see(EARTH_PLACE, EARTH_RADIUS),
+      ...view.postcards.flatMap((index) => {
+        const system = systems[index];
+        const card = system === undefined ? undefined : postcardOf(system, view.eye);
+        return card === undefined
+          ? []
+          : card.worlds.map((world, at) =>
+              see(placeOf(card.system, world, seconds), world.radius * (card.depth[at] ?? NaN)),
+            );
+      }),
+      ...(close === undefined || closeSystem === undefined ? [] : [see(placeOf(closeSystem, close, 0), close.radius)]),
+    ];
+  };
+  const boxed = (spots: readonly Seen[]) =>
+    spots.map((spot) => ({
+      ...spot,
+      left: spot.x - spot.radius,
+      right: spot.x + spot.radius,
+      top: spot.y - spot.radius,
+      bottom: spot.y + spot.radius,
+    }));
+
+  it.each(rows)(
+    "stands each still, at its own orbit and size, a twelfth of a turn from its own a step, with %s",
+    (name) => {
+      const { systems, view } = made(sets[name]);
+      const own = earthSystemOf(projects);
+      const placed = projectsOf(judgeOf(systems, view, LENT), own, RING);
+      expect(placed.spin).toBe(0);
+      expect(placed.place).toEqual(EARTH_PLACE);
+      expect(placed.worlds.length).toBeGreaterThan(0);
+      const ids = new Set(placed.worlds.map(({ id }) => id));
+      expect(placed.worlds.map(({ id }) => id)).toEqual(own.worlds.map(({ id }) => id).filter((id) => ids.has(id)));
+      for (const world of placed.worlds) {
+        const mine = own.worlds.find(({ id }) => id === world.id);
+        expect({ orbit: world.orbit, radius: world.radius }).toEqual({ orbit: mine?.orbit, radius: mine?.radius });
+        const steps = (world.phase - (mine?.phase ?? NaN)) / STEP;
+        expect(steps).toBeCloseTo(Math.round(steps), 9);
+        expect(Math.round(steps)).toBeGreaterThanOrEqual(0);
+        expect(Math.round(steps)).toBeLessThan(12);
+      }
+    },
+  );
+
+  it.each(rows)(
+    "crowds, piles and lines up nothing the view did not, at rest and on every frame of the way down, with %s",
+    (name) => {
+      const { systems, view } = made(sets[name]);
+      const placed = projectsOf(judgeOf(systems, view, LENT), earthSystemOf(projects), RING);
+      const shown = (spots: readonly Seen[]) => spots.filter(({ radius, depth }) => depth > 0 && radius >= BODY_PIXELS);
+      const see = cameraOf(view, REST_SCREENS[0]);
+      const own = ownOf({ systems, view }, see, 0);
+      const added = placed.worlds.map((world) => see(placeOf(placed, world, 0), world.radius));
+      const frame = { deep: view.close !== undefined, lights: [see({ x: 0, y: 0, z: 0 })], ...REST_SCREENS[0] };
+      const [earth, ...rest] = boxed(own);
+      if (earth === undefined) throw new Error("no Earth");
+      if (composed(rest, earth, frame)) expect(composed([...rest, ...boxed(added)], earth, frame)).toBe(true);
+      const out = { x: NaN, y: NaN, z: NaN };
+      for (let step = 1; step < DIVE.seconds * 60; step += 1) {
+        diveAt(view.eye, step / (DIVE.seconds * 60), out);
+        const down = cameraOf({ ...view, eye: { ...out } }, REST_SCREENS[0]);
+        const mine = shown(ownOf({ systems, view }, down, orbitTime(step / 60)));
+        const theirs = shown(placed.worlds.map((world) => down(placeOf(placed, world, 0), world.radius)));
+        if (evenRow(boxed([...mine, ...theirs]))) expect(evenRow(boxed(mine))).toBe(true);
+      }
+    },
+  );
+
+  it("stands each in the judge as it is placed, so the depth's worlds and the rocks keep off it", () => {
+    const { systems, view } = made(sets["rich mix"]);
+    const judge = judgeOf(systems, view, LENT);
+    const [cards, spots] = [judge.cards.length, judge.spots.length];
+    const placed = projectsOf(judge, earthSystemOf(projects), RING);
+    expect(judge.cards.slice(cards).flatMap(({ worlds }) => worlds)).toEqual(placed.worlds);
+    expect(judge.cards.slice(cards).every(({ system }) => system.id === "earth" && system.spin === 0)).toBe(true);
+    expect(judge.spots.length).toBe(spots + placed.worlds.length);
+  });
+
+  // 7v's design review (F4471): at home gnosh.ai stood over the small Earth's Moon where it rests: each stands off it on every screen, a
+  // third of the Moon's width between them. The globe turns with the camera, so the ring is the screen's.
+  it.each(rows)("keeps each off the small Earth's Moon where it rests, on every screen, with %s", (name) => {
+    const { systems, view } = made(sets[name]);
+    const placed = projectsOf(judgeOf(systems, view, LENT), earthSystemOf(projects), RING);
+    for (const screen of REST_SCREENS) {
+      const see = cameraOf(view, screen);
+      const earth = see(EARTH_PLACE, EARTH_RADIUS);
+      // The ring's point in the globe's frame turned by three's ZXY Euler, no turn about y: the lean about x, then the roll about z.
+      const [x, z] = [RING.reach * Math.cos(RING.rest), RING.reach * Math.sin(RING.rest)];
+      const across = Math.cos(RING.roll) * x + Math.sin(RING.roll) * Math.sin(RING.tilt) * z;
+      const up = Math.sin(RING.roll) * x - Math.cos(RING.roll) * Math.sin(RING.tilt) * z;
+      const moon = {
+        x: earth.x + across * earth.radius,
+        y: earth.y - up * earth.radius,
+        radius: RING.moon * earth.radius,
+      };
+      for (const world of placed.worlds) {
+        const spot = see(placeOf(placed, world, 0), world.radius);
+        const gap = Math.hypot(spot.x - moon.x, spot.y - moon.y) - moon.radius - spot.radius;
+        expect(gap).toBeGreaterThanOrEqual((2 * moon.radius) / 3);
+      }
+    }
+  });
+
+  // The first clear place, not any (7v's review): gnosh.ai alone stands clear at its own in these two views, so it is kept there.
+  it.each(["1,000 systems", "300 systems of four"] as const)(
+    "keeps a project at its own place where it stands clear, with %s",
+    (name) => {
+      const { systems, view } = made(sets[name]);
+      const own = earthSystemOf([{ name: "gnosh.ai" }]);
+      expect(projectsOf(judgeOf(systems, view, LENT), own, RING).worlds).toEqual(own.worlds);
+    },
+  );
+
+  it("stands none where no screen is composed, and none of a file of none", () => {
+    const { systems, view } = made(sets["rich mix"]);
+    const judge = judgeOf(systems, view, LENT);
+    expect(projectsOf({ ...judge, looks: [] }, earthSystemOf(projects), RING).worlds).toEqual([]);
+    expect(projectsOf(judge, earthSystemOf([]), RING).worlds).toEqual([]);
   });
 });

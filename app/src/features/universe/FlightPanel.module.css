@@ -2,13 +2,9 @@
    it, the dock open or not (frame 36): its phase in small capitals, four instruments in columns, the target's widest, and a thin mint bar.
    Over the canvas and the labels, taking no pointer: a click lands the flight wherever it falls. */
 @layer components {
+  /* Under the header as Universe.module.css's `.underHeader` stands it. */
   .panel {
-    position: fixed;
-    /* raw: under the header's 96 px (shellHeader.module.css), a step down: frame 18's 103 px */
-    inset-block-start: calc(96px + var(--space-2xs));
     inset-inline-start: 50%;
-    /* raw: over the labels' layer (0) and the canvas (-1), as the header is */
-    z-index: 1;
     /* raw: frame 18's 558 px, its columns' 511 and two steps; a phone's width less its gutters */
     inline-size: min(calc(100vi - 2 * var(--space-s)), calc(511px + 2 * var(--space-m)));
     padding: var(--space-s) var(--space-m);

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Drawn, EARTH_RADIUS } from "@gnoworld/core";
+import { Drawn, EARTH_RADIUS, plannedOf } from "@gnoworld/core";
 import { Group, InstancedBufferGeometry, Mesh, Vector3 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CosmosLabels, type Seen } from "./labelled.ts";
@@ -118,5 +118,143 @@ describe("the home's rocks through the labels' way in", () => {
     }).not.toThrow();
     part.dispose();
     orphan.dispose();
+  });
+});
+
+// A system's Plan (7v) comes through the labels' chunk too: its ellipses and names in a chunk of their own, asked once a look holds one, its
+// words from the file (a world's page is its first realm's view), an amber dot where people are; no pill label while it shows.
+describe("a system's Plan through the labels' way in", () => {
+  const system = {
+    id: "gnoswap",
+    place: { x: 0, y: 0, z: 0 },
+    star: 2,
+    warmth: 0.5,
+    spin: 0,
+    tilt: 0,
+    node: 0,
+    belt: false,
+    worlds: [],
+  };
+  const worlds = [
+    { id: "gnoswap/router", radius: 0.3, orbit: 1, phase: 0 },
+    { id: "gnoswap/pool", radius: 0.3, orbit: 2, phase: 2 },
+  ];
+  const list = [
+    { id: "gnoswap/router", namespace: "gnoswap", realms: [{ callers: 3, path: "gno.land/r/gnoswap/v1/router" }] },
+    { id: "gnoswap/pool", namespace: "gnoswap", realms: [{ callers: 1 }] },
+  ];
+  const signals = {
+    present: new Map([["gnoswap/pool", { here: 2, perHour: 1, rise: null }]]),
+    names: new Map<string, string>(),
+    visited: () => false,
+    now: 0,
+  };
+  const planned = () => {
+    const drawn = new Drawn();
+    drawn.plan = plannedOf(
+      { system, worlds },
+      {
+        names: new Map([
+          ["gnoswap/router", "router"],
+          ["gnoswap/pool", "pool"],
+        ]),
+        links: new Map(),
+      },
+    );
+    return drawn;
+  };
+  const names = () => [...document.querySelectorAll<HTMLAnchorElement>("[data-plan] a")];
+
+  it("draws the Plan a look holds once its chunk came, its worlds named from the file, who is here marked, no pill label", async () => {
+    const group = new Group();
+    const part = new CosmosLabels(document, {
+      projector: { ...projector, group },
+      earth: () => new Vector3(0, 0, -20),
+      earthRadius: EARTH_RADIUS,
+    });
+    part.list(list, signals);
+    part.look([system], planned(), []);
+    await vi.dynamicImportSettled();
+    part.tick({ x: 0, y: 0, z: 0 }, true);
+    expect(names().map(({ textContent }) => textContent)).toEqual(["router", "pool"]);
+    expect(names()[0]?.getAttribute("href")).toBe("/r/gnoswap/v1/router");
+    expect(names()[1]?.getAttribute("href")).toBeNull();
+    expect(names()[1]?.querySelector(".dot[data-tone='warm']")).not.toBeNull();
+    expect(shown()).toHaveLength(0);
+    part.look([system], new Drawn(), []);
+    expect(names()).toEqual([]);
+    part.dispose();
+    expect(document.querySelector("[data-plan]")).toBeNull();
+  });
+
+  // The file's realm paths are the chain's data: one that is no realm's path makes no link, and hands the page nothing.
+  it("links a world to its first realm's view only where the file's path is a realm's, and marks none here at nobody", async () => {
+    const part = new CosmosLabels(document, {
+      projector: { ...projector, group: new Group() },
+      earth: () => undefined,
+      earthRadius: EARTH_RADIUS,
+    });
+    const paths = [
+      "gno.land/p/demo/avl",
+      "gno.land/r/../evil",
+      "gno.land/r/a b",
+      "gno.land/r/a?b",
+      "gno.land/r//x",
+      "",
+      "x/r/y",
+    ];
+    const hostile = paths.map((path, at) => ({
+      id: `gnoswap/w${String(at)}`,
+      namespace: "gnoswap",
+      realms: [{ callers: 0, path }],
+    }));
+    part.list(hostile, { ...signals, present: new Map([["gnoswap/w0", { here: 0, perHour: 0, rise: null }]]) });
+    const drawn = new Drawn();
+    drawn.plan = plannedOf(
+      { system, worlds: hostile.map(({ id }, at) => ({ id, radius: 0.2, orbit: 1 + at, phase: at })) },
+      { names: new Map(hostile.map(({ id }) => [id, id])), links: new Map() },
+    );
+    part.look([system], drawn, []);
+    await vi.dynamicImportSettled();
+    expect(names()).toHaveLength(paths.length);
+    expect(names().every((name) => !name.hasAttribute("href"))).toBe(true);
+    expect(names()[0]?.querySelector(".dot")).toBeNull();
+    part.dispose();
+  });
+
+  // 7v's review (F4454): leaving the cosmos (a realm's page, the Plan's own second click) takes its names away with the labels.
+  it("takes the Plan's names away when the cosmos goes", async () => {
+    const part = new CosmosLabels(document, {
+      projector: { ...projector, group: new Group() },
+      earth: () => undefined,
+      earthRadius: EARTH_RADIUS,
+    });
+    part.list(list, signals);
+    part.look([system], planned(), []);
+    await vi.dynamicImportSettled();
+    part.tick({ x: 0, y: 0, z: 0 }, true);
+    expect(names()).toHaveLength(2);
+    part.list(undefined, undefined);
+    expect(names()).toEqual([]);
+    expect(document.querySelector<HTMLElement>("[data-plan]")?.hidden).toBe(true);
+    part.dispose();
+  });
+
+  it("hands the page a world's address at a second click, as an event its router reads", async () => {
+    const part = new CosmosLabels(document, {
+      projector: { ...projector, group: new Group() },
+      earth: () => undefined,
+      earthRadius: EARTH_RADIUS,
+    });
+    part.list(list, signals);
+    part.look([system], planned(), []);
+    await vi.dynamicImportSettled();
+    const opened = vi.fn<(event: Event) => void>();
+    window.addEventListener("gnoworld:open", opened);
+    names()[0]?.click();
+    names()[0]?.click();
+    expect((opened.mock.lastCall?.[0] as CustomEvent<string> | undefined)?.detail).toBe("/r/gnoswap/v1/router");
+    window.removeEventListener("gnoworld:open", opened);
+    part.dispose();
   });
 });

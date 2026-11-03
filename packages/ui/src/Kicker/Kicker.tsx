@@ -11,7 +11,7 @@ export interface KickerProps {
 export function Kicker({ children, dot, vertical }: KickerProps) {
   return (
     <p className={["label", styles["kicker"]].join(" ")} data-orientation={vertical === true ? "vertical" : undefined}>
-      {dot === undefined ? null : <span className={styles["dot"]} data-tone={dot} aria-hidden="true" />}
+      {dot === undefined ? null : <span className="dot" data-tone={dot} aria-hidden="true" />}
       {children}
     </p>
   );

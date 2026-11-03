@@ -14,7 +14,7 @@ import {
   Worlds,
 } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useNewcomer, useSpace, useWorldsCount } from "../features/universe/index.ts";
+import { useNewcomer, useResting, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
 
@@ -47,6 +47,9 @@ export default function Home() {
     places: { earth: universe.earth.path, worlds: universe.worlds },
   };
   useSpace(universe.isDefault ? "cosmos" : undefined, universe.isDefault ? rail : undefined);
+  // A system the eye rests at takes the screen, its crumb at the top left (7v): the hero and the list of worlds there give way, and come back
+  // at rest.
+  const resting = useResting();
   // The first visit's one filled call is the Earth's "Start here", which only the default universe's cosmos labels (ADR-0003 §3).
   const newcomer = useNewcomer();
   // The chain's trends lead the ticker (7t), the default universe's alone: the server's worlds job reads no other.
@@ -57,15 +60,19 @@ export default function Home() {
   );
   return (
     <>
-      <Hero
-        universe={universe}
-        worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
-        coming={drawn === undefined}
-        newcomer={universe.isDefault && newcomer}
-      />
-      <Worlds>
-        <PlaceLinks places={universe.worlds} />
-      </Worlds>
+      {resting === undefined ? (
+        <Hero
+          universe={universe}
+          worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
+          coming={drawn === undefined}
+          newcomer={universe.isDefault && newcomer}
+        />
+      ) : null}
+      {resting === undefined ? (
+        <Worlds>
+          <PlaceLinks places={universe.worlds} />
+        </Worlds>
+      ) : null}
       <Ticker items={ledByTrends(trends, tickerItems(news, events, now))} />
     </>
   );

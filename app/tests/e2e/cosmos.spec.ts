@@ -1070,11 +1070,11 @@ test("gives the release's page the whole cosmos, with the links read on the chai
   expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 18, gold: 0 });
 });
 
-// 7d3: a system's arrival, the eye come to it as 7g's flights will land it. Onyx's gnoswap, sixteen worlds and a far belt; a lone world
-// of no belt 156 units out; a view not chosen for these tests.
+// 7d3: a system's arrival, the eye come to it as 7g's flights will land it, now its dynamic view (7v). Onyx's gnoswap, sixteen worlds and a
+// far belt; a lone world of no belt 156 units out; a view not chosen for these tests.
 const ARRIVALS = ["gnoswap", "g1nufzhlvkr7ep9m9t52mk9jfymtn7ywclsaydf8"] as const;
-// The star a third of the way in or so (core's arrival.test.ts), the header's band, a tenth of the height.
-const [SIDE_LEAST, SIDE_MOST, HEADER] = [0.12, 0.3, 0.09];
+// The header's band, a tenth of the height; the star at the centre within a pixel or two of the camera's rounding.
+const [HEADER, CENTRED] = [0.09, 2];
 const recorded = () => JSON.parse(RECORDED) as { updated: string; worlds: Parameters<typeof heldOf>[0] };
 const arrivalAt = (id: string) => {
   const systems = systemsOf(heldOf(recorded().worlds));
@@ -1129,16 +1129,32 @@ async function cameTo(page: Page, id: string, { size = COMPUTER, still = true } 
       return Math.sqrt(dot3(off, off));
     }, SLOW)
     .toBeLessThan(0.5);
-  await standing(page, 0);
+  // Every world its arrival draws held and on the screen: a body waits for its maps, then its programs, and `standing` counts the held
+  // alone (F4408: under load it read two of gnoswap's three).
+  const worlds = arrivalAt(id).arrival.postcard.worlds.map(({ id: world }) => world);
+  await expect
+    .poll(async () => {
+      const shown = new Set((await cosmos(page)).screen.bodies.map(({ id: world }) => world));
+      return worlds.every((world) => shown.has(world));
+    }, SLOW)
+    .toBe(true);
 }
-// Each body whole under the header, off the star's heart; the star a third of the way in.
+// The star at the centre (7v, Alexis's "centrée sur son soleil"); the nearest body cut by the frame, its head under the header; each other
+// whole under it; none on the star's heart.
 async function framed(page: Page, id: string, size: { width: number; height: number }) {
   const { bodies } = (await cosmos(page)).screen;
   const offset = await starOf(page, id, size);
   const star = { x: size.width / 2 + offset.x, y: size.height / 2 + offset.y };
-  expect(Math.abs(offset.x)).toBeGreaterThanOrEqual(SIDE_LEAST * size.width);
-  expect(Math.abs(offset.x)).toBeLessThanOrEqual(SIDE_MOST * size.width);
-  for (const body of bodies) {
+  expect(Math.abs(offset.x)).toBeLessThanOrEqual(CENTRED);
+  expect(Math.abs(offset.y)).toBeLessThanOrEqual(CENTRED);
+  const [near, ...others] = [...bodies].sort((a, b) => a.away - b.away);
+  if (near !== undefined) {
+    const cut = near.x - near.radius < 0 || near.x + near.radius > size.width || near.y + near.radius > size.height;
+    expect(cut).toBe(true);
+    expect(near.y - near.radius).toBeGreaterThanOrEqual(HEADER * size.height);
+    expect(Math.hypot(near.x - star.x, near.y - star.y) - near.radius).toBeGreaterThanOrEqual(STAR_HEART);
+  }
+  for (const body of others) {
     expect(body.x - body.radius).toBeGreaterThanOrEqual(0);
     expect(body.x + body.radius).toBeLessThanOrEqual(size.width);
     expect(body.y - body.radius).toBeGreaterThanOrEqual(HEADER * size.height);
@@ -1150,7 +1166,7 @@ async function framed(page: Page, id: string, size: { width: number; height: num
 
 for (const id of ARRIVALS)
   for (const size of id === "gnoswap" ? [COMPUTER, WIDE] : [COMPUTER])
-    test(`comes to ${id.slice(0, 12)} as a postcard at ${String(size.width)} by ${String(size.height)}: its worlds whole, its star a third of the way in, none on its heart`, async ({
+    test(`comes to ${id.slice(0, 12)}'s dynamic view at ${String(size.width)} by ${String(size.height)}: its star at the centre, its nearest world cut by the frame, the others whole, none on its heart`, async ({
       page,
     }) => {
       await cameTo(page, id, { size });
@@ -1163,7 +1179,7 @@ for (const id of ARRIVALS)
       if (id === "gnoswap") expect((await cosmos(page)).rocks).toBeGreaterThan(0);
     });
 
-test("keeps the postcard whole as the eye sways, motion on", async ({ page }) => {
+test("keeps the dynamic view framed as the eye sways, motion on", async ({ page }) => {
   await cameTo(page, "gnoswap", { still: false });
   const { seconds } = await stats(page);
   for (let read = 0; read < 4; read += 1) {
@@ -1199,9 +1215,24 @@ async function haloAt(page: Page, now: number, { at, still = false }: { at: stri
           y: y + COMPUTER.height / 2,
         }));
   const [x, y] = [Math.round(spot.x), Math.round(spot.y)];
-  const [light] = await brightness(page, await page.locator("canvas").screenshot(), [
+  // Beside the star, where no body stands: a system's dynamic view stands its worlds round its centred star (7v), and the eye's sway
+  // would move one through a box on one side.
+  const bodies = (await cosmos(page)).screen.bodies;
+  const boxes = [
     [x + 60, y - 20, x + 110, y + 20],
-  ]);
+    [x - 110, y - 20, x - 60, y + 20],
+    [x - 25, y + 60, x + 25, y + 110],
+    [x - 25, y - 110, x + 25, y - 60],
+  ] as const;
+  const clear = boxes.find(([left, top, right, bottom]) =>
+    bodies.every(
+      (body) =>
+        Math.hypot(Math.max(left, Math.min(body.x, right)) - body.x, Math.max(top, Math.min(body.y, bottom)) - body.y) >
+        body.radius + 12,
+    ),
+  );
+  expect(clear, "a box beside the star that no body crosses").toBeDefined();
+  const [light] = await brightness(page, await page.locator("canvas").screenshot(), [[...(clear ?? boxes[0])]]);
   return light ?? NaN;
 }
 

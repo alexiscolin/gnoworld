@@ -13,6 +13,7 @@ import {
   driftAt,
   glideAt,
   EARTH_PLACE,
+  EARTH_RADIUS,
   evenRow,
   FIELD_OF_VIEW,
   GNO_LAND,
@@ -32,6 +33,9 @@ import {
   offLine,
   onScreen,
   planetSeed,
+  earthPlanOf,
+  earthSystemOf,
+  planOf,
   postcardOf,
   restView,
   ROCKS_FROM,
@@ -75,13 +79,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { Dissolve } from "../dissolve.ts";
 import { focalOf } from "../lens.ts";
-import { MOON_FAR } from "../earth/orbit.ts";
+import { MOON_FAR, ORBIT_RADIUS } from "../earth/orbit.ts";
 import { fromEyeOf, starAt } from "../planet/light.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
+import orbiting from "../../../data/earthOrbit.json" with { type: "json" };
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import { Cosmos } from "./cosmos.ts";
 import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
-import { angleAt, limbAt } from "./far.ts";
+import { angleAt, fadeAt, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
 const globes = vi.hoisted(() => ({ build: vi.fn() }));
@@ -146,7 +151,7 @@ function made(width = WIDTH, height = HEIGHT, eye?: { look: Point | undefined })
   const device = { renderer, stage, camera, halved: () => false, base: "/", moved, stood, veil };
   const cosmos = owner.add(new Cosmos(eye === undefined ? device : { ...device, eye }));
   cosmos.resize(height, 1);
-  return { stage, camera, owner, moved, renderer, cosmos, stood };
+  return { stage, camera, owner, moved, renderer, cosmos, stood, height };
 }
 
 // A look runs off the frame, and maps load behind it: every task due is run, none guessed at.
@@ -234,9 +239,11 @@ function debrisClear(
     const found = systems.find(({ place }) => star.distanceTo(new Vector3(place.x, place.y, place.z)) < 1e-4);
     if (found === undefined) throw new Error("a rock with no star");
     const { system, worlds: drawnWorlds } = drawnOf(found);
+    // A system held still (7v) stands one instant.
+    const steps = system.spin === 0 ? 1 : 16;
     for (const world of drawnWorlds)
-      for (let step = 0; step < 16; step += 1) {
-        const seconds = (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
+      for (let step = 0; step < steps; step += 1) {
+        const seconds = system.spin === 0 ? 0 : (step * 2 * Math.PI) / 16 / Math.abs(system.spin);
         expect(rock.distanceTo(turned(system, world, seconds)) - world.radius).toBeGreaterThanOrEqual(DEBRIS_CLEAR);
         judged += 1;
       }
@@ -272,12 +279,13 @@ describe("what it draws", () => {
   it("stands stars, worlds and bodies from the file, each a draw of its own however many", async () => {
     const scene = made();
     await shown(scene);
-    const { stars, dots: points, bodies } = scene.cosmos.stats();
+    const { stars, dots: points, bodies, list } = scene.cosmos.stats();
     expect(stars).toBe(31);
-    // The view at rest draws three systems' bodies at most (7d6): every other system is a distant star.
+    // The view at rest draws three systems' bodies at most (7d6): every other system is a distant star. The Earth's projects (7v) are
+    // bodies of no system of the file: its 90 worlds are its own bodies and its points.
     expect(bodies).toBeGreaterThan(0);
     expect(bodies).toBeLessThanOrEqual(BOUNDS.bodies);
-    expect(points).toBe(90 - bodies);
+    expect(points).toBe(90 - list.filter(({ id }) => !id.startsWith("~earth/")).length);
     expect(glows(scene)).toHaveLength(1);
     expect(dots(scene)).toHaveLength(1);
   });
@@ -306,7 +314,12 @@ describe("what it draws", () => {
   it("gives each body the look of its world and its size", async () => {
     const scene = made();
     await shown(scene);
-    const known = new Map(held(worlds(30)).flatMap(({ worlds: list }) => list.map((world) => [world.id, world])));
+    // The file's worlds, and the Earth's projects (7v).
+    const known = new Map(
+      [...held(worlds(30)), earthSystemOf(orbiting)].flatMap(({ worlds: list }) =>
+        list.map((world) => [world.id, world]),
+      ),
+    );
     const { list } = scene.cosmos.stats();
     // The view at rest draws its postcards' and its close world's bodies, a few (Alexis, 2026-11-02).
     expect(list.length).toBeGreaterThan(0);
@@ -426,7 +439,8 @@ describe("what it draws", () => {
     );
     const { list } = scene.cosmos.stats();
     expect(list.length).toBeGreaterThan(0);
-    for (const { id, at, star } of list) {
+    // The Earth's projects (7v) stand round the Earth, lit by the great star: their test is the Earth's, below.
+    for (const { id, at, star } of list.filter((body) => !body.id.startsWith("~earth/"))) {
       const found = known.get(id);
       if (found === undefined) throw new Error("no world");
       expect(at.distanceTo(star)).toBeCloseTo(found.world.orbit, 6);
@@ -542,8 +556,18 @@ describe("what it draws", () => {
         .map(({ phase }) => phase.toFixed(4)),
     );
     const sizes = new Set<string>();
-    // A postcard's specks that would stand on one of its bodies are left out (7d3): 91 of the crowd's 120 points stand.
-    expect(count).toBeGreaterThan(80);
+    // A postcard's specks that would stand on one of its bodies or on its path (7d3, F3594) are left out: every other of the crowd's worlds
+    // not a body is a point.
+    const systems = held(crowd);
+    const index = systems.findIndex(({ id }) => id === "c");
+    const view = restView(systems);
+    const system = systems[index];
+    if (system === undefined) throw new Error("no crowd");
+    const hidden = view.postcards.includes(index) ? postcardOf(system, view.eye).hidden.size : 0;
+    const bodies = scene.cosmos.stats().list.filter(({ id }) => id.startsWith("c/")).length;
+    expect(hidden).toBeGreaterThan(0);
+    expect(count).toBe(120 - bodies - hidden);
+    expect(count).toBeGreaterThan(10);
     for (let at = 0; at < count; at += 1) {
       if (!grains.has(orbit.getY(at).toFixed(4))) continue;
       expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
@@ -871,7 +895,13 @@ describe("the view at rest (7d6)", () => {
     await shown(scene, ONYX);
     const systems = held(ONYX);
     const view = restView(systems);
-    const drawn = new Set(scene.cosmos.stats().list.map(({ id }) => systemOf(systems, id)?.id));
+    // The Earth's projects (7v) stand by the Earth, of no system of the file.
+    const drawn = new Set(
+      scene.cosmos
+        .stats()
+        .list.filter(({ id }) => !id.startsWith("~earth/"))
+        .map(({ id }) => systemOf(systems, id)?.id),
+    );
     const chosen = [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map(
       (index) => systems[index]?.id,
     );
@@ -2906,13 +2936,17 @@ describe("a flight's star (7g)", () => {
 });
 
 describe("a system's arrival (7d3)", () => {
-  // Comes to system `id`: the scene's eye the cosmos asks for, given back to it as the scene's frame would.
-  const arrived = async (scene: ReturnType<typeof made>, id: string | undefined) => {
-    const go = vi.fn<(eye: Point) => void>();
-    scene.cosmos.arrive(id, go);
+  // Comes to system `id`, in its Plan if asked (7v): the scene's eye the cosmos asks for, given back to it as the scene's frame would,
+  // through the lens it asks, a Plan's own, the home's where none (7v's design review, F4470).
+  const arrived = async (scene: ReturnType<typeof made>, id: string | undefined, plan = false) => {
+    const go = vi.fn<(eye: Point, lens?: number) => void>();
+    scene.cosmos.arrive(id, go, plan);
     await settled();
-    const to = go.mock.lastCall?.[0];
+    const [to, lens] = go.mock.lastCall ?? [];
     if (to === undefined) throw new Error("no arrival");
+    scene.camera.fov = lens ?? FIELD_OF_VIEW;
+    scene.camera.updateProjectionMatrix();
+    scene.cosmos.resize(scene.height, 1);
     scene.cosmos.tick(to, 0);
     await settled();
     scene.cosmos.tick(to, 0);
@@ -3132,9 +3166,31 @@ describe("a system's arrival (7d3)", () => {
     const { worlds: bodies } = postcardOf(system, restView(systems).eye);
     expect(bodies.map(({ id }) => id.split("/").at(-1))).toEqual(["agents", "streak"]);
     const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
-    expect(own.length).toBeGreaterThan(40);
+    // None on agents' or streak's path either (F3594): 37 of the 124 stand.
+    expect(own.length).toBeGreaterThan(30);
     for (const point of own)
       for (const body of bodies) expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(body.radius);
+  });
+
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): the grain left an orange trail beside agents and streak, 21 specks of 3 to 6 px; each speck
+  // is 2 px across at most, and none stands on a world's path round its star, its drawn width each side of its orbit.
+  it("draws g1magld5's grain as fine dust in Onyx's view at rest, 2 px across at most, none on agents' or streak's path (F3594)", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    const card = postcardOf(system, restView(systems).eye);
+    const paths = card.worlds.map(({ orbit, radius }, at) => ({ orbit, half: radius * (card.depth[at] ?? 1) }));
+    const grains = new Set(system.worlds.filter(({ radius }) => radius < GRAIN).map(({ orbit }) => orbit.toFixed(4)));
+    const dust = pointsOf(scene).filter(
+      ({ star, orbit }) => distanceOf(star, system.place) < 1e-4 && grains.has(orbit.toFixed(4)),
+    );
+    expect(dust.length).toBeGreaterThan(0);
+    for (const speck of dust) {
+      expect(speck.size).toBeLessThanOrEqual(1);
+      for (const path of paths) expect(Math.abs(speck.orbit - path.orbit)).toBeGreaterThanOrEqual(path.half);
+    }
   });
 
   // Alexis, 2026-11-03 (reports/alexis-1213-same-level.png): the lower postcard's agents and streak stood 1.17 times apart, 92 pixels apart
@@ -3179,8 +3235,9 @@ describe("a system's arrival (7d3)", () => {
   });
 
   // Alexis, 2026-11-03 ("roches d'ambiance", through the chief): a few rocks at the home's view at rest, decor laid in space, which the
-  // labels' chunk draws from what each look leaves (7p); a system's arrival has none.
-  it("lays a few rocks at Onyx's home for the labels' chunk to draw, and none at a system's arrival", async () => {
+  // labels' chunk draws from what each look leaves (7p). Alexis, 2026-11-03 (7v): a depth cue of a system's dynamic view too; its Plan, a
+  // map, has none.
+  it("lays a few rocks at Onyx's home and at a system's dynamic view for the labels' chunk to draw, and none in its Plan", async () => {
     const scene = made();
     const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
     scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
@@ -3189,7 +3246,148 @@ describe("a system's arrival (7d3)", () => {
     expect(rocks().length).toBeGreaterThanOrEqual(3);
     expect(rocks().length).toBeLessThanOrEqual(7);
     await arrived(scene, GNOSWAP);
+    expect(rocks().length).toBeGreaterThanOrEqual(1);
+    await arrived(scene, GNOSWAP, true);
     expect(rocks()).toEqual([]);
+  });
+
+  // Alexis, 2026-11-03 (7v): a system's two views, the dynamic one by default and the Plan seen from above, as the header's switch asks.
+  const ownPoints = (scene: ReturnType<typeof made>, system: StarSystem) =>
+    pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+
+  // 7v's review (F4459): the hero, whose box keeps the page's text clear, gives way at a system; its box held on there and put out the worlds
+  // standing where it stood (gnoswap's access in its Plan, a name with no world).
+  it("stands a system's worlds where the hero's box stood, which gives way at a system, and keeps the box at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    scene.cosmos.keepClear({ left: 0, top: 0, right: WIDTH, bottom: HEIGHT });
+    scene.cosmos.tick(HOME, 0);
+    expect(scene.cosmos.stats().screen.bodies).toEqual([]);
+    await arrived(scene, GNOSWAP, true);
+    expect(scene.cosmos.stats().screen.bodies.length).toBe(planOf(named(held(ONYX), GNOSWAP)).postcard.worlds.length);
+    const { to } = await arrived(scene, undefined);
+    scene.cosmos.tick(to, 0);
+    expect(scene.cosmos.stats().screen.bodies).toEqual([]);
+  });
+
+  it("comes to gnoswap's Plan when the page asks the Plan: the eye at the Plan's, the Plan's worlds its bodies, no speck", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const system = named(held(ONYX), GNOSWAP);
+    await arrived(scene, GNOSWAP, true);
+    const plan = planOf(system);
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(plan.eye))).toBeLessThan(1e-6);
+    const ids = scene.cosmos.stats().list.map(({ id }) => id);
+    expect(ids.sort()).toEqual(plan.postcard.worlds.map(({ id }) => id).sort());
+    expect(ownPoints(scene, system)).toEqual([]);
+  });
+
+  // The design review's second pass (F4470; the chief): a Plan's bodies were lit at a fixed angle from the eye, each facing its light alike,
+  // a planetarium's tell, so one in front of its star showed lit (gnoland's boards2 about 70%, its place 13%). Each is lit from its own star
+  // now, its lit side towards it, never past 2.2 radians from the eye: a fifth of its disc lit at the least.
+  it("lights a Plan's bodies from their own star, a fifth of each lit at the least", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    await arrived(scene, GNOSWAP, true);
+    const { list } = scene.cosmos.stats();
+    let turned = 0;
+    for (const { at, star, sun } of list) {
+      const [toStar, toEye] = [star.clone().sub(at).normalize(), at.clone().negate().normalize()];
+      expect(sun.angleTo(toEye)).toBeCloseTo(Math.min(toStar.angleTo(toEye), 2.2), 6);
+      expect(sun.clone().cross(toEye).normalize().dot(toStar.clone().cross(toEye).normalize())).toBeCloseTo(1, 6);
+      if (toStar.angleTo(toEye) > 1.2) turned += 1;
+    }
+    expect(turned).toBeGreaterThan(0);
+  });
+
+  it("goes from gnoswap's dynamic view to its Plan and back as the page asks, the eye moving to each", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = named(systems, GNOSWAP);
+    const eyeAt = () => new Vector3().copy(scene.cosmos.stats().eye);
+    await arrived(scene, GNOSWAP, true);
+    expect(eyeAt().distanceTo(onStage(planOf(system).eye))).toBeLessThan(1e-6);
+    await arrived(scene, GNOSWAP, false);
+    expect(eyeAt().distanceTo(onStage(arrivalOf(system, systems).eye))).toBeLessThan(1e-6);
+    await arrived(scene, GNOSWAP, true);
+    expect(eyeAt().distanceTo(onStage(planOf(system).eye))).toBeLessThan(1e-6);
+  });
+
+  it("hands the labels' chunk the Plan it draws, its worlds on their orbits named, and none in the dynamic view", async () => {
+    const scene = made();
+    const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
+    scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
+    await shown(scene, ONYX);
+    const system = named(held(ONYX), GNOSWAP);
+    await arrived(scene, GNOSWAP);
+    expect(look.mock.lastCall?.[1].plan).toBeUndefined();
+    await arrived(scene, GNOSWAP, true);
+    const plan = look.mock.lastCall?.[1].plan;
+    expect(plan?.worlds).toEqual(planOf(system).postcard.worlds);
+    expect(plan?.system.place).toEqual(system.place);
+    for (const world of plan?.worlds ?? []) expect(plan?.names.get(world.id)).toBe(world.id.split("/").at(-1));
+  });
+
+  // Alexis, 2026-11-03 (7v): the Earth is no namespace; round it turn the projects the team adds by hand (app/data/earthOrbit.json), small
+  // bodies by it in the view at rest, its dynamic view; its Plan, the Earth from above, each on its orbit, named and a link to its address.
+  it("stands each hand-made project as a small body by the Earth in Onyx's view at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const { list, screen } = scene.cosmos.stats();
+    const projects = list.filter(({ id }) => id.startsWith("~earth/"));
+    expect(projects.map(({ id }) => id)).toEqual(orbiting.slice(0, 12).map(({ name }) => `~earth/${name}`));
+    const earth = screen.earth?.radius ?? NaN;
+    const eye = new Vector3().copy(scene.cosmos.stats().eye);
+    const own = new Map(earthSystemOf(orbiting).worlds.map((world) => [world.id, world]));
+    for (const { id, at, star } of projects) {
+      const body = screen.bodies.find((each) => each.id === id);
+      expect(body?.radius).toBeLessThan(earth / 2);
+      // Lit by the great star, the map's origin: the Earth is no star (7v's review).
+      expect(star.distanceTo(onStage({ x: 0, y: 0, z: 0 }).sub(eye))).toBeLessThan(1e-6);
+      // At its own orbit round the Earth, held still where the view's judge found it clear (deep.ts, projectsOf).
+      expect(at.distanceTo(onStage(EARTH_PLACE).sub(eye))).toBeCloseTo(own.get(id)?.orbit ?? NaN, 6);
+    }
+    // Past the golden ring, which the globe's Moon runs on: none stands on it.
+    for (const world of earthSystemOf(orbiting).worlds)
+      expect(world.orbit).toBeGreaterThan(1.5 * ORBIT_RADIUS * EARTH_RADIUS);
+  });
+
+  it("comes to the Earth's Plan at rest when the Plan is asked with no system, its projects named and linked, no rock", async () => {
+    const scene = made();
+    const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
+    scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
+    await shown(scene, ONYX);
+    await arrived(scene, undefined, true);
+    const plan = earthPlanOf(orbiting);
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(plan.eye))).toBeLessThan(1e-6);
+    const drawn = look.mock.lastCall?.[1].plan;
+    expect(drawn?.worlds).toEqual(plan.postcard.worlds);
+    expect(drawn?.names.get("~earth/gnosh.ai")).toBe("gnosh.ai");
+    expect(drawn?.links.get("~earth/gnosh.ai")).toBe("https://gnosh.ai");
+    expect(look.mock.lastCall?.[1].rocks ?? []).toEqual([]);
+    const { to } = await arrived(scene, undefined, false);
+    expect(to).toEqual(HOME);
+  });
+
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): at a system's own view too, each speck 2 px across at most, none on a world's path.
+  it("draws g1magld5's grain as fine dust at its dynamic view, 2 px across at most, none on its worlds' paths (F3594)", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    await arrived(scene, system.id);
+    const { postcard } = arrivalOf(system, systems);
+    const grains = new Set(system.worlds.filter(({ radius }) => radius < GRAIN).map(({ orbit }) => orbit.toFixed(4)));
+    const dust = ownPoints(scene, system).filter(({ orbit }) => grains.has(orbit.toFixed(4)));
+    expect(dust.length).toBeGreaterThan(0);
+    for (const speck of dust) {
+      expect(speck.size).toBeLessThanOrEqual(1);
+      postcard.worlds.forEach(({ orbit, radius }, at) => {
+        expect(Math.abs(speck.orbit - orbit)).toBeGreaterThanOrEqual(radius * (postcard.depth[at] ?? NaN));
+      });
+    }
   });
 
   it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
@@ -3205,13 +3403,43 @@ describe("a system's arrival (7d3)", () => {
     }
   });
 
+  // The design review's second pass (F4468; Alexis's "depth everywhere"): gnoswap's farthest world had its nearest's black point and colour.
+  // In a system's dynamic view a world behind its star greys and dims as the 14:09 mock-up's far ones; at home, by its distance alone.
+  it("greys and dims a dynamic view's worlds behind their star, its farthest to 70% of its light, and the home's by distance alone", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const fades = () =>
+      scene.cosmos.stats().list.map(({ planet, at, star }) => {
+        const far = vi.spyOn(planet, "setFar");
+        return { far, away: at.length(), behind: at.length() / star.length() };
+      });
+    const home = fades();
+    scene.cosmos.tick(HOME, 0);
+    expect(home.length).toBeGreaterThan(0);
+    for (const { far, away } of home) expect(far.mock.lastCall?.[0]).toBeCloseTo(fadeAt(away), 9);
+    const { to } = await arrived(scene, GNOSWAP);
+    const seen = fades();
+    scene.cosmos.tick(to, 0);
+    const read = seen.map(({ far, away, behind }) => ({ away, behind, fade: far.mock.lastCall?.[0] ?? NaN }));
+    for (const { away, behind, fade } of read) if (behind <= 1.05) expect(fade).toBeCloseTo(fadeAt(away), 9);
+    const farthest = read.reduce((one, other) => (other.away > one.away ? other : one));
+    expect(farthest.fade).toBeGreaterThanOrEqual(0.8);
+    expect(read.filter(({ fade }) => fade >= 0.8).length).toBeGreaterThanOrEqual(2);
+    const byAway = read.toSorted((one, other) => one.away - other.away);
+    for (let at = 1; at < byAway.length; at += 1)
+      expect(byAway[at]?.fade).toBeGreaterThanOrEqual((byAway[at - 1]?.fade ?? Infinity) - 1e-9);
+  });
+
+  // Each way as far as the view's room says (the design review's second pass, F4468): gnoswap's leans a quarter as far to the right, where
+  // its pool left under the ticker.
   it("leans half as far at an arrival as at home: the eye nearer what it looks at", async () => {
     const { scene, arrival } = await atGnoswap();
     const { to } = await arrived(scene, GNOSWAP);
     scene.cosmos.tick({ x: to.x + LEAN, y: to.y + LEAN, z: to.z }, 0);
     const moved = new Vector3().copy(scene.cosmos.stats().eye).sub(onStage(arrival.eye));
-    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN, 6);
-    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN, 6);
+    expect(arrival.room?.right).toBeLessThan(1);
+    expect(moved.x).toBeCloseTo(ARRIVAL_LEAN * (arrival.room?.right ?? 1), 6);
+    expect(moved.y).toBeCloseTo(ARRIVAL_LEAN * (arrival.room?.up ?? 1), 6);
     expect(moved.z).toBeCloseTo(0, 6);
   });
 

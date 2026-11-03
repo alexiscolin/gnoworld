@@ -76,6 +76,20 @@ describe("the header", () => {
     },
   );
 
+  // 7v (Alexis, 2026-11-03, the GUI board's option B): two icons after the pill's views say how one looks at space, once the page wakes
+  // (F4692): the page as written holds none, so a not-found path, served the fallback written at /, hydrates as its own page.
+  test.each(["/", "/net/gnoland"])(
+    "%s: offers no views of space in the page as written, before it wakes",
+    async (path) => {
+      const html = await header(path);
+      expect(html).not.toMatch(/Views of space|Dynamic view|Plan view/);
+    },
+  );
+
+  test.each(["/earth", "/list", "/w/bubble"])("%s: offers no views of space to switch", async (path) => {
+    const html = await header(path);
+    expect(html).not.toMatch(/Views of space|Dynamic view|Plan view/);
+  });
   // ADR-0003 §2, 2c: each view says what it holds to a screen reader alone, as its description; nothing is drawn under the tabs.
   test.each(["/", "/earth", "/net/gnoland"])(
     "%s: describes each view to screen readers, and draws no word of it",

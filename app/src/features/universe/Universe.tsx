@@ -13,6 +13,7 @@ import { lazyPart } from "./lazyPart.ts";
 import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
 import { firstArrival, HomeOpening } from "./Opening.tsx";
 import type { Rail } from "./Rail.tsx";
+import { SystemCrumb } from "./SystemCrumb.tsx";
 import styles from "./Universe.module.css";
 
 // The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
@@ -92,6 +93,27 @@ function OnTheCosmos({ host, page }: { host: SceneHost; page: CosmosPage | undef
   );
 }
 
+// What stands over the scene: the flight panel while it runs, and on the cosmos the crumb back from a system the eye rests at (7v), whatever
+// the scene's state: a lost context leaves the eye at a system, and the way back with it (7v's review).
+function Over({
+  host,
+  shown,
+  running,
+  flight,
+}: {
+  host: SceneHost;
+  shown: Shown;
+  running: boolean;
+  flight: ReturnType<SceneHost["flown"]["flight"]>;
+}) {
+  return (
+    <>
+      {shown && running ? <FlightPanel flight={flight} /> : null}
+      {shown === "cosmos" ? <SystemCrumb back={host.back} /> : null}
+    </>
+  );
+}
+
 // What stands with the running scene: wherever maps show, their credits.
 function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
   const placed = page !== undefined && "store" in page ? page : undefined;
@@ -148,7 +170,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
       {status === "on" ? (
         <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
       ) : null}
-      {shown && status === "on" ? <FlightPanel flight={flight} /> : null}
+      <Over host={host} shown={shown} running={status === "on"} flight={flight} />
     </>
   );
 }

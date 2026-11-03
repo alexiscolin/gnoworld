@@ -65,6 +65,24 @@ describe("Breadcrumb", () => {
     staysText((text) => <Breadcrumb label="x" items={[{ label: text, href: "/" }, { label: "end" }]} />);
   });
 
+  // 7v: a system's view in the cosmos is no page of its own, so its way back is a step that acts, "← Cosmos › gnoswap" (frame 45's kicker).
+  it("draws a step that acts as a button of its words, an arrow back before it no reader meets, pressed once a press", () => {
+    let pressed = 0;
+    render(
+      <Breadcrumb
+        label="You are here"
+        items={[{ label: "Cosmos", onSelect: () => (pressed += 1) }, { label: "gnoswap" }]}
+      />,
+    );
+    const back = screen.getByRole("button", { name: "Cosmos" });
+    expect(back.getAttribute("type")).toBe("button");
+    expect(back.querySelector("[aria-hidden='true'] svg, svg[aria-hidden='true']")).not.toBeNull();
+    back.click();
+    expect(pressed).toBe(1);
+    expect(screen.queryAllByRole("link")).toEqual([]);
+    expect(screen.getByText("gnoswap").closest("[aria-current]")?.getAttribute("aria-current")).toBe("page");
+  });
+
   it("draws nothing for an empty trail: a navigation with an empty list is a fault", () => {
     const { container } = render(<Breadcrumb label="You are here" items={[]} />);
     expect(container.childElementCount).toBe(0);
