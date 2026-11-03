@@ -1,7 +1,7 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { LIMB_LIGHT } from "../planet/planet.ts";
-import { angleAt, fadeAt, FAR_ANGLE, limbAt, sideOf } from "./far.ts";
+import { angleAt, behindAt, fadeAt, FAR_ANGLE, limbAt, sideOf } from "./far.ts";
 
 describe("sideOf", () => {
   const eye = new Vector3(0, 0, 1);
@@ -65,5 +65,24 @@ describe("fadeAt", () => {
     expect(fades[2]).toBeGreaterThan(0);
     expect(fades[4]).toBeCloseTo(0.45, 9);
     expect(fades[5]).toBeCloseTo(0.45, 9);
+  });
+});
+
+// The design review's second pass (F4468; Alexis's "depth everywhere"): a system's dynamic view drew its far worlds with its near ones'
+// black point and colour. The 14:09 mock-up draws its two farthest, behind the star, at 85% and 70% of their light on the screen, which
+// the planet's `faraway` gives at 0.425 and 0.85 (measured on gnoswap's view: 68% and 72% at 0.85).
+describe("behindAt", () => {
+  it("leaves a world before its star crisp, and greys and dims one behind it as the mock-up's far ones", () => {
+    const star = 8;
+    const fades = [0.5, 1, 1.05, 1.1, 1.2, 1.3, 1.35, 2].map((share) => behindAt(share * star, star));
+    expect(fades.slice(0, 3)).toEqual([0, 0, 0]);
+    for (let at = 1; at < fades.length; at += 1) expect(fades[at]).toBeGreaterThanOrEqual(fades[at - 1] ?? Infinity);
+    expect(fades[3]).toBeGreaterThan(0);
+    expect(fades[4]).toBeCloseTo(0.425, 9);
+    expect(fades[6]).toBeCloseTo(0.85, 9);
+    expect(fades[7]).toBeCloseTo(0.85, 9);
+    expect(behindAt(1.2 * 20, 20)).toBeCloseTo(0.425, 9);
+    expect(fadeAt(40)).toBeGreaterThan(0);
+    expect(behindAt(40, 60)).toBe(fadeAt(40));
   });
 });

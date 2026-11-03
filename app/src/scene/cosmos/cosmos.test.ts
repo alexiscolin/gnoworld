@@ -86,7 +86,7 @@ import orbiting from "../../../data/earthOrbit.json" with { type: "json" };
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import { Cosmos } from "./cosmos.ts";
 import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
-import { angleAt, limbAt } from "./far.ts";
+import { angleAt, fadeAt, limbAt } from "./far.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn() }));
 const globes = vi.hoisted(() => ({ build: vi.fn() }));
@@ -3401,6 +3401,33 @@ describe("a system's arrival (7d3)", () => {
       expect(offset.length()).toBeGreaterThan(0.01);
       expect(offset.dot(look.clone().sub(onStage(arrival.eye)).normalize())).toBeCloseTo(0, 6);
     }
+  });
+
+  // The design review's second pass (F4468; Alexis's "depth everywhere"): gnoswap's farthest world had its nearest's black point and colour.
+  // In a system's dynamic view a world behind its star greys and dims as the 14:09 mock-up's far ones; at home, by its distance alone.
+  it("greys and dims a dynamic view's worlds behind their star, its farthest to 70% of its light, and the home's by distance alone", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const fades = () =>
+      scene.cosmos.stats().list.map(({ planet, at, star }) => {
+        const far = vi.spyOn(planet, "setFar");
+        return { far, away: at.length(), behind: at.length() / star.length() };
+      });
+    const home = fades();
+    scene.cosmos.tick(HOME, 0);
+    expect(home.length).toBeGreaterThan(0);
+    for (const { far, away } of home) expect(far.mock.lastCall?.[0]).toBeCloseTo(fadeAt(away), 9);
+    const { to } = await arrived(scene, GNOSWAP);
+    const seen = fades();
+    scene.cosmos.tick(to, 0);
+    const read = seen.map(({ far, away, behind }) => ({ away, behind, fade: far.mock.lastCall?.[0] ?? NaN }));
+    for (const { away, behind, fade } of read) if (behind <= 1.05) expect(fade).toBeCloseTo(fadeAt(away), 9);
+    const farthest = read.reduce((one, other) => (other.away > one.away ? other : one));
+    expect(farthest.fade).toBeGreaterThanOrEqual(0.8);
+    expect(read.filter(({ fade }) => fade >= 0.8).length).toBeGreaterThanOrEqual(2);
+    const byAway = read.toSorted((one, other) => one.away - other.away);
+    for (let at = 1; at < byAway.length; at += 1)
+      expect(byAway[at]?.fade).toBeGreaterThanOrEqual((byAway[at - 1]?.fade ?? Infinity) - 1e-9);
   });
 
   // Each way as far as the view's room says (the design review's second pass, F4468): gnoswap's leans a quarter as far to the right, where

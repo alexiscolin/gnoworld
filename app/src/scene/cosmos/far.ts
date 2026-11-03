@@ -42,6 +42,16 @@ export const limbAt = (distance: number): number => LIMB_LIGHT * (1 - FAR_LIMB *
 /** How soft and dim a body stands at a distance: none up close, `SOFTEST` afar (the planet's `faraway`). */
 export const fadeAt = (distance: number): number => SOFTEST * smoothstep(CRISP, SOFT, distance);
 
+// A system's view's world is crisp before its star and to this share of the eye's distance to it, then by degrees as soft and dim as the
+// 14:09 mock-up's farthest, 70% of its light on the screen, which `faraway` 0.85 gives gnoswap's two farthest, at 1.33 and 1.35 (68% and
+// 72%, measured; the mock-up's next, 85%, at 1.2) (F4468).
+const [BEHIND_CRISP, BEHIND_SOFT, BEHIND_SOFTEST] = [1.05, 1.35, 0.85];
+
+/** How soft and dim a world of a system's view stands at `distance` from the eye, its star `star` from it: as any body there, and more
+ * by degrees behind its star. */
+export const behindAt = (distance: number, star: number): number =>
+  Math.max(fadeAt(distance), BEHIND_SOFTEST * smoothstep(BEHIND_CRISP * star, BEHIND_SOFT * star, distance));
+
 /** The light of a world among others, written over `star`, a unit vector from the world: it stays on the side its star stands on screen, always
  * `angle` from `eye`, so it is lit as the Earth is wherever it sits round its star, never a black disc. */
 export function sideOf(star: Vector3, eye: Vector3, angle: number): Vector3 {

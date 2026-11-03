@@ -21,7 +21,7 @@ import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
 import type { Planet } from "../planet/planet.ts";
-import { angleAt, chartAngle, fadeAt, limbAt, sideOf, type View } from "./far.ts";
+import { angleAt, behindAt, chartAngle, fadeAt, limbAt, sideOf, type View } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
 interface Body {
@@ -156,7 +156,9 @@ export class Bodies {
     planet.setSun(sideOf(sun, this.#toEye, angle));
     planet.setTime(seconds);
     if (planet.look.rim !== null) planet.setLimb(limbAt(this.#view === "rest" ? away : 0));
-    planet.setFar(fadeAt(at.length()));
+    // In a system's view, also by how far behind its star it stands, as the mock-up's far worlds (F4468).
+    const far = at.length();
+    planet.setFar(this.#view === "near" ? behindAt(far, away) : fadeAt(far));
     const room = this.#diving ? 1 : this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
     planet.group.visible = body.shown && room > 0;
