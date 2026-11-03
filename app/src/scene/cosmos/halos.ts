@@ -41,6 +41,7 @@ export class Halos {
   readonly #order: number[] = [];
   #mainSize = Infinity;
   #main = 0;
+  #lit = true;
   #focal = 1;
 
   /** Chooses which of `sight`'s drawn stars keep a halo. */
@@ -65,16 +66,19 @@ export class Halos {
     this.#lead(sight);
   }
 
-  // The main light, the great star unless the view says: its size on screen, the widest halo kept.
+  // The main light, the great star unless the view says: its size on screen, the widest halo kept; none for a view with no light of its
+  // own, the Earth's Plan, a chart the great star blinded (7v's design review, F4469): there every star is its point.
   #lead({ systems, eye, focal, main = 0 }: HaloSight): void {
     this.#focal = focal;
     this.#main = main;
+    this.#lit = systems[main] !== undefined;
     this.#mainSize = mainSize(systems[main], eye, focal);
   }
 
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
+    if (!this.#lit) return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
     const ceiling = (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize * distance;
     const full =
       index === this.#main

@@ -264,6 +264,15 @@ describe("the suns' halos", () => {
     for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
   });
 
+  // 7v's design review (F4469): the Earth's Plan, a chart with no light of its own, looked into the great star 6.7 units off, a white disc
+  // 260 px wide that put gnosh.ai's name at 1.6:1. Where the view's main light is none of its systems, every star is its point, no halo.
+  it("draws every star as its point, with no halo, where the view has no light of its own, as the Earth's Plan", () => {
+    const aways = [7, 20, 3];
+    const suns = sunsAt(aways, { main: -1, needsHalo: () => false });
+    expect(suns.map(({ halo }) => halo)).toEqual([0, 0, 0]);
+    for (const [at, { reach }] of suns.entries()) expect((reach * 1158) / (aways[at] ?? NaN)).toBeCloseTo(10, 6);
+  });
+
   it("keeps a region's glow whole: it is no sun's halo", () => {
     const systems = [{ ...system(0, 0, false), place: { x: 0, y: -600, z: 0 } }];
     const sight = sighted(systems, (drawn) => {
