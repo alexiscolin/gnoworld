@@ -35,7 +35,8 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
   const Env = z
     .object({
       ANTHROPIC_API_KEY_FILE: z.string().min(1),
-      JARVIS_DATABASE: databasePath,
+      // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
+      JARVIS_DATABASE: databasePath.pipe(absolute),
       JARVIS_BUDGET_USD: whole(500, 45),
       JARVIS_TRANSLATION_BUDGET_USD: whole(500, 5),
       JARVIS_QUESTION_CHARS: whole(8_000, 2_000),

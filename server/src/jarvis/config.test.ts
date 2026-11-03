@@ -164,6 +164,12 @@ describe("loadJarvisConfig", () => {
     ["JARVIS_DATABASE", undefined],
     ["JARVIS_DATABASE", ""],
     ["JARVIS_DATABASE", "d".repeat(1025)],
+    ["JARVIS_DATABASE", `/${"d".repeat(1024)}`],
+    // In memory, a restart would open the day again at zero (D45, F5179).
+    ["JARVIS_DATABASE", ":memory:"],
+    ["JARVIS_DATABASE", "jarvis.db"],
+    ["JARVIS_DATABASE", "./jarvis.db"],
+    ["JARVIS_DATABASE", "file:jarvis.db"],
     ["JARVIS_PROFILES", undefined],
     ["JARVIS_PROFILES", ""],
     ["JARVIS_PROFILES", "testnet,"],
