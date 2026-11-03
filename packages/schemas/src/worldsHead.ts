@@ -9,3 +9,18 @@ export const WORLDS_CAPS = { worlds: 20_000, realms: 512, functions: 256, import
 export const Slug = z.string().check(z.minLength(1), z.maxLength(WORLDS_CAPS.name), z.regex(/^[a-z0-9][a-z0-9_-]*$/));
 /** A time the job read or saw, with its offset. */
 export const Moment = z.iso.datetime({ offset: true }).check(z.maxLength(40));
+
+/** The most bytes of the worlds' count: its head and a number, under 300; a client refuses more. */
+export const WORLDS_COUNT_MAX_BYTES = 1024;
+
+/** worlds-count.json (7n2), written with worlds.json in the same pass: its head and the worlds the cosmos draws from it with the Earth (core's
+ * `worldsDrawn`), so the home's hero reads a few bytes for its number and a phone nothing of the cosmos before View in space. */
+export const WorldsCount = z.strictObject({
+  version: z.literal(1),
+  universe: Slug,
+  updated: Moment,
+  count: z
+    .number()
+    .check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(WORLDS_CAPS.worlds + 1)),
+});
+export type WorldsCount = z.infer<typeof WorldsCount>;
