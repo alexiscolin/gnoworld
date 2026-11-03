@@ -103,6 +103,7 @@ export {
   type RealmFunctions,
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseCounts } from "./planet/gauges.ts";
+export { callersIn } from "./planet/gauges.ts";
 export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
