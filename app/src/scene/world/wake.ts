@@ -39,11 +39,6 @@ export class Wake {
   /** How much of the grid shows, 1 whole and 0 none. */
   grid = 0;
 
-  /** A reading that wakes a seed starts its part on the next resting frame. */
-  read(reading: WorldReading, last: WorldReading | undefined): void {
-    if (reading.wake && last?.wake !== true) this.#woke = undefined;
-  }
-
   /** The appearance at `seconds`, and the signs it gives the world: none starts while a flight brings the world, not yet `resting`. */
   at(reading: WorldReading | undefined, seconds: number, { still, resting }: Pose): WorldSigns | undefined {
     if (resting && reading?.first === true) this.#drawn ??= seconds;
@@ -55,7 +50,7 @@ export class Wake {
   #draw(seconds: number, still: boolean): void {
     const age = this.#drawn === undefined ? Infinity : seconds - this.#drawn;
     this.band = still || age >= SWEEP ? -BAND_REACH : BAND_REACH * (1 - (2 * age) / SWEEP);
-    this.grid = age < SWEEP ? 1 : 1 - smoothstep(SWEEP, SWEEP + FADE, age);
+    this.grid = 1 - smoothstep(SWEEP, SWEEP + FADE, age);
   }
 
   #grow(reading: WorldReading | undefined, seconds: number, still: boolean): WorldSigns | undefined {
@@ -80,8 +75,6 @@ export class Wake {
     this.#drawn = undefined;
     this.#woke = undefined;
     this.left = 0;
-    this.band = -BAND_REACH;
-    this.grid = 0;
   }
 
   keep(): Kept {

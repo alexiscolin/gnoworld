@@ -139,7 +139,6 @@ export class WorldView {
 
   /** What the world's data says now. */
   read(reading: WorldReading): void {
-    this.#waking.read(reading, this.#reading);
     this.#reading = reading;
     this.#device.moved();
   }
