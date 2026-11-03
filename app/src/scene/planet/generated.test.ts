@@ -610,7 +610,8 @@ describe("the generated program", () => {
     expect(veins.match(/crackAt\(/g)).toHaveLength(2);
     expect(veins).toMatch(/vec2 main = crackAt\(p, [\d.]+ \+ shape\.scale, vec2\(0\.1\d*, 0\.[3-5]\d*\), pixel\);/);
     // The fine net draws only near a main vein, within its halo's reach, never asterisks inside a cell (Alexis, 2026-11-03, "retirer").
-    expect(veins).toMatch(/float near = pow\(main\.x, 0\.\d+\);/);
+    expect(veins).toMatch(/float reach = pow\(main\.x, 0\.\d+\);\n {2}float near = reach \* reach;/);
+    expect(veins).toMatch(/vec3 halo = vec3\([^)]*\) \* reach;/);
     expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x \* near\);/);
     // Cream at their hottest, as Music's (Alexis, 2026-11-03, "crème comme Music"): its brightest tenth #e6b997, linear 1, 0.62, 0.39.
     expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[5-7]\d*, 0\.[2-4]\d*\), heat\)/);

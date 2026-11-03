@@ -20,11 +20,12 @@ float groovesAt(vec3 p, float frequency, float pixel, out float lane) {
   return smoothstep(0.22 + 0.12 * noise(q * 4.0 + 5.0), 0.4, abs(fract(wave) - 0.5)) * lane * (1.0 - smoothstep(0.25, 0.35, 30.0 * frequency * pixel));
 }
 vec3 veinsOf(vec3 p, float pixel, float burn) {
-  vec2 main = crackAt(p, 4.0 + shape.scale, vec2(0.14, 0.4), pixel);
+  vec2 main = crackAt(p, 4.0 + shape.scale, vec2(0.16, 0.46), pixel);
   vec2 fine = crackAt(p + 2.7, 10.0 + 2.0 * shape.scale, vec2(0.05, 0.22), pixel);
-  float near = pow(main.x, 0.6);
+  float reach = pow(main.x, 0.3);
+  float near = reach * reach;
   float heat = max(main.x, 0.6 * fine.x * near);
-  vec3 halo = vec3(0.3, 0.06, 0.004) * near;
-  return rampOf(vec3(0.1, 0.012, 0.0), vec3(0.75, 0.17, 0.01), vec3(1.0, 0.6, 0.36), heat) * heat * (0.85 + 0.2 * burn) + halo + vec3(0.05, 0.009, 0.004);
+  vec3 halo = vec3(0.3, 0.06, 0.004) * reach;
+  return rampOf(vec3(0.1, 0.012, 0.0), vec3(0.75, 0.17, 0.01), vec3(1.0, 0.58, 0.32), heat) * heat * (0.85 + 0.2 * burn) + halo + vec3(0.05, 0.009, 0.004);
 }
 `;
