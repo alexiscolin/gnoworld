@@ -41,13 +41,15 @@ export interface TrendPlaces extends WorldPlaces {
   readonly worlds: readonly (WorldPlaces["worlds"][number] & { readonly name: string })[];
 }
 
-// A trend's world as the page names and links it, or none.
+// A trend's world as the page names and links it, or none: the Earth rises by its slug, but a chain's world of its id is a realm's under the
+// namespace earth, which the page's Earth is not (F4550), and the rail leaves out too.
 function placeOf(item: Trend, places: TrendPlaces): { name: string; path: string } | undefined {
-  if (item.world === EARTH) return { name: "Earth", path: places.earth };
   if (item.kind === "rising") {
+    if (item.world === EARTH) return { name: "Earth", path: places.earth };
     const hub = places.worlds.find(({ slug }) => slug === item.world);
     return hub === undefined ? undefined : { name: hub.name, path: hub.path };
   }
+  if (item.world === EARTH) return undefined;
   const name = places.worlds.find((hub) => hubWorldOf(hub) === item.world)?.name ?? item.title;
   const path = pagesOf([{ id: item.world, realms: [{ path: item.realm }] }], places).get(item.world);
   return path === undefined ? undefined : { name, path };

@@ -75,6 +75,21 @@ describe("trendItems", () => {
     expect(item).toMatchObject({ text: "Earth · +46% on its usual hour", link: places().earth });
   });
 
+  // F4550 (7t's security review, S1): a realm under the namespace earth groups to the world earth, which the page's Earth is not.
+  it("leaves out a chain's world named earth, so a deployer's realm never reads as the page's Earth", () => {
+    const earth = { world: "earth", realm: "gno.land/r/earth/v1", title: "earth" };
+    expect(
+      trendItems(
+        [
+          { ...BUSIEST, ...earth },
+          { ...NEWEST, ...earth },
+        ],
+        places(),
+        NOW,
+      ),
+    ).toEqual([]);
+  });
+
   it("leaves out a rising world the page lists no hub for: it has no name nor page here", () => {
     expect(trendItems([{ ...RISING, world: "nowhere" }], places(), NOW)).toEqual([]);
   });
