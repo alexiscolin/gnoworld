@@ -3,6 +3,7 @@ import { chooseLabels, LABEL_SLOTS, PLACE, toScene, type Label, type LabelAsk, t
 import { Vector3 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Labels, type Projector } from "./labels.ts";
+import styles from "./labels.module.css";
 
 // The cosmos's labels on the page (ADR-0002 §9: HTML labels pooled, never made each frame; slice 7 §3: text only, off each other): eight
 // elements made once, their words written as text ten times a second at most, each frame moving them beside their bodies.
@@ -407,5 +408,108 @@ describe("where a label may stand (F3772)", () => {
     expect(box.shown).toBe(true);
     expect(box.right).toBeGreaterThan(899 - 149);
     phone.dispose();
+  });
+});
+
+// ADR-0003 §2, 2b and 2e: each label names its world for the page's doors, and the Earth's says "Start here" to a newcomer, in place of its
+// heat, on a larger pill measured as it is drawn; a hidden label takes no pointer, so none lies in wait over the page.
+describe("the labels as doors", () => {
+  // The larger Earth's class, its stylesheet's.
+  const START = styles["start"] ?? "start";
+  const earth = (): Label => ({
+    id: "earth",
+    kind: "earth",
+    title: "Earth",
+    count: "184 here",
+    badge: "▲ 21% · 130/h",
+    uncharted: false,
+  });
+  const slotOf = (id: string) => slots().find((slot) => slot.dataset["world"] === id);
+
+  it("names the world each label stands for, and the next one a slot takes", () => {
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
+    expect(slotOf("gov/govern")?.textContent).toContain("govern");
+    const slot = slotOf("gov/govern");
+    vi.advanceTimersByTime(200);
+    labels.show(labelled([near("games/chess")]).map((label) => ({ label, at: body(0, 0) })));
+    vi.advanceTimersByTime(200);
+    expect(slotOf("games/chess")).toBe(slot);
+    expect(slotOf("gov/govern")).toBeUndefined();
+  });
+
+  // F4526: any of a label's words changing writes them again: its heat alone, its uncharted state alone.
+  it.each([
+    ["its heat", { badge: "▲ 5%" }],
+    ["its uncharted state", { uncharted: true }],
+  ])("writes a label's words again when %s alone changes", (_, change) => {
+    const label: Label = {
+      id: "gov/govern",
+      kind: "near",
+      title: "govern",
+      count: "3 here",
+      badge: "",
+      uncharted: false,
+    };
+    labels.show([{ label, at: body(0, 0) }]);
+    vi.advanceTimersByTime(200);
+    labels.show([{ label: { ...label, ...change }, at: body(0, 0) }]);
+    vi.advanceTimersByTime(200);
+    const slot = slotOf("gov/govern");
+    expect(slot?.textContent).toContain("badge" in change ? "▲ 5%" : "govern");
+    expect(slot?.classList.contains(styles["uncharted"] ?? "uncharted")).toBe("uncharted" in change);
+  });
+
+  it("names two worlds apart though their words are the same, two uncharted signals", () => {
+    const signal = (id: string): Label => ({
+      id,
+      kind: "far",
+      title: "Uncharted signal",
+      count: "go and look",
+      badge: "",
+      uncharted: true,
+    });
+    labels.show([{ label: signal("a/one"), at: body(-8, 0) }]);
+    vi.advanceTimersByTime(200);
+    labels.show([{ label: signal("b/two"), at: body(-8, 0) }]);
+    vi.advanceTimersByTime(200);
+    expect(slotOf("b/two")).toBeDefined();
+    expect(slotOf("a/one")).toBeUndefined();
+  });
+
+  it("says Start here in the Earth's label in place of its heat, while it is asked, and draws it so", () => {
+    labels.show([{ label: earth(), at: body(0, 0), start: true }]);
+    const slot = slotOf("earth");
+    expect(words(slot)).toEqual(["Earth", "184 here", "Start here →"]);
+    expect(slot?.classList.contains(START)).toBe(true);
+    vi.advanceTimersByTime(200);
+    labels.show([{ label: earth(), at: body(0, 0) }]);
+    vi.advanceTimersByTime(200);
+    expect(words(slot)).toEqual(["Earth", "184 here", "▲ 21% · 130/h"]);
+    expect(slot?.classList.contains(START)).toBe(false);
+  });
+
+  it("measures the Earth's label as Start here draws it, and again as it takes back its size", () => {
+    const width = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+    width.mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains(START) ? 260 : 150;
+    });
+    labels.show([{ label: earth(), at: body(0, 0), start: true }]);
+    expect(statOf(labels).width).toBe(260);
+    vi.advanceTimersByTime(200);
+    labels.show([{ label: earth(), at: body(0, 0) }]);
+    vi.advanceTimersByTime(200);
+    expect(statOf(labels).width).toBe(150);
+  });
+
+  // The stylesheet takes the pointer from every label (labels.module.css); the script gives it back to a shown one alone.
+  it("lets a shown label take the pointer, and gives it back as the label hides", () => {
+    const taking = () => slots().filter((slot) => slot.style.getPropertyValue("pointer-events") === "auto");
+    expect(taking()).toEqual([]);
+    labels.show(labelled([near("gov/govern")]).map((label) => ({ label, at: body(0, 0) })));
+    labels.tick(EYE, true);
+    expect(taking()).toEqual(shown());
+    expect(taking()).toHaveLength(1);
+    labels.tick(EYE, false);
+    expect(taking()).toEqual([]);
   });
 });

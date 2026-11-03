@@ -1,12 +1,13 @@
 // Who is here, as the cosmos's labels read it (7h): the server's counts keyed by each world as the cosmos holds it (a hub's world is its first
-// realm's, gov/dao for the slug govdao; the Earth and a hub with no realm by their slug), the default universe's hubs' names, and this
-// reader's visits. A chunk of its own, asked after the first screen. The names and visits never wait on the server; a failed read drops
-// every count.
+// realm's, gov/dao for the slug govdao; the Earth and a hub with no realm by their slug), the default universe's hubs' names, this reader's
+// visits, and whether they are new (ADR-0003). A chunk of its own, asked after the first screen. The names, visits and newcomer never wait on
+// the server; a failed read drops every count.
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
 import type { Presence } from "@gnoworld/schemas/indexer";
 import { pagePresenceApi } from "../../lib/api/presence.ts";
 import { hubWorldOf } from "../../lib/hubWorld.ts";
+import { isNewcomer } from "../../lib/newcomer.ts";
 import type { LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { visitedIn } from "./globe.ts";
 
@@ -21,6 +22,7 @@ export function signalsOf({ worlds }: Presence, now: number): LabelSignals {
     ),
     names: new Map(ours.map((hub) => [hubWorldOf(hub), hub.name])),
     visited: visitedIn(universe),
+    newcomer: isNewcomer,
     now,
   };
 }

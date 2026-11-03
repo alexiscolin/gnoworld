@@ -11,11 +11,15 @@ export interface Anchor {
   readonly visible: boolean;
 }
 
-/** A label and what it points at: a body, or a distant star's place on the map. */
+/** A label and what it points at: a body, or a distant star's place on the map; `start`, the Earth's to a newcomer (ADR-0003, 2b). */
 export interface Chosen {
   readonly label: Label;
   readonly at: Anchor | Point;
+  readonly start?: true;
 }
+
+// The Earth's call to a newcomer, in place of its heat (ADR-0003, 2b).
+const START_HERE = "Start here →";
 
 export interface Slot {
   readonly element: HTMLElement;
@@ -40,17 +44,29 @@ export function slotIn(layer: HTMLElement, document: Document): Slot {
   return { element, words, chosen: undefined, written: new Float64Array(7).fill(Number.NaN) };
 }
 
-/** Gives `slot` what `chosen` says, its words written as text and measured only when they changed. */
+// Whether `next` says what `before` said, of the same world.
+const same = (before: Chosen | undefined, next: Chosen) =>
+  before?.label.id === next.label.id &&
+  before.label.title === next.label.title &&
+  before.label.count === next.label.count &&
+  before.label.badge === next.label.badge &&
+  before.label.uncharted === next.label.uncharted &&
+  before.start === next.start;
+
+/** Gives `slot` what `chosen` says, its words written as text and measured only when they or its world changed; the world it names is
+ * marked for the page's doors (ADR-0003, 2e). */
 export function wordsInto(slot: Slot, chosen: Chosen, size: { layout: LabelLayout; index: number }): void {
-  const before = slot.chosen?.label;
+  const before = slot.chosen;
   slot.chosen = chosen;
-  const { title, count, badge, uncharted } = chosen.label;
-  if (before?.title === title && before.count === count && before.badge === badge && before.uncharted === uncharted)
-    return;
+  if (same(before, chosen)) return;
+  const { id, title, count, badge, uncharted } = chosen.label;
+  const start = chosen.start === true;
   const [titled, counted, badged] = slot.words;
   titled.textContent = title;
   counted.textContent = count;
-  badged.textContent = badge;
+  badged.textContent = start ? START_HERE : badge;
+  slot.element.dataset["world"] = id;
+  slot.element.classList.toggle(styles["start"] ?? "start", start);
   slot.element.classList.toggle(styles["uncharted"] ?? "uncharted", uncharted);
   size.layout.width[size.index] = slot.element.offsetWidth;
   size.layout.height[size.index] = slot.element.offsetHeight;
@@ -61,7 +77,11 @@ export function wordsInto(slot: Slot, chosen: Chosen, size: { layout: LabelLayou
 export function fadeTo({ element, written, chosen }: Slot, shown: boolean, fade: number): void {
   const opacity = shown ? 1 : 0;
   const words = chosen?.label.uncharted === true ? 1 : fade;
-  if (written[3] !== opacity) element.style.setProperty("opacity", String(opacity));
+  // A shown label takes the pointer; a hidden one, as its stylesheet says, none, so none lies in wait over the page (ADR-0003, 2e).
+  if (written[3] !== opacity) {
+    element.style.setProperty("opacity", String(opacity));
+    element.style.setProperty("pointer-events", shown ? "auto" : "");
+  }
   if (written[6] !== words) element.style.setProperty("--_fade", String(words));
   written[3] = opacity;
   written[6] = words;

@@ -26,6 +26,9 @@ export interface LabelSignals {
   >;
   readonly names: ReadonlyMap<string, string>;
   readonly visited: (id: string) => boolean;
+  /** Whether this reader has entered no place yet, read at each look: the Earth's label says "Start here" (ADR-0003, 2b). Unsaid, they came
+   * back. */
+  readonly newcomer?: () => boolean;
   readonly now: number;
 }
 

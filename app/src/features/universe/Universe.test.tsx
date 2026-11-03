@@ -53,7 +53,8 @@ const lose = vi.fn();
 const WORLDS = [{ id: "a/b", namespace: "a", realms: [] }];
 const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 // What the labels know with no word from the server (F3778): the default universe's hubs' names (data/hubs.json), keyed as the cosmos holds
-// each world, no count, and the clock; this reader's visits are a function, read where a test is about them.
+// each world, no count, and the clock; this reader's visits are a function, read where a test is about them; a device that kept nothing is
+// a newcomer's (ADR-0003 §4).
 const local = () => ({
   present: new Map(),
   names: new Map([
@@ -61,6 +62,7 @@ const local = () => ({
     ["gov/dao", "GovDAO"],
   ]),
   visited: expect.any(Function) as unknown,
+  newcomer: expect.any(Function) as unknown,
   now: NOW,
 });
 

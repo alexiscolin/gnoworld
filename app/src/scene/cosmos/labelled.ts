@@ -82,9 +82,12 @@ export class CosmosLabels {
       list: this.#list,
       signals: this.#signals,
     });
+    // The Earth's label says "Start here" to a newcomer, in place of its heat (ADR-0003, 2b).
+    const start = this.#signals?.newcomer?.() === true;
     const chosen = chooseLabels(asks).flatMap((label): Chosen[] => {
       const at: Anchor | Point | undefined = anchors.get(label.id) ?? stars.get(label.id);
-      return at === undefined ? [] : [{ label, at }];
+      if (at === undefined) return [];
+      return [start && label.kind === "earth" ? { label, at, start } : { label, at }];
     });
     // A Plan names each of its worlds under it: no pill beside them.
     this.#labels.show(drawn.plan === undefined ? chosen : [], [...anchors.values()]);

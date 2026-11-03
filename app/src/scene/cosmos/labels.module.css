@@ -1,6 +1,6 @@
 /* The cosmos's labels (frame 4): a dark glass pill beside each body, its name in the text's white, its people in amber figures, its heat in
    a pill of its own; an uncharted signal in violet within a dashed edge; a thin stem from the pill to the body. Over the canvas, under the
-   page, taking no pointer. The script moves each from the window's corner and fades it with depth. */
+   page; a shown one is a door to its world (ADR-0003, 2e), a hidden one takes no pointer. The script moves each from the window's corner. */
 @layer components {
   /* The layer is the window's corner: each label is moved from it. */
   .layer {
@@ -23,14 +23,23 @@
     --_stem: 12px;
     /* How much of its words a far label keeps: the script writes it, the pill never fades */
     --_fade: 1;
+    /* raw: how far an open label grew to its left, which the page's doors write (labelDoors.module.css); none shut */
+    --_open: 0px;
 
-    transform-origin: 0 0;
+    /* A hidden label takes no pointer: the script lets a shown one take it. */
     pointer-events: none;
-    padding: var(--space-2xs) var(--space-xs);
+    /* layout: the words in a row, "Enter →" after them once the label opens (labelDoors.module.css, ADR-0003 2e) */
+    display: flex;
+    /* layout: the words share a baseline, as the frames' do */
+    align-items: baseline;
+    transform-origin: 0 0;
+    /* ADR-0003's larger labels: 16 px names in a pill of frame 4's shape */
+    padding: var(--space-xs) var(--space-s);
     border-radius: var(--radius-pill);
     /* raw: f0004's pills, the night at 80% over the warm space behind them: no blur, which is not Baseline yet (F262) */
     background: color-mix(in oklab, var(--color-surface) 80%, transparent);
     box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
+    cursor: pointer;
     transition: opacity var(--motion-base) var(--ease-standard);
   }
 
@@ -38,7 +47,8 @@
   .label::after {
     position: absolute;
     inset-block-start: 100%;
-    inset-inline-start: var(--_stem);
+    /* The stem stays on its body while an open label grows to its left by the doors' --_open (labelDoors.module.css). */
+    inset-inline-start: calc(var(--_stem) - var(--_open));
     /* raw: one pixel wide and the gap's 22 px long, as core/lod's PLACE */
     inline-size: 1px;
     /* raw: the gap core/lod keeps between a label and its body */
@@ -56,7 +66,8 @@
 
   .title {
     color: var(--color-text);
-    font: var(--font-ui);
+    /* ADR-0003's larger labels: names at 16 px, the interface's weight */
+    font: var(--font-action);
   }
 
   /* A far label's words fade with depth, never its pill: f0004's are solid. */
@@ -68,9 +79,10 @@
 
   .count,
   .badge {
-    padding-inline-start: var(--space-2xs);
+    padding-inline-start: var(--space-xs);
     color: var(--color-warm);
-    font: var(--font-data);
+    /* raw: ADR-0003's larger labels, figures at 15 px in the video's amber */
+    font: 400 0.9375rem/1.4 var(--family-mono);
   }
 
   .count:empty,
@@ -80,6 +92,8 @@
 
   /* f0004's heat, "▲ 21% · 130/h": the warm figures in a pill of their own, inside the label. */
   .badge {
+    /* layout: its fill reaches over the pill's padding, so a label with its heat stands as tall as one without (frame 4) */
+    margin-block: calc(-1 * var(--space-3xs));
     /* layout: a step after the count, as f0004's, outside the badge's own fill */
     margin-inline-start: var(--space-2xs);
     padding: var(--space-3xs) var(--space-2xs);
@@ -96,5 +110,36 @@
 
   .uncharted .count {
     color: var(--color-signal);
+  }
+
+  /* ADR-0003, 2b: the Earth's label to a newcomer, larger, its call in the design system's amber with a glow in place of its heat. */
+  .start {
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-warm-line);
+    /* raw: mock-up 2's larger Earth, its pill a fifth taller than the others' */
+    padding-block: 6px;
+  }
+
+  .start .title {
+    /* raw: mock-up 2's Earth, 20 px */
+    font-size: 1.25rem;
+  }
+
+  .start .count {
+    /* raw: mock-up 2's figures beside it, 18 px */
+    font-size: 1.125rem;
+  }
+
+  .start .badge {
+    /* layout: the call takes its own room in the larger pill (mock-up 2) */
+    margin-block: 0;
+    /* layout: the call stands off the count, as mock-up 2's */
+    margin-inline-start: var(--space-s);
+    padding: var(--space-xs) var(--space-s);
+    background: var(--color-warm);
+    color: var(--color-ink);
+    /* raw: the call in sans, as a button's (mock-up 2) */
+    font: 600 1rem/1 var(--family-sans);
+    /* raw: the amber's glow, the sun's and live moments' (DESIGN-SYSTEM.md, palette) */
+    box-shadow: 0 0 24px color-mix(in oklab, var(--color-warm) 55%, transparent);
   }
 }
