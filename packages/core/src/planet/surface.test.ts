@@ -240,6 +240,18 @@ describe("a world's mix of two classes (ADR-0002 §3)", () => {
 
   it("gives every pair its chance: every minor under a dominant, over a few thousand worlds", () => {
     const minors = new Set(paths(3000, "pair").map((path) => planetRecipe(path, "volcanic").minor));
-    expect([...minors].sort()).toEqual(ANCHORS.filter((anchor) => anchor !== "volcanic").sort());
+    // A dark rock takes a rock's colours only (Alexis, 2026-11-03, 16:4x): no gas, no sea world, nothing green, no saturated blue.
+    const rocks = [
+      "rocky",
+      "desert",
+      "ice",
+      "tidally locked",
+      "dark carbon",
+      "shattered",
+      "nitrogen ice",
+      "grooved ice",
+      "lava world",
+    ];
+    expect([...minors].sort()).toEqual([...rocks, "two-faced"].sort());
   });
 });

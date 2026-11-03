@@ -480,6 +480,8 @@ describe("the generated program", () => {
       /z = noise\(vec3\(swirled\.y \* max\(shape\.bands \* [\d.]+, [\d.]+\), minorOffset\.xy\)\) \/ SPREAD;/,
     );
     expect(GENERATED_FRAGMENT).toMatch(/float edge = 0\.0[0-4]\d*;/);
+    // A giant's band minor covers its share: its soft edge half its share wide, so a minor that barely shows moves little (7b7).
+    expect(GENERATED_FRAGMENT).toContain("edge = min(0.1, 0.5 * minorShare);");
     expect(GENERATED_FRAGMENT).toContain("minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge,");
     // A dark ground's minor takes its main class's lightness, as a glowing world's does; a giant's keeps 0.6 of it (7b6).
     expect(GENERATED_FRAGMENT).toMatch(

@@ -83,7 +83,7 @@ void main() {
     float edge = 0.03;
     if (banded > 0.5) {
       z = noise(vec3(swirled.y * max(shape.bands * 0.3, 3.0), minorOffset.xy)) / SPREAD;
-      edge = min(0.1, minorShare);
+      edge = min(0.1, 0.5 * minorShare);
     }
     minor = smoothstep(1.0 - minorShare - edge, 1.0 - minorShare + edge, shareOf(vec2(z, 1.0)));
   }

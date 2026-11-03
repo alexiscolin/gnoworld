@@ -5,7 +5,7 @@ import { REALM_PREFIX } from "../chain/realm.ts";
 import type { Anchor, MapName } from "./anchors.ts";
 import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
 import { asciiBytes, planetSeed, worldPath } from "./look.ts";
-import { NO_TURN, paletteOf, turnOf, type Palette, type Turn } from "./palette.ts";
+import { labOf, NO_TURN, paletteOf, turnOf, type Lab, type Palette, type Turn } from "./palette.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { seedShare } from "./shares.ts";
@@ -43,10 +43,40 @@ function hueOf(path: Uint8Array): Turn {
   return turnOf(((seed[0] ?? 0) * 256 + (seed[1] ?? 0)) / 65535);
 }
 
+// A Lab colour's hue lies between two directions of the a-b plane, the first turned anticlockwise to the second (under half a turn), its
+// chroma past `least`: cross products alone, as every value here.
+const within = (
+  [, a, b]: Lab,
+  [from, to]: readonly [readonly [number, number], readonly [number, number]],
+  least: number,
+) => a * a + b * b >= least * least && from[0] * b - from[1] * a >= 0 && a * to[1] - b * to[0] >= 0;
+// Olive and moss are hues 105 to 160 degrees, a sea's blue -160 to -60; a system's hue turns a palette 12 degrees at most (palette.ts),
+// so a ramp's centre keeps that far from them: 93 to 172, -172 to -48, as the cosine and sine of each end.
+const GREEN = [
+  [-0.0523, 0.9986],
+  [-0.9903, 0.1392],
+] as const;
+const BLUE = [
+  [-0.9903, -0.1392],
+  [0.6691, -0.7431],
+] as const;
+
+// A minor brings a colour of gas or rock (Alexis, 2026-11-03, "les retirer": no olive or moss on a giant, no sea's blue on a dark world):
+// its dominant's kind, never a sea world's, no ramp's centre green past a grey, and no saturated blue under a world not blue itself.
+function fitsUnder(dominant: Anchor): (minor: Anchor) => boolean {
+  const blue = within(labOf(ROWS[dominant].palettes[0][1]), BLUE, 12);
+  return (minor) =>
+    (ROWS[minor].banded === true) === (ROWS[dominant].banded === true) &&
+    ROWS[minor].sea === undefined &&
+    ROWS[minor].palettes.every(
+      ([, centre]) => !within(labOf(centre), GREEN, 8) && (blue || !within(labOf(centre), BLUE, 12)),
+    );
+}
+
 /** The recipe a seed gives as `anchor`, turned by its system's hue. */
 export function seededRecipe(seed: Uint8Array, anchor: Anchor, turn: Turn): Recipe {
   const more = moreSeed(seed);
-  const minor = minorOf(more, anchor);
+  const minor = minorOf(more, anchor, fitsUnder(anchor));
   const grade = {
     blend: ((seed[12] ?? 0) * 256 + (seed[13] ?? 0)) / 65535,
     lightness: LIGHTNESS[0] + (LIGHTNESS[1] - LIGHTNESS[0]) * seedShare(more, 28),

@@ -81,9 +81,9 @@ export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor
   return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
 }
 
-/** The class mixed under `dominant`: any other, by its weight among the others, on one word so a small weight keeps its share. */
-export function minorOf(more: Uint8Array, dominant: Anchor): Anchor {
-  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant);
+/** The class mixed under `dominant`: another that `fits`, by its weight among those, on one word so a small weight keeps its share. */
+export function minorOf(more: Uint8Array, dominant: Anchor, fits: (anchor: Anchor) => boolean): Anchor {
+  const others = WEIGHTS.filter(([anchor]) => anchor !== dominant && fits(anchor));
   const total = others.reduce((sum, [, weight]) => sum + weight, 0);
   const word = (more[MINOR_WORD] ?? 0) * 256 + (more[MINOR_WORD + 1] ?? 0);
   return walked(others, Math.floor((word * total) / 65536));
