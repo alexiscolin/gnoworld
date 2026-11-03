@@ -21,10 +21,23 @@ export function openDatabase(path: string, migrations: readonly string[]): Datab
   }
 }
 
-function migrate(db: DatabaseSync, migrations: readonly string[]): void {
-  // The write lock taken here is kept, in EXCLUSIVE mode, until the connection closes.
+// One transaction, the write lock taken as it begins: committed if `work` returns, rolled back if it throws.
+export function transaction<T>(db: DatabaseSync, work: () => T): T {
   db.exec("BEGIN IMMEDIATE");
   try {
+    const done = work();
+    db.exec("COMMIT");
+    return done;
+  } catch (error) {
+    // A statement that ended the transaction itself leaves none: its own error is the one to see.
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function migrate(db: DatabaseSync, migrations: readonly string[]): void {
+  // The write lock taken here is kept, in EXCLUSIVE mode, until the connection closes.
+  transaction(db, () => {
     const { user_version: done } = Version.parse(db.prepare("PRAGMA user_version").get());
     for (const migration of migrations.slice(done)) db.exec(migration);
     const loose = Names.parse(
@@ -36,10 +49,5 @@ function migrate(db: DatabaseSync, migrations: readonly string[]): void {
     );
     if (loose.length > 0) throw new Error(`every table is STRICT, not ${loose.map(({ name }) => name).join(", ")}`);
     if (migrations.length > done) db.exec(`PRAGMA user_version = ${String(migrations.length)}`);
-    db.exec("COMMIT");
-  } catch (error) {
-    // A migration that ended the transaction itself leaves none: its own error is the one to see.
-    if (db.isTransaction) db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }

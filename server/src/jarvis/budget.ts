@@ -5,6 +5,7 @@
 // its worst once its deadline passes (D62). The alerts are values the loop logs (D63, D64).
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { transaction } from "../db.ts";
 
 export const BUDGET_TABLES = `
 CREATE TABLE budget_days (
@@ -73,18 +74,6 @@ export function makeBudget(
     expired: db.prepare("DELETE FROM budget_holds WHERE deadline <= ? RETURNING kind, day, worst"),
     spend: db.prepare("UPDATE budget_days SET spent = spent + ? WHERE kind = ? AND day = ?"),
   };
-  // A hold and the day's sum it moves into change together, or neither does, whatever stops the process between.
-  const atomically = <T>(work: () => T): T => {
-    db.exec("BEGIN");
-    try {
-      const done = work();
-      db.exec("COMMIT");
-      return done;
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
-  };
   // The holds past their deadline, spent at their worst: the call may have run.
   const release = (at: number): void => {
     for (const row of sql.expired.all(at)) {
@@ -92,13 +81,15 @@ export function makeBudget(
       sql.spend.run(worst, kind, day);
     }
   };
+  // Each one transaction: a hold and the day's sum it moves into change together, or neither does, whatever stops the
+  // process between.
   return {
     reserve(kind, worst) {
       if (!Number.isSafeInteger(worst) || worst < 1) throw new RangeError("a worst cost is a count, from 1");
       const at = now();
       const day = dayOf(at);
       const cap = caps[kind];
-      return atomically(() => {
+      return transaction(db, () => {
         release(at);
         sql.open.run(kind, day);
         const row = sql.hold.get({ kind, day, worst, deadline: at + holdMs, cap });
@@ -112,7 +103,7 @@ export function makeBudget(
       });
     },
     settle(hold, real) {
-      return atomically(() => {
+      return transaction(db, () => {
         const row = sql.take.get(hold.id, now());
         if (row === undefined) return { status: "gone" };
         const { kind, day, worst } = Taken.parse(row);
@@ -124,7 +115,7 @@ export function makeBudget(
     },
     state(kind) {
       const at = now();
-      return atomically(() => {
+      return transaction(db, () => {
         release(at);
         const row = sql.sums.get(kind, dayOf(at));
         const { spent, reserved } = row === undefined ? { spent: 0, reserved: 0 } : Sums.parse(row);
