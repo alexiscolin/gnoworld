@@ -11,10 +11,11 @@ export interface Project {
   readonly slug?: string | undefined;
 }
 
-// In Earth radii: past the golden ring (1.14) and well inside the view at rest's neighbours, a quarter to a third of the Earth across, the
-// least a body may be (GRAIN), in the disc's plane.
-const NEAREST = 1.9;
-const FARTHEST = 3.3;
+// In Earth radii: past the small Earth's ring and its Moon, which the view at rest draws 1.9 across and 0.27 wide (scene/earth/orbit.ts),
+// with a project's width and a third of the Moon's (7v's design review, F4471), well inside the view at rest's neighbours; a quarter to a
+// third of the Earth across, the least a body may be (GRAIN), in the disc's plane.
+const NEAREST = 2.7;
+const FARTHEST = 4.1;
 const SMALLEST = 0.25;
 const LARGEST = 0.32;
 // The most projects a view of the Earth stands, the file's first: a Plan's twelve (plan.ts).

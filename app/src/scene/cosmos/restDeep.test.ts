@@ -13,6 +13,7 @@ import {
 import { describe, expect, it } from "vitest";
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import projects from "../../../data/earthOrbit.json" with { type: "json" };
+import { SMALL_RING } from "../earth/orbit.ts";
 import { heldOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { inDepth } from "./restDeep.ts";
 
@@ -28,7 +29,7 @@ describe("the view at rest's depth chunk", () => {
     const view = restView(held);
     const { earth, bodies, rocks } = inDepth(held, view, LENT);
     const judge = judgeOf(held, view, LENT);
-    expect(earth).toEqual(projectsOf(judge, earthSystemOf(projects)));
+    expect(earth).toEqual(projectsOf(judge, earthSystemOf(projects), SMALL_RING));
     expect(earth.worlds.map(({ id }) => id)).toEqual(["~earth/gnosh.ai"]);
     expect(bodies).toEqual(deepOf(held, view, judge));
     const onMap = rocksOf(view, judge);

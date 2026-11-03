@@ -31,6 +31,14 @@ const FINE_TILT = -0.618;
 export const MOON_FAR = 3.736;
 /** Frame 4's Moon, 13 pixels on a 47-pixel Earth: its own size would be two pixels at this distance. */
 export const FAR_MOON_RADIUS = 0.27;
+/** The small Earth's ring as drawn, for the view at rest's judge to keep the Earth's projects off its Moon's path (F4471). */
+export const SMALL_RING = {
+  reach: FINE_REACH,
+  tilt: FINE_TILT,
+  roll: ORBIT_ROLL,
+  moon: FAR_MOON_RADIUS,
+  rest: MOON_FAR,
+};
 // Over the air, which is order 1.
 const ORBIT_ORDER = 2;
 

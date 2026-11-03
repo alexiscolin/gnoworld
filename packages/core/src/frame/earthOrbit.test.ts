@@ -17,17 +17,18 @@ const many = (count: number) =>
 const idOf = (name: string) => `~earth/${name}`;
 
 describe("what turns round the Earth", () => {
-  // The golden ring, the Moon's orbit, stands 1.14 Earth radii out (scene/earth/orbit.ts): a project past 1.8 never meets it.
+  // The small Earth's ring, the Moon's orbit as the view at rest draws it, reaches 1.9 Earth radii and its Moon 0.27 more
+  // (scene/earth/orbit.ts): a project past 2.6, its own width out, never meets them (7v's design review, F4471).
   // Held still, as a system's dynamic view holds its worlds: turning, gnosh.ai made a row with two of Onyx's bodies (deep.ts, projectsOf).
-  it("stands each hand-made project by the Earth as a small body of its own, still, past the golden ring, in the disc's plane", () => {
+  it("stands each hand-made project by the Earth as a small body of its own, still, past the small Earth's ring and Moon, in the disc's plane", () => {
     for (const projects of [ONE, SIX]) {
       const earth = earthSystemOf(projects);
       expect(earth.place).toEqual(EARTH_PLACE);
       expect(earth.tilt).toBe(0);
       expect(earth.worlds.map(({ id }) => id)).toEqual(projects.map(({ name }) => idOf(name)));
       for (const { orbit, radius } of earth.worlds) {
-        expect(orbit).toBeGreaterThanOrEqual(1.8 * EARTH_RADIUS);
-        expect(orbit).toBeLessThanOrEqual(3.5 * EARTH_RADIUS);
+        expect(orbit).toBeGreaterThanOrEqual(2.6 * EARTH_RADIUS);
+        expect(orbit).toBeLessThanOrEqual(4.2 * EARTH_RADIUS);
         expect(radius).toBeGreaterThanOrEqual(GRAIN);
         expect(radius).toBeLessThanOrEqual(EARTH_RADIUS / 3);
       }

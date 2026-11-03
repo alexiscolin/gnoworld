@@ -7,6 +7,7 @@ import { EARTH_PLACE, GRAIN, type Orbiter, type StarSystem } from "../cosmos/sys
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import { distanceOf } from "../space/cell.ts";
 import { SWAY_CORNERS } from "../space/drift.ts";
+import { offMoon, type MoonRing } from "./earthMoon.ts";
 import type { Lent } from "./lent.ts";
 import type { RestView } from "./rest.ts";
 import type { Card } from "./restCards.ts";
@@ -63,6 +64,10 @@ export function judgeOf(systems: readonly StarSystem[], view: RestView, lent: Le
   standing(judge, systems, view);
   return judge;
 }
+
+// Where each of `card`'s worlds stands at rest on `look`, at its drawn size.
+const spotsOn = (look: Look, lent: Lent, { system, worlds }: Pick<Card, "system" | "worlds">): Seen[] =>
+  worlds.map((world) => look.seen(lent.placeOf(system, world, 0), world.radius));
 
 /** Where each of `cards`' worlds stands at `seconds` into its turn on `judge`'s first screen, at its drawn size. */
 const spotsAt = ({ looks: [look], lent }: Judge, cards: Judge["cards"], seconds: number): Seen[] =>
@@ -182,16 +187,21 @@ function standsAt(judge: Judge, card: Pick<Card, "system" | "worlds">, seconds: 
 const TRIES = 12;
 
 /** The Earth's hand-made projects as the view at rest stands them (7v), `earth` held still: each at the first of twelve places round the
- * Earth, from its own, that stands clear in `judge` as a depth's world must, its orbit's ball aside, for they stand by the Earth; one with
- * none is left out. Each stands in the judge as it is placed, before the depth's worlds are chosen. */
-export function projectsOf(judge: Judge, earth: StarSystem): StarSystem {
+ * Earth, from its own, that stands clear in `judge` as a depth's world must, its orbit's ball aside, for they stand by the Earth, and off
+ * the Moon where it rests on its `ring`; one with none is left out. Each stands in the judge as it is placed, before the depth's worlds. */
+export function projectsOf(judge: Judge, earth: StarSystem, ring: MoonRing): StarSystem {
   const still = { ...earth, spin: 0 };
   const worlds: Orbiter[] = [];
   for (const world of earth.worlds) {
     const card = Array.from({ length: TRIES }, (_, at) => ({
       system: still,
       worlds: [{ ...world, phase: world.phase + (at * 2 * Math.PI) / TRIES }],
-    })).find((tried) => standsAt(judge, tried, 0) && !judge.rowDown([...judge.cards, tried]));
+    })).find(
+      (tried) =>
+        standsAt(judge, tried, 0) &&
+        judge.looks.every((look) => offMoon(look, spotsOn(look, judge.lent, tried), ring)) &&
+        !judge.rowDown([...judge.cards, tried]),
+    );
     if (card === undefined) continue;
     judge.spots.push(...spotsAt(judge, [card], 0));
     judge.cards.push(card);
