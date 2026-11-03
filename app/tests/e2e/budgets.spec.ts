@@ -43,6 +43,13 @@ const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of thei
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
+// A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g's flights
+// will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
+// set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
+const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
+const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
+const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
+const ARRIVAL_JS = 1680;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -101,6 +108,13 @@ async function closureOf(page: Page, start: string): Promise<string[]> {
       next.push(new URL(found[1] ?? "", url).href);
   }
   return [...seen];
+}
+
+// The address of the late chunk a built file names in its dynamic imports, by `pattern`'s first group.
+async function namedIn(page: Page, url: string, pattern: RegExp): Promise<string> {
+  const name = pattern.exec(await (await page.request.get(url)).text())?.[1];
+  expect(name, `${url} names its late chunk`).toBeDefined();
+  return new URL(name ?? "", url).href;
 }
 
 // The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
@@ -214,6 +228,22 @@ test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and
   });
   const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
   expect(await compressed(page, await ownOf(page, (await whole).url(), there))).toBeLessThanOrEqual(WHOLE_JS);
+});
+
+test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
+  page,
+}) => {
+  const asked = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const scene = (await asked).url();
+  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
+  const rest = await namedIn(page, cosmos, REST_NAMED);
+  const there = [scene, cosmos, rest].map((url) => closureOf(page, url));
+  const arrival = await namedIn(page, rest, ARRIVAL_NAMED);
+  expect(await compressed(page, await ownOf(page, arrival, (await Promise.all(there)).flat()))).toBeLessThanOrEqual(
+    ARRIVAL_JS,
+  );
 });
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {

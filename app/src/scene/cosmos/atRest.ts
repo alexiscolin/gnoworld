@@ -13,7 +13,7 @@ import {
   type StarSystem,
 } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
-import type { Asking, Landing } from "./restArrival.ts";
+import type { Asking } from "./restArrival.ts";
 
 const loadSearch = () => import("./restSearch.ts");
 type Searched = Awaited<ReturnType<typeof loadSearch>>;
@@ -36,10 +36,7 @@ function plainRest(): RestView {
 }
 
 export class AtRest {
-  /** What the eye looks at, on the stage: the Earth, or what a system's arrival looks at. */
-  readonly looked = { x: NaN, y: NaN, z: NaN };
-  /** The same on the map, around which the ladder stands bodies. */
-  focus: Point = EARTH_PLACE;
+  readonly #earth = { x: NaN, y: NaN, z: NaN };
   #written = Number.NaN;
   #read = Number.NaN;
   readonly #found: () => void;
@@ -51,30 +48,39 @@ export class AtRest {
   #asked = 0;
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
-  #landing: Landing | undefined;
 
   /** `found` is told once a file's view has come, or a system's arrival. */
   constructor(found: () => void) {
     this.#found = found;
-    toScene(EARTH_PLACE, this.looked);
+    toScene(EARTH_PLACE, this.#earth);
   }
 
   /** Comes to system `id`, or back to the view at rest with none or one the file does not hold: once its view is known, `go` is told the
    * scene's eye that stands the eye there, and again only if a new file moves it. A later ask wins. */
   arrive(id: string | undefined, go: (eye: Point) => void): void {
     this.#asking = { id, go };
-    this.#land();
+    this.#come();
   }
 
-  #land(): void {
-    const asking = this.#asking;
-    const landed = asking === undefined ? undefined : this.#eye?.arrive(this.#systems, asking);
-    if (landed === undefined) return;
-    if (landed.landing === undefined) this.#asking = undefined;
-    this.#landing = landed.landing;
-    this.focus = landed.focus;
-    toScene(this.focus, this.looked);
-    if (landed.moved) this.#found();
+  #come(): void {
+    if (this.#asking !== undefined) this.#eye?.arrive(this.#systems, this.#asking, this.#came);
+  }
+
+  // The eye moved to `asking`'s arrival: the scene is told, unless it was asked again since, or this is gone.
+  readonly #came = (asking: Asking, to: Point): void => {
+    if (asking !== this.#asking) return;
+    asking.go(to);
+    this.#found();
+  };
+
+  /** What the eye looks at, on the stage: the Earth, or what a system's arrival looks at. */
+  get looked(): Point {
+    return this.#eye?.looked ?? this.#earth;
+  }
+
+  /** The same on the map, around which the ladder stands bodies. */
+  get focus(): Point {
+    return this.#eye?.focus ?? EARTH_PLACE;
   }
 
   /** Gone: nothing on its way moves the eye. */
@@ -103,7 +109,7 @@ export class AtRest {
         this.#postcards = searched.postcardsOf(systems, view);
         this.#eye.rest(view);
         this.#found();
-        this.#land();
+        this.#come();
       },
       () => undefined,
     );
@@ -137,7 +143,7 @@ export class AtRest {
 
   /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it, the ladder's `drawn` anywhere else. */
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number; resting: Point }, drawn: Drawn) {
-    const shown = this.#landing ?? { view: this.#view, postcards: this.#postcards, index: 0 };
+    const shown = this.#eye?.landing ?? { view: this.#view, postcards: this.#postcards, index: 0 };
     return this.#searched?.drawnFrom(systems, { shown, drawn }, sight) ?? WAITING;
   }
 }

@@ -12,8 +12,11 @@ import {
   type RestView,
   type StarSystem,
 } from "@gnoworld/core";
-import { landingAt, type Asking, type Landing } from "./restArrival.ts";
+import type { Asking, Landing } from "./restArrival.ts";
 import type { PerspectiveCamera } from "three";
+
+// A system's arrival is looked for in a chunk of its own, asked the first time a system is: the view at rest's stays within its cap.
+const loadArrival = () => import("./restArrival.ts");
 
 interface Spot {
   x: number;
@@ -33,8 +36,11 @@ const cross = (a: Spot, b: Spot, out: Spot) => {
 };
 
 export class RestEye {
-  // What the camera looks at, on the stage: the Earth, or what the arrival looks at.
-  readonly #target = spot();
+  /** What the camera looks at, on the stage: the Earth, or what the arrival looks at; and the same on the map. */
+  readonly looked = spot();
+  focus: Point = EARTH_PLACE;
+  /** The arrival it came to, drawn in place of the view at rest; none at rest. */
+  landing: Landing | undefined;
   // The map's up, on the stage; from where the scene's eye rests (HOME) to the view at rest's; the axes the eye sways along, across and up.
   readonly #up = spot();
   readonly #rest = spot();
@@ -44,11 +50,12 @@ export class RestEye {
   readonly #sway = { across: 0, up: 0 };
   #asked: Asking | undefined;
   #went: Point | undefined;
+  #turn = 0;
   // How much of the scene's eye's lean and glide off where it rests reaches the eye: all at home, half at an arrival, nearer what it sees.
   #lean = 1;
 
   constructor() {
-    toScene(EARTH_PLACE, this.#target);
+    toScene(EARTH_PLACE, this.looked);
     const [top, centre] = [spot(), spot()];
     toScene({ x: 0, y: 1, z: 0 }, top);
     toScene({ x: 0, y: 0, z: 0 }, centre);
@@ -57,7 +64,7 @@ export class RestEye {
 
   // The sway's axes for an eye at `from` looking at the target, both on the stage.
   #face(from: Spot): void {
-    const ahead = { x: this.#target.x - from.x, y: this.#target.y - from.y, z: this.#target.z - from.z };
+    const ahead = { x: this.looked.x - from.x, y: this.looked.y - from.y, z: this.looked.z - from.z };
     cross(ahead, this.#up, this.#across);
     cross(this.#across, ahead, this.#upward);
   }
@@ -71,34 +78,44 @@ export class RestEye {
     this.#face(this.#rest);
   }
 
-  /** Comes to the system `asking` names among `systems`, or back to the view at rest with none or a name they do not hold: its landing,
-   * what the eye looks at on the map, and whether the eye moved. `go` is told the scene's eye that stands it there, the view at rest's
-   * way off it, unless it was told that already: a new file with the same arrival moves nothing. */
-  arrive(systems: readonly StarSystem[], asking: Asking) {
+  /** Comes to the system `asking` names among `systems`, or back to the view at rest with none or a name they do not hold, once its
+   * chunk came; a later ask wins. `came` is told the scene's eye that stands it there, the view at rest's way off it, unless it was told
+   * that already: a new file with the same arrival moves nothing. A chunk that does not come leaves the eye where it is. */
+  arrive(systems: readonly StarSystem[], asking: Asking, came: (asking: Asking, to: Point) => void): void {
+    this.#turn += 1;
+    const [turn, { id }] = [this.#turn, asking];
+    if (id === undefined) this.#come(asking, undefined, came);
+    else
+      loadArrival().then(
+        ({ landingAt }) => {
+          if (turn === this.#turn) this.#come(asking, landingAt(systems, id), came);
+        },
+        () => undefined,
+      );
+  }
+
+  #come(asking: Asking, landing: Landing | undefined, came: (asking: Asking, to: Point) => void): void {
     if (asking !== this.#asked) this.#went = undefined;
     this.#asked = asking;
-    const landing = asking.id === undefined ? undefined : landingAt(systems, asking.id);
-    const to = this.#land(landing);
-    const went = this.#went;
-    const moved = went === undefined || Math.hypot(to.x - went.x, to.y - went.y, to.z - went.z) >= MOVED;
-    if (moved) {
-      this.#went = to;
-      asking.go(to);
-    }
-    return { landing, focus: landing?.look ?? EARTH_PLACE, moved };
+    this.landing = landing;
+    this.focus = landing?.look ?? EARTH_PLACE;
+    const [to, went] = [this.#land(landing), this.#went];
+    if (went !== undefined && Math.hypot(to.x - went.x, to.y - went.y, to.z - went.z) < MOVED) return;
+    this.#went = to;
+    came(asking, to);
   }
 
   // The camera turned to what `landing` looks at, or the Earth with none, the eye swaying along its own axes; the scene's eye there.
   #land(landing: Landing | undefined): Point {
     this.#lean = landing === undefined ? 1 : ARRIVAL_LEAN / LEAN;
     if (landing === undefined) {
-      toScene(EARTH_PLACE, this.#target);
+      toScene(EARTH_PLACE, this.looked);
       this.#face(this.#rest);
       return HOME;
     }
     const at = spot();
     toScene(landing.view.eye, at);
-    toScene(landing.look, this.#target);
+    toScene(landing.look, this.looked);
     this.#face(at);
     return { x: at.x - this.#offset.x, y: at.y - this.#offset.y, z: at.z - this.#offset.z };
   }
@@ -116,7 +133,7 @@ export class RestEye {
   /** Turns `camera`, at the origin, the eye at `eye`, to what it looks at. */
   aim(camera: PerspectiveCamera, eye: Point): void {
     camera.up.set(this.#up.x, this.#up.y, this.#up.z);
-    camera.lookAt(this.#target.x - eye.x, this.#target.y - eye.y, this.#target.z - eye.z);
+    camera.lookAt(this.looked.x - eye.x, this.looked.y - eye.y, this.looked.z - eye.z);
     camera.updateMatrixWorld();
   }
 }

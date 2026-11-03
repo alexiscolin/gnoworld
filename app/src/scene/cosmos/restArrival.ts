@@ -1,5 +1,5 @@
-// A system's arrival on the stage (slice 7d3), in the view at rest's chunk: core's arrival as the view at rest's parts read a view, so its
-// postcard stands, its points glint whole and its star keeps its halo as a view at rest's postcard does.
+// A system's arrival on the stage (slice 7d3), in a chunk of its own the view at rest's eye asks the first time a system is: core's arrival
+// as the view at rest's parts read a view, so its postcard stands, its points glint whole and its star keeps its halo as a postcard does.
 import { arrivalOf, type Point, type Postcard, type RestView, type StarSystem } from "@gnoworld/core";
 
 /** A system asked for, and who moves the scene's eye to it. */
