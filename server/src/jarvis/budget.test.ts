@@ -238,6 +238,30 @@ describe("the budget", () => {
     expect(budget.state("ask")).toEqual({ spent: 400, reserved: 0, cap: CAP });
   });
 
+  it("gives a new hold no id a released one had: the late call's settle answers gone, the new one's counts (F5176)", () => {
+    const { budget, clock } = setup();
+    const late = budget.reserve("ask", 2_000);
+    if (!late.ok) throw new Error("refused");
+    clock.now = T0 + HOLD;
+    const next = budget.reserve("ask", 3_000);
+    if (!next.ok) throw new Error("refused");
+    expect(budget.settle(late.hold, 10)).toEqual({ status: "gone" });
+    expect(budget.settle(next.hold, 1_000)).toEqual({ status: "settled", charged: 1_000 });
+    expect(budget.state("ask")).toEqual({ spent: 3_000, reserved: 0, cap: CAP });
+  });
+
+  it("gives a new hold no id a settled one had: a second settle after it answers gone (F5176)", () => {
+    const { budget } = setup();
+    const first = budget.reserve("ask", 2_000);
+    if (!first.ok) throw new Error("refused");
+    budget.settle(first.hold, 500);
+    const second = budget.reserve("ask", 3_000);
+    if (!second.ok) throw new Error("refused");
+    expect(budget.settle(first.hold, 900)).toEqual({ status: "gone" });
+    expect(budget.settle(second.hold, 700)).toEqual({ status: "settled", charged: 700 });
+    expect(budget.state("ask")).toEqual({ spent: 1_200, reserved: 0, cap: CAP });
+  });
+
   it("settles no hold it never made", () => {
     const { budget } = setup();
     expect(budget.settle({ id: 999 }, 10)).toEqual({ status: "gone" });

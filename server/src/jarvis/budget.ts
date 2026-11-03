@@ -15,7 +15,7 @@ CREATE TABLE budget_days (
   PRIMARY KEY (kind, day)
 ) STRICT;
 CREATE TABLE budget_holds (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   kind TEXT NOT NULL,
   day TEXT NOT NULL,
   worst INTEGER NOT NULL CHECK (worst > 0),

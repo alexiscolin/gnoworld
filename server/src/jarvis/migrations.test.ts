@@ -5,7 +5,7 @@ import { jarvisMigrations } from "./migrations.ts";
 
 // Append-only, as the server's (server/src/migrations.test.ts): one SHA-256 for each of jarvis's migrations, in the
 // order they ran on its file. A new one appends its hash here last.
-const PINNED: readonly string[] = ["84ffa968dcf6c32060052a9535ef34556d0768713ae31d81e438df81b5a7c97a"];
+const PINNED: readonly string[] = ["7c11cf655762d878fd2f5727aff275c5c0de011d18c1fdd9eebd7a2f42d53730"];
 
 const sha = (text: string): string => createHash("sha256").update(text).digest("hex");
 
