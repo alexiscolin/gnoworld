@@ -1260,6 +1260,7 @@ def mutate_mutants():
         ('            if got == "survives" and label not in GAPS:  #', '            if got == "survives":  #', "judges no gap again alone (F5050)"),
         ("                except Stopped:\n", "                except ZeroDivisionError:\n", "names a survivor whose run alone never ends"),
         ('                    got = "stopped"\n', "                    pass\n", "says a survivor's run alone stopped, not that it survived"),
+        ('errors="replace", timeout=limit + GRACE', "timeout=limit + GRACE", "reads gno's output that is no UTF-8 (F5062)"),
     ))
 
 

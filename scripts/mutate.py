@@ -186,8 +186,9 @@ def run(pkg, packages, copies):
         # a slow mutant takes the time the fast ones leave, and each run of its own would start gno's workers again.
         limit = max(LEAST, math.ceil(SECONDS_A_COPY * len(dirs)))
         try:
+            # errors="replace": a failing test may print bytes that are no UTF-8, read as U+FFFD (F5062)
             out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
-                                 timeout=limit + GRACE)
+                                 errors="replace", timeout=limit + GRACE)
         except subprocess.TimeoutExpired:
             raise Stopped(f"FAIL  gno test did not end {GRACE} s past its own time limit of {limit} s, and was stopped: in {pkg}, no mutant has a verdict")
         return out.stdout + out.stderr

@@ -519,6 +519,7 @@ cat >"$mu/fakegno" <<'EOF'
 #!/bin/sh
 echo "$*" >>"$(dirname "$0")/fakegno.runs"
 [ "$FAKE:$#" = "hangalone:4" ] && exec sleep 30 # a run of one copy never ends
+[ "$FAKE" = binary ] && printf 'a failing test printed \377\n' >&2 # bytes that are no UTF-8
 for d in "$@"; do
 	case $FAKE:$d in
 	control:./m0) printf 'FAIL    ./m0 \t0.01s\n' ;;
@@ -526,7 +527,7 @@ for d in "$@"; do
 	compile:./m*) printf '%s/planted.gno:1:1: planted (code=gnoTypeCheckError)\nFAIL    %s \t0.00s\n' "${d#./}" "$d" ;;
 	timeout:./m22) printf 'panic: test timed out after 60s\n' >&2 && exit 2 ;;
 	timeout:./m*) printf 'FAIL    %s \t0.00s\n' "$d" ;;
-	survive:./m* | hangalone:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
+	survive:./m* | hangalone:./m* | binary:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
 	esac
 done
 exit 1
@@ -606,6 +607,10 @@ out=$(checked f GNO="$GNO") || fail "mutate.py judged a gap again alone: $out"
 gapped "$mu/check.py" '{}'
 out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
 [ "$out" = "FAIL  stopped: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not name the survivor whose run alone never ended: $out"
+# gno's output may hold bytes that are no UTF-8, a failing test printing them: mutate.py reads them as U+FFFD and judges on,
+# never stopping on a traceback (F5062).
+out=$(checked f GNO="$mu/fakegno" FAKE=binary) && fail "mutate.py passed the survivor of a run whose output is no UTF-8: $out"
+[ "$out" = "FAIL  survives: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not read gno's output that is no UTF-8 (F5062): $out"
 # The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
 out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
 out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"
