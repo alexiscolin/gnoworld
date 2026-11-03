@@ -29,10 +29,16 @@ const onRoom = (rock: Seen, body: Seen, margin = MARGIN) =>
   (Math.abs(rock.x - body.x) < LABEL.wide - LABEL.stem + rock.radius + margin &&
     Math.abs(rock.y - body.y) < body.radius + LABEL.gap + LABEL.high + rock.radius + margin);
 
-// A rock seen on one screen: off the hero, the star's heart, the Earth and its label's room, and every one of `rooms` and its label's room,
-// the rock sliding `drift` pixels past them as the eye sways.
-const clearOn = (look: Look, rock: Seen, { rooms, drift }: { rooms: readonly Seen[]; drift: number }) =>
-  look.clear(rock, MARGIN) && !onRoom(rock, look.earth) && rooms.every((body) => !onRoom(rock, body, MARGIN + drift));
+// A rock seen on one screen: off the page's text (the hero, or a system's card), the star's heart, the Earth and its label's room, and every
+// one of `rooms` and its label's room, the rock sliding `drift` pixels past them as the eye sways.
+const clearOn = (
+  look: Look,
+  rock: Seen,
+  { rooms, drift, page }: { rooms: readonly Seen[]; drift: number; page: Page | undefined },
+) =>
+  look.clear(rock, MARGIN, page) &&
+  !onRoom(rock, look.earth) &&
+  rooms.every((body) => !onRoom(rock, body, MARGIN + drift));
 
 /** A rock on the map: its place, its radius, its shade and its turn, both from 0 to 1. */
 export interface Laid {
@@ -42,13 +48,15 @@ export interface Laid {
   readonly turn: number;
 }
 
-// What the rocks read of a view: its screens at rest and swayed, its lens, what stands on each, the search's functions.
-type Seeing = Pick<Judge, "looks" | "swayed" | "focal" | "balls" | "spots" | "lent">;
+// What the rocks read of a view: its screens at rest and swayed, its lens, what stands on each, the search's functions; and the page's text
+// it keeps clear, the home's hero or, where the hero gives way, a system's card (the design review's second pass, F4468).
+type Seeing = Pick<Judge, "looks" | "swayed" | "focal" | "balls" | "spots" | "lent"> & { readonly page?: Page };
+type Page = "hero" | "card";
 
 /** The rocks of the home's view at rest `view`, read through its `judge` once its depth stands, from the view's own seed, on the map; or of
  * any view seen so, a system's dynamic one (7v), its depths `scale` of the home's so they stand in front of its nearer worlds. */
 export function rocksOf(view: Pick<RestView, "eye">, judge: Seeing, scale = 1): Laid[] {
-  const { looks, swayed, balls, focal, spots } = judge;
+  const { looks, swayed, balls, focal, spots, page } = judge;
   const [first] = looks;
   if (first === undefined) return [];
   let state = textHash(`rocks ${view.eye.x.toFixed(4)} ${view.eye.y.toFixed(4)} ${view.eye.z.toFixed(4)}`);
@@ -74,10 +82,10 @@ export function rocksOf(view: Pick<RestView, "eye">, judge: Seeing, scale = 1): 
     const clear =
       looks.every((look, at) => {
         const there = look.seen(place, rock.radius);
-        return (cut || look.whole(there, 0)) && clearOn(look, there, { rooms: balls[at] ?? [], drift });
+        return (cut || look.whole(there, 0)) && clearOn(look, there, { rooms: balls[at] ?? [], drift, page });
       }) &&
       spots.every((body) => !onRoom(spot, body, MARGIN + drift)) &&
-      swayed.every((look) => clearOn(look, look.seen(place, rock.radius), { rooms: [], drift: 0 }));
+      swayed.every((look) => clearOn(look, look.seen(place, rock.radius), { rooms: [], drift: 0, page }));
     if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.lent.evenRow([...seen, spot])) return false;
     rocks.push(rock);
     seen.push(spot);
@@ -132,6 +140,7 @@ export function rocksAt(arrival: Arrival, lent: Lent): Laid[] {
       balls,
       spots: balls[0] ?? [],
       lent,
+      page: "card",
     },
     Math.min(1, (0.8 * nearest) / FARTHEST),
   );

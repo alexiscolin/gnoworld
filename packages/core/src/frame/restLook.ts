@@ -218,14 +218,19 @@ export class Look {
     return Math.hypot(at.x - to.x, at.y - to.y) - at.radius - reach;
   }
 
-  /** Whether a body there, `margin` pixels round, leaves clear the Earth from in front, the great star's heart and the hero. */
-  clear(at: Seen, margin: number): boolean {
+  /** Whether a body there, `margin` pixels round, leaves clear the Earth from in front, the great star's heart and the page's text: the
+   * hero, or at a system's view, where the hero gives way, its card (7v). */
+  clear(at: Seen, margin: number, page: "hero" | "card" = "hero"): boolean {
     if (at.depth <= 0) return true;
     const { earth, star, width, height } = this;
-    const hero =
-      at.x - at.radius < HERO_ZONE.right * width + margin && at.y + at.radius > HERO_ZONE.top * height - margin;
+    const left = at.x - at.radius < (page === "hero" ? HERO_ZONE.right : CARD_ZONE.right) * width + margin;
+    const onPage =
+      left &&
+      (page === "hero"
+        ? at.y + at.radius > HERO_ZONE.top * height - margin
+        : at.y - at.radius < CARD_ZONE.bottom * height + margin);
     const onEarth = at.away < earth.away && this.#gap(at, earth, earth.radius) < margin;
-    return !hero && !onEarth && this.#gap(at, star, STAR_HEART) >= margin;
+    return !onPage && !onEarth && this.#gap(at, star, STAR_HEART) >= margin;
   }
 
   /** Whether a body there stands whole on the screen, under the header, `margin` pixels in. */
