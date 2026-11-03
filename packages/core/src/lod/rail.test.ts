@@ -98,6 +98,10 @@ describe("the rail's order", () => {
     expect(ids([trend("a", 3)])).toEqual(["a"]);
   });
 
+  it("shows one Earth, the first asked, though two asks say they are the Earth", () => {
+    expect(ids([EARTH, { id: "other", kind: "earth" }, trend("a", 3)])).toEqual(["earth", "a"]);
+  });
+
   it("keeps the Earth with nobody on it", () => {
     expect(ids([{ id: "earth", kind: "earth" }, trend("a", 3)])).toEqual(["earth", "a"]);
   });
@@ -122,6 +126,10 @@ describe("the rail's cap", () => {
     const count = (section: string) => chooseRail(asks).filter((each) => each.section === section).length;
     expect([RISING_MOST, SEEDS_MOST]).toEqual([8, 4]);
     expect([count("earth"), count("trend"), count("rising"), count("seed")]).toEqual([1, 12, 8, 4]);
+  });
+
+  it("gives the trends all 25 places on a rail with no Earth", () => {
+    expect(chooseRail(many(30, (at) => trend(`t${String(at)}`, 100 + at)))).toHaveLength(RAIL_MOST);
   });
 
   it("gives the trends the room the rising worlds and the seeds leave", () => {
@@ -155,7 +163,7 @@ describe("the rail's cap", () => {
         {
           here: fc.nat({ max: 500 }),
           use: fc.nat({ max: 5000 }),
-          rise: fc.double({ min: 0.21, max: 20, noNaN: true }),
+          rise: fc.double({ min: -5, max: 20, noNaN: true }),
           uncharted: fc.boolean(),
         },
         { requiredKeys: [] },
@@ -164,9 +172,9 @@ describe("the rail's cap", () => {
     });
     const order = ["earth", "trend", "rising", "seed"];
     // A trend's group (people here before callers alone) and what the hold weighs in it.
-    const scoreOf = ({ signals = {}, days = 0 }: RailAsk, section: string): readonly [number, number] => {
+    const scoreOf = ({ signals = {} }: RailAsk, section: string): readonly [number, number] => {
       if (section === "rising") return [0, signals.rise ?? 0];
-      return section === "seed" ? [0, -days] : (signals.here ?? 0) > 0 ? [0, signals.here ?? 0] : [1, signals.use ?? 0];
+      return (signals.here ?? 0) > 0 ? [0, signals.here ?? 0] : [1, signals.use ?? 0];
     };
     const isTrend = ({ signals = {} }: RailAsk) =>
       signals.uncharted !== true && signals.rise === undefined && ((signals.here ?? 0) > 0 || (signals.use ?? 0) > 0);
@@ -177,7 +185,7 @@ describe("the rail's cap", () => {
         .map(({ id }) => scoreOf(asks.get(id) ?? EARTH, section));
       return scores.every(([group, score], at) => {
         const [upper = 0, above = 0] = scores[at - 1] ?? [];
-        return at === 0 || group > upper || (group === upper && !(score > AHEAD * above));
+        return at === 0 || group > upper || (group === upper && !(score > above && score > AHEAD * above));
       });
     };
     fc.assert(
@@ -233,6 +241,12 @@ describe("the rail's order held", () => {
       "b",
       "a",
     ]);
+  });
+
+  it("ends with any scores: below zero a world goes above one only when it has more, and at zero none moves", () => {
+    expect(ids([EARTH, rising("a", -10), rising("b", -11)], ["earth", "b", "a"])).toEqual(["earth", "a", "b"]);
+    expect(ids([EARTH, rising("a", -11), rising("b", -10)], ["earth", "b", "a"])).toEqual(["earth", "b", "a"]);
+    expect(ids([EARTH, rising("a", 0), rising("b", 0)], ["earth", "b", "a"])).toEqual(["earth", "b", "a"]);
   });
 
   it("holds the rising worlds as it holds the trends", () => {
