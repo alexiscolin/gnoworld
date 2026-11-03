@@ -14,9 +14,11 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     relief: [0.018, 0.03],
     rings: 0.05,
   },
+  // The Earth's own plants off its day map, wet to dry: Scandinavia's forest, Siberia's, Kenya's savanna; the taiga, the cerrado,
+  // Mongolia's steppe.
   temperate: {
     maps: ["venus", "mars"],
-    palettes: [ramp(0x16240f, 0x4d6426, 0xb09a62), ramp(0x2a1f10, 0x6f6a2c, 0xc4ad78)],
+    palettes: [ramp(0x323f1b, 0x454c2a, 0x847e5e), ramp(0x313f19, 0x706645, 0x948469)],
     warp: [0.08, 0.2],
     recolour: [0.75, 1],
     relief: [0.0042, 0.008],
