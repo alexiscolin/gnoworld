@@ -188,6 +188,10 @@ const green = (lab: Lab, margin = 0) =>
 const blue = (lab: Lab, margin = 0) =>
   Math.hypot(lab[1], lab[2]) >= 12 && hueOf(lab) >= -160 - margin && hueOf(lab) <= -60 + margin;
 const bluish = (anchor: Anchor) => blue(centreOf(anchor, 0));
+// Under a sea world or a dark giant (its minor matched in light at 0.6 only), a minor keeps near its dominant's light, ramp by ramp:
+// a jump reads as a hole, a pit or a pock (7b7).
+const held = (dominant: Anchor) =>
+  ROWS[dominant].sea !== undefined || (ROWS[dominant].banded === true && centreOf(dominant, 0)[0] < 20);
 const fitting = (minor: Anchor, dominant: Anchor) =>
   minor !== dominant &&
   (ROWS[minor].banded === true) === (ROWS[dominant].banded === true) &&
@@ -196,7 +200,7 @@ const fitting = (minor: Anchor, dominant: Anchor) =>
     (ramp) =>
       !green(centreOf(minor, ramp), 12) &&
       (bluish(dominant) || !blue(centreOf(minor, ramp), 12)) &&
-      (ROWS[dominant].sea === undefined || Math.abs(centreOf(minor, ramp)[0] - centreOf(dominant, 0)[0]) <= 25),
+      (!held(dominant) || Math.abs(centreOf(minor, ramp)[0] - centreOf(dominant, ramp)[0]) <= 25),
   );
 const minorOf = (more: Uint8Array, dominant: Anchor): Anchor => {
   const others = WEIGHTS.filter(([anchor]) => fitting(anchor, dominant));
@@ -240,6 +244,29 @@ describe("the minor class", () => {
     for (const anchor of ANCHORS)
       expect(Math.abs((counts.get(anchor) ?? 0) / total - (expected.get(anchor) ?? 0)), anchor).toBeLessThan(0.01);
   }, 30_000);
+
+  // The security review's nit: a class with no fitting minor would fall back to rocky, perhaps itself.
+  it("leaves every class a minor to draw, never itself", () => {
+    for (const dominant of ANCHORS) {
+      expect(
+        ANCHORS.some((minor) => fitting(minor, dominant)),
+        dominant,
+      ).toBe(true);
+      for (let at = 0; at < 200; at += 1)
+        expect(planetRecipe(asciiBytes(`gno.land/r/k${String(at)}/home`), dominant).minor, dominant).not.toBe(dominant);
+    }
+  });
+
+  // A world of continents (a sea under 0.8, as the program splits them) keeps its own map under its minor: a rock's craters would ring
+  // its continents (7b7's design review); an archipelago's islands keep the minor's map, their only fine detail.
+  it("keeps a world of continents' own map under its minor", () => {
+    for (const dominant of ANCHORS)
+      for (let at = 0; at < 50; at += 1) {
+        const { minor, minorMap, surface } = planetRecipe(asciiBytes(`gno.land/r/m${String(at)}/home`), dominant);
+        const continents = surface.sea > 0 && surface.sea < 0.8;
+        expect(minorMap, `${dominant} takes ${minor}`).toBe(ROWS[continents ? dominant : minor].maps[0]);
+      }
+  });
 
   // F4327, F4330 (7b6's design review): olive minors on gas giants read as moss, a bright blue one on a dark world as an ocean.
   it("brings no green to any world, never a sea world's colours, and no saturated blue to a world not blue itself, as drawn", () => {
