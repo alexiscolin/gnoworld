@@ -46,6 +46,8 @@ export class Flights {
   #flights = 0;
   #veil: Dissolve | undefined;
   #veiled = 0;
+  // Whether the cosmos showed at the last frame.
+  #cosmos = false;
 
   constructor(device: FlightDevice) {
     this.#device = device;
@@ -97,9 +99,24 @@ export class Flights {
 
   /** One frame on, `delta` ms after the last, before the eye advances. */
   advance(delta: number): void {
+    this.#homeIfBack();
     const seconds = delta > 0 ? Math.min(delta / 1000, LONGEST_FRAME) : 0;
     if (this.#flying) this.#onWay(seconds);
     this.#fadeVeil(seconds);
+  }
+
+  // The cosmos shown again with no flight bringing it, past a page with no space: the eye stands at the home's view, not where the last
+  // flight left it, 60 units past it after a page's (lot B's review, F3705).
+  #homeIfBack(): void {
+    const shown = this.#device.cosmos() !== undefined;
+    if (shown && !this.#cosmos && !this.#flying) {
+      const { eye } = this.#device;
+      eye.travel.x = 0;
+      eye.travel.y = 0;
+      eye.travel.z = 0;
+      eye.look = undefined;
+    }
+    this.#cosmos = shown;
   }
 
   #onWay(seconds: number): void {

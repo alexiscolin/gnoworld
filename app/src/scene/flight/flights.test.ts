@@ -545,6 +545,60 @@ describe("under reduced motion", () => {
   });
 });
 
+// A world's page, then one without space, then the home: no flight brings the cosmos back, and the eye stood 60 units past its view at
+// rest, where the world's flight had left it (lot B's review, F3705). The cosmos shown again with no flight under way is the home's view.
+describe("the cosmos shown again with no flight bringing it", () => {
+  const ZERO = { x: 0, y: 0, z: 0 };
+
+  it("gives the eye back to the view at rest after a page's flight, once the cosmos shows, never while it is hidden", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    scene.shows.value = false;
+    flown.fly({ kind: "body", name: "GovDAO" });
+    flown.ready();
+    run(flown, scene, 4);
+    expect(flown.stats().flying).toBe(false);
+    expect(away(scene.eye.travel, ZERO)).toBeGreaterThan(10);
+    frame(flown, scene);
+    expect(away(scene.eye.travel, ZERO)).toBeGreaterThan(10);
+    scene.shows.value = true;
+    frame(flown, scene);
+    expect(scene.eye.travel).toEqual(ZERO);
+    expect(scene.eye.look).toBeUndefined();
+  });
+
+  it("gives it back after a star's flight too, once the cosmos was hidden and shows again", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "star", id: pick(scene).id });
+    run(flown, scene, 4);
+    expect(scene.eye.look).toBeDefined();
+    scene.shows.value = false;
+    frame(flown, scene);
+    scene.shows.value = true;
+    frame(flown, scene);
+    expect(scene.eye.travel).toEqual(ZERO);
+    expect(scene.eye.look).toBeUndefined();
+  });
+
+  it("leaves the eye where a flight took it while the cosmos stays shown, and lets a flight that brings the cosmos back run", () => {
+    const scene = rig();
+    const flown = flights(scene.device);
+    flown.fly({ kind: "star", id: pick(scene).id });
+    run(flown, scene, 4);
+    const there = { ...scene.eye.travel };
+    frame(flown, scene);
+    expect(scene.eye.travel).toEqual(there);
+    scene.shows.value = false;
+    frame(flown, scene);
+    flown.fly({ kind: "cosmos", name: "Cosmos" });
+    scene.shows.value = true;
+    frame(flown, scene);
+    expect(flown.stats().flying).toBe(true);
+    expect(away(scene.eye.travel, ZERO)).toBeGreaterThan(0);
+  });
+});
+
 describe("a page's flight", () => {
   it("copies the page it leaves before it goes, crosses the sky along the view, and brings the next body from afar into its place", () => {
     const scene = rig({ yaw: 0.6, pitch: -0.25 });
