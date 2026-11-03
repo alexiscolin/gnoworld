@@ -67,7 +67,8 @@ const THREE_MARK = "isWebGLRenderer";
 // Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
 // the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
-const GENERATED_JS = 8 * 1024; // 7,780 B at 7b5's end (zlib, level 6; 6,489 before its look pass); the chief's to set.
+// 9 KiB since 2026-11-03 (Alexis, docs/decisions.md): 7b6's held details took about 480 B more than 8 KiB.
+const GENERATED_JS = 9 * 1024;
 const GENERATED_MARK = "minorShare";
 
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
