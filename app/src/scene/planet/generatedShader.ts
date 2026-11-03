@@ -1,5 +1,6 @@
 // Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from 7b4's recipe, real maps lending
 // their fine contrast only, lit with the Earth's own light. Comments live here, out of the strings that ship (the scene's budget).
+import { CONTINENTS_SEA } from "@gnoworld/core";
 import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
 import { CRACKS } from "./generatedCracks.ts";
 import { DETAIL, FORMS, NOISE } from "./generatedParts.ts";
@@ -44,7 +45,7 @@ void main() {
   Lookup place = lookupOf(direction);
   vec3 own = detailOf(surface, place);
   vec3 other = own;
-  bool continents = shape.sea > 0.0 && shape.sea < 0.8;
+  bool continents = shape.sea > 0.0 && shape.sea < ${String(CONTINENTS_SEA)};
   if (minorShare > 0.002 && banded < 0.5 && !continents) {
     Lookup elsewhere = lookupOf(spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy));
     other = detailOf(minorMap, elsewhere);

@@ -4,12 +4,14 @@
 import type { Anchor, MapName } from "./anchors.ts";
 import type { PlanetLook } from "./look.ts";
 import type { Lab } from "./palette.ts";
-import type { Recipe } from "./recipe.ts";
+import { ofContinents, type Recipe } from "./recipe.ts";
 import { SURFACE } from "./spans.ts";
 
 export interface Features {
   readonly anchor: Anchor;
   readonly minor: Anchor;
+  /** A world of continents' minor is its bare ground, its climate's in BARE's colours: its class and its map are drawn nowhere. */
+  readonly bare: boolean;
   readonly minorShare: number;
   readonly centre: Lab;
   /** Each value a still shows, as its place on its whole span, 0 to 1. */
@@ -37,6 +39,7 @@ const SHOWN = [
   "detail",
   "halves",
   "mix",
+  "gather",
 ] as const;
 const SAME_COLOUR = 10;
 const SAME_SHAPE = 0.1;
@@ -48,6 +51,7 @@ export function featuresOf(look: PlanetLook, recipe: Recipe): Features {
   return {
     anchor: look.anchor,
     minor: recipe.minor,
+    bare: ofContinents(recipe.surface),
     minorShare: recipe.minorShare,
     centre: recipe.palette.lab[1],
     shape: SHOWN.map((name) => {
@@ -62,9 +66,14 @@ export function featuresOf(look: PlanetLook, recipe: Recipe): Features {
 
 const near = (one: number, other: number, step: number): boolean => Math.abs(one - other) < step;
 
+// Two minors alike: neither shows, both are bare ground, or one class on one map.
+const sameMinor = (one: Features, other: Features): boolean =>
+  Math.max(one.minorShare, other.minorShare) < SAME_MINOR ||
+  (one.bare && other.bare) ||
+  (one.minor === other.minor && one.maps[1] === other.maps[1]);
+
 /** Whether a glance would take two worlds for one: every feature within a step it misses. */
 export function alike(one: Features, other: Features): boolean {
-  const shown = Math.max(one.minorShare, other.minorShare) >= SAME_MINOR;
   const [dl, da, db] = [0, 1, 2].map((at) => (one.centre[at] ?? 0) - (other.centre[at] ?? 0)) as [
     number,
     number,
@@ -74,7 +83,7 @@ export function alike(one: Features, other: Features): boolean {
     one.anchor === other.anchor &&
     one.ringed === other.ringed &&
     one.maps[0] === other.maps[0] &&
-    (!shown || (one.minor === other.minor && one.maps[1] === other.maps[1])) &&
+    sameMinor(one, other) &&
     dl * dl + da * da + db * db < SAME_COLOUR * SAME_COLOUR &&
     near(one.minorShare, other.minorShare, SAME_MINOR) &&
     near(one.air, other.air, SAME_AIR) &&

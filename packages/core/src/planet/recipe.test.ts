@@ -15,7 +15,7 @@ import {
   type PlanetLook,
 } from "./look.ts";
 import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
-import { BARE, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
+import { BARE, CONTINENTS_SEA, ofContinents, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
@@ -317,6 +317,19 @@ describe("a world of continents", () => {
         expect(minorPalette).toEqual(paletteOf(BARE, grade));
         expect(palette).toEqual(paletteOf(ROWS.temperate.palettes, grade));
       }
+  });
+
+  // The reviewer's R9: one rule for what a world of continents is, the program's too (its sea under an ocean's 0.8).
+  it("takes a world for one of continents from a sea of more than none to under an ocean's", () => {
+    expect(CONTINENTS_SEA).toBe(0.8);
+    expect([0, 0.0001, 0.45, 0.7999, 0.8, 1].map((sea) => ofContinents({ sea }))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
   });
 
   it("leaves every other world's minor in its own class's palette", () => {

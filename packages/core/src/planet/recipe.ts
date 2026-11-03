@@ -38,6 +38,10 @@ export interface Recipe {
 /** A world of continents' bare ground, the Earth's own off its day map, cold to hot: Patagonia's cold steppe, the outback's ochre, the
  * Sahara's sand; the Gobi, the outback's west, the Sahara's east. */
 export const BARE: readonly [Ramp, Ramp] = [ramp(0x72624f, 0x927461, 0xe8d2b8), ramp(0x9f8b75, 0x96765f, 0xdfc5aa)];
+/** A world of continents has a sea of less than this (an ocean world's starts there): the program draws its land and its climate. */
+export const CONTINENTS_SEA = 0.8;
+/** Whether a world's surface makes it a world of continents, its minor its bare ground. */
+export const ofContinents = ({ sea }: Pick<Surface, "sea">): boolean => sea > 0 && sea < CONTINENTS_SEA;
 const MAX_MINOR = 0.4;
 const LIGHTNESS = [0.9, 1.1] as const;
 const CHROMA = [0.8, 1] as const;
@@ -114,9 +118,8 @@ export function seededRecipe(seed: Uint8Array, anchor: Anchor, turn: Turn): Reci
     chroma: CHROMA[0] + (CHROMA[1] - CHROMA[0]) * seedShare(more, 29),
     turn,
   };
-  // A world of continents (its sea under 0.8, as the program splits them) keeps its own map, a rock's craters would ring them, and its
-  // minor is its bare ground, which its climate lays (7b8).
-  const continents = surface.sea > 0 && surface.sea < 0.8;
+  // A world of continents keeps its own map, a rock's craters would ring them, and its minor is its bare ground, which its climate lays.
+  const continents = ofContinents(surface);
   return {
     minor,
     minorShare: seedShare(seed, 15) * MAX_MINOR,
