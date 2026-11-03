@@ -1,5 +1,6 @@
-// The dive under reduced motion (7d7): no camera moves, so the whole cosmos, drawn still, is copied once from the screen and laid over the
-// view at rest, which shows through it as it fades. Its picture is the drawing buffer's size, and goes with it.
+// A frame copied once from the screen and laid over the stage, which shows through it as it fades: the dive's under reduced motion (7d7),
+// where no camera moves and the whole cosmos, drawn still, fades into the view at rest. Its picture is the drawing buffer's size, and goes
+// with it. It stands in the scene's folder, apart from the cosmos's, for more than the dive may lay one.
 import {
   BufferAttribute,
   BufferGeometry,
@@ -11,7 +12,7 @@ import {
   type WebGLRenderer,
 } from "three";
 // One triangle over the whole screen, drawn after everything else on the stage. The sky's own (sky.ts) stays its: an import of it from
-// this chunk splits the scene's chunk in two.
+// a lazy chunk splits the scene's chunk in two.
 const CORNERS = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
 const OVER = 10;
 

@@ -3,7 +3,7 @@
 // placed one. It comes with the view at rest, in its chunk.
 import { DIVE, diveAt, toScene, type Point } from "@gnoworld/core";
 import type { Scene as Stage } from "three";
-import { Dissolve } from "./dissolve.ts";
+import { Dissolve } from "../dissolve.ts";
 
 interface Spot {
   x: number;
