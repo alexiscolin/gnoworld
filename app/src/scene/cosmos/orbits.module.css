@@ -8,6 +8,10 @@
     color: #c8d0de;
     /* raw: the mock-up's 17 px names, the hero line's size */
     font: 400 17px/1.2 var(--family-sans);
+    /* raw: the page's space round each letter, so a name on a star's glow reads (the design review's second pass, F4470) */
+    text-shadow:
+      0 0 6px var(--color-space),
+      0 0 2px var(--color-space);
   }
 
   .name {
