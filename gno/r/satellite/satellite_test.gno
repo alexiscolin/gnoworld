@@ -112,6 +112,20 @@ func TestRentFromCodeRefused(cur realm, t *testing.T) {
 	uassert.Equal(t, 0, rentals.Size())
 }
 
+// F5056: a rent is the message's own call, as unsafe.OriginSend's doc asks beside
+// IsUserCall. A realm holding `var Rent = satellite.Rent` gets the coins of a call
+// to it, while IsUserCall still holds in Rent; the keeper refuses that message
+// today, as no code of the paid realm read them, a check its own comment calls no
+// access-control boundary. Here a wallet's call reaches Rent through a closure.
+func TestRentNotTheMessagesOwnCallRefused(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	offer(chain.Coins{{"ugnot", p0}})
+	uassert.AbortsWithMessage(t, cur, "invalid non-origin call", func() { Rent(cross(cur), "mars", "hello", 1) })
+	uassert.Equal(t, 0, rentals.Size())
+	uassert.Equal(t, 0, held)
+}
+
 func TestRentDaysAreOneThreeOrSeven(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))

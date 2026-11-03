@@ -6,6 +6,7 @@ package satellite
 import (
 	"chain"
 	"chain/banker"
+	"chain/runtime"
 	"chain/runtime/unsafe"
 	"strconv"
 	"strings"
@@ -116,8 +117,8 @@ func setWorlds(payer address, ws []string) {
 
 // Rent rents the world's satellite slot for days (1, 3 or 7) from now, showing
 // text; the caller sends exactly the price times the days, in ugnot, from a
-// wallet (a call, not a run). It closes the caller's ended rentals, and the
-// world's if it has ended.
+// wallet (a call, not a run), calling Rent itself. It closes the caller's ended
+// rentals, and the world's if it has ended.
 func Rent(cur realm, world, text string, days int) {
 	if paused {
 		panic("renting is paused")
@@ -145,6 +146,9 @@ func Rent(cur realm, world, text string, days int) {
 	}
 	cost := price * days
 	mustPay(cost)
+	// The message's own call, so its coins came to this realm, not to one holding
+	// Rent in a variable (F5056); called here, as it counts the calls above it.
+	runtime.AssertOriginCall()
 
 	for _, w := range ended {
 		r, _ := get(w)

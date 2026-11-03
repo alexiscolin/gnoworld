@@ -45,7 +45,9 @@ GAPS = {
     "r/seal/seal.gno: height, _ = strconv.ParseInt(f[1], 10, 64) [64 -> 63]": "equivalent: a block height stays below 2^62, where a 63-bit parse reads it alike",
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
-EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]
+EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"'),
+         # A guard that panics inside its call (F5056), switched off where its import stays used.
+         ("r/satellite/satellite.gno", "\truntime.AssertOriginCall()\n", "\tif false {\n\t\truntime.AssertOriginCall()\n\t}\n")]
 # A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
 # realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
 SECONDS_A_COPY = 1.5
