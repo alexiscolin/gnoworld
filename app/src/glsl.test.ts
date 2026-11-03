@@ -71,7 +71,7 @@ function tokensOf(glsl: string): string[] {
 describe("a shader's spaces, stripped", () => {
   it("drops the spaces round operators and the indentation, keeping one between two names", () => {
     expect(stripGlsl("  vec3 c = vec3( 1.0, 2.0, 3.0 );\n  if ( a <= b && c >= d ) discard;")).toBe(
-      "vec3 c=vec3(1.0,2.0,3.0);\nif(a<=b&&c>=d)discard;",
+      " vec3 c=vec3(1.0,2.0,3.0);\nif(a<=b&&c>=d)discard;",
     );
     expect(stripGlsl("uniform float uFade;\nvarying vec3 vTint;")).toBe("uniform float uFade;\nvarying vec3 vTint;");
   });
@@ -87,12 +87,16 @@ describe("a shader's spaces, stripped", () => {
       expect(tokensOf(stripGlsl(sample))).toEqual(tokensOf(sample));
   });
 
-  it("keeps a line break beside a value set in as a line break, and spaces as one space, and no edge elsewhere", () => {
-    const beside = { before: true, after: true };
-    expect(stripGlsl("\n  float a = 1.0;\n  ", beside)).toBe("\nfloat a=1.0;\n");
-    expect(stripGlsl("  = vec4( 1.0 );", beside)).toBe(" =vec4(1.0);");
-    expect(stripGlsl("#ifdef USE_MAP\n", beside)).toBe("#ifdef USE_MAP\n");
-    expect(stripGlsl("\n  float a = 1.0;\n  ")).toBe("float a=1.0;");
+  // Code joins a string to what stands beside it, a value set in or another string (three's `'#define ' + name`): its edge is kept as
+  // what it was, a line break as one, spaces as one space, none where there was none (7v's security review, F4450).
+  it("keeps a string's edges as they were, a line break as one and spaces as one space, none where there was none", () => {
+    expect(stripGlsl("\n  float a = 1.0;\n  ")).toBe("\nfloat a=1.0;\n");
+    expect(stripGlsl("  = vec4( 1.0 );")).toBe(" =vec4(1.0);");
+    expect(stripGlsl("#ifdef USE_MAP\n")).toBe("#ifdef USE_MAP\n");
+    expect(stripGlsl("#define ")).toBe("#define ");
+    expect(stripGlsl("\n#define HIGH_PRECISION")).toBe("\n#define HIGH_PRECISION");
+    expect(stripGlsl("float a = 1.0;")).toBe("float a=1.0;");
+    expect(stripGlsl(" \n ")).toBe("\n");
   });
 
   // Two signs a space keeps apart, for joined they would read as one operator or open or close a comment (7v's review: most of these
@@ -146,11 +150,11 @@ describe("a shader's spaces, stripped", () => {
     expect(stripGlsl("float/**/b;")).toBe("float b;");
     expect(stripGlsl("a = 1.0; // x /* y\nb = 2.0; /* z */ c = 3.0;")).toBe("a=1.0;\nb=2.0;c=3.0;");
     expect(stripGlsl("x = -/**/-b;")).toBe("x=- -b;");
-    expect(stripGlsl("#define A 1 // one\n#define B 2 /* two */")).toBe("#define A 1\n#define B 2");
+    expect(stripGlsl("#define A 1 // one\n#define B 2 /* two */")).toBe("#define A 1\n#define B 2 ");
   });
 
   it("reads a line break of either kind, and a continued #define as its preprocessor does", () => {
-    expect(stripGlsl("float a = 1.0;\r\nfloat b = 2.0;\r\n")).toBe("float a=1.0;\nfloat b=2.0;");
+    expect(stripGlsl("float a = 1.0;\r\nfloat b = 2.0;\r\n")).toBe("float a=1.0;\nfloat b=2.0;\n");
     const continued = "#define B(x) \\\n  ( x + 1.0 )\nfloat c = B( 2.0 );";
     expect(tokensOf(stripGlsl(continued))).toEqual(tokensOf(continued));
     expect(stripGlsl(continued)).toContain("\\\n");
@@ -202,7 +206,7 @@ describe("a built chunk's shaders, stripped", () => {
     expect(stripped).toContain(`const a=\`${stripGlsl(GLSL)}\`;`);
     expect(stripped).toContain(`const b=${JSON.stringify(stripGlsl(GLSL))};`);
     // Round a value set in, a space or a line break as there was: a preprocessor line before one stays a line of its own.
-    expect(stripped).toContain("const c=`void main(){\n${d} =vec4(1.0);\n}`;");
+    expect(stripped).toContain("const c=`\nvoid main(){\n${d} =vec4(1.0);\n}`;");
     expect(stripped).toContain('const e="a - -b + +c";const f=/a - -b/;const g=`x = y + z`;');
   });
 
@@ -236,8 +240,33 @@ describe("a built chunk's shaders, stripped", () => {
   // `time * ${SPIN}` (surfaceShader.ts): a value set in after a sign keeps its space, for a negative one would make `--`.
   it("keeps a space between a sign and a value set in after it", () => {
     expect(stripChunk("const s=`\nvoid main() { float a = b - ${n}; }`;")).toBe(
-      "const s=`void main(){float a=b- ${n};}`;",
+      "const s=`\nvoid main(){float a=b- ${n};}`;",
     );
+  });
+
+  // Three builds a program's text from strings joined by `+` and `+=` (WebGLProgram.js:170, 319, 396, three 0.187): stripped apart, each
+  // lost the edge its neighbour needed, `#defineSTANDARD` and `usampler2DArray;#define HIGH_PRECISION`, and WebGL2 refused every
+  // material (7v's security review, F4450).
+  it("keeps the edges code joins strings by: a directive on its own line, a define's name a word apart", () => {
+    const code = [
+      "chunks.push('#define '+name+' '+value);",
+      "let p=`precision ${q} float;\nprecision ${q} int;`;p+='\\n#define HIGH_PRECISION';",
+      "const v='#version '+version+'\\n';const f=v+'#define varying in\\n'+body;",
+    ].join("\n");
+    const stripped = stripChunk(code);
+    expect(stripped).toContain(`chunks.push("#define "+name+' '+value);`);
+    expect(stripped).toContain('let p=`precision ${q} float;\nprecision ${q} int;`;p+="\\n#define HIGH_PRECISION";');
+    expect(stripped).toContain(`const v="#version "+version+'\\n';const f=v+"#define varying in\\n"+body;`);
+  });
+
+  // What 7v's review's hand-made mutants showed no test held: a value set in beside another, a shader string inside a shader template's
+  // value (the outermost is taken, the inner left as it is), an escape in a template.
+  it("keeps a space between two values set in, takes the outermost shader, and leaves a template with an escape whole", () => {
+    expect(stripChunk("const s=`\nvoid main(){x=${a} ${b};}`;")).toBe("const s=`\nvoid main(){x=${a} ${b};}`;");
+    const nested = 'const s=`\nuniform float u;\nvoid main() { ${"uniform vec2 v;  x = 1.0;"} }`;';
+    expect(stripChunk(nested)).toBe('const s=`\nuniform float u;\nvoid main(){ ${"uniform vec2 v;  x = 1.0;"} }`;');
+    const escaped = "const t=`\nvoid main() { x = 1.0; }\\n`;";
+    expect(stripChunk(escaped)).toBe(escaped);
   });
 
   it.each(["ivec2", "uvec3", "bvec4", "vec2", "mat3", "mat2x3", "sampler2D", "sampler3D", "samplerCube"])(

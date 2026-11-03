@@ -47,30 +47,15 @@ function stripLine(line: string): string {
 const edgeOf = (space: string) => (space === "" ? "" : space.includes("\n") ? "\n" : " ");
 
 /** `glsl` with the spaces a compiler skips gone: comments, indentation, empty lines and the spaces round operators; a line the preprocessor
- * reads kept whole on its own line. Its edge `before` or `after` it is kept, a line break as one and spaces as one space, where a value is
- * set in beside it. */
-export function stripGlsl(glsl: string, beside: Beside = {}): string {
+ * reads kept whole on its own line. Its edges are kept as they were, a line break as one and spaces as one space: code joins a string to
+ * what stands beside it, a value set in or another string (three's `'#define ' + name`; 7v's security review, F4450). */
+export function stripGlsl(glsl: string): string {
   // Whichever comment starts first: `// x /* y` is a line's comment, and the next line is code.
   const uncommented = glsl.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (comment) => (comment.startsWith("//") ? "" : " "));
   const lead = /^\s*/.exec(uncommented)?.[0] ?? "";
   const trail = /\s*$/.exec(uncommented.slice(lead.length))?.[0] ?? "";
-  return framed(linesOf(uncommented.slice(lead.length, uncommented.length - trail.length)), { lead, trail }, beside);
-}
-
-/** Where a value is set in beside a text: before it, after it. */
-interface Beside {
-  readonly before?: boolean;
-  readonly after?: boolean;
-}
-
-// `body` with the edges kept where a value is set in beside it.
-function framed(
-  body: string,
-  { lead, trail }: { lead: string; trail: string },
-  { before = false, after = false }: Beside,
-) {
-  if (body === "") return before || after ? edgeOf(lead + trail) : "";
-  return (before ? edgeOf(lead) : "") + body + (after ? edgeOf(trail) : "");
+  const body = linesOf(uncommented.slice(lead.length, uncommented.length - trail.length));
+  return body === "" ? edgeOf(lead + trail) : edgeOf(lead) + body + edgeOf(trail);
 }
 
 // Each line stripped, a preprocessor's whole, the empty ones gone.
@@ -118,8 +103,7 @@ function templateOf(code: string, node: Node): string {
   const expressions = node["expressions"] as readonly Span[];
   const parts = quasis.map(({ value }, at) => {
     const set = expressions[at];
-    const stripped = stripGlsl(value.raw, { before: at > 0, after: set !== undefined });
-    return stripped + (set === undefined ? "" : `\${${code.slice(set.start, set.end)}}`);
+    return stripGlsl(value.raw) + (set === undefined ? "" : `\${${code.slice(set.start, set.end)}}`);
   });
   return `\`${parts.join("")}\``;
 }
