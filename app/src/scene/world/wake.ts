@@ -1,32 +1,69 @@
-// The wake (decision row F4103): a seed on this reader's first visit grows to its world's size in one step, and a wave of light runs out from
-// it a little longer. Under reduced motion it is the world at once, with no wave.
-import type { WorldSigns } from "@gnoworld/core";
+// A world's appearance on this reader's first visit (decision rows F4103 and 2026-11-03; frames 20, 21 and 102 to 105): once the world
+// rests, a band of light runs down it from its north pole drawing a grid behind it, which then fades; a seed grows to its world's size in one
+// step from the same frame, and a wave of light runs out from it a little longer. Under reduced motion a still grid shows and fades, and a
+// seed is its world at once, with no wave. A seed's part starts on the first resting frame that knows it is one: its file may come later.
+import { smoothstep, type WorldSigns } from "@gnoworld/core";
 import { eased } from "../earth/marks.ts";
 import type { WorldReading } from "./reading.ts";
 
 const GROW = 1.4;
 const RUN = 3;
+// Timed on the frames, one a second: landed at 102, the band just under the equator at 103, the grid whole and strong at 104, gone by 105.
+const SWEEP = 1.6;
+const FADE = 0.8;
+/** Where the band stands before it comes and once it has gone, in the world's own height: past a pole by more than its glow. */
+export const BAND_REACH = 1.4;
 
 type Growing = { -readonly [Key in keyof WorldSigns]: WorldSigns[Key] };
 
-export class Wake {
-  #from: number | undefined;
-  #growing: Growing | undefined;
-  /** What is left of the wave, 1 as it starts and 0 once gone. */
-  left = 0;
+/** How the world stands on a frame: under reduced motion, and at rest, no flight bringing it. */
+export interface Pose {
+  readonly still: boolean;
+  readonly resting: boolean;
+}
 
-  /** A reading that wakes a seed starts the wake on the next frame. */
+/** Where an appearance stands, kept across a context restored: it never plays twice, nor starts again. */
+export interface Kept {
+  readonly drawn: number | undefined;
+  readonly woke: number | undefined;
+}
+
+export class Wake {
+  #drawn: number | undefined;
+  #woke: number | undefined;
+  #growing: Growing | undefined;
+  /** What is left of a seed's wave, 1 as it starts and 0 once gone. */
+  left = 0;
+  /** Where the band stands, in the world's own height: 1 at its north pole, -1 at its south. */
+  band = -BAND_REACH;
+  /** How much of the grid shows, 1 whole and 0 none. */
+  grid = 0;
+
+  /** A reading that wakes a seed starts its part on the next resting frame. */
   read(reading: WorldReading, last: WorldReading | undefined): void {
-    if (reading.wake && last?.wake !== true) this.#from = undefined;
+    if (reading.wake && last?.wake !== true) this.#woke = undefined;
   }
 
-  /** The signs at `seconds`. */
-  signsAt(reading: WorldReading | undefined, seconds: number, still: boolean): WorldSigns | undefined {
+  /** The appearance at `seconds`, and the signs it gives the world: none starts while a flight brings the world, not yet `resting`. */
+  at(reading: WorldReading | undefined, seconds: number, { still, resting }: Pose): WorldSigns | undefined {
+    if (resting && reading?.first === true) this.#drawn ??= seconds;
+    if (resting && reading?.wake === true) this.#woke ??= seconds;
+    this.#draw(seconds, still);
+    return this.#grow(reading, seconds, still);
+  }
+
+  #draw(seconds: number, still: boolean): void {
+    const age = this.#drawn === undefined ? Infinity : seconds - this.#drawn;
+    this.band = still || age >= SWEEP ? -BAND_REACH : BAND_REACH * (1 - (2 * age) / SWEEP);
+    this.grid = age < SWEEP ? 1 : 1 - smoothstep(SWEEP, SWEEP + FADE, age);
+  }
+
+  #grow(reading: WorldReading | undefined, seconds: number, still: boolean): WorldSigns | undefined {
     this.left = 0;
     if (reading?.woken === undefined || !reading.wake) return reading?.signs;
     if (still) return reading.woken;
-    this.#from ??= seconds;
-    const age = seconds - this.#from;
+    if (this.#woke === undefined) return reading.signs;
+    const age = seconds - this.#woke;
     const grown = eased(Math.min(age / GROW, 1));
     this.left = Math.max(0, 1 - age / RUN);
     const { signs, woken } = reading;
@@ -40,16 +77,19 @@ export class Wake {
   }
 
   reset(): void {
-    this.#from = undefined;
+    this.#drawn = undefined;
+    this.#woke = undefined;
     this.left = 0;
+    this.band = -BAND_REACH;
+    this.grid = 0;
   }
 
-  /** Where the wake stands, kept across a context restored: a world that woke never wakes twice. */
-  keep(): number | undefined {
-    return this.#from;
+  keep(): Kept {
+    return { drawn: this.#drawn, woke: this.#woke };
   }
 
-  restore(from: number | undefined): void {
-    this.#from = from;
+  restore({ drawn, woke }: Kept): void {
+    this.#drawn = drawn;
+    this.#woke = woke;
   }
 }

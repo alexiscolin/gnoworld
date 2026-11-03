@@ -262,6 +262,21 @@ describe("readingOf", () => {
     expect(again.wake).toBe(false);
   });
 
+  // The appearance (Alexis, 2026-11-03, frames 103 to 105) plays on any world's first visit: an old world, one the file misses, or no file.
+  it("says a visit is this reader's first to the world whatever its age, and a return none", () => {
+    const old = fileOf({
+      id: "mint/old",
+      namespace: "mint",
+      realms: [realm("gno.land/r/mint/old")],
+      seen: new Date(NOW - 30 * DAY).toISOString(),
+    });
+    const first = readingOf(old, quiet({ id: "mint/old", visited: false }));
+    expect(first.first).toBe(true);
+    expect(first.wake).toBe(false);
+    expect(readingOf(undefined, quiet({ id: "bubble", visited: false })).first).toBe(true);
+    expect(readingOf(old, quiet({ id: "mint/old", visited: true })).first).toBe(false);
+  });
+
   it("keeps a world a seed through its seventh day, and no longer: 6 days 23 hours, then 7 days", () => {
     const aged = (days: number) =>
       readingOf(

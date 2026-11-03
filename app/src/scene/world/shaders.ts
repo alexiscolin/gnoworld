@@ -49,9 +49,15 @@ void main() {
 }
 `;
 
+// The first visit's grid, measured on frame 104: a meridian every 36 degrees, parallels at 18 and 54 degrees either side of the equator,
+// none on it nor at the poles (past 1.2 radians); lines about 1.5 px wide at any size, by their own screen derivatives. Its steps a radian.
+const STEPS = (5 / Math.PI).toFixed(6);
+// The band's glow is 0.12 of the radius wide (frame 103). Its light and a line's, read on frames 103 and 104 through the scene's tone
+// mapping: (211, 217, 215) laid over a black night, covering 0.88 of what is under it, on the day side and the night side alike.
+
 // shadowOf: each body between the point and the one sun darkens it, with a soft penumbra; only the day side has light to lose. stormOf: a
 // cyclone's spiral arms round a centre fixed on the ground, which turns as the surface does, its size from its strength. The aurora rings each pole on the night side and
-// shimmers with time; the heat warms the limb. All of it is premultiplied: a shadow darkens what is under it, the rest adds.
+// shimmers with time; the heat warms the limb. All of it is premultiplied: a shadow darkens what is under it, the rest adds; the grid and its band cover.
 export const OVERLAY_FRAGMENT = /* glsl */ `
 uniform vec3 sun;
 uniform float time;
@@ -61,11 +67,22 @@ uniform vec3 stormAt[3];
 uniform float heat;
 uniform vec4 occluders[${String(OCCLUDERS_MAX)}];
 uniform float occluderCount;
+uniform float band;
+uniform float grid;
 varying vec3 vLocal;
 varying vec3 vWorld;
 varying vec3 vNormal;
 
 ${TURNED}
+float lineOf(float along) {
+  return 1.0 - smoothstep(0.35, 1.1, abs(fract(along + 0.5) - 0.5) / max(fwidth(along), 1e-5));
+}
+
+float gridOf(vec3 ground) {
+  float latitude = asin(clamp(ground.y, -1.0, 1.0));
+  return max(lineOf(atan(ground.z, ground.x) * ${STEPS}), lineOf(latitude * ${STEPS} + 0.5) * step(abs(latitude), 1.2));
+}
+
 float shadowOf(vec3 point) {
   float dark = 0.0;
   for (int at = 0; at < ${String(OCCLUDERS_MAX)}; at++) {
@@ -113,6 +130,12 @@ void main() {
   vec3 heatLight = vec3(1.0, 0.6, 0.28) * edge * heat * 0.55;
   float alpha = 1.0 - (1.0 - cloud) * (1.0 - shade);
   vec3 colour = cloudLight * cloud * (1.0 - shade) + auroraLight + heatLight;
+  if (grid > 0.0) {
+    float fromBand = (ground.y - band) / 0.12;
+    float light = max(gridOf(ground) * step(band, ground.y), exp(-fromBand * fromBand)) * grid;
+    colour = colour * (1.0 - 0.88 * light) + vec3(0.83, 0.95, 0.89) * light;
+    alpha = 1.0 - (1.0 - alpha) * (1.0 - 0.88 * light);
+  }
   gl_FragColor = vec4(colour, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

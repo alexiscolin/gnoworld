@@ -1,5 +1,6 @@
-// A world seen close, as one group: its approved render, one overlay that adds its signs and the shadows cast on it, the status ring with its
-// moon, and the wake. It owns all of it but the maps, which its view loads and frees, and the sphere, which it is lent.
+// A world seen close, as one group: its approved render, one overlay that adds its signs, the shadows cast on it and the first visit's
+// grid, the status ring with its moon, and the wake. It owns all of it but the maps, which its view loads and frees, and the sphere, which
+// it is lent.
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import {
   CustomBlending,
@@ -24,6 +25,7 @@ import type { World } from "../planet/generated.ts";
 import { LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
 import { WorldHalo } from "./halo.ts";
 import { OCCLUDERS_MAX, OVERLAY_FRAGMENT, OVERLAY_VERTEX, STATUS_FRAGMENT, WAKE_FRAGMENT } from "./shaders.ts";
+import { BAND_REACH } from "./wake.ts";
 
 const OVER_GROUND = 1.004;
 // Off the orbit: no threshold's mark, where the realm states none.
@@ -98,6 +100,8 @@ export class WorldBody {
           heat: { value: 0 },
           occluders: { value: Array.from({ length: OCCLUDERS_MAX }, () => new Vector4()) },
           occluderCount: { value: 0 },
+          band: { value: -BAND_REACH },
+          grid: { value: 0 },
         },
       }),
     );
@@ -205,11 +209,15 @@ export class WorldBody {
     return count;
   }
 
-  /** The wake at `left`, 1 as it starts and 0 once gone. */
-  setWake(left: number): void {
+  /** The first visit's appearance: the wake's wave at `left`, 1 as it starts and 0 once gone; the grid's band, where it stands in the
+   * world's own height, and how much of the grid shows, both drawn by the overlay. */
+  setWake({ left, band, grid }: { readonly left: number; readonly band: number; readonly grid: number }): void {
     this.#wake.visible = left > 0;
     const wave = this.#wake.material.uniforms["wave"];
     if (wave !== undefined) wave.value = left;
+    const { uniforms } = this.overlay;
+    if (uniforms["band"] !== undefined) uniforms["band"].value = band;
+    if (uniforms["grid"] !== undefined) uniforms["grid"].value = grid;
   }
 
   dispose(): void {

@@ -59,3 +59,14 @@ describe("the scene's shaders", () => {
     expect(found).toEqual([]);
   });
 });
+
+// The appearance's grid (Alexis, 2026-11-03; frame 104) lies on the sphere: drawn in the frame of the ground the world turns, the one its
+// storms stand on, so it turns with the world; a journey reads its lines on the canvas (worldAppearance.spec.ts).
+describe("a world's overlay", () => {
+  it("draws the appearance's grid on the turned ground, as its storms", async () => {
+    const { OVERLAY_FRAGMENT } = await import("./shaders.ts");
+    expect(OVERLAY_FRAGMENT).toMatch(/vec3 ground = turned\(normalize\(vLocal\), time \* [\d.]+\);/);
+    expect(OVERLAY_FRAGMENT).toMatch(/gridOf\(ground\)/);
+    expect(OVERLAY_FRAGMENT).toMatch(/stormOf\(ground,/);
+  });
+});

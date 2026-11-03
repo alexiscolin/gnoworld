@@ -1,6 +1,6 @@
 // What a world's view is told, and from where (ADR-0002 §3): the people present in its rooms and the times of their lines, from the page's
-// store; the worlds' file, read once; whether this reader came before, told once a visit, so a first visit's wake plays to its end, and
-// remembered, so a reload never wakes the world again. The page reads and keeps both: the scene holds no storage.
+// store; the worlds' file, read once; whether this reader came before, told once a visit, so a first visit's appearance plays to its end,
+// and remembered for any world, so a reload never plays it again. The page reads and keeps both: the scene holds no storage.
 import { statusOrbit } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { StoreApi } from "zustand/vanilla";
@@ -93,7 +93,7 @@ export class WorldFeed {
       now: now(),
     });
     this.#view.read(reading);
-    if (reading.wake) remember();
+    if (reading.first) remember();
   }
 
   /** What the realm reports now, for the status ring. */

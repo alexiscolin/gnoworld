@@ -12,6 +12,7 @@ interface Held {
   readonly disc: number;
   readonly fit: number;
   readonly wake: number;
+  readonly appearance: { readonly band: number; readonly grid: number };
   readonly orbit: StatusOrbit | undefined;
   readonly reading: WorldReading | undefined;
   readonly shadows: number;
@@ -47,6 +48,7 @@ export function statsOf(held: Held) {
     centre: { x: centre?.x ?? 0, y: centre?.y ?? 0, radius: held.disc },
     size: held.fit,
     wake: held.wake,
+    appearance: { ...held.appearance },
     ring: ringOf(held),
     signs: signsOf(held.reading),
     moons: (standing?.moons?.spots ?? []).map((spot) => ({ ...spot })),

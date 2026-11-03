@@ -35,7 +35,13 @@ const PLATE = { left: 24, top: 98, right: 900, bottom: 1056, fill: [24, 31, 50] 
 const PLACE: Circle = { x: 960, y: 561, radius: 300, plate: PLATE };
 const ID = "gov/dao";
 
-function device({ halved = false } = {}) {
+// `arrival` is what a flight writes as it brings the world (7g): none, as on a page loaded by itself, is a world at rest.
+interface Arrival {
+  approach: number;
+  aside: number;
+}
+
+function device({ halved = false, arrival }: { halved?: boolean; arrival?: Arrival } = {}) {
   const stage = new Stage();
   const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
   const moved = vi.fn();
@@ -44,7 +50,16 @@ function device({ halved = false } = {}) {
     initTexture: vi.fn(),
     compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
   };
-  const view = new WorldView({ renderer, stage, camera, halved: () => halved, base: "/", moved, stood: vi.fn() });
+  const view = new WorldView({
+    renderer,
+    stage,
+    camera,
+    halved: () => halved,
+    base: "/",
+    moved,
+    stood: vi.fn(),
+    ...(arrival === undefined ? {} : { arrival }),
+  });
   return { stage, camera, moved, renderer, view };
 }
 
@@ -65,11 +80,13 @@ const reading = (more: Partial<WorldReading> = {}): WorldReading => ({
   aurora: 0,
   storms: [0, 0, 0],
   wake: false,
+  // A seed wakes only on this reader's first visit (isFresh): a reading that wakes one is a first visit, unless a test says otherwise.
+  first: more.wake === true,
   ...more,
 });
 
-async function opened({ halved = false, id = ID } = {}) {
-  const made = device({ halved });
+async function opened({ halved = false, id = ID, arrival }: { halved?: boolean; id?: string; arrival?: Arrival } = {}) {
+  const made = device({ halved, ...(arrival === undefined ? {} : { arrival }) });
   const said: string[] = [];
   const colours: string[] = [];
   made.view.resize(WIDTH, HEIGHT, 1);
@@ -433,6 +450,190 @@ describe("each sign on its data", () => {
     view.tick(0);
     expect(view.stats().wake).toBe(0);
     expect(view.stats().size).toBeCloseTo((await opened()).view.stats().size, 6);
+  });
+});
+
+// The first visit's appearance (Alexis, 2026-11-03; frames 20, 21 and 102 to 105, one a second): once the world rests, a band of light
+// runs down it from its north pole and draws a grid behind it; the grid then fades. Frame 102 has landed and shows none, 103 the band just
+// under the equator, 104 the whole grid, 105 nothing. A seed's wake is the same appearance, from the same frame.
+const appearance = (view: WorldView) => view.stats().appearance;
+
+describe("its appearance on this reader's first visit", () => {
+  it("runs a band of light down from its north pole, the grid drawn behind it, then fades the grid (frames 102 to 105)", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(10);
+    expect(appearance(view).band, "frame 102: above the north pole, nothing on the world yet").toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(appearance(view).grid).toBe(1);
+    view.tick(10.8);
+    expect(Math.abs(appearance(view).band), "frame 103: about the equator").toBeLessThan(0.3);
+    view.tick(11.8);
+    expect(appearance(view).band, "frame 104: gone under the south pole").toBeLessThanOrEqual(-1.3);
+    expect(appearance(view).grid, "frame 104: the grid whole and strong").toBeGreaterThan(0.7);
+    view.tick(12.1);
+    expect(appearance(view).grid, "fading").toBeGreaterThan(0);
+    expect(appearance(view).grid).toBeLessThan(0.7);
+    view.tick(12.8);
+    expect(appearance(view).grid, "frame 105: gone").toBe(0);
+    expect(Math.abs(appearance(view).band), "and its band off the world").toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("tells the world's overlay where the band stands and how much grid shows: drawn in its draw, nothing made", async () => {
+    const { view, stage } = await opened();
+    const before = materials(stage).length;
+    view.read(reading({ first: true }));
+    view.tick(3);
+    view.tick(3.9);
+    const overlay = overlayOf(stage);
+    expect(value(overlay, "band")).toBeCloseTo(appearance(view).band, 6);
+    expect(value(overlay, "grid")).toBeCloseTo(appearance(view).grid, 6);
+    expect(appearance(view).grid).toBeGreaterThan(0);
+    expect(materials(stage).length).toBe(before);
+    view.tick(9);
+    expect(value(overlay, "grid")).toBe(0);
+    expect(Math.abs(value(overlay, "band") as number)).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("plays none on a return: no grid, and no band on the world", async () => {
+    const { view, stage } = await opened();
+    view.read(reading({ first: false }));
+    for (let second = 0; second < 4; second += 0.25) {
+      view.tick(second);
+      expect(appearance(view).grid).toBe(0);
+      expect(Math.abs(appearance(view).band)).toBeGreaterThanOrEqual(1.3);
+    }
+    expect(value(overlayOf(stage), "grid")).toBe(0);
+    expect(Math.abs(value(overlayOf(stage), "band") as number)).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("plays once a visit: the readings that follow each second, and the page asking again, neither restart nor replay it", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(10);
+    view.tick(10.8);
+    view.read(reading({ first: true, heat: 0.2 }));
+    view.show({ circle: PLACE, id: ID }, () => undefined);
+    view.tick(10.9);
+    expect(Math.abs(appearance(view).band), "carried on, not back at the pole").toBeLessThan(0.3);
+    view.tick(13);
+    view.read(reading({ first: true, heat: 0.4 }));
+    view.tick(13.5);
+    view.tick(14);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("holds the grid while a flight brings the world, even at the last of its approach", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    Object.assign(arrival, { approach: 1.05, aside: 0.001 });
+    view.tick(2);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("starts the band on the frame the world rests (frames 101 and 102)", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(3);
+    expect(appearance(view).grid).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+    view.tick(3.8);
+    expect(Math.abs(appearance(view).band)).toBeLessThan(0.3);
+  });
+
+  it("holds a seed's wake while a flight brings it, and wakes it once it rests", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(1);
+    view.tick(2);
+    expect(view.stats().wake).toBe(0);
+    const held = view.stats().size;
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(3);
+    view.tick(3.8);
+    expect(view.stats().wake).toBeGreaterThan(0);
+    expect(view.stats().size).toBeGreaterThan(held);
+  });
+
+  it("is one appearance with a seed's wake: the seed grows, its wave runs and its grid draws from the same frame", async () => {
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(5);
+    expect(view.stats().wake).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+    view.tick(5.8);
+    expect(view.stats().wake).toBeLessThan(1);
+    expect(Math.abs(appearance(view).band)).toBeLessThan(0.3);
+  });
+
+  it("stands a still grid under reduced motion, shown then faded, with no band and no turn", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, stage } = await opened();
+    view.read(reading({ first: true }));
+    for (const second of [0, 0.8, 1.5]) {
+      view.tick(second);
+      expect(appearance(view).band, "no band on the world").toBeLessThanOrEqual(-1.3);
+      expect(appearance(view).grid).toBe(1);
+    }
+    expect(value(overlayOf(stage), "time"), "the grid does not turn").toBe(0);
+    view.tick(2);
+    expect(appearance(view).grid).toBeGreaterThan(0);
+    expect(appearance(view).grid).toBeLessThan(1);
+    view.tick(2.8);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  // Under reduced motion the scene draws only the frames it owes (frameRate): a grid shown and never owed its fade would stay for good.
+  it("owes a frame while it plays, under reduced motion too, and none once it is over", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, moved } = await opened();
+    view.read(reading({ first: true }));
+    moved.mockClear();
+    view.tick(0);
+    view.tick(2);
+    expect(moved).toHaveBeenCalledTimes(2);
+    view.tick(2.6);
+    moved.mockClear();
+    view.tick(2.7);
+    expect(moved).not.toHaveBeenCalled();
+  });
+
+  it("keeps the appearance that ran when a lost context comes back: it carries on, never starts again", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.tick(0.4);
+    view.restored();
+    await settled();
+    view.tick(0.8);
+    expect(Math.abs(appearance(view).band), "carried on, not back at the pole").toBeLessThan(0.3);
+    view.tick(3);
+    view.restored();
+    await settled();
+    view.tick(3.5);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("starts again for another world the page names: each world's first visit is its own", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.tick(3);
+    view.show({ circle: PLACE, id: "gnoland/blog" }, () => undefined);
+    view.read(reading({ first: true, look: worldLook("gnoland/blog") }));
+    await settled();
+    view.tick(4);
+    expect(appearance(view).grid).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -42,7 +42,8 @@ function line(room: string, id: string, at: number) {
   return parsed.message;
 }
 
-function parts(file: Worlds | undefined = FRESH, visited = false) {
+// `null` is a file that never came.
+function parts(file: Worlds | null = FRESH, visited = false) {
   const store = createAppStore();
   store.getState().chatActions.follow(["#bubble", "#bubble/games"]);
   store.setState((state) => ({
@@ -60,7 +61,7 @@ function parts(file: Worlds | undefined = FRESH, visited = false) {
     universe: "onyx",
     id: "bubble",
     page: { store, open: vi.fn(), slug: "bubble", room: null, universe: "onyx", path: "/w/bubble" },
-    file: () => Promise.resolve(file),
+    file: () => Promise.resolve(file ?? undefined),
     visited,
     remember,
     now: () => NOW,
@@ -103,6 +104,22 @@ describe("a world's feed", () => {
     await settled();
     again.feed.refresh();
     expect(again.view.read.mock.lastCall?.[0]).toMatchObject({ wake: false });
+    expect(again.remember).not.toHaveBeenCalled();
+  });
+
+  // The appearance plays on any world's first visit (Alexis, 2026-11-03), kept as the wake is: an old world, or one whose file never came.
+  it("has any world's first visit remembered, a seed or not, so a reload never plays its appearance again", async () => {
+    const old = parts({ ...FRESH, worlds: FRESH.worlds.map((world) => ({ ...world, seen: "2026-01-01T00:00:00Z" })) });
+    await settled();
+    expect(old.view.read.mock.lastCall?.[0]).toMatchObject({ first: true, wake: false });
+    expect(old.remember).toHaveBeenCalled();
+    const lost = parts(null);
+    await settled();
+    expect(lost.view.read.mock.lastCall?.[0]).toMatchObject({ first: true, wake: false });
+    expect(lost.remember).toHaveBeenCalled();
+    const again = parts(FRESH, true);
+    await settled();
+    expect(again.view.read.mock.lastCall?.[0]).toMatchObject({ first: false });
     expect(again.remember).not.toHaveBeenCalled();
   });
 

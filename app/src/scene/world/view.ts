@@ -11,7 +11,7 @@ import type { MoonMark } from "./orbiting.ts";
 import type { WorldReading } from "./reading.ts";
 import { Standing } from "./standing.ts";
 import { statsOf } from "./stats.ts";
-import { Wake } from "./wake.ts";
+import { Wake, type Pose } from "./wake.ts";
 import type { WorldBody } from "./body.ts";
 import { discOf, fitOf } from "./fit.ts";
 
@@ -44,6 +44,7 @@ export class WorldView {
   #orbit: StatusOrbit | undefined;
   #marks: readonly MoonMark[] = [];
   readonly #waking = new Wake();
+  readonly #frame: { -readonly [Key in keyof Pose]: Pose[Key] } = { still: false, resting: true };
   #fit = fitOf(1, undefined);
   #shadows = 0;
   // The world that could not come: placed again, it is not asked again. Another id, or a context restored, tries again.
@@ -162,8 +163,10 @@ export class WorldView {
     const standing = this.#standing;
     const body = standing?.body;
     if (standing === undefined || body === undefined || body.group.parent === null) return;
-    const still = this.#motion.matches;
-    this.#grow(body, this.#waking.signsAt(this.#reading, seconds, still));
+    const still = (this.#frame.still = this.#motion.matches);
+    // A flight bringing the world writes how far it stands: it rests once that is 1, or with no flight to write it.
+    this.#frame.resting = (this.#device.arrival?.approach ?? 1) <= 1;
+    this.#grow(body, this.#waking.at(this.#reading, seconds, this.#frame));
     // The eye looks about slowly: the world turns with it, so it stays in its circle, lit from the same side of the screen.
     const { quaternion } = this.#device.camera;
     broughtTo(body.group.position, this.#rest, this.#device.arrival).applyQuaternion(quaternion);
@@ -177,7 +180,9 @@ export class WorldView {
   #grow(body: WorldBody, signs: WorldSigns | undefined): void {
     this.#fit = fitOf(signs?.size ?? 1, this.#reading?.used);
     body.sized.scale.setScalar(this.#fit);
-    body.setWake(this.#waking.left);
+    body.setWake(this.#waking);
+    // Under reduced motion only owed frames are drawn: the appearance owes them while it plays, so its grid fades.
+    if (this.#waking.grid > 0) this.#device.moved();
     if (signs !== undefined && this.#reading !== undefined) body.setSigns(signs, this.#reading);
   }
 
@@ -224,6 +229,7 @@ export class WorldView {
       disc: this.#disc(),
       fit: this.#fit,
       wake: this.#waking.left,
+      appearance: { band: this.#waking.band, grid: this.#waking.grid },
       orbit: this.#orbit,
       reading: this.#reading,
       shadows: this.#shadows,

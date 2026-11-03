@@ -46,6 +46,8 @@ export interface WorldReading {
   readonly storms: readonly [number, number, number];
   /** This visit wakes a seed. */
   readonly wake: boolean;
+  /** This visit is this reader's first to the world, whatever its age: its appearance plays. */
+  readonly first: boolean;
   /** Its realms' use against its universe's, 0 to 1 on a log scale with no floor (F4307); none while the universe's file has no count. */
   readonly used?: number;
 }
@@ -111,6 +113,7 @@ export function readingOf(file: Worlds | undefined, at: WorldNow): WorldReading 
     aurora: auroraIn(found, at.now),
     storms: stormsOf(at.lines, at.now),
     wake: fresh,
+    first: !at.visited,
     ...(used === undefined ? {} : { used }),
   };
 }
