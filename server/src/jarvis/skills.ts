@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync, type Stats } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { hiddenIn } from "./untrusted.ts";
+import { hiddenIn, visible } from "./untrusted.ts";
 
 interface Limits {
   readonly file: number;
@@ -30,7 +30,9 @@ interface Folder {
   read(path: string, stats: Stats): string;
 }
 
-const failure = (path: string, why: string) => new Error(`skills: ${path}: ${why}`);
+// A refusal reaches the operator's terminal: a name's hidden characters, its lines included, are shown, never run.
+const failure = (path: string, why: string, options?: ErrorOptions) =>
+  new Error(`skills: ${visible(path, false)}: ${why}`, options);
 
 /** The skills of a folder, 64 KiB a file and 512 KiB in all by default; throws on anything else, naming the file. */
 export function loadSkills(folder: string, limits: Limits = { file: 64 * 1024, total: 512 * 1024 }) {
@@ -70,7 +72,7 @@ export function loadSkills(folder: string, limits: Limits = { file: 64 * 1024, t
     read({ skill, reference }: { readonly skill: string; readonly reference?: string | undefined }): string {
       const path = reference === undefined ? `${skill}/SKILL.md` : `${skill}/references/${reference}`;
       const file = files.get(path);
-      if (file === undefined) throw new Error(`skills: ${path} was not loaded`);
+      if (file === undefined) throw new Error(`skills: ${visible(path, false)} was not loaded`);
       return file.text;
     },
     digest: hash.digest("hex"),
@@ -116,7 +118,7 @@ function textOf(path: string, bytes: Buffer): string {
   try {
     text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch (cause) {
-    throw new Error(`skills: ${path}: not UTF-8 text`, { cause });
+    throw failure(path, "not UTF-8 text", { cause });
   }
   const hidden = hiddenIn(text);
   if (hidden !== undefined) throw failure(path, `holds ${hidden}, a hidden or control character`);

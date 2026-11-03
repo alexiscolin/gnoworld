@@ -25,6 +25,11 @@ export function hiddenIn(text: string): string | undefined {
   return undefined;
 }
 
+/** A text with each hidden or control character written as its code point, `[U+202E]`, tab and new line kept with `lines`. */
+export function visible(text: string, lines: boolean): string {
+  return text.replace(hidden(), (character) => (lines && isLine(character) ? character : `[${pointOf(character)}]`));
+}
+
 export interface Untrusted {
   /** The rule the turn states before its blocks, naming their markers. */
   readonly rule: string;

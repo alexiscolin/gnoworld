@@ -290,6 +290,24 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
     expect(failure(folder({ ...TWO(), [path]: bytes }))).toBe(`skills: ${why}`);
   });
 
+  // A refusal reaches the operator's terminal: a planted name's escape, line break or override is shown, never run.
+  it.each([
+    [() => `concierge/${String.fromCodePoint(0x1b)}[2Jok`, () => "concierge/[U+001B][2Jok: not a skill's file"],
+    [() => "concierge/run\nskills: ok.md", () => "concierge/run[U+000A]skills: ok.md: not a skill's file"],
+    [() => "concierge/a\tb", () => "concierge/a[U+0009]b: not a skill's file"],
+    [() => `gno/references/${String.fromCodePoint(0x202e)}dm.x`, () => "gno/references/[U+202E]dm.x: not a reference"],
+    [() => `${String.fromCodePoint(0x200b)}gno/SKILL.md`, () => "[U+200B]gno: not a skill's name"],
+  ])("names a planted file whose name hides a character by its code point (%#)", (path, why) => {
+    expect(failure(folder({ ...TWO(), [path()]: "# Planted\n" }))).toBe(`skills: ${why()}`);
+  });
+
+  it("names a skill it was asked to read and did not load with its hidden characters shown", () => {
+    const skills = loadSkills(folder(TWO()));
+    expect(() => skills.read({ skill: `gno${String.fromCodePoint(0x1b)}[2J` })).toThrow(
+      "skills: gno[U+001B][2J/SKILL.md was not loaded",
+    );
+  });
+
   it("refuses a skill with no SKILL.md, a SKILL.md that is a folder, and references that are a file", () => {
     expect(failure(folder({ ...TWO(), "realm-reader/references/a.md": "# A\n" }))).toBe(
       "skills: realm-reader: no SKILL.md",
