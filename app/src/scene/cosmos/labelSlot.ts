@@ -34,7 +34,7 @@ export function slotIn(layer: HTMLElement, document: Document): Slot {
     return element.appendChild(part);
   };
   const words = [word(styles["title"]), word(styles["count"]), word(styles["badge"])] as const;
-  element.className = styles["label"] ?? "";
+  element.className = `${styles["placed"] ?? ""} ${styles["label"] ?? ""}`;
   element.style.setProperty("opacity", "0");
   layer.append(element);
   return { element, words, chosen: undefined, written: new Float64Array(7).fill(Number.NaN) };

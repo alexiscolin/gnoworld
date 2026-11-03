@@ -11,14 +11,19 @@
     z-index: 0;
   }
 
+  /* What the script places from the layer's corner, on one line: each label, and a Plan's names (orbits.ts). */
+  .placed {
+    position: absolute;
+    inset: 0 auto auto 0;
+    white-space: nowrap;
+  }
+
   .label {
     /* raw: where the stem stands in from the pill's left edge, f0004's 12 px; the script writes it */
     --_stem: 12px;
     /* How much of its words a far label keeps: the script writes it, the pill never fades */
     --_fade: 1;
 
-    position: absolute;
-    inset: 0 auto auto 0;
     transform-origin: 0 0;
     pointer-events: none;
     padding: var(--space-2xs) var(--space-xs);
@@ -26,7 +31,6 @@
     /* raw: f0004's pills, the night at 80% over the warm space behind them: no blur, which is not Baseline yet (F262) */
     background: color-mix(in oklab, var(--color-surface) 80%, transparent);
     box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
-    white-space: nowrap;
     transition: opacity var(--motion-base) var(--ease-standard);
   }
 
