@@ -65,7 +65,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "check_docs,worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -1085,6 +1085,7 @@ def mutants():
     yield from regressions_name_mutants()
     yield from design_mutants()
     yield from mutate_mutants()
+    yield from hidden_mutants()
 
 
 def swaps(path, name, rows):
@@ -1252,6 +1253,29 @@ def mutate_mutants():
         ("max(60, math.ceil(", "max(0, math.ceil(", "gives a run 60 s at least"),
         ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
         ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
+    ))
+
+
+def hidden_mutants():
+    """check_docs refuses a hidden character in every file git tracks or would (F5053), and the listing it reads."""
+    yield from swaps("scripts/check_docs.py", "check_docs", (
+        ('unicodedata.category(c) != "Cf"', "True", "refuses a format character"),
+        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".jpg",)', "reads no .png"),
+        ('IMAGES = (".png", ".jpg")', 'IMAGES = (".png",)', "reads no .jpg"),
+        ('decode("utf-8", "surrogateescape")', 'decode("utf-8", "ignore")', "counts a byte that is no UTF-8 as a character"),
+        ("        line, seen = 1, 0\n", "        line, seen = 0, 0\n", "counts lines from 1"),
+        ("            seen = m.start()\n", "", "counts the lines before each hidden character once"),
+        ('column = m.start() - text.rfind("\\n", 0, m.start())', 'column = m.start() - text.rfind("\\n", 0, m.start()) - 1', "counts columns from 1"),
+        ("{unicodedata.name(c)}", "", "names the hidden character"),
+        ("p.relative_to(root).as_posix()}:{line}", "p.name}:{line}", "names the file by its path"),
+        ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
+        ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
+    ))
+    yield from swaps("scripts/repo_files.py", "repo_files", (
+        ('"ls-files", "-z", "--cached"', '"ls-files", "--cached"', "lists names git quotes none of (-z)"),
+        ('{"node_modules", ".git"}', '{"node_modules"}', "walks none of git's own folder"),
+        ('{"node_modules", ".git"}', '{".git"}', "walks no installed package"),
+        ("    return [p for p in paths if p.is_file()]\n", "    return paths\n", "lists no file deleted from the work tree"),
     ))
 
 

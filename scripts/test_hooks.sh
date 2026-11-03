@@ -1023,6 +1023,83 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
+# A hidden character (F5053), a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
+# file git tracks or would, prose and the prototype's docs included, fails, named by its file, line, column and code point;
+# no comment allows it. Written as an escape it passes, as an accent or an emoji does; an image is no text, and what git
+# ignores is not read. printf writes each from its UTF-8 bytes, so this file holds none.
+h="$t/hidden" && mkdir -p "$h/src" "$h/r/x" "$h/docs/prototype" "$h/.claude/rules" "$h/ignored" "$h/node_modules/x" "$h/app/node_modules" && good_rules "$h"
+git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
+hidden() { python3 -I "$docs" "$h" 2>&1; }
+printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
+printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
+printf 'PNG\342\200\256' >"$h/shot.png" && printf 'JPG\342\200\256' >"$h/shot.jpg"
+# A file deleted from the work tree but still in the index is not read.
+printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
+hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
+# A file it cannot read fails, never passes unread.
+: >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
+hidden >/dev/null && fail "check_docs passed a file it cannot read"
+chmod 644 "$h/src/locked.ts"
+# Every format character, the ends of each range the brief names included, and none of their neighbours that show.
+python3 -I - "$h/table.txt" "$h/table.want" <<'PY'
+import sys
+refused = [*range(0x200B, 0x2010), *range(0x202A, 0x202F), *range(0x2066, 0x206A), 0xFEFF, 0x061C, 0x00AD, *range(0x2060, 0x2065), 0x206A, 0x206F, 0xE0001, 0xE0020, 0xE007F]
+shown = [0x00A0, 0x200A, 0x2010, 0xFE0F, 0xE0100]  # two spaces, a hyphen, two variation selectors (an emoji's)
+points = refused + shown
+open(sys.argv[1], "w", encoding="utf-8").write("".join(f"x{chr(p)}\n" for p in points))
+open(sys.argv[2], "w").write("".join(f"  table.txt:{n}:2: U+{p:04X}\n" for n, p in enumerate(points, 1) if p in refused))
+PY
+printf '// a header\nconst x = "ab\342\200\256cd"; // gitleaks:allow noqa eslint-disable-line prettier-ignore @ts-ignore nolint\n' >"$h/src/a.ts"
+printf 'package x\n\nvar s = "\342\201\246"\n' >"$h/r/x/x.gno"
+printf 'ab\342\200\213c\n' >"$h/docs/prototype/notes.md"
+printf '\357\273\277# a file with a BOM\n' >"$h/README"
+printf 'x\342\200\215y\n' >"$h/src/joined.ts"
+printf '\330\234 a mark\n' >"$h/notes.txt"
+printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
+printf '# co\302\255de\n' >"$h/a.py"
+printf '\000\342\200\256\n' >"$h/blob.txt"
+printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
+printf 'a\014b\342\200\256\nc\342\200\213d\342\200\215\n\303\251\360\237\230\200\342\200\256\n' >"$h/multi.txt"
+printf '\342\200\256\n' >"$h/$(printf 'caf\303\251 notes.md')" && printf '\342\200\256\n' >"$h/q\"uote.md"
+for f in ignored/x.ts node_modules/x/y.js app/node_modules/z.js; do printf 'const x = "\342\200\256";\n' >"$h/$f"; done
+git -C "$h" add README && git -C "$h" commit -qm base
+cat >"$h/want" <<'EOF'
+  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE
+  r/x/x.gno:3:10: U+2066 LEFT-TO-RIGHT ISOLATE
+  docs/prototype/notes.md:1:3: U+200B ZERO WIDTH SPACE
+  README:1:1: U+FEFF ZERO WIDTH NO-BREAK SPACE
+  src/joined.ts:1:2: U+200D ZERO WIDTH JOINER
+  notes.txt:1:1: U+061C ARABIC LETTER MARK
+  .claude/rules/x.md:1:11: U+E0041 TAG LATIN CAPITAL LETTER A
+  a.py:1:5: U+00AD SOFT HYPHEN
+  blob.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
+  latin.txt:1:6: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:1:4: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:2:2: U+200B ZERO WIDTH SPACE
+  multi.txt:2:4: U+200D ZERO WIDTH JOINER
+  multi.txt:3:3: U+202E RIGHT-TO-LEFT OVERRIDE
+  café notes.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+  q"uote.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+EOF
+out=$(hidden) && fail "check_docs accepted hidden characters: $out"
+printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character" || fail "check_docs did not say why it refused hidden characters: $out"
+printf '%s\n' "$out" | grep ': U+' | grep -v '^  table\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
+diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
+$(cat "$h/diff")"
+printf '%s\n' "$out" | grep '^  table\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' >"$h/table.got"
+diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's format characters, one a line, against the wanted ones (<):
+$(cat "$h/diff")"
+# The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
+# file of the folder but git's own and the installed packages', and still refuses.
+mkdir -p "$t/nogit" "$t/badgit" && printf '#!/bin/sh\nexit 1\n' >"$t/badgit/git" && chmod +x "$t/badgit/git"
+printf '\342\200\256\n' >"$h/.git/planted"
+py=$(command -v python3)
+for path in "$t/nogit" "$t/badgit:$PATH"; do
+	out=$(PATH=$path "$py" -I "$docs" "$h" 2>&1) && fail "check_docs accepted a hidden character with PATH=$path: $out"
+	printf '%s\n' "$out" | grep -qxF "  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs, with PATH=$path, did not name the hidden character: $out"
+	printf '%s\n' "$out" | grep -qF "  .git/" && fail "check_docs, with PATH=$path, read git's own folder: $out"
+	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
+done
 fi
 
 if part harness_mutate; then
@@ -1818,6 +1895,10 @@ mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && 
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
+# A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
+printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
+precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
+git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red

@@ -3,16 +3,18 @@
 # .claude/**/*.md (the ADRs, plans and ARCHITECTURE describe the future too), and checks
 # every `scripts/`, `.claude/`, `docs/`, `adr/` or `.githooks/` path written in backticks.
 # Paths with a template variable or under .claude/tmp/ are skipped. It also checks the findings
-# ledger, docs/review/findings.md (docs/REVIEW.md), and the runbook's alerts and known limits.
+# ledger, docs/review/findings.md (docs/REVIEW.md), the runbook's alerts and known limits, and
+# that no file git tracks or would holds a hidden character (F5053).
 # Usage: check_docs.py [root]
 import pathlib
 import re
 import subprocess
 import sys
+import unicodedata
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
-from repo_files import listed
+from repo_files import listed, tracked
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
@@ -54,6 +56,32 @@ def lost_rules(root):
     claude = root / "CLAUDE.md"
     if not claude.is_file() or not CARD_ITEM.search(claude.read_text()):
         out.append("CLAUDE.md: the review card has no item `8. Risk and undo:`")
+    return out
+
+
+# A format character (Unicode's category Cf: a bidi control, a zero-width one, a BOM, a tag) shows nothing, or changes how
+# the text around it reads: code that reads otherwise than it runs, words a reader never sees but a model does (F5053). A
+# file that needs one writes it as an escape. An image is no text; any other file is read, a NUL byte or no UTF-8 included.
+IMAGES = (".png", ".jpg")
+NON_ASCII = re.compile(r"[^\x00-\x7f]")
+
+
+def hidden(root):
+    """Each format character of the files git tracks or would, as `<path>:<line>:<column>: U+<hex> <name>`."""
+    out = []
+    for p in tracked(root):
+        if p.suffix in IMAGES:
+            continue
+        text = p.read_bytes().decode("utf-8", "surrogateescape")  # a byte that is no UTF-8 stays one character
+        line, seen = 1, 0
+        for m in NON_ASCII.finditer(text):
+            c = m.group()
+            if unicodedata.category(c) != "Cf":
+                continue
+            line += text.count("\n", seen, m.start())
+            seen = m.start()
+            column = m.start() - text.rfind("\n", 0, m.start())
+            out.append(f"{p.relative_to(root).as_posix()}:{line}:{column}: U+{ord(c):04X} {unicodedata.name(c)}")
     return out
 
 
@@ -146,5 +174,9 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
-if missing or problems or orphans or unnamed or lost or rules:
+hidden_chars = hidden(root)
+if hidden_chars:
+    print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
+          " (F5053); write each as an escape, never raw:", *hidden_chars, sep="\n  ", file=sys.stderr)
+if hidden_chars or missing or problems or orphans or unnamed or lost or rules:
     sys.exit(1)

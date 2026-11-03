@@ -115,12 +115,18 @@ def worktree(rev):
             git("worktree", "remove", "--force", tree)
 
 
-def listed(root, suffixes, skip=frozenset()):
-    """The files git would track under root (so .gitignore holds), or every file when root is not
-    in a repository; a file deleted but still in the index is left out."""
+def tracked(root):
+    """The files git would track under root (so .gitignore holds), or every file but git's own and the installed packages
+    when root is not in a repository or git cannot list it; a file deleted but still in the index is left out. Names come
+    NUL-ended (-z), so git quotes none, whatever its characters (a quoted name is no file: F1545)."""
     try:
-        paths = [root / line for line in git("-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard").splitlines()]
+        paths = [root / name for name in git("-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0") if name]
     except (OSError, subprocess.CalledProcessError):
         # Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it borrows.
-        paths = [p for p in root.rglob("*") if "node_modules" not in p.relative_to(root).parts]
-    return [p for p in paths if p.suffix in suffixes and p.is_file() and not skip & set(p.relative_to(root).parts)]
+        paths = [p for p in root.rglob("*") if not {"node_modules", ".git"} & set(p.relative_to(root).parts)]
+    return [p for p in paths if p.is_file()]
+
+
+def listed(root, suffixes, skip=frozenset()):
+    """tracked()'s files ending in one of suffixes, outside the folders skip names."""
+    return [p for p in tracked(root) if p.suffix in suffixes and not skip & set(p.relative_to(root).parts)]
