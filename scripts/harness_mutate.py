@@ -691,6 +691,8 @@ def mutants():
                                ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\n", "unset GIT_CONFIG_COUNT\n", "git -c's parameters"),
                                ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT\n", "unset GIT_CONFIG_PARAMETERS\n", "git -c's count")):
         yield from each("scripts/test_hooks.sh", find, replace, "hooks", f"the hook suite's throwaway repositories ignore the git config of {way} (F5012)")
+    yield from each("scripts/test_hooks.sh", "export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n",
+                    "hooks", "the hook suite exports its git config files to git, which a plain assignment never reaches (F5021)")
     yield from each(".githooks/commit-msg", '--config "$(dirname "$0")/$config"', '--config "scripts/$config"', "hooks", "commit-msg scans with its own rules, not the working tree's (F129)")
     yield from each(".githooks/pre-push", 'sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" ||', "true ||", "hooks", "pre-push wants the hooks of the main it pushes installed (F129)")
     yield from each(ck, 'if [ "$runs_from" != "$git_dir/hooks" ]; then', "if false; then", "hooks", "check.sh refuses hooks taken from elsewhere (F129)")

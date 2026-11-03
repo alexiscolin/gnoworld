@@ -686,7 +686,8 @@ signs "XDG's git/config" -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME="$us/xdg"
 signs "git -c's parameters" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'"
 signs "git -c's count" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs"
 # All at once around a copy of this file, whose one planted section commits in a throwaway repository: it passes, unsigned.
-printf 'if part commits; then\ngit init -q "$t/c" && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\nfi\n' >"$us/planted"
+# The section also wants the two file variables exported as /dev/null, which a system file it cannot plant needs.
+printf 'if part commits; then\n[ "$(printenv GIT_CONFIG_GLOBAL):$(printenv GIT_CONFIG_SYSTEM)" = /dev/null:/dev/null ] || fail "git does not get the config files this file sets"\ngit init -q "$t/c" && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\nfi\n' >"$us/planted"
 sed "/^part() {/r $us/planted" "$0" >"$us/scripts/test_hooks.sh"
 grep -qx 'if part commits; then' "$us/scripts/test_hooks.sh" || fail "the planted section is not in the copy of test_hooks.sh"
 rm -f "$us/signed"
@@ -694,6 +695,11 @@ out=$(env HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" GIT_CONFIG_GLOBAL="$us/signs
 	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
 	fail "a throwaway repository took the git config around test_hooks.sh, which signs (F5012): $out"
 [ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012)"
+# Then with neither file variable around it, as in Alexis's shell: a value this file sets but does not export would never reach
+# git, and HOME's .gitconfig would sign again (F5021).
+out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
+	fail "a throwaway repository took the git config of HOME around test_hooks.sh, which signs (F5021): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of HOME's git config (F5021)"
 fi
 
 if part pre_commit; then
