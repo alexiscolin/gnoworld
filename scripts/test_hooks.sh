@@ -378,7 +378,8 @@ assert mutate.verdict("m1/x.gno:1:1: e (code=gnoTypeCheckError)\nFAIL    ./m1 \t
 assert mutate.verdict("FAIL    ./m1 \t0.00s\n", 1) == "killed"
 PY
 # Then the check, on a planted workspace and the real gno: a package whose every mutant is killed or a known gap passes,
-# printing each verdict and the flips that do not compile; a guard's line and verdicts stay what they were before the flips.
+# printing each verdict and the flips that do not compile; a guard's printed line and verdicts stay what they were before the
+# flips, and its key is that line, which names its file as a flip's does (F5018).
 for w in a b; do
 	mkdir -p "$mu/$w/r/planted" && : >"$mu/$w/gnowork.toml"
 	printf 'module = "gno.land/r/test/planted"\ngno = "0.9"\n' >"$mu/$w/r/planted/gnomod.toml"
@@ -460,7 +461,7 @@ PY
 }
 checked() { (cd "$mu/$1" && shift && env "$@" python3 -I "$mu/check.py" 2>&1); } # $1: the workspace; then the environment
 P=r/planted/planted.gno
-gapped "$mu/check.py" '{"if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
 out=$(checked a GNO="$GNO") || fail "mutate.py failed a package whose every mutant is killed or a known gap: $out"
 cat >"$mu/a.want" <<EOF
 ok    killed: $P: mustPositive(n)
@@ -492,7 +493,7 @@ $(cat "$mu/a.diff")"
 # A survivor outside GAPS fails, guard or flip, a `+` or a number's as well; so does a gap a test now kills, guard or flip, a
 # gap that does not compile, a key that names no mutant left, and a guard or an EXTRA line that does not compile. A flip in
 # GAPS is never dropped: it must keep surviving.
-gapped "$mu/check.py" '{"gone(x)": "stale guard", "r/planted/planted.gno: gone [< -> <=]": "stale flip", "mustPositive(n)": "now killed", "r/planted/planted.gno: if n < 1 { [< -> <=]": "now killed", "r/planted/planted.gno: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -]": "does not compile"}' \
+gapped "$mu/check.py" '{"r/planted/planted.gno: gone(x)": "stale guard", "r/planted/planted.gno: gone [< -> <=]": "stale flip", "r/planted/planted.gno: mustPositive(n)": "now killed", "r/planted/planted.gno: if n < 1 { [< -> <=]": "now killed", "r/planted/planted.gno: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -]": "does not compile"}' \
 	'[["r/planted/planted.gno", "return \"n\" + strconv", "return \"n\" - strconv"]]'
 out=$(checked b GNO="$GNO") && fail "mutate.py passed survivors, stale keys and a guard that does not compile: $out"
 B=r/broken/broken.gno
@@ -503,7 +504,7 @@ for line in "FAIL  survives: $P: if bad { (expected killed)" "FAIL  survives: $P
 	"FAIL  killed: $P: mustPositive(n) (expected survives)" "FAIL  killed: $P: if n < 1 { [< -> <=] (expected survives)" \
 	"FAIL  does not compile: $P: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -] (expected survives)" \
 	"FAIL  does not compile: $B: mustSmall(k) (expected killed)" "FAIL  does not compile: $P: return \"n\" + strconv (expected killed)" \
-	"FAIL  GAPS lists a mutant that no longer exists: gone(x)" "FAIL  GAPS lists a mutant that no longer exists: $P: gone [< -> <=]"; do
+	"FAIL  GAPS lists a mutant that no longer exists: $P: gone(x)" "FAIL  GAPS lists a mutant that no longer exists: $P: gone [< -> <=]"; do
 	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
 $out"
 done
@@ -529,7 +530,7 @@ done
 exit 1
 EOF
 chmod +x "$mu/fakegno"
-gapped "$mu/check.py" '{"if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
 out=$(checked a GNO="$mu/fakegno" FAKE=compile) && fail "mutate.py passed when no mutant compiled: $out"
 # One gno run judges a package's guards and flips together: the untouched copy and its 5 guards and 17 flips, each once.
 [ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] || fail "mutate.py ran gno other than once for one package: $(cat "$mu/fakegno.runs")"
@@ -547,16 +548,21 @@ printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does 
 out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
-# One GAPS key excuses one mutant: a guard's key is its bare line, so the same untested guard in two packages would hide
-# behind one gap given for the first.
+# One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
+# line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
 for p in one two; do
 	mkdir -p "$mu/c/r/$p" && printf 'module = "gno.land/r/test/%s"\ngno = "0.9"\n' "$p" >"$mu/c/r/$p/gnomod.toml"
 	printf 'package %s\n\nfunc Do(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' "$p" >"$mu/c/r/$p/$p.gno"
 done
+printf '\nfunc Again(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' >>"$mu/c/r/two/two.gno"
 : >"$mu/c/gnowork.toml"
-gapped "$mu/check.py" '{"if bad {": "one gap, given for r/one"}'
-out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse a guard in two packages: $out"
-printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one"}'
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let a gap given for r/one excuse the same guard in r/two: $out"
+printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (known gap: one gap, given for r/one)" || fail "mutate.py did not keep r/one's gap: $out"
+[ "$(printf '%s\n' "$out" | grep -cxF "FAIL  survives: r/two/two.gno: if bad { (expected killed)")" = 2 ] || fail "mutate.py did not fail r/two's two untested guards: $out"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
 # The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
 out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
 out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"

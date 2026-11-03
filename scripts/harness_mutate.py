@@ -1218,6 +1218,7 @@ def mutate_mutants():
         ('    return prefix + {16: f"{value:x}", 2: f"{value:b}", 8: f"{value:o}", 10: str(value)}[base]\n', "    return str(value)\n", "writes a number in its own base"),
         ("{f' #{k}' if seen[line, text, new] > 1 else ''}", "", "numbers the same flip of the same text"),
         ('        yield f"{path}: {line} [', '        yield f"{line} [', "names the file in a flip's key"),
+        ('cases = [(f"{f}: {label}", f, src, False)', "cases = [(label, f, src, False)", "names the file in a guard's key (F5018)"),
         ('text not in FLIP or text in ("+", "-")', "True", "drops no comparison or logic flip"),
         ('text not in FLIP or text in ("+", "-")', "text not in FLIP", "drops a + or - flip that does not compile"),
         ("        cases += flipped\n", "", "runs the flips"),

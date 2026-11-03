@@ -14,11 +14,12 @@ array's size) is dropped and counted, unless GAPS lists it. A comparison or logi
 flip changes no type, so one that does not compile means a broken run.
 
 GAPS holds the mutants no test catches yet, with the reason. They must keep
-surviving, so closing a gap means deleting its line here. A guard's key is its
-line; a flip's is `<file>: <line> [<from> -> <to>]`, with ` #<k>` after `<to>`
-when the same flip of the same text comes k times in the file. A key that names
-more than one mutant (the same guard line twice) fails: one gap, one mutant. A flip that loops
-forever times the whole run out, and no gap can hold it: bound its loop.
+surviving, so closing a gap means deleting its line here. A key names its file:
+a guard's is `<file>: <line>` (its branch, for one `||` branch), a flip's
+`<file>: <line> [<from> -> <to>]`, with ` #<k>` after `<to>` when the same flip
+of the same text comes k times in the file. A key that names more than one
+mutant (the same guard line twice in a file) fails: one gap, one mutant. A flip
+that loops forever times the whole run out, and no gap can hold it: bound its loop.
 Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
 import glob
 import os
@@ -29,11 +30,11 @@ import sys
 import tempfile
 
 GAPS = {
-    "mustStrong(b)": "no test seals with a weak key as b: seal-store slice",
-    "mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): seal-store slice",
-    "if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): seal-store slice",
-    "if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 2, on onyx",
-    "!ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: seal-store slice",
+    "r/seal/seal.gno: mustStrong(b)": "no test seals with a weak key as b: seal-store slice",
+    "r/seal/seal.gno: mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): seal-store slice",
+    "r/seal/seal.gno: if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): seal-store slice",
+    "r/seal/seal.gno: if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 2, on onyx",
+    "r/seal/seal.gno: !ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: seal-store slice",
     "r/seal/seal.gno: height, _ = strconv.ParseInt(f[1], 10, 64) [64 -> 63]": "equivalent: a block height stays below 2^62, where a 63-bit parse reads it alike",
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
@@ -181,15 +182,15 @@ def main():
     failed, seen = False, {}  # each mutant's key, and how many mutants carry it
     for pkg in sorted(packages):
         sources = [f for f in sorted(glob.glob(f"{pkg}/*.gno")) if not f.endswith(("_test.gno", "_filetest.gno"))]
-        # (key, what is printed, file, source, may be dropped when it does not compile)
-        cases = [(label, f"{f}: {label}", f, src, False) for f in sources for label, src in mutants(f)]
-        flipped = [(label, label, f, src, drop) for f in sources for label, src, drop in flips(f)]
+        # (key, file, source, may be dropped when it does not compile): a guard's key names its file, as a flip's (F5018)
+        cases = [(f"{f}: {label}", f, src, False) for f in sources for label, src in mutants(f)]
+        flipped = [(label, f, src, drop) for f in sources for label, src, drop in flips(f)]
         cases += flipped
-        out = run(pkg, packages, [(f, src) for _, _, f, src, _ in cases])
+        out = run(pkg, packages, [(f, src) for _, f, src, _ in cases])
         if verdict(out, 0) != "survives":
             sys.exit(f"FAIL  control: {pkg}'s untouched copy does not pass\n{out}")
         dropped = 0
-        for i, (label, shown, _, _, droppable) in enumerate(cases, 1):
+        for i, (label, _, _, droppable) in enumerate(cases, 1):
             seen[label] = seen.get(label, 0) + 1
             got, want = verdict(out, i), "survives" if label in GAPS else "killed"
             if got == "does not compile" and droppable and label not in GAPS:
@@ -198,7 +199,7 @@ def main():
             note = f"  (known gap: {GAPS[label]})" if label in GAPS else ""
             ok = got == want
             failed |= not ok
-            print(f"{'ok  ' if ok else 'FAIL'}  {got}: {shown}{note if ok else f' (expected {want})'}")
+            print(f"{'ok  ' if ok else 'FAIL'}  {got}: {label}{note if ok else f' (expected {want})'}")
         if dropped:
             print(f"ok    {dropped} of {len(flipped)} flips do not compile, dropped: {pkg}")
         if "test timed out after" in out:
@@ -207,7 +208,7 @@ def main():
     for stale in GAPS.keys() - seen.keys():
         print(f"FAIL  GAPS lists a mutant that no longer exists: {stale}")
         failed = True
-    # A guard's key is its bare line: the same line in two places would hide behind one gap.
+    # The same guard line twice in one file has one key: both would hide behind one gap.
     for shared in (key for key in GAPS if seen.get(key, 0) > 1):
         print(f"FAIL  GAPS key names {seen[shared]} mutants, one only: {shared}")
         failed = True
