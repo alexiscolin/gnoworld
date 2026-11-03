@@ -306,6 +306,9 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
     expect(() => skills.read({ skill: `gno${String.fromCodePoint(0x1b)}[2J` })).toThrow(
       "skills: gno[U+001B][2J/SKILL.md was not loaded",
     );
+    expect(() => skills.read({ skill: "gno", reference: "audit.md\nskills: ok" })).toThrow(
+      "skills: gno/references/audit.md[U+000A]skills: ok was not loaded",
+    );
   });
 
   it("refuses a skill with no SKILL.md, a SKILL.md that is a folder, and references that are a file", () => {
