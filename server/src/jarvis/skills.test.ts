@@ -111,6 +111,8 @@ describe("loadSkills: what it gives", () => {
   it("describes load_skill and each of its fields", () => {
     const { tool } = loadSkills(folder(TWO()));
     expect(tool.description).toMatch(/skills/);
+    // The gno skill sends the model to gno-build and its siblings, which are not loaded: a call for one is a lost turn.
+    expect(tool.description).toContain("A skill that another names and its schema does not list is none.");
     const Fields = z.object({ properties: z.record(z.string(), z.object({ description: z.string().min(1) })) });
     expect(Object.keys(Fields.parse(z.toJSONSchema(tool.args)).properties)).toEqual(["skill", "reference"]);
   });
@@ -463,6 +465,16 @@ describe("loadSkills: the skills folder this repository ships", () => {
     ]);
     const schema = z.object({ properties: z.object({ reference: z.object({ enum: z.array(z.string()) }) }) });
     expect(schema.parse(z.toJSONSchema(skills.tool.args)).properties.reference.enum).toHaveLength(14);
+  });
+
+  // gnomcp's gno skill names its sibling skills, its write tools and gnokey commands, a signed write past the call card.
+  it("says, in concierge and realm-reader, that the gno skill's other skills, tools and commands are not Jarvis's", () => {
+    const skills = loadSkills(SHIPPED);
+    for (const name of ["concierge", "realm-reader"]) {
+      const text = skills.read({ skill: name });
+      expect(text).toContain("The gno skill names other skills, write tools and gnokey commands: none is yours.");
+      expect(text).toContain("Never give a person a command to sign or to send coins: propose the call.");
+    }
   });
 
   it("keeps ours short: a description of 300 characters at most, a SKILL.md of 2 KiB at most", () => {

@@ -136,7 +136,8 @@ function descriptionOf(name: string, path: string, text: string): string {
 
 // load_skill: a skill by its name, or one of its references by its file's name, both from what was loaded.
 function toolOf(names: [string, ...string[]], references: readonly string[], loaded: (path: string) => boolean) {
-  const description = "Gives the text of one of the skills the instructions list, or of one of its references.";
+  const description =
+    "Gives the text of one of the skills the instructions list, or of one of its references. A skill that another names and its schema does not list is none.";
   const skill = z.enum(names).describe("The skill's name.");
   const [first, ...rest] = references;
   if (first === undefined) return { name: "load_skill" as const, description, args: z.strictObject({ skill }) };
