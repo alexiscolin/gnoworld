@@ -174,7 +174,7 @@ export class Cosmos {
     this.#whole.look(this.#mapEye, this.#focal);
     const sight = { eye: this.#mapEye, focal: this.#focal };
     const { bodies, hidden, near, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
-    this.#bodies.stand(bodies, near);
+    this.#bodies.stand(bodies, worlds.chart === true ? "chart" : near ? "near" : "rest");
     this.labels?.look(this.#systems, this.#drawn, bodies.keys());
     this.#disc.paint({
       ...sight,

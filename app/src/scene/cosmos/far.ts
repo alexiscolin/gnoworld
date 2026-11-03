@@ -26,6 +26,16 @@ export function angleAt(own: number, distance: number): number {
   return own + (FAR_ANGLE - own) * farShare(distance);
 }
 
+/** Where the eye rests, which says how a body takes its light: at the view at rest, at a system's view, or in a Plan, a chart. */
+export type View = "rest" | "near" | "chart";
+
+// A Plan's body, lit from its own star, turns no further than this from the eye: a fifth of its disc lit at the least (F4470).
+const CHART_DARKEST = 2.2;
+
+/** The star's angle from the eye for a body of a Plan, a chart: its own star's real one, `sun` from the body and `eye` towards it, a fifth
+ * of its disc lit at the least (the design review's second pass, F4470). */
+export const chartAngle = (sun: Vector3, eye: Vector3): number => Math.min(sun.angleTo(eye), CHART_DARKEST);
+
 /** A world's limb at a distance: the Earth's band fits under a pixel on a far disc, and would read as a hard white line. */
 export const limbAt = (distance: number): number => LIMB_LIGHT * (1 - FAR_LIMB * farShare(distance));
 

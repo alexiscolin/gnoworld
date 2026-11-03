@@ -21,7 +21,7 @@ import { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { fromEyeOf } from "../planet/light.ts";
 import type { Planet } from "../planet/planet.ts";
-import { angleAt, fadeAt, limbAt, sideOf } from "./far.ts";
+import { angleAt, chartAngle, fadeAt, limbAt, sideOf, type View } from "./far.ts";
 import type { BodyMaps } from "./maps.ts";
 
 interface Body {
@@ -38,16 +38,9 @@ interface Body {
   ready: boolean;
   /** It stood at a look once compiled, which took its point away: from then it shows, never over its point (7d9). */
   shown: boolean;
-  /** It is lit as up close, its own angle and its whole rim, wherever it stands: a system's arrival's (7d3). */
-  near: boolean;
 }
 
-interface BodyView {
-  readonly width: number;
-  readonly height: number;
-  readonly focal: number;
-  readonly box: ClearBox | undefined;
-}
+type BodyView = Readonly<{ width: number; height: number; focal: number; box: ClearBox | undefined }>;
 
 /** The worlds a look wants, by id. */
 export type Wanted = ReadonlyMap<string, readonly [StarSystem, Orbiter]>;
@@ -75,8 +68,9 @@ export class Bodies {
   #diving = false;
   /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
   sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
-  // The eye rests at a system or a Plan, as the last look stood: the page's text box holds at the view at rest alone (7v's review).
-  #near = false;
+  // Where the eye rests, as the last look stood: at the view at rest, where the page's text box holds (7v's review); at a system, its bodies
+  // lit as up close, their own angle and whole rim (7d3); in a Plan, a chart, from their own star (the design review's second pass).
+  #view: View = "rest";
 
   /** The device's `moved` is told once a body's programs are compiled: a look then stands it in place of its point. */
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
@@ -97,7 +91,7 @@ export class Bodies {
   }
 
   /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; what is compiled shows from now. */
-  stand(wanted: Wanted, near = false): void {
+  stand(wanted: Wanted, view: View = "rest"): void {
     for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
@@ -108,8 +102,8 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
-    this.#near = near;
-    for (const body of this.#held.values()) Object.assign(body, { shown: body.ready, near });
+    this.#view = view;
+    for (const body of this.#held.values()) body.shown = body.ready;
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
     if (this.#last !== undefined) this.tick(this.#last, this.#seconds, this.#diving);
@@ -125,7 +119,7 @@ export class Bodies {
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
-    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false, near: false };
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -157,9 +151,11 @@ export class Bodies {
     planet.group.position.copy(this.fromEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
-    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, body.near ? 0 : away)));
+    const angle =
+      this.#view === "chart" ? chartAngle(sun, this.#toEye) : angleAt(fromEye, this.#view === "near" ? 0 : away);
+    planet.setSun(sideOf(sun, this.#toEye, angle));
     planet.setTime(seconds);
-    if (planet.look.rim !== null) planet.setLimb(limbAt(body.near ? 0 : away));
+    if (planet.look.rim !== null) planet.setLimb(limbAt(this.#view === "rest" ? away : 0));
     planet.setFar(fadeAt(at.length()));
     const room = this.#diving ? 1 : this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
@@ -186,7 +182,7 @@ export class Bodies {
 
   // What the box of the page's text leaves of a body at `at`: none at a system's view, where the page's text, the hero, gives way (7v).
   #room(at: Vector3, radius: number): number {
-    const box = this.#near ? undefined : this.sight.box;
+    const box = this.#view === "rest" ? this.sight.box : undefined;
     return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
@@ -198,7 +194,7 @@ export class Bodies {
 
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
-    const box = this.#near ? undefined : this.sight.box;
+    const box = this.#view === "rest" ? this.sight.box : undefined;
     return box === undefined ? 1 : clearOf({ ...this.seen(this.fromEye(place, eye, this.#ahead), 0), radius }, box);
   }
 
