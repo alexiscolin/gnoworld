@@ -59,6 +59,10 @@ export class AtRest {
   readonly #found: () => void;
   readonly #device: { readonly stage: Stage; readonly moved: () => void };
   readonly #owner: Disposer;
+  // The page's seconds when the worlds arrived: the dive's start, or its giving up (the review of 7d9: they turn from it).
+  #arrival = 0;
+  /** The worlds' clock this frame: the seconds since they arrived, which their orbits, the sway and the Earth's turn run by. */
+  since = 0;
   #view = plainRest();
   #postcards: ReadonlyMap<number, Postcard> = new Map();
   #closeSystem: Still;
@@ -98,10 +102,13 @@ export class AtRest {
     this.#dive?.dispose();
   }
 
-  /** A frame at `clock`, the whole cosmos `ready` to take the view or not: how much of the cosmos shows, none while the dive waits. Once
-   * its code came, each frame asks the next, its last among them, which takes away what it drew; a chunk on its way asks none. */
-  advance(clock: number, ready: boolean): number {
+  /** A frame at `clock`, the page at `seconds`, the whole cosmos `ready` to take the view or not: how much of the cosmos shows, none while
+   * the dive waits. Once its code came, each frame asks the next, its last among them, which takes away what it drew; a chunk on its way
+   * asks none. */
+  advance(clock: number, ready: boolean, seconds: number): number {
     if (this.#still === undefined) return 1;
+    // Till the dive starts or gives up, its frame is the worlds' arrival.
+    if (this.#dive?.waiting ?? true) this.#arrival = seconds;
     const dive = this.#dive;
     if (dive === undefined) return 0;
     this.#device.moved();
@@ -144,7 +151,8 @@ export class AtRest {
   /** Stands the eye `seconds` on from the scene's `eye`, and turns `camera` to the Earth from it; the scene's own turn stands until the
    * view has come. Gives the eye it stood. */
   stand(eye: Point, seconds: number, camera: PerspectiveCamera): Point {
-    this.#place(eye, seconds, this.eye);
+    this.since = seconds - this.#arrival;
+    this.#place(eye, this.since, this.eye);
     this.#place(eye, 0, this.#resting);
     if (this.#still !== undefined) this.#dive?.dived(this.#view.eye, this.eye);
     this.#eye?.aim(camera, this.eye);

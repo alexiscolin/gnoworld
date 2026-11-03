@@ -138,11 +138,11 @@ export class Cosmos {
    * sways about the view at rest's, or dives down to it, and the camera keeps the Earth at the centre. */
   tick(eye: Point, seconds: number, clock = seconds): void {
     if (!this.#wanted) return;
-    this.#shown = this.#atRest.advance(clock, this.#whole.ready);
+    this.#shown = this.#atRest.advance(clock, this.#whole.ready, seconds);
     const placed = this.#atRest.stand(eye, seconds, this.#device.camera);
-    this.#disc.advance(placed, seconds);
-    this.#bodies.tick(placed, seconds);
-    this.#home.tick(placed, seconds, this.#device.camera.quaternion);
+    this.#disc.advance(placed, this.#atRest.since);
+    this.#bodies.tick(placed, this.#atRest.since);
+    this.#home.tick(placed, this.#atRest.since, this.#device.camera.quaternion);
     // What the eye looks at is the Earth: its distance says how much of the nebulae shows, and how much of the view is the whole cosmos's.
     const looking = distanceOf(this.#atRest.earth, placed);
     this.#nebulae.group.visible = this.#shown > 0;
@@ -150,7 +150,7 @@ export class Cosmos {
     // Past a cluster's distance the worlds' points take the view at one distance: the disc gives up faster than they come, and the
     // bodies, which cannot fade, go as they start.
     this.#whole.most = this.#shown;
-    const whole = this.#whole.advance(placed, seconds, looking);
+    const whole = this.#whole.advance(placed, this.#atRest.since, looking);
     this.#disc.fade((1 - whole) ** 2 * this.#shown, this.#ahead.done);
     this.#bodies.group.visible = whole === 0 && this.#shown === 1;
     if (!(distanceOf(placed, this.#looked) < this.#whole.step)) this.#askLook();

@@ -2384,6 +2384,37 @@ describe("the whole cosmos", () => {
       expect([...kinds].sort()).toEqual(["body", "point"]);
     });
 
+    // The review of 7d9 (its medium 1): the worlds turned by the page's clock, so a dive that starts later than its first second (a wait
+    // for the whole cosmos, or the home reached from another page) came down past postcards the search had not judged there. The worlds'
+    // clock counts from the arrival: a dive that starts 30 s into the page lands as one that starts at once.
+    it("turns the worlds from the arrival: a dive that starts 30 s into the page lands as one that starts at once", async () => {
+      const landing = async (late: number) => {
+        const scene = made();
+        scene.cosmos.dive(false);
+        scene.cosmos.show(ONYX);
+        for (let step = 0; step < 3; step += 1) {
+          scene.cosmos.tick(HOME, late, 0);
+          await settled();
+        }
+        for (let step = 0; step <= 30; step += 1) {
+          const clock = (step / 30) * (DIVE.seconds + 1);
+          scene.cosmos.tick(HOME, late + clock, clock);
+          await settled();
+        }
+        const at = DIVE.seconds + 1;
+        scene.cosmos.tick(HOME, late + at, at);
+        const { eye, list } = scene.cosmos.stats();
+        return {
+          eye,
+          places: new Map(list.map(({ id, at: from }) => [id, from.clone().add(new Vector3(eye.x, eye.y, eye.z))])),
+        };
+      };
+      const [soon, late] = [await landing(0), await landing(30)];
+      expect(distanceOf(late.eye, soon.eye)).toBeLessThan(1e-6);
+      expect([...late.places.keys()].sort()).toEqual([...soon.places.keys()].sort());
+      for (const [id, place] of soon.places) expect(late.places.get(id)?.distanceTo(place)).toBeLessThan(1e-6);
+    });
+
     // The red pass (H1): its body's programs compiling, the close world stays a point and its body hides; compiled, its body shows and
     // the point goes, never both on one frame.
     it("keeps the close world a point while its body compiles, then draws its body alone", async () => {
@@ -2620,7 +2651,8 @@ describe("the whole cosmos", () => {
         expect(stats.sky.share).toBe(0);
       }
       const late = await frame(scene, DIVE.wait + 0.1);
-      const rest = await frame(await atRest(), DIVE.wait + 0.1);
+      // The worlds arrive as it gives up, and turn from then (7d9): it lands on the view at rest as that stands at its own arrival.
+      const rest = await frame(await atRest(), 0);
       expect(late.dive.along).toBe(1);
       expect(spotKey(late.eye)).toBe(spotKey(rest.eye));
       await frame(scene, DIVE.wait + 0.2);
