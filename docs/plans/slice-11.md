@@ -49,5 +49,5 @@ They follow each other, one pane at a time: the account's usage limit is shared 
 1. D1, the path: `gno.land/r/gnoworld/satellite`; the namespace to deploy under (`gnoworld` unregistered, or a `nym-` name, ADR-0001 question 13).
 2. D3, the price: 1 GNOT a day (1,000,000 ugnot), the prototype's lowest sample.
 3. D5, the limit: 3 live satellites per address at once.
-4. D6, an approval lives 100 blocks at most (about 6 minutes at mainnet's 3.65 s; onyx's block time unmeasured tonight).
+4. D6, an approval lives 100 blocks at most (about 6 minutes: onyx-1 made 680 blocks in 2,515 s, 3.7 s each, read with gnomcp's `gno_status` at heights 867,181 and 867,861 on 2026-11-03; mainnet's is about 3.65 s).
 5. D12, a takedown refunds the whole days not yet begun, at the price that rental paid.
