@@ -48,6 +48,12 @@
     z-index: 1;
   }
 
+  /* A system's crumb (7v): under the header, in the hero's gutter, as frame 45's kicker stands under its own. */
+  .crumb {
+    /* raw: the hero's 48 px from the left (Hero.module.css) */
+    inset-inline-start: 48px;
+  }
+
   /* Above the views' bar and the ticker on a phone (Ticker.module.css), in the gutter, within reach. */
   .offer,
   .status {

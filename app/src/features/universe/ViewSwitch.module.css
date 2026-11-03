@@ -1,0 +1,12 @@
+/* The two views of space in the header's pill, after its views: a pair of the pill's own icon controls, 2 px apart as its links are. */
+@layer components {
+  .switch {
+    /* layout: the two icons on the pill's row */
+    display: inline-flex;
+    /* layout: they share its middle */
+    align-items: center;
+    /* raw: the prototype's links' 2 px (shellHeader.module.css) */
+    /* layout: the icons 2 px apart, as the pill's links */
+    gap: 2px;
+  }
+}

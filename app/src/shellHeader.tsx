@@ -1,10 +1,13 @@
 // The header as the video's frames 1, 20 and 37 draw it: the logo at the left, the views Earth, Cosmos and List in the middle
 // with search inside their pill, the network the page is in ("Testnet" when it is one) and the login at the right. A control
-// stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land.
+// stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land. On the cosmos, the pill's
+// views say where one looks, two icons after them how (7v).
 import { Chip, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
 import { LoginControl } from "./features/login/index.ts";
 import { SearchPalette } from "./features/search/index.ts";
+// The switch's own module, not the universe's door: the header is on every page, which loads no scene's door for it.
+import { ViewSwitch } from "./features/universe/ViewSwitch.tsx";
 import { site, type UniverseView, type View } from "./places.ts";
 import styles from "./shellHeader.module.css";
 
@@ -33,6 +36,12 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
           </Link>
         ))}
         <span className={styles["divider"]} aria-hidden="true" />
+        {current === "cosmos" ? (
+          <>
+            <ViewSwitch />
+            <span className={styles["divider"]} aria-hidden="true" />
+          </>
+        ) : null}
         <SearchPalette />
       </nav>
       <div className={styles["end"]}>

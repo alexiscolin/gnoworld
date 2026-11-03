@@ -5,7 +5,7 @@ import { type MetaArgs, useLoaderData } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Hero, Ticker, tickerItems, useClock, Worlds } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useSpace, useWorldsCount } from "../features/universe/index.ts";
+import { useResting, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
 
@@ -30,13 +30,17 @@ export default function Home() {
   // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
   const drawn = useWorldsCount(universe.isDefault);
   useSpace(universe.isDefault ? "cosmos" : undefined);
+  // A system the eye rests at takes the screen, its crumb at the top left (7v): the hero gives way, and comes back at rest.
+  const resting = useResting();
   return (
     <>
-      <Hero
-        universe={universe}
-        worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
-        coming={drawn === undefined}
-      />
+      {resting === undefined ? (
+        <Hero
+          universe={universe}
+          worlds={universe.isDefault ? (drawn ?? undefined) : universe.worlds.length}
+          coming={drawn === undefined}
+        />
+      ) : null}
       <Worlds>
         <PlaceLinks places={universe.worlds} />
       </Worlds>

@@ -6,6 +6,7 @@ import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import type { Shown } from "./host.ts";
 import { createAppStore } from "../../store/index.ts";
 import { Universe } from "./Universe.tsx";
+import { views } from "./views.ts";
 
 const scene = vi.hoisted(() => ({
   cover: vi.fn<(covered: boolean) => void>(),
@@ -154,17 +155,20 @@ function rendered(shown: Shown, wrap: (child: ReactNode) => ReactNode = (child) 
 beforeAll(async () => {
   await import("./signals.ts");
 });
+// The scene a start gives, with what a test adds to it.
+const sceneWith = (more: object = {}) => ({
+  cover: scene.cover,
+  fly: vi.fn(),
+  cosmos: scene.cosmos,
+  keepClear: scene.keepClear,
+  dispose: scene.dispose,
+  stats: () => ({}),
+  ...more,
+});
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW });
   scene.presence.mockImplementation(() => new Promise(() => undefined));
-  scene.start.mockImplementation(() => ({
-    cover: scene.cover,
-    fly: vi.fn(),
-    cosmos: scene.cosmos,
-    keepClear: scene.keepClear,
-    dispose: scene.dispose,
-    stats: () => ({}),
-  }));
+  scene.start.mockImplementation(() => sceneWith());
   scene.read.mockImplementation(() => Promise.resolve({ worlds: WORLDS }));
   scene.load.mockImplementation(() => Promise.resolve({ startScene: scene.start }));
   localStorage.clear();
@@ -1058,15 +1062,18 @@ describe("on a world's page", () => {
       });
     };
     rerender(shown);
-    return {
-      rerender,
-      unmount: () => {
+    // Gone after each test as `rendered`'s roots are, unless the test took it away: a page left mounted would keep its host listening.
+    let mounted = true;
+    const unmount = () => {
+      if (mounted)
         act(() => {
           root.unmount();
         });
-        box.remove();
-      },
+      mounted = false;
+      box.remove();
     };
+    left.push(unmount);
+    return { rerender, unmount };
   }
   const say = (state: string, colour?: string) => {
     act(() => {
@@ -1477,5 +1484,103 @@ describe("flights between places (7g)", () => {
       started().onLost(true);
     });
     expect(all(box, "[data-flight]")).toEqual([]);
+  });
+});
+
+// 7v (Alexis, 2026-11-03): the views of space, Dynamic or Plan, which the header's switch sets, told to the running scene; and the system the
+// scene's eye rests at named in a crumb, "← Cosmos › gnoswap" as frame 45's, whose first step, or Esc, goes a step back.
+describe("the views of space and the system the eye rests at", () => {
+  const see = vi.fn<(plan: boolean) => void>();
+  const arrive = vi.fn<(id: string | undefined) => void>();
+  const resting = () => (started() as unknown as { onSystem: (id: string | undefined) => void }).onSystem;
+  beforeEach(() => {
+    scene.start.mockImplementation(() => sceneWith({ see, arrive }));
+  });
+  afterEach(() => {
+    act(() => {
+      views.see("dynamic");
+      views.rest(undefined);
+    });
+  });
+
+  it("tells the running scene the Plan asked before it came, then each change, and nothing once it went", async () => {
+    views.see("plan");
+    const { unmount } = rendered("cosmos");
+    await settle();
+    expect(see.mock.calls).toEqual([[true]]);
+    act(() => {
+      views.see("dynamic");
+    });
+    expect(see).toHaveBeenLastCalledWith(false);
+    unmount();
+    act(() => {
+      views.see("plan");
+    });
+    expect(see).toHaveBeenCalledTimes(2);
+  });
+
+  it("names the system the eye rests at, a step back to the cosmos at a click or at Esc, and nothing at rest", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    expect(all(box, "nav[aria-label='Where you are']")).toEqual([]);
+    act(() => {
+      resting()("gnoswap");
+    });
+    const crumb = one(box, "nav[aria-label='Where you are']");
+    expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "gnoswap"]);
+    act(() => {
+      button(crumb, "Cosmos")?.click();
+    });
+    expect(arrive).toHaveBeenLastCalledWith(undefined);
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(arrive).toHaveBeenCalledTimes(2);
+    act(() => {
+      resting()(undefined);
+    });
+    expect(all(box, "nav[aria-label='Where you are']")).toEqual([]);
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(arrive).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells the page where the eye rests, for the hero to give the system the screen, and nowhere once the scene went", async () => {
+    const { unmount } = rendered("cosmos");
+    await settle();
+    act(() => {
+      resting()("gnoswap");
+    });
+    expect(views.system()).toBe("gnoswap");
+    unmount();
+    expect(views.system()).toBeUndefined();
+  });
+
+  // Escape is the field's or the dialog's where one holds it, and the page's own when it was taken already (the flights' and the search's).
+  it("goes no step back at an Escape a field, a dialog or another listener holds", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    act(() => {
+      resting()("gnoswap");
+    });
+    const field = document.createElement("input");
+    box.append(field);
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    box.append(dialog);
+    act(() => {
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    dialog.remove();
+    const taken = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    taken.preventDefault();
+    act(() => {
+      document.body.dispatchEvent(taken);
+    });
+    expect(arrive).not.toHaveBeenCalled();
   });
 });

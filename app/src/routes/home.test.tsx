@@ -4,11 +4,12 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace, useWorldsCount } = vi.hoisted(() => ({
+const { useSpace, useWorldsCount, useResting } = vi.hoisted(() => ({
   useSpace: vi.fn(),
   useWorldsCount: vi.fn<(wanted: boolean) => number | null | undefined>(() => undefined),
+  useResting: vi.fn<() => string | undefined>(() => undefined),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting }));
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -100,6 +101,16 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
 });
 
 // Slice 5r (frames 1 to 8): the hero's big number, its line and two big actions; with no data, what is true.
+// 7v (Alexis, 2026-11-03): at a system's view the screen is the system's, its crumb at the top left: the hero gives way, and comes back at rest.
+test("gives the screen to a system the eye rests at: no hero then, the hero back at rest, the list of worlds kept", async () => {
+  useResting.mockReturnValue("gnoswap");
+  const there = await render({ path: "/", Component: Home, loader }, "/");
+  expect(there).not.toContain("data-hero=");
+  expect(there).toContain('<a href="/w/bubble"');
+  useResting.mockReturnValue(undefined);
+  expect(await render({ path: "/", Component: Home, loader }, "/")).toContain("data-hero=");
+});
+
 describe("home's hero", () => {
   test("claims nobody online while no source says so: no number of people, no sample (5m fills it)", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");

@@ -17,6 +17,7 @@ import type { PageSigns } from "./EarthSigns.tsx";
 import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
 import { SceneHost, type EarthPage, type Shown, type WorldPage } from "./host.ts";
+import { SystemCrumb } from "./SystemCrumb.tsx";
 import styles from "./Universe.module.css";
 
 // The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
@@ -91,6 +92,24 @@ function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
   return showsMaps ? <Credits overTicker /> : null;
 }
 
+// What stands over the running scene: the flight panel, and on the cosmos the crumb back from a system the eye rests at (7v).
+function Over({
+  host,
+  shown,
+  flight,
+}: {
+  host: SceneHost;
+  shown: Shown;
+  flight: ReturnType<SceneHost["flown"]["flight"]>;
+}) {
+  return (
+    <>
+      <FlightPanel flight={flight} />
+      {shown === "cosmos" ? <SystemCrumb back={host.back} /> : null}
+    </>
+  );
+}
+
 export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | WorldPage | undefined }) {
   const [host] = useState(() => new SceneHost());
   const status = useSyncExternalStore(host.subscribe, host.status);
@@ -131,7 +150,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
       {status === "on" ? (
         <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
       ) : null}
-      {shown && status === "on" ? <FlightPanel flight={flight} /> : null}
+      {shown && status === "on" ? <Over host={host} shown={shown} flight={flight} /> : null}
     </>
   );
 }

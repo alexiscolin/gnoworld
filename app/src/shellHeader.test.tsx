@@ -76,6 +76,27 @@ describe("the header", () => {
     },
   );
 
+  // 7v (Alexis, 2026-11-03, the GUI board's option B): the pill says where one looks; two icons after its views say how, where space can be
+  // seen two ways, the cosmos; no "?", nothing else added.
+  test.each(["/", "/net/gnoland"])(
+    "%s: offers space's two views after Earth, Cosmos and List and before search, the dynamic one pressed, each named",
+    async (path) => {
+      const html = await header(path);
+      const at = (text: string) => html.indexOf(text);
+      expect(html).toMatch(/aria-label="Views of space"/);
+      expect(html).toMatch(/aria-label="Dynamic view" aria-pressed="true"/);
+      expect(html).toMatch(/aria-label="Plan view" aria-pressed="false"/);
+      expect(at(">List<")).toBeLessThan(at('aria-label="Dynamic view"'));
+      expect(at('aria-label="Plan view"')).toBeLessThan(at('aria-label="Search"'));
+      expect(html).not.toMatch(/>\?</);
+    },
+  );
+
+  test.each(["/earth", "/list", "/w/bubble"])("%s: offers no views of space to switch", async (path) => {
+    const html = await header(path);
+    expect(html).not.toMatch(/Views of space|Dynamic view|Plan view/);
+  });
+
   test("keeps the views inside a universe's own pages: Cosmos and Earth of gno.land under /net/gnoland", async () => {
     const html = await header("/net/gnoland");
     expect(html).toContain('href="/net/gnoland/earth"');

@@ -13,6 +13,7 @@ import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
 import { Heard } from "./heard.ts";
+import { tellScene, views } from "./views.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
@@ -56,6 +57,8 @@ export class SceneHost {
   #earth: EarthState = "gone";
   #watching: AbortController | undefined;
   #decided = false;
+  // What stops telling the scene the reader's view once it goes (7v).
+  #unsee = (): void => undefined;
 
   readonly subscribe = this.#heard.subscribe;
 
@@ -174,6 +177,7 @@ export class SceneHost {
       this.#feed.leave();
       this.#stopWatching();
       tintPage(undefined);
+      this.#unsee();
       this.#scene?.dispose();
       this.#canvas = undefined;
     };
@@ -220,6 +224,7 @@ export class SceneHost {
               this.#say(lost ? "failed" : "on");
             },
             onFlight: this.flown.said,
+            onSystem: views.rest,
           }),
         );
       })
@@ -229,9 +234,17 @@ export class SceneHost {
       .finally(settled);
   }
 
+  /** A step back from the system the eye rests at, to the cosmos's view at rest (7v): the crumb's first step, and Escape. */
+  readonly back = (): void => {
+    this.#scene?.arrive(undefined);
+  };
+
   #started(scene: Scene): void {
     this.#scene = scene;
     scene.cover(!this.#shown);
+    // A scene started again (a failed load, then View in space) is told in place of the last: one telling a host.
+    this.#unsee();
+    this.#unsee = tellScene(scene);
     showJourneys(scene);
     this.#say("on");
     this.#syncEarth();
