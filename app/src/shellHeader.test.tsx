@@ -76,6 +76,23 @@ describe("the header", () => {
     },
   );
 
+  // ADR-0003 §2, 2c: each view says what it holds to a screen reader alone, as its description; nothing is drawn under the tabs.
+  test.each(["/", "/earth", "/net/gnoland"])(
+    "%s: describes each view to screen readers, and draws no word of it",
+    async (path) => {
+      const html = await header(path);
+      const described = [...html.matchAll(/<a [^>]*aria-description="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map(
+        ([, description, label]) => [(label ?? "").replace(/<[^>]*>/g, ""), description] as const,
+      );
+      expect(described).toEqual([
+        ["Earth", "where everyone talks"],
+        ["Cosmos", "every world"],
+        ["List", "every world, as text"],
+      ]);
+      expect(html.replace(/aria-description="[^"]*"/g, "")).not.toMatch(/where everyone talks|every world/);
+    },
+  );
+
   test("keeps the views inside a universe's own pages: Cosmos and Earth of gno.land under /net/gnoland", async () => {
     const html = await header("/net/gnoland");
     expect(html).toContain('href="/net/gnoland/earth"');
