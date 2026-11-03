@@ -3,23 +3,31 @@
 // it came, and the home's dive.
 import {
   HOME,
+  LENT,
   restView,
   toMap,
+  type Deep,
   type Drawn,
+  type Rock,
   type Point,
   type Postcard,
   type RestView,
   type StarSystem,
 } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
+import type { EarthDevice } from "../earth/device.ts";
 import type { Asking } from "./restArrival.ts";
 import { Beat } from "./restBeat.ts";
 import { drawnFrom, postcardsOf } from "./restBodies.ts";
 import { RestEye } from "./restEye.ts";
 
+// The view's depth, the real worlds of other nearby systems it draws and the home's rocks (7p), is found in a chunk of its own once the view
+// has come.
+const loadDeep = () => import("./restDeep.ts");
+
 export class Resting {
   readonly #found: () => void;
-  readonly #eye = new RestEye();
+  readonly #eye: RestEye;
   readonly #beat = new Beat();
   // Where the eye rests, neither swayed nor diving, on the stage and on the map: what says the view's bodies stand.
   readonly #resting = { x: NaN, y: NaN, z: NaN };
@@ -27,12 +35,16 @@ export class Resting {
   /** The view found for the last file, its postcards cleared while a new file's is looked for. */
   view: RestView;
   #postcards: ReadonlyMap<number, Postcard> = new Map();
+  #deep: readonly Deep[] = [];
+  #rocks: readonly Rock[] = [];
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
 
-  /** `found` is told once a file's view has come, or a system's arrival. Till then the view is the scene's own, at its home. */
-  constructor(found: () => void) {
+  /** `found` is told once a file's view has come, or a system's arrival; `device`'s eye is the one a flight turns (7g). Till then the view is
+   * the scene's own, at its home. */
+  constructor(found: () => void, device: Pick<EarthDevice, "eye">) {
     this.#found = found;
+    this.#eye = new RestEye(device);
     const eye = { x: NaN, y: NaN, z: NaN };
     toMap(HOME, eye);
     this.view = { eye, postcards: [], close: undefined };
@@ -43,15 +55,32 @@ export class Resting {
     this.view = restView(systems);
     this.#postcards = postcardsOf(systems, this.view);
     this.#systems = systems;
+    this.#deepen(systems, this.view);
     this.#eye.rest(this.view);
     this.#found();
     this.arrive(asking);
+  }
+
+  // The view's depth and rocks, for `view` only, drawn once their chunk came: a chunk that does not come leaves the view as it is.
+  #deepen(systems: readonly StarSystem[], view: RestView): void {
+    this.#deep = [];
+    this.#rocks = [];
+    loadDeep().then(
+      ({ inDepth }) => {
+        if (this.view !== view) return;
+        ({ bodies: this.#deep, rocks: this.#rocks } = inDepth(systems, view, LENT));
+        this.#found();
+      },
+      () => undefined,
+    );
   }
 
   /** A new file is looked for: no postcard stands till its view comes, and an arrival is looked for among `systems`. */
   clear(systems: readonly StarSystem[]): void {
     this.view = { ...this.view, postcards: [], close: undefined };
     this.#postcards = new Map();
+    this.#deep = [];
+    this.#rocks = [];
     this.#systems = systems;
   }
 
@@ -96,7 +125,13 @@ export class Resting {
   /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it, the ladder's `drawn` anywhere else. */
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
     toMap(this.#resting, this.#restingMap);
-    const shown = this.#eye.landing ?? { view: this.view, postcards: this.#postcards, index: 0 };
+    const shown = this.#eye.landing ?? {
+      view: this.view,
+      postcards: this.#postcards,
+      index: 0,
+      deep: this.#deep,
+      rocks: this.#rocks,
+    };
     return drawnFrom(systems, { shown, drawn }, { ...sight, resting: this.#restingMap });
   }
 }

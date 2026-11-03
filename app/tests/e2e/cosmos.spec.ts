@@ -339,12 +339,19 @@ for (const size of [COMPUTER, WIDE])
     await expect.poll(async () => (await cosmos(page)).screen.earth !== undefined, SLOW).toBe(true);
     const { earth, sun, bodies } = (await cosmos(page)).screen;
     if (earth === undefined) throw new Error("no Earth");
-    expect(new Set(bodies.map(({ id }) => byId.get(id))).size).toBeLessThanOrEqual(3);
+    // 7p (Alexis, 2026-11-03, "la perspective doit être partout"): beside the view's own three systems, four more stand a body each.
+    const own = new Set(
+      [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map((at) => systems[at]?.id),
+    );
+    const deep = bodies.filter(({ id }) => !own.has(byId.get(id)));
+    expect(new Set(deep.map(({ id }) => byId.get(id))).size).toBe(deep.length);
+    expect(deep.length).toBeLessThanOrEqual(4);
+    expect(new Set(bodies.map(({ id }) => byId.get(id))).size).toBeLessThanOrEqual(3 + 4);
     const close = bodies.filter((body) => cutBy(body, size));
     expect(close).toHaveLength(view.close === undefined ? 0 : 1);
     for (const one of close) expect(one.radius).toBeGreaterThanOrEqual(2 * earth.radius);
     const postcards = new Map<string, number>();
-    for (const body of bodies.filter((one) => !cutBy(one, size))) {
+    for (const body of bodies.filter((one) => !cutBy(one, size) && !deep.includes(one))) {
       const system = byId.get(body.id) ?? body.id;
       postcards.set(system, (postcards.get(system) ?? 0) + 1);
     }
@@ -572,11 +579,11 @@ for (const tier of ["high", "low"] as const)
     expect((await stats(page)).tier).toBe(tier);
     expect(seen.length).toBeGreaterThan(300);
     expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
-    // The whole cosmos's two draws, and the bodies passing behind the hero's text on the way down, which at rest keeps its room (7d9).
-    // Measured on the recorded file (2026-11-03): 21 draws at most before 7d9, 24 after, 20 or 21 landed; 47,508 points at most, 47,465
-    // landed.
+    // The whole cosmos's two draws, the bodies passing behind the hero's text on the way down (7d9), 7p's two depth bodies among them, and
+    // the rocks' one draw. Measured on the recorded file (2026-11-03): 24 draws at most after 7d9, 28 after 7p, 21 or 22 landed; 47,508
+    // points at most, 47,465 landed.
     const landedFrame = seen.at(-1);
-    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 4);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 7);
     expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_AT_REST);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual((landedFrame?.points ?? 0) + 533);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST);

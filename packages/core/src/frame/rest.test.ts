@@ -1,13 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { EARTH_PLACE, EARTH_RADIUS, GRAIN, systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
+import {
+  EARTH_PLACE,
+  EARTH_RADIUS,
+  GRAIN,
+  systemsOf,
+  type Orbiter,
+  type StarSystem,
+  type WorldHeld,
+} from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitTime, SWAY } from "../space/drift.ts";
 import { orbitPlace } from "./disc.ts";
 import { CELL } from "../cosmos/cosmos.ts";
-import { coveredShare, evenRow } from "./composition.ts";
+import { composed, coveredShare, evenRow } from "./composition.ts";
+import { deepOf, judgeOf } from "./deep.ts";
+import { LENT } from "./lent.ts";
+import { rocksOf } from "./rocks.ts";
 import { DIVE, diveAt } from "./dive.ts";
+import { haloAt } from "./halo.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
-import { postcardOf } from "./postcard.ts";
+import { PLACE } from "../lod/settle.ts";
+import { drawnOf, postcardOf, shapeOf } from "./postcard.ts";
+import { postcardsOf } from "./restCards.ts";
+import { cameraTowards, looksFrom, type Look } from "./restLook.ts";
 import { FIELD_OF_VIEW, HERO_ZONE, REST_SCREENS, restView, STAR_HEART, type RestView } from "./rest.ts";
 
 // The view at rest (7d6): the Earth at the canvas's centre, the great star beside it, two postcards, one world close to the eye and cut by
@@ -43,6 +58,16 @@ function spread(systems: number, each: number): WorldHeld[] {
 
 function crowd(namespace: string, count: number): WorldHeld[] {
   return Array.from({ length: count }, (_, at) => ({ id: `${namespace}/w${String(at)}`, namespace, use: at % 9 }));
+}
+
+// Sixty single worlds and thirty systems of six: poor and rich systems mixed.
+function richMix(): WorldHeld[] {
+  const rich = Array.from({ length: 180 }, (_, at) => ({
+    id: `rich${String(at % 30)}/w${String(at)}`,
+    namespace: `rich${String(at % 30)}`,
+    use: 1 + (at % 5) * 40,
+  }));
+  return [...spread(60, 1), ...rich];
 }
 
 interface Seen {
@@ -172,6 +197,9 @@ const made = (file: readonly WorldHeld[]) => {
   const systems = systemsOf(file);
   return { systems, view: restView(systems) };
 };
+// The view's depth bodies, read through the judge the view lends, as the scene's chunk asks them (7p).
+const deepBodies = (systems: readonly StarSystem[], view: RestView) =>
+  deepOf(systems, view, judgeOf(systems, view, LENT));
 
 describe("what the view is composed for", () => {
   // Alexis, 2026-11-03 ("tout pourrait être un peu plus gros"), 1.2 times by the chief: the home's lens, which the scene's camera takes
@@ -339,12 +367,7 @@ describe("the postcards", () => {
   // 7d6's review (lots 3 and 4): the search's order, a close world before the postcards' bodies. No other set decides it: here the best view
   // with no close world draws five bodies in its postcards (measured with the close world's score at 0), this one four.
   it("takes a close world first, then the richest postcard of the Earth's 24 nearest, with poor and rich systems mixed", () => {
-    const rich = Array.from({ length: 180 }, (_, at) => ({
-      id: `rich${String(at % 30)}/w${String(at)}`,
-      namespace: `rich${String(at % 30)}`,
-      use: 1 + (at % 5) * 40,
-    }));
-    const { systems, view } = made([...spread(60, 1), ...rich]);
+    const { systems, view } = made(richMix());
     const counted = (system: StarSystem | undefined) =>
       system === undefined ? 0 : Math.min(3, postcardOf(system, view.eye).worlds.length);
     const awayOf = ({ place }: StarSystem) => Math.hypot(...Object.values(minus(place, EARTH_PLACE)));
@@ -421,6 +444,180 @@ describe("the postcards", () => {
   );
 });
 
+// Alexis, 2026-11-03 ("pas 2 planètes de la même taille au même niveau, c'est pas naturel"), option B: a postcard's worlds read in depth
+// by their drawn size, the nearer larger, 1.5 times its neighbour or more through its turn, none at one height, none dropped to a dot.
+describe("the postcards in depth (7p)", () => {
+  // 7d9's sets beside the view's own: the rule as briefed left one body per postcard in each.
+  const sets = {
+    ...files,
+    "54 of four": spread(54, 4),
+    "104 of eight": spread(104, 8),
+    "rich mix": richMix(),
+  } as const satisfies Record<string, readonly WorldHeld[]>;
+  // The bodies each postcard drew before the depth (7p, measured on b582d1aa): none is dropped to get there.
+  const BEFORE: Record<keyof typeof sets, readonly number[]> = {
+    "one system": [1],
+    "3 systems": [1],
+    "7 systems": [1, 1],
+    "100 systems": [2, 1],
+    "1,000 systems": [1, 1],
+    "10,000 systems": [1, 1],
+    "crowds and singles": [1, 1],
+    "one namespace of 20,000": [1, 1],
+    "300 systems of four": [2, 2],
+    "54 of four": [2, 2],
+    "104 of eight": [3, 3],
+    "rich mix": [3, 1],
+  };
+  const rows = Object.keys(sets) as (keyof typeof sets)[];
+  // Each postcard's bodies as drawn, at a share of their size, in its plane as drawn, and eight instants of its turn.
+  const cardsOf = (name: keyof typeof sets) => {
+    const { systems, view } = made(sets[name]);
+    return view.postcards.map((index) => {
+      const system = systems[index];
+      if (system === undefined) throw new Error("no postcard");
+      const { system: plane, worlds, depth } = postcardOf(system, view.eye);
+      const drawn = worlds.map((world, at) => ({ ...world, radius: world.radius * (depth[at] ?? NaN) }));
+      const turn = (2 * Math.PI) / Math.abs(system.spin);
+      const instants = Array.from({ length: 8 }, (_, step) => (step * turn) / 8);
+      return { view, plane, worlds, drawn, instants };
+    });
+  };
+  const seenOf = (
+    { view, plane, drawn }: { view: RestView; plane: StarSystem; drawn: readonly Orbiter[] },
+    seconds: number,
+  ) => {
+    const see = cameraOf(view, REST_SCREENS[0]);
+    return drawn.map((world) => see(placeOf(plane, world, seconds), world.radius));
+  };
+
+  it.each(rows)(
+    "draws each postcard's bodies 1.5 times apart in size or more, at rest and through its turn, with %s",
+    (name) => {
+      for (const { view, plane, worlds, drawn, instants } of cardsOf(name))
+        for (const seconds of instants) {
+          const seen = seenOf({ view, plane, drawn }, seconds);
+          expect(seen).toHaveLength(worlds.length);
+          seen.forEach((one, at) => {
+            for (const other of seen.slice(at + 1))
+              expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(
+                1.5,
+              );
+          });
+        }
+    },
+  );
+
+  it.each(rows)("draws the nearer of a postcard's bodies the larger at rest, with %s", (name) => {
+    for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+      const byDepth = seenOf({ view, plane, drawn }, 0).sort((a, b) => a.depth - b.depth);
+      expect(byDepth).toHaveLength(worlds.length);
+      byDepth.forEach((near, at) => {
+        const far = byDepth[at + 1];
+        if (far !== undefined) expect(near.radius).toBeGreaterThan(far.radius);
+      });
+    }
+  });
+
+  // Two neighbours stand at one height when their centres are less than a tenth of the screen's height apart up the screen and their line
+  // stands less than 40 degrees off level: a far postcard's bodies stand closer than a tenth of the height, and read apart by their slant.
+  it.each(rows)("stands no two neighbouring bodies of a postcard at one height at rest, with %s", (name) => {
+    const { height } = REST_SCREENS[0];
+    for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+      const seen = seenOf({ view, plane, drawn }, 0);
+      expect(seen).toHaveLength(worlds.length);
+      for (const one of seen) {
+        const others = seen.filter((other) => other !== one);
+        const [nearest] = others.sort(
+          (a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y),
+        );
+        if (nearest === undefined) continue;
+        const [across, up] = [Math.abs(nearest.x - one.x), Math.abs(nearest.y - one.y)];
+        expect(up >= 0.1 * height || up >= Math.tan((40 * Math.PI) / 180) * across).toBe(true);
+      }
+    }
+  });
+
+  it.each(rows)(
+    "drops no body of a postcard to a dot: each a body's least size on screen or more through its turn, with %s",
+    (name) => {
+      for (const { view, plane, drawn, instants } of cardsOf(name))
+        for (const seconds of instants)
+          for (const { radius } of seenOf({ view, plane, drawn }, seconds))
+            expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
+    },
+  );
+
+  // The review of 7p (R2): the search judges a postcard at its drawn size, its own at the least. Its ball, round each world's orbit and
+  // larger radius, with the search's 24 pixels round it, stands whole on both screens and clear of the Earth.
+  it.each(rows)(
+    "judges each postcard whole and off the Earth at its drawn size, its own at the least, with %s",
+    (name) => {
+      for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+        const reach = Math.max(
+          ...worlds.map(({ orbit, radius }, at) => orbit + Math.max(radius, drawn[at]?.radius ?? NaN)),
+        );
+        for (const screen of REST_SCREENS) {
+          const see = cameraOf(view, screen);
+          const [seen, earth] = [see(plane.place, reach), see(EARTH_PLACE, EARTH_RADIUS)];
+          const ball = { ...seen, radius: seen.radius + 24 };
+          expect(whole(ball, screen.width, screen.height)).toBe(true);
+          expect(Math.hypot(ball.x - earth.x, ball.y - earth.y)).toBeGreaterThanOrEqual(ball.radius + earth.radius);
+        }
+      }
+    },
+  );
+
+  // The review of 7p (R2): "104 of eight" draws n51, a postcard, its far world lifted past its own size. Slid sideways, the eye finds where
+  // its ball fits on both screens at the worlds' own size and not as drawn: the search refuses it there, and takes it where both fit.
+  it("refuses a postcard whose ball fits at its worlds' own size and not as drawn, and takes it where both fit", () => {
+    const { systems, view } = made(sets["104 of eight"]);
+    const index = systems.findIndex(({ id }) => id === "n51");
+    const system = systems[index];
+    if (system === undefined) throw new Error("no n51");
+    expect(Math.max(...postcardOf(system, view.eye).depth)).toBeGreaterThan(1.2);
+    const postcard = postcardOf(system, view.eye).worlds;
+    const reach = Math.max(...system.worlds.map(({ orbit, radius }) => orbit + radius));
+    const held = { index, system, bodies: system.worlds, postcard, reach };
+    const fitsAt = (looks: readonly Look[], ball: number) =>
+      looks.every((look) => {
+        const seen = look.ball(system.place, ball);
+        const earth = Math.hypot(seen.x - look.earth.x, seen.y - look.earth.y) - seen.radius - look.earth.radius;
+        return look.whole(seen, 24) && look.clear(seen, 24) && earth >= 24;
+      });
+    const outcomes = { refused: 0, taken: 0 };
+    for (let step = -400; step <= 400; step += 1) {
+      const right = cameraTowards(view.eye, EARTH_PLACE).right;
+      const eye = {
+        x: view.eye.x + right.x * step * 0.05,
+        y: view.eye.y + right.y * step * 0.05,
+        z: view.eye.z + right.z * step * 0.05,
+      };
+      const looks = looksFrom(cameraTowards(eye, EARTH_PLACE));
+      const [first] = looks;
+      if (first === undefined) continue;
+      const drawn = drawnOf(shapeOf(system, postcard, first.camera), 1);
+      const [own, wide] = [reach, Math.max(reach, ...drawn.map(({ orbit, radius }) => orbit + radius))];
+      const cards = postcardsOf(looks, { near: [held], lenient: true, most: 1 });
+      if (fitsAt(looks, own) && !fitsAt(looks, wide)) {
+        expect(cards).toBeUndefined();
+        outcomes.refused += 1;
+      } else if (fitsAt(looks, wide) && cards !== undefined) outcomes.taken += 1;
+    }
+    expect(outcomes.refused).toBeGreaterThan(0);
+    expect(outcomes.taken).toBeGreaterThan(0);
+  });
+
+  it.each(rows)("draws as many bodies in each postcard as before the depth, with %s", (name) => {
+    const { systems, view } = made(sets[name]);
+    const counts = view.postcards.map((index) => {
+      const system = systems[index];
+      return system === undefined ? 0 : postcardOf(system, view.eye).worlds.length;
+    });
+    expect(counts).toEqual(BEFORE[name]);
+  });
+});
+
 // The bodies drawn at rest: the postcards' four largest worlds of a body's size, spread round their star, and the close world.
 const drawn = (systems: readonly StarSystem[], view: RestView) => [
   ...view.postcards.flatMap((index) => {
@@ -435,6 +632,451 @@ const drawn = (systems: readonly StarSystem[], view: RestView) => [
         ({ system, world }) => (system === undefined || world === undefined ? [] : [{ system, world }]),
       )),
 ];
+
+// Alexis, 2026-11-03 ("la perspective doit être partout", his references in .claude/tmp/slice-7/inspi-depth/): the arrival reads in depth
+// across its whole frame, real worlds of other nearby systems drawn as bodies in the middle and far, sizes spanning about ten times with
+// the close world; none invented, none over another, none of one size at one height beside its neighbour.
+describe("the view's depth (7p)", () => {
+  const sets = {
+    "one system": files["one system"],
+    "3 systems": files["3 systems"],
+    "7 systems": files["7 systems"],
+    "100 systems": files["100 systems"],
+    "1,000 systems": files["1,000 systems"],
+    "10,000 systems": files["10,000 systems"],
+    "crowds and singles": files["crowds and singles"],
+    "one namespace of 20,000": files["one namespace of 20,000"],
+    "300 systems of four": files["300 systems of four"],
+    "54 of four": spread(54, 4),
+    "104 of eight": spread(104, 8),
+    "rich mix": richMix(),
+  } as const satisfies Record<string, readonly WorldHeld[]>;
+  const rows = Object.keys(sets) as (keyof typeof sets)[];
+  // No other system stands near enough in the first three; in "crowds and singles" the view's bodies stand near a line through the great
+  // star, and any body added beside them would make a row. The review's rules (eight instants, no fourth of a row, off the great star's
+  // glow; the chief's option A, 2026-11-03) leave none in "one namespace of 20,000" and "54 of four".
+  const NONE = new Set<string>([
+    "one system",
+    "3 systems",
+    "7 systems",
+    "crowds and singles",
+    "one namespace of 20,000",
+    "54 of four",
+  ]);
+  // "7 systems", framed farther out by 7d9, stands the Earth and a postcard's body 1.45 times apart at one height: holding the rule there
+  // moves that view, which 7d9's tests pin (7p's report, for the chief).
+  const TWINS = new Set<string>(["7 systems"]);
+  // Those with a close world, which the span is asked of.
+  const CLOSE = ["1,000 systems", "one namespace of 20,000", "300 systems of four", "rich mix"] as const;
+  // The view's depth bodies, and everything the view draws at rest as a spot on the video's screen: the Earth, the close world, the
+  // postcards' bodies at their drawn share, the depth bodies; with the postcards' balls.
+  const frameOf = (name: keyof typeof sets) => {
+    const { systems, view } = made(sets[name]);
+    const deep = deepBodies(systems, view);
+    const see = cameraOf(view, REST_SCREENS[0]);
+    const close = closeOf(systems, view);
+    const closeSystem = view.close === undefined ? undefined : systems[view.close.system];
+    const cards = view.postcards.flatMap((index) => {
+      const system = systems[index];
+      return system === undefined ? [] : [{ system, card: postcardOf(system, view.eye) }];
+    });
+    const spots = [
+      ...(close === undefined || closeSystem === undefined ? [] : [see(placeOf(closeSystem, close, 0), close.radius)]),
+      ...cards.flatMap(({ card }) =>
+        card.worlds.map((world, at) => see(placeOf(card.system, world, 0), world.radius * (card.depth[at] ?? NaN))),
+      ),
+    ];
+    const bodies = deep.map(({ system, world }) => {
+      const held = systems[system];
+      const own = held?.worlds[world];
+      if (held === undefined || own === undefined) throw new Error("no such world");
+      return { held, own, seen: see(placeOf(held, own, 0), own.radius) };
+    });
+    // At `seconds` into the turn, on the video's screen: the Earth, the close world held still, the postcards' bodies at their share, and
+    // the depth bodies; the glowing stars, the great star's, the postcards' and any other's with three quarters of its halo or more.
+    const at = (seconds: number) => ({
+      own: [
+        see(EARTH_PLACE, EARTH_RADIUS),
+        ...(close === undefined || closeSystem === undefined
+          ? []
+          : [see(placeOf(closeSystem, close, 0), close.radius)]),
+        ...cards.flatMap(({ card }) =>
+          card.worlds.map((world, at) =>
+            see(placeOf(card.system, world, seconds), world.radius * (card.depth[at] ?? NaN)),
+          ),
+        ),
+      ],
+      deep: bodies.map(({ held, own }) => see(placeOf(held, own, seconds), own.radius)),
+      stars: [
+        see({ x: 0, y: 0, z: 0 }),
+        ...cards.map(({ card }) => see(card.system.place)),
+        ...systems
+          .filter((_, index) => index > 0 && !view.postcards.includes(index))
+          .map((system) => see(system.place))
+          .filter(({ depth, away }) => depth > 0 && haloAt(away) >= 0.75),
+      ],
+    });
+    // Eight instants through the longest turn of what turns: the postcards and the depth bodies.
+    const spins = [...cards.map(({ system }) => system.spin), ...bodies.map(({ held }) => held.spin)].filter(
+      (spin) => spin !== 0,
+    );
+    const turn = (2 * Math.PI) / Math.min(...spins.map((spin) => Math.abs(spin)));
+    const instants = Array.from({ length: 8 }, (_, step) => (spins.length === 0 ? 0 : (step * turn) / 8));
+    return { systems, view, deep, see, cards, spots, bodies, earth: see(EARTH_PLACE, EARTH_RADIUS), at, instants };
+  };
+  const onScreen = ({ x, y }: { x: number; y: number }) =>
+    x >= 0 && x <= REST_SCREENS[0].width && y >= 0 && y <= REST_SCREENS[0].height;
+
+  it.each(rows)(
+    "draws one to four real worlds of other nearby systems as bodies (none where they would make a row), one a system, with %s",
+    (name) => {
+      const { view, deep, systems, bodies } = frameOf(name);
+      expect(deep.length).toBeGreaterThanOrEqual(NONE.has(name) ? 0 : 1);
+      expect(deep.length).toBeLessThanOrEqual(4);
+      expect(new Set(deep.map(({ system }) => system)).size).toBe(deep.length);
+      for (const { system } of deep) {
+        expect(view.postcards).not.toContain(system);
+        expect(system).not.toBe(view.close?.system);
+        expect(systems[system]?.worlds.length).toBeGreaterThan(0);
+      }
+      for (const { own } of bodies) expect(own.radius).toBeGreaterThanOrEqual(GRAIN);
+      // Taken from the nearest systems out, each a body's size, so the near ones are tried first.
+      const aways = deep.map(({ system }) =>
+        Math.hypot(...Object.values(minus(systems[system]?.place ?? view.eye, view.eye))),
+      );
+      expect(aways).toEqual([...aways].sort((a, b) => a - b));
+    },
+  );
+
+  // 7d7's dive comes down to the view at rest, the depth bodies with it: on no frame of the way down, every sixtieth of a second, the
+  // postcards turning as they do, do they make a row at like gaps the view's own bodies did not make (7d9's rule allows those a tenth of a
+  // second).
+  it.each(rows)("adds no row at like gaps on any frame of the way down, with %s", (name) => {
+    const { systems, view, cards, bodies } = frameOf(name);
+    const close = closeOf(systems, view);
+    const closeSystem = systems[view.close?.system ?? -1];
+    const out = { x: NaN, y: NaN, z: NaN };
+    const boxed = (spots: readonly Seen[]) => spots.map((spot) => ({ ...spot, left: 0, right: 0, top: 0, bottom: 0 }));
+    let frames = 0;
+    for (let frame = 1; frame < DIVE.seconds * 60; frame += 1) {
+      diveAt(view.eye, frame / (DIVE.seconds * 60), out);
+      const see = cameraOf({ ...view, eye: { ...out } }, REST_SCREENS[0]);
+      const seconds = orbitTime(frame / 60);
+      const shown = (spots: readonly Seen[]) => spots.filter(({ radius, depth }) => depth > 0 && radius >= BODY_PIXELS);
+      const own = shown([
+        see(EARTH_PLACE, EARTH_RADIUS),
+        ...cards.flatMap(({ card }) =>
+          card.worlds.map((world, at) =>
+            see(placeOf(card.system, world, seconds), world.radius * (card.depth[at] ?? NaN)),
+          ),
+        ),
+        ...(close === undefined || closeSystem === undefined
+          ? []
+          : [see(placeOf(closeSystem, close, 0), close.radius)]),
+      ]);
+      const deep = shown(bodies.map(({ held, own: world }) => see(placeOf(held, world, seconds), world.radius)));
+      if (deep.length > 0 && evenRow(boxed([...own, ...deep]))) expect(evenRow(boxed(own))).toBe(true);
+      frames += 1;
+    }
+    expect(frames).toBeGreaterThan(60);
+  });
+
+  it.each(rows)(
+    "stands each whole and clear on both screens through its turn, off the Earth's ring, every body and postcard, with %s",
+    (name) => {
+      const { systems, view, bodies, cards, deep } = frameOf(name);
+      expect(bodies).toHaveLength(deep.length);
+      const close = closeOf(systems, view);
+      const closeSystem = view.close === undefined ? undefined : systems[view.close.system];
+      for (const { width, height } of REST_SCREENS) {
+        const see = cameraOf(view, { width, height });
+        const earth = see(EARTH_PLACE, EARTH_RADIUS);
+        const star = see({ x: 0, y: 0, z: 0 });
+        const others = [
+          ...(close === undefined || closeSystem === undefined
+            ? []
+            : [see(placeOf(closeSystem, close, 0), close.radius)]),
+          ...cards.map(({ system, card }) =>
+            see(system.place, Math.max(...card.worlds.map(({ orbit, radius }) => orbit + radius))),
+          ),
+          ...bodies.map(({ held, own }) => see(held.place, own.orbit + own.radius)),
+        ];
+        for (const { held, own } of bodies) {
+          const ball = see(held.place, own.orbit + own.radius);
+          expect(whole(ball, width, height)).toBe(true);
+          expect(inHero(ball, width, height)).toBe(false);
+          expect(overlaps(ball, star, STAR_HEART)).toBe(false);
+          expect(Math.hypot(ball.x - earth.x, ball.y - earth.y)).toBeGreaterThanOrEqual(ball.radius + 2 * earth.radius);
+          for (const other of others.filter((one) => one !== ball && Math.hypot(one.x - ball.x, one.y - ball.y) > 1e-6))
+            expect(Math.hypot(other.x - ball.x, other.y - ball.y) - ball.radius - other.radius).toBeGreaterThanOrEqual(
+              24,
+            );
+        }
+      }
+    },
+  );
+
+  // At one height: less than a tenth of the screen's height apart up it, and less than 40 degrees off level; of one size: within 1.5 times.
+  it.each(rows.filter((name) => !TWINS.has(name)))(
+    "stands no two neighbours of one size at one height anywhere in the frame, with %s",
+    (name) => {
+      const { spots, bodies, earth } = frameOf(name);
+      const all = [earth, ...spots, ...bodies.map(({ seen }) => seen)];
+      for (const one of all) {
+        const [nearest] = all
+          .filter((other) => other !== one)
+          .sort((a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y));
+        if (nearest === undefined) continue;
+        const like = Math.max(one.radius, nearest.radius) < 1.5 * Math.min(one.radius, nearest.radius);
+        const [across, up] = [Math.abs(nearest.x - one.x), Math.abs(nearest.y - one.y)];
+        const level = up < 0.1 * REST_SCREENS[0].height && up < Math.tan((40 * Math.PI) / 180) * across;
+        expect(like && level).toBe(false);
+      }
+    },
+  );
+
+  // The review of 7p (R6): a depth body turns round its star as the postcards do. At none of eight instants of the turn does it stand of
+  // one size, within 1.5 times, beside its nearest neighbour or as that neighbour's nearest, at one height or above it (40 degrees).
+  it.each(rows)(
+    "stands no depth body of one size by a neighbour, level or in a column, at any of eight instants of the turn, with %s",
+    (name) => {
+      const { at, instants } = frameOf(name);
+      expect(instants).toHaveLength(8);
+      const H = REST_SCREENS[0].height;
+      const slant = Math.tan((40 * Math.PI) / 180);
+      for (const seconds of instants) {
+        const { own, deep } = at(seconds);
+        const all = [...own, ...deep];
+        const nearest = (one: Seen) =>
+          all
+            .filter((other) => other !== one)
+            .sort((a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y))[0];
+        for (const body of deep)
+          for (const other of all.filter((one) => one !== body && (nearest(body) === one || nearest(one) === body))) {
+            const like = Math.max(body.radius, other.radius) < 1.5 * Math.min(body.radius, other.radius);
+            const [across, up] = [Math.abs(other.x - body.x), Math.abs(other.y - body.y)];
+            const level = up < 0.1 * H && up < slant * across;
+            const column = across < slant * up;
+            expect(like && (level || column)).toBe(false);
+          }
+      }
+    },
+  );
+
+  // The design review of 7p (D1): gnotif made the fourth of a row with gnoslinger and two glowing stars, 34 pixels high across 546. No depth
+  // body makes the fourth of four marks, bodies, the Earth and stars mixed, within a twentieth of the height across more than 0.15 of the
+  // width.
+  it.each(rows)(
+    "makes the fourth of no level row on the screen, stars among its marks, at any of eight instants, with %s",
+    (name) => {
+      const { at, instants } = frameOf(name);
+      expect(instants).toHaveLength(8);
+      for (const seconds of instants) {
+        const { own, deep, stars } = at(seconds);
+        deep.forEach((body, rank) => {
+          const marks = [...own, ...deep.slice(0, rank), ...stars].filter(onScreen);
+          marks.forEach((a, i) => {
+            marks.slice(i + 1).forEach((b, j) => {
+              marks.slice(i + j + 2).forEach((c) => {
+                const [ys, xs] = [[a, b, c, body].map(({ y }) => y), [a, b, c, body].map(({ x }) => x)];
+                const level = Math.max(...ys) - Math.min(...ys) < 0.05 * REST_SCREENS[0].height;
+                if (onScreen(body))
+                  expect(level && Math.max(...xs) - Math.min(...xs) > 0.15 * REST_SCREENS[0].width).toBe(false);
+              });
+            });
+          });
+        });
+      }
+    },
+  );
+
+  // The design review of 7p (D5): dao, its disc 97 pixels off the great star's heart, read as a hole in its glow; each depth body's disc
+  // keeps a tenth of the screen's height off the star's heart at every instant.
+  it.each(rows)("keeps every depth body off the great star's glow at every instant, with %s", (name) => {
+    const { at, instants } = frameOf(name);
+    expect(instants).toHaveLength(8);
+    for (const seconds of instants) {
+      const { deep, stars } = at(seconds);
+      const [star] = stars;
+      if (star === undefined) throw new Error("no great star");
+      for (const body of deep)
+        expect(Math.hypot(body.x - star.x, body.y - star.y) - body.radius).toBeGreaterThanOrEqual(
+          0.1 * REST_SCREENS[0].height,
+        );
+    }
+  });
+
+  // Past 1.5 times the Earth's distance: the review's rules leave "104 of eight" one, at 1.79 times (the chief's option A, 2026-11-03).
+  it.each(rows)(
+    "draws them in depth: the farthest past 1.5 times the Earth's distance, none under 1.5 times a body's least size, with %s",
+    (name) => {
+      const { bodies, earth } = frameOf(name);
+      if (NONE.has(name)) expect(bodies).toEqual([]);
+      else expect(Math.max(...bodies.map(({ seen }) => seen.away))).toBeGreaterThan(1.5 * earth.away);
+      for (const { seen } of bodies) expect(seen.radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS);
+    },
+  );
+
+  it.each(CLOSE)(
+    "spans the frame's sizes about ten times beside the close world: the largest eight times the smallest or more, with %s",
+    (name) => {
+      const { spots, bodies, earth, view } = frameOf(name);
+      expect(view.close).toBeDefined();
+      const radii = [earth, ...spots, ...bodies.map(({ seen }) => seen)].map(({ radius }) => radius);
+      expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThanOrEqual(8);
+    },
+  );
+
+  it.each(rows)(
+    "crowds, piles and lines up nothing with its new bodies, as the view at rest is judged, with %s",
+    (name) => {
+      const { spots, bodies, earth, view, see, deep } = frameOf(name);
+      if (NONE.has(name)) expect(deep).toEqual([]);
+      // The rule reads a round thing's box: its centre and radius give it here.
+      const boxed = (spot: Seen) => ({
+        ...spot,
+        left: spot.x - spot.radius,
+        right: spot.x + spot.radius,
+        top: spot.y - spot.radius,
+        bottom: spot.y + spot.radius,
+      });
+      const all = [...spots, ...bodies.map(({ seen }) => seen)].map(boxed);
+      const frame = { deep: view.close !== undefined, lights: [see({ x: 0, y: 0, z: 0 })], ...REST_SCREENS[0] };
+      if (!NONE.has(name)) expect(composed(all, boxed(earth), frame)).toBe(true);
+    },
+  );
+
+  it("gives the same set the same depth, in any order of its file", () => {
+    const file = sets["300 systems of four"];
+    const { systems, view } = made(file);
+    const again = systemsOf([...file].reverse());
+    const ids = (list: readonly StarSystem[], deep: ReturnType<typeof deepBodies>) =>
+      deep.map(({ system, world }) => list[system]?.worlds[world]?.id);
+    expect(ids(again, deepBodies(again, restView(again)))).toEqual(ids(systems, deepBodies(systems, view)));
+  });
+});
+
+// Alexis, 2026-11-03 ("roches d'ambiance", through the chief): at the home's view at rest, a few rocks in front of everything, decor and not
+// worlds, from the view's own seed; larger and soft when near, sliding with the eye; never over the Earth's disc or a label.
+describe("the home's rocks (7p)", () => {
+  const sets = {
+    "100 systems": files["100 systems"],
+    "1,000 systems": files["1,000 systems"],
+    "300 systems of four": files["300 systems of four"],
+    "54 of four": spread(54, 4),
+    "rich mix": richMix(),
+  } as const satisfies Record<string, readonly WorldHeld[]>;
+  const rows = Object.keys(sets) as (keyof typeof sets)[];
+  const rocksFor = (name: keyof typeof sets) => {
+    const { systems, view } = made(sets[name]);
+    const framed = judgeOf(systems, view, LENT);
+    deepOf(systems, view, framed);
+    return { systems, view, framed, rocks: rocksOf(view, framed) };
+  };
+
+  // The close world passes nearer still: a rock may stand behind it, never on it.
+  it.each(rows)(
+    "lays three to seven, each nearer the eye than the Earth and every body but the close world, with %s",
+    (name) => {
+      const { systems, view, framed, rocks } = rocksFor(name);
+      expect(rocks.length).toBeGreaterThanOrEqual(3);
+      expect(rocks.length).toBeLessThanOrEqual(7);
+      const see = cameraOf(view, REST_SCREENS[0]);
+      const [close, closeSystem] = [closeOf(systems, view), systems[view.close?.system ?? -1]];
+      const closeAway =
+        close === undefined || closeSystem === undefined ? Infinity : see(placeOf(closeSystem, close, 0)).away;
+      const aways = framed.spots.map(({ away }) => away).filter((away) => Math.abs(away - closeAway) > 1e-6);
+      const nearest = Math.min(see(EARTH_PLACE).away, ...aways);
+      for (const { place, radius } of rocks) expect(see(place).away + radius).toBeLessThan(nearest);
+    },
+  );
+
+  // A label stands where core's layout may stand it (settle.ts's PLACE): its stem 12 pixels in from either end of a pill up to 200 wide and
+  // 32 high, held over the body's centre, 22 off its outline, above or below. Swayed, the near rocks slide the most.
+  it.each(rows)(
+    "stands none over the Earth, a body or its label's room, the hero or the star's heart, at rest and swayed, with %s",
+    (name) => {
+      const { view, framed, rocks } = rocksFor(name);
+      expect(rocks.length).toBeGreaterThan(0);
+      const [pill, high] = [200, 32];
+      const roomOf = (rock: Seen, body: { x: number; y: number; radius: number }) =>
+        overlaps(rock, body, body.radius) ||
+        (Math.abs(rock.x - body.x) < pill - PLACE.stem + rock.radius &&
+          Math.abs(rock.y - body.y) < body.radius + PLACE.gap + high + rock.radius);
+      for (const [{ width, height }, swayed] of SCREENS_SWAYED) {
+        const see = cameraOf(view, { width, height }, swayed);
+        const earth = see(EARTH_PLACE, EARTH_RADIUS);
+        const star = see({ x: 0, y: 0, z: 0 });
+        for (const { place, radius } of rocks) {
+          const rock = see(place, radius);
+          expect(roomOf(rock, earth)).toBe(false);
+          expect(inHero(rock, width, height)).toBe(false);
+          expect(overlaps(rock, star, STAR_HEART)).toBe(false);
+        }
+      }
+      const see = cameraOf(view, REST_SCREENS[0]);
+      for (const { place, radius } of rocks)
+        for (const body of framed.spots) expect(roomOf(see(place, radius), body)).toBe(false);
+    },
+  );
+
+  // The design review of 7p (D3): nothing read in front, the rocks a sprinkle no larger than the far worlds. One near rock, larger than the
+  // middle worlds, cut by the frame's left edge above the hero or its bottom edge right of it (the references); the others whole pebbles.
+  it.each(rows)(
+    "draws one near, 30 to 60 pixels, cut by the frame's edge, the others whole and smaller, none on another, in no row, with %s",
+    (name) => {
+      const { view, rocks } = rocksFor(name);
+      const { width, height } = REST_SCREENS[0];
+      const see = cameraOf(view, REST_SCREENS[0]);
+      const spots = rocks.map(({ place, radius }) => see(place, radius)).sort((a, b) => a.away - b.away);
+      const radii = spots.map(({ radius }) => radius);
+      const [near, ...others] = spots;
+      if (near === undefined) throw new Error("no rock");
+      expect(near.radius).toBeGreaterThanOrEqual(30 - 1e-9);
+      expect(near.radius).toBeLessThanOrEqual(60 + 1e-9);
+      expect(near.x - near.radius < 0 || near.y + near.radius > height).toBe(true);
+      expect(near.x + near.radius < width && near.y - near.radius > 0).toBe(true);
+      for (const spot of others) {
+        expect(whole(spot, width, height)).toBe(true);
+        expect(spot.radius).toBeGreaterThanOrEqual(2.5 - 1e-9);
+        expect(spot.radius).toBeLessThanOrEqual(15 + 1e-9);
+      }
+      expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThanOrEqual(2);
+      const third = Math.ceil(spots.length / 3);
+      expect(Math.max(...radii.slice(0, third))).toBeGreaterThan(Math.max(...radii.slice(spots.length - third)));
+      spots.forEach((one, at) => {
+        for (const other of spots.slice(at + 1)) expect(overlaps(one, other, other.radius)).toBe(false);
+      });
+      expect(evenRow(spots)).toBe(false);
+    },
+  );
+
+  // The design review of 7p (D3): f0004's debris stands as a cluster of three or four, not a sprinkle: the pebbles lie round one place, no
+  // two of them more than 200 pixels apart.
+  it.each(rows)("lays the pebbles as one cluster round one place, with %s", (name) => {
+    const { view, rocks } = rocksFor(name);
+    const see = cameraOf(view, REST_SCREENS[0]);
+    const [, ...pebbles] = rocks.map(({ place, radius }) => see(place, radius)).sort((a, b) => a.away - b.away);
+    expect(pebbles.length).toBeGreaterThanOrEqual(2);
+    pebbles.forEach((one, at) => {
+      for (const other of pebbles.slice(at + 1))
+        expect(Math.hypot(one.x - other.x, one.y - other.y)).toBeLessThanOrEqual(200);
+    });
+  });
+
+  // Seeded by the view: an eye a thousandth of a unit away sees nearly the same frame, and other rocks.
+  it("lays the same rocks for the same view, and others for another eye", () => {
+    const { systems, view, rocks } = rocksFor("100 systems");
+    expect(rocksFor("100 systems").rocks).toEqual(rocks);
+    const moved = { ...view, eye: { ...view.eye, x: view.eye.x + 1e-3 } };
+    const judge = judgeOf(systems, moved, LENT);
+    deepOf(systems, moved, judge);
+    const see = cameraOf(view, REST_SCREENS[0]);
+    const places = (list: typeof rocks) =>
+      list.map(({ place }) => see(place)).map(({ x, y }) => `${x.toFixed(0)} ${y.toFixed(0)}`);
+    expect(places(rocksOf(moved, judge))).not.toEqual(places(rocks));
+  });
+});
 
 describe("what the drawn bodies leave clear", () => {
   it.each(Object.entries(files))(

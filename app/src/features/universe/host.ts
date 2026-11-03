@@ -10,15 +10,17 @@ import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
 import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
-import { circleOf, tintPage, worldAsk } from "./globe.ts";
+import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
+import { Flown } from "./flown.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
-/** A world's page: the world it shows, by the id the worlds' job groups it under. */
+/** A world's page: the world it shows, by the id the worlds' job groups it under, and its name, which a flight there shows (7g). */
 export interface WorldShown {
   readonly world: string;
+  readonly name?: string;
 }
 
 /** Whether the page shows space, and the Earth, the default universe's worlds or one world in it. */
@@ -79,9 +81,19 @@ export class SceneHost {
 
   readonly world = () => this.#world;
 
+  /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and the page's body is not marked,
+   * for a flight speaks as it starts, before the next page is taken. */
+  readonly flown = new Flown(() => {
+    this.#heard();
+  });
+
+  #heard(): void {
+    for (const listener of this.#listeners) listener();
+  }
+
   #tell(): void {
     this.#markPage();
-    for (const listener of this.#listeners) listener();
+    this.#heard();
   }
 
   #say(status: SceneStatus): void {
@@ -89,20 +101,10 @@ export class SceneHost {
     this.#tell();
   }
 
-  // The page's stylesheet keeps the globe's room and opens the plate from this: "waiting" while the scene may yet come, so a window that
-  // loads it by itself does not jump; "none" where nothing will. A lost context takes both away. The Earth's page and a world's alike.
+  // The Earth's page and a world's alike.
   #markPage(): void {
-    const wanted = this.#wantsEarth || this.#wantsWorld !== undefined;
-    const globe = wanted ? document.querySelector<HTMLElement>("[data-globe]") : null;
-    if (globe === null) return;
-    const state = this.#bodyState(this.#wantsEarth ? this.#earth : this.#world);
-    globe.dataset[this.#wantsEarth ? "earth" : "world"] = state;
-    if (state !== "drawn") tintPage(undefined);
-  }
-
-  #bodyState(body: EarthState): EarthState | "waiting" | "none" {
-    if (this.#status === "on" && (body === "loading" || body === "drawn")) return body;
-    return this.#status === "off" || this.#status === "loading" ? "waiting" : "none";
+    if (this.#wantsEarth || this.#wantsWorld !== undefined)
+      markGlobe(this.#wantsEarth ? "earth" : "world", this.#wantsEarth ? this.#earth : this.#world, this.#status);
   }
 
   readonly #worldSaid = (state: EarthState, colour?: string): void => {
@@ -189,6 +191,7 @@ export class SceneHost {
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
   show(shown: Shown, page?: EarthPage | WorldPage): void {
+    this.flown.between(this.#scene, shown);
     this.#shown = shown !== false;
     this.#page = page;
     this.#wantsEarth = shown === "earth";
@@ -226,6 +229,7 @@ export class SceneHost {
             onLost: (lost) => {
               this.#say(lost ? "failed" : "on");
             },
+            onFlight: this.flown.said,
           }),
         );
       })

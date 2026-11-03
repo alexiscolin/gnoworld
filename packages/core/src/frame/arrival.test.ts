@@ -16,6 +16,7 @@ import { ARRIVAL_LEAN, arrivalOf, type Arrival } from "./arrival.ts";
 import { composed } from "./composition.ts";
 import { CENTRE, onPlane, orbitPlace, toMap } from "./disc.ts";
 import { haloAt } from "./halo.ts";
+import { BODY_PIXELS } from "../lod/ladder.ts";
 import { postcardWorlds } from "./postcard.ts";
 import { REST_SCREENS, STAR_HEART } from "./rest.ts";
 import { away, DEGREE, dot, focalOf, minus, type Seen } from "./restLook.ts";
@@ -467,6 +468,105 @@ describe("a system's arrival: a good angle", () => {
         if (other !== system) expect(away(arrival.eye, other.place)).toBeGreaterThanOrEqual(ROOM + 1);
       expect(arrivalOf(system, reversed)).toEqual(arrival);
     }
+  });
+});
+
+// Alexis, 2026-11-03, option B (part 7p): a system's arrival reads in depth as the view at rest's postcards do, the nearer of its bodies
+// drawn larger, 1.5 times its neighbour or more through its turn, none at one height on arrival, none dropped to a dot.
+describe("a system's arrival in depth (7p)", () => {
+  // Each body at its drawn share of its size, where it stands `seconds` on, seen from the arrival's eye on the video's screen.
+  const seenAt = (arrival: Arrival, seconds: number) => {
+    const see = cameraOf(arrival, REST_SCREENS[0]);
+    const { system, worlds, depth } = arrival.postcard;
+    return worlds.map((world, at) => {
+      const out = { x: NaN, y: NaN, z: NaN };
+      orbitPlace({ system, world }, seconds, out);
+      return see(out, world.radius * (depth[at] ?? NaN));
+    });
+  };
+
+  it.each(ROWS)(
+    "on %s, draws %s's bodies 1.5 times apart in size or more through its turn, the nearer the larger",
+    (name, id) => {
+      const { system, systems } = caseOf(name, id);
+      const arrival = arrivalOf(system, systems);
+      expect(arrival.postcard.depth).toHaveLength(arrival.postcard.worlds.length);
+      for (const seconds of turnOf(arrival)) {
+        const seen = seenAt(arrival, seconds);
+        seen.forEach((one, at) => {
+          for (const other of seen.slice(at + 1))
+            expect(Math.max(one.radius, other.radius) / Math.min(one.radius, other.radius)).toBeGreaterThanOrEqual(1.5);
+        });
+      }
+      const byDepth = seenAt(arrival, 0).sort((a, b) => a.depth - b.depth);
+      byDepth.forEach((near, at) => {
+        const far = byDepth[at + 1];
+        if (far !== undefined) expect(near.radius).toBeGreaterThan(far.radius);
+      });
+    },
+  );
+
+  // At one height: less than a tenth of the screen's height apart up it, and less than 40 degrees off level (rest.test.ts).
+  it.each(ROWS)("on %s, stands no two of %s's neighbouring bodies at one height on arrival", (name, id) => {
+    const { system, systems } = caseOf(name, id);
+    const arrival = arrivalOf(system, systems);
+    const seen = seenAt(arrival, 0);
+    expect(seen).toHaveLength(arrival.postcard.worlds.length);
+    for (const one of seen) {
+      const [nearest] = seen
+        .filter((other) => other !== one)
+        .sort((a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y));
+      if (nearest === undefined) continue;
+      const [across, up] = [Math.abs(nearest.x - one.x), Math.abs(nearest.y - one.y)];
+      expect(up >= 0.1 * REST_SCREENS[0].height || up >= Math.tan(40 * DEGREE) * across).toBe(true);
+    }
+  });
+
+  // The review of 7p (R2): the arrival judges its worlds at their drawn size, their own at the least: none of them, so drawn, stands on its
+  // star's heart on arrival, on either screen (7d3 judges the heart there; through the turn a world may pass before its star).
+  it.each(ROWS)(
+    "on %s, keeps %s's star's heart clear of its bodies at their drawn size, own at the least, on arrival",
+    (name, id) => {
+      const { system, systems } = caseOf(name, id);
+      const arrival = arrivalOf(system, systems);
+      const { system: plane, worlds, depth } = arrival.postcard;
+      for (const screen of REST_SCREENS) {
+        const see = cameraOf(arrival, screen);
+        const star = see(system.place);
+        worlds.forEach((world, at) => {
+          const out = { x: NaN, y: NaN, z: NaN };
+          orbitPlace({ system: plane, world }, 0, out);
+          const seen = see(out, world.radius * Math.max(1, depth[at] ?? NaN));
+          expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
+        });
+      }
+    },
+  );
+
+  it.each(ROWS)("on %s, drops none of %s's bodies to a dot through its turn", (name, id) => {
+    const { system, systems } = caseOf(name, id);
+    const arrival = arrivalOf(system, systems);
+    for (const seconds of turnOf(arrival))
+      for (const { radius } of seenAt(arrival, seconds))
+        expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
+  });
+
+  // The bodies each arrival drew before the depth (7p, measured on b582d1aa), by its system's id: none is dropped to get there.
+  const BEFORE: Record<SetName, string> = {
+    "80 mixed systems":
+      "n0:1 n1:1 n10:1 n11:2 n12:1 n13:1 n14:1 n15:2 n16:2 n17:1 n18:1 n19:1 n2:1 n20:1 n21:1 n22:2 n23:2 n24:1 n25:1 n26:1 n27:2 " +
+      "n28:2 n29:2 n3:2 n30:1 n31:1 n32:1 n33:2 n34:2 n35:2 n36:1 n37:1 n38:1 n39:2 n4:1 n40:2 n41:3 n42:1 n43:1 n44:1 n45:2 n46:2 " +
+      "n47:3 n48:1 n49:1 n5:2 n50:1 n51:2 n52:2 n53:2 n54:1 n55:1 n56:1 n57:1 n58:2 n59:2 n6:1 n60:1 n61:1 n62:1 n63:2 n64:2 n65:2 " +
+      "n66:1 n67:1 n68:1 n69:2 n7:1 n70:2 n71:3 n72:1 n73:1 n74:1 n75:2 n76:2 n77:3 n78:1 n79:1 n8:1 n9:2",
+    "crowds and singles":
+      "busy:2 mid:1 n0:1 n1:1 n10:1 n11:2 n12:1 n13:1 n14:1 n15:2 n16:2 n17:1 n18:1 n19:1 n2:1 n3:2 n4:1 n5:2 n6:1 n7:1 n8:1 n9:2 test:2",
+  };
+  it.each(Object.keys(SETS) as SetName[])("draws as many bodies at each arrival on %s as before the depth", (name) => {
+    const systems = SETS[name]();
+    const counts = systems
+      .filter(({ worlds }) => worlds.length > 0)
+      .map((system) => `${system.id}:${String(arrivalOf(system, systems).postcard.worlds.length)}`);
+    expect(counts.join(" ")).toBe(BEFORE[name]);
   });
 });
 

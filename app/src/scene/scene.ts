@@ -15,7 +15,7 @@ import { Space } from "./space.ts";
 import { Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
-import { MOTION, watchAim, watchCanvas, watchPage, watchScreen } from "./watch.ts";
+import { MOTION, watchScene } from "./watch.ts";
 
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
@@ -49,6 +49,7 @@ class LiveScene implements Scene {
   #frames = 0;
   #seconds = 0;
   #refused = false;
+  readonly fly: Scene["fly"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -71,12 +72,15 @@ class LiveScene implements Scene {
       renderer: this.#renderer,
       stage: this.#stage,
       camera: this.#camera,
+      eye: this.#eye,
+      said: options.onFlight,
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
         this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
+        this.#parts.flights.part?.ready();
       },
     };
     this.#earth = this.#owner.add(new EarthView(device));
@@ -84,6 +88,7 @@ class LiveScene implements Scene {
       this.#viewport.changed();
     });
     this.ground = this.#earth;
+    this.fly = this.#parts.fly;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -98,32 +103,24 @@ class LiveScene implements Scene {
     this.#viewport.apply();
     this.#loop = new FrameLoop(clock, this.#draw);
     this.#loop.set({ busy: this.#probe.running });
-    this.#watch(canvas);
-  }
-
-  #watch(canvas: HTMLCanvasElement): void {
-    const { signal } = this.#owner;
-    watchPage(this.#loop, signal);
-    watchScreen(this.#viewport.changed, signal);
-    watchAim(this.#eye.aim, signal);
-    watchCanvas(
+    const { changed, resized } = this.#viewport;
+    watchScene(
       canvas,
-      {
-        resized: this.#viewport.resized,
-        lost: (now) => {
-          this.#lost = now;
-          this.#space.redraw();
-          this.#options.onLost(now);
-          this.#stopOrGo();
-          if (!now) {
-            this.#earth.restored();
-            this.#parts.restored();
-          }
-        },
-      },
-      signal,
+      { loop: this.#loop, aim: this.#eye.aim, changed, resized, lost: this.#lostNow },
+      this.#owner.signal,
     );
   }
+
+  readonly #lostNow = (now: boolean): void => {
+    this.#lost = now;
+    this.#space.redraw();
+    this.#options.onLost(now);
+    this.#stopOrGo();
+    if (!now) {
+      this.#earth.restored();
+      this.#parts.restored();
+    }
+  };
 
   // Three calls this in place of its own log, in the middle of a draw, which must end before anything is freed.
   readonly #shaderRefused = (gl: WebGLRenderingContext, program: WebGLProgram): void => {
@@ -132,6 +129,7 @@ class LiveScene implements Scene {
   };
 
   readonly #draw = (delta: number): void => {
+    this.#parts.flights.part?.advance(delta);
     this.#viewport.settle();
     this.#eye.advance(delta, this.#motion.matches);
     this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
@@ -145,7 +143,7 @@ class LiveScene implements Scene {
     this.#frames += 1;
     if (this.#refused) this.#earth.refused();
     this.#refused = false;
-    this.#probe.frame(delta, this.#earth.arriving);
+    this.#probe.frame(delta, this.#earth.arriving || this.#parts.flights.part?.busy === true);
   };
 
   readonly #redraw = (): void => {
@@ -164,6 +162,7 @@ class LiveScene implements Scene {
   };
 
   #stopOrGo(): void {
+    if (this.#covered || this.#lost) this.#parts.flights.part?.land();
     this.#loop.set({ covered: this.#covered || this.#lost });
     this.#loop.redraw();
   }
@@ -204,7 +203,7 @@ class LiveScene implements Scene {
     this.#loop.redraw();
   }
 
-  /** Comes to system `id`, as 7g's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
    * the system's arrival stands (7d3). */
   arrive(id: string | undefined): void {
     this.#parts.cosmos.arrive(id, this.moveTo);

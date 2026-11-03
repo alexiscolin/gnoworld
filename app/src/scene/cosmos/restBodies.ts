@@ -4,11 +4,15 @@
 import {
   BODY_PIXELS,
   distanceOf as away,
+  drawnOf,
   EARTH_PLACE,
+  easedOf,
   EARTH_RADIUS,
   GRAIN,
   smoothstep,
+  type Deep,
   type Drawn,
+  type Rock,
   postcardOf,
   screenRadius,
   type Postcard,
@@ -24,14 +28,18 @@ const GLINT = 0.12;
 // The eye stands at the view within a mouse's lean (3 units each way, eye.ts) and its sway; away from it, the cosmos draws as anywhere
 // (Alexis, 2026-11-02: depth everywhere).
 const REST_REACH = 5;
+const EASED_BY = 10 * REST_REACH;
 const WHOLE = () => 1;
 const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
-/** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, and its main light's system. */
+/** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, its main light's system, and, once
+ * found, the real worlds of other nearby systems the view at rest draws for depth and the home's rocks (7p). */
 export interface Shown {
   readonly view: RestView;
   readonly postcards: ReadonlyMap<number, Postcard>;
   readonly index: number;
+  readonly deep?: readonly Deep[];
+  readonly rocks?: readonly Rock[];
 }
 
 /** The close world's system, by its index, as drawn wherever the eye stands: held still, so none of its worlds jumps to its orbit's place
@@ -80,22 +88,36 @@ export const postcardsOf = (
     }),
   );
 
-/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards' and its close world's system's. */
+/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards', its close world's system's and its depth's. */
 function restBodies(
-  { postcards, still }: { postcards: ReadonlyMap<number, Postcard>; still: Still | undefined },
+  systems: readonly StarSystem[],
+  {
+    postcards,
+    still,
+    deep,
+  }: { postcards: ReadonlyMap<number, Postcard>; still: Still | undefined; deep: readonly Deep[] },
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
-  const offer = (system: StarSystem, world: Orbiter) => {
-    if (world.radius < GRAIN) return;
+  // A world too small for a body is a speck by its own size, whatever a postcard draws it at (7p).
+  const offer = (system: StarSystem, world: Orbiter, own = world.radius) => {
+    if (own < GRAIN) return;
     const { x, y, z } = system.place;
     const away = Math.hypot(x - sight.eye.x, y - sight.eye.y, z - sight.eye.z);
     if (screenRadius(world.radius, away, sight.focal) >= BODY_PIXELS) wanted.set(world.id, [system, world]);
   };
-  // A postcard's bodies stand spread round its star, in its plane as drawn, from the eye at rest: the same view, the same spread. The
-  // close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
-  for (const { system, worlds } of postcards.values()) for (const world of worlds) offer(system, world);
+  // A postcard's bodies stand spread round its star, in its plane as drawn, each at its drawn size (7p), from the eye at rest: the same
+  // view, the same spread. The close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
+  for (const card of postcards.values())
+    drawnOf(card).forEach((world, at) => {
+      offer(card.system, world, card.worlds[at]?.radius);
+    });
   if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
+  for (const { system, world } of deep) {
+    const held = systems[system];
+    const own = held?.worlds[world];
+    if (held !== undefined && own !== undefined) offer(held, own);
+  }
   return wanted;
 }
 
@@ -112,50 +134,77 @@ function pointShares({ postcards, close }: RestView): (system: number) => number
   return (system) => (kept.has(system) ? 1 : GLINT);
 }
 
+// A postcard's world as drawn, at its share of its size; another, or one the postcard leaves out, at its own.
+const asDrawn = (card: Postcard | undefined, world: Orbiter): Orbiter =>
+  card === undefined ? world : (drawnOf(card)[card.worlds.findIndex(({ id }) => id === world.id)] ?? world);
+
+// The view's systems as drawn, by their index: the close world's held still, each postcard's plane as drawn (7d9, 7p); none for another.
+const planesOf = (postcards: ReadonlyMap<number, Postcard>, still: Still | undefined) => (system: number) =>
+  postcards.get(system)?.system ?? (system === still?.index ? still.system : undefined);
+
+// Off the rest, `back` of the way from the view's drawing to the ladder's: each postcard eased back to its own system (7p's review).
+const easedFrom = (systems: readonly StarSystem[], postcards: ReadonlyMap<number, Postcard>, back: number) =>
+  back >= 1
+    ? new Map<number, Postcard>()
+    : new Map(
+        [...postcards].map(([index, card]) => [index, easedOf(card, systems[index] ?? card.system, back)] as const),
+      );
+
 // Anywhere but at a view: the worlds the ladder stands as bodies, each large enough on screen to tell from a point, its others whole points;
-// the close world's system held still.
-function everywhere(systems: readonly StarSystem[], drawn: Drawn, still: Still | undefined): Wanted {
+// the close world's system held still, and the postcards as `postcards` draws them, so none jumps as the eye leaves it.
+function everywhere(
+  systems: readonly StarSystem[],
+  drawn: Drawn,
+  { still, postcards }: { still: Still | undefined; postcards: ReadonlyMap<number, Postcard> },
+): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
+  const planeOf = planesOf(postcards, still);
   for (let at = 0; at < drawn.bodyCount; at += 1) {
     const index = drawn.bodySystems[at] ?? -1;
-    const system = index === still?.index ? still.system : systems[index];
+    const system = planeOf(index) ?? systems[index];
     const world = system?.worlds[drawn.bodyWorlds[at] ?? -1];
-    if (system !== undefined && world !== undefined) wanted.set(world.id, [system, world]);
+    if (system !== undefined && world !== undefined)
+      wanted.set(world.id, [system, asDrawn(postcards.get(index), world)]);
   }
   return wanted;
 }
 
-/** What is drawn from `sight`: `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, on the map, the eye less the
- * arrival's glide and the sway), the ladder's `drawn` anywhere else, the close world's system held still in both (7d9); the main light's
- * system, the specks left out for they would stand on a body, and whether the bodies are lit as up close, as at a system's arrival (7d3). */
+/** What is drawn from `sight`: `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, the eye less the glide and
+ * the sway), the ladder's `drawn` elsewhere, the close world held still and the postcards as drawn in both (7d9, 7p); the main light, the
+ * specks left out for they would stand on a body, and whether the bodies are lit as up close, as at a system's arrival (7d3). */
 export function drawnFrom(
   systems: readonly StarSystem[],
   { shown, drawn }: { shown: Shown; drawn: Drawn },
   sight: { eye: Point; focal: number; resting: Point },
 ) {
-  const { view, postcards, index: main } = shown;
+  const { view, postcards, index: main, deep = [] } = shown;
+  // The home's rocks stand in space wherever the eye is, for the labels' chunk to draw (7p); a system's arrival has none.
+  drawn.rocks = shown.rocks ?? [];
   const [{ eye }, { resting }] = [view, sight];
   const still = stillOf(systems, view);
-  const held = (system: number) => (system === still?.index ? still.system : undefined);
   // At an arrival its own star alone is needed: any other keeps the halo its distance leaves it.
   const lead = (system: number) => system === main;
-  if (Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH)
+  const off = Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z);
+  if (off > REST_REACH) {
+    // Off the rest, the postcards ease back to their own over ten times its reach: the eye can cross it by units in one step (7d9's walk).
+    const eased = easedFrom(systems, postcards, smoothstep(REST_REACH, EASED_BY, off));
     return {
-      bodies: everywhere(systems, drawn, still),
+      bodies: everywhere(systems, drawn, { still, postcards: eased }),
       pointShare: WHOLE,
       needsHalo: lead,
-      planeOf: held,
+      planeOf: planesOf(eased, still),
       still: still?.index,
       limb: limbOf(sight),
       main,
       hidden: NONE_HIDDEN,
       near: false,
     };
+  }
   return {
-    bodies: restBodies({ postcards, still }, sight),
+    bodies: restBodies(systems, { postcards, still, deep }, sight),
     pointShare: pointShares(view),
     needsHalo: main === 0 ? haloNeeds(view) : lead,
-    planeOf: (system: number) => postcards.get(system)?.system ?? held(system),
+    planeOf: planesOf(postcards, still),
     still: still?.index,
     limb: limbOf(sight),
     main,

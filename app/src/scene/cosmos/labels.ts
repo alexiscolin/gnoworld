@@ -10,10 +10,11 @@ import styles from "./labels.module.css";
 export type { Anchor, Chosen };
 
 const WORDS_MS = 100;
-// The bands the page keeps at 1,080 high, frames 4 and 17: the header's 9%, the ticker's 34 px, the rail's 143 px and its 25 of margin.
+// The bands the page keeps at 1,080 high, frames 4 and 17: the header's 9%, the ticker's 34 px, and the rail's, from 6 px of air before the
+// rail's own edge (x 1,585 at 1,728 px in frame 4, 7h2's measure), which a label slides left of: 7i's rail reads it.
 const HEADER = 0.09;
 const TICKER = 34;
-const RAIL = 168;
+const RAIL_BAND = 149;
 const RAIL_FROM = 900;
 // A distant star's room on screen, in pixels, whatever its distance.
 const STAR_PIXELS = 4;
@@ -79,7 +80,7 @@ export class Labels {
     const bands = [
       [0, 0, width, HEADER * height],
       [0, height - TICKER, width, height],
-      ...(width >= RAIL_FROM ? [[width - RAIL, 0, width, height]] : []),
+      ...(width >= RAIL_FROM ? [[width - RAIL_BAND, 0, width, height]] : []),
       ...(box === undefined ? [] : [[box.left, box.top, box.right, box.bottom]]),
     ];
     this.#bandCount = bands.length;
@@ -131,6 +132,7 @@ export class Labels {
     const layout = this.#layout;
     if (this.#projector.sight !== this.#sight) this.#view(this.#projector.sight);
     layout.screenWidth = this.#sight.width;
+    layout.railLeft = this.#sight.width >= RAIL_FROM ? this.#sight.width - RAIL_BAND : Infinity;
     layout.screenHeight = this.#sight.height;
     layout.discCount = 0;
     for (let index = 0; index < LABEL_SLOTS; index += 1) this.#aim(index, eye, shown);

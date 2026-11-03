@@ -337,3 +337,45 @@ describe("depth", () => {
     expect(scales.at(-2)).toBeCloseTo(DEPTH.scale, 9);
   });
 });
+
+// 7h2's measures, the chief's fix B (2026-11-03): Onyx's agents at (1590.741, 876.574), radius 33.106, at 1,728 px (96 more at 1,920),
+// by the rail's band, from 6 px of air before the rail's 1,585 in frame 4: 149 px wide. A pill slides left of the band, its stem upright
+// over the body's disc, so the body keeps its name (labels.spec, "names what the view draws").
+describe("a label by the rail's band", () => {
+  const RAIL = 149;
+  const agentsAt = (width: number) => {
+    const layout = new LabelLayout();
+    layout.screenWidth = width;
+    layout.screenHeight = SCREEN.height;
+    layout.railLeft = width - RAIL;
+    layout.active[0] = 1;
+    [layout.x[0], layout.y[0], layout.radius[0], layout.away[0]] = [
+      1590.741 + (width - 1728) / 2,
+      876.574,
+      33.106,
+      41.181,
+    ];
+    [layout.width[0], layout.height[0]] = [66, 37];
+    layout.boxes.set([width - RAIL, 0, width, SCREEN.height], 0);
+    layout.boxCount = 1;
+    settle(layout);
+    return layout;
+  };
+
+  it("stands agents' label left of the rail's band at 1,728 and 1,920 px, its stem over the body's disc", () => {
+    for (const width of [1728, 1920]) {
+      const layout = agentsAt(width);
+      expect(layout.shown[0], String(width)).toBe(1);
+      const scale = layout.scale[0] ?? NaN;
+      const right = (layout.left[0] ?? NaN) + (layout.width[0] ?? NaN) * scale;
+      expect(right).toBeLessThanOrEqual(width - RAIL - PLACE.air);
+      const stem = (layout.left[0] ?? NaN) + (layout.stem[0] ?? NaN) * scale;
+      expect(Math.abs(stem - (layout.x[0] ?? NaN))).toBeLessThanOrEqual(layout.radius[0] ?? NaN);
+    }
+  });
+
+  it("keeps a pill to the screen's margin where the page shows no rail", () => {
+    const layout = new LabelLayout();
+    expect(layout.railLeft).toBe(Infinity);
+  });
+});
