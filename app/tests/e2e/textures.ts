@@ -25,14 +25,16 @@ interface Tile {
   readonly echo: number;
 }
 
-// Each pixel of a tile less the mean of the 9 by 9 around it: the broad shading out.
-function fineIn(left: number, top: number): Float64Array {
+// Each pixel of a tile less the mean of the square `reach` pixels around it, 9 by 9 unless asked: the broad shading out.
+function fineIn(left: number, top: number, reach = 4): Float64Array {
   const { image, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  const side = 2 * reach + 1;
   return Float64Array.from({ length: 24 * 24 }, (_, i) => {
     const [x, y] = [left + (i % 24), top + Math.floor(i / 24)];
     let sum = 0;
-    for (let at = 0; at < 81; at++) sum += luma(image, x + (at % 9) - 4, y + Math.floor(at / 9) - 4);
-    return luma(image, x, y) - sum / 81;
+    for (let at = 0; at < side * side; at++)
+      sum += luma(image, x + (at % side) - reach, y + Math.floor(at / side) - reach);
+    return luma(image, x, y) - sum / (side * side);
   });
 }
 

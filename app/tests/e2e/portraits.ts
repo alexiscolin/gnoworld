@@ -81,18 +81,18 @@ const portraitsOf = (discs: readonly Circle[]) => {
   });
 };
 
-// The day side's box of a world lit from the right, as the Earth's is read: the Laplacian's variance at full size and at half.
+/** The day side's box of a world lit from the right, as the Earth's is read: left, right, top, bottom. */
+function dayBox({ x, y, r }: Circle): [number, number, number, number] {
+  return [Math.round(x + 0.1 * r), Math.round(x + 0.5 * r), Math.round(y - 0.3 * r), Math.round(y + 0.3 * r)];
+}
+
+// The day side's box: the Laplacian's variance at full size and at half.
 const detailsOf = (discs: readonly Circle[]) => {
   const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
   const [image] = images;
   if (image === undefined) throw new Error("no picture");
-  return discs.map(({ x, y, r }) => {
-    const [x0, x1, y0, y1] = [x + 0.1 * r, x + 0.5 * r, y - 0.3 * r, y + 0.3 * r].map(Math.round) as [
-      number,
-      number,
-      number,
-      number,
-    ];
+  return discs.map((disc) => {
+    const [x0, x1, y0, y1] = dayBox(disc);
     const variance = (value: (i: number, j: number) => number, w: number, h: number) => {
       let [n, s, q] = [0, 0, 0];
       for (let j = 1; j < h - 1; j++)
@@ -150,7 +150,7 @@ const apartOf = (discs: readonly Circle[]) => {
 export const portraits = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Portrait[]> =>
   reading(page, [picture], [portraitsOf, places]);
 export const details = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Detail[]> =>
-  reading(page, [picture], [detailsOf, places]);
+  reading(page, [picture], [detailsOf, places, String(dayBox)]);
 export const apart = (
   page: Page,
   [before, after]: readonly [Buffer, Buffer],
