@@ -17,7 +17,7 @@ import { createWorld, styleOf, worldOf, worldUniforms, type World } from "./gene
 import { GENERATED_FRAGMENT } from "./generatedShader.ts";
 import type { MapSet, Planet } from "./planet.ts";
 import { SHADE } from "./surfaceParts.ts";
-import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
+import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
 import { working } from "./uniforms.ts";
 
 // Every world but the Earth, drawn from its recipe (slice 7, 7b5; ADR-0002 §3, "a class is data"): one program for all of them, each
@@ -156,6 +156,13 @@ describe("a generated world, drawn from its recipe", () => {
     expect(read(drawn(worldAt("rocky")).surface, "banded")).toBe(0);
   });
 
+  // A uniform the program does not declare is dropped without a word; the program then fails to compile, which only a journey sees.
+  it("declares every uniform a world hands its program", () => {
+    for (const anchor of ANCHORS)
+      for (const name of Object.keys(worldUniforms(worldAt(anchor), fixed().set)))
+        expect(`${SURFACE_VERTEX}\n${GENERATED_FRAGMENT}`, name).toMatch(new RegExp(`uniform \\w+ [^;]*\\b${name}\\b`));
+  });
+
   it("marks a glow, a lock and a sea by value, as the look gives them", () => {
     const volcanic = worldAt("volcanic");
     const lava = drawn(volcanic).surface;
@@ -249,6 +256,11 @@ describe("a generated world, drawn from its recipe", () => {
 });
 
 describe("the generated program", () => {
+  const bodyOf = (signature: string) => {
+    const from = GENERATED_FRAGMENT.slice(GENERATED_FRAGMENT.indexOf(signature));
+    return from.slice(0, from.indexOf("\n}\n"));
+  };
+
   it("lights every world with the Earth's own light: one chunk, in both programs", () => {
     expect(SHADE.length).toBeGreaterThan(500);
     expect(GENERATED_FRAGMENT).toContain(SHADE);
@@ -463,8 +475,26 @@ describe("the generated program", () => {
   it("draws each style from its uniform: veins glowing on the night side too, a sulfur crust with calderas", () => {
     const start = GENERATED_FRAGMENT.indexOf("if (glowLevel > 0.0) {\n    float hot");
     const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
-    expect(glow).toMatch(/if \(style > 0\.5 && style < 1\.5\) [^;]*veinsAt\(/);
+    expect(glow).toMatch(/if \(style > 0\.5 && style < 1\.5\) glow = veinsOf\(at \+ offset, /);
+    expect(GENERATED_FRAGMENT).not.toMatch(/veinsAt\(|goldOf\(/);
     expect(GENERATED_FRAGMENT).toMatch(/if \(style > 1\.5\) albedo = rampOf\(sulfurLow, sulfurMid, sulfurHigh, tint\)/);
+  });
+
+  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, gold to orange, never white; each vein a crack along the seams
+  // of cells, its width wandering between two bounds, and a crack under a pixel wide fades out whole, never a hairline that breaks up.
+  it("draws a veined world's veins as two nets of cracks, gold to orange, each faded out whole under a pixel", () => {
+    const crack = bodyOf("vec2 crackAt(");
+    expect(crack).toMatch(/float away = seams\(/);
+    expect(crack).toMatch(/float wide = mix\(width\.x, width\.y, smoothstep\(/);
+    expect(crack).toMatch(/float seen = [1-9]\d*\.0 \* frequency \* pixel;/);
+    expect(crack).toContain(
+      "return vec2((1.0 - smoothstep(0.0, max(wide, seen), away)) * smoothstep(0.5, 1.5, wide / seen), wide / seen);",
+    );
+    const veins = bodyOf("vec3 veinsOf(");
+    expect(veins.match(/crackAt\(/g)).toHaveLength(2);
+    expect(veins).toMatch(/vec2 main = crackAt\(p, [\d.]+ \+ shape\.scale, vec2\(0\.1\d*, 0\.[3-5]\d*\), pixel\);/);
+    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x\);/);
+    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[3-7]\d*, 0\.[01]\d*\), heat\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

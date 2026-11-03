@@ -209,3 +209,27 @@ const HELPERS = [
 /** Each disc's glowing lines as a net: `veins` reads gold to orange glow, `fractures` any warm glow. */
 export const lines = (page: Page, picture: Buffer, asked: { discs: readonly Circle[]; kind: Kind }): Promise<Lines[]> =>
   reading(page, [picture], [linesOf, asked, HELPERS]);
+
+/** The ground between a glowing world's lines, inside 0.85 of its radius: the luma of its darkest quarter, and its mean red over its
+ * mean blue as a difference (a dark maroon's warmth). */
+export interface Cells {
+  readonly floor: number;
+  readonly warmth: number;
+}
+
+function cellsOf({ discs, kind }: { discs: readonly Circle[]; kind: Kind }): Cells[] {
+  const { image, luma, rgbAt } = Reflect.get(globalThis, "__pixels") as Tools;
+  return discs.map((disc) => {
+    const { mask, inside, w, x0, y0 } = netOf(disc, kind);
+    const off = [...inside.keys()].filter((i) => inside[i] === 1 && mask[i] === 0);
+    const lumas = off.map((i) => luma(image, x0 + (i % w), y0 + Math.floor(i / w))).sort((one, other) => one - other);
+    const warmth = off.reduce((sum, i) => {
+      const [red, , blue] = rgbAt(image, x0 + (i % w), y0 + Math.floor(i / w));
+      return sum + red - blue;
+    }, 0);
+    return { floor: lumas[Math.floor(lumas.length / 4)] ?? 0, warmth: warmth / Math.max(off.length, 1) };
+  });
+}
+
+export const cells = (page: Page, picture: Buffer, asked: { discs: readonly Circle[]; kind: Kind }): Promise<Cells[]> =>
+  reading(page, [picture], [cellsOf, asked, HELPERS]);

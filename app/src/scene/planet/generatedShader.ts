@@ -1,6 +1,7 @@
 // Every world but the Earth, one program (ADR-0002 §3, "a class is data"): its ground generated from 7b4's recipe, real maps lending
 // their fine contrast only, lit with the Earth's own light. Comments live here, out of the strings that ship (the scene's budget).
 import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
+import { CRACKS } from "./generatedCracks.ts";
 import { DETAIL, FORMS, NOISE } from "./generatedParts.ts";
 import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { COMMON, PARTS, SHADE } from "./surfaceParts.ts";
@@ -29,6 +30,7 @@ ${LOOKUP}
 ${PARTS}
 ${NOISE}
 ${FORMS}
+${CRACKS}
 ${DETAIL}
 ${SHADE}
 ${LIGHTS}
@@ -160,7 +162,7 @@ void main() {
     float heat = mix(vents, rift * smoothstep(0.1, 0.8, flow.z + 0.4), smoothstep(0.08, 0.2, shape.craters));
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
     vec3 glow = mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
-    if (style > 0.5 && style < 1.5) glow = goldOf(veinsAt(at, pixel), burn);
+    if (style > 0.5 && style < 1.5) glow = veinsOf(at + offset, pixel, burn);
     colour += glow;
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);

@@ -61,6 +61,9 @@ vec4 fbm(vec3 p, float frequency, float pixel, float carved, float octaves) {
 float shareOf(vec2 height) {
   return 1.0 / (1.0 + exp(-1.702 * height.x / height.y));
 }
+vec3 rampOf(vec3 one, vec3 two, vec3 three, float t) {
+  return t < 0.5 ? mix(one, two, t * 2.0) : mix(two, three, t * 2.0 - 1.0);
+}
 `;
 
 // A ground: its height from the warped fBm, its craters, bowls with a rim no steeper than a quad holds; a gas world: its bands, each
@@ -116,17 +119,6 @@ float streaksAt(vec3 q, float pixel) {
     frequency *= 2.0;
   }
   return sum / max(weight, 1e-3) / SPREAD;
-}
-float veinsAt(vec3 p, float pixel) {
-  float frequency = 7.0 + 2.0 * shape.scale;
-  vec3 q = p * frequency + offset;
-  float finer = 1.5 * abs(noise(q * 2.2 + 5.0)) + 1.0 - fadeAt(frequency * 2.2, pixel);
-  float away = min(abs(noise(q)), finer);
-  float width = 0.022 * (0.5 + smoothstep(-0.25, 0.25, noise(q * 0.3 + 9.0)));
-  return 1.0 - smoothstep(0.0, max(width, 1.1 * frequency * pixel), away);
-}
-vec3 goldOf(float vein, float burn) {
-  return mix(vec3(0.6, 0.16, 0.02), vec3(0.9, 0.42, 0.07), vein) * vein * (0.4 + 0.1 * burn) + vec3(0.03, 0.008, 0.0);
 }
 float bandsAt(vec3 q, float pixel) {
   vec4 churn = fbm(vec3(q.x, q.y * 4.0, q.z) + offset, shape.scale, pixel, 0.0, shape.octaves);
@@ -200,8 +192,5 @@ vec3 eyeball(vec3 albedo, float tone, float day) {
   vec3 cold = mix(frost, albedo * vec3(0.62, 0.78, 0.6), smoothstep(0.0, 0.4, day));
   vec3 warm = mix(cold, albedo, smoothstep(0.2, 0.7, day));
   return mix(warm, albedo * vec3(0.3, 0.2, 0.16), smoothstep(0.78, 0.97, day));
-}
-vec3 rampOf(vec3 one, vec3 two, vec3 three, float t) {
-  return t < 0.5 ? mix(one, two, t * 2.0) : mix(two, three, t * 2.0 - 1.0);
 }
 `;

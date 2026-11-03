@@ -6,7 +6,7 @@
 import { ANCHORS, type Anchor } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, drawn, heldQuiet, open, picture, type Circle } from "./lab.ts";
-import { lines } from "./lines.ts";
+import { cells, lines } from "./lines.ts";
 import { apart, details } from "./portraits.ts";
 import { cores, darkest, lightness, wholeRows } from "./surfaces.ts";
 import { grain, landOn } from "./textures.ts";
@@ -18,6 +18,9 @@ const NET = { junctions: 50, endsPerJunction: 0.4, glow: [0.33, 0.8], width: [0.
 // The core the brief asks, #ffc870 (luma 205), gold to orange: its blue over red 0.44 sets the bound, never white (Music's own top 2%,
 // #fcd3b2, reads 0.70 through the video's compression); 7b5's #b8853a, luma 138.
 const CORE = { luma: 0.8 * 205, blueOverRed: 0.6, greenOverRed: [0.6, 0.9] } as const;
+// Music's cells between its veins (lines.ts's cells, on the same disc of f0004.jpg): its darkest quarter at luma 18.1, its red over its
+// blue by 59.2, a dark maroon; half of each at least, as generated.spec.ts holds Music's veins (7b6's patch: #070304, black).
+const CELLS = { floor: 18.1 / 2, warmth: 59.2 / 2 } as const;
 // A shattered crust's fractures (the chief, 7b5's pass2: neon tubes, straight lines making triangles): Music's veins, read as lines,
 // run straight on 7% to 12% of their 60 px windows, their light's spread 0.31 to 0.39, following their width by 0.47 to 0.60; 7b5's
 // arcs run straight on 82%, their light's spread 0.16 (a tube's even light), following their width by 0.33.
@@ -129,6 +132,18 @@ test.describe("the generated worlds polished", () => {
       expect(blue / red, "gold, never white").toBeLessThanOrEqual(CORE.blueOverRed);
       expect(green / red, "gold to orange").toBeGreaterThanOrEqual(CORE.greenOverRed[0]);
       expect(green / red, "gold to orange").toBeLessThanOrEqual(CORE.greenOverRed[1]);
+    });
+  });
+
+  test("a veined volcanic world's cells glow dark maroon between its veins, never black, as Music's", async ({
+    page,
+  }) => {
+    await styled(page, 1, async (place) => {
+      const [between] = await cells(page, await picture(page), { discs: [place], kind: "veins" });
+      if (between === undefined) throw new Error("no measure");
+      test.info().annotations.push({ type: "cells", description: JSON.stringify(between) });
+      expect(between.floor, "never black").toBeGreaterThanOrEqual(CELLS.floor);
+      expect(between.warmth, "a dark maroon").toBeGreaterThanOrEqual(CELLS.warmth);
     });
   });
 
