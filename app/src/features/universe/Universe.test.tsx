@@ -1360,6 +1360,18 @@ describe("flights between places (7g)", () => {
     fly.mockReset();
   });
 
+  // A world's page builds its place anew when its ring or a room comes: the same world, as a new object, is no flight (lot C's review,
+  // F3720).
+  it("flies nowhere when the page shows the world it is at again, as a new object", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    rerender({ world: "gov/dao" });
+    expect(fly).toHaveBeenCalledTimes(1);
+  });
+
   it("flies nowhere before the scene runs, to the place it is at, or from a page that covers space", async () => {
     const { rerender } = rendered("cosmos");
     rerender({ world: "gov/dao", name: "GovDAO" });
