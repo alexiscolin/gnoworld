@@ -33,6 +33,9 @@ describe("keeps", () => {
   it("drops a translation that adds an account, with its at sign or not, anywhere, or names the whole room", () => {
     expect(keeps(ORIGINAL, `${ORIGINAL} @${OTHER}`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER}`)).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER.toUpperCase()}`)).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER.slice(0, 9)}${char(0x200b)}${OTHER.slice(9)}`)).toBe(false);
+    expect(keeps(ORIGINAL, ORIGINAL.replace(ADDRESS, ADDRESS.toUpperCase()))).toBe(true);
     expect(keeps(ORIGINAL, `${ORIGINAL}\n\n> *@${OTHER}*`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} @room`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL}\n\n- **@room**`)).toBe(false);
@@ -41,6 +44,8 @@ describe("keeps", () => {
 
   it("drops a translation that adds a number, anywhere, in any form, or splits one differently", () => {
     expect(keeps(ORIGINAL, `${ORIGINAL} 77`)).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} 1${char(0x200b)}2${char(0x200b)}0${char(0x200b)}4`)).toBe(false);
+    expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", "-1,204"))).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL}\n\n\`\`\`\n9999\n\`\`\``)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} ${char(0x2464, 0x24ea, 0x24ea)} GNOT`)).toBe(false);
     expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", "12,04"))).toBe(false);

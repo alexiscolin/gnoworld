@@ -1,7 +1,7 @@
 import { PAGE_MAX_BYTES } from "@gnoworld/core";
 import type { Digest } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { digestFacts, factsOf, sourceFactsOf } from "./facts.ts";
+import { digestFacts, factsOf, groupsOf, sourceFactsOf } from "./facts.ts";
 
 // 10d's one extractor: what grounding and the translation's check read in a text. Characters above ASCII are built from
 // their code points.
@@ -9,7 +9,11 @@ const char = (...points: number[]) => String.fromCodePoint(...points);
 const ADDRESS = "g1qpzry9x8gf2tvdw0s3jn54khce6mua7lqpzry9";
 const OTHER = `g1${"l".repeat(38)}`;
 const ORIGIN = "https://gno.land";
-const numbers = (text: string) => [...factsOf(text).numbers];
+// A text's numbers as a translation compares them, by their groups, and as grounding does, as written.
+const numbers = (text: string) => [...new Set([...factsOf(text).numbers].map(groupsOf))];
+const written = (text: string) => [...factsOf(text).numbers];
+// Characters that draw nothing, by their code points in hexadecimal: format, joiner, mark, filler, the braille blank.
+const ZERO_WIDTH = ["200b", "2060", "00ad", "200d", "fe0f", "034f", "3164", "115f", "2800", "180e"];
 
 describe("a text's numbers", () => {
   it.each([
@@ -24,6 +28,10 @@ describe("a text's numbers", () => {
     [`1${char(0x2019)}000`, "a right single quote"],
     [`1${char(0x66c)}000`, "Arabic's thousands separator"],
     [`1${char(0xff0c)}000`, "a full-width comma"],
+    ["1_000", "a low line"],
+    [`1${char(0x2bc)}000`, "a modifier apostrophe"],
+    [`1${char(0xb7)}000`, "a middle dot"],
+    [`1${char(0x2032)}000`, "a prime"],
   ])("reads %j as one number, its groups whatever separator joins them (%s)", (text) => {
     expect(numbers(text)).toEqual(["1,000"]);
   });
@@ -48,7 +56,7 @@ describe("a text's numbers", () => {
 
   it("ends a number at any other character, and at a separator no digit follows", () => {
     expect(numbers("2026-11-04 at 10:30")).toEqual(["2026", "11", "04", "10", "30"]);
-    expect(numbers("-5, then 1,000.")).toEqual(["5", "1,000"]);
+    expect(numbers("-5, then 1,000.")).toEqual(["-5", "1,000"]);
     expect(numbers("1,,000 1, 000")).toEqual(["1", "000"]);
     expect(numbers("GRC20 and v2")).toEqual(["20", "2"]);
     expect(numbers("no figure here")).toEqual([]);
@@ -73,6 +81,30 @@ describe("a text's numbers", () => {
     expect(numbers(char(0x1d7d9))).toEqual(["1"]);
     expect(numbers(char(0x1d7ff))).toEqual(["9"]);
     expect(numbers(char(0x1d7ce))).toEqual(["0"]);
+  });
+
+  it("keeps a number as written for grounding: its separators, a plain space for any blank, each digit an ASCII one", () => {
+    expect(written("1,250 and 1.250 and 1 250")).toEqual(["1,250", "1.250", "1 250"]);
+    for (const blank of [0xa0, 0x202f, 0x2009, 0x2007]) expect(written(`1${char(blank)}250`)).toEqual(["1 250"]);
+    expect(written("1  250 and 1\t250")).toEqual(["1 250"]);
+    expect(written(`${char(0x661)}${char(0x66c)}${char(0x662, 0x665, 0x660)}`)).toEqual([`1${char(0x66c)}250`]);
+    expect(written(`1${char(0xff0c)}250`)).toEqual(["1,250"]);
+  });
+
+  it("reads a sign: a hyphen or a minus sign after no letter or digit", () => {
+    expect(written("-5 and (-6) and a -7")).toEqual(["-5", "-6", "-7"]);
+    expect(written(`${char(0x2212)}5 and ${char(0xff0d)}6 and --7`)).toEqual(["-5", "-6", "-7"]);
+    expect(written("x-5, GRC-20 and 10-20")).toEqual(["5", "20", "10"]);
+  });
+
+  it.each(ZERO_WIDTH)("reads digits U+%s parts as the one number a person sees", (hex) => {
+    const between = char(Number.parseInt(hex, 16));
+    expect(written(`Claim 1${between}0${between}0${between}0 GNOT`)).toEqual(["1000"]);
+  });
+
+  it("reads keycap digits as the digits they show", () => {
+    const keycap = (digit: string) => `${digit}${char(0xfe0f, 0x20e3)}`;
+    expect(written(`${keycap("1")}${keycap("0")}${keycap("0")} GNOT`)).toEqual(["100"]);
   });
 
   it("reads a digit written circled, raised or as a fraction, as its compatibility form writes it", () => {
@@ -109,6 +141,21 @@ describe("a message's facts", () => {
     expect([...factsOf(`send to ${ADDRESS}.`).addresses]).toEqual([ADDRESS]);
     expect([...factsOf(`> *@${ADDRESS}*\n\n- ${OTHER}`).addresses]).toEqual([ADDRESS, OTHER]);
     expect([...factsOf(`https://gno.land/u/${ADDRESS}`).addresses]).toEqual([ADDRESS]);
+  });
+
+  it("reads every word that begins g1 as an account, in any case, lower-cased, whatever its form", () => {
+    expect([...factsOf(`send to ${ADDRESS.toUpperCase()}`).addresses]).toEqual([ADDRESS]);
+    expect([...factsOf(`send to G1QPZRY9${ADDRESS.slice(8)}`).addresses]).toEqual([ADDRESS]);
+    for (const word of [`${ADDRESS}q`, ADDRESS.slice(0, -1), `g1${"b".repeat(38)}`, "g1"])
+      expect([...factsOf(`ask ${word}`).addresses]).toEqual([word]);
+    const lookalike = `${ADDRESS.slice(0, 30)}${char(0x430)}${ADDRESS.slice(31)}`;
+    expect([...factsOf(`ask ${lookalike}`).addresses]).toEqual([lookalike]);
+  });
+
+  it.each(ZERO_WIDTH)("reads an account U+%s parts or flanks as the one a person sees", (hex) => {
+    const at = char(Number.parseInt(hex, 16));
+    expect([...factsOf(`send to ${ADDRESS.slice(0, 20)}${at}${ADDRESS.slice(20)}`).addresses]).toEqual([ADDRESS]);
+    expect([...factsOf(`send to ${at}${ADDRESS}${at}`).addresses]).toEqual([ADDRESS]);
   });
 
   it("finds no account in a word not of an account's form", () => {
@@ -153,10 +200,14 @@ describe("a source's facts", () => {
     ]);
   });
 
-  it("finds its numbers in its raw text, and its words that begin g1, an account's among them", () => {
-    const facts = sourceFactsOf(`## 42 votes\n\nby @${ADDRESS}, ok g1short _g1under xg1no`, ORIGIN);
-    expect([...facts.numbers]).toContain("42");
-    expect([...facts.addresses]).toEqual([ADDRESS, "g1short", "g1under"]);
+  it("finds its numbers as written in its raw text, and its words as a person reads them, lower-cased", () => {
+    const facts = sourceFactsOf(`## 1.250 votes\n\nby @${ADDRESS.toUpperCase()}, Ok g1short _g1under xg1no`, ORIGIN);
+    expect([...facts.numbers]).toContain("1.250");
+    expect([...facts.words].sort()).toEqual(
+      ["1", "250", ADDRESS, "by", "g1short", "g1under", "ok", "votes", "xg1no"].sort(),
+    );
+    const parted = sourceFactsOf(`by ${ADDRESS.slice(0, 9)}${char(0x200b)}${ADDRESS.slice(9)}`, ORIGIN);
+    expect(parted.words.has(ADDRESS)).toBe(true);
   });
 
   it("reads no link of a source past core's cap, and its numbers and words still", () => {
@@ -164,7 +215,7 @@ describe("a source's facts", () => {
     const facts = sourceFactsOf(source, ORIGIN);
     expect([...facts.links]).toEqual([]);
     expect([...facts.numbers]).toEqual(["7", "1"]);
-    expect([...facts.addresses]).toEqual(["g1big"]);
+    expect(facts.words.has("g1big")).toBe(true);
   });
 });
 
@@ -198,7 +249,7 @@ describe("a digest's facts", () => {
   });
 
   it("gathers the numbers of every label, value, point, argument and why, none of a links block's address, a realm or a name", () => {
-    const expected = ["5", "1,204", ...numbers(ADDRESS), "2026", "3", "1,5", "8", "100", "4", "1", "900", "66"];
+    const expected = ["5", "1,204", ...written(ADDRESS), "2026", "3", "1.5", "-8", "100", "4", "1", "900", "66"];
     expect([...digestFacts(full()).numbers].sort()).toEqual([...new Set(expected)].sort());
     const named: Digest = { blocks: [{ type: "form", action: { ...action(), args: { n4: "17" }, why: "Now." } }] };
     expect([...digestFacts(named).numbers]).toEqual(["17"]);

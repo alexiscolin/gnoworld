@@ -1,12 +1,11 @@
 // What a text states that can be checked (ADR-0002 §4, "Grounded"; §5, points 4 and 5): its links as core's reader finds
-// them, the accounts it names, its numbers. One extractor for a digest's grounding and a translation's check, so both read
-// a text alike. A number is its groups of digits, read in their compatibility forms, a digit by its value in any script,
-// whatever a language writes between groups: `1,000`, `1 000` and `1.000` are one number, `10,00` and `1000` two others.
-import { inlines, markdown, mentions, mentionsRoom, page, type Inline, type PageBlock } from "@gnoworld/core";
+// them, and what a person reads once nothing unseen parts it: its numbers, as written, and its words, each that begins `g1`
+// an account. One extractor for a digest's grounding and a translation's check, both reading a text alike.
+import { fold, inlines, isBlank, markdown, mentionsRoom, page, type Inline, type PageBlock } from "@gnoworld/core";
 import type { Digest, DigestBlock, ProposedAction } from "@gnoworld/schemas";
 
-/** What a text states: its links, the accounts it names with their at sign or not, its numbers, and whether it names the
- * whole room (`@room`). */
+/** What a text states: its links, the accounts it names (its words that begin `g1`, lower-cased), its numbers as written,
+ * and whether it names the whole room (`@room`). */
 export interface Facts {
   readonly links: ReadonlySet<string>;
   readonly addresses: ReadonlySet<string>;
@@ -27,24 +26,35 @@ function valueOf(digit: string, values: Map<string, string>): string {
   return value;
 }
 
-function numbersIn(text: string): Set<string> {
-  // A space parts groups of three after a first of three digits at most, as thousands are written (`12 345`, never
-  // `2026 100` nor `1 2`); a mark parts groups of any length. NFKC makes each space a plain one.
-  const number =
-    /\p{Nd}{1,3}(?: \p{Nd}{3}(?!\p{Nd}))+(?:[.,'\u2019\u066b\u066c]\p{Nd}+)*|\p{Nd}+(?:[.,'\u2019\u066b\u066c]\p{Nd}+)*/gu;
+// A text as a person reads its figures and names: core's fold (compatibility forms, no mark nor format character, lower
+// case), what else core's isBlank says draws nothing dropped, each digit an ASCII one, a minus sign a hyphen, and each run
+// of blanks on a line one space, as a page draws it.
+function unseen(text: string): string {
   const values = new Map<string, string>();
-  const found = new Set<string>();
-  for (const [run] of text.normalize("NFKC").matchAll(number))
-    found.add(run.replace(/\P{Nd}/gu, ",").replace(/[^\d,]/gu, (digit) => valueOf(digit, values)));
-  return found;
+  const plain = (char: string): string => {
+    if (/\p{Nd}/u.test(char)) return valueOf(char, values);
+    if (char === "\u2212") return "-";
+    return isBlank(char) && !/\s/u.test(char) ? "" : char;
+  };
+  return fold(text)
+    .replace(/\P{ASCII}/gu, plain)
+    .replace(/[^\S\n]+/g, " ");
 }
 
-// A text's words that begin `g1`, runs of letters and digits: an account's address is one, with its at sign or not.
-const g1Words = (text: string): Set<string> => new Set(text.match(/(?<![\p{L}\p{N}])g1[\p{L}\p{N}]*/gu));
+function numbersIn(shown: string): Set<string> {
+  // A space parts groups of three after a first of three digits at most, as thousands are written (`12 345`, never
+  // `2026 100` nor `1 2`); a mark parts groups of any length; a hyphen after no letter nor digit is a sign.
+  const number =
+    /(?:(?<![\p{L}\p{N}])-)?(?:\d{1,3}(?: \d{3}(?!\d))+(?:[.,'_\u2019\u02bc\u00b7\u2032\u066b\u066c]\d+)*|\d+(?:[.,'_\u2019\u02bc\u00b7\u2032\u066b\u066c]\d+)*)/gu;
+  return new Set(shown.match(number));
+}
 
-// Of those, the words of an account's form, by core's rule for a mention read with an at sign (its form, not its checksum).
-const accountsIn = (text: string): Set<string> =>
-  new Set([...g1Words(text)].filter((word) => mentions(markdown(`@${word}`))[0] === word));
+/** A number's groups of digits, a comma between each, whatever a language writes between them: `1 000` and `1.000` are
+ * `1,000`, which a translation may write either way. */
+export const groupsOf = (number: string): string => number.replace(/[^\d-]/g, ",");
+
+// A text's words as a person reads them: runs of letters and digits.
+const wordsOf = (shown: string): string[] => shown.match(/[\p{L}\p{N}]+/gu) ?? [];
 
 function linksIn(nodes: Iterable<Inline>): Set<string> {
   const links = new Set<string>();
@@ -55,19 +65,20 @@ function linksIn(nodes: Iterable<Inline>): Set<string> {
 /** A text's facts, read as the room reads a message. */
 export function factsOf(text: string): Facts {
   const blocks = markdown(text);
+  const shown = unseen(text);
   return {
     links: linksIn(inlines(blocks)),
-    addresses: accountsIn(text),
-    numbers: numbersIn(text),
+    addresses: new Set(wordsOf(shown).filter((word) => word.startsWith("g1"))),
+    numbers: numbersIn(shown),
     room: mentionsRoom(blocks),
   };
 }
 
-/** What a source can ground: its links, its numbers, and its words that begin `g1`, every account it names among them. */
+/** What a source can ground: its links, its numbers as written, and its words, every account it names among them. */
 export interface SourceFacts {
   readonly links: ReadonlySet<string>;
   readonly numbers: ReadonlySet<string>;
-  readonly addresses: ReadonlySet<string>;
+  readonly words: ReadonlySet<string>;
 }
 
 // A page's inline nodes: core's walk of a message's blocks, and each heading's line.
@@ -83,10 +94,11 @@ function* pageInlines(blocks: readonly PageBlock[]): Generator<Inline> {
  * cap, its numbers and words still. */
 export function sourceFactsOf(source: string, origin: string): SourceFacts {
   const read = page(source, { origin });
+  const shown = unseen(source);
   return {
     links: read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>(),
-    numbers: numbersIn(source),
-    addresses: g1Words(source),
+    numbers: numbersIn(shown),
+    words: new Set(wordsOf(shown)),
   };
 }
 

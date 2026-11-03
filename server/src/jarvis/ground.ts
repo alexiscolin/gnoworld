@@ -47,7 +47,7 @@ function missingIn(stated: DigestFacts, sources: Sources): Missing[] {
   };
   check("link", stated.links, (facts) => facts.links);
   check("number", stated.numbers, (facts) => facts.numbers);
-  check("address", stated.addresses, (facts) => facts.addresses);
+  check("address", stated.addresses, (facts) => facts.words);
   if (stated.room) missing.push({ kind: "room", value: "@room" });
   // ponytail: each form looks its function up in the realm's list, 50 forms at most (the schema's blocks).
   for (const action of stated.actions) {

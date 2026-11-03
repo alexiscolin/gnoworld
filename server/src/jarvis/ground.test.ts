@@ -114,11 +114,56 @@ describe("grounded", () => {
       expect(grounded(digest(link(href)), sources())).toEqual(refused({ kind: "link", value: href }));
   });
 
-  it("refuses a number split differently from the page's, and grounds it written with another separator", () => {
+  it("refuses a number split or separated otherwise than the page writes it, a thousand times another", () => {
     expect(grounded(digest(facts("12,04")), sources())).toEqual(refused({ kind: "number", value: "12,04" }));
     expect(grounded(digest(facts("1204")), sources())).toEqual(refused({ kind: "number", value: "1204" }));
-    for (const written of ["1.204", "1 204", `1${String.fromCodePoint(0x202f)}204`])
-      expect(grounded(digest(facts(written)), sources()).ok).toBe(true);
+    const separated: [string, string][] = [
+      ["1.204", "1.204"],
+      ["1 204", "1 204"],
+      [`1${String.fromCodePoint(0x202f)}204`, "1 204"],
+    ];
+    for (const [written, value] of separated)
+      expect(grounded(digest(facts(written)), sources())).toEqual(refused({ kind: "number", value }));
+    const price = sources({ page: "Ticket price: 1.250 GNOT" });
+    expect(grounded(digest(facts("1,250 GNOT")), price)).toEqual(refused({ kind: "number", value: "1,250" }));
+    expect(grounded(digest(facts("1.250 GNOT")), price).ok).toBe(true);
+  });
+
+  it("refuses a number the page holds without its sign", () => {
+    const refund = sources({ page: "Refund: 5 GNOT" });
+    expect(grounded(digest(facts("-5 GNOT")), refund)).toEqual(refused({ kind: "number", value: "-5" }));
+    expect(grounded(digest(facts(`${String.fromCodePoint(0x2212)}5 GNOT`)), refund)).toEqual(
+      refused({ kind: "number", value: "-5" }),
+    );
+  });
+
+  it("refuses digits a character that draws nothing parts, or blanks a page collapses, as the number a person sees", () => {
+    const zero = String.fromCodePoint(0x200b);
+    expect(grounded(digest(facts(`Claim 1${zero}0${zero}0${zero}0 GNOT`)), sources())).toEqual(
+      refused({ kind: "number", value: "1000" }),
+    );
+    const keycap = (digit: string) => `${digit}${String.fromCodePoint(0xfe0f, 0x20e3)}`;
+    expect(grounded(digest(facts(`${keycap("7")}${keycap("7")}${keycap("3")} GNOT`)), sources())).toEqual(
+      refused({ kind: "number", value: "773" }),
+    );
+    const parts = sources({ page: "5 and 250" });
+    for (const blank of ["  ", "\t"])
+      expect(grounded(digest(facts(`5${blank}250`)), parts)).toEqual(refused({ kind: "number", value: "5 250" }));
+  });
+
+  it("refuses an account in upper case, parted by a character that draws nothing, or holding a look-alike letter", () => {
+    const pay = (to: string) => digest(form({ function: "Transfer", args: { to, n4: "37" } }));
+    expect(grounded(pay(OTHER.toUpperCase()), sources())).toEqual(refused({ kind: "address", value: OTHER }));
+    expect(grounded(pay(ADMIN.toUpperCase()), sources()).ok).toBe(true);
+    const parted = `${OTHER.slice(0, 20)}${String.fromCodePoint(0x200b)}${OTHER.slice(20)}`;
+    expect(grounded(digest(text(`Send to ${parted}`)), sources())).toEqual(refused({ kind: "address", value: OTHER }));
+    expect(grounded(digest(text(`Send to ${String.fromCodePoint(0x3164)}${OTHER}`)), sources())).toEqual(
+      refused({ kind: "address", value: OTHER }),
+    );
+    const lookalike = `${ADMIN.slice(0, 30)}${String.fromCodePoint(0x430)}${ADMIN.slice(31)}`;
+    expect(grounded(digest(text(`Send to ${lookalike}`)), sources())).toEqual(
+      refused({ kind: "address", value: lookalike }),
+    );
   });
 
   it.each([`gno.land/r/demo/other`, `${REALM}2`, `${REALM}/sub`, `${REALM}/`, REALM.toUpperCase(), ` ${REALM}`])(
@@ -152,7 +197,7 @@ describe("grounded", () => {
       [digest({ type: "chart", label: "Proposals", points: [37, 38] }), { kind: "number", value: "38" }],
       [
         digest({ type: "chart", label: "Proposals", points: [0.1 + 0.2] }),
-        { kind: "number", value: "0,30000000000000004" },
+        { kind: "number", value: "0.30000000000000004" },
       ],
       [digest(form({ args: { id: "99", answer: "yes" } })), { kind: "number", value: "99" }],
       [digest(form({ why: "It ends at block 777." })), { kind: "number", value: "777" }],
@@ -220,7 +265,8 @@ describe("grounded", () => {
     expect(grounded(digest(facts("512")), sources()).ok).toBe(true);
     expect(grounded(digest(facts("8080")), sources({ page: "```\nport 8080\n```" })).ok).toBe(true);
     const arabic = sources({ page: String.fromCodePoint(0x661, 0x66c, 0x662, 0x660, 0x664) });
-    expect(grounded(digest(facts("1,204")), arabic).ok).toBe(true);
+    expect(grounded(digest(facts(`1${String.fromCodePoint(0x66c)}204`)), arabic).ok).toBe(true);
+    expect(grounded(digest(facts("1,204")), arabic)).toEqual(refused({ kind: "number", value: "1,204" }));
     const typed = sources({
       page: "",
       state: "",
@@ -254,6 +300,9 @@ describe("groundedButton", () => {
       refused({ kind: "link", value: "https://evil.example" }),
     );
     expect(groundedButton(fly(`Pay ${OTHER}`), sources())).toEqual(refused({ kind: "address", value: OTHER }));
+    expect(groundedButton(fly(`Pay ${OTHER.toUpperCase()}`), sources())).toEqual(
+      refused({ kind: "address", value: OTHER }),
+    );
   });
 
   it("grounds an action's button as a digest's form: the realm read, a call its function can make, its figures held", () => {
