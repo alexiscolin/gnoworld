@@ -95,6 +95,42 @@ describe("a shader's spaces, stripped", () => {
     expect(stripGlsl("\n  float a = 1.0;\n  ")).toBe("float a=1.0;");
   });
 
+  // Two signs a space keeps apart, for joined they would read as one operator or open or close a comment (7v's review: most of these
+  // could go from the code with no test failing).
+  it.each([
+    "++",
+    "--",
+    "+=",
+    "-=",
+    "*=",
+    "/=",
+    "%=",
+    "<<",
+    ">>",
+    "<=",
+    ">=",
+    "==",
+    "!=",
+    "&&",
+    "||",
+    "^^",
+    "&=",
+    "|=",
+    "^=",
+    "//",
+    "/*",
+    "*/",
+  ])("keeps %s's two signs apart where they stood apart", (pair) => {
+    const [first, second] = [pair.charAt(0), pair.charAt(1)];
+    expect(stripGlsl(`x = y ${first} ${second} z;`)).toBe(`x=y${first} ${second}z;`);
+  });
+
+  it("keeps a word apart from a number that starts with its point, drops empty lines, and one space in a preprocessor's line", () => {
+    expect(stripGlsl("float x = y .5;")).toBe("float x=y .5;");
+    expect(stripGlsl("a = 1.0;\n\n  \nb = 2.0;")).toBe("a=1.0;\nb=2.0;");
+    expect(stripGlsl("#define  A   1")).toBe("#define A 1");
+  });
+
   it("keeps each line the preprocessor reads whole, on its own line: #define, #version, #include, #ifdef", () => {
     const glsl =
       "#version 300 es\n  #define PI 3.14159 \nfloat a = PI;\n  #include <common>\n#ifdef USE_MAP\n x = 1.0;\n#endif";
@@ -202,6 +238,37 @@ describe("a built chunk's shaders, stripped", () => {
     expect(stripChunk("const s=`\nvoid main() { float a = b - ${n}; }`;")).toBe(
       "const s=`void main(){float a=b- ${n};}`;",
     );
+  });
+
+  it.each(["ivec2", "uvec3", "bvec4", "vec2", "mat3", "mat2x3", "sampler2D", "sampler3D", "samplerCube"])(
+    "reads a statement beside %s as GLSL",
+    (word) => {
+      expect(stripChunk(`const s="x  =  1; ${word}";`)).toBe(`const s="x=1;${word}";`);
+    },
+  );
+
+  it.each(["uniform", "varying", "attribute", "precision", "gl_Position", "void main"])(
+    "reads a statement beside %s as GLSL",
+    (word) => {
+      expect(stripChunk(`const s="x  =  1; ${word}";`)).toBe(`const s="x=1;${word}";`);
+    },
+  );
+
+  it.each([
+    "include",
+    "ifdef",
+    "ifndef",
+    "if",
+    "elif",
+    "else",
+    "endif",
+    "define",
+    "undef",
+    "version",
+    "pragma",
+    "extension",
+  ])("reads a line the preprocessor reads, #%s, as GLSL with no statement", (word) => {
+    expect(stripChunk(`const s="#${word} A\\n  b  =  1";`)).toBe(`const s="#${word} A\\nb=1";`);
   });
 
   it("is a plugin of the build alone, which strips a chunk's shaders and leaves a chunk with none untouched", () => {
