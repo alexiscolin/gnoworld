@@ -131,6 +131,14 @@ func TestRebindSameAddress(cur realm, t *testing.T) {
 	uassert.Equal(t, hex.EncodeToString(raw(pubA2)), KeyOf(alice))
 }
 
+// A seal of no message is refused, before any signature is read.
+func TestSealOfNoMessage(cur realm, t *testing.T) {
+	testing.SetRealm(testing.NewUserRealm(bob))
+	uassert.AbortsWithMessage(t, cur, "n must be positive", func() {
+		Seal(cross(cur), k32(root), 0, k32(pubA), s64(sealSigA), k32(pubB), s64(sealSigB), true)
+	})
+}
+
 // One message is enough for a seal.
 func TestSealOfOneMessage(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(bob))

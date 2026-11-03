@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Mutation check (ADR-0001 §14): every guard in a realm, removed in turn, must
-make a test fail.
+"""Mutation check (ADR-0001 §14): every guard in a realm, removed in turn, and
+every operator or number flipped, must make a test fail.
 
 A guard is a `mustX(...)` call on its own line, or an `if` whose body starts
-with `panic(`; each `||` branch of such an `if` is removed on its own. A package's mutants are copies of it in one temporary workspace,
-next to an untouched copy that must pass, all tested by one `gno test` run. A
-mutant that does not compile is an error of this script, never a kill.
+with `panic(`; each `||` branch of such an `if` is removed on its own. A flip
+turns one `>=`, `>`, `<=`, `<`, `==`, `!=`, `&&`, `||`, `+` or `-` of a source's
+code (never its comments, strings or runes) into its partner, or shifts one
+integer literal by one, up or down. A package's mutants are copies of it in one
+temporary workspace, next to an untouched copy that must pass, all tested by one
+`gno test` run. A mutant that does not compile is an error of this script, never
+a kill; but a `+`, `-` or number flip that does not compile (a string's `+`, an
+array's size) is dropped and counted, unless GAPS lists it. A comparison or logic
+flip changes no type, so one that does not compile means a broken run.
 
-GAPS holds the guards no test catches yet, with the reason. They must keep
-surviving, so closing a gap means deleting its line here.
+GAPS holds the mutants no test catches yet, with the reason. They must keep
+surviving, so closing a gap means deleting its line here. A guard's key is its
+line; a flip's is `<file>: <line> [<from> -> <to>]`, with ` #<k>` after `<to>`
+when the same flip of the same text comes k times in the file. A key that names
+more than one mutant (the same guard line twice) fails: one gap, one mutant. A flip that loops
+forever times the whole run out, and no gap can hold it: bound its loop.
 Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
 import glob
 import os
@@ -23,15 +33,19 @@ GAPS = {
     "mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): seal-store slice",
     "if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): seal-store slice",
     "if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 2, on onyx",
-    "if n < 1 {": "no test seals with n < 1: seal-store slice",
     "!ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: seal-store slice",
+    "r/seal/seal.gno: height, _ = strconv.ParseInt(f[1], 10, 64) [64 -> 63]": "equivalent: a block height stays below 2^62, where a 63-bit parse reads it alike",
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
 EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]
 
-GNO = os.path.abspath(os.environ["GNO"])  # gno runs from temporary folders
 MUST = re.compile(r"^\s*must[A-Z]\w*\(.*\)\s*$")
 IF = re.compile(r"^(\s*if )(?:(.*); )?(.*) \{\s*$")
+FLIP = {">=": ">", ">": ">=", "<=": "<", "<": "<=", "==": "!=", "!=": "==", "&&": "||", "||": "&&", "+": "-", "-": "+"}
+# Go's operators of two and three characters, longest first: a flip takes a whole token, never a part of `++` or `>>=`.
+OPERATORS = ["<<=", ">>=", "&^=", "...", "&&", "||", "<-", "++", "--", "==", "!=", "<=", ">=", ":=", "+=", "-=", "*=", "/=",
+             "%=", "&=", "|=", "^=", "<<", ">>", "&^"]
+INTEGER = re.compile(r"0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|0[0-7_]*|[1-9][0-9_]*")
 
 
 def branches(cond):
@@ -72,20 +86,83 @@ def mutants(path):
             yield find.strip(), src.replace(find, repl)
 
 
+def tokens(src):
+    """(start, end) of each flippable operator and integer literal of src's code: comments, strings, runes, names and
+    other numbers are stepped over."""
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        if src.startswith("//", i):
+            i = src.find("\n", i)
+            i = n if i < 0 else i  # a last line without its newline ends the file
+        elif src.startswith("/*", i):
+            i = src.index("*/", i) + 2
+        elif c in "\"'`":
+            j = i + 1
+            while src[j] != c:
+                j += 2 if src[j] == "\\" and c != "`" else 1
+            i = j + 1
+        elif c.isalpha() or c == "_":  # a name: Go's letters are Python's, Unicode ones included
+            while i < n and (src[i].isalnum() or src[i] == "_"):
+                i += 1
+        elif c.isdigit() or (c == "." and src[i + 1 : i + 2].isdigit()):
+            j, exponent = i, "pP" if src[i : i + 2].lower() == "0x" else "eE"
+            while j < n and (src[j].isalnum() or src[j] in "_." or (src[j] in "+-" and src[j - 1] in exponent)):
+                j += 1
+            if INTEGER.fullmatch(src[i:j]):
+                yield i, j
+            i = j
+        elif c.isspace():
+            i += 1
+        else:
+            op = next((o for o in OPERATORS if src.startswith(o, i)), c)
+            if op in FLIP:
+                yield i, i + len(op)
+            i += len(op)
+
+
+def shifted(text, by):
+    """An integer literal plus `by`, written in its own base; below zero, in parentheses."""
+    prefix = text[:2] if text[:2].lower() in ("0x", "0b", "0o") else "0" if len(text) > 1 and text[0] == "0" else ""
+    base = {"0x": 16, "0b": 2, "0o": 8, "0": 8}.get(prefix.lower(), 10)
+    value = int(text[len(prefix):].replace("_", "") or "0", base) + by
+    if value < 0:
+        return f"({value})"
+    return prefix + {16: f"{value:x}", 2: f"{value:b}", 8: f"{value:o}", 10: str(value)}[base]
+
+
+def flips(path):
+    """(label, mutated source, may be dropped) for each flip of a file's code; the label is its GAPS key."""
+    src = open(path).read()
+    found, seen = [], {}
+    for start, end in tokens(src):
+        text = src[start:end]
+        stop = src.find("\n", end)
+        line = src[src.rfind("\n", 0, start) + 1 : len(src) if stop < 0 else stop].strip()
+        for new in [FLIP[text]] if text in FLIP else [shifted(text, 1), shifted(text, -1)]:
+            key = (line, text, new)
+            seen[key] = seen.get(key, 0) + 1
+            found.append((key, seen[key], src[:start] + new + src[end:], text not in FLIP or text in ("+", "-")))
+    for (line, text, new), k, mutated, droppable in found:
+        yield f"{path}: {line} [{text} -> {new}{f' #{k}' if seen[line, text, new] > 1 else ''}]", mutated, droppable
+
+
 def run(pkg, packages, cases):
-    """gno test's output for the untouched package (m0) and each case (m1…)."""
+    """gno test's output for the untouched package (m0) and each case (m1…), a (file, source) pair."""
+    gno = os.path.abspath(os.environ["GNO"])  # gno runs from temporary folders
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy("gnowork.toml", tmp)
         for other in packages - {pkg}:  # imported packages; pkg's copies take its module path
             shutil.copytree(other, os.path.join(tmp, other))
-        for i, (_, file, src) in enumerate([(None, None, None)] + cases):
+        for i, (file, src) in enumerate([(None, None)] + cases):
             shutil.copytree(pkg, os.path.join(tmp, f"m{i}"))
             if file:
                 with open(os.path.join(tmp, f"m{i}", os.path.relpath(file, pkg)), "w") as f:
                     f.write(src)
         dirs = [f"./m{i}" for i in range(len(cases) + 1)]
-        # -timeout: a mutant that loops forever fails instead of hanging the commit.
-        out = subprocess.run([GNO, "test", "-timeout", "60s", *dirs], cwd=tmp, capture_output=True, text=True, timeout=600)
+        # -timeout: a mutant that loops forever fails the check instead of hanging the commit; gno's timeout ends the
+        # whole run, so the mutants still running get no result.
+        out = subprocess.run([gno, "test", "-timeout", "60s", *dirs], cwd=tmp, capture_output=True, text=True, timeout=600)
         return out.stdout + out.stderr
 
 
@@ -99,23 +176,43 @@ def verdict(out, i):
     return "no result"
 
 
-packages = {os.path.dirname(p) for p in glob.glob("**/gnomod.toml", recursive=True)}
-failed, seen = False, set()
-for pkg in sorted(packages):
-    sources = [f for f in glob.glob(f"{pkg}/*.gno") if not f.endswith(("_test.gno", "_filetest.gno"))]
-    cases = [(label, f, src) for f in sorted(sources) for label, src in mutants(f)]
-    out = run(pkg, packages, cases)
-    if verdict(out, 0) != "survives":
-        sys.exit(f"FAIL  control: {pkg}'s untouched copy does not pass\n{out}")
-    for i, (label, file, _) in enumerate(cases, 1):
-        seen.add(label)
-        got, want = verdict(out, i), "survives" if label in GAPS else "killed"
-        note = f"  (known gap: {GAPS[label]})" if label in GAPS else ""
-        ok = got == want
-        failed |= not ok
-        print(f"{'ok  ' if ok else 'FAIL'}  {got}: {file}: {label}{note if ok else f' (expected {want})'}")
+def main():
+    packages = {os.path.dirname(p) for p in glob.glob("**/gnomod.toml", recursive=True)}
+    failed, seen = False, {}  # each mutant's key, and how many mutants carry it
+    for pkg in sorted(packages):
+        sources = [f for f in sorted(glob.glob(f"{pkg}/*.gno")) if not f.endswith(("_test.gno", "_filetest.gno"))]
+        # (key, what is printed, file, source, may be dropped when it does not compile)
+        cases = [(label, f"{f}: {label}", f, src, False) for f in sources for label, src in mutants(f)]
+        flipped = [(label, label, f, src, drop) for f in sources for label, src, drop in flips(f)]
+        cases += flipped
+        out = run(pkg, packages, [(f, src) for _, _, f, src, _ in cases])
+        if verdict(out, 0) != "survives":
+            sys.exit(f"FAIL  control: {pkg}'s untouched copy does not pass\n{out}")
+        dropped = 0
+        for i, (label, shown, _, _, droppable) in enumerate(cases, 1):
+            seen[label] = seen.get(label, 0) + 1
+            got, want = verdict(out, i), "survives" if label in GAPS else "killed"
+            if got == "does not compile" and droppable and label not in GAPS:
+                dropped += 1
+                continue
+            note = f"  (known gap: {GAPS[label]})" if label in GAPS else ""
+            ok = got == want
+            failed |= not ok
+            print(f"{'ok  ' if ok else 'FAIL'}  {got}: {shown}{note if ok else f' (expected {want})'}")
+        if dropped:
+            print(f"ok    {dropped} of {len(flipped)} flips do not compile, dropped: {pkg}")
+        if "test timed out after" in out:
+            print(f"FAIL  gno test timed out: in {pkg}, a mutant with no result above loops forever; no GAPS entry can hold it, so bound its loop")
+            failed = True
+    for stale in GAPS.keys() - seen.keys():
+        print(f"FAIL  GAPS lists a mutant that no longer exists: {stale}")
+        failed = True
+    # A guard's key is its bare line: the same line in two places would hide behind one gap.
+    for shared in (key for key in GAPS if seen.get(key, 0) > 1):
+        print(f"FAIL  GAPS key names {seen[shared]} mutants, one only: {shared}")
+        failed = True
+    return failed
 
-for stale in GAPS.keys() - seen:
-    print(f"FAIL  GAPS lists a guard that no longer exists: {stale}")
-    failed = True
-sys.exit(failed)
+
+if __name__ == "__main__":
+    sys.exit(main())
