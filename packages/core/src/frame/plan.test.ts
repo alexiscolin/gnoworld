@@ -128,6 +128,25 @@ describe("a system's Plan", () => {
     expect(varied).toBe(true);
   });
 
+  // 7v's design review (F4470): the Plan's orbits read as a diagram, evenly spaced (gnoswap's 41 to 48 px apart). They keep their real order
+  // and distance on a scale whose steps grow outward, as the mock-up's 130 to 180 px: never evenly.
+  it.each(Object.keys(SETS) as SetName[])(
+    "spaces the orbits of %s never evenly: not all gaps alike, and no three neighbours",
+    (name) => {
+      const alike = (a: number, b: number) => Math.abs(a - b) < 0.05 * Math.max(a, b);
+      for (const system of bodied(name)) {
+        const orbits = planOf(system).postcard.worlds.map(({ orbit }) => orbit);
+        const gaps = orbits.slice(1).map((orbit, at) => orbit - (orbits[at] ?? NaN));
+        if (gaps.length < 3) continue;
+        expect(Math.max(...gaps)).toBeGreaterThanOrEqual(1.1 * Math.min(...gaps));
+        gaps.slice(2).forEach((gap, at) => {
+          const [one, two] = [gaps[at] ?? NaN, gaps[at + 1] ?? NaN];
+          expect(alike(one, two) && alike(two, gap)).toBe(false);
+        });
+      }
+    },
+  );
+
   // A crowd is mostly grain (three clear bodies of 172): Onyx's g1ut6uspuh holds 21 worlds of a body's size.
   it("draws exactly twelve of a system with more", () => {
     const many = bodied("the recorded Onyx file").filter(

@@ -34,10 +34,12 @@ const SPAN = 0.78;
 const LARGEST = 0.14;
 // The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii, the room for a name between.
 const INNER = 0.24;
-const GAP = 1.2;
+const GAP = 1.0;
+const GROW = 1.15;
 // The sizes tried, from the largest down, a tenth smaller each time.
 const LEAST = 0.02;
 const SHRINK = 0.9;
+const NEAR_BEST = 0.8;
 // A name's room under its world, in pixels: its height, and half its width at the least.
 const NAME_HIGH = 30;
 const NAME_HALF = 60;
@@ -56,30 +58,36 @@ const planWorlds = (system: StarSystem): Orbiter[] =>
     .slice(0, PLAN_MOST)
     .sort((a, b) => a.orbit - b.orbit);
 
-// The Plan's orbits, its outer at 1 or past it: each world `GAP` of their radii or more past the one before, else in proportion to its real
-// orbit; each world `size` of the outer orbit at the most used's size, by its own.
+// The Plan's orbits, outer at 1 or past: each world at its real orbit's share as the area it rounds (a lattice's slots are laid by area), on a
+// scale whose steps grow `GROW` a world outward as the mock-up's; or past the one before by the names' room, `GAP` of their radii growing
+// `GROW` a ring: never evenly (F4470). Each world `size` of the outer orbit at the most used's size, by its own.
 function spread(worlds: readonly Orbiter[], size: number): Orbiter[] {
-  const [first] = worlds;
-  const span = Math.max(...worlds.map(({ orbit }) => orbit - (first?.orbit ?? 0)), 1e-9);
+  const inner = (worlds[0]?.orbit ?? 0) ** 2;
+  const span = Math.max(...worlds.map(({ orbit }) => orbit ** 2 - inner), 1e-9);
+  const scale = GROW ** Math.max(worlds.length - 1, 1);
   const placed: Orbiter[] = [];
-  for (const { own: _own, ...world } of worlds) {
+  let least = 0;
+  for (const { id, phase, ...world } of worlds) {
     const before = placed.at(-1);
-    const radius = ((_own ?? world.radius) / WORLD_MOST) * size;
-    const real = INNER + ((world.orbit - (first?.orbit ?? 0)) * (1 - INNER)) / span;
-    placed.push({
-      ...world,
-      radius,
-      orbit: Math.max(real, before === undefined ? INNER : before.orbit + GAP * Math.max(before.radius, radius)),
-    });
+    const radius = (sizeOf({ id, phase, ...world }) / WORLD_MOST) * size;
+    const share = (scale ** ((world.orbit ** 2 - inner) / span) - 1) / (scale - 1);
+    least = before === undefined ? 0 : Math.max(GAP * Math.max(before.radius, radius), GROW * least);
+    placed.push({ id, phase, radius, orbit: Math.max(INNER + share * (1 - INNER), (before?.orbit ?? INNER) + least) });
   }
   return placed;
 }
 
-// The Plan's worlds `size` of its outer orbit at the most used's size, its outer orbit at 1.
+// The Plan's worlds `size` of its outer orbit at the most used's size, its inner orbit kept and its outer at 1: what lies between drawn
+// in, its gaps and worlds alike, so a spread past 1 brings none nearer the star's heart.
 function planOrbits(worlds: readonly Orbiter[], size: number): Orbiter[] {
   const placed = spread(worlds, size);
   const outer = Math.max(placed.at(-1)?.orbit ?? 1, 1);
-  return placed.map((world) => ({ ...world, orbit: world.orbit / outer, radius: world.radius / outer }));
+  const scale = (1 - INNER) / (outer - INNER);
+  return placed.map((world) => ({
+    ...world,
+    orbit: INNER + (world.orbit - INNER) * scale,
+    radius: world.radius * scale,
+  }));
 }
 
 /** Whether each world stands whole with its name's room under it, `heart` pixels or more off the centre's own (a star's, the Earth's disc),
@@ -115,8 +123,8 @@ function readable(
 }
 
 /** `system`'s Plan: the eye over its plane at a slant, far enough that its outer orbit spans most of the narrower screen, at the first turn
- * from its address's that stands every world readable, at the largest size that lets one; its first turn at the least size if none does.
- * Its postcard holds the Plan's worlds, still, and leaves out every other. */
+ * from its address's whose largest size that stands every world readable is within a fifth of the best turn's; its first turn at the least
+ * size if none does. Its postcard holds the Plan's worlds, still, and leaves out every other. */
 export function planOf(system: StarSystem): Arrival {
   const still = { ...system, spin: 0 };
   const worlds = planWorlds(system);
@@ -139,17 +147,21 @@ export function planOf(system: StarSystem): Arrival {
     );
     return cameraTowards(along(system.place, way, distance), system.place, up);
   });
-  const inRoom = (size: number) =>
-    planOrbits(worlds, size).map((world) => ({ ...world, orbit: world.orbit * room, radius: world.radius * room }));
-  let [placed, camera] = [inRoom(LEAST), cameras[0] ?? cameraTowards(system.place, system.place, up)];
-  for (let size = LARGEST; size >= LEAST; size *= SHRINK) {
-    const tried = inRoom(size);
-    const found = cameras.find((one) => readable({ system: still, worlds: tried }, one));
-    if (found !== undefined) {
-      [placed, camera] = [tried, found];
-      break;
-    }
-  }
+  const sizes = Array.from({ length: Math.floor(Math.log(LEAST / LARGEST) / Math.log(SHRINK)) + 1 }, (_, at) =>
+    planOrbits(worlds, LARGEST * SHRINK ** at).map((world) => ({
+      ...world,
+      orbit: world.orbit * room,
+      radius: world.radius * room,
+    })),
+  );
+  // Each turn's largest readable size; the first turn, in the address's order, within a fifth of the best: alike systems turn apart.
+  const readableAt = cameras.map((one) => sizes.findIndex((tried) => readable({ system: still, worlds: tried }, one)));
+  const best = Math.min(...readableAt.filter((at) => at >= 0));
+  const chosen = readableAt.findIndex((at) => at >= 0 && SHRINK ** (at - best) >= NEAR_BEST);
+  const [placed, camera] = [
+    sizes[chosen < 0 ? sizes.length - 1 : (readableAt[chosen] ?? 0)] ?? [],
+    cameras[Math.max(chosen, 0)] ?? cameraTowards(system.place, system.place, up),
+  ];
   const hidden = new Set(
     system.worlds.filter(({ id }) => !placed.some((world) => world.id === id)).map(({ id }) => id),
   );
