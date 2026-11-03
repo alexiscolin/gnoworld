@@ -851,6 +851,21 @@ def mutants():
     for name in ("pnpm-lock.yaml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs", ".npmrc", "':(glob)**/package.json'"):
         yield from each("scripts/worktree.sh", f" {name}" if name[0] != "'" else f" {name}", "", "hooks", f"worktree.sh refuses a base whose {name.strip(chr(39))} is not this tree's (security-S5)")
     yield from each("scripts/worktree.sh", '[ -z "$differ" ] ||', "true ||", "hooks", "worktree.sh refuses a base whose package files are not this tree's (security-S5)")
+    # F5058: it may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
+    # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.
+    yield from each("scripts/worktree.sh", '[ "$parent" = "$root" ] ||', "true ||", "hooks", "worktree.sh makes and removes the folders of its root alone (F5058)")
+    yield from each("scripts/worktree.sh", "root=/private/tmp/claude-$(id -u)/gnoworld-wt", "root=/private/tmp/claude-$(id -u)", "hooks", "worktree.sh's root is /private/tmp/claude-<uid>/gnoworld-wt (F5058)")
+    yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -L) || parent=", "hooks", "worktree.sh resolves the folder's parent, never through a link (F5058)")
+    for char in "._":
+        yield from each("scripts/worktree.sh", "*[!abcdefghijklmnopqrstuvwxyz0123456789-]*)", f"*[!{char}abcdefghijklmnopqrstuvwxyz0123456789-]*)", "hooks", f"worktree.sh refuses a {char} in its folder's name (F5058)")
+    yield from each("scripts/worktree.sh", "dir=$root/$name\n", "\n", "hooks", "worktree.sh names the folder by its resolved path, so no slash or .. hides a link (F5058)")
+    yield from each("scripts/worktree.sh", '[ ! -L "$dir" ] ||', "true ||", "hooks", "worktree.sh refuses a link named as its folder (F5058)")
+    yield from each("scripts/worktree.sh", "2:remove) action=remove", "2:*) action=remove", "hooks", "worktree.sh removes on the word remove alone")
+    yield from each("scripts/worktree.sh", "src=$(pwd -P)\n", "src=$PWD\n", "hooks", "worktree.sh sees the tree it runs in, entered through a link")
+    yield from each("scripts/worktree.sh", 'case $src/ in "$dir"/*)', "case $src/ in -none-)", "hooks", "worktree.sh never removes the tree it runs in")
+    yield from each("scripts/worktree.sh", '\tgit worktree remove "$dir"\n', '\tgit worktree remove --force "$dir"\n', "hooks", "worktree.sh removes a clean worktree alone")
+    yield from each("scripts/worktree.sh", "\tgit worktree prune\n", "\tgit worktree prune || :\n", "hooks", "worktree.sh prunes the records of the worktrees gone, and fails when it cannot")
+    yield from each("scripts/worktree.sh", "-, which git would read as an option\" >&2; exit 2", "-, which git would read as an option\" >&2; exit 1", "hooks", "worktree.sh refuses a leading dash as a wrong call")
     yield from each("scripts/bench.py", "    if mean > budget:", "    if False:", "hooks", "bench.py fails a bench over its budget")
     yield from each("scripts/bench.py", "    if found is None:", "    if False:", "hooks", "bench.py fails a bench with no budget")
     yield from each("scripts/bench.py", "    if mean is None:", "    if False:", "hooks", "bench.py fails a bench that took no sample (F1213)")

@@ -5,17 +5,44 @@
 # hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
 # copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
 # own, each tree writing them. StrykerJS's incremental file is the one the gate's every run shares (check.sh).
+# worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, keeps its
+# branch, and prunes the records of the worktrees gone.
 set -eu
-[ $# = 3 ] || { echo "usage: sh scripts/worktree.sh <dir> <branch> <base>" >&2; exit 2; }
-dir=$1 branch=$2 base=$3
+case $#:${1-} in
+3:*) action=add dir=$1 branch=$2 base=$3 ;;
+2:remove) action=remove dir=$2 branch= base= ;;
+*) printf 'usage: sh scripts/worktree.sh <dir> <branch> <base>\n   or: sh scripts/worktree.sh remove <dir>\n' >&2; exit 2 ;;
+esac
 # An argument that starts with - is an option for git, never a name (a base `--output=<file>` made git diff truncate a file), and
 # every check is made before the tree is: what the script cannot undo is not begun (CR6).
 for arg in "$dir" "$branch" "$base"; do
 	case $arg in -*) echo "worktree.sh: $arg starts with -, which git would read as an option" >&2; exit 2 ;; esac
 done
+# It may run outside the sandbox, which denies every worktree's harness to every session (F5058): it makes and removes the
+# folders of one root alone, which no variable moves. The folder's parent is resolved, so a `..`, a link on the way or another
+# path is refused, and compared with the root as written, never resolved; the name's letters are spelled out, as sh's [a-z]
+# takes a capital or an accented letter in a UTF-8 locale (bash 3.2). The folder is then named by that resolved path, so no
+# trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as the folder is refused,
+# as git makes the branch before failing on one, and removes the tree a link leads to, wherever it is.
+root=/private/tmp/claude-$(id -u)/gnoworld-wt
+name=$(basename "$dir")
+parent=$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P) || parent=
+case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac
+[ "$parent" = "$root" ] || { echo "worktree.sh: $dir is not $root/<name>, <name> in a-z, 0-9 and -, once resolved" >&2; exit 1; }
+dir=$root/$name
+[ ! -L "$dir" ] || { echo "worktree.sh: $dir is a link; name the folder itself" >&2; exit 1; }
+src=$(pwd -P)
+if [ "$action" = remove ]; then
+	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder, the prune failing. git
+	# removes only a clean worktree of this repository (no --force), its ignored files with it, never what a link in it leads to.
+	case $src/ in "$dir"/*) echo "worktree.sh: $dir is the tree this runs in; remove it from another" >&2; exit 1 ;; esac
+	git worktree remove "$dir"
+	git worktree prune
+	echo "worktree.sh: $dir removed, its branch kept"
+	exit 0
+fi
 [ ! -e "$dir" ] || { echo "worktree.sh: $dir exists; name a new folder" >&2; exit 1; }
 git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.sh: $base is no commit" >&2; exit 1; }
-src=$(pwd -P)
 # The root's node_modules is taken apart below, which a link to a folder (borrow_node_modules.sh skips it) cannot be.
 [ -d "$src/node_modules" ] && [ ! -L "$src/node_modules" ] || { echo "worktree.sh: $src/node_modules is a link or missing; it must be the real folder of this tree's installed packages" >&2; exit 1; }
 # The packages linked below are this tree's, whose lockfile and package files its install follows: a base with others would
