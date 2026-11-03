@@ -142,7 +142,7 @@ Where the decision left a choice, 7o made it as follows; each can be changed on 
 
 - **The newcomer.** The draft said "Start here" would use the visits the labels already read. They cannot: the device keeps a world's visit
   only when a seed wakes, so a world older than seven days is never kept, and the Earth's page keeps none (Verified). The device keeps
-  instead, per universe, the first place the reader entered: the Earth's page, a world's or a realm's. Until then the reader is new: the
+  instead the first place its reader entered, in any universe: the Earth's page, a world's or a realm's. Until then the reader is new: the
   Earth's label says "Start here" and the buttons are the first visit's. A device that keeps nothing (storage refused) reads every visit as a
   first.
 - **The opening's memory** is one more word on the device, kept as the opening shows: a reload while it shows does not show it again. It
@@ -154,9 +154,18 @@ Where the decision left a choice, 7o made it as follows; each can be changed on 
   cosmos waits for "View in space", the video's pair stays, so a phone always has its filled call.
 - **"Go explore"'s world** is the busiest world but the Earth, by the server's presence read as the click comes; the Earth when no world has
   anyone, or when the server does not answer. Its link's address is the Earth's, which a new tab opens.
+- **"What is gno.land?"** is `rel="noreferrer noopener"`, as the lint asks of every new tab: it holds the decided `noopener`.
+- **What shortens the opening.** A press, the wheel, or any key but Tab: Tab moves the focus, which may be on its way to "What is gno.land?",
+  and the words hold while the focus is in them. A press on that link keeps them too, for its click opens gno.land.
+- **The hero's line** says "Each one is a place to talk." wherever the universe holds a world, and nothing of it where it holds none.
 - **"On focus"** is the focus of that world's link: the labels take no focus, for they are hidden from readers and the page's links say
   every place. A world's label opens while the keyboard is on its link, in the rail or in the list.
 - **A label that opens** grows to its right over its neighbours, and goes back as the pointer, the focus or the tap leaves.
+- **The Earth's label is a door at once:** a click or a single tap enters, and it never opens to "Enter →", for it names its place
+  already, "Start here" to a newcomer.
+- **"Go explore" when nobody is anywhere** goes to the Earth, as decided. Where the Earth alone has people, it goes to the Earth too; where
+  a world has some, it goes to the busiest world even when the Earth holds more, for the Earth is where "Start here" and "Join the chat"
+  lead already.
 
 ### 5. What stays
 
