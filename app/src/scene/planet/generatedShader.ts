@@ -73,10 +73,13 @@ void main() {
     relieved = ground.z / ground.y + big * 0.8 * (1.0 - smoothstep(0.012, 0.03, shape.scale * 4.0 * pixel));
     if (continents) {
       vec4 land = fbm(p, 0.6 + 4.4 * (1.0 - shape.gather), pixel, 0.0, 3.0);
-      float coarse = land.w / land.y - 0.18 + 0.9 * smoothstep(0.6, 1.0, shape.gather) * dot(at, normalize(offset - 8.0));
-      float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702;
+      float lean = 0.9 * smoothstep(0.6, 1.0, shape.gather);
+      float rough = 0.5 - 0.2 * shape.gather;
+      float spread = sqrt(1.0 + lean * lean / 3.0 + rough * rough);
+      float coarse = land.w / land.y + lean * dot(at, normalize(offset - 8.0));
+      float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702 * spread;
       float near = 1.0 - smoothstep(0.0, above > 0.0 ? 0.5 : 1.1, abs(above));
-      t = shareOf(vec2(coarse + (0.5 - 0.2 * shape.gather + 0.5 * near) * ground.w / ground.y + 2.5 * near * fray, 1.0));
+      t = shareOf(vec2(coarse + (rough + 0.5 * near) * ground.w / ground.y + 2.5 * near * fray, spread));
     }
   }
   float minor = 0.0;

@@ -459,7 +459,7 @@ describe("the generated program", () => {
       /vec4 land = fbm\(p, 0\.[4-8]\d* \+ [2-4]\.\d+ \* \(1\.0 - shape\.gather\), pixel, 0\.0, 3\.0\);/,
     );
     expect(GENERATED_FRAGMENT).toMatch(
-      /float coarse = land\.w \/ land\.y - 0\.\d+ \+ [0-2]\.\d+ \* smoothstep\(0\.[5-8]\d*, 1\.0, shape\.gather\) \* dot\(at, normalize\(offset - 8\.0\)\);/,
+      /float lean = [0-2]\.\d+ \* smoothstep\(0\.[5-8]\d*, 1\.0, shape\.gather\);\n {6}float rough = [^;]*;\n {6}float spread = [^;]*;\n {6}float coarse = land\.w \/ land\.y \+ lean \* dot\(at, normalize\(offset - 8\.0\)\);/,
     );
   });
 
@@ -467,13 +467,15 @@ describe("the generated program", () => {
   // coast, weighed up near the sea's level, where it can move it, so gulfs, peninsulas and islands cut it at every zoom; the shallow
   // shelf follows the coast within a few hundredths of the sea's share, never a wide halo.
   it("breaks a coast with the ground's octaves to the pixel, weighed up near the sea's level, its shelf kept to the coast", () => {
-    expect(GENERATED_FRAGMENT).toContain("float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702;");
+    // R2: the field's level and its share read at its own spread, so the drawn sea keeps the seed's share at both ends of its span.
+    expect(GENERATED_FRAGMENT).toContain("float spread = sqrt(1.0 + lean * lean / 3.0 + rough * rough);");
+    expect(GENERATED_FRAGMENT).toContain("float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702 * spread;");
     // Narrower on the land's side, so the coast's noise raises islands off it more than lakes in it.
     expect(GENERATED_FRAGMENT).toMatch(
       /float near = 1\.0 - smoothstep\(0\.0, above > 0\.0 \? 0\.\d+ : 1\.\d+, abs\(above\)\);/,
     );
     expect(GENERATED_FRAGMENT).toMatch(
-      /t = shareOf\(vec2\(coarse \+ \([^;]* \* near\) \* ground\.w \/ ground\.y \+ [1-9][\d.]* \* near \* fray, 1\.0\)\);/,
+      /t = shareOf\(vec2\(coarse \+ \(rough \+ [\d.]+ \* near\) \* ground\.w \/ ground\.y \+ [1-9][\d.]* \* near \* fray, spread\)\);/,
     );
     expect(GENERATED_FRAGMENT).toContain("float shore = t;");
     expect(GENERATED_FRAGMENT).toMatch(
