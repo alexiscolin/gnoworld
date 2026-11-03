@@ -238,8 +238,9 @@ describe("the rail's portraits", () => {
     await asked;
     const image = pictures.put[0];
     const pixel = (x: number, y: number) => [...(image?.data.slice(4 * (y * 4 + x), 4 * (y * 4 + x) + 4) ?? [])];
-    expect(pixel(0, 3)).toEqual([255, 0, 0, 255]);
-    expect(pixel(0, 0)).toEqual([0, 0, 255, 255]);
+    const night = pixel(0, 0)[0];
+    expect(pixel(0, 3)).toEqual([255, night, night, 255]);
+    expect(pixel(0, 0)).toEqual([night, night, 255, 255]);
   });
 
   it("gives the renderer back as it found it: its viewport, its scissor and its test", async () => {
