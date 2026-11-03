@@ -1,6 +1,8 @@
 // The browser's capped, timed GET (5g; 5m's markets read it too): the bytes of an answer under a time limit and a size cap,
-// or a kind of failure. Nothing here reads a schema: `read.ts` does.
+// or a kind of failure. A chain's answer is read through its schema in `read.ts`; this site's own files are read here (7n2), for a module
+// of their own, shared by the first screen and the scene's chunk, would be a chunk that every lazy chunk names.
 import { cappedBytes } from "@gnoworld/core";
+import type * as z from "zod/mini";
 
 /** The time an answer has, its body read included. */
 const CHAIN_TIMEOUT_MS = 8_000;
@@ -128,5 +130,31 @@ export async function fetchBytes(url: string, options: Transport): Promise<Fetch
   } finally {
     clearTimeout(timer);
     if (leave !== undefined) outer?.removeEventListener("abort", leave);
+  }
+}
+
+export interface SiteFileRead {
+  fetch?: ChainFetch;
+  signal?: AbortSignal;
+}
+
+/** A file the server's jobs write from a chain, at this site's `url` (slice 7): its own credentials and cache, under `maxBytes`, as `schema`
+ * reads it, or nothing if it did not come whole. Never a throw, for a page has nothing to do with one. */
+export async function readSiteFile<T>(
+  url: string,
+  schema: z.ZodMiniType<T>,
+  { maxBytes, fetch, signal }: SiteFileRead & { maxBytes: number },
+): Promise<T | undefined> {
+  const answer = await fetchBytes(url, {
+    ...(fetch === undefined ? {} : { fetch }),
+    ...(signal === undefined ? {} : { signal }),
+    maxBytes,
+    credentials: "same-origin",
+  });
+  if ("kind" in answer) return undefined;
+  try {
+    return schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(answer.bytes))).data;
+  } catch {
+    return undefined;
   }
 }
