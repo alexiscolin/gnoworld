@@ -283,6 +283,26 @@ describe("a system's Plan on the stage", () => {
     orbits.dispose();
   });
 
+  // 7v's review (F4460): presence is polled each minute, each poll new words: the names were made again, a first click forgotten and the
+  // focus dropped to the page.
+  it("keeps each name, its naming and its focus when the file's words change under the same Plan", () => {
+    const { orbits, open } = made();
+    const plan = planned();
+    orbits.show(plan, words);
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    const [router] = names();
+    router?.focus();
+    expect(document.activeElement).toBe(router);
+    expect(clicked(router)).toBe(true);
+    orbits.show(plan, { worlds: [], signals: signalsWith(0) });
+    expect(names()[0]).toBe(router);
+    expect(router?.getAttribute("aria-current")).toBe("true");
+    expect(document.activeElement).toBe(router);
+    expect(names().map((name) => name.querySelector(".dot") !== null)).toEqual([false, false, false]);
+    expect(clicked(router)).toBe(true);
+    expect(open).toHaveBeenCalledWith("/r/gnoswap/v1/router");
+  });
+
   it("takes its ellipses and names away once no Plan is shown, and everything once gone", () => {
     const { parent, orbits } = made();
     orbits.show(planned(), words);

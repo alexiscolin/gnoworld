@@ -119,9 +119,15 @@ export class Orbits {
       words.signals === this.#shown.words.signals
     )
       return;
+    const kept = planned === this.#shown.plan;
     this.#shown = { plan: planned, words };
     const plan = planned === undefined ? undefined : namedOf(planned, words);
     this.#plan = plan;
+    // The same Plan in new words (a minute's presence): each name kept, its naming and its focus with it (7v's review).
+    if (kept && plan !== undefined) {
+      this.#rewrite(plan);
+      return;
+    }
     this.#lines.visible = plan !== undefined;
     this.#named = undefined;
     this.#names = plan === undefined ? [] : plan.worlds.map(({ id }) => this.#nameOf(plan, id));
@@ -153,21 +159,35 @@ export class Orbits {
   #nameOf(plan: Named, id: string): HTMLAnchorElement {
     const name = this.#layer.ownerDocument.createElement("a");
     name.className = `${labelStyles["placed"] ?? ""} ${styles["name"] ?? ""}`;
-    name.textContent = plan.names.get(id) ?? id;
-    const given = plan.links.get(id);
-    const href = linkable(given) ? given : undefined;
-    if (href !== undefined) name.href = href;
-    if (href !== undefined && external(href)) Object.assign(name, { target: "_blank", rel: "noopener noreferrer" });
-    if (plan.here.has(id)) name.prepend(warmDot(this.#layer.ownerDocument));
+    this.#word(plan, id, name);
     name.addEventListener("click", (event) => {
-      this.#click(event, name, href);
+      this.#click(event, name);
     });
     return name;
   }
 
+  #rewrite(plan: Named): void {
+    plan.worlds.forEach(({ id }, at) => {
+      const name = this.#names[at];
+      if (name !== undefined) this.#word(plan, id, name);
+    });
+  }
+
+  // A name's words, link and dot, in the file's words: written in place again when only those change.
+  #word(plan: Named, id: string, name: HTMLAnchorElement): void {
+    name.textContent = plan.names.get(id) ?? id;
+    const given = plan.links.get(id);
+    const href = linkable(given) ? given : undefined;
+    if (href === undefined) name.removeAttribute("href");
+    else name.href = href;
+    if (href !== undefined && external(href)) Object.assign(name, { target: "_blank", rel: "noopener noreferrer" });
+    else for (const attribute of ["target", "rel"]) name.removeAttribute(attribute);
+    if (plan.here.has(id)) name.prepend(warmDot(this.#layer.ownerDocument));
+  }
+
   // A first click names the world; a second goes: through the router for the site's own page, by the link itself for a project's. A click
   // with a modifier or the middle button is the reader's own way to a tab, which the browser keeps.
-  #click(event: MouseEvent, name: HTMLAnchorElement, href: string | undefined): void {
+  #click(event: MouseEvent, name: HTMLAnchorElement): void {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     if (this.#named !== name) {
       event.preventDefault();
@@ -176,7 +196,8 @@ export class Orbits {
       name.setAttribute("aria-current", "true");
       return;
     }
-    if (href === undefined || external(href)) return;
+    const href = name.getAttribute("href");
+    if (href === null || external(href)) return;
     event.preventDefault();
     this.#open(href);
   }
