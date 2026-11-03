@@ -229,18 +229,24 @@ describe("worstCost", () => {
   });
 
   it.each([
-    ["negative bytes", { inputBytes: -1, maxTokens: 10 }],
-    ["a fraction of a byte", { inputBytes: 1.5, maxTokens: 10 }],
-    ["bytes that are not a number", { inputBytes: Number.NaN, maxTokens: 10 }],
-    ["no output token", { inputBytes: 10, maxTokens: 0 }],
-    ["a fraction of a token", { inputBytes: 10, maxTokens: 0.5 }],
-    ["infinite tokens", { inputBytes: 10, maxTokens: Number.POSITIVE_INFINITY }],
-  ])("refuses %s: a bound must be a count", (_, bounds) => {
-    expect(() => worstCost("claude-sonnet-5-5", { ...bounds, attempts: 1 })).toThrow(RangeError);
+    ["negative bytes", { inputBytes: -1, maxTokens: 10 }, "inputBytes: a count of bytes"],
+    ["a fraction of a byte", { inputBytes: 1.5, maxTokens: 10 }, "inputBytes: a count of bytes"],
+    ["bytes that are not a number", { inputBytes: Number.NaN, maxTokens: 10 }, "inputBytes: a count of bytes"],
+    ["no output token", { inputBytes: 10, maxTokens: 0 }, "maxTokens: a count of tokens, from 1"],
+    ["a fraction of a token", { inputBytes: 10, maxTokens: 0.5 }, "maxTokens: a count of tokens, from 1"],
+    [
+      "infinite tokens",
+      { inputBytes: 10, maxTokens: Number.POSITIVE_INFINITY },
+      "maxTokens: a count of tokens, from 1",
+    ],
+  ])("refuses %s, naming the bound: a bound must be a count", (_, bounds, message) => {
+    expect(() => worstCost("claude-sonnet-5-5", { ...bounds, attempts: 1 })).toThrow(new RangeError(message));
   });
 
   it.each([0, 4, 1.5, Number.NaN])("refuses %d attempts: one, and two retries at most (ADR-0002 §5)", (attempts) => {
-    expect(() => worstCost("claude-sonnet-5-5", { inputBytes: 10, maxTokens: 10, attempts })).toThrow(RangeError);
+    expect(() => worstCost("claude-sonnet-5-5", { inputBytes: 10, maxTokens: 10, attempts })).toThrow(
+      new RangeError("attempts: one, and two retries at most"),
+    );
   });
 
   it("is never below the cost of an answer within its bounds, on every model", () => {

@@ -266,6 +266,35 @@ describe("the budget", () => {
     expect(budget.state("ask")).toEqual({ spent: 3_700, reserved: 0, cap: CAP });
   });
 
+  it("releases the holds past their deadline at the next reservation, so their table holds live calls only", () => {
+    const { db, budget, clock } = setup();
+    for (let call = 0; call < 5; call += 1) budget.reserve("ask", 1_000);
+    clock.now = T0 + HOLD;
+    expect(budget.reserve("ask", 1_000)).toMatchObject({ ok: true });
+    expect(db.prepare("SELECT COUNT(*) AS holds FROM budget_holds").get()).toEqual({ holds: 1 });
+  });
+
+  it("undoes a step that failed and keeps its error, whatever ended the transaction", () => {
+    const { db } = setup();
+    let fault: "none" | "throws" | "ends" = "none";
+    const now = (): number => {
+      // As SQLite ends a transaction itself on some faults (a full disk, an I/O error).
+      if (fault === "ends") db.exec("ROLLBACK");
+      if (fault !== "none") throw new Error("the clock failed");
+      return T0;
+    };
+    const budget = makeBudget(db, { caps: { ask: CAP, translate: TRANSLATE_CAP }, holdMs: HOLD, now });
+    const held = budget.reserve("ask", 1_000);
+    if (!held.ok) throw new Error("refused");
+    fault = "throws";
+    expect(() => budget.settle(held.hold, 500)).toThrow("the clock failed");
+    fault = "ends";
+    expect(() => budget.settle(held.hold, 500)).toThrow("the clock failed");
+    fault = "none";
+    expect(budget.settle(held.hold, 500)).toEqual({ status: "settled", charged: 500 });
+    expect(budget.state("ask")).toEqual({ spent: 500, reserved: 0, cap: CAP });
+  });
+
   it("counts a hold past its deadline against the cap before any read releases it", () => {
     const { budget, clock } = setup();
     expect(budget.reserve("ask", 60 * PERCENT)).toMatchObject({ ok: true });
@@ -298,7 +327,7 @@ describe("the budget", () => {
     ["past the safe integers", 1e300],
   ])("refuses a worst cost of %s, a bug in its caller, and holds nothing", (_, worst) => {
     const { budget } = setup();
-    expect(() => budget.reserve("ask", worst)).toThrow(RangeError);
+    expect(() => budget.reserve("ask", worst)).toThrow(new RangeError("a worst cost is a count, from 1"));
     expect(budget.state("ask")).toEqual({ spent: 0, reserved: 0, cap: CAP });
   });
 });
