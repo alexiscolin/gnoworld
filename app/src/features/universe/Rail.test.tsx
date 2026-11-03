@@ -100,6 +100,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("the rail", () => {
@@ -405,32 +406,38 @@ describe("the rail's magnification", () => {
     });
     frames();
   };
-  // A layout that answers the dock as a page's would: a link 85 px of planet, gap and name, 98 at least, its planet 64 px times its --_mag,
-  // the list shifted by the translate the dock writes.
-  const flowing = (box: HTMLElement) => {
+  // A layout that answers the dock as a page's would, read off the DOM as it stands: a link 85 px of planet, gap and name, 98 at least, its
+  // planet 64 px times its --_mag (none for the `planetless` one), each edge on the page's grid of 1/64 px as Chromium lays out, then moved
+  // by the translate the dock writes, a transform, in floats. What it gives: a planet's middle on the page.
+  const flowing = (box: HTMLElement, { planetless = -1 } = {}) => {
     const list = one(box, "nav[aria-label='Worlds'] ul");
-    const links = worlds(box);
+    const grid = (value: number) => Math.round(value * 64) / 64;
     const shift = () => Number(/(-?[\d.]+)px/.exec(list.style.getPropertyValue("translate"))?.[1] ?? 0);
-    const heights = () => links.map((link) => Math.max(98, 85 + 64 * (magnification(link) - 1)));
-    list.getBoundingClientRect = () => new DOMRect(1585, 160 + shift(), 118, 500);
-    links.forEach((link, at) => {
-      const top = () =>
+    const scrolled = () => list.parentElement?.scrollTop ?? 0;
+    const heights = () => worlds(box).map((link) => Math.max(98, 85 + 64 * (magnification(link) - 1)));
+    const topOf = (at: number) =>
+      grid(
         160 +
-        shift() +
-        heights()
-          .slice(0, at)
-          .reduce((sum, height) => sum + height, 0);
-      link.getBoundingClientRect = () => new DOMRect(1585, top(), 118, heights()[at] ?? 98);
-      const planet = link.firstElementChild;
-      if (planet !== null) {
-        planet.getBoundingClientRect = () =>
-          new DOMRect(1612, top(), 64 * magnification(link), 64 * magnification(link));
-      }
+          heights()
+            .slice(0, at)
+            .reduce((sum, height) => sum + height, 0),
+      ) +
+      shift() -
+      scrolled();
+    const side = (at: number) => (at === planetless ? 0 : 64 * magnification(nth(worlds(box), at)));
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function laidOut(this: HTMLElement) {
+      const links = worlds(box);
+      const link = links.indexOf(this);
+      const planet = links.findIndex((each) => each.firstElementChild === this);
+      if (this === list) return new DOMRect(1585, 160 + shift() - scrolled(), 118, 500);
+      if (link >= 0) return new DOMRect(1585, topOf(link), 118, grid(heights()[link] ?? 98));
+      if (planet >= 0) return new DOMRect(1612, topOf(planet), grid(side(planet)), grid(side(planet)));
+      return new DOMRect();
     });
-    return links.map((link) => () => {
-      const { top, height } = link.firstElementChild?.getBoundingClientRect() ?? new DOMRect();
+    return (at: number) => {
+      const { top, height } = nth(worlds(box), at).firstElementChild?.getBoundingClientRect() ?? new DOMRect();
       return top + height / 2;
-    });
+    };
   };
   const reach = (box: HTMLElement, at: number) => {
     act(() => {
@@ -482,14 +489,71 @@ describe("the rail's magnification", () => {
 
   it("keeps the planet under the pointer under it as the planets above it grow, its middle at the pointer", () => {
     const { box } = rail();
-    const middles = flowing(box);
+    const middle = flowing(box);
     const pointed = 160 + 98 * 2 + 32;
     point(box, pointed);
     frames();
     const sizes = worlds(box).map(magnification);
     expect(nth(sizes, 2)).toBe(Math.max(...sizes));
-    expect(Math.abs(nth(middles, 2)() - pointed)).toBeLessThanOrEqual(3);
+    expect(Math.abs(middle(2) - pointed)).toBeLessThanOrEqual(3);
     expect(nth(sizes, 2)).toBeGreaterThan(1.5);
+  });
+
+  it("keeps the place under the pointer as the planet grows: a point on a world's name stays on it", () => {
+    const { box } = rail();
+    const middle = flowing(box);
+    const pointed = 160 + 98 * 2 + 32 + 40;
+    point(box, pointed);
+    frames();
+    expect(Math.abs(middle(2) + 40 * magnification(nth(worlds(box), 2)) - pointed)).toBeLessThanOrEqual(3);
+  });
+
+  it("holds the upper world for a pointer on the line between two", () => {
+    const { box } = rail();
+    const middle = flowing(box);
+    const pointed = 160 + 98 * 2;
+    point(box, pointed);
+    frames();
+    expect(Math.abs(middle(1) + 66 * magnification(nth(worlds(box), 1)) - pointed)).toBeLessThanOrEqual(3);
+  });
+
+  it("keeps a world whose planet has no size where it stood, as the planets above it grow", () => {
+    const { box } = rail();
+    flowing(box, { planetless: 2 });
+    point(box, 160 + 98 * 2 + 49);
+    frames();
+    expect(Math.abs(nth(worlds(box), 2).getBoundingClientRect().top - (160 + 98 * 2))).toBeLessThanOrEqual(1);
+    expect(magnification(nth(worlds(box), 1))).toBeGreaterThan(1.2);
+  });
+
+  it("aims at the world under the pointer in a column scrolled before it was pointed at", () => {
+    const { box } = rail();
+    const middle = flowing(box);
+    const column = one(box, "nav[aria-label='Worlds'] ul").parentElement;
+    if (column === null) throw new Error("no column");
+    Object.defineProperty(column, "scrollTop", { value: 98, configurable: true });
+    const pointed = 160 + 98 * 2 + 32;
+    point(box, pointed);
+    frames();
+    expect(Math.abs(middle(3) - pointed)).toBeLessThanOrEqual(3);
+  });
+
+  it("holds the planet it left under the place it left as the planets shrink back, then stands the column at rest", () => {
+    const { box } = rail();
+    const middle = flowing(box);
+    const pointed = 160 + 98 * 2 + 32;
+    point(box, pointed);
+    act(() => {
+      one(box, "nav[aria-label='Worlds'] ul").dispatchEvent(new MouseEvent("pointerleave", { bubbles: false }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(magnification(nth(worlds(box), 2))).toBeGreaterThan(1.1);
+    expect(Math.abs(middle(2) - pointed)).toBeLessThanOrEqual(3);
+    frames();
+    expect(one(box, "nav[aria-label='Worlds'] ul").style.getPropertyValue("translate")).toBe("0 0px");
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("asks no frame once the planets stand still under a resting pointer", () => {
@@ -500,15 +564,22 @@ describe("the rail's magnification", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("aims again when the column scrolls under a resting pointer", () => {
+  it("aims again when the column scrolls under a resting pointer, at the world it brought there", () => {
     const { box } = rail();
-    flowing(box);
-    point(box, 160 + 98 * 2 + 32);
-    frames();
+    const middle = flowing(box);
+    const pointed = 160 + 98 * 2 + 32;
+    point(box, pointed);
+    const column = one(box, "nav[aria-label='Worlds'] ul").parentElement;
+    if (column === null) throw new Error("no column");
+    Object.defineProperty(column, "scrollTop", { value: 98, configurable: true });
     act(() => {
-      one(box, "nav[aria-label='Worlds'] ul").parentElement?.dispatchEvent(new Event("scroll"));
+      column.dispatchEvent(new Event("scroll"));
     });
     expect(vi.getTimerCount()).toBeGreaterThan(0);
+    frames();
+    const sizes = worlds(box).map(magnification);
+    expect(nth(sizes, 3)).toBe(Math.max(...sizes));
+    expect(Math.abs(middle(3) - pointed)).toBeLessThanOrEqual(3);
   });
 
   it("grows nothing under a finger, though the screen's main pointer is fine", () => {
