@@ -81,7 +81,7 @@ export class SceneHost {
 
   readonly world = () => this.#world;
 
-  /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and nothing of the page is marked,
+  /** What the page knows of the scene's flights, and what their panel shows (7g): the panel hears it, and the page's body is not marked,
    * for a flight speaks as it starts, before the next page is taken. */
   readonly flown = new Flown(() => {
     this.#heard();

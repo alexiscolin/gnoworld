@@ -4,6 +4,7 @@
 // change shows the next place at once, the one that left never saying it covers space (lot C's review): the place last shown is the one.
 import type { FlightGoal, FlightSaid } from "../../scene/flight/flights.ts";
 import type { Scene } from "../../scene/scene.ts";
+import { markFlown } from "./globe.ts";
 
 // The Earth's page, the cosmos, or a world's, by its id and its name.
 type Place = "earth" | "cosmos" | { readonly world: string; readonly name?: string };
@@ -21,6 +22,8 @@ const same = (a: Place, b: Place) => (typeof a === "object" && typeof b === "obj
 export class Flown {
   readonly #told: () => void;
   #at: Place | undefined;
+  // Whether the flight under way is one this page asked, which brings the next page's body.
+  #asked = false;
   #flight: FlightSaid | undefined;
 
   /** `told`, each time what the panel shows changes. */
@@ -34,6 +37,8 @@ export class Flown {
   /** The scene says how its flight goes, ten times a second at most; nothing once it landed. */
   readonly said = (flight: FlightSaid | undefined): void => {
     this.#flight = flight === undefined ? undefined : { ...flight };
+    if (flight === undefined) this.#asked = false;
+    markFlown(this.paging);
     this.#told();
   };
 
@@ -42,6 +47,13 @@ export class Flown {
   between(scene: Scene | undefined, shown: boolean | Place): void {
     const [from, at] = [this.#at, typeof shown === "boolean" ? undefined : shown];
     this.#at = at;
-    if (scene !== undefined && from !== undefined && at !== undefined && !same(from, at)) scene.fly(goalOf(at));
+    if (scene === undefined || from === undefined || at === undefined || same(from, at)) return;
+    this.#asked = true;
+    scene.fly(goalOf(at));
+  }
+
+  /** Whether a flight this page asked is under way and speaks: the next page's body is on its way. */
+  get paging(): boolean {
+    return this.#asked && this.#flight !== undefined;
   }
 }

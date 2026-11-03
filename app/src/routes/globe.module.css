@@ -17,6 +17,18 @@
     display: block;
   }
 
+  /* A flight brings the page's body: its plate waits out of sight, out of reach of a pointer, a key or a reader, and fades in as the body
+     lands, there at once to a key and a reader. Frames 19, 36 and 101 fly with the dock alone (7g). */
+  .globe + * {
+    transition: opacity var(--motion-base) var(--ease-standard);
+  }
+
+  .globe[data-flown="flying"] + * {
+    opacity: 0;
+    visibility: hidden;
+    transition: none;
+  }
+
   /* A window this wide loads the scene by itself: the room is kept from the first paint, or the plate jumps half a screen under the reader. */
   /* raw: the phone's end and the plate's breakpoint */
   @media (min-width: 900px) and (max-width: 1279px) {

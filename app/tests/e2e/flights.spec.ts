@@ -41,6 +41,8 @@ interface PanelSeen {
   tightest: number;
   cut: string[];
   widest: string;
+  // The page's plate as each phase of the panel came in: frames 19, 36 and 101 fly with no plate.
+  plates: string[];
 }
 
 const flightOf = async (page: Page): Promise<FlightStats | undefined> => (await stats(page)).flight;
@@ -70,6 +72,7 @@ const watchPanel = (page: Page) =>
       tightest: Infinity,
       cut: [],
       widest: "",
+      plates: [],
     };
     Reflect.set(globalThis, "__panelSeen", seen);
     const boxOf = (element: Element | null) => {
@@ -114,7 +117,11 @@ const watchPanel = (page: Page) =>
       if (Number.isNaN(seen.shownAt)) first(panel);
       room(panel);
       const phase = panel.querySelector("[data-phase]")?.textContent ?? "";
-      if (seen.phases.at(-1) !== phase) seen.phases.push(phase);
+      if (seen.phases.at(-1) !== phase) {
+        seen.phases.push(phase);
+        const plate = document.querySelector("[data-look='plate']");
+        seen.plates.push(plate === null ? "none" : getComputedStyle(plate).visibility);
+      }
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
   });
 const panelSeen = (page: Page) => page.evaluate(() => Reflect.get(globalThis, "__panelSeen") as PanelSeen);
@@ -291,6 +298,9 @@ test("flies from the cosmos to a world's page: the panel names it, and lands as 
   const { waited } = (await flightOf(page)) ?? { waited: NaN };
   expect(waited).toBeLessThan(2);
   expect(seen.goneAt).toBeGreaterThanOrEqual(seen.drawnAt);
+  // The plate waits out of sight while the world comes, and is there once it has landed (F3707).
+  expect(seen.plates).toEqual(["hidden", "hidden", "hidden"]);
+  await expect(page.locator("[data-look='plate']")).toBeVisible();
 });
 
 // Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (Playwright's CDP

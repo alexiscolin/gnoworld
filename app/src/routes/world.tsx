@@ -69,7 +69,7 @@ export default function World() {
   return (
     <>
       {/* The planet's place: the page lays it out, the scene draws in it (frames 22, 93, 104). */}
-      <div className={place["globe"]} data-globe data-world="waiting" />
+      <div className={place["globe"]} data-globe data-world="waiting" data-flown="landed" />
       <Panel.Layout
         plate={
           <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">

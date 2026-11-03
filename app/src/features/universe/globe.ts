@@ -65,6 +65,12 @@ export function markGlobe(kind: "earth" | "world", body: EarthState, status: str
   if (state !== "drawn") tintPage(undefined);
 }
 
+/** Marks the page's box with whether a flight brings its body, `flying`: its plate waits out of sight till it lands (frames 19, 36, 101). */
+export function markFlown(flying: boolean): void {
+  const globe = document.querySelector<HTMLElement>("[data-globe]");
+  if (globe !== null) globe.dataset["flown"] = flying ? "flying" : "landed";
+}
+
 /** Tints the page with a world's own colour where the globe's sibling takes it, as the Earth's blue is; none gives the page its blue back. */
 export function tintPage(colour: string | undefined): void {
   const globe = document.querySelector<HTMLElement>("[data-globe]");

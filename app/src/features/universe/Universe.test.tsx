@@ -1398,6 +1398,59 @@ describe("flights between places (7g)", () => {
     expect(all(box, "[data-flight]")).toEqual([]);
   });
 
+  // Frames 19, 36 and 101 fly with no plate, only the dock; it comes in on landing (f0020, f0102). The page's plate waits out of sight
+  // while the flight its page asked speaks, and only then: a flight that never speaks, or a jump to a star, leaves it as it is (the
+  // design review's second high, F3707).
+  describe("the next page's plate", () => {
+    // The box the next page keeps for its body, put in as the route changes: its plate stands beside it.
+    const boxOf = () => {
+      document.querySelector("[data-globe]")?.remove();
+      const globe = document.body.appendChild(document.createElement("div"));
+      globe.setAttribute("data-globe", "");
+      globe.dataset["flown"] = "landed";
+      return globe;
+    };
+
+    it("waits out of sight while the flight its page asked speaks, and comes in once it has landed", async () => {
+      fly.mockImplementation(() => {
+        onFlight()?.(said);
+      });
+      const { rerender } = rendered("cosmos");
+      await settle();
+      const globe = boxOf();
+      rerender({ world: "gov/dao", name: "GovDAO" });
+      expect(globe.dataset["flown"]).toBe("flying");
+      act(() => {
+        onFlight()?.(said);
+      });
+      expect(globe.dataset["flown"]).toBe("flying");
+      act(() => {
+        onFlight()?.(undefined);
+      });
+      expect(globe.dataset["flown"]).toBe("landed");
+      globe.remove();
+      fly.mockReset();
+    });
+
+    it("stays as it is for a flight that never speaks, and for a jump to a star its page did not ask", async () => {
+      const { rerender } = rendered("cosmos");
+      await settle();
+      const globe = boxOf();
+      rerender({ world: "gov/dao", name: "GovDAO" });
+      expect(fly).toHaveBeenCalledTimes(1);
+      expect(globe.dataset["flown"]).toBe("landed");
+      rerender("cosmos");
+      act(() => {
+        onFlight()?.(undefined);
+      });
+      act(() => {
+        onFlight()?.(said);
+      });
+      expect(globe.dataset["flown"]).toBe("landed");
+      globe.remove();
+    });
+  });
+
   it("shows no panel over a page that covers space, nor once the context went", async () => {
     const { box, rerender } = rendered("cosmos");
     await settle();
