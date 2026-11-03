@@ -15,7 +15,7 @@ import { Space } from "./space.ts";
 import { Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
-import { MOTION, watchAim, watchCanvas, watchPage, watchScreen } from "./watch.ts";
+import { MOTION, watchScene } from "./watch.ts";
 
 const TOUCH = "(pointer: coarse)";
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
@@ -93,39 +93,26 @@ class LiveScene implements Scene {
       owed: this.#redraw,
     });
     this.#viewport.apply();
-    this.#loop = new FrameLoop(clock, this.#draw);
-    this.#owner.add({
-      dispose: () => {
-        this.#loop.stop();
-      },
-    });
+    this.#loop = this.#owner.add(new FrameLoop(clock, this.#draw));
     this.#loop.set({ busy: this.#probe.running });
-    this.#watch(canvas);
-  }
-
-  #watch(canvas: HTMLCanvasElement): void {
-    const { signal } = this.#owner;
-    watchPage(this.#loop, signal);
-    watchScreen(this.#viewport.changed, signal);
-    watchAim(this.#eye.aim, signal);
-    watchCanvas(
+    const { changed, resized } = this.#viewport;
+    watchScene(
       canvas,
-      {
-        resized: this.#viewport.resized,
-        lost: (now) => {
-          this.#lost = now;
-          this.#space.redraw();
-          this.#options.onLost(now);
-          this.#stopOrGo();
-          if (!now) {
-            this.#earth.restored();
-            this.#parts.restored();
-          }
-        },
-      },
-      signal,
+      { loop: this.#loop, aim: this.#eye.aim, changed, resized, lost: this.#lostNow },
+      this.#owner.signal,
     );
   }
+
+  readonly #lostNow = (now: boolean): void => {
+    this.#lost = now;
+    this.#space.redraw();
+    this.#options.onLost(now);
+    this.#stopOrGo();
+    if (!now) {
+      this.#earth.restored();
+      this.#parts.restored();
+    }
+  };
 
   // Three calls this in place of its own log, in the middle of a draw, which must end before anything is freed.
   readonly #shaderRefused = (gl: WebGLRenderingContext, program: WebGLProgram): void => {
