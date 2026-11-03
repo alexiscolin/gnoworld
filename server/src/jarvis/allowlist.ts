@@ -58,7 +58,8 @@ export function allowlist<const D extends Definition>(definitions: readonly D[],
     input_schema: { ...z.toJSONSchema(args, { io: "input" }), type: "object" as const },
   }));
   return {
-    offered: () => [...offered],
+    // A copy whole, its schemas too, so what a caller changes (a mark for the prompt cache) is never offered after.
+    offered: () => structuredClone(offered),
     check(name, input) {
       const definition = table.get(name);
       if (definition === undefined) {
