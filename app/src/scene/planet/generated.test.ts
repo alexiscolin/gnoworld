@@ -163,6 +163,12 @@ describe("a generated world, drawn from its recipe", () => {
         expect(`${SURFACE_VERTEX}\n${GENERATED_FRAGMENT}`, name).toMatch(new RegExp(`uniform \\w+ [^;]*\\b${name}\\b`));
   });
 
+  // Ganymede's lanes (7b6's held details, 7b7): grooved ice alone cuts grooves, by a value its look hands the one program.
+  it("marks grooved ice's lanes by value, on that class alone", () => {
+    for (const anchor of ANCHORS)
+      expect(read(drawn(worldAt(anchor)).surface, "grooved"), anchor).toBe(anchor === "grooved ice" ? 1 : 0);
+  });
+
   it("marks a glow, a lock and a sea by value, as the look gives them", () => {
     const volcanic = worldAt("volcanic");
     const lava = drawn(volcanic).surface;
@@ -295,6 +301,25 @@ describe("the generated program", () => {
       GENERATED_FRAGMENT.indexOf("float bandsAt("),
     );
     expect(streaks).toMatch(/weight \+= faded;/);
+  });
+
+  // Ganymede's grooves (7b6's held details, 7b7; F4323: never a contour map): bright lanes along the seams of large cells, narrow
+  // beside a cell, each a bundle of fine dark grooves along its seam, faded out before they are a few pixels apart; a second net turned
+  // so the sets cross at angles; the rifts' arcs give way to them, and the broad relief is softer there (F4238's 2x2 steps).
+  it("cuts a grooved world's grooves in narrow lanes of two nets that cross, faded before they alias", () => {
+    const start = GENERATED_FRAGMENT.indexOf("if (grooved > 0.5) {");
+    expect(start).toBeGreaterThan(0);
+    const block = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
+    expect(block.match(/groovesAt\(/g)).toHaveLength(2);
+    expect(block).toMatch(/groovesAt\(turned\(at, [1-5]\.\d+\) \+ /);
+    expect(block).toMatch(
+      /albedo \*= mix\(0\.\d+, 1\.\d+, max\(lane, other\)\) \* \(1\.0 - 0\.[2-5]\d* \* min\(grooves, 1\.0\)\);/,
+    );
+    const grooves = bodyOf("float groovesAt(");
+    expect(grooves).toMatch(/float away = seams\(/);
+    expect(grooves).toMatch(/lane = 1\.0 - smoothstep\(0\.[0-2]\d*, 0\.[0-3]\d*, away\);/);
+    expect(grooves).toMatch(/\* lane \* \(1\.0 - smoothstep\([\d.]+, [\d.]+, [1-9][\d.]* \* frequency \* pixel\)\);/);
+    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal);");
   });
 
   // F4239: a giant's streaks stretched five times across a latitude read as hairs a pixel tall, their octaves past a pixel; Alexis chose
@@ -435,7 +460,7 @@ describe("the generated program", () => {
     expect(body).toMatch(/dot\(at, /);
     expect(GENERATED_FRAGMENT).toMatch(/rift = lines\(ridge, at, /);
     // Only a riven world shows them (rocky's rifts reach 0.2, desert's 0.4, ice's start at 0.4): thin arcs on the rest read as ink.
-    expect(GENERATED_FRAGMENT).toContain("float riven = smoothstep(0.25, 0.5, shape.rifts);");
+    expect(GENERATED_FRAGMENT).toContain("float riven = smoothstep(0.25, 0.5, shape.rifts) * (1.0 - grooved);");
     expect(GENERATED_FRAGMENT).toMatch(/albedo \*= 1\.0 \+ [\d.]+ \* max\(ridge, 0\.0\)/);
   });
 

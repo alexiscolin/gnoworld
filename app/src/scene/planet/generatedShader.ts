@@ -17,7 +17,7 @@ uniform Shape shape;
 uniform sampler2D minorMap;
 uniform vec3 offset, minorOffset, low, mid, high, minorLow, minorMid, minorHigh, seaShallow, seaDeep, glowColour;
 uniform vec3 sulfurLow, sulfurMid, sulfurHigh;
-uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style;
+uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -119,11 +119,17 @@ void main() {
     float pole = abs(axis.y) + 0.3 * (t - 0.5) + 0.15 * flow.y;
     albedo = mix(albedo, mix(vec3(0.86, 0.9, 0.95), high, 0.35) * detail, smoothstep(1.0 - shape.caps, 1.0 - shape.caps + 0.06, pole));
   }
+  if (grooved > 0.5) {
+    float lane;
+    float other;
+    float grooves = groovesAt(at, 0.9 + 0.3 * shape.scale, pixel, lane) + groovesAt(turned(at, 1.9) + 4.0, 1.4 + 0.3 * shape.scale, pixel, other);
+    albedo *= mix(0.72, 1.08, max(lane, other)) * (1.0 - 0.35 * min(grooves, 1.0));
+  }
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
   float burning = 0.0;
   if (shape.rifts > 0.0) {
-    float riven = smoothstep(0.25, 0.5, shape.rifts);
+    float riven = smoothstep(0.25, 0.5, shape.rifts) * (1.0 - grooved);
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
     if (riven > 0.0 && glowLevel > 0.0) {
@@ -142,7 +148,7 @@ void main() {
   if (locked > 0.5) albedo = eyeball(albedo, t, day);
   vec3 view = normalize(cameraPosition - vWorld);
   float world = length(modelMatrix[0].xyz);
-  vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world, normal);
+  vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world * (1.0 - 0.3 * grooved), normal);
   float near = 1.0 - smoothstep(0.004, 0.008, pixel);
   if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet) * near, angle);
   float light;

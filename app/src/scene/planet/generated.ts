@@ -63,6 +63,7 @@ export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<str
     glowColour: { value: working(look.glow?.colour ?? NO_COLOUR) },
     glowLevel: { value: look.glow?.level ?? 0 },
     style: { value: styleOf({ look, recipe }) },
+    grooved: { value: look.anchor === "grooved ice" ? 1 : 0 },
     sulfurLow: { value: working(SULFUR[0]) },
     sulfurMid: { value: working(SULFUR[1]) },
     sulfurHigh: { value: working(SULFUR[2]) },

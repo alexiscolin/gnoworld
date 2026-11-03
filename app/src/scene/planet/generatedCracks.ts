@@ -1,9 +1,9 @@
-// What the generated worlds' program draws along the seams of cells (chunks.ts): a glowing world's veins. Comments live here, out of
-// the strings that ship.
+// What the generated worlds' program draws along the seams of cells (chunks.ts): a glowing world's veins, a grooved world's lanes.
+// Comments live here, out of the strings that ship.
 
-// A crack along the seams of cells, bent then broken at angles: its core, 1 to 0 across a width that wanders between two bounds, and
-// that width in pixels; a crack under a pixel wide fades out whole, never a hairline. Veins: two nets of cracks, gold to orange, over
-// cells that keep a dark maroon ember, as frame 4's Music.
+// A crack along the seams of cells, bent then broken at angles: its core, 1 to 0, and its width in pixels; under a pixel it fades out
+// whole. Grooves: a narrow lane along each seam of large cells, a bundle of fine dark grooves along it (the seam's distance in 15 steps
+// a cell), gone before they are 4 px apart. Veins: two nets of cracks, gold to orange, over a dark maroon ember, as frame 4's Music.
 export const CRACKS = /* glsl */ `
 vec2 crackAt(vec3 p, float frequency, vec2 width, float pixel) {
   vec3 q = p * frequency + 0.4 * field(p * 2.3 + offset) + 0.16 * field(p * 19.0 + offset.zxy);
@@ -11,6 +11,13 @@ vec2 crackAt(vec3 p, float frequency, vec2 width, float pixel) {
   float wide = mix(width.x, width.y, smoothstep(-0.3, 0.5, noise(q * 0.45 + 7.0)));
   float seen = 2.0 * frequency * pixel;
   return vec2((1.0 - smoothstep(0.0, max(wide, seen), away)) * smoothstep(0.5, 1.5, wide / seen), wide / seen);
+}
+float groovesAt(vec3 p, float frequency, float pixel, out float lane) {
+  vec3 q = p * frequency + 0.3 * field(p * 1.7 + offset);
+  float away = seams(q) + 0.04 * noise(q * 1.9);
+  lane = 1.0 - smoothstep(0.18, 0.28, away);
+  float wave = away * 15.0 + 0.4 * noise(q * 1.3);
+  return smoothstep(0.22, 0.4, abs(fract(wave) - 0.5)) * lane * (1.0 - smoothstep(0.25, 0.35, 30.0 * frequency * pixel));
 }
 vec3 veinsOf(vec3 p, float pixel, float burn) {
   vec2 main = crackAt(p, 4.0 + shape.scale, vec2(0.14, 0.4), pixel);
