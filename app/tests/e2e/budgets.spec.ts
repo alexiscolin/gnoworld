@@ -45,9 +45,9 @@ const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
 // The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
 // once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B). The view at rest's is
-// 9 KiB since 7d3's arrival and beat came into it, 8,591 B with them (Alexis, 2026-11-03, docs/decisions.md).
+// 10 KiB since 7p judges the postcards in depth in the search, 10,066 B on 7d9's tree (Alexis, 2026-11-03, docs/decisions.md).
 const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const REST_JS = 9 * 1024;
+const REST_JS = 10 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
