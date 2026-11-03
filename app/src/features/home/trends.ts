@@ -26,7 +26,7 @@ export function useTrends(wanted: boolean): readonly Trend[] {
     const leaving = new AbortController();
     readTrends({ signal: leaving.signal })
       .then((read) => {
-        if (read !== undefined && !leaving.signal.aborted) setItems(read.items);
+        if (read !== undefined) setItems(read.items);
       })
       .catch(reportError);
     return () => {
