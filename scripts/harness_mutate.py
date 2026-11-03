@@ -1286,6 +1286,7 @@ def hidden_mutants():
         ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
         ('    if not (root / ".git").exists():\n', "    if True:\n", "reads the branch's commit messages (F5079)"),
         ('"refs/remotes/origin/main..HEAD"', '"HEAD"', "reads no message main holds already"),
+        ('"refs/remotes/origin/main..HEAD"', '"-1", "refs/remotes/origin/main..HEAD"', "reads each message of the branch, not its newest only (F5081)"),
         ('"refs/remotes/origin/main"):\n        return []', '"refs/remotes/origin/main") and False:\n        return []', "reads no message with no origin/main"),
         ('if not git("-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/remotes/origin/main"):',
          'if subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "origin/main^{commit}"]).returncode:',
