@@ -15,7 +15,7 @@ const howTo = "To rent one, call `Rent` with a world's id, a text of 1 to 40 cha
 	"sending exactly the price times the days, in ugnot.\n\n## Live satellites\n\n"
 
 // open is the home page's top at the deploy price, renting open.
-const open = head + "1000000 ugnot a day. Renting is open.\n\n" + howTo
+const open = head + "2000000 ugnot a day. Renting is open.\n\n" + howTo
 
 const prev, next = "\n[Previous page](?page=", "\n[Next page](?page="
 
