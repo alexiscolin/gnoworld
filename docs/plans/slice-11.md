@@ -43,10 +43,12 @@ They run side by side in two herdr panes (Alexis, 2026-11-03); two agents at mos
 
 `gno.land/p/nt/markdown/sanitize/v0` (on onyx-1, read with gnomcp 2026-11-03; imports `chain/markdown`, `html`, `strings` only), allowed by Alexis 2026-11-03. Nothing else: `avl` is seal's already.
 
-## 9. Questions for Alexis (decided for tonight, to confirm)
+## 9. Questions for Alexis, answered on 2026-11-04
 
-1. D1, the path: `gno.land/r/gnoworld/satellite`; the namespace to deploy under (`gnoworld` unregistered, or a `nym-` name, ADR-0001 question 13).
-2. D3, the price: 1 GNOT a day (1,000,000 ugnot), the prototype's lowest sample.
-3. D5, the limit: 3 live satellites per address at once.
-4. D12, a takedown refunds the whole days not yet begun, at the price that rental paid.
-5. The realm holds the payments until they are earned, to refund takedowns, while ADR-0001 says "gnoworld never holds user funds" (A1:584): keep, or refund nothing?
+1. D1, the path: `gno.land/r/gnoworld/satellite`; the namespace is chosen at deploy, checked then with gnomcp (`gnoworld`, unregistered on onyx-1 today, or a `nym-` name).
+2. D3, the price: 2 GNOT a day (2,000,000 ugnot), Alexis's choice over the proposed 1.
+3. D5, the limit: 3 live satellites per address at once, kept.
+4. D12, a takedown refunds the whole days not yet begun, at the price that rental paid, kept.
+5. The realm holds the payments until they are earned, to refund takedowns: kept, and ADR-0001's "gnoworld never holds user funds" names this one exception.
+6. D28, after a takedown its payer alone may close it until its paid end, the world empty until then: kept.
+7. F5052, events, gas and storage are checked at deploy, the deployer staying the owner (D14): kept.

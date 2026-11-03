@@ -581,7 +581,9 @@ A third-party realm is opened with explicit warnings:
   forever";
 - every call shows "gnoworld does not check what this realm does".
 
-gnoworld never holds user funds.
+gnoworld never holds user funds, but in one realm: the satellites' slot realm holds a live
+rental's payment until its days are earned, so a takedown can refund the days not begun
+(ADR-0002 §8, row 7; Alexis, 2026-11-04).
 
 ### 12. Client and stack
 
