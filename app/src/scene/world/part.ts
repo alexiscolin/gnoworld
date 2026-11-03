@@ -6,9 +6,8 @@ import { WorldView, type MoonMark, type WorldPlace, type WorldSaid } from "./vie
 
 export type { MoonMark, WorldPage, WorldSaid };
 
-/** What a world's page asks of the scene: the place, the page, and what the page reads and keeps for it. */
-export interface WorldAsk
-  extends WorldPlace, Pick<FeedOptions, "universe" | "page" | "file" | "visited" | "remember"> {}
+/** What a world's page asks of the scene: the place, the page, and what the page reads for it. */
+export interface WorldAsk extends WorldPlace, Pick<FeedOptions, "universe" | "page" | "file" | "visited"> {}
 
 export class WorldPart {
   readonly #view: WorldView;

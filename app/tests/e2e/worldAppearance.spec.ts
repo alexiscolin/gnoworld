@@ -5,7 +5,7 @@
 // each step are attached for the design review.
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { reading, type Tools } from "./pixels.ts";
-import { held } from "./sceneStage.ts";
+import { held, landed, running, stats } from "./sceneStage.ts";
 
 const COMPUTER = { width: 1728, height: 1080 };
 const SLOW = { timeout: 150_000 };
@@ -74,13 +74,19 @@ async function stepUntil(
   return found;
 }
 
-// A world's page opened with the clock held, once its world is drawn: its loading stepped three frames at a time.
-async function opened(page: Page, path = "/w/bubble?test-gpu") {
-  await page.clock.install();
-  await page.goto(path);
+// A world's page reached by `go`, the page's clock installed, then held once it runs: back once its world is drawn, its loading stepped
+// three frames at a time.
+async function arrived(page: Page, go: () => Promise<unknown>) {
+  await go();
   await hydrated(page);
   await held(page);
   return stepUntil(page, () => true, { what: "the world drawn", step: 3 * FRAME_MS });
+}
+
+// A world's page opened with the clock held, once its world is drawn.
+async function opened(page: Page, path = "/w/bubble?test-gpu") {
+  await page.clock.install();
+  return arrived(page, () => page.goto(path));
 }
 
 // Every band and grid the world shows, a frame at a time, with the frame that drew it, until its grid has come and gone, or for `frames`
@@ -95,6 +101,14 @@ async function watched(page: Page, frames: number) {
     if (step > 20 * frames) throw new Error("the grid never went");
   }
   return seen;
+}
+
+// The next visit to Bubble, `go` there with the page's clock held: its appearance plays whole, and the device keeps the visit.
+async function playsNext(page: Page, go: () => Promise<unknown>) {
+  await arrived(page, go);
+  const seen = await watched(page, 60);
+  expect(Math.max(...seen.map(({ grid }) => grid)), "the appearance plays").toBe(1);
+  expect(await visits(page)).toHaveLength(1);
 }
 
 // Along a line of two pictures, from `from` to `to` (a row at `at`, or a column), each run of pixels where the first is brighter than the
@@ -184,13 +198,79 @@ test("plays on this reader's first visit to a world, its band running down, and 
     );
   expect(Math.abs(bands.at(-1) ?? 0), "and leaves the world").toBeGreaterThanOrEqual(OFF);
   expect(await visits(page)).toHaveLength(1);
-  await page.reload();
-  await hydrated(page);
-  await held(page);
-  await stepUntil(page, () => true, { what: "the world drawn again", step: 3 * FRAME_MS });
+  await arrived(page, () => page.reload());
   const again = await watched(page, 200);
   expect(Math.max(...again.map(({ grid }) => grid)), "no grid on a return").toBe(0);
   expect(Math.min(...again.map(({ band }) => Math.abs(band))), "no band on the world").toBeGreaterThanOrEqual(OFF);
+});
+
+// The visit is kept as the grid starts (Alexis, 2026-11-04, F4533): a tab closed while the maps load, or a world whose maps fail, keeps none,
+// so the next visit plays the appearance. The worker would answer the maps past `page.route`: with it off, the fault is the one planted.
+test.describe("a world that does not come", () => {
+  test.use({ serviceWorkers: "block" });
+  const MAPS = "**/textures/*.webp";
+  const stateOf = async (page: Page) => {
+    await page.clock.runFor(3 * FRAME_MS);
+    return (await world(page))?.state;
+  };
+
+  test("keeps no visit while its maps never come, nor once they fail, and the next visit plays the appearance", async ({
+    page,
+  }) => {
+    await page.route(MAPS, () => undefined);
+    await page.clock.install();
+    await page.goto("/w/bubble?test-gpu");
+    await hydrated(page);
+    await held(page);
+    await expect.poll(() => stateOf(page), { ...SLOW, intervals: [10] }).toBe("loading");
+    await page.clock.runFor(1_000);
+    expect(await visits(page), "the maps still coming").toEqual([]);
+    await page.unroute(MAPS);
+    await page.route(MAPS, (route) => route.fulfill({ status: 404, body: "" }));
+    await page.reload();
+    await hydrated(page);
+    await held(page);
+    await expect.poll(() => stateOf(page), { ...SLOW, intervals: [10] }).toBe("failed");
+    expect(await visits(page), "the world failed").toEqual([]);
+    await page.unroute(MAPS);
+    await playsNext(page, () => page.reload());
+  });
+});
+
+// A flight backed out of keeps no visit (F4533): a page's flight holds in transit till its world is drawn and lands after it, so with the
+// page's clock held the reader goes back between the two. Read at the flights' small size, which the gate's software GPU draws in time.
+test.describe("a flight backed out of", () => {
+  test.use({ viewport: { width: 1000, height: 700 } });
+
+  test("keeps no visit when the reader goes back before the world lands, and the next visit plays the appearance", async ({
+    page,
+  }) => {
+    await page.clock.install();
+    await page.goto("/?test-gpu");
+    await hydrated(page);
+    await running(page);
+    await landed(page);
+    await held(page);
+    await page.locator("a[href='/w/bubble']").first().click();
+    let along = NaN;
+    await expect
+      .poll(
+        async () => {
+          await page.clock.runFor(FRAME_MS);
+          const { flight } = await stats(page);
+          along = flight?.along ?? NaN;
+          return flight?.kind === "body" && (await world(page))?.state === "drawn";
+        },
+        { ...SLOW, intervals: [10] },
+      )
+      .toBe(true);
+    expect(along, "the world drawn while the flight still brings it").toBeLessThan(1);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/\?test-gpu$/);
+    await page.clock.runFor(500);
+    expect(await visits(page), "the flight backed out of").toEqual([]);
+    await playsNext(page, () => page.goto("/w/bubble?test-gpu"));
+  });
 });
 
 test("under reduced motion: a still grid shown whole and faded, with no band", async ({ page }) => {

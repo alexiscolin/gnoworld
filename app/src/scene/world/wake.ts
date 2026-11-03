@@ -38,10 +38,15 @@ export class Wake {
   band = -BAND_REACH;
   /** How much of the grid shows, 1 whole and 0 none. */
   grid = 0;
+  /** Keeps this reader's visit: told once, on the frame an appearance starts (F4533). */
+  remember: (() => void) | undefined;
 
   /** The appearance at `seconds`, and the signs it gives the world: none starts while a flight brings the world, not yet `resting`. */
   at(reading: WorldReading | undefined, seconds: number, { still, resting }: Pose): WorldSigns | undefined {
-    if (resting && reading?.first === true) this.#drawn ??= seconds;
+    if (resting && reading?.first === true && this.#drawn === undefined) {
+      this.#drawn = seconds;
+      this.remember?.();
+    }
     if (resting && reading?.wake === true) this.#woke ??= seconds;
     this.#draw(seconds, still);
     return this.#grow(reading, seconds, still);
