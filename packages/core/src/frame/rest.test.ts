@@ -19,7 +19,9 @@ import { rocksOf } from "./rocks.ts";
 import { DIVE, diveAt } from "./dive.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import { PLACE } from "../lod/settle.ts";
-import { postcardOf } from "./postcard.ts";
+import { drawnOf, postcardOf, shapeOf } from "./postcard.ts";
+import { postcardsOf } from "./restCards.ts";
+import { cameraTowards, looksFrom, type Look } from "./restLook.ts";
 import { FIELD_OF_VIEW, HERO_ZONE, REST_SCREENS, restView, STAR_HEART, type RestView } from "./rest.ts";
 
 // The view at rest (7d6): the Earth at the canvas's centre, the great star beside it, two postcards, one world close to the eye and cut by
@@ -544,6 +546,66 @@ describe("the postcards in depth (7p)", () => {
             expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
     },
   );
+
+  // The review of 7p (R2): the search judges a postcard at its drawn size, its own at the least. Its ball, round each world's orbit and
+  // larger radius, with the search's 24 pixels round it, stands whole on both screens and clear of the Earth.
+  it.each(rows)(
+    "judges each postcard whole and off the Earth at its drawn size, its own at the least, with %s",
+    (name) => {
+      for (const { view, plane, worlds, drawn } of cardsOf(name)) {
+        const reach = Math.max(
+          ...worlds.map(({ orbit, radius }, at) => orbit + Math.max(radius, drawn[at]?.radius ?? NaN)),
+        );
+        for (const screen of REST_SCREENS) {
+          const see = cameraOf(view, screen);
+          const [seen, earth] = [see(plane.place, reach), see(EARTH_PLACE, EARTH_RADIUS)];
+          const ball = { ...seen, radius: seen.radius + 24 };
+          expect(whole(ball, screen.width, screen.height)).toBe(true);
+          expect(Math.hypot(ball.x - earth.x, ball.y - earth.y)).toBeGreaterThanOrEqual(ball.radius + earth.radius);
+        }
+      }
+    },
+  );
+
+  // The review of 7p (R2): "104 of eight" draws n51, a postcard, its far world lifted past its own size. Slid sideways, the eye finds where
+  // its ball fits on both screens at the worlds' own size and not as drawn: the search refuses it there, and takes it where both fit.
+  it("refuses a postcard whose ball fits at its worlds' own size and not as drawn, and takes it where both fit", () => {
+    const { systems, view } = made(sets["104 of eight"]);
+    const index = systems.findIndex(({ id }) => id === "n51");
+    const system = systems[index];
+    if (system === undefined) throw new Error("no n51");
+    expect(Math.max(...postcardOf(system, view.eye).depth)).toBeGreaterThan(1.2);
+    const postcard = postcardOf(system, view.eye).worlds;
+    const reach = Math.max(...system.worlds.map(({ orbit, radius }) => orbit + radius));
+    const held = { index, system, bodies: system.worlds, postcard, reach };
+    const fitsAt = (looks: readonly Look[], ball: number) =>
+      looks.every((look) => {
+        const seen = look.ball(system.place, ball);
+        const earth = Math.hypot(seen.x - look.earth.x, seen.y - look.earth.y) - seen.radius - look.earth.radius;
+        return look.whole(seen, 24) && look.clear(seen, 24) && earth >= 24;
+      });
+    const outcomes = { refused: 0, taken: 0 };
+    for (let step = -400; step <= 400; step += 1) {
+      const right = cameraTowards(view.eye, EARTH_PLACE).right;
+      const eye = {
+        x: view.eye.x + right.x * step * 0.05,
+        y: view.eye.y + right.y * step * 0.05,
+        z: view.eye.z + right.z * step * 0.05,
+      };
+      const looks = looksFrom(cameraTowards(eye, EARTH_PLACE));
+      const [first] = looks;
+      if (first === undefined) continue;
+      const drawn = drawnOf(shapeOf(system, postcard, first.camera), 1);
+      const [own, wide] = [reach, Math.max(reach, ...drawn.map(({ orbit, radius }) => orbit + radius))];
+      const cards = postcardsOf(looks, { near: [held], lenient: true, most: 1 });
+      if (fitsAt(looks, own) && !fitsAt(looks, wide)) {
+        expect(cards).toBeUndefined();
+        outcomes.refused += 1;
+      } else if (fitsAt(looks, wide) && cards !== undefined) outcomes.taken += 1;
+    }
+    expect(outcomes.refused).toBeGreaterThan(0);
+    expect(outcomes.taken).toBeGreaterThan(0);
+  });
 
   it.each(rows)("draws as many bodies in each postcard as before the depth, with %s", (name) => {
     const { systems, view } = made(sets[name]);

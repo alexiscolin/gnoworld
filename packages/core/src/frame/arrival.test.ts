@@ -522,6 +522,27 @@ describe("a system's arrival in depth (7p)", () => {
     }
   });
 
+  // The review of 7p (R2): the arrival judges its worlds at their drawn size, their own at the least: none of them, so drawn, stands on its
+  // star's heart on arrival, on either screen (7d3 judges the heart there; through the turn a world may pass before its star).
+  it.each(ROWS)(
+    "on %s, keeps %s's star's heart clear of its bodies at their drawn size, own at the least, on arrival",
+    (name, id) => {
+      const { system, systems } = caseOf(name, id);
+      const arrival = arrivalOf(system, systems);
+      const { system: plane, worlds, depth } = arrival.postcard;
+      for (const screen of REST_SCREENS) {
+        const see = cameraOf(arrival, screen);
+        const star = see(system.place);
+        worlds.forEach((world, at) => {
+          const out = { x: NaN, y: NaN, z: NaN };
+          orbitPlace({ system: plane, world }, 0, out);
+          const seen = see(out, world.radius * Math.max(1, depth[at] ?? NaN));
+          expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
+        });
+      }
+    },
+  );
+
   it.each(ROWS)("on %s, drops none of %s's bodies to a dot through its turn", (name, id) => {
     const { system, systems } = caseOf(name, id);
     const arrival = arrivalOf(system, systems);
