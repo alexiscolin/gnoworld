@@ -14,7 +14,7 @@ import {
 
 const MOST = 8;
 
-// A rock from 4 units off is soft over a third of its edge, from 12 or more crisp; its light comes from the great star, the way it was laid.
+// A rock from 4 units off is soft over an eighth of its edge, from 12 or more crisp; its light comes from the great star, the way it was laid.
 const VERTEX = /* glsl */ `
 attribute vec3 aAt;
 attribute vec3 aRock;
@@ -28,13 +28,13 @@ void main() {
   vPlace = position.xy;
   vRock = aRock;
   vLight = normalize(mat3(viewMatrix) * aLight);
-  vSoft = mix(0.05, 0.34, 1.0 - smoothstep(4.0, 12.0, -at.z));
+  vSoft = mix(0.04, 0.12, 1.0 - smoothstep(4.0, 12.0, -at.z));
   at.xy += position.xy * aRock.x;
   gl_Position = projectionMatrix * at;
 }`;
 
-// A ragged outline from three waves round it, turned by the rock's own turn; a dome under it, dented, lit low on its star's side with a dim
-// night side and a warm rim where the light grazes it: low-key, never a flat disc.
+// A ragged outline from three waves round it, turned by the rock's own turn; a dome under it, dented, lit low on its star's side, its night
+// side near black and a warm rim where the light grazes it: darker than what it stands on, never a flat stain (the design review of 7p).
 const FRAGMENT = /* glsl */ `
 varying vec2 vPlace;
 varying vec3 vRock;
@@ -50,9 +50,9 @@ void main() {
   float dent = 0.12 * sin(7.0 * dome.x + vRock.z * 9.0) * sin(6.0 * dome.y - vRock.z * 5.0);
   vec3 normal = normalize(vec3(dome, sqrt(max(1.0 - dot(dome, dome), 0.0)) + dent));
   float lit = max(dot(normal, vLight), 0.0);
-  float rim = pow(1.0 - normal.z, 3.0) * max(dot(normalize(dome + 1.0e-4), normalize(vLight.xy + 1.0e-4)), 0.0);
+  float rim = pow(1.0 - normal.z, 2.0) * max(dot(normalize(dome + 1.0e-4), normalize(vLight.xy + 1.0e-4)), 0.0);
   vec3 stone = mix(vec3(0.09, 0.075, 0.06), vec3(0.2, 0.17, 0.13), vRock.y);
-  gl_FragColor = vec4(stone * (0.22 + 1.5 * lit) + vec3(0.9, 0.62, 0.36) * rim * 0.35, alpha);
+  gl_FragColor = vec4(stone * (0.06 + 1.5 * lit) + vec3(0.9, 0.62, 0.36) * rim, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
