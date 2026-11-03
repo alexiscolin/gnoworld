@@ -4,6 +4,7 @@
 // its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
 // that tell the activity, the rooms by section and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
+import type { Presence } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
 import { activityRoutes } from "./activity/routes.ts";
@@ -45,8 +46,9 @@ export interface Chat {
   mayPin: (room: string, who: string) => boolean;
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
-  // Who is here in each world (7h), where the server keeps its history.
+  // Who is here in each world (7h), where the server keeps its history, and what that route serves, for the ticker's trends (7t).
   presence?: Hono;
+  presenceNow?: () => Presence;
   stop: () => Promise<void>;
 }
 
@@ -221,7 +223,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
-    ...(present === undefined ? {} : { presence: present.routes }),
+    ...(present === undefined ? {} : { presence: present.routes, presenceNow: present.current }),
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

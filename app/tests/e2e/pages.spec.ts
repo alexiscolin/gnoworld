@@ -140,6 +140,9 @@ test.describe("as a search engine reads it, before any script runs", () => {
 });
 
 test.describe("once the client takes over", () => {
+  // Every request the page makes is watched: the home's count comes as a deployment serves it once the job ran (7t, red since 7n2).
+  test.use({ counted: true });
+
   for (const { path, title } of pages) {
     test(`${path} hydrates with no error and keeps its title`, async ({ page }) => {
       const problems = watch(page);

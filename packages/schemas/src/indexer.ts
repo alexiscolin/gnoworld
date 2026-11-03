@@ -42,3 +42,5 @@ export {
 } from "./worlds.ts";
 // Who is here (7h) behind the same door: only the universe's feed reads it, after the first screen.
 export { Presence, PRESENCE_ANSWER_MAX } from "./presence.ts";
+// The ticker's trends (7t) behind it too: only the home reads them, and the store's chunk, on every page, holds none of them.
+export { Trend, Trends, TRENDS_MAX_BYTES, TRENDS_MOST } from "./trends.ts";
