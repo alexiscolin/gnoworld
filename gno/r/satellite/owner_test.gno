@@ -151,7 +151,8 @@ func TestSetOperator(cur realm, t *testing.T) {
 	SetOperator(cross(cur), bob)
 	testing.SetRealm(testing.NewUserRealm(bob))
 	Takedown(cross(cur), "mars", "r1")
-	uassert.Equal(t, 0, rentals.Size())
+	_, _, _, ok := Rental("mars")
+	uassert.False(t, ok)
 }
 
 // D14: the owner proposes, and only the proposed address takes over.

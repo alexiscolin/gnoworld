@@ -462,7 +462,9 @@ func TestTakedownReportIsAnId(cur realm, t *testing.T) {
 	for _, r := range []string{"", strings.Repeat("a", 65), "R1", "r 1", "r_1", "-r1", "r1-", "r--1", "r1\n"} {
 		uassert.AbortsWithMessage(t, cur, "not a report's id", func() { Takedown(cross(cur), "mars", r) }, r)
 	}
-	uassert.Equal(t, 1, rentals.Size())
+	_, _, _, ok := Rental("mars")
+	uassert.True(t, ok)
 	Takedown(cross(cur), "mars", strings.Repeat("r1-", 21)+"z")
-	uassert.Equal(t, 0, rentals.Size())
+	_, _, _, ok = Rental("mars")
+	uassert.False(t, ok)
 }
