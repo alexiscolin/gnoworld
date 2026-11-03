@@ -585,6 +585,20 @@ printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (know
 gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
 out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
+# A filetest kills nothing (F5050): it imports its package by path, which the workspace of copies resolves to the untouched
+# copy, m0, whichever copy holds the filetest. So a guard only a filetest catches survives, while that filetest, run on the
+# mutant alone, kills it: such a guard gets a unit test, or goes in GAPS with its reason.
+mkdir -p "$mu/f/r/only" "$mu/g/r/only" && : >"$mu/f/gnowork.toml" && : >"$mu/g/gnowork.toml"
+for w in f g; do
+	printf 'module = "gno.land/r/test/only"\ngno = "0.9"\n' >"$mu/$w/r/only/gnomod.toml"
+	printf 'package main\n\nimport "gno.land/r/test/only"\n\nfunc main() {\n\tprintln(only.Do(true))\n}\n\n// Error:\n// bad\n' >"$mu/$w/r/only/z_only_filetest.gno"
+done
+printf 'package only\n\nfunc Do(bad bool) string {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn "done"\n}\n' >"$mu/f/r/only/only.gno"
+printf 'package only\n\nfunc Do(bad bool) string {\n\tif false && (bad) {\n\t\tpanic("bad")\n\t}\n\treturn "done"\n}\n' >"$mu/g/r/only/only.gno"
+(cd "$mu/g" && "$GNO" test ./r/only/ >/dev/null 2>&1) && fail "the filetest, run on the guard's mutant alone, does not kill it: the case below proves nothing"
+gapped "$mu/check.py" '{}'
+out=$(checked f GNO="$GNO") && fail "mutate.py passed a guard only a filetest catches: a filetest killed a mutant, so F5050 is gone; say so in mutate.py and docs/HARNESS.md: $out"
+[ "$out" = "FAIL  survives: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not keep the guard only a filetest catches as its one survivor (F5050): $out"
 # The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
 out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
 out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"

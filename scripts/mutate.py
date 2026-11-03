@@ -8,7 +8,10 @@ turns one `>=`, `>`, `<=`, `<`, `==`, `!=`, `&&`, `||`, `+` or `-` of a source's
 code (never its comments, strings or runes) into its partner, or shifts one
 integer literal by one, up or down. A package's mutants are copies of it in one
 temporary workspace, next to an untouched copy that must pass, all tested by one
-`gno test` run, whose time limit grows with its copies (F5051). A mutant that
+`gno test` run, whose time limit grows with its copies (F5051). A filetest kills
+nothing: it imports its package by path, which that workspace resolves to the
+untouched copy, whichever copy holds the filetest (F5050). So only a unit test
+kills a mutant, and a guard only a filetest catches survives. A mutant that
 does not compile is an error of this script, never a kill; but a `+`, `-` or
 number flip that does not compile (a string's `+`, an array's size) is dropped and
 counted, unless GAPS lists it. A comparison or logic flip changes no type, so one
