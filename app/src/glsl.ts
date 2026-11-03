@@ -78,13 +78,20 @@ type Node = Span & { readonly type: string; readonly [key: string]: unknown };
 const isNode = (value: unknown): value is Node =>
   typeof value === "object" && value !== null && typeof (value as { type?: unknown }).type === "string";
 
-// Whether `node` is a string or a template that reads as GLSL. A template that holds an escape is left whole: its lines are not all its
-// text's, and a comment's end could be misread.
+// A line the preprocessor joins to the next; a part of a template that ends inside a comment, a `//` with no line break after it or a `/*`
+// with no end, which stripped apart would make the comment's rest code.
+const CONTINUED = /\\\r?\n/;
+const opensComment = (part: string) => /\/[/*]/.test(part.replace(/\/\/[^\n]*\n|\/\*[\s\S]*?\*\//g, ""));
+
+// Whether `node` is a string or a template that reads as GLSL. One left whole: a string with a line continuation; a template that holds an
+// escape (its lines are not all its text's) or runs a comment into a value set in (7v's review).
 function readsAsShader(node: Node): boolean {
-  if (node.type === "Literal") return typeof node["value"] === "string" && isShader(node["value"]);
+  if (node.type === "Literal")
+    return typeof node["value"] === "string" && isShader(node["value"]) && !CONTINUED.test(node["value"]);
   if (node.type !== "TemplateLiteral") return false;
-  const raw = (node["quasis"] as readonly Quasi[]).map(({ value }) => value.raw).join(" ");
-  return isShader(raw) && !raw.includes("\\");
+  const parts = (node["quasis"] as readonly Quasi[]).map(({ value }) => value.raw);
+  const raw = parts.join(" ");
+  return isShader(raw) && !raw.includes("\\") && !parts.slice(0, -1).some(opensComment);
 }
 
 // The strings and templates of `node`'s tree that read as GLSL, the outermost first: none inside one is taken again.

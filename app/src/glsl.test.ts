@@ -259,6 +259,20 @@ describe("a built chunk's shaders, stripped", () => {
     expect(stripped).toContain(`const v="#version "+version+'\\n';const f=v+"#define varying in\\n"+body;`);
   });
 
+  // 7v's review (F4451): a template's part that ends inside a comment, stripped apart, would make the comment's rest code; a string's line
+  // continuation, stripped, would glue its two lines' words (`floaty`).
+  it("leaves whole a template whose comment runs into a value set in, and a string the preprocessor continues", () => {
+    const code = [
+      "const a=`\nvoid main() { float a = 1.0; // scaled by ${k} here\n}`;",
+      "const b=`\nvoid main() { float a = 1.0; /* by ${k} */ }`;",
+      'const c="#define F(x) \\\\\\n  float \\\\\\n  y = x;";',
+    ].join("\n");
+    expect(stripChunk(code)).toBe(code);
+    expect(stripChunk("const d=`\nvoid main() { float a = 1.0; // one\n  float b = ${k}; }`;")).toBe(
+      "const d=`\nvoid main(){float a=1.0;\nfloat b= ${k};}`;",
+    );
+  });
+
   // What 7v's review's hand-made mutants showed no test held: a value set in beside another, a shader string inside a shader template's
   // value (the outermost is taken, the inner left as it is), an escape in a template.
   it("keeps a space between two values set in, takes the outermost shader, and leaves a template with an escape whole", () => {
