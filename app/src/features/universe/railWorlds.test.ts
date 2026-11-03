@@ -63,13 +63,11 @@ describe("the rail's worlds", () => {
     expect(ids([fresh], signalsOf({}))).toEqual(["earth", "demo/fresh"]);
   });
 
-  it("puts the youngest seed first, whatever order the file holds them in", () => {
-    const [young, old] = [1, 3].map((days) =>
-      worldOf(`demo/d${String(days)}`, { seen: new Date(NOW - days * DAY).toISOString() }),
-    );
-    if (young === undefined || old === undefined) throw new Error("no seeds");
-    expect(ids([old, young], signalsOf({}))).toEqual(["earth", "demo/d1", "demo/d3"]);
-    expect(ids([young, old], signalsOf({}))).toEqual(["earth", "demo/d1", "demo/d3"]);
+  it("puts the youngest seed first, whatever order the file holds them in, though its id sorts last", () => {
+    const young = worldOf("demo/zz", { seen: new Date(NOW - DAY).toISOString() });
+    const old = worldOf("demo/aa", { seen: new Date(NOW - 3 * DAY).toISOString() });
+    expect(ids([old, young], signalsOf({}))).toEqual(["earth", "demo/zz", "demo/aa"]);
+    expect(ids([young, old], signalsOf({}))).toEqual(["earth", "demo/zz", "demo/aa"]);
   });
 
   it("names a hub's world by the hub's name, as its label does", () => {
@@ -191,6 +189,57 @@ describe("the rail's order, held", () => {
     order.read({ worlds, signals: after });
     expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
     order.dispose();
+  });
+
+  it("tells a change of a world's name, its section or its page alone, its place kept", () => {
+    const order = new RailOrder(PLACES);
+    const heard = vi.fn<() => void>();
+    order.subscribe(heard);
+    const one = (world: CosmosWorld, signals: LabelSignals) => {
+      vi.advanceTimersByTime(RAIL_MINUTE);
+      order.read({ worlds: [world], signals });
+      return order.entries()[1];
+    };
+    expect(one(worldOf("a/a"), signalsOf({ "a/a": here(5, 0.5) }))).toMatchObject({ title: "a", section: "rising" });
+    expect(one(worldOf("a/a"), signalsOf({ "a/a": here(5) }))).toMatchObject({ title: "a", section: "trend" });
+    expect(one(worldOf("a/a"), signalsOf({ "a/a": here(5) }, { names: new Map([["a/a", "Alpha"]]) }))).toMatchObject({
+      title: "Alpha",
+    });
+    expect(one(worldOf("a/a", { realms: [realm("a/b")] }), signalsOf({ "a/a": here(5) }))).toMatchObject({
+      href: "/r/a/b",
+    });
+    expect(heard).toHaveBeenCalledTimes(4);
+    order.dispose();
+  });
+
+  it("takes a read that changes nothing for no change: the next change waits only for the last one's minute", () => {
+    const order = new RailOrder(PLACES);
+    order.read({ worlds, signals: before });
+    vi.advanceTimersByTime(RAIL_MINUTE + 10_000);
+    order.read({ worlds, signals: before });
+    vi.advanceTimersByTime(10_000);
+    order.read({ worlds, signals: after });
+    expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
+    order.dispose();
+  });
+
+  it("applies two changes told inside a minute one after the other, each at its minute, and leaves no timer", () => {
+    const order = new RailOrder(PLACES);
+    const third = signalsOf({ "a/a": here(90), "b/b": here(40) });
+    order.read({ worlds, signals: before });
+    order.read({ worlds, signals: after });
+    expect(shown(order)).toEqual(["earth", "a/a", "b/b"]);
+    vi.advanceTimersByTime(RAIL_MINUTE);
+    expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
+    order.read({ worlds, signals: third });
+    expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
+    vi.advanceTimersByTime(RAIL_MINUTE);
+    expect(shown(order)).toEqual(["earth", "a/a", "b/b"]);
+    order.read({ worlds, signals: before });
+    order.read({ worlds, signals: after });
+    order.read({ worlds, signals: third });
+    order.dispose();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("keeps a world shown before in its place while no other is clearly ahead of it", () => {

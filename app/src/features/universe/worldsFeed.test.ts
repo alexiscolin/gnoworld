@@ -90,6 +90,40 @@ describe("the rail's portraits", () => {
 });
 
 describe("the worlds' feed", () => {
+  it("tells the rail nothing while the signals have come and the file has not, the usual order (7i)", async () => {
+    let arrive: (file: typeof FILE) => void = () => undefined;
+    feed.read.mockImplementation(
+      () =>
+        new Promise((done) => {
+          arrive = done;
+        }),
+    );
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()).toBeUndefined();
+    arrive(FILE);
+    await settled();
+    expect(worlds.data()?.worlds).toBe(FILE.worlds);
+  });
+
+  it("keeps what it told the rail once the cosmos is covered (7i)", async () => {
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    worlds.sync(scene, false);
+    await settled();
+    expect(worlds.data()?.worlds).toBe(FILE.worlds);
+  });
+
   it("tells the rail the worlds and what is known of them as it tells the cosmos, once both are known (7i)", async () => {
     const { cosmos, scene } = sceneOf();
     const worlds = new WorldsFeed();
