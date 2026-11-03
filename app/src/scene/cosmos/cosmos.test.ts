@@ -2112,6 +2112,22 @@ describe("a system's arrival (7d3)", () => {
     }
   });
 
+  // Alexis, 2026-11-03 (reports/alexis-0816-postcard.png): pebbles round agents on the home's lower postcard, g1magld5's 124 grains on
+  // orbits from 1.61 to 3.28, agents widened to 3.25 among them.
+  it("keeps g1magld5's grain a body's width off agents and streak in Onyx's view at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    const { worlds: bodies } = postcardOf(system, restView(systems).eye);
+    expect(bodies.map(({ id }) => id.split("/").at(-1))).toEqual(["agents", "streak"]);
+    const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+    expect(own.length).toBeGreaterThan(40);
+    for (const point of own)
+      for (const body of bodies) expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(body.radius);
+  });
+
   it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {
     const { scene, arrival } = await atGnoswap();
     const { to } = await arrived(scene, GNOSWAP);

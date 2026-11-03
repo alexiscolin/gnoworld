@@ -171,16 +171,17 @@ describe("a postcard's worlds at a count", () => {
 });
 
 // 7d3's review: a postcard's specks, its worlds too small for a body, stand at their own orbits in its plane while its bodies are widened;
-// one that would stand on a body's ground, or against it, is not drawn. A system turns as one, so what stands clear at rest stays clear.
+// one that would stand on a body's ground, or against it, is not drawn: within the body's own width, half a unit at the least (Alexis's
+// pebbles round Onyx's agents, 2026-11-03). A system turns as one, so what stands clear at rest stays clear.
 describe("a postcard's specks", () => {
-  const CLEAR = 0.5;
+  const clearOf = ({ radius }: Orbiter) => Math.max(0.5, radius);
   const placed = (system: StarSystem, world: Orbiter) => {
     const out = { x: NaN, y: NaN, z: NaN };
     orbitPlace({ system, world }, 0, out);
     return out;
   };
 
-  it("leaves out each speck that would stand within half a unit of a body's ground, and only those", () => {
+  it("leaves out each speck that would stand within a body's width of its ground, half a unit at the least, and only those", () => {
     const crowds = systemsOf(
       ["a", "b", "c", "d", "e"].flatMap((namespace, at) =>
         Array.from({ length: 12 + at * 40 }, (_, world) => ({
@@ -201,7 +202,7 @@ describe("a postcard's specks", () => {
               ...(["x", "y", "z"] as const).map((axis) => placed(drawn, speck)[axis] - placed(drawn, body)[axis]),
             ) -
               body.radius <
-            CLEAR,
+            clearOf(body),
         );
         expect(left.has(speck.id)).toBe(near);
         if (near) hidden += 1;
