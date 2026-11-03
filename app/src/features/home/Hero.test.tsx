@@ -126,6 +126,11 @@ describe("the hero's actions for a newcomer", () => {
   });
 
   // F4518: the first visit's look holds only where the cosmos stands, which the universe marks (Universe.test); the build writes none.
+  // F4529: the opening marks the hero while its words show, mock-up 1's hero coming as the camera lands; the build writes none.
+  test("writes the hero as shown, which the opening marks while its words stand", async () => {
+    expect(await heroOf("main")).toMatch(/<div class="[^"]*" data-clear="" data-yield="none">/);
+  });
+
   test("writes its actions as standing beside no cosmos, which the universe marks once it stands", async () => {
     expect(actionsOf(await heroOf("main"))).toContain('data-cosmos="none"');
   });

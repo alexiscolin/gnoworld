@@ -12,6 +12,13 @@
     gap: 22px;
     /* The hero's own box takes no click from the page behind it; its words and actions do. */
     pointer-events: none;
+    /* raw: the hero comes back in the opening's own 600 ms as its words leave (Opening.module.css) */
+    transition: opacity 600ms var(--ease-standard);
+  }
+
+  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1). */
+  .hero[data-yield="opening"] {
+    opacity: 0;
   }
 
   .hero > * {
@@ -126,8 +133,8 @@
 
   /* ADR-0003, 2d: the list's kicker, over its first link. */
   .worlds > p {
-    /* layout: the kicker stands a step over the list's first link */
-    margin-block: 0 var(--space-xs);
+    /* layout: the kicker's own line, its first link's line box under it (mock-ups 2 to 4: 13 px between) */
+    margin-block: 0;
     color: var(--color-text-muted);
   }
 
@@ -151,6 +158,12 @@
   .figure:empty::before {
     visibility: hidden;
     content: "000";
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero {
+      transition: none;
+    }
   }
 
   @media (max-width: 899px) {
@@ -204,8 +217,8 @@
       margin-block-start: 0;
       padding-block-end: 0;
       position: fixed;
-      /* raw: under the header's 96 px, and 16 more, less the kicker's 11 px and its 8 over the first link, which stays where it was */
-      inset-block-start: 93px;
+      /* raw: the kicker at mock-ups 2 to 4's 98 px, under the header's 96, its first link where it was */
+      inset-block-start: 101px;
       inset-inline-start: var(--space-xl);
       /* raw: the room above the hero (the header, the hero at its tallest and the margins), whatever the list's length */
       max-block-size: calc(100dvb - 520px);

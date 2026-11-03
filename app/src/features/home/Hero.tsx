@@ -25,7 +25,8 @@ export function Hero({
   newcomer?: boolean;
 }) {
   return (
-    <div className={styles["hero"]} data-clear="">
+    // The opening's words over the dive take its place while they show (mock-up 1), which the opening marks (ADR-0003 §1).
+    <div className={styles["hero"]} data-clear="" data-yield="none">
       <Kicker dot="warm">{universe.isDefault ? "gno.world" : universe.name}</Kicker>
       {/* A figure space keeps the number's line while none is known: the page does not jump when it comes. */}
       <p className={styles["number"]} data-hero="number">

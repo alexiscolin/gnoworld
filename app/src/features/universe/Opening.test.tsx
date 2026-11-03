@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { DIVE } from "@gnoworld/core";
 import { act, createRef } from "react";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, one } from "../../../tests/mount.tsx";
 import type { SceneStatus } from "./host.ts";
@@ -59,6 +60,46 @@ describe("the opening's words", () => {
       vi.advanceTimersByTime(10 * OPENING_MOST);
     });
     expect(left(words())).toBe(false);
+  });
+});
+
+// F4529, mock-up 1: "The hero, the labels and the buttons come as the camera lands": the hero gives way while the words show, out of the
+// keyboard's reach, and comes back as they leave.
+describe("the hero under the opening", () => {
+  const hero = () => {
+    const box = document.createElement("div");
+    box.dataset["yield"] = "none";
+    document.body.append(box);
+    return box;
+  };
+
+  it("gives way while the words show, out of reach, and comes back as they leave", () => {
+    const box = hero();
+    opened("loading");
+    expect(box.dataset["yield"]).toBe("opening");
+    expect(box.hasAttribute("inert")).toBe(true);
+    act(() => {
+      document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    });
+    expect(box.dataset["yield"]).toBe("none");
+    expect(box.hasAttribute("inert")).toBe(false);
+  });
+
+  it("comes back if the words go with their page", () => {
+    const box = hero();
+    const { ref } = canvasRef();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(<Opening canvas={ref} status="loading" />);
+    });
+    expect(box.dataset["yield"]).toBe("opening");
+    act(() => {
+      root.unmount();
+    });
+    expect(box.dataset["yield"]).toBe("none");
+    expect(box.hasAttribute("inert")).toBe(false);
   });
 });
 

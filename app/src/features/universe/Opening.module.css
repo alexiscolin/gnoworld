@@ -4,8 +4,8 @@
   .opening {
     position: fixed;
     inset-inline: 0;
-    /* raw: the column's middle a tenth of the window over its own, the Earth under it, clear of the hero at a laptop's foot */
-    inset-block-start: 45%;
+    /* raw: mock-up 1's: the column's middle a little under the window's, over the Earth, the hero given way */
+    inset-block-start: 54%;
     translate: 0 -50%;
     /* layout: the words in one centred column over the canvas */
     display: grid;
@@ -32,7 +32,8 @@
     margin-block: 0;
   }
 
-  .opening > :first-child {
+  /* The kicker's word in amber, mock-up 1's: the label utility colours its line in a later layer. */
+  .warm {
     color: var(--color-warm);
   }
 
@@ -40,15 +41,15 @@
     color: var(--color-text);
     /* raw: mock-up 1's promise, 54 px at 1,728 px wide, 600 */
     font: 600 clamp(2rem, 3.2vi, 3.5rem) / 1.08 var(--family-sans);
-    /* raw: the promise's tight tracking (mock-up 1) */
-    letter-spacing: -0.02em;
+    /* raw: the promise's tight tracking (mock-up 1, about -0.04em) */
+    letter-spacing: -0.04em;
     /* raw: a shade under the words, so they read over a sun */
     text-shadow: 0 2px 24px color-mix(in oklab, var(--color-ink) 70%, transparent);
   }
 
   .line {
-    /* raw: the line on two rows at most on a laptop's screen, as mock-up 1's on one */
-    max-inline-size: 62rem;
+    /* raw: mock-up 1's line on one row at 1,728 px, on two at most on a laptop's screen */
+    max-inline-size: 64rem;
     /* raw: the hero line's own grey (Hero.module.css) */
     color: #c8d0de;
     /* raw: mock-up 1's line, 20 px at 1,728 px wide */

@@ -16,6 +16,15 @@ const GNO_LAND = "https://gno.land";
 // Tab moves the focus, and a modifier comes down alone before the key it changes, Shift before a Tab going back: none shortens the words.
 const HOLDING = new Set(["Tab", "Shift", "Control", "Alt", "Meta"]);
 
+// The hero gives way while the words show, out of the keyboard's reach, and comes back as they leave or go: mock-up 1's "the hero, the
+// labels and the buttons come as the camera lands".
+function yieldHero(yielding: boolean): void {
+  const hero = document.querySelector<HTMLElement>("[data-yield]");
+  if (hero === null) return;
+  hero.dataset["yield"] = yielding ? "opening" : "none";
+  hero.toggleAttribute("inert", yielding);
+}
+
 interface Ends {
   readonly words: HTMLElement;
   readonly scene: HTMLCanvasElement | null;
@@ -70,6 +79,12 @@ export function Opening({ canvas, status }: { canvas: RefObject<HTMLCanvasElemen
     openingShows();
   }, []);
   useEffect(() => {
+    yieldHero(!left);
+    return () => {
+      yieldHero(false);
+    };
+  }, [left]);
+  useEffect(() => {
     const words = boxRef.current;
     if (left || words === null) return undefined;
     const ending = new AbortController();
@@ -89,7 +104,9 @@ export function Opening({ canvas, status }: { canvas: RefObject<HTMLCanvasElemen
   }, [left, status, canvas]);
   return (
     <div ref={boxRef} className={styles["opening"]} data-opening="" data-left={left ? "" : undefined} inert={left}>
-      <Kicker>gno.world</Kicker>
+      <Kicker>
+        <span className={styles["warm"]}>gno.world</span>
+      </Kicker>
       <p className={styles["title"]}>The living map of gno.land.</p>
       <p className={styles["line"]}>
         Every realm is a world. Discover what&apos;s being built, follow what&apos;s trending, and talk with the people

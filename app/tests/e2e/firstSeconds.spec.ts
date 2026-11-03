@@ -63,12 +63,31 @@ test.describe("a newcomer", () => {
     await expect(about).toHaveAttribute("rel", "noreferrer noopener");
     expect(await opening(page).evaluate((words) => getComputedStyle(words).pointerEvents)).toBe("none");
     expect(await about.evaluate((link) => getComputedStyle(link).pointerEvents)).toBe("auto");
+    // F4529, mock-up 1: the kicker in amber, and the hero given way under the words, out of the keyboard's reach.
+    expect(
+      await opening(page)
+        .getByText("gno.world")
+        .evaluate((word) => {
+          const probe = document.createElement("i");
+          probe.style.setProperty("color", "var(--color-warm)");
+          document.body.append(probe);
+          const warm = getComputedStyle(probe).color;
+          probe.remove();
+          return getComputedStyle(word).color === warm;
+        }),
+    ).toBe(true);
+    const hero = page.locator("[data-yield]");
+    await expect(hero).toHaveAttribute("data-yield", "opening");
+    await expect(hero).toHaveAttribute("inert", "");
+    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("0");
     // F4517: a newcomer's page, its opening shown, under the axe as every page is.
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await running(page);
     await landed(page);
     await expect(page.locator("canvas[data-scene]")).toHaveAttribute("data-dive", "landed");
     await expect(opening(page)).toBeHidden();
+    await expect(hero).toHaveAttribute("data-yield", "none");
+    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("1");
     await expect(page.locator("[data-hero='line']")).toHaveText(/worlds in Onyx\. Each one is a place to talk\.$/);
     await expect(explore(page)).toBeVisible();
     expect(await filled(explore(page))).toBe(false);
