@@ -122,11 +122,12 @@ func TestRotationRevokes(cur realm, t *testing.T) {
 	})
 }
 
-// The tests below run after those above, on the state they leave: alice holds pubA2, and root has one kept seal, (pubA, pubB, 3).
+// The tests below make the state they read, so each passes run alone as well as after those above.
 
 // Binding again the key one already holds is no takeover: only another address is refused.
 func TestRebindSameAddress(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(alice))
+	Bind(cross(cur), k32(pubA2), s64(bindSigA2))
 	Bind(cross(cur), k32(pubA2), s64(bindSigA2))
 	uassert.Equal(t, hex.EncodeToString(raw(pubA2)), KeyOf(alice))
 }
@@ -143,16 +144,19 @@ func TestSealOfNoMessage(cur realm, t *testing.T) {
 func TestSealOfOneMessage(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(bob))
 	p := page[0]
-	Seal(cross(cur), k32(root), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), false)
+	Seal(cross(cur), k32(pageRoot), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), false)
 }
 
 // Kept reads back exactly what Seal stored, and zeros for a pair that never sealed.
-func TestKeptReadsBack(t *testing.T) {
-	n, h, ok := Kept(k32(root), k32(pubA), k32(pubB))
+func TestKeptReadsBack(cur realm, t *testing.T) {
+	testing.SetRealm(testing.NewUserRealm(bob))
+	a, b := k32(sealOfTwo[0]), k32(sealOfTwo[1])
+	Seal(cross(cur), k32(root), 2, a, s64(sealOfTwo[2]), b, s64(sealOfTwo[3]), true)
+	n, h, ok := Kept(k32(root), a, b)
 	uassert.True(t, ok)
-	uassert.Equal(t, 3, n)
+	uassert.Equal(t, 2, n)
 	uassert.Equal(t, runtime.ChainHeight(), h)
-	n, h, ok = Kept(k32(root), k32(pubA), k32(pubC))
+	n, h, ok = Kept(k32(root), a, k32(pubC))
 	uassert.False(t, ok)
 	uassert.Equal(t, 0, n)
 	uassert.Equal(t, int64(0), h)
@@ -160,13 +164,13 @@ func TestKeptReadsBack(t *testing.T) {
 
 // Render shows each kept seal's block, count and pair, the bound key by its address and the other by its hex, ten at most.
 func TestRenderPage(cur realm, t *testing.T) {
-	line := "\n- block " + strconv.FormatInt(runtime.ChainHeight(), 10) + ", 3 messages: " + alice.String() + " and `" + hex.EncodeToString(raw(pubB)) + "` (unbound key)\n"
-	out := Render("root/" + rootHex)
-	uassert.True(t, strings.Contains(out, line), out)
 	testing.SetRealm(testing.NewUserRealm(bob))
+	Bind(cross(cur), k32(page[0][0]), s64(pageBindSig))
 	for _, p := range page {
-		Seal(cross(cur), k32(root), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), true)
+		Seal(cross(cur), k32(pageRoot), 1, k32(p[0]), s64(p[2]), k32(p[1]), s64(p[3]), true)
 	}
-	out = Render("root/" + rootHex)
+	out := Render("root/" + pageRootHex)
+	line := "\n- block " + strconv.FormatInt(runtime.ChainHeight(), 10) + ", 1 messages: " + bob.String() + " and `" + hex.EncodeToString(raw(page[0][1])) + "` (unbound key)\n"
+	uassert.True(t, strings.Contains(out, line), out)
 	uassert.Equal(t, 10, strings.Count(out, "\n- block "), out)
 }
