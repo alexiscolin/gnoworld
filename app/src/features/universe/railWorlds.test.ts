@@ -87,6 +87,11 @@ describe("the rail's worlds", () => {
     expect(rail[1]?.href).toBe(`/r/${"gno.land/r/games/go".slice(REALM_PREFIX.length)}`);
   });
 
+  it("links the Earth to its page though a realm on the chain takes the id earth", () => {
+    const rail = railOf({ worlds: [worldOf("earth")], signals: signalsOf({ earth: here(3) }) }, PLACES);
+    expect(rail.map(({ id, href }) => [id, href])).toEqual([["earth", "/earth"]]);
+  });
+
   it("links a hub with no realm, a world of its own by its slug, to its page", () => {
     const rail = railOf(
       { worlds: [worldOf("bubble", { realms: [] })], signals: signalsOf({ bubble: here(5) }) },

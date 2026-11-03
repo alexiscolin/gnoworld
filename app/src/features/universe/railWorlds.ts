@@ -26,14 +26,16 @@ export interface RailEntry extends RailWorld {
 
 const EARTH = "earth";
 
-// A world's page: its hub's, else its first realm's view; none for a world with neither.
+// A world's page: its hub's, else its first realm's view; none for a world with neither. The Earth's is set last: a realm deployed under
+// the namespace earth is a world of that id, and never takes the Earth's link.
 function pagesOf(worlds: readonly CosmosWorld[], { earth, worlds: hubs }: RailPlaces): Map<string, string> {
-  const pages = new Map<string, string>([[EARTH, earth]]);
+  const pages = new Map<string, string>();
   for (const world of worlds) {
     const realm = world.realms[0]?.path;
     if (realm !== undefined) pages.set(world.id, `/r/${realm.slice(REALM_PREFIX.length)}`);
   }
   for (const hub of hubs) pages.set(hubWorldOf(hub), hub.path);
+  pages.set(EARTH, earth);
   return pages;
 }
 
