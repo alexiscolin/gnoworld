@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { Locator } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { landed, running, stats } from "./sceneStage.ts";
 
@@ -33,12 +34,23 @@ const pressed = async (page: Page) =>
     ["Dynamic view", "Plan view"].map((name) => views(page).getByRole("button", { name }).getAttribute("aria-pressed")),
   );
 const names = (page: Page) => page.locator("[data-plan] a");
+// A control's height and whether it is rounded whole, as the pill's views are.
+const shapeOf = (control: Locator) =>
+  control.evaluate((element) => {
+    const { height } = element.getBoundingClientRect();
+    return { height, round: Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) >= height / 2 };
+  });
 
 test("offers space's two views in the header's pill, V toggling them, and the Earth's Plan at rest naming gnosh.ai", async ({
   page,
 }) => {
   await home(page);
   expect(await pressed(page)).toEqual(["true", "false"]);
+  // The design review (F4472): the selected icon a pill as the selected view, the view links' 34 px rounded whole, and so the other.
+  const view = await shapeOf(page.getByRole("banner").locator("[aria-current='page']"));
+  expect(view).toEqual({ height: 34, round: true });
+  for (const name of ["Dynamic view", "Plan view"])
+    expect(await shapeOf(views(page).getByRole("button", { name }))).toEqual(view);
   await page.keyboard.press("v");
   expect(await pressed(page)).toEqual(["false", "true"]);
   // The file the team reviews: gnosh.ai among its projects, a link to its own address in a tab of its own.

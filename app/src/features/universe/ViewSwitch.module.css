@@ -9,4 +9,15 @@
     /* layout: the icons 2 px apart, as the pill's links */
     gap: 2px;
   }
+
+  /* Each icon a round of the pill's views' height, the selected one filled as the selected view (the design review, F4472): over the plain
+     icon control's square corners and height, which the pressed state alone names here. */
+  .switch button[aria-pressed] {
+    /* raw: a view link's 34 px inside the 44 px pill (shellHeader.module.css) */
+    --_h: 34px;
+
+    /* layout: no room to share with the pill's 40 px controls: the icons are its links' height */
+    margin-block: 0;
+    border-radius: var(--radius-pill);
+  }
 }
