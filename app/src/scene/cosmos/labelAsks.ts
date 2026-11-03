@@ -2,6 +2,7 @@
 // real data names: people here, a rise, callers the file counts, a new world this reader has not visited. A world nothing names asks for
 // none: signs always mean real data (ADR-0002 §10).
 import {
+  callersIn,
   daysSince,
   isFresh,
   known,
@@ -22,14 +23,6 @@ interface Look {
   readonly bodies: readonly { readonly id: string; readonly away: number }[];
   readonly list: readonly CosmosWorld[];
   readonly signals?: LabelSignals | undefined;
-  /** The callers the file counts in a world's realms, handed by the cosmos: this chunk imports nothing that lives with it. */
-  readonly callersOf: (world: CosmosWorld) => number;
-}
-
-// What a look reads its worlds with: the signals, and how a world's callers are counted.
-interface Reading {
-  readonly signals: LabelSignals;
-  readonly callersOf: Look["callersOf"];
 }
 
 type Heard = LabelSignals["present"] extends ReadonlyMap<string, infer Count> ? Count : never;
@@ -47,17 +40,17 @@ function heardIn(world: CosmosWorld | undefined, id: string, { present, visited,
 
 /** What the data says of world `id` now: who is here, its rise, its callers, whether it is new to this reader. Its label's and the rail's
  * alike (7i). */
-export function signalsOf(world: CosmosWorld | undefined, id: string, { signals, callersOf }: Reading): Signals {
-  const use = world === undefined ? 0 : callersOf(world);
+export function signalsOf(world: CosmosWorld | undefined, id: string, signals: LabelSignals): Signals {
+  const use = world === undefined ? 0 : callersIn(world.realms);
   return { ...heardIn(world, id, signals), ...(use > 0 ? { use } : {}) };
 }
 
 type Known = Map<string, [CosmosWorld, Signals][]>;
 // The worlds data names, by namespace.
-function knownIn(list: readonly CosmosWorld[], reading: Reading): Known {
+function knownIn(list: readonly CosmosWorld[], signals: LabelSignals): Known {
   const named: Known = new Map();
   for (const world of list) {
-    const said = signalsOf(world, world.id, reading);
+    const said = signalsOf(world, world.id, signals);
     const group = named.get(world.namespace);
     if (!known(said)) continue;
     if (group === undefined) named.set(world.namespace, [[world, said]]);
@@ -72,11 +65,11 @@ const held = new WeakMap<
   readonly CosmosWorld[],
   { byId: ReadonlyMap<string, CosmosWorld>; known: WeakMap<LabelSignals, Known> }
 >();
-function heldOf(list: readonly CosmosWorld[], reading: Reading) {
+function heldOf(list: readonly CosmosWorld[], signals: LabelSignals) {
   const kept = held.get(list) ?? { byId: new Map(list.map((world) => [world.id, world])), known: new WeakMap() };
-  const known = kept.known.get(reading.signals) ?? knownIn(list, reading);
+  const known = kept.known.get(signals) ?? knownIn(list, signals);
   held.set(list, kept);
-  kept.known.set(reading.signals, known);
+  kept.known.set(signals, known);
   return { byId: kept.byId, known };
 }
 
@@ -102,12 +95,11 @@ const nameOf = (names: LabelSignals["names"], id: string) => {
 
 /** What a look asks labels for, and the star each far world's label points at. */
 export function asksOf(look: Look) {
-  const { bodies, list, signals = NOTHING, callersOf } = look;
-  const reading = { signals, callersOf };
-  const { byId, known } = heldOf(list, reading);
-  const asks: LabelAsk[] = [{ id: "earth", kind: "earth", signals: signalsOf(undefined, "earth", reading) }];
+  const { bodies, list, signals = NOTHING } = look;
+  const { byId, known } = heldOf(list, signals);
+  const asks: LabelAsk[] = [{ id: "earth", kind: "earth", signals: signalsOf(undefined, "earth", signals) }];
   for (const { id } of [...bodies].sort((a, b) => a.away - b.away))
-    asks.push({ id, kind: "near", ...nameOf(signals.names, id), signals: signalsOf(byId.get(id), id, reading) });
+    asks.push({ id, kind: "near", ...nameOf(signals.names, id), signals: signalsOf(byId.get(id), id, signals) });
   const far = farAsks(look, known, new Set(bodies.map(({ id }) => id)));
   return { asks: [...asks, ...far.asks], stars: far.stars };
 }

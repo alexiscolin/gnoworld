@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { callersOf, type CosmosWorld, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
+import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { Drawn } from "@gnoworld/core";
 import { asksOf } from "../../scene/cosmos/labelAsks.ts";
 import type { Scene } from "../../scene/scene.ts";
@@ -297,7 +297,6 @@ describe("the worlds' feed", () => {
       systems: [],
       drawn: new Drawn(),
       bodies,
-      callersOf,
       list: cosmos.mock.lastCall?.[0] as typeof FILE.worlds,
       signals,
     });

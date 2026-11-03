@@ -1,6 +1,6 @@
 // The rail's worlds (7i): the asks core orders, read from the worlds' file and what is known of them now as the labels read it, each with the
 // page it links to. The order changes at most once a minute, and never while the reader is on the rail (ADR-0002 §1's rail).
-import { callersIn, chooseRail, daysSince, REALM_PREFIX, type RailAsk, type RailWorld } from "@gnoworld/core";
+import { chooseRail, daysSince, REALM_PREFIX, type RailAsk, type RailWorld } from "@gnoworld/core";
 import { createStore } from "zustand/vanilla";
 import { hubWorldOf } from "../../lib/hubWorld.ts";
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
@@ -40,8 +40,7 @@ function pagesOf(worlds: readonly CosmosWorld[], { earth, worlds: hubs }: RailPl
 }
 
 function asksOf(worlds: readonly CosmosWorld[], signals: LabelSignals, pages: ReadonlyMap<string, string>): RailAsk[] {
-  const reading = { signals, callersOf: ({ realms }: CosmosWorld) => callersIn(realms) };
-  const asks: RailAsk[] = [{ id: EARTH, kind: "earth", signals: signalsOf(undefined, EARTH, reading) }];
+  const asks: RailAsk[] = [{ id: EARTH, kind: "earth", signals: signalsOf(undefined, EARTH, signals) }];
   const listed = new Map(worlds.map((world) => [world.id, world]));
   for (const id of pages.keys()) {
     const world = listed.get(id);
@@ -50,7 +49,7 @@ function asksOf(worlds: readonly CosmosWorld[], signals: LabelSignals, pages: Re
     asks.push({
       id,
       kind: "far",
-      signals: signalsOf(world, id, reading),
+      signals: signalsOf(world, id, signals),
       ...(name === undefined ? {} : { name }),
       ...(days === null ? {} : { days }),
     });
