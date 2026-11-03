@@ -109,7 +109,7 @@ void main() {
   float landed = 1.0;
   float shore = t;
   if (shape.sea > 0.0) {
-    float coast = max(fwidth(t), 0.002);
+    float coast = max(0.5 * fwidth(t), 0.002);
     wet = 1.0 - smoothstep(shape.sea - coast, shape.sea + coast, t);
     landed = smoothstep(shape.sea, shape.sea + 0.04, t) * inland;
     t = clamp((t - shape.sea) / max(1.0 - shape.sea, 0.001), 0.0, 1.0);

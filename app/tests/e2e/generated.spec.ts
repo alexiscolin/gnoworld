@@ -36,6 +36,8 @@ const ALIKE_AT_MOST = 2;
 const DETAIL_SHARE = 0.8;
 const GRAIN = 3;
 const ROUNDING = 2.3;
+// A temperate world close on six seeds, each at the Earth's level, never one chosen (the chief, 2026-11-03; 7b8's coasts lost it on two).
+const TEMPERATE_SEEDS = 6;
 // A giant seen close as Alexis chose it (2026-11-03, 15:2x, "la version douce", reports/7b7-compare/): no streak, soft, about a third of
 // frame 104's Jupiter's fine detail (0.119 to 0.312 against 0.354, the same measure on its box clear of the grid), so 0.28 of Jupiter's at
 // least; no variance floor, for at the pixel a soft giant no longer differs from rounding (1.8 to 6.9 on 11 of 15 views).
@@ -118,13 +120,13 @@ const closeDetail = async (page: Page, query: string) => {
     type: "detail",
     description: JSON.stringify({ day, earth, raw: day.variance / earth.variance, anchor }),
   });
-  expect(day.sharpness, "no grain").toBeLessThanOrEqual(GRAIN);
+  expect(day.sharpness, `${query}: no grain`).toBeLessThanOrEqual(GRAIN);
   if (isGiant(anchor)) {
-    expect(day.sharpness, "a soft giant's detail").toBeGreaterThanOrEqual(GIANT_SHARPNESS);
+    expect(day.sharpness, `${query}: a soft giant's detail`).toBeGreaterThanOrEqual(GIANT_SHARPNESS);
     return;
   }
-  expect(day.sharpness, "as sharp as the Earth").toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
-  expect(day.variance, "detail, not rounding").toBeGreaterThan(4 * ROUNDING);
+  expect(day.sharpness, `${query}: as sharp as the Earth`).toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
+  expect(day.variance, `${query}: detail, not rounding`).toBeGreaterThan(4 * ROUNDING);
 };
 
 // The real file's 24, read once a worker: the lab's own choice of them, which `real=` must follow.
@@ -317,7 +319,9 @@ test.describe("generated worlds", () => {
 
   for (const index of ANCHORS.keys())
     test(`a ${ANCHORS[index] ?? ""} world seen close holds the Earth's fine detail`, async ({ page }) => {
-      await closeDetail(page, `?view=close&world=${String(index)}`);
+      const seeds = ANCHORS[index] === "temperate" ? TEMPERATE_SEEDS : 1;
+      for (let seed = 0; seed < seeds; seed += 1)
+        await closeDetail(page, `?view=close&world=${String(index)}&seed=${String(seed)}`);
     });
 
   for (let index = 0; index < VIEW_OF_24; index += 1)

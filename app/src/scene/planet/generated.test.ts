@@ -483,6 +483,12 @@ describe("the generated program", () => {
     );
   });
 
+  // A coast smoothed a whole pixel either side drew every close coast two pixels soft: by a dark sea, a bright land's step then held
+  // most of a close view's detail at half size (7b8, seeds 0 and 5 at 0.31 and 0.29 against the Earth's 0.42).
+  it("draws a coast over one pixel, half either side, never two pixels soft", () => {
+    expect(GENERATED_FRAGMENT).toContain("float coast = max(0.5 * fwidth(t), 0.002);");
+  });
+
   // A relief that stops dead at the coast is a cliff a pixel wide: its slope lit a bright stair-stepped line along every coast on the
   // night side, and a dark one under clouds (7b8's close views). The relief rises from nothing over the land's first hundredths.
   it("raises a sea world's relief from nothing at its coast, never a cliff a pixel wide", () => {
