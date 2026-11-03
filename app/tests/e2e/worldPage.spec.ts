@@ -160,6 +160,8 @@ test.describe("who is here right now", () => {
       const figure = await box(page, "[data-look='plate'] [data-value]");
       near(rule.x, words.x, "the hairline from the column's left");
       near(figure.y - rule.y, 364 - 355, "the figure under the hairline");
+      // One fact a column, as frame 26's two: a hairline 226 px wide of the column's 484, 33 px from the next; a lone fact keeps its own.
+      near(rule.width, (words.width - 32) / 2, "the hairline's width, a column's");
     });
 
   test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({

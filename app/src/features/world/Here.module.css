@@ -20,6 +20,13 @@
       margin-block-start: 11px;
     }
 
+    .here > * {
+      /* layout: frame 26's two facts' columns, a lone fact in the first, so a hairline is a column wide (226 px of 484) */
+      grid-template-columns: repeat(2, 1fr);
+      /* layout: frame 26's 33 px between its two columns */
+      gap: var(--space-l);
+    }
+
     .here > * > * {
       /* raw: frame 26's figure box 9 px under its hairline: the figure's line rises 7 px over its box, and the hairline is 1 px */
       padding-block-start: 15px;
