@@ -124,9 +124,10 @@ for (const size of [COMPUTER, WIDE])
     const { screen } = await cosmos(page);
     near(screen.earth?.x ?? NaN, size.width / 2, "the Earth's x");
     near(screen.earth?.y ?? NaN, size.height / 2, "the Earth's y");
-    // Alexis, 2026-11-02: "la Terre un peu plus grosse", about 110 pixels across against frame 4's 95.
-    expect(screen.earth?.radius).toBeGreaterThanOrEqual(50);
-    expect(screen.earth?.radius).toBeLessThanOrEqual(60);
+    // Alexis, 2026-11-02: "la Terre un peu plus grosse", about 110 pixels across against frame 4's 95; then, 2026-11-03, 1.2 times that
+    // through the home's lens, about 130.
+    expect(screen.earth?.radius).toBeGreaterThanOrEqual(60);
+    expect(screen.earth?.radius).toBeLessThanOrEqual(72);
     expect(screen.sun.x - size.width / 2).toBeGreaterThanOrEqual(100);
     expect(screen.sun.x).toBeLessThan(size.width);
     expect(Math.abs(screen.sun.y - size.height / 2)).toBeLessThanOrEqual(0.3 * size.height);

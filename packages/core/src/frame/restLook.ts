@@ -5,8 +5,10 @@ import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
 import { outlineOf, type Outline } from "./outline.ts";
 
-/** The camera's field of view, in degrees, up and down: the scene's own lens. */
-export const FIELD_OF_VIEW = 50;
+/** The home's lens, in degrees, up and down, which the scene's camera takes while the cosmos shows: 1.2 times the scene's 50 degrees'
+ * magnification (Alexis, 2026-11-03, "tout pourrait être un peu plus gros"; 1.25 left Onyx no view with its close world and two
+ * postcards). Every other page keeps 50 degrees. A number: a call at a module's top stays in every chunk that imports core. */
+export const FIELD_OF_VIEW = 42.47122885453438;
 /** The screens the view is composed for, in the page's pixels: the video's, and a 16:9 window of its height. */
 export const REST_SCREENS = [
   { width: 1728, height: 1080 },
@@ -46,8 +48,8 @@ export interface Close {
 }
 
 export const DEGREE = Math.PI / 180;
-/** The eye's distances from the Earth, the plain one first: the Earth about 110 pixels across, a little larger than frame 4's 95 (Alexis,
- * 2026-11-02), 101 to 118. */
+/** The eye's distances from the Earth, the plain one first: the Earth about 130 pixels across through the home's lens, 121 to 142 (Alexis,
+ * 2026-11-02 and 2026-11-03). */
 export const DISTANCES = [26, 25, 27, 24, 28];
 // The share of the Earth's disc in day, at the least: frame 4's, about 45%.
 const LIT_LEAST = 0.45;
@@ -106,7 +108,7 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
 };
 
 /** A camera at `eye`, on the map, looking at the Earth, the disc's up kept up. */
-function cameraFrom(eye: Point): Camera {
+export function cameraFrom(eye: Point): Camera {
   const ahead = direction(minus(EARTH_PLACE, eye));
   const right = direction({ x: -ahead.z, y: 0, z: ahead.x });
   const up = {

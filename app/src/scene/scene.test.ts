@@ -224,6 +224,41 @@ describe("the cosmos", () => {
     scene.dispose();
   });
 
+  // Alexis, 2026-11-03 ("tout pourrait être un peu plus gros"), 1.2 times by the chief's measure: the home looks through a lens that
+  // narrow, its view at rest composed for it; every other page keeps the scene's 50 degrees, so the Earth's page stands as approved.
+  it("looks through the home's lens while the cosmos shows, and through 50 degrees again once it goes, each part sized for it", async () => {
+    const scene = startScene(options(), clock);
+    const camera = () => three.renderer.render.mock.lastCall?.[1];
+    const through = (degrees: number) => {
+      expect(camera()?.fov).toBe(degrees);
+      expect(camera()?.projectionMatrix.elements[5]).toBeCloseTo(1 / Math.tan((degrees * Math.PI) / 360), 9);
+    };
+    clock.run(100);
+    through(50);
+    expect(Math.tan((25 * Math.PI) / 180) / Math.tan((FIELD_OF_VIEW * Math.PI) / 360)).toBeCloseTo(1.2, 9);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    clock.run(100);
+    through(FIELD_OF_VIEW);
+    // The red pass (M5): a window resized while the cosmos shows keeps the home's lens.
+    sized(canvas, 1440, 900);
+    observed?.();
+    clock.run(100);
+    through(FIELD_OF_VIEW);
+    expect(cosmos.resize.mock.lastCall?.[0]).toBe(900);
+    earth.resize.mockClear();
+    scene.cosmos(undefined);
+    clock.run(100);
+    through(50);
+    expect(earth.resize).toHaveBeenCalled();
+    cosmos.resize.mockClear();
+    scene.cosmos(WORLDS);
+    clock.run(100);
+    through(FIELD_OF_VIEW);
+    expect(cosmos.resize).toHaveBeenCalled();
+    scene.dispose();
+  });
+
   it("hands it what a page asks, and takes it away with nothing", async () => {
     const scene = await started();
     scene.cosmos(WORLDS);
@@ -1010,7 +1045,7 @@ describe("the eye", () => {
   });
 
   // F4250's journey reads them: a globe that stays on its circle proves nothing while the eye stands still.
-  it("tells the journeys how the eye looks about and its clock, through the lens the view at rest is composed for", () => {
+  it("tells the journeys how the eye looks about and its clock", () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(20_000);
     const seconds = three.space.follow.mock.lastCall?.[1] ?? NaN;
@@ -1018,7 +1053,6 @@ describe("the eye", () => {
     turnAt(turn, seconds);
     expect(scene.stats().turn).toEqual(turn);
     expect(scene.stats().seconds).toBe(seconds);
-    expect(three.renderer.render.mock.lastCall?.[1].fov).toBe(FIELD_OF_VIEW);
     scene.dispose();
   });
 

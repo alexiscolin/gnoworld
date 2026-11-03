@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { EARTH_PLACE, EARTH_RADIUS, GRAIN, systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
-import { SWAY } from "../space/drift.ts";
+import { orbitTime, SWAY } from "../space/drift.ts";
 import { orbitPlace } from "./disc.ts";
 import { CELL } from "../cosmos/cosmos.ts";
-import { coveredShare } from "./composition.ts";
+import { coveredShare, evenRow } from "./composition.ts";
+import { DIVE, diveAt } from "./dive.ts";
+import { BODY_PIXELS } from "../lod/ladder.ts";
 import { postcardOf } from "./postcard.ts";
 import { FIELD_OF_VIEW, HERO_ZONE, REST_SCREENS, restView, STAR_HEART, type RestView } from "./rest.ts";
 
@@ -26,6 +28,10 @@ const files = {
 
 // The three systems all stand beyond the great star: a view that lights the Earth has them behind the eye, so theirs stands it unlit.
 const UNLIT = new Set<string>(["3 systems"]);
+// Through the home's lens (7d9) the seven systems read well only from farther out, 30 to 34 units, and the three systems' view frames one
+// of them whole, not two (the chief, 2026-11-03: composed farther out before any view that only fits).
+const FARTHER = new Set<string>(["7 systems"]);
+const ONE_CARD = new Set<string>(["3 systems"]);
 
 function spread(systems: number, each: number): WorldHeld[] {
   return Array.from({ length: systems * each }, (_, at) => ({
@@ -168,12 +174,14 @@ const made = (file: readonly WorldHeld[]) => {
 };
 
 describe("what the view is composed for", () => {
-  it("is the video's screen and a 16:9 window of the same height, through the app camera's 50 degrees", () => {
+  // Alexis, 2026-11-03 ("tout pourrait être un peu plus gros"), 1.2 times by the chief: the home's lens, which the scene's camera takes
+  // while the cosmos shows, magnifies 1.2 times the app camera's 50 degrees.
+  it("is the video's screen and a 16:9 window of the same height, through the home's lens, 1.2 times the app camera's 50 degrees", () => {
     expect(REST_SCREENS).toEqual([
       { width: 1728, height: 1080 },
       { width: 1920, height: 1080 },
     ]);
-    expect(FIELD_OF_VIEW).toBe(50);
+    expect(Math.tan(25 * DEGREE) / Math.tan((FIELD_OF_VIEW * DEGREE) / 2)).toBeCloseTo(1.2, 12);
   });
 
   it("keeps the hero's room, left of 45% of the width and under 58% of the height, and the great star's heart of 40 pixels", () => {
@@ -204,28 +212,32 @@ describe("the search's cost", () => {
 
 describe("the eye at rest", () => {
   it.each(Object.entries(files))(
-    "looks at the Earth from 24 to 28 units, 6 to 30 degrees over the disc, with %s",
-    (_, file) => {
+    "looks at the Earth from 24 to 28 units, or 30 to 34 where only those read well, 6 to 30 degrees over the disc, with %s",
+    (name, file) => {
       const { view } = made(file);
       const from = minus(view.eye, EARTH_PLACE);
       const away = Math.hypot(from.x, from.y, from.z);
-      expect(away).toBeGreaterThanOrEqual(24 - 1e-9);
-      expect(away).toBeLessThanOrEqual(28 + 1e-9);
+      expect(away).toBeGreaterThanOrEqual((FARTHER.has(name) ? 30 : 24) - 1e-9);
+      expect(away).toBeLessThanOrEqual((FARTHER.has(name) ? 34 : 28) + 1e-9);
       const slant = Math.asin(from.y / away);
       expect(slant).toBeGreaterThanOrEqual(6 * DEGREE - 1e-9);
       expect(slant).toBeLessThanOrEqual(30 * DEGREE + 1e-9);
     },
   );
 
-  // Alexis, 2026-11-02: "la Terre un peu plus grosse et illuminée". Frame 4's is about 95 pixels across, some 45% of its disc in day.
-  it.each(Object.entries(files))("stands the Earth 100 to 120 pixels across, at both screens, with %s", (_, file) => {
-    const { view } = made(file);
-    for (const screen of REST_SCREENS) {
-      const { radius } = cameraOf(view, screen)(EARTH_PLACE, EARTH_RADIUS);
-      expect(2 * radius).toBeGreaterThanOrEqual(100);
-      expect(2 * radius).toBeLessThanOrEqual(120);
-    }
-  });
+  // Alexis, 2026-11-02: "la Terre un peu plus grosse et illuminée", 100 to 120 pixels against frame 4's 95; then, 2026-11-03, everything
+  // 1.2 times larger through the home's lens, from the same eyes.
+  it.each(Object.entries(files))(
+    "stands the Earth 120 to 144 pixels across, 99 to 113 farther out, at both screens, with %s",
+    (name, file) => {
+      const { view } = made(file);
+      for (const screen of REST_SCREENS) {
+        const { radius } = cameraOf(view, screen)(EARTH_PLACE, EARTH_RADIUS);
+        expect(2 * radius).toBeGreaterThanOrEqual(FARTHER.has(name) ? 99 : 120);
+        expect(2 * radius).toBeLessThanOrEqual(FARTHER.has(name) ? 113 : 144);
+      }
+    },
+  );
 
   it.each(Object.entries(files).filter(([name]) => !UNLIT.has(name)))(
     "lights 45% of the Earth's disc or more from the great star, as it stands, with %s",
@@ -270,11 +282,12 @@ describe("the eye at rest", () => {
 
 describe("the postcards", () => {
   it.each(Object.entries(files))(
-    "draws two neighbour systems whole, at every phase, at both screens, with %s",
-    (_, file) => {
+    "draws two neighbour systems whole, one where the home's lens frames no two, at every phase, at both screens, with %s",
+    (name, file) => {
       const { systems, view } = made(file);
       const neighbours = systems.filter((system) => system.worlds.length > 0).length;
-      expect(view.postcards).toHaveLength(Math.min(2, neighbours - (view.close === undefined ? 0 : 1)));
+      const most = ONE_CARD.has(name) ? 1 : 2;
+      expect(view.postcards).toHaveLength(Math.min(most, neighbours - (view.close === undefined ? 0 : 1)));
       expect(new Set(view.postcards).size).toBe(view.postcards.length);
       expect(view.postcards).not.toContain(view.close?.system);
       for (const index of view.postcards) {
@@ -401,22 +414,22 @@ describe("the postcards", () => {
   );
 });
 
-describe("what the drawn bodies leave clear", () => {
-  // The bodies drawn at rest: the postcards' four largest worlds of a body's size, spread round their star, and the close world.
-  const drawn = (systems: readonly StarSystem[], view: RestView) => [
-    ...view.postcards.flatMap((index) => {
-      const system = systems[index];
-      if (system === undefined) return [];
-      const postcard = postcardOf(system, view.eye);
-      return postcard.worlds.map((world) => ({ system: postcard.system, world }));
-    }),
-    ...(view.close === undefined
-      ? []
-      : [{ system: systems[view.close.system], world: systems[view.close.system]?.worlds[view.close.world] }].flatMap(
-          ({ system, world }) => (system === undefined || world === undefined ? [] : [{ system, world }]),
-        )),
-  ];
+// The bodies drawn at rest: the postcards' four largest worlds of a body's size, spread round their star, and the close world.
+const drawn = (systems: readonly StarSystem[], view: RestView) => [
+  ...view.postcards.flatMap((index) => {
+    const system = systems[index];
+    if (system === undefined) return [];
+    const postcard = postcardOf(system, view.eye);
+    return postcard.worlds.map((world) => ({ system: postcard.system, world }));
+  }),
+  ...(view.close === undefined
+    ? []
+    : [{ system: systems[view.close.system], world: systems[view.close.system]?.worlds[view.close.world] }].flatMap(
+        ({ system, world }) => (system === undefined || world === undefined ? [] : [{ system, world }]),
+      )),
+];
 
+describe("what the drawn bodies leave clear", () => {
   it.each(Object.entries(files))(
     "covers neither the Earth from in front, nor the great star's heart, nor the hero, at any phase, with %s",
     (_, file) => {
@@ -642,6 +655,37 @@ describe("what the drawn bodies leave clear", () => {
       }
     },
   );
+});
+
+// The chief, 2026-11-03 (Alexis's not-a-planetarium rule): through the home's lens Onyx's dive stood the Earth and two bodies on a line at
+// like gaps for 1.3 s. The way down to every set's view, at 60 frames a second, stands no three of its drawn bodies, the Earth among them,
+// on a line at like gaps for longer than a tenth of a second (six frames).
+describe("the way down", () => {
+  it.each(Object.entries(files))("stands no row at like gaps longer than a tenth of a second, with %s", (_, file) => {
+    const { systems, view } = made(file);
+    const bodies = drawn(systems, view);
+    const close = closeOf(systems, view);
+    const frames = Math.round(DIVE.seconds * 60);
+    let [run, longest] = [0, 0];
+    for (let frame = 1; frame < frames; frame += 1) {
+      const eye = { x: NaN, y: NaN, z: NaN };
+      diveAt(view.eye, frame / frames, eye);
+      const row = REST_SCREENS.some((screen) => {
+        const see = cameraOf({ ...view, eye }, screen);
+        const onScreen = ({ x, y, radius }: Seen) =>
+          x + radius > 0 && x - radius < screen.width && y + radius > 0 && y - radius < screen.height;
+        const seen = bodies
+          .map(({ system, world }) =>
+            see(placeOf(system, world, world === close ? 0 : orbitTime(frame / 60)), world.radius),
+          )
+          .filter((at) => at.depth > 0 && at.radius >= BODY_PIXELS && onScreen(at));
+        return evenRow([see(EARTH_PLACE, EARTH_RADIUS), ...seen]);
+      });
+      run = row ? run + 1 : 0;
+      longest = Math.max(longest, run);
+    }
+    expect(longest).toBeLessThanOrEqual(6);
+  });
 });
 
 describe("the close world", () => {

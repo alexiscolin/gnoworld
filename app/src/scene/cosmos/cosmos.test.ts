@@ -9,6 +9,7 @@ import {
   glideAt,
   EARTH_PLACE,
   evenRow,
+  FIELD_OF_VIEW,
   GRAIN,
   orbitPlace,
   orbitTime,
@@ -115,7 +116,8 @@ const worlds = (systems: number, each = 3): CosmosWorld[] =>
 
 function made(width = WIDTH, height = HEIGHT) {
   const stage = new Stage();
-  const camera = new PerspectiveCamera(50, width / height, 0.1, 2000);
+  // The scene hands the camera the home's lens while the cosmos shows (7d9).
+  const camera = new PerspectiveCamera(FIELD_OF_VIEW, width / height, 0.1, 2000);
   const owner = new Disposer();
   const moved = vi.fn();
   const renderer = {
@@ -645,8 +647,8 @@ describe("the view at rest (7d6)", () => {
     const { earth } = scene.cosmos.stats().screen;
     expect(earth?.x).toBeCloseTo(width / 2, 1);
     expect(earth?.y).toBeCloseTo(height / 2, 1);
-    expect(earth?.radius).toBeGreaterThan(40);
-    expect(earth?.radius).toBeLessThan(56);
+    expect(earth?.radius).toBeGreaterThan(48);
+    expect(earth?.radius).toBeLessThan(67);
   });
 
   it("keeps the Earth at the centre as the eye drifts and leans: the camera follows it", async () => {
@@ -724,7 +726,7 @@ describe("the view at rest (7d6)", () => {
     await shown(scene, ONYX);
     const systems = held(ONYX);
     const view = restView(systems);
-    const focal = 540 / Math.tan((25 * Math.PI) / 180);
+    const focal = focalOf(scene.camera, HEIGHT);
     const eye = new Vector3(view.eye.x, view.eye.y, view.eye.z);
     const drawn = pointsOf(scene, systems);
     expect(drawn.map(({ index }) => index)).not.toContain(view.close?.system);

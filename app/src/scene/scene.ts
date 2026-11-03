@@ -17,10 +17,11 @@ import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import { MOTION, watchAim, watchCanvas, watchPage, watchScreen } from "./watch.ts";
 
-const TOUCH = "(pointer: coarse)";
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
-const LENS = { fieldOfView: 50, near: 0.1, far: 2000 } as const;
+// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
+// barrel into this chunk; the lens test ties the two.
+const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
 // The sky beside the worlds: the warmth comes from the suns, with black between them (frame 4).
 const VEILED = 0.3;
 
@@ -29,7 +30,7 @@ export type { Scene, SceneOptions };
 class LiveScene implements Scene {
   readonly #owner = new Disposer();
   readonly #options: SceneOptions;
-  readonly #touch = matchMedia(TOUCH).matches;
+  readonly #touch = matchMedia("(pointer: coarse)").matches;
   readonly #renderer: WebGLRenderer;
   readonly #stage = new Stage();
   readonly #camera = new PerspectiveCamera(LENS.fieldOfView, 1, LENS.near, LENS.far);
@@ -197,6 +198,7 @@ class LiveScene implements Scene {
     if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
     this.#parts.cosmos.show(worlds, written);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
+    this.#viewport.lens(worlds === undefined ? LENS.fieldOfView : LENS.home);
     this.#loop.redraw();
   }
 
