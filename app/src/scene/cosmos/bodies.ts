@@ -81,10 +81,6 @@ export class Bodies {
     this.#sphere = owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
   }
 
-  get size(): number {
-    return this.#held.size;
-  }
-
   /** The screen, in the page's pixels, its lens, and the box of the page's text. */
   view(sight: BodyView): void {
     this.#view = sight;
@@ -240,6 +236,6 @@ export class Bodies {
   /** What stands, for the journeys, seen from `eye`, the Earth at `earth`: no body counted while hidden. */
   stats(shown: boolean, eye: Point, earth: Vector3 | undefined) {
     const list = [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));
-    return { bodies: shown ? this.size : 0, list, screen: this.screen(eye, earth) };
+    return { bodies: shown ? this.#held.size : 0, list, screen: this.screen(eye, earth) };
   }
 }
