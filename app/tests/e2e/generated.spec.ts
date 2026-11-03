@@ -1,6 +1,17 @@
 import { ANCHORS, asciiBytes, planetRecipe, SURFACE, worldLook, type Lab } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
-import { askLab, circles, COMPUTER, listen, looks, noneOnAnother, open, picture, stats, type Circle } from "./lab.ts";
+import {
+  askLab,
+  circles,
+  EARTH_INSTANT,
+  EARTH_VIEW,
+  listen,
+  looks,
+  noneOnAnother,
+  open,
+  picture,
+  stats,
+} from "./lab.ts";
 import { glows } from "./pixels.ts";
 import {
   alikeOnScreen,
@@ -44,10 +55,6 @@ const NEVER_WHITE = 0.005;
 // Io's sulfur crust as the chief described it, yellow to orange and bright, a few hot spots: set from that description, no image of Io
 // measured. Lab hue of the lit ground in degrees, its chroma, its lightness, and its white share at most (lit sulfur is bright, not white).
 const SULFUR = { hue: [55, 100], chroma: 25, lightness: 35, white: 0.01 } as const;
-// The instant realism.spec pins the Earth at: its detail is measured on that same picture.
-const INSTANT = Date.UTC(2026, 10, 2, 3, 0, 0);
-// What the hand-made Earth's view draws: earthView.ts's circle, a third of the screen's height at its centre.
-const EARTH_CIRCLE: Circle = { x: COMPUTER.width / 2, y: COMPUTER.height / 2, r: COMPUTER.height * 0.33 };
 // A real map lends its fine contrast only: with every map grey, a world's 8-pixel blocks move a tenth of its lightness at most.
 const BLOCKS_MOVE = 0.1;
 // A class's colour reads from afar on three discs of four at least: its minor takes 40% of a world, and may face the eye.
@@ -81,11 +88,11 @@ const turned = (one: number, other: number) => Math.abs(Math.atan2(Math.sin(one 
 let earthDetail: Detail | undefined;
 const earthOf = async (page: Page): Promise<Detail> => {
   if (earthDetail !== undefined) return earthDetail;
-  await page.clock.setFixedTime(INSTANT);
+  await page.clock.setFixedTime(EARTH_INSTANT);
   await open(page, "?view=earth");
   const [day, night] = await details(page, await picture(page), [
-    EARTH_CIRCLE,
-    { ...EARTH_CIRCLE, x: EARTH_CIRCLE.x - 0.6 * EARTH_CIRCLE.r },
+    EARTH_VIEW,
+    { ...EARTH_VIEW, x: EARTH_VIEW.x - 0.6 * EARTH_VIEW.r },
   ]);
   if (day === undefined || night === undefined) throw new Error("no Earth");
   expect(day.luma, "the Earth's box lies on its lit side").toBeGreaterThan(night.luma + 10);
@@ -98,7 +105,7 @@ const closeDetail = async (page: Page, query: string) => {
   await open(page, query);
   const [place] = await circles(page);
   if (place === undefined) throw new Error("no world");
-  expect(Math.abs(place.r / EARTH_CIRCLE.r - 1), "the Earth's size on screen").toBeLessThan(0.03);
+  expect(Math.abs(place.r / EARTH_VIEW.r - 1), "the Earth's size on screen").toBeLessThan(0.03);
   const [day] = await details(page, await picture(page), [place]);
   const [{ anchor } = { anchor: "" }] = await looks(page);
   if (day === undefined) throw new Error("no measure");
