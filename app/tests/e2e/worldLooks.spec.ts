@@ -9,7 +9,7 @@ import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, pic
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
-import { facesOn, grain, landOn, rows, type Face } from "./textures.ts";
+import { facesOn, grain, landOn, rows, shownPart, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
@@ -53,8 +53,10 @@ const WHOLE_BANDS = 0.75;
 // ground's darkest (rocky 0.27, the Earth 0.29) by more than a quarter, and calderas there (7b5's Io 0.115, luma 17 in 150).
 const CALDERA = [0.2, 0.5] as const;
 // A glowing world's air past its limb reads red past blue, as frame 4's Music's limb (#edc3ad, red 64 past blue; Alexis, 2026-11-03,
-// "réchauffer"); every other world's keeps its cool light. 7b6's brown airs read -6.9 and -10.1, the coolest other air -8.7.
-const WARM_LIMB = 0;
+// "réchauffer"); every other world's keeps its cool light, both by 2 at least. 7b6's brown airs read -6.9 and -10.1, the others -8.7 or less.
+const WARM_LIMB = 2;
+// The air's ring brighter than space past it, or a ring not drawn would read as no colour at all.
+const AIR_LIGHT = 20;
 // Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
 // (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
 // world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
@@ -65,8 +67,9 @@ const ALL_SEA = 0.05;
 // or its land's colour 10 or more from the Earth's in Lab, or its cloud cover a tenth or more apart, each a step a glance takes (core's
 // variety.ts: a colour under 10 and a value under a tenth of its span read alike). The Earth: its close view at realism.spec's instant.
 const GLANCE = { colour: 10, clouds: 0.1 } as const;
+// Two faces apart in a part both show; a part one of them does not show sets them apart in nothing.
 const apartIn = (one: Face["sea"], other: Face["sea"]) =>
-  one === null || other === null ? Infinity : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
+  one === null || other === null ? 0 : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -224,14 +227,17 @@ test.describe("the generated worlds polished", () => {
       const [look] = await askLab<PlanetLook[]>(page, "looks");
       if (look === undefined || look.rim === null) continue;
       const [limb] = await limbs(page, await picture(page), [await placeOf(page)]);
-      const [red = 0, , blue = 0] = limb?.colour ?? [];
+      if (limb === undefined) throw new Error(`${anchor}: no limb`);
+      expect(limb.luma, `${anchor}: its air drawn`).toBeGreaterThanOrEqual(AIR_LIGHT);
+      const [red, , blue] = limb.colour;
       read.push({ anchor, glows: look.glow !== null, warmth: red - blue });
     }
     test.info().annotations.push({ type: "limbs", description: JSON.stringify(read) });
     const glowing = read.filter(({ glows }) => glows).map(({ warmth }) => warmth);
     const others = read.filter(({ glows }) => !glows).map(({ warmth }) => warmth);
+    expect(glowing, "the volcanic and the lava world").toHaveLength(2);
     expect(Math.min(...glowing), "a glowing world's air").toBeGreaterThanOrEqual(WARM_LIMB);
-    expect(Math.max(...others), "every other air").toBeLessThan(WARM_LIMB);
+    expect(Math.max(...others), "every other air").toBeLessThanOrEqual(-WARM_LIMB);
   });
 
   test("Io's calderas are dark ground, never punched black", async ({ page }) => {
@@ -258,10 +264,10 @@ test.describe("the generated worlds polished", () => {
       if (seed > 0) await nextSeed(page);
       worlds.push(...(await facesOn(page, await picture(page), await circles(page))));
     }
-    const apart = worlds.map(({ sea, land, clouds }) => ({
-      sea: apartIn(sea, earth.sea),
-      land: apartIn(land, earth.land),
-      clouds: Math.abs(clouds - earth.clouds),
+    const apart = worlds.map((face) => ({
+      sea: apartIn(shownPart(face, "sea"), shownPart(earth, "sea")),
+      land: apartIn(shownPart(face, "land"), shownPart(earth, "land")),
+      clouds: Math.abs(face.clouds - earth.clouds),
     }));
     const nearest = Math.min(...apart.map(({ sea, land }) => Math.max(sea, land)));
     test.info().annotations.push({ type: "faces", description: JSON.stringify({ earth, nearest, apart }) });

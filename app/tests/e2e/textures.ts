@@ -21,6 +21,10 @@ export interface Face {
   readonly clouds: number;
   readonly shares: { readonly sea: number; readonly land: number };
 }
+/** A part a world shows covers a tenth of its lit disc at least, a share's glance step (core's variety.ts): on a few pixels it reads
+ * nothing. */
+const SHOWN = 0.1;
+export const shownPart = (face: Face, part: "sea" | "land") => (face.shares[part] >= SHOWN ? face[part] : null);
 export interface Land {
   readonly share: number;
   /** The share of the land in its largest piece. */
