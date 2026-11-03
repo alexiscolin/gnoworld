@@ -78,7 +78,8 @@ function newest(worlds: Worlds): ChainTrend[] {
 }
 
 /** The chain's trends of each pass, against the pass before it. ponytail: it keeps the last pass's reads, one entry a realm read, at most
- * the job's HISTORY_MAX_CALLS; past that cap two passes read other realms, and no world is busiest. */
+ * the job's HISTORY_MAX_CALLS; past that cap each pass reads a run of realms that moves on, so the busiest world is the busiest of the realms
+ * both passes read, a part of the chain's, and none once the runs no longer meet (from twice the cap). */
 export function makeTrends(): TrendKeeper {
   let last: { at: string; read: PassReads } | undefined;
   let items: readonly ChainTrend[] = [];
@@ -91,9 +92,10 @@ export function makeTrends(): TrendKeeper {
   };
 }
 
-// The hub that rises most against its own 14 days, more people breaking a tie, then the name; none rises by nothing.
+// The hub that rises most against its own 14 days, more people breaking a tie, then the name. A rise is core's riseOf, above a fifth or
+// none; the route's schema refuses any other.
 function risingOf({ worlds }: Presence, at: number): Trend[] {
-  const rising = worlds.flatMap(({ world, here, rise }) => (rise !== null && rise > 0 ? [{ world, here, rise }] : []));
+  const rising = worlds.flatMap(({ world, here, rise }) => (rise === null ? [] : [{ world, here, rise }]));
   const [first] = rising.sort((a, b) => b.rise - a.rise || b.here - a.here || (a.world < b.world ? -1 : 1));
   return first === undefined
     ? []
