@@ -59,7 +59,7 @@ describe("the view at rest's depth, handed over", () => {
     const deep = deepFor(systems);
     found.mockReturnValue({ bodies: [{ system: deep.system, world: deep.world }], rocks: [ROCK] });
     const told = vi.fn();
-    const resting = new Resting(told);
+    const resting = new Resting(told, {});
     resting.rest(systems, undefined);
     expect(told).toHaveBeenCalledTimes(1);
     expect(drawnOf(resting, systems).rocks).toEqual([]);
@@ -75,7 +75,7 @@ describe("the view at rest's depth, handed over", () => {
     const [first, second] = [filed(100, 0), filed(60, 500)];
     found.mockReturnValue({ bodies: [], rocks: [ROCK] });
     const told = vi.fn();
-    const resting = new Resting(told);
+    const resting = new Resting(told, {});
     resting.rest(first, undefined);
     resting.rest(second, undefined);
     await vi.waitFor(() => {
@@ -91,7 +91,7 @@ describe("the view at rest's depth, handed over", () => {
     const systems = filed(100, 0);
     const deep = deepFor(systems);
     found.mockReturnValue({ bodies: [{ system: deep.system, world: deep.world }], rocks: [ROCK] });
-    const resting = new Resting(vi.fn());
+    const resting = new Resting(vi.fn(), {});
     resting.rest(systems, undefined);
     await settled();
     expect(drawnOf(resting, systems).rocks).toHaveLength(1);

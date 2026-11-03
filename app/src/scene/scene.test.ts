@@ -41,6 +41,23 @@ const earth = vi.hoisted(() => ({
   views: [] as unknown[],
 }));
 
+// The flights' chunk (7g), as the scene sees it: the device it is handed, and what the scene asks of it.
+interface FlightDeviceSeen {
+  readonly eye: { readonly travel: { x: number; y: number; z: number } };
+  readonly moved: () => void;
+}
+const flight = vi.hoisted(() => ({
+  made: [] as FlightDeviceSeen[],
+  cosmos: [] as { readonly sight: unknown }[],
+  fly: vi.fn<(goal: unknown) => void>(),
+  ready: vi.fn<() => void>(),
+  advance: vi.fn<(delta: number) => void>(),
+  land: vi.fn<() => void>(),
+  dispose: vi.fn<() => void>(),
+  stats: vi.fn(() => ({ flying: true, kind: "rest" })),
+  busy: false,
+}));
+
 const cosmos = vi.hoisted(() => ({
   made: [] as { halved: () => boolean; moved: () => void; stood: () => void }[],
   show: vi.fn<(worlds: unknown) => void>(),
@@ -69,6 +86,23 @@ vi.mock("./cosmos/cosmos.ts", () => ({
     dispose = cosmos.dispose;
     stats = cosmos.stats;
     arrive = cosmos.arrive;
+  },
+}));
+vi.mock("./flight/flights.ts", () => ({
+  flightsOn: (device: FlightDeviceSeen, cosmos: { readonly sight: unknown }) => {
+    flight.made.push(device);
+    flight.cosmos.push(cosmos);
+    return {
+      fly: flight.fly,
+      ready: flight.ready,
+      advance: flight.advance,
+      land: flight.land,
+      dispose: flight.dispose,
+      stats: flight.stats,
+      get busy() {
+        return flight.busy;
+      },
+    };
   },
 }));
 vi.mock("./space.ts", () => ({
@@ -152,6 +186,8 @@ beforeEach(() => {
   clock = new FakeClock(60);
   earth.made.length = 0;
   earth.arriving = false;
+  flight.made.length = 0;
+  flight.busy = false;
   cosmos.made.length = 0;
   three.create.mockReturnValue(three.renderer);
   canvas = document.createElement("canvas");
@@ -1416,6 +1452,110 @@ describe("the Earth", () => {
     earth.stats.mockReturnValue({ radius: 321 });
     const scene = startScene(options(), clock);
     expect(scene.stats().earth).toEqual({ radius: 321 });
+    scene.dispose();
+  });
+});
+
+describe("flights (7g)", () => {
+  // A page without the cosmos: its eye still holds the last sight, which a click would aim with (lot B's review, F3718).
+  it("gives the flights no sight of a cosmos the page does not show, though the eye still holds the last one", async () => {
+    const scene = startScene(options(), clock);
+    await vi.dynamicImportSettled();
+    const [device] = flight.made;
+    const held = flight.cosmos.at(-1);
+    if (device === undefined || held === undefined) throw new Error("no flights' chunk");
+    const sight = { systems: () => [] };
+    Object.assign(device.eye, { sight });
+    scene.cosmos([]);
+    expect(held.sight).toBe(sight);
+    scene.cosmos(undefined);
+    expect(held.sight).toBeUndefined();
+    scene.dispose();
+  });
+
+  const opened = async () => {
+    const scene = startScene(options(), clock);
+    await vi.dynamicImportSettled();
+    const [device] = flight.made;
+    if (device === undefined) throw new Error("no flights' chunk");
+    return { scene, device };
+  };
+  const drawnIn = (ms: number) => {
+    three.renderer.render.mockClear();
+    clock.run(ms);
+    return three.renderer.render.mock.calls.length;
+  };
+
+  it("opens the flights' chunk as it starts, so the first flight finds it, and flies where a page asks", async () => {
+    const { scene } = await opened();
+    expect(flight.made).toHaveLength(1);
+    scene.fly({ kind: "cosmos", name: "Cosmos" });
+    expect(flight.fly).toHaveBeenLastCalledWith({ kind: "cosmos", name: "Cosmos" });
+    expect(scene.stats().flight).toEqual({ flying: true, kind: "rest" });
+    scene.dispose();
+    expect(flight.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("flies nowhere before its chunk came, and draws on", async () => {
+    const scene = startScene(options(), clock);
+    scene.fly({ kind: "rest" });
+    expect(scene.stats().flight).toBeUndefined();
+    await vi.dynamicImportSettled();
+    expect(flight.fly).not.toHaveBeenCalled();
+    expect(drawnIn(100)).toBeGreaterThan(0);
+    scene.dispose();
+  });
+
+  it("moves the eye on a frame before the eye advances, so the sky follows the flight on that same frame", async () => {
+    const { scene, device } = await opened();
+    clock.run(100);
+    const before = three.space.follow.mock.lastCall?.[0].z ?? NaN;
+    flight.advance.mockImplementation(() => {
+      device.eye.travel.z += 7;
+    });
+    clock.run(1000 / 60);
+    // The eye's own drift moves it a tenth of a unit a frame: the flight's 7 show on this frame, not the next.
+    expect((three.space.follow.mock.lastCall?.[0].z ?? NaN) - before).toBeCloseTo(7, 0);
+    flight.advance.mockReset();
+    scene.dispose();
+  });
+
+  it("keeps the full rate while a flight is under way, and the probe's when the flight says it is done", async () => {
+    const { scene, device } = await opened();
+    const busy = (flying: boolean) => {
+      flight.busy = flying;
+      device.moved();
+    };
+    busy(true);
+    busy(false);
+    expect(scene.stats().probing).toBe(true);
+    expect(drawnIn(500)).toBeGreaterThanOrEqual(29);
+    clock.run(2000);
+    expect(scene.stats().probing).toBe(false);
+    busy(true);
+    expect(drawnIn(1000)).toBeGreaterThanOrEqual(59);
+    busy(false);
+    clock.run(100);
+    expect(Math.abs(drawnIn(1000) - 30)).toBeLessThanOrEqual(1);
+    scene.dispose();
+  });
+
+  it("lands a flight when a page covers the scene, and when the context goes", async () => {
+    const { scene } = await opened();
+    scene.cover(true);
+    expect(flight.land).toHaveBeenCalledTimes(1);
+    scene.cover(false);
+    canvas.dispatchEvent(new Event("webglcontextlost"));
+    expect(flight.land).toHaveBeenCalledTimes(2);
+    scene.dispose();
+  });
+
+  it("tells a flight once the page's body stood, and not before", async () => {
+    const { scene } = await opened();
+    clock.run(100);
+    expect(flight.ready).not.toHaveBeenCalled();
+    earth.made[0]?.stood();
+    expect(flight.ready).toHaveBeenCalledTimes(1);
     scene.dispose();
   });
 });

@@ -2,7 +2,7 @@
 // once a visit, and this reader's visits, which the device keeps.
 import { readWorlds } from "../../lib/chain/realms.ts";
 import { readFlag, writeFlag } from "../../lib/flags.ts";
-import type { Circle } from "../../scene/earth/device.ts";
+import type { Circle, EarthState } from "../../scene/earth/device.ts";
 import type { WorldAsk, WorldPage } from "../../scene/world/part.ts";
 
 const VISITED = "gnoworld:visited:";
@@ -51,6 +51,24 @@ export function worldAsk(circle: Circle, id: string, page: WorldPage): WorldAsk 
       writeFlag(visitKey(page.universe, id), "1");
     },
   };
+}
+
+/** Marks the box a page keeps for its body with how far it came, which the page's stylesheet keeps the globe's room and opens the plate from:
+ * "waiting" while the scene may yet come (`status` "off" or "loading"), so a window that loads it by itself does not jump; "none" where
+ * nothing will. A lost context takes both away. */
+export function markGlobe(kind: "earth" | "world", body: EarthState, status: string): void {
+  const globe = document.querySelector<HTMLElement>("[data-globe]");
+  if (globe === null) return;
+  const coming = status === "off" || status === "loading";
+  const state = status === "on" && (body === "loading" || body === "drawn") ? body : coming ? "waiting" : "none";
+  globe.dataset[kind] = state;
+  if (state !== "drawn") tintPage(undefined);
+}
+
+/** Marks the page's box with whether a flight brings its body, `flying`: its plate waits out of sight till it lands (frames 19, 36, 101). */
+export function markFlown(flying: boolean): void {
+  const globe = document.querySelector<HTMLElement>("[data-globe]");
+  if (globe !== null) globe.dataset["flown"] = flying ? "flying" : "landed";
 }
 
 /** Tints the page with a world's own colour where the globe's sibling takes it, as the Earth's blue is; none gives the page its blue back. */

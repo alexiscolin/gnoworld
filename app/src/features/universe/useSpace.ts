@@ -72,13 +72,14 @@ const waited = (ms: number, signal: AbortSignal) =>
 export function useSpace(body?: "earth" | "cosmos" | WorldShown, from?: Page): boolean {
   const [firstScreenDone, setFirstScreenDone] = useState(false);
   const world = typeof body === "object" ? body.world : undefined;
+  const name = typeof body === "object" ? body.name : undefined;
   const named = typeof body === "object" ? undefined : body;
   useEffect(() => {
-    show(world === undefined ? (named ?? true) : { world }, from);
+    show(world === undefined ? (named ?? true) : { world, ...(name === undefined ? {} : { name }) }, from);
     return () => {
       show(false);
     };
-  }, [world, named, from]);
+  }, [world, name, named, from]);
   useEffect(() => {
     const stop = new AbortController();
     const done = () => {

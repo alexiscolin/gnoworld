@@ -1,0 +1,88 @@
+/* The flight panel (frames 18, 36, 88, 89, 101, 142): a dark glass card under the header, in the middle of the window as every frame stands
+   it, the dock open or not (frame 36): its phase in small capitals, four instruments in columns, the target's widest, and a thin mint bar.
+   Over the canvas and the labels, taking no pointer: a click lands the flight wherever it falls. */
+@layer components {
+  .panel {
+    position: fixed;
+    /* raw: under the header's 96 px (shellHeader.module.css), a step down: frame 18's 103 px */
+    inset-block-start: calc(96px + var(--space-2xs));
+    inset-inline-start: 50%;
+    /* raw: over the labels' layer (0) and the canvas (-1), as the header is */
+    z-index: 1;
+    /* raw: frame 18's 558 px, its columns' 511 and two steps; a phone's width less its gutters */
+    inline-size: min(calc(100vi - 2 * var(--space-s)), calc(511px + 2 * var(--space-m)));
+    padding: var(--space-s) var(--space-m);
+    border-radius: var(--radius-box);
+    /* raw: the panels' night at 86% over the scene (docs/design/coherence.md), no blur, which is not Baseline yet (F262) */
+    background: color-mix(in oklab, var(--color-surface) 86%, transparent);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    pointer-events: none;
+    translate: -50% 0;
+  }
+
+  .phase {
+    /* layout: a paragraph with no margin of its own */
+    margin-block: 0;
+  }
+
+  .instruments {
+    /* layout: four columns as frame 18's, 170, 128, 128 and 85 of its 511 px */
+    display: grid;
+    /* layout: the target's column widest, the time's narrowest */
+    grid-template-columns: 4fr 3fr 3fr 2fr;
+    /* layout: a step between columns, so four-digit figures never meet the next (frame 18's "1,158 km/s") */
+    column-gap: var(--space-2xs);
+    /* layout: a step under the phase, no margin under the list */
+    margin-block: var(--space-s) 0;
+  }
+
+  .instrument,
+  .detail {
+    /* raw: a column may be narrower than its words: the target's are cut, never the grid */
+    min-inline-size: 0;
+  }
+
+  /* A value in the one label style's place, cut with the utility's ellipsis when its column is narrower (frame 89's target). */
+  .instruments dd {
+    /* layout: a value a small step under its name, with no indent of the list's */
+    margin: var(--space-2xs) 0 0;
+    color: var(--color-text);
+    /* frame 18's figures, light, their digits 16 px tall: Geist at the room's title size */
+    font: var(--font-title-room);
+  }
+
+  /* The bar: the track a line, the flight's share of it mint, from the left. */
+  .bar {
+    /* How far the flight has gone, 0 to 1: the panel writes it. */
+    --_along: 0;
+
+    /* layout: a step under the figures */
+    margin-block-start: var(--space-s);
+    /* raw: frame 18's bar, two pixels */
+    block-size: 2px;
+    background: var(--color-line-strong);
+  }
+
+  .bar::before {
+    display: block;
+    block-size: 100%;
+    background: var(--color-mine);
+    content: "";
+    transform: scaleX(var(--_along));
+    transform-origin: left;
+    /* raw: the panel hears its flight ten times a second: the bar runs between */
+    transition: transform 100ms linear;
+  }
+
+  /* A phone keeps the target and the time: the distance and the speed drop first (DESIGN-SYSTEM.md, Layout). */
+  @media (max-width: 899px) {
+    .instruments {
+      /* layout: the two kept, the target wider */
+      grid-template-columns: 2fr 1fr;
+    }
+
+    .detail {
+      display: none;
+    }
+  }
+}

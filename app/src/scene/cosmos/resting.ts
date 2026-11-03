@@ -15,6 +15,7 @@ import {
   type StarSystem,
 } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
+import type { EarthDevice } from "../earth/device.ts";
 import type { Asking } from "./restArrival.ts";
 import { Beat } from "./restBeat.ts";
 import { drawnFrom, postcardsOf } from "./restBodies.ts";
@@ -26,7 +27,7 @@ const loadDeep = () => import("./restDeep.ts");
 
 export class Resting {
   readonly #found: () => void;
-  readonly #eye = new RestEye();
+  readonly #eye: RestEye;
   readonly #beat = new Beat();
   // Where the eye rests, neither swayed nor diving, on the stage and on the map: what says the view's bodies stand.
   readonly #resting = { x: NaN, y: NaN, z: NaN };
@@ -39,9 +40,11 @@ export class Resting {
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
 
-  /** `found` is told once a file's view has come, or a system's arrival. Till then the view is the scene's own, at its home. */
-  constructor(found: () => void) {
+  /** `found` is told once a file's view has come, or a system's arrival; `device`'s eye is the one a flight turns (7g). Till then the view is
+   * the scene's own, at its home. */
+  constructor(found: () => void, device: Pick<EarthDevice, "eye">) {
     this.#found = found;
+    this.#eye = new RestEye(device);
     const eye = { x: NaN, y: NaN, z: NaN };
     toMap(HOME, eye);
     this.view = { eye, postcards: [], close: undefined };

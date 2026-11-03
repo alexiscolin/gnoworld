@@ -5,7 +5,7 @@ export const MOTION = "(prefers-reduced-motion: reduce)";
 const INPUTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
 
 /** Feeds the loop from the tab, the window, the reader's motion setting and their inputs. */
-export function watchPage(loop: FrameLoop, signal: AbortSignal): void {
+function watchPage(loop: FrameLoop, signal: AbortSignal): void {
   const motion = matchMedia(MOTION);
   const read = () => {
     loop.set({ hidden: document.hidden, focused: document.hasFocus(), still: motion.matches });
@@ -23,7 +23,7 @@ export function watchPage(loop: FrameLoop, signal: AbortSignal): void {
 }
 
 /** Gives `aim` a mouse's place, -1 to 1 across the window, y up. A finger is no aim. */
-export function watchAim(aim: (x: number, y: number) => void, signal: AbortSignal): void {
+function watchAim(aim: (x: number, y: number) => void, signal: AbortSignal): void {
   window.addEventListener(
     "pointermove",
     ({ pointerType, clientX, clientY }) => {
@@ -34,7 +34,7 @@ export function watchAim(aim: (x: number, y: number) => void, signal: AbortSigna
 }
 
 /** Calls `apply` when the window moves to a screen of another pixel ratio, and on the one after. */
-export function watchScreen(apply: () => void, signal: AbortSignal): void {
+function watchScreen(apply: () => void, signal: AbortSignal): void {
   const arm = () => {
     matchMedia(`(resolution: ${String(devicePixelRatio)}dppx)`).addEventListener(
       "change",
@@ -49,7 +49,7 @@ export function watchScreen(apply: () => void, signal: AbortSignal): void {
 }
 
 /** Calls `on.resized` when the canvas's box changes, and `on.lost` with true when its context goes, false when it comes back. */
-export function watchCanvas(
+function watchCanvas(
   canvas: HTMLCanvasElement,
   on: { readonly resized: () => void; readonly lost: (now: boolean) => void },
   signal: AbortSignal,
@@ -73,4 +73,22 @@ export function watchCanvas(
     },
     { signal },
   );
+}
+
+/** Everything the scene listens to in the page, `canvas` and its context with it. */
+export function watchScene(
+  canvas: HTMLCanvasElement,
+  scene: {
+    readonly loop: FrameLoop;
+    readonly aim: (x: number, y: number) => void;
+    readonly changed: () => void;
+    readonly resized: () => void;
+    readonly lost: (now: boolean) => void;
+  },
+  signal: AbortSignal,
+): void {
+  watchPage(scene.loop, signal);
+  watchScreen(scene.changed, signal);
+  watchAim(scene.aim, signal);
+  watchCanvas(canvas, scene, signal);
 }

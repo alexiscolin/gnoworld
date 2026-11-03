@@ -2,8 +2,8 @@
 // the dissolve that stands in for the move. Its path is core's, from the view at rest's eye; a frame adds its way off that eye to the
 // placed one. It comes with the view at rest, in its chunk.
 import { DIVE, diveAt, toScene, type Point } from "@gnoworld/core";
-import type { Scene as Stage } from "three";
-import { Dissolve } from "./dissolve.ts";
+import type { Dissolve } from "../dissolve.ts";
+import type { EarthDevice } from "../earth/device.ts";
 
 interface Spot {
   x: number;
@@ -16,7 +16,7 @@ export class Dive {
   along = 0;
   /** How much of the cosmos shows: none while it waits for the whole cosmos, then fading in. */
   shown = 0;
-  readonly #stage: Stage;
+  readonly #device: Pick<EarthDevice, "stage" | "veil">;
   readonly #still: boolean;
   readonly #on: Spot = { x: NaN, y: NaN, z: NaN };
   readonly #at: Spot = { x: NaN, y: NaN, z: NaN };
@@ -26,9 +26,9 @@ export class Dive {
   #veiled = NaN;
   #dissolve: Dissolve | undefined;
 
-  /** On `stage`; `still`, under reduced motion. */
-  constructor(stage: Stage, still: boolean) {
-    this.#stage = stage;
+  /** On `device`'s stage, with the dissolve its flights lend under reduced motion, `still`. */
+  constructor(device: Pick<EarthDevice, "stage" | "veil">, still: boolean) {
+    this.#device = device;
     this.#still = still;
   }
 
@@ -60,8 +60,10 @@ export class Dive {
   // Still for a while, then the frame drawn is copied once, the eye stands at rest under it, and it fades.
   #dissolveAt(clock: number, time: number): void {
     if (time < DIVE.hold) return;
-    this.#dissolve ??= new Dissolve(this.#stage);
-    if (!this.#dissolve.copied) return;
+    this.#dissolve ??= this.#device.veil?.(this.#device.stage);
+    // A dissolve the flights' chunk has not lent, its chunk late or failed: the eye stands at rest at once.
+    if (this.#dissolve === undefined) this.#land();
+    if (this.#dissolve?.copied !== true) return;
     if (Number.isNaN(this.#veiled)) this.#veiled = clock;
     this.along = 1;
     this.#dissolve.fade(1 - (clock - this.#veiled) / DIVE.dissolve);

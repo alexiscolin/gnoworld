@@ -15,6 +15,7 @@ import {
   EARTH_PLACE,
   evenRow,
   FIELD_OF_VIEW,
+  GNO_LAND,
   GRAIN,
   HERO_ZONE,
   haloAt,
@@ -72,6 +73,7 @@ import {
 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
+import { Dissolve } from "../dissolve.ts";
 import { focalOf } from "../lens.ts";
 import { MOON_FAR } from "../earth/orbit.ts";
 import { fromEyeOf, starAt } from "../planet/light.ts";
@@ -127,7 +129,7 @@ const worlds = (systems: number, each = 3): CosmosWorld[] =>
     })),
   ).flat();
 
-function made(width = WIDTH, height = HEIGHT) {
+function made(width = WIDTH, height = HEIGHT, eye?: { look: Point | undefined }) {
   const stage = new Stage();
   // The scene hands the camera the home's lens while the cosmos shows (7d9).
   const camera = new PerspectiveCamera(FIELD_OF_VIEW, width / height, 0.1, 2000);
@@ -139,7 +141,10 @@ function made(width = WIDTH, height = HEIGHT) {
     compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
   };
   const stood = vi.fn();
-  const cosmos = owner.add(new Cosmos({ renderer, stage, camera, halved: () => false, base: "/", moved, stood }));
+  // The dissolve the flights' chunk lends the dive, as the scene's device carries it (7g).
+  const veil = (on: Stage) => new Dissolve(on);
+  const device = { renderer, stage, camera, halved: () => false, base: "/", moved, stood, veil };
+  const cosmos = owner.add(new Cosmos(eye === undefined ? device : { ...device, eye }));
   cosmos.resize(height, 1);
   return { stage, camera, owner, moved, renderer, cosmos, stood };
 }
@@ -2808,6 +2813,62 @@ describe("the whole cosmos", () => {
       expect(plain.cosmos.stats().dive).toEqual({ along: 1, veil: 0 });
       expect(earthShown(plain)).toBe(true);
     });
+  });
+});
+
+describe("a flight's star (7g)", () => {
+  it("hands a flight the fixed places' stars when the file holds no world, so the great star can be flown to", async () => {
+    const eye: { look: Point | undefined; sight?: { systems: () => readonly StarSystem[] } } = { look: undefined };
+    const scene = made(WIDTH, HEIGHT, eye);
+    await shown(scene, []);
+    expect(eye.sight?.systems().map(({ id }) => id)).toEqual([GNO_LAND]);
+  });
+
+  it("hands a flight the cosmos as it reads it once the view at rest has come: its systems, its eye and its Earth on the stage", async () => {
+    const eye: { look: Point | undefined; sight?: unknown } = { look: undefined };
+    const list = worlds(30);
+    const scene = made(WIDTH, HEIGHT, eye);
+    expect(eye.sight).toBeUndefined();
+    await shown(scene, list);
+    const sight = eye.sight as { systems: () => readonly StarSystem[]; eye: Point; earth: Point } | undefined;
+    expect(sight?.systems().map(({ id }) => id)).toEqual(held(list).map(({ id }) => id));
+    expect(sight?.eye).toEqual(scene.cosmos.stats().eye);
+    const earth = { x: NaN, y: NaN, z: NaN };
+    toScene(EARTH_PLACE, earth);
+    expect(sight?.earth).toEqual(earth);
+  });
+
+  it("stands as bodies the worlds of the star a flight looks at, which the Earth's focus leaves as points", async () => {
+    const eye: { look: Point | undefined } = { look: undefined };
+    const list = worlds(30);
+    const scene = made(WIDTH, HEIGHT, eye);
+    await shown(scene, list);
+    const rest = scene.cosmos.stats().eye;
+    // The system farthest from the Earth, and an eye 12 units from its star, between it and the view at rest.
+    const far = held(list).reduce((most, system) =>
+      distanceOf(system.place, EARTH_PLACE) > distanceOf(most.place, EARTH_PLACE) ? system : most,
+    );
+    const star = { x: NaN, y: NaN, z: NaN };
+    toScene(far.place, star);
+    const away = distanceOf(star, rest);
+    const there = {
+      x: star.x + ((rest.x - star.x) * 12) / away,
+      y: star.y + ((rest.y - star.y) * 12) / away,
+      z: star.z + ((rest.z - star.z) * 12) / away,
+    };
+    const at = { x: HOME.x + there.x - rest.x, y: HOME.y + there.y - rest.y, z: HOME.z + there.z - rest.z };
+    const ofTheStar = () =>
+      scene.cosmos.stats().list.filter(({ id }) => far.worlds.some((world) => world.id === id)).length;
+    scene.cosmos.tick(at, 0);
+    await settled();
+    expect(ofTheStar()).toBe(0);
+    // A look runs once the eye has moved a step: back to the view at rest, then out again with the star looked at.
+    eye.look = star;
+    scene.cosmos.tick(HOME, 0);
+    await settled();
+    scene.cosmos.tick(at, 0);
+    await settled();
+    expect(ofTheStar()).toBeGreaterThan(0);
   });
 });
 

@@ -54,7 +54,13 @@ const NEBULAE_JS = 3.75 * 1024;
 // Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
 const LABELS_JS = 5960;
-// A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g's flights
+// The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
+// cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
+// camera-controls' own warning, which no minifier renames.
+const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
+const FLIGHTS_JS = 18 * 1024;
+const FLIGHTS_MARK = "camera-controls:";
+// A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g2's flights
 // will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
 // set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
@@ -306,6 +312,21 @@ for (const [name, chunk, cap] of [
     const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
     expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
   });
+
+test("the flights' chunk holds camera-controls, comes once the scene runs, within its own cap, and the scene's holds none of it", async ({
+  page,
+}) => {
+  const flights = page.waitForResponse((response) => FLIGHTS.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const [sceneUrl, flightsUrl] = [(await scene).url(), (await flights).url()];
+  const there = await closureOf(page, sceneUrl);
+  const own = await ownOf(page, flightsUrl, there);
+  expect(await (await page.request.get(flightsUrl)).text()).toContain(FLIGHTS_MARK);
+  for (const url of there) expect(await (await page.request.get(url)).text()).not.toContain(FLIGHTS_MARK);
+  expect(await compressed(page, own)).toBeLessThanOrEqual(FLIGHTS_JS);
+});
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {
   const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));

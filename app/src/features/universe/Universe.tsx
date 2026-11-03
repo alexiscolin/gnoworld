@@ -12,6 +12,7 @@ import {
   type ComponentType,
 } from "react";
 import { Credits } from "./Credits.tsx";
+import { FlightPanel } from "./FlightPanel.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
 import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
@@ -95,6 +96,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
   const status = useSyncExternalStore(host.subscribe, host.status);
   const earth = useSyncExternalStore(host.subscribe, host.earth);
   const world = useSyncExternalStore(host.subscribe, host.world);
+  const flight = useSyncExternalStore(host.subscribe, host.flown.flight);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => (canvasRef.current === null ? undefined : host.attach(canvasRef.current)), [host]);
   useEffect(() => {
@@ -129,6 +131,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
       {status === "on" ? (
         <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
       ) : null}
+      {shown && status === "on" ? <FlightPanel flight={flight} /> : null}
     </>
   );
 }

@@ -113,6 +113,17 @@ const heading = (child: ReactNode) => (
   </>
 );
 
+// The page's boxes are watched for their size: jsdom has no observer, so one that sees nothing stands in.
+const stubObserver = () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+};
+
 const left: (() => void)[] = [];
 
 // A root of its own: a test here draws the component again with another prop, or leaves it.
@@ -148,6 +159,7 @@ beforeEach(() => {
   scene.presence.mockImplementation(() => new Promise(() => undefined));
   scene.start.mockImplementation(() => ({
     cover: scene.cover,
+    fly: vi.fn(),
     cosmos: scene.cosmos,
     keepClear: scene.keepClear,
     dispose: scene.dispose,
@@ -745,6 +757,7 @@ describe("on the Earth's page", () => {
     vi.stubGlobal("ResizeObserver", Observer);
     scene.start.mockImplementation(() => ({
       cover: scene.cover,
+      fly: vi.fn(),
       dispose: scene.dispose,
       earth: scene.earth,
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
@@ -1062,13 +1075,7 @@ describe("on a world's page", () => {
   };
 
   beforeEach(() => {
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        observe = vi.fn();
-        disconnect = vi.fn();
-      },
-    );
+    stubObserver();
     scene.start.mockImplementation(() => ({
       cover: scene.cover,
       dispose: scene.dispose,
@@ -1076,6 +1083,7 @@ describe("on a world's page", () => {
       world: scene.world,
       worldMoons: vi.fn(),
       cosmos: scene.cosmos,
+      fly: vi.fn(),
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
       stats: () => ({}),
     }));
@@ -1271,5 +1279,203 @@ describe("on a world's page", () => {
     await settle();
     rerender(true);
     expect(scene.world.mock.lastCall?.[0]).toBeUndefined();
+  });
+});
+
+describe("flights between places (7g)", () => {
+  const fly = vi.fn<(goal: unknown) => void>();
+  const depart = vi.fn<() => void>();
+  const said = { target: "GovDAO", phase: "transit", distance: 6.29, speed: 1158, eta: 1.7, along: 0.3 } as const;
+  const onFlight = () =>
+    (scene.start.mock.calls[0]?.[0] as { onFlight?: (flight: typeof said | undefined) => void }).onFlight;
+
+  beforeEach(() => {
+    stubObserver();
+    scene.start.mockImplementation(() => ({
+      cover: scene.cover,
+      cosmos: scene.cosmos,
+      earth: scene.earth,
+      world: scene.world,
+      keepClear: scene.keepClear,
+      fly,
+      depart,
+      dispose: scene.dispose,
+      stats: () => ({}),
+    }));
+  });
+
+  // The scene is asked to fly before it is told of the next place: the flight copies what is still drawn.
+  const flewBefore = (next: { mock: { invocationCallOrder: number[] } }) => {
+    expect(fly.mock.invocationCallOrder.at(-1)).toBeLessThan(next.mock.invocationCallOrder.at(-1) ?? 0);
+  };
+
+  it("flies when the page goes from one place in space to another, named as the panel shows it, before the place changes", async () => {
+    // The box a page keeps for its body: the host watches it, and lets the body go as the page leaves.
+    const globe = document.body.appendChild(document.createElement("div"));
+    globe.setAttribute("data-globe", "");
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(fly).not.toHaveBeenCalled();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "GovDAO" });
+    flewBefore(scene.cosmos);
+    rerender({ world: "bubble", name: "Bubble" });
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "Bubble" });
+    flewBefore(scene.world);
+    rerender("earth");
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "Earth" });
+    flewBefore(scene.world);
+    rerender("cosmos");
+    expect(fly).toHaveBeenLastCalledWith({ kind: "cosmos", name: "Cosmos" });
+    flewBefore(scene.earth);
+    flewBefore(scene.cosmos);
+    expect(fly).toHaveBeenCalledTimes(4);
+    globe.remove();
+  });
+
+  // The scene's flight says its first figures as it starts (Flights.fly), before the host has taken the next page: the next page's box,
+  // put in as the route changes, must be marked for its own body alone (lot C's review, F3704).
+  it("marks the next page's box for its own body alone when the flight it asks speaks at once", async () => {
+    fly.mockImplementation(() => {
+      onFlight()?.(said);
+    });
+    const box = () => {
+      document.querySelector("[data-globe]")?.remove();
+      const globe = document.body.appendChild(document.createElement("div"));
+      globe.setAttribute("data-globe", "");
+      return globe;
+    };
+    box();
+    const { rerender } = rendered("earth");
+    await settle();
+    const world = box();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+    expect(world.dataset["earth"]).toBeUndefined();
+    const earth = box();
+    rerender("earth");
+    expect(fly).toHaveBeenCalledTimes(2);
+    expect(earth.dataset["world"]).toBeUndefined();
+    earth.remove();
+    fly.mockReset();
+  });
+
+  // A world's page builds its place anew when its ring or a room comes: the same world, as a new object, is no flight (lot C's review,
+  // F3720).
+  it("flies nowhere when the page shows the world it is at again, as a new object", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    rerender({ world: "gov/dao" });
+    expect(fly).toHaveBeenCalledTimes(1);
+  });
+
+  it("flies nowhere before the scene runs, to the place it is at, or from a page that covers space", async () => {
+    const { rerender } = rendered("cosmos");
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    await settle();
+    expect(fly).not.toHaveBeenCalled();
+    rerender("cosmos");
+    expect(fly).toHaveBeenCalledTimes(1);
+    rerender("cosmos");
+    rerender(false);
+    await Promise.resolve();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+  });
+
+  // A page without space covers the scene and asks nothing else of it: a frame copied for a flight that cannot start was held, the size of
+  // the screen, for as long as the reader stayed away (lot B's review, F3715). A route's change shows the next place at once, and its
+  // flight copies the frame as it starts (lot C's review, F3721).
+  it("only covers the scene for a page without space, and has it keep no copy of what it drew", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender(false);
+    expect(scene.cover).toHaveBeenLastCalledWith(true);
+    expect(depart).not.toHaveBeenCalled();
+  });
+
+  it("shows the panel while the scene says a flight is under way, and takes it off once it has landed", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    act(() => {
+      onFlight()?.(said);
+    });
+    expect(one(box, "[data-flight]").textContent).toContain("GovDAO");
+    act(() => {
+      onFlight()?.(undefined);
+    });
+    expect(all(box, "[data-flight]")).toEqual([]);
+  });
+
+  // Frames 19, 36 and 101 fly with no plate, only the dock; it comes in on landing (f0020, f0102). The page's plate waits out of sight
+  // while the flight its page asked speaks, and only then: a flight that never speaks, or a jump to a star, leaves it as it is (the
+  // design review's second high, F3707).
+  describe("the next page's plate", () => {
+    // The box the next page keeps for its body, put in as the route changes: its plate stands beside it.
+    const boxOf = () => {
+      document.querySelector("[data-globe]")?.remove();
+      const globe = document.body.appendChild(document.createElement("div"));
+      globe.setAttribute("data-globe", "");
+      globe.dataset["flown"] = "landed";
+      return globe;
+    };
+
+    it("waits out of sight while the flight its page asked speaks, and comes in once it has landed", async () => {
+      fly.mockImplementation(() => {
+        onFlight()?.(said);
+      });
+      const { rerender } = rendered("cosmos");
+      await settle();
+      const globe = boxOf();
+      rerender({ world: "gov/dao", name: "GovDAO" });
+      expect(globe.dataset["flown"]).toBe("flying");
+      act(() => {
+        onFlight()?.(said);
+      });
+      expect(globe.dataset["flown"]).toBe("flying");
+      act(() => {
+        onFlight()?.(undefined);
+      });
+      expect(globe.dataset["flown"]).toBe("landed");
+      globe.remove();
+      fly.mockReset();
+    });
+
+    it("stays as it is for a flight that never speaks, and for a jump to a star its page did not ask", async () => {
+      const { rerender } = rendered("cosmos");
+      await settle();
+      const globe = boxOf();
+      rerender({ world: "gov/dao", name: "GovDAO" });
+      expect(fly).toHaveBeenCalledTimes(1);
+      expect(globe.dataset["flown"]).toBe("landed");
+      rerender("cosmos");
+      act(() => {
+        onFlight()?.(undefined);
+      });
+      act(() => {
+        onFlight()?.(said);
+      });
+      expect(globe.dataset["flown"]).toBe("landed");
+      globe.remove();
+    });
+  });
+
+  it("shows no panel over a page that covers space, nor once the context went", async () => {
+    const { box, rerender } = rendered("cosmos");
+    await settle();
+    act(() => {
+      onFlight()?.(said);
+    });
+    expect(all(box, "[data-flight]")).toHaveLength(1);
+    rerender(false);
+    expect(all(box, "[data-flight]")).toEqual([]);
+    rerender("cosmos");
+    act(() => {
+      started().onLost(true);
+    });
+    expect(all(box, "[data-flight]")).toEqual([]);
   });
 });

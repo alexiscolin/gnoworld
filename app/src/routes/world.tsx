@@ -50,7 +50,7 @@ function useWorldSpace(world: ReturnType<typeof site.world>, universe: string, r
     ring,
   };
   // The chat comes once the door to space has: this page holds both, and the first screen's budget carries the door (budgets.spec.ts).
-  return useSpace({ world: hubWorldOf(world) }, page);
+  return useSpace({ world: hubWorldOf(world), name: world.name }, page);
 }
 
 export default function World() {
@@ -69,7 +69,7 @@ export default function World() {
   return (
     <>
       {/* The planet's place: the page lays it out, the scene draws in it (frames 22, 93, 104). */}
-      <div className={place["globe"]} data-globe data-world="waiting" />
+      <div className={place["globe"]} data-globe data-world="waiting" data-flown="landed" />
       <Panel.Layout
         plate={
           <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">

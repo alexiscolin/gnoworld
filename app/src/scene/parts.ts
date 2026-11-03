@@ -2,10 +2,12 @@
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
+import type { CosmosSight } from "./flight/flights.ts";
 import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
 import { LazyLabels } from "./cosmos/lazyLabels.ts";
 import { Door } from "./door.ts";
+import type { FlightGoal, Flights, FlightScene } from "./flight/flights.ts";
 import type { EarthDevice } from "./earth/device.ts";
 import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
 
@@ -19,8 +21,10 @@ export class CosmosPart {
   readonly #gone: AbortSignal;
   // The home's dive, once asked: under reduced motion or not.
   #still: boolean | undefined;
+  readonly #eye: EarthDevice["eye"];
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+    this.#eye = device.eye;
     this.#gone = owner.signal;
     this.door = new Door(
       () =>
@@ -42,6 +46,11 @@ export class CosmosPart {
         },
       },
     );
+  }
+
+  /** What a flight reads of the cosmos while it shows (7g). */
+  get sight(): CosmosSight | undefined {
+    return this.#worlds === undefined ? undefined : this.#eye?.sight;
   }
 
   /** The home opens with the dive, once (7d7); `still`, under reduced motion. */
@@ -123,15 +132,34 @@ export class WorldDoor {
   }
 }
 
-/** Both, as the scene sizes, moves, restores and reads them. */
+/** Both, and the flights between them (7g), as the scene sizes, moves, restores and reads them. The flights' chunk, with camera-controls,
+ * is asked as the scene starts, so the first flight finds it: one asked before it came, or if it never comes, is no flight, and the page
+ * changes as it did. What the flights make of the scene's device is their chunk's. */
 export class Parts {
   readonly cosmos: CosmosPart;
   readonly world: WorldDoor;
+  readonly flights: Door<Flights>;
 
-  constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+  constructor(device: EarthDevice & FlightScene, owner: Disposer, came: () => void) {
     this.cosmos = new CosmosPart(device, owner, came);
     this.world = new WorldDoor(device, owner, came);
+    this.flights = new Door(
+      () =>
+        import("./flight/flights.ts").then(
+          ({ flightsOn }) =>
+            () =>
+              flightsOn(device, this.cosmos),
+        ),
+      owner,
+      { came: () => undefined },
+    );
+    this.flights.open();
   }
+
+  /** Flies to `goal`, bound: the scene hands it on as its own. */
+  readonly fly = (goal: FlightGoal): void => {
+    this.flights.part?.fly(goal);
+  };
 
   resize(width: number, height: number, ratio: number): void {
     this.cosmos.door.part?.resize(height, ratio);
@@ -151,6 +179,10 @@ export class Parts {
   }
 
   stats() {
-    return { cosmos: this.cosmos.door.part?.stats(), world: this.world.door.part?.stats() };
+    return {
+      cosmos: this.cosmos.door.part?.stats(),
+      world: this.world.door.part?.stats(),
+      flight: this.flights.part?.stats(),
+    };
   }
 }
