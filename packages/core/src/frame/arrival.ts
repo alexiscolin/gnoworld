@@ -4,7 +4,7 @@
 // same postcard and two systems are seldom seen alike; the eye stands near enough that the system's near side reads larger than its far.
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { LEAN, SWAY_CORNERS } from "../space/drift.ts";
+import { ARRIVAL_LEAN, SWAY_CORNERS } from "../space/drift.ts";
 import { composed } from "./composition.ts";
 import { CENTRE, onPlane, toMap } from "./disc.ts";
 import { HALO_FAR, haloAt } from "./halo.ts";
@@ -31,8 +31,8 @@ export interface Arrival {
   readonly postcard: Postcard;
 }
 
-/** How far a mouse leans the eye at an arrival: half the home's, for the eye stands nearer what it looks at (7d3's review). */
-export const ARRIVAL_LEAN = LEAN / 2;
+// The lean lives beside the mouse's, where the view at rest's eye reads it without this module.
+export { ARRIVAL_LEAN } from "../space/drift.ts";
 
 // Slants over the system's plane, in degrees, from the least, over a span, tried a fourth of it apart: never face on (rings round the
 // star), never edge on (a row).
