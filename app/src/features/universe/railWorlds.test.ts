@@ -145,6 +145,18 @@ describe("the rail's order, held", () => {
     expect(shown(order)).toEqual(["earth", "a/a", "b/b"]);
   });
 
+  it("shows the server's first answer at once, though it showed the page's own signals a moment before, and holds a minute from it", () => {
+    const order = new RailOrder(PLACES);
+    order.read({ worlds, signals: before, unheard: true });
+    vi.advanceTimersByTime(1_000);
+    order.read({ worlds, signals: after });
+    expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
+    vi.advanceTimersByTime(1_000);
+    order.read({ worlds, signals: before });
+    expect(shown(order)).toEqual(["earth", "b/b", "a/a"]);
+    order.dispose();
+  });
+
   it("changes its order at most once a minute, then takes the latest it was told", () => {
     const order = new RailOrder(PLACES);
     const heard = vi.fn<() => void>();

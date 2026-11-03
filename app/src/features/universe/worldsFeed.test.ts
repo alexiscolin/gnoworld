@@ -140,6 +140,27 @@ describe("the worlds' feed", () => {
     expect(told.every((each) => each === FILE.worlds)).toBe(true);
   });
 
+  it("tells the rail the page's own signals as not yet heard from the server, then the server's answer (7i)", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBe(true);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+    expect(worlds.data()?.signals.present.size).toBeGreaterThan(0);
+  });
+
   it("hands the labels who is here, keyed as the cosmos holds each world, with the hubs' names and this reader's visits", async () => {
     const { cosmos, scene } = sceneOf();
     localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");

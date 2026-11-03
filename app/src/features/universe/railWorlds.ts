@@ -79,7 +79,8 @@ const sameEntries = (a: readonly RailEntry[], b: readonly RailEntry[]) =>
     );
   });
 
-/** The rail's entries as shown: the first at once, then at most one change a minute, none while the reader is on the rail. */
+/** The rail's entries as shown: the first at once, and the first from the server's answer, then at most one change a minute, none while the
+ * reader is on the rail. */
 export class RailOrder {
   readonly #places: RailPlaces;
   readonly #shown = createStore<readonly RailEntry[]>(() => []);
@@ -121,6 +122,7 @@ export class RailOrder {
       return;
     }
     const shown = this.#shown.getState();
+    const { unheard } = this.#latest;
     const next = railOf(
       this.#latest,
       this.#places,
@@ -128,7 +130,7 @@ export class RailOrder {
     );
     this.#latest = undefined;
     if (sameEntries(next, shown)) return;
-    this.#changed = Date.now();
+    this.#changed = unheard === true ? Number.NEGATIVE_INFINITY : Date.now();
     this.#shown.setState(next, true);
   }
 

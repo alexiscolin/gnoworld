@@ -20,6 +20,8 @@ export interface CosmosPage {
 export interface Known {
   readonly worlds: readonly CosmosWorld[];
   readonly signals: LabelSignals;
+  /** The page's own signals, the server not heard yet: what the rail shows till it is holds no minute. */
+  readonly unheard?: true;
 }
 
 /** The planets' portraits for the rail (7i): each world asked of the scene once for as long as the page lives, drawn or not, so a return
@@ -62,6 +64,7 @@ export class WorldsFeed {
   #shown = false;
   #clearing: AbortController | undefined;
   #signals: LabelSignals | undefined;
+  #heard = false;
   #polling: AbortController | undefined;
 
   /** Hears each change of what `data` gives; what it returns lets go. */
@@ -89,7 +92,7 @@ export class WorldsFeed {
   // The file's time goes with its worlds, once there is one: it ages their calls; the signals, once come, name them.
   #hand(scene: Scene, worlds: readonly CosmosWorld[] | undefined): void {
     if (worlds !== undefined && this.#came && this.#signals !== undefined)
-      this.#known.setState({ worlds, signals: this.#signals }, true);
+      this.#known.setState({ worlds, signals: this.#signals, ...(this.#heard ? {} : { unheard: true }) }, true);
     if (worlds !== undefined && this.#signals !== undefined) scene.cosmos(worlds, this.#written, this.#signals);
     else if (this.#written === undefined) scene.cosmos(worlds);
     else scene.cosmos(worlds, this.#written);
@@ -115,6 +118,7 @@ export class WorldsFeed {
           (signals) => {
             if (polling.signal.aborted || signals === undefined) return;
             this.#signals = signals;
+            this.#heard = true;
             this.#hand(scene, this.#worlds);
             timer ??= setInterval(whileSeen, PRESENCE_MS);
           },
