@@ -1,6 +1,7 @@
 // What a model call costs (ADR-0002 §5, D41): the three models' prices from the claude-api skill (models cached
-// 2026-10-06; shared/prompt-caching.md, "Economics"), in nano-dollars a token so that every price is whole; the cost
-// of an answer from its usage, and the most a call can cost, which it reserves before it starts (budget.ts).
+// 2026-10-06; shared/prompt-caching.md, "Economics") and Anthropic's pricing page, read on 2026-11-04, where the
+// skill's Sonnet 5.5 cache read was stale (F5181), in nano-dollars a token so that every price is whole; the cost of
+// an answer from its usage, and the most a call can cost, which it reserves before it starts (budget.ts).
 import { z } from "zod";
 
 export const MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"] as const;
@@ -18,7 +19,7 @@ interface Rates {
 function ratesOf(model: Model, prompt: number): Rates {
   switch (model) {
     case "claude-sonnet-5-5":
-      return { input: 2_000, output: 10_000, read: 200, fiveMinutes: 2_500, hour: 4_000 };
+      return { input: 2_000, output: 10_000, read: 100, fiveMinutes: 2_500, hour: 4_000 };
     case "claude-opus-5-5":
       return { input: 4_000, output: 20_000, read: 200, fiveMinutes: 5_000, hour: 8_000 };
     case "claude-haiku-5-5":

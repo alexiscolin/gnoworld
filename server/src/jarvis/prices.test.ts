@@ -26,11 +26,12 @@ describe("the models", () => {
 });
 
 describe("cost", () => {
-  it("prices Sonnet 5.5: $2 in, $10 out, $0.20 a cache read, $2.50 a 5-minute write, $4 an hour's", () => {
+  // Its cache read is 0.05 of its input on Anthropic's pricing page (read 2026-11-04), not the skill's cached $0.20 (F5181).
+  it("prices Sonnet 5.5: $2 in, $10 out, $0.10 a cache read, $2.50 a 5-minute write, $4 an hour's", () => {
     const model = "claude-sonnet-5-5";
     expect(cost(model, usage({ input_tokens: MILLION }))).toBe(MILLION * nano(2));
     expect(cost(model, usage({ output_tokens: MILLION }))).toBe(MILLION * nano(10));
-    expect(cost(model, usage({ cache_read_input_tokens: MILLION }))).toBe(MILLION * nano(0.2));
+    expect(cost(model, usage({ cache_read_input_tokens: MILLION }))).toBe(MILLION * nano(2 * 0.05));
     const fiveMinutes = { cache_creation_input_tokens: MILLION, cache_creation: split(MILLION, 0) };
     expect(cost(model, usage(fiveMinutes))).toBe(MILLION * nano(2 * 1.25));
     const hour = { cache_creation_input_tokens: MILLION, cache_creation: split(0, MILLION) };
@@ -87,10 +88,10 @@ describe("cost", () => {
     );
   });
 
-  it("costs the plan's question: 20K tokens in, 18K of them read from the cache, and 1K out on Sonnet 5.5, $0.0176", () => {
+  it("costs the plan's question: 20K tokens in, 18K of them read from the cache, and 1K out on Sonnet 5.5, $0.0158", () => {
     const question = usage({ input_tokens: 2_000, cache_read_input_tokens: 18_000, output_tokens: 1_000 });
-    expect(cost("claude-sonnet-5-5", question)).toBe(17_600_000);
-    expect(cost("claude-sonnet-5-5", question)).toBe(2_000 * nano(2) + 18_000 * nano(0.2) + 1_000 * nano(10));
+    expect(cost("claude-sonnet-5-5", question)).toBe(15_800_000);
+    expect(cost("claude-sonnet-5-5", question)).toBe(2_000 * nano(2) + 18_000 * nano(0.1) + 1_000 * nano(10));
   });
 
   it("adds every part of an answer's usage", () => {
@@ -102,7 +103,7 @@ describe("cost", () => {
       cache_creation: split(1_500, 500),
     });
     expect(cost("claude-sonnet-5-5", answer)).toBe(
-      1_000 * nano(2) + 500 * nano(10) + 18_000 * nano(0.2) + 1_500 * nano(2.5) + 500 * nano(4),
+      1_000 * nano(2) + 500 * nano(10) + 18_000 * nano(0.1) + 1_500 * nano(2.5) + 500 * nano(4),
     );
   });
 
@@ -146,7 +147,7 @@ describe("cost", () => {
       service_tier: "standard",
       speed: "standard",
     };
-    const standard = 2_000 * nano(2) + 18_000 * nano(0.2) + 1_000 * nano(10);
+    const standard = 2_000 * nano(2) + 18_000 * nano(0.1) + 1_000 * nano(10);
     expect(cost("claude-sonnet-5-5", answer)).toBe(standard);
     expect(
       cost("claude-sonnet-5-5", {
