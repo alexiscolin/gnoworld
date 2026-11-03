@@ -79,6 +79,14 @@ test("draws gnoswap's Plan with a name under each world, names one at a click, a
   await arrive(page, "gnoswap");
   await page.keyboard.press("v");
   await expect.poll(async () => names(page).count(), SLOW).toBeGreaterThanOrEqual(3);
+  // Every named world standing: a body shows once its maps and programs came, a while after its name.
+  const words = await names(page).allTextContents();
+  await expect
+    .poll(async () => {
+      const standing = new Set((await stats(page)).cosmos?.screen.bodies.map(({ id }) => id.split("/").at(-1)));
+      return words.filter((word) => !standing.has(word));
+    }, SLOW)
+    .toEqual([]);
   const shown = await stats(page);
   const bodies = new Map((shown.cosmos?.screen.bodies ?? []).map((body) => [body.id.split("/").at(-1), body]));
   for (const name of await names(page).all()) {
