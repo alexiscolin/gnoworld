@@ -53,6 +53,9 @@ export {
   screenRadius,
   type LadderView,
 } from "./lod/ladder.ts";
+export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
+export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
+export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
   CENTRE,
@@ -65,7 +68,8 @@ export {
   toScene,
   type InPlane,
 } from "./frame/disc.ts";
-export { coveredShare, offLine } from "./frame/composition.ts";
+export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
+export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";
 export {
@@ -109,6 +113,7 @@ export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";
 export { alike, featuresOf, type Features } from "./planet/variety.ts";
 export {
+  daysSince,
   isFresh,
   LIGHT_KINDS,
   STAGES,

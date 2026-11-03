@@ -4,11 +4,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
+import { Presence } from "@gnoworld/schemas/indexer";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet } from "./testing/signer.ts";
@@ -506,6 +507,23 @@ describe("the server's process", { timeout: 30_000 }, () => {
     const server = start({ ...settings(), WORLDS_FILE: join(folder("gnoworld-worlds-"), "worlds.json") });
     expect(await exited(server)).not.toBe(0);
     expect(server.out.stderr).toContain("setting UNIVERSES_FILE: required");
+  });
+
+  it("counts who is here beside its database: /api/presence answers each world, and its history is written as it stops (7h)", async () => {
+    const env = settings();
+    const server = start(env);
+    const port = await listening(server);
+    const answer = await fetch(`http://127.0.0.1:${String(port)}/api/presence`);
+    expect(answer.status).toBe(200);
+    expect(Presence.parse(await answer.json()).worlds.map(({ world }) => world)).toEqual(["bubble", "earth", "govdao"]);
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
+  });
+
+  it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
+    const port = await listening(start({ ...settings(), DATABASE: ":memory:" }));
+    expect((await fetch(`http://127.0.0.1:${String(port)}/api/presence`)).status).toBe(404);
   });
 
   it("starts no worlds job without WORLDS_FILE: nothing is asked of a chain", async () => {

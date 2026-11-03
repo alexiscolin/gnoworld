@@ -17,6 +17,7 @@ import { defaultRpc, defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 import { startWorlds } from "./worlds/job.ts";
+import { dirname, join } from "node:path";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -61,9 +62,16 @@ const chat = startChat(
     trustedProxy: config.trustedProxy,
     spared: spared(roles),
   },
-  { log, pepper: config.pepper, session },
+  // Who is here keeps its history beside the database (7h); a database held in memory keeps none.
+  {
+    log,
+    pepper: config.pepper,
+    session,
+    ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
+  },
 );
 app.route("/api/activity", chat.activity);
+if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);

@@ -7,6 +7,11 @@ import type { WorldAsk, WorldPage } from "../../scene/world/part.ts";
 
 const VISITED = "gnoworld:visited:";
 
+const visitKey = (universe: string, id: string) => `${VISITED}${universe}:${id}`;
+
+/** Whether this reader has visited world `id` of `universe`: the device keeps it, or nothing does. */
+export const visitedIn = (universe: string) => (id: string) => readFlag(visitKey(universe, id)) !== null;
+
 // The plate where the page fixes it beside the globe: in the flow it scrolls, and the canvas does not. Its fill as sRGB bytes, whatever
 // colour space the browser computes it in, for the scene paints it again behind the globe.
 function plateBeside(globe: HTMLElement) {
@@ -35,16 +40,15 @@ export function circleOf(globe: HTMLElement): Circle | undefined {
 
 /** What a world's page asks of the scene for world `id` in `circle`. */
 export function worldAsk(circle: Circle, id: string, page: WorldPage): WorldAsk {
-  const key = `${VISITED}${page.universe}:${id}`;
   return {
     circle,
     id,
     universe: page.universe,
     page,
     file: () => readWorlds(import.meta.env.BASE_URL),
-    visited: readFlag(key) !== null,
+    visited: visitedIn(page.universe)(id),
     remember: () => {
-      writeFlag(key, "1");
+      writeFlag(visitKey(page.universe, id), "1");
     },
   };
 }

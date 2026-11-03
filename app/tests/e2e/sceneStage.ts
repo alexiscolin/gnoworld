@@ -23,6 +23,9 @@ export interface CosmosStats {
   worlds: number;
   eye: { x: number; y: number; z: number };
   web?: { points: number; lines: number; gold: number; share: number };
+  sky: { share: number; eye: { x: number; y: number; z: number } };
+  /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
+  dive: { along: number; veil: number };
 }
 interface Stats {
   frames: number;
@@ -74,6 +77,19 @@ export async function keepsItsRoom(page: Page, path: string, come: (page: Page) 
 }
 
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
+
+/** The home's dive over (7d7): its cosmos came and stands at rest, the dissolve's picture gone. Until then the camera looks at the Earth
+ * from the whole cosmos, so the sky and the worlds are not the arrival's. */
+export const landed = (page: Page) =>
+  expect
+    .poll(
+      async () => {
+        const dive = (await stats(page)).cosmos?.dive;
+        return dive?.along === 1 && dive.veil === 0;
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true);
 
 // Once the iris has opened: before that a picture of the window shows the page's colour, not the stage.
 export const opened = async (page: Page) => {

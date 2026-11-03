@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { driftAt, FIELD_OF_VIEW, glideAt, HOME, turnAt } from "@gnoworld/core";
+import { driftAt, FIELD_OF_VIEW, HOME, turnAt } from "@gnoworld/core";
 import type { PerspectiveCamera } from "three";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, onTestFinished } from "vitest";
 import { FakeClock } from "../../tests/fakeClock.ts";
 import { startScene, type SceneOptions } from "./scene.ts";
 
@@ -46,9 +46,8 @@ const cosmos = vi.hoisted(() => ({
   show: vi.fn<(worlds: unknown) => void>(),
   keepClear: vi.fn<(box: unknown) => void>(),
   resize: vi.fn<(height: number, ratio: number) => void>(),
-  tick: vi.fn<
-    (eye: { x: number; y: number; z: number }, seconds: number, resting?: { x: number; y: number; z: number }) => void
-  >(),
+  tick: vi.fn<(eye: { x: number; y: number; z: number }, seconds: number, clock?: number) => void>(),
+  dive: vi.fn<(still: boolean) => void>(),
   restored: vi.fn<() => void>(),
   dispose: vi.fn<() => void>(),
   stats: vi.fn<() => unknown>(),
@@ -65,6 +64,7 @@ vi.mock("./cosmos/cosmos.ts", () => ({
     keepClear = cosmos.keepClear;
     resize = cosmos.resize;
     tick = cosmos.tick;
+    dive = cosmos.dive;
     restored = cosmos.restored;
     dispose = cosmos.dispose;
     stats = cosmos.stats;
@@ -139,12 +139,6 @@ const options = (more: Partial<SceneOptions> = {}): SceneOptions => ({
   onLost,
   ...more,
 });
-
-const glideOf = (seconds = NaN) => {
-  const out = { x: 0, y: 0, z: 0 };
-  glideAt(out, seconds);
-  return out;
-};
 
 // One frame of `ms`, drawn: the screen's refresh is what spaces them in the browser.
 const frames = (count: number, ms: number) => {
@@ -281,33 +275,61 @@ describe("the cosmos", () => {
     scene.dispose();
   });
 
-  it("shows the worlds from the eye's rest and its arrival, not the sky's cruise, for they must not be left behind", async () => {
+  // 7d7: the worlds' arrival is the dive, which the cosmos makes; the sky keeps its own glide and cruise.
+  it("shows the worlds from where the eye rests, neither the sky's cruise nor its glide, from the first frames on", async () => {
     const scene = await started();
-    frames(200, 100);
-    const [eye, seconds] = cosmos.tick.mock.lastCall ?? [];
-    const glide = { x: 0, y: 0, z: 0 };
-    glideAt(glide, seconds ?? NaN);
-    expect(seconds).toBeGreaterThan(10);
-    expect(eye?.x).toBeCloseTo(HOME.x + glide.x, 6);
-    expect(eye?.y).toBeCloseTo(HOME.y + glide.y, 6);
-    expect(eye?.z).toBeCloseTo(HOME.z + glide.z, 6);
+    for (const count of [3, 200]) {
+      frames(count, 100);
+      const [eye, seconds] = cosmos.tick.mock.lastCall ?? [];
+      expect(seconds).toBeGreaterThan(0.2);
+      expect(eye).toEqual({ x: HOME.x, y: HOME.y, z: HOME.z });
+    }
     scene.dispose();
   });
 
-  // 7d6's review: the arrival's glide is no move of the view; the cosmos keeps the view at rest's bodies through it.
-  it("tells them where the view rests, a mouse's lean with it but not the arrival's glide", async () => {
+  // The dissolve under reduced motion is no motion, so it runs on the scene's clock, which runs on when the eye's stands.
+  it("tells them the scene's clock, which runs on under reduced motion when the eye's stands", async () => {
+    query(MOTION).matches = true;
     const scene = await started();
     frames(3, 16);
-    window.dispatchEvent(
-      Object.assign(new MouseEvent("pointermove", { clientX: 1000, clientY: 0 }), { pointerType: "mouse" }),
-    );
-    frames(100, 16);
-    const [eye, seconds, resting] = cosmos.tick.mock.lastCall ?? [];
-    if (eye === undefined || resting === undefined) throw new Error("no tick");
-    const glide = glideOf(seconds);
-    expect(Math.hypot(resting.x - eye.x + glide.x, resting.y - eye.y + glide.y, resting.z - HOME.z)).toBeLessThan(1e-6);
-    expect(resting.x - HOME.x).toBeGreaterThan(0.5);
+    const [, standing, before] = cosmos.tick.mock.lastCall ?? [];
+    // A dissolve asks each frame, as the cosmos does.
+    cosmos.tick.mockImplementation(() => {
+      cosmos.made[0]?.moved();
+    });
+    onTestFinished(() => {
+      cosmos.tick.mockReset();
+    });
+    scene.keepClear({ left: 0, top: 0, right: 1, bottom: 1 });
+    frames(30, 16);
+    const [, stood, after] = cosmos.tick.mock.lastCall ?? [];
+    expect(stood).toBe(standing);
+    expect((after ?? NaN) - (before ?? NaN)).toBeGreaterThan(0.2);
     scene.dispose();
+  });
+
+  it("asks it to dive once, on the first worlds a page shows, still under reduced motion", async () => {
+    const scene = startScene(options(), clock);
+    scene.cosmos(undefined);
+    // The home's fixed places come first, an empty list, then its file: the dive is the home's, asked on the first.
+    scene.cosmos([]);
+    scene.cosmos(WORLDS);
+    await vi.dynamicImportSettled();
+    expect(cosmos.dive.mock.calls).toEqual([[false]]);
+    // Asked before it is shown its first list, so it never stands what the dive would then take away.
+    expect(cosmos.dive.mock.invocationCallOrder[0] ?? Infinity).toBeLessThan(
+      cosmos.show.mock.invocationCallOrder[0] ?? 0,
+    );
+    scene.cosmos([...WORLDS]);
+    scene.cosmos(undefined);
+    scene.cosmos(WORLDS);
+    expect(cosmos.dive).toHaveBeenCalledTimes(1);
+    scene.dispose();
+    cosmos.dive.mockClear();
+    query(MOTION).matches = true;
+    const still = await started();
+    expect(cosmos.dive.mock.calls).toEqual([[true]]);
+    still.dispose();
   });
 
   it("moves them with the view when it is sent elsewhere", async () => {
@@ -315,7 +337,7 @@ describe("the cosmos", () => {
     frames(1, 16);
     scene.moveTo({ x: 10, y: 20, z: 30 });
     frames(2, 16);
-    expect(cosmos.tick.mock.lastCall?.[0].x).toBeCloseTo(10 + glideOf(cosmos.tick.mock.lastCall?.[1]).x, 6);
+    expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
     scene.dispose();
   });
 
@@ -330,11 +352,7 @@ describe("the cosmos", () => {
     cosmos.arrive.mock.lastCall?.[1]({ x: 10, y: 20, z: 30 });
     frames(2, 16);
     expect(three.renderer.render.mock.calls.length).toBeGreaterThan(drawn);
-    const [eye, seconds] = cosmos.tick.mock.lastCall ?? [];
-    const glide = glideOf(seconds);
-    expect(eye?.x).toBeCloseTo(10 + glide.x, 6);
-    expect(eye?.y).toBeCloseTo(20 + glide.y, 6);
-    expect(eye?.z).toBeCloseTo(30 + glide.z, 6);
+    expect(cosmos.tick.mock.lastCall?.[0]).toEqual({ x: 10, y: 20, z: 30 });
     scene.arrive(undefined);
     expect(cosmos.arrive).toHaveBeenLastCalledWith(undefined, expect.any(Function));
     scene.dispose();

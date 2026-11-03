@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { anchorOf, ANCHORS, asciiBytes, planetSeed, type Anchor } from "./look.ts";
 import { sha256 } from "./sha256.ts";
 import {
+  daysSince,
   isFresh,
   LIGHT_KINDS,
   STAGES,
@@ -146,6 +147,22 @@ describe("isFresh", () => {
     expect(isFresh(Number.NaN, false)).toBe(false);
     expect(isFresh(-1, false)).toBe(false);
     expect(isFresh(-0.1, false)).toBe(false);
+  });
+});
+
+describe("daysSince", () => {
+  const NOW = Date.parse("2026-11-03T12:00:00.000Z");
+
+  it("counts the days since the file first saw a world, in parts of a day", () => {
+    expect(daysSince("2026-11-01T00:00:00.000Z", NOW)).toBeCloseTo(2.5, 9);
+    expect(daysSince("2026-11-03T12:00:00.000Z", NOW)).toBe(0);
+  });
+
+  it("says nothing of a world the file never saw, of a time it cannot read, nor of a time to come", () => {
+    expect(daysSince(null, NOW)).toBeNull();
+    expect(daysSince(undefined, NOW)).toBeNull();
+    expect(daysSince("not a time", NOW)).toBeNull();
+    expect(daysSince("2026-11-03T12:00:00.001Z", NOW)).toBeNull();
   });
 });
 

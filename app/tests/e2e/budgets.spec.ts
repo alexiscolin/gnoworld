@@ -43,6 +43,17 @@ const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of thei
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
+// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
+// once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B). The view at rest's is
+// 9 KiB since 7d3's arrival and beat came into it, 8,591 B with them (Alexis, 2026-11-03, docs/decisions.md).
+const REST = /\/assets\/restSearch-[\w-]+\.js$/;
+const REST_JS = 9 * 1024;
+const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
+const NEBULAE_JS = 3.75 * 1024;
+// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
+// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
+const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
+const LABELS_JS = 5960;
 // A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g's flights
 // will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
 // set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
@@ -245,6 +256,21 @@ test("a system's arrival's chunk stays within its cap, apart from the view at re
     ARRIVAL_JS,
   );
 });
+
+for (const [name, chunk, cap] of [
+  ["view at rest's", REST, REST_JS],
+  ["nebulae's", NEBULAE, NEBULAE_JS],
+  ["labels'", LABELS, LABELS_JS],
+] as const)
+  test(`the ${name} chunk stays within its cap, apart from the cosmos's and the scene's`, async ({ page }) => {
+    const late = page.waitForResponse((response) => chunk.test(response.url()));
+    const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
+    const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+    await page.goto("/?test-gpu");
+    await hydrated(page);
+    const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+    expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
+  });
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {
   const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));

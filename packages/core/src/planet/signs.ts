@@ -92,6 +92,14 @@ const FORMS: Record<Anchor, { readonly kind: LightKind; readonly grain: Span; re
   "sub-Neptune": { kind: "pools", grain: [1.6, 2.6], fine: [4.4, 5.4] },
 };
 
+const DAY = 86_400_000;
+
+/** How many days ago the worlds' file first saw a world, from its time; none when it never did, or says a time to come. */
+export function daysSince(seen: string | null | undefined, now: number): number | null {
+  const at = typeof seen === "string" ? Date.parse(seen) : Number.NaN;
+  return Number.isFinite(at) && at <= now ? (now - at) / DAY : null;
+}
+
 /** A new family stays a seed until its first visit or 7 days; a world of unknown age is no new one. */
 export const isFresh = (ageDays: number | null, visited: boolean): boolean =>
   !visited && ageDays !== null && ageDays >= 0 && ageDays < SEED_DAYS;

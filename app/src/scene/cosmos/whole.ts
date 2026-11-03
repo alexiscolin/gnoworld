@@ -25,6 +25,8 @@ export class Whole {
   #compiled = false;
   /** How far the eye may move before the cosmos looks again, from where this frame found it. */
   step = STEP;
+  /** The most of the view it may take: the dive fades it in (7d7). */
+  most = 1;
 
   /** `came` is told when its part came, which then needs a look. */
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
@@ -62,6 +64,16 @@ export class Whole {
     this.#door.part?.stand(set, Date.now());
   }
 
+  /** Asks for its part now: the home's dive opens in it (7d7). */
+  open(): void {
+    this.#door.open();
+  }
+
+  /** Whether it can take the view: its part here, its program compiled, a world to draw. */
+  get ready(): boolean {
+    return this.#compiled && (this.#door.part?.count ?? 0) > 0;
+  }
+
   resize(ratio: number): void {
     this.#ratio = ratio;
     this.#door.part?.resize(ratio);
@@ -74,11 +86,10 @@ export class Whole {
     this.#distance = distance;
     this.step = Math.max(STEP, STEP_SHARE * distance);
     if (distance > NEAR) this.#door.open();
-    const web = this.#door.part;
-    const share = web !== undefined && this.#compiled && web.count > 0 ? wholeShare(distance) : 0;
+    const share = this.ready ? wholeShare(distance) : 0;
     if (share > 0 && this.#share === 0) this.#came();
     this.#share = share;
-    web?.advance(eye, seconds, share);
+    this.#door.part?.advance(eye, seconds, share * this.most);
     return share;
   }
 

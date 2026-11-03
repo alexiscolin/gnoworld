@@ -1,6 +1,6 @@
 // The view at rest once its chunk and a file's view came (7d6), in that chunk: the view the core found, its postcards, the eye that rests and
 // sways at it, what it draws, a system's arrival in its place and the sun's beat (7d3). The cosmos's AtRest holds only what was asked before
-// it came.
+// it came, and the home's dive.
 import {
   HOME,
   restView,
@@ -21,7 +21,11 @@ export class Resting {
   readonly #found: () => void;
   readonly #eye = new RestEye();
   readonly #beat = new Beat();
-  #view: RestView;
+  // Where the eye rests, neither swayed nor diving, on the stage and on the map: what says the view's bodies stand.
+  readonly #resting = { x: NaN, y: NaN, z: NaN };
+  readonly #restingMap = { x: NaN, y: NaN, z: NaN };
+  /** The view found for the last file, its postcards cleared while a new file's is looked for. */
+  view: RestView;
   #postcards: ReadonlyMap<number, Postcard> = new Map();
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
@@ -31,22 +35,22 @@ export class Resting {
     this.#found = found;
     const eye = { x: NaN, y: NaN, z: NaN };
     toMap(HOME, eye);
-    this.#view = { eye, postcards: [], close: undefined };
+    this.view = { eye, postcards: [], close: undefined };
   }
 
   /** Takes `systems`' view, then comes to what `asking` names, if anything. */
   rest(systems: readonly StarSystem[], asking: Asking | undefined): void {
-    this.#view = restView(systems);
-    this.#postcards = postcardsOf(systems, this.#view);
+    this.view = restView(systems);
+    this.#postcards = postcardsOf(systems, this.view);
     this.#systems = systems;
-    this.#eye.rest(this.#view);
+    this.#eye.rest(this.view);
     this.#found();
     this.arrive(asking);
   }
 
   /** A new file is looked for: no postcard stands till its view comes, and an arrival is looked for among `systems`. */
   clear(systems: readonly StarSystem[]): void {
-    this.#view = { ...this.#view, postcards: [], close: undefined };
+    this.view = { ...this.view, postcards: [], close: undefined };
     this.#postcards = new Map();
     this.#systems = systems;
   }
@@ -73,9 +77,10 @@ export class Resting {
     return this.#eye.focus;
   }
 
-  /** The eye `seconds` on, from the scene's `eye`, into `out`. */
+  /** The eye `seconds` on, from the scene's `eye`, into `out`, and where it rests. */
   place(eye: Point, seconds: number, out: { x: number; y: number; z: number }): void {
     this.#eye.place(eye, seconds, out);
+    this.#eye.place(eye, 0, this.#resting);
   }
 
   /** Turns `camera` from `eye` to what it looks at. */
@@ -88,10 +93,10 @@ export class Resting {
     return this.#beat.lift(written, seconds);
   }
 
-  /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it (`resting`, on the map, the eye less the
-   * arrival's glide and the sway), the ladder's `drawn` anywhere else. */
-  drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number; resting: Point }, drawn: Drawn) {
-    const shown = this.#eye.landing ?? { view: this.#view, postcards: this.#postcards, index: 0 };
-    return drawnFrom(systems, { shown, drawn }, sight);
+  /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it, the ladder's `drawn` anywhere else. */
+  drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
+    toMap(this.#resting, this.#restingMap);
+    const shown = this.#eye.landing ?? { view: this.view, postcards: this.#postcards, index: 0 };
+    return drawnFrom(systems, { shown, drawn }, { ...sight, resting: this.#restingMap });
   }
 }
