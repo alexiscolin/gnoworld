@@ -105,6 +105,18 @@ describe("the opening's end", () => {
     expect(left(words())).toBe(false);
   });
 
+  // F4520: the words' observer of the canvas lets go as they leave.
+  it("lets the canvas go as the words leave", () => {
+    const disconnect = vi.spyOn(MutationObserver.prototype, "disconnect");
+    const { words } = opened("on");
+    expect(disconnect).not.toHaveBeenCalled();
+    act(() => {
+      document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    });
+    expect(left(words())).toBe(true);
+    expect(disconnect).toHaveBeenCalled();
+  });
+
   it("holds while the focus is on its link, and leaves as the focus goes", async () => {
     vi.useRealTimers();
     const { canvas, words } = opened("on");

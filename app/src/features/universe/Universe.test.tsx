@@ -1579,6 +1579,30 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
   });
 });
 
+// F4518: the first visit's one filled call is the Earth's "Start here", which stands only where the cosmos runs: the hero's calls are marked
+// while it stands, and the stylesheet gives a newcomer's their first look then alone.
+describe("the hero's calls beside the cosmos (ADR-0003)", () => {
+  const calls = () => {
+    const actions = document.createElement("div");
+    actions.dataset["hero"] = "actions";
+    actions.dataset["cosmos"] = "none";
+    document.body.append(actions);
+    return actions;
+  };
+
+  it.each([
+    ["the scene cannot run", () => device({ gpu: null })],
+    ["a phone did not ask for space", () => device({ phone: true })],
+  ])("leaves them unmarked where %s", async (_, made) => {
+    made();
+    const actions = calls();
+    rendered("cosmos");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("none");
+    actions.remove();
+  });
+});
+
 // ADR-0003 §1: the home's opening, over the dive, on a newcomer's first arrival on the cosmos alone; never on a return, nor where the reader
 // came first to another place (a shared link), nor where no dive runs.
 describe("the home's opening (ADR-0003)", () => {
