@@ -59,7 +59,7 @@ SECTIONS = {
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
-    "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed",
+    "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
@@ -607,6 +607,10 @@ def mutants():
     yield from each(cmsg, '|| { echo "commit-msg: git cannot list what is staged" >&2; exit 1; }', "|| :", "hooks", "commit-msg refuses a fix git cannot compare")
     yield from each(cmsg, "grep -qE '^fix(\\(.+\\))?!?:'; then", "grep -qE '^fix(\\(.+\\))?:'; then", "hooks", "commit-msg reads a breaking fix")
     yield from each(".githooks/commit-msg", "command -v gitleaks >/dev/null ||", "true ||", "hooks", "commit-msg names a missing gitleaks (F125)")
+    yield from each(".githooks/commit-msg", "print(len(sys.stdin.buffer.read().decode()))') || {", "print(len(sys.stdin.buffer.read().decode()))') || true || {", "hooks", "commit-msg refuses a subject python3 cannot count (F5080)")
+    yield from each(".githooks/commit-msg", 'if ! printf \'%s\\n\' "$msg" | python3 -I -c "$rule"; then', "if false; then", "hooks", "commit-msg refuses a hidden character in the message (F5085)")
+    yield from each(".githooks/commit-msg", 'rule=$(git show :scripts/hidden.py 2>/dev/null) && [ -n "$rule" ] ||', "rule=$(cat scripts/hidden.py) ||", "hooks", "commit-msg reads the message with the staged scripts/hidden.py (F5085)")
+    yield from each(".githooks/commit-msg", 'if [ -n "${SANDBOX_RUNTIME:-}" ]; then\n\trule=', "if true; then\n\trule=", "hooks", "commit-msg runs nothing of the repository outside the sandbox (F076, F5085)")
     yield from each("scripts/gitleaks-private.toml", r"'''(?i)\b[a-z]:\\{1,2}users", r"'''(?i)\bnever:\\{1,2}users", "hooks", "the private scan sees Windows home folders")
     yield from each("scripts/gitleaks-private.toml", "|file://)", ")", "hooks", "the private scan sees a file URL into a home folder")
     yield from each("scripts/gitleaks-private.toml", r"(?:^|[^\w./~]|file://)(", "(", "hooks", "the private scan lets a users folder inside a path pass (F117)")

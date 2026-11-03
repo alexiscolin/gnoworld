@@ -12,7 +12,12 @@ case $subject in
 		echo "commit-msg: the subject is 'type(scope): what', type one of feat fix docs test refactor perf build ci chore style revert." >&2
 		exit 1
 	fi
-	if [ "$(printf '%s' "$subject" | python3 -I -c 'import sys; print(len(sys.stdin.buffer.read().decode()))')" -gt 72 ]; then # characters, in any locale
+	# characters, in any locale; a python3 that cannot count them refuses (F5080): `[ "" -gt 72 ]` is no answer
+	length=$(printf '%s' "$subject" | python3 -I -c 'import sys; print(len(sys.stdin.buffer.read().decode()))') || {
+		echo "commit-msg: python3 cannot count the subject's characters" >&2
+		exit 1
+	}
+	if [ "$length" -gt 72 ]; then
 		echo "commit-msg: the subject is over 72 characters." >&2
 		exit 1
 	fi
@@ -45,3 +50,18 @@ for config in gitleaks.toml gitleaks-private.toml; do
 		exit 1
 	fi
 done
+# A hidden character in a message shows nothing or changes how it reads, and scripts parse messages (a `Removed-test:` line
+# shown as one name and read as another, F5079). In Claude Code's sandbox, whose tools once wrote one raw, the staged
+# scripts/hidden.py reads each message as it is written, a merge's and an amend's included (F5085), as pre-commit runs the
+# staged scripts there; outside, nothing of the repository runs (F076), and check_docs reads the branch's messages at the
+# next gate. With no staged rule, or a python3 that fails, nothing proves the message clean.
+if [ -n "${SANDBOX_RUNTIME:-}" ]; then
+	rule=$(git show :scripts/hidden.py 2>/dev/null) && [ -n "$rule" ] || {
+		echo "commit-msg: git cannot read the staged scripts/hidden.py, so the message is not proven free of hidden characters" >&2
+		exit 1
+	}
+	if ! printf '%s\n' "$msg" | python3 -I -c "$rule"; then
+		echo "commit-msg: the message holds a hidden character (above), which a message writes as an escape, or scripts/hidden.py could not read it" >&2
+		exit 1
+	fi
+fi

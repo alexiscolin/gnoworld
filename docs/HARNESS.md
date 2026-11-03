@@ -75,7 +75,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
-   product with no test and no `No-test:` line, and scans the message for secrets. `pre-commit`
+   product with no test and no `No-test:` line, scans the message for secrets, and, in Claude Code's sandbox only, refuses a hidden
+   character in it with the staged `scripts/hidden.py`, as pre-commit runs the staged scripts there (F5085, D36). `pre-commit`
    scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast gate on a copy
    of what is staged, scoped to the commit's paths (`GATE_CHANGED`), and records the code it
    passed. In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate

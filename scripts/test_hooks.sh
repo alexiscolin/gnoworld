@@ -625,6 +625,7 @@ cp "$hooks/commit-msg" "$cm/"
 secrets_into "$cm/"
 # It reads what is staged: it runs in a repository of its own, never the one under test.
 cmr="$t/commit-msg-repo" && git init -q "$cmr"
+mkdir -p "$cmr/scripts" && cp "$here/hidden.py" "$cmr/scripts/" && git -C "$cmr" add scripts/hidden.py # what it reads a message with
 refused() {
 	printf '%s\n' "$1" >"$t/msg"
 	! (cd "$cmr" && "$cm/commit-msg" "$t/msg") 2>"$t/err"
@@ -678,6 +679,11 @@ refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject wa
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
 (cd "$cmr" && LC_ALL=C "$cm/commit-msg" "$t/msg") 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+# A python3 that cannot count is no count (F5080): `[ "" -gt 72 ]` errs, and an 86-character subject passed.
+mkdir -p "$t/badpy" && printf '#!/bin/sh\nexit 1\n' >"$t/badpy/python3" && chmod +x "$t/badpy/python3"
+printf 'feat: %s\n' "$(printf 'a%.0s' $(seq 1 80))" >"$t/msg"
+(cd "$cmr" && env -u SANDBOX_RUNTIME PATH="$t/badpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a long subject python3 could not count (F5080)"
+grep -qF "python3 cannot count the subject's characters" "$t/err" || fail "commit-msg did not say python3 cannot count: $(cat "$t/err")"
 # A fix of the product comes with its test, or a line No-test: <why>, as prove_fix.py wants, refused
 # at the commit rather than 30 minutes later by the full gate (9db841c, slice 3).
 mkdir -p "$cmr/server/src" "$cmr/scripts" && printf 'x\n' >"$cmr/server/src/a.ts" && git -C "$cmr" add server/src/a.ts
@@ -706,8 +712,25 @@ refused "fix(server): x" || fail "a fix whose only test it deletes was accepted"
 git -C "$cmr" reset -q HEAD server/src/b.ts
 refused "fix(server): x" && fail "a fix that only deletes a test was refused, which changes no product code"
 mkdir -p "$t/no-repo" && printf 'fix(server): x\n' >"$t/msg"
-(cd "$t/no-repo" && GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
+(cd "$t/no-repo" && env -u SANDBOX_RUNTIME GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
 grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not say git failed: $(cat "$t/err")"
+# A hidden character in the message (F5085): in the sandbox, the staged scripts/hidden.py reads each message as it is
+# written, a merge's and an amend's too, as pre-commit runs the staged scripts there; an emoji's look selector passes. With
+# no staged rule, or a python3 that fails, nothing proves the message clean: it refuses.
+refused "$(printf 'test: x\n\nRemoved-test: a\342\200\256b - why')" || fail "commit-msg accepted a hidden character in the message (F5085)"
+grep -qxF "  message:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" "$t/err" || fail "commit-msg did not name the message's hidden character: $(cat "$t/err")"
+refused "$(printf 'docs: a heart \342\235\244\357\270\217')" && fail "commit-msg refused an emoji's look selector: $(cat "$t/err")"
+blob=$(printf 'import sys\nsys.exit("the staged copy ran")\n' | git -C "$cmr" hash-object -w --stdin) && git -C "$cmr" update-index --cacheinfo "100644,$blob,scripts/hidden.py"
+refused "docs: x" || fail "commit-msg ran another scripts/hidden.py than the staged one"
+grep -qF "the staged copy ran" "$t/err" || fail "commit-msg did not run the staged scripts/hidden.py: $(cat "$t/err")"
+git -C "$cmr" update-index --force-remove scripts/hidden.py
+refused "docs: x" || fail "commit-msg passed a message with no staged scripts/hidden.py to read it"
+grep -qF "git cannot read the staged scripts/hidden.py" "$t/err" || fail "commit-msg did not say it has no rule to read the message with: $(cat "$t/err")"
+git -C "$cmr" add scripts/hidden.py
+mkdir -p "$t/countpy" && printf '#!/bin/sh\ncase "$*" in *"print(len("*) echo 7 && exit 0 ;; esac\nexit 1\n' >"$t/countpy/python3" && chmod +x "$t/countpy/python3"
+printf 'docs: x\n' >"$t/msg" # a python3 that counts the subject, then fails
+(cd "$cmr" && PATH="$t/countpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a message with a python3 that fails"
+grep -qF "scripts/hidden.py could not read it" "$t/err" || fail "commit-msg did not say the message could not be read: $(cat "$t/err")"
 fi
 
 if part unsigned; then
@@ -2098,7 +2121,7 @@ mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
 cp "$hooks"/* "$here/code_changed.sh" "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
 # What Claude can edit, and a hook could reach, leaves a mark when it runs.
 for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
-for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
+for f in review_pass.py check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
 # Installed as Alexis does, so pre-push finds the hooks of the main it pushes (F129); the section
@@ -2138,8 +2161,11 @@ out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home f
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" && fail "commit-msg outside the sandbox let a home folder's path through"
+# Outside, commit-msg runs no scripts/hidden.py, staged or not: the branch's messages are read at the next gate (F5085).
+printf 'docs: x\n' >"$t/outside-msg"
+out sh .githooks/commit-msg "$t/outside-msg" || fail "commit-msg outside the sandbox refused a clean message"
 git -C "$o" commit -qm two
-untouched "pre-commit, pre-merge-commit"
+untouched "pre-commit, pre-merge-commit, commit-msg"
 # pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
 head=$(git -C "$o" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$head" "$1" "${2:-0000000000000000000000000000000000000000}" | out sh .githooks/pre-push origin url; }
