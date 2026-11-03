@@ -1,14 +1,15 @@
 // The cosmos's labels, the lazy chunk's way in (7h): a look asks core which worlds to label from what the view draws and what the data says,
-// and hands each label what it points at: the Earth, a body, a distant star. A frame moves them.
-import { chooseLabels, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
+// and hands each label what it points at: the Earth, a body, a distant star. A frame moves them. The home's rocks come through here too
+// (7p), the one chunk a look and a frame reach that the cosmos's and the scene's chunks pay nothing for.
+import { chooseLabels, type Drawn, type Point, type Rock, type StarSystem } from "@gnoworld/core";
 import { Vector3, type Group } from "three";
 import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
 import { asksOf } from "./labelAsks.ts";
 import { Labels, type Anchor, type Chosen, type Projector } from "./labels.ts";
 
-/** What the labels read of the cosmos: its bodies' projection and objects, and where its Earth stands. */
+/** What the labels read of the cosmos: its bodies' projection, objects and group, and where its Earth stands. */
 export interface Seen {
-  readonly projector: Projector & { anchorOf: (id: string) => Group | undefined };
+  readonly projector: Projector & { anchorOf: (id: string) => Group | undefined; group?: Group };
   readonly earth: () => Vector3 | undefined;
   /** The Earth's radius and how a world's callers are counted, handed by the cosmos: this chunk imports nothing that lives with it. */
   readonly earthRadius: number;
@@ -17,6 +18,9 @@ export interface Seen {
 
 // Where nothing stands: the Earth's label waits there, hidden, until the globe has come.
 const NOWHERE = new Vector3();
+// The home's rocks are drawn by a chunk of their own, asked the first time a look lays some.
+const loadRocks = () => import("./rocks.ts");
+type Rocks = InstanceType<Awaited<ReturnType<typeof loadRocks>>["Rocks"]>;
 
 export class CosmosLabels {
   readonly #labels: Labels;
@@ -25,6 +29,10 @@ export class CosmosLabels {
   readonly #earth: Anchor;
   #list: readonly CosmosWorld[] = [];
   #signals: LabelSignals | undefined;
+  #rocks: Rocks | undefined;
+  #laid: readonly Rock[] = [];
+  #asked = false;
+  #gone = false;
 
   constructor(document: Document, seen: Seen) {
     this.#seen = seen;
@@ -72,13 +80,34 @@ export class CosmosLabels {
       return at === undefined ? [] : [{ label, at }];
     });
     this.#labels.show(chosen, [...anchors.values()]);
+    this.#lay(drawn.rocks ?? []);
+  }
+
+  // The rocks a look laid, among the bodies, so they show and hide with them; a chunk that does not come leaves none.
+  #lay(rocks: readonly Rock[]): void {
+    this.#laid = rocks;
+    this.#rocks?.lay(rocks);
+    if (this.#asked || rocks.length === 0) return;
+    this.#asked = true;
+    loadRocks().then(
+      ({ Rocks: Made }) => {
+        const { group } = this.#seen.projector;
+        if (this.#gone || group === undefined) return;
+        this.#rocks = new Made(group);
+        this.#rocks.lay(this.#laid);
+      },
+      () => undefined,
+    );
   }
 
   tick(eye: Point, shown: boolean): void {
     this.#labels.tick(eye, shown);
+    this.#rocks?.tick(eye);
   }
 
   dispose(): void {
+    this.#gone = true;
     this.#labels.dispose();
+    this.#rocks?.dispose();
   }
 }

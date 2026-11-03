@@ -40,6 +40,7 @@ export {
   type WorldHeld,
 } from "./cosmos/system.ts";
 export { worldsDrawn } from "./cosmos/count.ts";
+export type { Rock } from "./lod/drawn.ts";
 export {
   BODY_PIXELS,
   BOUNDS,
@@ -55,7 +56,7 @@ export {
 } from "./lod/ladder.ts";
 export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
 export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
-export { chooseRail, type RailAsk, type RailWorld } from "./lod/rail.ts";
+export { callersIn, chooseRail, type RailAsk, type RailWorld } from "./lod/rail.ts";
 export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
@@ -72,19 +73,21 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
+export { deepOf, judgeOf, type Deep, type Judge } from "./frame/deep.ts";
+export { LENT, type Lent } from "./frame/lent.ts";
+export { rocksOf } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";
 export { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, stopNear, stopNearIn, wayAt } from "./frame/flight.ts";
 export type { Figures, FlightPhase } from "./frame/flight.ts";
+export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,
-  postcardOf,
   REST_DISTANCE,
   REST_SCREENS,
   restView,
   STAR_HEART,
   type RestView,
-  type Postcard,
 } from "./frame/rest.ts";
 export {
   anchorOf,
@@ -103,7 +106,6 @@ export {
   type RealmFunctions,
 } from "./planet/look.ts";
 export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseCounts } from "./planet/gauges.ts";
-export { callersIn } from "./planet/gauges.ts";
 export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";

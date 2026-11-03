@@ -3,9 +3,12 @@
 // it came, and the home's dive.
 import {
   HOME,
+  LENT,
   restView,
   toMap,
+  type Deep,
   type Drawn,
+  type Rock,
   type Point,
   type Postcard,
   type RestView,
@@ -18,6 +21,10 @@ import { Beat } from "./restBeat.ts";
 import { drawnFrom, postcardsOf } from "./restBodies.ts";
 import { RestEye } from "./restEye.ts";
 
+// The view's depth, the real worlds of other nearby systems it draws and the home's rocks (7p), is found in a chunk of its own once the view
+// has come.
+const loadDeep = () => import("./restDeep.ts");
+
 export class Resting {
   readonly #found: () => void;
   readonly #eye: RestEye;
@@ -28,6 +35,8 @@ export class Resting {
   /** The view found for the last file, its postcards cleared while a new file's is looked for. */
   view: RestView;
   #postcards: ReadonlyMap<number, Postcard> = new Map();
+  #deep: readonly Deep[] = [];
+  #rocks: readonly Rock[] = [];
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
 
@@ -46,15 +55,32 @@ export class Resting {
     this.view = restView(systems);
     this.#postcards = postcardsOf(systems, this.view);
     this.#systems = systems;
+    this.#deepen(systems, this.view);
     this.#eye.rest(this.view);
     this.#found();
     this.arrive(asking);
+  }
+
+  // The view's depth and rocks, for `view` only, drawn once their chunk came: a chunk that does not come leaves the view as it is.
+  #deepen(systems: readonly StarSystem[], view: RestView): void {
+    this.#deep = [];
+    this.#rocks = [];
+    loadDeep().then(
+      ({ inDepth }) => {
+        if (this.view !== view) return;
+        ({ bodies: this.#deep, rocks: this.#rocks } = inDepth(systems, view, LENT));
+        this.#found();
+      },
+      () => undefined,
+    );
   }
 
   /** A new file is looked for: no postcard stands till its view comes, and an arrival is looked for among `systems`. */
   clear(systems: readonly StarSystem[]): void {
     this.view = { ...this.view, postcards: [], close: undefined };
     this.#postcards = new Map();
+    this.#deep = [];
+    this.#rocks = [];
     this.#systems = systems;
   }
 
@@ -99,7 +125,13 @@ export class Resting {
   /** What is drawn from `sight`: the view at rest's, or the arrival's, where the eye rests at it, the ladder's `drawn` anywhere else. */
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
     toMap(this.#resting, this.#restingMap);
-    const shown = this.#eye.landing ?? { view: this.view, postcards: this.#postcards, index: 0 };
+    const shown = this.#eye.landing ?? {
+      view: this.view,
+      postcards: this.#postcards,
+      index: 0,
+      deep: this.#deep,
+      rocks: this.#rocks,
+    };
     return drawnFrom(systems, { shown, drawn }, { ...sight, resting: this.#restingMap });
   }
 }

@@ -23,8 +23,7 @@ import {
   type Look,
 } from "./restLook.ts";
 
-export { postcardOf, type Postcard } from "./postcard.ts";
-
+export { postcardOf } from "./postcard.ts";
 export { FIELD_OF_VIEW, HERO_ZONE, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 export { REST_DISTANCE };
 
@@ -91,7 +90,7 @@ function judge(candidate: Candidate, ask: Ask): Judged | undefined {
   return {
     score,
     view: { eye: camera.eye, postcards: postcards.map(({ held }) => held.index), close: where },
-    rows: () => rowOnTheWayDown(camera, postcards, close),
+    rows: () => rowOnTheWayDown(camera, postcards, { close }),
   };
 }
 

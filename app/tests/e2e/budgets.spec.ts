@@ -49,9 +49,9 @@ const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
 // The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
 // once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B). The view at rest's is
-// 9 KiB since 7d3's arrival and beat came into it, 8,591 B with them (Alexis, 2026-11-03, docs/decisions.md).
+// 10 KiB since 7p judges the postcards in depth in the search, 10,066 B on 7d9's tree (Alexis, 2026-11-03, docs/decisions.md).
 const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const REST_JS = 9 * 1024;
+const REST_JS = 10 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
@@ -79,6 +79,15 @@ const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
 const ARRIVAL_JS = 1680;
+// The view at rest in depth (7p): its far bodies and the home's rocks, found in a chunk the view at rest's names; the rocks drawn by one the
+// labels' name, its program (an attribute no minifier renames) in no chunk the cosmos or the scene loads first. First caps: their sizes, and
+// about a tenth: 1,204 B for the rocks; 2,534 B for the depth with its review's fixes, the rocks' near one and cluster (7p).
+const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
+const DEEP_JS = 2790;
+const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
+const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
+const ROCKS_JS = 1325;
+const ROCKS_MARK = "aRock";
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -259,20 +268,46 @@ test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and
   expect(await compressed(page, await ownOf(page, (await whole).url(), there))).toBeLessThanOrEqual(WHOLE_JS);
 });
 
-test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
-  page,
-}) => {
+// The home's scene chunk, once the page hydrated: each late chunk is found by name from it, chunk by chunk.
+async function homeScene(page: Page): Promise<string> {
   const asked = page.waitForResponse((response) => SCENE.test(response.url()));
   await page.goto("/?test-gpu");
   await hydrated(page);
-  const scene = (await asked).url();
+  return (await asked).url();
+}
+
+// A late chunk the view at rest's names by `named`, within `cap` apart from the view at rest's, the cosmos's and the scene's.
+async function restLateWithin(page: Page, named: RegExp, cap: number): Promise<void> {
+  const scene = await homeScene(page);
   const cosmos = await namedIn(page, scene, COSMOS_NAMED);
   const rest = await namedIn(page, cosmos, REST_NAMED);
-  const there = [scene, cosmos, rest].map((url) => closureOf(page, url));
-  const arrival = await namedIn(page, rest, ARRIVAL_NAMED);
-  expect(await compressed(page, await ownOf(page, arrival, (await Promise.all(there)).flat()))).toBeLessThanOrEqual(
-    ARRIVAL_JS,
-  );
+  const there = (await Promise.all([scene, cosmos, rest].map((url) => closureOf(page, url)))).flat();
+  expect(await compressed(page, await ownOf(page, await namedIn(page, rest, named), there))).toBeLessThanOrEqual(cap);
+}
+
+test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await restLateWithin(page, ARRIVAL_NAMED, ARRIVAL_JS);
+});
+
+test("the view at rest's depth chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await restLateWithin(page, DEEP_NAMED, DEEP_JS);
+});
+
+test("the rocks' chunk stays within its cap, apart from the labels', the cosmos's and the scene's, which hold none of it", async ({
+  page,
+}) => {
+  const scene = await homeScene(page);
+  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
+  const labels = await namedIn(page, scene, LABELS_NAMED);
+  const there = (await Promise.all([scene, cosmos, labels].map((url) => closureOf(page, url)))).flat();
+  const rocks = await namedIn(page, labels, ROCKS_NAMED);
+  expect(await compressed(page, await ownOf(page, rocks, there))).toBeLessThanOrEqual(ROCKS_JS);
+  for (const url of [...(await closureOf(page, scene)), ...(await closureOf(page, cosmos))])
+    expect(await (await page.request.get(url)).text(), url).not.toContain(ROCKS_MARK);
 });
 
 for (const [name, chunk, cap] of [
