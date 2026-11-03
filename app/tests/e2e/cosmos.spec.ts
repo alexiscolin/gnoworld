@@ -868,6 +868,7 @@ async function bothWays(page: Page, turn?: (page: Page) => Promise<void>) {
 // Frame 16's teal, top right (f0016.jpg read with ffmpeg, 2026-11-02): hues 182 to 193 from the tenth part of its pixels to the ninetieth,
 // mean sRGB (10, 44, 50), its ninetieth (10, 62, 66). The light a nebula adds is read against black, so a few degrees more either way.
 const FRAME_TEAL = { least: 176, most: 200, brightest: 66, saturation: 0.82 };
+const SATURATION_READ = 7;
 function hueOf([red, green, blue]: readonly number[]): number {
   const [r = 0, g = 0, b = 0] = [red, green, blue];
   const top = Math.max(r, g, b);
@@ -894,7 +895,7 @@ test.describe("the nebulae's light", () => {
   test("gives a cool nebula frame 16's teal, dark and discreet as there, never the grey-blue", async ({ page }) => {
     const { without, withNebulae } = await bothWays(page, quarterTurned);
     const [before, after] = [await colours(page, without, boxes()), await colours(page, withNebulae, boxes())];
-    let teal = 0;
+    let [teal, read] = [0, 0];
     for (const [at, colour] of after.entries()) {
       const behind = before[at] ?? [255, 255, 255];
       const added = colour.map((value, channel) => value - (behind[channel] ?? 0));
@@ -906,9 +907,14 @@ test.describe("the nebulae's light", () => {
       expect(hueOf(added), `box ${String(at)}`).toBeGreaterThanOrEqual(FRAME_TEAL.least);
       expect(hueOf(added), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.most);
       expect(Math.max(...colour), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.brightest);
+      // Its saturation is read where the light added reaches 7 on its strongest channel: there half a step of 8-bit rounding moves it by
+      // 0.07 at most, under the bound's margin over frame 16's 0.82 (7d9). Seventy-five boxes read at the least, so the floor hides no change.
+      if (top < SATURATION_READ) continue;
+      read += 1;
       expect((top - Math.min(...added)) / top, `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.saturation + 0.1);
     }
     expect(teal).toBeGreaterThan(3);
+    expect(read).toBeGreaterThanOrEqual(75);
   });
 });
 
