@@ -113,7 +113,7 @@ export { worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";
-export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export { CONTINENTS_SEA, planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
 export { labOf, type Lab, type Palette } from "./planet/palette.ts";
 export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";

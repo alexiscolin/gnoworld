@@ -105,9 +105,11 @@ function staged(worlds: readonly Planet[], layout: Layout, sky: Object3D) {
 }
 
 // The Earth's light for each world: its own star from its path's seed, and the bright limb of its air where it has one.
-function lightWorlds(worlds: readonly Planet[], shown: readonly Shown[]): void {
+// Or, asked, every world lit from the eye: its whole face in the light, what the journeys count its land on.
+function lightWorlds(worlds: readonly Planet[], shown: readonly Shown[], front: boolean): void {
   for (const [index, world] of worlds.entries()) {
-    world.setSun(sideLight(planetSeed(shown[index]?.path ?? new Uint8Array()), new Vector3()));
+    const sun = new Vector3(0, 0, 1);
+    world.setSun(front ? sun : sideLight(planetSeed(shown[index]?.path ?? new Uint8Array()), sun));
     if (world.look.rim !== null) world.setLimb(LIMB_LIGHT);
   }
 }
@@ -150,7 +152,7 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
   const worlds = shown.map((world) => createWorld(world, set, sphere));
   const stars = starField(ratio);
   const stage = staged(worlds, layout, stars);
-  if (layout.sun === undefined) lightWorlds(worlds, shown);
+  if (layout.sun === undefined) lightWorlds(worlds, shown, choice.front);
   showSigns(worlds, signs);
   const sprite = spriteOf(choice, layout);
   if (sprite !== undefined) stage.add(sprite);

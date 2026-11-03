@@ -36,6 +36,8 @@ const ALIKE_AT_MOST = 2;
 const DETAIL_SHARE = 0.8;
 const GRAIN = 3;
 const ROUNDING = 2.3;
+// A temperate world close on six seeds, each at the Earth's level, never one chosen (the chief, 2026-11-03; 7b8's coasts lost it on two).
+const TEMPERATE_SEEDS = 6;
 // A giant seen close as Alexis chose it (2026-11-03, 15:2x, "la version douce", reports/7b7-compare/): no streak, soft, about a third of
 // frame 104's Jupiter's fine detail (0.119 to 0.312 against 0.354, the same measure on its box clear of the grid), so 0.28 of Jupiter's at
 // least; no variance floor, for at the pixel a soft giant no longer differs from rounding (1.8 to 6.9 on 11 of 15 views).
@@ -50,9 +52,10 @@ const APPROVED_HOT = [0.0387, 0.0605] as const;
 const APPROVED_RED_OVER_HOT = [0.75, 0.84] as const;
 const PALE_AT_MOST = 0.01;
 // The veins of the video's frame 4 "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; pixels.ts's glows): 55.2% of its disc,
-// 62.8% of its night half; its brightest pixels gold (blue 0.57 of red), never white. A veined world holds half of each at least.
+// 62.8% of its night half, a veined world half of each at least; cream as Music's (Alexis, 2026-11-03), 4.5% of its disc white by glows'
+// rule (luma past 170, blue two thirds of red or more), a quarter past it at most: no whiter (7b7's gold read 0.5% at most).
 const MUSIC = [0.552, 0.628] as const;
-const NEVER_WHITE = 0.005;
+const MUSIC_WHITE = 1.25 * 0.045;
 // Io's sulfur crust as the chief described it, yellow to orange and bright, a few hot spots: set from that description, no image of Io
 // measured. Lab hue of the lit ground in degrees, its chroma, its lightness, and its white share at most (lit sulfur is bright, not white).
 const SULFUR = { hue: [55, 100], chroma: 25, lightness: 35, white: 0.01 } as const;
@@ -117,13 +120,13 @@ const closeDetail = async (page: Page, query: string) => {
     type: "detail",
     description: JSON.stringify({ day, earth, raw: day.variance / earth.variance, anchor }),
   });
-  expect(day.sharpness, "no grain").toBeLessThanOrEqual(GRAIN);
+  expect(day.sharpness, `${query}: no grain`).toBeLessThanOrEqual(GRAIN);
   if (isGiant(anchor)) {
-    expect(day.sharpness, "a soft giant's detail").toBeGreaterThanOrEqual(GIANT_SHARPNESS);
+    expect(day.sharpness, `${query}: a soft giant's detail`).toBeGreaterThanOrEqual(GIANT_SHARPNESS);
     return;
   }
-  expect(day.sharpness, "as sharp as the Earth").toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
-  expect(day.variance, "detail, not rounding").toBeGreaterThan(4 * ROUNDING);
+  expect(day.sharpness, `${query}: as sharp as the Earth`).toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
+  expect(day.variance, `${query}: detail, not rounding`).toBeGreaterThan(4 * ROUNDING);
 };
 
 // The real file's 24, read once a worker: the lab's own choice of them, which `real=` must follow.
@@ -263,7 +266,7 @@ test.describe("generated worlds", () => {
     for (const veins of of(1)) {
       expect(veins.glow, "veins over the disc").toBeGreaterThanOrEqual(MUSIC[0] / 2);
       expect(veins.night, "veins on the night side").toBeGreaterThanOrEqual(MUSIC[1] / 2);
-      expect(veins.white, "gold, never white").toBeLessThanOrEqual(NEVER_WHITE);
+      expect(veins.white, "cream, never whiter than Music's").toBeLessThanOrEqual(MUSIC_WHITE);
     }
     for (const sulfur of of(2)) {
       const [lightness, a, b] = sulfur.lab;
@@ -316,7 +319,9 @@ test.describe("generated worlds", () => {
 
   for (const index of ANCHORS.keys())
     test(`a ${ANCHORS[index] ?? ""} world seen close holds the Earth's fine detail`, async ({ page }) => {
-      await closeDetail(page, `?view=close&world=${String(index)}`);
+      const seeds = ANCHORS[index] === "temperate" ? TEMPERATE_SEEDS : 1;
+      for (let seed = 0; seed < seeds; seed += 1)
+        await closeDetail(page, `?view=close&world=${String(index)}&seed=${String(seed)}`);
     });
 
   for (let index = 0; index < VIEW_OF_24; index += 1)

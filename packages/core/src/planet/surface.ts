@@ -12,11 +12,15 @@ export type Surface = Readonly<Record<SurfaceName, number>> & {
 /** Cycles per radius of the finest structure the close view shows: two texels of the Earth's 4096-wide map. */
 export const FINEST = 2048 / (2 * Math.PI);
 const FIRST_BYTE = 9;
+// Bytes 26 to 29 are the minor's and the grade's (choice.ts's moreSeed): the values past the seventeenth read on from byte 30.
+const TAKEN = 17;
+const AFTER = 30;
 const NAMES = Object.keys(SURFACE) as SurfaceName[];
 
 export function surfaceOf(more: Uint8Array, anchor: Anchor): Surface {
+  const byteOf = (at: number) => (at < TAKEN ? FIRST_BYTE + at : AFTER + at - TAKEN);
   const values = Object.fromEntries(
-    NAMES.map((name, at) => [name, between(spanOf(anchor, name), seedShare(more, FIRST_BYTE + at))]),
+    NAMES.map((name, at) => [name, between(spanOf(anchor, name), seedShare(more, byteOf(at)))]),
   ) as Record<SurfaceName, number>;
   let octaves = 1;
   for (let frequency = values.scale; frequency < FINEST; frequency *= values.lacunarity) octaves += 1;

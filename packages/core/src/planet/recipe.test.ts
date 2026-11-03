@@ -14,9 +14,11 @@ import {
   type Anchor,
   type PlanetLook,
 } from "./look.ts";
-import { labOf, linearOf, turnOf, type Lab } from "./palette.ts";
-import { planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
+import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
+import { BARE, CONTINENTS_SEA, ofContinents, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
+import { sha256 } from "./sha256.ts";
+import { correlation } from "../testing.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
 
 const EACH = 500;
@@ -98,14 +100,6 @@ function universe(): Map<string, number>[] {
       return places;
     }),
   );
-}
-
-function correlation(pairs: readonly (readonly [number, number])[]): number {
-  const mean = (at: 0 | 1) => pairs.reduce((sum, pair) => sum + pair[at], 0) / pairs.length;
-  const [mx, my] = [mean(0), mean(1)];
-  let [xy, xx, yy] = [0, 0, 0];
-  for (const [x, y] of pairs) [xy, xx, yy] = [xy + (x - mx) * (y - my), xx + (x - mx) ** 2, yy + (y - my) ** 2];
-  return xy / Math.sqrt(xx * yy);
 }
 
 function evenly(name: string, values: readonly number[]): void {
@@ -259,6 +253,85 @@ describe("a world's sea", () => {
         ).toBeGreaterThanOrEqual(10);
       }
     }
+  });
+});
+
+// Temperate worlds real (7b8; Alexis, 2026-11-03, "surtout naturel"): a world of continents grows the Earth's own plants and bares its
+// own ground, read off its day map (earth-day.webp; 13-pixel means): forests (hue 114 to 122) to steppes (84), the Sahara's sand (L* 85),
+// the outback's ochre (59), cold steppes (75); its greens' mean chroma 25.1, the low-key bound ("toujours en retenue").
+describe("a world of continents", () => {
+  const EARTH_MOST = 25.1;
+  const DEGREE = Math.PI / 180;
+  const hueOf = ([, a, b]: Lab) => Math.atan2(b, a) / DEGREE;
+  const lights = ([low, mid, high]: readonly [Lab, Lab, Lab]) => [low[0], mid[0], high[0]] as const;
+  const temperate = (count: number) =>
+    Array.from({ length: count }, (_, at) =>
+      planetRecipe(asciiBytes(`gno.land/r/t${String(at % 50)}/w${String(at)}`), "temperate"),
+    );
+
+  it("grows the Earth's plants, deep forest to dry grass, never more saturated than the Earth's own greens", () => {
+    for (const { palette } of temperate(500)) {
+      for (const colour of palette.lab) {
+        expect(hueOf(colour)).toBeGreaterThanOrEqual(75 - 12);
+        expect(hueOf(colour)).toBeLessThanOrEqual(124 + 12);
+        expect(chroma(colour)).toBeLessThanOrEqual(EARTH_MOST);
+      }
+      const [low, mid, high] = lights(palette.lab);
+      expect(low).toBeLessThan(mid);
+      expect(mid).toBeLessThan(high);
+      expect(low, "a deep forest").toBeLessThanOrEqual(35);
+      expect(high, "a dry grass").toBeGreaterThanOrEqual(45);
+    }
+  });
+
+  it("bares its ground in the Earth's tundra, ochre and sand, graded and turned as its plants", () => {
+    for (const ramp of BARE) {
+      for (const colour of ramp) {
+        expect(hueOf(labOf(colour))).toBeGreaterThanOrEqual(55);
+        expect(hueOf(labOf(colour))).toBeLessThanOrEqual(105);
+        expect(chroma(labOf(colour))).toBeLessThanOrEqual(EARTH_MOST);
+      }
+      const [tundra, ochre, sand] = [labOf(ramp[0]), labOf(ramp[1]), labOf(ramp[2])];
+      expect(hueOf(tundra), "a cold steppe").toBeGreaterThanOrEqual(70);
+      expect(hueOf(ochre), "an ochre").toBeLessThanOrEqual(65);
+      expect(sand[0], "a sand").toBeGreaterThanOrEqual(75);
+    }
+    for (const share of [0, 0.4, 1])
+      for (let at = 0; at < 40; at += 1) {
+        const seed = planetSeed(asciiBytes(`gno.land/r/bare${String(at)}/home`));
+        const more = sha256(seed);
+        const grade = {
+          blend: word(seed, 6),
+          lightness: lerp(...LIGHTNESS, (more[28] ?? 0) / 255),
+          chroma: lerp(...CHROMA, (more[29] ?? 0) / 255),
+          turn: turnOf(share),
+        };
+        const { minorPalette, palette } = seededRecipe(seed, "temperate", grade.turn);
+        expect(minorPalette).toEqual(paletteOf(BARE, grade));
+        expect(palette).toEqual(paletteOf(ROWS.temperate.palettes, grade));
+      }
+  });
+
+  // The reviewer's R9: one rule for what a world of continents is, the program's too (its sea under an ocean's 0.8).
+  it("takes a world for one of continents from a sea of more than none to under an ocean's", () => {
+    expect(CONTINENTS_SEA).toBe(0.8);
+    expect([0, 0.0001, 0.45, 0.7999, 0.8, 1].map((sea) => ofContinents({ sea }))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("leaves every other world's minor in its own class's palette", () => {
+    for (const anchor of ANCHORS.filter((one) => one !== "temperate"))
+      for (let at = 0; at < 30; at += 1) {
+        const path = asciiBytes(`gno.land/r/other${String(at)}/home`);
+        const recipe = planetRecipe(path, anchor);
+        expect(recipe.minorPalette, anchor).toEqual(planetRecipe(path, recipe.minor).palette);
+      }
   });
 });
 

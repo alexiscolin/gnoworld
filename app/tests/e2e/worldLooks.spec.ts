@@ -9,15 +9,18 @@ import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, pic
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
-import { facesOn, grain, landOn, rows, shownPart, type Face } from "./textures.ts";
+import { facesApart, facesOn, GLANCE, grain, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
 // 0.069 of the radius wide, their width's spread 0.65 and 0.48. 7b5's worm loops: 1.30 ends a junction, glow 0.26, 0.006 r wide.
 const NET = { junctions: 50, endsPerJunction: 0.4, glow: [0.33, 0.8], width: [0.03, 0.1], widthSpread: 0.3 } as const;
-// The core the brief asks, #ffc870 (luma 205), gold to orange: its blue over red 0.44 sets the bound, never white (Music's own top 2%,
-// #fcd3b2, reads 0.70 through the video's compression); 7b5's #b8853a, luma 138.
-const CORE = { luma: 0.8 * 205, blueOverRed: 0.6, greenOverRed: [0.6, 0.9] } as const;
+// No asterisks of fine veins inside a cell (Alexis, 2026-11-03, "corriger et retirer"): 7b7's net read 565 and 572 junctions, most of them
+// its fine net's stars; one gated near its main veins 307 to 375. Music's own 186, a little over doubled.
+const MOST_JUNCTIONS = 420;
+// The core cream as Music's (Alexis, 2026-11-03, "crème comme Music"): Music's brightest tenth #e6b997 to #eabd9b, blue over red 0.66, its
+// top 2% #fcd3b2, 0.70 (through the video's compression); 7b7's gold #f5c575 read 0.48, 7b5's #b8853a luma 138.
+const CORE = { luma: 0.8 * 205, blueOverRed: [0.55, 0.75], greenOverRed: [0.6, 0.9] } as const;
 // Music's cells between its veins (lines.ts's cells, on the same disc of f0004.jpg): its darkest quarter at luma 18.1, its red over its
 // blue by 59.2, a dark maroon; half of each at least, as generated.spec.ts holds Music's veins (7b6's patch: #070304, black).
 const CELLS = { floor: 18.1 / 2, warmth: 59.2 / 2 } as const;
@@ -57,19 +60,8 @@ const CALDERA = [0.2, 0.5] as const;
 const WARM_LIMB = 2;
 // The air's ring brighter than space past it, or a ring not drawn would read as no colour at all.
 const AIR_LIGHT = 20;
-// Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
-// (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
-// world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
-const CONTINENT = 0.7;
-const LAND = [0.3, 0.6] as const;
-const ALL_SEA = 0.05;
 // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre ... unique et bien reconnaissable"): its sea's
-// or its land's colour 10 or more from the Earth's in Lab, or its cloud cover a tenth or more apart, each a step a glance takes (core's
-// variety.ts: a colour under 10 and a value under a tenth of its span read alike). The Earth: its close view at realism.spec's instant.
-const GLANCE = { colour: 10, clouds: 0.1 } as const;
-// Two faces apart in a part both show; a part one of them does not show sets them apart in nothing.
-const apartIn = (one: Face["sea"], other: Face["sea"]) =>
-  one === null || other === null ? 0 : Math.hypot(...one.map((value, at) => value - (other[at] ?? 0)));
+// or its land's colour or its cloud cover a glance apart (textures.ts's GLANCE). The Earth: its close view at realism.spec's instant.
 
 const close = (anchor: Anchor) => `?view=close&world=${String(ANCHORS.indexOf(anchor))}`;
 const ofClass = (anchor: Anchor) => `?view=class24&world=${String(ANCHORS.indexOf(anchor))}`;
@@ -124,7 +116,7 @@ test.describe("the generated worlds polished", () => {
 
   heldQuiet();
 
-  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores gold", async ({
+  test("a veined volcanic world is a net of cells, as frame 4's Music: veins that meet, wide and varied, their cores cream", async ({
     page,
   }) => {
     await styled(page, 1, async (place) => {
@@ -134,6 +126,7 @@ test.describe("the generated worlds polished", () => {
       if (net === undefined || core === undefined) throw new Error("no measure");
       test.info().annotations.push({ type: "veins", description: JSON.stringify({ net, core }) });
       expect(net.junctions, "a net").toBeGreaterThanOrEqual(NET.junctions);
+      expect(net.junctions, "no asterisks inside a cell").toBeLessThanOrEqual(MOST_JUNCTIONS);
       expect(net.ends / net.junctions, "cells close: veins end seldom").toBeLessThanOrEqual(NET.endsPerJunction);
       expect(net.glow, "veins over the disc").toBeGreaterThanOrEqual(NET.glow[0]);
       expect(net.glow, "dark cells between them").toBeLessThanOrEqual(NET.glow[1]);
@@ -142,7 +135,8 @@ test.describe("the generated worlds polished", () => {
       expect(net.widthSpread, "their width varies").toBeGreaterThanOrEqual(NET.widthSpread);
       const [red, green, blue] = core.colour;
       expect(core.luma, "a hot core").toBeGreaterThanOrEqual(CORE.luma);
-      expect(blue / red, "gold, never white").toBeLessThanOrEqual(CORE.blueOverRed);
+      expect(blue / red, "cream, as Music's").toBeGreaterThanOrEqual(CORE.blueOverRed[0]);
+      expect(blue / red, "never white").toBeLessThanOrEqual(CORE.blueOverRed[1]);
       expect(green / red, "gold to orange").toBeGreaterThanOrEqual(CORE.greenOverRed[0]);
       expect(green / red, "gold to orange").toBeLessThanOrEqual(CORE.greenOverRed[1]);
     });
@@ -266,11 +260,7 @@ test.describe("the generated worlds polished", () => {
       if (seed > 0) await nextSeed(page);
       worlds.push(...(await facesOn(page, await picture(page), await circles(page))));
     }
-    const apart = worlds.map((face) => ({
-      sea: apartIn(shownPart(face, "sea"), shownPart(earth, "sea")),
-      land: apartIn(shownPart(face, "land"), shownPart(earth, "land")),
-      clouds: Math.abs(face.clouds - earth.clouds),
-    }));
+    const apart = worlds.map((face) => facesApart(face, earth));
     const nearest = Math.min(...apart.map(({ sea, land }) => Math.max(sea, land)));
     test.info().annotations.push({ type: "faces", description: JSON.stringify({ earth, nearest, apart }) });
     for (const [at, { sea, land, clouds }] of apart.entries())
@@ -278,16 +268,5 @@ test.describe("the generated worlds polished", () => {
         sea >= GLANCE.colour || land >= GLANCE.colour || clouds >= GLANCE.clouds,
         `world ${String(at)}: sea ${sea.toFixed(1)}, land ${land.toFixed(1)}, clouds ${clouds.toFixed(2)} from the Earth's`,
       ).toBe(true);
-  });
-
-  test("24 temperate worlds hold continents, as the Earth does, not islands (F4243)", async ({ page }) => {
-    await open(page, ofClass("temperate"));
-    const land = await landOn(page, await picture(page), await circles(page));
-    test.info().annotations.push({ type: "land", description: JSON.stringify(land) });
-    expect(median(land.map(({ largest }) => largest)), "one large piece").toBeGreaterThanOrEqual(CONTINENT);
-    expect(median(land.map(({ share }) => share)), "land").toBeGreaterThanOrEqual(LAND[0]);
-    expect(median(land.map(({ share }) => share)), "and sea").toBeLessThanOrEqual(LAND[1]);
-    for (const [at, { share }] of land.entries())
-      expect(share, `world ${String(at)}: some land`).toBeGreaterThan(ALL_SEA);
   });
 });

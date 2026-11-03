@@ -59,7 +59,7 @@ const GAME = ["Play", "Move", "Guess", "Shot", "Lobby", "Game", "Challenge"];
 
 /**
  * 32 bytes more of a world, for what the seed's own have no room for. Byte 0 is its class, 1 and 2 its nudge, 3 to 8 its signs' form,
- * 9 to 25 its surface, 26 and 27 its minor class, 28 and 29 its palette's grade.
+ * 9 to 25 its surface, 26 and 27 its minor class, 28 and 29 its palette's grade, 30 its land's gather.
  */
 export const moreSeed = (seed: Uint8Array): Uint8Array => sha256(seed);
 

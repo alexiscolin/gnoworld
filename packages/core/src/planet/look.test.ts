@@ -411,16 +411,22 @@ describe("planetLook", () => {
       }
   });
 
-  // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre"): its sea is a deep teal, 20 or more
-  // in Lab from the frames' navy, which the ocean keeps.
+  // A temperate world is never the Earth (Alexis, 2026-11-03, 16:4x: "ne pas singer la Terre"): its sea a teal, shallow and deep,
+  // within 20 degrees of the hue he chose (-140 in Lab), 20 or more in Lab from the frames' navy, which the ocean keeps.
   it("gives an ocean world the frames' seas, and a temperate world a teal sea of its own, never the Earth's navy", () => {
     const byte = ([red, green, blue]: readonly number[]) =>
       (red ?? 0) * 255 * 65536 + (green ?? 0) * 255 * 256 + (blue ?? 0) * 255;
     const seaOf = (anchor: Anchor) => planetLook(DAO, anchor).sea;
-    expect(byte(seaOf("temperate")?.shallow ?? [])).toBeCloseTo(0x064e59, 6);
-    expect(byte(seaOf("temperate")?.deep ?? [])).toBeCloseTo(0x00262e, 6);
     expect(byte(seaOf("ocean")?.shallow ?? [])).toBeCloseTo(0x1b5c8f, 6);
     expect(byte(seaOf("ocean")?.deep ?? [])).toBeCloseTo(0x0a2a5c, 6);
+    const [temperate, ocean] = [seaOf("temperate"), seaOf("ocean")];
+    if (!temperate || !ocean) throw new Error("no sea");
+    for (const depth of ["shallow", "deep"] as const) {
+      const [lab, navy] = [labOf(temperate[depth]), labOf(ocean[depth])];
+      const hue = (Math.atan2(lab[2], lab[1]) * 180) / Math.PI;
+      expect(Math.abs(hue + 140), depth).toBeLessThanOrEqual(20);
+      expect(Math.hypot(...lab.map((value, at) => value - (navy[at] ?? 0))), depth).toBeGreaterThanOrEqual(20);
+    }
   });
 
   it("draws rings wide on any world, so they never read as the status ring", () => {

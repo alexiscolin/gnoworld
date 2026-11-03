@@ -25,7 +25,10 @@ const SHOWN = [
   "detail",
   "halves",
   "mix",
+  "gather",
 ] as const;
+// What a still cannot show: a cloud's drift, an octave's ratio.
+const NOT_SHOWN = ["lacunarity", "drift"] as const;
 const SAME_COLOUR = 10;
 const SAME_SHAPE = 0.1;
 const DAO = asciiBytes("gno.land/r/gov/dao");
@@ -54,6 +57,10 @@ describe("featuresOf", () => {
     expect(features.ringed).toBe(look.rings !== null);
     expect(features.air).toBe(look.rim?.thickness ?? 0);
     expect(features.maps).toEqual([look.map, recipe.minorMap]);
+  });
+
+  it("names every surface value a still shows, and states each one it cannot", () => {
+    expect([...SHOWN, ...NOT_SHOWN].sort()).toEqual(Object.keys(SURFACE).sort());
   });
 
   it("puts each shown value on its whole span, 0 to 1, and leaves out what a still cannot show", () => {
@@ -130,6 +137,24 @@ describe("alike", () => {
     expect(alike(barely, { ...barely, maps: [map, otherMinor] })).toBe(false);
     const under: Features = { ...desert(), minorShare: 0.039 };
     expect(alike(under, { ...under, maps: [map, otherMinor] })).toBe(true);
+  });
+
+  // The reviewer's R1 (7b8): a world of continents shows its gather, and its minor is its bare ground, laid by its climate in BARE's
+  // colours: the minor class's name and map are drawn nowhere on it, so they part nothing.
+  it("parts two worlds of continents by their gather, and never by a minor class or map they do not draw", () => {
+    const path = asciiBytes("gno.land/r/gov/temperate");
+    const recipe = planetRecipe(path, "temperate");
+    const look = planetLook(path, "temperate");
+    const of = (changed: Recipe) => featuresOf(look, changed);
+    expect(alike(of(recipe), of(moved(recipe, "gather", recipe.surface.gather > 0.5 ? -0.2 : 0.2)))).toBe(false);
+    const shown: Recipe = { ...recipe, minorShare: 0.3 };
+    expect(
+      alike(of(shown), of({ ...shown, minor: shown.minor === "rocky" ? "desert" : "rocky", minorMap: "moon" })),
+    ).toBe(true);
+    const desertRecipe = planetRecipe(DAO, "desert");
+    const shownDesert: Recipe = { ...desertRecipe, minorShare: 0.3 };
+    const desertOf = (changed: Recipe) => featuresOf(planetLook(DAO, "desert"), changed);
+    expect(alike(desertOf(shownDesert), desertOf({ ...shownDesert, minor: "rocky", minorMap: "eris" }))).toBe(false);
   });
 
   it("reads both ways", () => {

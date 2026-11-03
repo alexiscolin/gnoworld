@@ -163,6 +163,14 @@ describe("a generated world, drawn from its recipe", () => {
         expect(`${SURFACE_VERTEX}\n${GENERATED_FRAGMENT}`, name).toMatch(new RegExp(`uniform \\w+ [^;]*\\b${name}\\b`));
   });
 
+  it("declares every surface value in the program's own struct, under its own name", () => {
+    const struct = GENERATED_FRAGMENT.slice(
+      GENERATED_FRAGMENT.indexOf("struct Shape {"),
+      GENERATED_FRAGMENT.indexOf("};"),
+    );
+    for (const name of [...NAMES, "gather"]) expect(struct, name).toMatch(new RegExp(`float [^;]*\\b${name}\\b`));
+  });
+
   // Ganymede's lanes (7b6's held details, 7b7): grooved ice alone cuts grooves, by a value its look hands the one program.
   it("marks grooved ice's lanes by value, on that class alone", () => {
     for (const anchor of ANCHORS)
@@ -325,7 +333,7 @@ describe("the generated program", () => {
     // Never op-art (7b7's design review): the spacing wanders from lane to lane, each groove's width along it.
     expect(grooves).toMatch(/float wave = away \* [\d.]+ \+ (0\.[5-9]|1\.\d)\d* \* noise\(/);
     expect(grooves).toMatch(/smoothstep\([\d.]+ \+ [\d.]+ \* noise\([^)]*\), [\d.]+, abs\(fract\(wave\) - 0\.5\)\)/);
-    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal);");
+    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal)");
   });
 
   // F4239: a giant's streaks stretched five times across a latitude read as hairs a pixel tall, their octaves past a pixel; Alexis chose
@@ -369,9 +377,11 @@ describe("the generated program", () => {
     expect(sky.slice(0, sky.indexOf("\n}\n"))).toMatch(/\), 2\.19\);/);
   });
 
-  // F4233: no minor, or a banded world, reads no minor's map.
+  // F4233: no minor, or a banded world, reads no minor's map; nor a world of continents, whose bare ground its climate places (7b8).
   it("reads the minor's map only where a minor shows on a ground", () => {
-    expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && banded < 0\.5\) \{[^}]*detailOf\(minorMap/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(minorShare > 0\.002 && banded < 0\.5 && !continents\) \{[^}]*detailOf\(minorMap/,
+    );
   });
 
   // F4238: relief shaded from screen derivatives comes out in 2x2 blocks wherever it holds detail under a few pixels: the relief keeps
@@ -438,7 +448,89 @@ describe("the generated program", () => {
   // F4335: an ocean world's continents would leave its close view open sea: a sea of 0.8 or more keeps its archipelagos, the ground's
   // own field; a temperate world's sea (0.55 to 0.78) gathers its land in continents.
   it("gathers land in continents only where the sea leaves room for them", () => {
-    expect(GENERATED_FRAGMENT).toContain("if (shape.sea > 0.0 && shape.sea < 0.8) {");
+    expect(GENERATED_FRAGMENT).toContain("bool continents = shape.sea > 0.0 && shape.sea < 0.8;");
+    expect(GENERATED_FRAGMENT).toMatch(/if \(continents\) \{\n {6}vec4 land = fbm\(/);
+  });
+
+  // Temperate worlds varied (7b8; Alexis, 2026-11-03, "formes variées"): the same sea makes one supercontinent, a few continents or an
+  // archipelago, by the seed's gather: its continents' scale, coarse to fine, and past 0.6 of it the land leaning to one side of the world.
+  it("gathers a world's continents at its seed's scale, an archipelago to one supercontinent", () => {
+    expect(GENERATED_FRAGMENT).toMatch(
+      /vec4 land = fbm\(.+, 0\.[4-8]\d* \+ [2-4]\.\d+ \* \(1\.0 - shape\.gather\), pixel, 0\.0, 3\.0\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float lean = [0-2]\.\d+ \* smoothstep\(0\.[5-8]\d*, 1\.0, shape\.gather\);\n {6}float rough = [^;]*;\n {6}float spread = [^;]*;\n {6}float coarse = land\.w \/ land\.y \+ lean \* dot\(at, normalize\(offset - 8\.0\)\);/,
+    );
+  });
+
+  // A world of continents' land pushed by its noise as far as half a radius came out sheared into parallel strokes (7b8's design review,
+  // seed 5 close): an archipelago's waves, a fifth of a radius, pushed two and a half times their length. Its land takes 0.15 at most.
+  it("pushes a world of continents' land 0.15 of a radius at most by its noise, never sheared into strokes", () => {
+    expect(GENERATED_FRAGMENT).toContain("vec3 p = at + shape.warp * bend + offset;");
+    expect(GENERATED_FRAGMENT).toMatch(/vec4 land = fbm\(at \+ min\(shape\.warp, 0\.15\) \* bend \+ offset, /);
+  });
+
+  // Sharp coasts with islands (7b8; Alexis, 2026-11-03, "côtes nettes et îles"): every octave of the ground down to the pixel breaks the
+  // coast, weighed up near the sea's level, where it can move it, so gulfs, peninsulas and islands cut it at every zoom; the shallow
+  // shelf follows the coast within a few hundredths of the sea's share, never a wide halo.
+  it("breaks a coast with the ground's octaves to the pixel, weighed up near the sea's level, its shelf kept to the coast", () => {
+    // R2: the field's level and its share read at its own spread, so the drawn sea keeps the seed's share at both ends of its span.
+    expect(GENERATED_FRAGMENT).toContain("float spread = sqrt(1.0 + lean * lean / 3.0 + rough * rough);");
+    expect(GENERATED_FRAGMENT).toContain("float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702 * spread;");
+    // Narrower on the land's side, so the coast's noise raises islands off it more than lakes in it.
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float near = 1\.0 - smoothstep\(0\.0, above > 0\.0 \? 0\.\d+ : 1\.\d+, abs\(above\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /t = shareOf\(vec2\(coarse \+ \(rough \+ [\d.]+ \* near\) \* ground\.w \/ ground\.y \+ [1-9][\d.]* \* near \* fray, spread\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toContain("float shore = t;");
+    expect(GENERATED_FRAGMENT).toMatch(
+      /continents \? smoothstep\(0\.0, 0\.0\d+, \(shape\.sea - shore\) \/ shape\.sea\)/,
+    );
+  });
+
+  // A coast smoothed a whole pixel either side drew every close coast two pixels soft: by a dark sea, a bright land's step then held
+  // most of a close view's detail at half size (7b8, seeds 0 and 5 at 0.31 and 0.29 against the Earth's 0.42).
+  it("draws a coast over one pixel, half either side, never two pixels soft", () => {
+    expect(GENERATED_FRAGMENT).toContain("float coast = max(0.5 * fwidth(t), 0.002);");
+  });
+
+  // A relief stopped dead at the coast lit a stair-stepped line along every coast on the night side (7b8); flattening the coastal plains
+  // to hide it took their fine detail too (the chief, 2026-11-03). The height runs on across the coast, and the water alone lies flat.
+  it("keeps a sea world's relief to its coast, its water alone flat: no plain flattened, no cliff at the coast", () => {
+    expect(GENERATED_FRAGMENT).toContain(
+      "vec3 bent = normalize(mix(bentBy(relieved * relief * world * (1.0 - 0.3 * grooved), normal), normal, wet));",
+    );
+    expect(GENERATED_FRAGMENT).toMatch(/bent = grained\(bent, [^;]* \* \(1\.0 - wet\) \* near, angle\);/);
+    expect(GENERATED_FRAGMENT).not.toMatch(/\b(landed|inland)\b/);
+  });
+
+  // A world of continents' land off its coasts read a fifth to four fifths of the Earth's fine detail (7b8, seeds 0 to 5; the chief,
+  // 2026-11-03): its real map's fine contrast now tints it whole, and the map's grain shades it at three times its relief.
+  it("gives a world of continents' land its map's whole fine contrast and its grain three times its relief", () => {
+    expect(GENERATED_FRAGMENT).toContain("if (continents) albedo *= detail;");
+    expect(GENERATED_FRAGMENT).toMatch(
+      /relief \* \(continents \? 3\.0 : min\(shape\.detail \* 2\.0, 1\.0\)\) \* \(1\.0 - wet\) \* near, angle\);/,
+    );
+  });
+
+  // Climates by latitude and by seed (7b8; Alexis, 2026-11-03, "climats par latitude"): bare ground where it is dry, in a belt about the
+  // tropics (sin 0.42, 25 degrees) wandering with the flow, and where it is cold, poleward, high or on an icy world; the seed's minor share
+  // tilts the whole world drier. Plants run from deep forest where wet to dry grass; bare ground from tundra where cold to sand where hot.
+  it("lays a world of continents' climate by latitude, its bare ground where dry or cold, never in pasted patches", () => {
+    expect(GENERATED_FRAGMENT).toMatch(/if \(minorShare > 0\.002 && !continents\) \{\n {4}vec4 patches/);
+    expect(GENERATED_FRAGMENT).toMatch(/float lat = abs\(axis\.y\) \+ [\d.]+ \* flow\.x \+ [\d.]+ \* broad;/);
+    expect(GENERATED_FRAGMENT).toMatch(/float cold = lat \+ [\d.]+ \* t \+ [1-9][\d.]* \* shape\.caps;/);
+    expect(GENERATED_FRAGMENT).toMatch(
+      /float dry = 1\.0 - smoothstep\([\d.]+, [\d.]+, abs\(lat - 0\.4\d*\)\) \+ [\d.]+ \* minorShare/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(
+      /minor = max\(smoothstep\([\d.]+, [\d.]+, dry\), smoothstep\([\d.]+, [\d.]+, cold\)\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(/tint = clamp\([\d.]+ \+ [\d.]+ \* dry, 0\.0, 1\.0\);/);
+    expect(GENERATED_FRAGMENT).toMatch(/bare = 1\.0 - smoothstep\([\d.]+, [\d.]+, cold\);/);
+    expect(GENERATED_FRAGMENT).toContain("vec3 second = rampOf(minorLow, minorMid, minorHigh, bare);");
   });
 
   it("carves only the finer octaves, their crease rounded", () => {
@@ -538,9 +630,9 @@ describe("the generated program", () => {
     expect(GENERATED_FRAGMENT).toMatch(/if \(style > 1\.5\) albedo = rampOf\(sulfurLow, sulfurMid, sulfurHigh, tint\)/);
   });
 
-  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, gold to orange, never white; each vein a crack along the seams
+  // Frame 4's Music (7b6's held details, 7b7): a net of veins in two sizes, orange to cream, never white; each vein a crack along the seams
   // of cells, its width wandering between two bounds, and a crack under a pixel wide fades out whole, never a hairline that breaks up.
-  it("draws a veined world's veins as two nets of cracks, gold to orange, each faded out whole under a pixel", () => {
+  it("draws a veined world's veins as two nets of cracks, orange to cream, each faded out whole under a pixel", () => {
     const crack = bodyOf("vec2 crackAt(");
     expect(crack).toMatch(/float away = seams\(/);
     expect(crack).toMatch(/float wide = mix\(width\.x, width\.y, smoothstep\(/);
@@ -551,8 +643,12 @@ describe("the generated program", () => {
     const veins = bodyOf("vec3 veinsOf(");
     expect(veins.match(/crackAt\(/g)).toHaveLength(2);
     expect(veins).toMatch(/vec2 main = crackAt\(p, [\d.]+ \+ shape\.scale, vec2\(0\.1\d*, 0\.[3-5]\d*\), pixel\);/);
-    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x\);/);
-    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[3-7]\d*, 0\.[01]\d*\), heat\)/);
+    // The fine net draws only near a main vein, within its halo's reach, never asterisks inside a cell (Alexis, 2026-11-03, "retirer").
+    expect(veins).toMatch(/float reach = pow\(main\.x, 0\.\d+\);\n {2}float near = reach \* reach;/);
+    expect(veins).toMatch(/vec3 halo = vec3\([^)]*\) \* reach;/);
+    expect(veins).toMatch(/float heat = max\(main\.x, 0\.[1-9]\d* \* fine\.x \* near\);/);
+    // Cream at their hottest, as Music's (Alexis, 2026-11-03, "crème comme Music"): its brightest tenth #e6b997, linear 1, 0.62, 0.39.
+    expect(veins).toMatch(/rampOf\(vec3\([^)]*\), vec3\([^)]*\), vec3\(1\.0, 0\.[5-7]\d*, 0\.[2-4]\d*\), heat\)/);
   });
 
   // A real map is detail only: what it lends is its own fine contrast over its smoothed self, never its shapes or its colours whole.

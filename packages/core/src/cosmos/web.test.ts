@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { toScene } from "../frame/disc.ts";
+import { correlation } from "../testing.ts";
 import { MOOD_SCALE, moodAt, newMood } from "../space/mood.ts";
 import { systemsOf, worldSize, type WorldHeld } from "./system.ts";
 import { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld } from "./web.ts";
@@ -301,13 +302,6 @@ describe("pointTint", () => {
       ].entries())
         pairs[at]?.push([own ?? 0, (theirs ?? 0) / brightest]);
     }
-    const correlation = (list: readonly [number, number][]) => {
-      const mean = (pick: (pair: [number, number]) => number) =>
-        list.reduce((sum, pair) => sum + pick(pair), 0) / list.length;
-      const [ma, mb] = [mean(([a]) => a), mean(([, b]) => b)];
-      const cov = mean(([a, b]) => (a - ma) * (b - mb));
-      return cov / Math.sqrt(mean(([a]) => (a - ma) ** 2) * mean(([, b]) => (b - mb) ** 2));
-    };
     for (const list of pairs) expect(correlation(list)).toBeGreaterThan(0.95);
   });
 
