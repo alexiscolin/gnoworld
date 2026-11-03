@@ -14,7 +14,7 @@ import unicodedata
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
-from repo_files import listed, tracked
+from repo_files import git, listed, tracked
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
 # matter (moot); and the ones still open: claimed, reproduced, asked.
@@ -66,22 +66,45 @@ IMAGES = (".png", ".jpg")
 NON_ASCII = re.compile(r"[^\x00-\x7f]")
 
 
+def hidden_in(where, text):
+    """Each format character of text, as `<where>:<line>:<column>: U+<hex> <name>`."""
+    out, line, seen = [], 1, 0
+    for m in NON_ASCII.finditer(text):
+        c = m.group()
+        if unicodedata.category(c) != "Cf":
+            continue
+        line += text.count("\n", seen, m.start())
+        seen = m.start()
+        column = m.start() - text.rfind("\n", 0, m.start())
+        out.append(f"{where}:{line}:{column}: U+{ord(c):04X} {unicodedata.name(c)}")
+    return out
+
+
+def messages(root):
+    """(short sha, message) of each commit since the branch left origin/main (F5079): none outside a repository (the
+    pre-commit's staged copy) or with no origin/main to say where the branch starts. A git that cannot run, or fails, raises:
+    for-each-ref answers nothing for a missing ref, so a failure is never taken for one."""
+    if not (root / ".git").exists():
+        return []
+    if not git("-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/remotes/origin/main"):
+        return []
+    log = git("-C", str(root), "log", "-z", "--format=%h%x00%B", "refs/remotes/origin/main..HEAD").split("\0")
+    return list(zip(log[0::2], log[1::2]))
+
+
 def hidden(root):
-    """Each format character of the files git tracks or would, as `<path>:<line>:<column>: U+<hex> <name>`."""
+    """Each format character of the files git tracks or would, and of the branch's commit messages."""
     out = []
     for p in tracked(root):
         if p.suffix in IMAGES:
             continue
         text = p.read_bytes().decode("utf-8", "surrogateescape")  # a byte that is no UTF-8 stays one character
-        line, seen = 1, 0
-        for m in NON_ASCII.finditer(text):
-            c = m.group()
-            if unicodedata.category(c) != "Cf":
-                continue
-            line += text.count("\n", seen, m.start())
-            seen = m.start()
-            column = m.start() - text.rfind("\n", 0, m.start())
-            out.append(f"{p.relative_to(root).as_posix()}:{line}:{column}: U+{ord(c):04X} {unicodedata.name(c)}")
+        out += hidden_in(p.relative_to(root).as_posix(), text)
+    try:
+        for sha, message in messages(root):
+            out += hidden_in(f"commit {sha}", message)
+    except (OSError, subprocess.CalledProcessError) as e:
+        out.append(f"git cannot read the branch's commit messages, so none is proven clean: {e}")
     return out
 
 

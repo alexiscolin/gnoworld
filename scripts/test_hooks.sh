@@ -1100,6 +1100,23 @@ for path in "$t/nogit" "$t/badgit:$PATH"; do
 	printf '%s\n' "$out" | grep -qF "  .git/" && fail "check_docs, with PATH=$path, read git's own folder: $out"
 	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
 done
+# A commit message is text the repository keeps too, which scripts parse (a `Removed-test:` line shown as one name, read as
+# another): each message since the branch left origin/main is read, named by its commit (F5079); a message main holds
+# already is not, nor any with no origin/main to compare with. With no git, or a git that fails, nothing proves the messages
+# clean: it fails, never takes the failure for a branch with no origin/main.
+m="$t/messages" && mkdir -p "$m" && good_rules "$m" && git -C "$m" init -q && git -C "$m" add -A
+git -C "$m" commit -qm "$(printf 'docs: on main\n\nzero\342\200\213width')" && git -C "$m" update-ref refs/remotes/origin/main HEAD
+messages() { python3 -I "$docs" "$m" 2>&1; }
+messages >/dev/null || fail "check_docs read a message main holds already"
+git -C "$m" commit -q --allow-empty -m "$(printf 'test: the branch\n\nRemoved-test: a\342\200\256b - why')"
+out=$(messages) && fail "check_docs accepted a commit message holding a hidden character: $out"
+printf '%s\n' "$out" | grep -qxF "  commit $(git -C "$m" rev-parse --short HEAD):3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the message's hidden character: $out"
+out=$(PATH="$t/nogit" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with no git to read them: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say git cannot read the messages: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
+git -C "$m" update-ref -d refs/remotes/origin/main
+messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
 fi
 
 if part harness_mutate; then
