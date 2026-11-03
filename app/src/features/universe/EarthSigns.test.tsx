@@ -297,7 +297,7 @@ describe("a pin", () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it.each(["ctrlKey", "metaKey", "shiftKey"])(
+  it.each(["ctrlKey", "metaKey", "shiftKey", "altKey"])(
     "leaves a click with %s to the browser: a new tab stays a new tab",
     async (key) => {
       const { box, open } = await shown();
@@ -319,6 +319,16 @@ describe("a pin", () => {
     place?.(500, 300, true);
     expect(sign?.hidden).toBe(false);
     expect(sign?.style.transform).toBe("translate(500px, 300px)");
+  });
+
+  it("leaves a click another handler already took to it, as a router's link does", async () => {
+    const { box, open } = await shown();
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    event.preventDefault();
+    act(() => {
+      pin(box).dispatchEvent(event);
+    });
+    expect(open).not.toHaveBeenCalled();
   });
 
   it("keeps a pin in the focus's hands: it never drops the reader's place as the globe turns it away", async () => {
