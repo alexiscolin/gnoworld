@@ -55,6 +55,7 @@ void main() {
   float broad = 0.0;
   float fray = 0.0;
   float relieved = 0.0;
+  float inland = 1.0;
   float cratered = 0.0;
   float t;
   vec3 swirled = at;
@@ -80,6 +81,7 @@ void main() {
       float coarse = land.w / land.y + lean * dot(at, normalize(offset - 8.0));
       float above = coarse - log(shape.sea / (1.0 - shape.sea)) / 1.702 * spread;
       float near = 1.0 - smoothstep(0.0, above > 0.0 ? 0.5 : 1.1, abs(above));
+      inland = smoothstep(0.8, 1.4, above);
       t = shareOf(vec2(coarse + (rough + 0.5 * near) * ground.w / ground.y + 2.5 * near * fray, spread));
     }
   }
@@ -104,10 +106,12 @@ void main() {
     molten = shareOf(vec2(0.35 * crackle - height, 1.3));
   }
   float wet = 0.0;
+  float landed = 1.0;
   float shore = t;
   if (shape.sea > 0.0) {
     float coast = max(fwidth(t), 0.002);
     wet = 1.0 - smoothstep(shape.sea - coast, shape.sea + coast, t);
+    landed = smoothstep(shape.sea, shape.sea + 0.04, t) * inland;
     t = clamp((t - shape.sea) / max(1.0 - shape.sea, 0.001), 0.0, 1.0);
   }
   float tint = mix(0.7, t, 0.8);
@@ -166,9 +170,9 @@ void main() {
   if (locked > 0.5) albedo = eyeball(albedo, t, day);
   vec3 view = normalize(cameraPosition - vWorld);
   float world = length(modelMatrix[0].xyz);
-  vec3 bent = bentBy(relieved * (1.0 - wet) * relief * world * (1.0 - 0.3 * grooved), normal);
+  vec3 bent = bentBy(relieved * landed * relief * world * (1.0 - 0.3 * grooved), normal);
   float near = 1.0 - smoothstep(0.004, 0.008, pixel);
-  if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * (1.0 - wet) * near, angle);
+  if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * min(shape.detail * 2.0, 1.0) * landed * near, angle);
   float light;
   float shine;
   vec3 colour = litBy(albedo, wet, bent, normal, view, light, shine);
