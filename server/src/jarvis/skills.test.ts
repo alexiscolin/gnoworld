@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type * as Fs from "node:fs";
 import {
   linkSync,
   mkdirSync,
@@ -13,11 +14,20 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { logger } from "../log.ts";
 import { allowlist } from "./allowlist.ts";
 import { loadSkills } from "./skills.ts";
+
+// The Linux image's file system lists a folder in its names' hash order, where APFS lists them sorted: a test may have
+// every listing come reversed, so the walk's own sort is what it sees.
+const listing = vi.hoisted(() => ({ reversed: false }));
+vi.mock("node:fs", async (original) => {
+  const fs = await original<typeof Fs>();
+  const listed = (path: string) => fs.readdirSync(path);
+  return { ...fs, readdirSync: (path: string) => (listing.reversed ? listed(path).reverse() : listed(path)) };
+});
 
 const base = mkdtempSync(join(tmpdir(), "gnoworld-skills-"));
 afterAll(() => {
@@ -144,6 +154,26 @@ describe("loadSkills: what it gives", () => {
     ["no skill", { reference: "audit.md" }, false],
   ])("checks load_skill's arguments: %s", (_case, args, ok) => {
     expect(checked(folder(TWO())).check("load_skill", args).ok).toBe(ok);
+  });
+});
+
+describe("loadSkills: on a file system that lists a folder in another order", () => {
+  beforeEach(() => {
+    listing.reversed = true;
+  });
+  afterEach(() => {
+    listing.reversed = false;
+  });
+
+  it("lists the skills by name, and offers them in that order", () => {
+    const skills = loadSkills(folder({ "a/SKILL.md": skill("a"), "b/SKILL.md": skill("b"), "c/SKILL.md": skill("c") }));
+    expect(skills.index.map((entry) => entry.name)).toEqual(["a", "b", "c"]);
+    expect(z.toJSONSchema(skills.tool.args)).toMatchObject({ properties: { skill: { enum: ["a", "b", "c"] } } });
+  });
+
+  it("refuses the first planted file by name, whichever the file system lists first", () => {
+    const files = { "a/SKILL.md": skill("a"), "a/run.sh": "echo planted\n", "b/SKILL.md": skill("b"), "b/x.sh": "x\n" };
+    expect(failure(folder(files))).toBe("skills: a/run.sh: not a skill's file");
   });
 });
 
