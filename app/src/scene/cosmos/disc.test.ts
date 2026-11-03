@@ -1,5 +1,5 @@
-import { BODY_PIXELS, BOUNDS, Drawn, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
-import { Points, Scene as Stage, type BufferAttribute, type BufferGeometry } from "three";
+import { BODY_PIXELS, BOUNDS, Drawn, EARTH_PLACE, EARTH_RADIUS, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
+import { Points, Scene as Stage, Vector3, type BufferAttribute, type BufferGeometry } from "three";
 import { describe, expect, it } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { ROCKS } from "./belt.ts";
@@ -51,6 +51,7 @@ const sunsOf = (disc: Disc) => {
   return Array.from({ length: suns.geometry.instanceCount }, (_, at) => ({
     reach: look.getX(at),
     halo: halo.getX(at),
+    light: look.getW(at),
   }));
 };
 
@@ -245,5 +246,41 @@ describe("the suns' halos", () => {
       drawn.glowCount = 1;
     });
     expect(sunsOf(painted(sight).disc)[0]?.halo).toBe(1);
+  });
+});
+
+// The chief, 2026-11-03: through the home's lens a far star's point stood 3 pixels off the Earth's limb, behind it, and read as a glitch.
+// The camera looks at the Earth: a star's distance on screen from the Earth's centre is the lens times the tangent of its angle off it.
+describe("a star's point by the Earth's limb", () => {
+  it("puts out a halo-less star behind the Earth at its limb, never one in front of it, one with a halo, or one clear of it", () => {
+    const eye = new Vector3(0, 30, 0);
+    const toEarth = new Vector3(EARTH_PLACE.x, EARTH_PLACE.y, EARTH_PLACE.z).sub(eye);
+    const [near, ahead] = [toEarth.length(), toEarth.clone().normalize()];
+    const side = new Vector3(0, 0, 1).cross(ahead).normalize();
+    const limb = (EARTH_RADIUS * 1158) / near;
+    // A star `away` from the eye, its heart `gap` pixels off the Earth's limb on the screen.
+    const at = (away: number, gap: number) => {
+      const angle = Math.atan((limb + gap) / 1158);
+      const { x, y, z } = ahead
+        .clone()
+        .multiplyScalar(Math.cos(angle))
+        .addScaledVector(side, Math.sin(angle))
+        .multiplyScalar(away)
+        .add(eye);
+      return { x, y, z };
+    };
+    // g1ut6usp's star stood 87.8 units off, 3 pixels off the limb.
+    const places = [{ x: 0, y: 0, z: 0 }, at(150, 3), at(near / 2, 3), at(150, 3), at(150, 20), at(87.8, 3)];
+    const systems = places.map((place, index) => ({ ...system(index, 0, false), place }));
+    const base = sighted(systems, (drawn) => {
+      for (const index of places.keys()) drawn.stars[index] = index;
+      drawn.starCount = places.length;
+    });
+    // The one in front of the Earth and the one 87.8 units off are left out of the halos' choice, so they stand with none, as g1ut6usp's
+    // did behind seven nearer suns.
+    const inView = (place: { readonly x: number }) => place.x !== places[2]?.x && place.x !== places[5]?.x;
+    const suns = sunsOf(painted({ ...base, eye, needsHalo: (index) => index === 0 || index === 3, inView }).disc);
+    expect(suns.map(({ halo }) => halo > 0)).toEqual([true, false, false, true, false, false]);
+    expect(suns.map(({ light }) => light)).toEqual([1, 0, 1, 1, 1, 0]);
   });
 });

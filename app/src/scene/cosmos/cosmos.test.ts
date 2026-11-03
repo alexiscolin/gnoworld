@@ -670,6 +670,29 @@ function drawnOf(scene: ReturnType<typeof made>, [system, world]: readonly [Star
   return { ...truly, asBody, asPoint: asPointOf(scene, { system, world, at: truly.onMap }, seconds) };
 }
 
+// Each halo-less star the suns' draw holds, as the camera sees it beside the Earth: how far its heart stands off the Earth's limb, in
+// pixels, whether it stands behind the Earth, and its light, the share the page's text dims too (aSun's fourth slot).
+function bareSuns(scene: ReturnType<typeof made>) {
+  const suns = must(glows(scene).find(({ geometry }) => geometry.hasAttribute("aHalo"))?.geometry, "no suns");
+  const read = (name: string) => suns.getAttribute(name) as BufferAttribute;
+  const [at, look, halo] = [read("aAt"), read("aSun"), read("aHalo")];
+  const { eye, screen } = scene.cosmos.stats();
+  const earth = must(screen.earth, "no Earth");
+  const [earthAt, onStage] = [nowhere(), nowhere()];
+  toScene(EARTH_PLACE, earthAt);
+  const bare = Array.from({ length: suns.instanceCount }, (_, index) => index).filter(
+    (index) => halo.getX(index) === 0 && look.getZ(index) === 0,
+  );
+  return bare.map((index) => {
+    const place = { x: at.getX(index), y: at.getY(index), z: at.getZ(index) };
+    toScene(place, onStage);
+    const from = new Vector3(onStage.x - eye.x, onStage.y - eye.y, onStage.z - eye.z);
+    const seen = from.clone().project(scene.camera);
+    const limb = Math.hypot(((seen.x + 1) * WIDTH) / 2 - earth.x, ((1 - seen.y) * HEIGHT) / 2 - earth.y) - earth.radius;
+    return { place, limb, behind: from.length() > distanceOf(earthAt, eye) && seen.z < 1, light: look.getW(index) };
+  });
+}
+
 // Onyx's close world, with its system.
 function onyxClose() {
   const systems = held(ONYX);
@@ -1087,6 +1110,17 @@ describe("the close world off the rest (7d9)", () => {
       const seen = await walk(scene, [system, world], [must(back, "no way back")]);
       expect(seen.flat().some((frame) => frame !== undefined)).toBe(true);
     }
+  });
+
+  // The chief, 2026-11-03: through the home's lens g1ut6usp's star stood 3 pixels off the Earth's limb, 87.8 units behind it, and read as
+  // a glitch (its case is the disc's test). A star with no halo fades out behind the Earth within a few pixels of its limb; others keep it.
+  it("puts out the light of a halo-less star behind the Earth within a few pixels of its limb, and leaves the others'", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const behind = bareSuns(scene).filter((sun) => sun.behind);
+    expect(behind.length).toBeGreaterThan(0);
+    for (const { light } of behind.filter(({ limb }) => limb <= 4)) expect(light).toBe(0);
+    for (const { light } of behind.filter(({ limb }) => limb >= 20)) expect(light).toBe(1);
   });
 });
 

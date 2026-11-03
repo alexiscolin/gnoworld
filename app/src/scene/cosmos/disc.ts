@@ -7,9 +7,12 @@ import {
   DISC_TILT,
   distanceOf as away,
   dotLight,
+  EARTH_PLACE,
+  EARTH_RADIUS,
   GRAIN,
   onScreen,
   orbitTime,
+  smoothstep,
   textHash,
   unitOf,
   worldLook,
@@ -83,6 +86,22 @@ const colourOf = ({ ramp }: PlanetLook): [number, number, number] => {
   return [red ?? 0, green ?? 0, blue ?? 0];
 };
 
+// A star with no halo standing behind the Earth, its point a few pixels off the limb, reads as a glitch on it (the chief, 2026-11-03): it
+// fades out there. The camera looks at the Earth, so a place's distance on screen from its centre is the lens times its angle's tangent.
+const LIMB_GONE = 5;
+const LIMB_CLEAR = 10;
+function pastLimb(place: Point, { eye, focal }: Pick<Sight, "eye" | "focal">): number {
+  const [star, earth] = [away(place, eye), away(EARTH_PLACE, eye)];
+  const along =
+    (place.x - eye.x) * (EARTH_PLACE.x - eye.x) +
+    (place.y - eye.y) * (EARTH_PLACE.y - eye.y) +
+    (place.z - eye.z) * (EARTH_PLACE.z - eye.z);
+  const cosine = along / (star * earth);
+  if (star <= earth || cosine <= 0) return 1;
+  const offCentre = (focal * Math.sqrt(Math.max(1 - cosine * cosine, 0))) / cosine;
+  return smoothstep(LIMB_GONE, LIMB_CLEAR, offCentre - (EARTH_RADIUS * focal) / earth);
+}
+
 const lifted = ([red, green, blue]: readonly [number, number, number]): [number, number, number] => [
   red + (DOT_WARM[0] - red) * DOT_LIFT,
   green + (DOT_WARM[1] - green) * DOT_LIFT,
@@ -154,7 +173,8 @@ export class Disc {
       const system = systems[index];
       if (system === undefined) continue;
       const { reach, halo } = this.#halos.sunOf(at, index, system);
-      const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS);
+      const clear = halo > 0 ? 1 : pastLimb(system.place, sight);
+      const light = (UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS)) * clear;
       this.#suns.set(at, system.place, { reach, warmth: system.warmth, glow: false, shows: light, halo });
     }
     for (let at = 0; at < drawn.glowCount; at += 1) {
