@@ -36,25 +36,25 @@ ADR-0002 §9's rows that apply: unit tests in the server's Vitest project, with 
 
 ## 7. Files and branches
 
-Creates `server/src/jarvis/` (the code, one concept a file), `server/jarvis/skills/` (`SKILL.md` folders: ours, and gnomcp's `gno` skill under its Apache-2.0 licence), `evals/` (its own workspace); changes `server/src/config.ts` (its helpers shared, never copied), `server/src/log.ts` (fields), `knip.json` (the jarvis entry), `deploy/` (the `jarvis` service, its egress, gnomcp pinned by digest), `docs/ARCHITECTURE.md` (the layout: skills and evals where §5 puts them). Tier 1: the loop and its allowlist, `deploy/`.
+Creates `server/src/jarvis/` (the code, one concept a file), `server/jarvis/skills/` (`SKILL.md` folders: ours, and gnomcp's `gno` skill under its Apache-2.0 licence), `evals/` (apart: its own lockfile, outside the pnpm workspace); changes `server/src/config.ts` (its helpers shared, never copied), `server/src/log.ts` (fields), `knip.json` (the jarvis entry), `deploy/` (the `jarvis` service, its egress, gnomcp pinned by digest), `docs/ARCHITECTURE.md` (the layout: skills and evals where §5 puts them). Tier 1: the loop and its allowlist, `deploy/`.
 - **10b, the locks** (tier 1, tonight): `allowlist.ts`, `untrusted.ts`, `skills.ts` and the skills' text.
-- **10c, the limits** (tonight, beside 10b): `config.ts` for jarvis, `prices.ts`, `budget.ts`, `quota.ts`, jarvis's migrations; the shared helpers of `server/src/config.ts`.
+- **10c, the limits** (tonight, beside 10b): `config.ts` for jarvis, `prices.ts`, `budget.ts`, jarvis's migrations; the shared helpers of `server/src/config.ts`.
 - **10d, the checks on what Jarvis returns** (tonight, once 10b or 10c is merged): the digest, proposal and button schemas in `packages/schemas` (sharing `FunctionList`), grounding, the proposal's check, the translation's check.
 - **10e, the loop** (tier 1, after Alexis's install and 10b to 10d): the SDK client, the loop and its spans, gnomcp over stdio; its first commit brings the five server dependencies with the code that imports them all (knip refuses one unused).
 - **10f, the tools** (tier 1, after 10e): ours (the places, the chain's latest blocks and transactions, the digest, the proposal and the buttons through 10d's checks) and gnoscope's behind its switch.
-- **10g, the service** (after 10f): translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas (D42, D43).
-- **10h, evals and deploy** (tier 1, after 10g): `evals/` with its provider and cases, the `jarvis` container in `deploy/`.
+- **10g, the service** (after 10f): translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas and their allowlist (D42, D43); the budgets, the quotas and the allowlist kept in the databases, the environment giving their first value, changed by an admin call at once, with no restart, each change logged (D47).
+- **10h, evals and deploy** (tier 1, after 10g): `evals/` with its provider and cases, installed apart, the `jarvis` container in `deploy/`.
 The modules of 10b to 10d are reached by their tests until 10e calls them; the slice merges into `main` whole, never before 10h. Two parts at once at most, each in its own session, worktree and herdr pane.
 
 ## 8. Dependencies
 
-Approved by Alexis (2026-11-03), read on npm the night of 2026-11-04 and installed in a scratch folder for their sizes: `@anthropic-ai/sdk` 1.4.0 (2026-11-02, 25 Mo); `@modelcontextprotocol/client` 2.4.0 (2026-10-23, 9 Mo with its core); `@opentelemetry/api` 1.9.1 (2026-03-25), `@opentelemetry/sdk-trace-node` 2.12.0 and `@opentelemetry/exporter-trace-otlp-http` 0.223.0 (both 2026-10-06), 26 Mo together; `promptfoo` 0.125.1 (2026-10-25, 615 packages, 702 Mo, in `evals/` only). OpenTelemetry's 2.x line, as api 1.10.0 with exporter 0.300.0 needs `@opentelemetry/sdk-trace` 3, another name (D46). The install is Alexis's: pnpm cannot run in the sandbox (F027; tonight `ERR_PNPM_STORE_DIR_OPEN_OPERATION_LOCK`, even for a lockfile alone in a scratch folder), and the sandbox refuses writing `server/package.json` and `pnpm-lock.yaml` in a worktree. His script: `.claude/tmp/slice-10/setup.sh`.
+Approved by Alexis (2026-11-03), read on npm the night of 2026-11-04 and installed in a scratch folder for their sizes: `@anthropic-ai/sdk` 1.4.0 (2026-11-02, 25 Mo); `@modelcontextprotocol/client` 2.4.0 (2026-10-23, 9 Mo with its core); `@opentelemetry/api` 1.9.1 (2026-03-25), `@opentelemetry/sdk-trace` 2.12.0 and `@opentelemetry/exporter-trace-otlp-http` 0.223.0 (both 2026-10-06), 26 Mo together; `promptfoo` 0.125.1 (2026-10-25, 615 packages, 702 Mo, in `evals/` only, installed apart). OpenTelemetry's 2.x line, as api 1.10.0 with exporter 0.300.0 needs `@opentelemetry/sdk-trace` 3 (D46); `sdk-trace` in place of the deprecated `sdk-trace-node`, by Alexis on 2026-11-04. His script: `.claude/tmp/slice-10/setup.sh --sdk-trace`. The install is Alexis's: pnpm cannot run in the sandbox (F027; tonight `ERR_PNPM_STORE_DIR_OPEN_OPERATION_LOCK`, even for a lockfile alone in a scratch folder), and the sandbox refuses writing `server/package.json` and `pnpm-lock.yaml` in a worktree.
 
-## 9. Questions for Alexis (decided for tonight, to confirm)
+## 9. Questions for Alexis (answered on 2026-11-04, `docs/decisions.md`)
 
-1. D40, the base: `slice-11-realm`, merged into `main` after slice 11.
-2. D46: npm marks `@opentelemetry/sdk-trace-node` 2.12.0 deprecated ("Use @opentelemetry/sdk-trace package"); take `@opentelemetry/sdk-trace` 2.12.0 instead, already in the tree through the exporter? A new name, so yours.
-3. D42, the door: `server` checks the session, the rate and the size, adds the room's public lines, and calls `jarvis` on a network of their own; `jarvis` serves nothing else and holds no session secret.
-4. D43, the quota: 20 questions a day per account, 5 for an account with no mainnet name; D47, the budgets: $45 for questions and $5 for translation a day, $3 and $1 in the demo.
-5. D45: jarvis keeps its budget and translations in its own SQLite file, on a volume of its own; the quotas are the door's, in the server's database, as `server` holds the session and the pepper.
-6. promptfoo adds 702 Mo to the main checkout's packages: keep it in the workspace, or install `evals/` apart?
+1. D40, the base: `slice-11-realm`, merged into `main` after slice 11. Confirmed.
+2. D46: npm marks `@opentelemetry/sdk-trace-node` 2.12.0 deprecated ("Use @opentelemetry/sdk-trace package"); take `@opentelemetry/sdk-trace` 2.12.0 instead, already in the tree through the exporter? Taken; the loop hands each span its parent, as it has no async context manager.
+3. D42, the door: `server` checks the session, the rate and the size, adds the room's public lines, and calls `jarvis` on a network of their own; `jarvis` serves nothing else and holds no session secret. Confirmed.
+4. D43, the quota: 20 questions a day per account, 5 for an account with no mainnet name; D47, the budgets: $45 for questions and $5 for translation a day, $3 and $1 in the demo. Confirmed, with an allowlist of accounts with no quota, the budget stopping them still, and every number changed by an admin at once (§7, 10g).
+5. D45: jarvis keeps its budget and translations in its own SQLite file, on a volume of its own; the quotas are the door's, in the server's database, as `server` holds the session and the pepper. Confirmed.
+6. promptfoo adds 702 Mo to the main checkout's packages: keep it in the workspace, or install `evals/` apart? Apart.
