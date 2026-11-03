@@ -243,6 +243,33 @@ describe("the rail's portraits", () => {
     expect(pixel(0, 0)).toEqual([night, night, 255, 255]);
   });
 
+  it("draws the other worlds when one's planet cannot be made", async () => {
+    made.create.mockImplementation((world) => {
+      if (world.id === "b/b") throw new Error("no program");
+      return planetOf(world.id);
+    });
+    const { device, frame } = deviceOf();
+    const asked = portraitsOf(device, ["a/a", "b/b", "c/c"], 100);
+    await settle();
+    frame();
+    expect([...(await asked).keys()]).toEqual(["a/a", "c/c"]);
+  });
+
+  it("keeps the portraits drawn before a draw throws", async () => {
+    const { device, renderer, frame } = deviceOf();
+    let draws = 0;
+    renderer.render.mockImplementation(() => {
+      draws += 1;
+      if (draws > PER_FRAME) throw new Error("refused");
+    });
+    const asked = portraitsOf(device, ["a/a", "b/b", "c/c", "d/d", "e/e", "f/f"], 100);
+    await settle();
+    frame();
+    await settle();
+    frame();
+    expect([...(await asked).keys()]).toEqual(["a/a", "b/b", "c/c", "d/d"]);
+  });
+
   it("gives the renderer back as it found it: its viewport, its scissor and its test", async () => {
     const { device, renderer, frame, viewport, scissor } = deviceOf();
     const asked = portraitsOf(device, ["gov/dao", "games/go"], 100);

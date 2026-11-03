@@ -69,23 +69,37 @@ async function mapsFor({ renderer, base, halved }: PortraitDevice, names: Readon
   return new Map<string, Texture>(loaded.flatMap((each) => (each.status === "fulfilled" ? [each.value] : [])));
 }
 
-// Each world's planet into `planets`, from the maps that came: one whose maps did not gets none.
+// Each world's planet into `planets`, from the maps that came: one whose maps did not gets none, nor one that cannot be made.
 function make(
   ids: readonly string[],
   { kit, maps, sphere }: { kit: Kit; maps: ReadonlyMap<string, Texture>; sphere: SphereGeometry },
   planets: Map<string, Planet>,
 ) {
   for (const id of ids) {
-    if (id !== EARTH) {
-      const world = kit.worldOf(id);
-      const set = mapSetOf(world, maps);
-      if (set !== undefined) planets.set(id, kit.createWorld(world, set, sphere));
-      continue;
+    try {
+      const planet = id === EARTH ? earthOf(maps, sphere) : worldOf(kit, id, { maps, sphere });
+      if (planet !== undefined) planets.set(id, planet);
+    } catch {
+      // A planet that cannot be made leaves its world the rail's drawn disc, and the others their portraits.
     }
-    const [day, night, clouds] = EARTH_MAPS.map((name) => maps.get(name));
-    if (day !== undefined && night !== undefined && clouds !== undefined)
-      planets.set(id, earthPlanet({ day, night, clouds }, sphere));
   }
+}
+
+function worldOf(
+  kit: Kit,
+  id: string,
+  { maps, sphere }: { maps: ReadonlyMap<string, Texture>; sphere: SphereGeometry },
+) {
+  const world = kit.worldOf(id);
+  const set = mapSetOf(world, maps);
+  return set === undefined ? undefined : kit.createWorld(world, set, sphere);
+}
+
+function earthOf(maps: ReadonlyMap<string, Texture>, sphere: SphereGeometry) {
+  const [day, night, clouds] = EARTH_MAPS.map((name) => maps.get(name));
+  return day === undefined || night === undefined || clouds === undefined
+    ? undefined
+    : earthPlanet({ day, night, clouds }, sphere);
 }
 
 function easelOf(renderer: PortraitRenderer, size: number): Easel {
@@ -161,7 +175,8 @@ const frameOf = ({ lend, signal }: PortraitDevice, run: () => boolean) =>
     });
   });
 
-// The planets drawn a few a frame and encoded between frames; what was drawn before the scene went or the context was lost is kept.
+// The planets drawn a few a frame and encoded between frames; what was drawn before the scene went, the context was lost or a draw threw
+// is kept.
 async function drawn(
   device: PortraitDevice,
   planets: ReadonlyMap<string, Planet>,
@@ -173,7 +188,8 @@ async function drawn(
   while (left.length > 0) {
     const batch = left.splice(0, PER_FRAME);
     const planetsOf = batch.map(([, planet]) => planet);
-    if (!(await frameOf(device, () => draw(device.renderer, easel, planetsOf)))) break;
+    const lent = await frameOf(device, () => draw(device.renderer, easel, planetsOf)).catch(() => false);
+    if (!lent) break;
     batch.forEach(([id], at) => {
       const picture = encoded(easel.buffers[at] ?? new Uint8Array(), easel.side);
       if (picture !== undefined) pictures.set(id, picture);
@@ -198,9 +214,6 @@ export async function portraitsOf(
   try {
     make(ids, { kit, maps, sphere }, planets);
     return await drawn(device, planets, size);
-  } catch {
-    // A planet that cannot be made or drawn leaves the rail its drawn discs.
-    return new Map();
   } finally {
     for (const planet of planets.values()) planet.dispose();
     sphere.dispose();
