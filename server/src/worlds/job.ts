@@ -1,15 +1,16 @@
-// The worlds job (slice 7, 7c; plan §3 "The server's new reads"): every half hour it reads a universe's realm list, groups the
-// realms into worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions,
-// imports), asks the indexer for each realm's calls and the chain for each deployer's name, and writes worlds.json beside and
-// renamed over. One call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last
-// file; a silent indexer leaves a world at rest (null counts) and the rest of the file whole. Nothing a chain or an indexer wrote
-// reaches a log: a fault is logged by its kind. The file keeps every realm it has seen, for a chain only adds realms.
+// The worlds job (slice 7, 7c; plan §3 "The server's new reads"): every half hour it reads a universe's realm list, groups the realms into
+// worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions, imports), asks the
+// indexer for each realm's calls and the chain for each deployer's name, and writes worlds.json and its count (7n2) beside and renamed over.
+// One call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last files; a silent indexer leaves
+// a world at rest (null counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind. The file keeps every realm.
+import { worldsDrawn } from "@gnoworld/core";
+import type { WorldsCount } from "@gnoworld/schemas";
 import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";
 import { repeat } from "../repeat.ts";
-import { replaceFile } from "../replaceFile.ts";
+import { replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths } from "./group.ts";
@@ -48,6 +49,9 @@ export const EVERY_MS = 30 * 60_000;
 export const PAUSE_MS = 250;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The worlds' count beside their file, named after it (worlds.json, worlds-count.json: the name nginx serves), so the two never share a path.
+const countFileOf = (file: string): string => `${file.replace(/\.json$/, "")}-count.json`;
 
 // The options with their defaults, so the pass reads them as plain values.
 interface Settings {
@@ -173,8 +177,13 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     if (worlds.dropped > 0) settings.log("worlds_shed", { error: "worlds" });
     const file = Worlds.safeParse({ ...head, worlds: worlds.worlds });
     if (!file.success) return fail("shape");
-    const text = `${JSON.stringify(file.data)}\n`;
-    return replaceFile(settings.file, text) ? { wrote: true } : fail("write");
+    // The count of the file as written, as the scene counts it: the hero and the cosmos never say two numbers.
+    const count: WorldsCount = { ...head, count: worldsDrawn(file.data.worlds) };
+    const written = replaceFiles([
+      { file: settings.file, text: `${JSON.stringify(file.data)}\n` },
+      { file: countFileOf(settings.file), text: `${JSON.stringify(count)}\n` },
+    ]);
+    return written ? { wrote: true } : fail("write");
   } catch (error) {
     return fail(kindOf(error));
   }

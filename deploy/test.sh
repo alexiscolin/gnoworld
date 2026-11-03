@@ -448,6 +448,14 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed '/location = \/worlds\.json {/,/}/d'
 	mutant "worlds.json open without the password" "web serves worlds.json only with the password" \
 		nginx awk '{ print } /location = \/worlds\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds-count.json is not served" "web serves worlds-count.json from the volume the server writes" \
+		nginx sed '/location = \/worlds-count\.json {/,/}/d'
+	mutant "worlds-count.json open without the password" "web serves worlds-count.json only with the password" \
+		nginx awk '{ print } /location = \/worlds-count\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds-count.json kept a year" "web serves worlds-count.json with a short cache" \
+		nginx sed '/worlds-count/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
+	mutant "web follows a link at worlds-count.json" "web does not follow a link planted at worlds-count.json" \
+		nginx awk '/location = \/worlds-count\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
 	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
 		nginx sed '/disable_symlinks on/d'
 	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
@@ -1413,6 +1421,10 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 		sleep 10
 	done
 	expect "the running worlds job reads a realm's deployer, functions and calls from the chain and its indexer" "$worlds_real" read
+	# Its count (7n2), which the home's hero reads, written by the same pass beside it at the name nginx serves: a WORLDS_FILE named
+	# otherwise would leave the hero without its number for good.
+	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
+	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
@@ -1430,7 +1442,14 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves worlds.json from the volume the server writes" "$(status /worlds.json 203.0.113.1 -u "$auth")" 200
 	expect "web serves worlds.json with a short cache" "$(header cache-control /worlds.json 203.0.113.1 -u "$auth")" "public, max-age=60"
 	expect "web serves worlds.json only with the password" "$(status /worlds.json 203.0.113.3)" 401
-	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/worlds.json')" >/dev/null 2>&1 || true
+	# Its count beside it (7n2), which the home's hero reads: the same volume, location and cache.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds-count.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), count: 1 }))" >/dev/null 2>&1 || true
+	expect "web serves worlds-count.json from the volume the server writes" "$(status /worlds-count.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves worlds-count.json with a short cache" "$(header cache-control /worlds-count.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves worlds-count.json only with the password" "$(status /worlds-count.json 203.0.113.3)" 401
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/worlds-count.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/worlds-count.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted at worlds-count.json" "$(status /worlds-count.json 203.0.113.4 -u "$auth")" 404
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets/worlds.json', '/markets/worlds-count.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
 	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404

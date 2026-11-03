@@ -1,6 +1,4 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { callersOf, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { Drawn } from "@gnoworld/core";
@@ -210,66 +208,5 @@ describe("the worlds' feed", () => {
     expect(cosmos.mock.calls.slice(before).filter(([handed]) => handed !== undefined)).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
     worlds.leave();
-  });
-});
-
-// 7n: the home asks the worlds' file for its hero's number before the scene comes, and the feed takes that read: one request for both.
-async function pageAsked() {
-  vi.resetModules();
-  await import("./signals.ts");
-  const { useWorldsCount } = await import("./worldsFile.ts");
-  const { WorldsFeed: Feed } = await import("./worldsFeed.ts");
-  const seen: (number | null | undefined)[] = [];
-  function Home() {
-    seen.push(useWorldsCount(true));
-    return null;
-  }
-  const root = createRoot(document.createElement("div"));
-  act(() => {
-    root.render(createElement(Home));
-  });
-  const leave = () => {
-    act(() => {
-      root.unmount();
-    });
-  };
-  return { Feed, seen, leave };
-}
-
-describe("the worlds' feed, on a home that asked the file", () => {
-  it("takes the page's read for the cosmos: one request for the hero's number and the worlds drawn", async () => {
-    const { Feed, seen, leave } = await pageAsked();
-    const { cosmos, scene } = sceneOf();
-    const worlds = new Feed();
-    worlds.sync(scene, true);
-    await act(settled);
-    expect(feed.read).toHaveBeenCalledTimes(1);
-    expect(cosmos.mock.lastCall?.slice(0, 2)).toEqual([FILE.worlds, FILE.updated]);
-    expect(seen.at(-1)).toBe(2);
-    worlds.leave();
-    leave();
-  });
-
-  it("hands nothing to a scene gone for good when the page's read comes after it, and the hero still counts", async () => {
-    let answer: (file: unknown) => void = () => undefined;
-    feed.read.mockImplementationOnce(
-      () =>
-        new Promise((done) => {
-          answer = done;
-        }),
-    );
-    const { Feed, seen, leave } = await pageAsked();
-    const { cosmos, scene } = sceneOf();
-    const worlds = new Feed();
-    worlds.sync(scene, true);
-    worlds.leave();
-    answer(FILE);
-    await act(settled);
-    expect(feed.read).toHaveBeenCalledTimes(1);
-    expect(cosmos.mock.calls.map(([drawn, written]) => [drawn, written])).toEqual(
-      cosmos.mock.calls.map(() => [[], undefined]),
-    );
-    expect(seen.at(-1)).toBe(2);
-    leave();
   });
 });

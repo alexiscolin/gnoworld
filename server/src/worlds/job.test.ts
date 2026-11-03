@@ -1,4 +1,5 @@
-import { NATURES } from "@gnoworld/core";
+import { NATURES, worldsDrawn } from "@gnoworld/core";
+import { WorldsCount } from "@gnoworld/schemas";
 import { WORLD_NATURES, Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -700,6 +701,119 @@ describe("runWorlds", () => {
       expect(second.chain.asked.filter(({ kind }) => kind === "vm/qdoc")).toHaveLength(2);
       expect(written(file).worlds.map((world) => world.seen ?? null)).toEqual([null, null]);
     });
+  });
+});
+
+// The count beside the file (7n2): the home's hero reads a few bytes for its number, so a phone asks nothing of the cosmos before View in
+// space. It is core's count of the file the pass writes, the one the scene's count uses, written with it or not at all.
+describe("the worlds' count, beside their file", () => {
+  // Written out, so the job is pinned to the name nginx serves (deploy/web/nginx.conf) and not to a helper it calls.
+  const countFileOf = (file: string) => join(file, "..", "worlds-count.json");
+  const countOf = (file: string) => WorldsCount.parse(JSON.parse(readFileSync(countFileOf(file), "utf8")));
+  const ONYX = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
+    .split("\n")
+    .filter((line) => line !== "");
+
+  it("writes beside the worlds' file their count with the Earth, with the file's universe and time, and nothing else", async () => {
+    const { file, outcome } = await run(chainRoutes([POOL, POOL1, ROUTER]));
+    expect(outcome).toEqual({ wrote: true });
+    expect(countOf(file)).toEqual({ version: 1, universe: "onyx", updated: "2026-11-01T12:00:00.000Z", count: 3 });
+    expect(readFileSync(countFileOf(file), "utf8")).toBe(`${JSON.stringify(countOf(file))}\n`);
+    expect(readdirSync(join(file, "..")).sort()).toEqual(["worlds-count.json", "worlds.json"]);
+  });
+
+  it("counts the recorded chain's file as the scene does, core's count of the file written: 534", async () => {
+    const { file } = await run(chainRoutes(ONYX));
+    expect(countOf(file).count).toBe(534);
+    expect(countOf(file).count).toBe(worldsDrawn(written(file).worlds));
+  }, 60_000);
+
+  it("counts the file as written, with the worlds the byte cap dropped left out", async () => {
+    const fat = (path: string): string =>
+      JSON.stringify({
+        package_path: path,
+        imports: [],
+        funcs: Array.from({ length: 200 }, (_, i) => ({ type: "", name: `Fn${String(i)}` })),
+      });
+    const paths = [ROUTER, ...Array.from({ length: 40 }, (_, i) => `gno.land/r/evil/fat${String(i)}`)];
+    const { file, logged } = await run(
+      chainRoutes(paths, { doc: (path) => (path.includes("evil") ? fat(path) : doc(path)) }),
+      { maxBytes: 4_000 },
+    );
+    expect(logged).toContainEqual({ event: "worlds_shed", error: "worlds" });
+    expect(countOf(file).count).toBe(written(file).worlds.length + 1);
+    expect(countOf(file).count).toBeLessThan(paths.length + 1);
+  });
+
+  it("follows each pass: a world that joins the list joins the count", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    expect(countOf(file).count).toBe(2);
+    await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + EVERY_MS });
+    expect(countOf(file)).toMatchObject({ count: 3, updated: new Date(NOW + EVERY_MS).toISOString() });
+  });
+
+  it("writes the count on the first pass after the upgrade, beside a worlds' file that has none yet", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    rmSync(countFileOf(file));
+    const { outcome } = await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5 });
+    expect(outcome).toEqual({ wrote: true });
+    expect(countOf(file).count).toBe(3);
+    expect(written(file).worlds).toHaveLength(2);
+  });
+
+  it("names the count after a worlds' file of another name, so the two never share one", async () => {
+    const file = join(fresh(), "..", "onyx.json");
+    const { outcome } = await run(chainRoutes([POOL]), { file });
+    expect(outcome).toEqual({ wrote: true });
+    expect(readdirSync(join(file, "..")).sort()).toEqual(["onyx-count.json", "onyx.json"]);
+  });
+
+  it("names the count after the worlds' file alone, whatever its folder is called", async () => {
+    const folder = join(fresh(), "..", "d.json");
+    mkdirSync(folder);
+    const { outcome } = await run(chainRoutes([POOL]), { file: join(folder, "worlds.json") });
+    expect(outcome).toEqual({ wrote: true });
+    expect(readdirSync(folder).sort()).toEqual(["worlds-count.json", "worlds.json"]);
+  });
+
+  it("writes no count when the pass fails, and keeps the last one byte for byte", async () => {
+    const none = fresh();
+    await run(chainRoutes([], { paths: () => new TypeError("fetch failed") }), { file: none });
+    expect(existsSync(countFileOf(none))).toBe(false);
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    const before = readFileSync(countFileOf(file), "utf8");
+    const { outcome } = await run(chainRoutes([POOL, ROUTER], { paths: () => new Response("down", { status: 502 }) }), {
+      file,
+      now: NOW + 5,
+    });
+    expect(outcome).toEqual({ wrote: false, kind: "status" });
+    expect(readFileSync(countFileOf(file), "utf8")).toBe(before);
+  });
+
+  it("writes neither file when the count cannot be written: both keep their last text, and no temporary stays", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    const before = [readFileSync(file, "utf8"), readFileSync(countFileOf(file), "utf8")];
+    mkdirSync(`${countFileOf(file)}.tmp`);
+    const { outcome, logged } = await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5 });
+    expect(outcome).toEqual({ wrote: false, kind: "write" });
+    expect(logged).toEqual([{ event: "worlds_failed", error: "write" }]);
+    expect([readFileSync(file, "utf8"), readFileSync(countFileOf(file), "utf8")]).toEqual(before);
+    expect(readdirSync(join(file, "..")).sort()).toEqual(["worlds-count.json", "worlds-count.json.tmp", "worlds.json"]);
+  });
+
+  it("writes neither file when the worlds' file cannot be written: the count keeps its last text", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    const before = readFileSync(countFileOf(file), "utf8");
+    mkdirSync(`${file}.tmp`);
+    const { outcome } = await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5 });
+    expect(outcome).toEqual({ wrote: false, kind: "write" });
+    expect(readFileSync(countFileOf(file), "utf8")).toBe(before);
+    expect(existsSync(`${countFileOf(file)}.tmp`)).toBe(false);
   });
 });
 

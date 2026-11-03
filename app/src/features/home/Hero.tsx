@@ -7,7 +7,7 @@ import type { UniverseView } from "../../places.ts";
 import styles from "./Hero.module.css";
 import { Live } from "./Live.tsx";
 
-/** `coming`: no number yet, but one is on its way (the worlds' file is being read). */
+/** `coming`: no number yet, but one is on its way (the worlds' count is being read). */
 export function Hero({
   universe,
   worlds,

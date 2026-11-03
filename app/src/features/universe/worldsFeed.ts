@@ -1,5 +1,5 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
-// taken from the home's read or read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
+// read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import type { Scene } from "../../scene/scene.ts";
 import { worldsFile } from "./worldsFile.ts";
@@ -91,7 +91,7 @@ export class WorldsFeed {
     measure();
   }
 
-  // The home's read runs on whether the scene stays or not: a file that comes after the scene has gone for good is let go here.
+  // The scene's own read, under its signal: a file that comes as the scene goes for good is let go here.
   #read(scene: Scene): void {
     this.#asked = true;
     worldsFile(this.#leaving.signal).then(
