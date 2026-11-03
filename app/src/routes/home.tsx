@@ -26,8 +26,8 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
   const now = useClock();
-  // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's (7d6). The number asks the file
-  // before space is asked, whether the scene runs or not, so a scene already there takes this read rather than ask again (7n).
+  // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's (7d6). The number reads that count,
+  // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
   const drawn = useWorldsCount(universe.isDefault);
   useSpace(universe.isDefault ? "cosmos" : undefined);
   return (

@@ -52,24 +52,14 @@ test("counts another universe's worlds by its page's list: no cosmos is drawn th
   useWorldsCount.mockReturnValue(undefined);
 });
 
-// 7n: the number came only from the scene, so a home whose scene never runs (no WebGL, a refused GPU, a phone) lost it for good.
-test("asks the worlds' file for its hero's number on the default universe's home alone, whether the scene runs or not", async () => {
+// 7n: the number came only from the scene, so a home whose scene never runs (no WebGL, a refused GPU, a phone) lost it for good; 7n2: it reads
+// the worlds' count, not their file, so a phone asks nothing of the cosmos before View in space.
+test("asks the worlds' count for its hero's number on the default universe's home alone, whether the scene runs or not", async () => {
   useWorldsCount.mockClear();
   await render({ path: "/", Component: Home, loader }, "/");
   expect(useWorldsCount).toHaveBeenLastCalledWith(true);
   await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
   expect(useWorldsCount).toHaveBeenLastCalledWith(false);
-});
-
-// A page's effects run in the order it asks: the number's read starts first, so a scene already there takes it rather than read again.
-test("asks for its number before it asks for space, so the scene takes the page's read of the file", async () => {
-  useWorldsCount.mockClear();
-  useSpace.mockClear();
-  await render({ path: "/", Component: Home, loader }, "/");
-  const [number] = useWorldsCount.mock.invocationCallOrder;
-  const [space] = useSpace.mock.invocationCallOrder;
-  expect(number).toBeDefined();
-  expect(number).toBeLessThan(space ?? 0);
 });
 
 test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {
