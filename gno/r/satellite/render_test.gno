@@ -90,16 +90,12 @@ func TestRenderWorld(cur realm, t *testing.T) {
 	uassert.True(t, strings.HasPrefix(Render(long), "# Satellite over "+sanitize.InlineText(long)+"\n\nhello\n\n"), Render(long))
 }
 
-// Bidi and zero-width characters are not control characters (D7), so a text
-// may hold them; Render strips them. Built from code points: never raw in a source.
-func TestRenderStripsBidi(cur realm, t *testing.T) {
+// Render strips bidi and zero-width characters from whatever text is stored,
+// planted here past Rent's checks. Built from code points: never raw in a source.
+func TestRenderStripsBidi(t *testing.T) {
 	fresh()
 	text := "ab" + string(rune(0x202e)) + "cd" + string(rune(0x200b)) + "ef" + string(rune(0x2066))
-	testing.SetRealm(testing.NewUserRealm(alice))
-	pay(p0)
-	Rent(cross(cur), "mars", text, 1)
-	_, got, _, _ := Rental("mars")
-	uassert.Equal(t, text, got)
+	rentals.Set("mars", rental{payer: alice, start: t0, days: 1, price: p0, text: text}.encode())
 	uassert.True(t, strings.Contains(Render("mars"), "\n\nabcdef\n\n"), Render("mars"))
 	uassert.True(t, strings.Contains(Render(""), "**: abcdef, until"), Render(""))
 }
