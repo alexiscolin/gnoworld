@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { callersOf, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { callersOf, type CosmosWorld, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { Drawn } from "@gnoworld/core";
 import { asksOf } from "../../scene/cosmos/labelAsks.ts";
 import type { Scene } from "../../scene/scene.ts";
@@ -54,6 +54,22 @@ afterEach(() => {
 });
 
 describe("the worlds' feed", () => {
+  it("tells the rail the worlds and what is known of them as it tells the cosmos, once both are known (7i)", async () => {
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    const told: (readonly CosmosWorld[] | undefined)[] = [];
+    worlds.subscribe(() => told.push(worlds.data()?.worlds));
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    expect(worlds.data()).toBeUndefined();
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()).toEqual({ worlds: FILE.worlds, signals: lastSignals(cosmos) });
+    expect(told.length).toBeGreaterThan(0);
+    expect(told.every((each) => each === FILE.worlds)).toBe(true);
+  });
+
   it("hands the labels who is here, keyed as the cosmos holds each world, with the hubs' names and this reader's visits", async () => {
     const { cosmos, scene } = sceneOf();
     localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");

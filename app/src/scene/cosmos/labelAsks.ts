@@ -45,7 +45,9 @@ function heardIn(world: CosmosWorld | undefined, id: string, { present, visited,
   return { ...heardOf(present.get(id)), ...(uncharted ? { uncharted: true } : {}) };
 }
 
-function signalsOf(world: CosmosWorld | undefined, id: string, { signals, callersOf }: Reading): Signals {
+/** What the data says of world `id` now: who is here, its rise, its callers, whether it is new to this reader. Its label's and the rail's
+ * alike (7i). */
+export function signalsOf(world: CosmosWorld | undefined, id: string, { signals, callersOf }: Reading): Signals {
   const use = world === undefined ? 0 : callersOf(world);
   return { ...heardIn(world, id, signals), ...(use > 0 ? { use } : {}) };
 }

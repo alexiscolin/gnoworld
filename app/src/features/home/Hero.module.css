@@ -156,6 +156,13 @@
     }
   }
 
+  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
+  @media (min-width: 900px) {
+    .worlds[data-rail="standing"] {
+      display: none;
+    }
+  }
+
   /* Over the page only where it holds: a screen of 800 px high, the list of worlds above it in the room that is left. */
   @media (min-width: 900px) and (min-height: 800px) {
     .hero {

@@ -1,7 +1,7 @@
 // A universe's cosmos: the home for the default one (/), its own page for another (/net/<id>/).
 import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
-import { type MetaArgs, useLoaderData } from "react-router";
+import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Hero, Ticker, tickerItems, useClock, Worlds } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
@@ -26,10 +26,18 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
   const now = useClock();
+  const navigate = useNavigate();
   // Universes are never shown together: the worlds' file is the default one's, and its count the cosmos's (7d6). The number reads that count,
   // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
   const drawn = useWorldsCount(universe.isDefault);
-  useSpace(universe.isDefault ? "cosmos" : undefined);
+  // The rail beside the cosmos (7i) links its worlds to their pages, the Earth's and the hubs' as this page lists them, through the router.
+  const rail = {
+    open: (href: string) => {
+      Promise.resolve(navigate(href)).catch(reportError);
+    },
+    places: { earth: universe.earth.path, worlds: universe.worlds },
+  };
+  useSpace(universe.isDefault ? "cosmos" : undefined, universe.isDefault ? rail : undefined);
   return (
     <>
       <Hero

@@ -1,5 +1,6 @@
 // The space behind the page (ADR-0001 §7): a canvas under everything, the 3D's code loaded after the text, or on request. It stays
 // mounted once it came, so a page that does not show it only covers it. The places' links stay in the page, with or without the 3D.
+import { PHONE_QUERY } from "@gnoworld/core";
 import { Button } from "@gnoworld/ui";
 import {
   lazy,
@@ -16,7 +17,8 @@ import { FlightPanel } from "./FlightPanel.tsx";
 import type { PageSigns } from "./EarthSigns.tsx";
 import type { WorldMoons } from "./WorldMoons.tsx";
 import type { EarthState } from "../../scene/earth/device.ts";
-import { SceneHost, type EarthPage, type Shown, type WorldPage } from "./host.ts";
+import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
+import type { Rail } from "./Rail.tsx";
 import styles from "./Universe.module.css";
 
 // The button leaves as the scene comes: a focus it held goes to the page's heading, where the reader was. One they took elsewhere stays.
@@ -78,20 +80,46 @@ function OnTheEarth({ host, page }: { host: SceneHost; page: EarthPage | WorldPa
 
 interface BesideProps {
   readonly host: SceneHost;
-  readonly page: EarthPage | WorldPage | undefined;
+  readonly page: EarthPage | WorldPage | CosmosPage | undefined;
   readonly showsMaps: boolean;
   readonly earth: EarthState;
   readonly world: EarthState;
 }
 
-// What stands with the running scene: wherever maps show, their credits.
-function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
-  if (earth === "drawn") return <OnTheEarth host={host} page={page} />;
-  if (world === "drawn") return <OnTheWorld host={host} page={page} />;
-  return showsMaps ? <Credits overTicker /> : null;
+// The rail (7i), its code asked once the cosmos runs on a computer: a chunk that does not come leaves the page's list of worlds.
+const RailPart = lazy<ComponentType<ComponentProps<typeof Rail>>>(() =>
+  import("./Rail.tsx").then(
+    ({ Rail: rail }) => ({ default: rail }),
+    () => ({ default: () => null }),
+  ),
+);
+
+// What stands beside the cosmos: its maps' credits, and on a computer the rail, read once as the host decides a phone.
+function OnTheCosmos({ host, page }: { host: SceneHost; page: CosmosPage | undefined }) {
+  const [computer] = useState(() => !matchMedia(PHONE_QUERY).matches);
+  return (
+    <>
+      <Credits overTicker />
+      {computer && page !== undefined ? (
+        <Suspense fallback={null}>
+          <RailPart source={host.feed} places={page.places} open={page.open} />
+        </Suspense>
+      ) : null}
+    </>
+  );
 }
 
-export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | WorldPage | undefined }) {
+// What stands with the running scene: wherever maps show, their credits.
+function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
+  const placed = page !== undefined && "store" in page ? page : undefined;
+  if (earth === "drawn") return <OnTheEarth host={host} page={placed} />;
+  if (world === "drawn") return <OnTheWorld host={host} page={placed} />;
+  return showsMaps ? (
+    <OnTheCosmos host={host} page={page !== undefined && "places" in page ? page : undefined} />
+  ) : null;
+}
+
+export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | WorldPage | CosmosPage | undefined }) {
   const [host] = useState(() => new SceneHost());
   const status = useSyncExternalStore(host.subscribe, host.status);
   const earth = useSyncExternalStore(host.subscribe, host.earth);

@@ -19,7 +19,20 @@ const scene = vi.hoisted(() => ({
   counted: vi.fn<(count: number) => void>(),
   start: vi.fn(),
   load: vi.fn(),
+  portraits: vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>(),
+  railDrawn: vi.fn(),
 }));
+// The rail (7i), its chunk asked the first time it draws: each draw counted, so a test sees whether a page drew it, and so asked its code.
+vi.mock("./Rail.tsx", async (original) => {
+  const loaded = await original<typeof import("./Rail.tsx")>();
+  return {
+    ...loaded,
+    Rail: (props: Parameters<typeof loaded.Rail>[0]) => {
+      scene.railDrawn();
+      return loaded.Rail(props);
+    },
+  };
+});
 
 vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
 vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: scene.read }));
@@ -164,7 +177,9 @@ beforeEach(() => {
     keepClear: scene.keepClear,
     dispose: scene.dispose,
     stats: () => ({}),
+    portraits: scene.portraits,
   }));
+  scene.portraits.mockImplementation(() => new Promise(() => undefined));
   scene.read.mockImplementation(() => Promise.resolve({ worlds: WORLDS }));
   scene.load.mockImplementation(() => Promise.resolve({ startScene: scene.start }));
   localStorage.clear();
@@ -1477,5 +1492,77 @@ describe("flights between places (7g)", () => {
       started().onLost(true);
     });
     expect(all(box, "[data-flight]")).toEqual([]);
+  });
+});
+
+describe("the rail (7i)", () => {
+  const page = () => ({ open: vi.fn<(href: string) => void>(), places: { earth: "/earth", worlds: [] } });
+  const railLinks = () => all(document.body, "nav[aria-label='Worlds'] li a").map((link) => link.textContent);
+  // The rail's chunk comes once the cosmos runs: the scene, its worlds, then the chunk the page asks for them.
+  const railed = async () => {
+    await settle();
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
+    await settle();
+  };
+
+  it("stands beside the cosmos once the scene runs and its worlds are known, the Earth first", async () => {
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(railLinks()).toEqual(["Earth"]);
+    expect(scene.railDrawn).toHaveBeenCalled();
+  });
+
+  it("asks the scene for its planets' portraits", async () => {
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(scene.portraits).toHaveBeenCalledWith(["earth"], expect.any(Number));
+  });
+
+  it("goes to a world's page through the page's router", async () => {
+    const cosmos = page();
+    mount(<Universe shown="cosmos" page={cosmos} />);
+    await railed();
+    click(one(document.body, "nav[aria-label='Worlds'] li a"));
+    expect(cosmos.open).toHaveBeenCalledWith("/earth");
+  });
+
+  it("stands no rail on a phone, and asks none of its code, even once space shows", async () => {
+    device({ phone: true });
+    const box = mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    click(button(box, VIEW));
+    await railed();
+    expect(on(box)).toBe(true);
+    expect(railLinks()).toEqual([]);
+    expect(scene.railDrawn).not.toHaveBeenCalled();
+  });
+
+  it("stands no rail where the scene does not run", async () => {
+    device({ gpu: null });
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(railLinks()).toEqual([]);
+  });
+
+  it("takes the rail away once the page leaves the cosmos, and stands none beside the Earth", async () => {
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    act(() => {
+      root.render(<Universe shown="cosmos" page={page()} />);
+    });
+    await railed();
+    expect(railLinks()).toEqual(["Earth"]);
+    act(() => {
+      root.render(<Universe shown="earth" />);
+    });
+    await railed();
+    expect(railLinks()).toEqual([]);
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
   });
 });

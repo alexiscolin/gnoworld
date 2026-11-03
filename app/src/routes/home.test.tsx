@@ -65,10 +65,31 @@ test("asks the worlds' count for its hero's number on the default universe's hom
 test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {
   useSpace.mockClear();
   await render({ path: "/", Component: Home, loader }, "/");
-  expect(useSpace).toHaveBeenLastCalledWith("cosmos");
+  expect(useSpace.mock.lastCall?.[0]).toBe("cosmos");
   useSpace.mockClear();
   await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
-  expect(useSpace).toHaveBeenLastCalledWith(undefined);
+  expect(useSpace).toHaveBeenLastCalledWith(undefined, undefined);
+});
+
+// 7i: the rail beside the cosmos links each world to its page, the Earth's and the hubs' as the page lists them, through the page's router.
+test("hands the cosmos the places its rail links to and the page's router", async () => {
+  useSpace.mockClear();
+  await render({ path: "/", Component: Home, loader }, "/");
+  const page = useSpace.mock.lastCall?.[1] as { places: unknown; open: unknown } | undefined;
+  expect(page?.places).toEqual({
+    earth: "/earth",
+    worlds: [
+      expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
+      expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
+    ],
+  });
+  expect(page?.open).toBeTypeOf("function");
+});
+
+// 7i: where the rail stands it stands for the page's list of worlds, which steps aside (Hero.module.css).
+test("marks its list of worlds as the one a rail stands for", async () => {
+  const html = await render({ path: "/", Component: Home, loader }, "/");
+  expect(html).toMatch(/<nav aria-label="Worlds"[^>]*data-rail="none"/);
 });
 
 const failing = {

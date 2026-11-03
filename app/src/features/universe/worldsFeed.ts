@@ -1,15 +1,32 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
 // read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
+import { createStore } from "zustand/vanilla";
 import type { Scene } from "../../scene/scene.ts";
+import type { RailPlaces } from "./railWorlds.ts";
 import { worldsFile } from "./worldsFile.ts";
 
 // Who is here changes by the minute: asked again each minute while the cosmos shows (the server's answer keeps a minute too).
 const PRESENCE_MS = 60_000;
 const loadSignals = () => import("./signals.ts");
 
+/** What the cosmos's page hands its rail (7i): its router, and the places its links go to. */
+export interface CosmosPage {
+  readonly open: (href: string) => void;
+  readonly places: RailPlaces;
+}
+
+/** The worlds and what is known of them now, once both are: what the rail reads (7i). */
+export interface Known {
+  readonly worlds: readonly CosmosWorld[];
+  readonly signals: LabelSignals;
+}
+
 export class WorldsFeed {
   readonly #leaving = new AbortController();
+  readonly #known = createStore<Known | undefined>(() => undefined);
+  #scene: Scene | undefined;
+  #came = false;
   #worlds: readonly CosmosWorld[] = [];
   #written: string | undefined;
   #asked = false;
@@ -18,8 +35,19 @@ export class WorldsFeed {
   #signals: LabelSignals | undefined;
   #polling: AbortController | undefined;
 
+  /** Hears each change of what `data` gives; what it returns lets go. */
+  readonly subscribe = this.#known.subscribe;
+
+  /** The worlds and what is known of them, as last told to the cosmos, once both are. */
+  readonly data = this.#known.getState;
+
+  /** The scene's portraits of these worlds' planets; none before a scene came. */
+  readonly portraits = (ids: readonly string[], size: number): Promise<ReadonlyMap<string, string>> =>
+    this.#scene?.portraits(ids, size) ?? Promise.resolve(new Map());
+
   /** Says whether the page wants the worlds on `scene`. */
   sync(scene: Scene, wanted: boolean): void {
+    this.#scene = scene;
     if (wanted === this.#shown) return;
     this.#shown = wanted;
     this.#hand(scene, wanted ? this.#worlds : undefined);
@@ -32,6 +60,8 @@ export class WorldsFeed {
 
   // The file's time goes with its worlds, once there is one: it ages their calls; the signals, once come, name them.
   #hand(scene: Scene, worlds: readonly CosmosWorld[] | undefined): void {
+    if (worlds !== undefined && this.#came && this.#signals !== undefined)
+      this.#known.setState({ worlds, signals: this.#signals }, true);
     if (worlds !== undefined && this.#signals !== undefined) scene.cosmos(worlds, this.#written, this.#signals);
     else if (this.#written === undefined) scene.cosmos(worlds);
     else scene.cosmos(worlds, this.#written);
@@ -99,6 +129,7 @@ export class WorldsFeed {
         if (file === undefined || this.#leaving.signal.aborted) return;
         this.#worlds = file.worlds;
         this.#written = file.updated;
+        this.#came = true;
         if (this.#shown) this.#hand(scene, this.#worlds);
       },
       () => undefined,

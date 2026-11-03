@@ -57,10 +57,11 @@ export function Hero({
   );
 }
 
-/** The universe's worlds, as the page lists them, beside the hero's left edge until the planets of slice 7 stand for them. */
+/** The universe's worlds, as the page lists them, beside the hero's left edge; from 900 px the cosmos's rail stands for them while it
+ * stands (7i), and marks them so. */
 export function Worlds({ children }: { children: ReactNode }) {
   return (
-    <nav aria-label="Worlds" className={styles["worlds"]}>
+    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none">
       {children}
     </nav>
   );

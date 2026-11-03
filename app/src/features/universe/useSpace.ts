@@ -2,13 +2,13 @@
 // the first screen of the others holds none of it (ADR-0001 §12's budget). The universe comes after the text and stays once it came:
 // leaving covers it, for the way back. A chunk that does not come leaves the page as it is, and the next page that shows space asks again.
 import { useEffect, useState } from "react";
-import type { EarthPage, Shown, WorldPage, WorldShown } from "./host.ts";
+import type { CosmosPage, EarthPage, Shown, WorldPage, WorldShown } from "./host.ts";
 
 const loadUniverse = () => import("./mountUniverse.tsx");
 
 let wanted: Shown = false;
 let asked = false;
-type Page = EarthPage | WorldPage;
+type Page = EarthPage | WorldPage | CosmosPage;
 
 let page: Page | undefined;
 let draw: ((shown: Shown, page?: Page) => void) | undefined;
