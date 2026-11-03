@@ -55,6 +55,7 @@ export {
 } from "./lod/ladder.ts";
 export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
 export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
+export { chooseRail, type RailAsk, type RailWorld } from "./lod/rail.ts";
 export { riseOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {

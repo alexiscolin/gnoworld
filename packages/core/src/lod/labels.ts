@@ -68,7 +68,8 @@ function givenName(name: string | undefined): string | null {
   return plain === "" || looksLikeAddress(plain) ? null : cut(plain);
 }
 
-function titleOf({ id, kind, name, signals }: LabelAsk): string | null {
+/** A world's title on its label and on the rail: the Earth's, a new world's as an uncharted signal, else its name; none for an address. */
+export function titleOf({ id, kind, name, signals }: LabelAsk): string | null {
   if (kind === "earth") return "Earth";
   if (signals?.uncharted === true) return UNCHARTED;
   return givenName(name) ?? labelName(id);
