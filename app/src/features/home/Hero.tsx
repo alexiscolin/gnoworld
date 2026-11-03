@@ -7,6 +7,9 @@ import type { UniverseView } from "../../places.ts";
 import styles from "./Hero.module.css";
 import { Live } from "./Live.tsx";
 
+// ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
+const TALK = ". Each one is a place to talk.";
+
 /** `coming`: no number yet, but one is on its way (the worlds' count is being read). */
 export function Hero({
   universe,
@@ -25,22 +28,26 @@ export function Hero({
         {worlds ?? "\u2007"}
       </p>
       <div className={styles["row"]}>
-        {/* The line keeps its figure's room while the number comes, so the actions beside it stay put (7n); with none, it names the worlds. */}
-        <h1 className={styles["line"]} tabIndex={-1}>
-          {worlds === undefined && !coming ? (
-            `Worlds in ${universe.name}`
-          ) : (
-            <>
-              <strong className={styles["count"]}>
-                <span className={styles["figure"]} data-hero="figure">
-                  {worlds}
-                </span>
-                {` ${worlds === 1 ? "world" : "worlds"}`}
-              </strong>
-              {` in ${universe.name}`}
-            </>
-          )}
-        </h1>
+        {/* The line keeps its figure's room while the number comes, so the actions beside it stay put (7n); with none, it names the worlds.
+            The page's heading is its count; what a world is follows it, on the same line. */}
+        <div className={styles["line"]} data-hero="line">
+          <h1 className={styles["heading"]} tabIndex={-1}>
+            {worlds === undefined && !coming ? (
+              `Worlds in ${universe.name}`
+            ) : (
+              <>
+                <strong className={styles["count"]}>
+                  <span className={styles["figure"]} data-hero="figure">
+                    {worlds}
+                  </span>
+                  {` ${worlds === 1 ? "world" : "worlds"}`}
+                </strong>
+                {` in ${universe.name}`}
+              </>
+            )}
+          </h1>
+          {worlds === 0 ? null : TALK}
+        </div>
         <div className={styles["actions"]} data-hero="actions">
           <Link to={universe.earth.path} className={styles["action"]} data-emphasis="solid">
             Go explore

@@ -73,6 +73,31 @@ describe("the hero's big number, on a planted site", () => {
   });
 });
 
+// ADR-0003 §2, 2a: the line says what a world is, after the count the page's heading holds.
+describe("the hero's line", () => {
+  const lineOf = (html: string) => /data-hero="line"[^>]*>(.*?)<\/div>/s.exec(html)?.[1]?.replace(/<[^>]*>/g, "");
+
+  test("says each world is a place to talk, after the count, outside the page's heading", async () => {
+    const html = await heroWith("main", 534);
+    expect(lineOf(html)).toBe("534 worlds in Mainland. Each one is a place to talk.");
+    expect(headingOf(html)).toBe("534 worlds in Mainland");
+  });
+
+  test("says it while the number comes, and once none came", async () => {
+    expect(lineOf(await heroWith("main", undefined, true))).toBe(" worlds in Mainland. Each one is a place to talk.");
+    expect(lineOf(await heroWith("main", undefined))).toBe("Worlds in Mainland. Each one is a place to talk.");
+  });
+
+  test("says it of one world as the decision words it (F4514)", async () => {
+    expect(lineOf(await heroOf("lab"))).toBe("1 world in Lab. Each one is a place to talk.");
+  });
+
+  // Nothing fake (ADR-0003, Constraints): a universe that holds no world has no place to talk to speak of.
+  test("says nothing of places to talk in a universe that holds no world", async () => {
+    expect(lineOf(await heroWith("main", 0))).toBe("0 worlds in Mainland");
+  });
+});
+
 // F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
 describe("the hero's parts", () => {
   test("opens with the kicker and its warm dot, the universe's name in the one label style", async () => {
@@ -91,6 +116,6 @@ describe("the hero's parts", () => {
     const html = await heroOf("main");
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(headingOf(html)).toBe("2 worlds in Mainland");
-    expect(html).toMatch(/<\/h1><div[^>]*data-hero="actions">/);
+    expect(html).toMatch(/<\/h1>[^<]*<\/div><div[^>]*data-hero="actions"/);
   });
 });

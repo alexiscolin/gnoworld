@@ -45,13 +45,20 @@
   }
 
   .line {
-    /* layout: the page's heading, in the line's own size: no margin, no heading size */
-    margin-block: 0;
     /* raw: the line's own grey and 17 px (the prototype's #hero .heroCap) */
     color: #c8d0de;
     /* raw: the prototype's and the frames' own value */
     font: 400 17px/1.5 var(--family-sans);
     letter-spacing: normal;
+  }
+
+  /* The page's heading is the line's count, inline in it, in the line's own size: no margin, no heading size (ADR-0003, 2a). */
+  .heading {
+    display: inline;
+    /* layout: a heading with no margin of its own, inline in the line */
+    margin-block: 0;
+    font: inherit;
+    letter-spacing: inherit;
   }
 
   .actions {
