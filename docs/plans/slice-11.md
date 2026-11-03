@@ -14,7 +14,7 @@ The app's half (the rent card, the slot on the plate, satellites in space, "Spon
 
 Assets: the payments the realm holds, the slot's text (shown as gnoworld's), the approver's and operator's power. Entry points: every exported function, `Render`'s path.
 - **A forged or replayed approval:** ed25519 over `"gnoworld/satellite/v1|" chain id "|" realm path "|" world "|" hex(sha256(text)) "|" payer "|" days "|" expiry height`, every field from a fixed alphabet so no `|` is ambiguous; the realm checks the signature, then that expiry ≥ height and expiry ≤ height + 100 (D6), then that it is unused. Tests: one per field changed, expired, too long-lived, used once, and twice in one block.
-- **A weak approver key** (a small-order point verifies forged signatures): refused when the owner sets it, with the blocklist seal uses, moved into a pure package both import (D9). Test: each of the 8 small-order points refused.
+- **A weak approver key** (a small-order point verifies forged signatures): refused when the owner sets it, with the blocklist seal uses, moved with seal's statement prefix into a pure package both import (D9). Test: each of the 8 small-order points refused.
 - **Payment tricks:** `cur.Previous().IsUserCall()`, then one coin of `ugnot`, exactly price × days (D4); `GetCoin` for the realm's balance, the denom a constant. Tests: a code-realm caller, no coins, two coins, another denom, one ugnot less and more.
 - **Draining refunds:** `Withdraw` sends at most the realm's balance minus the payments of rentals not yet closed, so every takedown can refund. Test: withdraw all, then a takedown still refunds.
 - **Takeover:** owner, approver key and operator change only by the owner; ownership moves in two steps (the new owner accepts), so a typo cannot lock the realm (D14). Tests: each refused for any other caller.
@@ -35,9 +35,9 @@ ADR-0002 §9's realm row: `gno test`, the mutation check, `gno-audit`. Failing f
 
 ## 7. Files and branches
 
-Creates `gno/r/satellite/` (module `gno.land/r/gnoworld/satellite`, D1), `gno/p/edkey/` (the weak-key blocklist, D9), `gno/tools/satvec/`. Changes `gno/r/seal/seal.gno` (imports the blocklist), `scripts/mutate.py` and its tests (Alexis, 2026-11-03). Tier 1: every file under `gno/r/` and `gno/p/`; the harness: `scripts/mutate.py`.
+Creates `gno/r/satellite/` (module `gno.land/r/gnoworld/satellite`, D1), `gno/p/signing/` (the statement prefix and the weak-key blocklist, D9), `gno/tools/satvec/` and a Go package it shares with `gno/tools/sealvec` (seeded test keys, the prefix, the vectors' decoding helpers). Changes `gno/r/seal/` (imports the shared package; its vectors regenerated, byte for byte what the gate compares) and `gno/tools/sealvec/`, `scripts/mutate.py` and its tests (Alexis, 2026-11-03). Tier 1: every file under `gno/r/` and `gno/p/`; the harness: `scripts/mutate.py`.
 - **11a, the mutation check's flips** (`scripts/mutate.py`, its probe and harness tests): first failing tests that plant a surviving flip and a stale `GAPS` line; then the flips on every `.gno` source line, not only guards. Seal's new survivors are killed by seal tests when a vector exists, or listed in `GAPS` with their reason. First, because 11b's tests must face the flips.
-- **11b, the realm** (`gno/r/satellite/`, `gno/p/edkey/`, `gno/tools/satvec/`, seal's import): from 11a's merge. The blocklist's move is a refactor commit of its own, seal's results unchanged.
+- **11b, the realm** (`gno/r/satellite/`, `gno/p/signing/`, `gno/tools/`, seal's imports): from 11a's merge. What seal and sealvec share moves first, in a refactor commit of its own, seal's tests and mutation results unchanged: nothing of seal is copied.
 They follow each other, one pane at a time: the account's usage limit is shared with the Mac Studio.
 
 ## 8. Dependencies
