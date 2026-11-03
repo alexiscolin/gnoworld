@@ -56,7 +56,7 @@ test.describe("a world's page at the video's size", () => {
     await hydrated(page);
     const title = await box(page, "[data-look='plate'] h1");
     const line = await box(page, "[data-look='plate'] h1 + p");
-    // The activity's words by what they say: since b3aedf52 who is here keeps a place between the line and them.
+    // The activity's words by what they say: from 1,280 px nobody counted holds no place over them (Alexis, 2026-11-03, "retire le vide").
     const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
     const main = await box(page, "[data-look='plate'] a[href='#chat']");
     near(title.y, 172, "the title's top");
@@ -124,6 +124,21 @@ test.describe("who is here right now", () => {
     return plate;
   };
 
+  // Frame 26 draws "38 here" where Bubble's activity words stand while nobody is counted, its digits from 372 to 405 px: the page's
+  // figure, 44 px at line height 1, stands its box at 364, where it stood in the held place (7e). The fact comes there, the words under it,
+  // from the plate's breakpoint (1,280 px) to the video's size.
+  for (const width of [1280, 1728] as const)
+    test(`stands where frame 26 draws it once someone is counted, the activity's words under it, at ${String(width)} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await connected(page);
+      const figure = await box(page, "[data-look='plate'] [data-value]");
+      const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
+      near(figure.y, 364, "the figure's top");
+      expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
+    });
+
   test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
     page,
   }) => {
@@ -153,6 +168,28 @@ test.describe("who is here right now", () => {
     expect(caption[0]).toContain("Geist Mono");
     expect(caption[1]).toBe("uppercase");
   });
+});
+
+// Who is here, while nobody is counted (Alexis, 2026-11-03, "retire le vide"): where the plate is a block in the page, under 1,280 px, its
+// place is held, so nothing under it moves as the count comes (7e); from 1,280 px, where the plate stands beside its dock, it holds none.
+// The chat's socket answers nothing, so nobody is ever counted.
+test.describe("who is here while nobody is counted", () => {
+  const FACT = 59;
+  for (const [width, held] of [
+    [390, FACT],
+    [1279, FACT],
+    [1280, 0],
+    [1728, 0],
+  ] as const)
+    test(`at ${String(width)} px holds ${held === 0 ? "no place" : "the fact's place"}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.routeWebSocket(/\/ws$/, () => undefined);
+      await page.goto("/w/bubble");
+      await hydrated(page);
+      const here = page.locator("[data-look='plate'] h1 + p + div");
+      await expect(here).toBeAttached();
+      expect(await here.evaluate((node) => node.getBoundingClientRect().height)).toBeCloseTo(held, 0);
+    });
 });
 
 test.describe("Share", () => {

@@ -1,8 +1,17 @@
-/* "Here, right now" keeps its place on the plate before the chat has counted anyone, and where nobody is: the plate under it never
-   moves as the count comes (7e, 2026-11-02). */
+/* "Here, right now" keeps its place on the plate before the chat has counted anyone, and where nobody is, while the plate is a block in
+   the page: the plate under it never moves as the count comes (7e, 2026-11-02). From the plate's breakpoint, beside its dock, an empty one
+   holds no place (Alexis, 2026-11-03). */
 @layer components {
   .here {
     /* raw: the fact's height: its figure's line (--font-figure, 2.75rem/1), Stat's 3xs step and its caption's line (--font-label, 0.6875rem/1) */
     min-block-size: calc(2.75rem + var(--space-3xs) + 0.6875rem);
+  }
+
+  /* raw: the plate's one breakpoint, where it stands beside its dock (Panel.module.css) */
+  @media (min-width: 1280px) {
+    .here:empty {
+      /* layout: an empty one takes no row of the column, so the words under it stand at frame 26's y; the plate moves once, at the first count */
+      display: none;
+    }
   }
 }

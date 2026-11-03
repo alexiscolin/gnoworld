@@ -13,7 +13,8 @@ const people = ({ chat }: AppState) =>
 
 export function Here() {
   const here = useApp(people);
-  // The place is the fact's height whether it is drawn or not: the count comes after the door and the chat (7e), and nothing under it moves.
+  // Under the plate's breakpoint the place is the fact's height, drawn or not: the count comes after the door and the chat (7e), and nothing
+  // under it moves. The place holds no child while the fact is not drawn, so the stylesheet frees it from 1,280 px.
   return (
     <div className={styles["here"]}>
       {here === 0 ? null : (
