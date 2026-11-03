@@ -27,24 +27,26 @@ const scene = startScene({ canvas, remembered: undefined, remember: () => undefi
 const file = linked(recorded, read);
 scene.cosmos(file.worlds, file.updated);
 Reflect.set(globalThis, "__gnoworldScene", scene);
-// The hero's room (core's HERO_ZONE), which holds the home's text: the suns the home dims under its words are dimmed here too.
-const keepHeroRoom = () => {
-  scene.keepClear({
-    left: 0,
-    top: HERO_ZONE.top * innerHeight,
-    right: HERO_ZONE.right * innerWidth,
-    bottom: innerHeight,
-  });
-};
-addEventListener("resize", keepHeroRoom);
-keepHeroRoom();
-
 let away = 1;
 let aside = 0;
 let along = 0;
 
+// The hero's room (core's HERO_ZONE), which holds the home's text: the suns the home dims under its words are dimmed here too, at rest. The
+// home never leaves the rest, and the lab shows no text: moved, it keeps no room, or a world passing it would shrink and go (7d9).
+const keepHeroRoom = () => {
+  const atRest = away === 1 && aside === 0 && along === 0;
+  scene.keepClear(
+    atRest
+      ? { left: 0, top: HERO_ZONE.top * innerHeight, right: HERO_ZONE.right * innerWidth, bottom: innerHeight }
+      : undefined,
+  );
+};
+addEventListener("resize", keepHeroRoom);
+keepHeroRoom();
+
 const go = () => {
   scene.moveTo({ x: HOME.x + aside, y: HOME.y + along, z: HOME.z + (away - 1) * LEFT });
+  keepHeroRoom();
 };
 
 addEventListener("wheel", ({ deltaY }) => {

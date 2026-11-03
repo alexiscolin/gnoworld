@@ -5,7 +5,7 @@ import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
 import { EARTH_PLACE, systemsOf } from "../../../packages/core/src/cosmos/system.ts";
 import { distanceOf } from "../../../packages/core/src/space/cell.ts";
 import { coveredShare, offLine } from "../../../packages/core/src/frame/composition.ts";
-import { postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
+import { FIELD_OF_VIEW, postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -648,6 +648,40 @@ test("gives the release's page the cosmos as a view, from the recorded file, for
 }) => {
   await inTheLab(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
+});
+
+// Alexis, 2026-11-03, on the lab: "la grosse planète à gauche disparaît si on bouge en rétrécissant". The lab keeps the home's hero room,
+// which has no text there, so a drag or the wheel slid the close world under it, shrank it and put it out. The room is the rest's alone.
+test("keeps the close world at its size in the lab as a drag or the wheel takes the eye off the rest", async ({
+  page,
+}) => {
+  const { systems, view } = viewOf();
+  const world = systems[view.close?.system ?? -1]?.worlds[view.close?.world ?? -1];
+  if (world === undefined) throw new Error("the recorded file gives no close world");
+  const focal = COMPUTER.height / 2 / Math.tan((FIELD_OF_VIEW * Math.PI) / 360);
+  await inTheLab(page);
+  // The lab's own moves: a drag takes the eye 0.06 units a pixel at rest (3 units, within the view at rest's reach, then 6, past it), the
+  // "0" key brings it back, a wheel's step backs it off by a share of the way. F4271's journey holds the room kept at rest.
+  const moves = [
+    ...[50, 50].map(
+      (pixels) => `dispatchEvent(new PointerEvent("pointermove", { buttons: 1, movementX: ${String(pixels)} }))`,
+    ),
+    `dispatchEvent(new KeyboardEvent("keydown", { key: "0" }))`,
+    ...Array.from({ length: 6 }, () => `dispatchEvent(new WheelEvent("wheel", { deltaY: 20 }))`),
+  ];
+  // A step under the cosmos's own (4 units) takes no look, and reduced motion draws the one frame a change owes: it poses the bodies.
+  for (const move of moves) {
+    const { frames } = await stats(page);
+    await page.evaluate(move);
+    await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames);
+    const spot = (await cosmos(page)).screen.bodies.find(({ id }) => id === world.id);
+    if (spot === undefined) throw new Error(`the close world went after ${move}`);
+    // Its depth along the view is its distance or less, and more than 0.8 of it within the lens's corners: drawn whole, it stands as
+    // large as its distance says, or up to a quarter larger off the view's axis.
+    const truly = (world.radius * focal) / spot.away;
+    expect(spot.radius).toBeGreaterThanOrEqual(0.98 * truly);
+    expect(spot.radius).toBeLessThanOrEqual(1.25 * truly);
+  }
 });
 
 // The nebulae: real images, warped and recoloured, in layers behind the worlds (ADR-0002 §10, "Space views"), seen from a system's
