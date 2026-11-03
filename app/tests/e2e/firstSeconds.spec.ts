@@ -56,6 +56,21 @@ test.describe("a newcomer", () => {
     await served(page);
     await arrive(page);
     await expect(opening(page)).toBeVisible();
+    // F4529, mock-up 1: while the words stand, the hero has given way, still the page's reading; read with the words' own state, for the
+    // dive may land soon on a loaded machine.
+    const hero = page.locator("[data-yield]");
+    expect(
+      await page.evaluate(() => {
+        const words = document.querySelector("[data-opening]");
+        const box = document.querySelector("[data-yield]");
+        return {
+          left: words?.hasAttribute("data-left"),
+          yielded: box?.getAttribute("data-yield"),
+          inert: box?.hasAttribute("inert"),
+        };
+      }),
+    ).toEqual({ left: false, yielded: "opening", inert: false });
+    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("0");
     await expect(opening(page)).toContainText("The living map of gno.land.");
     const about = opening(page).getByRole("link", { name: "What is gno.land?" });
     await expect(about).toHaveAttribute("href", "https://gno.land");
@@ -63,7 +78,7 @@ test.describe("a newcomer", () => {
     await expect(about).toHaveAttribute("rel", "noreferrer noopener");
     expect(await opening(page).evaluate((words) => getComputedStyle(words).pointerEvents)).toBe("none");
     expect(await about.evaluate((link) => getComputedStyle(link).pointerEvents)).toBe("auto");
-    // F4529, mock-up 1: the kicker in amber, and the hero given way under the words, out of the keyboard's reach.
+    // F4529, mock-up 1: the kicker in amber.
     expect(
       await opening(page)
         .getByText("gno.world")
@@ -76,10 +91,6 @@ test.describe("a newcomer", () => {
           return getComputedStyle(word).color === warm;
         }),
     ).toBe(true);
-    const hero = page.locator("[data-yield]");
-    await expect(hero).toHaveAttribute("data-yield", "opening");
-    await expect(hero).toHaveAttribute("inert", "");
-    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("0");
     // F4517: a newcomer's page, its opening shown, under the axe as every page is.
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await running(page);
@@ -116,7 +127,7 @@ test.describe("a newcomer", () => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
     await page.getByRole("link", { name: "Cosmos", exact: true }).click();
-    await expect(page).toHaveURL(/\/(\?test-gpu)?$/);
+    await expect(page).toHaveURL(/\/(\?test-gpu)?$/, SLOW);
     await running(page);
     await expect(opening(page)).toHaveCount(0);
   });

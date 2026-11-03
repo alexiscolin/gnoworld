@@ -63,8 +63,8 @@ describe("the opening's words", () => {
   });
 });
 
-// F4529, mock-up 1: "The hero, the labels and the buttons come as the camera lands": the hero gives way while the words show, out of the
-// keyboard's reach, and comes back as they leave.
+// F4529, mock-up 1: "The hero, the labels and the buttons come as the camera lands": the hero gives way while the words show, and comes
+// back as they leave; it stays the page's reading (its heading a screen reader's), so it is never inert.
 describe("the hero under the opening", () => {
   const hero = () => {
     const box = document.createElement("div");
@@ -73,11 +73,11 @@ describe("the hero under the opening", () => {
     return box;
   };
 
-  it("gives way while the words show, out of reach, and comes back as they leave", () => {
+  it("gives way while the words show, still the page's reading, and comes back as they leave", () => {
     const box = hero();
     opened("loading");
     expect(box.dataset["yield"]).toBe("opening");
-    expect(box.hasAttribute("inert")).toBe(true);
+    expect(box.hasAttribute("inert")).toBe(false);
     act(() => {
       document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
     });

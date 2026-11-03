@@ -16,9 +16,14 @@
     transition: opacity 600ms var(--ease-standard);
   }
 
-  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1). */
-  .hero[data-yield="opening"] {
+  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
+     page's reading, and shows again as the keyboard reaches it. */
+  .hero[data-yield="opening"]:not(:focus-within) {
     opacity: 0;
+  }
+
+  .hero[data-yield="opening"]:not(:focus-within) > * {
+    pointer-events: none;
   }
 
   .hero > * {

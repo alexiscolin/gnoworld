@@ -16,13 +16,11 @@ const GNO_LAND = "https://gno.land";
 // Tab moves the focus, and a modifier comes down alone before the key it changes, Shift before a Tab going back: none shortens the words.
 const HOLDING = new Set(["Tab", "Shift", "Control", "Alt", "Meta"]);
 
-// The hero gives way while the words show, out of the keyboard's reach, and comes back as they leave or go: mock-up 1's "the hero, the
-// labels and the buttons come as the camera lands".
+// The hero gives way while the words show, and comes back as they leave or go: mock-up 1's "the hero, the labels and the buttons come as
+// the camera lands". It stays the page's reading, its heading a reader's, and shows again as the keyboard reaches it (Hero.module.css).
 function yieldHero(yielding: boolean): void {
   const hero = document.querySelector<HTMLElement>("[data-yield]");
-  if (hero === null) return;
-  hero.dataset["yield"] = yielding ? "opening" : "none";
-  hero.toggleAttribute("inert", yielding);
+  if (hero !== null) hero.dataset["yield"] = yielding ? "opening" : "none";
 }
 
 interface Ends {
@@ -72,7 +70,7 @@ function hearEnds({ words, scene, leave, gone }: Ends, signal: AbortSignal): voi
 }
 
 export function Opening({ canvas, status }: { canvas: RefObject<HTMLCanvasElement | null>; status: SceneStatus }) {
-  const boxRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLElement>(null);
   const askedRef = useRef(false);
   const [left, setLeft] = useState(false);
   useEffect(() => {
@@ -103,7 +101,14 @@ export function Opening({ canvas, status }: { canvas: RefObject<HTMLCanvasElemen
     };
   }, [left, status, canvas]);
   return (
-    <div ref={boxRef} className={styles["opening"]} data-opening="" data-left={left ? "" : undefined} inert={left}>
+    <aside
+      ref={boxRef}
+      aria-label="About gnoworld"
+      className={styles["opening"]}
+      data-opening=""
+      data-left={left ? "" : undefined}
+      inert={left}
+    >
       <Kicker>
         <span className={styles["warm"]}>gno.world</span>
       </Kicker>
@@ -115,7 +120,7 @@ export function Opening({ canvas, status }: { canvas: RefObject<HTMLCanvasElemen
       <a href={GNO_LAND} target="_blank" rel="noreferrer noopener" className={styles["about"]}>
         What is gno.land?
       </a>
-    </div>
+    </aside>
   );
 }
 

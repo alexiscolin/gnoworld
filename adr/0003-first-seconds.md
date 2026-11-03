@@ -149,7 +149,8 @@ Where the decision left a choice, 7o made it as follows; each can be changed on 
   shows only to a newcomer, so a reader who entered a world from a shared link never sees it.
 - **Where the opening shows.** Over the home's dive, which runs where the scene loads by itself (a computer) or once a phone pressed "View in
   space". Where no dive runs (space refused, a weak device, a phone that did not ask) nothing shows, and the device keeps its first visit
-  for the next dive. The hero gives way to the words, out of the keyboard's reach, and comes back as they leave, as mock-up 1 draws it
+  for the next dive. The hero gives way to the words and comes back as they leave, as mock-up 1 draws it; it stays the page's
+  reading, its heading a screen reader's, and shows again as the keyboard reaches it
   ("the hero, the labels and the buttons come as the camera lands"; the design review, F4529).
 - **The first visit's buttons** stand where "Start here" can: while the cosmos stands, the scene running on the default universe's home,
   which the universe marks on the hero's calls. Elsewhere, a phone that did not ask for space or a computer whose scene does not run, the
