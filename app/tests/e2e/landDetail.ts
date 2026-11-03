@@ -2,7 +2,7 @@ import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { READ, type gridOf } from "./coasts.ts";
 import { reading, type Tools } from "./pixels.ts";
-import { dayBox } from "./portraits.ts";
+import { dayBox, halved, laplacian } from "./portraits.ts";
 
 // A world's land off its coasts and its clouds (7b8), on coasts.ts's grid: its fine detail as the day box reads it (portraits.ts), the
 // Laplacian's energy at full size and its share over the energy at half size, on land alone, so no coast's step and no sea's flat counts.
@@ -18,6 +18,8 @@ export interface LandDetail {
 interface Held {
   readonly gridOf: typeof gridOf;
   readonly dayBox: typeof dayBox;
+  readonly laplacian: typeof laplacian;
+  readonly halved: typeof halved;
 }
 const held = (): Held => globalThis as unknown as Held;
 
@@ -29,10 +31,8 @@ function landDetailsOf(input: readonly (readonly [Circle, boolean])[]): LandDeta
     const [left, right, top, bottom] = boxed ? held().dayBox(disc) : [-Infinity, Infinity, -Infinity, Infinity];
     const land = (x: number, y: number) => kinds[(y - y0) * w + (x - x0)] === 2;
     const at = (x: number, y: number) => luma(image, x, y);
-    const half = (i: number, j: number) =>
-      (at(2 * i, 2 * j) + at(2 * i + 1, 2 * j) + at(2 * i, 2 * j + 1) + at(2 * i + 1, 2 * j + 1)) / 4;
-    const lap = (value: (i: number, j: number) => number, i: number, j: number) =>
-      4 * value(i, j) - value(i - 1, j) - value(i + 1, j) - value(i, j - 1) - value(i, j + 1);
+    const { laplacian: lap, halved: halve } = held();
+    const half = halve(at);
     let [blocks, full, coarse] = [0, 0, 0];
     for (let j = Math.ceil(y0 / 2) + 2; 2 * j + 6 < y0 + w; j++)
       for (let i = Math.ceil(x0 / 2) + 2; 2 * i + 6 < x0 + w; i++) {
@@ -47,7 +47,7 @@ function landDetailsOf(input: readonly (readonly [Circle, boolean])[]): LandDeta
   });
 }
 
-const LAND = [READ, `const held = ${String(held)};`, dayBox].map(String).join("\n");
+const LAND = [READ, `const held = ${String(held)};`, dayBox, laplacian, halved].map(String).join("\n");
 
 export const landDetailsOn = (
   page: Page,

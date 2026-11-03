@@ -86,6 +86,16 @@ export function dayBox({ x, y, r }: Circle): [number, number, number, number] {
   return [Math.round(x + 0.1 * r), Math.round(x + 0.5 * r), Math.round(y - 0.3 * r), Math.round(y + 0.3 * r)];
 }
 
+/** The Laplacian of a picture's `value` at (i, j): four times it less its four neighbours. */
+export function laplacian(value: (i: number, j: number) => number, i: number, j: number): number {
+  return 4 * value(i, j) - value(i - 1, j) - value(i + 1, j) - value(i, j - 1) - value(i, j + 1);
+}
+/** A picture's `value` at half size: each the mean of the 2 by 2 block at (2i, 2j). */
+export function halved(value: (i: number, j: number) => number): (i: number, j: number) => number {
+  return (i, j) =>
+    (value(2 * i, 2 * j) + value(2 * i + 1, 2 * j) + value(2 * i, 2 * j + 1) + value(2 * i + 1, 2 * j + 1)) / 4;
+}
+
 // The day side's box: the Laplacian's variance at full size and at half.
 const detailsOf = (discs: readonly Circle[]) => {
   const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
@@ -97,14 +107,13 @@ const detailsOf = (discs: readonly Circle[]) => {
       let [n, s, q] = [0, 0, 0];
       for (let j = 1; j < h - 1; j++)
         for (let i = 1; i < w - 1; i++) {
-          const lap = 4 * value(i, j) - value(i - 1, j) - value(i + 1, j) - value(i, j - 1) - value(i, j + 1);
+          const lap = laplacian(value, i, j);
           [n, s, q] = [n + 1, s + lap, q + lap * lap];
         }
       return q / n - (s / n) ** 2;
     };
     const at = (i: number, j: number) => luma(image, x0 + i, y0 + j);
-    const half = (i: number, j: number) =>
-      (at(2 * i, 2 * j) + at(2 * i + 1, 2 * j) + at(2 * i, 2 * j + 1) + at(2 * i + 1, 2 * j + 1)) / 4;
+    const half = halved(at);
     let [total, along, across] = [0, 0, 0];
     for (let j = 0; j < y1 - y0; j++)
       for (let i = 0; i < x1 - x0; i++)
@@ -150,7 +159,7 @@ const apartOf = (discs: readonly Circle[]) => {
 export const portraits = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Portrait[]> =>
   reading(page, [picture], [portraitsOf, places]);
 export const details = (page: Page, picture: Buffer, places: readonly Circle[]): Promise<Detail[]> =>
-  reading(page, [picture], [detailsOf, places, String(dayBox)]);
+  reading(page, [picture], [detailsOf, places, [dayBox, laplacian, halved].map(String).join("\n")]);
 export const apart = (
   page: Page,
   [before, after]: readonly [Buffer, Buffer],
