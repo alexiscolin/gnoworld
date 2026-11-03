@@ -3,6 +3,7 @@
 // crossfade. Their own chunk, with camera-controls, asked once the scene runs. The camera stays at the origin: a flight writes the eye's way,
 // what it looks at and how far the page's body stands, and the panel hears it ten times a second at most.
 import { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt } from "@gnoworld/core";
+import { Vector2 } from "three";
 import { Dissolve, veilAhead } from "../dissolve.ts";
 import type { FlightDevice, FlightGoal, FlightSaid } from "./goal.ts";
 import { listen } from "./keys.ts";
@@ -24,6 +25,7 @@ export class Flights {
   readonly #leaving = new AbortController();
   readonly #streaks = new Streaks();
   readonly #ahead = veilAhead();
+  readonly #size = new Vector2();
   readonly #way: Way;
   readonly #was = { x: 0, y: 0, z: 0 };
   readonly #moved = { x: 0, y: 0, z: 0 };
@@ -146,6 +148,7 @@ export class Flights {
     this.#was.x = travel.x;
     this.#was.y = travel.y;
     this.#was.z = travel.z;
+    this.#streaks.pixel(this.#device.renderer.getDrawingBufferSize(this.#size));
     this.#streaks.follow(travel, this.#moved, seconds);
     this.#sayOn(this.#along);
   }
