@@ -47,6 +47,23 @@ function circles({ canvas, view }: Probed) {
   });
 }
 
+// Each world's pole, its climate's axis, in its own screen frame: right, up and towards the eye from its centre, so a pixel's normal on a
+// disc off the view's middle reads its latitude.
+function poles({ view }: Probed): [number, number, number][] {
+  const shown = view();
+  if (shown === undefined) return [];
+  const { camera } = shown;
+  camera.updateMatrixWorld();
+  const up = new Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+  return shown.worlds.map(({ group }) => {
+    group.updateMatrixWorld();
+    const toward = camera.position.clone().sub(group.position).normalize();
+    const right = up.clone().cross(toward).normalize();
+    const pole = new Vector3(0, 1, 0).applyQuaternion(group.quaternion);
+    return [pole.dot(right), pole.dot(toward.clone().cross(right)), pole.dot(toward)];
+  });
+}
+
 // What a frame of the view costs, in milliseconds: drawn `count` times, the GPU waited for by a read of one pixel.
 function cost({ renderer, view, draw }: Probed, count: number): number {
   const shown = view();
@@ -79,11 +96,13 @@ export function probes(page: Probed) {
   return {
     stats: () => stats(page),
     circles: () => circles(page),
+    poles: () => poles(page),
     cost: (count: number) => cost(page, count),
     live: () => live(page),
     looks: () => shown().map(({ look }) => look),
     ids: () => shown().map(({ id }) => id),
     minors: () => shown().map(({ recipe }) => recipe.minorShare),
+    surfaces: () => shown().map(({ recipe }) => recipe.surface),
     // What a glance takes for a world's colours: its land palette's centre, and its sea's two colours where it has a sea.
     centres: () => shown().map(({ recipe }) => ({ land: recipe.palette.lab[1], sea: recipe.sea?.lab ?? null })),
     styles: () => shown().map((world) => styleOf(world)),
