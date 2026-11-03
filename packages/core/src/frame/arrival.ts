@@ -42,18 +42,17 @@ export { ARRIVAL_LEAN } from "../space/drift.ts";
 const SLANT_LEAST = 32;
 const SLANT_SPAN = 22;
 const SLANT_TRIES = 4;
-const TURNS = 36;
-const STRIDE = 11;
+const [TURNS, STRIDE] = [36, 11];
 // How far the eye stands from the star, in the reach of its worlds: near, so its near side reads far larger than its far side.
 const DISTANCES = [1.1, 1.25, 1.45, 1.7, 2];
 // Where no angle cuts it, the view stands back to hold its nearest world whole as well.
 const WHOLE_DISTANCES = [2.2, 2.7, 3.3, 4];
-// The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more (the depth's own, depth.ts),
-// half the height across at most.
-const SHOWN_AT_REST = 0.3;
-const SHOWN_SWAYED = 0.25;
-const NEAR_OVER = 1.5;
-const NEAR_MOST = 0.5;
+// The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more at rest (the depth's own,
+// depth.ts) and 1.35 through the sway, where of Onyx's six systems that stand six worlds none held 1.5 at every corner (F4468); a tenth of
+// the height across at the least, for worlds under their crowd's cap stand smaller than at it (F4468), half the height at most.
+const [SHOWN_AT_REST, SHOWN_SWAYED] = [0.3, 0.25];
+const [NEAR_OVER, NEAR_SWAYED] = [1.5, 1.35];
+const [NEAR_LEAST, NEAR_MOST] = [0.1, 0.5];
 const [MARGIN, HEADER] = [24, 0.09];
 // The view looks no steeper than this up or down the map: its up stays up.
 const STEEP = Math.sin(60 * DEGREE);
@@ -65,6 +64,9 @@ const FILL = 0.6;
 const OUTSIDE = ROOM + 1;
 const SECOND_SUN = 0.75;
 const NEAR = HALO_FAR + 2 * ROOM;
+// The most worlds a dynamic view draws: the mock-up's six (Alexis, 2026-11-03, the views page, 14:09), held still, where the home's
+// postcards keep frame 4's four.
+const MOST_WORLDS = 6;
 // A mouse's lean on the map: the eight edges of the stage's across and up, at an arrival's lean.
 const LEANS: readonly Point[] = [
   [1, 1],
@@ -134,8 +136,9 @@ function leads(
   if (!cut) return look.whole(near, MARGIN);
   return (
     cutByFrame(look, near, atRest ? SHOWN_AT_REST : SHOWN_SWAYED) &&
+    near.radius >= NEAR_LEAST * look.height &&
     near.radius <= NEAR_MOST * look.height &&
-    others.every(({ radius }) => near.radius >= NEAR_OVER * radius)
+    others.every(({ radius }) => near.radius >= (atRest ? NEAR_OVER : NEAR_SWAYED) * radius)
   );
 }
 
@@ -236,10 +239,10 @@ export function arrivalOf(system: StarSystem, systems: readonly StarSystem[]): A
   const pick = chosenOf(system.id);
   // ponytail: one pass over the set an arrival, asked once a system and off the frame: 20,000 distances.
   const around = systems.filter((other) => other.id !== system.id && away(other.place, system.place) <= NEAR);
-  const most = postcardWorlds(system).length;
+  const most = postcardWorlds(system, MOST_WORLDS, true).length;
   for (const [count, cut] of most === 0 ? [] : triesOf(most))
     for (const leaning of [true, false]) {
-      const found = firstHolding(system, postcardWorlds(system, count), { pick, around, leaning, cut });
+      const found = firstHolding(system, postcardWorlds(system, count, true), { pick, around, leaning, cut });
       if (found !== undefined) return found;
     }
   // Framed whole by its star and far belt, as 7d3 framed it: the ball's height a share of the screen's.

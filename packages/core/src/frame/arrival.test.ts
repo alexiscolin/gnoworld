@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import recorded from "../../../../app/lab/worlds.json" with { type: "json" };
 import {
   BELT_INNER,
   EARTH_PLACE,
@@ -19,7 +20,7 @@ import { haloAt } from "./halo.ts";
 import { LENT } from "./lent.ts";
 import { outlineOf } from "./outline.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
-import { postcardWorlds } from "./postcard.ts";
+import { postcardOf, postcardWorlds } from "./postcard.ts";
 import { REST_SCREENS, STAR_HEART } from "./rest.ts";
 import { rocksAt } from "./rocks.ts";
 import { away, DEGREE, dot, focalOf, minus, type Seen } from "./restLook.ts";
@@ -48,6 +49,12 @@ const SETS = {
     systemsOf([...mixed(20), ...crowd("busy", 172), ...crowd("test", 127), ...crowd("mid", 30)]),
 } as const;
 type SetName = keyof typeof SETS;
+// A world of Onyx's recorded file, as the dynamic view's count reads it (7v's design review, F4468): its use, its realms and callers.
+interface Recorded {
+  readonly id: string;
+  readonly namespace: string;
+  readonly realms: readonly { readonly callers: number | null }[];
+}
 // A row names a system by its set and its id: each test builds the set again, so what it asserts is computed while it runs.
 const ROWS = (Object.keys(SETS) as SetName[]).flatMap((name) =>
   SETS[name]()
@@ -196,17 +203,21 @@ describe("a system's arrival: the same address, the same postcard", () => {
   );
 
   it(
-    "draws the worlds the view at rest would, each at its own phase and size, four at most, as no figure at any count",
+    "draws the worlds its still postcard would, each at its own phase and size under its crowd's cap, six at most, as no figure at any count",
     () => {
       for (const { system, systems } of allCases()) {
         const { postcard } = arrivalOf(system, systems);
-        expect(postcard.worlds.length).toBeLessThanOrEqual(4);
+        expect(postcard.worlds.length).toBeLessThanOrEqual(6);
         // Fewer than the postcard's own, the same rules choose them again: never a cut of a larger one's spread.
-        expect(postcard.worlds).toEqual(postcardWorlds(system, postcard.worlds.length));
+        expect(postcard.worlds).toEqual(postcardWorlds(system, postcard.worlds.length, true));
+        // Each at its own size, its crowd's cap one scale on all (7v's design review, F4468).
+        const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
+        const scale =
+          Math.max(...bodies.map(({ radius }) => radius)) / Math.max(...bodies.map(({ radius, own }) => own ?? radius));
         for (const world of postcard.worlds) {
-          const own = system.worlds.find(({ id }) => id === world.id);
-          expect(world.radius).toBe(own?.radius);
-          expect(world.phase).toBe(own?.phase);
+          const real = system.worlds.find(({ id }) => id === world.id);
+          expect(world.radius).toBeCloseTo((real?.own ?? real?.radius ?? NaN) * scale, 9);
+          expect(world.phase).toBe(real?.phase);
         }
       }
     },
@@ -253,7 +264,7 @@ describe("a system's arrival: a good angle", () => {
     (name, id) => {
       const { system, systems } = caseOf(name, id);
       const arrival = arrivalOf(system, systems);
-      expect(arrival.postcard.worlds.length).toBeLessThanOrEqual(4);
+      expect(arrival.postcard.worlds.length).toBeLessThanOrEqual(6);
       const cutAtRest = REST_SCREENS.map((screen) => {
         const [near] = nearestFirst(cameraOf(arrival, screen), arrival);
         return near !== undefined && cutByFrame(near, screen, 0.3);
@@ -283,7 +294,7 @@ describe("a system's arrival: a good angle", () => {
     expect(cutByFrame(near, screen, swayed ? 0.25 : 0.3)).toBe(true);
     expect(near.radius).toBeGreaterThanOrEqual(0.1 * screen.height);
     expect(near.radius).toBeLessThanOrEqual(0.5 * screen.height);
-    for (const other of others) expect(near.radius).toBeGreaterThanOrEqual(1.5 * other.radius - 1e-9);
+    for (const other of others) expect(near.radius).toBeGreaterThanOrEqual((swayed ? 1.35 : 1.5) * other.radius - 1e-9);
   }
 
   it.each(Object.keys(SETS) as SetName[])(
@@ -323,14 +334,14 @@ describe("a system's arrival: a good angle", () => {
   // Every system with a world of a body's size comes to a view with one or more (7d3's guarantee), every one whose postcard can draw two with
   // two or more, and nine in ten with every world their postcard can draw.
   it.each(Object.keys(SETS) as SetName[])(
-    "on %s, draws every system with a world of a body's size, two of it where its postcard can, nine in ten every world it can",
+    "on %s, draws every system with a world of a body's size, two of it where its postcard can, nine in ten the home's postcard's or more",
     (name) => {
       const systems = SETS[name]();
       const bodied = systems.filter(({ worlds }) => worlds.some(({ radius }) => radius >= GRAIN));
       const views = bodied.map((system) => [system, arrivalOf(system, systems).postcard.worlds.length] as const);
       for (const [system, count] of views)
         expect(count, system.id).toBeGreaterThanOrEqual(Math.min(2, postcardWorlds(system).length));
-      const whole = views.filter(([system, count]) => count === postcardWorlds(system).length);
+      const whole = views.filter(([system, count]) => count >= postcardWorlds(system).length);
       expect(whole.length).toBeGreaterThanOrEqual(0.9 * views.length);
     },
   );
@@ -549,14 +560,33 @@ describe("a system's arrival: a good angle", () => {
     expect(star.y).toBeCloseTo(screen.height / 2, 6);
   });
 
-  it("holds in a file of 10,000 worlds: the eye outside every room, four bodies at most, the same in any order", () => {
+  // 7v's design review (F4468; the chief: as the mock-up Alexis approved, the views page at 14:09, about six worlds): a dynamic view drew
+  // three of gnoswap's thirteen bodies, bound by the home's four and by the room its worlds keep to turn apart. Held still, they need only
+  // stand apart in space, each at its own size under its crowd's cap, the nearest 1.5 times every other's at rest.
+  it("draws up to six of a system's worlds in its dynamic view, gnoswap's five or more on Onyx, while the home's postcards keep four", () => {
+    const systems = systemsOf(
+      (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
+        id,
+        namespace,
+        use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
+      })),
+    );
+    const counts = systems.map((system) => arrivalOf(system, systems).postcard.worlds.length);
+    expect(Math.max(...counts)).toBe(6);
+    expect(counts.filter((count) => count >= 5).length).toBeGreaterThanOrEqual(5);
+    const gnoswap = systems.find(({ id }) => id === "gnoswap");
+    expect(gnoswap === undefined ? 0 : arrivalOf(gnoswap, systems).postcard.worlds.length).toBeGreaterThanOrEqual(5);
+    for (const system of systems) expect(postcardOf(system, EARTH_PLACE).worlds.length).toBeLessThanOrEqual(4);
+  });
+
+  it("holds in a file of 10,000 worlds: the eye outside every room, six bodies at most, the same in any order", () => {
     const systems = systemsOf(mixed(2500, (system) => 1 + (system % 7)));
     const sample = systems.filter(({ worlds }) => worlds.length > 0).filter((_, at) => at % 125 === 0);
     expect(sample.length).toBeGreaterThanOrEqual(20);
     const reversed = [...systems].reverse();
     for (const system of sample) {
       const arrival = arrivalOf(system, systems);
-      expect(arrival.postcard.worlds.length).toBeLessThanOrEqual(4);
+      expect(arrival.postcard.worlds.length).toBeLessThanOrEqual(6);
       for (const other of systems)
         if (other !== system) expect(away(arrival.eye, other.place)).toBeGreaterThanOrEqual(ROOM + 1);
       expect(arrivalOf(system, reversed)).toEqual(arrival);
@@ -618,7 +648,7 @@ describe("a system's arrival in depth (7p)", () => {
       const { system, systems } = caseOf(name, id);
       const arrival = arrivalOf(system, systems);
       const { system: plane, worlds, depth } = arrival.postcard;
-      expect(worlds.length).toBeLessThanOrEqual(4);
+      expect(worlds.length).toBeLessThanOrEqual(6);
       for (const screen of REST_SCREENS) {
         const see = cameraOf(arrival, screen);
         const star = see(system.place);
@@ -635,7 +665,7 @@ describe("a system's arrival in depth (7p)", () => {
   it.each(ROWS)("on %s, drops none of %s's bodies to a dot", (name, id) => {
     const { system, systems } = caseOf(name, id);
     const seen = seenAt(arrivalOf(system, systems), 0);
-    expect(seen.length).toBeLessThanOrEqual(4);
+    expect(seen.length).toBeLessThanOrEqual(6);
     for (const { radius } of seen) expect(radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS - 1e-9);
   });
 
