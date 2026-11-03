@@ -22,12 +22,14 @@ function watchPage(loop: FrameLoop, signal: AbortSignal): void {
   for (const name of INPUTS) window.addEventListener(name, input, { signal, passive: true });
 }
 
-/** Gives `aim` a mouse's place, -1 to 1 across the window, y up. A finger is no aim. */
+/** Gives `aim` a mouse's place, -1 to 1 across the window, y up. A finger is no aim, nor a mouse on a label of the cosmos: a door to its
+ * world (ADR-0003, 2e), it would slide from under the pointer as the eye leans (F4640). */
 function watchAim(aim: (x: number, y: number) => void, signal: AbortSignal): void {
   window.addEventListener(
     "pointermove",
-    ({ pointerType, clientX, clientY }) => {
-      if (pointerType === "mouse") aim((clientX / innerWidth) * 2 - 1, 1 - (clientY / innerHeight) * 2);
+    ({ pointerType, clientX, clientY, target }) => {
+      const onLabel = target instanceof Element && target.closest("[data-labels]") !== null;
+      if (pointerType === "mouse" && !onLabel) aim((clientX / innerWidth) * 2 - 1, 1 - (clientY / innerHeight) * 2);
     },
     { signal, passive: true },
   );

@@ -1116,13 +1116,16 @@ describe("the eye", () => {
 
   // Where the eye is after each stretch of time, each with its pointer events first, on a screen of its own: the drift is the same in
   // every run, so a run's difference from one with no events is the lean alone.
-  function eyeAfter(stretches: readonly { events?: readonly Record<string, unknown>[]; ms: number }[]) {
+  function eyeAfter(
+    stretches: readonly { events?: readonly (Record<string, unknown> & { on?: EventTarget })[]; ms: number }[],
+  ) {
     clock = new FakeClock(60);
     three.space.follow.mockClear();
     const scene = startScene(options({ remembered: "low" }), clock);
     clock.run(200);
     for (const { events = [], ms } of stretches) {
-      for (const event of events) window.dispatchEvent(Object.assign(new Event("pointermove"), event));
+      for (const { on = window, ...event } of events)
+        on.dispatchEvent(Object.assign(new Event("pointermove", { bubbles: true }), event));
       clock.run(ms);
     }
     const eye = { x: NaN, y: NaN, z: NaN, ...lastEye() };
@@ -1324,6 +1327,19 @@ describe("the eye", () => {
   it("takes no lean from a finger: a touch is no aim", () => {
     const finger = { pointerType: "touch", clientX: 1024, clientY: 0 };
     expect(eyeAfter([{ events: [finger], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
+  });
+
+  // F4640: a label of the cosmos is a door (ADR-0003, 2e); a mouse resting on it leaned the eye, so the label slid from under the pointer and
+  // shut, a near world's by 28 px in 190 ms on 7v's view.
+  it("takes no lean from a mouse on a label of the cosmos, and leans again off it", () => {
+    const layer = document.createElement("div");
+    layer.dataset["labels"] = "";
+    const label = layer.appendChild(document.createElement("div"));
+    document.body.append(layer);
+    expect(eyeAfter([{ events: [{ ...mouse(1024, 0), on: label }], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
+    const off = eyeAfter([{ events: [{ ...mouse(1024, 0), on: document.body }], ms: 3000 }]);
+    expect(off.x - eyeAfter([{ ms: 3000 }]).x).toBeGreaterThan(0.5);
+    layer.remove();
   });
 
   it("takes no lean under reduced motion", () => {
