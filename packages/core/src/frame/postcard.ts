@@ -5,6 +5,7 @@
 import { CELL } from "../cosmos/cosmos.ts";
 import { BELT_INNER, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
+import { normalOf, withNormal } from "./depth.ts";
 
 // Frame 4's densest group is four bodies; a postcard's are chosen among its eight largest.
 const POSTCARD_BODIES = 4;
@@ -35,10 +36,11 @@ export interface Postcard {
 
 // `system`'s plane, opened towards `eye` till it is seen `OPEN_LEAST` open: its normal turned towards the eye's line, the nearer way.
 function opened(system: StarSystem, eye: Point): StarSystem {
-  const { place, tilt, node } = system;
+  const { place } = system;
   const length = Math.hypot(place.x - eye.x, place.y - eye.y, place.z - eye.z);
   const view = [(place.x - eye.x) / length, (place.y - eye.y) / length, (place.z - eye.z) / length] as const;
-  const normal = [-Math.sin(node) * Math.sin(tilt), Math.cos(tilt), Math.cos(node) * Math.sin(tilt)] as const;
+  const { x: nx, y: ny, z: nz } = normalOf(system);
+  const normal = [nx, ny, nz] as const;
   const along = normal[0] * view[0] + normal[1] * view[1] + normal[2] * view[2];
   if (Math.abs(along) >= OPEN_LEAST) return system;
   // The normal's part across the line, and the line itself the side the normal leans: the opened normal is made of the two.
@@ -47,8 +49,7 @@ function opened(system: StarSystem, eye: Point): StarSystem {
   const width = Math.hypot(...across);
   const keep = Math.sqrt(1 - OPEN_LEAST ** 2);
   const [x = 0, y = 1, z = 0] = across.map((value, at) => (value / width) * keep + side * OPEN_LEAST * (view[at] ?? 0));
-  const sign = y < 0 ? -1 : 1;
-  return { ...system, tilt: Math.atan2(Math.hypot(x, z), Math.abs(y)), node: Math.atan2(-sign * x, sign * z) };
+  return withNormal(system, { x, y, z });
 }
 
 const placeIn = ({ orbit, phase }: Pick<Orbiter, "orbit" | "phase">, spread: number) => ({
