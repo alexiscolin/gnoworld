@@ -28,7 +28,7 @@ Hot paths and their benches (budgets set by each part, measured before and after
 
 ## 5. Scale
 
-The first limit is the day's budget (about 2,500 such questions), then the quotas; one `jarvis` container with one gnomcp child. Next: digests and translations cached per content hash (§7), then several `jarvis` containers, whose budget and quotas then leave the container's own SQLite (D45) for a shared store; load tested against the fake model.
+The first limit is the day's budget (about 2,500 such questions), then the quotas; one `jarvis` container with one gnomcp child. Next: digests and translations cached per content hash (§7), then several `jarvis` containers, whose budget then leaves the container's own SQLite (D45) for a shared store; load tested against the fake model.
 
 ## 6. Tests, by level
 
@@ -41,7 +41,7 @@ Creates `server/src/jarvis/` (the code, one concept a file), `server/jarvis/skil
 - **10c, the limits** (tonight, beside 10b): `config.ts` for jarvis, `prices.ts`, `budget.ts`, `quota.ts`, jarvis's migrations; the shared helpers of `server/src/config.ts`.
 - **10d, the checks on what Jarvis returns** (tonight, once 10b or 10c is merged): the digest, proposal and button schemas in `packages/schemas` (sharing `FunctionList`), grounding, the proposal's check, the translation's check.
 - **10e, the loop** (tier 1, after Alexis's install and 10b to 10d): the SDK client, the loop, gnomcp over stdio, gnoscope behind its switch, our tools.
-- **10f, the service** (after 10e): the spans, translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door (D42).
+- **10f, the service** (after 10e): the spans, translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas (D42, D43).
 - **10g, evals and deploy** (tier 1, after 10f): `evals/` with its provider and cases, the `jarvis` container in `deploy/`.
 The modules of 10b to 10d are reached by their tests until 10e calls them; the slice merges into `main` whole, never before 10f. Two parts at once at most, each in its own session, worktree and herdr pane.
 
@@ -55,5 +55,5 @@ Approved by Alexis (2026-11-03), read on npm the night of 2026-11-04 and install
 2. D46: npm marks `@opentelemetry/sdk-trace-node` 2.12.0 deprecated ("Use @opentelemetry/sdk-trace package"); take `@opentelemetry/sdk-trace` 2.12.0 instead, already in the tree through the exporter? A new name, so yours.
 3. D42, the door: `server` checks the session, the rate and the size, adds the room's public lines, and calls `jarvis` on a network of their own; `jarvis` serves nothing else and holds no session secret.
 4. D43, the quota: 20 questions a day per account, 5 for an account with no mainnet name; D47, the budgets: $45 for questions and $5 for translation a day, $3 and $1 in the demo.
-5. D45: jarvis keeps its budget, quotas and translations in its own SQLite file, on a volume of its own.
+5. D45: jarvis keeps its budget and translations in its own SQLite file, on a volume of its own; the quotas are the door's, in the server's database, as `server` holds the session and the pepper.
 6. promptfoo adds 702 Mo to the main checkout's packages: keep it in the workspace, or install `evals/` apart?
