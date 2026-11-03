@@ -13,7 +13,7 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
-from hidden import hidden_in
+from hidden import hidden_in, hidden_in_data
 from repo_files import git, listed, tracked
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
@@ -59,8 +59,10 @@ def lost_rules(root):
     return out
 
 
-# An image is no text; any other file is read, a NUL byte or no UTF-8 included, for what hidden.py names (F5053).
-IMAGES = (".png", ".jpg")
+# An image is no text: a file whose suffix names one and that starts with its format's own bytes is not read (a text so
+# named is). Any other file is UTF-8 text read for what hidden.py names (F5053), or is refused: a binary of another format
+# (a font, a video) wants its suffix and first bytes here first (F5082).
+IMAGES = {".png": b"\x89PNG\r\n\x1a\n", ".jpg": b"\xff\xd8\xff"}
 
 
 def messages(root):
@@ -79,10 +81,10 @@ def hidden(root):
     """Each format character of the files git tracks or would, and of the branch's commit messages."""
     out = []
     for p in tracked(root):
-        if p.suffix in IMAGES:
+        data = p.read_bytes()
+        if p.suffix in IMAGES and data.startswith(IMAGES[p.suffix]):
             continue
-        text = p.read_bytes().decode("utf-8", "surrogateescape")  # a byte that is no UTF-8 stays one character
-        out += hidden_in(p.relative_to(root).as_posix(), text)
+        out += hidden_in_data(p.relative_to(root).as_posix(), data)
     try:
         for sha, message in messages(root):
             out += hidden_in(f"commit {sha}", message)
@@ -183,6 +185,7 @@ if lost:
 hidden_chars = hidden(root)
 if hidden_chars:
     print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
-          " (F5053); write each as an escape, never raw:", *hidden_chars, sep="\n  ", file=sys.stderr)
+          " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
+          " bytes, IMAGES):", *hidden_chars, sep="\n  ", file=sys.stderr)
 if hidden_chars or missing or problems or orphans or unnamed or lost or rules:
     sys.exit(1)

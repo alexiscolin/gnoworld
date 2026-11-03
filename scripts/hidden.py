@@ -43,3 +43,16 @@ def hidden_in(where, text):
         name = unicodedata.name(c, "")
         out.append(f"{where}:{line}:{column}: U+{ord(c):04X}{' ' + name if name else ''}")
     return out
+
+
+def hidden_in_data(where, data):
+    """hidden_in of data read as UTF-8, or one line alone when data is no UTF-8 text (a NUL, or a byte that is no UTF-8):
+    what it holds cannot be read, as UTF-16 writes U+202E as `2E 20` (F5088), and a binary has no escape to write (F5082)."""
+    bad = data.find(b"\0")
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as e:
+        bad = e.start if bad < 0 else min(bad, e.start)
+    if bad >= 0:
+        return [f"{where}: no UTF-8 text, from its byte {bad + 1} (a NUL, or a byte that is no UTF-8)"]
+    return hidden_in(where, text)

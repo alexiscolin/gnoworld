@@ -1032,7 +1032,8 @@ git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
 hidden() { python3 -I "$docs" "$h" 2>&1; }
 printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
 printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
-printf 'PNG\342\200\256' >"$h/shot.png" && printf 'JPG\342\200\256' >"$h/shot.jpg"
+# An image is known by its suffix and its format's first bytes, as each real one starts (F5082).
+printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
 # A file deleted from the work tree but still in the index is not read.
 printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
 hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
@@ -1089,8 +1090,14 @@ printf 'x\342\200\215y\n' >"$h/src/joined.ts"
 printf '\330\234 a mark\n' >"$h/notes.txt"
 printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
 printf '# co\302\255de\n' >"$h/a.py"
+# What is no UTF-8 text is refused whole, from its first byte that is a NUL or no UTF-8: its characters cannot be read, as
+# UTF-16 writes U+202E as `2E 20` (F5088), and a binary cannot write one as an escape (F5082). So is a text named as an
+# image, which Vite's `?raw` reads.
 printf '\000\342\200\256\n' >"$h/blob.txt"
 printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
+printf '\377\376a\000\056\040b\000\n\000' >"$h/u16.md" && printf 'a\000\056\040b\000\n\000' >"$h/u16raw.md"
+python3 -I -c 'import os, sys; open(sys.argv[1], "wb").write(os.urandom(65536))' "$h/font.woff2"
+printf 'a\342\200\256\n' >"$h/text.png"
 printf 'a\014b\342\200\256\nc\342\200\213d\342\200\215\n\303\251\360\237\230\200\342\200\256\n' >"$h/multi.txt"
 printf '\342\200\256\n' >"$h/$(printf 'caf\303\251 notes.md')" && printf '\342\200\256\n' >"$h/q\"uote.md"
 for f in ignored/x.ts node_modules/x/y.js app/node_modules/z.js; do printf 'const x = "\342\200\256";\n' >"$h/$f"; done
@@ -1104,8 +1111,7 @@ cat >"$h/want" <<'EOF'
   notes.txt:1:1: U+061C ARABIC LETTER MARK
   .claude/rules/x.md:1:11: U+E0041 TAG LATIN CAPITAL LETTER A
   a.py:1:5: U+00AD SOFT HYPHEN
-  blob.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
-  latin.txt:1:6: U+202E RIGHT-TO-LEFT OVERRIDE
+  text.png:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
   multi.txt:1:4: U+202E RIGHT-TO-LEFT OVERRIDE
   multi.txt:2:2: U+200B ZERO WIDTH SPACE
   multi.txt:2:4: U+200D ZERO WIDTH JOINER
@@ -1118,6 +1124,11 @@ printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character
 printf '%s\n' "$out" | grep ': U+' | grep -Ev '^  (table|sel|start)\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
 diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
 $(cat "$h/diff")"
+for no in blob.txt:1 latin.txt:4 u16.md:1 u16raw.md:2; do
+	printf '%s\n' "$out" | grep -qxF "  ${no%:*}: no UTF-8 text, from its byte ${no#*:} (a NUL, or a byte that is no UTF-8)" || fail "check_docs did not refuse ${no%:*} as no UTF-8 text from its byte ${no#*:}: $out"
+done
+printf '%s\n' "$out" | grep -q '^  font\.woff2: no UTF-8 text, from its byte [0-9]* ' || fail "check_docs did not refuse a binary it knows no format of: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^  font\.woff2:')" = 1 ] || fail "check_docs named a binary's bytes as characters: $out"
 printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
 diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
 $(cat "$h/diff")"
