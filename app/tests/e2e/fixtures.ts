@@ -70,8 +70,28 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
   planted: boolean;
   violations: string[];
   homeReads: undefined;
+  newcomer: boolean;
+  returning: undefined;
 }>({
   planted: [false, { option: true }],
+  // ADR-0003: a device new to gnoworld sees the home's opening, "Start here" and the first visit's buttons. A journey's browser is a new
+  // device, so each one is a reader who came back, as the video's frames are, unless it asks to be a newcomer.
+  newcomer: [false, { option: true }],
+  returning: [
+    async ({ context, newcomer }, use) => {
+      if (!newcomer)
+        await context.addInitScript(() => {
+          // A document with no origin of its own (about:blank) keeps no storage, and refuses it.
+          try {
+            for (const key of ["gnoworld:entered", "gnoworld:opened"]) localStorage.setItem(key, "1");
+          } catch {
+            return;
+          }
+        });
+      await use(undefined);
+    },
+    { auto: true },
+  ],
   // The home's one read, answered as a settled site would: a file with no price and a block three minutes old (the server's timer
   // writes both), so no page fails a request it did not mean to and the age words stay still. The home asks no chain: a journey
   // that reads one routes its own. A journey that asks otherwise routes its own file.
