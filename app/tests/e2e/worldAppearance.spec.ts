@@ -74,13 +74,19 @@ async function stepUntil(
   return found;
 }
 
-// A world's page opened with the clock held, once its world is drawn: its loading stepped three frames at a time.
-async function opened(page: Page, path = "/w/bubble?test-gpu") {
-  await page.clock.install();
-  await page.goto(path);
+// A world's page reached by `go`, the page's clock installed, then held once it runs: back once its world is drawn, its loading stepped
+// three frames at a time.
+async function arrived(page: Page, go: () => Promise<unknown>) {
+  await go();
   await hydrated(page);
   await held(page);
   return stepUntil(page, () => true, { what: "the world drawn", step: 3 * FRAME_MS });
+}
+
+// A world's page opened with the clock held, once its world is drawn.
+async function opened(page: Page, path = "/w/bubble?test-gpu") {
+  await page.clock.install();
+  return arrived(page, () => page.goto(path));
 }
 
 // Every band and grid the world shows, a frame at a time, with the frame that drew it, until its grid has come and gone, or for `frames`
@@ -99,10 +105,7 @@ async function watched(page: Page, frames: number) {
 
 // The next visit to Bubble, `go` there with the page's clock held: its appearance plays whole, and the device keeps the visit.
 async function playsNext(page: Page, go: () => Promise<unknown>) {
-  await go();
-  await hydrated(page);
-  await held(page);
-  await stepUntil(page, () => true, { what: "the world drawn", step: 3 * FRAME_MS });
+  await arrived(page, go);
   const seen = await watched(page, 60);
   expect(Math.max(...seen.map(({ grid }) => grid)), "the appearance plays").toBe(1);
   expect(await visits(page)).toHaveLength(1);
@@ -196,10 +199,7 @@ test("plays on this reader's first visit to a world, its band running down, and 
     );
   expect(Math.abs(bands.at(-1) ?? 0), "and leaves the world").toBeGreaterThanOrEqual(OFF);
   expect(await visits(page)).toHaveLength(1);
-  await page.reload();
-  await hydrated(page);
-  await held(page);
-  await stepUntil(page, () => true, { what: "the world drawn again", step: 3 * FRAME_MS });
+  await arrived(page, () => page.reload());
   const again = await watched(page, 200);
   expect(Math.max(...again.map(({ grid }) => grid)), "no grid on a return").toBe(0);
   expect(Math.min(...again.map(({ band }) => Math.abs(band))), "no band on the world").toBeGreaterThanOrEqual(OFF);
