@@ -92,19 +92,22 @@ function Beside({ host, page, showsMaps, earth, world }: BesideProps) {
   return showsMaps ? <Credits overTicker /> : null;
 }
 
-// What stands over the running scene: the flight panel, and on the cosmos the crumb back from a system the eye rests at (7v).
+// What stands over the scene: the flight panel while it runs, and on the cosmos the crumb back from a system the eye rests at (7v), whatever
+// the scene's state: a lost context leaves the eye at a system, and the way back with it (7v's review).
 function Over({
   host,
   shown,
+  running,
   flight,
 }: {
   host: SceneHost;
   shown: Shown;
+  running: boolean;
   flight: ReturnType<SceneHost["flown"]["flight"]>;
 }) {
   return (
     <>
-      <FlightPanel flight={flight} />
+      {shown && running ? <FlightPanel flight={flight} /> : null}
       {shown === "cosmos" ? <SystemCrumb back={host.back} /> : null}
     </>
   );
@@ -150,7 +153,7 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
       {status === "on" ? (
         <Beside host={host} page={page} showsMaps={shown === "cosmos"} earth={earth} world={world} />
       ) : null}
-      {shown && status === "on" ? <Over host={host} shown={shown} flight={flight} /> : null}
+      <Over host={host} shown={shown} running={status === "on"} flight={flight} />
     </>
   );
 }

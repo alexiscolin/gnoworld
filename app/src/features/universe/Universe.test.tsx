@@ -1559,6 +1559,21 @@ describe("the views of space and the system the eye rests at", () => {
     expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "g1magl…e8hlv"]);
   });
 
+  // 7v's review (F4457): a lost context fails the scene, which took the crumb and its Escape with it while the hero stayed hidden: no way back.
+  it("keeps the crumb and its way back at a system once the scene failed", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    act(() => {
+      resting()("gnoswap");
+      started().onLost(true);
+    });
+    const crumb = one(box, "nav[aria-label='Where you are']");
+    act(() => {
+      button(crumb, "Cosmos")?.click();
+    });
+    expect(arrive).toHaveBeenLastCalledWith(undefined);
+  });
+
   it("tells the page where the eye rests, for the hero to give the system the screen, and nowhere once the scene went", async () => {
     const { unmount } = rendered("cosmos");
     await settle();
