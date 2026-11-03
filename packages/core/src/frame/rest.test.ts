@@ -17,6 +17,7 @@ import { deepOf, judgeOf } from "./deep.ts";
 import { LENT } from "./lent.ts";
 import { rocksOf } from "./rocks.ts";
 import { DIVE, diveAt } from "./dive.ts";
+import { haloAt } from "./halo.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import { PLACE } from "../lod/settle.ts";
 import { drawnOf, postcardOf, shapeOf } from "./postcard.ts";
@@ -652,8 +653,16 @@ describe("the view's depth (7p)", () => {
   } as const satisfies Record<string, readonly WorldHeld[]>;
   const rows = Object.keys(sets) as (keyof typeof sets)[];
   // No other system stands near enough in the first three; in "crowds and singles" the view's bodies stand near a line through the great
-  // star, and any body added beside them would make a row.
-  const NONE = new Set<string>(["one system", "3 systems", "7 systems", "crowds and singles"]);
+  // star, and any body added beside them would make a row. The review's rules (eight instants, no fourth of a row, off the great star's
+  // glow; the chief's option A, 2026-11-03) leave none in "one namespace of 20,000" and "54 of four".
+  const NONE = new Set<string>([
+    "one system",
+    "3 systems",
+    "7 systems",
+    "crowds and singles",
+    "one namespace of 20,000",
+    "54 of four",
+  ]);
   // "7 systems", framed farther out by 7d9, stands the Earth and a postcard's body 1.45 times apart at one height: holding the rule there
   // moves that view, which 7d9's tests pin (7p's report, for the chief).
   const TWINS = new Set<string>(["7 systems"]);
@@ -683,8 +692,40 @@ describe("the view's depth (7p)", () => {
       if (held === undefined || own === undefined) throw new Error("no such world");
       return { held, own, seen: see(placeOf(held, own, 0), own.radius) };
     });
-    return { systems, view, deep, see, cards, spots, bodies, earth: see(EARTH_PLACE, EARTH_RADIUS) };
+    // At `seconds` into the turn, on the video's screen: the Earth, the close world held still, the postcards' bodies at their share, and
+    // the depth bodies; the glowing stars, the great star's, the postcards' and any other's with three quarters of its halo or more.
+    const at = (seconds: number) => ({
+      own: [
+        see(EARTH_PLACE, EARTH_RADIUS),
+        ...(close === undefined || closeSystem === undefined
+          ? []
+          : [see(placeOf(closeSystem, close, 0), close.radius)]),
+        ...cards.flatMap(({ card }) =>
+          card.worlds.map((world, at) =>
+            see(placeOf(card.system, world, seconds), world.radius * (card.depth[at] ?? NaN)),
+          ),
+        ),
+      ],
+      deep: bodies.map(({ held, own }) => see(placeOf(held, own, seconds), own.radius)),
+      stars: [
+        see({ x: 0, y: 0, z: 0 }),
+        ...cards.map(({ card }) => see(card.system.place)),
+        ...systems
+          .filter((_, index) => index > 0 && !view.postcards.includes(index))
+          .map((system) => see(system.place))
+          .filter(({ depth, away }) => depth > 0 && haloAt(away) >= 0.75),
+      ],
+    });
+    // Eight instants through the longest turn of what turns: the postcards and the depth bodies.
+    const spins = [...cards.map(({ system }) => system.spin), ...bodies.map(({ held }) => held.spin)].filter(
+      (spin) => spin !== 0,
+    );
+    const turn = (2 * Math.PI) / Math.min(...spins.map((spin) => Math.abs(spin)));
+    const instants = Array.from({ length: 8 }, (_, step) => (spins.length === 0 ? 0 : (step * turn) / 8));
+    return { systems, view, deep, see, cards, spots, bodies, earth: see(EARTH_PLACE, EARTH_RADIUS), at, instants };
   };
+  const onScreen = ({ x, y }: { x: number; y: number }) =>
+    x >= 0 && x <= REST_SCREENS[0].width && y >= 0 && y <= REST_SCREENS[0].height;
 
   it.each(rows)(
     "draws one to four real worlds of other nearby systems as bodies (none where they would make a row), one a system, with %s",
@@ -794,12 +835,84 @@ describe("the view's depth (7p)", () => {
     },
   );
 
+  // The review of 7p (R6): a depth body turns round its star as the postcards do. At none of eight instants of the turn does it stand of
+  // one size, within 1.5 times, beside its nearest neighbour or as that neighbour's nearest, at one height or above it (40 degrees).
   it.each(rows)(
-    "draws them in depth: the farthest past twice the Earth's distance, none under 1.5 times a body's least size, with %s",
+    "stands no depth body of one size by a neighbour, level or in a column, at any of eight instants of the turn, with %s",
+    (name) => {
+      const { at, instants } = frameOf(name);
+      expect(instants).toHaveLength(8);
+      const H = REST_SCREENS[0].height;
+      const slant = Math.tan((40 * Math.PI) / 180);
+      for (const seconds of instants) {
+        const { own, deep } = at(seconds);
+        const all = [...own, ...deep];
+        const nearest = (one: Seen) =>
+          all
+            .filter((other) => other !== one)
+            .sort((a, b) => Math.hypot(a.x - one.x, a.y - one.y) - Math.hypot(b.x - one.x, b.y - one.y))[0];
+        for (const body of deep)
+          for (const other of all.filter((one) => one !== body && (nearest(body) === one || nearest(one) === body))) {
+            const like = Math.max(body.radius, other.radius) < 1.5 * Math.min(body.radius, other.radius);
+            const [across, up] = [Math.abs(other.x - body.x), Math.abs(other.y - body.y)];
+            const level = up < 0.1 * H && up < slant * across;
+            const column = across < slant * up;
+            expect(like && (level || column)).toBe(false);
+          }
+      }
+    },
+  );
+
+  // The design review of 7p (D1): gnotif made the fourth of a row with gnoslinger and two glowing stars, 34 pixels high across 546. No depth
+  // body makes the fourth of four marks, bodies, the Earth and stars mixed, within a twentieth of the height across more than 0.15 of the
+  // width.
+  it.each(rows)(
+    "makes the fourth of no level row on the screen, stars among its marks, at any of eight instants, with %s",
+    (name) => {
+      const { at, instants } = frameOf(name);
+      expect(instants).toHaveLength(8);
+      for (const seconds of instants) {
+        const { own, deep, stars } = at(seconds);
+        deep.forEach((body, rank) => {
+          const marks = [...own, ...deep.slice(0, rank), ...stars].filter(onScreen);
+          marks.forEach((a, i) => {
+            marks.slice(i + 1).forEach((b, j) => {
+              marks.slice(i + j + 2).forEach((c) => {
+                const [ys, xs] = [[a, b, c, body].map(({ y }) => y), [a, b, c, body].map(({ x }) => x)];
+                const level = Math.max(...ys) - Math.min(...ys) < 0.05 * REST_SCREENS[0].height;
+                if (onScreen(body))
+                  expect(level && Math.max(...xs) - Math.min(...xs) > 0.15 * REST_SCREENS[0].width).toBe(false);
+              });
+            });
+          });
+        });
+      }
+    },
+  );
+
+  // The design review of 7p (D5): dao, its disc 97 pixels off the great star's heart, read as a hole in its glow; each depth body's disc
+  // keeps a tenth of the screen's height off the star's heart at every instant.
+  it.each(rows)("keeps every depth body off the great star's glow at every instant, with %s", (name) => {
+    const { at, instants } = frameOf(name);
+    expect(instants).toHaveLength(8);
+    for (const seconds of instants) {
+      const { deep, stars } = at(seconds);
+      const [star] = stars;
+      if (star === undefined) throw new Error("no great star");
+      for (const body of deep)
+        expect(Math.hypot(body.x - star.x, body.y - star.y) - body.radius).toBeGreaterThanOrEqual(
+          0.1 * REST_SCREENS[0].height,
+        );
+    }
+  });
+
+  // Past 1.5 times the Earth's distance: the review's rules leave "104 of eight" one, at 1.79 times (the chief's option A, 2026-11-03).
+  it.each(rows)(
+    "draws them in depth: the farthest past 1.5 times the Earth's distance, none under 1.5 times a body's least size, with %s",
     (name) => {
       const { bodies, earth } = frameOf(name);
       if (NONE.has(name)) expect(bodies).toEqual([]);
-      else expect(Math.max(...bodies.map(({ seen }) => seen.away))).toBeGreaterThan(2 * earth.away);
+      else expect(Math.max(...bodies.map(({ seen }) => seen.away))).toBeGreaterThan(1.5 * earth.away);
       for (const { seen } of bodies) expect(seen.radius).toBeGreaterThanOrEqual(1.5 * BODY_PIXELS);
     },
   );

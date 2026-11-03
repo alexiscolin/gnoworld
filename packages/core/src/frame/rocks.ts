@@ -76,7 +76,7 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
       ) &&
       judge.spots.every((body) => !onRoom(spot, body, MARGIN + drift)) &&
       swayed.every((look) => clearOn(look, look.seen(place, rock.radius), { rooms: [], drift: 0 }));
-    if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.evenRow([...seen, spot])) continue;
+    if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.lent.evenRow([...seen, spot])) continue;
     rocks.push(rock);
     seen.push(spot);
   }

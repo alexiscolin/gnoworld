@@ -5,7 +5,7 @@
 // own: it reads the view with the functions the search lends it.
 import { EARTH_PLACE, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { BODY_PIXELS } from "../lod/ladder.ts";
-import { distanceOf, type Point } from "../space/cell.ts";
+import { distanceOf } from "../space/cell.ts";
 import { SWAY_CORNERS } from "../space/drift.ts";
 import type { Lent } from "./lent.ts";
 import type { RestView } from "./rest.ts";
@@ -25,29 +25,26 @@ export interface Judge {
   readonly swayed: readonly Look[];
   /** The video's screen's lens, in pixels. */
   readonly focal: number;
-  /** What stands: a ball with its room on each screen, a spot on the video's, and its bodies by system for the way down. */
+  /** What stands: a ball with its room on each screen, a spot at rest on the video's, its bodies by system, the glowing stars' spots. */
   readonly balls: Seen[][];
   readonly spots: Seen[];
   readonly cards: Pick<Card, "system" | "worlds">[];
-  /** Where a world stands at rest. */
-  readonly placeOf: (system: StarSystem, world: Orbiter) => Point;
+  readonly stars: Seen[];
   /** The view's rule on the video's screen: `spots` with its Earth and great star, no crowd, pile or row. */
   readonly composed: (spots: readonly Seen[]) => boolean;
   /** Whether `cards` stand a row on any frame of the way down. */
   readonly rowDown: (cards: readonly Pick<Card, "system" | "worlds">[]) => boolean;
-  readonly evenRow: (spots: readonly Seen[]) => boolean;
-  /** Whether two of `spots` stand beside each other of one size at one height, on a screen `height` pixels high. */
-  readonly twins: (spots: readonly Seen[], height: number) => boolean;
+  /** The search's functions it was read with. */
+  readonly lent: Lent;
 }
 
 /** `view` over `systems` as its judge, read with the search's `lent` functions: what stands, each postcard's ball at its worlds' own size
  * at the least with its bodies as drawn, and the close world, held still as the scene holds it. */
 export function judgeOf(systems: readonly StarSystem[], view: RestView, lent: Lent): Judge {
-  const { cameraTowards, composed, evenRow, focalOf, looksFrom, placeOf, rowOnTheWayDown, swayed, twins } = lent;
+  const { cameraTowards, composed, focalOf, looksFrom, rowOnTheWayDown, swayed } = lent;
   const camera = cameraTowards(view.eye, EARTH_PLACE);
   const looks = looksFrom(camera);
   const [first] = looks;
-  const at = (system: StarSystem, world: Orbiter) => placeOf(system, world, 0);
   const deep = view.close !== undefined;
   const judge: Judge = {
     looks,
@@ -56,28 +53,34 @@ export function judgeOf(systems: readonly StarSystem[], view: RestView, lent: Le
     balls: looks.map(() => []),
     spots: [],
     cards: [],
-    placeOf: at,
+    stars: first === undefined ? [] : [first.star],
     composed: (spots) =>
       first === undefined ||
       composed(spots, first.earth, { deep, lights: [first.star], width: first.width, height: first.height }),
     rowDown: (cards) => rowOnTheWayDown(camera, cards, { most: 0 }),
-    evenRow,
-    twins,
+    lent,
   };
-  standing(judge, systems, { view, lent });
+  standing(judge, systems, view);
   return judge;
 }
 
-// What stands before the depth, into `judge`: each postcard's ball at its worlds' own size at the least, with its bodies as drawn, and the
-// close world, held still as the scene holds it.
-function standing(judge: Judge, systems: readonly StarSystem[], { view, lent }: { view: RestView; lent: Lent }): void {
-  const { drawnOf, postcardOf } = lent;
-  const [first] = judge.looks;
+/** Where each of `cards`' worlds stands at `seconds` into its turn on `judge`'s first screen, at its drawn size. */
+const spotsAt = ({ looks: [look], lent }: Judge, cards: Judge["cards"], seconds: number): Seen[] =>
+  look === undefined
+    ? []
+    : cards.flatMap(({ system, worlds }) =>
+        worlds.map((world) => look.seen(lent.placeOf(system, world, seconds), world.radius)),
+      );
+
+// What stands before the depth, into `judge`: each postcard's ball at its worlds' own size at the least, with its bodies as drawn and its
+// star, the close world, held still as the scene holds it, and the stars that glow.
+const SECOND_SUN = 0.75;
+function standing(judge: Judge, systems: readonly StarSystem[], view: RestView): void {
+  const { drawnOf, postcardOf } = judge.lent;
   const stand = (balled: (look: Look) => Seen, card: Pick<Card, "system" | "worlds">) => {
     judge.looks.forEach((look, index) => judge.balls[index]?.push(balled(look)));
     judge.cards.push(card);
-    for (const world of card.worlds)
-      if (first !== undefined) judge.spots.push(first.seen(judge.placeOf(card.system, world), world.radius));
+    judge.spots.push(...spotsAt(judge, [card], 0));
   };
   for (const index of view.postcards) {
     const system = systems[index];
@@ -89,36 +92,61 @@ function standing(judge: Judge, systems: readonly StarSystem[], { view, lent }: 
   const close = systems[view.close?.system ?? -1];
   const world = close?.worlds[view.close?.world ?? -1];
   if (close !== undefined && world !== undefined)
-    stand((look) => look.seen(judge.placeOf(close, world), world.radius), {
+    stand((look) => look.seen(judge.lent.placeOf(close, world, 0), world.radius), {
       system: { ...close, spin: 0 },
       worlds: [world],
     });
+  glowing(judge, systems, view);
+}
+
+// The postcards' stars and every other that glows, its halo three quarters whole or more, as the arrival's second sun (7d3), into `judge`.
+function glowing({ looks: [first], stars, lent }: Judge, systems: readonly StarSystem[], view: RestView): void {
+  systems.forEach((system, index) => {
+    const star = first?.seen(system.place);
+    if (star === undefined || index === 0) return;
+    if (view.postcards.includes(index) || (star.depth > 0 && lent.haloAt(star.away) >= SECOND_SUN)) stars.push(star);
+  });
 }
 
 // Four at most, each 1.5 times a body's least size or more, pixels of room round it, and twice the Earth's radius round the Earth, where
-// its Moon's ring stands; never of one size with its nearest neighbour in a column, 40 degrees from upright at most.
+// its Moon's ring stands; never of one size with a neighbour, level with it or above it, 40 degrees off at most; never the fourth of a
+// row, marks within a twentieth of the height across more than 0.15 of the width; off the great star's glow (the design review of 7p).
 const MOST = 4;
 const LEAST = 1.5 * BODY_PIXELS;
 const MARGIN = 24;
 const APART = 1.5;
 const UPRIGHT = Math.tan((40 * Math.PI) / 180);
+const ROW = { up: 0.05, across: 0.15 };
+const GLOW = 0.1;
 
-const gap = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y) - a.radius - b.radius;
-
-// Whether `spot` stands of one size with its nearest of `spots` and above or under it, within 40 degrees of upright: a column of two reads
-// as laid out, as a row does (the view's rule keeps rows out).
-const column = (spot: Seen, spots: readonly Seen[]) => {
-  const apart = (other: Seen) => Math.hypot(other.x - spot.x, other.y - spot.y);
-  const next = spots.reduce<Seen | undefined>(
-    (best, other) => (best === undefined || apart(other) < apart(best) ? other : best),
+const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y);
+const gap = (a: Seen, b: Seen) => apart(a, b) - a.radius - b.radius;
+const like = (a: Seen, b: Seen) => Math.max(a.radius, b.radius) < APART * Math.min(a.radius, b.radius);
+const nearestOf = (one: Seen, all: readonly Seen[]) =>
+  all.reduce<Seen | undefined>(
+    (best, other) => (other === one || (best !== undefined && apart(one, best) <= apart(one, other)) ? best : other),
     undefined,
   );
-  return (
-    next !== undefined &&
-    Math.max(next.radius, spot.radius) < APART * Math.min(next.radius, spot.radius) &&
-    Math.abs(next.x - spot.x) < UPRIGHT * Math.abs(next.y - spot.y)
-  );
+
+// Whether `spot` and a neighbour, either the other's nearest of `all`, stand of one size and as `along` says: level, or a column.
+const paired = (spot: Seen, all: readonly Seen[], along: (one: Seen, other: Seen) => boolean) =>
+  all.some((one) => {
+    const next = nearestOf(one, all);
+    return next !== undefined && (one === spot || next === spot) && like(one, next) && along(one, next);
+  });
+
+// Whether four marks stand a row on `look`: level within a twentieth of its height, and wide. Bodies, the Earth and the glowing stars
+// mixed: gnotif made the fourth of one with gnoslinger and two stars (the design review of 7p).
+const aRow = (four: readonly Seen[], { width, height }: Look) => {
+  const [ys, xs] = [four.map(({ y }) => y), four.map(({ x }) => x)];
+  return Math.max(...ys) - Math.min(...ys) < ROW.up * height && Math.max(...xs) - Math.min(...xs) > ROW.across * width;
 };
+
+// Whether `spot` makes the fourth of a row with three of `marks`. ponytail: n³ on the dozen marks a view stands.
+const lengthens = (spot: Seen, marks: readonly Seen[], look: Look) =>
+  marks.some((a, i) =>
+    marks.slice(i + 1).some((b, j) => marks.slice(i + j + 2).some((c) => aRow([a, b, c, spot], look))),
+  );
 
 // A world's ball, its orbit round its star, whole and clear on one screen: off the hero, the star's heart, the Earth and its ring, and
 // every ball already standing.
@@ -128,23 +156,43 @@ const clearOn = (look: Look, ball: Seen, balls: readonly Seen[]) =>
   gap(ball, look.earth) >= look.earth.radius + MARGIN &&
   balls.every((other) => gap(ball, other) >= MARGIN);
 
+// Whether `world` of `system` stands as the frame needs on the video's screen `seconds` into the turn, beside what stands then.
+function standsAt(judge: Judge, card: Pick<Card, "system" | "worlds">, seconds: number): boolean {
+  const { looks, cards, stars, lent } = judge;
+  const [first] = looks;
+  const [spot] = spotsAt(judge, [card], seconds);
+  if (first === undefined || spot === undefined) return false;
+  const spots = spotsAt(judge, cards, seconds);
+  const all = [first.earth, ...spots, spot];
+  const shown = [first.earth, ...spots, ...stars].filter(
+    ({ x, y }) => x >= 0 && x <= first.width && y >= 0 && y <= first.height,
+  );
+  return (
+    spot.radius >= LEAST &&
+    gap(spot, first.star) >= GLOW * first.height &&
+    !paired(spot, all, (one, other) => lent.atOneHeight(one, other, first.height)) &&
+    !paired(spot, all, (one, other) => Math.abs(one.x - other.x) < UPRIGHT * Math.abs(one.y - other.y)) &&
+    !lengthens(spot, shown, first) &&
+    judge.composed([...spots, spot])
+  );
+}
+
 /** The worlds of other nearby systems `view` draws as bodies for depth, read through its `judge`, nearest first, one a system, four at most;
- * each stands in the judge as it is chosen. ponytail: a pass over every system and a sort, once a view, in a chunk asked after it. */
+ * each stands in the judge as it is chosen, judged at eight instants through the longest turn of what turns. ponytail: a pass over every
+ * system and a sort, once a view, in a chunk asked after it. */
 export function deepOf(systems: readonly StarSystem[], view: RestView, judge: Judge): Deep[] {
-  const { looks, balls, spots, cards } = judge;
+  const { looks, balls, cards, lent } = judge;
   const [first] = looks;
   if (first === undefined) return [];
   const taken = new Set<number>([0, ...view.postcards, ...(view.close === undefined ? [] : [view.close.system])]);
-  const holds = (system: StarSystem, world: StarSystem["worlds"][number]) => {
-    const seen = first.seen(judge.placeOf(system, world), world.radius);
-    const all = [...spots, seen];
+  const holds = (system: StarSystem, world: Orbiter) => {
+    const card = { system, worlds: [world] };
+    const spins = [...cards, card].map(({ system: { spin } }) => spin).filter((spin) => spin !== 0);
     return (
-      seen.radius >= LEAST &&
+      first.seen(lent.placeOf(system, world, 0), world.radius).radius >= LEAST &&
       looks.every((look, at) => clearOn(look, look.ball(system.place, world.orbit + world.radius), balls[at] ?? [])) &&
-      !column(seen, [first.earth, ...spots]) &&
-      !judge.twins([first.earth, ...all], first.height) &&
-      judge.composed(all) &&
-      !judge.rowDown([...cards, { system, worlds: [world] }])
+      lent.instantsOf(spins).every((seconds) => standsAt(judge, card, seconds)) &&
+      !judge.rowDown([...cards, card])
     );
   };
   const bodies: Deep[] = [];
@@ -162,7 +210,7 @@ export function deepOf(systems: readonly StarSystem[], view: RestView, judge: Ju
     if (found === undefined) continue;
     const reach = found.world.orbit + found.world.radius;
     looks.forEach((look, at) => balls[at]?.push(look.ball(system.place, reach)));
-    spots.push(first.seen(judge.placeOf(system, found.world), found.world.radius));
+    judge.spots.push(...spotsAt(judge, [{ system, worlds: [found.world] }], 0));
     cards.push({ system, worlds: [found.world] });
     bodies.push({ system: index, world: found.at });
   }
