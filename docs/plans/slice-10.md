@@ -40,8 +40,8 @@ Creates `server/src/jarvis/` (the code, one concept a file), `server/jarvis/skil
 - **10b, the locks** (tier 1, tonight): `allowlist.ts`, `untrusted.ts`, `skills.ts` and the skills' text.
 - **10c, the limits** (tonight, beside 10b): `config.ts` for jarvis, `prices.ts`, `budget.ts`, `quota.ts`, jarvis's migrations; the shared helpers of `server/src/config.ts`.
 - **10d, the checks on what Jarvis returns** (tonight, once 10b or 10c is merged): the digest, proposal and button schemas in `packages/schemas` (sharing `FunctionList`), grounding, the proposal's check, the translation's check.
-- **10e, the loop** (tier 1, after Alexis's install and 10b to 10d): the SDK client, the loop, gnomcp over stdio, gnoscope behind its switch, our tools.
-- **10f, the service** (after 10e): the spans, translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas (D42, D43).
+- **10e, the loop** (tier 1, after Alexis's install and 10b to 10d): the SDK client, the loop and its spans, gnomcp over stdio, gnoscope behind its switch, our tools; its first commit brings the five server dependencies with the code that imports them (knip refuses one unused).
+- **10f, the service** (after 10e): translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas (D42, D43).
 - **10g, evals and deploy** (tier 1, after 10f): `evals/` with its provider and cases, the `jarvis` container in `deploy/`.
 The modules of 10b to 10d are reached by their tests until 10e calls them; the slice merges into `main` whole, never before 10f. Two parts at once at most, each in its own session, worktree and herdr pane.
 
