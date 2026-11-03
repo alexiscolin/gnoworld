@@ -122,6 +122,7 @@ func TestRenderPages(cur realm, t *testing.T) {
 		lines[i] = plain(w)
 	}
 	page := func(from, to int) string { return open + strings.Join(lines[from:to], "") }
+	uassert.Equal(t, open+"None on this page.\n", Render("?page=1")) // the first page is there with none
 	who := []address{alice, bob, carol, adm, mod, self, chain.PackageAddress("gno.land/r/test/dave")}
 	for i, w := range ws {
 		testing.SetRealm(testing.NewUserRealm(who[i/3]))
@@ -131,18 +132,16 @@ func TestRenderPages(cur realm, t *testing.T) {
 		case 9:
 			uassert.Equal(t, page(0, 9), Render(""))
 			uassert.Equal(t, "No such page.\n", Render("?page=2"))
-		case 10:
+		case 10: // a full page, and none after it: no link leads past it
 			uassert.Equal(t, page(0, 10), Render(""))
-			uassert.Equal(t, open+"None on this page.\n"+prev+"1)\n", Render("?page=2"))
-			uassert.Equal(t, "No such page.\n", Render("?page=3"))
+			uassert.Equal(t, "No such page.\n", Render("?page=2"))
 		case 11:
 			uassert.Equal(t, page(0, 10)+next+"2)\n", Render(""))
 			uassert.Equal(t, page(10, 11)+prev+"1)\n", Render("?page=2"))
 			uassert.Equal(t, "No such page.\n", Render("?page=10"))
-		case 20: // the second page is the last, the third empty, the fourth none
+		case 20: // the second page is the last
 			uassert.Equal(t, page(10, 20)+prev+"1)\n", Render("?page=2"))
-			uassert.Equal(t, open+"None on this page.\n"+prev+"2)\n", Render("?page=3"))
-			uassert.Equal(t, "No such page.\n", Render("?page=4"))
+			uassert.Equal(t, "No such page.\n", Render("?page=3"))
 		case 21:
 			uassert.Equal(t, page(0, 10)+next+"2)\n", Render("?page=1"))
 			uassert.Equal(t, page(10, 20)+prev+"1)\n"+next+"3)\n", Render("?page=2"))

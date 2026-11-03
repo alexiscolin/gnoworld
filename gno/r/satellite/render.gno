@@ -23,7 +23,7 @@ func Render(path string) string {
 	}
 	if p, found := strings.CutPrefix(path, "?page="); found {
 		n, _ := strconv.Atoi(p)
-		if strconv.Itoa(n) != p || n < 1 || n-1 > rentals.Size()/pageSize {
+		if strconv.Itoa(n) != p || n < 1 || n > 1 && n > pages() {
 			return noPage
 		}
 		return home(n)
@@ -60,10 +60,15 @@ func home(n int) string {
 	if n > 1 {
 		b.WriteString("\n[Previous page](?page=" + strconv.Itoa(n-1) + ")\n")
 	}
-	if n*pageSize < rentals.Size() {
+	if n < pages() {
 		b.WriteString("\n[Next page](?page=" + strconv.Itoa(n+1) + ")\n")
 	}
 	return b.String()
+}
+
+// pages is how many home pages the rentals fill: the first is there with none.
+func pages() int {
+	return (rentals.Size() + pageSize - 1) / pageSize
 }
 
 func worldPage(world string) string {
