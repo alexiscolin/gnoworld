@@ -98,8 +98,9 @@ function sectionsOf(asks: readonly RailAsk[]): Map<RailSection, RailAsk[]> {
   return sections;
 }
 
-// The first `most` of `ranked` that have a title, in its order: a world only an address names is left out, and no title is made for a
-// world past the cap (a file holds up to 20,000).
+// The first `most` of `ranked` that have a title, in its order: a world only an address names is left out, and none is titled once `most`
+// are kept. ponytail: till then each is tried, so a file of 20,000 worlds only addresses name tries them all, about 40 ms (measured, 7i),
+// once a minute at most.
 function kept(ranked: readonly RailAsk[], section: RailSection, most: number): Held[] {
   const held: Held[] = [];
   for (const ask of ranked) {
