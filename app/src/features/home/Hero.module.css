@@ -120,6 +120,24 @@
     color: var(--color-text);
   }
 
+  /* f0008 lights the line's count, its figure and its word, over the rest of the line: #f4f5f9 against #c8d0de, a heavier weight. */
+  .count {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .figure {
+    /* Digits of one width each, so a count fills the room its figure kept. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* While the number comes, three hidden digits keep its room (7n): a count of 100 to 999 fills it, whatever face draws the line. `3ch`
+     and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits: the actions slid. */
+  .figure:empty::before {
+    visibility: hidden;
+    content: "000";
+  }
+
   @media (max-width: 899px) {
     .row {
       /* layout: the actions go under the line when the phone is too narrow for both */

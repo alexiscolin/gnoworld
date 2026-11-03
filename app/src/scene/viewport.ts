@@ -54,6 +54,13 @@ export class Viewport {
     parts.resize(width, height, renderer.getPixelRatio());
   }
 
+  /** Looks through `degrees` up and down, the home's lens or the scene's: each part sizes itself for it on the frame that draws it. */
+  lens(degrees: number): void {
+    if (this.#parts.camera.fov === degrees) return;
+    this.#parts.camera.fov = degrees;
+    this.changed();
+  }
+
   readonly changed = (): void => {
     this.#stale = true;
     this.#parts.owed();

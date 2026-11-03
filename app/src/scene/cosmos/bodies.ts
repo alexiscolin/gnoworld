@@ -36,8 +36,10 @@ interface Body {
   readonly fromEye: number;
   /** Its programs are compiled: until then it waits off the screen. */
   ready: boolean;
-  /** It holds its place at rest: the close world, whose turn would sweep it across the view. */
-  still: boolean;
+  /** It stood at a look once compiled, which took its point away: from then it shows, never over its point (7d9). */
+  shown: boolean;
+  /** It is lit as up close, its own angle and its whole rim, wherever it stands: a system's arrival's (7d3). */
+  near: boolean;
 }
 
 interface BodyView {
@@ -71,17 +73,15 @@ export class Bodies {
   readonly group = new Group();
   #last: Point | undefined;
   #seconds = 0;
+  #diving = false;
   /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
   sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
+  /** The device's `moved` is told once a body's programs are compiled: a look then stands it in place of its point. */
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
     this.#maps = maps;
     this.#device = device;
     this.#sphere = owner.add(new SphereGeometry(1, SPHERE_WIDTH, SPHERE_HEIGHT));
-  }
-
-  get size(): number {
-    return this.#held.size;
   }
 
   /** Shows the bodies or hides them; shown, the generated worlds' code is asked now, so it comes beside the first maps, not after them. */
@@ -90,12 +90,13 @@ export class Bodies {
     if (shown) this.#maps.kit();
   }
 
-  has(id: string): boolean {
-    return this.#held.has(id);
+  /** Whether a world stands as a body: held, compiled and stood at a look since, so its point is gone. */
+  stands(id: string): boolean {
+    return this.#held.get(id)?.shown === true;
   }
 
-  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; `still` holds its place. */
-  stand(wanted: Wanted, still?: string): void {
+  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; what is compiled shows from now. */
+  stand(wanted: Wanted, near = false): void {
     for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
@@ -106,10 +107,10 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
-    for (const body of this.#held.values()) body.still = body.id === still;
+    for (const body of this.#held.values()) Object.assign(body, { shown: body.ready, near });
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
-    if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
+    if (this.#last !== undefined) this.tick(this.#last, this.#seconds, this.#diving);
   }
 
   #add(id: string, system: StarSystem, world: Orbiter): void {
@@ -122,7 +123,7 @@ export class Bodies {
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
-    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, still: false };
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false, near: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -133,10 +134,12 @@ export class Bodies {
     renderer.compileAsync(planet.group, camera, stage).then(ready, ready);
   }
 
-  /** One frame on: each where its orbit has it, from `eye`, in doubles, leant as the camera sees it. */
-  tick(eye: Point, seconds: number): void {
+  /** One frame on: each where its orbit has it, from `eye`, in doubles, leant as the camera sees it; `diving`, it keeps no room for the
+   * page's text. */
+  tick(eye: Point, seconds: number, diving = false): void {
     this.#last = eye;
     this.#seconds = seconds;
+    this.#diving = diving;
     this.#back.copy(this.#device.camera.quaternion).invert();
     for (let at = 0; at < this.#shown.length; at += 1) {
       const body = this.#shown[at];
@@ -147,17 +150,17 @@ export class Bodies {
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
     const away = this.fromEye(system.place, eye, star).length();
-    orbitPlace(body, body.still ? 0 : orbitTime(seconds), this.#place);
+    orbitPlace(body, orbitTime(seconds), this.#place);
     planet.group.position.copy(this.fromEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
-    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, away)));
+    planet.setSun(sideOf(sun, this.#toEye, angleAt(fromEye, body.near ? 0 : away)));
     planet.setTime(seconds);
-    if (planet.look.rim !== null) planet.setLimb(limbAt(away));
+    if (planet.look.rim !== null) planet.setLimb(limbAt(body.near ? 0 : away));
     planet.setFar(fadeAt(at.length()));
-    const room = this.#room(at, world.radius);
+    const room = this.#diving ? 1 : this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
-    planet.group.visible = body.ready && room > 0;
+    planet.group.visible = body.shown && room > 0;
     const seen = this.#seen.copy(at).applyQuaternion(this.#back); // as the camera, turned to the Earth, sees it
     this.#lean.set(leanFor(planet.look.lean, Math.atan2(seen.y, -seen.z)), 0, planet.look.tilt);
     planet.group.quaternion.setFromEuler(this.#lean).premultiply(this.#device.camera.quaternion);
@@ -242,6 +245,6 @@ export class Bodies {
   /** What stands, for the journeys, seen from `eye`, the Earth at `earth`: no body counted while hidden. */
   stats(shown: boolean, eye: Point, earth: Vector3 | undefined) {
     const list = [...this.#held.values()].map((body) => ({ ...body, anchor: body.planet.look.anchor }));
-    return { bodies: shown ? this.size : 0, list, screen: this.screen(eye, earth) };
+    return { bodies: shown ? this.#held.size : 0, list, screen: this.screen(eye, earth) };
   }
 }

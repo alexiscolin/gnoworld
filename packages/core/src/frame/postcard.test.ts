@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CELL } from "../cosmos/cosmos.ts";
-import type { Orbiter, StarSystem } from "../cosmos/system.ts";
+import { BELT_INNER, GRAIN, systemsOf, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { orbitPlace } from "./disc.ts";
 import { postcardFrom, postcardOf, postcardWorlds } from "./postcard.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -93,6 +94,26 @@ describe("a postcard's worlds", () => {
     }
   });
 
+  // 7d3, no debris near a planet: widened past it, a world would stand in its system's far belt, among the rocks.
+  it("keeps a belted system's worlds inside the belt's inner edge, off their star as far as that leaves them", () => {
+    const [one, three] = [
+      systemOf([[1.5, 1.2, 0.4]]),
+      systemOf([
+        [0.6, 1.0, 0.2],
+        [0.4, 1.8, 2.1],
+        [0.3, 2.5, 4.4],
+      ]),
+    ];
+    // Unbelted, the room is its cell's half: the large world goes past the belt's edge.
+    expect(postcardWorlds(one)[0]?.orbit).toBeCloseTo(CELL / 2 - 1.5, 12);
+    expect(postcardWorlds({ ...one, belt: true })[0]?.orbit).toBeCloseTo(BELT_INNER - 1.5, 12);
+    for (const system of [one, three]) {
+      const worlds = postcardWorlds({ ...system, belt: true });
+      expect(worlds.length).toBeGreaterThan(0);
+      for (const { orbit, radius } of worlds) expect(orbit + radius).toBeLessThanOrEqual(BELT_INNER + 1e-9);
+    }
+  });
+
   // 7d6's review (lots 3 and 4): the 15% rule and the eight largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
   // is (each off its star, the nearest two 3 apart), so two at `arc` apart leave a gap of `6·sin(arc/2) − 0.6` between them.
   const arcFor = (gap: number) => 2 * Math.asin((gap + 0.6) / 6);
@@ -122,6 +143,73 @@ describe("a postcard's worlds", () => {
     expect(postcardWorlds(systemOf([[0.1, 1, 0]]))).toEqual([]);
     const many = systemOf(Array.from({ length: 12 }, (_, at) => [0.3 + at * 0.08, 0.8 + at * 0.1, at * 1.3]));
     expect(postcardWorlds(many).length).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("a postcard's worlds at a count", () => {
+  it("chooses as many as asked at most, by the same rules: as no figure, apart, within the cell", () => {
+    const four = systemOf(
+      [
+        [0.6, 1.0, 0.2],
+        [0.4, 1.8, 2.1],
+        [0.5, 2.5, 4.4],
+        [0.35, 3.1, 5.3],
+      ],
+      0.3,
+      1.1,
+    );
+    const all = postcardWorlds(four);
+    expect(all.length).toBeGreaterThan(2);
+    for (let most = all.length; most > 0; most -= 1) {
+      const some = postcardWorlds(four, most);
+      expect(some.length).toBeLessThanOrEqual(most);
+      expect(some.length).toBeGreaterThan(0);
+    }
+    expect(postcardWorlds(four, 0)).toEqual([]);
+    expect(postcardWorlds(four, 4)).toEqual(all);
+  });
+});
+
+// 7d3's review: a postcard's specks, its worlds too small for a body, stand at their own orbits in its plane while its bodies are widened;
+// one that would stand on a body's ground, or against it, is not drawn: within the body's own width, half a unit at the least (Alexis's
+// pebbles round Onyx's agents, 2026-11-03). A system turns as one, so what stands clear at rest stays clear.
+describe("a postcard's specks", () => {
+  const clearOf = ({ radius }: Orbiter) => Math.max(0.5, radius);
+  const placed = (system: StarSystem, world: Orbiter) => {
+    const out = { x: NaN, y: NaN, z: NaN };
+    orbitPlace({ system, world }, 0, out);
+    return out;
+  };
+
+  it("leaves out each speck that would stand within a body's width of its ground, half a unit at the least, and only those", () => {
+    const crowds = systemsOf(
+      ["a", "b", "c", "d", "e"].flatMap((namespace, at) =>
+        Array.from({ length: 12 + at * 40 }, (_, world) => ({
+          id: `${namespace}/w${String(world)}`,
+          namespace,
+          use: (world * 7) % 11,
+        })),
+      ),
+    );
+    let hidden = 0;
+    for (const system of crowds.filter(({ worlds }) => worlds.length > 0)) {
+      const { system: drawn, worlds, hidden: left } = postcardOf(system, { x: 0, y: 60, z: 0 });
+      const bodies = new Set(worlds.map(({ id }) => id));
+      for (const speck of system.worlds.filter(({ id }) => !bodies.has(id))) {
+        const near = worlds.some(
+          (body) =>
+            Math.hypot(
+              ...(["x", "y", "z"] as const).map((axis) => placed(drawn, speck)[axis] - placed(drawn, body)[axis]),
+            ) -
+              body.radius <
+            clearOf(body),
+        );
+        expect(left.has(speck.id)).toBe(near);
+        if (near) hidden += 1;
+      }
+    }
+    expect(hidden).toBeGreaterThan(0);
+    expect(GRAIN).toBeGreaterThan(0);
   });
 });
 

@@ -65,6 +65,22 @@ describe("the labels in a chunk of their own", () => {
     expect(made[0]?.list).toHaveBeenLastCalledWith(undefined, SIGNALS);
   });
 
+  it("hides the labels while the scene's eye is not calm, a flight under way (7g), and shows them again once it is", async () => {
+    made.length = 0;
+    const eye = { calm: false };
+    const lazy = new LazyLabels(new Disposer(), seen, eye);
+    lazy.look([], new Drawn(), []);
+    await vi.dynamicImportSettled();
+    const at = { x: 1, y: 2, z: 3 };
+    lazy.tick(at, true);
+    expect(made[0]?.tick).toHaveBeenLastCalledWith(at, false);
+    eye.calm = true;
+    lazy.tick(at, true);
+    expect(made[0]?.tick).toHaveBeenLastCalledWith(at, true);
+    lazy.tick(at, false);
+    expect(made[0]?.tick).toHaveBeenLastCalledWith(at, false);
+  });
+
   it("lets go of a chunk that comes after the cosmos has gone, and shows nothing of it", async () => {
     made.length = 0;
     const owner = new Disposer();

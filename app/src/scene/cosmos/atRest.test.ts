@@ -30,7 +30,7 @@ describe("the dive's chunk (the security review of 7d7)", () => {
     await vi.waitFor(() => {
       expect(arrive).toBeDefined();
     });
-    for (const clock of [0, 1, 10, 100]) expect(atRest.advance(clock, true)).toBe(0);
+    for (const clock of [0, 1, 10, 100]) expect(atRest.advance(clock, true, clock)).toBe(0);
     expect(told.moved).not.toHaveBeenCalled();
     arrive?.({
       Dive: class {
@@ -54,7 +54,7 @@ describe("the dive's chunk (the security review of 7d7)", () => {
     atRest.dive(false);
     await vi.dynamicImportSettled();
     expect(atRest.landing).toEqual({ along: 1, veil: 0 });
-    expect(atRest.advance(0, true)).toBe(1);
+    expect(atRest.advance(0, true, 0)).toBe(1);
     expect(told.moved).not.toHaveBeenCalled();
   });
 });

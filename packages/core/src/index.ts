@@ -31,6 +31,7 @@ export {
   EARTH_RADIUS,
   GNO_LAND,
   GRAIN,
+  ROCKS_FROM,
   ROOM,
   systemsOf,
   worldSize,
@@ -69,7 +70,9 @@ export {
 } from "./frame/disc.ts";
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
-export { arrivalIn, arrivalOf, ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt } from "./frame/flight.ts";
+export { arrivalOf, type Arrival } from "./frame/arrival.ts";
+export { HALO_FAR, haloAt } from "./frame/halo.ts";
+export { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, stopNear, stopNearIn, wayAt } from "./frame/flight.ts";
 export type { Figures, FlightPhase } from "./frame/flight.ts";
 export {
   FIELD_OF_VIEW,
@@ -169,7 +172,8 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
-export { driftAt, glideAt, HOME, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
+export { beatAt } from "./space/beat.ts";
+export { ARRIVAL_LEAN, driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
 export { smoothstep } from "./space/smooth.ts";
 export {

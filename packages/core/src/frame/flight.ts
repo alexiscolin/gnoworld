@@ -73,15 +73,15 @@ export function figuresOf(
 
 /** Where a flight to `system`'s star from `from` stops, on the map, into `out`: round its star the way it came, 20 degrees off its plane on
  * the side it came from, as far as its worlds reach takes to hold them in view. */
-export function arrivalOf(system: StarSystem, from: Point, out: { x: number; y: number; z: number }): void {
+export function stopNear(system: StarSystem, from: Point, out: { x: number; y: number; z: number }): void {
   const offset = { along: 0, across: 0, up: 0 };
-  arrivalIn(system, from, offset);
+  stopNearIn(system, from, offset);
   onPlane(system, offset, out);
 }
 
 /** The same stop in `system`'s own plane's terms, into `out`, for a caller that holds its own way onto the map (the flights' chunk takes
  * the cosmos's). */
-export function arrivalIn(system: StarSystem, from: Point, out: InPlane): void {
+export function stopNearIn(system: StarSystem, from: Point, out: InPlane): void {
   const reach = system.worlds.reduce((most, { orbit, radius }) => Math.max(most, orbit + radius), 0);
   const away = Math.min(STOP.most, Math.max(STOP.least, STOP.reach * reach));
   const { place, tilt, node } = system;

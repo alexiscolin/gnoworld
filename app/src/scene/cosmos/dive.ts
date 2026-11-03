@@ -32,6 +32,11 @@ export class Dive {
     this.#still = still;
   }
 
+  /** Whether it waits still: neither started nor given up. */
+  get waiting(): boolean {
+    return Number.isNaN(this.#start) && this.along < 1;
+  }
+
   /** How much of the dissolve's picture still shows. */
   get veil(): number {
     return this.#dissolve?.veil ?? 0;

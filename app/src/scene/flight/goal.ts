@@ -33,11 +33,12 @@ export interface CosmosSight {
   readonly onPlane: typeof onPlane;
 }
 
-/** What the scene hands its flights: what a flight writes and draws with, the panel's ear, a frame owed, and where the dive takes the
- * dissolve this chunk lends it. */
-export type FlightScene = Pick<FlightDevice, "renderer" | "stage" | "camera" | "eye" | "arrival"> & {
+/** What the scene hands its flights: what a flight writes and draws with, the panel's ear and a frame owed; and where the views read the
+ * approach this chunk writes, and the dive the dissolve it lends. */
+export type FlightScene = Pick<FlightDevice, "renderer" | "stage" | "camera" | "eye"> & {
   readonly said: ((flight: FlightSaid | undefined) => void) | undefined;
   readonly moved: () => void;
+  arrival?: FlightDevice["arrival"];
   veil?: (stage: Stage) => Dissolve;
 };
 

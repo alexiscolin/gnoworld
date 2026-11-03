@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {
-  arrivalOf,
+  stopNear,
   EARTH_PLACE,
   flightSeconds,
   HOME,
@@ -162,7 +162,7 @@ function endOf(scene: Rig, system: StarSystem) {
   const map = { x: NaN, y: NaN, z: NaN };
   toMap(scene.placed(), map);
   const stop = { x: NaN, y: NaN, z: NaN };
-  arrivalOf(system, map, stop);
+  stopNear(system, map, stop);
   const eye = { x: NaN, y: NaN, z: NaN };
   toScene(stop, eye);
   const star = { x: NaN, y: NaN, z: NaN };

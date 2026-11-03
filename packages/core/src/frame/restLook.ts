@@ -5,8 +5,10 @@ import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
 import { outlineOf, type Outline } from "./outline.ts";
 
-/** The camera's field of view, in degrees, up and down: the scene's own lens. */
-export const FIELD_OF_VIEW = 50;
+/** The home's lens, in degrees, up and down, which the scene's camera takes while the cosmos shows: 1.2 times the scene's 50 degrees'
+ * magnification (Alexis, 2026-11-03, "tout pourrait être un peu plus gros"; 1.25 left Onyx no view with its close world and two
+ * postcards). Every other page keeps 50 degrees. A number: a call at a module's top stays in every chunk that imports core. */
+export const FIELD_OF_VIEW = 42.47122885453438;
 /** The screens the view is composed for, in the page's pixels: the video's, and a 16:9 window of its height. */
 export const REST_SCREENS = [
   { width: 1728, height: 1080 },
@@ -46,8 +48,8 @@ export interface Close {
 }
 
 export const DEGREE = Math.PI / 180;
-/** The eye's distances from the Earth, the plain one first: the Earth about 110 pixels across, a little larger than frame 4's 95 (Alexis,
- * 2026-11-02), 101 to 118. */
+/** The eye's distances from the Earth, the plain one first: the Earth about 130 pixels across through the home's lens, 121 to 142 (Alexis,
+ * 2026-11-02 and 2026-11-03). */
 export const DISTANCES = [26, 25, 27, 24, 28];
 // The share of the Earth's disc in day, at the least: frame 4's, about 45%.
 const LIT_LEAST = 0.45;
@@ -89,7 +91,12 @@ const direction = (a: Point): Point => {
   const length = Math.hypot(a.x, a.y, a.z);
   return { x: a.x / length, y: a.y / length, z: a.z / length };
 };
-const along = (a: Point, b: Point, by: number): Point => ({ x: a.x + b.x * by, y: a.y + b.y * by, z: a.z + b.z * by });
+/** `a` moved `by` along `b`. */
+export const along = (a: Point, b: Point, by: number): Point => ({
+  x: a.x + b.x * by,
+  y: a.y + b.y * by,
+  z: a.z + b.z * by,
+});
 
 /** The eye `distance` from the Earth, `slant` radians over the disc and `turn` radians round from the map's z towards its x, into `out`. */
 export function eyeInto({ distance, slant, turn }: Candidate, out: { x: number; y: number; z: number }): void {
@@ -105,9 +112,9 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
   return out;
 };
 
-/** A camera at `eye`, on the map, looking at the Earth, the disc's up kept up. */
-function cameraFrom(eye: Point): Camera {
-  const ahead = direction(minus(EARTH_PLACE, eye));
+/** A camera at `eye`, on the map, looking at `target`, the disc's up kept up. */
+export function cameraTowards(eye: Point, target: Point): Camera {
+  const ahead = direction(minus(target, eye));
   const right = direction({ x: -ahead.z, y: 0, z: ahead.x });
   const up = {
     x: right.y * ahead.z - right.z * ahead.y,
@@ -117,9 +124,14 @@ function cameraFrom(eye: Point): Camera {
   return { eye, ahead, right, up };
 }
 
-/** The eye moved `across` and `upward` along `camera`'s own axes, looking at the Earth still: its sway. */
-export const swayed = ({ eye, right, up }: Camera, [across, upward]: readonly [number, number]): Camera =>
-  cameraFrom(along(along(eye, right, across), up, upward));
+const cameraFrom = (eye: Point): Camera => cameraTowards(eye, EARTH_PLACE);
+
+/** The eye moved `across` and `upward` along `camera`'s own axes, looking at `target` still, the Earth unless said: its sway. */
+export const swayed = (
+  { eye, right, up }: Camera,
+  [across, upward]: readonly [number, number],
+  target: Point = EARTH_PLACE,
+): Camera => cameraTowards(along(along(eye, right, across), up, upward), target);
 
 /** The focal length of a screen `height` pixels high, in pixels. */
 export const focalOf = (height: number): number => height / 2 / Math.tan((FIELD_OF_VIEW * DEGREE) / 2);

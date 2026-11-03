@@ -1,6 +1,6 @@
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { describe, expect, test, vi } from "vitest";
-import { render, routeError } from "../tests/render.tsx";
+import { headingOf, render, routeError } from "../tests/render.tsx";
 import Earth, {
   clientLoader as earthLoader,
   ErrorBoundary as EarthError,
@@ -139,7 +139,7 @@ describe("a universe's index", () => {
     const html = await page("home", "/net/gnoland/");
     // F3267: the hero's kicker names the universe, and the heading is its line, what the page holds.
     expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land<\/p>/);
-    expect(html).toMatch(/<h1\b[^>]*>1 world in gno\.land<\/h1>/);
+    expect(headingOf(html)).toBe("1 world in gno.land");
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
     expect(html).toContain("Other");
     // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
@@ -153,8 +153,9 @@ describe("a universe's index", () => {
     for (const path of ["/", "/net/onyx/"]) {
       const html = await page("home", path);
       expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-      // The default universe's count is the cosmos's, which the browser reads once the scene runs (7d6): none in the build.
-      expect(html, path).toMatch(/<h1\b[^>]*>Worlds in Onyx<\/h1>/);
+      // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+      // the line's figure's room for it.
+      expect(headingOf(html), path).toBe(" worlds in Onyx");
     }
   });
 

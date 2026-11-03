@@ -1,7 +1,7 @@
 // Where a flight goes (7g): a star's stop as core places it, round its star the way the eye came; back to the view at rest, its way undone;
 // or a page's straight along the view. And what the panel calls where it goes, never an address. The ways between the map and the stage
 // are the cosmos's, which the sight hands over.
-import { arrivalIn, type Point } from "@gnoworld/core";
+import { stopNearIn, type Point } from "@gnoworld/core";
 import { isPlace, starName } from "./aim.ts";
 import type { CosmosSight, FlightDevice, FlightGoal } from "./goal.ts";
 import type { Way } from "./way.ts";
@@ -34,7 +34,7 @@ function starWay(
   const [map, stop, star] = [point(), point(), point()];
   const offset = { along: 0, across: 0, up: 0 };
   sight.toMap(from.eye, map);
-  arrivalIn(system, map, offset);
+  stopNearIn(system, map, offset);
   sight.onPlane(system, offset, stop);
   sight.toScene(stop, stop);
   sight.toScene(system.place, star);

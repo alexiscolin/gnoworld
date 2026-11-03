@@ -80,11 +80,6 @@ export class FrameLoop {
     this.#cancel();
   }
 
-  /** Stops for good, as its owner leaves. */
-  dispose(): void {
-    this.stop();
-  }
-
   #readRate(): FrameRate {
     this.#state.sinceInput = this.#clock.now() - this.#lastInput;
     return frameRate(this.#state);

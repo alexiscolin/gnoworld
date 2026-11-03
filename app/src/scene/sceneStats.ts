@@ -41,6 +41,8 @@ export interface Scene {
   cosmos(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void;
   /** The box of the page's text, in its pixels: no body stands under it. */
   keepClear(box: ClearBox | undefined): void;
+  /** Comes to the system named `id`, its postcard at its arrival, or back to the view at rest with none (7d3). */
+  arrive(id: string | undefined): void;
   dispose(): void;
   stats(): SceneStats;
 }

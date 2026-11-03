@@ -19,6 +19,7 @@ import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
 import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
+import { headingOf } from "../tests/render.tsx";
 
 // 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
@@ -458,11 +459,12 @@ describe("react-router build", () => {
         const client = join(copy, "build", "client");
         const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
         const pages: [string[], string, string][] = [
-          // The default universe's count is the cosmos's, which the browser reads once the scene runs (7d6): none in the build.
-          [[], "Worlds in Onyx", "/net/onyx/"],
+          // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+          // the line's figure's room for it.
+          [[], " worlds in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
           [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "onyx"], "Worlds in Onyx", "/net/onyx/"],
+          [["net", "onyx"], " worlds in Onyx", "/net/onyx/"],
           [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
           [["net", "gnoland"], "\\d+ worlds? in gno\\.land", "/net/gnoland/"],
           [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
@@ -476,8 +478,8 @@ describe("react-router build", () => {
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
           const where = path.join("/") || "/";
-          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern.
-          expect(html.replaceAll("<!-- -->", ""), where).toMatch(new RegExp(`<h1\\b[^>]*>${heading}</h1>`));
+          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern, of its words whatever marks their parts.
+          expect(headingOf(html), where).toMatch(new RegExp(`^${heading}$`));
           expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
         }
         // The home lists the worlds of its universe alone, and the data's order is not a page.

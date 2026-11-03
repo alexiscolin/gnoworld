@@ -39,10 +39,18 @@ export interface Sight {
   /** How large a system's worlds stand as points, by its index: whole for the view at rest's postcards, none for its close world's
    * system, whose rest is off the screen, and a glint for every other, a distant star. */
   readonly pointShare: (system: number) => number;
-  /** The plane a postcard's points turn in, by its system's index, as its bodies' at rest: opened towards the eye if need be. */
+  /** A system as its points turn, by its index, as its bodies do: a postcard's plane opened towards the eye at rest if need be, the close
+   * world's system held still. */
   readonly planeOf: (system: number) => StarSystem | undefined;
+  /** The close world's system, by its index: its points stand up to a body's least size, so its world keeps its size as it becomes a
+   * body, or a point (7d9). */
+  readonly still?: number | undefined;
+  /** How much of a star's point at a place on the map shows past the Earth's limb, when it has no halo (7d9). */
+  readonly limb: (place: Point) => number;
   /** Whether the view needs a system's halo, by its index, whatever its distance: the great star's and the postcards' stars'. */
   readonly needsHalo: (system: number) => boolean;
+  /** The main light's system, by its index: the great star's (0) unless said, or a system's own at its arrival. */
+  readonly main?: number;
   /** Whether a round thing at a place on the map, of a radius in world units, shows on the screen. */
   readonly inView: (place: Point, radius: number) => boolean;
   /** How much of what stands at a place on the map, of a radius in pixels, the page's text leaves on screen. */
@@ -52,8 +60,9 @@ export interface Sight {
 interface Held {
   readonly system: StarSystem;
   readonly world: Orbiter;
-  /** How large its world stands, as a share of its own size. */
+  /** How large its world stands, as a share of its own size, and at most, in pixels. */
   readonly share: number;
+  readonly most: number;
 }
 
 // A star's reach, from its size; a region's glow, from the systems it holds.
@@ -128,10 +137,11 @@ export class Disc {
     this.#belt.fade.value = level;
   }
 
-  /** One frame on. */
-  advance(eye: Point, seconds: number): void {
+  /** One frame on, the great star lifted `lift` on the sun's beat. */
+  advance(eye: Point, seconds: number, lift = 0): void {
     this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);
     this.#dots.advance(orbitTime(seconds));
+    this.#suns.beat.value = lift;
   }
 
   /** Writes what a look saw. */
@@ -149,7 +159,8 @@ export class Disc {
       const system = systems[index];
       if (system === undefined) continue;
       const { reach, halo } = this.#halos.sunOf(at, index, system);
-      const light = UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS);
+      const clear = halo > 0 ? 1 : sight.limb(system.place);
+      const light = (UNDER_TEXT + (1 - UNDER_TEXT) * shows(system.place, HEART_PIXELS)) * clear;
       this.#suns.set(at, system.place, { reach, warmth: system.warmth, glow: false, shows: light, halo });
     }
     for (let at = 0; at < drawn.glowCount; at += 1) {
@@ -166,12 +177,12 @@ export class Disc {
     return known;
   }
 
-  #paintDot(index: number, { system, world, share: shown }: Held, sight: Sight): void {
+  #paintDot(index: number, { system, world, share: shown, most }: Held, sight: Sight): void {
     const distance = away(system.place, sight.eye);
     const grain = world.radius < GRAIN;
     const share = unitOf(textHash(world.id));
     const size =
-      Math.min(onScreen(world.radius * shown, distance, sight.focal), SPECK) * (grain ? 0.5 + 0.9 * share : 1);
+      Math.min(onScreen(world.radius * shown, distance, sight.focal), most) * (grain ? 0.5 + 0.9 * share : 1);
     if (!grain) {
       this.#sizes += size;
       this.#sized += 1;
@@ -196,8 +207,9 @@ export class Disc {
       const share = sight.pointShare(at);
       if (system === undefined || held === undefined || count === BOUNDS.dots || sight.isBody(held.id) || share === 0)
         return;
-      // A postcard's points turn in the plane its bodies do.
-      this.#paintDot(count, { system: sight.planeOf(at) ?? system, world: held, share }, sight);
+      // A postcard's points turn in the plane its bodies do, the close world's system's hold still as its bodies do.
+      const most = at === sight.still ? BODY_PIXELS : SPECK;
+      this.#paintDot(count, { system: sight.planeOf(at) ?? system, world: held, share, most }, sight);
       count += 1;
     };
     for (let at = 0; at < drawn.bodyCount; at += 1) paint(drawn.bodySystems[at] ?? -1, drawn.bodyWorlds[at] ?? -1);

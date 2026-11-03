@@ -5,8 +5,13 @@ import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
 import { EARTH_PLACE, systemsOf } from "../../../packages/core/src/cosmos/system.ts";
 import { distanceOf } from "../../../packages/core/src/space/cell.ts";
 import { coveredShare, offLine } from "../../../packages/core/src/frame/composition.ts";
-import { postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
+import { arrivalOf } from "../../../packages/core/src/frame/arrival.ts";
+import { STAR_HEART } from "../../../packages/core/src/frame/restLook.ts";
+import { BLOCK_MS } from "../../../packages/core/src/planet/activity.ts";
+import { beatAt } from "../../../packages/core/src/space/beat.ts";
+import { FIELD_OF_VIEW, postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
+import { heldOf } from "../../src/scene/cosmos/cosmosWorld.ts";
 import { CREDITS } from "../../src/scene/planet/credits.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
@@ -124,9 +129,10 @@ for (const size of [COMPUTER, WIDE])
     const { screen } = await cosmos(page);
     near(screen.earth?.x ?? NaN, size.width / 2, "the Earth's x");
     near(screen.earth?.y ?? NaN, size.height / 2, "the Earth's y");
-    // Alexis, 2026-11-02: "la Terre un peu plus grosse", about 110 pixels across against frame 4's 95.
-    expect(screen.earth?.radius).toBeGreaterThanOrEqual(50);
-    expect(screen.earth?.radius).toBeLessThanOrEqual(60);
+    // Alexis, 2026-11-02: "la Terre un peu plus grosse", about 110 pixels across against frame 4's 95; then, 2026-11-03, 1.2 times that
+    // through the home's lens, about 130.
+    expect(screen.earth?.radius).toBeGreaterThanOrEqual(60);
+    expect(screen.earth?.radius).toBeLessThanOrEqual(72);
     expect(screen.sun.x - size.width / 2).toBeGreaterThanOrEqual(100);
     expect(screen.sun.x).toBeLessThan(size.width);
     expect(Math.abs(screen.sun.y - size.height / 2)).toBeLessThanOrEqual(0.3 * size.height);
@@ -566,9 +572,11 @@ for (const tier of ["high", "low"] as const)
     expect((await stats(page)).tier).toBe(tier);
     expect(seen.length).toBeGreaterThan(300);
     expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
-    // Measured on the recorded file, 344 frames (2026-11-03): 21 draws at most, 20 or 21 landed; 47,508 points at most, 47,465 landed.
+    // The whole cosmos's two draws, and the bodies passing behind the hero's text on the way down, which at rest keeps its room (7d9).
+    // Measured on the recorded file (2026-11-03): 21 draws at most before 7d9, 24 after, 20 or 21 landed; 47,508 points at most, 47,465
+    // landed.
     const landedFrame = seen.at(-1);
-    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 2);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 4);
     expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_AT_REST);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual((landedFrame?.points ?? 0) + 533);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST);
@@ -636,8 +644,11 @@ for (const systems of [100, 1000, 10_000])
   });
 
 // 7d7: the lab is the site's own scene, so it opens with the dive too, which Alexis judges on his own GPU.
+// The whole cosmos shows whole for a tenth of a second of the dive, from its fade's end (0.145) till the eye passes 680 units (0.163): the
+// page's time is held and stepped a frame at a time, in a small window, so no frame of it is missed under load.
 test("opens the release's page with the dive, from the whole cosmos to the view at rest", async ({ page }) => {
-  const seen = await dove(page, { path: "/lab/realism.html?view=cosmos" });
+  test.setTimeout(480_000);
+  const seen = await dove(page, { path: "/lab/realism.html?view=cosmos", size: SMALL, step: 16 });
   expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
   expect(seen.at(-1)?.along).toBe(1);
 });
@@ -647,6 +658,40 @@ test("gives the release's page the cosmos as a view, from the recorded file, for
 }) => {
   await inTheLab(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
+});
+
+// Alexis, 2026-11-03, on the lab: "la grosse planète à gauche disparaît si on bouge en rétrécissant". The lab keeps the home's hero room,
+// which has no text there, so a drag or the wheel slid the close world under it, shrank it and put it out. The room is the rest's alone.
+test("keeps the close world at its size in the lab as a drag or the wheel takes the eye off the rest", async ({
+  page,
+}) => {
+  const { systems, view } = viewOf();
+  const world = systems[view.close?.system ?? -1]?.worlds[view.close?.world ?? -1];
+  if (world === undefined) throw new Error("the recorded file gives no close world");
+  const focal = COMPUTER.height / 2 / Math.tan((FIELD_OF_VIEW * Math.PI) / 360);
+  await inTheLab(page);
+  // The lab's own moves: a drag takes the eye 0.06 units a pixel at rest (3 units, within the view at rest's reach, then 6, past it), the
+  // "0" key brings it back, a wheel's step backs it off by a share of the way. F4271's journey holds the room kept at rest.
+  const moves = [
+    ...[50, 50].map(
+      (pixels) => `dispatchEvent(new PointerEvent("pointermove", { buttons: 1, movementX: ${String(pixels)} }))`,
+    ),
+    `dispatchEvent(new KeyboardEvent("keydown", { key: "0" }))`,
+    ...Array.from({ length: 6 }, () => `dispatchEvent(new WheelEvent("wheel", { deltaY: 20 }))`),
+  ];
+  // A step under the cosmos's own (4 units) takes no look, and reduced motion draws the one frame a change owes: it poses the bodies.
+  for (const move of moves) {
+    const { frames } = await stats(page);
+    await page.evaluate(move);
+    await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames);
+    const spot = (await cosmos(page)).screen.bodies.find(({ id }) => id === world.id);
+    if (spot === undefined) throw new Error(`the close world went after ${move}`);
+    // Its depth along the view is its distance or less, and more than 0.8 of it within the lens's corners: drawn whole, it stands as
+    // large as its distance says, or up to a quarter larger off the view's axis.
+    const truly = (world.radius * focal) / spot.away;
+    expect(spot.radius).toBeGreaterThanOrEqual(0.98 * truly);
+    expect(spot.radius).toBeLessThanOrEqual(1.25 * truly);
+  }
 });
 
 // The nebulae: real images, warped and recoloured, in layers behind the worlds (ADR-0002 §10, "Space views"), seen from a system's
@@ -833,6 +878,7 @@ async function bothWays(page: Page, turn?: (page: Page) => Promise<void>) {
 // Frame 16's teal, top right (f0016.jpg read with ffmpeg, 2026-11-02): hues 182 to 193 from the tenth part of its pixels to the ninetieth,
 // mean sRGB (10, 44, 50), its ninetieth (10, 62, 66). The light a nebula adds is read against black, so a few degrees more either way.
 const FRAME_TEAL = { least: 176, most: 200, brightest: 66, saturation: 0.82 };
+const SATURATION_READ = 7;
 function hueOf([red, green, blue]: readonly number[]): number {
   const [r = 0, g = 0, b = 0] = [red, green, blue];
   const top = Math.max(r, g, b);
@@ -859,7 +905,7 @@ test.describe("the nebulae's light", () => {
   test("gives a cool nebula frame 16's teal, dark and discreet as there, never the grey-blue", async ({ page }) => {
     const { without, withNebulae } = await bothWays(page, quarterTurned);
     const [before, after] = [await colours(page, without, boxes()), await colours(page, withNebulae, boxes())];
-    let teal = 0;
+    let [teal, read] = [0, 0];
     for (const [at, colour] of after.entries()) {
       const behind = before[at] ?? [255, 255, 255];
       const added = colour.map((value, channel) => value - (behind[channel] ?? 0));
@@ -871,9 +917,14 @@ test.describe("the nebulae's light", () => {
       expect(hueOf(added), `box ${String(at)}`).toBeGreaterThanOrEqual(FRAME_TEAL.least);
       expect(hueOf(added), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.most);
       expect(Math.max(...colour), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.brightest);
+      // Its saturation is read where the light added reaches 7 on its strongest channel: there half a step of 8-bit rounding moves it by
+      // 0.07 at most, under the bound's margin over frame 16's 0.82 (7d9). Seventy-five boxes read at the least, so the floor hides no change.
+      if (top < SATURATION_READ) continue;
+      read += 1;
       expect((top - Math.min(...added)) / top, `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.saturation + 0.1);
     }
     expect(teal).toBeGreaterThan(3);
+    expect(read).toBeGreaterThanOrEqual(75);
   });
 });
 
@@ -1022,4 +1073,171 @@ test("gives the release's page the whole cosmos, with the links read on the chai
   await whole(page);
   // The 18 pairs of worlds the sample of 58 realms read on Onyx links (app/lab/imports.json, the part's state file).
   expect((await cosmos(page)).web).toMatchObject({ points: 533, lines: 18, gold: 0 });
+});
+
+// 7d3: a system's arrival, the eye come to it as 7g's flights will land it. Onyx's gnoswap, sixteen worlds and a far belt; a lone world
+// of no belt 156 units out; a view not chosen for these tests.
+const ARRIVALS = ["gnoswap", "g1nufzhlvkr7ep9m9t52mk9jfymtn7ywclsaydf8"] as const;
+// The star a third of the way in or so (core's arrival.test.ts), the header's band, a tenth of the height.
+const [SIDE_LEAST, SIDE_MOST, HEADER] = [0.12, 0.3, 0.09];
+const recorded = () => JSON.parse(RECORDED) as { updated: string; worlds: Parameters<typeof heldOf>[0] };
+const arrivalAt = (id: string) => {
+  const systems = systemsOf(heldOf(recorded().worlds));
+  const system = systems.find((each) => each.id === id);
+  if (system === undefined) throw new Error(`no system ${id}`);
+  return { system, arrival: arrivalOf(system, systems) };
+};
+interface Point3 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+const staged = (at: Point3): Point3 => {
+  const out = { x: 0, y: 0, z: 0 };
+  toScene(at, out);
+  return out;
+};
+const minus3 = (a: Point3, b: Point3): Point3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const dot3 = (a: Point3, b: Point3) => a.x * b.x + a.y * b.y + a.z * b.z;
+const unit3 = (a: Point3): Point3 => {
+  const length = Math.sqrt(dot3(a, a));
+  return { x: a.x / length, y: a.y / length, z: a.z / length };
+};
+const cross3 = (a: Point3, b: Point3): Point3 => ({
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+});
+// Where the system's star stands on the screen, off its middle, through the scene's camera: at the eye, turned to what the arrival looks
+// at, the map's up kept up (three's lookAt), the lens of 50 degrees.
+async function starOf(page: Page, id: string, { height }: { width: number; height: number }) {
+  const { system, arrival } = arrivalAt(id);
+  const { eye } = await cosmos(page);
+  const back = unit3(minus3(eye, staged(arrival.look)));
+  const right = unit3(cross3(minus3(staged({ x: 0, y: 1, z: 0 }), staged({ x: 0, y: 0, z: 0 })), back));
+  const up = cross3(back, right);
+  const from = minus3(staged(system.place), eye);
+  const [depth, focal] = [-dot3(from, back), height / 2 / Math.tan((25 * Math.PI) / 180)];
+  return { x: (focal * dot3(from, right)) / depth, y: (-focal * dot3(from, up)) / depth };
+}
+async function cameTo(page: Page, id: string, { size = COMPUTER, still = true } = {}) {
+  await page.setViewportSize(size);
+  if (still) await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`/lab/realism.html?view=cosmos&arrive=${id}`);
+  await running(page);
+  await landed(page);
+  const there = staged(arrivalAt(id).arrival.eye);
+  // At its arrival, within the sway's reach with motion on.
+  await expect
+    .poll(async () => {
+      const off = minus3((await cosmos(page)).eye, there);
+      return Math.sqrt(dot3(off, off));
+    }, SLOW)
+    .toBeLessThan(0.5);
+  await standing(page, 0);
+}
+// Each body whole under the header, off the star's heart; the star a third of the way in.
+async function framed(page: Page, id: string, size: { width: number; height: number }) {
+  const { bodies } = (await cosmos(page)).screen;
+  const offset = await starOf(page, id, size);
+  const star = { x: size.width / 2 + offset.x, y: size.height / 2 + offset.y };
+  expect(Math.abs(offset.x)).toBeGreaterThanOrEqual(SIDE_LEAST * size.width);
+  expect(Math.abs(offset.x)).toBeLessThanOrEqual(SIDE_MOST * size.width);
+  for (const body of bodies) {
+    expect(body.x - body.radius).toBeGreaterThanOrEqual(0);
+    expect(body.x + body.radius).toBeLessThanOrEqual(size.width);
+    expect(body.y - body.radius).toBeGreaterThanOrEqual(HEADER * size.height);
+    expect(body.y + body.radius).toBeLessThanOrEqual(size.height);
+    expect(Math.hypot(body.x - star.x, body.y - star.y) - body.radius).toBeGreaterThanOrEqual(STAR_HEART);
+  }
+  return bodies;
+}
+
+for (const id of ARRIVALS)
+  for (const size of id === "gnoswap" ? [COMPUTER, WIDE] : [COMPUTER])
+    test(`comes to ${id.slice(0, 12)} as a postcard at ${String(size.width)} by ${String(size.height)}: its worlds whole, its star a third of the way in, none on its heart`, async ({
+      page,
+    }) => {
+      await cameTo(page, id, { size });
+      const bodies = await framed(page, id, size);
+      expect(bodies.map(({ id: world }) => world).sort()).toEqual(
+        arrivalAt(id)
+          .arrival.postcard.worlds.map(({ id: world }) => world)
+          .sort(),
+      );
+      if (id === "gnoswap") expect((await cosmos(page)).rocks).toBeGreaterThan(0);
+    });
+
+test("keeps the postcard whole as the eye sways, motion on", async ({ page }) => {
+  await cameTo(page, "gnoswap", { still: false });
+  const { seconds } = await stats(page);
+  for (let read = 0; read < 4; read += 1) {
+    await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(seconds + read);
+    await framed(page, "gnoswap", COMPUTER);
+  }
+});
+
+// The sun's beat (ADR-0001 §7): the great star swells once a block from the file's time. The wall's clock held at the beat's top, then at
+// its rest, a frame each, motion on: the halo round the great star's heart reads brighter at the top; no other sun's does.
+const BEAT_FROM = Date.parse(recorded().updated);
+const beatTop = () =>
+  Array.from({ length: 400 }, (_, at) => BEAT_FROM + 30 * BLOCK_MS + at * 10).reduce((best, now) =>
+    beatAt(BEAT_FROM, now, BEAT_FROM) > beatAt(BEAT_FROM, best, BEAT_FROM) ? now : best,
+  );
+const beatRest = () => beatTop() + BLOCK_MS / 2;
+// The light of a box right of a star's heart, past its white, on a frame drawn at `now`: two more frames with motion on, the one a change
+// owes under reduced motion, which a step of the eye too small for a look asks.
+async function haloAt(page: Page, now: number, { at, still = false }: { at: string | undefined; still?: boolean }) {
+  await page.clock.setFixedTime(now);
+  const { frames, eye } = await stats(page);
+  if (still)
+    await page.evaluate((to) => {
+      (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
+    }, eye);
+  await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThanOrEqual(frames + (still ? 1 : 2));
+  // The great star at home, or the system's own star at its arrival.
+  const spot =
+    at === undefined
+      ? (await cosmos(page)).screen.sun
+      : await starOf(page, at, COMPUTER).then(({ x, y }) => ({
+          x: x + COMPUTER.width / 2,
+          y: y + COMPUTER.height / 2,
+        }));
+  const [x, y] = [Math.round(spot.x), Math.round(spot.y)];
+  const [light] = await brightness(page, await page.locator("canvas").screenshot(), [
+    [x + 60, y - 20, x + 110, y + 20],
+  ]);
+  return light ?? NaN;
+}
+
+test("beats the great star once a block: its halo brighter at the beat's top than at its rest", async ({ page }) => {
+  await page.clock.setFixedTime(beatRest());
+  await page.setViewportSize(COMPUTER);
+  await page.goto("/lab/realism.html?view=cosmos");
+  await running(page);
+  await standing(page);
+  const top = await haloAt(page, beatTop(), { at: undefined });
+  const rest = await haloAt(page, beatRest(), { at: undefined });
+  expect(beatAt(BEAT_FROM, beatRest(), BEAT_FROM)).toBe(0);
+  expect(top).toBeGreaterThan(rest * 1.04);
+});
+
+test("beats no other sun: a system's own star at its arrival reads the same at the beat's top and rest", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(beatRest());
+  await cameTo(page, "gnoswap", { still: false });
+  const top = await haloAt(page, beatTop(), { at: "gnoswap" });
+  const rest = await haloAt(page, beatRest(), { at: "gnoswap" });
+  expect(Math.abs(top - rest)).toBeLessThanOrEqual(0.01 * rest + 1);
+});
+
+test("beats nothing under reduced motion: the great star's halo the same at the beat's top and rest", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(beatRest());
+  await inTheLab(page);
+  const top = await haloAt(page, beatTop(), { at: undefined, still: true });
+  const rest = await haloAt(page, beatRest(), { at: undefined, still: true });
+  expect(Math.abs(top - rest)).toBeLessThanOrEqual(0.01 * rest + 1);
 });

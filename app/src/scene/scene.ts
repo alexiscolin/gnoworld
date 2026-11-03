@@ -7,7 +7,6 @@ import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { Eye } from "./eye.ts";
-import type { FlightGoal } from "./flight/flights.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { Probe } from "./probe.ts";
 import { rendered, type Scene, type SceneOptions, type SceneStats } from "./sceneStats.ts";
@@ -18,10 +17,11 @@ import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import { MOTION, watchScene } from "./watch.ts";
 
-const TOUCH = "(pointer: coarse)";
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
-const LENS = { fieldOfView: 50, near: 0.1, far: 2000 } as const;
+// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
+// barrel into this chunk; the lens test ties the two.
+const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
 // The sky beside the worlds: the warmth comes from the suns, with black between them (frame 4).
 const VEILED = 0.3;
 
@@ -30,7 +30,7 @@ export type { Scene, SceneOptions };
 class LiveScene implements Scene {
   readonly #owner = new Disposer();
   readonly #options: SceneOptions;
-  readonly #touch = matchMedia(TOUCH).matches;
+  readonly #touch = matchMedia("(pointer: coarse)").matches;
   readonly #renderer: WebGLRenderer;
   readonly #stage = new Stage();
   readonly #camera = new PerspectiveCamera(LENS.fieldOfView, 1, LENS.near, LENS.far);
@@ -49,6 +49,8 @@ class LiveScene implements Scene {
   #frames = 0;
   #seconds = 0;
   #refused = false;
+  readonly fly: Scene["fly"];
+  readonly depart: Scene["depart"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -58,8 +60,10 @@ class LiveScene implements Scene {
     this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
     this.#renderer.debug.onShaderError = this.#shaderRefused;
     this.#stage.background = new Color(DEEP_BLACK);
+    // Last, once every part let go: the loop stops, the renderer goes.
     this.#owner.add({
       dispose: () => {
+        this.#loop.stop();
         this.#renderer.forceContextLoss();
         this.#renderer.dispose();
       },
@@ -70,7 +74,6 @@ class LiveScene implements Scene {
       stage: this.#stage,
       camera: this.#camera,
       eye: this.#eye,
-      arrival: { approach: 1 },
       said: options.onFlight,
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
@@ -78,7 +81,7 @@ class LiveScene implements Scene {
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
         this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
-        this.#parts.flights.ready();
+        this.#parts.flights.part?.ready();
       },
     };
     this.#earth = this.#owner.add(new EarthView(device));
@@ -86,6 +89,7 @@ class LiveScene implements Scene {
       this.#viewport.changed();
     });
     this.ground = this.#earth;
+    ({ fly: this.fly, depart: this.depart } = this.#parts);
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -98,7 +102,7 @@ class LiveScene implements Scene {
       owed: this.#redraw,
     });
     this.#viewport.apply();
-    this.#loop = this.#owner.add(new FrameLoop(clock, this.#draw));
+    this.#loop = new FrameLoop(clock, this.#draw);
     this.#loop.set({ busy: this.#probe.running });
     const { changed, resized } = this.#viewport;
     watchScene(
@@ -126,7 +130,7 @@ class LiveScene implements Scene {
   };
 
   readonly #draw = (delta: number): void => {
-    this.#parts.flights.advance(delta);
+    this.#parts.flights.part?.advance(delta);
     this.#viewport.settle();
     this.#eye.advance(delta, this.#motion.matches);
     this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
@@ -140,7 +144,7 @@ class LiveScene implements Scene {
     this.#frames += 1;
     if (this.#refused) this.#earth.refused();
     this.#refused = false;
-    this.#probe.frame(delta, this.#earth.arriving || this.#parts.flights.busy);
+    this.#probe.frame(delta, this.#earth.arriving || this.#parts.flights.part?.busy === true);
   };
 
   readonly #redraw = (): void => {
@@ -159,7 +163,7 @@ class LiveScene implements Scene {
   };
 
   #stopOrGo(): void {
-    if (this.#covered || this.#lost) this.#parts.flights.land();
+    if (this.#covered || this.#lost) this.#parts.flights.part?.land();
     this.#loop.set({ covered: this.#covered || this.#lost });
     this.#loop.redraw();
   }
@@ -169,18 +173,10 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  fly(goal: FlightGoal): void {
-    this.#parts.flights.fly(goal);
-  }
-
-  depart(): void {
-    this.#parts.flights.depart();
-  }
-
-  moveTo(to: Point): void {
+  readonly moveTo = (to: Point): void => {
     this.#eye.moveTo(to);
     this.#loop.redraw();
-  }
+  };
 
   earth(place: Circle | undefined, said: (state: EarthState) => void): void {
     this.#earth.show(place, said);
@@ -199,12 +195,19 @@ class LiveScene implements Scene {
     if (worlds !== undefined) this.#parts.cosmos.dive(this.#motion.matches);
     this.#parts.cosmos.show(worlds, written, signals);
     this.#space.veil(worlds === undefined ? 1 : VEILED);
+    this.#viewport.lens(worlds === undefined ? LENS.fieldOfView : LENS.home);
     this.#loop.redraw();
   }
 
   keepClear(box: ClearBox | undefined): void {
     this.#parts.cosmos.keepClear(box);
     this.#loop.redraw();
+  }
+
+  /** Comes to system `id`, as 7g2's flights will land on it, or back to the view at rest with none: the view rests where the cosmos says
+   * the system's arrival stands (7d3). */
+  arrive(id: string | undefined): void {
+    this.#parts.cosmos.arrive(id, this.moveTo);
   }
 
   dispose(): void {

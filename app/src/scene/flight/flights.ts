@@ -8,11 +8,14 @@ export { Flights };
 export type { CosmosSight, FlightDevice, FlightGoal, FlightSaid, FlightScene } from "./goal.ts";
 
 /** The flights on the scene's device, the cosmos as the scene holds it: reduced motion, the panel's ear and a frame owed wired here, in
- * this chunk, so the scene's carries only their door; and the dissolve, which this chunk holds, lent to the dive. */
+ * this chunk, so the scene's carries only their door; the approach the views read, which only a flight changes; and the dissolve, which
+ * this chunk holds, lent to the dive. */
 export function flightsOn(scene: FlightScene, cosmos: { readonly sight: CosmosSight | undefined }): Flights {
   const motion = matchMedia(MOTION);
+  const arrival = { approach: 1 };
+  scene.arrival = arrival;
   scene.veil = (stage) => new Dissolve(stage);
-  const { renderer, stage, camera, eye, arrival, said, moved } = scene;
+  const { renderer, stage, camera, eye, said, moved } = scene;
   return new Flights({
     renderer,
     stage,

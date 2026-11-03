@@ -1,9 +1,10 @@
-import { BODY_PIXELS, BOUNDS, Drawn, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
-import { Points, Scene as Stage, type BufferAttribute, type BufferGeometry } from "three";
+import { BODY_PIXELS, BOUNDS, Drawn, EARTH_PLACE, EARTH_RADIUS, Ladder, MIDDLE, type StarSystem } from "@gnoworld/core";
+import { Points, Scene as Stage, Vector3, type BufferAttribute, type BufferGeometry } from "three";
 import { describe, expect, it } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { ROCKS } from "./belt.ts";
 import { Disc, type Sight } from "./disc.ts";
+import { limbOf } from "./restBodies.ts";
 
 // What a look writes, from a record no map makes: so each cap is seen binding, and nothing past it reaches a buffer.
 const system = (at: number, worlds: number, belt: boolean): StarSystem => ({
@@ -32,6 +33,7 @@ function sighted(systems: readonly StarSystem[], fill: (drawn: Drawn) => void): 
     drawn,
     eye: { x: 0, y: 30, z: 0 },
     focal: 1158,
+    limb: limbOf({ eye: { x: 0, y: 30, z: 0 }, focal: 1158 }),
     isBody: () => false,
     pointShare: () => 1,
     needsHalo: (index) => index === 0,
@@ -51,6 +53,7 @@ const sunsOf = (disc: Disc) => {
   return Array.from({ length: suns.geometry.instanceCount }, (_, at) => ({
     reach: look.getX(at),
     halo: halo.getX(at),
+    light: look.getW(at),
   }));
 };
 
@@ -213,8 +216,29 @@ describe("the suns' halos", () => {
     const suns = sunsAt(aways, { needsHalo: (index) => index === 0 || index === 1 });
     const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
     expect(pixels[0]).toBeCloseTo((9.5 * 1158) / 40, 6);
-    for (const other of pixels.slice(1)) expect(other).toBeLessThanOrEqual((pixels[0] ?? 0) / 2 + 1e-9);
-    expect(pixels[1]).toBeCloseTo((pixels[0] ?? 0) / 2, 6);
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
+    // A sun this near nears the ceiling, never reaching it (7d9).
+    expect(pixels[1]).toBeGreaterThan(0.99 * ((pixels[0] ?? 0) / 2));
+  });
+
+  // The chief, 2026-11-03, on Alexis's not-a-planetarium rule: through the home's lens two suns over the Earth, 42.6 and 76.6 units off,
+  // the farther a postcard's, whose halo is whole at any distance, drew one size, both at the cap. A halo follows its distance under the cap.
+  it("draws the nearer of two like suns the larger, a tenth apart or more, both under half the great star's size", () => {
+    const focal = 1.2 * 1158;
+    const aways = [24.4, 42.6, 76.6];
+    const suns = sunsAt(aways, { focal, needsHalo: (index) => index === 0 || index === 2 });
+    const pixels = suns.map(({ reach }, at) => (reach * focal) / (aways[at] ?? NaN));
+    expect(pixels[1]).toBeGreaterThanOrEqual(1.1 * (pixels[2] ?? Infinity));
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
+  });
+
+  // The red pass (L5): over the whole range, a sun's size falls as its distance grows, strictly, under the ceiling.
+  it("draws a sun the smaller the farther it stands, from 6 to 120 units, every one under half the great star's size", () => {
+    const aways = [24.4, ...Array.from({ length: 20 }, (_, at) => 6 + at * 6)];
+    const suns = sunsAt(aways, { needsHalo: () => true });
+    const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
+    for (let at = 2; at < pixels.length; at += 1) expect(pixels[at]).toBeLessThan(pixels[at - 1] ?? -Infinity);
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
   });
 
   it("keeps a region's glow whole: it is no sun's halo", () => {
@@ -224,5 +248,49 @@ describe("the suns' halos", () => {
       drawn.glowCount = 1;
     });
     expect(sunsOf(painted(sight).disc)[0]?.halo).toBe(1);
+  });
+});
+
+// The chief, 2026-11-03: through the home's lens a far star's point stood 3 pixels off the Earth's limb, behind it, and read as a glitch.
+// The camera looks at the Earth: a star's distance on screen from the Earth's centre is the lens times the tangent of its angle off it.
+describe("a star's point by the Earth's limb", () => {
+  it("puts out a halo-less star behind the Earth at its limb, never one in front of it, one with a halo, or one clear of it", () => {
+    const eye = new Vector3(0, 30, 0);
+    const toEarth = new Vector3(EARTH_PLACE.x, EARTH_PLACE.y, EARTH_PLACE.z).sub(eye);
+    const [near, ahead] = [toEarth.length(), toEarth.clone().normalize()];
+    const side = new Vector3(0, 0, 1).cross(ahead).normalize();
+    const limb = (EARTH_RADIUS * 1158) / near;
+    // A star `away` from the eye, its heart `gap` pixels off the Earth's limb on the screen.
+    const at = (away: number, gap: number) => {
+      const angle = Math.atan((limb + gap) / 1158);
+      const { x, y, z } = ahead
+        .clone()
+        .multiplyScalar(Math.cos(angle))
+        .addScaledVector(side, Math.sin(angle))
+        .multiplyScalar(away)
+        .add(eye);
+      return { x, y, z };
+    };
+    // g1ut6usp's star stood 87.8 units off, 3 pixels off the limb.
+    const places = [{ x: 0, y: 0, z: 0 }, at(150, 3), at(near / 2, 3), at(150, 3), at(150, 20), at(87.8, 3)];
+    const systems = places.map((place, index) => ({ ...system(index, 0, false), place }));
+    const base = sighted(systems, (drawn) => {
+      for (const index of places.keys()) drawn.stars[index] = index;
+      drawn.starCount = places.length;
+    });
+    // The one in front of the Earth and the one 87.8 units off are left out of the halos' choice, so they stand with none, as g1ut6usp's
+    // did behind seven nearer suns.
+    const inView = (place: { readonly x: number }) => place.x !== places[2]?.x && place.x !== places[5]?.x;
+    const suns = sunsOf(
+      painted({
+        ...base,
+        eye,
+        limb: limbOf({ eye, focal: 1158 }),
+        needsHalo: (index) => index === 0 || index === 3,
+        inView,
+      }).disc,
+    );
+    expect(suns.map(({ halo }) => halo > 0)).toEqual([true, false, false, true, false, false]);
+    expect(suns.map(({ light }) => light)).toEqual([1, 0, 1, 1, 1, 0]);
   });
 });

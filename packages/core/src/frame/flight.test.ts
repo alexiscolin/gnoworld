@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
 import { distanceOf, type Point } from "../space/cell.ts";
-import { arrivalOf, ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt, type Figures } from "./flight.ts";
+import { stopNear, ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt, type Figures } from "./flight.ts";
 
 // A flight (7g; ADR-0001 §7, "travel like a ship"; docs/DESIGN-SYSTEM.md, "Motion"): 1.3 to 3.2 s by distance, a slow start out of orbit, a
 // crossing and a slow arrival, and the panel's instruments read from it (frames 18, 36, 88, 89, 101, 128, 142).
@@ -156,7 +156,7 @@ const minus = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y, z: a
 const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y + a.z * b.z;
 const arrive = (system: StarSystem, from: Point): Point => {
   const out = { x: NaN, y: NaN, z: NaN };
-  arrivalOf(system, from, out);
+  stopNear(system, from, out);
   return out;
 };
 const FROMS: Point[] = [

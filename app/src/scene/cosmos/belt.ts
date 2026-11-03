@@ -1,7 +1,7 @@
 // A far belt (ADR-0002 §10): rocks past every orbit, one draw, from a system's name alone. Dark brown and soft, a pixel or two, lit on one
 // side, with the glow a quarter through them: no black hole in the light. Points: at this size a rock has no shape to tell, and an instanced
 // mesh would bring three's classes into the scene's chunk. Scenery, so nothing here means data.
-import { BELT_INNER, onPlane, ROOM, type StarSystem } from "@gnoworld/core";
+import { onPlane, ROCKS_FROM, ROOM, type StarSystem } from "@gnoworld/core";
 import { ShaderMaterial, type Object3D } from "three";
 import type { Disposer } from "../disposer.ts";
 import { pointCloud, type Cloud } from "./cloud.ts";
@@ -83,7 +83,7 @@ export class Belt {
     const { position, aStar, aSize } = this.#cloud.attributes;
     for (let rock = 0; rock < ROCKS; rock += 1) {
       const angle = next() * Math.PI * 2;
-      const across = BELT_INNER + next() * (ROOM - BELT_INNER);
+      const across = ROCKS_FROM + next() * (ROOM - ROCKS_FROM);
       this.#offset.along = across * Math.cos(angle);
       this.#offset.across = across * Math.sin(angle);
       this.#offset.up = (next() - 0.5) * THICK;
