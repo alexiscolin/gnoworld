@@ -48,7 +48,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       JARVIS_MODEL: z.enum(MODELS).default("claude-sonnet-5-5"),
       JARVIS_MODEL_FAST: z.enum(MODELS).default("claude-haiku-5-5"),
       JARVIS_MODEL_DEEP: z.enum(MODELS).default("claude-opus-5-5"),
-      JARVIS_GNOSCOPE: z.enum(["on", "off"]).default("off"),
+      JARVIS_GNOSCOPE: z.enum(["on", "off"]).optional(),
       JARVIS_SKILLS_DIR: absolute.default(fileURLToPath(new URL("../../jarvis/skills", import.meta.url))),
       JARVIS_GNOMCP_COMMAND: absolute,
       JARVIS_GNOMCP_CONFIG: absolute,
@@ -65,7 +65,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
     .superRefine(({ JARVIS_PROFILES, JARVIS_INDEXER_PROFILES }, ctx) => {
       const readable = new Set(JARVIS_PROFILES);
       for (const [at, name] of JARVIS_INDEXER_PROFILES.entries()) {
-        if (!readable.has(name)) ctx.addIssue({ code: "custom", path: ["JARVIS_INDEXER_PROFILES", at], message: "" });
+        if (!readable.has(name)) ctx.addIssue({ code: "custom", path: ["JARVIS_INDEXER_PROFILES", at] });
       }
     });
   const settings = parseSettings(Env, env);

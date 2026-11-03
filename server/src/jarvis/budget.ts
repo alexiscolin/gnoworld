@@ -47,8 +47,7 @@ export interface Budget {
 
 // A time's day in UTC, as its date: toISOString writes UTC whatever the machine's zone.
 const dayOf = (at: number): string => new Date(at).toISOString().slice(0, 10);
-const isCount = (value: number | undefined): value is number =>
-  value !== undefined && Number.isSafeInteger(value) && value >= 0;
+const isCount = (value: number | undefined): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
 
 export function makeBudget(
   db: DatabaseSync,
