@@ -566,7 +566,7 @@ for copies in 40:60 41:62 80:120; do
 	i=1 && printf 'package many\n' >"$mu/d/r/many/many.gno"
 	while [ $i -lt "${copies%:*}" ]; do printf '\nfunc F%s(bad bool) {\n\tif bad {\n\t\tpanic("bad")\n\t}\n}\n' "$i" >>"$mu/d/r/many/many.gno" && i=$((i + 1)); done
 	: >"$mu/fakegno.runs"
-	checked d GNO="$mu/fakegno" FAKE=survive >/dev/null || : # every guard survives the fake: only its run is read
+	checked d GNO="$mu/fakegno" FAKE=compile >/dev/null || : # no mutant compiles in the fake: only its one run is read
 	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
 		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
 done
