@@ -203,6 +203,13 @@ async function drawn(
   return pictures;
 }
 
+/** An ask's portraits: they end with the scene, or once `signal` lets the ask go (the cosmos covered), and no frame is lent past it. */
+export const portraitsFor = (
+  device: PortraitDevice,
+  ids: readonly string[],
+  { size, signal }: { size: number; signal: AbortSignal },
+) => portraitsOf({ ...device, signal: AbortSignal.any([device.signal, signal]) }, ids, size);
+
 /** The portraits of `ids`, `size` page pixels a side, by their ids: none of a world whose maps did not come, none once the scene went. */
 export async function portraitsOf(
   device: PortraitDevice,

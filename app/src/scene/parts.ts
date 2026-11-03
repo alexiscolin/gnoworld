@@ -157,11 +157,8 @@ export class Parts {
         moved();
       },
     };
-    // An ask ends with the scene, or once its asker lets it go: the cosmos covered, no frame is lent for it.
     this.portraits = (ids, size, signal) =>
-      import("./portraits.ts").then(({ portraitsOf }) =>
-        portraitsOf({ ...portrait, signal: AbortSignal.any([owner.signal, signal]) }, ids, size),
-      );
+      import("./portraits.ts").then(({ portraitsFor }) => portraitsFor(portrait, ids, { size, signal }));
     this.cosmos = new CosmosPart(device, owner, came);
     this.world = new WorldDoor(device, owner, came);
     this.flights = new Door(

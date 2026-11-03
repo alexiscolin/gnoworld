@@ -80,11 +80,15 @@ interface PortraitDeviceSeen {
   readonly signal: AbortSignal;
 }
 const portrait = vi.hoisted(() => ({
-  asked: [] as { device: PortraitDeviceSeen; ids: readonly string[]; size: number }[],
+  asked: [] as { device: PortraitDeviceSeen; ids: readonly string[]; size: number; signal: AbortSignal }[],
 }));
 vi.mock("./portraits.ts", () => ({
-  portraitsOf: (device: PortraitDeviceSeen, ids: readonly string[], size: number) => {
-    portrait.asked.push({ device, ids, size });
+  portraitsFor: (
+    device: PortraitDeviceSeen,
+    ids: readonly string[],
+    { size, signal }: { size: number; signal: AbortSignal },
+  ) => {
+    portrait.asked.push({ device, ids, size, signal });
     return Promise.resolve(new Map(ids.map((id) => [id, `data:image/jpeg;base64,${id}`])));
   },
 }));
@@ -1613,14 +1617,11 @@ describe("the rail's portraits", () => {
     expect(signal?.aborted).toBe(true);
   });
 
-  it("tells an ask's portraits when the ask is let go, the scene still on (F3804)", async () => {
+  it("hands the portraits the signal of the ask, which its asker lets go (F3804)", async () => {
     const scene = startScene(options({ remembered: "low" }), clock);
     const asking = new AbortController();
     await scene.portraits(["gov/dao"], 100, asking.signal);
-    const signal = portrait.asked[0]?.device.signal;
-    expect(signal?.aborted).toBe(false);
-    asking.abort();
-    expect(signal?.aborted).toBe(true);
+    expect(portrait.asked[0]?.signal).toBe(asking.signal);
     scene.dispose();
   });
 

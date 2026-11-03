@@ -2,7 +2,7 @@
 import { Group, PerspectiveCamera, SphereGeometry, Vector3, Vector4 } from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EARTH, GROUND_TO_MAP } from "./earth/look.ts";
-import { MAP_WIDTH, PER_FRAME, portraitsOf, SUN, type PortraitDevice } from "./portraits.ts";
+import { MAP_WIDTH, PER_FRAME, portraitsFor, portraitsOf, SUN, type PortraitDevice } from "./portraits.ts";
 
 // The rail's planets (7i): each world drawn alone by the planets' own code, the Earth from its own maps, lit from the side as the frames'
 // are, in a corner of the scene's canvas at the start of a frame the scene lends, before it draws its own over it; read back as a picture
@@ -426,6 +426,23 @@ describe("the rail's portraits", () => {
     expect(renderer.render).not.toHaveBeenCalled();
     expect(made.planets.every((planet) => planet.dispose.mock.calls.length === 1)).toBe(true);
     expect([...made.freed].sort()).toEqual([...new Set(made.maps.map(({ name }) => name))].sort());
+  });
+
+  it("ends an ask once its asker lets it go, the scene still on, keeping what it drew (F3804)", async () => {
+    const { device, frame, lent } = deviceOf();
+    const asking = new AbortController();
+    const asked = portraitsFor(device, ["a/a", "b/b", "c/c", "d/d", "e/e", "f/f"], {
+      size: 100,
+      signal: asking.signal,
+    });
+    await settle();
+    frame();
+    await settle();
+    asking.abort();
+    const drawn = await asked;
+    expect([...drawn.keys()]).toEqual(["a/a", "b/b", "c/c", "d/d"]);
+    expect(lent.length).toBeLessThanOrEqual(1);
+    expect(device.signal.aborted).toBe(false);
   });
 
   it("keeps the portraits drawn before the scene went", async () => {
