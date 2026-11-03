@@ -560,8 +560,11 @@ def mutants():
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
-    yield from each("scripts/check_regressions.py", 're.finditer(r" - (?=\\S)", m.group(1))', 're.finditer(r" - (?=\\S)|$", m.group(1))', "hooks", "check_regressions wants a reason")
-    yield from each("scripts/check_regressions.py", 're.finditer(r" - (?=\\S)", m.group(1))', 'list(re.finditer(r" - (?=\\S)", m.group(1)))[:1]', "hooks", "check_regressions reads an item holding ' - ' (F5000)")
+    yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
+    yield from each("scripts/check_regressions.py", 'rf"{key}: (.+) - \\S.*"', 'rf"{key}: (.+?) - \\S.*"', "hooks", "check_regressions reads an item holding ' - ' (F5000)")
+    yield from each("scripts/check_regressions.py", '{m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \\S.*", line.strip()))}',
+                    '{m.group(1)[: cut.start()].strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+)", line.strip())) for cut in re.finditer(r" - (?=\\S)", m.group(1)) if cut.start()}',
+                    "hooks", "check_regressions names one item a line (F5023)")
     yield from each("scripts/check_regressions.py", "e for e in after - before if", "e for e in set() if", "hooks", "check_regressions gaps and ignores")
     yield from each("scripts/check_regressions.py", ".strip() in gone.get(current, set())", ".strip() in set()", "hooks", "check_regressions switched to fails")
     yield from each("scripts/check_regressions.py", 'elif path.endswith(("_test.gno", "_test.go")):', "elif False:", "hooks", "check_regressions gno and Go tests")
