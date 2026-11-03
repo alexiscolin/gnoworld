@@ -572,9 +572,11 @@ for (const tier of ["high", "low"] as const)
     expect((await stats(page)).tier).toBe(tier);
     expect(seen.length).toBeGreaterThan(300);
     expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
-    // Measured on the recorded file, 344 frames (2026-11-03): 21 draws at most, 20 or 21 landed; 47,508 points at most, 47,465 landed.
+    // The whole cosmos's two draws, and the bodies passing behind the hero's text on the way down, which at rest keeps its room (7d9).
+    // Measured on the recorded file (2026-11-03): 21 draws at most before 7d9, 24 after, 20 or 21 landed; 47,508 points at most, 47,465
+    // landed.
     const landedFrame = seen.at(-1);
-    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 2);
+    expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 4);
     expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_AT_REST);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual((landedFrame?.points ?? 0) + 533);
     expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST);
