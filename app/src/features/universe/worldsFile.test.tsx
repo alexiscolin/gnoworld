@@ -13,7 +13,9 @@ const fileOf = () => ({
   version: 1,
   universe: "onyx",
   updated: "2026-11-03T10:00:00Z",
+  // Four entries, two worlds: counted each once with the Earth, 3, never the entries' 4.
   worlds: [
+    { id: "a/b", namespace: "a", realms: [] },
     { id: "a/b", namespace: "a", realms: [] },
     { id: "a/b", namespace: "a", realms: [] },
     { id: "c/d", namespace: "c", realms: [] },
@@ -70,8 +72,15 @@ async function visit() {
   return { open, opened, seen, served, worldsFile: file.worldsFile };
 }
 
+// A few turns of the microtask queue, for a step where a read the test holds is still unanswered.
+const turned = () =>
+  act(async () => {
+    for (let turn = 0; turn < 10; turn += 1) await Promise.resolve();
+  });
+
 afterEach(() => {
   read.mockReset();
+  vi.useRealTimers();
 });
 
 describe("the hero's number, from the worlds' file", () => {
@@ -115,7 +124,7 @@ describe("the hero's number, from the worlds' file", () => {
     const { open, worldsFile } = await visit();
     open()();
     await settled();
-    expect((await worldsFile(new AbortController().signal))?.worlds).toHaveLength(3);
+    expect((await worldsFile(new AbortController().signal))?.worlds).toHaveLength(4);
     expect(read).toHaveBeenCalledTimes(1);
   });
 
@@ -149,7 +158,7 @@ describe("the hero's number, from the worlds' file", () => {
     const { open, seen, worldsFile } = await visit();
     const leave = open();
     await settled();
-    expect((await worldsFile(new AbortController().signal))?.worlds).toHaveLength(3);
+    expect((await worldsFile(new AbortController().signal))?.worlds).toHaveLength(4);
     await settled();
     expect(read).toHaveBeenCalledTimes(2);
     expect(seen.at(-1)).toBe(3);
@@ -204,6 +213,77 @@ describe("the hero's number, from the worlds' file", () => {
     await settled();
     expect(read).not.toHaveBeenCalled();
     expect(seen).toEqual([undefined]);
+  });
+
+  it("is read once for a home that opens while the read a scene took still runs", async () => {
+    read.mockResolvedValue(fileOf());
+    const answer = held();
+    const { open, seen, worldsFile } = await visit();
+    open()();
+    const scene = worldsFile(new AbortController().signal);
+    const leave = open();
+    answer(fileOf());
+    await settled();
+    expect((await scene)?.worlds).toHaveLength(4);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(seen.at(-1)).toBe(3);
+    leave();
+  });
+
+  // A page's read the scene took fails while a second scene's own read runs: each test opens a home on a side of that failure.
+  const twoReads = async () => {
+    read.mockResolvedValue(fileOf());
+    const page = held();
+    const own = held();
+    const opened = await visit();
+    opened.open()();
+    const first = opened.worldsFile(new AbortController().signal);
+    const second = opened.worldsFile(new AbortController().signal);
+    return { ...opened, first, second, page, own };
+  };
+
+  it("lets go of a read that brought nothing alone: the page's share of the read still running stays for the next scene", async () => {
+    const { open, seen, worldsFile, first, second, page, own } = await twoReads();
+    const leave = open();
+    page(undefined);
+    own(fileOf());
+    await settled();
+    expect(await first).toBeUndefined();
+    expect((await second)?.worlds).toHaveLength(4);
+    expect(seen.at(-1)).toBe(3);
+    expect((await worldsFile(new AbortController().signal))?.worlds).toHaveLength(4);
+    expect(read).toHaveBeenCalledTimes(2);
+    leave();
+  });
+
+  it("shares with a home that opens after a read brought nothing the read still running, rather than ask again", async () => {
+    const { open, seen, page, own } = await twoReads();
+    page(undefined);
+    await turned();
+    const leave = open();
+    own(fileOf());
+    await settled();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(seen.at(-1)).toBe(3);
+    leave();
+  });
+
+  it("keeps the page's read for a scene a minute, as the host lets a browser keep the file, and then lets it go", async () => {
+    vi.useFakeTimers();
+    read.mockResolvedValue(fileOf());
+    const early = await visit();
+    early.open()();
+    await settled();
+    vi.advanceTimersByTime(59_000);
+    await early.worldsFile(new AbortController().signal);
+    expect(read).toHaveBeenCalledTimes(1);
+    read.mockClear();
+    const late = await visit();
+    late.open()();
+    await settled();
+    vi.advanceTimersByTime(60_000);
+    await late.worldsFile(new AbortController().signal);
+    expect(read).toHaveBeenCalledTimes(2);
   });
 
   it("counts what the scene's own read brings, for a home that opens after it", async () => {
