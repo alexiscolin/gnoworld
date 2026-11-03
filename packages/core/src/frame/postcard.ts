@@ -150,6 +150,22 @@ export function postcardFrom(system: StarSystem, worlds: readonly Orbiter[], sig
 export const drawnOf = ({ worlds, depth }: Pick<Postcard, "worlds" | "depth">, least = 0): Orbiter[] =>
   worlds.map((world, at) => ({ ...world, radius: world.radius * Math.max(least, depth[at] ?? 1) }));
 
+/** `postcard`, drawn from `own`, eased `share` of the way back to it: its plane's normal and each world's share of its size, so the view at
+ * rest's drawing turns into the ladder's as the eye leaves it (7p's review). */
+export function easedOf(postcard: Postcard, own: StarSystem, share: number): Postcard {
+  const [from, to] = [normalOf(postcard.system), normalOf(own)];
+  const normal = {
+    x: from.x + (to.x - from.x) * share,
+    y: from.y + (to.y - from.y) * share,
+    z: from.z + (to.z - from.z) * share,
+  };
+  return {
+    ...postcard,
+    system: withNormal(postcard.system, normal),
+    depth: postcard.depth.map((one) => one + (1 - one) * share),
+  };
+}
+
 /** A postcard as drawn from the eye at rest `eye`. */
 export const postcardOf = (system: StarSystem, eye: Point): Postcard =>
   postcardFrom(system, postcardWorlds(system), eye);

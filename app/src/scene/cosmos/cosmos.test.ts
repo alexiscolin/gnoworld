@@ -1183,6 +1183,39 @@ describe("the close world off the rest (7d9)", () => {
     expect(new Set(seen.flat().map((frame) => frame?.kind))).toEqual(new Set([undefined, "body", "point"]));
   });
 
+  // The review of 7p (R1): at rest a postcard draws its bodies at a share of their size, its plane turned; off the rest they held their own,
+  // and streak grew 1.58 times in one step as the eye left. Held as drawn, as the close world is, none grows or shrinks by a fifth from one
+  // step to the next, back, in, aside, up or down.
+  it("holds Onyx's postcards' bodies as drawn as the eye steps off the rest, none changing size by a fifth in a step", async () => {
+    const systems = held(ONYX);
+    const ids = new Set(
+      restView(systems).postcards.flatMap((index) => systems[index]?.worlds.map(({ id }) => id) ?? []),
+    );
+    const scene = await restAt(ONYX);
+    for (const way of waysOff(scene)) {
+      let before = new Map<string, number>();
+      for (const by of way) {
+        const to = { x: HOME.x + by.x, y: HOME.y + by.y, z: HOME.z + by.z };
+        scene.cosmos.tick(to, CLOCK);
+        await settled();
+        scene.cosmos.tick(to, CLOCK);
+        const now = new Map(
+          scene.cosmos
+            .stats()
+            .screen.bodies.filter(({ id }) => ids.has(id))
+            .map(({ id, radius }) => [id, radius] as const),
+        );
+        for (const [id, radius] of now)
+          expect(
+            Math.abs(Math.log(radius / (before.get(id) ?? radius))),
+            `${id}, ${by.length().toFixed(2)} units off`,
+          ).toBeLessThanOrEqual(Math.log(1.2));
+        before = now;
+      }
+    }
+    expect(ids.size).toBeGreaterThanOrEqual(3);
+  }, 20_000);
+
   // The red pass (M2): the close world's whole system holds, its other worlds too, a body or a point, at their size. Onyx's close system
   // has one world; sixty systems of four, through the home's lens, give a close world with three beside it.
   it("holds the close world's whole system where it holds, its other worlds too, as the eye steps back", async () => {

@@ -78,7 +78,7 @@ export { rocksOf } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";
 export { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, stopNear, stopNearIn, wayAt } from "./frame/flight.ts";
 export type { Figures, FlightPhase } from "./frame/flight.ts";
-export { drawnOf, postcardOf, type Postcard } from "./frame/postcard.ts";
+export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,

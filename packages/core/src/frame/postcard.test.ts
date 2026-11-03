@@ -4,7 +4,7 @@ import { BELT_INNER, EARTH_PLACE, GRAIN, systemsOf, type Orbiter, type StarSyste
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
-import { postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
+import { easedOf, postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
 import { cameraTowards, Look, placeOf as restPlaceOf, REST_SCREENS } from "./restLook.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -306,6 +306,42 @@ describe("a postcard in depth", () => {
     expect(levelled.system).not.toEqual(plain);
     expect(opennessOf(levelled.system, eye)).toBeCloseTo(opennessOf(plain, eye), 9);
     expect(levelled.worlds).toEqual(postcardWorlds(system));
+  });
+
+  // The review of 7p (R1): as the eye leaves the rest the drawing eases back to the system's own, so no body jumps where the ladder takes
+  // over: its plane's normal and each world's share, the given part of the way.
+  it("eases a postcard back to its system's own plane and sizes: none of the way, halfway, all the way", () => {
+    const system = systemOf([
+      [0.5, 2.5, 0.25],
+      [0.4, 3.2, 0.25 + Math.PI],
+    ]);
+    const card = postcardOf(system, { x: 0, y: 6, z: 40 });
+    const normal = ({ tilt, node }: StarSystem) => [
+      -Math.sin(node) * Math.sin(tilt),
+      Math.cos(tilt),
+      Math.cos(node) * Math.sin(tilt),
+    ];
+    const angle = (a: StarSystem, b: StarSystem) =>
+      Math.acos(
+        Math.min(
+          1,
+          normal(a).reduce((sum, value, at) => sum + value * (normal(b)[at] ?? 0), 0),
+        ),
+      );
+    expect(angle(card.system, system)).toBeGreaterThan(0.1);
+    expect(card.depth.some((share) => Math.abs(share - 1) > 0.1)).toBe(true);
+    const [none, half, all] = [0, 0.5, 1].map((share) => easedOf(card, system, share));
+    if (none === undefined || half === undefined || all === undefined) throw new Error("no easing");
+    expect(angle(none.system, card.system)).toBeCloseTo(0, 6);
+    expect(none.depth).toEqual(card.depth);
+    expect(angle(all.system, system)).toBeCloseTo(0, 6);
+    expect(all.depth.every((share) => Math.abs(share - 1) < 1e-12)).toBe(true);
+    expect(angle(half.system, card.system)).toBeCloseTo(angle(half.system, system), 6);
+    half.depth.forEach((share, at) => {
+      expect(share).toBeCloseTo(((card.depth[at] ?? NaN) + 1) / 2, 12);
+    });
+    expect(all.worlds).toEqual(card.worlds);
+    expect({ ...all.system, tilt: 0, node: 0 }).toEqual({ ...card.system, tilt: 0, node: 0 });
   });
 
   it("draws no body where no turn of its plane stands its two at two heights: both on its line of nodes", () => {
