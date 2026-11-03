@@ -19,7 +19,20 @@ const scene = vi.hoisted(() => ({
   counted: vi.fn<(count: number) => void>(),
   start: vi.fn(),
   load: vi.fn(),
+  portraits: vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>(),
+  railDrawn: vi.fn(),
 }));
+// The rail (7i), its chunk asked the first time it draws: each draw counted, so a test sees whether a page drew it, and so asked its code.
+vi.mock("./Rail.tsx", async (original) => {
+  const loaded = await original<typeof import("./Rail.tsx")>();
+  return {
+    ...loaded,
+    Rail: (props: Parameters<typeof loaded.Rail>[0]) => {
+      scene.railDrawn();
+      return loaded.Rail(props);
+    },
+  };
+});
 
 vi.mock("./loadScene.ts", () => ({ loadScene: scene.load }));
 vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: scene.read }));
@@ -164,7 +177,9 @@ beforeEach(() => {
     keepClear: scene.keepClear,
     dispose: scene.dispose,
     stats: () => ({}),
+    portraits: scene.portraits,
   }));
+  scene.portraits.mockImplementation(() => new Promise(() => undefined));
   scene.read.mockImplementation(() => Promise.resolve({ worlds: WORLDS }));
   scene.load.mockImplementation(() => Promise.resolve({ startScene: scene.start }));
   localStorage.clear();
@@ -1477,5 +1492,202 @@ describe("flights between places (7g)", () => {
       started().onLost(true);
     });
     expect(all(box, "[data-flight]")).toEqual([]);
+  });
+});
+
+// Each test runs the scene's start, the worlds' read and the rail's chunk to their end, several times for some: 20 s, not 5, at the gate's load.
+describe("the rail (7i)", { timeout: 20_000 }, () => {
+  // The rail's chunk, loaded once here as the labels' signals are: in the browser it comes from the cache, not from a transform.
+  beforeAll(async () => {
+    await import("./Rail.tsx");
+  });
+  // A world the file counts callers for: a trend beside the Earth; the rail's column watched for its size.
+  beforeEach(() => {
+    stubObserver();
+    scene.read.mockImplementation(() =>
+      Promise.resolve({ worlds: [{ id: "a/b", namespace: "a", realms: [{ path: "gno.land/r/a/b", callers: 3 }] }] }),
+    );
+  });
+  const page = () => ({ open: vi.fn<(href: string) => void>(), places: { earth: "/earth", worlds: [] } });
+  const railLinks = () => all(document.body, "nav[aria-label='Worlds'] li a").map((link) => link.textContent);
+  // The rail's chunk comes once the cosmos runs: the scene, its worlds, then the chunk the page asks for them.
+  const railed = async () => {
+    await settle();
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
+    await settle();
+  };
+
+  it("stands beside the cosmos once the scene runs and its worlds are known, the Earth first", async () => {
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(railLinks()).toEqual(["Earth", "b"]);
+    expect(scene.railDrawn).toHaveBeenCalled();
+  });
+
+  it("asks the scene for its planets' portraits", async () => {
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(scene.portraits).toHaveBeenCalledWith(["earth", "a/b"], expect.any(Number), expect.any(AbortSignal));
+  });
+
+  it("goes to a world's page through the page's router", async () => {
+    const cosmos = page();
+    mount(<Universe shown="cosmos" page={cosmos} />);
+    await railed();
+    click(all(document.body, "nav[aria-label='Worlds'] li a")[0]);
+    expect(cosmos.open).toHaveBeenCalledWith("/earth");
+  });
+
+  it("stands no rail on a phone, and asks none of its code, even once space shows", async () => {
+    device({ phone: true });
+    const box = mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    click(button(box, VIEW));
+    await railed();
+    expect(on(box)).toBe(true);
+    expect(railLinks()).toEqual([]);
+    expect(scene.railDrawn).not.toHaveBeenCalled();
+  });
+
+  it("stands no rail where the scene does not run", async () => {
+    device({ gpu: null });
+    mount(<Universe shown="cosmos" page={page()} />);
+    await railed();
+    expect(railLinks()).toEqual([]);
+  });
+
+  it("takes the rail away once the page leaves the cosmos, and stands none beside the Earth", async () => {
+    const box = document.createElement("div");
+    document.body.append(box);
+    const root = createRoot(box);
+    act(() => {
+      root.render(<Universe shown="cosmos" page={page()} />);
+    });
+    await railed();
+    expect(railLinks()).toEqual(["Earth", "b"]);
+    act(() => {
+      root.render(<Universe shown="earth" />);
+    });
+    await railed();
+    expect(railLinks()).toEqual([]);
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+  });
+});
+
+// F4518: the first visit's one filled call is the Earth's "Start here", which stands only where the cosmos runs: the hero's calls are marked
+// while it stands, and the stylesheet gives a newcomer's their first look then alone.
+describe("the hero's calls beside the cosmos (ADR-0003)", () => {
+  const calls = () => {
+    const actions = document.createElement("div");
+    actions.dataset["hero"] = "actions";
+    actions.dataset["cosmos"] = "none";
+    document.body.append(actions);
+    return actions;
+  };
+
+  it("marks them while the cosmos stands, and takes the mark away as the page leaves it", async () => {
+    const actions = calls();
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("standing");
+    rerender("earth");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("none");
+    actions.remove();
+  });
+
+  it.each([
+    ["the scene cannot run", () => device({ gpu: null })],
+    ["a phone did not ask for space", () => device({ phone: true })],
+  ])("leaves them unmarked where %s", async (_, made) => {
+    made();
+    const actions = calls();
+    rendered("cosmos");
+    await settle();
+    expect(actions.dataset["cosmos"]).toBe("none");
+    actions.remove();
+  });
+});
+
+// ADR-0003 §1: the home's opening, over the dive, on a newcomer's first arrival on the cosmos alone; never on a return, nor where the reader
+// came first to another place (a shared link), nor where no dive runs.
+describe("the home's opening (ADR-0003)", () => {
+  const words = () => document.querySelector("[data-opening]");
+
+  it("shows over a newcomer's first arrival on the cosmos while the scene loads, and as it runs", async () => {
+    const arrive = slowChunk();
+    const { box } = rendered("cosmos");
+    expect(words()).not.toBeNull();
+    arrive();
+    await settle();
+    expect(on(box)).toBe(true);
+    expect(words()).not.toBeNull();
+  });
+
+  it.each([
+    ["entered a place", "gnoworld:entered"],
+    ["saw the opening once", "gnoworld:opened"],
+  ])("shows nothing to a reader who %s", async (_, key) => {
+    localStorage.setItem(key, "1");
+    rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+  });
+
+  it.each<Shown>(["earth", { world: "gov/dao", name: "GovDAO" }, true])(
+    "shows nothing where the first place shown is %j, even once the cosmos shows",
+    async (first) => {
+      const { rerender } = rendered(first);
+      await settle();
+      rerender("cosmos");
+      await settle();
+      expect(words()).toBeNull();
+    },
+  );
+
+  // F4502: where no dive runs the device keeps its first visit for the next one.
+  it("waits for View in space on a phone, keeping the first visit till then, then shows over its dive", async () => {
+    device({ phone: true });
+    const { box } = rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBeNull();
+    click(button(box, VIEW));
+    expect(words()).not.toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBe("1");
+  });
+
+  it("shows nothing where the scene cannot run, and keeps the first visit for a device that can", async () => {
+    device({ gpu: null });
+    rendered("cosmos");
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBeNull();
+  });
+
+  it("goes once the scene failed, its words having shown while it loaded: nothing shows twice", async () => {
+    scene.load.mockImplementation(() => Promise.reject(new Error("the chunk did not come")));
+    rendered("cosmos");
+    expect(words()).not.toBeNull();
+    await settle();
+    expect(words()).toBeNull();
+    expect(localStorage.getItem("gnoworld:opened")).toBe("1");
+  });
+
+  it("goes for good as the page leaves the cosmos", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(words()).not.toBeNull();
+    rerender("earth");
+    await settle();
+    expect(words()).toBeNull();
+    rerender("cosmos");
+    await settle();
+    expect(words()).toBeNull();
   });
 });

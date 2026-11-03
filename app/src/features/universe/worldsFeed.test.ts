@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { callersOf, type LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { Drawn } from "@gnoworld/core";
 import { asksOf } from "../../scene/cosmos/labelAsks.ts";
 import type { Scene } from "../../scene/scene.ts";
-import { WorldsFeed } from "./worldsFeed.ts";
+import { Portraits, WorldsFeed } from "./worldsFeed.ts";
 
 // What the cosmos is told (7h): its worlds once the file comes, then who is here, keyed as the cosmos holds each world (a hub's world is its
 // first realm's, gov/dao for the slug govdao), with the hubs' names and this reader's visits, asked again each minute while the cosmos
@@ -31,7 +31,15 @@ const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 
 const sceneOf = () => {
   const cosmos = vi.fn<(worlds: unknown, written?: string, signals?: LabelSignals) => void>();
-  return { cosmos, keepClear: vi.fn(), scene: { cosmos, keepClear: vi.fn() } as unknown as Scene };
+  const portraits = vi.fn<
+    (ids: readonly string[], size: number, signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+  >(() => new Promise(() => undefined));
+  return {
+    cosmos,
+    portraits,
+    keepClear: vi.fn(),
+    scene: { cosmos, keepClear: vi.fn(), portraits } as unknown as Scene,
+  };
 };
 const lastSignals = (cosmos: ReturnType<typeof sceneOf>["cosmos"]) => cosmos.mock.lastCall?.[2];
 // The signals' chunk and the reads resolve in turns of the microtask queue: a few turns settle them.
@@ -53,7 +61,177 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("the rail's portraits", () => {
+  it("stops what it draws when told, keeps what it drew, and asks again for the rest (F3804)", async () => {
+    let finish: (drawn: ReadonlyMap<string, string>) => void = () => undefined;
+    const draw = vi.fn<
+      (ids: readonly string[], size: number, signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+    >(
+      () =>
+        new Promise((done) => {
+          finish = done;
+        }),
+    );
+    const portraits = new Portraits(draw);
+    portraits.ask(["a", "b"], 100);
+    const asked = draw.mock.calls[0]?.[2];
+    expect(asked?.aborted).toBe(false);
+    portraits.stop();
+    expect(asked?.aborted).toBe(true);
+    finish(new Map([["a", "data:image/jpeg;base64,A"]]));
+    await settled();
+    expect(portraits.drawn().get("a")).toBe("data:image/jpeg;base64,A");
+    portraits.ask(["a", "b"], 100);
+    expect(draw.mock.lastCall?.[0]).toEqual(["b"]);
+    expect(draw.mock.lastCall?.[2].aborted).toBe(false);
+  });
+
+  it("stops the portraits' drawing once the cosmos is covered (F3804)", async () => {
+    const { portraits, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    worlds.portraits.ask(["gov/dao"], 100);
+    const signal = portraits.mock.calls[0]?.[2];
+    expect(signal?.aborted).toBe(false);
+    worlds.sync(scene, false);
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("asks the scene for each world once for as long as the page lives, drawn or not, and keeps what it drew", async () => {
+    const draw = vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>();
+    draw.mockResolvedValueOnce(new Map([["a", "data:image/jpeg;base64,A"]]));
+    draw.mockRejectedValueOnce(new Error("lost"));
+    const portraits = new Portraits(draw);
+    portraits.ask(["a", "b"], 100);
+    portraits.ask(["a", "b"], 100);
+    await settled();
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect([...portraits.drawn()]).toEqual([["a", "data:image/jpeg;base64,A"]]);
+    portraits.ask(["b", "c"], 100);
+    await settled();
+    expect(draw).toHaveBeenLastCalledWith(["c"], 100, expect.any(AbortSignal));
+    expect([...portraits.drawn().keys()]).toEqual(["a"]);
+  });
+
+  it("asks the scene the feed was last told of; before one, it asks nothing and keeps nothing as asked", async () => {
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.portraits.ask(["a"], 100);
+    await settled();
+    expect(worlds.portraits.drawn().size).toBe(0);
+    const drawn = vi.fn(() => Promise.resolve(new Map([["b", "data:image/jpeg;base64,B"]])));
+    const { scene } = sceneOf();
+    Object.assign(scene, { portraits: drawn });
+    worlds.sync(scene, true);
+    worlds.portraits.ask(["a", "b"], 100);
+    await settled();
+    expect(drawn).toHaveBeenCalledWith(["a", "b"], 100, expect.any(AbortSignal));
+    expect(worlds.portraits.drawn().get("b")).toBe("data:image/jpeg;base64,B");
+  });
+});
+
 describe("the worlds' feed", () => {
+  it("tells the rail nothing while the signals have come and the file has not, the usual order (7i)", async () => {
+    let arrive: (file: typeof FILE) => void = () => undefined;
+    feed.read.mockImplementation(
+      () =>
+        new Promise((done) => {
+          arrive = done;
+        }),
+    );
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()).toBeUndefined();
+    arrive(FILE);
+    await settled();
+    expect(worlds.data()?.worlds).toBe(FILE.worlds);
+  });
+
+  it("keeps what it told the rail once the cosmos is covered (7i)", async () => {
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    worlds.sync(scene, false);
+    await settled();
+    expect(worlds.data()?.worlds).toBe(FILE.worlds);
+  });
+
+  it("tells the rail the worlds and what is known of them as it tells the cosmos, once both are known (7i)", async () => {
+    const { cosmos, scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    const told: (readonly CosmosWorld[] | undefined)[] = [];
+    worlds.subscribe(() => told.push(worlds.data()?.worlds));
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    expect(worlds.data()).toBeUndefined();
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()).toEqual({ worlds: FILE.worlds, signals: lastSignals(cosmos) });
+    expect(told.length).toBeGreaterThan(0);
+    expect(told.every((each) => each === FILE.worlds)).toBe(true);
+  });
+
+  it("tells the rail the page's own signals as not yet heard from the server, then the server's answer (7i)", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBe(true);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+    expect(worlds.data()?.signals.present.size).toBeGreaterThan(0);
+  });
+
+  it("tells the rail what it knew as not yet heard when the cosmos shows again, till the server answers anew (7i)", async () => {
+    const { scene } = sceneOf();
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+    worlds.sync(scene, false);
+    let answer: (value: unknown) => void = () => undefined;
+    feed.presence.mockReturnValue(
+      new Promise((done) => {
+        answer = done;
+      }),
+    );
+    worlds.sync(scene, true);
+    await settled();
+    expect(worlds.data()?.unheard).toBe(true);
+    answer({ ok: true, value: ANSWER });
+    await settled();
+    expect(worlds.data()?.unheard).toBeUndefined();
+  });
+
   it("hands the labels who is here, keyed as the cosmos holds each world, with the hubs' names and this reader's visits", async () => {
     const { cosmos, scene } = sceneOf();
     localStorage.setItem("gnoworld:visited:onyx:gov/dao", "1");
@@ -166,7 +344,6 @@ describe("the worlds' feed", () => {
       systems: [],
       drawn: new Drawn(),
       bodies,
-      callersOf,
       list: cosmos.mock.lastCall?.[0] as typeof FILE.worlds,
       signals,
     });

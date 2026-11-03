@@ -1,6 +1,6 @@
 // What the tests of core and of the app's journeys share, never the product's (7b8; Alexis's "rangement propre"): one correlation where
-// five tests each wrote their own, on core's entry (the sandbox keeps package.json from a `./testing` path). Its source also runs on the
-// journeys' reading pages, so it calls nothing outside itself.
+// five tests each wrote their own; the journeys import it by its path, as cosmos.spec.ts does ladder.ts. Its source also runs on their
+// reading pages, so it calls nothing outside itself.
 
 /** Pearson's correlation of the pairs' two values, -1 to 1; NaN where either never moves, so a flat series passes no bound. */
 export function correlation(pairs: readonly (readonly [number, number])[]): number {

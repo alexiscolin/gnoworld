@@ -1,5 +1,7 @@
 // A world of the worlds' file as the cosmos reads it (slice 7, 7d2 and 7d5): its id, its namespace, and of its realms their callers, and
 // for the whole cosmos their paths, imports and calls where the file has them.
+import { callersIn } from "@gnoworld/core";
+
 /** A world of the file: what the scene reads of it, its realms' paths, imports and calls for the whole cosmos where the file has them. */
 export interface CosmosWorld {
   readonly id: string;
@@ -27,12 +29,8 @@ export interface LabelSignals {
   readonly now: number;
 }
 
-/** How much a world is used: its realms, and their callers. */
-export const usageOf = (world: CosmosWorld): number => callersOf(world) + world.realms.length;
-
-/** The callers the file counts in a world's realms; a realm whose callers it does not count adds none. */
-export const callersOf = ({ realms }: CosmosWorld): number =>
-  realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0);
+/** How much a world is used: its realms, and the callers the file counts in them (core's gauges). */
+export const usageOf = ({ realms }: CosmosWorld): number => callersIn(realms) + realms.length;
 
 /** The worlds as the cosmos places them, each by its id, its namespace and its use. */
 export const heldOf = (worlds: readonly CosmosWorld[]) =>

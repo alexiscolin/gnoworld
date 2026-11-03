@@ -202,6 +202,10 @@ test.describe("the home at the video's size", () => {
   });
 
   test("keeps the strip out of the way of the hero: the actions stay above it and take the click", async ({ page }) => {
+    // Nobody anywhere: Go explore goes to the Earth (ADR-0003 §3), so its click lands on one page (F4516).
+    await page.route("**/api/presence", (route) =>
+      route.fulfill({ body: JSON.stringify({ worlds: [] }), contentType: "application/json" }),
+    );
     await openHome(page);
     await expect(page.locator("[data-ticker]")).toBeVisible();
     const strip = await box(page, "[data-ticker]");

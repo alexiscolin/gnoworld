@@ -1,7 +1,7 @@
-import { correlation } from "@gnoworld/core";
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
+import { correlation } from "../../../packages/core/src/testing.ts";
 
 // What a glance takes from a world on a still (ADR-0002 §3, "variety is measured"; F4218: on what is drawn): the mean colour of its lit
 // ground in CIE Lab, how much its lightness varies, and its texture's energy at four scales, each over its own lightness. A close view's

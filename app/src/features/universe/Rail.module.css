@@ -1,0 +1,96 @@
+/* The rail (frames 4 and 16): a dark glass column at the right edge, under the header, as tall as its worlds down to over the ticker
+   (DESIGN-SYSTEM.md, Rail), its planets one under the other, 98 px apart, each with its name in the label style under it; past that, the
+   column scrolls under the panel's foot, which fades it, and See all ends it. Its width comes from its footprint, which the labels keep
+   clear (core's RAIL), and which the rail writes on itself. */
+@layer components {
+  .rail {
+    /* raw: frame 4's 25 px between the rail and the window's right edge */
+    --_edge: 25px;
+    /* The rail's footprint from the window's right edge (core's RAIL), written by the rail: unset, the rail takes its content's width. */
+    --_footprint: initial;
+
+    position: fixed;
+    /* raw: frame 4's rail from 98 px of 1,080, under the header */
+    inset-block-start: 98px;
+    inset-inline-end: var(--_edge);
+    /* raw: over the labels' layer (0) and the canvas (-1), as the flight panel is */
+    z-index: 1;
+    /* layout: the footprint less the rail's own edge (x 1,585 to 1,703 at 1,728 px) */
+    inline-size: calc(var(--_footprint) - var(--_edge));
+    border-radius: var(--radius-l);
+    /* raw: the panels' night over the scene, darker than the flight panel's glass: frame 4's column dims the suns behind it */
+    background: color-mix(in oklab, var(--color-surface) 62%, transparent);
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
+  }
+
+  .column {
+    /* raw: the panel down to 1,024 px of 1,080 at most, frame 4's foot, over the ticker and its air */
+    max-block-size: calc(100vb - 154px);
+    /* layout: the planets and See all scroll inside the panel, which keeps its edge */
+    overflow: auto;
+    /* raw: a planet the dock or the scroll moves past the panel's top fades over 12 px, under its edge */
+    mask-image: linear-gradient(transparent, #000 12px);
+  }
+
+  /* The foot fades only while the column holds more than it shows, which the rail says. */
+  .column[data-cut] {
+    /* raw: frame 4's last planets fading from 127 px over the panel's foot, gone 18 px above it */
+    mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 127px), transparent calc(100% - 18px));
+  }
+
+  .worlds {
+    /* layout: the planets one under the other */
+    display: flex;
+    /* layout: the planets one under the other */
+    flex-direction: column;
+    /* layout: a list with no margin of its own */
+    margin: 0;
+    /* raw: frame 4's first planet 18 px under the panel's top, with no view tabs above it */
+    padding: 18px 0 0;
+    list-style-type: none;
+  }
+
+  .world {
+    /* layout: the planet over its name, both in the middle of the column */
+    display: grid;
+    /* layout: both in the middle of the column */
+    justify-items: center;
+    /* layout: the planet and its name at the top of their place */
+    align-content: start;
+    /* raw: frame 4's 9 px from a planet to its name's letters, 8 px less the name's leading */
+    /* layout: the planet and its name apart */
+    row-gap: 8px;
+    /* raw: frame 4's 98 px from one planet's middle to the next */
+    min-block-size: 98px;
+    text-decoration: none;
+  }
+
+  .name {
+    /* layout: two lines at most, as frame 4's KYOTO BUILDERS; a longer name is cut there */
+    max-block-size: 2lh;
+    max-inline-size: calc(100% - var(--space-s));
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .world:is(:hover, :focus-visible) .name,
+  .all:is(:hover, :focus-visible) {
+    color: var(--color-text);
+  }
+
+  .all {
+    /* layout: See all ends the column, a step under the last planet */
+    display: block;
+    /* layout: in the middle of the column, a step under the last planet, a larger one above the panel's foot */
+    margin: var(--space-xs) auto var(--space-l);
+    inline-size: fit-content;
+  }
+
+  /* The rail is a computer's: a phone keeps the page's list (Hero's Worlds). */
+  @media (max-width: 899px) {
+    .rail {
+      display: none;
+    }
+  }
+}

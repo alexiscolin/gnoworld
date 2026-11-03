@@ -13,7 +13,6 @@
     border: var(--line-width) var(--_dash) var(--_edge);
     border-radius: var(--_round);
     vertical-align: middle;
-    transition: scale var(--motion-fast) var(--ease-standard);
   }
 
   .thumb[data-size="s"] {
@@ -45,10 +44,16 @@
     --_dash: dashed;
   }
 
+  /* The dock's magnification, which its list writes on each planet as --_mag (1 at rest): the planet grows and moves its neighbours, as a
+     dock's do. Never under reduced motion. */
+  .thumb[data-magnify] {
+    --_mag: 1;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .thumb[data-magnify]:hover {
-      /* raw: the dock's magnification, a quarter more, from the prototype */
-      scale: 1.25;
+    .thumb[data-magnify] {
+      inline-size: calc(var(--_size) * var(--_mag));
+      block-size: calc(var(--_size) * var(--_mag));
     }
   }
 

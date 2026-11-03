@@ -3,7 +3,7 @@
 // a hash each, never a chosen few), the Earth's own number beside it (its view at realism.spec's instant at a close world's zoom; its day
 // map, unlit, by latitude). Each main bound failed on 81e07949, whose numbers the comments give; "held" marks one that passed there too.
 
-import { ANCHORS, correlation, type Surface } from "@gnoworld/core";
+import { ANCHORS, type Surface } from "@gnoworld/core";
 import { climatesOn, mapClimateOn, type Climate, type Pole } from "./climates.ts";
 import { shoresOn, type Shore } from "./coasts.ts";
 import { expect, test, type Page } from "./fixtures.ts";
@@ -11,6 +11,7 @@ import { askLab, circles, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, t
 import { landDetailsOn, type LandDetail } from "./landDetail.ts";
 import { seaLightsOn } from "./seaLight.ts";
 import { facesApart, facesOn, GLANCE, type Face } from "./textures.ts";
+import { correlation } from "../../../packages/core/src/testing.ts";
 
 // Coasts at a close world's zoom (radius 350 px, the Earth's view 356), the median world's: the coast's length over its smoothed copy's,
 // the Earth's 3.93 (81e07949: 0.44 to 0.50 of it), never past 1.6 times it (speckle); islands per continent, the Earth's 4 (0.08 to 0.35).

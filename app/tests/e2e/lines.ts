@@ -3,10 +3,10 @@
 // noise's zero lines never do, and a hairline breaking into dots ends everywhere. A junction is where three lines or more leave a pixel
 // of the middle line (its crossing number), never a staircase's corner. The helpers run in the reading page, declared there.
 
-import { correlation } from "@gnoworld/core";
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
 import { reading, type Tools } from "./pixels.ts";
+import { correlation } from "../../../packages/core/src/testing.ts";
 
 type Kind = "veins" | "fractures";
 interface Net {

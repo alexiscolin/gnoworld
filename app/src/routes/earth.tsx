@@ -5,7 +5,7 @@ import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Connected } from "../features/world/Connected.tsx";
 import { PlaceLinks } from "../features/list/index.ts";
-import { useSpace } from "../features/universe/index.ts";
+import { useEntered, useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
@@ -36,6 +36,8 @@ export default function Earth() {
   const universe = useLoaderData<typeof loader>();
   const store = useAppStore();
   const navigate = useNavigate();
+  // The Earth is a place entered: its "Start here" and the first visit's calls go (ADR-0003 §4).
+  useEntered();
   const page = {
     store,
     open: (href: string) => {

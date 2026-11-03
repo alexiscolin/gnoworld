@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
@@ -34,11 +35,14 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk.
-const SCENE_JS = 156 * 1024;
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk. 160,000 B since
+// the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03).
+const SCENE_JS = 160_000;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02).
+// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B since the rail's portraits share the maps'
+// chunks with it (Alexis, 2026-11-03).
+const COSMOS_JS = 16_512;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
@@ -51,15 +55,23 @@ const REST_JS = 10 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
-// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
+// Its first value was the part's (5,960 B); 6 KiB since the rail shares the labels' ranking, titles and reading and their band (Alexis,
+// 2026-11-03): sharing them made two chunks of their own, the price of sharing rather than copying.
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 5960;
+const LABELS_JS = 6 * 1024;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
 // cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
 // camera-controls' own warning, which no minifier renames.
 const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
 const FLIGHTS_JS = 18 * 1024;
 const FLIGHTS_MARK = "camera-controls:";
+// The rail (7i) and its planets' portraits: chunks of their own, asked once the cosmos's worlds stand on a computer, outside the scene's and
+// the cosmos's caps. Their first caps are the part's (the chief, 2026-11-03): 6,408 B and 1,712 B measured, and about a tenth.
+const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
+const RAIL_JS = 7 * 1024;
+const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
+const PORTRAITS_JS = 1900;
+const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g2's flights
 // will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
 // set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
@@ -314,6 +326,21 @@ for (const [name, chunk, cap] of [
     const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
     expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
   });
+
+test("the rail's and its portraits' chunks come once the cosmos's worlds stand, each within its own cap, apart from the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await page.route("**/worlds.json", (route) =>
+    route.fulfill({ body: RECORDED_WORLDS, contentType: "application/json" }),
+  );
+  const asked = (chunk: RegExp) => page.waitForResponse((response) => chunk.test(response.url()));
+  const [rail, portraits, cosmos, scene] = [asked(RAIL), asked(PORTRAITS), asked(COSMOS), asked(SCENE)];
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
+  expect(await compressed(page, await ownOf(page, (await rail).url(), there))).toBeLessThanOrEqual(RAIL_JS);
+  expect(await compressed(page, await ownOf(page, (await portraits).url(), there))).toBeLessThanOrEqual(PORTRAITS_JS);
+});
 
 test("the flights' chunk holds camera-controls, comes once the scene runs, within its own cap, and the scene's holds none of it", async ({
   page,

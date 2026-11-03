@@ -1,0 +1,78 @@
+/* The home's opening (ADR-0003 §1, mock-up 1): the kicker in amber, the promise in large type and its line, over the dive's middle, the
+   Earth under them; a discreet link to gno.land's own site. The words take no pointer but their link, and fade as the camera lands. */
+@layer components {
+  .opening {
+    position: fixed;
+    inset-inline: 0;
+    /* raw: mock-up 1's: the column's middle a little under the window's, over the Earth, the hero given way */
+    inset-block-start: 54%;
+    translate: 0 -50%;
+    /* layout: the words in one centred column over the canvas */
+    display: grid;
+    /* layout: each line centred in the column */
+    justify-items: center;
+    /* layout: the arrangement mock-up 1 draws */
+    gap: var(--space-m);
+    padding-inline: var(--space-l);
+    text-align: center;
+    pointer-events: none;
+    /* raw: the words fade in 600 ms as the camera lands (the review's demo, 0.8 s), then leave the page's reading */
+    transition:
+      opacity 600ms var(--ease-standard),
+      visibility 0s linear 600ms;
+  }
+
+  .opening[data-left] {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .opening > p {
+    /* layout: the column spaces its lines */
+    margin-block: 0;
+  }
+
+  /* The kicker's word in amber, mock-up 1's: the label utility colours its line in a later layer. */
+  .warm {
+    color: var(--color-warm);
+  }
+
+  .title {
+    color: var(--color-text);
+    /* raw: mock-up 1's promise, 54 px at 1,728 px wide, 600 */
+    font: 600 clamp(2rem, 3.2vi, 3.5rem) / 1.08 var(--family-sans);
+    /* raw: the promise's tight tracking (mock-up 1, about -0.04em) */
+    letter-spacing: -0.04em;
+    /* raw: a shade under the words, so they read over a sun */
+    text-shadow: 0 2px 24px color-mix(in oklab, var(--color-ink) 70%, transparent);
+  }
+
+  .line {
+    /* raw: mock-up 1's line on one row at 1,728 px, on two at most on a laptop's screen */
+    max-inline-size: 64rem;
+    /* raw: the hero line's own grey (Hero.module.css) */
+    color: #c8d0de;
+    /* raw: mock-up 1's line, 20 px at 1,728 px wide */
+    font: 400 clamp(1rem, 1.16vi, 1.25rem) / 1.5 var(--family-sans);
+    /* raw: the same shade as the promise's */
+    text-shadow: 0 2px 18px color-mix(in oklab, var(--color-ink) 70%, transparent);
+  }
+
+  .about {
+    pointer-events: auto;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+    /* raw: the underline a little under the words */
+    text-underline-offset: 0.2em;
+  }
+
+  .about:hover {
+    color: var(--color-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .opening {
+      transition: none;
+    }
+  }
+}
