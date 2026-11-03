@@ -91,6 +91,12 @@ export class AtRest {
     return dive.shown;
   }
 
+  /** Whether the dive runs: the bodies pass behind the page's text on the way down at their own size, as frame 1's do behind the hero's
+   * number (the chief, 2026-11-03); at rest the text keeps its room. */
+  get diving(): boolean {
+    return this.#still !== undefined;
+  }
+
   /** How far the dive is, 1 at rest, and how much of its dissolve still shows. */
   get landing() {
     return { along: this.#still === undefined ? 1 : (this.#dive?.along ?? 0), veil: this.#dive?.veil ?? 0 };

@@ -15,6 +15,7 @@ import {
   evenRow,
   FIELD_OF_VIEW,
   GRAIN,
+  HERO_ZONE,
   haloAt,
   LEAN,
   orbitPlace,
@@ -2469,6 +2470,25 @@ describe("the whole cosmos", () => {
         kinds.add(drawnOnce(seen, `at ${clock.toFixed(2)} s`).kind);
       }
       expect([...kinds].sort()).toEqual(["body", "point"]);
+    });
+
+    // The chief, 2026-11-03, on the design review of 7d9: on the home's dive the hero's room shrank the close world as it passed its
+    // corner, to 0.43 of its size, then let it swell 3.8 times where its distance gave 1.8. On the way down the bodies pass behind the
+    // text, as frame 1's do behind the hero's number: the close world at its true size on every frame.
+    it("lets the close world pass behind the hero's text on the way down, at its true size on every frame", async () => {
+      const scene = await diving();
+      scene.cosmos.keepClear({ left: 0, top: HERO_ZONE.top * HEIGHT, right: HERO_ZONE.right * WIDTH, bottom: HEIGHT });
+      const { system, world } = onyxClose();
+      let near = 0;
+      for (let step = 0; step <= 120; step += 1) {
+        const clock = (step / 120) * DIVE.seconds;
+        const { dive } = await frame(scene, clock);
+        const { asBody, radius, onScreen } = drawnOf(scene, [system, world], clock);
+        if (dive.along >= 1 || asBody === undefined || !onScreen) continue;
+        near += Number(radius > 20);
+        expect(asBody.size / radius, `at ${clock.toFixed(2)} s`).toBeGreaterThan(0.99);
+      }
+      expect(near).toBeGreaterThan(5);
     });
 
     // The review of 7d9 (its medium 1): the worlds turned by the page's clock, so a dive that starts later than its first second (a wait

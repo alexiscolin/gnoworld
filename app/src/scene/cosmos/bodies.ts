@@ -73,6 +73,7 @@ export class Bodies {
   readonly group = new Group();
   #last: Point | undefined;
   #seconds = 0;
+  #diving = false;
   /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
   sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
@@ -109,7 +110,7 @@ export class Bodies {
     for (const body of this.#held.values()) Object.assign(body, { shown: body.ready, near });
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
-    if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
+    if (this.#last !== undefined) this.tick(this.#last, this.#seconds, this.#diving);
   }
 
   #add(id: string, system: StarSystem, world: Orbiter): void {
@@ -133,10 +134,12 @@ export class Bodies {
     renderer.compileAsync(planet.group, camera, stage).then(ready, ready);
   }
 
-  /** One frame on: each where its orbit has it, from `eye`, in doubles, leant as the camera sees it. */
-  tick(eye: Point, seconds: number): void {
+  /** One frame on: each where its orbit has it, from `eye`, in doubles, leant as the camera sees it; `diving`, it keeps no room for the
+   * page's text. */
+  tick(eye: Point, seconds: number, diving = false): void {
     this.#last = eye;
     this.#seconds = seconds;
+    this.#diving = diving;
     this.#back.copy(this.#device.camera.quaternion).invert();
     for (let at = 0; at < this.#shown.length; at += 1) {
       const body = this.#shown[at];
@@ -155,7 +158,7 @@ export class Bodies {
     planet.setTime(seconds);
     if (planet.look.rim !== null) planet.setLimb(limbAt(body.near ? 0 : away));
     planet.setFar(fadeAt(at.length()));
-    const room = this.#room(at, world.radius);
+    const room = this.#diving ? 1 : this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
     planet.group.visible = body.shown && room > 0;
     const seen = this.#seen.copy(at).applyQuaternion(this.#back); // as the camera, turned to the Earth, sees it

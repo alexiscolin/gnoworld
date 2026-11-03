@@ -142,7 +142,7 @@ export class Cosmos {
     this.#shown = this.#atRest.advance(clock, this.#whole.ready, seconds);
     const placed = this.#atRest.stand(eye, seconds, this.#device.camera);
     this.#disc.advance(placed, this.#atRest.since, this.#atRest.lift(seconds));
-    this.#bodies.tick(placed, this.#atRest.since);
+    this.#bodies.tick(placed, this.#atRest.since, this.#atRest.diving);
     this.#home.tick(placed, this.#atRest.since, this.#device.camera.quaternion);
     // What the eye looks at, the Earth or a system it came to: its distance says how much of the nebulae and of the whole cosmos shows.
     const looking = distanceOf(this.#atRest.looked, placed);
