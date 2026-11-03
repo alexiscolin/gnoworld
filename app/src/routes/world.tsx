@@ -85,10 +85,13 @@ export default function World() {
                 <Here />
                 {/* No source yet for the history: the block says so. */}
                 <Activity />
-                <Actions
-                  address={ORIGIN + world.canonical}
-                  {...(realmPath === undefined ? {} : { proposals: realmPath })}
-                />
+                {/* Frame 26 stands the actions 30 px under the words over them (world.module.css). */}
+                <div className={styles["actions"]}>
+                  <Actions
+                    address={ORIGIN + world.canonical}
+                    {...(realmPath === undefined ? {} : { proposals: realmPath })}
+                  />
+                </div>
                 {realmPath === undefined ? null : (
                   <Suspense fallback={null}>
                     <Proposals path={realmPath} onRing={setRing} />

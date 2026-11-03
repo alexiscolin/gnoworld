@@ -1,7 +1,16 @@
-/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26). */
+/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26); and the plate's actions, set
+   off the words over them as frame 26 sets them. */
 @layer components {
   .chat {
     /* layout: the chat takes the dock's height */
     block-size: 100%;
+  }
+
+  /* raw: the dock's breakpoint (ChatScreen.tsx, Panel.module.css) */
+  @media (min-width: 1280px) {
+    .actions {
+      /* layout: frame 26 stands its actions 30 px under the words' ink over them (544 to 574): the column's step and one more */
+      margin-block-start: var(--space-xs);
+    }
   }
 }

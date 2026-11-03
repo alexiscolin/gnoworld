@@ -143,6 +143,25 @@ test.describe("who is here right now", () => {
       expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
     });
 
+  // Frame 26 draws a hairline over each fact (1 px at 355, from the column's left: 100 to 325 and 358 to 583), its digits 17 px under it:
+  // the figure's box 9 px under the hairline.
+  for (const width of [1280, 1728] as const)
+    test(`draws a hairline over each fact, as frame 26, at ${String(width)} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await connected(page);
+      const fact = page.locator("[data-look='plate'] h1 + p + div > * > *").first();
+      const drawn = await fact.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [style.borderTopWidth, style.borderTopStyle];
+      });
+      expect(drawn, "a hairline over the fact").toEqual(["1px", "solid"]);
+      const rule = (await fact.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      const words = await box(page, "[data-look='plate'] h1 + p");
+      const figure = await box(page, "[data-look='plate'] [data-value]");
+      near(rule.x, words.x, "the hairline from the column's left");
+      near(figure.y - rule.y, 364 - 355, "the figure under the hairline");
+    });
+
   test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
     page,
   }) => {
