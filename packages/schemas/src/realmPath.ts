@@ -1,5 +1,5 @@
-// A realm's path and a world's id (7c), which the worlds' file and the ticker's trends (7t) both check. Apart from the barrel's modules, so the
-// store's chunk, on every page, holds neither: only a page that reads one of the two takes them.
+// A realm's path, a world's id and a chain's count (7c), which the worlds' file and the ticker's trends (7t) both check. Apart from the
+// barrel's modules, so the store's chunk, on every page, holds none: only a page that reads one of the two takes them.
 import { WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";
 
@@ -16,3 +16,8 @@ export const RealmPath = z.string().check(
 export const WorldId = z
   .string()
   .check(z.maxLength(WORLDS_CAPS.path), z.regex(/^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/));
+
+/** A count or a height read from a chain: a whole number from 0, at most 10^12. */
+export const ChainCount = z
+  .number()
+  .check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(1e12));

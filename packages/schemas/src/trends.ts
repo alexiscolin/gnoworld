@@ -2,7 +2,7 @@
 // reads a few items and never the worlds' file. Each kind once: the busiest world between two passes, the hub rising most against its own 14
 // days, the world the chain's list first showed in the last day. Every field came from a chain, an indexer or a room count, so each is bounded.
 import { HubSlug } from "./slug.ts";
-import { RealmPath, WorldId } from "./realmPath.ts";
+import { ChainCount, RealmPath, WorldId } from "./realmPath.ts";
 import { Moment, WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";
 
@@ -12,7 +12,7 @@ export const TRENDS_MOST = 3;
 export const TRENDS_MAX_BYTES = 4096;
 
 const Title = z.string().check(z.minLength(1), z.maxLength(WORLDS_CAPS.name));
-const Calls = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(1e12));
+const Calls = ChainCount.check(z.gte(1));
 
 const Trending = z.strictObject({
   kind: z.literal("trending"),
