@@ -537,6 +537,7 @@ out=$(checked a GNO="$mu/fakegno" FAKE=compile) && fail "mutate.py passed when n
 [ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] || fail "mutate.py ran gno other than once for one package: $(cat "$mu/fakegno.runs")"
 [ "$(tr ' ' '\n' <"$mu/fakegno.runs" | grep '^\./m' | sort)" = "$(i=0; while [ $i -le 22 ]; do echo "./m$i"; i=$((i + 1)); done | sort)" ] ||
 	fail "mutate.py's one gno run did not judge the control and its 22 mutants each once: $(cat "$mu/fakegno.runs")"
+[ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout 60s" ] || fail "mutate.py's run of 23 copies has not 60 s, the least (34.5 rounded up is less): $(cat "$mu/fakegno.runs")"
 for line in "FAIL  does not compile: $P: if n > 3 || n == 2 { [> -> >=] (expected killed)" "FAIL  does not compile: $P: mustPositive(n) (expected killed)" \
 	"FAIL  does not compile: $P: if a >= b { [>= -> >] (expected survives)" "ok    12 of 17 flips do not compile, dropped: r/planted"; do
 	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
@@ -549,6 +550,26 @@ printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does 
 out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
+# A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
+# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale (F5084).
+# The constants are made small so it is stopped in 2 s.
+printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
+out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
+[ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
+	fail "mutate.py did not fail by name, alone, a gno that never ended (F5084): $out"
+# The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
+# one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
+# rounded up), 80 have 120, each package in one run.
+mkdir -p "$mu/d/r/many" && : >"$mu/d/gnowork.toml" && printf 'module = "gno.land/r/test/many"\ngno = "0.9"\n' >"$mu/d/r/many/gnomod.toml"
+gapped "$mu/check.py" '{}'
+for copies in 40:60 41:62 80:120; do
+	i=1 && printf 'package many\n' >"$mu/d/r/many/many.gno"
+	while [ $i -lt "${copies%:*}" ]; do printf '\nfunc F%s(bad bool) {\n\tif bad {\n\t\tpanic("bad")\n\t}\n}\n' "$i" >>"$mu/d/r/many/many.gno" && i=$((i + 1)); done
+	: >"$mu/fakegno.runs"
+	checked d GNO="$mu/fakegno" FAKE=survive >/dev/null || : # every guard survives the fake: only its run is read
+	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
+		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
+done
 # One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
 # line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
 for p in one two; do
@@ -1009,6 +1030,178 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
+# A hidden character (F5053), a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
+# file git tracks or would, prose and the prototype's docs included, fails, named by its file, line, column and code point;
+# no comment allows it. Written as an escape it passes, as an accent or an emoji does; an image is no text, and what git
+# ignores is not read. printf writes each from its UTF-8 bytes, so this file holds none.
+h="$t/hidden" && mkdir -p "$h/src" "$h/r/x" "$h/docs/prototype" "$h/.claude/rules" "$h/ignored" "$h/node_modules/x" "$h/app/node_modules" && good_rules "$h"
+git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
+hidden() { python3 -I "$docs" "$h" 2>&1; }
+printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
+printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
+# An image is known by its suffix and its format's first bytes, as each real one starts (F5082).
+printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
+# A file deleted from the work tree but still in the index is not read.
+printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
+# So is a source the alerts check reads (listed(), which lists only what is there).
+mkdir -p "$h/server/src" && printf 'gone\n' >"$h/server/src/gone.ts" && git -C "$h" add server/src/gone.ts && git -C "$h" commit -qm gone2 && rm "$h/server/src/gone.ts"
+hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
+# A file it cannot read fails, never passes unread.
+: >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
+hidden >/dev/null && fail "check_docs passed a file it cannot read"
+chmod 644 "$h/src/locked.ts"
+# What is hidden is a table, not the Python's Unicode (F5083): Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
+# Node's ICU gives them, range by range, and the version hidden.py names.
+node -e '
+const set = /^[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]$/u;
+const out = [process.versions.unicode];
+for (let c = 0, start = -1; c <= 0x110000; c++) {
+  const hit = c <= 0x10ffff && set.test(String.fromCodePoint(c));
+  if (hit && start < 0) start = c;
+  if (!hit && start >= 0) { out.push(start.toString(16) + " " + (c - 1).toString(16)); start = -1; }
+}
+console.log(out.join("\n"));' >"$h/table.node" || fail "node could not list Unicode's hidden characters"
+python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import hidden; print(hidden.UNICODE); print("\n".join(f"{a:x} {b:x}" for a, b in hidden.TABLE))' "$here" >"$h/table.py"
+diff "$h/table.node" "$h/table.py" >"$h/diff" || fail "hidden.py's TABLE is not Unicode's hidden characters as the pinned Node gives them (<):
+$(cat "$h/diff")"
+rm "$h/table.node" "$h/table.py"
+# Each end of the table's ranges and a point inside some (an unassigned tag, a variation selector) after a letter, and none
+# of their neighbours. U+FE0E and U+FE0F, which pick an emoji's look, pass right after a character that shows and is no
+# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits (F5086).
+python3 -I - "$h/table.txt" "$h/sel.txt" "$h/table.want" "$here" <<'PY'
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[4])
+from hidden import TABLE
+inside = lambda p: any(a <= p <= b for a, b in TABLE)
+refused = sorted({p for a, b in TABLE for p in (a, b)} | {0x2065, 0xFE05, 0xE0080, 0xE0100})
+shown = sorted({p for a, b in TABLE for p in (a - 1, b + 1) if not inside(p)} | {0x00A0, 0x200A, 0x2010})
+points = refused + shown
+open(sys.argv[1], "w", encoding="utf-8").write("".join(f"x{chr(p)}\n" for p in points))
+heart, emoji, cap = chr(0x2764), chr(0x1F600), chr(0xFE0F) + chr(0x20E3)
+lines = [  # (line, the columns it refuses)
+    (heart + chr(0xFE0F) + " ok", []), (emoji + chr(0xFE0E), []), ("1" + cap + " #" + cap + " *" + cap, []),
+    ("a" + chr(0xFE0F), [2]), (heart + chr(0xFE0F) + chr(0xFE0F), [3]), (chr(0xFE0F) + "x", [1]), ("1" + chr(0xFE0F) + "x", [2]),
+    (heart + chr(0xFE00), [2]), (chr(0x4E00) + chr(0xE0100), [2]), (chr(0x200D) + chr(0xFE0F), [1, 2]),
+]
+open(sys.argv[2], "w", encoding="utf-8").write("".join(text + "\n" for text, _ in lines))
+# One that starts a text follows nothing, whatever the text ends with.
+open(sys.argv[2].replace("sel.txt", "start.txt"), "w", encoding="utf-8").write(chr(0xFE0F) + "a" + chr(0xE9))
+want = [f"  table.txt:{n}:2: U+{p:04X}" for n, p in enumerate(points, 1) if p in refused] + ["  start.txt:1:1: U+FE0F"]
+want += [f"  sel.txt:{n}:{col}: U+{ord(text[col - 1]):04X}" for n, (text, cols) in enumerate(lines, 1) for col in cols]
+open(sys.argv[3], "w").write("".join(f"{w}\n" for w in sorted(want)))
+PY
+printf '// a header\nconst x = "ab\342\200\256cd"; // gitleaks:allow noqa eslint-disable-line prettier-ignore @ts-ignore nolint\n' >"$h/src/a.ts"
+printf 'package x\n\nvar s = "\342\201\246"\n' >"$h/r/x/x.gno"
+printf 'ab\342\200\213c\n' >"$h/docs/prototype/notes.md"
+printf '\357\273\277# a file with a BOM\n' >"$h/README"
+printf 'x\342\200\215y\n' >"$h/src/joined.ts"
+printf '\330\234 a mark\n' >"$h/notes.txt"
+printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
+printf '# co\302\255de\n' >"$h/a.py"
+# What is no UTF-8 text is refused whole, from its first byte that is a NUL or no UTF-8: its characters cannot be read, as
+# UTF-16 writes U+202E as `2E 20` (F5088), and a binary cannot write one as an escape (F5082). So is a text named as an
+# image, which Vite's `?raw` reads.
+printf '\000\342\200\256\n' >"$h/blob.txt"
+printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
+printf '\377\376a\000\056\040b\000\n\000' >"$h/u16.md" && printf 'a\000\056\040b\000\n\000' >"$h/u16raw.md"
+python3 -I -c 'import os, sys; open(sys.argv[1], "wb").write(os.urandom(65536))' "$h/font.woff2"
+printf 'a\342\200\256\n' >"$h/text.png"
+printf 'a\014b\342\200\256\nc\342\200\213d\342\200\215\n\303\251\360\237\230\200\342\200\256\n' >"$h/multi.txt"
+printf '\342\200\256\n' >"$h/$(printf 'caf\303\251 notes.md')" && printf '\342\200\256\n' >"$h/q\"uote.md"
+for f in ignored/x.ts node_modules/x/y.js app/node_modules/z.js; do printf 'const x = "\342\200\256";\n' >"$h/$f"; done
+git -C "$h" add README && git -C "$h" commit -qm base
+cat >"$h/want" <<'EOF'
+  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE
+  r/x/x.gno:3:10: U+2066 LEFT-TO-RIGHT ISOLATE
+  docs/prototype/notes.md:1:3: U+200B ZERO WIDTH SPACE
+  README:1:1: U+FEFF ZERO WIDTH NO-BREAK SPACE
+  src/joined.ts:1:2: U+200D ZERO WIDTH JOINER
+  notes.txt:1:1: U+061C ARABIC LETTER MARK
+  .claude/rules/x.md:1:11: U+E0041 TAG LATIN CAPITAL LETTER A
+  a.py:1:5: U+00AD SOFT HYPHEN
+  text.png:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:1:4: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:2:2: U+200B ZERO WIDTH SPACE
+  multi.txt:2:4: U+200D ZERO WIDTH JOINER
+  multi.txt:3:3: U+202E RIGHT-TO-LEFT OVERRIDE
+  café notes.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+  q"uote.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+EOF
+out=$(hidden) && fail "check_docs accepted hidden characters: $out"
+printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character" || fail "check_docs did not say why it refused hidden characters: $out"
+printf '%s\n' "$out" | grep ': U+' | grep -Ev '^  (table|sel|start)\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
+diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
+$(cat "$h/diff")"
+for no in blob.txt:1 latin.txt:4 u16.md:1 u16raw.md:2; do
+	printf '%s\n' "$out" | grep -qxF "  ${no%:*}: no UTF-8 text, from its byte ${no#*:} (a NUL, or a byte that is no UTF-8)" || fail "check_docs did not refuse ${no%:*} as no UTF-8 text from its byte ${no#*:}: $out"
+done
+printf '%s\n' "$out" | grep -q '^  font\.woff2: no UTF-8 text, from its byte [0-9]* ' || fail "check_docs did not refuse a binary it knows no format of: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^  font\.woff2:')" = 1 ] || fail "check_docs named a binary's bytes as characters: $out"
+printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
+diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
+$(cat "$h/diff")"
+# The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
+# file of the folder but git's own and the installed packages', and still refuses.
+mkdir -p "$t/nogit" "$t/badgit" && printf '#!/bin/sh\nexit 1\n' >"$t/badgit/git" && chmod +x "$t/badgit/git"
+printf '\342\200\256\n' >"$h/.git/planted"
+py=$(command -v python3)
+for path in "$t/nogit" "$t/badgit:$PATH"; do
+	out=$(PATH=$path "$py" -I "$docs" "$h" 2>&1) && fail "check_docs accepted a hidden character with PATH=$path: $out"
+	printf '%s\n' "$out" | grep -qxF "  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs, with PATH=$path, did not name the hidden character: $out"
+	printf '%s\n' "$out" | grep -qF "  .git/" && fail "check_docs, with PATH=$path, read git's own folder: $out"
+	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
+done
+# A commit message is text the repository keeps too, which scripts parse (a `Removed-test:` line shown as one name, read as
+# another): each message since the branch left origin/main is read, named by its commit (F5079); a message main holds
+# already is not, nor any with no origin/main to compare with. With no git, or a git that fails, nothing proves the messages
+# clean: it fails, never takes the failure for a branch with no origin/main.
+m="$t/messages" && mkdir -p "$m" && good_rules "$m" && git -C "$m" init -q && git -C "$m" add -A
+git -C "$m" commit -qm "$(printf 'docs: on main\n\nzero\342\200\213width')" && git -C "$m" update-ref refs/remotes/origin/main HEAD
+messages() { python3 -I "$docs" "$m" 2>&1; }
+messages >/dev/null || fail "check_docs read a message main holds already"
+git -C "$m" commit -q --allow-empty -m "$(printf 'test: the branch\n\nRemoved-test: a\342\200\256b - why')"
+out=$(messages) && fail "check_docs accepted a commit message holding a hidden character: $out"
+printf '%s\n' "$out" | grep -qxF "  commit $(git -C "$m" rev-parse --short HEAD):3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the message's hidden character: $out"
+# Every message of the branch, not its newest only (F5081): a clean commit on top hides nothing.
+older=$(git -C "$m" rev-parse --short HEAD) && git -C "$m" commit -q --allow-empty -m "test: a clean top"
+out=$(messages) && fail "check_docs accepted a hidden character in a message under a clean one (F5081): $out"
+printf '%s\n' "$out" | grep -qxF "  commit $older:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the older message's hidden character: $out"
+out=$(PATH="$t/nogit" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with no git to read them: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say git cannot read the messages: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
+git -C "$m" update-ref -d refs/remotes/origin/main
+messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
+# What a commit takes is the index's copy (F5087): a hidden character staged under a clean work tree's copy is named, and
+# one in the work tree's copy under a clean staged one, as `(work tree)`. A `.gitattributes` encoding keeps the work tree in
+# another text than the one git stores (F5088): UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
+# text too, a link deleted or pointing nowhere included (F5089); a gitlink (a submodule) holds none.
+x="$t/staged" && mkdir -p "$x/docs" && good_rules "$x" && git -C "$x" init -q
+staged() { python3 -I "$docs" "$x" 2>&1; }
+printf 'a\342\200\256b\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'ab\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character staged under a clean work tree (F5087): $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the staged copy's hidden character: $out"
+printf '%s\n' "$out" | grep -qF "(work tree)" && fail "check_docs named a work tree's copy that holds none: $out"
+printf 'ab\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'a\342\200\256b\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character in the work tree under a clean staged copy: $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md (work tree):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the work tree's hidden character: $out"
+printf 'ab\n' >"$x/docs/s.md"
+staged >/dev/null || fail "check_docs refused a staged and a work tree copy that hold none"
+printf '*.txt working-tree-encoding=UTF-7\n' >"$x/.gitattributes" && printf 'a+IC4-b\n' >"$x/e.txt" && git -C "$x" add .gitattributes e.txt
+out=$(staged) && fail "check_docs passed U+202E that git stores while the work tree writes it in UTF-7 (F5088): $out"
+printf '%s\n' "$out" | grep -qxF "  e.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name what git stores under UTF-7: $out"
+git -C "$x" rm -qf e.txt .gitattributes
+printf 'x\n' >"$x/$(printf 'a\342\200\256b.md')" && printf 'x\n' >"$x/$(printf 'c\342\200\256d.md')"
+ln -s "$(printf 'c\342\200\256d.md')" "$x/link.md" && ln -s "$(printf 'e\342\200\256f')" "$x/staged-link" && git -C "$x" add staged-link && rm "$x/staged-link"
+git -C "$x" update-index --add --cacheinfo "160000,$(printf '%040d' 1),sub"
+out=$(staged) && fail "check_docs passed a hidden character in a name or a link's target (F5089): $out"
+for line in "the name 'a\\u202eb.md':1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "link.md (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "staged-link (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE"; do
+	printf '%s\n' "$out" | grep -qxF "  $line" || fail "check_docs did not say $line: $out"
+done
+printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
 fi
 
 if part harness_mutate; then
@@ -1792,7 +1985,7 @@ if part pre_commit; then
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 [ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
@@ -1804,6 +1997,13 @@ mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && 
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
+# A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
+printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
+precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
+# What it reads is what the commit takes, the staged copy, not the work tree's (F5087).
+printf 'ab\n' >"$c2/docs/hidden.md"
+precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
+git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
@@ -3327,7 +3527,7 @@ regr_fixture() { # $1: a folder
 	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
 	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
 	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
-	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
 	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
 }
 logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }

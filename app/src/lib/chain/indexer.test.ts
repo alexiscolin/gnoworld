@@ -9,7 +9,7 @@ import { readRealmFacts } from "./indexer.ts";
 const INDEXER = "https://indexer.onyx.testnets.gno.land/graphql/query";
 const REALM = "gno.land/r/gnoland/wugnot";
 const NOW = new Date("2026-10-31T06:00:00.000Z");
-const HOSTILE = "<script>alert('HOSTILE')</script>\u0000‮ HOSTILE";
+const HOSTILE = "<script>alert('HOSTILE')</script>\u0000\u202e HOSTILE";
 const FACTS = {
   path: REALM,
   deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",

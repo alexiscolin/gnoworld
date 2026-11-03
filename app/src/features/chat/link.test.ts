@@ -1912,23 +1912,26 @@ describe("the chat's link: reactions", () => {
   it("reacts to a line by its msgid with one emoji, takes the reaction back, each labelled", () => {
     const t = memberIn(["#bubble/games"]);
     expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👍", on: true })).toBe(true);
-    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👩🏻‍❤️‍💋‍👨🏿", on: false })).toBe(true);
+    expect(t.link.react("#bubble/games", { to: MSGID, emoji: "👩🏻\u200d❤️\u200d💋\u200d👨🏿", on: false })).toBe(true);
     expect(tagged(t.fake.sent)).toEqual([
       `@label=*;+draft/react=👍;+reply=${MSGID} TAGMSG #bubble/games`,
-      `@label=*;+draft/unreact=👩🏻‍❤️‍💋‍👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
+      `@label=*;+draft/unreact=👩🏻\u200d❤️\u200d💋\u200d👨🏿;+reply=${MSGID} TAGMSG #bubble/games`,
     ]);
   });
 
-  it.each(["🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🧑‍🦰", "1️⃣"])("reacts with the emoji %s whole", (emoji) => {
-    const t = memberIn(["#bubble/games"]);
-    expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(true);
-    expect(tagged(t.fake.sent)).toEqual([`@label=*;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
-  });
+  it.each(["🏴\u{e0067}\u{e0062}\u{e0065}\u{e006e}\u{e0067}\u{e007f}", "🧑\u200d🦰", "1️⃣"])(
+    "reacts with the emoji %s whole",
+    (emoji) => {
+      const t = memberIn(["#bubble/games"]);
+      expect(t.link.react("#bubble/games", { to: MSGID, emoji: emoji, on: true })).toBe(true);
+      expect(tagged(t.fake.sent)).toEqual([`@label=*;+draft/react=${emoji};+reply=${MSGID} TAGMSG #bubble/games`]);
+    },
+  );
 
   it.each([
     ["words", "nice"],
     ["two emoji", "👍👍"],
-    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍‍😂"],
+    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍\u200d😂"],
     ["a skin tone on an emoji that takes none", "🙂🏽"],
     ["an emoji under a combining accent", "👍́"],
     ["a smile in its text form", "☺︎"],

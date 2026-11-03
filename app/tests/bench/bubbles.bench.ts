@@ -52,7 +52,7 @@ describe("bubbles", () => {
   bench("a pick over 2000 messages, which reads 500 [1 ms]", timed(past));
   bench("a pick over 500 Japanese messages [2 ms]", timed(japanese));
   bench("a pick over 500 accented messages [2 ms]", timed(accents));
-  const megabyte = "ab​\n".repeat(256 * 1024);
+  const megabyte = "ab\u200b\n".repeat(256 * 1024);
   bench("the cut of a text of a megabyte [2 ms]", () => {
     if (cutText(megabyte, rules.maxChars).length === 0) throw new Error("the bench cuts to nothing");
   });

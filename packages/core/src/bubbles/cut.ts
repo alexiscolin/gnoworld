@@ -3,7 +3,7 @@
 // line break or a tab becomes a space; a cluster over CLUSTER_UNITS is dropped whole. The text is read a window at a
 // time, so a megabyte costs what its first kilobyte does, unless it is all hidden.
 const SEGMENTER = new Intl.Segmenter();
-const JOINER = "‍";
+const JOINER = "\u200d";
 const WINDOW = 1024;
 /** The longest cluster that stays, in UTF-16 units (a family of four with skin tones is 19): a bubble is never longer
  * than its cap times this. */

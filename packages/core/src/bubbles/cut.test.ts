@@ -6,7 +6,7 @@ import { cutText } from "./cut.ts";
 // character but a joiner between two emoji, no lone surrogate, no cluster over CLUSTER units (it is dropped whole).
 const MAX = 80;
 const CLUSTER = 32;
-const ZWJ = "‍";
+const ZWJ = "\u200d";
 const MARK = "́";
 const graphemes = (text: string): string[] => Array.from(new Intl.Segmenter().segment(text), (s) => s.segment);
 const FAMILY = `👨${ZWJ}👩${ZWJ}👧${ZWJ}👦`;
@@ -72,7 +72,7 @@ describe("cutText: the cut", () => {
     for (const pad of [0, 1, 1000, 1020, 1023, 1024, 1025, 2047, 2048, 4095, 4096])
       for (const marks of [CLUSTER, 1500, 5000, 9000])
         expect(
-          cutText(`${"a".repeat(pad % 70)}${"​".repeat(pad)}${stack(marks)}end`, MAX),
+          cutText(`${"a".repeat(pad % 70)}${"\u200b".repeat(pad)}${stack(marks)}end`, MAX),
           `${String(pad)} ${String(marks)}`,
         ).toBe(`${"a".repeat(pad % 70)}end`);
   });
@@ -109,8 +109,8 @@ describe("cutText: plain text", () => {
   });
 
   it("removes the bidi overrides and isolates, the zero-width and invisible characters", () => {
-    const bad = ["‪", "‫", "‬", "‭", "‮", "⁦", "⁧", "⁨", "⁩"];
-    const more = ["‎", "‏", "؜", "​", "‌", "⁠", "﻿", "­", "⁡"];
+    const bad = ["\u202a", "\u202b", "\u202c", "\u202d", "\u202e", "\u2066", "\u2067", "\u2068", "\u2069"];
+    const more = ["\u200e", "\u200f", "\u061c", "\u200b", "\u200c", "\u2060", "\ufeff", "\u00ad", "\u2061"];
     for (const c of [...bad, ...more]) expect(cutText(`a${c}b`, MAX), JSON.stringify(c)).toBe("ab");
   });
 
@@ -141,8 +141,8 @@ describe("cutText: plain text", () => {
 
   it("keeps the joiner of an emoji sequence, and no other (finding 2)", () => {
     expect(cutText(FAMILY, MAX)).toBe(FAMILY);
-    expect(cutText("❤️‍🔥", MAX)).toBe("❤️‍🔥");
-    expect(cutText("👩🏽‍⚕️", MAX)).toBe("👩🏽‍⚕️");
+    expect(cutText("❤️\u200d🔥", MAX)).toBe("❤️\u200d🔥");
+    expect(cutText("👩🏽\u200d⚕️", MAX)).toBe("👩🏽\u200d⚕️");
   });
 
   it("removes a joiner that joins nothing: alone, between letters, at either end, or after an emoji and before a letter", () => {
@@ -157,7 +157,7 @@ describe("cutText: plain text", () => {
   it("keeps a sequence whole wherever the windows it is read in end", () => {
     const pads = [...Array.from({ length: 70 }, (_, n) => 1000 + n), 2040, 2047, 2048, 2049, 4090, 4095, 4096, 4097];
     for (const pad of pads) {
-      const hidden = "​".repeat(pad);
+      const hidden = "\u200b".repeat(pad);
       expect(cutText(`${hidden}${FAMILY}`, MAX), `family ${String(pad)}`).toBe(FAMILY);
       expect(cutText(`${hidden}😀`, MAX), `pair ${String(pad)}`).toBe("😀");
       expect(cutText(`${hidden}\ud800x`, MAX), `lone ${String(pad)}`).toBe("x");
@@ -176,20 +176,20 @@ describe("cutText: plain text", () => {
   });
 
   it("cuts after the removal: hidden characters do not use up the room", () => {
-    expect(cutText(`${"​".repeat(MAX)}${"a".repeat(MAX)}`, MAX)).toBe("a".repeat(MAX));
+    expect(cutText(`${"\u200b".repeat(MAX)}${"a".repeat(MAX)}`, MAX)).toBe("a".repeat(MAX));
   });
 
   it("returns a plain string with no control or format character, at most max graphemes and CLUSTER units each (property)", () => {
     const hostile = fc.constantFrom(
-      "‮",
-      "​",
+      "\u202e",
+      "\u200b",
       "\n",
       "\u0007",
-      "⁦",
-      "﻿",
+      "\u2066",
+      "\ufeff",
       "\u0000",
       "\t",
-      "­",
+      "\u00ad",
       ZWJ,
       "\ud800",
       "\udc00",
@@ -233,13 +233,13 @@ describe("cutText: its cost", () => {
   });
 
   it("still finds its max graphemes behind a long run of hidden characters", () => {
-    const text = `${"​".repeat(100_000)}${"a".repeat(MAX + 5)}`;
+    const text = `${"\u200b".repeat(100_000)}${"a".repeat(MAX + 5)}`;
     const out = cutText(text, MAX);
     expect(out).toBe("a".repeat(MAX));
   });
 
   it("holds on a megabyte of line breaks, combining marks, joiners and emoji, and returns a short text (finding 3)", () => {
-    for (const unit of ["\n", MARK, FAMILY, "x‮", ZWJ, "\ud800", `e${MARK}`.repeat(40)]) {
+    for (const unit of ["\n", MARK, FAMILY, "x\u202e", ZWJ, "\ud800", `e${MARK}`.repeat(40)]) {
       const out = cutText(unit.repeat(Math.ceil((1024 * 1024) / unit.length)), MAX);
       expect(graphemes(out).length).toBeLessThanOrEqual(MAX);
       expect(out.length).toBeLessThanOrEqual(MAX * CLUSTER);
