@@ -5,6 +5,7 @@
 import { labelName } from "@gnoworld/core";
 import { Trend, type Presence, type Trends, type Worlds } from "@gnoworld/schemas/indexer";
 import { Hono } from "hono";
+import { callsOf } from "./shed.ts";
 
 const HOUR = 3_600_000;
 /** The most time between the two passes the busiest world compares, and its oldest pass: a stopped job is no hour's trend. */
@@ -58,15 +59,13 @@ function busiest(worlds: Worlds, last: { at: string; read: PassReads } | undefin
     : [{ kind: "trending", world: best.id, ...best.place, calls: best.calls, since: last.at, at: worlds.updated }];
 }
 
-const callsIn = (world: World): number => world.realms.reduce((sum, { calls }) => sum + (calls ?? 0), 0);
-
 // The world first seen most lately within a day of the pass, the most called then the first by id among those seen at once.
 function newest(worlds: Worlds): ChainTrend[] {
   const at = Date.parse(worlds.updated);
   const fresh = worlds.worlds.flatMap((world) => {
     const seen = Date.parse(world.seen ?? "");
     const place = seen <= at && at - seen <= NEW_MS ? placed(world) : undefined;
-    return place === undefined ? [] : [{ world, seen, place, calls: callsIn(world) }];
+    return place === undefined ? [] : [{ world, seen, place, calls: callsOf(world) }];
   });
   const [first] = fresh.sort((a, b) => b.seen - a.seen || b.calls - a.calls || byId(a.world, b.world));
   if (first === undefined) return [];

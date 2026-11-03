@@ -30,7 +30,8 @@ const bare = (world: WorldRow): WorldRow => ({
   ...world,
   realms: world.realms.map((realm) => ({ ...realm, functions: [], imports: [] })),
 });
-const callsOf = (world: WorldRow): number => world.realms.reduce((sum, realm) => sum + (realm.calls ?? 0), 0);
+/** The calls a world's realms count, a realm not read counting none; the shed's order, and the ticker's new worlds (7t). */
+export const callsOf = (world: WorldRow): number => world.realms.reduce((sum, realm) => sum + (realm.calls ?? 0), 0);
 
 interface Tally {
   sum: number;
