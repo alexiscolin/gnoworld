@@ -45,8 +45,6 @@ export class Flights {
   #heard = 0;
   #flights = 0;
   #veil: Dissolve | undefined;
-  // The frame a page left, copied as it went, for the flight its next page asks for in the same task.
-  #pending: Dissolve | undefined;
   #veiled = 0;
 
   constructor(device: FlightDevice) {
@@ -66,10 +64,7 @@ export class Flights {
     this.#flight.distance = this.#way.length;
     this.#dropVeil();
     this.#still = this.#device.still();
-    const [pending, copies] = [this.#pending, this.#still || goal.kind === "body" || goal.kind === "cosmos"];
-    this.#pending = undefined;
-    if (copies) this.#veil = pending ?? this.#copy();
-    else pending?.dispose();
+    if (this.#still || goal.kind === "body" || goal.kind === "cosmos") this.#veil = this.#copy();
     this.#veil?.fade(1);
     this.#veiled = 0;
     const { eye } = this.#device;
@@ -86,13 +81,8 @@ export class Flights {
     this.#sayOn(0);
   }
 
-  /** The page leaves its place: the frame drawn now is copied, for a flight its next page asks for at once. */
-  depart(): void {
-    this.#pending?.dispose();
-    this.#pending = this.#leaving.signal.aborted ? undefined : this.#copy();
-  }
-
-  // The frame drawn now, copied before the place it shows goes.
+  // The frame drawn now, copied before the place it shows goes: a page's flight starts as the next page is shown, its last frame still
+  // the one before.
   #copy(): Dissolve {
     const { renderer, stage, camera } = this.#device;
     const copy = new Dissolve(stage);
@@ -107,8 +97,6 @@ export class Flights {
 
   /** One frame on, `delta` ms after the last, before the eye advances. */
   advance(delta: number): void {
-    this.#pending?.dispose();
-    this.#pending = undefined;
     const seconds = delta > 0 ? Math.min(delta / 1000, LONGEST_FRAME) : 0;
     if (this.#flying) this.#onWay(seconds);
     this.#fadeVeil(seconds);
@@ -200,7 +188,6 @@ export class Flights {
 
   dispose(): void {
     this.#leaving.abort();
-    this.#pending?.dispose();
     this.#dropVeil();
     this.land();
     this.#streaks.dispose();

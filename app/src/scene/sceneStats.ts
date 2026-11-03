@@ -24,8 +24,6 @@ export interface Scene {
   cover(covered: boolean): void;
   /** Flies to a star of the cosmos, back to its view at rest, or to the place a page shows next, before the page changes it (7g). */
   fly(goal: FlightGoal): void;
-  /** The page leaves its place: the frame drawn now is copied, for the flight the next page asks for in the same task (7g). */
-  depart(): void;
   /** Where the view rests, in world units of any size. */
   moveTo(to: Point): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */

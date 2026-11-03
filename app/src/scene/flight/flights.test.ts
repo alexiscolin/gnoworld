@@ -580,23 +580,6 @@ describe("a page's flight", () => {
     expect(flying(scene.said)[0]?.target).toBe("GovDAO");
   });
 
-  it("copies the page it leaves as it goes, for the flight its next page asks at once, and lets it go at the next frame if none does", () => {
-    const scene = rig();
-    const flown = flights(scene.device);
-    flown.depart();
-    expect(scene.copies).toHaveLength(1);
-    expect(flown.stats().veil).toBe(0);
-    flown.fly({ kind: "body", name: "GovDAO" });
-    expect(scene.copies).toHaveLength(1);
-    expect(flown.stats().veil).toBe(1);
-    run(flown, scene, 6);
-    flown.depart();
-    expect(scene.copies).toHaveLength(2);
-    frame(flown, scene);
-    expect(scene.copies.every((copy) => scene.freed.has(copy))).toBe(true);
-    expect(veilOn(scene.stage)).toBe(false);
-  });
-
   it("waits in transit while the next body is not drawn, two seconds at most, then lands", () => {
     const scene = rig();
     const flown = flights(scene.device);

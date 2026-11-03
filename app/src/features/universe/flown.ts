@@ -1,6 +1,7 @@
 // What the page knows of the scene's flights (7g): where space showed last, so a page that moves from one place in space to another asks
 // the scene to fly there before it is told of the next, its flight copying what is still drawn; and what the flight panel shows, as the
-// scene says it, which it tells whoever the page has listening. No React: the panel reads it as the universe reads the host.
+// scene says it, which it tells whoever the page has listening. No React: the panel reads it as the universe reads the host. A route's
+// change shows the next place at once, the one that left never saying it covers space (lot C's review): the place last shown is the one.
 import type { FlightGoal, FlightSaid } from "../../scene/flight/flights.ts";
 import type { Scene } from "../../scene/scene.ts";
 
@@ -20,8 +21,6 @@ const same = (a: Place, b: Place) => (typeof a === "object" && typeof b === "obj
 export class Flown {
   readonly #told: () => void;
   #at: Place | undefined;
-  // The place a page just left: the next page, in the same task, flies from it.
-  #left: Place | undefined;
   #flight: FlightSaid | undefined;
 
   /** `told`, each time what the panel shows changes. */
@@ -38,18 +37,10 @@ export class Flown {
     this.#told();
   };
 
-  /** The page shows `shown` next, on `scene` if it runs: from another place in space, a flight there. A page that leaves covers space as it
-   * goes, and the next asks for its place in the same task: the frame the first showed is copied as it leaves, and the flight starts there.
-   * A page that stays covered, flies from nowhere. */
+  /** The page shows `shown` next, on `scene` if it runs: from another place in space, a flight there; a page that covers space, or flies
+   * from nowhere, asks none. */
   between(scene: Scene | undefined, shown: boolean | Place): void {
-    const [from, at] = [this.#at ?? this.#left, typeof shown === "boolean" ? undefined : shown];
-    if (at === undefined && this.#at !== undefined) {
-      this.#left = this.#at;
-      scene?.depart();
-      queueMicrotask(() => {
-        this.#left = undefined;
-      });
-    }
+    const [from, at] = [this.#at, typeof shown === "boolean" ? undefined : shown];
     this.#at = at;
     if (scene !== undefined && from !== undefined && at !== undefined && !same(from, at)) scene.fly(goalOf(at));
   }

@@ -161,11 +161,6 @@ export class Parts {
     this.flights.part?.fly(goal);
   };
 
-  /** The page leaves its place: what is drawn now is kept for a flight from it. Bound, as `fly`. */
-  readonly depart = (): void => {
-    this.flights.part?.depart();
-  };
-
   resize(width: number, height: number, ratio: number): void {
     this.cosmos.door.part?.resize(height, ratio);
     this.world.door.part?.resize(width, height, ratio);

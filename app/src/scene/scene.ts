@@ -50,7 +50,6 @@ class LiveScene implements Scene {
   #seconds = 0;
   #refused = false;
   readonly fly: Scene["fly"];
-  readonly depart: Scene["depart"];
 
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
@@ -89,7 +88,7 @@ class LiveScene implements Scene {
       this.#viewport.changed();
     });
     this.ground = this.#earth;
-    ({ fly: this.fly, depart: this.depart } = this.#parts);
+    this.fly = this.#parts.fly;
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,

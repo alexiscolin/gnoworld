@@ -49,7 +49,6 @@ interface FlightDeviceSeen {
 const flight = vi.hoisted(() => ({
   made: [] as FlightDeviceSeen[],
   fly: vi.fn<(goal: unknown) => void>(),
-  depart: vi.fn<() => void>(),
   ready: vi.fn<() => void>(),
   advance: vi.fn<(delta: number) => void>(),
   land: vi.fn<() => void>(),
@@ -93,7 +92,6 @@ vi.mock("./flight/flights.ts", () => ({
     flight.made.push(device);
     return {
       fly: flight.fly,
-      depart: flight.depart,
       ready: flight.ready,
       advance: flight.advance,
       land: flight.land,
@@ -1473,8 +1471,6 @@ describe("flights (7g)", () => {
   it("opens the flights' chunk as it starts, so the first flight finds it, and flies where a page asks", async () => {
     const { scene } = await opened();
     expect(flight.made).toHaveLength(1);
-    scene.depart();
-    expect(flight.depart).toHaveBeenCalledTimes(1);
     scene.fly({ kind: "cosmos", name: "Cosmos" });
     expect(flight.fly).toHaveBeenLastCalledWith({ kind: "cosmos", name: "Cosmos" });
     expect(scene.stats().flight).toEqual({ flying: true, kind: "rest" });

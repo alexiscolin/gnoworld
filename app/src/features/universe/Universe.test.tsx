@@ -160,7 +160,6 @@ beforeEach(() => {
   scene.start.mockImplementation(() => ({
     cover: scene.cover,
     fly: vi.fn(),
-    depart: vi.fn(),
     cosmos: scene.cosmos,
     keepClear: scene.keepClear,
     dispose: scene.dispose,
@@ -759,7 +758,6 @@ describe("on the Earth's page", () => {
     scene.start.mockImplementation(() => ({
       cover: scene.cover,
       fly: vi.fn(),
-      depart: vi.fn(),
       dispose: scene.dispose,
       earth: scene.earth,
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
@@ -1086,7 +1084,6 @@ describe("on a world's page", () => {
       worldMoons: vi.fn(),
       cosmos: scene.cosmos,
       fly: vi.fn(),
-      depart: vi.fn(),
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
       stats: () => ({}),
     }));
@@ -1377,15 +1374,15 @@ describe("flights between places (7g)", () => {
     expect(fly).toHaveBeenCalledTimes(1);
   });
 
-  // A route's change: the page that leaves covers space as it goes, and the next asks for its place in the same task.
-  it("flies from the page that left to the next, the frame it showed copied before space was covered", async () => {
+  // A page without space covers the scene and asks nothing else of it: a frame copied for a flight that cannot start was held, the size of
+  // the screen, for as long as the reader stayed away (lot B's review, F3715). A route's change shows the next place at once, and its
+  // flight copies the frame as it starts (lot C's review, F3721).
+  it("only covers the scene for a page without space, and has it keep no copy of what it drew", async () => {
     const { rerender } = rendered("cosmos");
     await settle();
     rerender(false);
-    expect(depart).toHaveBeenCalledTimes(1);
-    expect(depart.mock.invocationCallOrder[0]).toBeLessThan(scene.cosmos.mock.invocationCallOrder.at(-1) ?? 0);
-    rerender({ world: "gov/dao", name: "GovDAO" });
-    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "GovDAO" });
+    expect(scene.cover).toHaveBeenLastCalledWith(true);
+    expect(depart).not.toHaveBeenCalled();
   });
 
   it("shows the panel while the scene says a flight is under way, and takes it off once it has landed", async () => {
