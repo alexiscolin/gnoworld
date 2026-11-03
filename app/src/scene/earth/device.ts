@@ -34,9 +34,9 @@ export interface EarthDevice {
   readonly stood: () => void;
   /** How far a page's body stands as a flight brings it, a share of where it stands at rest: 1 once it landed (7g). */
   readonly arrival?: { readonly approach: number };
-  /** The scene's eye as a flight leaves it: what it looks at, none as at rest, and whether it is calm, the labels shown; and the cosmos as
-   * a flight reads it, which the view at rest's eye hands it (7g). */
-  readonly eye?: { readonly look: Point | undefined; readonly calm: boolean; sight?: CosmosSight | undefined };
+  /** The scene's eye as a flight leaves it: what it looks at, none as at rest; and the cosmos as a flight reads it, which the view at
+   * rest's eye hands it (7g). */
+  readonly eye?: { readonly look: Point | undefined; sight?: CosmosSight | undefined };
   /** A frame copied and laid over the stage, lent by the flights' chunk, which holds it (7g): the dive's under reduced motion. */
   veil?: (stage: Scene) => Dissolve;
 }

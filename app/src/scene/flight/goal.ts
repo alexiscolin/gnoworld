@@ -49,8 +49,8 @@ export interface FlightDevice {
   >;
   readonly stage: Stage;
   readonly camera: PerspectiveCamera;
-  /** The scene's eye: a flight writes its way, its look and whether it is calm. */
-  readonly eye: Pick<Eye, "travel" | "look" | "calm">;
+  /** The scene's eye: a flight writes its way and its look. */
+  readonly eye: Pick<Eye, "travel" | "look">;
   /** How far the page's body stands, as a share of its place at rest. */
   readonly arrival: { approach: number };
   readonly said: (flight: FlightSaid | undefined) => void;

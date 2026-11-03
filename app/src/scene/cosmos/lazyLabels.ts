@@ -9,17 +9,14 @@ type Look = Parameters<CosmosLabels["look"]>;
 
 export class LazyLabels {
   readonly #seen: Seen;
-  readonly #eye: { readonly calm: boolean } | undefined;
   #part: CosmosLabels | undefined;
   #gone = false;
   #list: readonly CosmosWorld[] | undefined;
   #signals: LabelSignals | undefined;
   #look: Look | undefined;
 
-  /** Owned by `owner`, placed by what the cosmos has `seen`; hidden while the scene's `eye` is not calm, a flight under way (7g). */
-  constructor(owner: Disposer, seen: Seen, eye?: { readonly calm: boolean }) {
+  constructor(owner: Disposer, seen: Seen) {
     this.#seen = seen;
-    this.#eye = eye;
     owner.add({
       dispose: () => {
         this.#gone = true;
@@ -62,6 +59,6 @@ export class LazyLabels {
   }
 
   tick(eye: Point, shown: boolean): void {
-    this.#part?.tick(eye, shown && this.#eye?.calm !== false);
+    this.#part?.tick(eye, shown);
   }
 }

@@ -5,12 +5,11 @@ import { Eye } from "./eye.ts";
 // The eye a flight moves (7g): its way is added to where the view rests, so the sky and the cosmos come to it, and what it looks at stands
 // in place of the view's own aim until the flight is done.
 describe("the eye a flight moves", () => {
-  it("rests where the view does, calm and looking where the view looks, until a flight moves it", () => {
+  it("rests where the view does, looking where the view looks, until a flight moves it", () => {
     const eye = new Eye();
     eye.advance(16, true);
     expect(eye.travel).toEqual({ x: 0, y: 0, z: 0 });
     expect(eye.look).toBeUndefined();
-    expect(eye.calm).toBe(true);
     expect(eye.worlds).toEqual(HOME);
   });
 

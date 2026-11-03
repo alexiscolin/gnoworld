@@ -82,7 +82,6 @@ export class Flights {
     this.#was.x = eye.travel.x;
     this.#was.y = eye.travel.y;
     this.#was.z = eye.travel.z;
-    eye.calm = false;
     this.#hold(true);
     this.#sayOn(0);
   }
@@ -178,7 +177,6 @@ export class Flights {
     this.#way.end(this.#device);
     this.#flying = false;
     this.#along = 1;
-    this.#device.eye.calm = true;
     this.#streaks.hide();
     if (!this.#still) this.#dropVeil();
     this.#device.said(undefined);

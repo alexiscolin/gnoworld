@@ -15,8 +15,6 @@ export class Eye {
   readonly travel = { x: 0, y: 0, z: 0 };
   /** What a flight in the cosmos looks at, on the stage; none, and the view aims as it does at rest. */
   look: Point | undefined;
-  /** False while a flight is under way: the labels wait for it to land. */
-  calm = true;
   /** The cosmos as a flight reads it, once a file's view at rest has come. */
   sight: CosmosSight | undefined;
   readonly #rest = { x: HOME.x, y: HOME.y, z: HOME.z };

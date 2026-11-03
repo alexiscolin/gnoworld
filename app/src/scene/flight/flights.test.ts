@@ -269,24 +269,6 @@ describe("the jump to a star", () => {
     expect(flown.stats()).toMatchObject({ flying: false, along: 1 });
   });
 
-  it("hides the labels on every frame of the way, and gives them back on the frame it lands", () => {
-    const scene = rig();
-    const flown = flights(scene.device);
-    flown.fly({ kind: "star", id: pick(scene).id });
-    expect(scene.eye.calm).toBe(false);
-    const frames: { calm: boolean; flying: boolean }[] = [];
-    run(flown, scene, {
-      seconds: 4,
-      each: () => {
-        frames.push({ calm: scene.eye.calm, flying: flown.stats().flying });
-      },
-    });
-    const landed = frames.findIndex(({ flying }) => !flying);
-    expect(landed).toBeGreaterThan(0);
-    expect(frames.slice(0, landed).every(({ calm }) => !calm)).toBe(true);
-    expect(frames.slice(landed).every(({ calm }) => calm)).toBe(true);
-  });
-
   it("tells the panel its target, its phases in order and its instruments, ten times a second at most, then that it landed", () => {
     const scene = rig();
     const flown = flights(scene.device);
@@ -455,7 +437,6 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
     expect(scene.said.at(-1)).toBeUndefined();
     expect(scene.busy.at(-1)).toBe(false);
-    expect(scene.eye.calm).toBe(true);
   });
 
   it("flies back to the view at rest on Escape once at a star, its way undone and its look given back", () => {
@@ -543,7 +524,6 @@ describe("under reduced motion", () => {
     expect(scene.copies).toHaveLength(1);
     frame(flown, scene);
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
-    expect(scene.eye.calm).toBe(true);
     expect(flown.stats().veil).toBeGreaterThan(0.8);
     run(flown, scene, 0.2);
     expect(flown.stats().veil).toBe(0);
@@ -554,14 +534,13 @@ describe("under reduced motion", () => {
     expect(scene.busy.at(-1)).toBe(false);
   });
 
-  it("brings a page's body to its place at once, the labels calm", () => {
+  it("brings a page's body to its place at once", () => {
     const scene = rig();
     scene.still.value = true;
     const flown = flights(scene.device);
     flown.fly({ kind: "body", name: "GovDAO" });
     frame(flown, scene);
     expect(scene.device.arrival.approach).toBe(1);
-    expect(scene.eye.calm).toBe(true);
     expect(flying(scene.said)).toEqual([]);
   });
 });
@@ -575,7 +554,7 @@ describe("a page's flight", () => {
     expect(scene.renderer.render).toHaveBeenCalledTimes(1);
     expect(scene.copies).toHaveLength(1);
     flown.ready();
-    const frames: { approach: number; veil: number; streaks: number; calm: boolean }[] = [];
+    const frames: { approach: number; veil: number; streaks: number }[] = [];
     run(flown, scene, {
       seconds: 3.5,
       each: () => {
@@ -583,7 +562,6 @@ describe("a page's flight", () => {
           approach: scene.device.arrival.approach,
           veil: flown.stats().veil,
           streaks: flown.stats().streaks,
-          calm: scene.eye.calm,
         });
       },
     });
@@ -595,7 +573,6 @@ describe("a page's flight", () => {
     expect(frames.at(-1)?.veil).toBe(0);
     expect(frames.some(({ streaks }) => streaks > 0)).toBe(true);
     expect(frames.at(-1)?.streaks).toBe(0);
-    expect(frames.slice(0, 30).every(({ calm }) => !calm)).toBe(true);
     const way = new Vector3(scene.eye.travel.x, scene.eye.travel.y, scene.eye.travel.z);
     expect(way.length()).toBeGreaterThan(10);
     expect(way.normalize().dot(forward)).toBeCloseTo(1, 6);
@@ -666,7 +643,6 @@ describe("a page's flight", () => {
     expect(back.normalize().dot(forward)).toBeCloseTo(-1, 6);
     run(flown, scene, 4);
     expect(scene.eye.travel).toEqual({ x: 0, y: 0, z: 0 });
-    expect(scene.eye.calm).toBe(true);
   });
 });
 

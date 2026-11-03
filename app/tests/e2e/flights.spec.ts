@@ -198,15 +198,13 @@ test("keeps the panel in a phone's gutters, under its header", async ({ page }) 
   expect(panel.y).toBeGreaterThanOrEqual(header.y + header.height);
 });
 
-test("jumps to the star aimed at, the labels hidden on the way, lands at once on Escape, and comes back on Escape", async ({
-  page,
-}) => {
+test("jumps to the star aimed at, lands at once on Escape, and comes back on Escape", async ({ page }) => {
   await home(page);
+  // The labels stand once the cosmos has looked: by then its stars can be aimed at.
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
   await aimAtTheGreatStar(page);
   await expect.poll(async () => (await flightOf(page))?.flying).toBe(true);
   expect(await flightOf(page)).toMatchObject({ kind: "star", target: "gno.land" });
-  await expect.poll(() => labelsShown(page)).toBe(0);
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await flightOf(page))?.flying, { timeout: 2_000 }).toBe(false);
   expect((await flightOf(page))?.along).toBe(1);
@@ -216,7 +214,42 @@ test("jumps to the star aimed at, the labels hidden on the way, lands at once on
   await expect.poll(async () => (await flightOf(page))?.kind).toBe("rest");
   await flown(page);
   expect((await flightOf(page))?.travel).toEqual({ x: 0, y: 0, z: 0 });
+});
+
+// Frame 18 keeps its labels beside the panel: a flight leaves them as they are, only the home's dive hides them (the chief, 2026-11-03,
+// after the design review). Read in the page on every frame of the flight past 0.3 of the way, when a label told to go would have faded
+// long since; mid-way to samcrew no labelled body may be in view, so some frame, not each, holds one.
+test("keeps the labels through a flight, as frame 18 does", async ({ page }) => {
+  await page.route("**/worlds.json", (route) => route.fulfill({ body: RECORDED, contentType: "application/json" }));
+  await home(page);
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
+  const shown = page.evaluate(
+    () =>
+      new Promise<number[]>((resolve) => {
+        const scene = Reflect.get(globalThis, "__gnoworldScene") as {
+          stats: () => { flight?: { flying: boolean; along: number } };
+        };
+        const counts: number[] = [];
+        let flew = false;
+        const frame = () => {
+          const flight = scene.stats().flight;
+          flew ||= flight?.flying === true;
+          if (flight?.flying === true && flight.along > 0.3)
+            counts.push(
+              [...document.querySelectorAll("[data-labels] > *")].filter(
+                (label) => Number(getComputedStyle(label).opacity) > 0.05,
+              ).length,
+            );
+          if (flew && flight?.flying === false) resolve(counts);
+          else requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+  await fly(page, { kind: "star", id: "samcrew" });
+  const counts = await shown;
+  expect(counts.length).toBeGreaterThan(0);
+  expect(Math.max(...counts), `labels on each frame past 0.3 of the way: ${counts.join(", ")}`).toBeGreaterThan(0);
 });
 
 test("draws its streaks while it crosses, and none at rest", async ({ page }) => {

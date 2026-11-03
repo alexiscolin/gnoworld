@@ -37,7 +37,7 @@ export class CosmosPart {
       {
         came: (cosmos) => {
           // The labels' loader stands here, behind the cosmos's door, so the cosmos's chunk pays only for their calls (7h).
-          cosmos.labels = new LazyLabels(owner, cosmos.seen, device.eye);
+          cosmos.labels = new LazyLabels(owner, cosmos.seen);
           cosmos.keepClear(this.#box);
           if (this.#still !== undefined) cosmos.dive(this.#still);
           this.#tell(cosmos);
