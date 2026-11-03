@@ -152,6 +152,55 @@ const fly = (page: Page, goal: unknown) =>
 
 const flown = (page: Page) => expect.poll(async () => (await flightOf(page))?.flying, SLOW).toBe(false);
 
+// In the page, the next frame a flight flies: Escape there, read at once. A wall clock between the start and the key let a flight that
+// landed by itself pass for one Escape landed, and an Escape after it fly back (lot C's review, F3722).
+const escapeInFlight = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ before: number; flying: boolean; along: number }>((resolve) => {
+        const scene = Reflect.get(globalThis, "__gnoworldScene") as {
+          stats: () => { flight?: { flying: boolean; along: number } };
+        };
+        const frame = () => {
+          const before = scene.stats().flight;
+          if (before?.flying !== true) {
+            requestAnimationFrame(frame);
+            return;
+          }
+          document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+          const after = scene.stats().flight;
+          resolve({ before: before.along, flying: after?.flying ?? true, along: after?.along ?? NaN });
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+
+// In the page, every frame of the next flight till its veil is gone: what the veil showed, and each place the eye stood at.
+const crossfadeOf = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ veils: number[]; places: string[] }>((resolve) => {
+        const scene = Reflect.get(globalThis, "__gnoworldScene") as {
+          stats: () => { flight?: { flights: number; flying: boolean; veil: number; travel: unknown } };
+        };
+        const first = scene.stats().flight?.flights ?? 0;
+        const [veils, places] = [[] as number[], new Set<string>()];
+        const frame = () => {
+          const flight = scene.stats().flight;
+          if (flight !== undefined && flight.flights > first) {
+            veils.push(flight.veil);
+            places.add(JSON.stringify(flight.travel));
+            if (!flight.flying && flight.veil === 0) {
+              resolve({ veils, places: [...places] });
+              return;
+            }
+          }
+          requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+  );
+
 const labelsShown = (page: Page) =>
   page.$$eval(
     "[data-labels] > *",
@@ -224,12 +273,12 @@ test("jumps to the star aimed at, lands at once on Escape, and comes back on Esc
   await home(page);
   // The labels stand once the cosmos has looked: by then its stars can be aimed at.
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
+  const escaped = escapeInFlight(page);
   await aimAtTheGreatStar(page);
-  await expect.poll(async () => (await flightOf(page))?.flying).toBe(true);
+  const { before, flying, along } = await escaped;
   expect(await flightOf(page)).toMatchObject({ kind: "star", target: "gno.land" });
-  await page.keyboard.press("Escape");
-  await expect.poll(async () => (await flightOf(page))?.flying, { timeout: 2_000 }).toBe(false);
-  expect((await flightOf(page))?.along).toBe(1);
+  expect(before).toBeLessThan(1);
+  expect({ flying, along }).toEqual({ flying: false, along: 1 });
   const there = (await flightOf(page))?.travel ?? { x: 0, y: 0, z: 0 };
   expect(Math.hypot(there.x, there.y, there.z)).toBeGreaterThan(1);
   await page.keyboard.press("Escape");
@@ -288,11 +337,13 @@ test("crossfades under reduced motion: no camera moves between, no panel, the co
 }) => {
   await home(page, FRAME, "reduce");
   await watchPanel(page);
-  const before = (await flightOf(page))?.flights ?? NaN;
+  const crossfade = crossfadeOf(page);
   await aimAtTheGreatStar(page);
-  await expect.poll(async () => (await flightOf(page))?.flights).toBe(before + 1);
-  await expect.poll(async () => (await flightOf(page))?.along).toBe(1);
-  await expect.poll(async () => (await flightOf(page))?.veil, { timeout: 5_000 }).toBe(0);
+  const { veils, places } = await crossfade;
+  // The copy laid and seen fading (a flight that laid none passed before), and the eye at two places at most: where it was, and the end.
+  expect(Math.max(...veils)).toBeGreaterThan(0);
+  expect(places.length).toBeLessThanOrEqual(2);
+  expect((await flightOf(page))?.along).toBe(1);
   expect((await panelSeen(page)).phases).toEqual([]);
 });
 
