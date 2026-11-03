@@ -1,11 +1,11 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
-import { readFileSync } from "node:fs";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
+import { absolute, databasePath, parseSettings, readSecret, readWord, Secret, whole } from "./settings.ts";
 
 export interface Config {
   host: string;
@@ -35,46 +35,11 @@ export interface Config {
   };
 }
 
-// A secret that never prints: inspect, JSON and a template string show [redacted]; reveal() reads it.
-class Secret {
-  readonly #value: string;
-  constructor(value: string) {
-    this.#value = value;
-  }
-  reveal(): string {
-    return this.#value;
-  }
-  toJSON(): string {
-    return "[redacted]";
-  }
-  toString(): string {
-    return "[redacted]";
-  }
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return "[redacted]";
-  }
-}
-
 // An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
 function isOrigin(text: string): boolean {
   const url = URL.parse(text);
   return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
 }
-
-// A whole number from 1 to `max`, written plainly: no sign, no leading zero, no point.
-const whole = (max: number, otherwise: number) =>
-  z
-    .string()
-    .regex(/^[1-9]\d*$/)
-    .transform(Number)
-    .pipe(z.number().max(max))
-    .default(otherwise);
-
-// An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole (F636).
-const absolute = z.string().refine((path) => {
-  const [root, ...parts] = path.split("/");
-  return root === "" && parts.length > 0 && parts.every((part) => !["", ".", ".."].includes(part));
-});
 
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
@@ -84,7 +49,7 @@ const Env = z.object({
     .transform(Number)
     .pipe(z.number().max(65_535))
     .default(8080),
-  DATABASE: z.string().min(1).max(1024),
+  DATABASE: databasePath,
   TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
   LOG_PEPPER_FILE: z.string().min(1),
   // The roles file the server ships (server/roles.json), unless a deployment names another.
@@ -156,26 +121,18 @@ const Env = z.object({
 });
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
-  const parsed = Env.safeParse(env);
-  if (!parsed.success) {
-    // The path and the code only: a message may quote the value.
-    const issue = parsed.error.issues[0];
-    // A list's entry by its place, so a deploy knows which one; its value stays out.
-    const [setting, ...place] = issue?.path ?? [];
-    const at = place.length > 0 ? ` (at ${place.map(String).join(".")})` : "";
-    throw new Error(`setting ${String(setting)}: ${issue?.code ?? "invalid"}${at}`);
-  }
+  const settings = parseSettings(Env, env);
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
-    parsed.data;
-  const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE, ERGO_DATA, ERGO_DATA_MB } = parsed.data;
-  const { OPENAI_API_KEY_FILE, MODERATION_THRESHOLDS, NEW_ACCOUNT_HOURS } = parsed.data;
-  const { MUTE_STRIKES, MUTE_WINDOW_MINUTES, MUTE_MINUTES, MUTE_MAX } = parsed.data;
+    settings;
+  const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE, ERGO_DATA, ERGO_DATA_MB } = settings;
+  const { OPENAI_API_KEY_FILE, MODERATION_THRESHOLDS, NEW_ACCOUNT_HOURS } = settings;
+  const { MUTE_STRIKES, MUTE_WINDOW_MINUTES, MUTE_MINUTES, MUTE_MAX } = settings;
   return {
     host: HOST,
     port: PORT,
     database: DATABASE,
     trustedProxy: TRUSTED_PROXY,
-    pepper: secret("LOG_PEPPER_FILE", LOG_PEPPER_FILE),
+    pepper: readSecret("LOG_PEPPER_FILE", LOG_PEPPER_FILE),
     roles: ROLES_FILE,
     chains: CHAINS,
     origins: ORIGINS,
@@ -183,11 +140,13 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
-    markets: parsed.data.MARKETS_FILE,
-    universes: parsed.data.UNIVERSES_FILE,
+    markets: settings.MARKETS_FILE,
+    universes: settings.UNIVERSES_FILE,
     moderation: {
       openaiKey:
-        OPENAI_API_KEY_FILE === undefined ? undefined : new Secret(word("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
+        OPENAI_API_KEY_FILE === undefined
+          ? undefined
+          : new Secret(readWord("OPENAI_API_KEY_FILE", OPENAI_API_KEY_FILE)),
       thresholds: MODERATION_THRESHOLDS,
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },
@@ -201,7 +160,7 @@ function ergoOf(
   env: Record<string, string | undefined>,
   { host, port, passwordFile }: { host: string; port: number; passwordFile: string | undefined },
 ): Config["ergo"] {
-  if (passwordFile !== undefined) return { host, port, password: word("ERGO_OPER_PASSWORD_FILE", passwordFile) };
+  if (passwordFile !== undefined) return { host, port, password: readWord("ERGO_OPER_PASSWORD_FILE", passwordFile) };
   if (env["ERGO_HOST"] !== undefined || env["ERGO_PORT"] !== undefined) {
     throw new Error("setting ERGO_OPER_PASSWORD_FILE: required");
   }
@@ -214,24 +173,4 @@ function ergoDataOf(env: Record<string, string | undefined>, dir: string | undef
   if (dir !== undefined) return { dir, maxBytes: mb * 1024 * 1024 };
   if (env["ERGO_DATA_MB"] !== undefined) throw new Error("setting ERGO_DATA: required");
   return undefined;
-}
-
-// A secret that goes on a line as it is (the OPER line, an Authorization header): one word of printable
-// ASCII, 256 at most, which the OPER line's 510 bytes hold.
-function word(setting: string, path: string): string {
-  const text = secret(setting, path);
-  if (!/^[\x21-\x7e]+$/.test(text)) throw new Error(`setting ${setting}: invalid_characters`);
-  if (text.length > 256) throw new Error(`setting ${setting}: too_long`);
-  return text;
-}
-
-function secret(setting: string, path: string): string {
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8").trim();
-  } catch (cause) {
-    throw new Error(`setting ${setting}: unreadable`, { cause });
-  }
-  if (text.length < 32) throw new Error(`setting ${setting}: too_short`);
-  return text;
 }
