@@ -48,10 +48,36 @@
     z-index: 1;
   }
 
-  /* A system's crumb (7v): under the header, in the hero's gutter, as frame 45's kicker stands under its own. */
+  /* A system's card (7v, the GUI board's option B): under the header, in the hero's gutter, frame 45's kicker over the system's name and
+     its line, 6 px apart. */
   .crumb {
     /* raw: the hero's 48 px from the left (Hero.module.css) */
     inset-inline-start: 48px;
+    /* layout: the kicker, the name and its line in a column */
+    display: flex;
+    /* layout: the kicker, the name and its line in a column */
+    flex-direction: column;
+    /* raw: option B's 6 px between its three lines */
+    /* layout: the arrangement option B draws */
+    gap: 6px;
+  }
+
+  .system {
+    /* layout: the name's own lines, no heading margin */
+    margin-block: 0;
+    color: var(--color-text);
+    /* raw: option B's name, 30 px semibold, a hundredth of an em closer */
+    font: 600 30px/1.1 var(--family-sans);
+    letter-spacing: -0.01em;
+  }
+
+  .about {
+    /* layout: the line's own, no paragraph margin */
+    margin-block: 0;
+    /* raw: the hero line's grey (Hero.module.css) and option B's 14 px */
+    color: #c8d0de;
+    /* raw: option B's 14 px */
+    font: 400 14px/1.3 var(--family-sans);
   }
 
   /* Above the views' bar and the ticker on a phone (Ticker.module.css), in the gutter, within reach. */

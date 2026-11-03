@@ -1527,7 +1527,7 @@ describe("the views of space and the system the eye rests at", () => {
       resting()("gnoswap");
     });
     const crumb = one(box, "nav[aria-label='Where you are']");
-    expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "gnoswap"]);
+    expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "System"]);
     act(() => {
       button(crumb, "Cosmos")?.click();
     });
@@ -1555,8 +1555,31 @@ describe("the views of space and the system the eye rests at", () => {
     act(() => {
       resting()(address);
     });
-    const crumb = one(box, "nav[aria-label='Where you are']");
-    expect(all(crumb, "li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "g1magl…e8hlv"]);
+    expect(one(box, "h1").textContent).toBe("g1magl…e8hlv");
+    act(() => {
+      resting()("gnoswap");
+    });
+    expect(one(box, "h1").textContent).toBe("gnoswap");
+  });
+
+  // 7v's design review (F4472; the GUI board's option B, Alexis's): the crumb is a card, the kicker "← Cosmos › System" over the system's name,
+  // the page's heading where the hero's gave way, then its worlds' count and its network; an address never in the kicker's capitals.
+  it("draws the system as option B's card: the kicker, its name the page's heading, its worlds and its network", async () => {
+    const worlds = ["a", "b", "c"].map((name) => ({ id: `gnoswap/${name}`, namespace: "gnoswap", realms: [] }));
+    scene.read.mockImplementation(() => Promise.resolve({ worlds: [...WORLDS, ...worlds, worlds[0]] }));
+    const { box } = rendered("cosmos");
+    await settle();
+    act(() => {
+      resting()("gnoswap");
+    });
+    const card = one(box, "nav[aria-label='Where you are']").parentElement ?? box;
+    expect(all(card, "nav li").map(({ textContent }) => textContent)).toEqual(["Cosmos", "System"]);
+    expect(all(card, "h1").map(({ textContent }) => textContent)).toEqual(["gnoswap"]);
+    expect(all(card, "p").map(({ textContent }) => textContent)).toEqual(["3 worlds · a namespace on Onyx"]);
+    act(() => {
+      resting()("a");
+    });
+    expect(all(card, "p").map(({ textContent }) => textContent)).toEqual(["1 world · a namespace on Onyx"]);
   });
 
   // 7v's review (F4457): a lost context fails the scene, which took the crumb and its Escape with it while the hero stayed hidden: no way back.

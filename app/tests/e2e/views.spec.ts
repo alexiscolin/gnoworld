@@ -69,14 +69,17 @@ test("offers space's two views in the header's pill, V toggling them, and the Ea
   // Every shader compiles, three's and ours, their spaces stripped at build.
 });
 
-test("names the system the eye comes to, '← Cosmos › gnoswap', gives it the screen, and goes back a step from the crumb", async ({
+test("names the system the eye comes to in option B's card, gives it the screen, and goes back a step from the crumb", async ({
   page,
 }) => {
   await home(page);
   await expect(page.locator("[data-hero]").first()).toBeVisible();
   await arrive(page, "gnoswap");
   const crumb = page.getByRole("navigation", { name: "Where you are" });
-  await expect(crumb.getByRole("listitem")).toHaveText(["Cosmos", "gnoswap"], SLOW);
+  await expect(crumb.getByRole("listitem")).toHaveText(["Cosmos", "System"], SLOW);
+  // The GUI board's option B (F4472): the system's name the page's heading under the kicker, then its worlds and its network.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("gnoswap");
+  await expect(page.getByText("16 worlds · a namespace on Onyx")).toBeVisible();
   await expect(page.locator("[data-hero]")).toHaveCount(0);
   await crumb.getByRole("button", { name: "Cosmos" }).click();
   await expect(crumb).toHaveCount(0, SLOW);

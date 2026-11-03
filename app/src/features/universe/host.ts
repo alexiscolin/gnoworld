@@ -13,7 +13,7 @@ import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
 import { Heard } from "./heard.ts";
-import { tellScene, views } from "./views.ts";
+import { restsAt, tellScene } from "./views.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
@@ -224,7 +224,7 @@ export class SceneHost {
               this.#say(lost ? "failed" : "on");
             },
             onFlight: this.flown.said,
-            onSystem: views.rest,
+            onSystem: restsAt(this.#feed.worldsIn),
           }),
         );
       })
