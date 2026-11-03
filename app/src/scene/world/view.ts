@@ -180,8 +180,9 @@ export class WorldView {
     this.#fit = fitOf(signs?.size ?? 1, this.#reading?.used);
     body.sized.scale.setScalar(this.#fit);
     body.setWake(this.#waking);
-    // Under reduced motion only owed frames are drawn: the appearance owes them while it plays, so its grid fades.
-    if (this.#waking.grid > 0) this.#device.moved();
+    // ponytail: under reduced motion only owed frames are drawn, and the clock moves on them alone: the grid owes them while it shows, 96 still
+    // ones over its 1.6 s hold. With motion the loop draws the scenery at its own rate.
+    if (this.#frame.still && this.#waking.grid > 0) this.#device.moved();
     if (signs !== undefined && this.#reading !== undefined) body.setSigns(signs, this.#reading);
   }
 

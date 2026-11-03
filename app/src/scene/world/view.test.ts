@@ -607,6 +607,15 @@ describe("its appearance on this reader's first visit", () => {
     expect(moved).not.toHaveBeenCalled();
   });
 
+  // ADR-0002 §9: scenery that moves runs at the loop's own 30 fps; owing frames would hold it at 60 (7w's review, F4531).
+  it("owes no frame with motion on: the loop draws the scenery's frames already", async () => {
+    const { view, moved } = await opened();
+    view.read(reading({ first: true }));
+    moved.mockClear();
+    for (const second of [0, 0.5, 1, 2]) view.tick(second);
+    expect(moved).not.toHaveBeenCalled();
+  });
+
   it("keeps the appearance that ran when a lost context comes back: it carries on, never starts again", async () => {
     const { view } = await opened();
     view.read(reading({ first: true }));
