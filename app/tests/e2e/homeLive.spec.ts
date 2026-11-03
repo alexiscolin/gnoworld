@@ -203,8 +203,8 @@ test.describe("the home at the video's size", () => {
     await trendsShown(page);
     expect(await style(page, "[data-ticker] [data-kind]", "text-transform")).toBe("uppercase");
     const links = page.locator("[data-ticker] a");
-    await expect(links.nth(0)).toHaveText("pool · 45 calls since 30 Oct 09:00 UTC");
-    await expect(links.nth(1)).toHaveText("Bubble · +45% on its usual hour");
+    await expect(links.nth(0)).toHaveText("pool · 45 calls in 31 min");
+    await expect(links.nth(1)).toHaveText("Bubble · +45% this hour");
     await expect(links.nth(2)).toHaveText("blog · first seen 30 Oct 22:10 UTC");
     const trends = await links.evaluateAll((all) =>
       all

@@ -56,20 +56,22 @@ function placeOf(item: Trend, places: TrendPlaces): { name: string; path: string
 }
 
 const callsOf = (calls: number): string => `${String(calls)} ${calls === 1 ? "call" : "calls"}`;
+// The length of the busiest world's window, the time between the two reads, in whole minutes, a part of one counting one.
+const minutesOf = (since: string, at: string): number =>
+  Math.max(1, Math.ceil((Date.parse(at) - Date.parse(since)) / 60_000));
 
-// A placed trend's words and the source its link says.
+// A placed trend's words, as short as the video's (frame 6), and the source its link says, with its times.
 function wordsOf(item: Trend, name: string, now: Date): Pick<TickerItem, "text" | "source"> {
   const at = stampOf(item.at, now);
   if (item.kind === "trending") {
-    const since = stampOf(item.since, now);
     return {
-      text: `${name} · ${callsOf(item.calls)} since ${since}`,
-      source: `Calls to its realms, as the chain's indexer counts them, from ${since} to ${at}`,
+      text: `${name} · ${callsOf(item.calls)} in ${String(minutesOf(item.since, item.at))} min`,
+      source: `Calls to its realms, as the chain's indexer counts them, from ${stampOf(item.since, now)} to ${at}`,
     };
   }
   if (item.kind === "rising")
     return {
-      text: `${name} · +${String(Math.round(item.rise * 100))}% on its usual hour`,
+      text: `${name} · +${String(Math.round(item.rise * 100))}% this hour`,
       source: `People in its rooms against its usual hour of the last 14 days, at ${at}`,
     };
   return { text: `${name} · first seen ${at}`, source: `First on the chain's list of realms at ${at}` };

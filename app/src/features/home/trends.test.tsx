@@ -46,7 +46,7 @@ describe("trendItems", () => {
       {
         id: "trend-trending",
         kind: "trending",
-        text: "pool · 45 calls since 09:00 UTC",
+        text: "pool · 45 calls in 31 min",
         link: "/r/gnoswap/pool",
         source: "Calls to its realms, as the chain's indexer counts them, from 09:00 UTC to 09:31 UTC",
       },
@@ -54,7 +54,12 @@ describe("trendItems", () => {
   });
 
   it("says one call in the singular", () => {
-    expect(trendItems([{ ...BUSIEST, calls: 1 }], places(), NOW)[0]?.text).toBe("pool · 1 call since 09:00 UTC");
+    expect(trendItems([{ ...BUSIEST, calls: 1 }], places(), NOW)[0]?.text).toBe("pool · 1 call in 31 min");
+  });
+
+  it("says a window of seconds as a minute, never none", () => {
+    const short = { ...BUSIEST, since: "2026-11-04T09:30:40.000Z" };
+    expect(trendItems([short], places(), NOW)[0]?.text).toBe("pool · 45 calls in 1 min");
   });
 
   it("names a rising hub by the page's own name, links its page, and says its rise in whole percents", () => {
@@ -63,7 +68,7 @@ describe("trendItems", () => {
       {
         id: "trend-rising",
         kind: "rising",
-        text: `${bubble.name} · +46% on its usual hour`,
+        text: `${bubble.name} · +46% this hour`,
         link: bubble.path,
         source: "People in its rooms against its usual hour of the last 14 days, at 09:39 UTC",
       },
@@ -72,7 +77,7 @@ describe("trendItems", () => {
 
   it("names the Earth when the Earth rises, and links its page", () => {
     const [item] = trendItems([{ ...RISING, world: "earth" }], places(), NOW);
-    expect(item).toMatchObject({ text: "Earth · +46% on its usual hour", link: places().earth });
+    expect(item).toMatchObject({ text: "Earth · +46% this hour", link: places().earth });
   });
 
   // F4550 (7t's security review, S1): a realm under the namespace earth groups to the world earth, which the page's Earth is not.
@@ -112,7 +117,7 @@ describe("trendItems", () => {
     const realm = hub.realms?.[0] ?? "";
     const world = worldIdOf(realm);
     const [item] = trendItems([{ ...BUSIEST, world, realm, title: "other" }], places(), NOW);
-    expect(item).toMatchObject({ text: `${hub.name} · 45 calls since 09:00 UTC`, link: hub.path });
+    expect(item).toMatchObject({ text: `${hub.name} · 45 calls in 31 min`, link: hub.path });
   });
 
   it("keeps the server's order", () => {
