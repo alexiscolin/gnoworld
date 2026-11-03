@@ -1141,7 +1141,15 @@ async function cameTo(page: Page, id: string, { size = COMPUTER, still = true } 
       return Math.sqrt(dot3(off, off));
     }, SLOW)
     .toBeLessThan(0.5);
-  await standing(page, 0);
+  // Every world its arrival draws held and on the screen: a body waits for its maps, then its programs, and `standing` counts the held
+  // alone (F4408: under load it read two of gnoswap's three).
+  const worlds = arrivalAt(id).arrival.postcard.worlds.map(({ id: world }) => world);
+  await expect
+    .poll(async () => {
+      const shown = new Set((await cosmos(page)).screen.bodies.map(({ id: world }) => world));
+      return worlds.every((world) => shown.has(world));
+    }, SLOW)
+    .toBe(true);
 }
 // Each body whole under the header, off the star's heart; the star a third of the way in.
 async function framed(page: Page, id: string, size: { width: number; height: number }) {
