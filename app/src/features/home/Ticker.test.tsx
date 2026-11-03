@@ -136,6 +136,8 @@ describe("the ticker", () => {
     const box = mount(<Ticker items={ITEMS} />);
     expect(all(box, "[data-ticker]")).toHaveLength(1);
     expect(one(box, "[data-ticker]").getAttribute("aria-label")).toMatch(/news and events/i);
+    // 7t: the region leads with the chain's trends, and says so (F4562).
+    expect(one(box, "[data-ticker]").getAttribute("aria-label")).toBe("Trends, news and events");
     expect(visibleLinks(box).map((each) => [each.textContent, each.getAttribute("href")])).toEqual([
       ["A first headline", "https://gno.land/one"],
       ["A call, date to be confirmed", "https://gno.land/two"],

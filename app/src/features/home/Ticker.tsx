@@ -20,7 +20,7 @@ export function Ticker({ items }: { items: TickerItem[] }) {
   const [paused, setPaused] = useState(false);
   if (items.length === 0) return null;
   return (
-    <section className={styles["ticker"]} data-ticker="" data-paused={paused} aria-label="News and events">
+    <section className={styles["ticker"]} data-ticker="" data-paused={paused} aria-label="Trends, news and events">
       <button
         type="button"
         className={styles["pause"]}
