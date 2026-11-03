@@ -259,7 +259,7 @@ func isSlug(s string, limit int) bool {
 // printable (a letter, mark, number, punctuation, symbol or the ASCII space) and
 // not default-ignorable, so nothing steers or hides what shows (a bidi mark, a
 // zero-width, a tag, a filler), and one at least shows: not a space, a mark or the
-// Braille blank (D7, widened by S1, S2 and F5041). Code points, as the app counts.
+// Braille blank (D7, widened by D27: F5040, F5041). Code points, as the app counts.
 func isText(s string) bool {
 	if !utf8.ValidString(s) {
 		return false

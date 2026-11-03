@@ -180,7 +180,7 @@ func TestRentTextIsOneToFortyCodePointsWithNoControl(cur realm, t *testing.T) {
 	}
 }
 
-// S1: no text steers or hides what it shows. Render's sanitizer strips bidi and
+// F5040: no text steers or hides what it shows. Render's sanitizer strips bidi and
 // zero-width characters only in part, and the Rent event carries the text raw.
 // Refused: control, format (bidi marks, zero-width, word joiner, soft hyphen,
 // tags), line and paragraph separators, other default-ignorable code points
@@ -205,8 +205,8 @@ func TestRentRefusesInvisibleAndBidiText(cur realm, t *testing.T) {
 	uassert.Equal(t, heart, got)
 }
 
-// S2: a satellite shows something: spaces, marks and the Braille blank alone are
-// no text (F5041: a lone variation selector, U+180B or U+2800 passed).
+// F5041: a satellite shows something: spaces, marks and the Braille blank alone
+// are no text (a lone variation selector, U+180B or U+2800 passed).
 func TestRentRefusesABlankText(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))
