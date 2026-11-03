@@ -390,12 +390,12 @@ describe("where a label may stand (F3772)", () => {
   it("keeps a label out of the rail's band at 1728 px wide, and lets it stand there under 900 px, where there is no rail", () => {
     const wide = one(labels, body((1728 - 190 - SCREEN.width / 2) / 20, 0));
     expect(wide.shown).toBe(true);
-    expect(wide.right).toBeLessThanOrEqual(1728 - 168);
+    expect(wide.right).toBeLessThanOrEqual(1728 - 149);
     const narrow = { width: 899, height: SCREEN.height };
     const phone = new Labels(document, projector(undefined, narrow));
     const box = one(phone, body((899 - 190 - narrow.width / 2) / 20, 0));
     expect(box.shown).toBe(true);
-    expect(box.right).toBeGreaterThan(899 - 168);
+    expect(box.right).toBeGreaterThan(899 - 149);
     phone.dispose();
   });
 });
