@@ -96,7 +96,7 @@ export class Cosmos {
       this.#release = setTimeout(this.#releaseMaps, RELEASE_MS);
       return;
     }
-    this.#atRest.written = Date.parse(written ?? "");
+    this.#atRest.written = written;
     if (worlds !== this.#list) {
       this.#list = worlds;
       this.#systems = systemsOf(heldOf(worlds));

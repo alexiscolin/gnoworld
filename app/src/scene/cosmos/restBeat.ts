@@ -8,12 +8,16 @@ const LIFT = 0.18;
 
 export class Beat {
   #seconds = Number.NaN;
+  #written: string | undefined;
+  #read = Number.NaN;
 
-  /** The lift on a frame `seconds` on the worlds' clock, from a file written at `written` and read at `read` (milliseconds): none while
-   * the clock stands. */
-  lift(written: number, read: number, seconds: number): number {
+  /** The lift on a frame `seconds` on the worlds' clock, from a file written at `written`, read when it first came: none while the clock
+   * stands. */
+  lift(written: string | undefined, seconds: number): number {
+    if (written !== this.#written) this.#read = Date.now();
+    this.#written = written;
     const moving = seconds > this.#seconds;
     this.#seconds = seconds;
-    return moving ? LIFT * beatAt(written, Date.now(), read) : 0;
+    return moving ? LIFT * beatAt(Date.parse(written ?? ""), Date.now(), this.#read) : 0;
   }
 }
