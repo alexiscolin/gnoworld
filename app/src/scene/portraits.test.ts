@@ -371,4 +371,24 @@ describe("the rail's portraits", () => {
     expect(made.planets.every((planet) => planet.dispose.mock.calls.length === 1)).toBe(true);
     expect([...made.freed].sort()).toEqual([...new Set(made.maps.map(({ name }) => name))].sort());
   });
+
+  it("keeps the portraits drawn before the scene went", async () => {
+    const { device, gone, frame } = deviceOf();
+    const asked = portraitsOf(device, ["a/a", "b/b", "c/c", "d/d", "e/e", "f/f"], 100);
+    await settle();
+    frame();
+    await settle();
+    gone.abort();
+    const drawn = await asked;
+    expect([...drawn.keys()]).toEqual(["a/a", "b/b", "c/c", "d/d"]);
+  });
+
+  it("hands back no picture where the page cannot draw one", async () => {
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const { device, frame } = deviceOf();
+    const asked = portraitsOf(device, ["gov/dao"], 100);
+    await settle();
+    frame();
+    expect((await asked).size).toBe(0);
+  });
 });
