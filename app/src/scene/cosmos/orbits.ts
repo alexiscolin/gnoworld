@@ -15,8 +15,9 @@ export type { Words } from "./planWords.ts";
 
 // The names a step under their worlds' outlines.
 const UNDER = 8;
-// The mock-up's orbits: the text's muted grey at a sixth.
+// The mock-up's orbits: the text's muted grey at a sixth; none within twice a world's radius of it.
 const LINE = { color: 0xc8d0de, opacity: 0.16 };
+const CUT = 2;
 
 // The site's router follows a world to its page: the page's views listen (features/universe/ViewSwitch.tsx).
 const openPage = (href: string) => {
@@ -108,8 +109,9 @@ export class Orbits {
   }
 
   // Each world's orbit, its ring of points round the star on the map, from the star on the stage (the map turned, toScene being linear):
-  // the lines stand at the star, so a frame moves one place.
-  #ellipses({ rings }: Planned): void {
+  // the lines stand at the star, so a frame moves one place. A segment by a world is left out (7v's design review, F4470): seen 30
+  // degrees over its plane, a line through a planet's centre crosses its disc within twice its radius. ponytail: 12 rings of 96, by 12.
+  #ellipses({ rings, system, places, worlds }: Planned): void {
     const none = { x: 0, y: 0, z: 0 };
     const origin = this.#projector.fromEye(none, none, new Vector3());
     const points: number[] = [];
@@ -117,10 +119,19 @@ export class Orbits {
       this.#projector.fromEye(at, none, this.#at).sub(origin);
       points.push(this.#at.x, this.#at.y, this.#at.z);
     };
+    const { x, y, z } = system.place;
+    const byWorld = (from: Point, to: Point) =>
+      places.some(
+        (at, index) =>
+          Math.hypot(x + (from.x + to.x) / 2 - at.x, y + (from.y + to.y) / 2 - at.y, z + (from.z + to.z) / 2 - at.z) <
+          CUT * (worlds[index]?.radius ?? 0),
+      );
     for (const ring of rings)
       ring.forEach((at, step) => {
+        const next = ring[(step + 1) % ring.length] ?? at;
+        if (byWorld(at, next)) return;
         push(at);
-        push(ring[(step + 1) % ring.length] ?? at);
+        push(next);
       });
     this.#lines.geometry.dispose();
     this.#lines.geometry = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(points, 3));

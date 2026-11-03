@@ -76,13 +76,38 @@ afterEach(() => {
 });
 
 describe("a system's Plan on the stage", () => {
-  it("draws one ellipse round the star for each world's orbit, in the system's plane, all in one draw", () => {
+  // The segments as drawn, from the star on the stage: each a pair of points.
+  const segmentsOf = (parent: Group) => {
+    const lines = parent.children.filter((child): child is LineSegments => child instanceof LineSegments);
+    const position = lines[0]?.geometry.getAttribute("position") as BufferAttribute;
+    return {
+      lines,
+      pairs: Array.from({ length: position.count / 2 }, (_, at) => [
+        new Vector3().fromBufferAttribute(position, 2 * at),
+        new Vector3().fromBufferAttribute(position, 2 * at + 1),
+      ]),
+    };
+  };
+  // Each world's place from the star, on the stage.
+  const placesOn = () => {
+    const [star, origin] = [
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 0 },
+    ];
+    toScene(system.place, star);
+    return worlds.map((world) => {
+      const at = { x: 0, y: 0, z: 0 };
+      orbitPlace({ system, world }, 0, at);
+      toScene(at, origin);
+      return new Vector3(origin.x - star.x, origin.y - star.y, origin.z - star.z);
+    });
+  };
+
+  it("draws the ellipses round the star, each world's orbit's, in the system's plane, all in one draw", () => {
     const { parent, orbits } = made();
     orbits.show(planned(), words);
-    const lines = parent.children.filter((child): child is LineSegments => child instanceof LineSegments);
+    const { lines, pairs } = segmentsOf(parent);
     expect(lines).toHaveLength(1);
-    const position = lines[0]?.geometry.getAttribute("position") as BufferAttribute;
-    expect(position.count % (2 * worlds.length)).toBe(0);
     // The plane's normal on the stage: the map's turned as toScene turns it.
     const [origin, up] = [
       { x: 0, y: 0, z: 0 },
@@ -98,22 +123,59 @@ describe("a system's Plan on the stage", () => {
       up,
     );
     const normal = new Vector3(up.x - origin.x, up.y - origin.y, up.z - origin.z);
-    const each = position.count / worlds.length;
-    // A closed loop of 64 segments or more each: every segment starts where the one before ended, the last ends at the first.
-    expect(each).toBeGreaterThanOrEqual(128);
-    for (let ring = 0; ring < worlds.length; ring += 1) {
-      const vertex = (at: number) => new Vector3().fromBufferAttribute(position, ring * each + at);
-      for (let at = 2; at < each; at += 2) expect(vertex(at).distanceTo(vertex(at - 1))).toBeLessThan(1e-6);
-      expect(vertex(each - 1).distanceTo(vertex(0))).toBeLessThan(1e-6);
-    }
-    worlds.forEach(({ orbit }, ring) => {
-      for (let at = ring * each; at < (ring + 1) * each; at += 1) {
-        // Round the star, which the ellipses' own place stands at: its orbit's radius, in the plane its world turns in.
-        const vertex = new Vector3().fromBufferAttribute(position, at);
-        expect(vertex.length()).toBeCloseTo(orbit, 4);
-        expect(vertex.dot(normal)).toBeCloseTo(0, 4);
-      }
+    // Each segment a 96th of its world's orbit round the star, in the plane its world turns in, from the star, which the ellipses stand at.
+    const counts = worlds.map(
+      ({ orbit }) =>
+        pairs.filter(
+          ([from, to]) =>
+            [from, to].every(
+              (at) => Math.abs((at?.length() ?? NaN) - orbit) < 1e-4 && Math.abs(at?.dot(normal) ?? NaN) < 1e-4,
+            ) && Math.abs((from?.distanceTo(to ?? from) ?? NaN) - 2 * orbit * Math.sin(Math.PI / 96)) < 1e-4,
+        ).length,
+    );
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(pairs.length);
+    for (const count of counts) expect(count).toBeGreaterThanOrEqual(64);
+  });
+
+  // 7v's design review (F4470): a ring through a world's centre showed across its disc (smoke's in g1nufzhl's Plan). Seen 30 degrees over
+  // its plane, the line crosses the disc within twice the world's radius of it: there it is left out, and kept all round elsewhere.
+  it("leaves each orbit's line out by a world, within twice its radius, and keeps the rest of the ring", () => {
+    const { parent, orbits } = made();
+    orbits.show(planned(), words);
+    const { pairs } = segmentsOf(parent);
+    const places = placesOn();
+    const by = (from: Vector3, to: Vector3) =>
+      places.some(
+        (at, index) => from.clone().add(to).multiplyScalar(0.5).distanceTo(at) < 2 * (worlds[index]?.radius ?? 0),
+      );
+    expect(pairs.filter(([from, to]) => from !== undefined && to !== undefined && by(from, to))).toEqual([]);
+    // Every other step of each ring is drawn: the 96 steps less those by a world.
+    const kept = worlds.map(
+      ({ orbit }) => pairs.filter(([from]) => Math.abs((from?.length() ?? NaN) - orbit) < 1e-4).length,
+    );
+    const due = worlds.map(({ orbit }) => {
+      const steps = Array.from({ length: 96 }, (_, step) => (2 * Math.PI * (step + 0.5)) / 96);
+      return steps.filter((angle) => {
+        const at = { x: 0, y: 0, z: 0 };
+        orbitPlace(
+          { system: { ...system, place: { x: 0, y: 0, z: 0 } }, world: { id: "", radius: 0, orbit, phase: angle } },
+          0,
+          at,
+        );
+        const [mid, origin] = [
+          { x: 0, y: 0, z: 0 },
+          { x: 0, y: 0, z: 0 },
+        ];
+        toScene(at, mid);
+        toScene({ x: 0, y: 0, z: 0 }, origin);
+        const step = new Vector3(mid.x - origin.x, mid.y - origin.y, mid.z - origin.z).multiplyScalar(
+          Math.cos(Math.PI / 96),
+        );
+        return !places.some((place, index) => step.distanceTo(place) < 2 * (worlds[index]?.radius ?? 0));
+      }).length;
     });
+    expect(kept).toEqual(due);
+    expect(kept[0]).toBeLessThan(96);
   });
 
   it("stands its ellipses round the star as the eye moves: the star less the eye", () => {
