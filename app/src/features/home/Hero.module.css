@@ -116,6 +116,13 @@
     text-decoration: none;
   }
 
+  /* ADR-0003, 2d: the list's kicker, over its first link. */
+  .worlds > p {
+    /* layout: the kicker stands a step over the list's first link */
+    margin-block: 0 var(--space-xs);
+    color: var(--color-text-muted);
+  }
+
   .worlds a:hover {
     color: var(--color-text);
   }
@@ -176,8 +183,8 @@
       margin-block-start: 0;
       padding-block-end: 0;
       position: fixed;
-      /* raw: under the header's 96 px, and 16 more */
-      inset-block-start: 112px;
+      /* raw: under the header's 96 px, and 16 more, less the kicker's 11 px and its 8 over the first link, which stays where it was */
+      inset-block-start: 93px;
       inset-inline-start: var(--space-xl);
       /* raw: the room above the hero (the header, the hero at its tallest and the margins), whatever the list's length */
       max-block-size: calc(100dvb - 520px);

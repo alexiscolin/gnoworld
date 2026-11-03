@@ -92,6 +92,14 @@ test("marks its list of worlds as the one a rail stands for", async () => {
   expect(html).toMatch(/<nav aria-label="Worlds"[^>]*data-rail="none"/);
 });
 
+// ADR-0003 §2, 2d: a kicker names the page's list of worlds, inside it, so it steps aside with it where the rail stands (7i).
+test("names its list of worlds with a Worlds kicker, inside the list's own box and before its links", async () => {
+  const html = await render({ path: "/", Component: Home, loader }, "/");
+  const list = /<nav aria-label="Worlds"[^>]*>(.*?)<\/nav>/s.exec(html)?.[1] ?? "";
+  expect(list).toMatch(/^<p class="label [^"]*">Worlds<\/p><ul/);
+  expect(list).toContain('href="/w/bubble"');
+});
+
 const failing = {
   path: "/",
   Component: Home,

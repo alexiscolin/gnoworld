@@ -57,11 +57,12 @@ export function Hero({
   );
 }
 
-/** The universe's worlds, as the page lists them, beside the hero's left edge; from 900 px the cosmos's rail stands for them while it
- * stands (7i), and marks them so. */
+/** The universe's worlds, as the page lists them, beside the hero's left edge, under their kicker (ADR-0003, 2d); from 900 px the cosmos's
+ * rail stands for them while it stands (7i), and marks them so. */
 export function Worlds({ children }: { children: ReactNode }) {
   return (
     <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none">
+      <Kicker>Worlds</Kicker>
       {children}
     </nav>
   );
