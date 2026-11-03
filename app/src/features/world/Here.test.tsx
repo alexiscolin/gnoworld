@@ -86,6 +86,17 @@ describe("who is here, from the chat's store", () => {
     expect(place?.querySelector(".label")?.textContent).toBe("right now");
   });
 
+  // From 1,280 px the stylesheet frees an empty place (Alexis, 2026-11-03): `:empty` matches only an element with no child, text included.
+  it("leaves its place without a child while nobody is counted, so the plate's breakpoint can free it", () => {
+    const place = host?.firstElementChild;
+    expect(place?.matches(":empty")).toBe(true);
+    act(() => {
+      held().follow(["#bubble"]);
+      held().connected(ME);
+    });
+    expect(place?.matches(":empty")).toBe(true);
+  });
+
   it("counts the distinct people of the rooms followed, once the chat has connected, and writes no rate", async () => {
     act(() => {
       held().follow(["#bubble", "#bubble/games"]);
