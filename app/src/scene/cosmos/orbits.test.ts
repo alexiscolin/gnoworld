@@ -103,6 +103,46 @@ describe("a system's Plan on the stage", () => {
     });
   };
 
+  // The design review's second pass (F4470): a world cut rings it was not on, gnoland's inner three broken into dashes. Its own ring alone.
+  it("keeps another world's ring whole by a world it does not hold", () => {
+    const close: Orbiter[] = [
+      { id: "gnoswap/router", radius: 0.3, orbit: 1.2, phase: 0.4 },
+      { id: "gnoswap/pool", radius: 0.3, orbit: 1.5, phase: 1.9 },
+    ];
+    const { parent, orbits } = made();
+    orbits.show(plannedOf({ system, worlds: close }, { names: new Map(), links: new Map() }), words);
+    const { pairs } = segmentsOf(parent);
+    const kept = close.map(
+      ({ orbit }) => pairs.filter(([from]) => Math.abs((from?.length() ?? NaN) - orbit) < 1e-4).length,
+    );
+    // The steps of each ring, from the star on the map, and those within twice a world's radius of it, its own or any.
+    const places = close.map((world) => {
+      const at = { x: 0, y: 0, z: 0 };
+      orbitPlace({ system: { ...system, place: { x: 0, y: 0, z: 0 } }, world }, 0, at);
+      return at;
+    });
+    const by = (orbit: number, worlds: readonly number[]) =>
+      Array.from({ length: 96 }, (_, step) => (2 * Math.PI * (step + 0.5)) / 96).filter((angle) => {
+        const at = { x: 0, y: 0, z: 0 };
+        orbitPlace(
+          { system: { ...system, place: { x: 0, y: 0, z: 0 } }, world: { id: "", radius: 0, orbit, phase: angle } },
+          0,
+          at,
+        );
+        const mid = {
+          x: at.x * Math.cos(Math.PI / 96),
+          y: at.y * Math.cos(Math.PI / 96),
+          z: at.z * Math.cos(Math.PI / 96),
+        };
+        return worlds.some((index) => {
+          const place = places[index] ?? at;
+          return Math.hypot(mid.x - place.x, mid.y - place.y, mid.z - place.z) < 0.6;
+        });
+      }).length;
+    expect(kept).toEqual([96 - by(1.2, [0]), 96 - by(1.5, [1])]);
+    expect(by(1.5, [0, 1])).toBeGreaterThan(by(1.5, [1]));
+  });
+
   it("draws the ellipses round the star, each world's orbit's, in the system's plane, all in one draw", () => {
     const { parent, orbits } = made();
     orbits.show(planned(), words);
@@ -144,9 +184,12 @@ describe("a system's Plan on the stage", () => {
     orbits.show(planned(), words);
     const { pairs } = segmentsOf(parent);
     const places = placesOn();
+    // By its own world: a segment of a world's ring, its middle within twice that world's radius of it.
     const by = (from: Vector3, to: Vector3) =>
       places.some(
-        (at, index) => from.clone().add(to).multiplyScalar(0.5).distanceTo(at) < 2 * (worlds[index]?.radius ?? 0),
+        (at, index) =>
+          Math.abs(from.length() - (worlds[index]?.orbit ?? NaN)) < 1e-4 &&
+          from.clone().add(to).multiplyScalar(0.5).distanceTo(at) < 2 * (worlds[index]?.radius ?? 0),
       );
     expect(pairs.filter(([from, to]) => from !== undefined && to !== undefined && by(from, to))).toEqual([]);
     // Every other step of each ring is drawn: the 96 steps less those by a world.
@@ -171,7 +214,8 @@ describe("a system's Plan on the stage", () => {
         const step = new Vector3(mid.x - origin.x, mid.y - origin.y, mid.z - origin.z).multiplyScalar(
           Math.cos(Math.PI / 96),
         );
-        return !places.some((place, index) => step.distanceTo(place) < 2 * (worlds[index]?.radius ?? 0));
+        const own = worlds.findIndex((world) => world.orbit === orbit);
+        return step.distanceTo(places[own] ?? step) >= 2 * (worlds[own]?.radius ?? 0);
       }).length;
     });
     expect(kept).toEqual(due);

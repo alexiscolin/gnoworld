@@ -110,7 +110,7 @@ export class Orbits {
 
   // Each world's orbit, its ring of points round the star on the map, from the star on the stage (the map turned, toScene being linear):
   // the lines stand at the star, so a frame moves one place. A segment by a world is left out (7v's design review, F4470): seen 30
-  // degrees over its plane, a line through a planet's centre crosses its disc within twice its radius. ponytail: 12 rings of 96, by 12.
+  // degrees over its plane, a line through a planet's centre crosses its disc within twice its radius.
   #ellipses({ rings, system, places, worlds }: Planned): void {
     const none = { x: 0, y: 0, z: 0 };
     const origin = this.#projector.fromEye(none, none, new Vector3());
@@ -120,19 +120,24 @@ export class Orbits {
       points.push(this.#at.x, this.#at.y, this.#at.z);
     };
     const { x, y, z } = system.place;
-    const byWorld = (from: Point, to: Point) =>
-      places.some(
-        (at, index) =>
-          Math.hypot(x + (from.x + to.x) / 2 - at.x, y + (from.y + to.y) / 2 - at.y, z + (from.z + to.z) / 2 - at.z) <
-          CUT * (worlds[index]?.radius ?? 0),
+    // By its own world alone: another's ring passing near a world stays whole (the design review's second pass).
+    const byWorld = (from: Point, to: Point, index: number) => {
+      const at = places[index] ?? from;
+      const away = Math.hypot(
+        x + (from.x + to.x) / 2 - at.x,
+        y + (from.y + to.y) / 2 - at.y,
+        z + (from.z + to.z) / 2 - at.z,
       );
-    for (const ring of rings)
+      return away < CUT * (worlds[index]?.radius ?? 0);
+    };
+    rings.forEach((ring, index) => {
       ring.forEach((at, step) => {
         const next = ring[(step + 1) % ring.length] ?? at;
-        if (byWorld(at, next)) return;
+        if (byWorld(at, next, index)) return;
         push(at);
         push(next);
       });
+    });
     this.#lines.geometry.dispose();
     this.#lines.geometry = new BufferGeometry().setAttribute("position", new Float32BufferAttribute(points, 3));
   }
