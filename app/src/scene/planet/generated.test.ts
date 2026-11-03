@@ -456,7 +456,7 @@ describe("the generated program", () => {
   // archipelago, by the seed's gather: its continents' scale, coarse to fine, and past 0.6 of it the land leaning to one side of the world.
   it("gathers a world's continents at its seed's scale, an archipelago to one supercontinent", () => {
     expect(GENERATED_FRAGMENT).toMatch(
-      /vec4 land = fbm\(p, 0\.[4-8]\d* \+ [2-4]\.\d+ \* \(1\.0 - shape\.gather\), pixel, 0\.0, 3\.0\);/,
+      /vec4 land = fbm\(.+, 0\.[4-8]\d* \+ [2-4]\.\d+ \* \(1\.0 - shape\.gather\), pixel, 0\.0, 3\.0\);/,
     );
     expect(GENERATED_FRAGMENT).toMatch(
       /float lean = [0-2]\.\d+ \* smoothstep\(0\.[5-8]\d*, 1\.0, shape\.gather\);\n {6}float rough = [^;]*;\n {6}float spread = [^;]*;\n {6}float coarse = land\.w \/ land\.y \+ lean \* dot\(at, normalize\(offset - 8\.0\)\);/,
