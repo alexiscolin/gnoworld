@@ -4,7 +4,7 @@
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
-import { discOf, projector, standIn } from "../lens.ts";
+import { projector, standIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
 import { MOTION } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
@@ -13,7 +13,7 @@ import { Standing } from "./standing.ts";
 import { statsOf } from "./stats.ts";
 import { Wake } from "./wake.ts";
 import type { WorldBody } from "./body.ts";
-import { fitOf } from "./fit.ts";
+import { discOf, fitOf } from "./fit.ts";
 
 export type { MoonMark };
 
