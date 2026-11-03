@@ -348,7 +348,10 @@ Slice 3, the server's retention (3n):
 - **The worlds** (`WORLDS_FILE`, `/markets/worlds.json`, served at `/worlds.json`, 7c): with `UNIVERSES_FILE`, every half hour from
   the end of the last pass the server reads the default universe's realm list (`vm/qpaths`), each new package once (`vm/qdoc`,
   `vm/qfile`), each realm's calls from the universe's indexer and each new deployer's name, one call at a time with a quarter-second
-  pause, and writes the worlds by renaming a temporary file, at most 4 MiB. A failed list keeps the last file and logs
+  pause, and writes the worlds by renaming a temporary file, at most 4 MiB. Beside it the same pass writes their count
+  (`/markets/worlds-count.json`, served at `/worlds-count.json`, 7n2): the file's universe and time and the worlds the cosmos draws
+  with the Earth, which the home's hero reads, so a phone asks nothing of the cosmos before View in space. Both temporaries are written
+  before either is renamed: a failed write keeps both last files and logs `write`. A failed list keeps the last file and logs
   `{"event":"worlds_failed","error":"<kind>"}`; a list the chain cuts at its limit is read by prefix, up to 2,000 requests. A world
   keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
   `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of the network on the indexer, or three answers of the wrong
