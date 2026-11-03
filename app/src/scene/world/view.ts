@@ -132,7 +132,7 @@ export class WorldView {
     this.#rest.set(0, 0, -standIn(this.#device.camera, this.#screen, this.#circle));
     body.group.position.copy(this.#rest);
     body.ground.show(this.#circle.plate);
-    body.ground.resize(this.#screen.height, this.#screen.ratio);
+    body.resize(this.#screen.height, this.#screen.ratio);
     this.#sight.words = this.#circle.plate?.right ?? -Infinity;
     this.#device.moved();
   }

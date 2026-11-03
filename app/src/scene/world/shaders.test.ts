@@ -69,4 +69,13 @@ describe("a world's overlay", () => {
     expect(OVERLAY_FRAGMENT).toMatch(/gridOf\(ground\)/);
     expect(OVERLAY_FRAGMENT).toMatch(/stormOf\(ground,/);
   });
+
+  // The light is laid on after the tone mapping and the colour space, in the screen's own values, so it fades as it says (7w's review).
+  it("lays the grid's light on in the screen's values, its lines a page's pixels wide", async () => {
+    const { OVERLAY_FRAGMENT } = await import("./shaders.ts");
+    expect(OVERLAY_FRAGMENT.indexOf("gridOf(ground)")).toBeGreaterThan(
+      OVERLAY_FRAGMENT.indexOf("#include <colorspace_fragment>"),
+    );
+    expect(OVERLAY_FRAGMENT).toMatch(/fwidth\(along\)[^;]*\* ratio/);
+  });
 });

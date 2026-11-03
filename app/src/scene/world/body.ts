@@ -75,6 +75,8 @@ export class WorldBody {
   readonly #moonGlow: Mesh<PlaneGeometry, ShaderMaterial>;
   readonly #halo: WorldHalo;
   readonly #wake: Mesh<PlaneGeometry, ShaderMaterial>;
+  // The first visit's uniforms, as the overlay holds them.
+  readonly #appearance = { band: { value: -BAND_REACH }, grid: { value: 0 }, ratio: { value: 1 } };
 
   constructor({ world, seed, kit, maps, sphere }: BodyParts) {
     this.planet = this.#owner.add(kit.createWorld(world, maps.world, sphere));
@@ -100,8 +102,7 @@ export class WorldBody {
           heat: { value: 0 },
           occluders: { value: Array.from({ length: OCCLUDERS_MAX }, () => new Vector4()) },
           occluderCount: { value: 0 },
-          band: { value: -BAND_REACH },
-          grid: { value: 0 },
+          ...this.#appearance,
         },
       }),
     );
@@ -209,15 +210,20 @@ export class WorldBody {
     return count;
   }
 
+  /** The window's height and the buffer's pixels to one of the page's: the plate's, and the grid's lines' width. */
+  resize(height: number, ratio: number): void {
+    this.ground.resize(height, ratio);
+    this.#appearance.ratio.value = ratio;
+  }
+
   /** The first visit's appearance: the wake's wave at `left`, 1 as it starts and 0 once gone; the grid's band, where it stands in the
    * world's own height, and how much of the grid shows, both drawn by the overlay. */
   setWake({ left, band, grid }: { readonly left: number; readonly band: number; readonly grid: number }): void {
     this.#wake.visible = left > 0;
     const wave = this.#wake.material.uniforms["wave"];
     if (wave !== undefined) wave.value = left;
-    const { uniforms } = this.overlay;
-    if (uniforms["band"] !== undefined) uniforms["band"].value = band;
-    if (uniforms["grid"] !== undefined) uniforms["grid"].value = grid;
+    this.#appearance.band.value = band;
+    this.#appearance.grid.value = grid;
   }
 
   dispose(): void {

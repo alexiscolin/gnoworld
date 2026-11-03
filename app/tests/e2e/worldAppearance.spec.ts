@@ -16,8 +16,13 @@ const FRAME_103_BAND = -0.06;
 const FRAME_20_BAND = 0.7;
 // Frame 104 is a second after 103: the band gone, the grid fading but strong.
 const FRAME_104_GRID = 0.8;
-// The band off the world, before it comes and once it has gone: past a pole by more than its glow.
+// The band off the world, before it comes and once it has gone: past a pole by more than its glow; where it starts and ends.
 const OFF = 1.3;
+const BAND_REACH = 1.4;
+// Frames 103's and 104's lines on the night side stand at 157 to 190 of luma, about three quarters of the band's (7w's design review).
+const LINE_LIGHT = [150, 195] as const;
+// The band's width at half its light on the night side, a share of the radius: frame 103's is 0.24 (79 to 86 px on 342).
+const BAND_SPAN = [0.18, 0.3] as const;
 // A grid line over the ground it covers: frame 104's add 50 to 130 of luma, on the day and the night side alike.
 const LINE = 40;
 // Frame 104's lines are about 1.5 px wide.
@@ -32,15 +37,17 @@ test.describe.configure({ timeout: 400_000 });
 test.use({ viewport: COMPUTER });
 
 interface Shown {
+  frames: number;
   state: string;
   centre: { x: number; y: number; radius: number };
   appearance: { band: number; grid: number };
 }
-// The world as the scene says it, or none before the scene runs.
+// The world as the scene says it, with the frames it has drawn, or none before the scene runs.
 const world = (page: Page) =>
   page.evaluate(() => {
     const scene: unknown = Reflect.get(globalThis, "__gnoworldScene");
-    return (scene as { stats: () => { world: unknown } } | undefined)?.stats().world as Shown | undefined;
+    const said = (scene as { stats: () => { world: unknown; frames: number } } | undefined)?.stats();
+    return said?.world === undefined ? undefined : ({ ...(said.world as object), frames: said.frames } as Shown);
   });
 const visits = (page: Page) =>
   page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith("gnoworld:visited:")));
@@ -76,15 +83,16 @@ async function opened(page: Page, path = "/w/bubble?test-gpu") {
   return stepUntil(page, () => true, { what: "the world drawn", step: 3 * FRAME_MS });
 }
 
-// Every band and grid the world shows, a frame at a time, until its grid has come and gone, or for `frames` frames if none comes.
+// Every band and grid the world shows, a frame at a time, with the frame that drew it, until its grid has come and gone, or for `frames`
+// frames if none comes.
 async function watched(page: Page, frames: number) {
-  const seen: Shown["appearance"][] = [];
-  for (let frame = 0; frame < frames || seen.some(({ grid }) => grid > 0); frame += 1) {
+  const seen: (Shown["appearance"] & { frame: number })[] = [];
+  for (let step = 0; step < frames || seen.some(({ grid }) => grid > 0); step += 1) {
     await page.clock.runFor(FRAME_MS);
-    const now = (await world(page))?.appearance;
-    if (now !== undefined) seen.push({ ...now });
-    if (seen.some(({ grid }) => grid > 0) && now?.grid === 0) break;
-    if (frame > 20 * frames) throw new Error("the grid never went");
+    const now = await world(page);
+    if (now !== undefined) seen.push({ ...now.appearance, frame: now.frames });
+    if (seen.some(({ grid }) => grid > 0) && now?.appearance.grid === 0) break;
+    if (step > 20 * frames) throw new Error("the grid never went");
   }
   return seen;
 }
@@ -124,6 +132,39 @@ const brighterRuns = ({
   return runs;
 };
 
+// The brightest luma of the first of two pictures over each run, and of the second at the same pixel.
+const runPeaks = ({ at, runs }: { at: number; runs: { start: number; width: number }[] }) => {
+  const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  return images.map((image) =>
+    runs.map(({ start, width }) => {
+      let most = 0;
+      for (let x = start; x < start + width; x += 1) most = Math.max(most, luma(image, x, at));
+      return most;
+    }),
+  );
+};
+
+// The band's width at half its light, on the night side's columns, south of its peak where no line is drawn, as a share of the radius: the
+// median of the columns read, and how many.
+const bandSpan = ({ x, y, radius, night }: { x: number; y: number; radius: number; night: number }) => {
+  const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  const [lit, bare] = images;
+  if (lit === undefined || bare === undefined) throw new Error("two pictures are read");
+  const spans: number[] = [];
+  for (let column = Math.ceil(x - 0.8 * radius); column <= x; column += 4) {
+    if (luma(bare, column, Math.round(y)) >= night) continue;
+    let peak = Math.round(y - 0.4 * radius);
+    for (let row = peak; row <= y + 0.6 * radius; row += 1)
+      if (luma(lit, column, row) > luma(lit, column, peak)) peak = row;
+    const half = (luma(lit, column, peak) + luma(bare, column, peak)) / 2;
+    let below = 0;
+    while (luma(lit, column, peak + below + 1) >= half) below += 1;
+    spans.push((2 * below + 1) / radius);
+  }
+  spans.sort((one, two) => one - two);
+  return { columns: spans.length, median: spans[Math.floor(spans.length / 2)] ?? 0 };
+};
+
 test("plays on this reader's first visit to a world, its band running down, and a reload, which the device remembers, plays none", async ({
   page,
 }) => {
@@ -134,8 +175,14 @@ test("plays on this reader's first visit to a world, its band running down, and 
   const bands = first.map(({ band }) => band);
   const onTheWorld = bands.filter((band) => Math.abs(band) < 1);
   expect(onTheWorld.length, "the band ran over the world, a frame at a time").toBeGreaterThan(10);
-  for (let at = 1; at < bands.length; at += 1)
-    expect(bands[at], `the band runs down: ${JSON.stringify(bands)}`).toBeLessThanOrEqual(bands[at - 1] ?? Infinity);
+  // Each frame drawn while the band crosses the world moves it down: a band that stalls, or runs up, fails (7w's review, F4534).
+  const crossing = first.filter(
+    ({ grid, band }, at) => grid > 0 && Math.abs(band) < BAND_REACH && first[at - 1]?.frame !== first[at]?.frame,
+  );
+  for (let at = 1; at < crossing.length; at += 1)
+    expect(crossing[at]?.band, `the band runs down: ${JSON.stringify(crossing)}`).toBeLessThan(
+      crossing[at - 1]?.band ?? Infinity,
+    );
   expect(Math.abs(bands.at(-1) ?? 0), "and leaves the world").toBeGreaterThanOrEqual(OFF);
   expect(await visits(page)).toHaveLength(1);
   await page.reload();
@@ -167,6 +214,8 @@ test("draws thin lines as frame 104's, meridians every 36 degrees on the night s
   await opened(page);
   const shown = await stepUntil(page, ({ appearance }) => appearance.grid === 1, { what: "the grid whole" });
   const whole = await page.screenshot();
+  const fading = await stepUntil(page, ({ appearance }) => appearance.grid <= 0.5, { what: "the grid half faded" });
+  const half = await page.screenshot();
   await stepUntil(page, ({ appearance }) => appearance.grid === 0, { what: "the grid gone" });
   const bare = await page.screenshot();
   const { x, y, radius } = shown.centre;
@@ -190,6 +239,22 @@ test("draws thin lines as frame 104's, meridians every 36 degrees on the night s
   expect(Math.max(...meridians.map(({ width }) => width)), `thin, as frame 104's: ${said}`).toBeLessThanOrEqual(THIN);
   expect(meridians.filter(({ dark }) => dark).length, `on the night side: ${said}`).toBeGreaterThanOrEqual(1);
   expect(meridians.filter(({ dark }) => !dark).length, `on the day side: ${said}`).toBeGreaterThanOrEqual(1);
+  // On the night side a line stands as frames 103's and 104's do, under the band's light, and fades as the grid says (7w's reviews).
+  const [inWhole = [], inHalf = [], inBare = []] = await reading(
+    page,
+    [whole, half, bare],
+    [runPeaks, { at: Math.round(y), runs: meridians.filter(({ dark }) => dark) }],
+  );
+  for (const [at, peak] of inWhole.entries()) {
+    const ground = inBare[at] ?? 0;
+    expect(peak, `a line's light on the night side: ${JSON.stringify(inWhole)}`).toBeGreaterThanOrEqual(LINE_LIGHT[0]);
+    expect(peak, `a line's light on the night side: ${JSON.stringify(inWhole)}`).toBeLessThanOrEqual(LINE_LIGHT[1]);
+    const share = ((inHalf[at] ?? 0) - ground) / (peak - ground);
+    const grid = fading.appearance.grid;
+    expect(Math.abs(share - grid), `it fades as the grid: ${String(share)} of it at ${String(grid)}`).toBeLessThan(
+      0.15,
+    );
+  }
   // A column halfway between the two meridians nearest the middle, clear of them: it meets the parallels alone.
   const middle = [...meridians].sort((one, two) => Math.abs(one.start - x) - Math.abs(two.start - x)).slice(0, 2);
   const between = Math.round(middle.reduce((sum, { start }) => sum + start, 0) / middle.length);
@@ -309,4 +374,59 @@ test("shows each step as frames 103, 104 and 105 do: the grid drawn north of the
     [ridges, { ...across, at: Math.round(y - 0.3 * radius) }],
   );
   expect(up20, `none under the cap: ${String(up20)} at the cap, ${String(up105)} at 105`).toBeLessThanOrEqual(up105);
+  // The band as wide as frame 103's, at half its light (7w's design review).
+  const span = await reading(page, [at103, at105], [bandSpan, { x, y, radius, night: NIGHT }]);
+  expect(span.columns, "the night side's columns read").toBeGreaterThanOrEqual(3);
+  expect(span.median, `the band's width: ${JSON.stringify(span)}`).toBeGreaterThanOrEqual(BAND_SPAN[0]);
+  expect(span.median, `the band's width: ${JSON.stringify(span)}`).toBeLessThanOrEqual(BAND_SPAN[1]);
+});
+
+// Each run's width at half its peak, in the picture's pixels: what the first of two pictures adds over the second along the row `at`.
+const halfWidths = ({ at, runs }: { at: number; runs: { start: number; width: number }[] }) => {
+  const { images, luma } = Reflect.get(globalThis, "__pixels") as Tools;
+  const [shown, bare] = images;
+  if (shown === undefined || bare === undefined) throw new Error("two pictures are read");
+  const added = (x: number) => luma(shown, x, at) - luma(bare, x, at);
+  return runs.map(({ start, width }) => {
+    let peak = 0;
+    for (let x = start; x < start + width; x += 1) peak = Math.max(peak, added(x));
+    let wide = 0;
+    for (let x = start - 2; x < start + width + 2; x += 1) if (added(x) >= peak / 2) wide += 1;
+    return wide;
+  });
+};
+
+// At a pixel ratio of 2, which a computer's high tier draws at, a line keeps frame 104's width in the page's pixels: about 3 of the picture's
+// at half its light, never the 1.5 a buffer's pixel would make it (7w's review). Read at 1,280 by 800, under reduced motion, as above.
+test.describe("at a pixel ratio of 2", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+
+  test("draws the grid's lines as wide in the page as at a ratio of 1", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await opened(page);
+    const shown = await stepUntil(page, ({ appearance }) => appearance.grid === 1, { what: "the grid whole" });
+    const ratio = await page.evaluate(
+      () => (Reflect.get(globalThis, "__gnoworldScene") as { stats: () => { ratio: number } }).stats().ratio,
+    );
+    expect(ratio, "the scene draws at the screen's ratio").toBe(2);
+    const whole = await page.screenshot();
+    await stepUntil(page, ({ appearance }) => appearance.grid === 0, { what: "the grid gone" });
+    const bare = await page.screenshot();
+    const { x, y, radius } = shown.centre;
+    const row = {
+      at: Math.round(2 * y),
+      from: Math.ceil(2 * (x - 0.9 * radius)),
+      to: Math.floor(2 * (x + 0.9 * radius)),
+      least: LINE,
+      night: NIGHT,
+    };
+    const runs = await reading(page, [whole, bare], [brighterRuns, row]);
+    const widths = (await reading(page, [whole, bare], [halfWidths, { at: row.at, runs }])).sort(
+      (one, two) => one - two,
+    );
+    expect(widths.length, JSON.stringify(runs)).toBeGreaterThanOrEqual(3);
+    const said = `the lines' widths at half their light, in the picture's pixels: ${JSON.stringify(widths)}`;
+    expect(widths[Math.floor(widths.length / 2)], said).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...widths), said).toBeLessThanOrEqual(2 * THIN);
+  });
 });

@@ -616,6 +616,14 @@ describe("its appearance on this reader's first visit", () => {
     expect(moved).not.toHaveBeenCalled();
   });
 
+  // fwidth counts the buffer's pixels: at a ratio of 2 a line of 1.5 of them is 0.75 of the page's (7w's review, F4532).
+  it("tells the overlay the buffer's pixels to one of the page's, so its lines keep frame 104's width at any ratio", async () => {
+    const { view, stage } = await opened();
+    expect(value(overlayOf(stage), "ratio")).toBe(1);
+    view.resize(WIDTH, HEIGHT, 2);
+    expect(value(overlayOf(stage), "ratio")).toBe(2);
+  });
+
   it("keeps the appearance that ran when a lost context comes back: it carries on, never starts again", async () => {
     const { view } = await opened();
     view.read(reading({ first: true }));
