@@ -11,14 +11,16 @@ import type { AppState } from "../../store/index.ts";
 import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
+import { Flown } from "./flown.ts";
 import { WorldsFeed } from "./worldsFeed.ts";
 
 /** `loading` came by itself; `asked` is the reader's press, which the button shows. */
 export type SceneStatus = "off" | "none" | "offered" | "loading" | "asked" | "on" | "failed";
 
-/** A world's page: the world it shows, by the id the worlds' job groups it under. */
+/** A world's page: the world it shows, by the id the worlds' job groups it under, and its name, which a flight there shows (7g). */
 export interface WorldShown {
   readonly world: string;
+  readonly name?: string;
 }
 
 /** Whether the page shows space, and the Earth, the default universe's worlds or one world in it. */
@@ -78,6 +80,11 @@ export class SceneHost {
   };
 
   readonly world = () => this.#world;
+
+  /** What the page knows of the scene's flights, and what their panel shows (7g). */
+  readonly flown = new Flown(() => {
+    this.#tell();
+  });
 
   #tell(): void {
     this.#markPage();
@@ -179,6 +186,7 @@ export class SceneHost {
 
   /** Whether the page shows the scene: the first that does decides, one that does not covers it. */
   show(shown: Shown, page?: EarthPage | WorldPage): void {
+    this.flown.between(this.#scene, shown);
     this.#shown = shown !== false;
     this.#page = page;
     this.#wantsEarth = shown === "earth";
@@ -216,6 +224,7 @@ export class SceneHost {
             onLost: (lost) => {
               this.#say(lost ? "failed" : "on");
             },
+            onFlight: this.flown.said,
           }),
         );
       })

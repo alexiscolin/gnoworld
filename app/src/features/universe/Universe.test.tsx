@@ -113,6 +113,17 @@ const heading = (child: ReactNode) => (
   </>
 );
 
+// The page's boxes are watched for their size: jsdom has no observer, so one that sees nothing stands in.
+const stubObserver = () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
+};
+
 const left: (() => void)[] = [];
 
 // A root of its own: a test here draws the component again with another prop, or leaves it.
@@ -148,6 +159,8 @@ beforeEach(() => {
   scene.presence.mockImplementation(() => new Promise(() => undefined));
   scene.start.mockImplementation(() => ({
     cover: scene.cover,
+    fly: vi.fn(),
+    depart: vi.fn(),
     cosmos: scene.cosmos,
     keepClear: scene.keepClear,
     dispose: scene.dispose,
@@ -745,6 +758,8 @@ describe("on the Earth's page", () => {
     vi.stubGlobal("ResizeObserver", Observer);
     scene.start.mockImplementation(() => ({
       cover: scene.cover,
+      fly: vi.fn(),
+      depart: vi.fn(),
       dispose: scene.dispose,
       earth: scene.earth,
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
@@ -1062,13 +1077,7 @@ describe("on a world's page", () => {
   };
 
   beforeEach(() => {
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        observe = vi.fn();
-        disconnect = vi.fn();
-      },
-    );
+    stubObserver();
     scene.start.mockImplementation(() => ({
       cover: scene.cover,
       dispose: scene.dispose,
@@ -1076,6 +1085,8 @@ describe("on a world's page", () => {
       world: scene.world,
       worldMoons: vi.fn(),
       cosmos: scene.cosmos,
+      fly: vi.fn(),
+      depart: vi.fn(),
       ground: { setMarks: vi.fn(), facing: vi.fn(), face: vi.fn() },
       stats: () => ({}),
     }));
@@ -1271,5 +1282,111 @@ describe("on a world's page", () => {
     await settle();
     rerender(true);
     expect(scene.world.mock.lastCall?.[0]).toBeUndefined();
+  });
+});
+
+describe("flights between places (7g)", () => {
+  const fly = vi.fn<(goal: unknown) => void>();
+  const depart = vi.fn<() => void>();
+  const said = { target: "GovDAO", phase: "transit", distance: 6.29, speed: 1158, eta: 1.7, along: 0.3 } as const;
+  const onFlight = () =>
+    (scene.start.mock.calls[0]?.[0] as { onFlight?: (flight: typeof said | undefined) => void }).onFlight;
+
+  beforeEach(() => {
+    stubObserver();
+    scene.start.mockImplementation(() => ({
+      cover: scene.cover,
+      cosmos: scene.cosmos,
+      earth: scene.earth,
+      world: scene.world,
+      keepClear: scene.keepClear,
+      fly,
+      depart,
+      dispose: scene.dispose,
+      stats: () => ({}),
+    }));
+  });
+
+  // The scene is asked to fly before it is told of the next place: the flight copies what is still drawn.
+  const flewBefore = (next: { mock: { invocationCallOrder: number[] } }) => {
+    expect(fly.mock.invocationCallOrder.at(-1)).toBeLessThan(next.mock.invocationCallOrder.at(-1) ?? 0);
+  };
+
+  it("flies when the page goes from one place in space to another, named as the panel shows it, before the place changes", async () => {
+    // The box a page keeps for its body: the host watches it, and lets the body go as the page leaves.
+    const globe = document.body.appendChild(document.createElement("div"));
+    globe.setAttribute("data-globe", "");
+    const { rerender } = rendered("cosmos");
+    await settle();
+    expect(fly).not.toHaveBeenCalled();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "GovDAO" });
+    flewBefore(scene.cosmos);
+    rerender({ world: "bubble", name: "Bubble" });
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "Bubble" });
+    flewBefore(scene.world);
+    rerender("earth");
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "Earth" });
+    flewBefore(scene.world);
+    rerender("cosmos");
+    expect(fly).toHaveBeenLastCalledWith({ kind: "cosmos", name: "Cosmos" });
+    flewBefore(scene.earth);
+    flewBefore(scene.cosmos);
+    expect(fly).toHaveBeenCalledTimes(4);
+    globe.remove();
+  });
+
+  it("flies nowhere before the scene runs, to the place it is at, or from a page that covers space", async () => {
+    const { rerender } = rendered("cosmos");
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    await settle();
+    expect(fly).not.toHaveBeenCalled();
+    rerender("cosmos");
+    expect(fly).toHaveBeenCalledTimes(1);
+    rerender("cosmos");
+    rerender(false);
+    await Promise.resolve();
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenCalledTimes(1);
+  });
+
+  // A route's change: the page that leaves covers space as it goes, and the next asks for its place in the same task.
+  it("flies from the page that left to the next, the frame it showed copied before space was covered", async () => {
+    const { rerender } = rendered("cosmos");
+    await settle();
+    rerender(false);
+    expect(depart).toHaveBeenCalledTimes(1);
+    expect(depart.mock.invocationCallOrder[0]).toBeLessThan(scene.cosmos.mock.invocationCallOrder.at(-1) ?? 0);
+    rerender({ world: "gov/dao", name: "GovDAO" });
+    expect(fly).toHaveBeenLastCalledWith({ kind: "body", name: "GovDAO" });
+  });
+
+  it("shows the panel while the scene says a flight is under way, and takes it off once it has landed", async () => {
+    const { box } = rendered("cosmos");
+    await settle();
+    act(() => {
+      onFlight()?.(said);
+    });
+    expect(one(box, "[data-flight]").textContent).toContain("GovDAO");
+    act(() => {
+      onFlight()?.(undefined);
+    });
+    expect(all(box, "[data-flight]")).toEqual([]);
+  });
+
+  it("shows no panel over a page that covers space, nor once the context went", async () => {
+    const { box, rerender } = rendered("cosmos");
+    await settle();
+    act(() => {
+      onFlight()?.(said);
+    });
+    expect(all(box, "[data-flight]")).toHaveLength(1);
+    rerender(false);
+    expect(all(box, "[data-flight]")).toEqual([]);
+    rerender("cosmos");
+    act(() => {
+      started().onLost(true);
+    });
+    expect(all(box, "[data-flight]")).toEqual([]);
   });
 });

@@ -27,6 +27,20 @@ export interface CosmosStats {
   /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
   dive: { along: number; veil: number };
 }
+/** The flights (7g): how many started, one under way or not, how far along, its veil and streaks, where it goes, and the eye's way so far. */
+export interface FlightStats {
+  flights: number;
+  flying: boolean;
+  along: number;
+  veil: number;
+  streaks: number;
+  kind: string;
+  target: string;
+  seconds: number;
+  /** How long, on its own clock, the last flight waited in transit for its page's body. */
+  waited: number;
+  travel: { x: number; y: number; z: number };
+}
 interface Stats {
   frames: number;
   tier: "high" | "low";
@@ -40,6 +54,7 @@ interface Stats {
   turn: { yaw: number; pitch: number };
   seconds: number;
   cosmos: CosmosStats | undefined;
+  flight: FlightStats | undefined;
 }
 
 export const stats = (page: Page) =>
