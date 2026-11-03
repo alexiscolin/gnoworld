@@ -914,7 +914,7 @@ describe("startWorlds", () => {
     const counting = chainRoutes([POOL], {
       indexer: () => {
         reads += 1;
-        return history(3 * reads, POOL);
+        return history(6 * reads, POOL);
       },
     });
     const chain = fakeChain(counting);
@@ -922,7 +922,7 @@ describe("startWorlds", () => {
     expect(job.trends()).toEqual([]);
     await until(() => job.trends().some(({ kind }) => kind === "trending"));
     job.stop();
-    expect(job.trends().find(({ kind }) => kind === "trending")).toMatchObject({ world: "gnoswap/pool", calls: 3 });
+    expect(job.trends().find(({ kind }) => kind === "trending")).toMatchObject({ world: "gnoswap/pool", calls: 6 });
   });
 
   it("runs another pass after the period, once the first has ended", async () => {
