@@ -44,23 +44,27 @@ const NAME_HALF = 60;
 const HEADER = 0.09;
 const MARGIN = 16;
 
-/** The worlds a Plan of `system` draws: its bodies, the largest `PLAN_MOST`, in the order of their orbits, nearest the star first. */
+// A world's own size, its use's, before its system's room caps it (7v's design review, F4470: gnoswap's 16 stood at their crowd's cap).
+const sizeOf = ({ radius, own }: Orbiter) => own ?? radius;
+
+/** The worlds a Plan of `system` draws: its bodies, the largest `PLAN_MOST` by their own size, in the order of their orbits, nearest the
+ * star first. */
 const planWorlds = (system: StarSystem): Orbiter[] =>
   system.worlds
     .filter(({ radius }) => radius >= GRAIN)
-    .sort((a, b) => b.radius - a.radius)
+    .sort((a, b) => sizeOf(b) - sizeOf(a))
     .slice(0, PLAN_MOST)
     .sort((a, b) => a.orbit - b.orbit);
 
 // The Plan's orbits, its outer at 1 or past it: each world `GAP` of their radii or more past the one before, else in proportion to its real
-// orbit; each world `size` of the outer orbit at the most used's size.
+// orbit; each world `size` of the outer orbit at the most used's size, by its own.
 function spread(worlds: readonly Orbiter[], size: number): Orbiter[] {
   const [first] = worlds;
   const span = Math.max(...worlds.map(({ orbit }) => orbit - (first?.orbit ?? 0)), 1e-9);
   const placed: Orbiter[] = [];
-  for (const world of worlds) {
+  for (const { own: _own, ...world } of worlds) {
     const before = placed.at(-1);
-    const radius = (world.radius / WORLD_MOST) * size;
+    const radius = ((_own ?? world.radius) / WORLD_MOST) * size;
     const real = INNER + ((world.orbit - (first?.orbit ?? 0)) * (1 - INNER)) / span;
     placed.push({
       ...world,

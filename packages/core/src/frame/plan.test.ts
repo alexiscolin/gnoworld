@@ -5,6 +5,7 @@ import {
   EARTH_RADIUS,
   GRAIN,
   systemsOf,
+  worldSize,
   type Orbiter,
   type StarSystem,
   type WorldHeld,
@@ -81,18 +82,20 @@ describe("a system's Plan", () => {
     },
   );
 
-  // The twelve largest by their own size, computed here: every other body no larger than the least of them.
+  // The twelve largest by their own size, before a crowd's cap (7v's design review, F4470), computed here: every other body no larger than
+  // the least of them.
   it.each(Object.keys(SETS) as SetName[])(
     "draws %s's twelve largest worlds of a body's size, on orbits of their own in their real order",
     (name) => {
       for (const system of bodied(name)) {
         const { postcard } = planOf(system);
         const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
-        const largest = [...bodies].sort((a, b) => b.radius - a.radius).slice(0, 12);
+        const own = ({ radius, own: size }: Orbiter) => size ?? radius;
+        const largest = [...bodies].sort((a, b) => own(b) - own(a)).slice(0, 12);
         expect(postcard.worlds.map(({ id }) => id).sort()).toEqual(largest.map(({ id }) => id).sort());
-        const least = Math.min(...largest.map(({ radius }) => radius));
+        const least = Math.min(...largest.map(own));
         const drawn = new Set(largest.map(({ id }) => id));
-        for (const other of bodies) if (!drawn.has(other.id)) expect(other.radius).toBeLessThanOrEqual(least);
+        for (const other of bodies) if (!drawn.has(other.id)) expect(own(other)).toBeLessThanOrEqual(least);
         const real = new Map(system.worlds.map((world) => [world.id, world]));
         postcard.worlds.forEach((world, at) => {
           const before = postcard.worlds[at - 1];
@@ -104,6 +107,26 @@ describe("a system's Plan", () => {
       }
     },
   );
+
+  // 7v's design review (F4470): every Plan world stood at one size (gnoswap's 16 all at their crowd's cap, 0.493). Each is drawn at its own
+  // size, its use's, whatever its crowd's cap.
+  it.each([
+    ["60 mixed systems", () => mixed(60)],
+    ["a crowd of 172", () => [...mixed(4), ...crowd("busy", 172)]],
+  ] as const)("draws each world of %s at its own size, by its use, whatever its crowd's cap", (name, held) => {
+    const use = new Map(held().map(({ id, use: used }) => [id, used]));
+    let varied = false;
+    for (const system of bodied(name)) {
+      const [first, ...others] = planOf(system).postcard.worlds;
+      if (first === undefined) continue;
+      const size = (id: string) => worldSize(use.get(id) ?? NaN);
+      for (const world of others) {
+        expect(world.radius / first.radius).toBeCloseTo(size(world.id) / size(first.id), 9);
+        varied ||= Math.abs(world.radius - first.radius) > 1e-9;
+      }
+    }
+    expect(varied).toBe(true);
+  });
 
   // A crowd is mostly grain (three clear bodies of 172): Onyx's g1ut6uspuh holds 21 worlds of a body's size.
   it("draws exactly twelve of a system with more", () => {
@@ -119,7 +142,7 @@ describe("a system's Plan", () => {
     (name) => {
       for (const system of bodied(name)) {
         const { postcard } = planOf(system);
-        const real = new Map(system.worlds.map((world) => [world.id, world.radius]));
+        const real = new Map(system.worlds.map((world) => [world.id, world.own ?? world.radius]));
         const scale = (postcard.worlds[0]?.radius ?? NaN) / (real.get(postcard.worlds[0]?.id ?? "") ?? NaN);
         for (const world of postcard.worlds) expect(world.radius).toBeCloseTo((real.get(world.id) ?? NaN) * scale, 9);
         const drawn = new Set(postcard.worlds.map(({ id }) => id));

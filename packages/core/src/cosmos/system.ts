@@ -55,6 +55,8 @@ export interface WorldHeld {
 export interface Orbiter {
   readonly id: string;
   readonly radius: number;
+  /** Its own size, its use's, where its system's room makes its radius another: a Plan draws it so (7v's design review, F4470). */
+  readonly own?: number;
   readonly orbit: number;
   readonly phase: number;
 }
@@ -133,9 +135,12 @@ function latticeOf(
     const slot = places.get(id) ?? 0;
     const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
     const placed = { orbit, phase: start + slot * GOLDEN };
+    const own = worldSize(use);
+    const radius = Math.min(own, most);
     return {
       id,
-      radius: Math.min(worldSize(use), most),
+      radius,
+      ...(own === radius ? {} : { own }),
       ...(crowd ? scattered(id, placed, { start, outer }) : placed),
     };
   });
@@ -154,7 +159,9 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
   return all.map((world, rank) => {
     if (rank >= CLEAR_BODIES) return world;
     const nearest = Math.min(...clear.filter((other) => other !== world).map((other) => gap(world, other)));
-    return { ...world, radius: Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM) };
+    const { own = world.radius, ...kept } = world;
+    const radius = Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM);
+    return { ...kept, radius, ...(own === radius ? {} : { own }) };
   });
 }
 
