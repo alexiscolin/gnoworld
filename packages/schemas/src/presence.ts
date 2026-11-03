@@ -1,6 +1,6 @@
 // GET /api/presence (slice 7, 7h): who is here in each world a guest may see, counts alone, for the cosmos's labels. A world is named by its
 // roles file's slug, as the server's rooms are; the client keys it as the cosmos holds it. Every count is bounded, and nothing else rides.
-import { Slug } from "./slug.ts";
+import { HubSlug } from "./slug.ts";
 import { z } from "./zod.ts";
 
 /** The most worlds one answer holds. */
@@ -13,7 +13,7 @@ const People = z
   .check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(PEOPLE_MOST));
 
 const World = z.strictObject({
-  world: Slug.check(z.maxLength(64)),
+  world: HubSlug,
   here: People,
   perHour: z.number().check(z.gte(0), z.lte(PER_HOUR_MOST)),
   rise: z.nullable(z.number().check(z.gte(0), z.lte(PEOPLE_MOST))),
