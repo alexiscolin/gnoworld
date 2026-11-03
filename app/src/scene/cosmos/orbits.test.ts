@@ -257,6 +257,32 @@ describe("a system's Plan on the stage", () => {
     expect(names().map((name) => name.querySelector(".dot[data-tone='warm']") !== null)).toEqual([false, true, false]);
   });
 
+  // 7v's review (F4454): the universe stays on the page across routes, so a Plan's layer that ignored the canvas stayed over a realm's page,
+  // its links clickable; with no Plan, an empty landmark stayed for a screen reader.
+  it("shows its layer only while a Plan is shown and the scene's canvas runs", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.dataset["scene"] = "on";
+    document.body.append(canvas);
+    const { orbits } = made();
+    const layer = () => document.querySelector<HTMLElement>("[data-plan]");
+    expect(layer()?.hidden).toBe(true);
+    orbits.show(planned(), words);
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    expect(layer()?.hidden).toBe(false);
+    canvas.dataset["scene"] = "covered";
+    await Promise.resolve();
+    expect(layer()?.hidden).toBe(true);
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    expect(layer()?.hidden).toBe(true);
+    canvas.dataset["scene"] = "on";
+    await Promise.resolve();
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    expect(layer()?.hidden).toBe(false);
+    orbits.show(undefined, words);
+    expect(layer()?.hidden).toBe(true);
+    orbits.dispose();
+  });
+
   it("takes its ellipses and names away once no Plan is shown, and everything once gone", () => {
     const { parent, orbits } = made();
     orbits.show(planned(), words);

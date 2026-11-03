@@ -226,6 +226,25 @@ describe("a system's Plan through the labels' way in", () => {
     part.dispose();
   });
 
+  // 7v's review (F4454): leaving the cosmos (a realm's page, the Plan's own second click) takes its names away with the labels.
+  it("takes the Plan's names away when the cosmos goes", async () => {
+    const part = new CosmosLabels(document, {
+      projector: { ...projector, group: new Group() },
+      earth: () => undefined,
+      earthRadius: EARTH_RADIUS,
+      callersOf,
+    });
+    part.list(list, signals);
+    part.look([system], planned(), []);
+    await vi.dynamicImportSettled();
+    part.tick({ x: 0, y: 0, z: 0 }, true);
+    expect(names()).toHaveLength(2);
+    part.list(undefined, undefined);
+    expect(names()).toEqual([]);
+    expect(document.querySelector<HTMLElement>("[data-plan]")?.hidden).toBe(true);
+    part.dispose();
+  });
+
   it("hands the page a world's address at a second click, as an event its router reads", async () => {
     const part = new CosmosLabels(document, {
       projector: { ...projector, group: new Group() },

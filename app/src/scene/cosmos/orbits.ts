@@ -11,6 +11,7 @@ import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
 import type { Projector } from "./labels.ts";
 import labelStyles from "./labels.module.css";
 import styles from "./orbits.module.css";
+import { watchScene } from "./sceneRuns.ts";
 
 /** A Plan as its names show it: in the file's words, linked to the worlds' pages, who is here in each world. */
 export type Named = Planned & { readonly here: ReadonlySet<string> };
@@ -73,6 +74,10 @@ export class Orbits {
   #shown: { plan: Planned | undefined; words: Words | undefined } = { plan: undefined, words: undefined };
   #names: HTMLAnchorElement[] = [];
   #named: HTMLAnchorElement | undefined;
+  // The layer shows while a Plan is shown, the frames run, and the scene's canvas does: the page stays over other routes (7v's review).
+  #running = true;
+  #ticking = false;
+  readonly #watching: MutationObserver | undefined;
 
   /** In `parent`, whose origin is the eye; its names in `document`, placed by `projector`; `open` takes a site's page's address, by default
    * an event the page's router reads. */
@@ -94,7 +99,16 @@ export class Orbits {
     this.#layer.className = `${labelStyles["layer"] ?? ""} ${styles["plan"] ?? ""}`;
     this.#layer.setAttribute("aria-label", "The worlds of the Plan");
     this.#layer.dataset["plan"] = "";
+    this.#layer.hidden = true;
     document.body.append(this.#layer);
+    this.#watching = watchScene(document, (running) => {
+      this.#running = running;
+      this.#hide();
+    });
+  }
+
+  #hide(): void {
+    this.#layer.hidden = !(this.#running && this.#ticking && this.#plan !== undefined);
   }
 
   /** Draws `plan` in the file's `words`, or takes it away with none; the same Plan and words, nothing new. */
@@ -113,6 +127,7 @@ export class Orbits {
     this.#names = plan === undefined ? [] : plan.worlds.map(({ id }) => this.#nameOf(plan, id));
     this.#written = new Float64Array(2 * this.#names.length).fill(NaN);
     this.#layer.replaceChildren(...this.#names);
+    this.#hide();
     if (plan !== undefined) this.#ellipses(plan);
   }
 
@@ -169,9 +184,10 @@ export class Orbits {
   /** A frame: the ellipses at their star, each name under its world, from `eye` on the stage, none for a world behind the eye; nothing
    * while the scene is not `shown`. */
   tick(eye: Point, shown = true): void {
-    this.#layer.hidden = !shown;
+    this.#ticking = shown;
+    this.#hide();
     const plan = this.#plan;
-    if (plan === undefined || !shown) return;
+    if (plan === undefined || this.#layer.hidden) return;
     this.#lines.position.copy(this.#projector.fromEye(plan.system.place, eye, this.#at));
     for (let at = 0; at < this.#names.length; at += 1) {
       const name = this.#names[at];
@@ -194,6 +210,7 @@ export class Orbits {
 
   /** Off the stage and the page, its buffers and program freed. */
   dispose(): void {
+    this.#watching?.disconnect();
     this.#lines.removeFromParent();
     this.#lines.geometry.dispose();
     this.#lines.material.dispose();

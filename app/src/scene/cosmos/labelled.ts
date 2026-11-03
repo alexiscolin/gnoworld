@@ -59,7 +59,11 @@ export class CosmosLabels {
   list(worlds: readonly CosmosWorld[] | undefined, signals: LabelSignals | undefined): void {
     this.#list = worlds ?? [];
     this.#signals = signals;
-    if (worlds === undefined) this.#labels.tick(NOWHERE, false);
+    if (worlds !== undefined) return;
+    // The cosmos goes: its labels and its Plan's names with it (7v's review).
+    this.#labels.tick(NOWHERE, false);
+    this.#plan = undefined;
+    this.#orbits?.show(undefined, { worlds: [], signals: undefined });
   }
 
   /** A look: the systems, what the ladder drew, and the ids of the bodies the view stands. */
