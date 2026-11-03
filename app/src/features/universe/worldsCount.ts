@@ -7,7 +7,7 @@ import { readWorldsCount } from "../../lib/chain/worldsCount.ts";
 let drawnWorlds: number | undefined;
 const counting = new Set<() => void>();
 
-/** Says how many worlds the cosmos draws, once a read of the worlds' file has brought it. */
+/** Says how many worlds the cosmos draws, once a read has brought it: the worlds' count the home reads, or the file the scene draws. */
 export function worldsDrawn(count: number): void {
   drawnWorlds = count;
   for (const tell of counting) tell();
