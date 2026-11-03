@@ -383,13 +383,14 @@ test.describe("a shader the driver refuses", () => {
   test.use({ viewport: COMPUTER, serviceWorkers: "block" });
 
   test("leaves the page whole, says so, and keeps the plate shut: no hole with no word", async ({ page }) => {
-    // The line is broken in whichever of the scene's chunks holds it: a second lazy part split the scene's shared code out of its chunk (7e).
+    // The line is broken in whichever of the scene's chunks holds it: a second lazy part split the scene's shared code out of its chunk (7e),
+    // and the build strips the shaders' spaces (7v), so `float facing=`.
     let broken = 0;
     await page.route(/\/assets\/[\w-]+\.js$/, async (route) => {
       const answer = await route.fetch();
       const text = await answer.text();
-      if (text.includes("float facing =")) broken += 1;
-      await route.fulfill({ response: answer, body: text.replace("float facing =", "flot facing =") });
+      if (text.includes("float facing=")) broken += 1;
+      await route.fulfill({ response: answer, body: text.replace("float facing=", "flot facing=") });
     });
     const refused: string[] = [];
     page.on("pageerror", ({ message }) => refused.push(message));
