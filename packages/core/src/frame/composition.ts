@@ -137,9 +137,11 @@ function aRow(all: readonly Seen[], { deep, lights, width, height }: Frame): boo
 }
 
 // Two neighbours stand at one height under a tenth of the screen's height apart and under 40 degrees off level (the chief's reading of
-// Alexis's rule, 2026-11-03: a far postcard's bodies stand nearer than a tenth of the height, and read apart by their slant).
+// Alexis's rule, 2026-11-03: a far postcard's bodies stand nearer than a tenth of the height, and read apart by their slant); of one size,
+// under 1.5 times apart.
 const ONE_HEIGHT = 0.1;
 const LEVEL = Math.tan((40 * Math.PI) / 180);
+const TWIN = 1.5;
 
 /** Whether two places stand at one height on a screen `height` pixels high. */
 export const atOneHeight = (
@@ -150,6 +152,16 @@ export const atOneHeight = (
   const up = Math.abs(one.y - other.y);
   return up < ONE_HEIGHT * height && up < LEVEL * Math.abs(one.x - other.x);
 };
+
+/** Whether any of `spots` stands of one size and at one height beside its nearest neighbour (Alexis, 2026-11-03, "pas 2 planètes de la
+ * même taille au même niveau"), on a screen `height` pixels high. */
+export const twins = (spots: readonly Spot[], height: number): boolean =>
+  spots.some((one) => {
+    const gap = (other: Spot) => (other === one ? Infinity : apart(one, other));
+    const next = spots.reduce((best, other) => (gap(other) < gap(best) ? other : best), one);
+    const like = Math.max(next.radius, one.radius) < TWIN * Math.min(next.radius, one.radius);
+    return next !== one && like && atOneHeight(one, next, height);
+  });
 
 /** Whether the bodies on screen, `spots`, and the Earth read as the view must, judged in `frame`: spread, apart, in no row that does not
  * recede, and deep with a close world. */

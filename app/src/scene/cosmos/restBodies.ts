@@ -9,7 +9,9 @@ import {
   EARTH_RADIUS,
   GRAIN,
   smoothstep,
+  type Deep,
   type Drawn,
+  type Rock,
   postcardOf,
   screenRadius,
   type Postcard,
@@ -28,11 +30,14 @@ const REST_REACH = 5;
 const WHOLE = () => 1;
 const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
-/** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, and its main light's system. */
+/** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, its main light's system, and, once
+ * found, the real worlds of other nearby systems the view at rest draws for depth and the home's rocks (7p). */
 export interface Shown {
   readonly view: RestView;
   readonly postcards: ReadonlyMap<number, Postcard>;
   readonly index: number;
+  readonly deep?: readonly Deep[];
+  readonly rocks?: readonly Rock[];
 }
 
 /** The close world's system, by its index, as drawn wherever the eye stands: held still, so none of its worlds jumps to its orbit's place
@@ -81,9 +86,14 @@ export const postcardsOf = (
     }),
   );
 
-/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards' and its close world's system's. */
+/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards', its close world's system's and its depth's. */
 function restBodies(
-  { postcards, still }: { postcards: ReadonlyMap<number, Postcard>; still: Still | undefined },
+  systems: readonly StarSystem[],
+  {
+    postcards,
+    still,
+    deep,
+  }: { postcards: ReadonlyMap<number, Postcard>; still: Still | undefined; deep: readonly Deep[] },
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
@@ -101,6 +111,11 @@ function restBodies(
       offer(card.system, world, card.worlds[at]?.radius);
     });
   if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
+  for (const { system, world } of deep) {
+    const held = systems[system];
+    const own = held?.worlds[world];
+    if (held !== undefined && own !== undefined) offer(held, own);
+  }
   return wanted;
 }
 
@@ -138,7 +153,9 @@ export function drawnFrom(
   { shown, drawn }: { shown: Shown; drawn: Drawn },
   sight: { eye: Point; focal: number; resting: Point },
 ) {
-  const { view, postcards, index: main } = shown;
+  const { view, postcards, index: main, deep = [] } = shown;
+  // The home's rocks stand in space wherever the eye is, for the labels' chunk to draw (7p); a system's arrival has none.
+  drawn.rocks = shown.rocks ?? [];
   const [{ eye }, { resting }] = [view, sight];
   const still = stillOf(systems, view);
   const held = (system: number) => (system === still?.index ? still.system : undefined);
@@ -157,7 +174,7 @@ export function drawnFrom(
       near: false,
     };
   return {
-    bodies: restBodies({ postcards, still }, sight),
+    bodies: restBodies(systems, { postcards, still, deep }, sight),
     pointShare: pointShares(view),
     needsHalo: main === 0 ? haloNeeds(view) : lead,
     planeOf: (system: number) => postcards.get(system)?.system ?? held(system),

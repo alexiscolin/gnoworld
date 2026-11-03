@@ -1,6 +1,7 @@
 import {
   ARRIVAL_LEAN,
   arrivalOf,
+  deepOf,
   asciiBytes,
   beatAt,
   BELT_INNER,
@@ -21,6 +22,8 @@ import {
   orbitPlace,
   orbitTime,
   HOME,
+  judgeOf,
+  LENT,
   BLOCK_MS,
   MOOD_SCALE,
   NEBULA_IMAGES,
@@ -857,7 +860,8 @@ describe("the view at rest (7d6)", () => {
     }
   });
 
-  it("draws the bodies of three systems at most, the view's own: two postcards and the close world's", async () => {
+  // Alexis, 2026-11-03 ("la perspective doit être partout"): beside the view's own three systems, real worlds of four more at most (7p).
+  it("draws the bodies of the view's own systems, two postcards and the close world's, and of four more at most for depth", async () => {
     const scene = made();
     await shown(scene, ONYX);
     const systems = held(ONYX);
@@ -866,8 +870,9 @@ describe("the view at rest (7d6)", () => {
     const chosen = [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map(
       (index) => systems[index]?.id,
     );
-    expect(drawn.size).toBeLessThanOrEqual(3);
-    expect([...drawn].sort()).toEqual([...new Set(chosen)].sort());
+    const deep = deepOf(systems, view, judgeOf(systems, view, LENT)).map(({ system }) => systems[system]?.id);
+    expect(drawn.size).toBeLessThanOrEqual(3 + 4);
+    expect([...drawn].sort()).toEqual([...new Set([...chosen, ...deep])].sort());
   });
 
   it("draws Onyx's close world cut by the frame's edge, twice the Earth's size or more", async () => {
@@ -3055,6 +3060,43 @@ describe("a system's arrival (7d3)", () => {
     expect(up >= 0.1 * HEIGHT || up >= Math.tan((40 * Math.PI) / 180) * across).toBe(true);
     expect(screen.earth?.x).toBeCloseTo(WIDTH / 2, 0);
     expect(screen.earth?.y).toBeCloseTo(HEIGHT / 2, 0);
+  });
+
+  // Alexis, 2026-11-03 ("la perspective doit être partout"): beside the close world, the Earth and the postcards, real worlds of other
+  // nearby systems drawn as bodies at their own size, far, so the frame's sizes span about ten times, where they spanned 7.5 (149 px for
+  // the close world to gnoslinger's 20).
+  it("draws Onyx's view at rest in depth: real worlds of other systems as bodies, its sizes spanning eight times or more", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const view = restView(systems);
+    const deep = deepOf(systems, view, judgeOf(systems, view, LENT)).map(
+      ({ system, world }) => systems[system]?.worlds[world]?.id,
+    );
+    expect(deep.length).toBeGreaterThanOrEqual(2);
+    const { screen } = scene.cosmos.stats();
+    const ids = screen.bodies.map(({ id }) => id);
+    for (const id of deep) expect(ids).toContain(id);
+    const earth = screen.earth?.radius ?? NaN;
+    const radii = [earth, ...screen.bodies.map(({ radius }) => radius)];
+    expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThanOrEqual(8);
+    const close = screen.bodies.find(({ id }) => id.endsWith("/minichess"));
+    for (const { id, away } of screen.bodies.filter((body) => deep.includes(body.id)))
+      expect(away, id).toBeGreaterThan(2 * (close?.away ?? NaN));
+  });
+
+  // Alexis, 2026-11-03 ("roches d'ambiance", through the chief): a few rocks at the home's view at rest, decor laid in space, which the
+  // labels' chunk draws from what each look leaves (7p); a system's arrival has none.
+  it("lays a few rocks at Onyx's home for the labels' chunk to draw, and none at a system's arrival", async () => {
+    const scene = made();
+    const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
+    scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
+    await shown(scene, ONYX);
+    const rocks = () => look.mock.lastCall?.[1].rocks ?? [];
+    expect(rocks().length).toBeGreaterThanOrEqual(3);
+    expect(rocks().length).toBeLessThanOrEqual(7);
+    await arrived(scene, GNOSWAP);
+    expect(rocks()).toEqual([]);
   });
 
   it("sways along the arrival's own axes, across and up its view of what it looks at", async () => {

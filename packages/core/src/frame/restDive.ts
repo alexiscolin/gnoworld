@@ -15,9 +15,13 @@ const PER_SECOND = 60;
 const FRAMES_MOST = 6;
 const FRAMES = Math.round(DIVE.seconds * PER_SECOND);
 
-/** Whether the dive down to `camera`'s eye stands three of the drawn bodies on a line at like gaps for longer than a tenth of a second, on
- * either screen; the postcards turn on the way. */
-export function rowOnTheWayDown(camera: Camera, cards: readonly Card[], close: Close | undefined): boolean {
+/** Whether the dive down to `camera`'s eye stands three of the drawn bodies, `close` among them, on a line at like gaps for longer than a
+ * tenth of a second, or than `most` frames, on either screen; the postcards turn on the way. */
+export function rowOnTheWayDown(
+  camera: Camera,
+  cards: readonly Pick<Card, "system" | "worlds">[],
+  { close, most = FRAMES_MOST }: { close?: Close | undefined; most?: number } = {},
+): boolean {
   const out = { x: 0, y: 0, z: 0 };
   const rowAt = (frame: number) => {
     diveAt(camera.eye, frame / FRAMES, out);
@@ -26,12 +30,12 @@ export function rowOnTheWayDown(camera: Camera, cards: readonly Card[], close: C
       evenRow([look.earth, ...spotsOf(look, cards, { close, seconds }).filter(({ radius }) => radius >= BODY_PIXELS)]),
     );
   };
-  for (let frame = FRAMES_MOST + 1; frame < FRAMES; frame += FRAMES_MOST + 1) {
+  for (let frame = most + 1; frame < FRAMES; frame += most + 1) {
     if (!rowAt(frame)) continue;
     let [first, last] = [frame, frame];
     while (first > 1 && rowAt(first - 1)) first -= 1;
     while (last < FRAMES - 1 && rowAt(last + 1)) last += 1;
-    if (last - first + 1 > FRAMES_MOST) return true;
+    if (last - first + 1 > most) return true;
   }
   return false;
 }

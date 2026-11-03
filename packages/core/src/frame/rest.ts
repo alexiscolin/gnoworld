@@ -91,7 +91,7 @@ function judge(candidate: Candidate, ask: Ask): Judged | undefined {
   return {
     score,
     view: { eye: camera.eye, postcards: postcards.map(({ held }) => held.index), close: where },
-    rows: () => rowOnTheWayDown(camera, postcards, close),
+    rows: () => rowOnTheWayDown(camera, postcards, { close }),
   };
 }
 
