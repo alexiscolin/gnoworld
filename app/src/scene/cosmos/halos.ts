@@ -4,6 +4,9 @@
 import { smoothstep, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
 
 const HALOS = 7;
+
+/** Until the view at rest has come, and away from it, the great star's halo alone is needed: it is the first of the systems. */
+export const GREAT_STAR = (system: number) => system === 0;
 const HALO_NEAR = 40;
 const HALO_FAR = 120;
 const POINT_PIXELS = 10;

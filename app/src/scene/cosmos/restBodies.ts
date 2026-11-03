@@ -7,11 +7,13 @@ import {
   screenRadius,
   type Postcard,
   type Orbiter,
+  type Drawn,
   type Point,
   type RestView,
   type StarSystem,
 } from "@gnoworld/core";
 import type { Wanted } from "./bodies.ts";
+import { GREAT_STAR } from "./halos.ts";
 
 // A distant star's worlds glint, drawn as worlds of this share of their size, so they still fall with distance.
 const GLINT = 0.12;
@@ -62,4 +64,28 @@ export function haloNeeds({ postcards }: RestView): (system: number) => boolean 
 export function pointShares({ postcards, close }: RestView): (system: number) => number {
   const kept = new Set(postcards);
   return (system) => (kept.has(system) ? 1 : system === close?.system ? 0 : GLINT);
+}
+
+const WHOLE = () => 1;
+const NO_PLANE = () => undefined;
+
+/** What the cosmos draws anywhere but at rest (Alexis, 2026-11-02: depth everywhere): the worlds the ladder stands as bodies, each large
+ * enough on screen to tell from a point, its others whole points. Here, with the view at rest's code, for it runs only once that came. */
+export function everywhere(
+  systems: readonly StarSystem[],
+  drawn: Drawn,
+): {
+  bodies: Wanted;
+  close: undefined;
+  pointShare: () => number;
+  needsHalo: (system: number) => boolean;
+  planeOf: () => undefined;
+} {
+  const bodies = new Map<string, readonly [StarSystem, StarSystem["worlds"][number]]>();
+  for (let at = 0; at < drawn.bodyCount; at += 1) {
+    const system = systems[drawn.bodySystems[at] ?? -1];
+    const world = system?.worlds[drawn.bodyWorlds[at] ?? -1];
+    if (system !== undefined && world !== undefined) bodies.set(world.id, [system, world]);
+  }
+  return { bodies, close: undefined, pointShare: WHOLE, needsHalo: GREAT_STAR, planeOf: NO_PLANE };
 }

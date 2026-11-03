@@ -14,29 +14,15 @@ import {
 import type { PerspectiveCamera, Scene as Stage } from "three";
 import type { Disposer } from "../disposer.ts";
 import type { Wanted } from "./bodies.ts";
+import { GREAT_STAR } from "./halos.ts";
 
 const loadSearch = () => import("./restSearch.ts");
 type Searched = Awaited<ReturnType<typeof loadSearch>>;
 const NONE: Wanted = new Map();
 const NO_POINT = () => 0;
-const NO_PLANE = () => undefined;
-const WHOLE = () => 1;
-// Until the view has come, and away from it, the great star's halo alone is needed: it is the first of the systems.
-const GREAT_STAR = (system: number) => system === 0;
 // The eye stands at the view at rest within a mouse's lean (3 units each way, eye.ts) and its sway; away from it, the cosmos draws as
 // anywhere (Alexis, 2026-11-02: depth everywhere).
 const REST_REACH = 5;
-
-// Anywhere but at rest: the worlds the ladder stands as bodies, each large enough on screen to tell from a point, its others whole points.
-function everywhere(systems: readonly StarSystem[], drawn: Drawn): Wanted {
-  const wanted = new Map<string, readonly [StarSystem, StarSystem["worlds"][number]]>();
-  for (let at = 0; at < drawn.bodyCount; at += 1) {
-    const system = systems[drawn.bodySystems[at] ?? -1];
-    const world = system?.worlds[drawn.bodyWorlds[at] ?? -1];
-    if (system !== undefined && world !== undefined) wanted.set(world.id, [system, world]);
-  }
-  return wanted;
-}
 
 function plainRest(): RestView {
   const eye = { x: NaN, y: NaN, z: NaN };
@@ -161,13 +147,7 @@ export class AtRest {
     const [{ eye }, resting] = [this.#view, this.#restingMap];
     toMap(this.#resting, resting);
     if (searched !== undefined && Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH)
-      return {
-        bodies: everywhere(systems, drawn),
-        close: undefined,
-        pointShare: WHOLE,
-        needsHalo: GREAT_STAR,
-        planeOf: NO_PLANE,
-      };
+      return searched.everywhere(systems, drawn);
     const postcards = this.#postcards;
     return {
       bodies: searched?.restBodies(systems, { view: this.#view, postcards }, sight) ?? NONE,
