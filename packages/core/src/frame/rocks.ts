@@ -8,16 +8,15 @@ import type { Judge } from "./deep.ts";
 import type { RestView } from "./rest.ts";
 import type { Look, Seen } from "./restLook.ts";
 
-// A few, from this many tries: from 4 to 18 units ahead, the Earth 24 or more; their radius on the video's screen from 5 pixels far to 40
-// near, a quarter of it by chance; 40 pixels apart at the least, so none clumps. A label's room round its body, as core's `settle.ts` stands
-// it (PLACE): a pill 200 pixels wide at most and 32 high, its stem 12 in from the end over the body, 22 off its outline, above or below.
+// One near, 4 to 6 units ahead, 30 to 60 pixels in radius on the video's screen, its centre a third of that off the frame's left or bottom
+// edge at most, so the frame cuts it (the design review of 7p, after the references). Then pebbles, a cluster round one place 8 to 16
+// units ahead (frame 4's debris): 3 to 12 pixels there, the nearer larger, within 100 pixels of it.
 const MOST = 7;
 const TRIES = 60;
-const NEAREST = 4;
-const DEEPEST = 14;
-const SIZE = [5, 40] as const;
 const MARGIN = 16;
-const APART = 40;
+const APART = 6;
+// A label's room round its body, as core's `settle.ts` stands it (PLACE): a pill 200 pixels wide at most and 32 high, its stem 12 in from
+// the end over the body, 22 off its outline, above or below.
 const LABEL = { wide: 200, high: 32, stem: 12, gap: 22 } as const;
 
 const gap = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y) - a.radius - b.radius;
@@ -42,7 +41,7 @@ export interface Laid {
 
 /** The rocks of the home's view at rest `view`, read through its `judge` once its depth stands, from the view's own seed, on the map. */
 export function rocksOf(view: RestView, judge: Judge): Laid[] {
-  const { looks, swayed, balls, focal } = judge;
+  const { looks, swayed, balls, focal, spots } = judge;
   const [first] = looks;
   if (first === undefined) return [];
   let state = textHash(`rocks ${view.eye.x.toFixed(4)} ${view.eye.y.toFixed(4)} ${view.eye.z.toFixed(4)}`);
@@ -52,12 +51,10 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
   };
   const { camera, width, height } = first;
   const { eye, ahead, right, up } = camera;
-  const rocks: Laid[] = [];
-  const seen: Seen[] = [];
-  for (let tried = 0; tried < TRIES && rocks.length < MOST; tried += 1) {
-    const depth = NEAREST + DEEPEST * next();
-    const pixels = SIZE[0] + (SIZE[1] - SIZE[0]) * (1 - (depth - NEAREST) / DEEPEST) ** 1.5 * (0.75 + 0.25 * next());
-    const [x, y] = [width * (0.03 + 0.94 * next()), height * (0.12 + 0.85 * next())];
+  const [rocks, seen]: [Laid[], Seen[]] = [[], []];
+  // A rock at `x`, `y` on the video's screen, `depth` units ahead and `pixels` in radius there, laid if it stands clear: on both screens at
+  // rest, whole unless `cut`, and swayed, clear of the Earth, the hero and the star; apart from the rocks laid, in no row with them.
+  const tryAt = ([x, y, depth, pixels]: readonly [number, number, number, number], cut = false) => {
     const [across, upward] = [((x - width / 2) * depth) / focal, ((height / 2 - y) * depth) / focal];
     const place: Point = {
       x: eye.x + ahead.x * depth + right.x * across + up.x * upward,
@@ -66,19 +63,36 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
     };
     const rock = { place, radius: (pixels * depth) / focal, shade: next(), turn: next() };
     const spot = first.seen(place, rock.radius);
-    // At rest, whole and clear on both screens; swayed, clear of the Earth, the hero and the star, which each look sees again.
     const drift = (Math.hypot(SWAY.across, SWAY.up) * focal) / depth;
     const clear =
-      looks.every(
-        (look, at) =>
-          look.whole(look.seen(place, rock.radius), 0) &&
-          clearOn(look, look.seen(place, rock.radius), { rooms: balls[at] ?? [], drift }),
-      ) &&
-      judge.spots.every((body) => !onRoom(spot, body, MARGIN + drift)) &&
+      looks.every((look, at) => {
+        const there = look.seen(place, rock.radius);
+        return (cut || look.whole(there, 0)) && clearOn(look, there, { rooms: balls[at] ?? [], drift });
+      }) &&
+      spots.every((body) => !onRoom(spot, body, MARGIN + drift)) &&
       swayed.every((look) => clearOn(look, look.seen(place, rock.radius), { rooms: [], drift: 0 }));
-    if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.lent.evenRow([...seen, spot])) continue;
+    if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.lent.evenRow([...seen, spot])) return false;
     rocks.push(rock);
     seen.push(spot);
+    return true;
+  };
+  // The near one, its centre off the frame's left edge or its bottom edge by a third of its radius at most.
+  for (let tried = 0; tried < TRIES; tried += 1) {
+    const size = [4 + 2 * next(), 30 + 30 * next()] as const;
+    const [off, along] = [size[1] * 0.35 * (2 * next() - 1), next()];
+    const [x, y] = next() < 0.5 ? [off, height * (0.12 + 0.85 * along)] : [width * (0.03 + 0.85 * along), height + off];
+    if (tryAt([x, y, ...size], true)) break;
+  }
+  // The pebbles round one place: the first of a few that holds three, or what the last holds.
+  const from = rocks.length;
+  for (let place = 0; place < 4 && rocks.length - from < 3; place += 1) {
+    [rocks.length, seen.length] = [from, from];
+    const [x, y, depth] = [width * (0.1 + 0.8 * next()), height * (0.15 + 0.7 * next()), 8 + 8 * next()];
+    for (let tried = 0; tried < TRIES && rocks.length < MOST; tried += 1) {
+      const [reach, angle, nearer] = [100 * Math.sqrt(next()), 2 * Math.PI * next(), 0.85 + 0.3 * next()];
+      const pixels = (3 + 9 * next() ** 2) / nearer;
+      tryAt([x + reach * Math.cos(angle), y + reach * Math.sin(angle), depth * nearer, pixels]);
+    }
   }
   return rocks;
 }

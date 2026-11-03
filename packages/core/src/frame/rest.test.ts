@@ -1020,17 +1020,27 @@ describe("the home's rocks (7p)", () => {
     },
   );
 
+  // The design review of 7p (D3): nothing read in front, the rocks a sprinkle no larger than the far worlds. One near rock, larger than the
+  // middle worlds, cut by the frame's left edge above the hero or its bottom edge right of it (the references); the others whole pebbles.
   it.each(rows)(
-    "draws them of varied sizes, the nearest the largest of a third, none on another, in no row, with %s",
+    "draws one near, 30 to 60 pixels, cut by the frame's edge, the others whole and smaller, none on another, in no row, with %s",
     (name) => {
       const { view, rocks } = rocksFor(name);
+      const { width, height } = REST_SCREENS[0];
       const see = cameraOf(view, REST_SCREENS[0]);
       const spots = rocks.map(({ place, radius }) => see(place, radius)).sort((a, b) => a.away - b.away);
       const radii = spots.map(({ radius }) => radius);
-      expect(Math.min(...radii)).toBeGreaterThanOrEqual(5 - 1e-9);
-      expect(Math.max(...radii)).toBeLessThanOrEqual(40 + 1e-9);
-      expect(Math.max(...radii)).toBeLessThan(see(EARTH_PLACE, EARTH_RADIUS).radius);
-      for (const spot of spots) expect(whole(spot, REST_SCREENS[0].width, REST_SCREENS[0].height)).toBe(true);
+      const [near, ...others] = spots;
+      if (near === undefined) throw new Error("no rock");
+      expect(near.radius).toBeGreaterThanOrEqual(30 - 1e-9);
+      expect(near.radius).toBeLessThanOrEqual(60 + 1e-9);
+      expect(near.x - near.radius < 0 || near.y + near.radius > height).toBe(true);
+      expect(near.x + near.radius < width && near.y - near.radius > 0).toBe(true);
+      for (const spot of others) {
+        expect(whole(spot, width, height)).toBe(true);
+        expect(spot.radius).toBeGreaterThanOrEqual(2.5 - 1e-9);
+        expect(spot.radius).toBeLessThanOrEqual(15 + 1e-9);
+      }
       expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThanOrEqual(2);
       const third = Math.ceil(spots.length / 3);
       expect(Math.max(...radii.slice(0, third))).toBeGreaterThan(Math.max(...radii.slice(spots.length - third)));
@@ -1040,6 +1050,19 @@ describe("the home's rocks (7p)", () => {
       expect(evenRow(spots)).toBe(false);
     },
   );
+
+  // The design review of 7p (D3): f0004's debris stands as a cluster of three or four, not a sprinkle: the pebbles lie round one place, no
+  // two of them more than 200 pixels apart.
+  it.each(rows)("lays the pebbles as one cluster round one place, with %s", (name) => {
+    const { view, rocks } = rocksFor(name);
+    const see = cameraOf(view, REST_SCREENS[0]);
+    const [, ...pebbles] = rocks.map(({ place, radius }) => see(place, radius)).sort((a, b) => a.away - b.away);
+    expect(pebbles.length).toBeGreaterThanOrEqual(2);
+    pebbles.forEach((one, at) => {
+      for (const other of pebbles.slice(at + 1))
+        expect(Math.hypot(one.x - other.x, one.y - other.y)).toBeLessThanOrEqual(200);
+    });
+  });
 
   // Seeded by the view: an eye a thousandth of a unit away sees nearly the same frame, and other rocks.
   it("lays the same rocks for the same view, and others for another eye", () => {
