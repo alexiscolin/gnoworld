@@ -166,7 +166,10 @@ export class WorldView {
     this.#grow(body, this.#waking.signsAt(this.#reading, seconds, still));
     // The eye looks about slowly: the world turns with it, so it stays in its circle, lit from the same side of the screen.
     const { quaternion } = this.#device.camera;
-    body.group.position.copy(this.#rest).applyQuaternion(quaternion);
+    body.group.position
+      .copy(this.#rest)
+      .multiplyScalar(this.#device.arrival?.approach ?? 1)
+      .applyQuaternion(quaternion);
     body.group.quaternion.copy(quaternion);
     body.setSun(sideLight(standing.seed, this.#sun), quaternion);
     body.setTime(still ? 0 : seconds);

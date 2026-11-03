@@ -1,6 +1,6 @@
 // A frame copied once from the screen and laid over the stage, which shows through it as it fades: the dive's under reduced motion (7d7),
 // where no camera moves and the whole cosmos, drawn still, fades into the view at rest. Its picture is the drawing buffer's size, and goes
-// with it. It stands in the scene's folder, apart from the cosmos's, for more than the dive may lay one.
+// with it. A flight leaving a page lays one too (7g), and zooms it as the eye goes on through it.
 import {
   BufferAttribute,
   BufferGeometry,
@@ -20,6 +20,7 @@ export class Dissolve {
   readonly #stage: Stage;
   readonly #before: Stage["onAfterRender"];
   readonly #veil = { value: 1 };
+  readonly #zoom = { value: 1 };
   readonly #picture: { value: FramebufferTexture | null } = { value: null };
   readonly #mesh: Mesh<BufferGeometry, ShaderMaterial>;
   #gone = false;
@@ -37,7 +38,7 @@ export class Dissolve {
         depthWrite: false,
         transparent: true,
         toneMapped: false,
-        uniforms: { uPicture: this.#picture, uVeil: this.#veil },
+        uniforms: { uPicture: this.#picture, uVeil: this.#veil, uZoom: this.#zoom },
         vertexShader: /* glsl */ `
           varying vec2 vUv;
           void main() {
@@ -47,9 +48,10 @@ export class Dissolve {
         fragmentShader: /* glsl */ `
           uniform sampler2D uPicture;
           uniform float uVeil;
+          uniform float uZoom;
           varying vec2 vUv;
           void main() {
-            gl_FragColor = vec4(texture2D(uPicture, vUv).rgb, uVeil);
+            gl_FragColor = vec4(texture2D(uPicture, (vUv - 0.5) / uZoom + 0.5).rgb, uVeil);
           }`,
       }),
     );
@@ -79,9 +81,10 @@ export class Dissolve {
     this.#picture.value = picture;
   };
 
-  /** Shows `veil` of its picture over the stage, once it has one. */
-  fade(veil: number): void {
+  /** Shows `veil` of its picture over the stage, once it has one, `zoom` times as large about the screen's middle. */
+  fade(veil: number, zoom = 1): void {
     this.#veil.value = Math.min(1, Math.max(0, veil));
+    this.#zoom.value = zoom;
     this.#mesh.visible = this.copied && this.#veil.value > 0;
   }
 

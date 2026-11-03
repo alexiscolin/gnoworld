@@ -53,6 +53,12 @@ const NEBULAE_JS = 3.75 * 1024;
 // Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
 const LABELS_JS = 5960;
+// The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
+// cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
+// camera-controls' own warning, which no minifier renames.
+const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
+const FLIGHTS_JS = 18 * 1024;
+const FLIGHTS_MARK = "camera-controls:";
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -240,6 +246,21 @@ for (const [name, chunk, cap] of [
     const there = [...(await closureOf(page, (await scene).url())), ...(await closureOf(page, (await cosmos).url()))];
     expect(await compressed(page, await ownOf(page, (await late).url(), there))).toBeLessThanOrEqual(cap);
   });
+
+test("the flights' chunk holds camera-controls, comes once the scene runs, within its own cap, and the scene's holds none of it", async ({
+  page,
+}) => {
+  const flights = page.waitForResponse((response) => FLIGHTS.test(response.url()));
+  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
+  await page.goto("/?test-gpu");
+  await hydrated(page);
+  const [sceneUrl, flightsUrl] = [(await scene).url(), (await flights).url()];
+  const there = await closureOf(page, sceneUrl);
+  const own = await ownOf(page, flightsUrl, there);
+  expect(await (await page.request.get(flightsUrl)).text()).toContain(FLIGHTS_MARK);
+  for (const url of there) expect(await (await page.request.get(url)).text()).not.toContain(FLIGHTS_MARK);
+  expect(await compressed(page, own)).toBeLessThanOrEqual(FLIGHTS_JS);
+});
 
 test("a world's part of the scene stays within its cap", async ({ page }) => {
   const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));

@@ -2,10 +2,12 @@
 // asks at once, the part comes when its chunk does, and is told the last thing asked.
 import type { ClearBox, Point } from "@gnoworld/core";
 import type { Cosmos } from "./cosmos/cosmos.ts";
+import type { CosmosSight } from "./flight/flights.ts";
 import type { CosmosWorld, LabelSignals } from "./cosmos/cosmosWorld.ts";
 import type { Disposer } from "./disposer.ts";
 import { LazyLabels } from "./cosmos/lazyLabels.ts";
 import { Door } from "./door.ts";
+import { FlightDoor, type FlightDoorDevice } from "./flightDoor.ts";
 import type { EarthDevice } from "./earth/device.ts";
 import type { MoonMark, WorldAsk, WorldPart, WorldSaid } from "./world/part.ts";
 
@@ -17,8 +19,10 @@ export class CosmosPart {
   #box: ClearBox | undefined;
   // The home's dive, once asked: under reduced motion or not.
   #still: boolean | undefined;
+  readonly #eye: EarthDevice["eye"];
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+    this.#eye = device.eye;
     this.door = new Door(
       () =>
         import("./cosmos/cosmos.ts").then(
@@ -38,6 +42,11 @@ export class CosmosPart {
         },
       },
     );
+  }
+
+  /** What a flight reads of the cosmos while it shows (7g). */
+  get sight(): CosmosSight | undefined {
+    return this.#worlds === undefined ? undefined : this.#eye?.sight;
   }
 
   /** The home opens with the dive, once (7d7); `still`, under reduced motion. */
@@ -112,14 +121,16 @@ export class WorldDoor {
   }
 }
 
-/** Both, as the scene sizes, moves, restores and reads them. */
+/** Both, and the flights between them (7g), as the scene sizes, moves, restores and reads them. */
 export class Parts {
   readonly cosmos: CosmosPart;
   readonly world: WorldDoor;
+  readonly flights: FlightDoor;
 
-  constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+  constructor(device: EarthDevice & FlightDoorDevice, owner: Disposer, came: () => void) {
     this.cosmos = new CosmosPart(device, owner, came);
     this.world = new WorldDoor(device, owner, came);
+    this.flights = new FlightDoor(device, owner, this.cosmos);
   }
 
   resize(width: number, height: number, ratio: number): void {
@@ -140,6 +151,10 @@ export class Parts {
   }
 
   stats() {
-    return { cosmos: this.cosmos.door.part?.stats(), world: this.world.door.part?.stats() };
+    return {
+      cosmos: this.cosmos.door.part?.stats(),
+      world: this.world.door.part?.stats(),
+      flight: this.flights.stats(),
+    };
   }
 }

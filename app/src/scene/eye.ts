@@ -1,7 +1,8 @@
 // Where the view is, in doubles (slice-7 §5): the camera stays at the origin, and the world comes to it. The arrival's drift, its slow
 // look about and a mouse's lean add to where it rests; under reduced motion none moves, and whatever they had stays, so nothing jumps back.
-// The worlds' arrival is the cosmos's own dive (7d7): they take the lean alone.
+// The worlds' arrival is the cosmos's own dive (7d7): they take the lean alone. A flight's way adds to both (7g).
 import { driftAt, HOME, turnAt, type Point } from "@gnoworld/core";
+import type { CosmosSight } from "./flight/goal.ts";
 
 // How far a mouse at the window's edge leans the view, in world units: enough to part the motes from the stars.
 const LEAN = 3;
@@ -12,6 +13,14 @@ export class Eye {
   /** Where the worlds are seen from: where it rests and a mouse's lean, not the sky's drift, which would leave them behind. */
   readonly worlds = { x: HOME.x, y: HOME.y, z: HOME.z };
   readonly turn = { yaw: 0, pitch: 0 };
+  /** The way flights have taken it from where it rests, which they alone write (7g). */
+  readonly travel = { x: 0, y: 0, z: 0 };
+  /** What a flight in the cosmos looks at, on the stage; none, and the view aims as it does at rest. */
+  look: Point | undefined;
+  /** False while a flight is under way: the labels wait for it to land. */
+  calm = true;
+  /** The cosmos as a flight reads it, once a file's view at rest has come. */
+  sight: CosmosSight | undefined;
   readonly #rest = { x: HOME.x, y: HOME.y, z: HOME.z };
   readonly #drift = { x: 0, y: 0, z: 0 };
   #seconds = 0;
@@ -40,12 +49,13 @@ export class Eye {
       this.#leanX += (this.#aimX - this.#leanX) * eased;
       this.#leanY += (this.#aimY - this.#leanY) * eased;
     }
-    this.at.x = this.#rest.x + this.#drift.x + this.#leanX * LEAN;
-    this.at.y = this.#rest.y + this.#drift.y + this.#leanY * LEAN;
-    this.at.z = this.#rest.z + this.#drift.z;
-    this.worlds.x = this.#rest.x + this.#leanX * LEAN;
-    this.worlds.y = this.#rest.y + this.#leanY * LEAN;
-    this.worlds.z = this.#rest.z;
+    const { travel } = this;
+    this.at.x = this.#rest.x + this.#drift.x + this.#leanX * LEAN + travel.x;
+    this.at.y = this.#rest.y + this.#drift.y + this.#leanY * LEAN + travel.y;
+    this.at.z = this.#rest.z + this.#drift.z + travel.z;
+    this.worlds.x = this.#rest.x + this.#leanX * LEAN + travel.x;
+    this.worlds.y = this.#rest.y + this.#leanY * LEAN + travel.y;
+    this.worlds.z = this.#rest.z + travel.z;
   }
 
   /** Where the view rests from now on. */

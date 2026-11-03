@@ -7,6 +7,7 @@ import type { Ground } from "./earth/marks.ts";
 import type { Circle, EarthState, EarthView } from "./earth/view.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import type { WorldStats } from "./world/view.ts";
+import type { FlightGoal, FlightSaid, Flights } from "./flight/flights.ts";
 
 export interface SceneOptions {
   readonly canvas: HTMLCanvasElement;
@@ -15,10 +16,16 @@ export interface SceneOptions {
   readonly remember: () => void;
   /** The context went (true), or came back (false). */
   readonly onLost: (lost: boolean) => void;
+  /** What the flight panel shows of a flight under way, ten times a second at most; nothing once it landed (7g). */
+  readonly onFlight?: (flight: FlightSaid | undefined) => void;
 }
 
 export interface Scene {
   cover(covered: boolean): void;
+  /** Flies to a star of the cosmos, back to its view at rest, or to the place a page shows next, before the page changes it (7g). */
+  fly(goal: FlightGoal): void;
+  /** The page leaves its place: the frame drawn now is copied, for the flight the next page asks for in the same task (7g). */
+  depart(): void;
   /** Where the view rests, in world units of any size. */
   moveTo(to: Point): void;
   /** Stands the Earth in `place`, or takes it away, and says how it goes. */
@@ -54,6 +61,7 @@ export interface SceneStats {
   readonly earth: ReturnType<EarthView["stats"]>;
   readonly cosmos: ReturnType<Cosmos["stats"]> | undefined;
   readonly world: WorldStats | undefined;
+  readonly flight: ReturnType<Flights["stats"]> | undefined;
 }
 
 export const rendered = ({ render, memory }: WebGLRenderer["info"]) => ({

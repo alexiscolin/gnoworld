@@ -13,6 +13,7 @@ import {
 } from "@gnoworld/core";
 import type { PerspectiveCamera, Scene as Stage } from "three";
 import type { Disposer } from "../disposer.ts";
+import type { EarthDevice } from "../earth/device.ts";
 import type { Wanted } from "./bodies.ts";
 import { GREAT_STAR } from "./halos.ts";
 
@@ -30,6 +31,9 @@ function plainRest(): RestView {
   return { eye, postcards: [], close: undefined };
 }
 
+// The stage it draws on, a frame owed, the scene's eye as a flight leaves it, and the dissolve the flights lend the dive (7g).
+type AtRestDevice = { readonly stage: Stage; readonly moved: () => void } & Pick<EarthDevice, "eye" | "veil">;
+
 export class AtRest {
   /** Where the Earth stands on the stage. */
   readonly earth = { x: NaN, y: NaN, z: NaN };
@@ -39,7 +43,7 @@ export class AtRest {
   readonly #resting = { x: NaN, y: NaN, z: NaN };
   readonly #restingMap = { x: NaN, y: NaN, z: NaN };
   readonly #found: () => void;
-  readonly #device: { readonly stage: Stage; readonly moved: () => void };
+  readonly #device: AtRestDevice;
   readonly #owner: Disposer;
   #view = plainRest();
   #postcards: ReadonlyMap<number, Postcard> = new Map();
@@ -51,7 +55,7 @@ export class AtRest {
   #dive: InstanceType<Searched["Dive"]> | undefined;
 
   /** On the device's stage, owned by `owner`; `found` is told once a file's view has come, and a frame asked. */
-  constructor(device: { readonly stage: Stage; readonly moved: () => void }, owner: Disposer, found: () => void) {
+  constructor(device: AtRestDevice, owner: Disposer, found: () => void) {
     this.#device = device;
     this.#owner = owner;
     this.#found = found;
@@ -63,7 +67,7 @@ export class AtRest {
     this.#still = still;
     loadSearch().then(
       ({ Dive }) => {
-        if (this.#still !== undefined) this.#dive ??= this.#owner.add(new Dive(this.#device.stage, still));
+        if (this.#still !== undefined) this.#dive ??= this.#owner.add(new Dive(this.#device, still));
         this.#device.moved();
       },
       // A chunk that does not come leaves no view to dive to.
@@ -91,25 +95,33 @@ export class AtRest {
     return dive.shown;
   }
 
+  /** What the eye looks at, on the map, round which the ladder stands bodies: the Earth, or the star a flight looks at (7g). */
+  get focus(): Point {
+    return this.#eye?.focus ?? EARTH_PLACE;
+  }
+
   /** How far the dive is, 1 at rest, and how much of its dissolve still shows. */
   get landing() {
     return { along: this.#still === undefined ? 1 : (this.#dive?.along ?? 0), veil: this.#dive?.veil ?? 0 };
   }
 
   /** Looks for `systems`' view; a later search wins. The eye stays where it rests till the view has come, so it moves once (7d6's
-   * review: it went back to the plain view first); a list with no world is no view. A chunk that does not come leaves no body. */
+   * review: it went back to the plain view first); a list with no world is no view, though a flight still reads its stars (7g). A chunk
+   * that does not come leaves no body. */
   search(systems: readonly StarSystem[]): void {
     this.#view = { ...this.#view, postcards: [], close: undefined };
     this.#postcards = new Map();
     this.#asked += 1;
     const asked = this.#asked;
-    if (!systems.some(({ worlds }) => worlds.length > 0)) return;
+    const viewed = systems.some(({ worlds }) => worlds.length > 0);
     loadSearch().then(
       (searched) => {
         if (asked !== this.#asked) return;
+        searched.handSight(this.#device, systems, this);
+        if (!viewed) return;
         const view = searched.restView(systems);
         this.#searched = searched;
-        this.#eye ??= new searched.RestEye();
+        this.#eye ??= new searched.RestEye(this.#device);
         this.#view = view;
         this.#postcards = searched.postcardsOf(systems, view);
         this.#eye.rest(view);

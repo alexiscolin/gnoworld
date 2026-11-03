@@ -7,6 +7,7 @@ import { Disposer } from "./disposer.ts";
 import type { Ground } from "./earth/marks.ts";
 import { EarthView, type Circle, type EarthState } from "./earth/view.ts";
 import { Eye } from "./eye.ts";
+import type { FlightGoal } from "./flight/flights.ts";
 import { browserClock, FrameLoop, type FrameClock } from "./loop.ts";
 import { Probe } from "./probe.ts";
 import { rendered, type Scene, type SceneOptions, type SceneStats } from "./sceneStats.ts";
@@ -68,12 +69,16 @@ class LiveScene implements Scene {
       renderer: this.#renderer,
       stage: this.#stage,
       camera: this.#camera,
+      eye: this.#eye,
+      arrival: { approach: 1 },
+      said: options.onFlight,
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
         this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
+        this.#parts.flights.ready();
       },
     };
     this.#earth = this.#owner.add(new EarthView(device));
@@ -121,6 +126,7 @@ class LiveScene implements Scene {
   };
 
   readonly #draw = (delta: number): void => {
+    this.#parts.flights.advance(delta);
     this.#viewport.settle();
     this.#eye.advance(delta, this.#motion.matches);
     this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
@@ -134,7 +140,7 @@ class LiveScene implements Scene {
     this.#frames += 1;
     if (this.#refused) this.#earth.refused();
     this.#refused = false;
-    this.#probe.frame(delta, this.#earth.arriving);
+    this.#probe.frame(delta, this.#earth.arriving || this.#parts.flights.busy);
   };
 
   readonly #redraw = (): void => {
@@ -153,6 +159,7 @@ class LiveScene implements Scene {
   };
 
   #stopOrGo(): void {
+    if (this.#covered || this.#lost) this.#parts.flights.land();
     this.#loop.set({ covered: this.#covered || this.#lost });
     this.#loop.redraw();
   }
@@ -160,6 +167,14 @@ class LiveScene implements Scene {
   cover(covered: boolean): void {
     this.#covered = covered;
     this.#stopOrGo();
+  }
+
+  fly(goal: FlightGoal): void {
+    this.#parts.flights.fly(goal);
+  }
+
+  depart(): void {
+    this.#parts.flights.depart();
   }
 
   moveTo(to: Point): void {

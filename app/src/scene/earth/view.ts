@@ -159,7 +159,10 @@ export class EarthView implements Ground {
     this.#turned = this.#turn + gone - SPIN * age;
     globe.setTurn(this.#turned, this.#turned - gone);
     globe.setMoon(MOON_REST + left * MOON_SWEEP - MOON_RATE * age);
-    globe.group.position.set(-SETTLE_LEFT * settling, this.#rest.y, this.#rest.z).applyQuaternion(quaternion);
+    const approach = this.#device.arrival?.approach ?? 1;
+    globe.group.position
+      .set(-SETTLE_LEFT * settling, this.#rest.y, this.#rest.z * approach)
+      .applyQuaternion(quaternion);
     globe.group.scale.setScalar(1 + SETTLE_NEARER * settling);
     this.#marks.place(this.#where(globe), this.#screen);
   }
