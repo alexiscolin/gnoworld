@@ -28,11 +28,14 @@ export function starAt(
   let best = REACH;
   for (const system of sight.systems()) {
     sight.toScene(system.place, seat);
-    seat.set(seat.x - sight.eye.x, seat.y - sight.eye.y, seat.z - sight.eye.z).applyMatrix4(camera.matrixWorldInverse);
+    seat.set(seat.x - sight.eye.x, seat.y - sight.eye.y, seat.z - sight.eye.z);
+    // A star the suns leave unlit, past their reach, is empty space to a click.
+    const lit = seat.length() < sight.lit;
+    seat.applyMatrix4(camera.matrixWorldInverse);
     const ahead = seat.z < 0;
     seat.applyMatrix4(camera.projectionMatrix);
     const off = Math.hypot(((seat.x + 1) * innerWidth) / 2 - x, ((1 - seat.y) * innerHeight) / 2 - y);
-    if (ahead && off <= best) {
+    if (ahead && lit && off <= best) {
       best = off;
       nearest = system;
     }

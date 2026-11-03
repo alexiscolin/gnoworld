@@ -1,7 +1,7 @@
 // What a flight reads of the cosmos (7g), handed to the scene's eye once the view at rest's chunk has come, with or without a file: the
 // flights' chunk takes the cosmos's own ways between the map and the stage rather than import them, which would split them out of the
 // cosmos's chunk into one both share; made here, the cosmos's chunk pays only for the call.
-import { onPlane, toMap, toScene, type Point, type StarSystem } from "@gnoworld/core";
+import { MIDDLE, onPlane, toMap, toScene, type Point, type StarSystem } from "@gnoworld/core";
 import type { EarthDevice } from "../earth/device.ts";
 import type { CosmosSight } from "../flight/goal.ts";
 
@@ -11,6 +11,7 @@ const sightOf = (systems: readonly StarSystem[], { eye, looked }: { eye: Point; 
   systems: () => systems,
   eye,
   earth: looked,
+  lit: MIDDLE,
   toScene,
   toMap,
   onPlane,

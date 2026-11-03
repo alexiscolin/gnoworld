@@ -28,6 +28,8 @@ export interface CosmosSight {
   readonly systems: () => readonly StarSystem[];
   readonly eye: Point;
   readonly earth: Point;
+  /** How far from the eye, on the stage, the suns give a star its light: past it a star is empty space. */
+  readonly lit: number;
   readonly toScene: typeof toScene;
   readonly toMap: typeof toMap;
   readonly onPlane: typeof onPlane;

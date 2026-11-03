@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import {
-  stopNear,
   EARTH_PLACE,
   flightSeconds,
   HOME,
+  MIDDLE,
   onPlane,
+  stopNear,
   systemsOf,
   toMap,
   toScene,
@@ -113,6 +114,7 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
               return placed();
             },
             earth,
+            lit: MIDDLE,
             toScene,
             toMap,
             onPlane,
@@ -361,6 +363,21 @@ describe("aiming at a star", () => {
     expect(flown.stats()).toMatchObject({ flying: true, kind: "star", target: lone.system.id });
     run(flown, scene, 4);
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
+  });
+
+  // The suns give a star no light past the ladder's middle reach from the eye (suns.ts, MIDDLE): a click there is on empty space, and flies
+  // nowhere; at 2,000 systems 43% of the clicks in reach fell on such a star (lot A's review, F3714).
+  it.each([
+    [MIDDLE + 10, false],
+    [MIDDLE - 20, true],
+  ])("flies to a star %s units from the eye: %s, the suns lighting none past their middle reach", (distance, flies) => {
+    const base = rig();
+    const where = ahead(base, [0, 0, distance]);
+    const scene = rig({ systems: [starAt("star", where)] });
+    const flown = flights(scene.device);
+    const spot = onScreen(scene, where);
+    click(document.body, spot.x, spot.y);
+    expect(flown.stats().flying).toBe(flies);
   });
 
   it("takes the nearer of two stars in reach, and none behind the eye whose picture would fall there", () => {
