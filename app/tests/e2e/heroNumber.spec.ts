@@ -42,6 +42,21 @@ for (const width of [390, 1280]) {
       expect(file.asked()).toBe(1);
     });
 
+    // The hero as the frames draw it (2 to 8), with a count: from its kicker to its actions, the live line and the ticker left out.
+    test("the hero as it looks with its number", async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await served(page);
+      await page.goto("/");
+      await hydrated(page);
+      await expect(page.locator(NUMBER)).toHaveText(COUNT);
+      const kicker = await box(page, "[data-clear] > p");
+      const actions = await box(page, "[data-hero='actions']");
+      const top = Math.floor(kicker.y) - 8;
+      await expect(page).toHaveScreenshot(`hero-${String(width)}.png`, {
+        clip: { x: 0, y: top, width, height: Math.ceil(actions.y + actions.height) + 8 - top },
+      });
+    });
+
     test("the hero keeps its number's room while the file comes: nothing on the page moves", async ({ page }) => {
       await countShifts(page);
       const file = await served(page, true);
