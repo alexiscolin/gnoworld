@@ -28,8 +28,9 @@ function ratesOf(model: Model, prompt: number): Rates {
   }
 }
 
-// An answer's usage as the API sends it, read only where jarvis can price it: the standard speed, the standard tier
-// or the batch one (half the price, so never under the bill), no server tool. Ten million tokens in a field at most.
+// An answer's usage as the API sends it, read only where jarvis can price it: the global inference (US-only bills
+// 1.1x), the standard speed, the standard tier or the batch one (half the price, so never under the bill), no server
+// tool. Ten million tokens in a field at most.
 function usageOf(usage: unknown) {
   const count = z.number().int().min(0).max(10_000_000);
   const optional = count.nullish().transform((tokens) => tokens ?? 0);
@@ -44,6 +45,7 @@ function usageOf(usage: unknown) {
         .nullish()
         .transform((split) => split ?? { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }),
       server_tool_use: z.object({ web_fetch_requests: z.literal(0), web_search_requests: z.literal(0) }).nullish(),
+      inference_geo: z.literal("global").nullish(),
       service_tier: z.enum(["standard", "batch"]).nullish(),
       speed: z.literal("standard").nullish(),
     })

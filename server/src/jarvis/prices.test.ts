@@ -148,9 +148,15 @@ describe("cost", () => {
     };
     const standard = 2_000 * nano(2) + 18_000 * nano(0.2) + 1_000 * nano(10);
     expect(cost("claude-sonnet-5-5", answer)).toBe(standard);
-    expect(cost("claude-sonnet-5-5", { ...answer, server_tool_use: null, service_tier: null, speed: null })).toBe(
-      standard,
-    );
+    expect(
+      cost("claude-sonnet-5-5", {
+        ...answer,
+        inference_geo: null,
+        server_tool_use: null,
+        service_tier: null,
+        speed: null,
+      }),
+    ).toBe(standard);
     // The batch tier costs half: priced at the standard one, the cost is never below the bill.
     expect(cost("claude-sonnet-5-5", { ...answer, service_tier: "batch" })).toBe(standard);
   });
@@ -160,6 +166,8 @@ describe("cost", () => {
     ["no model", "", {}],
     ["the priority tier", "claude-sonnet-5-5", { service_tier: "priority" }],
     ["fast mode", "claude-opus-5-5", { speed: "fast" }],
+    ["US-only inference, billed 1.1 times (F5177)", "claude-sonnet-5-5", { inference_geo: "us" }],
+    ["an inference place it knows no price for", "claude-haiku-5-5", { inference_geo: "eu" }],
     ["a web search", "claude-sonnet-5-5", { server_tool_use: { web_fetch_requests: 0, web_search_requests: 1 } }],
     ["a web fetch", "claude-sonnet-5-5", { server_tool_use: { web_fetch_requests: 1, web_search_requests: 0 } }],
   ])("prices nothing for %s, which jarvis never asks: the call is charged at its worst", (_, model, fields) => {
