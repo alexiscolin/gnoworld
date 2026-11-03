@@ -69,6 +69,8 @@ export {
 } from "./frame/disc.ts";
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
+export { arrivalIn, arrivalOf, ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt } from "./frame/flight.ts";
+export type { Figures, FlightPhase } from "./frame/flight.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,
