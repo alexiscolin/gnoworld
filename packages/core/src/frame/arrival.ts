@@ -4,10 +4,10 @@
 // picks the slant and the turn the angles are tried in, so the same address gives the same view. Built on 7d3's postcards (7p's depth).
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { ARRIVAL_LEAN, SWAY_CORNERS } from "../space/drift.ts";
-import { CENTRE, onPlane, toMap } from "./disc.ts";
+import { SWAY_CORNERS } from "../space/drift.ts";
+import { onPlane } from "./disc.ts";
 import { HALO_FAR, haloAt } from "./halo.ts";
-import { frames, seenOf, type Card } from "./framing.ts";
+import { frames, leaned, LEANS, seenOf, type Card } from "./framing.ts";
 import { postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
 import {
   along,
@@ -59,22 +59,6 @@ const NEAR = HALO_FAR + 2 * ROOM;
 // The most worlds a dynamic view draws: the mock-up's six (Alexis, 2026-11-03, the views page, 14:09), held still, where the home's
 // postcards keep frame 4's four.
 const MOST_WORLDS = 6;
-// A mouse's lean on the map: the eight edges of the stage's across and up, at an arrival's lean.
-const LEANS: readonly Point[] = [
-  [1, 1],
-  [1, -1],
-  [-1, 1],
-  [-1, -1],
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-].map(([across = 0, up = 0]) => {
-  const out = { x: 0, y: 0, z: 0 };
-  toMap({ x: CENTRE.x + across * ARRIVAL_LEAN, y: CENTRE.y + up * ARRIVAL_LEAN, z: CENTRE.z }, out);
-  return out;
-});
-
 /** What an address picks: the slant and the turn the angles start from. */
 interface Chosen {
   readonly first: number;
@@ -125,7 +109,7 @@ function holds(camera: Camera, card: Card, { around, leaning, cut }: Asked) {
     looksFrom(camera).every((look) => alone(look, card, around)) &&
     looked(camera, true) &&
     SWAY_CORNERS.every((sway) => looked(swayed(camera, sway, system.place), false)) &&
-    (!leaning || LEANS.every((lean) => looked(cameraTowards(along(camera.eye, lean, 1), system.place), false)))
+    (!leaning || LEANS.every((lean) => looked(leaned(camera, lean, system.place), false)))
   );
 }
 

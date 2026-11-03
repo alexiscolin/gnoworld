@@ -3,7 +3,10 @@
 // for the angle (arrival.ts), which reads it.
 import { composed } from "./composition.ts";
 import { drawnOf, type Postcard } from "./postcard.ts";
-import { CARD_ZONE, placeOf, STAR_HEART, type Look, type Seen } from "./restLook.ts";
+import type { Point } from "../space/cell.ts";
+import { ARRIVAL_LEAN } from "../space/drift.ts";
+import { CENTRE, toMap } from "./disc.ts";
+import { along, CARD_ZONE, cameraTowards, placeOf, STAR_HEART, type Camera, type Look, type Seen } from "./restLook.ts";
 
 // The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more at rest (the depth's own,
 // depth.ts) and 1.35 through the sway, where of Onyx's six systems that stand six worlds none held 1.5 at every corner (F4468); a tenth of
@@ -22,14 +25,34 @@ export function seenOf(look: Look, card: Card): { star: Seen; worlds: Seen[] } {
   return { star: look.seen(card.system.place), worlds: worlds.sort((a, b) => a.away - b.away) };
 }
 
+// The least share of a body there shown each way in the frame, over `foot` of its height; none in front of the eye or over the header.
+function leastShown({ width, height }: Look, at: Seen, foot: number): number {
+  const shown = (Math.min(at.right, width) - Math.max(at.left, 0)) / (at.right - at.left);
+  const up = (Math.min(at.bottom, foot * height) - at.top) / (at.bottom - at.top);
+  return at.depth > 0 && at.top >= HEADER * height ? Math.min(shown, up) : -Infinity;
+}
+
 // Whether a body there is cut by the frame's sides or its foot, never its head, which the header holds: `least` of it shown each way.
-function cutByFrame(look: Look, at: Seen, least: number): boolean {
-  const { width, height } = look;
-  const [wide, high] = [at.right - at.left, at.bottom - at.top];
-  const shown = (Math.min(at.right, width) - Math.max(at.left, 0)) / wide;
-  const up = (Math.min(at.bottom, height) - at.top) / high;
-  const cut = at.left < 0 || at.right > width || at.bottom > height;
-  return at.depth > 0 && cut && at.top >= HEADER * height && shown >= least && up >= least;
+const cutByFrame = (look: Look, at: Seen, least: number) =>
+  (at.left < 0 || at.right > look.width || at.bottom > look.height) && leastShown(look, at, 1) >= least;
+
+// A mouse's lean on the map: the eight edges of the stage's across and up as shares of a dynamic view's lean, each way, then the corners.
+export const LEANS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+] as const;
+
+/** `camera` leaned shares of a dynamic view's lean across and up, turned back to `at`. */
+export function leaned(camera: Camera, [across, up]: readonly [number, number], at: Point): Camera {
+  const by: Point = { x: 0, y: 0, z: 0 };
+  toMap({ x: CENTRE.x + across * ARRIVAL_LEAN, y: CENTRE.y + up * ARRIVAL_LEAN, z: CENTRE.z }, by);
+  return cameraTowards(along(camera.eye, by, 1), at);
 }
 
 const offHeart = (spot: Seen, star: Seen) => Math.hypot(spot.x - star.x, spot.y - star.y) - spot.radius >= STAR_HEART;
