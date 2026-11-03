@@ -642,8 +642,11 @@ for (const systems of [100, 1000, 10_000])
   });
 
 // 7d7: the lab is the site's own scene, so it opens with the dive too, which Alexis judges on his own GPU.
+// The whole cosmos shows whole for a tenth of a second of the dive, from its fade's end (0.145) till the eye passes 680 units (0.163): the
+// page's time is held and stepped a frame at a time, in a small window, so no frame of it is missed under load.
 test("opens the release's page with the dive, from the whole cosmos to the view at rest", async ({ page }) => {
-  const seen = await dove(page, { path: "/lab/realism.html?view=cosmos" });
+  test.setTimeout(480_000);
+  const seen = await dove(page, { path: "/lab/realism.html?view=cosmos", size: SMALL, step: 16 });
   expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
   expect(seen.at(-1)?.along).toBe(1);
 });
