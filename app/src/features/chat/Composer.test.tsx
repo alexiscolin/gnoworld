@@ -607,7 +607,9 @@ describe("Composer: a reply", () => {
 
   it("cuts the words at 60 characters, between two graphemes", () => {
     expect(words(draw(to("a".repeat(80))))).toContain(`: ${"a".repeat(59)}…`);
-    expect(words(draw(to(`${"a".repeat(58)}👩‍👩‍👧‍👦${"a".repeat(5)}`)))).toContain(`: ${"a".repeat(58)}👩‍👩‍👧‍👦…`);
+    expect(words(draw(to(`${"a".repeat(58)}👩\u200d👩\u200d👧\u200d👦${"a".repeat(5)}`)))).toContain(
+      `: ${"a".repeat(58)}👩\u200d👩\u200d👧\u200d👦…`,
+    );
   });
 
   it("keeps markup and a link of another scheme in the words as text", () => {

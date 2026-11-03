@@ -77,7 +77,7 @@ describe("a realm's facts", () => {
   });
 
   it("draws a hostile path or deployer as text, each in its own left-to-right element, and creates no element from it", () => {
-    const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script>‮";
+    const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script>\u202e";
     const el = draw(ok({ ...FACTS, path: hostile, deployer: hostile }));
     expect(el.querySelector("img, script")).toBeNull();
     for (const label of ["Path", "Deployer"]) {

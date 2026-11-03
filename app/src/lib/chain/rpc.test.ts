@@ -25,7 +25,7 @@ const RPC = {
 type ChainId = keyof typeof RPC;
 const CHAINS = Object.keys(RPC) as ChainId[];
 const NOW = new Date("2026-10-31T06:00:00.000Z");
-const HOSTILE = "<script>alert('HOSTILE')</script>\u0000‮ HOSTILE";
+const HOSTILE = "<script>alert('HOSTILE')</script>\u0000\u202e HOSTILE";
 
 const hexOf = (text: string): string =>
   Array.from(new TextEncoder().encode(text), (byte) => byte.toString(16).padStart(2, "0")).join("");

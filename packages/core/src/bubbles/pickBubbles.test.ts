@@ -452,7 +452,7 @@ describe("what is never picked", () => {
 
 describe("the text", () => {
   it("is plain text cut like cutText, and links stay text", () => {
-    const text = `<script>x</script> https://evil.test/${"a".repeat(200)}‮`;
+    const text = `<script>x</script> https://evil.test/${"a".repeat(200)}\u202e`;
     expect(pick([msg(1, { text })]).bubbles[0]?.text).toBe(cutText(text, RULES.maxChars));
   });
 

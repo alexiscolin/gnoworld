@@ -300,7 +300,7 @@ describe("readChain, a hostile string", () => {
     "<script>alert(1)</script>",
     "javascript:alert(1)",
     "</script><!--  ",
-    "\u0000‮",
+    "\u0000\u202e",
     "'; DROP TABLE x; --",
     "${process.env.SECRET}",
   ];
