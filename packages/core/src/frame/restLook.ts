@@ -16,6 +16,9 @@ export const REST_SCREENS = [
 ] as const;
 /** The hero's room, as shares of the screen: left of `right`, under `top`. */
 export const HERO_ZONE = { right: 0.45, top: 0.58 } as const;
+/** A system's card's room at its views (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
+ * screen), as shares of the screen: left of `right`, over `bottom`. */
+export const CARD_ZONE = { right: 0.25, bottom: 0.2 } as const;
 /** The great star's heart, in pixels: no body stands on it. */
 export const STAR_HEART = 40;
 

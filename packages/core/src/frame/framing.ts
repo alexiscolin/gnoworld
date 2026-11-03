@@ -3,7 +3,7 @@
 // for the angle (arrival.ts), which reads it.
 import { composed } from "./composition.ts";
 import { drawnOf, type Postcard } from "./postcard.ts";
-import { placeOf, STAR_HEART, type Look, type Seen } from "./restLook.ts";
+import { CARD_ZONE, placeOf, STAR_HEART, type Look, type Seen } from "./restLook.ts";
 
 // The near world shows this share of itself each way at rest and swayed, 1.5 times every other's size or more at rest (the depth's own,
 // depth.ts) and 1.35 through the sway, where of Onyx's six systems that stand six worlds none held 1.5 at every corner (F4468); a tenth of
@@ -33,6 +33,9 @@ function cutByFrame(look: Look, at: Seen, least: number): boolean {
 }
 
 const offHeart = (spot: Seen, star: Seen) => Math.hypot(spot.x - star.x, spot.y - star.y) - spot.radius >= STAR_HEART;
+// Off the system's card at the top left, which a ringed giant stood over in g1magld5's view (the design review's second pass, F4472).
+const offCard = (look: Look, spot: Seen) =>
+  spot.left >= CARD_ZONE.right * look.width || spot.top >= CARD_ZONE.bottom * look.height;
 
 /** On one screen: the nearest world cut by the frame, half the height across at most, 1.5 times every other's size or more, or where `cut`
  * is not asked whole as the others; off the star's heart; the others whole under the header and off it; at rest, in no crowd, pile or row
@@ -42,6 +45,7 @@ export function frames(look: Look, card: Card, how: { atRest: boolean; cut: bool
   const [near, ...others] = worlds;
   if (near === undefined || !leads(look, [near, others], how)) return false;
   if (!offHeart(near, star) || !others.every((spot) => look.whole(spot, MARGIN) && offHeart(spot, star))) return false;
+  if (!worlds.every((spot) => offCard(look, spot))) return false;
   const { atRest } = how;
   const frame = { deep: false, lights: [star], width: look.width, height: look.height };
   return !atRest || others.length === 0 || composed(others, near, frame);

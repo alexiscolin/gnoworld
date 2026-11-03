@@ -579,6 +579,29 @@ describe("a system's arrival: a good angle", () => {
     for (const system of systems) expect(postcardOf(system, EARTH_PLACE).worlds.length).toBeLessThanOrEqual(4);
   });
 
+  // The system's card at the top left (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
+  // screen): g1magld5's ringed giant stood over it. No world of a dynamic view stands in its room, a fourth across and a fifth down.
+  it(
+    "keeps the system's card's room at the top left clear of every world it draws, on both screens, Onyx's too",
+    () => {
+      const onyx = systemsOf(
+        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
+          id,
+          namespace,
+          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
+        })),
+      );
+      const cases = [...allCases(), ...onyx.map((system) => ({ system, systems: onyx }))];
+      for (const { system, systems } of cases) {
+        const arrival = arrivalOf(system, systems);
+        for (const screen of REST_SCREENS)
+          for (const seen of nearestFirst(cameraOf(arrival, screen), arrival))
+            expect(seen.left < 0.25 * screen.width && seen.top < 0.2 * screen.height, system.id).toBe(false);
+      }
+    },
+    WHOLE_SEARCHES,
+  );
+
   it("holds in a file of 10,000 worlds: the eye outside every room, six bodies at most, the same in any order", () => {
     const systems = systemsOf(mixed(2500, (system) => 1 + (system % 7)));
     const sample = systems.filter(({ worlds }) => worlds.length > 0).filter((_, at) => at % 125 === 0);
