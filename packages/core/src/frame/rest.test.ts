@@ -208,6 +208,13 @@ describe("the search's cost", () => {
     expect(least(systemsOf(spread(10_000, 2)))).toBeLessThanOrEqual(100);
     expect(least(systemsOf(spread(20_000, 10)))).toBeLessThanOrEqual(100);
   });
+
+  // The review of 7d9: 54 systems of four, whose best views stand rows on the way down, took 114 ms, every view judged once the best was
+  // refused; 104 systems of eight, with no close world, 152 ms.
+  it("finds it in 100 ms or less where the best views stand rows on the way down, or where no close world stands", () => {
+    expect(least(systemsOf(spread(54, 4)))).toBeLessThanOrEqual(100);
+    expect(least(systemsOf(spread(104, 8)))).toBeLessThanOrEqual(100);
+  });
 });
 
 describe("the eye at rest", () => {

@@ -48,6 +48,7 @@ const DEPTH_MOST = 6;
 // The distance and the slant the views stray from: the Earth about 110 pixels across, and the disc's own tilt on the stage, in degrees.
 const PLAIN_DISTANCE = 26;
 const FARTHER = [30, 32, 34];
+const PLAIN_MOST = 64;
 const PLAIN_SLANT = 15;
 
 const strayOf = ({ distance, slant, turn }: Candidate) =>
@@ -131,6 +132,42 @@ function lastResort(near: readonly Held[]): Judged | undefined {
   return undefined;
 }
 
+type Bound = (view: Candidate, close?: Close) => number;
+
+// A view's score is at most its close world's, the bodies the two richest postcards draw and the depth's, less its stray: one that cannot
+// beat the best so far is not judged.
+function boundOf(near: readonly Held[]): Bound {
+  const [first = 0, second = 0] = near.map(({ postcard }) => Math.min(postcard.length, RICH)).sort((a, b) => b - a);
+  return (view, close) =>
+    (close === undefined ? 0 : CLOSE_SCORE) + BODY_SCORE * (first + second) + DEPTH_SCORE * DEPTH_MOST - strayOf(view);
+}
+
+// A close world comes first (Alexis, 2026-11-02): its views, few, are each asked their way down once they would win.
+function closeView(near: readonly Held[], most: Bound): Judged | undefined {
+  let chosen: Judged | undefined;
+  for (const { view, close } of closeOnes(near)) {
+    const one = chosen !== undefined && most(view, close) <= chosen.score ? undefined : judge(view, { near, close });
+    if (one !== undefined && (chosen === undefined || one.score > chosen.score) && !one.rows()) chosen = one;
+  }
+  return chosen;
+}
+
+// The plain views from `distances`, many, are cut off by the best judged whatever its way down, the 64 nearest the plain one that read
+// well at most, then asked theirs the best first (the review of 7d9: a best refused left nothing to cut by, and some 2,700 views were
+// judged, 114 ms).
+function plainly(near: readonly Held[], most: Bound, distances: readonly number[]): Judged | undefined {
+  const judged: Judged[] = [];
+  let best: Judged | undefined;
+  for (const view of plain(distances)) {
+    const one = best !== undefined && most(view) <= best.score ? undefined : judge(view, { near });
+    if (one === undefined) continue;
+    judged.push(one);
+    if (best === undefined || one.score > best.score) best = one;
+    if (judged.length === PLAIN_MOST) break;
+  }
+  return judged.sort((a, b) => b.score - a.score).find((one) => !one.rows());
+}
+
 /** The view at rest over `systems`, as `systemsOf` gives them: the same systems, the same view. */
 export function restView(systems: readonly StarSystem[]): RestView {
   // The Earth's nearest first, then each laid out: a file of 20,000 systems lays out 24.
@@ -144,24 +181,8 @@ export function restView(systems: readonly StarSystem[]): RestView {
       const reach = Math.max(0, ...bodies.map(({ orbit, radius }) => orbit + radius));
       return { index, system, bodies, postcard: postcardWorlds(system), reach };
     });
-  let chosen: Judged | undefined;
-  // A view's score is at most its close world's, the bodies the two richest postcards draw and the depth's, less its stray: one that
-  // cannot win is not judged.
-  const [first = 0, second = 0] = near.map(({ postcard }) => Math.min(postcard.length, RICH)).sort((a, b) => b - a);
-  const offer = (view: Candidate, close?: Close) => {
-    const most =
-      (close === undefined ? 0 : CLOSE_SCORE) +
-      BODY_SCORE * (first + second) +
-      DEPTH_SCORE * DEPTH_MOST -
-      strayOf(view);
-    const judged = chosen !== undefined && most <= chosen.score ? undefined : judge(view, { near, close });
-    if (judged !== undefined && (chosen === undefined || judged.score > chosen.score) && !judged.rows())
-      chosen = judged;
-  };
-  for (const { view, close } of closeOnes(near)) offer(view, close);
-  for (const view of plain()) offer(view);
-  // A universe too small to read well through the home's lens from these distances reads well farther out, before one that only fits.
-  if (chosen === undefined) for (const view of plain(FARTHER)) offer(view);
-  chosen ??= lastResort(near);
+  const most = boundOf(near);
+  const chosen =
+    closeView(near, most) ?? plainly(near, most, DISTANCES) ?? plainly(near, most, FARTHER) ?? lastResort(near);
   return chosen?.view ?? { eye: eyeAt(PLAIN_DISTANCE, PLAIN_SLANT * DEGREE, 0), postcards: [], close: undefined };
 }
