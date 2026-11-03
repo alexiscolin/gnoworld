@@ -1501,8 +1501,9 @@ describe("the rail (7i)", { timeout: 20_000 }, () => {
   beforeAll(async () => {
     await import("./Rail.tsx");
   });
-  // A world the file counts callers for: a trend beside the Earth.
+  // A world the file counts callers for: a trend beside the Earth; the rail's column watched for its size.
   beforeEach(() => {
+    stubObserver();
     scene.read.mockImplementation(() =>
       Promise.resolve({ worlds: [{ id: "a/b", namespace: "a", realms: [{ path: "gno.land/r/a/b", callers: 3 }] }] }),
     );

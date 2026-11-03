@@ -5,11 +5,11 @@ import { running } from "./sceneStage.ts";
 
 // The rail (frame 4 and 16, 7i): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
 // 25 at most and "See all"; one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
-// motion; each planet its own portrait. Frame 4's rail spans x 1,585 to 1,703 at 1,728 px, from y 98 to 1,022, its planets 64 px, 98 apart.
+// motion; each planet its own portrait. Frame 4's rail: x 1,585 to 1,703 at 1,728 px, y 98 to 1,024 at most, its planets 64 px, 98 apart.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
-const FRAME = { left: 1585, right: 1703, top: 98, bottom: 1022, planet: 64, pitch: 98 };
+const FRAME = { left: 1585, right: 1703, top: 98, bottom: 1024, planet: 64, pitch: 98 };
 const RECORDED = JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")) as {
   worlds: { id: string; seen?: string | null; realms?: { callers: number | null }[] }[];
 };
@@ -79,19 +79,33 @@ async function clearOf(page: Page, x: number) {
   );
   for (const right of rights) expect(right).toBeLessThanOrEqual(x);
 }
+// The fades the column's mask holds: the top's alone, or the foot's too while the column holds more than it shows.
+const fadesOf = (page: Page) =>
+  rail(page)
+    .locator("ul")
+    .locator("..")
+    .evaluate((column) => getComputedStyle(column).maskImage.match(/rgba\(0, 0, 0, 0\)|transparent/g)?.length ?? 0);
 const boxOf = async (page: Page, selector: string) => {
   const found = await page.locator(selector).first().boundingBox();
   if (found === null) throw new Error(`${selector} has no box`);
   return found;
 };
 
-test("stands where frame 4's rail stands, its planets the frame's size and 98 px apart", async ({ page }) => {
+test("stands where frame 4's rail stands, as tall as its worlds, its planets the frame's size and 98 px apart", async ({
+  page,
+}) => {
   await arrived(page);
   const { x, y, width, height } = await boxOf(page, "nav[aria-label='Worlds']:not([data-rail])");
   expect(Math.abs(x - FRAME.left)).toBeLessThanOrEqual(2);
   expect(Math.abs(x + width - FRAME.right)).toBeLessThanOrEqual(2);
   expect(Math.abs(y - FRAME.top)).toBeLessThanOrEqual(6);
-  expect(Math.abs(y + height - FRAME.bottom)).toBeLessThanOrEqual(6);
+  // Eight worlds: the panel ends a step under See all, above frame 4's foot, and nothing fades at it.
+  const all = await rail(page).getByRole("link", { name: "See all" }).boundingBox();
+  const under = y + height - (all?.y ?? 0) - (all?.height ?? 0);
+  expect(under).toBeGreaterThan(0);
+  expect(under).toBeLessThanOrEqual(40);
+  expect(y + height).toBeLessThan(FRAME.bottom - 40);
+  expect(await fadesOf(page)).toBe(1);
   const planets = await rail(page)
     .locator("li [data-kind]")
     .evaluateAll((images) =>
@@ -171,6 +185,29 @@ test("grows the planet under the pointer like a dock, its neighbours less, and l
     expect(near).toBeGreaterThan(FRAME.planet);
     expect(near).toBeLessThan(under);
   }
+  // The pointed planet stays under the pointer, and once all stand still the dock writes nothing more.
+  const middle = await planets.nth(2).evaluate((thumb) => {
+    const box = thumb.getBoundingClientRect();
+    return box.y + box.height / 2;
+  });
+  expect(Math.abs(middle - (target.y + target.height / 2))).toBeLessThanOrEqual(3);
+  const writes = await rail(page)
+    .locator("ul")
+    .evaluate(
+      (list) =>
+        new Promise<number>((done) => {
+          let count = 0;
+          const watch = new MutationObserver((records) => {
+            count += records.length;
+          });
+          watch.observe(list, { attributes: true, attributeFilter: ["style"], subtree: true });
+          setTimeout(() => {
+            watch.disconnect();
+            done(count);
+          }, 1000);
+        }),
+    );
+  expect(writes).toBe(0);
   await page.mouse.move(100, 500);
   await expect.poll(async () => Math.max(...(await sizes())), SLOW).toBeCloseTo(FRAME.planet, 0);
 });
@@ -256,8 +293,9 @@ test("holds 25 worlds at most in its fixed panel, which scrolls, its last world 
   await expect.poll(() => railLinks(page).count(), SLOW).toBe(25);
   const { y, height } = await boxOf(page, "nav[aria-label='Worlds']:not([data-rail])");
   expect(Math.abs(y - FRAME.top)).toBeLessThanOrEqual(6);
-  expect(Math.abs(y + height - FRAME.bottom)).toBeLessThanOrEqual(6);
-  // The column scrolls inside the panel, which keeps its edge.
+  expect(Math.abs(y + height - FRAME.bottom)).toBeLessThanOrEqual(2);
+  // The column scrolls inside the panel, which keeps its edge, and fades at its foot.
+  expect(await fadesOf(page)).toBe(2);
   const column = rail(page).locator("ul").locator("..");
   expect(await column.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   await railLinks(page).first().focus();
@@ -301,5 +339,6 @@ test("draws its panel, names and See all as frame 4's rail", async ({ page }) =>
   await expect(rail(page)).toHaveScreenshot("rail.png", {
     mask: [rail(page).locator("li img")],
     maxDiffPixelRatio: 0.01,
+    ...SLOW,
   });
 });

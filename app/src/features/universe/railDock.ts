@@ -97,8 +97,8 @@ function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, at
 }
 
 /** Grows the planets of `list`'s links, each by the `--_mag` written on it (ui's PlanetThumb), and shifts the list as a dock's, until
- * `signal` ends. */
-export function dock(list: HTMLElement, signal: AbortSignal): void {
+ * `signal` ends; and tells `cut` whether the column holds more than it shows, whose foot then fades (frame 4). */
+export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean) => void): void {
   // The column the list scrolls in: a list with none is no rail's.
   const scroller = list.parentElement;
   if (scroller === null) return;
@@ -166,7 +166,14 @@ export function dock(list: HTMLElement, signal: AbortSignal): void {
     on,
   );
   list.parentElement?.addEventListener("scroll", aim, on);
+  // The column's own box tells it is cut: it grows with its list up to its cap, so it changes as its list crosses the cap, or the window
+  // moves the cap.
+  const watch = new ResizeObserver(() => {
+    cut(scroller.scrollHeight > scroller.clientHeight);
+  });
+  watch.observe(scroller);
   signal.addEventListener("abort", () => {
     cancelAnimationFrame(frame);
+    watch.disconnect();
   });
 }

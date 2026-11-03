@@ -68,13 +68,14 @@ function holdWhileOn(rail: HTMLElement, order: RailOrder, signal: AbortSignal): 
   );
 }
 
-// The rail's order and portraits from its source, and while it stands: the page's list stepping aside, the hold and the dock.
+// The rail's order and portraits from its source, and while it stands: the page's list stepping aside, the hold, the dock and the cut.
 function useRail(source: RailSource, places: RailPlaces) {
   const [order] = useState(() => new RailOrder(places));
   const known = useSyncExternalStore(source.subscribe, source.data);
   const entries = useSyncExternalStore(order.subscribe, order.entries);
   const drawn = useSyncExternalStore(source.portraits.subscribe, source.portraits.drawn);
   const railRef = useRef<HTMLElement>(null);
+  const [cut, setCut] = useState(false);
   // A rail of the Earth alone stands not, and leaves the page its list of hubs (Alexis, 2026-11-03).
   const standing = known !== undefined && entries.some(({ section }) => section !== "earth");
   useEffect(() => {
@@ -98,14 +99,14 @@ function useRail(source: RailSource, places: RailPlaces) {
     if (standing && rail !== null) {
       holdWhileOn(rail, order, leaving.signal);
       const list = rail.querySelector("ul");
-      if (list !== null) dock(list, leaving.signal);
+      if (list !== null) dock(list, leaving.signal, setCut);
     }
     return () => {
       leaving.abort();
       standFor(false);
     };
   }, [standing, order]);
-  return { entries: standing ? entries : [], drawn, railRef };
+  return { entries: standing ? entries : [], drawn, railRef, cut };
 }
 
 export function Rail({
@@ -117,7 +118,7 @@ export function Rail({
   places: RailPlaces;
   open: (href: string) => void;
 }) {
-  const { entries, drawn, railRef } = useRail(source, places);
+  const { entries, drawn, railRef, cut } = useRail(source, places);
   const [stop, setStop] = useState(0);
   if (entries.length === 0) return null;
   const moved = (event: KeyboardEvent<HTMLUListElement>) => {
@@ -133,7 +134,7 @@ export function Rail({
   const tabStop = stop < entries.length ? stop : 0;
   return (
     <nav aria-label="Worlds" className={styles["rail"]} style={FOOTPRINT} ref={railRef}>
-      <div className={styles["column"]}>
+      <div className={styles["column"]} data-cut={cut || undefined}>
         <ul className={styles["worlds"]} onKeyDown={moved}>
           {entries.map(({ id, title, section, href }, at) => (
             <li key={id}>

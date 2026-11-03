@@ -82,6 +82,16 @@ function rail(source = sourceOf().source) {
   const box = mount(<Rail source={source} places={PLACES} open={open} />);
   return { box, open };
 }
+// The rail in a root of its own, for a test that takes it off the page.
+function alone() {
+  const box = document.createElement("div");
+  document.body.append(box);
+  const root = createRoot(box);
+  act(() => {
+    root.render(<Rail source={sourceOf().source} places={PLACES} open={vi.fn()} />);
+  });
+  return { box, root };
+}
 const worlds = (box: HTMLElement) => all(box, "nav[aria-label='Worlds'] li a");
 const names = (box: HTMLElement) => worlds(box).map((link) => link.textContent);
 const press = (target: HTMLElement, key: string) => {
@@ -90,12 +100,30 @@ const press = (target: HTMLElement, key: string) => {
   });
 };
 
+// jsdom has no ResizeObserver: each one the rail makes is kept, to be told a change by hand.
+const resized = vi.hoisted(() => ({ told: [] as (() => void)[], watched: 0, gone: 0 }));
+class Watching {
+  constructor(told: () => void) {
+    resized.told.push(told);
+  }
+  observe(): void {
+    resized.watched += 1;
+  }
+  disconnect(): void {
+    resized.gone += 1;
+  }
+}
+
 beforeEach(() => {
   vi.useFakeTimers({
     now: NOW,
     toFake: ["setTimeout", "clearTimeout", "Date", "requestAnimationFrame", "cancelAnimationFrame"],
   });
   media();
+  vi.stubGlobal("ResizeObserver", Watching);
+  resized.told.length = 0;
+  resized.watched = 0;
+  resized.gone = 0;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -661,6 +689,31 @@ describe("the rail's magnification", () => {
   });
 });
 
+describe("the rail's column", () => {
+  it("fades its foot only while it holds more than it shows, and stops watching once the rail goes", () => {
+    const { box, root } = alone();
+    const column = one(box, "nav[aria-label='Worlds'] ul").parentElement;
+    if (column === null) throw new Error("no column");
+    const holds = (scroll: number) => {
+      Object.defineProperty(column, "scrollHeight", { value: scroll, configurable: true });
+      Object.defineProperty(column, "clientHeight", { value: 500, configurable: true });
+      act(() => {
+        for (const told of resized.told) told();
+      });
+    };
+    holds(900);
+    expect(column.hasAttribute("data-cut")).toBe(true);
+    holds(500);
+    expect(column.hasAttribute("data-cut")).toBe(false);
+    act(() => {
+      root.unmount();
+    });
+    box.remove();
+    expect(resized.gone).toBe(resized.told.length);
+    expect(resized.watched).toBe(resized.told.length);
+  });
+});
+
 describe("the page's plain list of worlds", () => {
   let list: HTMLElement;
   beforeEach(() => {
@@ -688,12 +741,7 @@ describe("the page's plain list of worlds", () => {
   });
 
   it("comes back when the rail is taken off the page", () => {
-    const box = document.createElement("div");
-    document.body.append(box);
-    const root = createRoot(box);
-    act(() => {
-      root.render(<Rail source={sourceOf().source} places={PLACES} open={vi.fn()} />);
-    });
+    const { box, root } = alone();
     expect(list.dataset["rail"]).toBe("standing");
     act(() => {
       root.unmount();

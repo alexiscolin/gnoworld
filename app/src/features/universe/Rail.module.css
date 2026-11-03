@@ -1,6 +1,7 @@
-/* The rail (frames 4 and 16): a dark glass column at the right edge, from under the header to over the ticker, its planets one under the
-   other, 98 px apart, each with its name in the label style under it; the column scrolls past the panel's foot, which fades it, and See all
-   ends it. Its width comes from its footprint, which the labels keep clear (core's RAIL), and which the rail writes on itself. */
+/* The rail (frames 4 and 16): a dark glass column at the right edge, under the header, as tall as its worlds down to over the ticker
+   (DESIGN-SYSTEM.md, Rail), its planets one under the other, 98 px apart, each with its name in the label style under it; past that, the
+   column scrolls under the panel's foot, which fades it, and See all ends it. Its width comes from its footprint, which the labels keep
+   clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
     /* raw: frame 4's 25 px between the rail and the window's right edge */
@@ -9,8 +10,8 @@
     --_footprint: initial;
 
     position: fixed;
-    /* raw: frame 4's rail from 98 px to 1,022 px of 1,080: under the header, over the ticker and its air */
-    inset-block: 98px 58px;
+    /* raw: frame 4's rail from 98 px of 1,080, under the header */
+    inset-block-start: 98px;
     inset-inline-end: var(--_edge);
     /* raw: over the labels' layer (0) and the canvas (-1), as the flight panel is */
     z-index: 1;
@@ -23,11 +24,18 @@
   }
 
   .column {
+    /* raw: the panel down to 1,024 px of 1,080 at most, frame 4's foot, over the ticker and its air */
+    max-block-size: calc(100vb - 154px);
     /* layout: the planets and See all scroll inside the panel, which keeps its edge */
-    block-size: 100%;
     overflow: auto;
-    /* raw: frame 4's last planet fading into the panel's foot, the last 9% of its height */
-    mask-image: linear-gradient(#000 91%, transparent);
+    /* raw: a planet the dock or the scroll moves past the panel's top fades over 12 px, under its edge */
+    mask-image: linear-gradient(transparent, #000 12px);
+  }
+
+  /* The foot fades only while the column holds more than it shows, which the rail says. */
+  .column[data-cut] {
+    /* raw: frame 4's last planets fading from 127 px over the panel's foot, gone 18 px above it */
+    mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 127px), transparent calc(100% - 18px));
   }
 
   .worlds {
@@ -49,9 +57,9 @@
     justify-items: center;
     /* layout: the planet and its name at the top of their place */
     align-content: start;
-    /* raw: frame 4's 10 px between a planet and its name */
+    /* raw: frame 4's 9 px from a planet to its name's letters, 8 px less the name's leading */
     /* layout: the planet and its name apart */
-    row-gap: 10px;
+    row-gap: 8px;
     /* raw: frame 4's 98 px from one planet's middle to the next */
     min-block-size: 98px;
     text-decoration: none;
