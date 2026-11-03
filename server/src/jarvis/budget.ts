@@ -53,6 +53,8 @@ export function makeBudget(
   db: DatabaseSync,
   { caps, holdMs, now }: { caps: Record<Kind, number>; holdMs: number; now: () => number },
 ): Budget {
+  // openDatabase's NORMAL may lose the last commits to a power cut in WAL mode, and with them settles (F5180).
+  db.exec("PRAGMA synchronous = FULL");
   const Held = z.object({ id: z.number() });
   const Taken = z.object({ kind: z.enum(["ask", "translate"]), day: z.string(), worst: z.number() });
   const Sums = z.object({ spent: z.number(), reserved: z.number(), alerted: z.number() });

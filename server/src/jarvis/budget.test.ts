@@ -327,6 +327,11 @@ describe("the budget", () => {
     expect(budget.state("ask")).toEqual({ spent: 60 * PERCENT, reserved: 0, cap: CAP });
   });
 
+  it("writes each commit to the disk before it answers, so a power cut loses no settle (F5180)", () => {
+    const { db } = setup(join(dir, "durable.db"));
+    expect(db.prepare("PRAGMA synchronous").get()).toEqual({ synchronous: 2 });
+  });
+
   it("keeps the day's sums across a restart, a crashed process's holds included (D45)", () => {
     const path = join(dir, "restart.db");
     const first = setup(path);
