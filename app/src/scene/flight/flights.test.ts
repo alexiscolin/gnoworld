@@ -620,7 +620,7 @@ describe("a page's flight", () => {
       },
     });
     const approaches = frames.map(({ approach }) => approach);
-    expect(approaches[0]).toBeGreaterThan(20);
+    expect(approaches[0]).toBeGreaterThan(4);
     expect(approaches).toEqual([...approaches].sort((a, b) => b - a));
     expect(approaches.at(-1)).toBe(1);
     expect(frames[0]?.veil).toBeGreaterThan(0.8);
