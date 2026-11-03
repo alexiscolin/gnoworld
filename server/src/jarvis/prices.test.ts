@@ -209,24 +209,33 @@ describe("cost", () => {
 });
 
 describe("worstCost", () => {
-  it("prices every input byte as an hour's cache write and every allowed output token", () => {
+  // The tool-use system prompt the API adds to a request with tools, in no byte jarvis sends (Anthropic's pricing
+  // page, "Tool use pricing", read 2026-11-04): 286 tokens on the three, 406 on Haiku 5.5 with a forced tool (F5182).
+  const toolPrompt = (model: Model): number => (model === "claude-haiku-5-5" ? 406 : 286);
+
+  it("prices every input byte and the tool prompt as an hour's cache write, and every allowed output token", () => {
     expect(worstCost("claude-sonnet-5-5", { inputBytes: 1_000, maxTokens: 100 })).toBe(
-      1_000 * nano(4) + 100 * nano(10),
+      (1_000 + 286) * nano(4) + 100 * nano(10),
     );
-    expect(worstCost("claude-opus-5-5", { inputBytes: 1_000, maxTokens: 10 })).toBe(1_000 * nano(8) + 10 * nano(20));
+    expect(worstCost("claude-opus-5-5", { inputBytes: 1_000, maxTokens: 10 })).toBe(
+      (1_000 + 286) * nano(8) + 10 * nano(20),
+    );
+    expect(worstCost("claude-haiku-5-5", { inputBytes: 1_000, maxTokens: 10 })).toBe(
+      (1_000 + 406) * nano(0.2) + 10 * nano(0.5),
+    );
   });
 
-  it("prices Haiku 5.5 at its other card once the bytes can pass 100K tokens", () => {
-    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_000, maxTokens: 1_000 })).toBe(
+  it("prices Haiku 5.5 at its other card once the bytes and the tool prompt can pass 100K tokens", () => {
+    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_000 - 406, maxTokens: 1_000 })).toBe(
       100_000 * nano(0.2) + 1_000 * nano(0.5),
     );
-    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_001, maxTokens: 1_000 })).toBe(
+    expect(worstCost("claude-haiku-5-5", { inputBytes: 100_001 - 406, maxTokens: 1_000 })).toBe(
       100_001 * nano(1) + 1_000 * nano(2.5),
     );
   });
 
-  it("takes no input byte and one output token, the least", () => {
-    expect(worstCost("claude-sonnet-5-5", { inputBytes: 0, maxTokens: 1 })).toBe(nano(10));
+  it("takes no input byte and one output token, the least, the tool prompt still counted", () => {
+    expect(worstCost("claude-sonnet-5-5", { inputBytes: 0, maxTokens: 1 })).toBe(286 * nano(4) + nano(10));
   });
 
   it.each([
@@ -265,11 +274,18 @@ describe("worstCost", () => {
             cache_creation: split(tokens.fiveMinutes, tokens.hour),
             output_tokens: Math.min(output, maxTokens),
           });
-          // No prompt has more tokens than its UTF-8 bytes; an answer priced at nothing fails the property.
+          // No prompt has more tokens than its UTF-8 bytes and the tool prompt; an answer priced at nothing fails.
           const priced = cost(model, answer) ?? Number.POSITIVE_INFINITY;
-          expect(worstCost(model, { inputBytes: prompt + spare, maxTokens })).toBeGreaterThanOrEqual(priced);
+          const inputBytes = Math.max(0, prompt - toolPrompt(model)) + spare;
+          expect(worstCost(model, { inputBytes, maxTokens })).toBeGreaterThanOrEqual(priced);
         },
       ),
     );
+  });
+
+  it.each(MODELS)("is the cost of no byte and the tool prompt alone, written for an hour, on %s: the edge", (model) => {
+    const written = toolPrompt(model);
+    const answer = usage({ cache_creation_input_tokens: written, cache_creation: split(0, written), output_tokens: 1 });
+    expect(worstCost(model, { inputBytes: 0, maxTokens: 1 })).toBe(cost(model, answer));
   });
 });

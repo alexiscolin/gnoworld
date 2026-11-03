@@ -71,8 +71,10 @@ export function cost(model: string, usage: unknown): number | undefined {
 export function worstCost(model: Model, { inputBytes, maxTokens }: { inputBytes: number; maxTokens: number }): number {
   if (!Number.isSafeInteger(inputBytes) || inputBytes < 0) throw new RangeError("inputBytes: a count of bytes");
   if (!Number.isSafeInteger(maxTokens) || maxTokens < 1) throw new RangeError("maxTokens: a count of tokens, from 1");
-  // No prompt has more tokens than its UTF-8 bytes: each byte is the dearest input token of the card they can reach.
-  const rates = ratesOf(model, inputBytes);
+  // No prompt has more tokens than its UTF-8 bytes and the tool-use system prompt the API adds (the pricing page:
+  // 286 tokens, 406 on Haiku 5.5 with a forced tool; F5182): each is the dearest input token of the card they reach.
+  const prompt = inputBytes + (model === "claude-haiku-5-5" ? 406 : 286);
+  const rates = ratesOf(model, prompt);
   const dearest = Math.max(rates.input, rates.read, rates.fiveMinutes, rates.hour);
-  return inputBytes * dearest + maxTokens * rates.output;
+  return prompt * dearest + maxTokens * rates.output;
 }
