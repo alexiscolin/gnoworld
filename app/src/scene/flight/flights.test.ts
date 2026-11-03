@@ -88,7 +88,7 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
     ),
   };
   const said: (FlightSaid | undefined)[] = [];
-  const busy: boolean[] = [];
+  const moved = { count: 0 };
   const still = { value: false };
   const shows = { value: true };
   const earth = { x: NaN, y: NaN, z: NaN };
@@ -102,8 +102,8 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
     said: (flight) => {
       said.push(flight === undefined ? undefined : { ...flight });
     },
-    busy: (flying) => {
-      busy.push(flying);
+    moved: () => {
+      moved.count += 1;
     },
     still: () => still.value,
     cosmos: () =>
@@ -121,7 +121,7 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
           }
         : undefined,
   };
-  return { device, eye, camera, stage, said, busy, copies, freed, renderer, still, placed, systems, shows, lift };
+  return { device, eye, camera, stage, said, moved, copies, freed, renderer, still, placed, systems, shows, lift };
 }
 type Rig = ReturnType<typeof rig>;
 
@@ -267,7 +267,8 @@ describe("the jump to a star", () => {
     expect(away(start, places[Math.floor(frames / 10)] ?? start)).toBeLessThan(way / 40);
     expect(away(places[Math.ceil((9 * frames) / 10)] ?? start, end.eye)).toBeLessThan(way / 40);
     expect(steps[Math.round(0.9 * frames)] ?? Infinity).toBeLessThan(peak / 3);
-    expect(scene.busy).toEqual([true, false]);
+    expect(scene.moved.count).toBe(1);
+    expect(flown.busy).toBe(false);
     expect(flown.stats()).toMatchObject({ flying: false, along: 1 });
   });
 
@@ -318,7 +319,7 @@ describe("the jump to a star", () => {
     flown.fly({ kind: "star", id: pick(scene).id });
     expect(flown.stats().flying).toBe(false);
     expect(scene.eye.travel).toEqual({ x: 0, y: 0, z: 0 });
-    expect(scene.busy).toEqual([]);
+    expect(scene.moved.count).toBe(0);
   });
 
   it("flies to the star the eye already stands by without a step out of the finite", () => {
@@ -457,7 +458,7 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     frame(flown, scene);
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
     expect(scene.said.at(-1)).toBeUndefined();
-    expect(scene.busy.at(-1)).toBe(false);
+    expect(flown.busy).toBe(false);
   });
 
   it("flies back to the view at rest on Escape once at a star, its way undone and its look given back", () => {
@@ -568,7 +569,7 @@ describe("under reduced motion", () => {
     expect(veilOn(scene.stage)).toBe(false);
     expect(flying(scene.said)).toEqual([]);
     expect(flown.stats().streaks).toBe(0);
-    expect(scene.busy.at(-1)).toBe(false);
+    expect(flown.busy).toBe(false);
   });
 
   it("brings a page's body to its place at once", () => {
@@ -890,6 +891,6 @@ describe("what a flight gives back", () => {
     escape();
     press();
     expect(flown.stats().flying).toBe(false);
-    expect(scene.busy.at(-1)).toBe(false);
+    expect(flown.busy).toBe(false);
   });
 });

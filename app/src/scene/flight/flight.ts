@@ -37,7 +37,6 @@ export class Flights {
   };
   #kind: FlightGoal["kind"] = "rest";
   #flying = false;
-  #busy = false;
   #still = false;
   #ready = true;
   #along = 1;
@@ -80,7 +79,7 @@ export class Flights {
     this.#was.x = eye.travel.x;
     this.#was.y = eye.travel.y;
     this.#was.z = eye.travel.z;
-    this.#hold(true);
+    this.#device.moved();
     this.#sayOn(0);
   }
 
@@ -166,7 +165,6 @@ export class Flights {
     else veil.fade(1 - this.#along / VEIL_UNTIL, 1 + VEIL_ZOOM * wayAt(this.#along));
     if (veil.veil > 0) return;
     this.#dropVeil();
-    if (!this.#flying) this.#hold(false);
   }
 
   #dropVeil(): void {
@@ -186,7 +184,6 @@ export class Flights {
     this.#streaks.hide();
     if (!this.#still) this.#dropVeil();
     this.#device.said(undefined);
-    if (this.#veil === undefined) this.#hold(false);
   }
 
   /** Whether a flight is under way. */
@@ -196,12 +193,7 @@ export class Flights {
 
   /** Whether a flight or its veil runs: the scene holds its loop's full rate for them. */
   get busy(): boolean {
-    return this.#busy;
-  }
-
-  #hold(busy: boolean): void {
-    this.#busy = busy;
-    this.#device.busy(busy);
+    return this.#flying || this.#veil !== undefined;
   }
 
   dispose(): void {

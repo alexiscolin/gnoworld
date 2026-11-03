@@ -56,8 +56,8 @@ export interface FlightDevice {
   /** How far the page's body stands, as a share of its place at rest, and how far to its side, as a share of its distance. */
   readonly arrival: { approach: number; aside: number };
   readonly said: (flight: FlightSaid | undefined) => void;
-  /** A flight, or its veil, needs the loop's full rate, or no more. */
-  readonly busy: (flying: boolean) => void;
+  /** A frame is owed: a flight starts, and the scene reads its busy from then on. */
+  readonly moved: () => void;
   readonly still: () => boolean;
   readonly cosmos: () => CosmosSight | undefined;
 }

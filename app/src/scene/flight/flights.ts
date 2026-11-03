@@ -23,7 +23,7 @@ export function flightsOn(scene: FlightScene, cosmos: { readonly sight: CosmosSi
     eye,
     arrival,
     said: said ?? (() => undefined),
-    busy: moved,
+    moved,
     still: () => motion.matches,
     cosmos: () => cosmos.sight,
   });
