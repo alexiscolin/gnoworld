@@ -24,6 +24,9 @@ export interface HaloSight {
 }
 
 const away = ({ x, y, z }: Point, eye: Point): number => Math.hypot(x - eye.x, y - eye.y, z - eye.z);
+// Under the ceiling, a sun's own size eased so it nears it and never reaches it: two suns at different distances never draw one size, the
+// nearer the larger (the chief, 2026-11-03, after Alexis's not-a-planetarium rule).
+const under = (size: number, most: number): number => size / (1 + (size / most) ** 4) ** 0.25;
 const reachOf = ({ star }: StarSystem): number => REACH * Math.sqrt(star) + LEAST_REACH;
 // The great star's size on screen, as its reach over its distance, the widest halo kept.
 const greatSize = (great: StarSystem | undefined, eye: Point, focal: number): number =>
@@ -65,8 +68,10 @@ export class Halos {
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-    const most = index === 0 ? Infinity : OTHER_SUN * this.#great * distance;
-    const full = Math.min(reachOf(system), (HALO_PIXELS * distance) / this.#focal, most);
+    const full =
+      index === 0
+        ? Math.min(reachOf(system), (HALO_PIXELS * distance) / this.#focal)
+        : under(reachOf(system), OTHER_SUN * this.#great * distance);
     const point = Math.min(full, (POINT_PIXELS * distance) / this.#focal);
     return { reach: point + (full - point) * halo, halo };
   }

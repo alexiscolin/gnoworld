@@ -213,8 +213,29 @@ describe("the suns' halos", () => {
     const suns = sunsAt(aways, { needsHalo: (index) => index === 0 || index === 1 });
     const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
     expect(pixels[0]).toBeCloseTo((9.5 * 1158) / 40, 6);
-    for (const other of pixels.slice(1)) expect(other).toBeLessThanOrEqual((pixels[0] ?? 0) / 2 + 1e-9);
-    expect(pixels[1]).toBeCloseTo((pixels[0] ?? 0) / 2, 6);
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
+    // A sun this near nears the ceiling, never reaching it (7d9).
+    expect(pixels[1]).toBeGreaterThan(0.99 * ((pixels[0] ?? 0) / 2));
+  });
+
+  // The chief, 2026-11-03, on Alexis's not-a-planetarium rule: through the home's lens two suns over the Earth, 42.6 and 76.6 units off,
+  // the farther a postcard's, whose halo is whole at any distance, drew one size, both at the cap. A halo follows its distance under the cap.
+  it("draws the nearer of two like suns the larger, a tenth apart or more, both under half the great star's size", () => {
+    const focal = 1.2 * 1158;
+    const aways = [24.4, 42.6, 76.6];
+    const suns = sunsAt(aways, { focal, needsHalo: (index) => index === 0 || index === 2 });
+    const pixels = suns.map(({ reach }, at) => (reach * focal) / (aways[at] ?? NaN));
+    expect(pixels[1]).toBeGreaterThanOrEqual(1.1 * (pixels[2] ?? Infinity));
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
+  });
+
+  // The red pass (L5): over the whole range, a sun's size falls as its distance grows, strictly, under the ceiling.
+  it("draws a sun the smaller the farther it stands, from 6 to 120 units, every one under half the great star's size", () => {
+    const aways = [24.4, ...Array.from({ length: 20 }, (_, at) => 6 + at * 6)];
+    const suns = sunsAt(aways, { needsHalo: () => true });
+    const pixels = suns.map(({ reach }, at) => (reach * 1158) / (aways[at] ?? NaN));
+    for (let at = 2; at < pixels.length; at += 1) expect(pixels[at]).toBeLessThan(pixels[at - 1] ?? -Infinity);
+    for (const other of pixels.slice(1)) expect(other).toBeLessThan((pixels[0] ?? 0) / 2);
   });
 
   it("keeps a region's glow whole: it is no sun's halo", () => {
