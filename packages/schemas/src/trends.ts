@@ -32,7 +32,7 @@ const Rising = z.strictObject({
 const New = z.strictObject({ kind: z.literal("new"), world: WorldId, realm: RealmPath, title: Title, at: Moment });
 
 /** One trend, as the server sends it. */
-export const Trend = z.discriminatedUnion("kind", [Trending, Rising, New]);
+export const Trend = z.union([Trending, Rising, New]);
 export type Trend = z.infer<typeof Trend>;
 
 export const Trends = z.strictObject({
