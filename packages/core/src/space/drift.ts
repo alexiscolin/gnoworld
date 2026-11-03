@@ -47,6 +47,14 @@ const ORBIT_PACE = 0.2;
  * its place on its orbit. */
 export const orbitTime = (seconds: number): number => seconds * ORBIT_PACE;
 
+// Instants through the longest turn of systems spinning at `spins`: postcards turn at rest, so a view reads well through a whole turn.
+const INSTANTS = 8;
+/** Eight instants through the longest turn of systems that spin at `spins`, in seconds. */
+export const instantsOf = (spins: readonly number[]): number[] => {
+  const longest = (2 * Math.PI) / Math.min(...spins.map((spin) => Math.abs(spin)), Infinity);
+  return Array.from({ length: INSTANTS }, (_, step) => (step * (Number.isFinite(longest) ? longest : 0)) / INSTANTS);
+};
+
 /** How far the eye sways at rest, in world units, across the view and up it (7d6): the near worlds slide past the far ones. */
 export const SWAY = { across: 0.25, up: 0.12 } as const;
 /** How far a mouse at the window's edge leans the view, in world units, across and up the stage (eye.ts): enough to part the motes from

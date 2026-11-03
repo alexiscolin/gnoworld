@@ -4,6 +4,7 @@ import type { Orbiter, StarSystem } from "../cosmos/system.ts";
 import { composed } from "./composition.ts";
 import { postcardFrom } from "./postcard.ts";
 import { clearOfClose } from "./restClose.ts";
+import { instantsOf } from "../space/drift.ts";
 import { placeOf, type Close, type Held, type Look, type Seen } from "./restLook.ts";
 
 // A postcard reads as a small system round its star from three bodies; pixels of room round its ball, which the sway leaves.
@@ -65,13 +66,7 @@ export function spotsOf(
   return drawn.filter((at) => !look.off(at));
 }
 
-// Instants through the longest turn of systems spinning at `spins`: postcards turn at rest, so a view reads well through a whole turn.
-const INSTANTS = 8;
-/** Eight instants through the longest turn of systems that spin at `spins`, in seconds. */
-export const instantsOf = (spins: readonly number[]): number[] => {
-  const longest = (2 * Math.PI) / Math.min(...spins.map((spin) => Math.abs(spin)), Infinity);
-  return Array.from({ length: INSTANTS }, (_, step) => (step * (Number.isFinite(longest) ? longest : 0)) / INSTANTS);
-};
+export { instantsOf };
 const turnOf = (cards: readonly Card[]) => instantsOf(cards.map(({ held }) => held.system.spin));
 
 // The richer of two postcards, three bodies or more counting alike, then the nearer, as the Earth's nearest are held.
