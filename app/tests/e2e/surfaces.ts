@@ -31,6 +31,18 @@ const coresOf = (discs: readonly Circle[]): Core[] => {
   return discs.map((disc) => brightestOf(inside(disc, 0.95), 0.02));
 };
 
+// A disc lit from the right: the mean colour of its air past its limb, the ring from 1.00 to 1.04 of its radius right of its centre.
+const limbsOf = (discs: readonly Circle[]): Core[] =>
+  discs.map(({ x, y, r }) => {
+    const ring: [number, number][] = [];
+    for (let py = Math.ceil(y - 1.04 * r); py < y + 1.04 * r; py++)
+      for (let px = Math.ceil(x); px < x + 1.04 * r; px++) {
+        const away = Math.hypot(px - x, py - y) / r;
+        if (away >= 1 && away <= 1.04) ring.push([px, py]);
+      }
+    return brightestOf(ring, 1);
+  });
+
 // The well-lit ground (right of 0.15 of the radius, inside 0.85): its 0.5th percentile luma and its median.
 const darkestOf = (discs: readonly Circle[]) => {
   const { image, luma, inside } = Reflect.get(globalThis, "__pixels") as Tools;
@@ -94,6 +106,8 @@ const rowsOf = (discs: readonly Circle[]) => {
 
 export const cores = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Core[]> =>
   reading(page, [picture], [coresOf, discs, String(brightestOf)]);
+export const limbs = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Core[]> =>
+  reading(page, [picture], [limbsOf, discs, String(brightestOf)]);
 export const darkest = (page: Page, picture: Buffer, discs: readonly Circle[]) =>
   reading(page, [picture], [darkestOf, discs]);
 export const lightness = (page: Page, pictures: readonly [Buffer, Buffer], discs: readonly Circle[]) =>

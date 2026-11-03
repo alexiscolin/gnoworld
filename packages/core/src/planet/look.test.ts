@@ -394,13 +394,20 @@ describe("planetLook", () => {
     );
   });
 
-  it("keeps every air as thin and as dim as the Earth's, each in its own colour", () => {
+  // A glowing world's air is warmed by its own light (Alexis, 2026-11-03, 16:4x, "réchauffer"): frame 4's Music's limb, #edc3ad, as 7b6
+  // showed it; every other air keeps the Earth's dimness in its own colour.
+  it("keeps every air as thin as the Earth's, and as dim but a glowing world's, warm as frame 4's Music's limb", () => {
     for (const anchor of ANCHORS)
       for (const path of paths(100)) {
-        const { rim } = planetLook(path, anchor);
+        const { rim, glow } = planetLook(path, anchor);
         if (rim === null) continue;
         expect(rim.thickness, anchor).toBeLessThanOrEqual(0.05);
-        expect(Math.max(...rim.colour), anchor).toBeLessThanOrEqual(0.55);
+        if (glow === null) expect(Math.max(...rim.colour), anchor).toBeLessThanOrEqual(0.55);
+        else
+          expect(
+            rim.colour.map((value) => Math.round(value * 255)),
+            anchor,
+          ).toEqual([0xed, 0xc3, 0xad]);
       }
   });
 

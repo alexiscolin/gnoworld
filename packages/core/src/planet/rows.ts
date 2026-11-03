@@ -59,8 +59,9 @@ const KEPT: Record<KeptAnchor, AnchorRow> = {
     recolour: [0.92, 1],
     relief: [0.012, 0.02],
     glow: { colour: LAVA, level: [0.5, 0.58] },
+    // Warmed by its own light (Alexis, 2026-11-03, "réchauffer"): frame 4's Music's limb.
     rim: {
-      colours: [rgb(0x734d26), rgb(0x6e562b)],
+      colours: [rgb(0xedc3ad), rgb(0xedc3ad)],
       thickness: [0.016, 0.026],
     },
   },

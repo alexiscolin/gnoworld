@@ -3,12 +3,12 @@
 // at cbb0a480, are what each test moves from. SwiftShader's picture is never the verdict on beauty: the design reviewer reads the
 // frames, and judges "no regular figure on any world" beside the straight runs held here.
 
-import { ANCHORS, type Anchor } from "@gnoworld/core";
+import { ANCHORS, type Anchor, type PlanetLook } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, drawn, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, type Circle } from "./lab.ts";
 import { cells, lines } from "./lines.ts";
 import { apart } from "./portraits.ts";
-import { cores, darkest, lightness, wholeRows } from "./surfaces.ts";
+import { cores, darkest, lightness, limbs, wholeRows } from "./surfaces.ts";
 import { facesOn, grain, landOn, rows, type Face } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
@@ -52,6 +52,9 @@ const WHOLE_BANDS = 0.75;
 // Io's calderas dark but never punched black: the well-lit ground's 0.5th percentile over its median no darker than a cratered
 // ground's darkest (rocky 0.27, the Earth 0.29) by more than a quarter, and calderas there (7b5's Io 0.115, luma 17 in 150).
 const CALDERA = [0.2, 0.5] as const;
+// A glowing world's air past its limb reads red past blue, as frame 4's Music's limb (#edc3ad, red 64 past blue; Alexis, 2026-11-03,
+// "réchauffer"); every other world's keeps its cool light. 7b6's brown airs read -6.9 and -10.1, the coolest other air -8.7.
+const WARM_LIMB = 0;
 // Temperate worlds of continents (F4243): the Earth's close view holds 83% of its land in one piece and 42% of its lit disc in land
 // (textures.ts's land: lit, its blue not leading, no cloud); 7b5's 24 temperate worlds' medians 0.51 and 0.34. Land, but no desert
 // world, and no world all sea from the eye (7b6's design review: 3 of 24 under 5%, the gallery's own 0.6%, at e43c31f9).
@@ -210,6 +213,25 @@ test.describe("the generated worlds polished", () => {
     expect(median(rows), "whole bands").toBeGreaterThanOrEqual(WHOLE_BANDS);
     const shown = (await apart(page, pictures, places)).filter(({ moved }) => moved > MINOR.shown);
     expect(shown.length, "worlds that show their minor").toBeGreaterThanOrEqual(MINOR.worlds);
+  });
+
+  test("a glowing world's air is warm, as frame 4's Music's limb; every other world's keeps its own cool light", async ({
+    page,
+  }) => {
+    const read: { anchor: string; glows: boolean; warmth: number }[] = [];
+    for (const anchor of ANCHORS) {
+      await open(page, close(anchor));
+      const [look] = await askLab<PlanetLook[]>(page, "looks");
+      if (look === undefined || look.rim === null) continue;
+      const [limb] = await limbs(page, await picture(page), [await placeOf(page)]);
+      const [red = 0, , blue = 0] = limb?.colour ?? [];
+      read.push({ anchor, glows: look.glow !== null, warmth: red - blue });
+    }
+    test.info().annotations.push({ type: "limbs", description: JSON.stringify(read) });
+    const glowing = read.filter(({ glows }) => glows).map(({ warmth }) => warmth);
+    const others = read.filter(({ glows }) => !glows).map(({ warmth }) => warmth);
+    expect(Math.min(...glowing), "a glowing world's air").toBeGreaterThanOrEqual(WARM_LIMB);
+    expect(Math.max(...others), "every other air").toBeLessThan(WARM_LIMB);
   });
 
   test("Io's calderas are dark ground, never punched black", async ({ page }) => {
