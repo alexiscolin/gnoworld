@@ -43,15 +43,20 @@ function gained(world: World, before: PassReads, now: PassReads): number {
 
 const byId = (a: World, b: World): number => (a.id < b.id ? -1 : Number(a.id > b.id));
 
-// The world that gained the most calls since the pass before, the first by id among equals; none past the window.
+// Whether a world's gain goes before the best so far: more calls, or as many and an earlier id; a world that gained none never does.
+const ahead = (world: { calls: number; id: string }, best: { calls: number; id: string } | undefined): boolean =>
+  best === undefined ? world.calls > 0 : world.calls > best.calls || (world.calls === best.calls && world.id < best.id);
+
+// The world that gained the most calls since the pass before, the first by id among equals; none past the window. The file's order is
+// not relied on.
 function busiest(worlds: Worlds, last: { at: string; read: PassReads } | undefined, read: PassReads): ChainTrend[] {
   if (last === undefined) return [];
   const window = Date.parse(worlds.updated) - Date.parse(last.at);
   if (!(window > 0 && window <= WINDOW_MOST_MS)) return [];
   let best: { calls: number; place: { title: string; realm: string }; id: string } | undefined;
-  for (const world of worlds.worlds.toSorted(byId)) {
+  for (const world of worlds.worlds) {
     const calls = gained(world, last.read, read);
-    const place = calls > (best?.calls ?? 0) ? placed(world) : undefined;
+    const place = ahead({ calls, id: world.id }, best) ? placed(world) : undefined;
     if (place !== undefined) best = { calls, place, id: world.id };
   }
   return best === undefined
