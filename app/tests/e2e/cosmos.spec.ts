@@ -339,12 +339,19 @@ for (const size of [COMPUTER, WIDE])
     await expect.poll(async () => (await cosmos(page)).screen.earth !== undefined, SLOW).toBe(true);
     const { earth, sun, bodies } = (await cosmos(page)).screen;
     if (earth === undefined) throw new Error("no Earth");
-    expect(new Set(bodies.map(({ id }) => byId.get(id))).size).toBeLessThanOrEqual(3);
+    // 7p (Alexis, 2026-11-03, "la perspective doit être partout"): beside the view's own three systems, four more stand a body each.
+    const own = new Set(
+      [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map((at) => systems[at]?.id),
+    );
+    const deep = bodies.filter(({ id }) => !own.has(byId.get(id)));
+    expect(new Set(deep.map(({ id }) => byId.get(id))).size).toBe(deep.length);
+    expect(deep.length).toBeLessThanOrEqual(4);
+    expect(new Set(bodies.map(({ id }) => byId.get(id))).size).toBeLessThanOrEqual(3 + 4);
     const close = bodies.filter((body) => cutBy(body, size));
     expect(close).toHaveLength(view.close === undefined ? 0 : 1);
     for (const one of close) expect(one.radius).toBeGreaterThanOrEqual(2 * earth.radius);
     const postcards = new Map<string, number>();
-    for (const body of bodies.filter((one) => !cutBy(one, size))) {
+    for (const body of bodies.filter((one) => !cutBy(one, size) && !deep.includes(one))) {
       const system = byId.get(body.id) ?? body.id;
       postcards.set(system, (postcards.get(system) ?? 0) + 1);
     }
