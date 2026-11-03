@@ -44,6 +44,17 @@ describe("the hero's big number, on a planted site", () => {
     expect(headingOf(html)).toBe("534 worlds in Mainland");
   });
 
+  // f0008 lights the line's count, its figure and its word, over the rest of the line (#f4f5f9 against #c8d0de, the design review of 7n).
+  test("marks the line's count, its figure and its word, apart from the universe's name", async () => {
+    expect(await heroWith("main", 534)).toMatch(
+      /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*>534<\/span> worlds<\/strong> in Mainland<\/h1>/,
+    );
+    expect(await heroWith("main", undefined, true)).toMatch(
+      /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*><\/span> worlds<\/strong> in Mainland<\/h1>/,
+    );
+    expect(await heroWith("main", undefined)).not.toContain("<strong");
+  });
+
   test("counts the number it is given, the cosmos's own", async () => {
     const html = await heroWith("main", 534);
     expect(numberOf(html)).toBe("534");

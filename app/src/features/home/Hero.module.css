@@ -120,6 +120,12 @@
     color: var(--color-text);
   }
 
+  /* f0008 lights the line's count, its figure and its word, over the rest of the line: #f4f5f9 against #c8d0de, a heavier weight. */
+  .count {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
   .figure {
     /* Digits of one width each, so a count fills the room its figure kept. */
     font-variant-numeric: tabular-nums;

@@ -31,10 +31,13 @@ export function Hero({
             `Worlds in ${universe.name}`
           ) : (
             <>
-              <span className={styles["figure"]} data-hero="figure">
-                {worlds}
-              </span>
-              {` ${worlds === 1 ? "world" : "worlds"} in ${universe.name}`}
+              <strong className={styles["count"]}>
+                <span className={styles["figure"]} data-hero="figure">
+                  {worlds}
+                </span>
+                {` ${worlds === 1 ? "world" : "worlds"}`}
+              </strong>
+              {` in ${universe.name}`}
             </>
           )}
         </h1>
