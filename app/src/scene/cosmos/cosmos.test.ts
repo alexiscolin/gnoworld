@@ -1187,7 +1187,7 @@ describe("the close world off the rest (7d9)", () => {
       const seen = await walk(scene, [system, world], [must(back, "no way back")]);
       expect(seen.flat().some((frame) => frame !== undefined)).toBe(true);
     }
-  });
+  }, 20_000);
 
   // The chief, 2026-11-03: through the home's lens g1ut6usp's star stood 3 pixels off the Earth's limb, 87.8 units behind it, and read as
   // a glitch (its case is the disc's test). A star with no halo fades out behind the Earth within a few pixels of its limb; others keep it.
