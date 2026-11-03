@@ -10,6 +10,9 @@ const { useSpace, useWorldsCount, useResting } = vi.hoisted(() => ({
   useResting: vi.fn<() => string | undefined>(() => undefined),
 }));
 vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting }));
+afterEach(() => {
+  useResting.mockReturnValue(undefined);
+});
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -101,14 +104,17 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
 });
 
 // Slice 5r (frames 1 to 8): the hero's big number, its line and two big actions; with no data, what is true.
-// 7v (Alexis, 2026-11-03): at a system's view the screen is the system's, its crumb at the top left: the hero gives way, and comes back at rest.
-test("gives the screen to a system the eye rests at: no hero then, the hero back at rest, the list of worlds kept", async () => {
+// 7v (Alexis, 2026-11-03): at a system's view the screen is the system's, its crumb at the top left where the list of worlds stands (the
+// design review: the crumb was drawn over it): both give way, and come back at rest.
+test("gives the screen to a system the eye rests at: no hero and no list of worlds then, both back at rest", async () => {
   useResting.mockReturnValue("gnoswap");
   const there = await render({ path: "/", Component: Home, loader }, "/");
   expect(there).not.toContain("data-hero=");
-  expect(there).toContain('<a href="/w/bubble"');
+  expect(there).not.toContain('<a href="/w/bubble"');
   useResting.mockReturnValue(undefined);
-  expect(await render({ path: "/", Component: Home, loader }, "/")).toContain("data-hero=");
+  const home = await render({ path: "/", Component: Home, loader }, "/");
+  expect(home).toContain("data-hero=");
+  expect(home).toContain('<a href="/w/bubble"');
 });
 
 describe("home's hero", () => {

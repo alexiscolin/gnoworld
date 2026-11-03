@@ -30,7 +30,8 @@ export default function Home() {
   // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
   const drawn = useWorldsCount(universe.isDefault);
   useSpace(universe.isDefault ? "cosmos" : undefined);
-  // A system the eye rests at takes the screen, its crumb at the top left (7v): the hero gives way, and comes back at rest.
+  // A system the eye rests at takes the screen, its crumb at the top left (7v): the hero and the list of worlds there give way, and come back
+  // at rest.
   const resting = useResting();
   return (
     <>
@@ -41,9 +42,11 @@ export default function Home() {
           coming={drawn === undefined}
         />
       ) : null}
-      <Worlds>
-        <PlaceLinks places={universe.worlds} />
-      </Worlds>
+      {resting === undefined ? (
+        <Worlds>
+          <PlaceLinks places={universe.worlds} />
+        </Worlds>
+      ) : null}
       <Ticker items={tickerItems(news, events, now)} />
     </>
   );
