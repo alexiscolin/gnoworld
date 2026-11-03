@@ -1,11 +1,9 @@
 // What lands or starts a flight from the page (7g; docs/DESIGN-SYSTEM.md, "Motion": "a click or Esc during a flight lands immediately"):
 // Escape or a press lands one at once, and the click of that press aims at nothing; Escape once at a star flies back to the view at rest;
 // a click on space aims at the star nearest it. A key a field or a dialog holds is theirs.
+import { keyHeld } from "../keyHeld.ts";
 import { isPlace, onSpace, starAt } from "./aim.ts";
 import type { FlightDevice, FlightGoal } from "./goal.ts";
-
-const FIELDS = "input, textarea, select, [contenteditable]:not([contenteditable='false'])";
-const DIALOGS = "dialog[open], [role='dialog']";
 
 interface Flown {
   readonly flying: boolean;
@@ -23,8 +21,7 @@ export function listen(
   window.addEventListener(
     "keydown",
     (event) => {
-      const held = event.target instanceof Element && event.target.closest(FIELDS) !== null;
-      if (event.key !== "Escape" || event.defaultPrevented || held || document.querySelector(DIALOGS) !== null) return;
+      if (event.key !== "Escape" || event.defaultPrevented || keyHeld(event)) return;
       if (flights.flying) flights.land();
       else if (device.eye.look !== undefined) flights.fly({ kind: "rest" });
     },
