@@ -72,7 +72,8 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { deepOf, judgeOf, type Deep, type Judge } from "./frame/deep.ts";
+export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
+export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt, rocksOf } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt } from "./frame/halo.ts";

@@ -178,6 +178,28 @@ function standsAt(judge: Judge, card: Pick<Card, "system" | "worlds">, seconds: 
   );
 }
 
+// A project tried at this many places round the Earth, a twelfth of a turn apart from its own.
+const TRIES = 12;
+
+/** The Earth's hand-made projects as the view at rest stands them (7v), `earth` held still: each at the first of twelve places round the
+ * Earth, from its own, that stands clear in `judge` as a depth's world must, its orbit's ball aside, for they stand by the Earth; one with
+ * none is left out. Each stands in the judge as it is placed, before the depth's worlds are chosen. */
+export function projectsOf(judge: Judge, earth: StarSystem): StarSystem {
+  const still = { ...earth, spin: 0 };
+  const worlds: Orbiter[] = [];
+  for (const world of earth.worlds) {
+    const card = Array.from({ length: TRIES }, (_, at) => ({
+      system: still,
+      worlds: [{ ...world, phase: world.phase + (at * 2 * Math.PI) / TRIES }],
+    })).find((tried) => standsAt(judge, tried, 0) && !judge.rowDown([...judge.cards, tried]));
+    if (card === undefined) continue;
+    judge.spots.push(...spotsAt(judge, [card], 0));
+    judge.cards.push(card);
+    worlds.push(...card.worlds);
+  }
+  return { ...still, worlds };
+}
+
 /** The worlds of other nearby systems `view` draws as bodies for depth, read through its `judge`, nearest first, one a system, four at most;
  * each stands in the judge as it is chosen, judged at eight instants through the longest turn of what turns. ponytail: a pass over every
  * system and a sort, once a view, in a chunk asked after it. */

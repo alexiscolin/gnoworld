@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { output } from "zod/mini";
 import {
   BubbleRules,
+  EarthOrbit,
   EarthRooms,
   Ecosystems,
   Events,
@@ -29,6 +30,7 @@ const SCHEMAS = {
   quests: Quests,
   bubbles: BubbleRules,
   earthRooms: EarthRooms,
+  earthOrbit: EarthOrbit,
   news: News,
 };
 
@@ -37,7 +39,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The eleven files of a directory, checked; throws every fault found in the first file that has one. */
+/** The twelve files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {
@@ -73,6 +75,14 @@ export function loadData(dir: string): Data {
     );
     if (faults.length > 0) throw new Error(faults.join("\n"));
   }
+  // A project round the Earth links to a hub's page by its slug: one no hub holds would link to no page.
+  const hubs = new Set(data.hubs.map((hub) => hub.slug));
+  const unknown = data.earthOrbit.flatMap(({ slug }, index) =>
+    slug === undefined || hubs.has(slug)
+      ? []
+      : [`earthOrbit.json: [${String(index)}].slug: no hub of hubs.json is named "${slug}"`],
+  );
+  if (unknown.length > 0) throw new Error(unknown.join("\n"));
   return data;
 }
 

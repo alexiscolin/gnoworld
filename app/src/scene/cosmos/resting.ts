@@ -36,6 +36,7 @@ export class Resting {
   view: RestView;
   #postcards: ReadonlyMap<number, Postcard> = new Map();
   #deep: readonly Deep[] = [];
+  #earth: StarSystem | undefined;
   #rocks: readonly Rock[] = [];
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
@@ -66,11 +67,12 @@ export class Resting {
   // The view's depth and rocks, for `view` only, drawn once their chunk came: a chunk that does not come leaves the view as it is.
   #deepen(systems: readonly StarSystem[], view: RestView): void {
     this.#deep = [];
+    this.#earth = undefined;
     this.#rocks = [];
     loadDeep().then(
       ({ inDepth }) => {
         if (this.view !== view) return;
-        ({ bodies: this.#deep, rocks: this.#rocks } = inDepth(systems, view, LENT));
+        ({ earth: this.#earth, bodies: this.#deep, rocks: this.#rocks } = inDepth(systems, view, LENT));
         this.#found();
       },
       () => undefined,
@@ -82,6 +84,7 @@ export class Resting {
     this.view = { ...this.view, postcards: [], close: undefined };
     this.#postcards = new Map();
     this.#deep = [];
+    this.#earth = undefined;
     this.#rocks = [];
     this.#systems = systems;
   }
@@ -148,6 +151,7 @@ export class Resting {
             postcards: this.#postcards,
             index: 0,
             deep: this.#deep,
+            earth: this.#earth,
             rocks: this.#rocks,
           }
         : { ...landing, rocks: this.#viewRocks };

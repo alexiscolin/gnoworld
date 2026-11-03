@@ -149,7 +149,8 @@ export class Bodies {
 
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
-    const away = this.fromEye(system.place, eye, star).length();
+    // Lit from its star, or where its light comes from (7v: the Earth's projects, by the great star).
+    const away = this.fromEye(system.litBy ?? system.place, eye, star).length();
     orbitPlace(body, orbitTime(seconds), this.#place);
     planet.group.position.copy(this.fromEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();

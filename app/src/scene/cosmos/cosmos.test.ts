@@ -13,6 +13,7 @@ import {
   driftAt,
   glideAt,
   EARTH_PLACE,
+  EARTH_RADIUS,
   evenRow,
   FIELD_OF_VIEW,
   GNO_LAND,
@@ -32,6 +33,7 @@ import {
   offLine,
   onScreen,
   planetSeed,
+  earthSystemOf,
   postcardOf,
   restView,
   ROCKS_FROM,
@@ -75,9 +77,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Disposer } from "../disposer.ts";
 import { Dissolve } from "../dissolve.ts";
 import { focalOf } from "../lens.ts";
-import { MOON_FAR } from "../earth/orbit.ts";
+import { MOON_FAR, ORBIT_RADIUS } from "../earth/orbit.ts";
 import { fromEyeOf, starAt } from "../planet/light.ts";
 import { LIMB_LIGHT } from "../planet/planet.ts";
+import orbiting from "../../../data/earthOrbit.json" with { type: "json" };
 import recorded from "../../../lab/worlds.json" with { type: "json" };
 import { Cosmos } from "./cosmos.ts";
 import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
@@ -274,12 +277,13 @@ describe("what it draws", () => {
   it("stands stars, worlds and bodies from the file, each a draw of its own however many", async () => {
     const scene = made();
     await shown(scene);
-    const { stars, dots: points, bodies } = scene.cosmos.stats();
+    const { stars, dots: points, bodies, list } = scene.cosmos.stats();
     expect(stars).toBe(31);
-    // The view at rest draws three systems' bodies at most (7d6): every other system is a distant star.
+    // The view at rest draws three systems' bodies at most (7d6): every other system is a distant star. The Earth's projects (7v) are
+    // bodies of no system of the file: its 90 worlds are its own bodies and its points.
     expect(bodies).toBeGreaterThan(0);
     expect(bodies).toBeLessThanOrEqual(BOUNDS.bodies);
-    expect(points).toBe(90 - bodies);
+    expect(points).toBe(90 - list.filter(({ id }) => !id.startsWith("~earth/")).length);
     expect(glows(scene)).toHaveLength(1);
     expect(dots(scene)).toHaveLength(1);
   });
@@ -308,7 +312,12 @@ describe("what it draws", () => {
   it("gives each body the look of its world and its size", async () => {
     const scene = made();
     await shown(scene);
-    const known = new Map(held(worlds(30)).flatMap(({ worlds: list }) => list.map((world) => [world.id, world])));
+    // The file's worlds, and the Earth's projects (7v).
+    const known = new Map(
+      [...held(worlds(30)), earthSystemOf(orbiting)].flatMap(({ worlds: list }) =>
+        list.map((world) => [world.id, world]),
+      ),
+    );
     const { list } = scene.cosmos.stats();
     // The view at rest draws its postcards' and its close world's bodies, a few (Alexis, 2026-11-02).
     expect(list.length).toBeGreaterThan(0);
@@ -428,7 +437,8 @@ describe("what it draws", () => {
     );
     const { list } = scene.cosmos.stats();
     expect(list.length).toBeGreaterThan(0);
-    for (const { id, at, star } of list) {
+    // The Earth's projects (7v) stand round the Earth, lit by the great star: their test is the Earth's, below.
+    for (const { id, at, star } of list.filter((body) => !body.id.startsWith("~earth/"))) {
       const found = known.get(id);
       if (found === undefined) throw new Error("no world");
       expect(at.distanceTo(star)).toBeCloseTo(found.world.orbit, 6);
@@ -883,7 +893,13 @@ describe("the view at rest (7d6)", () => {
     await shown(scene, ONYX);
     const systems = held(ONYX);
     const view = restView(systems);
-    const drawn = new Set(scene.cosmos.stats().list.map(({ id }) => systemOf(systems, id)?.id));
+    // The Earth's projects (7v) stand by the Earth, of no system of the file.
+    const drawn = new Set(
+      scene.cosmos
+        .stats()
+        .list.filter(({ id }) => !id.startsWith("~earth/"))
+        .map(({ id }) => systemOf(systems, id)?.id),
+    );
     const chosen = [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map(
       (index) => systems[index]?.id,
     );
@@ -3229,6 +3245,28 @@ describe("a system's arrival (7d3)", () => {
   // Alexis, 2026-11-03 (7v): a system's dynamic view, its worlds' grain as at the home's.
   const ownPoints = (scene: ReturnType<typeof made>, system: StarSystem) =>
     pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+
+  // Alexis, 2026-11-03 (7v): the Earth is no namespace; round it turn the projects the team adds by hand (app/data/earthOrbit.json), small
+  // bodies by it in the view at rest, its dynamic view; its Plan, the Earth from above, each on its orbit, named and a link to its address.
+  it("stands each hand-made project as a small body by the Earth in Onyx's view at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const { list, screen } = scene.cosmos.stats();
+    const projects = list.filter(({ id }) => id.startsWith("~earth/"));
+    expect(projects.map(({ id }) => id)).toEqual(orbiting.slice(0, 12).map(({ name }) => `~earth/${name}`));
+    const earth = screen.earth?.radius ?? NaN;
+    const eye = new Vector3().copy(scene.cosmos.stats().eye);
+    const own = new Map(earthSystemOf(orbiting).worlds.map((world) => [world.id, world]));
+    for (const { id, at } of projects) {
+      const body = screen.bodies.find((each) => each.id === id);
+      expect(body?.radius).toBeLessThan(earth / 2);
+      // At its own orbit round the Earth, held still where the view's judge found it clear (deep.ts, projectsOf).
+      expect(at.distanceTo(onStage(EARTH_PLACE).sub(eye))).toBeCloseTo(own.get(id)?.orbit ?? NaN, 6);
+    }
+    // Past the golden ring, which the globe's Moon runs on: none stands on it.
+    for (const world of earthSystemOf(orbiting).worlds)
+      expect(world.orbit).toBeGreaterThan(1.5 * ORBIT_RADIUS * EARTH_RADIUS);
+  });
 
   // Alexis, 2026-11-03 ("Poussière fine", F3594): at a system's own view too, each speck 2 px across at most, none on a world's path.
   it("draws g1magld5's grain as fine dust at its dynamic view, 2 px across at most, none on its worlds' paths (F3594)", async () => {

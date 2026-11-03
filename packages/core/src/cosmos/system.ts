@@ -62,6 +62,8 @@ export interface Orbiter {
 export interface StarSystem {
   readonly id: string;
   readonly place: SystemPlace;
+  /** Where its worlds' light comes from, when not from its own place: the Earth's projects are lit by the great star (7v). */
+  readonly litBy?: Point;
   readonly star: number;
   /** From red to white, 0 to 1. */
   readonly warmth: number;
