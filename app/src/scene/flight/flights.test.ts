@@ -700,6 +700,30 @@ describe("a page's flight", () => {
     expect(frames.some(({ along, veil }) => along < 0.25 && veil > 0)).toBe(true);
   });
 
+  // The loop holds its full rate while a flight or its veil runs: busy dropped mid-way left a page's flight at 30 frames a second, and a
+  // crossfade frozen till some input (lot B's review, F3717).
+  it.each([
+    ["a page's flight", false],
+    ["a crossfade under reduced motion", true],
+  ])("is busy on every frame of %s and of its veil, and on none once both are done", (_, still) => {
+    const scene = rig();
+    scene.still.value = still;
+    const flown = flights(scene.device);
+    flown.fly({ kind: "body", name: "GovDAO" });
+    flown.ready();
+    const frames: { busy: boolean; running: boolean }[] = [];
+    run(flown, scene, {
+      seconds: 4,
+      each: () => {
+        const { flying, veil } = flown.stats();
+        frames.push({ busy: flown.busy, running: flying || veil > 0 });
+      },
+    });
+    expect(frames.every(({ busy, running }) => busy === running)).toBe(true);
+    expect(frames.some(({ busy }) => busy)).toBe(true);
+    expect(frames.at(-1)?.busy).toBe(false);
+  });
+
   it("waits in transit while the next body is not drawn, two seconds at most, then lands", () => {
     const scene = rig();
     const flown = flights(scene.device);
