@@ -42,8 +42,8 @@
     opacity: 0.6;
   }
 
-  /* A step is a target of 24 px at least, as every control (WCAG 2.5.8). */
-  .trail a {
+  /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */
+  .trail :is(a, .back) {
     /* layout: a step's words centred in its 24 px target */
     display: inline-flex;
     /* layout: a step's words centred in its 24 px target */
@@ -53,7 +53,23 @@
     text-decoration: none;
   }
 
-  .trail a:hover {
+  /* A button's face is the reset's (none of its own); it reads as the trail's words. */
+  .back {
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+
+  /* The arrow back: the design system's arrow turned round, which turns with the text's direction, a step before the words. */
+  .arrow {
+    /* layout: the icon in the step's line */
+    display: inline-flex;
+    /* layout: a step between the arrow and the words */
+    margin-inline-end: var(--space-3xs);
+    rotate: 180deg;
+  }
+
+  .trail :is(a, .back):hover {
     color: var(--color-text);
     text-decoration: underline;
     /* raw: the prototype's and the frames' own value */
