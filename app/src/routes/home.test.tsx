@@ -4,11 +4,11 @@ import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
-const { useSpace, useWorldsDrawn } = vi.hoisted(() => ({
+const { useSpace, useWorldsCount } = vi.hoisted(() => ({
   useSpace: vi.fn(),
-  useWorldsDrawn: vi.fn<() => number | undefined>(() => undefined),
+  useWorldsCount: vi.fn<(wanted: boolean) => number | undefined>(() => undefined),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsDrawn }));
+vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount }));
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -21,21 +21,41 @@ test("home links to each world by its name, at the world's path", async () => {
   expect(html).toContain(">GovDAO</a>");
 });
 
-// 7d6: the hero counts what the cosmos draws, from the worlds' file the scene reads, never the page's list (hubs.json said 2 over 533).
-test("counts in its hero the worlds the cosmos draws, once the scene has told them, and no number before", async () => {
-  useWorldsDrawn.mockReturnValue(534);
+// 7d6: the hero counts what the cosmos draws, from the worlds' file, never the page's list (hubs.json said 2 over 533).
+test("counts in its hero the worlds the cosmos draws, once their file has come, and no number before", async () => {
+  useWorldsCount.mockReturnValue(534);
   const html = await render({ path: "/", Component: Home, loader }, "/");
   expect(html).toMatch(/<h1\b[^>]*>534 worlds in Onyx<\/h1>/);
   expect(html).toMatch(/data-hero="number"[^>]*>534</);
-  useWorldsDrawn.mockReturnValue(undefined);
+  useWorldsCount.mockReturnValue(undefined);
   expect(await render({ path: "/", Component: Home, loader }, "/")).not.toMatch(/data-hero="number"[^>]*>\d/);
 });
 
 test("counts another universe's worlds by its page's list: no cosmos is drawn there", async () => {
-  useWorldsDrawn.mockReturnValue(534);
+  useWorldsCount.mockReturnValue(534);
   const html = await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
   expect(html).not.toContain("534");
-  useWorldsDrawn.mockReturnValue(undefined);
+  useWorldsCount.mockReturnValue(undefined);
+});
+
+// 7n: the number came only from the scene, so a home whose scene never runs (no WebGL, a refused GPU, a phone) lost it for good.
+test("asks the worlds' file for its hero's number on the default universe's home alone, whether the scene runs or not", async () => {
+  useWorldsCount.mockClear();
+  await render({ path: "/", Component: Home, loader }, "/");
+  expect(useWorldsCount).toHaveBeenLastCalledWith(true);
+  await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
+  expect(useWorldsCount).toHaveBeenLastCalledWith(false);
+});
+
+// A page's effects run in the order it asks: the number's read starts first, so a scene already there takes it rather than read again.
+test("asks for its number before it asks for space, so the scene takes the page's read of the file", async () => {
+  useWorldsCount.mockClear();
+  useSpace.mockClear();
+  await render({ path: "/", Component: Home, loader }, "/");
+  const [number] = useWorldsCount.mock.invocationCallOrder;
+  const [space] = useSpace.mock.invocationCallOrder;
+  expect(number).toBeDefined();
+  expect(number).toBeLessThan(space ?? 0);
 });
 
 test("asks for the worlds on the default universe's home alone: universes are never shown together", async () => {

@@ -1,10 +1,8 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
-// read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
-import { worldsDrawn as counted } from "@gnoworld/core";
-import { readWorlds } from "../../lib/chain/realms.ts";
+// taken from the home's read or read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import type { Scene } from "../../scene/scene.ts";
-import { worldsDrawn } from "./worldsCount.ts";
+import { worldsFile } from "./worldsFile.ts";
 
 // Who is here changes by the minute: asked again each minute while the cosmos shows (the server's answer keeps a minute too).
 const PRESENCE_MS = 60_000;
@@ -93,13 +91,13 @@ export class WorldsFeed {
     measure();
   }
 
+  // The home's read runs on whether the scene stays or not: a file that comes after the scene has gone for good is let go here.
   #read(scene: Scene): void {
     this.#asked = true;
-    readWorlds(import.meta.env.BASE_URL, { signal: this.#leaving.signal }).then(
+    worldsFile(this.#leaving.signal).then(
       (file) => {
-        if (file === undefined) return;
+        if (file === undefined || this.#leaving.signal.aborted) return;
         this.#worlds = file.worlds;
-        worldsDrawn(counted(file.worlds));
         this.#written = file.updated;
         if (this.#shown) this.#hand(scene, this.#worlds);
       },
