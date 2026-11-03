@@ -1,3 +1,4 @@
+import { Texture } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EarthDevice } from "../earth/device.ts";
 import * as generated from "../planet/generated.ts";
@@ -84,6 +85,51 @@ describe("a body map that does not come", () => {
   afterEach(() => {
     vi.useRealTimers();
     loading.mockReset();
+  });
+
+  it("is fetched again a while after it failed, and stands once it comes (F4409)", async () => {
+    vi.useFakeTimers();
+    const map = new Texture();
+    loading.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(map);
+    const arrived = vi.fn();
+    const maps = new BodyMaps(fetching, arrived);
+    expect(maps.named("rocky")).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(100);
+    maps.named("rocky");
+    expect(fetches("rocky")).toBe(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(arrived).toHaveBeenCalled();
+    maps.named("rocky");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetches("rocky")).toBe(2);
+    expect(maps.named("rocky")).toBe(map);
+  });
+
+  it("is fetched a third time after two failed, and stands once that one comes (F4409)", async () => {
+    vi.useFakeTimers();
+    const map = new Texture();
+    loading
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue(map);
+    const maps = new BodyMaps(fetching, () => undefined);
+    for (let tries = 0; tries < 6; tries += 1) {
+      maps.named("rocky");
+      await vi.advanceTimersByTimeAsync(20_000);
+    }
+    expect(fetches("rocky")).toBe(3);
+    expect(maps.named("rocky")).toBe(map);
+  });
+
+  it("is given up after three fetches failed, however often it is asked (F4409)", async () => {
+    vi.useFakeTimers();
+    loading.mockRejectedValue(new Error("offline"));
+    const maps = new BodyMaps(fetching, () => undefined);
+    for (let tries = 0; tries < 20; tries += 1) {
+      maps.named("rocky");
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+    expect(fetches("rocky")).toBe(3);
   });
 
   it("is fetched again from the start once the maps were freed, and nothing waits after the free (F4409)", async () => {
