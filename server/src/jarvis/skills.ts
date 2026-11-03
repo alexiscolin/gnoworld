@@ -144,10 +144,9 @@ function toolOf(names: [string, ...string[]], references: readonly string[], loa
     .enum([first, ...rest])
     .optional()
     .describe("One of that skill's references, by its file's name.");
-  const args = z.strictObject({ skill, reference }).superRefine((value, context) => {
-    if (value.reference !== undefined && !loaded(`${value.skill}/references/${value.reference}`)) {
-      context.addIssue({ code: "custom", message: "not one of that skill's references" });
-    }
-  });
+  // The allowlist answers a refused call as bad arguments, never with why, so the refusal carries no message.
+  const args = z
+    .strictObject({ skill, reference })
+    .refine((value) => value.reference === undefined || loaded(`${value.skill}/references/${value.reference}`));
   return { name: "load_skill" as const, description, args };
 }
