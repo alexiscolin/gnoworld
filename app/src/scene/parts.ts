@@ -15,6 +15,8 @@ export class CosmosPart {
   #written: string | undefined;
   #signals: LabelSignals | undefined;
   #box: ClearBox | undefined;
+  // The home's dive, once asked: under reduced motion or not.
+  #still: boolean | undefined;
 
   constructor(device: EarthDevice, owner: Disposer, came: () => void) {
     this.door = new Door(
@@ -30,11 +32,19 @@ export class CosmosPart {
           // The labels' loader stands here, behind the cosmos's door, so the cosmos's chunk pays only for their calls (7h).
           cosmos.labels = new LazyLabels(owner, cosmos.seen);
           cosmos.keepClear(this.#box);
+          if (this.#still !== undefined) cosmos.dive(this.#still);
           this.#tell(cosmos);
           came();
         },
       },
     );
+  }
+
+  /** The home opens with the dive, once (7d7); `still`, under reduced motion. */
+  dive(still: boolean): void {
+    if (this.#still !== undefined) return;
+    this.#still = still;
+    this.door.part?.dive(still);
   }
 
   show(worlds: readonly CosmosWorld[] | undefined, written?: string, signals?: LabelSignals): void {
@@ -117,13 +127,11 @@ export class Parts {
     this.world.door.part?.resize(width, height, ratio);
   }
 
-  /** The cosmos moves with the eye and rests where the view rests (its glide apart, 7d6); a world's page turns by the scene's clock. */
-  tick(
-    { worlds, seconds, resting }: { readonly worlds: Point; readonly seconds: number; readonly resting: Point },
-    clock: number,
-  ): void {
+  /** The cosmos moves with the eye, and its dive by the scene's clock, which runs under reduced motion too (7d7); a world's page turns
+   * by it. */
+  tick({ worlds, seconds }: { readonly worlds: Point; readonly seconds: number }, clock: number): void {
     this.world.door.part?.tick(clock);
-    this.cosmos.door.part?.tick(worlds, seconds, resting);
+    this.cosmos.door.part?.tick(worlds, seconds, clock);
   }
 
   restored(): void {

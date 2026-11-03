@@ -67,7 +67,8 @@ export {
   toScene,
   type InPlane,
 } from "./frame/disc.ts";
-export { coveredShare, offLine } from "./frame/composition.ts";
+export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
+export { DIVE, diveAt } from "./frame/dive.ts";
 export {
   FIELD_OF_VIEW,
   HERO_ZONE,

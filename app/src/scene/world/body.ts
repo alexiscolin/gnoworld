@@ -1,6 +1,6 @@
 // A world seen close, as one group: its approved render, one overlay that adds its signs and the shadows cast on it, the status ring with its
 // moon, and the wake. It owns all of it but the maps, which its view loads and frees, and the sphere, which it is lent.
-import type { PlanetLook, StatusOrbit, WorldSigns } from "@gnoworld/core";
+import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import {
   CustomBlending,
   Group,
@@ -19,7 +19,9 @@ import { Disposer } from "../disposer.ts";
 import { Ground } from "../earth/ground.ts";
 import { added, ORBIT_ROLL, ORBIT_TILT, ORBIT_RADIUS } from "../earth/orbit.ts";
 import { GLOW_FRAGMENT, GLOW_VERTEX, ORBIT_VERTEX } from "../earth/orbitShader.ts";
-import { createPlanet, LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
+import type { Kit } from "../cosmos/maps.ts";
+import type { World } from "../planet/generated.ts";
+import { LIMB_LIGHT, type MapSet, type Planet } from "../planet/planet.ts";
 import { WorldHalo } from "./halo.ts";
 import { OCCLUDERS_MAX, OVERLAY_FRAGMENT, OVERLAY_VERTEX, STATUS_FRAGMENT, WAKE_FRAGMENT } from "./shaders.ts";
 
@@ -47,11 +49,12 @@ function stormPlace(seed: Uint8Array, at: number): Vector3 {
   return new Vector3(Math.cos(turn), height, Math.sin(turn)).normalize();
 }
 
-/** What a world's body is made of: its look and seed, its maps and its ring moon's, and the sphere it is lent. */
+/** What a world's body is made of: the world and its seed, the code that draws it, its maps and its ring moon's, and the sphere it is lent. */
 export interface BodyParts {
-  readonly look: PlanetLook;
+  readonly world: World;
   readonly seed: Uint8Array;
-  readonly maps: { readonly world: MapSet; readonly moon: MapSet; readonly moonLook: PlanetLook };
+  readonly kit: Kit;
+  readonly maps: { readonly world: MapSet; readonly moon: MapSet; readonly moonWorld: World };
   readonly sphere: BufferGeometry;
 }
 
@@ -71,12 +74,12 @@ export class WorldBody {
   readonly #halo: WorldHalo;
   readonly #wake: Mesh<PlaneGeometry, ShaderMaterial>;
 
-  constructor({ look, seed, maps, sphere }: BodyParts) {
-    this.planet = this.#owner.add(createPlanet(look, maps.world, sphere));
+  constructor({ world, seed, kit, maps, sphere }: BodyParts) {
+    this.planet = this.#owner.add(kit.createWorld(world, maps.world, sphere));
     // A seed's glow is made now, hidden, so it compiles with the world and nothing is made on the wake's first frame.
     this.planet.setSigns({ ...REST, signal: 1 });
     this.planet.setSigns(REST);
-    if (look.rim !== null) this.planet.setLimb(LIMB_LIGHT);
+    if (world.look.rim !== null) this.planet.setLimb(LIMB_LIGHT);
     this.overlay = this.#owner.add(
       new ShaderMaterial({
         vertexShader: OVERLAY_VERTEX,
@@ -114,7 +117,7 @@ export class WorldBody {
         ),
       ),
     );
-    this.ringMoon = this.#owner.add(createPlanet(maps.moonLook, maps.moon, sphere));
+    this.ringMoon = this.#owner.add(kit.createWorld(maps.moonWorld, maps.moon, sphere));
     this.ringMoon.group.scale.setScalar(RING_MOON);
     this.#moonGlow = this.#top(
       new Mesh(this.#owner.add(new PlaneGeometry(0.4, 0.4)), this.#owner.add(added(GLOW_VERTEX, GLOW_FRAGMENT, {}))),
@@ -132,7 +135,7 @@ export class WorldBody {
     this.#wake.scale.setScalar(WAKE_REACH);
     this.#wake.visible = false;
     this.sized.add(this.planet.group, this.orbit, this.#moonGlow);
-    this.#halo = new WorldHalo(this.#owner, look);
+    this.#halo = new WorldHalo(this.#owner, world.look);
     this.sized.add(...this.#halo.meshes);
     this.group.add(this.ground.mesh, this.sized, this.#wake);
   }

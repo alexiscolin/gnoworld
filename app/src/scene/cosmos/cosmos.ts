@@ -33,21 +33,16 @@ export class Cosmos {
   /** What its labels read of it. */
   readonly seen: Seen;
   readonly #drawn = new Drawn();
-  readonly #eye = { x: NaN, y: NaN, z: NaN };
   readonly #looked = { x: NaN, y: NaN, z: NaN };
   readonly #mapEye = { x: 0, y: 0, z: 0 };
-  // Where the eye rests, the view at rest's way off the scene's, less the arrival's glide and the sway: what says it is at rest.
-  readonly #resting = { x: NaN, y: NaN, z: NaN };
-  readonly #restingMap = { x: NaN, y: NaN, z: NaN };
-  readonly #atRest = new AtRest(() => {
-    this.#mapCame();
-    this.#device.moved();
-  });
+  readonly #atRest: AtRest;
   #box: ClearBox | undefined;
   #systems: ReturnType<typeof systemsOf> = [];
   #ladder: Ladder | undefined;
   #list: readonly CosmosWorld[] | undefined;
   #wanted = false;
+  // How much of it the dive lets show, as the last frame found it: a compile that ends between frames shows no more.
+  #shown = 1;
   #looks = 0;
   #focal = 1;
   #height = 1;
@@ -56,6 +51,7 @@ export class Cosmos {
 
   constructor(device: EarthDevice) {
     this.#device = device;
+    this.#atRest = new AtRest(device, this.#owner, this.#mapCame);
     this.#disc = new Disc(this.#owner);
     this.#maps = new BodyMaps(device, this.#mapCame);
     this.#bodies = new Bodies(this.#maps, this.#owner, device);
@@ -73,8 +69,8 @@ export class Cosmos {
 
   #setShown(shown: boolean): void {
     this.#wanted = shown;
-    this.#disc.group.visible = shown && this.#ahead.done;
-    this.#bodies.group.visible = shown;
+    this.#disc.group.visible = shown && this.#ahead.done && this.#shown > 0;
+    this.#bodies.show(shown && this.#shown === 1);
     this.#nebulae.show(shown);
     if (!shown) this.#whole.hide();
   }
@@ -91,6 +87,7 @@ export class Cosmos {
     this.#setShown(worlds !== undefined);
     clearTimeout(this.#release);
     if (worlds === undefined) {
+      this.#atRest.land();
       this.#release = setTimeout(this.#releaseMaps, RELEASE_MS);
       return;
     }
@@ -105,6 +102,12 @@ export class Cosmos {
     this.#ahead.ask();
     this.#home.stand();
     this.#device.moved();
+  }
+
+  /** The home opens with the dive (7d7), from the whole cosmos down to the view at rest; `still`, a dissolve, no camera moving. */
+  dive(still: boolean): void {
+    this.#atRest.dive(still);
+    this.#whole.open();
   }
 
   /** The canvas's height in its CSS pixels, and the pixels to one of them. */
@@ -128,26 +131,27 @@ export class Cosmos {
     this.#looked.x = NaN;
   }
 
-  /** One frame on: the eye, in doubles, and the clock everything orbits by. The eye sways about the view at rest's, and the camera keeps
-   * the Earth at the centre. */
-  tick(eye: Point, seconds: number, resting: Point = eye): void {
+  /** One frame on: the eye, in doubles, the clock everything orbits by, and the scene's own, which runs under reduced motion too. The eye
+   * sways about the view at rest's, or dives down to it, and the camera keeps the Earth at the centre. */
+  tick(eye: Point, seconds: number, clock = seconds): void {
     if (!this.#wanted) return;
-    this.#atRest.place(eye, seconds, this.#eye);
-    this.#atRest.place(resting, 0, this.#resting);
-    this.#atRest.aim(this.#device.camera, this.#eye);
-    this.#disc.advance(this.#eye, seconds);
-    this.#bodies.tick(this.#eye, seconds);
-    this.#home.tick(this.#eye, seconds, this.#device.camera.quaternion);
+    this.#shown = this.#atRest.advance(clock, this.#whole.ready);
+    const placed = this.#atRest.stand(eye, seconds, this.#device.camera);
+    this.#disc.advance(placed, seconds);
+    this.#bodies.tick(placed, seconds);
+    this.#home.tick(placed, seconds, this.#device.camera.quaternion);
     // What the eye looks at is the Earth: its distance says how much of the nebulae shows, and how much of the view is the whole cosmos's.
-    const looking = distanceOf(this.#atRest.earth, this.#eye);
+    const looking = distanceOf(this.#atRest.earth, placed);
+    this.#nebulae.group.visible = this.#shown > 0;
     this.#nebulae.follow(eye, seconds, looking);
     // Past a cluster's distance the worlds' points take the view at one distance: the disc gives up faster than they come, and the
     // bodies, which cannot fade, go as they start.
-    const whole = this.#whole.advance(this.#eye, seconds, looking);
-    this.#disc.fade((1 - whole) ** 2, this.#ahead.done);
-    this.#bodies.group.visible = whole === 0;
-    this.labels?.tick(this.#eye, whole === 0);
-    if (!(distanceOf(this.#eye, this.#looked) < this.#whole.step)) this.#askLook();
+    this.#whole.most = this.#shown;
+    const whole = this.#whole.advance(placed, seconds, looking);
+    this.#disc.fade((1 - whole) ** 2 * this.#shown, this.#ahead.done);
+    this.#bodies.group.visible = whole === 0 && this.#shown === 1;
+    this.labels?.tick(placed, this.#bodies.group.visible);
+    if (!(distanceOf(placed, this.#looked) < this.#whole.step)) this.#askLook();
   }
 
   #askLook(): void {
@@ -157,14 +161,14 @@ export class Cosmos {
   readonly #look = (): void => {
     this.#timer = undefined;
     const ladder = this.#ladder;
-    if (!this.#wanted || ladder === undefined || Number.isNaN(this.#eye.x)) return;
-    Object.assign(this.#looked, this.#eye);
+    const placed = this.#atRest.eye;
+    if (!this.#wanted || ladder === undefined || Number.isNaN(placed.x)) return;
+    Object.assign(this.#looked, placed);
     this.#looks += 1;
-    toMap(this.#eye, this.#mapEye);
+    toMap(placed, this.#mapEye);
     ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: EARTH_PLACE }, this.#drawn);
     this.#whole.look(this.#mapEye, this.#focal);
-    toMap(this.#resting, this.#restingMap);
-    const sight = { eye: this.#mapEye, focal: this.#focal, resting: this.#restingMap };
+    const sight = { eye: this.#mapEye, focal: this.#focal };
     const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
     this.#bodies.stand(bodies, close);
     this.labels?.look(this.#systems, this.#drawn, bodies.keys());
@@ -175,8 +179,8 @@ export class Cosmos {
       ladder,
       drawn: this.#drawn,
       isBody: (id) => this.#bodies.has(id),
-      inView: (place, radius) => this.#bodies.inView(place, radius, this.#eye),
-      shows: (place, radius) => this.#bodies.shows(place, radius, this.#eye),
+      inView: (place, radius) => this.#bodies.inView(place, radius, placed),
+      shows: (place, radius) => this.#bodies.shows(place, radius, placed),
     });
     this.#device.moved();
   };
@@ -211,23 +215,21 @@ export class Cosmos {
     const shown = this.#wanted;
     return {
       shown,
-      bodies: shown ? this.#bodies.size : 0,
+      ...this.#bodies.stats(shown, this.#atRest.eye, this.#home.at),
       stars: shown ? this.#drawn.starCount : 0,
       glows: shown ? this.#drawn.glowCount : 0,
-      dots: shown ? this.#disc.dotCount : 0,
-      rocks: shown ? this.#disc.rocks : 0,
+      ...this.#disc.stats(shown),
       maps: this.#maps.size,
       looks: this.#looks,
-      dotPixels: shown ? this.#disc.dotPixels : 0,
       earth: this.#home.stood,
-      list: this.#bodies.list(),
-      screen: this.#bodies.screen(this.#eye, this.#home.at),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
       // Counted from the systems it holds, apart from the hero's count of the file (7d6's review).
       worlds: this.#systems.reduce((sum, { worlds }) => sum + worlds.length, 1),
       // Where the eye stands on the stage: the scene's, moved to the view at rest's and swayed.
-      eye: { ...this.#eye },
+      eye: { ...this.#atRest.eye },
       web: this.#whole.stats(),
+      sky: this.#nebulae.follows(),
+      dive: this.#atRest.landing,
     };
   }
 }

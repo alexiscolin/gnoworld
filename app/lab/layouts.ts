@@ -7,6 +7,8 @@ const GALLERY = { fov: 20, distance: 30 };
 // The twelve anchors Alexis approved in a grid of four by three, as he saw them; all 24 in six by four, a little apart from the credits.
 const TWELVE = { columns: 4, rows: 3, fill: 0.74 };
 const ALL = { columns: 6, rows: 4, fill: 0.7 };
+// ADR-0002 §3's variety view: eight classes in frame, four by two.
+const EIGHT = { columns: 4, rows: 2, fill: 0.7 };
 // A row holds the six stages, the biggest world filling its cell.
 const STAGES_ROW = { columns: 6, biggest: 1.6 };
 const CLOSE = { fov: 30, distance: 5.75 };
@@ -68,7 +70,8 @@ function closeLayout(sun: Vector3 | undefined): Layout {
 
 export function layoutOf(view: ViewName, sizes: readonly number[]): Layout {
   if (view === "gallery") return galleryLayout(TWELVE);
-  if (view === "gallery24") return galleryLayout(ALL);
+  if (view === "gallery24" || view === "real24" || view === "class24") return galleryLayout(ALL);
+  if (view === "variety") return galleryLayout(EIGHT);
   if (view === "stages") return stagesLayout(sizes);
   if (view === "eclipse") return closeLayout(new Vector3(0.178, 0.1, -1));
   return closeLayout(undefined);

@@ -308,7 +308,7 @@ describe("pointTint", () => {
       const cov = mean(([a, b]) => (a - ma) * (b - mb));
       return cov / Math.sqrt(mean(([a]) => (a - ma) ** 2) * mean(([, b]) => (b - mb) ** 2));
     };
-    for (const list of pairs) expect(correlation(list)).toBeGreaterThan(0.8);
+    for (const list of pairs) expect(correlation(list)).toBeGreaterThan(0.95);
   });
 
   // The mood's own bound (mood.test.ts): a channel moves at most 0.02 for a unit's step. A point keeps it, so two systems a cell apart never

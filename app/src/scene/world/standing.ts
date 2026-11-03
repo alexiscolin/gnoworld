@@ -5,7 +5,7 @@ import { Color, SphereGeometry, SRGBColorSpace } from "three";
 import { BodyMaps } from "../cosmos/maps.ts";
 import type { EarthDevice } from "../earth/device.ts";
 import { WorldBody } from "./body.ts";
-import { moonLookOf, OrbitingMoons } from "./orbiting.ts";
+import { moonOf, OrbitingMoons } from "./orbiting.ts";
 
 /** A world's maps' width at High, the Earth's. */
 export const CLOSE_WIDTH = 4096;
@@ -52,19 +52,22 @@ export class Standing {
     return `#${tint.getHexString()}`;
   }
 
-  /** The body, made once every map it needs is here; none before. */
+  /** The body, made once the generated worlds' code and every map it needs are here; none before. */
   build(): WorldBody | undefined {
     if (this.body !== undefined) return this.body;
-    const moonLook = moonLookOf(`#${this.id}`);
-    const [world, moon] = [this.#maps.setFor(this.look), this.#moonMaps.setFor(moonLook)];
-    if (world === undefined || moon === undefined) return undefined;
+    const kit = this.#maps.kit();
+    if (kit === undefined) return undefined;
+    const [world, moonWorld] = [kit.worldOf(this.id), moonOf(kit, `#${this.id}`)];
+    const [maps, moon] = [this.#maps.setFor(world), this.#moonMaps.setFor(moonWorld)];
+    if (maps === undefined || moon === undefined) return undefined;
     this.body = new WorldBody({
-      look: this.look,
+      world,
       seed: this.seed,
-      maps: { world, moon, moonLook },
+      kit,
+      maps: { world: maps, moon, moonWorld },
       sphere: this.#sphere,
     });
-    this.moons = new OrbitingMoons(this.#sphere, (each) => this.#moonMaps.setFor(each));
+    this.moons = new OrbitingMoons(this.#sphere, kit, (each) => this.#moonMaps.setFor(each));
     this.body.sized.add(this.moons.group);
     return this.body;
   }

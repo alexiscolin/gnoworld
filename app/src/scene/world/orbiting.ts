@@ -1,9 +1,11 @@
 // A world's rooms as moons (ADR-0002 §1 and §3), drawn: each on an orbit of its own from its room's name, slow, beside the world. A moon is
 // shown where it stands clear of the plate's words and in front of the world, and its link with it; behind the world or over the plate, both
 // go. What a frame runs writes into what is kept here: the spots and the casters are made when the moons change, never on a frame.
-import { asciiBytes, planetLook, planetSeed, seedShare, type PlanetLook } from "@gnoworld/core";
+import { asciiBytes, planetSeed, seedShare } from "@gnoworld/core";
 import { Group, Vector3, Vector4, type BufferGeometry, type Object3D } from "three";
-import { createPlanet, type MapSet, type Planet } from "../planet/planet.ts";
+import type { Kit } from "../cosmos/maps.ts";
+import type { World } from "../planet/generated.ts";
+import type { MapSet, Planet } from "../planet/planet.ts";
 
 /** A room's moon as the page hands it: its size a share, and where the scene places its link. */
 export interface MoonMark {
@@ -47,10 +49,10 @@ const CLEAR = 8;
 
 const bytesOf = (room: string) => asciiBytes(encodeURIComponent(room));
 
-/** A room's moon's look: rocky or icy, from its name. A name is ASCII once encoded. */
-export function moonLookOf(room: string): PlanetLook {
+/** A room's moon, as the generated worlds' `kit` draws it: rocky or icy, from its name. A name is ASCII once encoded. */
+export function moonOf(kit: Kit, room: string): World {
   const bytes = bytesOf(room);
-  return planetLook(bytes, seedShare(planetSeed(bytes), 0) < 0.5 ? "rocky" : "ice");
+  return kit.bodyOf(bytes, seedShare(planetSeed(bytes), 0) < 0.5 ? "rocky" : "ice");
 }
 
 // A moon's orbit by its place among the moons, so two never share one, and by its room, so it is its own: the place a list gives, again when
@@ -68,7 +70,8 @@ function orbitOf(room: string, index: number): Omit<Moon, "mark" | "planet"> {
 export class OrbitingMoons {
   readonly group = new Group();
   readonly #sphere: BufferGeometry;
-  readonly #mapsOf: (look: PlanetLook) => MapSet | undefined;
+  readonly #kit: Kit;
+  readonly #mapsOf: (world: World) => MapSet | undefined;
   readonly #at = new Vector3();
   readonly #screen = new Vector3();
   readonly #centre = new Vector3();
@@ -78,8 +81,9 @@ export class OrbitingMoons {
   spots: MoonSpot[] = [];
   casters: Vector4[] = [];
 
-  constructor(sphere: BufferGeometry, mapsOf: (look: PlanetLook) => MapSet | undefined) {
+  constructor(sphere: BufferGeometry, kit: Kit, mapsOf: (world: World) => MapSet | undefined) {
     this.#sphere = sphere;
+    this.#kit = kit;
     this.#mapsOf = mapsOf;
   }
 
@@ -105,10 +109,10 @@ export class OrbitingMoons {
   }
 
   #made(mark: MoonMark, index: number): Moon | undefined {
-    const look = moonLookOf(mark.room);
-    const maps = this.#mapsOf(look);
+    const world = moonOf(this.#kit, mark.room);
+    const maps = this.#mapsOf(world);
     if (maps === undefined) return undefined;
-    const planet = createPlanet(look, maps, this.#sphere);
+    const planet = this.#kit.createWorld(world, maps, this.#sphere);
     this.group.add(planet.group);
     return { mark, planet, ...orbitOf(mark.room, index) };
   }

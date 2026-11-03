@@ -1,5 +1,6 @@
 import { BufferGeometry, Object3D, ShaderMaterial, Texture, Vector3 } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as kit from "../planet/generated.ts";
 import { OrbitingMoons, type MoonMark, type MoonSight } from "./orbiting.ts";
 
 // A world's rooms as moons, drawn (7e's review, A2b-3, 4 and 6): each on an orbit of its own, freed when it leaves, hidden behind the world
@@ -7,7 +8,7 @@ import { OrbitingMoons, type MoonMark, type MoonSight } from "./orbiting.ts";
 const maps = { map: () => new Texture(), clouds: new Texture(), ring: new Texture() };
 const SUN = new Vector3(1, 0, 0);
 
-const moonsOf = () => new OrbitingMoons(new BufferGeometry(), () => maps);
+const moonsOf = () => new OrbitingMoons(new BufferGeometry(), kit, () => maps);
 const mark = (room: string, size = 1) => {
   const places: [number, number, boolean][] = [];
   const moon: MoonMark = {

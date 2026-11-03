@@ -38,6 +38,7 @@ export async function earthView({ renderer, base, ratio }: Device): Promise<View
     stage,
     camera,
     worlds: [],
+    drawn: [],
     stages: [],
     textures: [],
     look(_eyeX, _eyeY, aspect) {

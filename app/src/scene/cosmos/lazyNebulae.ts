@@ -45,6 +45,11 @@ export class LazyNebulae {
     this.#nebulae?.follow(eye, seconds, distance);
   }
 
+  /** The share they follow and where they stand: none, nowhere, till they came (7d7). */
+  follows(): { share: number; eye: Point } {
+    return this.#nebulae?.follows() ?? { share: 0, eye: { x: NaN, y: NaN, z: NaN } };
+  }
+
   /** Frees their images, as the nebulae's own. */
   free(): void {
     this.#nebulae?.free();

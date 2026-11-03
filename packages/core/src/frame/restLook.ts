@@ -91,12 +91,19 @@ const direction = (a: Point): Point => {
 };
 const along = (a: Point, b: Point, by: number): Point => ({ x: a.x + b.x * by, y: a.y + b.y * by, z: a.z + b.z * by });
 
-/** The eye `distance` from the Earth, `slant` radians over the disc and `turn` radians round from the map's z towards its x. */
-export const eyeAt = (distance: number, slant: number, turn: number): Point => ({
-  x: EARTH_PLACE.x + distance * Math.cos(slant) * Math.sin(turn),
-  y: EARTH_PLACE.y + distance * Math.sin(slant),
-  z: EARTH_PLACE.z + distance * Math.cos(slant) * Math.cos(turn),
-});
+/** The eye `distance` from the Earth, `slant` radians over the disc and `turn` radians round from the map's z towards its x, into `out`. */
+export function eyeInto({ distance, slant, turn }: Candidate, out: { x: number; y: number; z: number }): void {
+  out.x = EARTH_PLACE.x + distance * Math.cos(slant) * Math.sin(turn);
+  out.y = EARTH_PLACE.y + distance * Math.sin(slant);
+  out.z = EARTH_PLACE.z + distance * Math.cos(slant) * Math.cos(turn);
+}
+
+/** The same eye, made. */
+export const eyeAt = (distance: number, slant: number, turn: number): Point => {
+  const out = { x: 0, y: 0, z: 0 };
+  eyeInto({ distance, slant, turn }, out);
+  return out;
+};
 
 /** A camera at `eye`, on the map, looking at the Earth, the disc's up kept up. */
 function cameraFrom(eye: Point): Camera {

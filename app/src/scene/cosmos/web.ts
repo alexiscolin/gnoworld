@@ -128,10 +128,14 @@ export class Web {
         this.#soft.size * (1 + GOLD_GROW * gold),
         this.#soft.light * held.calm * (1 + GOLD_LIFT * gold),
       );
-      const [red = 0, green = 0, blue = 0] = held.tint.map(
-        (channel, at) => channel + ((GOLD[at] ?? 0) - channel) * gold,
+      // No array made a world: a look at 20,000 worlds runs on the dive's frames (the review of 7d7).
+      const { tint } = held;
+      aTint.setXYZ(
+        index,
+        tint[0] + (GOLD[0] - tint[0]) * gold,
+        tint[1] + (GOLD[1] - tint[1]) * gold,
+        tint[2] + (GOLD[2] - tint[2]) * gold,
       );
-      aTint.setXYZ(index, red, green, blue);
     });
     aSoft.needsUpdate = true;
     aTint.needsUpdate = true;

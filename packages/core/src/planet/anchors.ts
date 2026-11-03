@@ -38,24 +38,16 @@ export type Anchor = (typeof ANCHORS)[number];
 export type KeptAnchor = (typeof KEPT)[number];
 export type MoreAnchor = (typeof MORE)[number];
 
-/** The small set of real maps every world reuses. */
-export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze", "earth-day"] as const;
+/** The small set of real maps every world takes its fine detail from; the Earth's is the Earth's alone (F4223). */
+export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze"] as const;
 export type MapName = (typeof MAPS)[number];
 
 export interface AnchorRow {
   readonly maps: readonly [MapName, ...MapName[]];
-  /** A world with a sea reads the Earth's map alone: its land, ice and shores are that map's. */
-  readonly second?: MapName;
   readonly palettes: readonly [Ramp, Ramp];
   readonly warp: Span;
   readonly recolour: Span;
   readonly relief: Span;
-  /** Above 1, a faint map's bands and clouds are lifted around its own mean. */
-  readonly contrast?: Span;
-  readonly caps?: Span;
-  readonly clouds?: Span;
-  readonly rifts?: Span;
-  readonly cracks?: Span;
   /** The share of worlds with rings. */
   readonly rings?: number;
   readonly banded?: true;
