@@ -5,7 +5,7 @@ import { ROWS } from "./rows.ts";
 
 type Span = readonly [number, number];
 
-/** Each value, a uniform of the same name: its unit and its whole span. Read from the second hash in this order, from byte 9. */
+/** Each value, a uniform of the same name: its unit and its whole span. Read from the second hash in this order, from byte 9 (surface.ts). */
 export const SURFACE = {
   scale: { unit: "cycles per radius of the largest structure", span: [0.8, 4] },
   lacunarity: { unit: "an octave's frequency over the last's", span: [1.8, 2.3] },
@@ -24,6 +24,7 @@ export const SURFACE = {
   detail: { unit: "share of a real map's detail in the structure", span: [0, 1] },
   halves: { unit: "share, how much darker one hemisphere is", span: [0, 1] },
   mix: { unit: "cycles per radius of the minor class's regions", span: [0.5, 2] },
+  gather: { unit: "share, an archipelago to one supercontinent", span: [0, 1] },
 } as const satisfies Record<string, { unit: string; span: Span }>;
 export type SurfaceName = keyof typeof SURFACE;
 
@@ -43,7 +44,16 @@ const GAS: Spans = { bands: [8, 24], turbulence: [0.2, 0.8], storms: [0, 0.6] };
 
 const SPANS: Record<Anchor, Spans> = {
   rocky: { craters: [0.55, 1], erosion: [0, 0.25], rifts: [0, 0.2] },
-  temperate: { sea: [0.45, 0.65], erosion: [0.4, 0.9], craters: [0, 0.05], caps: [0.02, 0.12], clouds: [0.25, 0.6] },
+  // Rougher, so its coasts break; from an archipelago to one supercontinent; its ice at the poles alone to past 50 degrees (Alexis, 7b8).
+  temperate: {
+    sea: [0.45, 0.65],
+    erosion: [0.4, 0.9],
+    craters: [0, 0.05],
+    caps: [0.04, 0.25],
+    clouds: [0.25, 0.6],
+    roughness: [0.55, 0.65],
+    gather: [0, 1],
+  },
   desert: { erosion: [0.2, 0.7], craters: [0.15, 0.6], caps: [0, 0.12], clouds: [0, 0.15], rifts: [0, 0.4] },
   ocean: { sea: [0.8, 0.95], erosion: [0.3, 0.8], craters: [0, 0.03], caps: [0, 0.15], clouds: [0.3, 0.65] },
   ice: { craters: [0, 0.25], erosion: [0, 0.3], rifts: [0.4, 1] },
