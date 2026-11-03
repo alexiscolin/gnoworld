@@ -121,11 +121,16 @@ void main() {
   }
   if (shape.halves > 0.0) albedo *= 1.0 - shape.halves * smoothstep(-0.12, 0.12, axis.x + 0.18 * field(at * 2.0 + minorOffset).x);
   float rift = 0.0;
+  float burning = 0.0;
   if (shape.rifts > 0.0) {
     float riven = smoothstep(0.25, 0.5, shape.rifts);
     if (glowLevel > 0.0) riven *= smoothstep(0.08, 0.2, shape.craters);
     float ridge = 0.0;
-    if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
+    if (riven > 0.0 && glowLevel > 0.0) {
+      vec2 crack = crackAt(at + offset, 3.0 + shape.scale, vec2(0.0, 0.14 + 0.16 * shape.rifts), pixel);
+      rift = crack.x * riven;
+      burning = rift * smoothstep(1.5, 6.0, crack.y);
+    } else if (riven > 0.0) rift = lines(ridge, at, 0.008 + 0.02 * shape.rifts, pixel) * riven;
     relieved += 0.4 * ridge * riven;
     vec3 riftTint = mix(low * 0.6, vec3(0.42, 0.2, 0.11), smoothstep(0.12, 0.3, dot(mid, LUMA)));
     albedo = mix(albedo, riftTint, rift * 0.75);
@@ -159,7 +164,7 @@ void main() {
   if (glowLevel > 0.0) {
     float hot = 1.0 - (1.0 - glowLevel) * 0.2;
     float vents = style > 1.5 ? smoothstep(0.985, 0.995, molten) : smoothstep(hot - 0.11, hot + 0.06, molten);
-    float heat = mix(vents, rift * smoothstep(0.1, 0.8, flow.z + 0.4), smoothstep(0.08, 0.2, shape.craters));
+    float heat = mix(vents, burning * (0.75 + 0.25 * smoothstep(0.1, 0.8, flow.z + 0.4)), smoothstep(0.08, 0.2, shape.craters));
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
     vec3 glow = mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
     if (style > 0.5 && style < 1.5) glow = veinsOf(at + offset, pixel, burn);

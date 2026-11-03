@@ -379,8 +379,19 @@ describe("the generated program", () => {
     const glow = GENERATED_FRAGMENT.slice(start, GENERATED_FRAGMENT.indexOf("\n  }\n", start));
     expect(GENERATED_FRAGMENT).toMatch(/molten = shareOf\(vec2\([\d.]+ \* crackle - height, /);
     expect(glow).toMatch(/: smoothstep\(hot - [\d.]+, hot \+ [\d.]+, molten\);/);
-    expect(glow).toMatch(/float heat = mix\(vents, rift \* [^;]*, smoothstep\([\d.]+, [\d.]+, shape\.craters\)\);/);
+    expect(glow).toMatch(/float heat = mix\(vents, burning \* [^;]*, smoothstep\([\d.]+, [\d.]+, shape\.craters\)\);/);
     expect(glow).not.toMatch(/seam/);
+  });
+
+  // An old crust's fractures (the chief, 7b5's pass2: Music's veins, never neon tubes; 7b6's held details, 7b7): cracks along the seams
+  // of cells, a few to a radius, which glow only where they are wider than a pixel and a half; a riven world that does not glow keeps
+  // its long crossing arcs.
+  it("breaks an old crust's fractures along the seams of cells, glowing on their wider parts only", () => {
+    expect(GENERATED_FRAGMENT).toMatch(
+      /if \(riven > 0\.0 && glowLevel > 0\.0\) \{\n {6}vec2 crack = crackAt\(at \+ offset, [1-5]\.0 \+ shape\.scale, vec2\(0\.0, 0\.[01]\d* \+ 0\.[01]\d* \* shape\.rifts\), pixel\);/,
+    );
+    expect(GENERATED_FRAGMENT).toMatch(/burning = rift \* smoothstep\([1-9][\d.]*, [\d.]+, crack\.y\);/);
+    expect(GENERATED_FRAGMENT).toMatch(/\} else if \(riven > 0\.0\) rift = lines\(ridge, at, /);
   });
 
   // The concentric marbling (the chief: real24's fourth world): erosion carved the two largest octaves too, whose few long creases the
