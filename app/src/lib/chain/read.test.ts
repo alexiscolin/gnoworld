@@ -299,7 +299,7 @@ describe("readChain, a hostile string", () => {
   const HOSTILE = [
     "<script>alert(1)</script>",
     "javascript:alert(1)",
-    "</script><!--  ",
+    "</script><!-- \u2028",
     "\u0000\u202e",
     "'; DROP TABLE x; --",
     "${process.env.SECRET}",
