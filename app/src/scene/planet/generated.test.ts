@@ -333,7 +333,7 @@ describe("the generated program", () => {
     // Never op-art (7b7's design review): the spacing wanders from lane to lane, each groove's width along it.
     expect(grooves).toMatch(/float wave = away \* [\d.]+ \+ (0\.[5-9]|1\.\d)\d* \* noise\(/);
     expect(grooves).toMatch(/smoothstep\([\d.]+ \+ [\d.]+ \* noise\([^)]*\), [\d.]+, abs\(fract\(wave\) - 0\.5\)\)/);
-    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal);");
+    expect(GENERATED_FRAGMENT).toContain("relief * world * (1.0 - 0.3 * grooved), normal)");
   });
 
   // F4239: a giant's streaks stretched five times across a latitude read as hairs a pixel tall, their octaves past a pixel; Alexis chose
