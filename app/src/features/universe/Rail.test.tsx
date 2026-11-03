@@ -7,6 +7,7 @@ import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.t
 import { MAGNIFIED, REACH } from "./railDock.ts";
 import { Rail, PORTRAIT_SIZE, type RailSource } from "./Rail.tsx";
 import type { RailPlaces } from "./railWorlds.ts";
+import { Portraits } from "./worldsFeed.ts";
 
 // The rail (frame 4, 7i): the Earth and the worlds of the moment as links, one stop in the tab order, the arrows moving among them, "See
 // all" after them; each planet the planets' own portrait once drawn; magnified like a dock under the pointer, never under reduced motion
@@ -47,14 +48,17 @@ const KNOWN: Data = { worlds: WORLDS, signals: SIGNALS };
 function sourceOf(data: Data | "none" = KNOWN) {
   const listeners = new Set<() => void>();
   let held: Data = data === "none" ? undefined : data;
-  const portraits = vi.fn<RailSource["portraits"]>(() => new Promise(() => undefined));
+  // The scene's portraits, as the feed asks them.
+  const portraits = vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>(
+    () => new Promise(() => undefined),
+  );
   const source: RailSource = {
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
     data: () => held,
-    portraits,
+    portraits: new Portraits(portraits),
   };
   const tell = (next: Data) => {
     held = next;
@@ -329,6 +333,27 @@ describe("the rail's planets", () => {
     });
     expect(portraits).toHaveBeenLastCalledWith(["new/one"], PORTRAIT_SIZE);
     expect(portraits).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks nothing again when the rail comes back to the same page: the portraits outlive it", async () => {
+    const { source, portraits } = sourceOf();
+    portraits.mockResolvedValue(new Map([["gov/dao", PORTRAIT]]));
+    for (let visit = 0; visit < 3; visit += 1) {
+      const box = document.createElement("div");
+      document.body.append(box);
+      const root = createRoot(box);
+      act(() => {
+        root.render(<Rail source={source} places={PLACES} open={vi.fn()} />);
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      act(() => {
+        root.unmount();
+      });
+      box.remove();
+    }
+    expect(portraits).toHaveBeenCalledTimes(1);
   });
 
   it("asks nothing again for the worlds an ask on its way holds when the list changes", () => {

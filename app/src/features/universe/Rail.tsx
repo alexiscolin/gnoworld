@@ -3,50 +3,22 @@
 // drew it, ui's drawn disc till then. Where it stands, the page's plain list of worlds steps aside: the rail stands for it.
 import { PlanetThumb } from "@gnoworld/ui";
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
-import { createStore } from "zustand/vanilla";
 import { followed } from "../../lib/followed.ts";
 import { nextLine } from "../../lib/nextLine.ts";
 import { dock } from "./railDock.ts";
-import { RailOrder, type RailEntry, type RailPlaces } from "./railWorlds.ts";
-import type { Known } from "./worldsFeed.ts";
+import { RailOrder, type RailPlaces } from "./railWorlds.ts";
+import type { Known, Portraits } from "./worldsFeed.ts";
 import styles from "./Rail.module.css";
 
 /** A portrait's side, in the page's pixels: a 64 px planet as the dock magnifies it. */
 export const PORTRAIT_SIZE = 100;
 const EVERY_PLACE = "/list";
 
-/** What the rail reads: the worlds and what is known of them, and the scene's portraits of their planets. */
+/** What the rail reads: the worlds and what is known of them, and the scene's portraits of their planets, which outlive the rail. */
 export interface RailSource {
   readonly subscribe: (listener: () => void) => () => void;
   readonly data: () => Known | undefined;
-  readonly portraits: (ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>;
-}
-
-// The portraits drawn so far: each world asked once, drawn or not. A seed shows none: it is unknown till charted.
-class Portraits {
-  readonly #source: RailSource;
-  readonly #asked = new Set<string>();
-  readonly #drawn = createStore<ReadonlyMap<string, string>>(() => new Map());
-
-  constructor(source: RailSource) {
-    this.#source = source;
-  }
-
-  readonly subscribe = this.#drawn.subscribe;
-
-  readonly drawn = this.#drawn.getState;
-
-  ask(entries: readonly RailEntry[]): void {
-    const ids = entries.filter(({ id, section }) => section !== "seed" && !this.#asked.has(id)).map(({ id }) => id);
-    if (ids.length === 0) return;
-    for (const id of ids) this.#asked.add(id);
-    this.#source.portraits(ids, PORTRAIT_SIZE).then(
-      (drawn) => {
-        this.#drawn.setState((before) => new Map([...before, ...drawn]), true);
-      },
-      () => undefined,
-    );
-  }
+  readonly portraits: Pick<Portraits, "subscribe" | "drawn" | "ask">;
 }
 
 // The page's plain list of worlds (Hero.tsx), marked while the rail stands for it.
@@ -96,10 +68,9 @@ function holdWhileOn(rail: HTMLElement, order: RailOrder, signal: AbortSignal): 
 // The rail's order and portraits from its source, and while it stands: the page's list stepping aside, the hold and the dock.
 function useRail(source: RailSource, places: RailPlaces) {
   const [order] = useState(() => new RailOrder(places));
-  const [portraits] = useState(() => new Portraits(source));
   const known = useSyncExternalStore(source.subscribe, source.data);
   const entries = useSyncExternalStore(order.subscribe, order.entries);
-  const drawn = useSyncExternalStore(portraits.subscribe, portraits.drawn);
+  const drawn = useSyncExternalStore(source.portraits.subscribe, source.portraits.drawn);
   const railRef = useRef<HTMLElement>(null);
   const standing = known !== undefined && entries.length > 0;
   useEffect(() => {
@@ -112,8 +83,10 @@ function useRail(source: RailSource, places: RailPlaces) {
     [order],
   );
   useEffect(() => {
-    portraits.ask(entries);
-  }, [portraits, entries]);
+    // A seed shows no portrait: it is unknown till charted.
+    const ids = entries.filter(({ section }) => section !== "seed").map(({ id }) => id);
+    source.portraits.ask(ids, PORTRAIT_SIZE);
+  }, [source, entries]);
   useEffect(() => {
     const rail = railRef.current;
     const leaving = new AbortController();

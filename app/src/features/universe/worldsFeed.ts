@@ -22,6 +22,35 @@ export interface Known {
   readonly signals: LabelSignals;
 }
 
+/** The planets' portraits for the rail (7i): each world asked of the scene once for as long as the page lives, drawn or not, so a return
+ * to the cosmos asks none again; none asked while no scene can draw them. */
+export class Portraits {
+  readonly #draw: (ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>> | undefined;
+  readonly #asked = new Set<string>();
+  readonly #drawn = createStore<ReadonlyMap<string, string>>(() => new Map());
+
+  constructor(draw: (ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>> | undefined) {
+    this.#draw = draw;
+  }
+
+  readonly subscribe = this.#drawn.subscribe;
+
+  readonly drawn = this.#drawn.getState;
+
+  ask(ids: readonly string[], size: number): void {
+    const fresh = ids.filter((id) => !this.#asked.has(id));
+    const drawing = fresh.length === 0 ? undefined : this.#draw(fresh, size);
+    if (drawing === undefined) return;
+    for (const id of fresh) this.#asked.add(id);
+    drawing.then(
+      (drawn) => {
+        this.#drawn.setState((before) => new Map([...before, ...drawn]), true);
+      },
+      () => undefined,
+    );
+  }
+}
+
 export class WorldsFeed {
   readonly #leaving = new AbortController();
   readonly #known = createStore<Known | undefined>(() => undefined);
@@ -41,9 +70,8 @@ export class WorldsFeed {
   /** The worlds and what is known of them, as last told to the cosmos, once both are. */
   readonly data = this.#known.getState;
 
-  /** The scene's portraits of these worlds' planets; none before a scene came. */
-  readonly portraits = (ids: readonly string[], size: number): Promise<ReadonlyMap<string, string>> =>
-    this.#scene?.portraits(ids, size) ?? Promise.resolve(new Map());
+  /** The planets' portraits the scene drew for the rail, kept as long as the page lives. */
+  readonly portraits = new Portraits((ids, size) => this.#scene?.portraits(ids, size));
 
   /** Says whether the page wants the worlds on `scene`. */
   sync(scene: Scene, wanted: boolean): void {

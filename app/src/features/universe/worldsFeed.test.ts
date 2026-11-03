@@ -4,7 +4,7 @@ import { callersOf, type CosmosWorld, type LabelSignals } from "../../scene/cosm
 import { Drawn } from "@gnoworld/core";
 import { asksOf } from "../../scene/cosmos/labelAsks.ts";
 import type { Scene } from "../../scene/scene.ts";
-import { WorldsFeed } from "./worldsFeed.ts";
+import { Portraits, WorldsFeed } from "./worldsFeed.ts";
 
 // What the cosmos is told (7h): its worlds once the file comes, then who is here, keyed as the cosmos holds each world (a hub's world is its
 // first realm's, gov/dao for the slug govdao), with the hubs' names and this reader's visits, asked again each minute while the cosmos
@@ -51,6 +51,42 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+});
+
+describe("the rail's portraits", () => {
+  it("asks the scene for each world once for as long as the page lives, drawn or not, and keeps what it drew", async () => {
+    const draw = vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>();
+    draw.mockResolvedValueOnce(new Map([["a", "data:image/jpeg;base64,A"]]));
+    draw.mockRejectedValueOnce(new Error("lost"));
+    const portraits = new Portraits(draw);
+    portraits.ask(["a", "b"], 100);
+    portraits.ask(["a", "b"], 100);
+    await settled();
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect([...portraits.drawn()]).toEqual([["a", "data:image/jpeg;base64,A"]]);
+    portraits.ask(["b", "c"], 100);
+    await settled();
+    expect(draw).toHaveBeenLastCalledWith(["c"], 100);
+    expect([...portraits.drawn().keys()]).toEqual(["a"]);
+  });
+
+  it("asks the scene the feed was last told of; before one, it asks nothing and keeps nothing as asked", async () => {
+    const worlds = new WorldsFeed();
+    onTestFinished(() => {
+      worlds.leave();
+    });
+    worlds.portraits.ask(["a"], 100);
+    await settled();
+    expect(worlds.portraits.drawn().size).toBe(0);
+    const drawn = vi.fn(() => Promise.resolve(new Map([["b", "data:image/jpeg;base64,B"]])));
+    const { scene } = sceneOf();
+    Object.assign(scene, { portraits: drawn });
+    worlds.sync(scene, true);
+    worlds.portraits.ask(["a", "b"], 100);
+    await settled();
+    expect(drawn).toHaveBeenCalledWith(["a", "b"], 100);
+    expect(worlds.portraits.drawn().get("b")).toBe("data:image/jpeg;base64,B");
+  });
 });
 
 describe("the worlds' feed", () => {
