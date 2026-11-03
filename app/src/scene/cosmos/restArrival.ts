@@ -20,6 +20,7 @@ export interface Landing {
   readonly plan?: Planned;
   readonly lens?: number | undefined;
   readonly up?: Point | undefined;
+  readonly lean?: number | undefined;
 }
 
 /** The arrival at the system of `systems` named `id`; none for a name the file does not hold. */

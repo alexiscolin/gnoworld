@@ -173,4 +173,37 @@ describe("a Plan's own lens and level", () => {
     expect(go.mock.lastCall?.[1]).toBeUndefined();
     expect(up().distanceTo(onStage({ x: 0, y: 1, z: 0 }))).toBeLessThan(1e-9);
   });
+
+  // 7v's design review (F4468; the chief): six worlds hold through a mouse's lean at a system's dynamic view at 1.36 units, 9% under the 1.5
+  // a Plan keeps, half the home's 3.
+  it("leans the eye 1.36 of the home's 3 units at a dynamic view, and 1.5 at a Plan", async () => {
+    const systems = filed(6, 0);
+    const system = systems.find(({ worlds }) => worlds.some(({ radius }) => radius >= GRAIN));
+    if (system === undefined) throw new Error("no system with a body");
+    found.mockReturnValue({ earth: NO_EARTH, bodies: [], rocks: [] });
+    const resting = new Resting(() => undefined, {});
+    resting.rest(systems, undefined);
+    const go = vi.fn<(eye: Point, lens?: number) => void>();
+    // How far the eye moves for a lean of one unit off where it rests.
+    const leaned = () => {
+      const to = go.mock.lastCall?.[0] ?? { x: NaN, y: NaN, z: NaN };
+      const [still, moved] = [
+        { x: 0, y: 0, z: 0 },
+        { x: 0, y: 0, z: 0 },
+      ];
+      resting.place(to, 0, still);
+      resting.place({ ...to, x: to.x + 1 }, 0, moved);
+      return (moved.x - still.x) * 3;
+    };
+    for (const [plan, lean, calls] of [
+      [false, 3 / 2.2, 1],
+      [true, 1.5, 2],
+    ] as const) {
+      resting.arrive({ id: system.id, go, plan });
+      await vi.waitFor(() => {
+        expect(go).toHaveBeenCalledTimes(calls);
+      });
+      expect(leaned()).toBeCloseTo(lean, 9);
+    }
+  });
 });

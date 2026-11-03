@@ -24,14 +24,15 @@ import {
   type Seen,
 } from "./restLook.ts";
 
-/** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there; a view
- * seen through a lens of its own says it, in degrees, and the up it keeps, a Plan's (7v): the home's lens and the map's up where none. */
+/** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there; a Plan's own
+ * lens in degrees, plane's up and lean (7v): the home's lens, the map's up and a dynamic view's lean where none. */
 export interface Arrival {
   readonly eye: Point;
   readonly look: Point;
   readonly postcard: Postcard;
   readonly lens?: number;
   readonly up?: Point;
+  readonly lean?: number;
 }
 
 // The lean lives beside the mouse's, where the view at rest's eye reads it without this module.
@@ -53,8 +54,7 @@ const SHOWN_AT_REST = 0.3;
 const SHOWN_SWAYED = 0.25;
 const NEAR_OVER = 1.5;
 const NEAR_MOST = 0.5;
-const MARGIN = 24;
-const HEADER = 0.09;
+const [MARGIN, HEADER] = [24, 0.09];
 // The view looks no steeper than this up or down the map: its up stays up.
 const STEEP = Math.sin(60 * DEGREE);
 // A system of grain alone is framed by its star; one no angle holds stands its ball 60% of the screen's height.

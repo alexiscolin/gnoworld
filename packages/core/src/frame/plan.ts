@@ -5,6 +5,7 @@
 // from above, each project round it on an orbit of its own, apart from what stands by the Earth at rest, so the depth's chunk has no Plan.
 import { EARTH_PLACE, EARTH_RADIUS, GRAIN, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { textHash, unitOf } from "../space/cell.ts";
+import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import { onPlane, orbitPlace } from "./disc.ts";
 import { earthSystemOf, type Project } from "./earthOrbit.ts";
@@ -26,6 +27,8 @@ const PLAN_MOST = 12;
 // A Plan's own lens, in degrees (the chief, 2026-11-04): a chart, its orbits round their star, where the home's 42.5 degrees put the outer
 // ellipse's centre 122 px under it; the offset falls with the lens's tangent, 17 px here at the video's screen (7v's design review, F4470).
 const PLAN_LENS = 7;
+// A mouse leans a Plan's eye half the home's, as an arrival leaned before a system's dynamic view leaned less (7v's design review, F4468).
+const PLAN_LEAN = LEAN / 2;
 // Seen 30 degrees over the plane: its orbits read as ellipses half as high as wide, the mock-up's.
 const SLANT = 30 * DEGREE;
 const TURNS = 24;
@@ -171,6 +174,7 @@ export function planOf(system: StarSystem): Arrival {
     postcard: { system: still, worlds: placed, depth: placed.map(() => 1), hidden },
     lens: PLAN_LENS,
     up,
+    lean: PLAN_LEAN,
   };
 }
 
@@ -208,6 +212,7 @@ export function earthPlanOf(projects: readonly Pick<Project, "name">[]): Arrival
     look: EARTH_PLACE,
     postcard: { system: earth, worlds, depth: worlds.map(() => 1), hidden: new Set() },
     lens: PLAN_LENS,
+    lean: PLAN_LEAN,
   };
 }
 

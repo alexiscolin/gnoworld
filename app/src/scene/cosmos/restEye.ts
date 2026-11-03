@@ -54,7 +54,7 @@ export class RestEye {
   #asked: Asking | undefined;
   #went: Point | undefined;
   #turn = 0;
-  // How much of the scene's eye's lean and glide off where it rests reaches the eye: all at home, half at an arrival, nearer what it sees.
+  // How much of the scene's eye's lean and glide off where it rests reaches the eye: all at home, less at a landing, nearer what it sees.
   #lean = 1;
   // The same on the map; and what a flight looks at, on the map, while it does.
   #arrived: Point = EARTH_PLACE;
@@ -132,7 +132,7 @@ export class RestEye {
 
   // The camera turned to what `landing` looks at, or the Earth with none, the eye swaying along its own axes; the scene's eye there.
   #land(landing: Landing | undefined): Point {
-    this.#lean = landing === undefined ? 1 : ARRIVAL_LEAN / LEAN;
+    this.#lean = landing === undefined ? 1 : (landing.lean ?? ARRIVAL_LEAN) / LEAN;
     this.#upFor(landing);
     if (landing === undefined) {
       toScene(EARTH_PLACE, this.looked);
