@@ -1,6 +1,6 @@
 import { Trends, type Presence, type Worlds } from "@gnoworld/schemas/indexer";
 import { describe, expect, it, vi } from "vitest";
-import { makeTrends, NEW_MS, trendsRoutes, WINDOW_MOST_MS, type ChainTrend } from "./trends.ts";
+import { makeTrends, NEW_MS, TRENDING_LEAST, trendsRoutes, WINDOW_MOST_MS, type ChainTrend } from "./trends.ts";
 
 // The ticker's trends (7t): what the worlds job's passes and who is here say, and nothing else. The busiest world is the one whose realms
 // gained the most calls between two passes that both read them; a new world is one the list first showed in the last day; a rising world is
@@ -55,6 +55,28 @@ describe("the busiest world", () => {
       since: at(T1),
       at: at(T2),
     });
+  });
+
+  // Alexis, 2026-11-04 ("Un seuil maintenant", F4551): one call gained made a world TRENDING. Under the floor the ticker has no Trending
+  // item rather than a weak one, and never a second world's smaller gain in its place.
+  it(`is none under ${String(TRENDING_LEAST)} calls gained in the window, a world's realms counted together`, () => {
+    expect(TRENDING_LEAST).toBe(5);
+    const busiest = (pool: number, pool1: number) => {
+      const trends = makeTrends();
+      trends.passed(file(T1, WORLDS), calls({ [POOL]: 10, [POOL1]: 10, [ROUTER]: 10 }));
+      trends.passed(file(T2, WORLDS), calls({ [POOL]: 10 + pool, [POOL1]: 10 + pool1, [ROUTER]: 13 }));
+      return busiestOf(trends.chain());
+    };
+    expect(busiest(4, 0)).toBeUndefined();
+    expect(busiest(2, 2)).toBeUndefined();
+    expect(busiest(5, 0)).toMatchObject({ world: "gnoswap/pool", calls: 5 });
+    expect(busiest(2, 3)).toMatchObject({ world: "gnoswap/pool", calls: 5 });
+    const address = "g1ut6usp7lsurwsk9n3cyeu3ckn8ftw7mtufzhcz";
+    const unnamed = [world(address, [`gno.land/r/${address}`]), world("gnoswap/router", [ROUTER])];
+    const trends = makeTrends();
+    trends.passed(file(T1, unnamed), calls({ [`gno.land/r/${address}`]: 1, [ROUTER]: 1 }));
+    trends.passed(file(T2, unnamed), calls({ [`gno.land/r/${address}`]: 91, [ROUTER]: 4 }));
+    expect(busiestOf(trends.chain()), "a world only an address names lends its gain to none").toBeUndefined();
   });
 
   it("is none on a first pass, for there is nothing to compare with", () => {

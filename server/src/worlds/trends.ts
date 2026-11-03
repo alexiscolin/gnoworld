@@ -1,7 +1,7 @@
 // The ticker's trends (slice 7, 7t), computed here so a phone reads a few items, never the worlds' file: the busiest world between the worlds
-// job's last two passes, the hub rising most against its own 14 days (who is here, 7h), the world the chain's list first showed in the last
-// day. Only from what was read: a realm either pass left unread gains nothing, a world with no name or page is passed over, an old trend is
-// none. Served at GET /api/trends, each item through its schema.
+// job's last two passes, if it gained 5 calls at least, the hub rising most against its own 14 days (who is here, 7h), the world the chain's
+// list first showed in the last day. Only from what was read: a realm either pass left unread gains nothing, a world with no name or page is
+// passed over, an old trend is none. Served at GET /api/trends, each item through its schema.
 import { labelName } from "@gnoworld/core";
 import { Trend, type Presence, type Trends, type Worlds } from "@gnoworld/schemas/indexer";
 import { Hono } from "hono";
@@ -12,6 +12,8 @@ const HOUR = 3_600_000;
 export const WINDOW_MOST_MS = 2 * HOUR;
 /** How long a world the list first showed stays new. */
 export const NEW_MS = 24 * HOUR;
+/** The fewest calls the busiest world gains in its window: fewer, and the ticker has no Trending item (Alexis, 2026-11-04). */
+export const TRENDING_LEAST = 5;
 
 export type ChainTrend = Extract<Trend, { kind: "trending" | "new" }>;
 /** The calls each realm's history gave in a pass, by its path. */
@@ -43,12 +45,14 @@ function gained(world: World, before: PassReads, now: PassReads): number {
 
 const byId = (a: World, b: World): number => (a.id < b.id ? -1 : Number(a.id > b.id));
 
-// Whether a world's gain goes before the best so far: more calls, or as many and an earlier id; a world that gained none never does.
+// Whether a world's gain goes before the best so far: more calls, or as many and an earlier id; a world under the floor never does.
 const ahead = (world: { calls: number; id: string }, best: { calls: number; id: string } | undefined): boolean =>
-  best === undefined ? world.calls > 0 : world.calls > best.calls || (world.calls === best.calls && world.id < best.id);
+  best === undefined
+    ? world.calls >= TRENDING_LEAST
+    : world.calls > best.calls || (world.calls === best.calls && world.id < best.id);
 
-// The world that gained the most calls since the pass before, the first by id among equals; none past the window. The file's order is
-// not relied on.
+// The world that gained the most calls since the pass before, the first by id among equals; none under the floor or past the window. The
+// file's order is not relied on.
 function busiest(worlds: Worlds, last: { at: string; read: PassReads } | undefined, read: PassReads): ChainTrend[] {
   if (last === undefined) return [];
   const window = Date.parse(worlds.updated) - Date.parse(last.at);
