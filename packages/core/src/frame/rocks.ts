@@ -4,7 +4,7 @@
 // depth's chunk: it reads the view through the judge `deep.ts` makes of it.
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { SWAY } from "../space/drift.ts";
-import type { Judge } from "./deep.ts";
+import { gap, type Judge } from "./deep.ts";
 import type { RestView } from "./rest.ts";
 import type { Look, Seen } from "./restLook.ts";
 
@@ -19,7 +19,6 @@ const APART = 6;
 // the end over the body, 22 off its outline, above or below.
 const LABEL = { wide: 200, high: 32, stem: 12, gap: 22 } as const;
 
-const gap = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y) - a.radius - b.radius;
 // Whether a rock there stands on a body, or where its label may stand, `margin` pixels round.
 const onRoom = (rock: Seen, body: Seen, margin = MARGIN) =>
   gap(rock, body) < margin ||

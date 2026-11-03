@@ -120,7 +120,8 @@ const ROW = { up: 0.05, across: 0.15 };
 const GLOW = 0.1;
 
 const apart = (a: Seen, b: Seen) => Math.hypot(a.x - b.x, a.y - b.y);
-const gap = (a: Seen, b: Seen) => apart(a, b) - a.radius - b.radius;
+/** The room between two round spots' rims, in pixels: under none when they overlap. */
+export const gap = (a: Seen, b: Seen) => apart(a, b) - a.radius - b.radius;
 const like = (a: Seen, b: Seen) => Math.max(a.radius, b.radius) < APART * Math.min(a.radius, b.radius);
 const nearestOf = (one: Seen, all: readonly Seen[]) =>
   all.reduce<Seen | undefined>(

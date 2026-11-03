@@ -7,7 +7,7 @@ import { atOneHeight } from "./composition.ts";
 import { dot, focalOf, minus, placeOf, REST_SCREENS, type Camera } from "./restLook.ts";
 import type { Point } from "../space/cell.ts";
 
-// The turns tried: every tenth of a half turn, both ways, its own first. A thousandth over 1.5, so the rounding of a projection never reads
+// The turns tried: every ten degrees, both ways, its own first. A thousandth over 1.5, so the rounding of a projection never reads
 // a pair under it.
 const TURN = Math.PI / 18;
 const TURNS = 36;
