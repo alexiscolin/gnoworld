@@ -1,14 +1,23 @@
 // @vitest-environment jsdom
+import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import dataEvents from "../../../data/events.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Ticker } from "./Ticker.tsx";
-import { tickerItems, type TickerItem } from "./ticker.ts";
+import { ledByTrends, tickerItems, type TickerItem } from "./ticker.ts";
 
 // Slice 5m (frame 6, the strip at the bottom): the data's news and events in a strip 34 px high that scrolls and can be paused.
 // With no news and no event it is not drawn at all, as before. Its look and size are measured in tests/e2e/homeLive.spec.ts.
 const NOW = new Date("2026-10-31T12:00:00.000Z");
+const trend = (kind: "trending" | "rising" | "new"): TickerItem => ({
+  id: `trend-${kind}`,
+  kind,
+  text: `A ${kind} world`,
+  link: `/r/${kind}`,
+  source: `The ${kind} world's source`,
+});
 const news = (id: string, date: string, title = `News ${id}`) => ({
   id,
   title,
@@ -61,7 +70,21 @@ describe("tickerItems", () => {
     expect(items[0]?.id).toBe("n8");
   });
 
-  // 7t: an event that waits for its date starts at the data's far-off sentinel (dataFiles.test.ts), and is no longer shown.
+  // 7t: the chain's trends come first, as the server ranks them, before what the team's data dates; an event that waits for its date
+  // starts at the data's far-off sentinel (dataFiles.test.ts), and is no longer shown.
+  it("puts the chain's trends first, in their order, then the events to come, then the news, six at most", () => {
+    const trends = [trend("trending"), trend("rising"), trend("new")];
+    const items = ledByTrends(
+      trends,
+      tickerItems(
+        [news("n1", "2026-10-30"), news("n2", "2026-10-29"), news("n3", "2026-10-28")],
+        [event("e1", "2026-11-02T10:00:00Z")],
+        NOW,
+      ),
+    );
+    expect(items.map((item) => item.id)).toEqual(["trend-trending", "trend-rising", "trend-new", "e1", "n1", "n2"]);
+  });
+
   it("shows no event that waits for its date, and keeps one dated far ahead but before the sentinel", () => {
     const items = tickerItems(
       [],
@@ -90,6 +113,17 @@ const ITEMS: TickerItem[] = [
   { id: "sample-1", kind: "news", text: "A first headline", link: "https://gno.land/one" },
   { id: "sample-2", kind: "event", text: "A call, date to be confirmed", link: "https://gno.land/two" },
 ];
+// The ticker in a router, as the home draws it: a trend's link goes through it.
+const mountRouted = (items: TickerItem[]) => {
+  const router = createMemoryRouter(
+    [
+      { path: "/", element: <Ticker items={items} /> },
+      { path: "*", element: <p>elsewhere</p> },
+    ],
+    { initialEntries: ["/"] },
+  );
+  return mount(<RouterProvider router={router} />);
+};
 const visibleLinks = (box: HTMLElement) =>
   all(box, "a").filter((each) => each.closest("[aria-hidden='true']") === null);
 
@@ -146,6 +180,29 @@ describe("the ticker", () => {
     click(play);
     expect(strip.getAttribute("data-paused")).toBe("false");
     expect(button(box, "Pause the ticker")).toBeDefined();
+  });
+
+  it("names each kind in a word, the chain's trends among them", () => {
+    const kinds = all(mountRouted([trend("trending"), trend("rising"), trend("new"), ...ITEMS]), "[data-kind]");
+    expect(kinds.map((each) => [each.getAttribute("data-kind"), each.textContent])).toEqual([
+      ["trending", "Trending"],
+      ["rising", "Rising"],
+      ["new", "New"],
+      ["news", "News"],
+      ["event", "Event"],
+    ]);
+  });
+
+  it("opens a trend's world on this site, in the page and through the router, and says its source on the link", () => {
+    const box = mountRouted([trend("trending"), ...ITEMS]);
+    const link = all(box, "a").find((each) => each.textContent === "A trending world");
+    expect(link?.getAttribute("href")).toBe("/r/trending");
+    expect(link?.getAttribute("target")).toBeNull();
+    expect(link?.getAttribute("title")).toBe("The trending world's source");
+    act(() => {
+      link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    });
+    expect(box.textContent).toContain("elsewhere");
   });
 
   it("makes the pause its first control, before any link, so a keyboard reaches it first", () => {

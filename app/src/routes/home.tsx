@@ -3,7 +3,16 @@ import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
 import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
-import { Hero, Ticker, tickerItems, useClock, Worlds } from "../features/home/index.ts";
+import {
+  Hero,
+  ledByTrends,
+  Ticker,
+  tickerItems,
+  trendItems,
+  useClock,
+  useTrends,
+  Worlds,
+} from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { useNewcomer, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
@@ -40,6 +49,12 @@ export default function Home() {
   useSpace(universe.isDefault ? "cosmos" : undefined, universe.isDefault ? rail : undefined);
   // The first visit's one filled call is the Earth's "Start here", which only the default universe's cosmos labels (ADR-0003 §3).
   const newcomer = useNewcomer();
+  // The chain's trends lead the ticker (7t), the default universe's alone: the server's worlds job reads no other.
+  const trends = trendItems(
+    useTrends(universe.isDefault),
+    { earth: universe.earth.path, worlds: universe.worlds },
+    now,
+  );
   return (
     <>
       <Hero
@@ -51,7 +66,7 @@ export default function Home() {
       <Worlds>
         <PlaceLinks places={universe.worlds} />
       </Worlds>
-      <Ticker items={tickerItems(news, events, now)} />
+      <Ticker items={ledByTrends(trends, tickerItems(news, events, now))} />
     </>
   );
 }

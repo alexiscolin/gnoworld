@@ -1,10 +1,12 @@
-// The ticker's items from the data's news and events: what is still to come first (the soonest), then the news (the newest), at
-// most six. An event that has begun is news of the past, and one that waits for its date is not shown.
+// The ticker's items: the chain's trends first (7t), as the server ranks them, then the data's events still to come (the soonest), then its
+// news (the newest), at most six. An event that has begun is news of the past, and one that waits for its date is not shown.
 export interface TickerItem {
   id: string;
-  kind: "news" | "event";
+  kind: "trending" | "rising" | "new" | "news" | "event";
   text: string;
   link: string;
+  /** Where a trend's data comes from and when, said on its link. */
+  source?: string;
 }
 interface Row {
   id: string;
@@ -29,3 +31,7 @@ export function tickerItems(
     .map((row): TickerItem => ({ id: row.id, kind: "news", text: row.title, link: row.link }));
   return [...coming, ...latest].slice(0, MOST);
 }
+
+/** The chain's trends before the data's items, as the server ranks them, six in all at most. */
+export const ledByTrends = (trends: readonly TickerItem[], items: readonly TickerItem[]): TickerItem[] =>
+  [...trends, ...items].slice(0, MOST);
