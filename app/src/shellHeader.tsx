@@ -25,7 +25,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
       <Link to="/" className={styles["logo"]} aria-label="gnoworld">
         <Logo wordmark />
       </Link>
-      <nav aria-label="Views" className={styles["views"]}>
+      <nav aria-label="Views" className={`${styles["views"] ?? ""} control-bar`}>
         {views.map((view) => (
           <Link
             key={view.view}

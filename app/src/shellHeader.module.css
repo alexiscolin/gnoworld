@@ -65,15 +65,8 @@
     inset-block-end: var(--space-s);
     /* raw: above the page's content until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
     z-index: 1;
-    box-sizing: border-box;
     /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
     block-size: 44px;
-    /* raw: four pixels between the pill's edge and its links */
-    padding: 4px;
-    border: var(--line-width) solid var(--color-line);
-    border-radius: var(--radius-pill);
-    /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45); no blur behind it until the scene has a sky (slice 7) */
-    background: color-mix(in oklab, var(--color-surface) 45%, transparent);
   }
 
   .view {
