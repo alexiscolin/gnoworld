@@ -1079,6 +1079,7 @@ async function cameTo(page: Page, id: string, { size = COMPUTER, still = true } 
   if (still) await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(`/lab/realism.html?view=cosmos&arrive=${id}`);
   await running(page);
+  await landed(page);
   const there = staged(arrivalAt(id).arrival.eye);
   // At its arrival, within the sway's reach with motion on.
   await expect
