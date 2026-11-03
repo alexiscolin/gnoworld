@@ -76,7 +76,6 @@
     place-items: center;
     /* raw: a link is 34 px tall inside the 44 px pill */
     block-size: 34px;
-    padding-inline: var(--space-s);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
     /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
@@ -85,6 +84,13 @@
     letter-spacing: 0.1em;
     text-decoration: none;
     text-transform: uppercase;
+  }
+
+  /* A step at each side of a view's name: the prototype's 16 px on a screen 390 px wide or more, a pixel less each 10 px narrower, 12 at the
+     least, so a bar 320 px wide holds its three names on one line (F4691). */
+  .views .view {
+    /* raw: 16 px at 390 px wide, 12 at 350 and under */
+    padding-inline: clamp(var(--space-xs), calc(var(--space-s) - (390px - 100vi) / 10), var(--space-s));
   }
 
   .view[aria-current="page"] {

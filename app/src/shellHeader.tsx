@@ -1,7 +1,7 @@
 // The header as the video's frames 1, 20 and 37 draw it: the logo at the left, the views Earth, Cosmos and List in the middle
 // with search inside their pill, the network the page is in ("Testnet" when it is one) and the login at the right. A control
 // stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land. On the cosmos, the pill's
-// views say where one looks, two icons after them how (7v).
+// views say where one looks, two icons after them how, shown while a scene runs (7v; on a phone apart from the bar, F4691).
 import { Chip, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
 import { LoginControl } from "./features/login/index.ts";
@@ -39,10 +39,9 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
         ))}
         <span className={styles["divider"]} aria-hidden="true" />
         {current === "cosmos" ? (
-          <>
-            <ViewSwitch />
+          <ViewSwitch>
             <span className={styles["divider"]} aria-hidden="true" />
-          </>
+          </ViewSwitch>
         ) : null}
         <SearchPalette />
       </nav>

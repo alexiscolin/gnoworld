@@ -2,7 +2,7 @@
 // where one looks, for how one looks, Dynamic or the Plan; each names itself on hover and to a screen reader, and V toggles them. The Plan's
 // second click on a world's name comes here as an event, which the router follows to the site's own page and nowhere else.
 import { IconButton } from "@gnoworld/ui";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { keyHeld } from "../../scene/keyHeld.ts";
 import { isOwnPage } from "../../pagePath.ts";
@@ -10,7 +10,8 @@ import { OPEN } from "../../scene/openEvent.ts";
 import { useSeeing, views } from "./views.ts";
 import styles from "./ViewSwitch.module.css";
 
-export function ViewSwitch() {
+/** The two views of space, and after them `children`, the pill's divider before its search, shown together while a scene runs. */
+export function ViewSwitch({ children }: { children?: ReactNode }) {
   const seeing = useSeeing();
   const navigate = useNavigate();
   useEffect(() => {
@@ -37,25 +38,28 @@ export function ViewSwitch() {
     };
   }, [navigate]);
   return (
-    <span role="group" aria-label="Views of space" className={styles["switch"]}>
-      <IconButton
-        icon="cluster"
-        label="Dynamic view"
-        emphasis="plain"
-        pressed={seeing === "dynamic"}
-        onClick={() => {
-          views.see("dynamic");
-        }}
-      />
-      <IconButton
-        icon="planet"
-        label="Plan view"
-        emphasis="plain"
-        pressed={seeing === "plan"}
-        onClick={() => {
-          views.see("plan");
-        }}
-      />
+    <span className={`${styles["space"] ?? ""} control-bar`}>
+      <span role="group" aria-label="Views of space" className={styles["switch"]}>
+        <IconButton
+          icon="cluster"
+          label="Dynamic view"
+          emphasis="plain"
+          pressed={seeing === "dynamic"}
+          onClick={() => {
+            views.see("dynamic");
+          }}
+        />
+        <IconButton
+          icon="planet"
+          label="Plan view"
+          emphasis="plain"
+          pressed={seeing === "plan"}
+          onClick={() => {
+            views.see("plan");
+          }}
+        />
+      </span>
+      {children}
     </span>
   );
 }
