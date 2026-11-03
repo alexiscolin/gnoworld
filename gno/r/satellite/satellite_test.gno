@@ -400,16 +400,51 @@ func TestTakedownByOwnerOrOperatorOnly(cur realm, t *testing.T) {
 
 	testing.SetRealm(testing.NewUserRealm(mod))
 	Takedown(cross(cur), "mars", "r1")
-	uassert.Equal(t, 0, rentals.Size())
+	_, _, _, ok := Rental("mars")
+	uassert.False(t, ok)
 
 	testing.SetRealm(testing.NewUserRealm(alice))
 	pay(3 * p0)
 	Rent(cross(cur), "mars", "hello", 3)
 	testing.SetRealm(testing.NewUserRealm(adm))
 	Takedown(cross(cur), "mars", "r2")
-	uassert.Equal(t, 0, rentals.Size())
-	uassert.Equal(t, 0, payers.Size())
-	uassert.Equal(t, 0, held)
+	_, _, _, ok = Rental("mars")
+	uassert.False(t, ok)
+	uassert.Equal(t, p0, held) // the second rental's day begun: the first was closed by it
+}
+
+// F5042: a takedown ends the rental now, kept for its days begun, rather than
+// deleting it: gno refunds a storage deposit to whoever frees the bytes, so the
+// one taking it down would earn the payer's. Whoever closes it gets the deposit,
+// as for any rental that ended: anyone, or the payer's own next rent.
+func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	pay(3 * p0)
+	Rent(cross(cur), "venus", "hello", 3)
+	at(t0 + oneDay)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	Takedown(cross(cur), "venus", "r2")
+	uassert.Equal(t, 2*p0, bal(alice)) // a day not begun each
+	uassert.True(t, rentals.Has("mars"))
+	_, _, _, ok := Rental("mars")
+	uassert.False(t, ok)
+	uassert.Equal(t, "No satellite over this world.\n", Render("mars"))
+	uassert.Equal(t, 4*p0, held) // two days begun each, until closed
+
+	testing.SetRealm(testing.NewUserRealm(carol))
+	Close(cross(cur), "mars") // at once: its end is now
+	uassert.Equal(t, 2*p0, held)
+
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(p0)
+	Rent(cross(cur), "jupiter", "hello", 1)
+	uassert.False(t, rentals.Has("venus"))
+	uassert.Equal(t, p0, held)
+	uassert.Equal(t, "jupiter", payers.Get(alice.String()))
 }
 
 // D12: the whole days not yet begun come back to the payer at once; the day
@@ -436,7 +471,7 @@ func TestTakedownRefundsTheWholeDaysNotBegun(cur realm, t *testing.T) {
 		Takedown(cross(cur), "mars", "r1")
 		uassert.Equal(t, c.refund, bal(alice)-before)
 		uassert.Equal(t, c.days*p0-c.refund, bal(self)-kept)
-		uassert.Equal(t, 0, held)
+		uassert.Equal(t, c.days*p0-c.refund, held) // the days begun, until the rental is closed
 	}
 }
 

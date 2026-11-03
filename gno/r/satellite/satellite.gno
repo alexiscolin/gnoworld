@@ -170,8 +170,8 @@ func mustPay(cost int) {
 	}
 }
 
-// Close clears a world's ended rental, so storage holds live rentals only (D2).
-// Anyone may close one.
+// Close clears a world's ended rental, a taken-down one too, so storage holds
+// live rentals only (D2). Anyone may close one, and gets its deposit back.
 func Close(cur realm, world string) {
 	r, ok := get(world)
 	if !ok {
@@ -183,14 +183,10 @@ func Close(cur realm, world string) {
 	closeEnded(world, r)
 }
 
+// closeEnded deletes an ended rental: its payment leaves the held total, and the
+// world and its payer's list no longer name it. The storage deposit of its bytes
+// goes back to the caller, as gno refunds whoever frees them.
 func closeEnded(world string, r rental) {
-	forget(world, r)
-	chain.Emit("Close", "world", world, "payer", r.payer.String())
-}
-
-// forget deletes a rental: its payment leaves the held total, and the world and
-// its payer's list no longer name it.
-func forget(world string, r rental) {
 	held -= r.paid()
 	rentals.Remove(world)
 	var rest []string
@@ -200,11 +196,14 @@ func forget(world string, r rental) {
 		}
 	}
 	setWorlds(r.payer, rest)
+	chain.Emit("Close", "world", world, "payer", r.payer.String())
 }
 
-// Takedown removes a live satellite after the report it answers, and refunds
+// Takedown ends a live satellite now, after the report it answers, and refunds
 // its payer the whole days not yet begun, at the price that rental paid; the
 // day under way counts as begun (D12), so a rental's last day refunds nothing.
+// The rental stays, ended, for the days begun, so whoever closes it, the payer
+// included, gets its storage deposit back, never the one taking it down (F5042).
 // The owner or the operator only.
 func Takedown(cur realm, world, report string) {
 	by := cur.Previous().Address()
@@ -219,8 +218,11 @@ func Takedown(cur realm, world, report string) {
 	if !ok {
 		panic("no live satellite on this world")
 	}
-	refund := (r.days - (now-r.start)/day - 1) * r.price
-	forget(world, r)
+	begun := (now-r.start)/day + 1
+	refund := (r.days - begun) * r.price
+	held -= refund
+	r.start, r.days = now-begun*day, begun // it ends now
+	rentals.Set(world, r.encode())
 	banker.NewBanker(banker.BankerTypeRealmSend, cur).SendCoins(cur.Address(), r.payer, coins(refund))
 	chain.Emit("Takedown", "world", world, "payer", r.payer.String(), "by", by.String(), "report", report,
 		"refund", strconv.Itoa(refund))

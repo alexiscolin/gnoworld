@@ -45,8 +45,9 @@ func TestPauseLeavesCloseAndTakedown(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(mod))
 	Takedown(cross(cur), "venus", "r1")
 	uassert.Equal(t, p0, bal(alice))
-	uassert.Equal(t, 0, rentals.Size())
-	uassert.Equal(t, 0, held)
+	_, _, _, ok := Rental("venus")
+	uassert.False(t, ok)
+	uassert.Equal(t, 2*p0, held) // venus's two days begun, until it is closed
 }
 
 // A rental keeps the price it paid: a later price changes no refund.
@@ -63,7 +64,7 @@ func TestTakedownRefundsAtThePriceTheRentalPaid(cur realm, t *testing.T) {
 	Takedown(cross(cur), "mars", "r1")
 	uassert.Equal(t, 1, bal(alice))
 	uassert.Equal(t, 2, bal(self))
-	uassert.Equal(t, 0, held)
+	uassert.Equal(t, 2, held) // the two days begun, at the price paid
 }
 
 // A close takes out of the held total what the rental paid, not today's price.
@@ -204,10 +205,13 @@ func TestWithdrawNeverTakesHeldPayments(cur realm, t *testing.T) {
 	uassert.Equal(t, 3*p0, bal(self))
 	uassert.AbortsWithMessage(t, cur, "withdraw 1 to 0 ugnot", func() { Withdraw(cross(cur), carol, 1) })
 
-	// Day two has begun: the takedown refunds one day, and two are earned.
+	// Day two has begun: the takedown refunds one day, and two are earned once
+	// the rental it leaves ended is closed.
 	at(t0 + oneDay)
 	Takedown(cross(cur), "mars", "r1")
 	uassert.Equal(t, p0, bal(alice))
+	uassert.AbortsWithMessage(t, cur, "withdraw 1 to 0 ugnot", func() { Withdraw(cross(cur), carol, 1) })
+	Close(cross(cur), "mars")
 	Withdraw(cross(cur), carol, 2*p0)
 	uassert.Equal(t, 0, bal(self))
 	uassert.Equal(t, 2*p0+5, bal(carol))
