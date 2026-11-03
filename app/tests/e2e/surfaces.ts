@@ -10,21 +10,25 @@ export interface Core {
   readonly luma: number;
 }
 
-// The mean colour and luma of a disc's brightest 2%: a glowing world's hottest cores.
+// The mean colour and luma of the brightest `share` of `points`.
+function brightestOf(points: readonly (readonly [number, number])[], share: number): Core {
+  const { image, luma, rgbAt } = Reflect.get(globalThis, "__pixels") as Tools;
+  const sorted = [...points].sort(([ax, ay], [bx, by]) => luma(image, bx, by) - luma(image, ax, ay));
+  const top = sorted.slice(0, Math.max(1, Math.round(sorted.length * share)));
+  const sum = top.reduce<[number, number, number, number]>(
+    (total, [x, y]) => {
+      const [red, green, blue] = rgbAt(image, x, y);
+      return [total[0] + red, total[1] + green, total[2] + blue, total[3] + luma(image, x, y)];
+    },
+    [0, 0, 0, 0],
+  );
+  return { colour: [sum[0] / top.length, sum[1] / top.length, sum[2] / top.length], luma: sum[3] / top.length };
+}
+
+// A disc's brightest 2%: a glowing world's hottest cores.
 const coresOf = (discs: readonly Circle[]): Core[] => {
-  const { image, luma, rgbAt, inside } = Reflect.get(globalThis, "__pixels") as Tools;
-  return discs.map((disc) => {
-    const points = inside(disc, 0.95).sort(([ax, ay], [bx, by]) => luma(image, bx, by) - luma(image, ax, ay));
-    const top = points.slice(0, Math.max(1, Math.round(points.length * 0.02)));
-    const sum = top.reduce<[number, number, number, number]>(
-      (total, [x, y]) => {
-        const [red, green, blue] = rgbAt(image, x, y);
-        return [total[0] + red, total[1] + green, total[2] + blue, total[3] + luma(image, x, y)];
-      },
-      [0, 0, 0, 0],
-    );
-    return { colour: [sum[0] / top.length, sum[1] / top.length, sum[2] / top.length], luma: sum[3] / top.length };
-  });
+  const { inside } = Reflect.get(globalThis, "__pixels") as Tools;
+  return discs.map((disc) => brightestOf(inside(disc, 0.95), 0.02));
 };
 
 // The well-lit ground (right of 0.15 of the radius, inside 0.85): its 0.5th percentile luma and its median.
@@ -89,7 +93,7 @@ const rowsOf = (discs: readonly Circle[]) => {
 };
 
 export const cores = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Core[]> =>
-  reading(page, [picture], [coresOf, discs]);
+  reading(page, [picture], [coresOf, discs, String(brightestOf)]);
 export const darkest = (page: Page, picture: Buffer, discs: readonly Circle[]) =>
   reading(page, [picture], [darkestOf, discs]);
 export const lightness = (page: Page, pictures: readonly [Buffer, Buffer], discs: readonly Circle[]) =>
