@@ -188,3 +188,160 @@ test.describe("a reader who came back", () => {
     await expect(list.getByRole("link", { name: "Bubble" })).toBeVisible();
   });
 });
+
+// The labels' part (ADR-0003, 2b and 2e): "Start here" in the Earth's label, the labels as doors, the larger labels.
+
+const earthLabel = (page: Page) => page.locator("[data-labels] [data-world='earth']");
+const opened = (label: ReturnType<Page["locator"]>) =>
+  label.evaluate((element) => getComputedStyle(element, "::before").content);
+// A world's label the layout shows, the one the pointer reaches at its middle, held by the world it names: a hidden one stands at opacity 0,
+// which Playwright counts as visible, and the shown ones change as the eye sways, so "the first shown" names another label at each reading.
+async function shownWorld(page: Page) {
+  const reached = () =>
+    page.evaluate(() => {
+      const labels = [
+        ...document.querySelectorAll<HTMLElement>("[data-labels] [data-world]:not([data-world='earth'])"),
+      ];
+      const found = labels.find((label) => {
+        if (label.style.opacity !== "1") return false;
+        const { left, top, width, height } = label.getBoundingClientRect();
+        return document.elementFromPoint(left + width / 2, top + height / 2)?.closest("[data-world]") === label;
+      });
+      return found?.dataset["world"] ?? "";
+    });
+  let world = "";
+  await expect
+    .poll(async () => {
+      world = await reached();
+      return world;
+    }, SLOW)
+    .not.toBe("");
+  return page.locator(`[data-labels] [data-world="${world}"]`);
+}
+
+test.describe("a newcomer's Earth label", () => {
+  test.use({ newcomer: true });
+
+  test("says Start here, the one filled call, enters the Earth at a click, and the return is the video's", async ({
+    page,
+  }) => {
+    await served(page);
+    await arrive(page);
+    await running(page);
+    await landed(page);
+    await expect(earthLabel(page)).toContainText("Start here →", SLOW);
+    await expect(earthLabel(page)).not.toContainText("▲");
+    expect(await filled(explore(page))).toBe(false);
+    // F4509: the Earth's label larger than the others, its call amber with a glow.
+    const start = await earthLabel(page).evaluate((label) => {
+      const other = document.querySelector("[data-labels] [data-world]:not([data-world='earth'])");
+      const probe = document.createElement("i");
+      probe.style.setProperty("color", "var(--color-warm)");
+      document.body.append(probe);
+      const warm = getComputedStyle(probe).color;
+      probe.remove();
+      const [title, , badge] = [...label.children].map((part) => getComputedStyle(part));
+      const size = (part: Element | null | undefined) =>
+        part === null || part === undefined ? 0 : parseFloat(getComputedStyle(part).fontSize);
+      return {
+        larger: parseFloat(title?.fontSize ?? "0") > size(other?.children[0]),
+        warm: badge?.backgroundColor === warm,
+        glow: badge?.boxShadow !== "none",
+      };
+    });
+    expect(start).toEqual({ larger: true, warm: true, glow: true });
+    await page.locator("canvas").evaluate((canvas) => {
+      canvas.style.visibility = "hidden";
+    });
+    await expect(earthLabel(page)).toHaveScreenshot("label-earth-start.png");
+    await page.locator("canvas").evaluate((canvas) => {
+      canvas.style.visibility = "";
+    });
+    // A label moves with the eye on every frame, so it is never still for a click's wait.
+    await earthLabel(page).click({ force: true });
+    await expect(page).toHaveURL(/\/earth$/, SLOW);
+    await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible(SLOW);
+
+    await page.goto(HOME);
+    await hydrated(page);
+    await running(page);
+    await expect(opening(page)).toHaveCount(0);
+    await landed(page);
+    await expect(earthLabel(page)).toContainText("▲ 21% · 130/h", SLOW);
+    await expect(earthLabel(page)).not.toContainText("Start here");
+    expect(await filled(explore(page))).toBe(true);
+    await expect(chat(page)).toBeVisible();
+    await chat(page).click();
+    await expect(page).toHaveURL(/\/earth$/, SLOW);
+    // F4515: the Earth's general room, read with no account asked.
+    await expect(page.locator("#chat")).toContainText("General chat", SLOW);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("sees no Start here after a shared link to a world: a place was entered", async ({ page }) => {
+    await served(page);
+    await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
+    await page.getByRole("link", { name: "Cosmos", exact: true }).click();
+    await expect(earthLabel(page)).toContainText("Earth", SLOW);
+    await expect(earthLabel(page)).not.toContainText("Start here");
+  });
+});
+
+// F4500: on a touch screen nothing hovers, so the first tap opens a label and the second enters.
+test.describe("a reader with a finger", () => {
+  test.use({ hasTouch: true });
+
+  test("opens a world's label at a first tap, and enters its page at a second", async ({ page }) => {
+    await served(page);
+    await arrive(page);
+    await running(page);
+    await landed(page);
+    const before = page.url();
+    // F4525: a label moves with the eye; each try taps a label the layout shows and the pointer reaches now.
+    let world = await shownWorld(page);
+    await expect
+      .poll(async () => {
+        world = await shownWorld(page);
+        await world.tap({ force: true });
+        return opened(world);
+      }, SLOW)
+      .toContain("Enter →");
+    expect(page.url()).toBe(before);
+    await world.tap({ force: true });
+    await expect.poll(() => page.url(), SLOW).not.toBe(before);
+    expect(new URL(page.url()).pathname).toMatch(/^\/(w|r)\//);
+  });
+});
+
+test.describe("a reader who came back, and the labels", () => {
+  test("sees a world's label open to Enter under the pointer, and enters its page at a click", async ({ page }) => {
+    await served(page);
+    await arrive(page);
+    await running(page);
+    await landed(page);
+    // A label sways with the eye, and one the layout hides takes no pointer: each try lays the pointer on a label it reaches now.
+    await expect
+      .poll(async () => {
+        const world = await shownWorld(page);
+        await world.hover({ force: true });
+        return opened(world);
+      }, SLOW)
+      .toContain("Enter →");
+    const before = page.url();
+    await (await shownWorld(page)).click({ force: true });
+    await expect.poll(() => page.url(), SLOW).not.toBe(before);
+    expect(new URL(page.url()).pathname).toMatch(/^\/(w|r)\//);
+  });
+
+  test("reads the labels larger: names at 16 px, figures at 15 px", async ({ page }) => {
+    await served(page);
+    await arrive(page);
+    await running(page);
+    await landed(page);
+    await expect(earthLabel(page)).toContainText("184 here", SLOW);
+    const sizes = await earthLabel(page).evaluate((element) =>
+      [...element.children].slice(0, 2).map((part) => getComputedStyle(part).fontSize),
+    );
+    expect(sizes).toEqual(["16px", "15px"]);
+  });
+});
