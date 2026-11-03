@@ -1,42 +1,20 @@
 // The rail's worlds (7i): the asks core orders, read from the worlds' file and what is known of them now as the labels read it, each with the
 // page it links to. The order changes at most once a minute, and never while the reader is on the rail (ADR-0002 §1's rail).
-import { chooseRail, daysSince, REALM_PREFIX, type RailAsk, type RailWorld } from "@gnoworld/core";
+import { chooseRail, daysSince, type RailAsk, type RailWorld } from "@gnoworld/core";
 import { createStore } from "zustand/vanilla";
-import { hubWorldOf } from "../../lib/hubWorld.ts";
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { signalsOf } from "../../scene/cosmos/labelAsks.ts";
+import { EARTH, pagesOf, type WorldPlaces } from "./worldPages.ts";
 import type { Known } from "./worldsFeed.ts";
 
 /** The least time between two orders of the rail. */
 export const RAIL_MINUTE = 60_000;
 
-/** Where the rail's links go: the Earth's page, and the hubs the page lists, by their worlds. */
-export interface RailPlaces {
-  readonly earth: string;
-  readonly worlds: readonly {
-    readonly slug: string;
-    readonly path: string;
-    readonly realms?: readonly string[] | undefined;
-  }[];
-}
+/** Where the rail's links go, the places the labels' doors lead to too. */
+export type RailPlaces = WorldPlaces;
 
 export interface RailEntry extends RailWorld {
   readonly href: string;
-}
-
-const EARTH = "earth";
-
-// A world's page: its hub's, else its first realm's view; none for a world with neither. The Earth's is set last: a realm deployed under
-// the namespace earth is a world of that id, and never takes the Earth's link.
-function pagesOf(worlds: readonly CosmosWorld[], { earth, worlds: hubs }: RailPlaces): Map<string, string> {
-  const pages = new Map<string, string>();
-  for (const world of worlds) {
-    const realm = world.realms[0]?.path;
-    if (realm !== undefined) pages.set(world.id, `/r/${realm.slice(REALM_PREFIX.length)}`);
-  }
-  for (const hub of hubs) pages.set(hubWorldOf(hub), hub.path);
-  pages.set(EARTH, earth);
-  return pages;
 }
 
 function asksOf(worlds: readonly CosmosWorld[], signals: LabelSignals, pages: ReadonlyMap<string, string>): RailAsk[] {
