@@ -13,6 +13,8 @@ import styles from "./Opening.module.css";
  * the two. */
 export const OPENING_MOST = 10_500;
 const GNO_LAND = "https://gno.land";
+// Tab moves the focus, and a modifier comes down alone before the key it changes, Shift before a Tab going back: none shortens the words.
+const HOLDING = new Set(["Tab", "Shift", "Control", "Alt", "Meta"]);
 
 interface Ends {
   readonly words: HTMLElement;
@@ -36,7 +38,7 @@ function hearEnds({ words, scene, leave, gone }: Ends, signal: AbortSignal): voi
   window.addEventListener(
     "keydown",
     ({ key }) => {
-      if (key !== "Tab") leave();
+      if (!HOLDING.has(key)) leave();
     },
     listening,
   );

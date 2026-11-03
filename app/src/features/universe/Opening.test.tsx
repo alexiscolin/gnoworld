@@ -100,10 +100,24 @@ describe("the opening's end", () => {
     const { words } = opened("loading");
     act(() => {
       document.body.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Tab" }));
-      document.body.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Tab", shiftKey: true }));
     });
     expect(left(words())).toBe(false);
   });
+
+  // F4519: a browser sends the modifier's own keydown before the key it changes: Shift then Tab, as a keyboard goes back.
+  it.each(["Shift", "Control", "Alt", "Meta"])(
+    "keeps the words at %s pressed alone, as before a Tab it changes",
+    (key) => {
+      const { words } = opened("loading");
+      act(() => {
+        document.body.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key }));
+        document.body.dispatchEvent(
+          new KeyboardEvent("keydown", { bubbles: true, key: "Tab", shiftKey: key === "Shift" }),
+        );
+      });
+      expect(left(words())).toBe(false);
+    },
+  );
 
   // F4520: the words' observer of the canvas lets go as they leave.
   it("lets the canvas go as the words leave", () => {
