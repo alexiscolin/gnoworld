@@ -115,6 +115,11 @@ test("draws gnoswap's Plan with a name under each world, names one at a click, a
     expect(at.y).toBeGreaterThan(body.y + body.radius - 2);
     expect(at.y).toBeLessThan(body.y + body.radius + 24);
   }
+  // The mock-up's names (7v's design review, F4470): 17 px, in the hero line's grey, #c8d0de.
+  const [style] = await names(page).evaluateAll((all) =>
+    all.slice(0, 1).map((element) => [getComputedStyle(element).fontSize, getComputedStyle(element).color]),
+  );
+  expect(style).toEqual(["17px", "rgb(200, 208, 222)"]);
   const linked = names(page).and(page.locator("[href^='/r/']")).first();
   const href = (await linked.getAttribute("href")) ?? "";
   await linked.click();

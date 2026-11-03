@@ -1,11 +1,13 @@
-/* A Plan's names (7v; the mock-up Alexis approved): under each world, centred on it, in the interface's words and the muted grey; the one
+/* A Plan's names (7v; the mock-up Alexis approved): under each world, centred on it, at the mock-up's 17 px in the hero line's grey; the one
    named at a first click in the text's white, an arrow after it; the design system's warm dot before a world where people are. Over the
    canvas, under the page's text, in the labels' layer and their placement (labels.module.css). */
 @layer components {
   /* The Plan's words, which each name keeps. */
   .plan {
-    color: var(--color-text-muted);
-    font: var(--font-ui);
+    /* raw: the hero line's grey (Hero.module.css), the mock-up's names' (7v's design review, F4470) */
+    color: #c8d0de;
+    /* raw: the mock-up's 17 px names, the hero line's size */
+    font: 400 17px/1.2 var(--family-sans);
   }
 
   .name {
