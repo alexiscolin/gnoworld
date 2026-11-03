@@ -20,8 +20,8 @@ export interface Shore {
   readonly continents: number;
   /** The sea's lift in L* over the ring past it, in the same quarter-radius tile, so the light's fall over the disc counts little: a shelf,
    * 0 to 2% of the radius off a coast over 2% to 6%; a wide halo, 2% to 6% over 6% to 12%. */
-  readonly shelf: number;
-  readonly halo: number;
+  readonly shelf: number | null;
+  readonly halo: number | null;
 }
 // colourKind as the reading page holds it: a function this module imports is a property of the import's binding once compiled, which that
 // page does not have.
@@ -122,7 +122,7 @@ export function added(sum: number[] | undefined, values: readonly number[], weig
   if (sum !== undefined) for (const [at, value] of values.entries()) sum[at] = (sum[at] ?? 0) + weight * value;
 }
 
-// The shelf's and the halo's lifts (Shore), 0 where a ring holds under 50 pixels in tiles holding 20 of it and 20 of the next. A tile
+// The shelf's and the halo's lifts (Shore), none where a ring holds under 50 pixels in tiles holding 20 of it and 20 of the next. A tile
 // holds each ring's count then its summed L*, ring by ring outward.
 function liftsOf(grid: Grid, r: number): Pick<Shore, "shelf" | "halo"> {
   const { image, labAt } = Reflect.get(globalThis, "__pixels") as Tools;
@@ -141,7 +141,7 @@ function liftsOf(grid: Grid, r: number): Pick<Shore, "shelf" | "halo"> {
     const held = [...tiles.values()].filter((tile) => (tile[ring] ?? 0) >= 20 && (tile[ring + 2] ?? 0) >= 20);
     const count = held.reduce((sum, tile) => sum + (tile[ring] ?? 0), 0);
     const beyond = (tile: readonly number[]) => ((tile[ring + 3] ?? 0) / (tile[ring + 2] ?? 1)) * (tile[ring] ?? 0);
-    return count < 50 ? 0 : held.reduce((sum, tile) => sum + (tile[ring + 1] ?? 0) - beyond(tile), 0) / count;
+    return count < 50 ? null : held.reduce((sum, tile) => sum + (tile[ring + 1] ?? 0) - beyond(tile), 0) / count;
   };
   return { shelf: lift(0), halo: lift(2) };
 }

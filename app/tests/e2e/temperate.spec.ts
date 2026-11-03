@@ -16,19 +16,14 @@ const COAST = { jagged: [0.6, 1.6], islands: 0.5 } as const;
 // The sea's lift past a coast, in L*, the worlds' mean (coasts.ts's Shore): no wide halo, the Earth's -1.5 (81e07949: 1.9 to 2.5); a thin
 // shelf (held, 1.9 to 2.6 there; the Earth's view -0.1, its shelves under a pixel at this zoom).
 const SEA = { halo: 1, shelf: 0.5 } as const;
-// Shapes on the classes' view without clouds (24 worlds a seed, 94 px of radius): the smoothed coast over the root of the land, 3.5 for one
-// round piece, the Earth's face 4.3; a tenth of the worlds as gathered (81e07949's tenth 5.4).
-const GATHERED = 4.5;
-// Held (they passed on 81e07949, where the eye's face, cut by the night, spread the largest piece's share from 0.40 to 0.98): a tenth an
-// archipelago of eight pieces, the largest piece's spread, several continents of a size on a sixth, 7b6's land and sea (F4243).
-const HELD = {
-  pieces: 8,
-  archipelagos: 0.1,
-  largest: [0.45, 0.85],
-  several: 1 / 6,
-  land: [0.3, 0.6],
-  allSea: 0.05,
-} as const;
+// Shapes on the classes' view without clouds, each world lit from the eye (its whole face; 24 worlds a seed, 94 px of radius): the largest
+// piece's share of the land, 81e07949's median 0.76 and tenth 0.38 (its "one shape"); no longer near it, small on a tenth, whole on another.
+const LARGEST = { median: 0.68, low: 0.33, high: 0.85 } as const;
+// The drawn land follows the seed's (1 - sea): the slope of one on the other 0.46 on 81e07949, its mean 0.053 under the seeds'.
+const FOLLOWS = { slope: 0.6, mean: 0.04 } as const;
+// Held there: one piece of 0.9 on a tenth, several continents of a size (the second 0.4 of the first) on a sixth, an archipelago of
+// eight pieces on a tenth, 7b6's land and sea (F4243), no world all sea.
+const HELD = { whole: 0.9, families: [0.1, 1 / 6, 0.1], pieces: 8, land: [0.3, 0.6], allSea: 0.05 } as const;
 // Land by latitude from its hue and greenness alone (a disc's light falls toward its poles; the Earth's map is unlit): the middle band (40
 // to 60 degrees) greener than the tropics (15 to 35), the Earth's map 21.4 degrees, a third at the median world (81e07949: -5.4).
 const GREENER = 7;
@@ -87,17 +82,21 @@ async function earthOf(page: Page): Promise<Earth> {
 
 /** The classes' view of temperate worlds at three seeds, without clouds: 72 worlds, each with its place, its pole, its surface and its
  * minor's share. */
-async function seventyTwo(page: Page) {
+async function seventyTwo(page: Page, light = "") {
   const views: { shot: Buffer; places: Circle[]; poles: Pole[]; surfaces: Surface[]; minors: number[] }[] = [];
   for (let seed = 0; seed < VIEWS; seed += 1) {
-    await open(page, `?view=class24&world=${String(WORLD)}&clouds=off&seed=${String(seed)}`);
-    views.push({
+    await open(page, `?view=class24&world=${String(WORLD)}&clouds=off${light}&seed=${String(seed)}`);
+    const view = {
       shot: await picture(page),
       places: await circles(page),
       poles: await askLab<Pole[]>(page, "poles"),
       surfaces: await askLab<Surface[]>(page, "surfaces"),
       minors: await askLab<number[]>(page, "minors"),
-    });
+    };
+    expect([view.poles.length, view.surfaces.length, view.minors.length], "a pole, a surface, a minor a world").toEqual(
+      Array.from({ length: 3 }, () => view.places.length),
+    );
+    views.push(view);
   }
   return views;
 }
@@ -110,7 +109,7 @@ const climatesOf = async (page: Page) =>
           await climatesOn(
             page,
             shot,
-            places.map((place, at) => [place, poles[at] ?? [0, 1, 0]] as const),
+            places.map((place, at) => [place, poles[at] ?? [0, 0, 0]] as const),
           )
         ).map((climate, at) => ({ climate, caps: surfaces[at]?.caps ?? 0, minor: minors[at] ?? 0 })),
       ),
@@ -144,13 +143,16 @@ test.describe("temperate worlds varied and real at the coast", () => {
             0.5,
           ) / earth.shore.jagged,
         islands: quantile(per, 0.5) / (earth.shore.islands / Math.max(earth.shore.continents, 1)),
-        halo: mean(shores.map(({ halo }) => halo)),
-        shelf: mean(shores.map(({ shelf }) => shelf)),
+        halo: mean(shores.flatMap(({ halo }) => halo ?? [])),
+        shelf: mean(shores.flatMap(({ shelf }) => shelf ?? [])),
       };
       test
         .info()
         .annotations.push({ type: "coasts", description: JSON.stringify({ earth: earth.shore, read, shores }) });
       expect(shores, "worlds read").toHaveLength(PER_PART);
+      expect(shores.filter(({ halo }) => halo !== null).length, "seas read near a coast").toBeGreaterThanOrEqual(
+        PER_PART / 2,
+      );
       expect(read.jagged, "jagged as the Earth's").toBeGreaterThanOrEqual(COAST.jagged[0]);
       expect(read.jagged, "a coast, not speckle").toBeLessThanOrEqual(COAST.jagged[1]);
       expect(read.islands, "islands off its continents").toBeGreaterThanOrEqual(COAST.islands);
@@ -172,28 +174,40 @@ test.describe("temperate worlds varied and real at the coast", () => {
     page,
   }) => {
     const earth = await earthOf(page);
-    const shores = (
-      await Promise.all((await seventyTwo(page)).map(({ shot, places }) => shoresOn(page, shot, places)))
-    ).flat();
-    const [broken, largest] = [shores.map((shore) => shore.broken), shores.map(({ pieces }) => pieces[0] ?? 0)];
+    const views = await seventyTwo(page, "&light=front");
+    const shores = (await Promise.all(views.map(({ shot, places }) => shoresOn(page, shot, places)))).flat();
+    const seas = views.flatMap(({ surfaces }) => surfaces.map(({ sea }) => 1 - sea));
+    const largest = shores.map(({ pieces }) => pieces[0] ?? 0);
     const share = (count: number) => count / shores.length;
+    const drawn = shores.map((shore) => shore.share);
+    const mean = (values: readonly number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    const spread = (values: readonly number[]) => mean(values.map((value) => (value - mean(values)) ** 2));
     const read = {
-      gathered: quantile(broken, 0.1),
-      archipelagos: share(shores.filter(({ pieces }) => pieces.length >= HELD.pieces).length),
-      largest: [quantile(largest, 0.1), quantile(largest, 0.9)],
-      several: share(shores.filter(({ pieces: [first = 0, second = 0] }) => second >= 0.4 * first).length),
-      land: quantile(
-        shores.map((shore) => shore.share),
-        0.5,
-      ),
+      largest: [quantile(largest, 0.1), quantile(largest, 0.5), quantile(largest, 0.9)],
+      slope:
+        (correlation(seas.map((sea, at) => [sea, drawn[at] ?? 0] as const)) * Math.sqrt(spread(drawn))) /
+        Math.sqrt(spread(seas)),
+      mean: mean(drawn) - mean(seas),
+      families: [
+        share(largest.filter((one) => one >= HELD.whole).length),
+        share(shores.filter(({ pieces: [first = 0, second = 0] }) => second >= 0.4 * first).length),
+        share(shores.filter(({ pieces }) => pieces.length >= HELD.pieces).length),
+      ],
+      land: quantile(drawn, 0.5),
     };
-    test.info().annotations.push({ type: "shapes", description: JSON.stringify({ earth: earth.shore, read, shores }) });
+    test
+      .info()
+      .annotations.push({ type: "shapes", description: JSON.stringify({ earth: earth.shore, read, shores, seas }) });
     expect(shores.length, "worlds read").toBeGreaterThanOrEqual(ENOUGH);
-    expect(read.gathered, "gathered as the Earth's face").toBeLessThanOrEqual(GATHERED);
-    expect(read.archipelagos, "archipelagos").toBeGreaterThanOrEqual(HELD.archipelagos);
-    expect(read.largest[0], "a largest piece small on some").toBeLessThanOrEqual(HELD.largest[0]);
-    expect(read.largest[1], "and nearly the whole land on others").toBeGreaterThanOrEqual(HELD.largest[1]);
-    expect(read.several, "several continents of a size").toBeGreaterThanOrEqual(HELD.several);
+    expect(read.largest[1], "the largest piece no longer near one shape").toBeLessThanOrEqual(LARGEST.median);
+    expect(read.largest[0], "small on some").toBeLessThanOrEqual(LARGEST.low);
+    expect(read.largest[2], "nearly the whole land on others").toBeGreaterThanOrEqual(LARGEST.high);
+    expect(read.slope, "the drawn land follows the seed's").toBeGreaterThanOrEqual(FOLLOWS.slope);
+    expect(Math.abs(read.mean), "as much land as the seeds give").toBeLessThanOrEqual(FOLLOWS.mean);
+    for (const [at, family] of read.families.entries())
+      expect(family, `one piece, several, an archipelago: ${String(at)}`).toBeGreaterThanOrEqual(
+        HELD.families[at] ?? 1,
+      );
     expect(read.land, "land").toBeGreaterThanOrEqual(HELD.land[0]);
     expect(read.land, "and sea").toBeLessThanOrEqual(HELD.land[1]);
     for (const [at, shore] of shores.entries())
