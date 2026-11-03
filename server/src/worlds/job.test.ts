@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, INDEXER, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
-import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds } from "./job.ts";
+import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 
 // The worlds job (slice 7, 7c), one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
 // names, and a capped file written beside and renamed over. Every fault leaves the last file whole and is logged by its kind.
@@ -74,7 +74,14 @@ interface Run {
 }
 async function run(
   routes: Routes,
-  extra: { file?: string; now?: number; maxBytes?: number; delayMs?: number; historyMax?: number } = {},
+  extra: {
+    file?: string;
+    now?: number;
+    maxBytes?: number;
+    delayMs?: number;
+    historyMax?: number;
+    trends?: RunOptions["trends"];
+  } = {},
 ): Promise<Run> {
   const file = extra.file ?? fresh();
   const logged: Run["logged"] = [];
@@ -89,6 +96,7 @@ async function run(
     wait: (ms) => Promise.resolve(void waits.push(ms)),
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
     ...(extra.historyMax === undefined ? {} : { historyMax: extra.historyMax }),
+    ...(extra.trends === undefined ? {} : { trends: extra.trends }),
   });
   return { file, logged, chain, outcome, waits };
 }
@@ -817,6 +825,54 @@ describe("the worlds' count, beside their file", () => {
   });
 });
 
+// The ticker's trends (7t) compare a pass with the one before it: the job tells them each file it wrote and the calls it read, realm by
+// realm, and nothing of a pass that wrote nothing, so a silent indexer or a failed write is never a world's gain.
+describe("the trends it tells", () => {
+  const keeper = () => {
+    const told: { worlds: Worlds; read: Map<string, number> }[] = [];
+    const trends: RunOptions["trends"] = {
+      passed: (worlds, read) =>
+        void told.push({ worlds, read: new Map([...read].map(([path, { calls }]) => [path, calls])) }),
+    };
+    return { told, trends };
+  };
+
+  it("tells the file it wrote, and the calls of each realm this pass read, none for a realm it could not read", async () => {
+    const { told, trends } = keeper();
+    const odd = chainRoutes([POOL, POOL1, ROUTER], {
+      indexer: ({ variables }) => (pathOf(variables) === POOL1 ? "{}" : history(3, pathOf(variables))),
+    });
+    const { file } = await run(odd, { trends });
+    expect(told).toHaveLength(1);
+    expect(told[0]?.worlds).toEqual(written(file));
+    expect(told[0]?.read).toEqual(
+      new Map([
+        [POOL, 3],
+        [ROUTER, 3],
+      ]),
+    );
+  });
+
+  it("tells no read of a pass whose indexer is silent, though it writes the file with the last counts", async () => {
+    const file = fresh();
+    await run(chainRoutes([POOL]), { file });
+    const { told, trends } = keeper();
+    await run(chainRoutes([POOL], { indexer: () => new TypeError("fetch failed") }), { file, now: NOW + 5, trends });
+    expect(told.map(({ read }) => read.size)).toEqual([0]);
+    expect(written(file).worlds[0]?.realms[0]?.calls).toBe(2);
+  });
+
+  it("tells nothing of a pass that wrote nothing: the list down, or the file refused", async () => {
+    const { told, trends } = keeper();
+    await run(chainRoutes([POOL], { paths: () => new TypeError("fetch failed") }), { trends });
+    const file = fresh();
+    mkdirSync(`${file}.tmp`);
+    const { outcome } = await run(chainRoutes([POOL]), { file, trends });
+    expect(outcome).toEqual({ wrote: false, kind: "write" });
+    expect(told).toEqual([]);
+  });
+});
+
 describe("startWorlds", () => {
   const base = { log: () => undefined, send: () => new Promise<Response>(() => undefined) };
   const universe = { id: "onyx", rpc: RPC, indexer: INDEXER };
@@ -851,6 +907,22 @@ describe("startWorlds", () => {
     await until(() => existsSync(file));
     job.stop();
     expect(chain.asked.filter(({ kind }) => kind === "vm/qpaths")).toHaveLength(1);
+  });
+
+  it("keeps the trends of its passes for the ticker's route, each pass against the one before (7t)", async () => {
+    let reads = 0;
+    const counting = chainRoutes([POOL], {
+      indexer: () => {
+        reads += 1;
+        return history(3 * reads, POOL);
+      },
+    });
+    const chain = fakeChain(counting);
+    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20 });
+    expect(job.trends()).toEqual([]);
+    await until(() => job.trends().some(({ kind }) => kind === "trending"));
+    job.stop();
+    expect(job.trends().find(({ kind }) => kind === "trending")).toMatchObject({ world: "gnoswap/pool", calls: 3 });
   });
 
   it("runs another pass after the period, once the first has ended", async () => {

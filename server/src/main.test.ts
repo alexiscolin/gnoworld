@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
-import { Presence } from "@gnoworld/schemas/indexer";
+import { Presence, Trends } from "@gnoworld/schemas/indexer";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet } from "./testing/signer.ts";
@@ -519,6 +519,16 @@ describe("the server's process", { timeout: 30_000 }, () => {
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
+  });
+
+  it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
+    for (const env of [settings(), { ...settings(), DATABASE: ":memory:" }]) {
+      const port = await listening(start(env));
+      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/trends`);
+      expect(answer.status).toBe(200);
+      expect(answer.headers.get("cache-control")).toBe("public, max-age=60");
+      expect(Trends.parse(await answer.json())).toEqual({ items: [] });
+    }
   });
 
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {

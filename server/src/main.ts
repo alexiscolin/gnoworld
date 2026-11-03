@@ -17,6 +17,7 @@ import { defaultRpc, defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 import { startWorlds } from "./worlds/job.ts";
+import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
 
 const FLAG = "--disallow-code-generation-from-strings";
@@ -72,6 +73,11 @@ const chat = startChat(
 );
 app.route("/api/activity", chat.activity);
 if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
+// The home's ticker's trends (7t): the worlds job's last passes and who is here, a few items; none without either, never a 404.
+app.route(
+  "/api/trends",
+  trendsRoutes({ chain: worlds?.trends ?? (() => []), presence: chat.presenceNow, now: Date.now }),
+);
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);

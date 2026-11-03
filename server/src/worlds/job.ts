@@ -20,6 +20,7 @@ import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
 import { Failure, kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
+import { makeTrends, type ChainTrend, type TrendKeeper } from "./trends.ts";
 
 interface Universe {
   readonly id: string;
@@ -41,6 +42,8 @@ export interface RunOptions {
   /** The most realms asked of the indexer in one pass. */
   historyMax?: number;
   isStopped?: () => boolean;
+  /** Told each pass that wrote its files: the file, and the calls this pass read (7t's trends). */
+  trends?: Pick<TrendKeeper, "passed">;
 }
 
 export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
@@ -65,6 +68,7 @@ interface Settings {
   readonly maxBytes: number;
   readonly historyMax: number;
   readonly isStopped: () => boolean;
+  readonly trends?: Pick<TrendKeeper, "passed">;
 }
 
 function settingsOf(options: RunOptions): Settings {
@@ -183,7 +187,9 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
       { file: settings.file, text: `${JSON.stringify(file.data)}\n` },
       { file: countFileOf(settings.file), text: `${JSON.stringify(count)}\n` },
     ]);
-    return written ? { wrote: true } : fail("write");
+    if (!written) return fail("write");
+    settings.trends?.passed(file.data, read.histories);
+    return { wrote: true };
   } catch (error) {
     return fail(kindOf(error));
   }
@@ -191,6 +197,8 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
 
 export interface WorldsJob {
   stop: () => void;
+  /** The chain's trends of its passes, each against the one before (7t). */
+  trends: () => readonly ChainTrend[];
 }
 
 // The universe's addresses, or a refusal at start: https on a public name, no user, and an id that is a plain slug.
@@ -204,11 +212,13 @@ function checked(universe: Universe): void {
 export function startWorlds(options: RunOptions & { everyMs?: number }): WorldsJob {
   checked(options.universe);
   const everyMs = options.everyMs ?? EVERY_MS;
-  return repeat({
-    pass: (isStopped) => runWorlds({ ...options, isStopped }),
+  const trends = makeTrends();
+  const job = repeat({
+    pass: (isStopped) => runWorlds({ ...options, isStopped, trends }),
     failed: () => {
       options.log("worlds_failed", { error: "internal" });
     },
     waitMs: () => everyMs,
   });
+  return { stop: job.stop, trends: trends.chain };
 }
