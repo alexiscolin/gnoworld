@@ -11,6 +11,10 @@ export const LABELS_MOST = 8;
 export const FAR_MOST = 3;
 export const NAME_MOST = 24;
 
+/** The page's rail (7i), at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (frame 4: x 1,585
+ * at 1,728 px, 7h2's measure). The labels keep it and their air clear; the rail takes its width from it. */
+export const RAIL = { from: 900, footprint: 143 } as const;
+
 const UNCHARTED = "Uncharted signal";
 const GO_AND_LOOK = "go and look";
 

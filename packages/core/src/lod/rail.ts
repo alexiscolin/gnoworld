@@ -3,8 +3,10 @@
 // each world once, 25 at most. Its order holds: a world moves above one shown above it only once it is clearly ahead.
 import { mostPopular, titleOf, type LabelAsk } from "./labels.ts";
 
-// What the rail weighs a world by when nobody is here: the callers the worlds' file counts (core's gauges).
+// What the rail weighs a world by when nobody is here: the callers the worlds' file counts (core's gauges); and its footprint, which the
+// labels keep clear (their module, which the labels' chunk and the rail's share).
 export { callersIn } from "../planet/gauges.ts";
+export { RAIL } from "./labels.ts";
 
 /** The most worlds the rail shows, the Earth one of them, and the most rising worlds and seeds among them. */
 export const RAIL_MOST = 25;
