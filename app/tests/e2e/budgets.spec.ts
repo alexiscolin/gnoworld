@@ -34,44 +34,47 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk.
-const SCENE_JS = 156 * 1024;
+// 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk. Lowered to
+// 158,208 B once the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
+const SCENE_JS = 158_208;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-const COSMOS_JS = 16 * 1024; // Again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02).
+// 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03).
+const COSMOS_JS = 16.5 * 1024;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
 const WHOLE_JS = 5 * 1024;
-// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks for
-// once its cosmos shows, their first caps a tenth or so over what they weighed when set (7d7: 6,771 B and 3,492 B). The view at rest's is
-// 10 KiB since 7p judges the postcards in depth in the search, 10,066 B on 7d9's tree (Alexis, 2026-11-03, docs/decisions.md).
+// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks once
+// its cosmos shows, first capped a tenth or so over their weight (7d7: 6,771 B and 3,492 B). The view at rest's: 10 KiB since 7p's depth,
+// 10.5 KiB with 7v's views (Alexis, 2026-11-03, docs/decisions.md).
 const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const REST_JS = 10 * 1024;
+const REST_JS = 10.5 * 1024;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
 const NEBULAE_JS = 3.75 * 1024;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them.
-// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth.
+// Its first value is the part's (the chief, 2026-11-03): its size once the review's fixes landed, 5,415 B, and about a tenth; 6.5 KiB with
+// 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 5960;
+const LABELS_JS = 6.5 * 1024;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
 // cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
 // camera-controls' own warning, which no minifier renames.
 const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
 const FLIGHTS_JS = 18 * 1024;
 const FLIGHTS_MARK = "camera-controls:";
-// A system's arrival (7d3): its search, a chunk the view at rest's asks the first time a system is, which no page asks yet (7g2's flights
-// will). It is found by name, from the scene's chunk to the cosmos's to the view at rest's, which names it. Its first cap is its size when
-// set, 1,518 B (1,526 B merged with slice-7), and about a tenth (the chief, 2026-11-03).
+// A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
+// chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
+// (Alexis, 2026-11-03).
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const ARRIVAL_JS = 1680;
-// The view at rest in depth (7p): its far bodies and the home's rocks, found in a chunk the view at rest's names; the rocks drawn by one the
-// labels' name, its program (an attribute no minifier renames) in no chunk the cosmos or the scene loads first. First caps: their sizes, and
-// about a tenth: 1,204 B for the rocks; 2,534 B for the depth with its review's fixes, the rocks' near one and cluster (7p).
+const ARRIVAL_JS = 2 * 1024;
+// The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
+// program (an attribute no minifier renames) in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B);
+// the depth 3.5 KiB with the dynamic views' rocks and the Earth's projects (7v; Alexis, 2026-11-03).
 const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 2790;
+const DEEP_JS = 3.5 * 1024;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
