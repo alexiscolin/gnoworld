@@ -1495,7 +1495,12 @@ describe("flights between places (7g)", () => {
   });
 });
 
-describe("the rail (7i)", () => {
+// Each test runs the scene's start, the worlds' read and the rail's chunk to their end, several times for some: 20 s, not 5, at the gate's load.
+describe("the rail (7i)", { timeout: 20_000 }, () => {
+  // The rail's chunk, loaded once here as the labels' signals are: in the browser it comes from the cache, not from a transform.
+  beforeAll(async () => {
+    await import("./Rail.tsx");
+  });
   const page = () => ({ open: vi.fn<(href: string) => void>(), places: { earth: "/earth", worlds: [] } });
   const railLinks = () => all(document.body, "nav[aria-label='Worlds'] li a").map((link) => link.textContent);
   // The rail's chunk comes once the cosmos runs: the scene, its worlds, then the chunk the page asks for them.
