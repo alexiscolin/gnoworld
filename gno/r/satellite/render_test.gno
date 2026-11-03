@@ -24,13 +24,11 @@ func line(world, text, until string) string {
 	return "- **" + sanitize.InlineText(world) + "**: " + sanitize.InlineText(text) + ", until " + until + " UTC\n"
 }
 
-// listed is the open home page listing ws, each rented one day at t0 with the text "t" + its id.
-func listed(ws []string) string {
-	s := open
-	for _, w := range ws {
-		s += line(w, "t"+w, "2027-01-16 08:00")
-	}
-	return s
+// plain is the home page's line of a world rented one day at t0 with the text
+// "t" + its id: letters only, which need no escaping (sanitize is costly, and
+// the mutation check runs every test once a mutant).
+func plain(world string) string {
+	return "- **" + world + "**: t" + world + ", until 2027-01-16 08:00 UTC\n"
 }
 
 func TestRenderHome(cur realm, t *testing.T) {
@@ -118,51 +116,42 @@ func TestRenderUnknownPathIsAFixedLine(t *testing.T) {
 	}
 }
 
-// Ten satellites a page, in the worlds' order; the links follow.
+// Ten rentals a page, in the worlds' order, the links after them: a page's
+// edges at nine, ten and eleven rentals, then twenty and twenty-one.
 func TestRenderPages(cur realm, t *testing.T) {
 	fresh()
 	ws := worlds(21)
-	who := []address{alice, bob, carol, adm, mod, self, chain.PackageAddress("gno.land/r/test/dave")}
+	lines := make([]string, len(ws))
 	for i, w := range ws {
-		testing.SetRealm(testing.NewUserRealm(who[i/3]))
-		pay(p0)
-		Rent(cross(cur), w, "t"+w, 1)
+		lines[i] = plain(w)
 	}
-	uassert.Equal(t, listed(ws[:10])+next+"2)\n", Render(""))
-	uassert.Equal(t, listed(ws[:10])+next+"2)\n", Render("?page=1"))
-	uassert.Equal(t, listed(ws[10:20])+prev+"1)\n"+next+"3)\n", Render("?page=2"))
-	uassert.Equal(t, listed(ws[20:])+prev+"2)\n", Render("?page=3"))
-	uassert.Equal(t, "No such page.\n", Render("?page=4"))
-
-	// Twenty: the second page is the last, the third empty, the fourth none.
-	testing.SetRealm(testing.NewUserRealm(mod))
-	Takedown(cross(cur), ws[20], "r1")
-	uassert.Equal(t, listed(ws[10:20])+prev+"1)\n", Render("?page=2"))
-	uassert.Equal(t, open+"None on this page.\n"+prev+"2)\n", Render("?page=3"))
-	uassert.Equal(t, "No such page.\n", Render("?page=4"))
-}
-
-// Nine, ten and eleven rentals: the edges of a page.
-func TestRenderPageEdges(cur realm, t *testing.T) {
-	fresh()
-	ws := worlds(11)
-	who := []address{alice, bob, carol, adm}
+	page := func(from, to int) string { return open + strings.Join(lines[from:to], "") }
+	who := []address{alice, bob, carol, adm, mod, self, chain.PackageAddress("gno.land/r/test/dave")}
 	for i, w := range ws {
 		testing.SetRealm(testing.NewUserRealm(who[i/3]))
 		pay(p0)
 		Rent(cross(cur), w, "t"+w, 1)
 		switch i + 1 {
 		case 9:
-			uassert.Equal(t, listed(ws[:9]), Render(""))
+			uassert.Equal(t, page(0, 9), Render(""))
 			uassert.Equal(t, "No such page.\n", Render("?page=2"))
 		case 10:
-			uassert.Equal(t, listed(ws[:10]), Render(""))
+			uassert.Equal(t, page(0, 10), Render(""))
 			uassert.Equal(t, open+"None on this page.\n"+prev+"1)\n", Render("?page=2"))
 			uassert.Equal(t, "No such page.\n", Render("?page=3"))
 		case 11:
-			uassert.Equal(t, listed(ws[:10])+next+"2)\n", Render(""))
-			uassert.Equal(t, listed(ws[10:])+prev+"1)\n", Render("?page=2"))
+			uassert.Equal(t, page(0, 10)+next+"2)\n", Render(""))
+			uassert.Equal(t, page(10, 11)+prev+"1)\n", Render("?page=2"))
 			uassert.Equal(t, "No such page.\n", Render("?page=10"))
+		case 20: // the second page is the last, the third empty, the fourth none
+			uassert.Equal(t, page(10, 20)+prev+"1)\n", Render("?page=2"))
+			uassert.Equal(t, open+"None on this page.\n"+prev+"2)\n", Render("?page=3"))
+			uassert.Equal(t, "No such page.\n", Render("?page=4"))
+		case 21:
+			uassert.Equal(t, page(0, 10)+next+"2)\n", Render("?page=1"))
+			uassert.Equal(t, page(10, 20)+prev+"1)\n"+next+"3)\n", Render("?page=2"))
+			uassert.Equal(t, page(20, 21)+prev+"2)\n", Render("?page=3"))
+			uassert.Equal(t, "No such page.\n", Render("?page=4"))
 		}
 	}
 }
