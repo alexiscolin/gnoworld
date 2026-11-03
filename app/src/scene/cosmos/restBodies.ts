@@ -12,6 +12,7 @@ import {
   smoothstep,
   type Deep,
   type Drawn,
+  type Planned,
   type Rock,
   postcardOf,
   screenRadius,
@@ -34,7 +35,7 @@ const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
 /** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, its main light's system, and, once
  * found, the real worlds of other nearby systems the view at rest draws for depth and the home's rocks (7p), and the Earth's projects
- * where they stand clear (7v). */
+ * where they stand clear (7v); a Plan's, for the labels' chunk to draw. */
 export interface Shown {
   readonly view: RestView;
   readonly postcards: ReadonlyMap<number, Postcard>;
@@ -42,6 +43,7 @@ export interface Shown {
   readonly deep?: readonly Deep[];
   readonly earth?: StarSystem | undefined;
   readonly rocks?: readonly Rock[];
+  readonly plan?: Planned | undefined;
 }
 
 /** The close world's system, by its index, as drawn wherever the eye stands: held still, so none of its worlds jumps to its orbit's place
@@ -90,6 +92,22 @@ export const postcardsOf = (
     }),
   );
 
+// Each postcard's worlds, at their drawn size, judged by their own: a world's own size is its system's, for a Plan draws its worlds at a
+// map's scale (7v), a postcard at its own; the Earth's projects stand in no system of the file. ponytail: a Plan's twelve looked up among
+// its system's worlds, 200 at most a system.
+function offerPostcards(
+  systems: readonly StarSystem[],
+  postcards: ReadonlyMap<number, Postcard>,
+  offer: (system: StarSystem, world: Orbiter, own?: number) => void,
+): void {
+  for (const [index, card] of postcards) {
+    const owned = new Map(systems[index]?.worlds.map((world) => [world.id, world.radius]));
+    drawnOf(card).forEach((world, at) => {
+      offer(card.system, world, owned.get(world.id) ?? card.worlds[at]?.radius);
+    });
+  }
+}
+
 /** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards', its close world's system's, its depth's, and the
  * Earth's projects that stand clear (7v). */
 function restBodies(
@@ -117,10 +135,7 @@ function restBodies(
   };
   // A postcard's bodies stand spread round its star, in its plane as drawn, each at its drawn size (7p), from the eye at rest: the same
   // view, the same spread. The close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
-  for (const card of postcards.values())
-    drawnOf(card).forEach((world, at) => {
-      offer(card.system, world, card.worlds[at]?.radius);
-    });
+  offerPostcards(systems, postcards, offer);
   if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
   for (const { system, world } of deep) {
     const held = systems[system];
@@ -188,8 +203,9 @@ export function drawnFrom(
   sight: { eye: Point; focal: number; resting: Point },
 ) {
   const { view, postcards, index: main, deep = [], earth } = shown;
-  // The home's rocks stand in space wherever the eye is, for the labels' chunk to draw (7p); a system's arrival has none.
+  // The rocks stand in space wherever the eye is, for the labels' chunk to draw (7p), and a Plan's ellipses and names (7v).
   drawn.rocks = shown.rocks ?? [];
+  drawn.plan = shown.plan;
   const [{ eye }, { resting }] = [view, sight];
   const still = stillOf(systems, view);
   // At an arrival its own star alone is needed: any other keeps the halo its distance leaves it.

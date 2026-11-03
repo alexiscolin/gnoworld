@@ -72,8 +72,9 @@ const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r
 const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
 
-/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters. */
-const RealmPath = z
+/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters; the
+ * cosmos's Plan links a world to its realm's view only by such a path (7v). */
+export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 

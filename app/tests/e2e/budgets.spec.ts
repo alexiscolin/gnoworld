@@ -79,6 +79,13 @@ const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
 const ROCKS_MARK = "aRock";
+// A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
+// which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps: their
+// sizes when set, 2,019 B and 1,888 B, and about a tenth.
+const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
+const PLAN_JS = 2220;
+const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
+const ORBITS_JS = 2080;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
@@ -267,34 +274,60 @@ async function homeScene(page: Page): Promise<string> {
   return (await asked).url();
 }
 
-// A late chunk the view at rest's names by `named`, within `cap` apart from the view at rest's, the cosmos's and the scene's.
-async function restLateWithin(page: Page, named: RegExp, cap: number): Promise<void> {
+// A late chunk the view at rest's names by `named`, within `cap` apart from the view at rest's, the cosmos's and the scene's, and the
+// labels' where `labels` says so.
+async function restLateWithin(
+  page: Page,
+  { named, cap, labels = false }: { named: RegExp; cap: number; labels?: boolean },
+): Promise<void> {
   const scene = await homeScene(page);
   const cosmos = await namedIn(page, scene, COSMOS_NAMED);
   const rest = await namedIn(page, cosmos, REST_NAMED);
-  const there = (await Promise.all([scene, cosmos, rest].map((url) => closureOf(page, url)))).flat();
+  const before = labels ? [scene, cosmos, rest, await namedIn(page, scene, LABELS_NAMED)] : [scene, cosmos, rest];
+  const there = (await Promise.all(before.map((url) => closureOf(page, url)))).flat();
   expect(await compressed(page, await ownOf(page, await namedIn(page, rest, named), there))).toBeLessThanOrEqual(cap);
+}
+
+// The chunks the labels' names come after: the scene's, the cosmos's and the labels' own, and all they import.
+async function labelsThere(page: Page) {
+  const scene = await homeScene(page);
+  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
+  const labels = await namedIn(page, scene, LABELS_NAMED);
+  const there = (await Promise.all([scene, cosmos, labels].map((url) => closureOf(page, url)))).flat();
+  return { scene, cosmos, labels, there };
 }
 
 test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, ARRIVAL_NAMED, ARRIVAL_JS);
+  await restLateWithin(page, { named: ARRIVAL_NAMED, cap: ARRIVAL_JS });
 });
 
 test("the view at rest's depth chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, DEEP_NAMED, DEEP_JS);
+  await restLateWithin(page, { named: DEEP_NAMED, cap: DEEP_JS });
+});
+
+test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({
+  page,
+}) => {
+  await restLateWithin(page, { named: PLAN_NAMED, cap: PLAN_JS, labels: true });
+});
+
+test("the Plan's orbits' chunk stays within its cap, apart from the labels', the cosmos's and the scene's", async ({
+  page,
+}) => {
+  const { labels, there } = await labelsThere(page);
+  expect(
+    await compressed(page, await ownOf(page, await namedIn(page, labels, ORBITS_NAMED), there)),
+  ).toBeLessThanOrEqual(ORBITS_JS);
 });
 
 test("the rocks' chunk stays within its cap, apart from the labels', the cosmos's and the scene's, which hold none of it", async ({
   page,
 }) => {
-  const scene = await homeScene(page);
-  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
-  const labels = await namedIn(page, scene, LABELS_NAMED);
-  const there = (await Promise.all([scene, cosmos, labels].map((url) => closureOf(page, url)))).flat();
+  const { scene, cosmos, labels, there } = await labelsThere(page);
   const rocks = await namedIn(page, labels, ROCKS_NAMED);
   expect(await compressed(page, await ownOf(page, rocks, there))).toBeLessThanOrEqual(ROCKS_JS);
   for (const url of [...(await closureOf(page, scene)), ...(await closureOf(page, cosmos))])

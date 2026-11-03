@@ -17,8 +17,10 @@ import type { Asking, Landing } from "./restArrival.ts";
 import type { PerspectiveCamera } from "three";
 import type { EarthDevice } from "../earth/device.ts";
 
-// A system's arrival is looked for in a chunk of its own, asked the first time a system is: the view at rest's stays within its cap.
+// A system's arrival is looked for in a chunk of its own, asked the first time a system is: the view at rest's stays within its cap; so are
+// the Plans, a system's and the Earth's, in one of their own (7v).
 const loadArrival = () => import("./restArrival.ts");
+const loadPlan = () => import("./restPlan.ts");
 
 interface Spot {
   x: number;
@@ -86,17 +88,27 @@ export class RestEye {
     this.#face(this.#rest);
   }
 
-  /** Comes to the system `asking` names among `systems`, or back to the view at rest with none or a name they do not hold, once its
-   * chunk came; a later ask wins. `came` is told the scene's eye that stands it there, the view at rest's way off it, unless it was told
-   * that already: a new file with the same arrival moves nothing. A chunk that does not come leaves the eye where it is. */
+  /** Comes to what `asking` names among `systems` once its chunk came, in its Plan where asked (the Earth's at rest, 7v), or back to the
+   * view at rest; a later ask wins. `came` is told the scene's eye there, unless it was told that already: a new file with the same arrival
+   * moves nothing. A chunk that does not come leaves the eye where it is. */
   arrive(systems: readonly StarSystem[], asking: Asking, came: (asking: Asking, to: Point) => void): void {
     this.#turn += 1;
-    const [turn, { id }] = [this.#turn, asking];
-    if (id === undefined) this.#come(asking, undefined, came);
+    const [turn, { id, plan }] = [this.#turn, asking];
+    const landed = (landing: Landing | undefined) => {
+      if (turn === this.#turn) this.#come(asking, landing, came);
+    };
+    if (plan)
+      loadPlan().then(
+        ({ planAt }) => {
+          landed(planAt(systems, id));
+        },
+        () => undefined,
+      );
+    else if (id === undefined) this.#come(asking, undefined, came);
     else
       loadArrival().then(
         ({ landingAt }) => {
-          if (turn === this.#turn) this.#come(asking, landingAt(systems, id), came);
+          landed(landingAt(systems, id));
         },
         () => undefined,
       );

@@ -1,0 +1,31 @@
+/* A Plan's names (7v; the mock-up Alexis approved): under each world, centred on it, in the interface's words and the muted grey; the one
+   named at a first click in the text's white, an arrow after it; the design system's warm dot before a world where people are. Over the
+   canvas, under the page's text, in the labels' layer and their placement (labels.module.css). */
+@layer components {
+  /* The Plan's words, which each name keeps. */
+  .plan {
+    color: var(--color-text-muted);
+    font: var(--font-ui);
+  }
+
+  .name {
+    /* raw: the name stands centred on its world's x, which the script writes */
+    translate: -50% 0;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .name[aria-current="true"] {
+    color: var(--color-text);
+  }
+
+  .name[aria-current="true"]::after {
+    content: "→";
+  }
+
+  .name:focus-visible {
+    outline: var(--line-width) solid var(--color-text);
+    /* raw: the focus ring's room off the words */
+    outline-offset: 2px;
+  }
+}

@@ -33,7 +33,9 @@ import {
   offLine,
   onScreen,
   planetSeed,
+  earthPlanOf,
   earthSystemOf,
+  planOf,
   postcardOf,
   restView,
   ROCKS_FROM,
@@ -2934,10 +2936,10 @@ describe("a flight's star (7g)", () => {
 });
 
 describe("a system's arrival (7d3)", () => {
-  // Comes to system `id`: the scene's eye the cosmos asks for, given back to it as the scene's frame would.
-  const arrived = async (scene: ReturnType<typeof made>, id: string | undefined) => {
+  // Comes to system `id`, in its Plan if asked (7v): the scene's eye the cosmos asks for, given back to it as the scene's frame would.
+  const arrived = async (scene: ReturnType<typeof made>, id: string | undefined, plan = false) => {
     const go = vi.fn<(eye: Point) => void>();
-    scene.cosmos.arrive(id, go);
+    scene.cosmos.arrive(id, go, plan);
     await settled();
     const to = go.mock.lastCall?.[0];
     if (to === undefined) throw new Error("no arrival");
@@ -3229,8 +3231,9 @@ describe("a system's arrival (7d3)", () => {
   });
 
   // Alexis, 2026-11-03 ("roches d'ambiance", through the chief): a few rocks at the home's view at rest, decor laid in space, which the
-  // labels' chunk draws from what each look leaves (7p). Alexis, 2026-11-03 (7v): a depth cue of a system's dynamic view too.
-  it("lays a few rocks at Onyx's home and at a system's dynamic view for the labels' chunk to draw", async () => {
+  // labels' chunk draws from what each look leaves (7p). Alexis, 2026-11-03 (7v): a depth cue of a system's dynamic view too; its Plan, a
+  // map, has none.
+  it("lays a few rocks at Onyx's home and at a system's dynamic view for the labels' chunk to draw, and none in its Plan", async () => {
     const scene = made();
     const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
     scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
@@ -3240,11 +3243,54 @@ describe("a system's arrival (7d3)", () => {
     expect(rocks().length).toBeLessThanOrEqual(7);
     await arrived(scene, GNOSWAP);
     expect(rocks().length).toBeGreaterThanOrEqual(1);
+    await arrived(scene, GNOSWAP, true);
+    expect(rocks()).toEqual([]);
   });
 
-  // Alexis, 2026-11-03 (7v): a system's dynamic view, its worlds' grain as at the home's.
+  // Alexis, 2026-11-03 (7v): a system's two views, the dynamic one by default and the Plan seen from above, as the header's switch asks.
   const ownPoints = (scene: ReturnType<typeof made>, system: StarSystem) =>
     pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
+
+  it("comes to gnoswap's Plan when the page asks the Plan: the eye at the Plan's, the Plan's worlds its bodies, no speck", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const system = named(held(ONYX), GNOSWAP);
+    await arrived(scene, GNOSWAP, true);
+    const plan = planOf(system);
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(plan.eye))).toBeLessThan(1e-6);
+    const ids = scene.cosmos.stats().list.map(({ id }) => id);
+    expect(ids.sort()).toEqual(plan.postcard.worlds.map(({ id }) => id).sort());
+    expect(ownPoints(scene, system)).toEqual([]);
+  });
+
+  it("goes from gnoswap's dynamic view to its Plan and back as the page asks, the eye moving to each", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = named(systems, GNOSWAP);
+    const eyeAt = () => new Vector3().copy(scene.cosmos.stats().eye);
+    await arrived(scene, GNOSWAP, true);
+    expect(eyeAt().distanceTo(onStage(planOf(system).eye))).toBeLessThan(1e-6);
+    await arrived(scene, GNOSWAP, false);
+    expect(eyeAt().distanceTo(onStage(arrivalOf(system, systems).eye))).toBeLessThan(1e-6);
+    await arrived(scene, GNOSWAP, true);
+    expect(eyeAt().distanceTo(onStage(planOf(system).eye))).toBeLessThan(1e-6);
+  });
+
+  it("hands the labels' chunk the Plan it draws, its worlds on their orbits named, and none in the dynamic view", async () => {
+    const scene = made();
+    const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
+    scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
+    await shown(scene, ONYX);
+    const system = named(held(ONYX), GNOSWAP);
+    await arrived(scene, GNOSWAP);
+    expect(look.mock.lastCall?.[1].plan).toBeUndefined();
+    await arrived(scene, GNOSWAP, true);
+    const plan = look.mock.lastCall?.[1].plan;
+    expect(plan?.worlds).toEqual(planOf(system).postcard.worlds);
+    expect(plan?.system.place).toEqual(system.place);
+    for (const world of plan?.worlds ?? []) expect(plan?.names.get(world.id)).toBe(world.id.split("/").at(-1));
+  });
 
   // Alexis, 2026-11-03 (7v): the Earth is no namespace; round it turn the projects the team adds by hand (app/data/earthOrbit.json), small
   // bodies by it in the view at rest, its dynamic view; its Plan, the Earth from above, each on its orbit, named and a link to its address.
@@ -3266,6 +3312,23 @@ describe("a system's arrival (7d3)", () => {
     // Past the golden ring, which the globe's Moon runs on: none stands on it.
     for (const world of earthSystemOf(orbiting).worlds)
       expect(world.orbit).toBeGreaterThan(1.5 * ORBIT_RADIUS * EARTH_RADIUS);
+  });
+
+  it("comes to the Earth's Plan at rest when the Plan is asked with no system, its projects named and linked, no rock", async () => {
+    const scene = made();
+    const look = vi.fn<NonNullable<typeof scene.cosmos.labels>["look"]>();
+    scene.cosmos.labels = { list: vi.fn(), look, tick: vi.fn() };
+    await shown(scene, ONYX);
+    await arrived(scene, undefined, true);
+    const plan = earthPlanOf(orbiting);
+    expect(new Vector3().copy(scene.cosmos.stats().eye).distanceTo(onStage(plan.eye))).toBeLessThan(1e-6);
+    const drawn = look.mock.lastCall?.[1].plan;
+    expect(drawn?.worlds).toEqual(plan.postcard.worlds);
+    expect(drawn?.names.get("~earth/gnosh.ai")).toBe("gnosh.ai");
+    expect(drawn?.links.get("~earth/gnosh.ai")).toBe("https://gnosh.ai");
+    expect(look.mock.lastCall?.[1].rocks ?? []).toEqual([]);
+    const { to } = await arrived(scene, undefined, false);
+    expect(to).toEqual(HOME);
   });
 
   // Alexis, 2026-11-03 ("Poussière fine", F3594): at a system's own view too, each speck 2 px across at most, none on a world's path.

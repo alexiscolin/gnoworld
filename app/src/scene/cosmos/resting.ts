@@ -96,7 +96,7 @@ export class Resting {
   }
 
   // The eye moved to `asking`'s arrival: the scene is told, unless it was asked again since, or the cosmos is gone; a dynamic view's rocks
-  // are laid once the depth's chunk comes.
+  // are laid once the depth's chunk comes, a Plan has none.
   readonly #came = (asking: Asking, to: Point): void => {
     if (asking !== this.#asking) return;
     asking.go(to);
@@ -104,7 +104,7 @@ export class Resting {
     this.#viewRocks = [];
     const landing = this.#eye.landing;
     const postcard = landing?.postcards.get(landing.index);
-    if (landing === undefined || postcard === undefined) return;
+    if (landing === undefined || landing.plan !== undefined || postcard === undefined) return;
     loadDeep().then(
       ({ rocksOfView }) => {
         if (this.#eye.landing !== landing) return;
