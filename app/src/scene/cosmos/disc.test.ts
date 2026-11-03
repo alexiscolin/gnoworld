@@ -139,6 +139,29 @@ describe("the disc's caps", () => {
     expect((dots?.geometry.getAttribute("aSize") as BufferAttribute).getX(0)).toBeLessThanOrEqual(BODY_PIXELS / 2);
   });
 
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): the specks beside a postcard's worlds left an orange trail, grains of 3 to 6 px; each is 2 px
+  // across at most, however near. Lit on its star's side by the points' own light (dots.ts), which the picture for Alexis shows.
+  it("draws a grain as fine dust, 2 px across at most however near its star (F3594)", () => {
+    const sizes = [2, 8, 20].map((away) => {
+      const dusty = { ...system(0, 3, false), place: { x: 0, y: 30 - away, z: 0 } };
+      const systems = [{ ...dusty, worlds: dusty.worlds.map((world) => ({ ...world, radius: 0.29 })) }];
+      const sight = sighted(systems, (drawn) => {
+        for (const world of [0, 1, 2]) {
+          drawn.dotSystems[world] = 0;
+          drawn.dotWorlds[world] = world;
+        }
+        drawn.dotCount = 3;
+      });
+      const size = painted(sight).dots?.geometry.getAttribute("aSize") as BufferAttribute | undefined;
+      return [0, 1, 2].map((at) => size?.getX(at) ?? NaN);
+    });
+    // Thin, never gone: a third of a pixel across at the least, as far as its world's light reaches.
+    for (const size of sizes.flat()) {
+      expect(size).toBeGreaterThanOrEqual(1 / 6);
+      expect(size).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("tells a region's glow from a star in what it writes", () => {
     const systems = Array.from({ length: 4 }, (_, at) => ({
       ...system(at, 0, false),

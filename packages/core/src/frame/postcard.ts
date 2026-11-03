@@ -22,9 +22,9 @@ const OFF_STAR = 3;
 const ROUNDING = 1e-9;
 // Of three bodies or more, no two gaps alike within this share: a regular figure reads as drawn on purpose.
 const ALIKE = 0.15;
-// A speck, a world too small for a body, at its own orbit while the bodies are widened: within the body's own width of its ground, and half
-// a unit at the least, it reads as that world's debris, and is not drawn (Alexis's pebbles round Onyx's agents, 2026-11-03). The system
-// turns as one, so what stands clear at rest stays clear.
+// A speck at its own orbit while the bodies are widened: within a body's width of its ground, half a unit at the least, it reads as that
+// world's debris (Alexis's pebbles, 2026-11-03); nor does grain stand on a body's path, its drawn width each side of its orbit, which the
+// planet cleared ("Poussière fine", F3594). The system turns as one, so what stands clear at rest stays clear.
 const SPECK_CLEAR = 0.5;
 
 /** A postcard as drawn: its system, its plane opened towards the eye if need be and turned about the eye's line so no two neighbours stand
@@ -112,13 +112,15 @@ export function postcardWorlds(system: StarSystem, most = POSTCARD_BODIES): Orbi
   return [];
 }
 
-// The specks of `system` that would stand within a body's width, `SPECK_CLEAR` at the least, of the ground of one of `worlds`, in its plane.
-function hiddenOf(system: StarSystem, worlds: readonly Orbiter[]): Set<string> {
+// The specks of `system` that would stand within a body's width, `SPECK_CLEAR` at the least, of the ground of one of `worlds`, in its plane,
+// or, grain, on its path: within its radius as drawn, `depth` its share, of its orbit.
+function hiddenOf(system: StarSystem, worlds: readonly Orbiter[], depth: readonly number[]): Set<string> {
   const bodies = new Set(worlds.map(({ id }) => id));
-  const near = ({ orbit, phase }: Orbiter) =>
-    worlds.some((body) => {
+  const near = ({ orbit, phase, radius }: Orbiter) =>
+    worlds.some((body, at) => {
       const [a, b] = [placeIn({ orbit, phase }, 1), placeIn(body, 1)];
-      return Math.hypot(a.x - b.x, a.y - b.y) - body.radius < Math.max(SPECK_CLEAR, body.radius);
+      const ground = Math.hypot(a.x - b.x, a.y - b.y) - body.radius < Math.max(SPECK_CLEAR, body.radius);
+      return ground || (radius < GRAIN && Math.abs(orbit - body.orbit) < body.radius * (depth[at] ?? 1));
     });
   return new Set(system.worlds.filter((world) => !bodies.has(world.id) && near(world)).map(({ id }) => id));
 }
@@ -142,7 +144,7 @@ export function shapeOf(
 /** `worlds` as a postcard from `sight`: its shape, and the specks it leaves out. */
 export function postcardFrom(system: StarSystem, worlds: readonly Orbiter[], sight: Point | Camera): Postcard {
   const shape = shapeOf(system, worlds, sight);
-  return { ...shape, hidden: hiddenOf(system, shape.worlds) };
+  return { ...shape, hidden: hiddenOf(system, shape.worlds, shape.depth) };
 }
 
 /** `postcard`'s worlds at their drawn size; with `least` 1, at their own size at the least, as a view is judged, so what held at their own

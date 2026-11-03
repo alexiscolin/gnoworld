@@ -77,8 +77,10 @@ const HEART_PIXELS = 60;
 const DOT_LIFT = 0.45;
 const DOT_WARM: readonly [number, number, number] = [1, 0.86, 0.68];
 
-// A point is a speck, half the least body's size at most: a postcard's worlds past its four bodies never read as discs beside them.
+// A point is a speck, half the least body's size at most: a postcard's worlds past its four bodies never read as discs beside them. A grain
+// is fine dust, 2 px across at most (Alexis, "Poussière fine", F3594).
 const SPECK = BODY_PIXELS / 2;
+const DUST = 1;
 const GRAIN_TINT: readonly [number, number, number] = [0.2, 0.11, 0.05];
 
 // A point takes its world's look, in the working space: between the ramp's middle and its top, for a dark world's middle is near black.
@@ -181,8 +183,9 @@ export class Disc {
     const distance = away(system.place, sight.eye);
     const grain = world.radius < GRAIN;
     const share = unitOf(textHash(world.id));
-    const size =
-      Math.min(onScreen(world.radius * shown, distance, sight.focal), most) * (grain ? 0.5 + 0.9 * share : 1);
+    const size = grain
+      ? Math.min(onScreen(world.radius * shown, distance, sight.focal), DUST) * (0.5 + 0.5 * share)
+      : Math.min(onScreen(world.radius * shown, distance, sight.focal), most);
     if (!grain) {
       this.#sizes += size;
       this.#sized += 1;

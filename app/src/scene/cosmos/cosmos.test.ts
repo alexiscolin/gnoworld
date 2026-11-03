@@ -542,8 +542,18 @@ describe("what it draws", () => {
         .map(({ phase }) => phase.toFixed(4)),
     );
     const sizes = new Set<string>();
-    // A postcard's specks that would stand on one of its bodies are left out (7d3): 91 of the crowd's 120 points stand.
-    expect(count).toBeGreaterThan(80);
+    // A postcard's specks that would stand on one of its bodies or on its path (7d3, F3594) are left out: every other of the crowd's worlds
+    // not a body is a point.
+    const systems = held(crowd);
+    const index = systems.findIndex(({ id }) => id === "c");
+    const view = restView(systems);
+    const system = systems[index];
+    if (system === undefined) throw new Error("no crowd");
+    const hidden = view.postcards.includes(index) ? postcardOf(system, view.eye).hidden.size : 0;
+    const bodies = scene.cosmos.stats().list.filter(({ id }) => id.startsWith("c/")).length;
+    expect(hidden).toBeGreaterThan(0);
+    expect(count).toBe(120 - bodies - hidden);
+    expect(count).toBeGreaterThan(10);
     for (let at = 0; at < count; at += 1) {
       if (!grains.has(orbit.getY(at).toFixed(4))) continue;
       expect(tint.getX(at)).toBeGreaterThan(tint.getZ(at));
@@ -3132,9 +3142,31 @@ describe("a system's arrival (7d3)", () => {
     const { worlds: bodies } = postcardOf(system, restView(systems).eye);
     expect(bodies.map(({ id }) => id.split("/").at(-1))).toEqual(["agents", "streak"]);
     const own = pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
-    expect(own.length).toBeGreaterThan(40);
+    // None on agents' or streak's path either (F3594): 37 of the 124 stand.
+    expect(own.length).toBeGreaterThan(30);
     for (const point of own)
       for (const body of bodies) expect(inPlane(point, body) - body.radius).toBeGreaterThanOrEqual(body.radius);
+  });
+
+  // Alexis, 2026-11-03 ("Poussière fine", F3594): the grain left an orange trail beside agents and streak, 21 specks of 3 to 6 px; each speck
+  // is 2 px across at most, and none stands on a world's path round its star, its drawn width each side of its orbit.
+  it("draws g1magld5's grain as fine dust in Onyx's view at rest, 2 px across at most, none on agents' or streak's path (F3594)", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    const systems = held(ONYX);
+    const system = systems.find(({ id }) => id.startsWith("g1magld5"));
+    if (system === undefined) throw new Error("no g1magld5");
+    const card = postcardOf(system, restView(systems).eye);
+    const paths = card.worlds.map(({ orbit, radius }, at) => ({ orbit, half: radius * (card.depth[at] ?? 1) }));
+    const grains = new Set(system.worlds.filter(({ radius }) => radius < GRAIN).map(({ orbit }) => orbit.toFixed(4)));
+    const dust = pointsOf(scene).filter(
+      ({ star, orbit }) => distanceOf(star, system.place) < 1e-4 && grains.has(orbit.toFixed(4)),
+    );
+    expect(dust.length).toBeGreaterThan(0);
+    for (const speck of dust) {
+      expect(speck.size).toBeLessThanOrEqual(1);
+      for (const path of paths) expect(Math.abs(speck.orbit - path.orbit)).toBeGreaterThanOrEqual(path.half);
+    }
   });
 
   // Alexis, 2026-11-03 (reports/alexis-1213-same-level.png): the lower postcard's agents and streak stood 1.17 times apart, 92 pixels apart
