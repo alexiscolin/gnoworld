@@ -85,27 +85,16 @@ function thinned(mask: Uint8Array, w: number): Uint8Array {
   return m;
 }
 
+// The distance of each pixel of the mask to its edge, by sides (1) and corners (the root of 2): one sweep forward, one back.
 function distances(mask: Uint8Array, w: number): Float32Array {
   const d = Float32Array.from(mask, (value) => (value > 0 ? 1e9 : 0));
-  const sweep = (i: number, steps: readonly (readonly [number, number])[]) => {
-    for (const [step, cost] of steps) d[i] = Math.min(d[i] ?? 0, (d[i + step] ?? 1e9) + cost);
+  const cost = (step: number) => (Math.abs(step) === 1 || Math.abs(step) === w ? 1 : Math.SQRT2);
+  const sweep = (i: number, sign: number) => {
+    for (const step of [1, w, w + 1, w - 1].map((one) => sign * one))
+      d[i] = Math.min(d[i] ?? 0, (d[i + step] ?? 1e9) + cost(step));
   };
-  for (let i = 0; i < d.length; i++)
-    if ((d[i] ?? 0) > 0)
-      sweep(i, [
-        [-1, 1],
-        [-w, 1],
-        [-w - 1, Math.SQRT2],
-        [-w + 1, Math.SQRT2],
-      ]);
-  for (let i = d.length - 1; i >= 0; i--)
-    if ((d[i] ?? 0) > 0)
-      sweep(i, [
-        [1, 1],
-        [w, 1],
-        [w + 1, Math.SQRT2],
-        [w - 1, Math.SQRT2],
-      ]);
+  for (let i = 0; i < d.length; i++) if ((d[i] ?? 0) > 0) sweep(i, -1);
+  for (let i = d.length - 1; i >= 0; i--) if ((d[i] ?? 0) > 0) sweep(i, 1);
   return d;
 }
 
