@@ -34,7 +34,8 @@ describe("the hero's big number, on a planted site", () => {
   test("keeps its figure's room in the line while the number comes: an empty figure, then the words", async () => {
     const html = await heroWith("main", undefined, true);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
-    expect(html).toMatch(/<h1[^>]*><span [^>]*data-hero="figure"[^>]*><\/span> worlds in Mainland<\/h1>/);
+    expect(html).toMatch(/data-hero="figure"[^>]*><\/span>/);
+    expect(headingOf(html)).toBe(" worlds in Mainland");
   });
 
   test("sets the number in the line's figure once it has come", async () => {
