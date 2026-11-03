@@ -4,8 +4,9 @@ import { defineConfig, type Plugin } from "vite";
 import { glslSpaces } from "./src/glsl.ts";
 import { parsed } from "./vite.config.ts";
 
-// The realism page (lab/realism.html), built beside the site for the journeys and on its own for Alexis's eye. LAB_HOSTS names the
-// addresses `vite preview` may answer, exactly. LAB_STATIC, an absolute folder, builds a static `index.html` with relative paths.
+// The realism page (lab/realism.html), built beside the site for the journeys and on its own for Alexis's eye, and served by the workshop's
+// dev server (docs/DEVELOPMENT.md). LAB_HOSTS names the addresses either server may answer, exactly. LAB_STATIC, an absolute folder, builds
+// a static `index.html` with relative paths.
 const hosts = process.env["LAB_HOSTS"]?.split(",").filter(Boolean) ?? [];
 const folder = process.env["LAB_STATIC"];
 // Beside the site, in the site's build folder: app/build, or GNOWORLD_BUILD (react-router.config.ts).
@@ -22,6 +23,8 @@ const asIndex: Plugin = {
 
 export default defineConfig({
   root: "lab",
+  // The workshop's switch, here alone: the scene's tunable values read the panel's (src/scene/tuning.ts); a site's build never has it.
+  define: { "import.meta.env.GNOWORLD_TUNING": JSON.stringify("1") },
   base: "./",
   publicDir: "../public",
   // The shaders the journeys walk here are stripped as the site's are (src/glsl.ts).
@@ -31,5 +34,6 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: { input: "lab/realism.html" },
   },
+  server: { host: "127.0.0.1", port: 5199, strictPort: true, allowedHosts: hosts },
   preview: { host: "127.0.0.1", port: 5199, strictPort: true, allowedHosts: hosts },
 });
