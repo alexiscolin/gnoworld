@@ -387,6 +387,16 @@ describe("where a label may stand (F3772)", () => {
     expect(box.shown && box.bottom > SCREEN.height - 34).toBe(false);
   });
 
+  // The review of 7p (R3): agents, 33 px round at x 1,591 on the video's screen, stands under the rail's band; its pill slides left of the
+  // band, still over its body, from the band the labels read off the window's width.
+  it("slides a body's pill left of the rail's band at 1728 px wide, still over its body", () => {
+    const [x, y, radius] = [1590.7, 873, 33.1];
+    const box = one(labels, body((x - SCREEN.width / 2) / 20, (SCREEN.height / 2 - y) / 20, radius / 20));
+    expect(box.shown).toBe(true);
+    expect(box.right).toBeLessThanOrEqual(SCREEN.width - 149);
+    expect(box.right).toBeGreaterThan(x - radius);
+  });
+
   it("keeps a label out of the rail's band at 1728 px wide, and lets it stand there under 900 px, where there is no rail", () => {
     const wide = one(labels, body((1728 - 190 - SCREEN.width / 2) / 20, 0));
     expect(wide.shown).toBe(true);
