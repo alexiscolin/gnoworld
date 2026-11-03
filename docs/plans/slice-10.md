@@ -24,11 +24,11 @@ Assets: the Anthropic key and the day's budget; people's trust in an answer, a c
 
 ## 4. Cost
 
-Hot paths and their benches (budgets set by each part, measured before and after): the allowlist's check and the untrusted wrapping of a 64 KiB result, under 1 ms; grounding a 50-block digest against a 100 KiB page through a set of the page's tokens, O(n + m), under 5 ms; the budget's reserve and settle, one SQLite statement each. Money, from the `claude-api` skill (models cached 2026-10-06): Sonnet 5.5 $2 in, $10 out, $0.20 cache read; Haiku 5.5 $0.10 and $0.50 up to a 100K-token prompt, $0.50 and $2.50 above; Opus 5.5 $4 and $20, $0.20 read; a cache write costs 1.25× the input for 5 minutes. A question of 20K input tokens, 18K of them cached, and 1K out on Sonnet 5.5 costs about $0.018, so about 2,500 questions a day at $45.
+Hot paths and their benches (budgets set by each part, measured before and after): the allowlist's check and the untrusted wrapping of a 64 KiB result, under 1 ms; grounding a 50-block digest against a 100 KiB page through a set of the page's tokens, O(n + m), under 5 ms; the budget's reserve and settle, one SQLite statement each. Money, from Anthropic's pricing page read on 2026-11-04 (10c's report; the `claude-api` skill's table, cached 2026-10-06, still gives Sonnet 5.5's read as $0.20): Sonnet 5.5 $2 in, $10 out, $0.10 cache read; Haiku 5.5 $0.10 and $0.50 up to a 100K-token prompt, $0.50 and $2.50 above; Opus 5.5 $4 and $20, $0.20 read; a cache write costs 1.25× the input for 5 minutes. A question of 20K input tokens, 18K of them cached, and 1K out on Sonnet 5.5 costs about $0.0158, so about 2,850 questions a day at $45.
 
 ## 5. Scale
 
-The first limit is the day's budget (about 2,500 such questions), then the quotas; one `jarvis` container with one gnomcp child. Next: digests and translations cached per content hash (§7), then several `jarvis` containers, whose budget then leaves the container's own SQLite (D45) for a shared store; load tested against the fake model.
+The first limit is the day's budget (about 2,850 such questions), then the quotas; one `jarvis` container with one gnomcp child. Next: digests and translations cached per content hash (§7), then several `jarvis` containers, whose budget then leaves the container's own SQLite (D45) for a shared store; load tested against the fake model.
 
 ## 6. Tests, by level
 
