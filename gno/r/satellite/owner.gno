@@ -70,7 +70,8 @@ func ProposeOwner(cur realm, next address) {
 	chain.Emit("ProposeOwner", "owner", next.String())
 }
 
-// AcceptOwner makes the proposed owner the owner. That address only.
+// AcceptOwner makes the proposed owner the owner; the operator stays, for the
+// new owner to keep or change. That address only.
 func AcceptOwner(cur realm) {
 	by := cur.Previous().Address()
 	if by != pending {

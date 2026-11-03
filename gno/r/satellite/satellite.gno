@@ -203,7 +203,8 @@ func forget(world string, r rental) {
 
 // Takedown removes a live satellite after the report it answers, and refunds
 // its payer the whole days not yet begun, at the price that rental paid; the
-// day under way counts as begun (D12). The owner or the operator only.
+// day under way counts as begun (D12), so a rental's last day refunds nothing.
+// The owner or the operator only.
 func Takedown(cur realm, world, report string) {
 	by := cur.Previous().Address()
 	if by != owner && by != operator {
