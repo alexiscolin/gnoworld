@@ -1,5 +1,6 @@
 import type { Page } from "./fixtures.ts";
 import type { Circle } from "./lab.ts";
+import { dayBox } from "./portraits.ts";
 import { reading, type Tools } from "./pixels.ts";
 
 // How a world's ground is ordered on a still: in 24-pixel tiles of its lit ground, the structure tensor of the lightness with its broad
@@ -102,6 +103,25 @@ function grainOf(discs: readonly Circle[]): Grain[] {
 
 const HELPERS = [fineIn, echoOf, tileOf].map(String).join("\n");
 
+// How far a disc's finest detail (fineIn at a reach of 2, a 5 by 5 mean) follows from one row to the next, a correlation over the close
+// detail's box in 24-pixel tiles: hairs a pixel or two tall along a latitude, a giant's fivefold streak, break it.
+function rowsOf(discs: readonly Circle[]): number[] {
+  return discs.map((disc) => {
+    const [x0, x1, y0, y1] = dayBox(disc);
+    let [n, one, next, both, ones, nexts] = [0, 0, 0, 0, 0, 0];
+    for (let tile = 0; tile < Math.floor((x1 - x0) / 24) * Math.floor((y1 - y0) / 24); tile++) {
+      const across = Math.floor((x1 - x0) / 24);
+      const fine = fineIn(x0 + 24 * (tile % across), y0 + 24 * Math.floor(tile / across), 2);
+      for (let i = 0; i < 24 * 23; i++) {
+        const [a, b] = [fine[i] ?? 0, fine[i + 24] ?? 0];
+        [n, one, next, both, ones, nexts] = [n + 1, one + a, next + b, both + a * b, ones + a * a, nexts + b * b];
+      }
+    }
+    const [ma, mb] = [one / n, next / n];
+    return (both / n - ma * mb) / Math.max(Math.sqrt((ones / n - ma * ma) * (nexts / n - mb * mb)), 1e-9);
+  });
+}
+
 // Land is a lit pixel (luma over 25) whose blue does not lead its red and green, as sea's does, and no cloud (pale, past L* 55, under 8 of
 // chroma): a cloud is neither land nor sea. Its pieces join by their sides.
 function landOf(discs: readonly Circle[]): Land[] {
@@ -141,5 +161,7 @@ function landOf(discs: readonly Circle[]): Land[] {
 
 export const grain = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Grain[]> =>
   reading(page, [picture], [grainOf, discs, HELPERS]);
+export const rows = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<number[]> =>
+  reading(page, [picture], [rowsOf, discs, [fineIn, dayBox].map(String).join("\n")]);
 export const landOn = (page: Page, picture: Buffer, discs: readonly Circle[]): Promise<Land[]> =>
   reading(page, [picture], [landOf, discs]);

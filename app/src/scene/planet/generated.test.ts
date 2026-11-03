@@ -297,6 +297,19 @@ describe("the generated program", () => {
     expect(streaks).toMatch(/weight \+= faded;/);
   });
 
+  // F4239: a giant's streaks stretched five times across a latitude read as hairs a pixel tall, their octaves past a pixel; Alexis chose
+  // the soft version (2026-11-03, 15:2x): each octave stretched twice at most, less as it nears the pixel, faded by its stretched wave,
+  // at today's contrast, with no thin filament.
+  it("stretches a giant's streaks twice at most, less near the pixel, never five times (F4239)", () => {
+    const streaks = bodyOf("float streaksAt(");
+    expect(streaks).toMatch(/float stretch = max\(2\.0 - [\d.]+ \* float\(i\), 1\.0\);/);
+    expect(streaks).toMatch(/noise\(vec3\(q\.x, q\.y \* stretch, q\.z\) \* frequency/);
+    expect(streaks).toContain("if (stretch * frequency * pixel > 0.5) break;");
+    expect(streaks).toContain("float faded = amplitude * (1.0 - smoothstep(0.3, 0.5, stretch * frequency * pixel));");
+    expect(streaks).not.toMatch(/q\.y \* 5\.0|fwidth/);
+    expect(GENERATED_FRAGMENT).toContain("(1.0 + (0.09 + 0.12 * shape.turbulence) * streaksAt(swirled, pixel))");
+  });
+
   // F4229: every finer noise fades by the pixel, the vents' crackle and the bands' second term too, or a small world sparkles.
   it("fades the vents' crackle and the bands' finer term by the pixel", () => {
     expect(GENERATED_FRAGMENT).toMatch(/float crackle = [^;]*fadeAt\(/);

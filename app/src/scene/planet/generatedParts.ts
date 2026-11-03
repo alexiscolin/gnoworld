@@ -110,12 +110,13 @@ float streaksAt(vec3 q, float pixel) {
   float weight = 0.0;
   float amplitude = 1.0;
   float frequency = shape.scale * 12.0;
-  for (int i = 0; i < 6; i++) {
-    if (frequency * pixel > 0.5) break;
-    float faded = amplitude * (1.0 - smoothstep(0.3, 0.5, frequency * pixel));
-    sum += faded * noise(vec3(q.x, q.y * 5.0, q.z) * frequency + float(i) * 3.1);
+  for (int i = 0; i < 8; i++) {
+    float stretch = max(2.0 - 0.3 * float(i), 1.0);
+    if (stretch * frequency * pixel > 0.5) break;
+    float faded = amplitude * (1.0 - smoothstep(0.3, 0.5, stretch * frequency * pixel));
+    sum += faded * noise(vec3(q.x, q.y * stretch, q.z) * frequency + float(i) * 3.1);
     weight += faded;
-    amplitude *= 0.85;
+    amplitude *= 0.9;
     frequency *= 2.0;
   }
   return sum / max(weight, 1e-3) / SPREAD;

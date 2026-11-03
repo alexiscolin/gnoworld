@@ -1,4 +1,4 @@
-import { ANCHORS, SURFACE, worldLook, type Lab } from "@gnoworld/core";
+import { ANCHORS, asciiBytes, planetRecipe, SURFACE, worldLook, type Lab } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, COMPUTER, listen, looks, noneOnAnother, open, picture, stats, type Circle } from "./lab.ts";
 import { glows } from "./pixels.ts";
@@ -24,6 +24,13 @@ const ALIKE_AT_MOST = 2;
 const DETAIL_SHARE = 0.8;
 const GRAIN = 3;
 const ROUNDING = 2.3;
+// A giant seen close as Alexis chose it (2026-11-03, 15:2x, "la version douce", reports/7b7-compare/): no streak, soft, about a third of
+// frame 104's Jupiter's fine detail (0.119 to 0.312 against 0.354, the same measure on its box clear of the grid), so 0.28 of Jupiter's at
+// least; no variance floor, for at the pixel a soft giant no longer differs from rounding (1.8 to 6.9 on 11 of 15 views).
+const GIANT_SHARPNESS = 0.1;
+// A class drawn as bands, as the program reads it (generated.ts's `banded`).
+const isGiant = (anchor: string) =>
+  ANCHORS.some((one) => one === anchor && planetRecipe(asciiBytes(one), one).surface.bands > 0);
 // The volcanic character Alexis approved (2026-11-02), a dark crust with white-hot vents red at their edges, as the approved lab measures
 // it (41776567, pixels.ts's glows): the gallery's 6.05% white-hot and 4.56% red, the close view's 3.87% and 3.24%, nothing pale. Its
 // style's median holds in that span, red over white-hot within half and twice theirs (0.75, 0.84).
@@ -93,13 +100,18 @@ const closeDetail = async (page: Page, query: string) => {
   if (place === undefined) throw new Error("no world");
   expect(Math.abs(place.r / EARTH_CIRCLE.r - 1), "the Earth's size on screen").toBeLessThan(0.03);
   const [day] = await details(page, await picture(page), [place]);
+  const [{ anchor } = { anchor: "" }] = await looks(page);
   if (day === undefined) throw new Error("no measure");
   test.info().annotations.push({
     type: "detail",
-    description: JSON.stringify({ day, earth, raw: day.variance / earth.variance }),
+    description: JSON.stringify({ day, earth, raw: day.variance / earth.variance, anchor }),
   });
-  expect(day.sharpness, "as sharp as the Earth").toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
   expect(day.sharpness, "no grain").toBeLessThanOrEqual(GRAIN);
+  if (isGiant(anchor)) {
+    expect(day.sharpness, "a soft giant's detail").toBeGreaterThanOrEqual(GIANT_SHARPNESS);
+    return;
+  }
+  expect(day.sharpness, "as sharp as the Earth").toBeGreaterThanOrEqual(earth.sharpness * DETAIL_SHARE);
   expect(day.variance, "detail, not rounding").toBeGreaterThan(4 * ROUNDING);
 };
 

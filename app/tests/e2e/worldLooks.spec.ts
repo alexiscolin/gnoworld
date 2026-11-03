@@ -7,9 +7,9 @@ import { ANCHORS, type Anchor } from "@gnoworld/core";
 import { expect, test, type Page } from "./fixtures.ts";
 import { askLab, circles, drawn, heldQuiet, open, picture, type Circle } from "./lab.ts";
 import { cells, lines } from "./lines.ts";
-import { apart, details } from "./portraits.ts";
+import { apart } from "./portraits.ts";
 import { cores, darkest, lightness, wholeRows } from "./surfaces.ts";
-import { grain, landOn } from "./textures.ts";
+import { grain, landOn, rows } from "./textures.ts";
 
 // Frame 4's "Music" world (f0004.jpg, its disc at 1254, 771, radius 36; lines.ts), and the same disc magnified ten times: its veins'
 // net ends 0.12 and 0.30 times a junction, 132 and 186 junctions; its glow covers 0.66 and 0.68 of the disc; its veins 0.057 and
@@ -32,8 +32,9 @@ const MINOR = { move: 5, far: 0.1, shown: 0.1, worlds: 6 } as const;
 // ordered tiles 45 degrees or more from their commonest way, and a tenth echoing at 6 to 10 px. 7b5's smudged grooved world (caeda94b)
 // reads 0.04 and 0.04; the Earth 0.46 and 0.05, a rocky world 0.43 and 0.01, a desert 0.02 and 0.08: none holds both (7b6's report).
 const GROOVES = { crossing: 0.25, period: 0.1 } as const;
-// A giant's fine steps along a latitude over across it (F4239): Jupiter on frame 104 (a box clear of its grid, 1020 to 1125 by 470
-// to 627) reads 0.78; 7b5's fivefold streaks 0.10 to 0.29; a third of Jupiter's at least.
+// The fivefold streak (F4239): hairs a pixel or two tall along a latitude, so a giant's finest detail no longer follows from one row to
+// the next (textures.ts's rows). Frame 104's Jupiter reads 0.81 on its box clear of the grid (1020 to 1125 by 470 to 627), today's eight
+// giants 0.20 at most, the soft version Alexis chose (2026-11-03, 15:2x) 0.35 at least.
 const GIANTS: readonly Anchor[] = [
   "gas giant",
   "ice giant",
@@ -44,7 +45,7 @@ const GIANTS: readonly Anchor[] = [
   "hot giant",
   "sub-Neptune",
 ];
-const ALONG_AT_LEAST = 0.78 / 3;
+const ROWS_FOLLOW = 0.3;
 // A giant's minor as whole bands (F4245): of what the minor moves in colour, the share in strips mostly moved, along its bands' lean
 // (surfaces.ts). The median over 24 gas giants: 7b5's pieces 0.57; whole bands, its worlds' edges and limbs read, about 0.8.
 const WHOLE_BANDS = 0.75;
@@ -186,12 +187,14 @@ test.describe("the generated worlds polished", () => {
   });
 
   for (const giant of GIANTS)
-    test(`a ${giant} seen close holds its fine detail without the fivefold streak (F4239)`, async ({ page }) => {
+    test(`a ${giant} seen close holds no fivefold streak: its finest detail follows from row to row (F4239)`, async ({
+      page,
+    }) => {
       await open(page, close(giant));
       const place = await placeOf(page);
-      const [read] = await details(page, await picture(page), [place]);
-      test.info().annotations.push({ type: "along", description: String(read?.along) });
-      expect(read?.along).toBeGreaterThanOrEqual(ALONG_AT_LEAST);
+      const [follows] = await rows(page, await picture(page), [place]);
+      test.info().annotations.push({ type: "rows", description: String(follows) });
+      expect(follows).toBeGreaterThanOrEqual(ROWS_FOLLOW);
     });
 
   test("a giant's minor is whole bands, never pieces, and still shows (F4245)", async ({ page }) => {

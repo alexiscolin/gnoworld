@@ -82,7 +82,7 @@ const portraitsOf = (discs: readonly Circle[]) => {
 };
 
 /** The day side's box of a world lit from the right, as the Earth's is read: left, right, top, bottom. */
-function dayBox({ x, y, r }: Circle): [number, number, number, number] {
+export function dayBox({ x, y, r }: Circle): [number, number, number, number] {
   return [Math.round(x + 0.1 * r), Math.round(x + 0.5 * r), Math.round(y - 0.3 * r), Math.round(y + 0.3 * r)];
 }
 
