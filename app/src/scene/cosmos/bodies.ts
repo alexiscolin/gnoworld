@@ -36,8 +36,8 @@ interface Body {
   readonly fromEye: number;
   /** Its programs are compiled: until then it waits off the screen. */
   ready: boolean;
-  /** It holds its place at rest: the close world, whose turn would sweep it across the view. */
-  still: boolean;
+  /** It stood at a look once compiled, which took its point away: from then it shows, never over its point (7d9). */
+  shown: boolean;
 }
 
 interface BodyView {
@@ -74,6 +74,7 @@ export class Bodies {
   #seconds = 0;
   #view: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
 
+  /** The device's `moved` is told once a body's programs are compiled: a look then stands it in place of its point. */
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
     this.#maps = maps;
     this.#device = device;
@@ -95,12 +96,13 @@ export class Bodies {
     if (shown) this.#maps.kit();
   }
 
-  has(id: string): boolean {
-    return this.#held.has(id);
+  /** Whether a world stands as a body: held, compiled and stood at a look since, so its point is gone. */
+  stands(id: string): boolean {
+    return this.#held.get(id)?.shown === true;
   }
 
-  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; `still` holds its place. */
-  stand(wanted: Wanted, still?: string): void {
+  /** Keeps what `wanted` keeps, frees what it left, and stands what is new if its maps are here; what is compiled shows from now. */
+  stand(wanted: Wanted): void {
     for (const [id, body] of this.#held)
       if (!wanted.has(id)) {
         this.#held.delete(id);
@@ -111,7 +113,7 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
-    for (const body of this.#held.values()) body.still = body.id === still;
+    for (const body of this.#held.values()) body.shown = body.ready;
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
     if (this.#last !== undefined) this.tick(this.#last, this.#seconds);
@@ -127,7 +129,7 @@ export class Bodies {
     this.group.add(planet.group);
     const fromEye = fromEyeOf(planetSeed(worldPath(id)));
     const [at, star, sun] = [new Vector3(), new Vector3(), new Vector3()];
-    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, still: false };
+    const body: Body = { id, system, world, planet, at, star, sun, fromEye, ready: false, shown: false };
     this.#held.set(id, body);
     // Compiled before it shows: a first-time compile on a frame stalls the arrival (three's guide, mistake 10).
     const { renderer, camera, stage, moved } = this.#device;
@@ -152,7 +154,7 @@ export class Bodies {
   #pose(body: Body, eye: Point, seconds: number): void {
     const { system, world, planet, at, star, sun, fromEye } = body;
     const away = this.#offEye(system.place, eye, star).length();
-    orbitPlace(body, body.still ? 0 : orbitTime(seconds), this.#place);
+    orbitPlace(body, orbitTime(seconds), this.#place);
     planet.group.position.copy(this.#offEye(this.#place, eye, at));
     this.#toEye.copy(at).negate().normalize();
     sun.subVectors(star, at).normalize();
@@ -162,7 +164,7 @@ export class Bodies {
     planet.setFar(fadeAt(at.length()));
     const room = this.#room(at, world.radius);
     planet.group.scale.setScalar(world.radius * room);
-    planet.group.visible = body.ready && room > 0;
+    planet.group.visible = body.shown && room > 0;
     const seen = this.#seen.copy(at).applyQuaternion(this.#back); // as the camera, turned to the Earth, sees it
     this.#lean.set(leanFor(planet.look.lean, Math.atan2(seen.y, -seen.z)), 0, planet.look.tilt);
     planet.group.quaternion.setFromEuler(this.#lean).premultiply(this.#device.camera.quaternion);

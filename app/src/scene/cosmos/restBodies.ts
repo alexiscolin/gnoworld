@@ -28,28 +28,39 @@ export const postcardsOf = (
     }),
   );
 
-/** The view's bodies, from `eye` on the map with a lens of `focal` pixels. */
+/** The close world's system, by its index, as drawn wherever the eye stands: held still, so none of its worlds jumps to its orbit's place
+ * as the ladder takes the view (7d9; Alexis, 2026-11-03, "la grosse planète à gauche disparaît si on bouge"). */
+export interface CloseSystem {
+  readonly index: number;
+  readonly system: StarSystem;
+}
+
+/** The view's close world's system, held still. */
+export function closeSystemOf(systems: readonly StarSystem[], { close }: RestView): CloseSystem | undefined {
+  const system = close === undefined ? undefined : systems[close.system];
+  return system === undefined || close === undefined
+    ? undefined
+    : { index: close.system, system: { ...system, spin: 0 } };
+}
+
+/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards' and its close system's. */
 export function restBodies(
-  systems: readonly StarSystem[],
-  { view: { close }, postcards }: { view: RestView; postcards: ReadonlyMap<number, Postcard> },
+  { postcards, still }: { postcards: ReadonlyMap<number, Postcard>; still: CloseSystem | undefined },
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
-  const offer = (system: StarSystem | undefined, world: Orbiter | undefined) => {
-    if (system === undefined || world === undefined || world.radius < GRAIN) return;
+  const offer = (system: StarSystem, world: Orbiter) => {
+    if (world.radius < GRAIN) return;
     const { x, y, z } = system.place;
     const away = Math.hypot(x - sight.eye.x, y - sight.eye.y, z - sight.eye.z);
     if (screenRadius(world.radius, away, sight.focal) >= BODY_PIXELS) wanted.set(world.id, [system, world]);
   };
-  // A postcard's bodies stand spread round its star, in its plane as drawn, from the eye at rest: the same view, the same spread.
+  // A postcard's bodies stand spread round its star, in its plane as drawn, from the eye at rest: the same view, the same spread. The
+  // close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
   for (const { system, worlds } of postcards.values()) for (const world of worlds) offer(system, world);
-  if (close !== undefined) offer(systems[close.system], systems[close.system]?.worlds[close.world]);
+  if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
   return wanted;
 }
-
-/** The close world's id, which holds its place at rest. */
-export const closeId = (systems: readonly StarSystem[], { close }: RestView): string | undefined =>
-  close === undefined ? undefined : systems[close.system]?.worlds[close.world]?.id;
 
 /** Whether the view needs a system's halo, by its index: the great star's, first of the systems, and the postcards' stars'. */
 export function haloNeeds({ postcards }: RestView): (system: number) => boolean {
@@ -57,9 +68,9 @@ export function haloNeeds({ postcards }: RestView): (system: number) => boolean 
   return (system) => kept.has(system);
 }
 
-/** How large a system's worlds stand as points, by its index: whole for a postcard, none for the close world's system, whose rest is off
- * the screen, a glint for any other. */
+/** How large a system's worlds stand as points, by its index: whole for a postcard and for the close world's system, whose world is a
+ * point until it is a body (7d9), a glint for any other. */
 export function pointShares({ postcards, close }: RestView): (system: number) => number {
-  const kept = new Set(postcards);
-  return (system) => (kept.has(system) ? 1 : system === close?.system ? 0 : GLINT);
+  const kept = new Set([...postcards, close?.system]);
+  return (system) => (kept.has(system) ? 1 : GLINT);
 }

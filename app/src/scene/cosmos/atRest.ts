@@ -17,9 +17,11 @@ import type { Wanted } from "./bodies.ts";
 
 const loadSearch = () => import("./restSearch.ts");
 type Searched = Awaited<ReturnType<typeof loadSearch>>;
+type Still = ReturnType<Searched["closeSystemOf"]>;
+// The close world's system as its worlds turn, held still, by its index; any other as it is.
+const heldBy = (still: Still) => (system: number) => (system === still?.index ? still.system : undefined);
 const NONE: Wanted = new Map();
 const NO_POINT = () => 0;
-const NO_PLANE = () => undefined;
 const WHOLE = () => 1;
 // Until the view has come, and away from it, the great star's halo alone is needed: it is the first of the systems.
 const GREAT_STAR = (system: number) => system === 0;
@@ -27,11 +29,13 @@ const GREAT_STAR = (system: number) => system === 0;
 // anywhere (Alexis, 2026-11-02: depth everywhere).
 const REST_REACH = 5;
 
-// Anywhere but at rest: the worlds the ladder stands as bodies, each large enough on screen to tell from a point, its others whole points.
-function everywhere(systems: readonly StarSystem[], drawn: Drawn): Wanted {
+// Anywhere but at rest: the worlds the ladder stands as bodies, each large enough on screen to tell from a point, its others whole points;
+// the close world's system held still.
+function everywhere(systems: readonly StarSystem[], drawn: Drawn, still: Still): Wanted {
   const wanted = new Map<string, readonly [StarSystem, StarSystem["worlds"][number]]>();
   for (let at = 0; at < drawn.bodyCount; at += 1) {
-    const system = systems[drawn.bodySystems[at] ?? -1];
+    const index = drawn.bodySystems[at] ?? -1;
+    const system = index === still?.index ? still.system : systems[index];
     const world = system?.worlds[drawn.bodyWorlds[at] ?? -1];
     if (system !== undefined && world !== undefined) wanted.set(world.id, [system, world]);
   }
@@ -57,6 +61,7 @@ export class AtRest {
   readonly #owner: Disposer;
   #view = plainRest();
   #postcards: ReadonlyMap<number, Postcard> = new Map();
+  #closeSystem: Still;
   #searched: Searched | undefined;
   #eye: InstanceType<Searched["RestEye"]> | undefined;
   #asked = 0;
@@ -115,6 +120,7 @@ export class AtRest {
   search(systems: readonly StarSystem[]): void {
     this.#view = { ...this.#view, postcards: [], close: undefined };
     this.#postcards = new Map();
+    this.#closeSystem = undefined;
     this.#asked += 1;
     const asked = this.#asked;
     if (!systems.some(({ worlds }) => worlds.length > 0)) return;
@@ -126,6 +132,7 @@ export class AtRest {
         this.#eye ??= new searched.RestEye();
         this.#view = view;
         this.#postcards = searched.postcardsOf(systems, view);
+        this.#closeSystem = searched.closeSystemOf(systems, view);
         this.#eye.rest(view);
         this.#found();
         this.#device.moved();
@@ -153,28 +160,35 @@ export class AtRest {
     }
   }
 
-  /** The worlds that stand as bodies from `sight`, the close world's id, how large each system's worlds stand as points, whose halos the
-   * view needs and the plane a postcard's points turn in: the view at rest's where the eye rests, neither swayed nor diving, the
-   * ladder's `drawn` anywhere else. */
+  /** The worlds that stand as bodies from `sight`, how large each system's worlds stand as points, whose halos the view needs, a system
+   * as its points turn (a postcard's plane opened, the close world's system held still) and the close world's system's index: the view at
+   * rest's where the eye rests, neither swayed nor diving, the ladder's `drawn` anywhere else. */
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
-    const searched = this.#searched;
-    const [{ eye }, resting] = [this.#view, this.#restingMap];
-    toMap(this.#resting, resting);
-    if (searched !== undefined && Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH)
+    const [searched, still] = [this.#searched, this.#closeSystem];
+    const [held, index] = [heldBy(still), still?.index];
+    if (this.#offRest())
       return {
-        bodies: everywhere(systems, drawn),
-        close: undefined,
+        bodies: everywhere(systems, drawn, still),
         pointShare: WHOLE,
         needsHalo: GREAT_STAR,
-        planeOf: NO_PLANE,
+        planeOf: held,
+        still: index,
       };
     const postcards = this.#postcards;
     return {
-      bodies: searched?.restBodies(systems, { view: this.#view, postcards }, sight) ?? NONE,
-      close: searched?.closeId(systems, this.#view),
+      bodies: searched?.restBodies({ postcards, still }, sight) ?? NONE,
       pointShare: searched?.pointShares(this.#view) ?? NO_POINT,
       needsHalo: searched?.haloNeeds(this.#view) ?? GREAT_STAR,
-      planeOf: (system: number) => postcards.get(system)?.system,
+      planeOf: (system: number) => postcards.get(system)?.system ?? held(system),
+      still: index,
     };
+  }
+
+  // Whether the eye rests past a mouse's lean and the sway off the view at rest's, once it came: there the cosmos draws as anywhere.
+  #offRest(): boolean {
+    const [{ eye }, resting] = [this.#view, this.#restingMap];
+    toMap(this.#resting, resting);
+    const off = Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z) > REST_REACH;
+    return this.#searched !== undefined && off;
   }
 }

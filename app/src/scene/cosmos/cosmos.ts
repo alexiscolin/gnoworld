@@ -59,7 +59,7 @@ export class Cosmos {
     this.#atRest = new AtRest(device, this.#owner, this.#mapCame);
     this.#disc = new Disc(this.#owner);
     this.#maps = new BodyMaps(device, this.#mapCame);
-    this.#bodies = new Bodies(this.#maps, this.#owner, device);
+    this.#bodies = new Bodies(this.#maps, this.#owner, { ...device, moved: this.#mapCame });
     this.#home = new Home(device, this.#bodies.group);
     this.#nebulae = new LazyNebulae(device, this.#owner);
     this.#ahead = new Ahead(device, this.#disc.group, () => {
@@ -171,15 +171,15 @@ export class Cosmos {
     ladder.look({ eye: this.#mapEye, focal: this.#focal, focus: EARTH_PLACE }, this.#drawn);
     this.#whole.look(this.#mapEye, this.#focal);
     const sight = { eye: this.#mapEye, focal: this.#focal };
-    const { bodies, close, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
-    this.#bodies.stand(bodies, close);
+    const { bodies, ...worlds } = this.#atRest.drawn(this.#systems, sight, this.#drawn);
+    this.#bodies.stand(bodies);
     this.#disc.paint({
       ...sight,
       ...worlds,
       systems: this.#systems,
       ladder,
       drawn: this.#drawn,
-      isBody: (id) => this.#bodies.has(id),
+      isBody: (id) => this.#bodies.stands(id),
       inView: (place, radius) => this.#bodies.inView(place, radius, placed),
       shows: (place, radius) => this.#bodies.shows(place, radius, placed),
     });
