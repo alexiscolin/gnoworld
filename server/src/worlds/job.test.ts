@@ -770,6 +770,14 @@ describe("the worlds' count, beside their file", () => {
     expect(readdirSync(join(file, "..")).sort()).toEqual(["onyx-count.json", "onyx.json"]);
   });
 
+  it("names the count after the worlds' file alone, whatever its folder is called", async () => {
+    const folder = join(fresh(), "..", "d.json");
+    mkdirSync(folder);
+    const { outcome } = await run(chainRoutes([POOL]), { file: join(folder, "worlds.json") });
+    expect(outcome).toEqual({ wrote: true });
+    expect(readdirSync(folder).sort()).toEqual(["worlds-count.json", "worlds.json"]);
+  });
+
   it("writes no count when the pass fails, and keeps the last one byte for byte", async () => {
     const none = fresh();
     await run(chainRoutes([], { paths: () => new TypeError("fetch failed") }), { file: none });
