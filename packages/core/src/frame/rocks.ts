@@ -8,9 +8,9 @@ import { gap, type Judge } from "./deep.ts";
 import type { RestView } from "./rest.ts";
 import type { Look, Seen } from "./restLook.ts";
 
-// One near, 4 to 6 units ahead, 30 to 60 pixels in radius on the video's screen, its centre a third of that off the frame's left or bottom
-// edge at most, so the frame cuts it (the design review of 7p, after the references). Then pebbles, a cluster round one place 8 to 16
-// units ahead (frame 4's debris): 3 to 12 pixels there, the nearer larger, within 100 pixels of it.
+// One near, 4 to 6 units ahead, 30 to 60 pixels in radius on the video's screen, its centre 0.2 to 0.95 of that inside the frame's left or
+// bottom edge, so the frame cuts some of it, the ticker's band no more (the design review of 7p, after the references). Then pebbles, a
+// cluster round one place 8 to 16 units ahead (frame 4's debris): 3 to 12 pixels there, the nearer larger, within 100 of it.
 const MOST = 7;
 const TRIES = 60;
 const MARGIN = 16;
@@ -75,11 +75,11 @@ export function rocksOf(view: RestView, judge: Judge): Laid[] {
     seen.push(spot);
     return true;
   };
-  // The near one, its centre off the frame's left edge or its bottom edge by a third of its radius at most.
-  for (let tried = 0; tried < TRIES; tried += 1) {
+  // The near one, its centre inside the frame's left edge or its bottom edge by 0.2 to 0.95 of its radius.
+  for (let tried = 0; tried < 3 * TRIES; tried += 1) {
     const size = [4 + 2 * next(), 30 + 30 * next()] as const;
-    const [off, along] = [size[1] * 0.35 * (2 * next() - 1), next()];
-    const [x, y] = next() < 0.5 ? [off, height * (0.12 + 0.85 * along)] : [width * (0.03 + 0.85 * along), height + off];
+    const [off, along] = [size[1] * (0.2 + 0.75 * next()), next()];
+    const [x, y] = next() < 0.5 ? [off, height * (0.12 + 0.85 * along)] : [width * (0.03 + 0.85 * along), height - off];
     if (tryAt([x, y, ...size], true)) break;
   }
   // The pebbles round one place: the first of a few that holds three, or what the last holds.
