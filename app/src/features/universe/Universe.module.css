@@ -39,6 +39,15 @@
     }
   }
 
+  /* What stands under the header, over the scene: the flights' panel, a system's crumb (7v). */
+  .underHeader {
+    position: fixed;
+    /* raw: under the header's 96 px (shellHeader.module.css), a step down: frame 18's 103 px */
+    inset-block-start: calc(96px + var(--space-2xs));
+    /* raw: over the labels' layer (0) and the canvas (-1), as the header is */
+    z-index: 1;
+  }
+
   /* Above the views' bar and the ticker on a phone (Ticker.module.css), in the gutter, within reach. */
   .offer,
   .status {
