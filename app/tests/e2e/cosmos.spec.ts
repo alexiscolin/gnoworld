@@ -1227,9 +1227,24 @@ async function haloAt(page: Page, now: number, { at, still = false }: { at: stri
           y: y + COMPUTER.height / 2,
         }));
   const [x, y] = [Math.round(spot.x), Math.round(spot.y)];
-  const [light] = await brightness(page, await page.locator("canvas").screenshot(), [
+  // Beside the star, where no body stands: a system's dynamic view stands its worlds round its centred star (7v), and the eye's sway
+  // would move one through a box on one side.
+  const bodies = (await cosmos(page)).screen.bodies;
+  const boxes = [
     [x + 60, y - 20, x + 110, y + 20],
-  ]);
+    [x - 110, y - 20, x - 60, y + 20],
+    [x - 25, y + 60, x + 25, y + 110],
+    [x - 25, y - 110, x + 25, y - 60],
+  ] as const;
+  const clear = boxes.find(([left, top, right, bottom]) =>
+    bodies.every(
+      (body) =>
+        Math.hypot(Math.max(left, Math.min(body.x, right)) - body.x, Math.max(top, Math.min(body.y, bottom)) - body.y) >
+        body.radius + 12,
+    ),
+  );
+  expect(clear, "a box beside the star that no body crosses").toBeDefined();
+  const [light] = await brightness(page, await page.locator("canvas").screenshot(), [[...(clear ?? boxes[0])]]);
   return light ?? NaN;
 }
 
