@@ -80,6 +80,7 @@ function chosen(query: URLSearchParams): Choice {
     real: realIn(query),
     minor: !off("minor"),
     clouds: !off("clouds"),
+    front: query.get("light") === "front",
     flat: query.get("maps") === "flat",
   };
 }

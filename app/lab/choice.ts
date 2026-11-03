@@ -38,6 +38,8 @@ export interface Choice {
   readonly minor: boolean;
   /** Off, every world's clouds are taken out: what the journeys read a world's land under. */
   readonly clouds: boolean;
+  /** On, every world is lit from the eye, its whole face in the light. */
+  readonly front: boolean;
   /** On, every real map is a grey: what a world owes its maps, which must be detail alone. */
   readonly flat: boolean;
 }
