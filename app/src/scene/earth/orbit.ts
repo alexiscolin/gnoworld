@@ -29,6 +29,8 @@ const FINE_REACH = 1.9;
 const FINE_TILT = -0.618;
 /** Where a small Earth's Moon rests: out at the ring's left end, as frame 4's. */
 export const MOON_FAR = 3.736;
+/** Frame 4's Moon, 13 pixels on a 47-pixel Earth: its own size would be two pixels at this distance. */
+export const FAR_MOON_RADIUS = 0.27;
 // Over the air, which is order 1.
 const ORBIT_ORDER = 2;
 
