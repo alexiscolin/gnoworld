@@ -3,6 +3,10 @@
 import { pixelRatioFor, type Tier } from "@gnoworld/core";
 import type { PerspectiveCamera, WebGLRenderer } from "three";
 
+// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
+// barrel into the scene's chunk; the lens test ties the two.
+export const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
+
 interface Sized {
   resize(width: number, height: number, ratio: number): void;
 }

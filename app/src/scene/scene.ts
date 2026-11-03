@@ -12,16 +12,13 @@ import { Probe } from "./probe.ts";
 import { rendered, type Scene, type SceneOptions, type SceneStats } from "./sceneStats.ts";
 import { createRenderer } from "./renderer.ts";
 import { Space } from "./space.ts";
-import { Viewport } from "./viewport.ts";
+import { LENS, Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
 import { MOTION, watchScene } from "./watch.ts";
 
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
-// The home's lens is core's FIELD_OF_VIEW, which the view at rest is composed for (7d9): a number here, for a value of core would bring its
-// barrel into this chunk; the lens test ties the two.
-const LENS = { fieldOfView: 50, home: 42.47122885453438, near: 0.1, far: 2000 } as const;
 // The sky beside the worlds: the warmth comes from the suns, with black between them (frame 4).
 const VEILED = 0.3;
 
