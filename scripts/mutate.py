@@ -8,7 +8,12 @@ turns one `>=`, `>`, `<=`, `<`, `==`, `!=`, `&&`, `||`, `+` or `-` of a source's
 code (never its comments, strings or runes) into its partner, or shifts one
 integer literal by one, up or down. A package's mutants are copies of it in one
 temporary workspace, next to an untouched copy that must pass, all tested by one
-`gno test` run, whose time limit grows with its copies (F5051). A mutant that
+`gno test` run, whose time limit grows with its copies (F5051). There a test in
+the package runs against its own copy, but a filetest against the first copy of
+its module in the workspace, the untouched one (F5050): so a mutant that run lets
+survive, GAPS not listing it, is judged again alone, in a workspace of its own
+copy, where its filetests see it. A gap is not judged again, so a gap only a
+filetest kills stays a gap. A mutant that
 does not compile is an error of this script, never a kill; but a `+`, `-` or
 number flip that does not compile (a string's `+`, an array's size) is dropped and
 counted, unless GAPS lists it. A comparison or logic flip changes no type, so one
@@ -40,7 +45,9 @@ GAPS = {
     "r/seal/seal.gno: height, _ = strconv.ParseInt(f[1], 10, 64) [64 -> 63]": "equivalent: a block height stays below 2^62, where a 63-bit parse reads it alike",
 }
 # Mutations that are not guards: (file, text found exactly once, replacement).
-EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"')]
+EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"'),
+         # A guard that panics inside its call (F5056), switched off where its import stays used.
+         ("r/satellite/satellite.gno", "\truntime.AssertOriginCall()\n", "\tif false {\n\t\truntime.AssertOriginCall()\n\t}\n")]
 # A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
 # realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
 SECONDS_A_COPY = 1.5
@@ -162,27 +169,28 @@ class Stopped(Exception):
     """A gno test run stopped GRACE seconds past its limit: its package has no verdict, and the check fails by its name."""
 
 
-def run(pkg, packages, cases):
-    """gno test's output for the untouched package (m0) and each case (m1…), a (file, source) pair; Stopped when gno did
-    not end GRACE seconds past its limit."""
+def run(pkg, packages, copies):
+    """gno test's output for copies of pkg, m0 first, each a (file, source) pair, (None, None) for the untouched package;
+    Stopped when gno did not end GRACE seconds past its limit."""
     gno = os.path.abspath(os.environ["GNO"])  # gno runs from temporary folders
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy("gnowork.toml", tmp)
         for other in packages - {pkg}:  # imported packages; pkg's copies take its module path
             shutil.copytree(other, os.path.join(tmp, other))
-        for i, (file, src) in enumerate([(None, None)] + cases):
+        for i, (file, src) in enumerate(copies):
             shutil.copytree(pkg, os.path.join(tmp, f"m{i}"))
             if file:
                 with open(os.path.join(tmp, f"m{i}", os.path.relpath(file, pkg)), "w") as f:
                     f.write(src)
-        dirs = [f"./m{i}" for i in range(len(cases) + 1)]
+        dirs = [f"./m{i}" for i in range(len(copies))]
         # -timeout: a mutant that loops forever fails the check instead of hanging the commit; gno's timeout ends the
         # whole run, so the mutants still running get no result. One run for all the copies, its limit grown with them:
         # a slow mutant takes the time the fast ones leave, and each run of its own would start gno's workers again.
         limit = max(LEAST, math.ceil(SECONDS_A_COPY * len(dirs)))
         try:
+            # errors="replace": a failing test may print bytes that are no UTF-8, read as U+FFFD (F5062)
             out = subprocess.run([gno, "test", "-timeout", f"{limit}s", *dirs], cwd=tmp, capture_output=True, text=True,
-                                 timeout=limit + GRACE)
+                                 errors="replace", timeout=limit + GRACE)
         except subprocess.TimeoutExpired:
             raise Stopped(f"FAIL  gno test did not end {GRACE} s past its own time limit of {limit} s, and was stopped: in {pkg}, no mutant has a verdict")
         return out.stdout + out.stderr
@@ -210,7 +218,7 @@ def main():
         for label, *_ in cases:  # each key is seen, judged or not: a package with no verdict calls none of its gaps stale
             seen[label] = seen.get(label, 0) + 1
         try:
-            out = run(pkg, packages, [(f, src) for _, f, src, _ in cases])
+            out = run(pkg, packages, [(None, None)] + [(f, src) for _, f, src, _ in cases])
         except Stopped as stopped:
             print(stopped)
             failed = True
@@ -218,8 +226,13 @@ def main():
         if verdict(out, 0) != "survives":
             sys.exit(f"FAIL  control: {pkg}'s untouched copy does not pass\n{out}")
         dropped = 0
-        for i, (label, _, _, droppable) in enumerate(cases, 1):
+        for i, (label, file, src, droppable) in enumerate(cases, 1):
             got, want = verdict(out, i), "survives" if label in GAPS else "killed"
+            if got == "survives" and label not in GAPS:  # its filetests ran against m0: judged again alone (F5050)
+                try:
+                    got = verdict(run(pkg, packages, [(file, src)]), 0)
+                except Stopped:
+                    got = "stopped"
             if got == "does not compile" and droppable and label not in GAPS:
                 dropped += 1
                 continue

@@ -910,6 +910,12 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
    so no filetest rents, and its `Events:`, `Gas:` and `Storage:` stay unpinned. Unit tests
    cannot read events at all. Found by slice 11c (F5052, five tries with their errors);
    until gno lets a filetest deploy as a chosen address, they are checked at deploy.
+11. **What `gno test` cannot see of the slot realm is checked at its deploy, before
+   `Unpause`.** Besides item 10: the chain restricts no `ugnot`, as a restricted one makes
+   every refunding takedown, withdraw and rent revert, and onyx-1's was read from its genesis
+   script only (`misc/deployments/onyx.gno.land/gen-genesis.sh:155`), never live, no realm
+   exposing it (F5043); `Owner()` is the deployer (D26); a wallet's own `Rent` call passes
+   `runtime.AssertOriginCall`, whose frame count `gno test` replaces with its own (F5056).
 
 ## Alternatives considered
 
