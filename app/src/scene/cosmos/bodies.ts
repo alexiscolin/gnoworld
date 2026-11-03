@@ -52,8 +52,7 @@ interface BodyView {
 /** The worlds a look wants, by id. */
 export type Wanted = ReadonlyMap<string, readonly [StarSystem, Orbiter]>;
 
-const SPHERE_WIDTH = 64;
-const SPHERE_HEIGHT = 48;
+const [SPHERE_WIDTH, SPHERE_HEIGHT] = [64, 48];
 
 export class Bodies {
   readonly #maps: BodyMaps;
@@ -76,6 +75,8 @@ export class Bodies {
   #diving = false;
   /** The screen, in the page's pixels, its lens, and the box of the page's text: the cosmos sets it, the labels read it. */
   sight: BodyView = { width: 1, height: 1, focal: 1, box: undefined };
+  // The eye rests at a system or a Plan, as the last look stood: the page's text box holds at the view at rest alone (7v's review).
+  #near = false;
 
   /** The device's `moved` is told once a body's programs are compiled: a look then stands it in place of its point. */
   constructor(maps: BodyMaps, owner: Disposer, device: EarthDevice) {
@@ -107,6 +108,7 @@ export class Bodies {
       if (held === undefined) this.#add(id, system, world);
       else Object.assign(held, { system, world });
     }
+    this.#near = near;
     for (const body of this.#held.values()) Object.assign(body, { shown: body.ready, near });
     this.#shown.length = 0;
     this.#shown.push(...this.#held.values());
@@ -182,9 +184,9 @@ export class Bodies {
     return this.#spot;
   }
 
-  // What the box of the page's text leaves of a body at `at`.
+  // What the box of the page's text leaves of a body at `at`: none at a system's view, where the page's text, the hero, gives way (7v).
   #room(at: Vector3, radius: number): number {
-    const { box } = this.sight;
+    const box = this.#near ? undefined : this.sight.box;
     return box === undefined ? 1 : clearOf(this.seen(at, radius), box);
   }
 
@@ -196,7 +198,7 @@ export class Bodies {
 
   /** How much of what stands at `place` on the map, `radius` pixels wide, from `eye`, the box of the page's text leaves. */
   shows(place: Point, radius: number, eye: Point): number {
-    const { box } = this.sight;
+    const box = this.#near ? undefined : this.sight.box;
     return box === undefined ? 1 : clearOf({ ...this.seen(this.fromEye(place, eye, this.#ahead), 0), radius }, box);
   }
 

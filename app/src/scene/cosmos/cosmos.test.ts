@@ -3251,6 +3251,21 @@ describe("a system's arrival (7d3)", () => {
   const ownPoints = (scene: ReturnType<typeof made>, system: StarSystem) =>
     pointsOf(scene).filter(({ star }) => distanceOf(star, system.place) < 1e-4);
 
+  // 7v's review (F4459): the hero, whose box keeps the page's text clear, gives way at a system; its box held on there and put out the worlds
+  // standing where it stood (gnoswap's access in its Plan, a name with no world).
+  it("stands a system's worlds where the hero's box stood, which gives way at a system, and keeps the box at rest", async () => {
+    const scene = made();
+    await shown(scene, ONYX);
+    scene.cosmos.keepClear({ left: 0, top: 0, right: WIDTH, bottom: HEIGHT });
+    scene.cosmos.tick(HOME, 0);
+    expect(scene.cosmos.stats().screen.bodies).toEqual([]);
+    await arrived(scene, GNOSWAP, true);
+    expect(scene.cosmos.stats().screen.bodies.length).toBe(planOf(named(held(ONYX), GNOSWAP)).postcard.worlds.length);
+    const { to } = await arrived(scene, undefined);
+    scene.cosmos.tick(to, 0);
+    expect(scene.cosmos.stats().screen.bodies).toEqual([]);
+  });
+
   it("comes to gnoswap's Plan when the page asks the Plan: the eye at the Plan's, the Plan's worlds its bodies, no speck", async () => {
     const scene = made();
     await shown(scene, ONYX);
