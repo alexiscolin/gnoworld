@@ -158,11 +158,16 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* While the number comes, three hidden digits keep its room (7n): a count of 100 to 999 fills it, whatever face draws the line. `3ch`
-     and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits: the actions slid. */
+  /* While the number comes, three hidden digits and the space after them keep its room (7n): a count of 100 to 999 fills it, whatever face
+     draws the line. `3ch` and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits. */
   .figure:empty::before {
     visibility: hidden;
-    content: "000";
+    content: "000 ";
+  }
+
+  /* The word after the room, "Worlds" in the page (F4641), drawn as the count's "worlds", so the line holds its width when the number comes. */
+  .coming {
+    text-transform: lowercase;
   }
 
   @media (prefers-reduced-motion: reduce) {
