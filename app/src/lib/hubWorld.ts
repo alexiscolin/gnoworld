@@ -1,6 +1,6 @@
 // Where a world leads on the page, which the rail's links (7i), the labels' doors and the home's ticker's trends (7t) share: its hub's page,
 // else its first realm's view; the Earth to its own. A hub's world is core's hubWorldOf.
-import { hubWorldOf, REALM_PREFIX } from "@gnoworld/core";
+import { EARTH, hubWorldOf, REALM_PREFIX } from "@gnoworld/core";
 
 /** The Earth's page, and the hubs the page lists, by their worlds. */
 export interface WorldPlaces {
@@ -11,9 +11,6 @@ export interface WorldPlaces {
     readonly realms?: readonly string[] | undefined;
   }[];
 }
-
-/** The Earth's id, as the cosmos holds it. */
-export const EARTH = "earth";
 
 /** A world as its page is found: its id, and its realms, the first the one its view opens. */
 interface Paged {

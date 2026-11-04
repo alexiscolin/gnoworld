@@ -1,10 +1,10 @@
 // The rail's worlds (7i): the asks core orders, read from the worlds' file and what is known of them now as the labels read it, each with the
 // page it links to. The order changes at most once a minute, and never while the reader is on the rail (ADR-0002 §1's rail).
-import { chooseRail, daysSince, type RailAsk, type RailWorld } from "@gnoworld/core";
+import { chooseRail, daysSince, EARTH, type RailAsk, type RailWorld } from "@gnoworld/core";
 import { createStore } from "zustand/vanilla";
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { signalsOf } from "../../scene/cosmos/labelAsks.ts";
-import { EARTH, pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
+import { pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
 import type { Known } from "./worldsFeed.ts";
 
 /** The least time between two orders of the rail. */
