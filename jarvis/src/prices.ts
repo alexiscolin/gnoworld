@@ -5,6 +5,8 @@
 import { z } from "zod";
 
 export const MODELS = ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"] as const;
+/** A dollar in nano-dollars, the unit of every price, cost and cap. */
+export const DOLLAR = 1_000_000_000;
 export type Model = (typeof MODELS)[number];
 
 interface Rates {

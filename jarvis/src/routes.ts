@@ -15,6 +15,7 @@ import type { Log } from "@gnoworld/service/log";
 import type { Budget } from "./budget.ts";
 import { refusal, type Reply, type Routes } from "./http.ts";
 import type { Question, Result } from "./loop.ts";
+import { DOLLAR } from "./prices.ts";
 
 type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
 interface Parts {
@@ -24,7 +25,6 @@ interface Parts {
   readonly log: Log;
 }
 
-const DOLLAR = 1_000_000_000;
 const answered = (answer: JarvisAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */

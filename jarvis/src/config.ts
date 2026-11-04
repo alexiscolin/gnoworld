@@ -5,7 +5,7 @@
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { absolute, databasePath, host, parseSettings, port, readWord, Secret, whole } from "@gnoworld/service/settings";
-import { MODELS, type Model } from "./prices.ts";
+import { DOLLAR, MODELS, type Model } from "./prices.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 
 export interface JarvisConfig {
@@ -45,8 +45,6 @@ export interface Served {
   // How long a stop waits for the questions in flight before it cuts them (D178).
   drainMs: number;
 }
-
-const DOLLAR = 1_000_000_000;
 
 // The settings read on or off; their schemas built at each read (F412).
 const servedShape = () => ({
