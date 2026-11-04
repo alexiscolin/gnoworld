@@ -180,7 +180,7 @@ export function LineView(props: LineViewProps) {
       {fresh ? <NewDivider /> : null}
       <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
-      <div data-line-text="">
+      <div data-line-text="" className={votes === undefined ? undefined : styles["wide"]}>
         <Body line={line} votes={votes} react={react}>
           <LineText blocks={blocks} me={me} known={known} stop={row.links} />
         </Body>

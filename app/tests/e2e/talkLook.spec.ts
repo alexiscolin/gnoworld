@@ -121,11 +121,12 @@ test.describe("reactions, replies and edits, as they look", () => {
       3,
     );
     const list = page.getByRole("list", { name: "Messages" });
-    // The 20 reactions, without the root's chip of its replies (4d's threads), which is no reaction.
+    // The 20 reactions, without the root's chip of its replies (4d's threads) or the author's name, which opens their card
+    // (8d): neither is a reaction.
     await expect(
       lines(page)
         .first()
-        .getByRole("button")
+        .locator("button:not([aria-haspopup])")
         .filter({ hasNotText: /^\d+ repl/ }),
     ).toHaveCount(20);
     expect(await list.evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);

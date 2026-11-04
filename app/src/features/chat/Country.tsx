@@ -13,18 +13,15 @@ const NOT_COUNTRIES = "AC AN BU CP CQ CS DD DG DY EA EU EZ FX HV IC NH QO RH SU 
 export const countryName = (code: string | undefined): string | undefined =>
   code === undefined || NOT_COUNTRIES.includes(code) ? undefined : REGIONS.of(code);
 
-/** A country's code, named for a screen reader; nothing for no country. With `named`, its name after it too (who is here). */
-export function Country({ code, named = false }: { code: string | undefined; named?: boolean }) {
+/** A country's code, named for a screen reader and in its title; nothing for no country. */
+export function Country({ code }: { code: string | undefined }) {
   const name = countryName(code);
   if (name === undefined) return null;
   return (
-    <>
-      <span className={styles["country"]} title={name} data-line-country="">
-        <span aria-hidden="true">{code}</span>
-        {named ? null : <span className="visually-hidden">{name}</span>}
-      </span>
-      {named ? <span className={styles["countryName"]}>{name}</span> : null}
-    </>
+    <span className={styles["country"]} title={name} data-line-country="">
+      <span aria-hidden="true">{code}</span>
+      <span className="visually-hidden">{name}</span>
+    </span>
   );
 }
 

@@ -68,7 +68,7 @@ export function People({ members, connected, me, onMessage, canFollow = false, l
                   <Who nick={nick} account={account} />
                 )}
                 <Cluster space="2xs">
-                  <Country code={countries.get(nick)} named />
+                  <Country code={countries.get(nick)} />
                   {canFollow && account && nick !== me ? (
                     <Suspense fallback={null}>
                       <FollowButton kind="people" id={nick} size="m" />
