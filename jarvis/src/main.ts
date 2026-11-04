@@ -1,14 +1,17 @@
 // jarvis's process (ADR-0002 §5, §7): its switch and settings, its file, the budget, and, switched on alone, its key,
-// its spans, its skills and places, gnomcp read-only, its cards, gnoscope behind its own switch and the loop; then its
+// its spans, its skills and places, gnomcp read-only, its cards, gnoscope behind its own switch, the loop, the translator
+// and the digests (10k); then its
 // HTTP face where its settings say. On SIGTERM it stops taking questions, lets those in flight end within its wait,
 // then closes gnomcp, gnoscope, the spans and its file, and exits by itself (D171, D178). Started as the image starts
 // it: node --disallow-code-generation-from-strings jarvis/src/main.ts
 import { randomBytes } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "@gnoworld/service/db";
 import { stop } from "@gnoworld/service/http";
 import { logger, type Log } from "@gnoworld/service/log";
 import { makeBudget, type Budget } from "./budget.ts";
 import { loadJarvisConfig, loadServed } from "./config.ts";
+import { makeDigests } from "./digest.ts";
 import { startGnomcp } from "./gnomcp.ts";
 import { serve } from "./http.ts";
 import { makeLoop } from "./loop.ts";
@@ -22,6 +25,7 @@ import { cardTools } from "./tools/cards.ts";
 import { startGnoscope } from "./tools/gnoscope.ts";
 import { loadPlaces, placesTool } from "./tools/places.ts";
 import { startTracing } from "./tracing.ts";
+import { makeTranslator } from "./translate.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start jarvis with ${FLAG} (ADR-0002 §7)`);
@@ -41,13 +45,14 @@ for (const kind of ["ask", "translate"] as const) {
 }
 // A start refused closes the file too, so nothing is left behind it (F5289).
 const running = served.on
-  ? await startModel(log, budget).catch((error: unknown) => {
+  ? await startModel(log, budget, db).catch((error: unknown) => {
       db.close();
       throw error;
     })
   : undefined;
 let draining = false;
-const jarvis = await serve(jarvisRoutes({ ask: running?.ask, budget, log }), {
+const routes = { ask: running?.ask, translate: running?.translate, digest: running?.digest, budget, log };
+const jarvis = await serve(jarvisRoutes(routes), {
   ...served.listen,
   log,
   ready: () => !draining,
@@ -55,7 +60,7 @@ const jarvis = await serve(jarvisRoutes({ ask: running?.ask, budget, log }), {
 
 // Switched on: what answers a question, each part checked at its start, and how it closes. What starts no child comes
 // first; past gnomcp's start, a part refused ends gnomcp before the start fails (F5289).
-async function startModel(log: Log, budget: Budget) {
+async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
   const config = loadJarvisConfig(process.env);
   // The model's one client refuses an environment that would add headers to its requests.
   const send = connectAnthropic(config.anthropicKey, config.caps.callTimeoutMs);
@@ -70,8 +75,14 @@ async function startModel(log: Log, budget: Budget) {
     const tools = toolbox({ profiles, gnomcp, skills, places: placesTool(places), cards, gnoscope, log });
     const { tracer } = tracing;
     const loop = makeLoop({ send, budget, log, tracer, model: config.models.main, caps: config.caps, skills, tools });
+    // Translations and digests on the fast model (ADR-0002 §5, "Models").
+    const fast = { send, budget, log, tracer, model: config.models.fast };
+    const translator = makeTranslator({ ...fast, db, retries: config.caps.retries, now: Date.now });
+    const digests = makeDigests({ db, places, cards, loop: { ...fast, caps: config.caps }, now: Date.now });
     return {
       ask: loop.ask,
+      translate: translator.translate,
+      digest: digests.digest,
       close: async (): Promise<void> => {
         await gnomcp.close();
         await gnoscope.close();

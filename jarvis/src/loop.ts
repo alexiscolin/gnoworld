@@ -20,10 +20,11 @@ import { keepCards, type Asked, type Cards, type Kept } from "./tools/kept.ts";
 import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
-/** A question: its words, and its room's lines, each a text. */
+/** A question: its words, its room's lines, each a text, and what the server read for it, each by its source's name. */
 export interface Question {
   readonly text: string;
   readonly room: readonly string[];
+  readonly read?: readonly { readonly source: string; readonly text: string }[];
 }
 /** How a question ended: its answer and its cards, or why there is none. */
 export type Result =
@@ -44,6 +45,8 @@ interface Parts {
   readonly caps: JarvisConfig["caps"];
   readonly skills: { readonly index: readonly { name: string; description: string }[]; readonly digest: string };
   readonly tools: { readonly allowlist: Allowlist<Definition>; readonly run: Runs };
+  // The system prompt of a loop with one job, such as a realm's digest, in place of the concierge's.
+  readonly system?: string | undefined;
   // The tag's random source, node:crypto's by default; a tool's time, 30 s by default; the wait between attempts.
   readonly random?: ((size: number) => Uint8Array) | undefined;
   readonly toolTimeoutMs?: number | undefined;
@@ -66,7 +69,7 @@ interface Run {
 
 /** The loop for these parts, and its prompt's version: the SHA-256 of its system prompt, skills and tools. */
 export function makeLoop(parts: Parts) {
-  const system = systemOf(parts.skills.index);
+  const system = parts.system ?? systemOf(parts.skills.index);
   const hash = createHash("sha256");
   for (const part of [system, parts.skills.digest, JSON.stringify(parts.tools.allowlist.offered())]) {
     hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
@@ -124,9 +127,10 @@ const invalid = (): Result => ({ kind: "invalid" });
 const askable = (text: string, cap: number) =>
   text.length <= 2 * cap && Array.from(text).length <= cap && !isBlank(text);
 
-function opening(blocks: Untrusted, { text, room }: Question): Anthropic.TextBlockParam[] {
+function opening(blocks: Untrusted, { text, room, read = [] }: Question): Anthropic.TextBlockParam[] {
   const lines = room.length === 0 ? [] : [blocks.wrap("room", room.join("\n"))];
-  return [blocks.rule, ...lines, blocks.wrap("question", text)].map((words) => ({
+  const sources = read.map(({ source, text: words }) => blocks.wrap(source, words));
+  return [blocks.rule, ...lines, ...sources, blocks.wrap("question", text)].map((words) => ({
     type: "text" as const,
     text: words,
   }));

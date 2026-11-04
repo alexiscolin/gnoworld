@@ -3,14 +3,20 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisBudgets,
+  JarvisMadeDigest,
+  JarvisTranslation,
   type AnswerButton,
   type JarvisAsk,
+  type JarvisDigestRequest,
+  type JarvisTranslate,
 } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serve } from "./http.ts";
 import type { Question, Result } from "./loop.ts";
 import { jarvisRoutes } from "./routes.ts";
 import { budgetFor, capture } from "./testing/kit.ts";
+import type { Digested } from "./digest.ts";
+import type { Translated } from "./translate.ts";
 
 const DOLLAR = 1_000_000_000;
 const ROOM = "#bubble";
@@ -20,15 +26,22 @@ afterEach(async () => {
 });
 
 type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
+type Translate = (asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>;
+type DigestOf = (asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>;
 const asking = (result: Result) => vi.fn<Ask>(() => Promise.resolve(result));
 
 // jarvis's routes on a port of their own, with the loop's ask the test gives (none: switched off) and a budget whose
 // caps start at $45 and $5.
-const served = async ({ ask }: { ask?: Ask | undefined } = {}) => {
+interface Served {
+  ask?: Ask | undefined;
+  translate?: Translate | undefined;
+  digest?: DigestOf | undefined;
+}
+const served = async ({ ask, translate, digest }: Served = {}) => {
   const { log, events, raw } = capture();
   const budget = budgetFor(45 * DOLLAR);
   budget.budget.change("translate", 5 * DOLLAR);
-  const jarvis = await serve(jarvisRoutes({ ask, budget: budget.budget, log }), {
+  const jarvis = await serve(jarvisRoutes({ ask, translate, digest, budget: budget.budget, log }), {
     host: "127.0.0.1",
     port: 0,
     names: ["127.0.0.1"],
@@ -342,5 +355,122 @@ describe("jarvis's routes", () => {
     expect(Object.keys(routes).sort()).toEqual(Object.values(JARVIS_PATHS).sort());
     expect(Object.keys(routes[JARVIS_PATHS.ask] ?? {})).toEqual(["POST"]);
     expect(Object.keys(routes[JARVIS_PATHS.budgets] ?? {}).sort()).toEqual(["GET", "POST"]);
+  });
+});
+
+describe("POST /translate: a message's translation", () => {
+  const asked = (): JarvisTranslate => ({ text: "The vote closes at block 1,204.", language: "fr" });
+  const translating = (result: Translated) => vi.fn<Translate>(() => Promise.resolve(result));
+
+  it("answers off while jarvis is switched off, once its body passed its schema, before any work", async () => {
+    const { post } = await served();
+    const response = await post(JARVIS_PATHS.translate, asked());
+    expect([response.status, JarvisTranslation.parse(await response.json())]).toEqual([200, { status: "off" }]);
+    expect((await post(JARVIS_PATHS.translate, { ...asked(), room: "#bubble" })).status).toBe(400);
+  });
+
+  it("hands the text and its language to the translator with the request's signal, and answers its translation", async () => {
+    const translate = translating({ kind: "translated", text: "Le vote se termine au bloc 1 204." });
+    const { post } = await served({ translate });
+    const response = await post(JARVIS_PATHS.translate, asked());
+    expect([response.status, JarvisTranslation.parse(await response.json())]).toEqual([
+      200,
+      { status: "translated", text: "Le vote se termine au bloc 1 204." },
+    ]);
+    expect(translate.mock.calls.map(([value, signal]) => [value, signal instanceof AbortSignal])).toEqual([
+      [asked(), true],
+    ]);
+  });
+
+  it.each([
+    ["the original", { kind: "original" }, [200, { status: "original" }]],
+    ["spent", { kind: "spent" }, [200, { status: "spent" }]],
+    ["a failure", { kind: "failed" }, [502, { error: "internal" }]],
+    ["its asker gone", { kind: "gone" }, [503, { error: "not_ready" }]],
+  ] as const)("answers %s as the door's schema reads it", async (_, result, answer) => {
+    const { post } = await served({ translate: translating(result) });
+    const response = await post(JARVIS_PATHS.translate, asked());
+    expect([response.status, await response.json()]).toEqual(answer);
+  });
+
+  it("refuses a body its schema refuses, logged by its route, before any work", async () => {
+    const translate = translating({ kind: "original" });
+    const { post, events } = await served({ translate });
+    for (const body of [{ text: "", language: "fr" }, { text: "Hi", language: "xx" }, { text: "Hi" }]) {
+      expect((await post(JARVIS_PATHS.translate, body)).status).toBe(400);
+    }
+    expect(translate).not.toHaveBeenCalled();
+    expect(events()[0]).toEqual({
+      event: "jarvis_refused",
+      route: JARVIS_PATHS.translate,
+      method: "POST",
+      status: 400,
+      error: "refused",
+    });
+  });
+
+  it("logs no text and no translation", async () => {
+    const { post, raw } = await served({ translate: translating({ kind: "translated", text: "Le secret 42." }) });
+    await post(JARVIS_PATHS.translate, { text: "The secret 42.", language: "fr" });
+    expect(raw()).not.toMatch(/secret/i);
+  });
+});
+
+describe("POST /digest: a realm's digest", () => {
+  const asked = (): JarvisDigestRequest => ({ universe: "onyx", realm: "gno.land/r/demo/poll" });
+  const made = (): Extract<JarvisMadeDigest, { status: "digest" }> => ({
+    status: "digest",
+    digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
+    proposal: null,
+    height: 1204,
+    made: false,
+  });
+  const digesting = (result: Digested) => vi.fn<DigestOf>(() => Promise.resolve(result));
+
+  it("answers off while jarvis is switched off, once its body passed its schema, before any work", async () => {
+    const { post } = await served();
+    const response = await post(JARVIS_PATHS.digest, asked());
+    expect([response.status, JarvisMadeDigest.parse(await response.json())]).toEqual([200, { status: "off" }]);
+    expect((await post(JARVIS_PATHS.digest, { ...asked(), page: "# forged" })).status).toBe(400);
+  });
+
+  it("hands the realm to the digests with the request's signal, and answers the digest with its height", async () => {
+    const { digest: body, height } = made();
+    const digest = digesting({ kind: "digest", digest: body, proposal: null, height });
+    const { post } = await served({ digest });
+    const response = await post(JARVIS_PATHS.digest, asked());
+    expect([response.status, JarvisMadeDigest.parse(await response.json())]).toEqual([200, made()]);
+    expect(digest.mock.calls.map(([value, signal]) => [value, signal instanceof AbortSignal])).toEqual([
+      [asked(), true],
+    ]);
+  });
+
+  it.each([
+    ["none", { kind: "none" }, [200, { status: "none", made: false }]],
+    ["spent", { kind: "spent" }, [200, { status: "spent" }]],
+    ["a universe jarvis does not read", { kind: "invalid" }, [400, { error: "refused" }]],
+    ["a failure", { kind: "failed" }, [502, { error: "internal" }]],
+    ["its asker gone", { kind: "gone" }, [503, { error: "not_ready" }]],
+  ] as const)("answers %s as the door's schema reads it", async (_, result, answer) => {
+    const { post } = await served({ digest: digesting(result) });
+    const response = await post(JARVIS_PATHS.digest, asked());
+    expect([response.status, await response.json()]).toEqual(answer);
+  });
+
+  it("are routes with the one method the door calls", () => {
+    const { log } = capture();
+    const routes = jarvisRoutes({ ask: undefined, budget: budgetFor(DOLLAR).budget, log });
+    expect(Object.keys(routes[JARVIS_PATHS.translate] ?? {})).toEqual(["POST"]);
+    expect(Object.keys(routes[JARVIS_PATHS.digest] ?? {})).toEqual(["POST"]);
+  });
+
+  it("says jarvis made the digest when its making told so, and only then (10k-1)", async () => {
+    const result = { kind: "digest", digest: made().digest, proposal: null, height: 1204 } as const;
+    const digest = vi.fn<DigestOf>((_asked, _signal, wasMade) => {
+      wasMade?.();
+      return Promise.resolve(result);
+    });
+    const { post } = await served({ digest });
+    expect(await (await post(JARVIS_PATHS.digest, asked())).json()).toEqual({ ...made(), made: true });
   });
 });

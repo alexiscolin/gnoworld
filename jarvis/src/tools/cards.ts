@@ -26,7 +26,8 @@ type Ready = Setup & { readonly seen: Map<string, number> };
 
 // A page is read only as far as 64 KiB, cut on its last line's end so no number is read cut (D102).
 const PAGE_BYTES = 64 * 1024;
-const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
+/** A card refused, said to the model with what is missing. */
+export const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
 const kept = (what: string): Ran => ({ ok: true, isError: false, text: `Kept: ${what}` });
 
 function definitionsOf([first, ...rest]: readonly string[]) {
@@ -67,14 +68,23 @@ function heightOf(status: Ran, universe: Universe): number | undefined {
 // The page inside gnomcp 0.11.0's wrapping (read live, 2026-11-04), cut to its last whole line within 64 KiB.
 function pageOf(text: string, realm: string): string {
   const [open, close] = [`<untrusted_content kind="render" source="${realm}">\n`, "\n</untrusted_content>"];
-  const page = text.startsWith(open) && text.endsWith(close) ? text.slice(open.length, -close.length) : text;
+  return cutPage(text.startsWith(open) && text.endsWith(close) ? text.slice(open.length, -close.length) : text);
+}
+
+/** A realm's page cut to its last whole line within 64 KiB, so no number is read cut (D102). */
+export function cutPage(page: string): string {
   // encodeInto reads no more of the page than its 64 KiB hold, whatever the page's size.
   const { read } = new TextEncoder().encodeInto(page, new Uint8Array(PAGE_BYTES));
   if (read === page.length) return page;
   return page.slice(0, page.lastIndexOf("\n", read - 1) + 1);
 }
 
-type Sourced = { ok: true; at: ReadAt; read: Read } | { ok: false; why: string };
+/** A realm's reads that call: where and at what height, and what was read. */
+export interface RealmRead {
+  readonly at: ReadAt;
+  readonly read: Read;
+}
+type Sourced = ({ ok: true } & RealmRead) | { ok: false; why: string };
 interface Realm {
   readonly profile: string;
   readonly realm: string;
@@ -129,16 +139,29 @@ function whyOf(
 type Definitions = ReturnType<typeof definitionsOf>;
 type Args<At extends 0 | 1 | 2> = z.output<Definitions[At]["args"]>;
 
+/** A digest kept once the realm's reads hold it, never the asker's words: one digest serves every reader. */
+export function keepDigest({ at, read }: RealmRead, args: { realm: string; digest: Digest }, asked: Asked): Ran {
+  const checked = grounded(args.digest, sourcesOf(read));
+  if (!checked.ok) return refused(whyOf(checked));
+  const card = { kind: "digest", realm: args.realm, read: at, digest: checked.digest } as const;
+  if (!asked.cards.keep(card)) return refused("its call's time is up, or the answer holds its digests.");
+  return kept(`the digest of ${args.realm}, read at block ${String(at.height)}, shows with the answer.`);
+}
+
 async function digestCard(setup: Ready, args: Args<0>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("digest")) return refused(`an answer holds ${String(CARDS.digests)} digests at most.`);
   const forms = args.digest.blocks.some((block) => block.type === "form");
   const sourced = await readRealm(setup, { profile: args.profile, realm: args.realm, forms, signal: asked.signal });
-  if (!sourced.ok) return refused(sourced.why);
-  const checked = grounded(args.digest, sourcesOf(sourced.read));
+  return sourced.ok ? keepDigest(sourced, args, asked) : refused(sourced.why);
+}
+
+/** A proposal kept once its reads ground it as a form; `read` holds the asker's words when its arguments may take them. */
+export function keepProposal({ at, read }: RealmRead, action: ProposedAction, asked: Asked): Ran {
+  const checked = grounded({ blocks: [{ type: "form", action }] }, sourcesOf(read));
   if (!checked.ok) return refused(whyOf(checked));
-  const card = { kind: "digest", realm: args.realm, read: sourced.at, digest: checked.digest } as const;
-  if (!asked.cards.keep(card)) return refused("its call's time is up, or the answer holds its digests.");
-  return kept(`the digest of ${args.realm}, read at block ${String(sourced.at.height)}, shows with the answer.`);
+  if (!asked.cards.keep({ kind: "proposal", read: at, action }))
+    return refused("its call's time is up, or the answer holds its proposal.");
+  return kept(`the proposal of ${action.function}, read at block ${String(at.height)}, shows with the answer.`);
 }
 
 async function proposalCard(setup: Ready, args: Args<1>, asked: Asked): Promise<Ran> {
@@ -150,16 +173,7 @@ async function proposalCard(setup: Ready, args: Args<1>, asked: Asked): Promise<
     signal: asked.signal,
   });
   if (!sourced.ok) return refused(sourced.why);
-  const checked = grounded(
-    { blocks: [{ type: "form", action: args.action }] },
-    sourcesOf(withQuestion(sourced.read, asked)),
-  );
-  if (!checked.ok) return refused(whyOf(checked));
-  if (!asked.cards.keep({ kind: "proposal", read: sourced.at, action: args.action }))
-    return refused("its call's time is up, or the answer holds its proposal.");
-  return kept(
-    `the proposal of ${args.action.function}, read at block ${String(sourced.at.height)}, shows with the answer.`,
-  );
+  return keepProposal({ at: sourced.at, read: withQuestion(sourced.read, asked) }, args.action, asked);
 }
 
 // A button to fly reads no chain, so its label may state no chain fact; its place is one of the data's.
@@ -186,6 +200,18 @@ async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ra
   return kept(`the button to ${button.action.function}, read at block ${String(sourced.at.height)}.`);
 }
 
+/** A call that names no tool of its table, or whose arguments its tool's own schema refuses: nothing runs. */
+export const no = (): Promise<Ran> => Promise.resolve({ ok: false, reason: "refused" });
+
+/** A call's arguments parsed again by its tool's own schema; none when it names another tool or its schema refuses it. */
+export function argsOf<A extends z.ZodType>(
+  { name, args }: { readonly name: string; readonly args: A },
+  call: { readonly name: string; readonly args: unknown },
+): z.output<A> | undefined {
+  if (call.name !== name) return undefined;
+  const parsed = args.safeParse(call.args);
+  return parsed.success ? parsed.data : undefined;
+}
 /** The card tools for Jarvis's chains, each named after its universe; throws when one names no universe of the data. */
 export function cardTools(setup: Setup) {
   const strange = setup.chains.find((chain) => !setup.places.universes.has(chain));
@@ -196,20 +222,14 @@ export function cardTools(setup: Setup) {
   const ready: Ready = { ...setup, seen: new Map() };
   return {
     definitions,
+    /** The chain profiles the cards read, each a universe's. */
+    chains: setup.chains,
     /** A card's call, its arguments parsed again by its own schema; refused when they fail it or it is no card's. */
     run(call: { readonly name: string; readonly args: unknown }, asked: Asked): Promise<Ran> {
-      const no = Promise.resolve<Ran>({ ok: false, reason: "refused" });
-      if (call.name === digest.name) {
-        const args = digest.args.safeParse(call.args);
-        return args.success ? digestCard(ready, args.data, asked) : no;
-      }
-      if (call.name === proposal.name) {
-        const args = proposal.args.safeParse(call.args);
-        return args.success ? proposalCard(ready, args.data, asked) : no;
-      }
-      if (call.name !== button.name) return no;
-      const args = button.args.safeParse(call.args);
-      return args.success ? buttonCard(ready, args.data, asked) : no;
+      const given = { digest: argsOf(digest, call), proposal: argsOf(proposal, call), button: argsOf(button, call) };
+      if (given.digest !== undefined) return digestCard(ready, given.digest, asked);
+      if (given.proposal !== undefined) return proposalCard(ready, given.proposal, asked);
+      return given.button === undefined ? no() : buttonCard(ready, given.button, asked);
     },
   };
 }

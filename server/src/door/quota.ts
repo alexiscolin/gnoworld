@@ -21,11 +21,22 @@ export interface QuotaValues {
 }
 
 export interface Quota {
-  // Counts a question of the account's quota, by its kind; false, counting nothing, once that quota is reached.
-  take: (account: Address, named: boolean) => boolean;
+  // Counts a question of the account's quota, by its kind, on the day of `at` (now by default); false, counting nothing,
+  // once that quota is reached.
+  take: (account: Address, named: boolean, at?: number) => boolean;
+  // A question given back to the day of `at`, the time it was taken (now by default): a digest jarvis made nothing for
+  // costs none (10k-1).
+  giveBack: (account: Address, at?: number) => void;
   values: () => QuotaValues;
   // A quota, or an account's own taken off or given back; full past the allowlist's cap.
   change: (change: Exclude<JarvisChange, { setting: "budget" }>) => "changed" | "full";
+}
+
+/** What a route that counts questions is given: the quota, and whether an account has a mainnet name, false whenever
+ * that could not be read (names.ts). */
+export interface Counted<K extends keyof Quota> {
+  quota: Pick<Quota, K>;
+  named: (account: Address) => Promise<boolean>;
 }
 
 // A time's day in UTC, as its date: toISOString writes UTC whatever the machine's zone.
@@ -51,6 +62,7 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
       WHERE EXISTS (SELECT 1 FROM jarvis_unlimited WHERE address = :account)
         OR count < (SELECT value FROM jarvis_settings WHERE name = :kind)
       RETURNING count`),
+    giveBack: db.prepare("UPDATE jarvis_asked SET count = count - 1 WHERE account = ? AND day = ? AND count > 0"),
     // At most 500 past rows a question, by the day's index: a day's turn never holds the event loop.
     purge: db.prepare(
       "DELETE FROM jarvis_asked WHERE rowid IN (SELECT rowid FROM jarvis_asked WHERE day < ? LIMIT 500)",
@@ -64,10 +76,13 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
       for (const address of first.unlimited) sql.allow.run({ address, at: now(), cap: DOOR_CAPS.unlimited });
   });
   return {
-    take(account, named) {
-      const day = dayOf(now());
+    take(account, named, at = now()) {
+      const day = dayOf(at);
       sql.purge.run(day);
       return sql.take.get({ account, day, kind: named ? "quota" : "quota_unnamed" }) !== undefined;
+    },
+    giveBack(account, at = now()) {
+      sql.giveBack.run(account, dayOf(at));
     },
     values() {
       const rows = Rows.parse(sql.settings.all());

@@ -216,3 +216,74 @@ describe("jarvis's budgets", () => {
     expect(await client.budgets()).toEqual({ ok: false, error: "down" });
   });
 });
+
+describe("a translation and a digest from jarvis (10k)", () => {
+  const TRANSLATE = () => ({ text: "The vote closes at block 1,204.", language: "fr" as const });
+  const DIGEST = () => ({ universe: "onyx", realm: "gno.land/r/demo/poll" });
+  const MADE = () => ({
+    status: "digest",
+    digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
+    proposal: null,
+    height: 1204,
+    made: true,
+  });
+
+  it("posts a line's text and its language to /translate, and reads the translation through its schema", async () => {
+    const translated = { status: "translated", text: "Le vote se termine au bloc 1 204." };
+    const jarvis = await fakeJarvis([json(translated), json({ status: "original" }), json({ status: "translated" })]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: true, answer: translated });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: true, answer: { status: "original" } });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "shape" });
+    expect(jarvis.heard.map(({ method, path }) => [method, path])[0]).toEqual(["POST", "/translate"]);
+    expect(JSON.parse(jarvis.heard[0]?.body ?? "")).toEqual(TRANSLATE());
+  });
+
+  it("posts a realm and its universe to /digest, and reads the digest through its schema", async () => {
+    const jarvis = await fakeJarvis([json(MADE()), json({ ...MADE(), height: 0 }), json({ error: "internal" }, 502)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: true, answer: MADE() });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "shape" });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "failed" });
+    expect(jarvis.heard.map(({ method, path }) => [method, path])[0]).toEqual(["POST", "/digest"]);
+    expect(JSON.parse(jarvis.heard[0]?.body ?? "")).toEqual(DIGEST());
+  });
+
+  it("answers each slow past its time, and down when nothing answers (red pass, R8)", async () => {
+    const jarvis = await fakeJarvis([never, never]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 200 });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "slow" });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "slow" });
+    const server = servers.pop();
+    server?.closeAllConnections();
+    server?.close();
+    if (server !== undefined) await once(server, "close");
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "down" });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "down" });
+  });
+
+  it("stops each with the request that asked", async () => {
+    const jarvis = await fakeJarvis([never, never]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 60_000 });
+    const [one, two] = [new AbortController(), new AbortController()];
+    const translating = client.translate(TRANSLATE(), one.signal);
+    const digesting = client.digest(DIGEST(), two.signal);
+    await expect.poll(() => jarvis.heard, { timeout: 30_000 }).toHaveLength(2);
+    one.abort();
+    two.abort();
+    expect([await translating, await digesting]).toEqual([
+      { ok: false, error: "gone" },
+      { ok: false, error: "gone" },
+    ]);
+  });
+
+  it("reads jarvis's refusal of a request as refused, never as its failure (the review's V3)", async () => {
+    const jarvis = await fakeJarvis([json({ error: "refused" }, 400), json({ error: "refused" }, 400)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.digest({ universe: "mars", realm: "gno.land/r/demo/poll" }, live())).toEqual({
+      ok: false,
+      error: "refused",
+    });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "refused" });
+  });
+});

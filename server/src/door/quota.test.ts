@@ -186,3 +186,24 @@ describe("the quota's counts", () => {
     expect(countOf(db, "g1today", "2026-11-04")).toBe(1);
   });
 });
+
+describe("a question given back (the second round's T1)", () => {
+  it("takes one off the account's count of the day, never below none", () => {
+    const db = openDatabase(":memory:", [QUOTA_TABLES]);
+    try {
+      const clock = { now: Date.parse("2026-11-04T12:00:00.000Z") };
+      const anna = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+      const quota = makeQuota(db, { first: { quota: 1, quotaUnnamed: 1, unlimited: [] }, now: () => clock.now });
+      expect(quota.take(anna, true)).toBe(true);
+      expect(quota.take(anna, true)).toBe(false);
+      quota.giveBack(anna);
+      expect(quota.take(anna, true)).toBe(true);
+      quota.giveBack(anna);
+      quota.giveBack(anna);
+      const rows = db.prepare("SELECT count FROM jarvis_asked").all();
+      expect(rows).toEqual([{ count: 0 }]);
+    } finally {
+      db.close();
+    }
+  });
+});

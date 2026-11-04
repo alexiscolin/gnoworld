@@ -88,4 +88,20 @@ describe("keeps", () => {
       }),
     );
   });
+
+  it("drops a translation that adds a hidden character its original lacks, such as a reversal around a number (10k, S3)", () => {
+    const reversed = `Le sondage a ${char(0x202e)}1,204${char(0x202c)} votes.`;
+    expect(keeps("The poll has 1,204 votes.", reversed)).toBe(false);
+    expect(keeps("The poll has 1,204 votes.", `Le sondage a 1,204${char(0x200b)} votes.`)).toBe(false);
+  });
+
+  it("keeps a translation whose hidden characters its original holds", () => {
+    const joined = `Bravo ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`;
+    expect(keeps(joined, `Well done ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`)).toBe(true);
+  });
+
+  it("keeps a translation that breaks a line its original wrote on one, and drops one trading a hidden character for another", () => {
+    expect(keeps("The poll closes today.", "Le sondage\nferme aujourd'hui.")).toBe(true);
+    expect(keeps(`Bravo${char(0x200d)} 1,204.`, `Bravo${char(0x202e)} 1,204.`)).toBe(false);
+  });
 });
