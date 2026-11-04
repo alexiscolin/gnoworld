@@ -157,6 +157,14 @@ describe("Composer", () => {
     expect(markup).toContain("<strong>draft</strong>");
   });
 
+  // 8k: the U of frame 73 writes `++`; the preview shows it as the room will.
+  it("shows an underlined draft underlined in its preview", () => {
+    const markup = renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="kept ++draft++" onSay={() => true} />,
+    );
+    expect(markup).toContain("<u>draft</u>");
+  });
+
   it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
     expect(html()).toMatch(/<textarea[^>]*><\/textarea>/);
     const markup = renderToStaticMarkup(

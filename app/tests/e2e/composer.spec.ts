@@ -102,6 +102,49 @@ test.describe("the composer", () => {
     }
   });
 
+  // 8k (frame 73's U): the bar's underline goes to Ergo as `++word++`, comes back to the room and is drawn as <u>, its line
+  // the muted grey a step under the words, apart from a link's, which is the words' own colour at the font's place.
+  test("underlines a word with the bar's U, sent through Ergo and drawn apart from a link", async ({ page }) => {
+    await inGames(page);
+    const tag = word("under");
+    await field(page).fill(`${tag} make this word, see [docs](https://gno.land/docs)`);
+    const from = `${tag} make this `.length;
+    await field(page).evaluate((box: HTMLTextAreaElement, at: number) => {
+      box.setSelectionRange(at, at + 4);
+    }, from);
+    await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Underline", exact: true }).click();
+    await expect(field(page)).toHaveValue(`${tag} make this ++word++, see [docs](https://gno.land/docs)`);
+    // A key just after the box took its text is sometimes lost (caretAt above): the link is added by fill.
+    await field(page).fill(`${await field(page).inputValue()} ++[gno](https://gno.land)++`);
+    await field(page).press("Enter");
+    const line = lineOf(page, tag);
+    await expect(line).toHaveCount(1);
+    await expect(line.locator("u").first()).toHaveText("word");
+    await expect(line.locator("u").first().getByRole("link")).toHaveCount(0);
+    // An underlined link is still the link it is: the anchor inside the underline, its address whole.
+    await expect(line.locator("u").nth(1).getByRole("link", { name: "gno" })).toHaveAttribute(
+      "href",
+      "https://gno.land",
+    );
+    await expect(line.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://gno.land/docs");
+    const look = (selector: string) =>
+      line.locator(selector).evaluate((element) => {
+        const css = getComputedStyle(element);
+        return {
+          line: css.textDecorationLine,
+          ink: css.textDecorationColor,
+          words: css.color,
+          offset: css.textUnderlineOffset,
+        };
+      });
+    const [underlined, linked] = [await look("u >> nth=0"), await look('a[href="https://gno.land/docs"]')];
+    expect([underlined.line, linked.line]).toEqual(["underline", "underline"]);
+    expect(linked.ink).toBe(linked.words);
+    expect(underlined.ink).not.toBe(underlined.words);
+    expect(underlined.ink).not.toBe(linked.ink);
+    expect(underlined.offset).not.toBe(linked.offset);
+  });
+
   test("wraps the selection in a mark from the format bar, the selection kept", async ({ page }) => {
     await inGames(page);
     await field(page).fill("make this bold");

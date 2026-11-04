@@ -289,8 +289,8 @@ Each slice that adds a resource proves it is released:
 
 - [ ] **CSP:** no inline script, no `eval`, `connect-src` limited to the hosts above,
       `frame-src` limited to the accepted embed services, and JSON-LD allowed by hash.
-- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, strike, code, block,
-      lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
+- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, strike, underline, code,
+      block, lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
 - [ ] **Links and media:**
   - https only;
   - embeds only from the accepted services (ADR-0002 §6), shown once the moderation check

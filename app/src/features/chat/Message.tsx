@@ -8,7 +8,7 @@ import { markdown, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
 import { isAccount, shortAddress } from "./names.ts";
 
-const MARKS = { strong: "strong", em: "em", strike: "s" } as const;
+const MARKS = { strong: "strong", em: "em", strike: "s", underline: "u" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
 const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
 
@@ -71,6 +71,7 @@ function inline(node: Inline, reader: Reader): ReactNode {
     case "strong":
     case "em":
     case "strike":
+    case "underline":
       return createElement(MARKS[node.type], null, ...drawInlines(node.children, reader));
   }
 }

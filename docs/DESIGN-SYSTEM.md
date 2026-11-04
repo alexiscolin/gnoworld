@@ -431,7 +431,9 @@ Components use container queries, so they fit wherever they are placed.
   cascade layers declared once: `@layer reset, tokens, base, compositions, components,
   utilities;`.
   - **Base** styles the elements globally first (type, links, focus, `hr`, rich text: code,
-    quote, mention), so components write little. `::selection` waits for Baseline.
+    quote, mention, underline), so components write little. An underline's line is the muted
+    grey, a step under the words; a link's is the words' own colour, at the font's place.
+    `::selection` waits for Baseline.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
     a space step (Center's is its gutter). All layout is one of them, never new CSS.

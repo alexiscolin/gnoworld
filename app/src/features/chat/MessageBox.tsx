@@ -5,12 +5,13 @@ import { Fragment, type ReactNode } from "react";
 import type { Format } from "./format.ts";
 import styles from "./MessageBox.module.css";
 
-// The format bar's groups, a rule between each (frame 66: the marks, the code, the lists). The video's underline has no
-// mark in the text the chat sends, so it is not drawn.
+// The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
+// them: B, I, U, S. Underline goes as `++` (8k).
 const BAR: readonly (readonly { format: Format; icon: IconName; label: string }[])[] = [
   [
     { format: "bold", icon: "bold", label: "Bold" },
     { format: "italic", icon: "italic", label: "Italic" },
+    { format: "underline", icon: "underline", label: "Underline" },
     { format: "strike", icon: "strikethrough", label: "Strikethrough" },
   ],
   [

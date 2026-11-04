@@ -2,10 +2,11 @@
 // a plain https one, never inside another link; a mention's (4d) an account's, never inside a link either; no text
 // is empty, and no two sit side by side.
 
-/** What a line holds: text, its marks, code, links, mentions, and the breaks between a paragraph's lines. */
+/** What a line holds: text, its marks (the chat's underline among them, 8k), code, links, mentions, and the breaks
+ * between a paragraph's lines. */
 export type Inline =
   | { type: "text"; text: string }
-  | { type: "strong" | "em" | "strike"; children: Inline[] }
+  | { type: "strong" | "em" | "strike" | "underline"; children: Inline[] }
   | { type: "code"; text: string }
   | { type: "link"; href: string; children: Inline[] }
   | { type: "mention"; address: string }
