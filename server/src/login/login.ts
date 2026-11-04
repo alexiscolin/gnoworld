@@ -83,7 +83,7 @@ interface Options {
   verify?: Verify;
   nonceCap?: number;
   // The admin console's login and changes (ADR-0002 §6): its own host's pending nonces counted alone, so a public flood
-  // never fills its cap (Alexis, 10g-6).
+  // never fills its cap (Alexis, 10g-6), and a session of one hour from its signature (10g-7).
   console?: boolean;
 }
 
@@ -162,7 +162,8 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
   const { now } = options;
   const signed = makeSigned(db, options);
   const day = 24 * 60 * 60_000;
-  const [sliding, cap] = [30 * day, 90 * day];
+  // The console's session ends an hour after its signature, whatever the use.
+  const [sliding, cap] = options.console === true ? [60 * 60_000, 60 * 60_000] : [30 * day, 90 * day];
   const tokensPerAccount = 10;
   const sql = {
     known: db.prepare("SELECT 1 FROM accounts WHERE address = ?"),
@@ -204,6 +205,8 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
       const row = sql.live.get(hash, at);
       if (row === undefined) return undefined;
       const { address, signed_at: signed, expires_at: expires } = Live.parse(row);
+      // A token another login made lives longer: the console takes none signed more than its hour ago.
+      if (signed + cap <= at) return undefined;
       // One write a minute at most per token: a stream of uses, a ticket per reconnect, costs one.
       const renewed = Math.min(at + sliding, signed + cap);
       if (renewed - expires >= 60_000) sql.renew.run(renewed, hash);

@@ -115,7 +115,8 @@ if (config.admin !== undefined) {
       "/api/admin/jarvis",
       adminRoutes({
         isTeam: (who) => isTeam(roles, who),
-        session,
+        // The console's session, an hour from its signature, whatever login made it (ADR-0002 §6).
+        session: makeLogin(db, { chains: config.chains, now: Date.now, console: true }).session,
         origins: config.admin.origins,
         signed: makeSigned(db, { chains: config.chains, now: Date.now, console: true }),
         quota: door.quota,

@@ -933,8 +933,8 @@ describe("a signed action", () => {
   });
 });
 
-// 10g (ADR-0002 §6; Alexis, 10g-6): the admin console's login, on its own listener: its pending nonces counted for its
-// own host alone.
+// 10g (ADR-0002 §6; Alexis, 10g-6 and 10g-7): the admin console's login, on its own listener: its pending nonces counted
+// for its own host alone, and a session of one hour from its signature.
 describe("the admin console's login", () => {
   const CONSOLE = "admin.gnoworld.test";
   const consoleSetup = () => {
@@ -947,6 +947,19 @@ describe("the admin console's login", () => {
     const signed = makeSigned(db, { chains: CHAINS, now, nonceCap: 2, console: true });
     return { db, clock, site, admin, signed };
   };
+  const signIn = async (login: Login, host: string) => {
+    const me = wallet();
+    const made = login.challenge("onyx-1", host);
+    if (typeof made === "string") throw new Error(made);
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+      anyone,
+      host,
+    );
+    if (typeof result === "string") throw new Error(result);
+    return { ...result, address: me.address };
+  };
+
   it("counts its own host's pending nonces alone, so the public site at its cap leaves its login and changes be", () => {
     const { site, admin, signed } = consoleSetup();
     for (let at = 0; at < 2; at += 1) site.challenge("onyx-1", DOMAIN);
@@ -962,5 +975,26 @@ describe("the admin console's login", () => {
     admin.challenge("onyx-1", CONSOLE);
     expect(site.challenge("onyx-1", DOMAIN)).toBe("full");
     expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
+  });
+
+  it("gives a session of one hour from its signature, its cookie too, renewed by no use", async () => {
+    const { clock, admin } = consoleSetup();
+    const made = await signIn(admin, CONSOLE);
+    expect(made.maxAge).toBe(60 * 60);
+    clock.now = T0 + 30 * MINUTE;
+    expect(admin.session(made.token)).toBe(made.address);
+    clock.now = T0 + 60 * MINUTE - 1;
+    expect(admin.session(made.token)).toBe(made.address);
+    clock.now = T0 + 60 * MINUTE;
+    expect(admin.session(made.token)).toBeUndefined();
+  });
+
+  it("refuses a public session signed more than an hour ago, presented by hand", async () => {
+    const { clock, site, admin } = consoleSetup();
+    const made = await signIn(site, DOMAIN);
+    clock.now = T0 + 60 * MINUTE - 1;
+    expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, made.address]);
+    clock.now = T0 + 60 * MINUTE;
+    expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, undefined]);
   });
 });

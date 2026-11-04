@@ -721,6 +721,10 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await read(leads)).toEqual([200, { ...settled, quota: 30 }]);
     const large = await post("/api/admin/jarvis/change", { nonce: "a".repeat(20_000) }, leads);
     expect(large.status).toBe(413);
+    // The console's session lasts an hour (ADR-0002 §6; Alexis, 10g-7), its cookie too.
+    const login = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
+    const signed = { nonce: login.nonce, address: lead.address, proof: lead.sign("onyx-1", login.text) };
+    expect((await post("/api/login/verify", signed)).headers.get("set-cookie")).toContain("Max-Age=3600;");
   });
 
   it("drains the admin listener on SIGTERM: a call already begun is answered, then the process exits 0 (F5272)", async () => {
