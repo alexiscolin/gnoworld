@@ -33,6 +33,28 @@ export const whole = (max: number, otherwise: number) =>
     .pipe(z.number().max(max))
     .default(otherwise);
 
+// A port, written plainly, 0 for one the system picks.
+export const port = () =>
+  z
+    .string()
+    .regex(/^(0|[1-9]\d{0,4})$/)
+    .transform(Number)
+    .pipe(z.number().max(65_535));
+
+// A list of entries parted by commas, none when empty, each checked by `item`.
+export const list = <T extends z.ZodType<unknown, string>>(item: T) =>
+  z
+    .string()
+    .default("")
+    .transform((text) => (text === "" ? [] : text.split(",")))
+    .pipe(z.array(item));
+
+// An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
+export function isOrigin(text: string): boolean {
+  const url = URL.parse(text);
+  return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
+}
+
 // An absolute path whose every part is a name (no "", "." or ".."), so never the root a walk would take whole (F636).
 export const absolute = z.string().refine((path) => {
   const [root, ...parts] = path.split("/");

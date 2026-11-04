@@ -5,7 +5,18 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
-import { absolute, databasePath, parseSettings, readSecret, readWord, Secret, whole } from "./settings.ts";
+import {
+  absolute,
+  databasePath,
+  isOrigin,
+  list,
+  parseSettings,
+  port,
+  readSecret,
+  readWord,
+  Secret,
+  whole,
+} from "./settings.ts";
 
 export interface Config {
   host: string;
@@ -35,20 +46,9 @@ export interface Config {
   };
 }
 
-// An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
-function isOrigin(text: string): boolean {
-  const url = URL.parse(text);
-  return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
-}
-
 const Env = z.object({
   HOST: z.string().min(1).max(253).default("127.0.0.1"),
-  PORT: z
-    .string()
-    .regex(/^(0|[1-9]\d{0,4})$/)
-    .transform(Number)
-    .pipe(z.number().max(65_535))
-    .default(8080),
+  PORT: port().default(8080),
   DATABASE: databasePath,
   TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
   LOG_PEPPER_FILE: z.string().min(1),
@@ -64,11 +64,7 @@ const Env = z.object({
     .transform((list) => list.split(","))
     .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
   // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
-  ORIGINS: z
-    .string()
-    .default("")
-    .transform((list) => (list === "" ? [] : list.split(",")))
-    .pipe(z.array(z.string().refine(isOrigin))),
+  ORIGINS: list(z.string().refine(isOrigin)),
   NEW_ACCOUNTS_PER_HOUR: z
     .string()
     .regex(/^[1-9]\d{0,3}$/)
