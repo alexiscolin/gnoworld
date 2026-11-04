@@ -13,6 +13,7 @@ import { message, text, toolUse, type Step } from "../testing/fakeModel.ts";
 import { capture } from "../testing/kit.ts";
 import { loopWith } from "../testing/loopWith.ts";
 import { placesData, universe } from "../testing/placesData.ts";
+import { REALM_TYPE } from "../testing/realm.ts";
 import { cardTools } from "./cards.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 import { keepCards, type Asked } from "./kept.ts";
@@ -23,11 +24,6 @@ import { loadPlaces, placesTool } from "./places.ts";
 const { folderOf, remove } = placesData();
 afterAll(remove);
 const REALM = "gno.land/r/demo/poll";
-const REALM_TYPE = [
-  "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool;",
-  "IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string;",
-  "Previous func() .uverse.realm; String func() string; Sub func(string) .uverse.realm; Subpath func() string}",
-].join(" ");
 const OTHER = `g1${"l".repeat(38)}`;
 const named = (Name: string, Type: string) => ({ Name, Type });
 const pollFunctions = (): FunctionList => [
