@@ -862,6 +862,15 @@ describe("the loop: a question whose asker left", () => {
     run.close();
   });
 
+  it("lets a wait that fails on its own, the asker still there, end the question with its error", async () => {
+    const run = setup({
+      steps: [statusError(529), ended()],
+      wait: () => Promise.reject(new Error("the clock failed")),
+    });
+    await expect(run.loop.ask(QUESTION, new AbortController().signal)).rejects.toThrow("the clock failed");
+    run.close();
+  });
+
   // Its AbortError, rejected once the asker leaves during the wait, ends the question as gone, never as thrown.
   it("ends node:timers' own wait before a retry once the asker leaves, its rejection read as gone", async () => {
     const left = new AbortController();

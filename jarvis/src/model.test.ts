@@ -249,6 +249,14 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     run.close();
   });
 
+  it("lets a wait that fails on its own end the request with its error, with no question's signal given", async () => {
+    const run = attempts(45 * DOLLAR);
+    const { send } = script(statusError(529));
+    const wait = () => Promise.reject(new Error("the clock failed"));
+    await expect(callModel({ ...run.parts, wait, send }, ask())).rejects.toThrow("the clock failed");
+    run.close();
+  });
+
   it("sends nothing once the day is spent: `spent` as a value", async () => {
     const run = attempts(1);
     const { send, requests } = script();
