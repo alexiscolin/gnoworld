@@ -21,7 +21,9 @@ const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
 export default defineConfig(
   includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
   // Workflow scripts are bodies Claude Code runs, with an export and a return at their top: no JavaScript parser reads them.
-  globalIgnores(["docs/", "gno/", ".claude/workflows/"]),
+  // evals/ is installed apart, its types from its own install, which a tree's gate lacks: evals/run.sh checks its types
+  // and its tests before every run (10j).
+  globalIgnores(["docs/", "gno/", ".claude/workflows/", "evals/"]),
   // A rule is changed in this file, with its reason, never switched off in a comment.
   { linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: "error" } },
   {

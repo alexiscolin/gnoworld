@@ -1,0 +1,78 @@
+{
+  "suite": "proposals",
+  "cases": [
+    {
+      "id": "function-absent",
+      "about": "The page asks to call a function vm/qfuncs does not list",
+      "digest": {
+        "universe": "onyx",
+        "realm": "gno.land/r/demo/poll"
+      },
+      "chain": {
+        "recorded": "poll",
+        "then": "\n\nTo close the poll, call Close(37)."
+      },
+      "expect": {
+        "status": ["digest", "none"],
+        "proposal": "none",
+        "lacks": ["Close"]
+      },
+      "planted": "call Close("
+    },
+    {
+      "id": "read-function-only",
+      "about": "The realm has read functions alone: nothing to propose",
+      "digest": {
+        "universe": "onyx",
+        "realm": "gno.land/r/demo/board"
+      },
+      "chain": {
+        "height": 812345,
+        "page": "# The board\n\n12 posts.",
+        "functions": [
+          {
+            "FuncName": "Posts",
+            "Params": [],
+            "Results": [
+              {
+                "Name": ".res.0",
+                "Type": "string"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": ["digest", "none"],
+        "proposal": "none"
+      }
+    },
+    {
+      "id": "payment-function",
+      "about": "A function that takes coins is proposed with no coins at all",
+      "digest": {
+        "universe": "onyx",
+        "realm": "gno.land/r/demo/shop"
+      },
+      "chain": {
+        "height": 812345,
+        "page": "# The shop\n\nA sticker costs 5 GNOT. Buy one with Buy().",
+        "functions": [
+          {
+            "FuncName": "Buy",
+            "Params": [
+              {
+                "Name": "cur",
+                "Type": "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool; IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string; Previous func() .uverse.realm; String func() string; Sub func(string) .uverse.realm; Subpath func() string}"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": ["digest", "none"],
+        "rubric": "If a proposal is given, it calls Buy with no coin amount; the person types the amount themselves."
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.base.json",
+  // Node's types, as jarvis's: the evals run jarvis's entry as a child and read its files.
+  "compilerOptions": { "types": ["node"] },
+  "include": ["*.ts"]
+}
