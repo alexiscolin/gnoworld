@@ -38,6 +38,14 @@ export type Verify = (proof: Proof, expected: Expected) => Promise<boolean>;
 export const verifyProof: Verify = async (proof, { signer, chainId, data }) =>
   verifyArbitrarySignature(proof, { signer, chainId, data });
 
+// A text signed once: a nonce kept with the whole text the wallet signs, then the proof that spends it.
+interface Signed {
+  // `head`'s lines, then the domain, the nonce and the times, for a chain the settings name; kept five minutes.
+  issue: (chainId: string, host: string, head: readonly string[]) => Challenge | "chain" | "full";
+  // The nonce spent first, by one statement, then the proof checked against the signer, the chain and the stored text.
+  prove: (request: VerifyRequest, host: string) => Promise<"proved" | "nonce" | "proof">;
+}
+
 export interface Login {
   challenge: (chainId: string, domain: string) => Challenge | "chain" | "full";
   verify: (
@@ -62,17 +70,59 @@ interface Options {
   nonceCap?: number;
 }
 
-export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof, nonceCap = 100_000 }: Options): Login {
+function makeSigned(db: DatabaseSync, { chains, now, verify = verifyProof, nonceCap = 100_000 }: Options): Signed {
   if (chains.length === 0) throw new Error("the login needs at least one chain");
   const ttl = 5 * 60_000;
-  const day = 24 * 60 * 60_000;
-  const [sliding, cap] = [30 * day, 90 * day];
-  const tokensPerAccount = 10;
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
     addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, expires_at) VALUES (?, ?, ?, ?, ?)"),
     spend: db.prepare("DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? RETURNING chain, text"),
+  };
+  return {
+    issue(chainId, host, head) {
+      if (!chains.includes(chainId)) return "chain";
+      const at = now();
+      sql.purgeNonces.run(at);
+      // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
+      if (Count.parse(sql.countNonces.get()).n >= nonceCap) return "full";
+      const nonce = randomBytes(16).toString("base64url");
+      const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
+      const text = [
+        ...head,
+        "",
+        `Domain: ${host}`,
+        `Nonce: ${nonce}`,
+        `Issued: ${issued}`,
+        `Expires: ${expiresAt}`,
+      ].join("\n");
+      sql.addNonce.run(nonce, chainId, host, text, at + ttl);
+      return { nonce, text, expiresAt };
+    },
+
+    async prove({ nonce, address, proof }, host) {
+      // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one success.
+      const spent = sql.spend.get(nonce, host, now());
+      if (spent === undefined) return "nonce";
+      const { chain, text } = Spent.parse(spent);
+      let valid = false;
+      try {
+        valid = await verify(proof, { signer: address, chainId: chain, data: text });
+      } catch {
+        // A verifier that fails refuses; the SDK's never throws, but the login must not depend on it.
+      }
+      return valid ? "proved" : "proof";
+    },
+  };
+}
+
+export function makeLogin(db: DatabaseSync, options: Options): Login {
+  const { now } = options;
+  const signed = makeSigned(db, options);
+  const day = 24 * 60 * 60_000;
+  const [sliding, cap] = [30 * day, 90 * day];
+  const tokensPerAccount = 10;
+  const sql = {
     known: db.prepare("SELECT 1 FROM accounts WHERE address = ?"),
     addAccount: db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)"),
     purgeTokens: db.prepare("DELETE FROM tokens WHERE expires_at <= ?"),
@@ -88,38 +138,12 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
   };
 
   return {
-    challenge(chainId, domain) {
-      if (!chains.includes(chainId)) return "chain";
-      const at = now();
-      sql.purgeNonces.run(at);
-      // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
-      if (Count.parse(sql.countNonces.get()).n >= nonceCap) return "full";
-      const nonce = randomBytes(16).toString("base64url");
-      const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
-      const text = [
-        "Sign in to gnoworld (login, version 1)",
-        "",
-        `Domain: ${domain}`,
-        `Nonce: ${nonce}`,
-        `Issued: ${issued}`,
-        `Expires: ${expiresAt}`,
-      ].join("\n");
-      sql.addNonce.run(nonce, chainId, domain, text, at + ttl);
-      return { nonce, text, expiresAt };
-    },
+    challenge: (chainId, domain) => signed.issue(chainId, domain, ["Sign in to gnoworld (login, version 1)"]),
 
-    async verify({ nonce, address, proof }, mayCreate, host) {
-      // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one login.
-      const spent = sql.spend.get(nonce, host, now());
-      if (spent === undefined) return "nonce";
-      const { chain, text } = Spent.parse(spent);
-      let valid = false;
-      try {
-        valid = await verify(proof, { signer: address, chainId: chain, data: text });
-      } catch {
-        // A verifier that fails refuses; the SDK's never throws, but the login must not depend on it.
-      }
-      if (!valid) return "proof";
+    async verify(request, mayCreate, host) {
+      const proved = await signed.prove(request, host);
+      if (proved !== "proved") return proved;
+      const { address } = request;
       const at = now();
       if (sql.known.get(address) === undefined) {
         if (!mayCreate()) return "new_account";
