@@ -1,4 +1,4 @@
-// The close stations' names and the caption over their group (part 7x2; frame 4, "STATIONS / Built and curated by the gno.land team"): each
+// The close stations' names and the caption over their group (part 7x2; frame 4's "Built and curated", "Curated" as half are other teams'): each
 // name over its station, a link to the project's own address, or to its world's page where the file names one, and the hand only then; the
 // caption over the names, where the stations group. Over the canvas, under the page's text, in the labels' layer.
 import { clearOf, type ClearBox } from "@gnoworld/core";
@@ -75,7 +75,7 @@ export class StationNames {
     const title = Object.assign(document.createElement("p"), { className: "label", textContent: "Stations" });
     const line = Object.assign(document.createElement("p"), {
       className: styles["line"] ?? "",
-      textContent: "Built and curated by the gno.land team",
+      textContent: "Curated by the gno.land team",
     });
     this.#caption.append(title, line);
     this.#captionPlaced.set([this.#caption]);

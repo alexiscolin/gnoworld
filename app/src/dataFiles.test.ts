@@ -250,7 +250,7 @@ describe("earthOrbit.json", () => {
   });
 
   it("ships gnosh.ai, Alexis's own link, among the projects", () => {
-    expect(orbiting).toContainEqual({ name: "gnosh.ai", url: "https://gnosh.ai" });
+    expect(orbiting).toContainEqual(expect.objectContaining({ name: "gnosh.ai", url: "https://gnosh.ai" }));
     expect(() => EarthOrbit.parse(orbiting)).not.toThrow();
   });
 });

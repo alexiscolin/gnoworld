@@ -1,1 +1,72 @@
-[{ "name": "gnosh.ai", "url": "https://gnosh.ai" }]
+[
+  {
+    "name": "Adena",
+    "url": "https://www.adena.app",
+    "size": 0.9
+  },
+  {
+    "name": "Gnoscan",
+    "url": "https://gnoscan.io",
+    "size": 0.85
+  },
+  {
+    "name": "GnoSwap",
+    "url": "https://gnoswap.io",
+    "size": 0.7
+  },
+  {
+    "name": "Gno Playground",
+    "url": "https://play.gno.land",
+    "size": 0.6
+  },
+  {
+    "name": "Gno Faucet Hub",
+    "url": "https://faucet.gno.land",
+    "size": 0.45
+  },
+  {
+    "name": "gnodev",
+    "url": "https://github.com/gnolang/gno/tree/master/contribs/gnodev",
+    "size": 0.45
+  },
+  {
+    "name": "tx-indexer",
+    "url": "https://github.com/gnolang/tx-indexer",
+    "size": 0.35
+  },
+  {
+    "name": "gnopls",
+    "url": "https://github.com/gnoverse/gnopls",
+    "size": 0.35
+  },
+  {
+    "name": "gnomcp",
+    "url": "https://mcp.gno.dev",
+    "size": 0.35
+  },
+  {
+    "name": "Gno Native Kit",
+    "url": "https://github.com/gnolang/gnonative",
+    "size": 0.3
+  },
+  {
+    "name": "Zenao",
+    "url": "https://zenao.io",
+    "size": 0.3
+  },
+  {
+    "name": "gnosh.ai",
+    "url": "https://gnosh.ai",
+    "size": 0.3
+  },
+  {
+    "name": "gnobro",
+    "url": "https://github.com/gnolang/gno/tree/master/contribs/gnobro",
+    "size": 0.2
+  },
+  {
+    "name": "Supernova",
+    "url": "https://github.com/gnolang/supernova",
+    "size": 0.1
+  }
+]
