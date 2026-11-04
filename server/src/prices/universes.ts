@@ -28,17 +28,22 @@ export function defaultUniverse(file: string): { id: string; rpc: string; indexe
 
 export const defaultRpc = (file: string): string => defaultUniverse(file).rpc;
 
-/** Each hub of the default universe that lists realms, by its slug, with its first realm's world (core's hubWorldOf), from hubs.json beside
- * the universes' file: the trends read its rooms and its realms as one world (7t3). A hub with no realm is a world of its own, joined to no
- * chain's world: one of its slug would be a realm alone in a namespace of that name, someone else's. */
-export function hubWorlds(universesFile: string): Map<string, string> {
+// The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone.
+function defaultHubs(universesFile: string) {
   const file = join(dirname(universesFile), "hubs.json");
   const parsed = Hubs.safeParse(dataOf(file));
   if (!parsed.success) throw new Error(`hubs: ${file} does not hold a good list of hubs`);
   const universe = defaultUniverse(universesFile).id;
+  return parsed.data.filter((hub) => hub.universe === universe);
+}
+
+/** Each hub of the default universe that lists realms, by its slug, with its first realm's world (core's hubWorldOf), from hubs.json beside
+ * the universes' file: the trends read its rooms and its realms as one world (7t3). A hub with no realm is a world of its own, joined to no
+ * chain's world: one of its slug would be a realm alone in a namespace of that name, someone else's. */
+export function hubWorlds(universesFile: string): Map<string, string> {
   return new Map(
-    parsed.data.flatMap((hub) =>
-      hub.universe === universe && hub.realms !== undefined ? [[hub.slug, hubWorldOf(hub)] as const] : [],
+    defaultHubs(universesFile).flatMap((hub) =>
+      hub.realms === undefined ? [] : [[hub.slug, hubWorldOf(hub)] as const],
     ),
   );
 }
