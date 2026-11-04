@@ -70,22 +70,30 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             </span>
           ) : null}
         </p>
+        {/* One item of the phone's header row: the controls with the account. Under 1,280 px Jarvis, the chat and the counter drop (the menu
+            keeps the passport): the network and the account never drop (DESIGN-SYSTEM.md, Layout). */}
         <Cluster space="2xs">
-          <ComingSoon name="Jarvis" icon="spark" words="Jarvis" />
-          {/* Drawn anew once the page wakes, as the views are: a path served another page's markup keeps its light otherwise (F4880). */}
-          <Button key={String(woken)} href={universe.earth.path} icon="chat" emphasis={docked ? "solid" : "outline"}>
-            Chat
-          </Button>
-          <PassportCounter
-            universe={universe.id}
-            listed={listed}
-            onOpen={() => {
-              openView("passport");
-            }}
-          />
+          <span className={styles["drops"]}>
+            <ComingSoon name="Jarvis" icon="spark" words="Jarvis" />
+          </span>
+          <span className={styles["drops"]}>
+            {/* Drawn anew once the page wakes, as the views are: a path served another page's markup keeps its light otherwise (F4880). */}
+            <Button key={String(woken)} href={universe.earth.path} icon="chat" emphasis={docked ? "solid" : "outline"}>
+              Chat
+            </Button>
+          </span>
+          <span className={styles["drops"]}>
+            <PassportCounter
+              universe={universe.id}
+              listed={listed}
+              onOpen={() => {
+                openView("passport");
+              }}
+            />
+          </span>
           <BellSlot />
+          <AccountMenu />
         </Cluster>
-        <AccountMenu />
       </div>
     </header>
   );

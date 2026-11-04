@@ -19,7 +19,7 @@ export function PassportCounter({
   const count = passportCount(stamped, listed);
   return (
     <Button icon="passport" onClick={onOpen}>
-      <span className="visually-hidden">Passport, worlds stamped: </span>
+      <span className="visually-hidden">Passport </span>
       {count === undefined ? String(stamped) : `${String(count.stamped)}/${String(count.listed)}`}
     </Button>
   );

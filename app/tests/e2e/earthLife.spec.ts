@@ -306,7 +306,7 @@ test.describe("a computer, as the frames", () => {
   test("takes the signs off with the page", async ({ page }) => {
     await parisSaid(page);
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Cosmos" }).click();
+    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Universe" }).click();
     await expect(page.locator("[data-signs]")).toHaveCount(0);
   });
 });

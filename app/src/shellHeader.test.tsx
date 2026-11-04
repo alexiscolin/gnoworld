@@ -170,7 +170,7 @@ describe("the header", () => {
     const html = await header("/earth");
     expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*aria-label="Jarvis, coming soon"/);
     expect(html).toMatch(/<a [^>]*href="\/earth"[^>]*>(?:(?!<\/a>)[\s\S])*Chat/);
-    expect(html).toContain("Passport, worlds stamped");
+    expect(html).toContain(">Passport </span>");
   });
 
   // Layout wraps every document, the failed ones too: no loader data is there, and the header still tells the truth.

@@ -418,7 +418,7 @@ for (const width of [390, 1280, 1728] as const) {
       const views = page.getByRole("navigation", { name: "Views" });
       for (const [name, path] of [
         ["Earth", "/earth"],
-        ["Cosmos", "/"],
+        ["Universe", "/"],
         ["List", "/list"],
       ] as const) {
         const link = views.getByRole("link", { name });
