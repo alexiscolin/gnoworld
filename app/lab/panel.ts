@@ -2,7 +2,16 @@
 // through the registry (src/scene/tuning.ts), live on the real renderer; its colours and sizes are the design system's custom properties,
 // set on :root's own style, with no product code touched. "Copy" lists what changed, to land in code; "Reset" puts back the code's.
 import { TUNABLES, tunedDefaults, type Tunable } from "../src/scene/tuning.ts";
-import { colourControl, fontControl, lengthControl, primitives, sceneControl, type Control } from "./controls.ts";
+import {
+  colourControl,
+  fontControl,
+  lengthControl,
+  primitives,
+  sceneControl,
+  studyControl,
+  type Control,
+  type Studied,
+} from "./controls.ts";
 
 // The labels' names and figures, and their padding: the lab's text.
 const FONTS = ["--font-ui", "--font-data"];
@@ -57,8 +66,9 @@ function readInto({ scene, controls, shown }: SceneRows, drawn: () => void): voi
   }
 }
 
-/** The panel on this page, hidden until T or its button (a phone has no keyboard); `drawn` asks the page for a frame after each change. */
-export function tuningPanel(drawn: () => void): void {
+/** The panel on this page, hidden until T or its button (a phone has no keyboard); `drawn` asks the page for a frame after each change;
+ * `studied`, a lab page's own values, tried before any product code reads them. */
+export function tuningPanel(drawn: () => void, studied: readonly Studied[] = []): void {
   const workshop = Object.assign(made("div"), { className: "workshop" });
   const aside = Object.assign(made("aside"), { hidden: true, id: "tuning" });
   aside.setAttribute("aria-label", "Tuning");
@@ -70,6 +80,12 @@ export function tuningPanel(drawn: () => void): void {
       event.stopPropagation();
     });
   const [scenes, tokens] = [[] as Control[], [] as Control[]];
+  const study = section(
+    "Study",
+    studied.map((value) => studyControl(value, drawn)),
+    scenes,
+  );
+  study.hidden = studied.length === 0;
   const scene = section("Scene", [], scenes);
   const list = Object.assign(made("output"), { className: "changed" });
   list.setAttribute("aria-label", "Changed values");
@@ -93,6 +109,7 @@ export function tuningPanel(drawn: () => void): void {
   actions.append(copy, reset);
   aside.append(
     made("h2", "Tuning"),
+    study,
     scene,
     section(
       "Colours",

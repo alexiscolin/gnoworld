@@ -162,6 +162,70 @@
   }
 }
 
+/* The particles study's labels (particles.ts): a dark box in mono type, its short id beside, the chosen's in gold; a card on hover. */
+@layer components {
+  .study-labels {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .study-label {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    display: flex;
+    gap: var(--space-2xs);
+    align-items: baseline;
+    padding: var(--space-3xs) var(--space-2xs);
+    background: var(--color-scrim);
+    color: var(--color-text);
+    font: var(--font-data);
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+
+  .study-label[hidden] {
+    display: none;
+  }
+
+  .study-label small {
+    color: var(--color-text-muted);
+    font: var(--font-hint);
+  }
+
+  .study-label.chosen {
+    border: var(--line-width) solid var(--color-warm-line);
+    color: var(--color-warm);
+  }
+
+  .study-card {
+    position: fixed;
+    inline-size: var(--popover-w);
+    padding: var(--space-xs) var(--space-s);
+    border: var(--line-width) solid var(--color-line-strong);
+    background: var(--color-scrim);
+    color: var(--color-text);
+    font: var(--font-data);
+    pointer-events: none;
+  }
+
+  .study-card[hidden] {
+    display: none;
+  }
+
+  .study-card h3 {
+    margin: 0;
+    font: var(--font-data);
+  }
+
+  .study-card dt {
+    color: var(--color-text-muted);
+    font: var(--font-hint);
+    text-transform: uppercase;
+  }
+}
+
 @layer components {
   .sheet-name {
     position: fixed;
