@@ -1,6 +1,7 @@
 // The belt (part 7x): every station that stands no body round the Earth is a light at its own place, one draw for all of them, its size
 // from the station's and held to a few pixels, so a thousand read as a far ring of lights and none is dropped without a trace.
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Points, ShaderMaterial } from "three";
+import { AdditiveBlending, Points, ShaderMaterial, type BufferGeometry } from "three";
+import { cloudOf } from "../cosmos/cloud.ts";
 
 const VERTEX = /* glsl */ `
 attribute float size;
@@ -22,9 +23,10 @@ void main() {
 
 /** The belt's lights at `places` (x, y, z each, round the group's origin), each `sizes` wide in world units. */
 export function beltOf(places: Float32Array, sizes: Float32Array): Points<BufferGeometry, ShaderMaterial> {
-  const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new BufferAttribute(places, 3));
-  geometry.setAttribute("size", new BufferAttribute(sizes, 1));
+  const cloud = cloudOf(sizes.length, { position: 3, size: 1 });
+  cloud.attributes.position.array.set(places);
+  cloud.attributes.size.array.set(sizes);
+  cloud.commit(sizes.length);
   const material = new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -33,7 +35,7 @@ export function beltOf(places: Float32Array, sizes: Float32Array): Points<Buffer
     depthWrite: false,
     blending: AdditiveBlending,
   });
-  const points = new Points(geometry, material);
+  const points = new Points(cloud.geometry, material);
   points.frustumCulled = false;
   return points;
 }
