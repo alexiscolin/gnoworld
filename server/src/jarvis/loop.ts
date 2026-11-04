@@ -11,6 +11,7 @@ import type { Tracer } from "@opentelemetry/api";
 import type { Log } from "../log.ts";
 import type { Allowlist, Definition } from "./allowlist.ts";
 import type { Budget } from "./budget.ts";
+import { failure, refusal, type Refusal } from "./callWords.ts";
 import type { JarvisConfig } from "./config.ts";
 import type { Ran } from "./gnomcp.ts";
 import { callModel, type Request, type Send } from "./model.ts";
@@ -28,7 +29,6 @@ type Result =
   | { readonly kind: "refusal"; readonly category: string | null }
   | { readonly kind: "failed"; readonly reason: "error" | "timeout" | "stop" };
 type Allowed = Extract<ReturnType<Allowlist<Definition>["check"]>, { ok: true }>;
-type Refusal = "unknown_tool" | "bad_arguments" | "holds_tag" | "too_many_calls";
 
 interface Parts {
   readonly send: Send;
@@ -214,25 +214,4 @@ async function ranWithin(parts: Parts, call: Allowed, span: ReturnType<Trace["to
     if (ran.ok) span.done(ran.isError);
     else span.failed(ran.reason);
   }
-}
-
-function refusal(reason: Refusal): string {
-  const words: Record<Refusal, string> = {
-    unknown_tool: "Refused: no tool of that name is yours.",
-    bad_arguments: "Refused: its arguments do not match the tool's schema.",
-    holds_tag: "Refused: its input holds the turn's tag.",
-    too_many_calls: "Refused: a turn takes eight calls at most.",
-  };
-  return words[reason];
-}
-
-function failure(reason: Extract<Ran, { ok: false }>["reason"]): string {
-  const words: Record<typeof reason, string> = {
-    timeout: "The tool did not answer in time.",
-    down: "The tool is not running.",
-    malformed: "The tool's answer could not be read.",
-    error: "The tool failed.",
-    refused: "The tool refused the call.",
-  };
-  return words[reason];
 }
