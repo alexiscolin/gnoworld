@@ -1,3 +1,4 @@
+import { APIConnectionError } from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
@@ -296,10 +297,11 @@ describe("the digests' stop", () => {
   });
 
   it("answers failed for a model that fails, keeping nothing", async () => {
-    const { ask } = setup({
-      steps: [message({ content: [text("cut")], stop: "max_tokens", model: "claude-haiku-5-5" })],
-    });
+    const down = new APIConnectionError({ message: "down" });
+    const { ask, model } = setup({ steps: [down, down, down, give(digest()), done()] });
     expect(await ask()).toEqual({ kind: "failed" });
+    expect(await ask()).toEqual({ kind: "digest", digest: digest(), proposal: null, height: 1204 });
+    expect(model.requests).toHaveLength(5);
   });
 
   it("answers gone to a reader who left, and stops the making once no reader waits", async () => {
