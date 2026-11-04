@@ -368,6 +368,32 @@ describe("the loop: each tool call checked before it runs", () => {
     run.close();
   });
 
+  it("keeps a name the model made up out of its spans and its own log lines, as <unknown>", async () => {
+    const made = "alice_owes_bob_300_wallet_g1abc";
+    const uses = [
+      toolUse("toolu_0", made, {}),
+      ...Array.from({ length: 8 }, (_use, at) => status(`toolu_${String(at + 1)}`)),
+    ];
+    const run = setup({ steps: [asking(...uses, toolUse("toolu_9", "secret_words_of_a_question", {})), ended()] });
+    await run.loop.ask(QUESTION);
+    const question = run.finished().find((span) => span.name === "jarvis.question");
+    expect(question?.events.map((event) => event.attributes)).toEqual([
+      { "gen_ai.tool.name": "<unknown>", "jarvis.reason": "unknown_tool" },
+      { "gen_ai.tool.name": "gno_status", "jarvis.reason": "too_many_calls" },
+      { "gen_ai.tool.name": "<unknown>", "jarvis.reason": "too_many_calls" },
+    ]);
+    const spans = JSON.stringify(run.finished().map((span) => [span.attributes, span.events]));
+    expect(spans).not.toContain(made);
+    expect(spans).not.toContain("secret_words_of_a_question");
+    expect(
+      run
+        .events()
+        .filter((event) => event["reason"] === "too_many_calls")
+        .map((event) => event["tool"]),
+    ).toEqual(["gno_status", "<unknown>"]);
+    run.close();
+  });
+
   it("logs a call refused for the turn's tag once, as refused, never as a call", async () => {
     const input = { profile: "onyx", path: "gno.land/r/demo/boards", expr: `Render("${TAG}")` };
     const run = setup({ steps: [asking(toolUse("toolu_1", "gno_eval", input)), ended()] });

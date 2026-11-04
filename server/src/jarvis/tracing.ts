@@ -37,7 +37,8 @@ export interface Trace {
     failed(error: string, charged: number | undefined): void;
   };
   tool(name: string): { done(isError: boolean): void; failed(reason: string): void };
-  refused(tool: string, reason: string): void;
+  // A tool's name, or none when the model made it up: such a name may carry a question's words.
+  refused(tool: string | undefined, reason: string): void;
   alert(level: number): void;
   end(result: string, turns: number): void;
 }
@@ -105,7 +106,8 @@ export function traceQuestion(tracer: Tracer, { model, version }: { model: strin
       };
     },
     refused(tool, reason) {
-      question.addEvent("jarvis.tool_refused", { "gen_ai.tool.name": shown(tool), "jarvis.reason": reason });
+      const name = tool === undefined ? "<unknown>" : shown(tool);
+      question.addEvent("jarvis.tool_refused", { "gen_ai.tool.name": name, "jarvis.reason": reason });
     },
     alert(level) {
       question.addEvent("jarvis.budget_alert", { "jarvis.level": level });

@@ -14,7 +14,7 @@ import type { JarvisConfig } from "./config.ts";
 import type { Ran } from "./gnomcp.ts";
 import { callModel, type Request, type Send } from "./model.ts";
 import type { Model } from "./prices.ts";
-import { shown, traceQuestion, type Trace } from "./tracing.ts";
+import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
 interface Question {
@@ -49,6 +49,8 @@ interface Run {
   readonly blocks: Untrusted;
   readonly trace: Trace;
   readonly messages: Anthropic.MessageParam[];
+  // A tool's name when it is one of the loop's tools, else none.
+  readonly named: (name: string) => string | undefined;
   turns: number;
 }
 
@@ -60,7 +62,9 @@ export function makeLoop(parts: Parts) {
     hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
   }
   const version = hash.digest("hex");
-  return { version, ask: (question: Question) => ask(parts, { system, version }, question) };
+  const tools = new Set(parts.tools.allowlist.offered().map(({ name }) => name));
+  const named = (name: string) => (tools.has(name) ? name : undefined);
+  return { version, ask: (question: Question) => ask(parts, { system, version, named }, question) };
 }
 
 function systemOf(index: Parts["skills"]["index"]): string {
@@ -74,11 +78,18 @@ function systemOf(index: Parts["skills"]["index"]): string {
   ].join("\n");
 }
 
-async function ask(parts: Parts, prompt: { system: string; version: string }, question: Question): Promise<Result> {
+interface Prompt {
+  readonly system: string;
+  readonly version: string;
+  readonly named: Run["named"];
+}
+
+async function ask(parts: Parts, prompt: Prompt, question: Question): Promise<Result> {
   const started = performance.now();
   const trace = traceQuestion(parts.tracer, { model: parts.model, version: prompt.version });
   const blocks = untrustedBlocks({ limit: parts.caps.toolResultBytes, random: parts.random ?? randomBytes });
-  const run: Run = { parts, blocks, trace, messages: [{ role: "user", content: opening(blocks, question) }], turns: 0 };
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: opening(blocks, question) }];
+  const run: Run = { parts, blocks, trace, messages, named: prompt.named, turns: 0 };
   let word = "thrown";
   try {
     const result = askable(question.text, parts.caps.questionChars) ? await converse(run, prompt.system) : invalid();
@@ -105,14 +116,7 @@ function opening(blocks: Untrusted, { text, room }: Question): Anthropic.TextBlo
 
 async function converse(run: Run, system: string): Promise<Result> {
   const { parts, trace } = run;
-  const attempts = {
-    send: parts.send,
-    budget: parts.budget,
-    retries: parts.caps.retries,
-    log: parts.log,
-    trace,
-    wait: parts.wait,
-  };
+  const attempts = { ...parts, retries: parts.caps.retries, trace };
   for (;;) {
     const called = await callModel(attempts, requestOf(parts, system, run.messages));
     if (!called.ok) {
@@ -182,9 +186,10 @@ const holdsTag = (blocks: Untrusted, text: string) =>
 
 // A refused call is answered as refused and never run; the allowlist logged its own refusals already.
 function refused(run: Run, use: Anthropic.ToolUseBlock, reason: Refusal): Anthropic.ToolResultBlockParam {
+  const name = run.named(use.name);
   if (reason === "holds_tag" || reason === "too_many_calls")
-    run.parts.log("jarvis_tool_refused", { tool: shown(use.name), reason });
-  run.trace.refused(use.name, reason);
+    run.parts.log("jarvis_tool_refused", { tool: name ?? "<unknown>", reason });
+  run.trace.refused(name, reason);
   return { type: "tool_result", tool_use_id: use.id, is_error: true, content: refusal(reason) };
 }
 
