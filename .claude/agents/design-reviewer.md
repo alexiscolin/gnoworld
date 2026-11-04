@@ -1,6 +1,6 @@
 ---
 name: design-reviewer
-description: Compares each screen a branch changes with the approved video's frames, in the branch loop's review (app/src/ or packages/ui/src/ changed). Read-only.
+description: Compares each screen a branch changes with the approved video's frames, apart from the reviewer, when it changes how space looks (the scene, the planets, the cosmos), or when the reviewer asks for it. Read-only.
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high

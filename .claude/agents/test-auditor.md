@@ -11,7 +11,7 @@ and never change a test. You may run the test suites.
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
 `--work-tree`); to try a change, `cp` the files into a new folder made by `mktemp -d` in `$TMPDIR`.
 
-Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); the slice plan in `docs/plans/` (its "Done when", threat model and tests by
+Read first: the ledger's rows on the files the tests aim at, by `grep` in `docs/review/findings.md`, never the whole file (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); the slice plan in `docs/plans/` (its "Done when", threat model and tests by
 level), `docs/REVIEW.md`, the `.claude/rules/` files for the areas touched, and ADR-0002 §9
 ("The test audit: no false green").
 

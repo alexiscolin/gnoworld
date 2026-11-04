@@ -57,6 +57,16 @@ if [ -n "$differ" ]; then
 	echo "pre-commit: staged harness files differ from the working tree's; stage them as they are on disk: $differ" >&2
 	exit 1
 fi
+# A staged code a green gate recorded runs no second gate (the harness audit, 2026-11-04: the copy's gate ran again after the one Claude
+# had just run on that code): records.sh's print of the tree this commit holds, prose left out, so the docs' names are checked here;
+# the secrets were scanned above; a recorded page in Markdown under the sources is in the print (F4816, F4827). One byte otherwise,
+# no record, or a merge being committed, and the copy's gate runs.
+if [ "${1:-}" != --merge ] && ! git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1 && green "$(git write-tree)" fast; then
+	python3 -I "$s/check_docs.py"
+	echo "pre-commit: a green gate recorded this staged code; no second gate"
+	finished=1
+	exit 0
+fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # What the commit changes, one path a line, so check.sh checks those areas alone: the copy has no
 # repository to ask. A list git cannot give is empty, and check.sh then checks everything.

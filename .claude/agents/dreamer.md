@@ -22,7 +22,9 @@ Steer by what matters most here: security, then cost and speed, then the rest. F
 - its evidence: the committed rows that show the need, with their ids;
 - its prevalence: how often it happened in the slice, and in earlier slices when the ledger says;
 - its cost: what it adds to every session or every gate run; a rule that costs more than it saves is said so.
-A proposal seen once, with no harm done, is dropped unless it is a security one.
+A proposal seen once, with no harm done, is dropped unless it is a security one. Propose removals as readily as
+additions: a rule, a test, a check or a step whose cost its catches do not repay, with what it costs and what it
+caught in the slice (Alexis, 2026-11-04).
 
 Report one table, a row per proposal, then one line: what you read, proposals made. Do not manufacture proposals: with
 none, say so in one line.

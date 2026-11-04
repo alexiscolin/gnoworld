@@ -1527,7 +1527,7 @@ precommit --merge || fail "pre-commit refused a merge with a gate that passes"
 [ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate pre-merge-commit's merge was one: $(cat "$t/gate-merge")"
 git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && precommit || fail "pre-commit refused a merge in progress with a gate that passes"
 [ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate a merge in progress was one: $(cat "$t/gate-merge")"
-rm -f "$c2/.git/MERGE_HEAD"
+rm -f "$c2/.git/MERGE_HEAD" "$c2/.claude/tmp/green-fast" # a work commit of a recorded tree would run no second gate to ask
 GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
 git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
 fi
@@ -4756,7 +4756,6 @@ const base = (files) => (l) =>
   : l === "build" || (l || "").startsWith("ledger") ? { commits: ["c"], notes: "", branch: "b" }
   : l === "reviewer" || l === "security" || l === "gno-auditor" ? { findings: [] }
   : l === "design-reviewer" ? { findings: [], framesMissing: false } : null;
-const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
 (async () => {
   let t = await run(base(["app/src/a.ts"]));
   ok(t.r.status === "ready for the chief", `a clean branch is not ready: ${t.r.status}`);
@@ -4793,19 +4792,17 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   // The harness and the realms bring their lenses with no argument saying so.
   t = await run(base(["scripts/check.sh", "gno/r/seal/gnomod.toml"]));
   ok(t.labels.includes("security") && t.labels.includes("gno-auditor"), `a harness and realm branch ran no security or gno lens: ${t.labels}`);
-  // Two lenses' findings both numbered 1 by their agents: the script's ids tell them apart, a refutation drops only its own.
+  // Two lenses' findings both numbered 1 by their agents: the script's ids tell them apart, and both reach the fixer.
   t = await run((l, p, o) =>
     l === "reviewer" ? { findings: [finding("high", "scripts/a.sh")] }
     : l === "security" ? { findings: [finding("medium", "scripts/b.sh")] }
-    : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "refuted", severity: "low", evidence: "e" }] }
-    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }], notes: "", branch: "b" }
+    : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "f1" }, { id: "reviewer-1-1", commit: "f2" }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p));
   const fix = t.calls.find((c) => (c.label || "").startsWith("fix round"));
-  ok(fix && fix.prompt.includes("security-1-1") && !fix.prompt.includes("reviewer-1-1"), `the refuted finding's twin was dropped, or the refuted one fixed: ${fix && fix.prompt}`);
+  ok(fix && fix.prompt.includes("security-1-1") && fix.prompt.includes("reviewer-1-1"), `two lenses' findings numbered alike did not both reach the fixer, each by its own id: ${fix && fix.prompt}`);
   // A high tier-1 finding each round: round 2 runs only its lens, on the diff since its fix; after the third, Alexis decides.
   const highEveryRound = (extra) => run((l, p, o) =>
     l === "security" ? { findings: [finding("high", "scripts/a.sh")] }
-    : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
     : (l || "").startsWith("fix round") ? { fixed: [{ id: p.match(/"id":"(security-\d-1)"/)[1], commit: "f" + l.slice(-1) }], notes: "", branch: "b" }
     : base(["scripts/a.sh"])(l, p), extra);
   t = await highEveryRound();
@@ -4814,7 +4811,7 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
   // Read-only agents are told to write nothing; writers get the shared files.
   for (const c of t.calls) {
-    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "verifier", "design-reviewer"].includes(c.label);
+    const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "design-reviewer"].includes(c.label);
     ok(readOnly ? c.prompt.includes("write nothing") && !c.prompt.includes("learnings.md") : c.prompt.includes("learnings.md"), `${c.label} was told the wrong way to write`);
   }
   // Each Bash command of an agent starts in the main checkout (the shell goes back there after every call): every one begins
@@ -4830,12 +4827,11 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
   for (const c of t.calls.filter((c) => (c.label || "").startsWith("ledger"))) ok(c.prompt.includes("F9000-F9049"), "the scribe was not given the branch's range of F numbers");
   // Every round's findings go to the ledger, a refuted or low one included.
   ok(t.labels.filter((l) => (l || "").startsWith("ledger")).length === 3, `not every round wrote its findings to the ledger: ${t.labels}`);
-  // Every tier-1 product path of docs/REVIEW.md's table that exists starts the security lens by itself, with no `tier1` argument, and
-  // a finding in it reaches the finding-verifier (5e and 5f launched the security-reviewer by hand; no csp.ts finding was verified).
+  // Every tier-1 product path of docs/REVIEW.md's table that exists starts the security lens by itself, with no `tier1` argument
+  // (5e and 5f launched the security-reviewer by hand).
   const lensOf = async (file) => {
     const only = await run((l, p, o) =>
       l === "security" ? { findings: [finding("medium", file)] }
-      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "low", evidence: "e" }] }
       : base([file])(l, p));
     return only.labels;
   };
@@ -4846,7 +4842,6 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
     const labels = await lensOf(file);
     ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
-    ok(labels.includes("verifier"), `a security finding in ${file} never reached the finding-verifier: ${labels}`);
   }
   // A lookalike is no tier-1 file.
   for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
@@ -4854,23 +4849,25 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
   }
   // The design-reviewer (Alexis, 2026-10-31): a read-only agent that renders each changed screen at 1728 by 1080 and compares it with
-  // the video's frames. It starts by itself when a branch changes app/src/ or packages/ui/src/ (a `ui` change alone included), reports
-  // like the other lenses (numbered findings, high and medium fixed), and frames missing fail the step, never skip it.
+  // the video's frames. It starts by itself when a branch changes how space looks (the scene, the planets, the cosmos; Alexis,
+  // 2026-11-04: another screen is the reviewer's, with the frames, in one combined review), reports like the other lenses (numbered
+  // findings, high and medium fixed), and frames missing fail the step, never skip it.
   {
     const withDesign = (files, design) => run((l, p, o) =>
       l === "design-reviewer" ? (design ? design(p, o) : { findings: [], framesMissing: false })
       : (l || "").startsWith("fix round") ? { fixed: [{ id: "design-reviewer-1-1", commit: "fd" }], notes: "", branch: "b" }
       : base(files)(l, p, o));
-    for (const file of ["packages/ui/src/Button.tsx", "packages/ui/src/tokens.css", "app/src/features/home/Home.tsx", "app/src/routes/home.tsx"]) {
+    for (const file of ["app/src/scene/space.ts", "packages/core/src/planet/look.ts", "packages/core/src/cosmos/cosmos.ts", "packages/core/src/space/drift.ts"]) {
       const d = await withDesign([file]);
       ok(d.labels.includes("design-reviewer"), `a change of ${file} alone started no design-reviewer: ${d.labels}`);
       ok(d.r.status === "ready for the chief", `a clean design review of ${file} did not end ready: ${d.r.status}`);
     }
-    for (const file of ["server/src/a.ts", "docs/x.md", "app/tests/e2e/a.spec.ts", "app/srcx/a.ts", "packages/ui/srcs/a.ts", "packages/core/src/a.ts", "scripts/check.sh"]) {
+    for (const file of ["server/src/a.ts", "docs/x.md", "app/tests/e2e/a.spec.ts", "app/srcx/a.ts", "packages/ui/srcs/a.ts", "packages/core/src/a.ts", "scripts/check.sh",
+      "packages/ui/src/Button.tsx", "app/src/features/home/Home.tsx", "app/src/scenery/a.ts"]) {
       const d = await withDesign([file]);
       ok(!d.labels.includes("design-reviewer"), `${file}, which is no screen, started the design-reviewer: ${d.labels}`);
     }
-    const d = await withDesign(["packages/ui/src/Button.tsx"]);
+    const d = await withDesign(["app/src/scene/space.ts"]);
     const call = d.calls.find((c) => c.label === "design-reviewer");
     ok(call.agentType === "design-reviewer", `the design lens ran as ${call.agentType}`);
     for (const word of ["1728", "1080", "docs/design/video-screens.md", "video-frames", "write nothing"])
@@ -4878,29 +4875,28 @@ const idOf = (o, n) => o.schema.properties.verdicts.items.properties.id.enum[n];
     ok(!call.prompt.includes("learnings.md"), "the read-only design-reviewer was told to write the learnings");
     ok(call.schema.properties.framesMissing && call.schema.properties.findings, "the design-reviewer's answer has no framesMissing, or no findings");
     // Its findings follow the loop: numbered by its label, a medium one fixed, the round's findings to the ledger.
-    const f = await withDesign(["app/src/a.ts"], () => ({ findings: [finding("medium", "app/src/a.ts")], framesMissing: false }));
+    const f = await withDesign(["app/src/scene/a.ts"], () => ({ findings: [finding("medium", "app/src/scene/a.ts")], framesMissing: false }));
     const fixCall = f.calls.find((c) => (c.label || "").startsWith("fix round"));
     ok(fixCall && fixCall.prompt.includes("design-reviewer-1-1"), `a medium design finding was not given to the fixer: ${fixCall && fixCall.prompt}`);
     ok(f.labels.includes("ledger 1"), `a design finding never reached the ledger: ${f.labels}`);
     // A screen and a tier-1 path in one change start both lenses; a finding fixed in round 1 starts no second design review, and a
     // second round for a tier-1 high finding runs its lens alone.
-    const both = await withDesign(["packages/ui/src/a.ts", "app/src/csp.ts"]);
+    const both = await withDesign(["app/src/scene/a.ts", "app/src/csp.ts"]);
     ok(both.labels.includes("design-reviewer") && both.labels.includes("security"), `a screen and a tier-1 path did not start both lenses: ${both.labels}`);
-    const hi = await withDesign(["packages/ui/src/a.ts"], () => ({ findings: [finding("high", "packages/ui/src/a.ts")], framesMissing: false }));
+    const hi = await withDesign(["app/src/scene/a.ts"], () => ({ findings: [finding("high", "app/src/scene/a.ts")], framesMissing: false }));
     ok(hi.r.status === "ready for the chief", `a high design finding, fixed, did not end ready: ${hi.r.status}`);
     ok(hi.labels.filter((l) => l === "design-reviewer").length === 1, `the design-reviewer ran again after its finding was fixed: ${hi.labels}`);
     let secRuns = 0;
     const two = await run((l, p, o) =>
       l === "security" ? (secRuns++ ? { findings: [] } : { findings: [finding("high", "app/src/csp.ts")] })
-      : l === "verifier" ? { verdicts: [{ id: idOf(o, 0), verdict: "reproduced", severity: "high", evidence: "e" }] }
       : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-1", commit: "fs" }], notes: "", branch: "b" }
-      : base(["app/src/csp.ts"])(l, p));
+      : base(["app/src/csp.ts", "app/src/scene/a.ts"])(l, p));
     ok(two.labels.filter((l) => l === "security").length === 2 && two.labels.filter((l) => l === "design-reviewer").length === 1 && two.labels.filter((l) => l === "reviewer").length === 1,
       `round 2 for a tier-1 high finding did not run its lens alone: ${two.labels}`);
     // Frames missing fail the step; so does an agent that dies.
-    const m = await withDesign(["app/src/a.ts"], () => ({ findings: [], framesMissing: true }));
+    const m = await withDesign(["app/src/scene/a.ts"], () => ({ findings: [], framesMissing: true }));
     ok(m.r.status.startsWith("blocked") && m.r.status.includes("frames"), `missing frames did not stop the loop: ${m.r.status}`);
-    const dead = await withDesign(["app/src/a.ts"], () => null);
+    const dead = await withDesign(["app/src/scene/a.ts"], () => null);
     ok(dead.r.status.startsWith("blocked"), `a dead design-reviewer counted as a clean review: ${dead.r.status}`);
     // The agent's own brief.
     const { dirname: dn } = require("node:path");

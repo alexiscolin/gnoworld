@@ -12,9 +12,8 @@ export const meta = {
     {
       title: "Review",
       detail:
-        "the reviewer; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm; the design-reviewer for a screen",
+        "the reviewer, screens read with the video's frames; the security-reviewer for tier 1 or the harness; the gno-auditor for a realm; the design-reviewer for space's look",
     },
-    { title: "Verify", detail: "the finding-verifier on findings in tier-1 files" },
     {
       title: "Fix",
       detail: "every finding to the ledger; high and medium fixed, test first; low ones listed for Alexis",
@@ -81,6 +80,15 @@ const FIXED = {
         required: ["id", "commit"],
       },
     },
+    // What the fixer could not reproduce, with its evidence: rejected, never fixed (no agent verifies the findings since 2026-11-04).
+    rejected: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { id: { type: "string" }, evidence: { type: "string" } },
+        required: ["id", "evidence"],
+      },
+    },
     notes: { type: "string" },
     branch: BRANCH,
   },
@@ -113,31 +121,9 @@ const GATE = {
     "branch",
   ],
 };
-// The verifier answers for the ids it is given, and only those.
-const verdictsFor = (ids) => ({
-  type: "object",
-  properties: {
-    verdicts: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: { type: "string", enum: ids },
-          verdict: { type: "string", enum: ["reproduced", "refuted", "unverified"] },
-          severity: SEVERITY,
-          evidence: { type: "string" },
-        },
-        required: ["id", "verdict", "severity", "evidence"],
-      },
-    },
-  },
-  required: ["verdicts"],
-});
-
 const commits = [];
 const low = [];
 const judged = [];
-const verdicts = [];
 // The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the relay's auth script, the CSP, the deploy folder, the markdown
 // scanner, Adena, the login (server and client), the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the
 // table names in backticks a path this list lacks, or this list holds one the table does not name.
@@ -167,8 +153,13 @@ const TIER1 = [
 const BASE = A.base || "main";
 const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
 const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
-// A screen: the app's own source and the design system's (Alexis, 2026-10-31); the design-reviewer compares it with the video's frames.
+// A screen: the app's own source and the design system's (Alexis, 2026-10-31), which the reviewer compares with the video's frames; how
+// space looks (the scene, the planets, the cosmos) brings the design-reviewer apart (Alexis, 2026-11-04: one combined review).
 const screen = (file) => file.startsWith("app/src/") || file.startsWith("packages/ui/src/");
+const space = (file) =>
+  ["app/src/scene/", "packages/core/src/planet/", "packages/core/src/cosmos/", "packages/core/src/space/"].some((p) =>
+    file.startsWith(p),
+  );
 // A writer that committed on another branch than its own (slice-5a's commit on main) counts as no report, and the loop
 // stops there, its status naming the branch; so does a list of files holding the agent's own rather than git's.
 const strays = [];
@@ -185,7 +176,6 @@ const result = (status, extra) => ({
   commits,
   low,
   judged,
-  verdicts,
   ...extra,
 });
 
@@ -290,7 +280,10 @@ for (let round = 1; ; round += 1) {
     [
       "reviewer",
       "reviewer",
-      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)}.`,
+      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)}.` +
+        (gate.files.some(screen) && !gate.files.some(space)
+          ? " Compare every screen it changes with the video's frames, by the steps of .claude/agents/design-reviewer.md, in this same pass."
+          : ""),
     ],
     ...(touchesTier1
       ? [["security-reviewer", "security", `Review the branch's diff since ${since} for security.`]]
@@ -298,7 +291,7 @@ for (let round = 1; ; round += 1) {
     ...(gate.files.some(realm)
       ? [["gnomcp:gno-auditor", "gno-auditor", `Audit every realm the branch changes, since ${since}.`]]
       : []),
-    ...(gate.files.some(screen)
+    ...(gate.files.some(space)
       ? [
           [
             "design-reviewer",
@@ -326,43 +319,24 @@ for (let round = 1; ; round += 1) {
   // Frames missing fail the step, never skip it: a comparison nobody made is not a clean review.
   if (reviews.some((r, i) => lenses[i][1] === "design-reviewer" && r.framesMissing))
     return result(`blocked at review round ${round}: the design-reviewer found the video's frames missing`, { gate });
-  // Numbered here, by lens and order: each lens counts from 1, and a verdict must name one finding alone.
+  // Numbered here, by lens and order: each lens counts from 1, and an id names one finding alone.
   const found = reviews.flatMap((r, i) =>
     r.findings.map((f, n) => ({ ...f, id: `${lenses[i][1]}-${round}-${n + 1}`, lens: lenses[i][1] })),
   );
 
-  phase("Verify");
-  let kept = found;
-  const onTier1 = found.filter((f) => tier1(f.file));
-  if (onTier1.length) {
-    const checked = await agent(
-      `${where(`verify-${round}`, false)}. Verify these findings: ${JSON.stringify(onTier1)}.`,
-      {
-        agentType: "finding-verifier",
-        label: "verifier",
-        schema: verdictsFor(onTier1.map((f) => f.id)),
-      },
-    );
-    if (!checked) return result(`blocked at verification round ${round}: the verifier gave no report`, { gate });
-    verdicts.push(...checked.verdicts);
-    const verdict = new Map(checked.verdicts.map((v) => [v.id, v]));
-    kept = found
-      .filter((f) => !verdict.has(f.id) || verdict.get(f.id).verdict !== "refuted")
-      .map((f) => (verdict.has(f.id) ? { ...f, severity: verdict.get(f.id).severity } : f));
-    log(`round ${round}: ${found.length} findings, ${found.length - kept.length} refuted`);
-  }
+  const kept = found;
   judged.push(...found);
 
   phase("Fix");
   const urgent = kept.filter((f) => f.severity !== "low" && !f.beyondPlan);
   low.push(...kept.filter((f) => f.severity === "low" || f.beyondPlan));
-  // The scribe: every finding of the round to the ledger with its status and evidence (a refuted one rejected with the
-  // verifier's), the round's reports saved; the reviewers wrote nothing themselves.
+  // The scribe: every finding of the round to the ledger with its status and evidence, the round's reports saved; the reviewers wrote
+  // nothing themselves.
   const scribed = await write(
     `${where(`ledger-${round}`, true)}. Write each of these findings as a row of docs/review/findings.md, with the next free F number: ` +
-      `the urgent ones \`reproduced\`, the low ones and those beyond the plan \`asked\`, a refuted one \`rejected\` with the verifier's evidence. ` +
+      `the urgent ones \`claimed\` (their fixer marks each \`reproduced\` once its test fails, or \`rejected\` with its evidence), the low ones and those beyond the plan \`asked\`. ` +
       `Number them within this branch's range, ${A.ids}, never past it. ` +
-      `Findings: ${JSON.stringify(found)}. Urgent: ${JSON.stringify(urgent.map((f) => f.id))}. Verdicts: ${JSON.stringify(verdicts)}. ` +
+      `Findings: ${JSON.stringify(found)}. Urgent: ${JSON.stringify(urgent.map((f) => f.id))}. ` +
       `Save them as ${A.shared}/reports/${A.branch}-review-${round}.md. Commit the ledger (\`docs(review): ${A.branch}'s round ${round}\`).`,
     { phase: "Fix", label: `ledger ${round}`, schema: DONE, model: "sonnet", effort: "low" },
   );
@@ -373,11 +347,13 @@ for (let round = 1; ; round += 1) {
   const fixed = await write(
     `${where(`fix-${round}`, true)}. Fix these findings, each test first, its commit body naming its ledger row (\`Finding: F<n>\`), and mark the ` +
       `row fixed with its commit: ${JSON.stringify(urgent)}. No red pass of these tests: the gate and the mutation tester check them. ` +
-      "Return each finding's id with the commit that fixes it.",
+      "Return each finding's id with the commit that fixes it; one you cannot reproduce, a command or a test, mark `rejected` with your " +
+      "evidence and return it under `rejected`.",
     { label: `fix round ${round}`, schema: FIXED },
   );
+  const rejectedIds = new Set(fixed && fixed.rejected ? fixed.rejected.map((f) => f.id) : []);
   const fixedIds = new Set(fixed ? fixed.fixed.map((f) => f.id) : []);
-  const open = urgent.filter((f) => !fixedIds.has(f.id));
+  const open = urgent.filter((f) => !fixedIds.has(f.id) && !rejectedIds.has(f.id));
   if (open.length)
     return result(`blocked at the fixes of round ${round}: ${open.map((f) => f.id).join(", ")} still open`, {
       gate,
@@ -386,7 +362,7 @@ for (let round = 1; ; round += 1) {
   commits.push(...fixed.fixed.map((f) => f.commit));
   // A second round only for a high finding fixed in a tier-1 file, and only its lens, on the diff since its first fix
   // (docs/REVIEW.md); otherwise one last merge check.
-  const highOnTier1 = urgent.filter((f) => f.severity === "high" && tier1(f.file));
+  const highOnTier1 = urgent.filter((f) => f.severity === "high" && tier1(f.file) && !rejectedIds.has(f.id));
   if (!highOnTier1.length) {
     gate = await gateCheck();
     break;

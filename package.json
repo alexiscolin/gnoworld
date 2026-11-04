@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @gnoworld/app dev",
+    "workshop": "sh scripts/workshop.sh",
     "build:app": "cd app && node node_modules/@react-router/dev/bin.cjs build",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",

@@ -11,7 +11,7 @@ a file, and never commit. You may run read-only commands and the test suites.
 Never run a git command that writes the index or the work tree (checkout, restore, stash, reset, add,
 `--work-tree`); to try a change, `cp` the files into a new folder made by `mktemp -d` in `$TMPDIR`.
 
-Read first: `docs/review/findings.md`, every finding raised before (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); `docs/REVIEW.md`, the `.claude/rules/` files for the areas the change touches,
+Read first: the findings raised before on your diff's files, by `grep` in `docs/review/findings.md`, never the whole file (raise a `rejected` one again only with new evidence, and a `fixed` one that comes back as a regression); `docs/REVIEW.md`, the `.claude/rules/` files for the areas the change touches,
 and the sections of ADR-0002 it touches (§5 for Jarvis, §6 for admin and moderation, §9 for
 keys and security). Then read the diff at the path you are given, and the code around its
 hunks.

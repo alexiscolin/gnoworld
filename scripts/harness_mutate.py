@@ -1302,13 +1302,13 @@ def regressions_name_mutants():
 
 
 def design_mutants():
-    """The design-reviewer starts for a screen, and missing frames fail the step (slice-5 harness-c)."""
+    """The design-reviewer starts for how space looks, and missing frames fail the step (slice-5 harness-c; 2026-11-04)."""
     yield from each("scripts/check_docs.py", 'AGENTS = ("design-reviewer", ', "AGENTS = (", "hooks", "check_docs.py asks for the design-reviewer's brief")
     j = ".claude/workflows/branch.js"
     yield from swaps(j, "branch.js", (
-        ('file.startsWith("app/src/") || file.startsWith("packages/ui/src/")', 'file.startsWith("packages/ui/src/")', "starts the design-reviewer for a change of app/src/"),
-        ('file.startsWith("app/src/") || file.startsWith("packages/ui/src/")', 'file.startsWith("app/src/")', "starts the design-reviewer for a change of packages/ui/src/"),
-        ("gate.files.some(screen)", "false", "starts the design-reviewer for a screen"),
+        ('["app/src/scene/", "packages/core/src/planet/", ', '["packages/core/src/planet/", ', "starts the design-reviewer for a change of the scene"),
+        ('"packages/core/src/cosmos/", "packages/core/src/space/"]', '"packages/core/src/space/"]', "starts the design-reviewer for a change of the cosmos"),
+        ("    ...(gate.files.some(space)\n", "    ...(false\n", "starts the design-reviewer for how space looks"),
         ('label === "design-reviewer" ? DESIGN : FINDINGS', "FINDINGS", "asks the design-reviewer whether the frames are missing"),
         ('lenses[i][1] === "design-reviewer" && r.framesMissing', "false", "fails the step on missing frames"),
         ("  if (!g || !g.passed || (g.exit === 0 && PASS_LINE.test(g.lastLine || \"\"))) return g;", "  if (true) return g;", "reads a merge check's last line itself (F2617)"),

@@ -13,8 +13,8 @@ on the slice's last merge.
 1. **No tokens first.** Run `scripts/check.sh --merge` (the full gate's lanes, with the harness
    mutants of the guard files the branch changed). If it fails, run the failing lane alone, fix,
    and run it again; stop and report if it still fails. Read `.claude/tmp/unsteady.log` (test files
-   the fast gate ran twice: failed once, then passed; docs/HARNESS.md): give each file named a
-   ledger row or its fix, then delete the log. Write the diff to `.claude/tmp/diff.patch` and pass
+   the fast gate ran twice: failed once, then passed; docs/HARNESS.md): a file that passed on its
+   second run is no ledger row, one named again and again is a test to fix; then delete the log. Write the diff to `.claude/tmp/diff.patch` and pass
    agents its path, never its content. Past the size `docs/REVIEW.md` allows (about 400 lines of
    product code with a tier-1 file, 600 otherwise), say so and propose a split before reviewing.
    A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
@@ -22,23 +22,26 @@ on the slice's last merge.
 2. **The plan.** List the files changed that the slice plan does not name; each gets its reason
    in the review card, or leaves the merge.
 3. **One combined review.** Launch the `reviewer` agent with the diff path, the surviving mutants
-   and the ledger's rows for the files it reads. It reads the code once: the tests' green pass,
-   correctness, security, cost and simplification, in one table. A tier-1 file or the harness
-   (`docs/REVIEW.md`) adds the `security-reviewer` agent, and a realm the `gno-auditor`, in the
-   same message; nothing else adds a lens. The last merge of a slice with tier-1 code: propose
+   and the ids of the ledger's rows that name its files (grep them; no agent reads the ledger whole).
+   It reads the code once, and the screens it changes with the video's frames: the tests' green pass
+   on StrykerJS's survivors (no hand-written mutant where StrykerJS runs), correctness, security, cost
+   and simplification, in one table. A tier-1 file or the harness (`docs/REVIEW.md`) adds the
+   `security-reviewer` agent, a realm the `gno-auditor`, a change of how space looks (the scene, the
+   planets, the cosmos) the `design-reviewer`, in the same message; nothing else adds a lens but the
+   `reviewer` asking for the `design-reviewer`. Two review lots at most: a part too large for them is
+   split, not reviewed in more. The last merge of a slice with tier-1 code: propose
    `/code-review ultra` to Alexis (billed per run; Claude cannot start it).
-4. **Verify, then reproduce.** Give the findings on tier-1 files to the `finding-verifier` agent,
-   which tries to refute each one, then to reproduce it, and rates it again; a `refuted` finding
-   is `rejected` with its evidence. Reproduce what is left yourself: a command, or a test seen
-   failing. Write every finding to `docs/review/findings.md` with its status and evidence:
+4. **Reproduce.** Reproduce each finding yourself: a command, or a test seen failing (no agent
+   verifies the reviewers' findings since 2026-11-04). Write every finding to `docs/review/findings.md` with its status and evidence:
    `fixed` with its commit, `rejected`, `intended`, `moot` or `asked`, each with its reason; one
    nobody reproduced stays `claimed`.
 5. **Fix high and medium.** Each test first, its commit body naming its finding (`Finding: F012`).
    Low findings, and any finding beyond the plan, go to one list for Alexis with a recommendation
    (fix now, a backlog row, or moot), never to a fixer by default. A fixer's tests get no red pass:
    the gate and the mutation tester re-check them. A second review round runs only for a high
-   finding fixed in a tier-1 file, and only its lens, on the diff since the first. A fourth round
-   does not run: stop and reconsider with Alexis.
+   finding fixed in a tier-1 file, and only its lens, on the diff since the first; the
+   `design-reviewer` runs again only on the screens of a high finding of its own that a fix changed.
+   A fourth round does not run: stop and reconsider with Alexis.
 6. **The operator's tests.** Every branch asks Alexis once, after every fix is committed, for
    `deploy/test.sh` on the host (and its `--mutants` for a branch that changes `deploy/`), run in the
    background while the review goes on; never in between. An app change alone broke the web image
