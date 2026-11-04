@@ -3,9 +3,10 @@
 // line's, none.
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
-import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Player } from "./embeds.ts";
 import styles from "./Embed.module.css";
+import { useFocusKept } from "./focusKept.ts";
 
 export interface EmbedProps {
   embed: Player;
@@ -54,28 +55,6 @@ function useLate(waiting: boolean): boolean {
     };
   }, [waiting]);
   return late && waiting;
-}
-
-// The focus held in the player's box, card or frame: when a hide takes the box away, it goes back to its line, which
-// the list's keys reach (4c: the list is no tab stop itself), not to the page (F896). Gone elsewhere, it is the reader's.
-function useFocusKept(hidden: boolean) {
-  const heldRef = useRef(false);
-  const lineRef = useRef<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (!hidden || !heldRef.current) return;
-    heldRef.current = false;
-    if (document.activeElement === document.body) lineRef.current?.focus();
-  }, [hidden]);
-  return {
-    onFocus: (event: FocusEvent<HTMLDivElement>) => {
-      heldRef.current = true;
-      lineRef.current = event.currentTarget.closest("li");
-    },
-    onBlur: (event: FocusEvent<HTMLDivElement>) => {
-      const to = event.relatedTarget;
-      if (to !== null && !event.currentTarget.contains(to)) heldRef.current = false;
-    },
-  };
 }
 
 export function Embed({ embed, verdict }: EmbedProps) {
