@@ -2,8 +2,8 @@
 // runner, as every call must pass our checks first. The system prompt is frozen per version and cached; the question
 // and the room's lines go in as untrusted blocks under the question's one tag (D80); each turn reserves, calls and
 // settles the model (model.ts), then each tool call passes the allowlist and the tag's check, eight a turn at most, runs
-// with the question's words and own cards (D103), its result cut and wrapped. It stops at the answer, with those cards,
-// the turn cap, max_tokens, a refusal (D81), an error, a stop it never asks for, or the day's budget (D84).
+// with the question's words and own cards (D103), its result cut and wrapped. It stops at the answer, with its cards,
+// the turn cap, max_tokens, a refusal (D81), an error, an unasked stop, the budget (D84), or its asker gone (D177).
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
@@ -14,19 +14,21 @@ import type { Budget } from "./budget.ts";
 import { failure, refusal, type Refusal } from "./callWords.ts";
 import type { JarvisConfig } from "./config.ts";
 import type { Ran } from "./gnomcp.ts";
-import { callModel, type Request, type Send } from "./model.ts";
+import { callModel, type Request, type Send, type Wait } from "./model.ts";
 import type { Model } from "./prices.ts";
 import { keepCards, type Asked, type Cards, type Kept } from "./tools/kept.ts";
 import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
-interface Question {
+/** A question: its words, and its room's lines, each a text. */
+export interface Question {
   readonly text: string;
   readonly room: readonly string[];
 }
-type Result =
+/** How a question ended: its answer and its cards, or why there is none. */
+export type Result =
   | { readonly kind: "answer"; readonly text: string; readonly cards: Cards }
-  | { readonly kind: "spent" | "turns" | "max_tokens" | "invalid" }
+  | { readonly kind: "spent" | "turns" | "max_tokens" | "invalid" | "gone" }
   | { readonly kind: "refusal"; readonly category: string | null }
   | { readonly kind: "failed"; readonly reason: "error" | "timeout" | "stop" };
 type Allowed = Extract<ReturnType<Allowlist<Definition>["check"]>, { ok: true }>;
@@ -45,7 +47,7 @@ interface Parts {
   // The tag's random source, node:crypto's by default; a tool's time, 30 s by default; the wait between attempts.
   readonly random?: ((size: number) => Uint8Array) | undefined;
   readonly toolTimeoutMs?: number | undefined;
-  readonly wait?: ((ms: number) => Promise<void>) | undefined;
+  readonly wait?: Wait | undefined;
 }
 // A question as it runs: its words, its cards, its blocks, its trace, its conversation, its count of the model's answers.
 interface Run {
@@ -57,6 +59,8 @@ interface Run {
   readonly messages: Anthropic.MessageParam[];
   // A tool's name when it is one of the loop's tools, else none.
   readonly named: (name: string) => string | undefined;
+  // The question's: fired once its asker left.
+  readonly signal: AbortSignal;
   turns: number;
 }
 
@@ -70,7 +74,11 @@ export function makeLoop(parts: Parts) {
   const version = hash.digest("hex");
   const tools = new Set(parts.tools.allowlist.offered().map(({ name }) => name));
   const named = (name: string) => (tools.has(name) ? name : undefined);
-  return { version, ask: (question: Question) => ask(parts, { system, version, named }, question) };
+  return {
+    version,
+    ask: (question: Question, signal = new AbortController().signal) =>
+      ask(parts, { system, version, named }, { question, signal }),
+  };
 }
 
 function systemOf(index: Parts["skills"]["index"]): string {
@@ -90,13 +98,15 @@ interface Prompt {
   readonly named: Run["named"];
 }
 
-async function ask(parts: Parts, prompt: Prompt, question: Question): Promise<Result> {
+async function ask(parts: Parts, prompt: Prompt, asked: { question: Question; signal: AbortSignal }): Promise<Result> {
+  const { question, signal } = asked;
   const started = performance.now();
   const trace = traceQuestion(parts.tracer, { model: parts.model, version: prompt.version });
   const blocks = untrustedBlocks({ limit: parts.caps.toolResultBytes, random: parts.random ?? randomBytes });
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: opening(blocks, question) }];
   const kept = keepCards();
-  const run: Run = { parts, question: question.text, kept, blocks, trace, messages, named: prompt.named, turns: 0 };
+  const { named } = prompt;
+  const run: Run = { parts, question: question.text, kept, blocks, trace, messages, named, signal, turns: 0 };
   let word = "thrown";
   try {
     const result = askable(question.text, parts.caps.questionChars) ? await converse(run, prompt.system) : invalid();
@@ -124,13 +134,13 @@ function opening(blocks: Untrusted, { text, room }: Question): Anthropic.TextBlo
 
 async function converse(run: Run, system: string): Promise<Result> {
   const { parts, trace } = run;
-  const attempts = { ...parts, retries: parts.caps.retries, trace };
+  const attempts = { ...parts, retries: parts.caps.retries, trace, signal: run.signal };
   for (;;) {
+    // callModel asks nothing once the asker left: it answers gone (D177).
     const called = await callModel(attempts, requestOf(parts, system, run.messages));
     if (!called.ok) {
-      return called.reason === "spent"
-        ? { kind: "spent" }
-        : { kind: "failed", reason: called.reason === "timeout" ? "timeout" : "error" };
+      if (called.reason === "spent" || called.reason === "gone") return { kind: called.reason };
+      return { kind: "failed", reason: called.reason === "timeout" ? "timeout" : "error" };
     }
     run.turns += 1;
     const stop = stopOf(called.answer, run.turns, parts.caps.turns);
@@ -204,16 +214,21 @@ function refused(run: Run, use: Anthropic.ToolUseBlock, reason: Refusal): Anthro
   return { type: "tool_result", tool_use_id: use.id, is_error: true, content: refusal(reason) };
 }
 
-// A run within the tool's time, its span ended however it ends; one past its time goes on, ended by its own timeout,
-// its signal aborted, so the question's cards keep nothing it hands in after.
+// A run within the tool's time and its asker's stay, its span ended however it ends; one past either goes on, ended
+// by its own timeout, its signal aborted, so the question's cards keep nothing it hands in after.
 async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]>): Promise<Ran> {
   const time = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let stop = (): void => undefined;
   const late = new Promise<Ran>((resolve) => {
-    timer = setTimeout(() => {
+    stop = () => {
       time.abort();
       resolve({ ok: false, reason: "timeout" });
-    }, run.parts.toolTimeoutMs ?? 30_000);
+    };
+    timer = setTimeout(stop, run.parts.toolTimeoutMs ?? 30_000);
+    run.signal.addEventListener("abort", stop);
+    // A signal fired before it listened fires no more.
+    if (run.signal.aborted) stop();
   });
   const asked: Asked = { text: run.question, cards: run.kept.within(time.signal), signal: time.signal };
   let ran: Ran = { ok: false, reason: "error" };
@@ -222,6 +237,7 @@ async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]
     return ran;
   } finally {
     clearTimeout(timer);
+    run.signal.removeEventListener("abort", stop);
     if (ran.ok) span.done(ran.isError);
     else span.failed(ran.reason);
   }

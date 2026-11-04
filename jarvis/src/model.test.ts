@@ -75,6 +75,22 @@ describe("connectAnthropic: the SDK's one client", () => {
     expect(bodyOf(call?.init ?? {})).not.toHaveProperty("fallbacks");
   });
 
+  it("ends a request in flight once the question's signal fires, as the SDK's own abort", async () => {
+    const left = new AbortController();
+    const { fetch } = fetcher(
+      (init) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted", "AbortError"));
+          });
+          left.abort();
+        }),
+    );
+    await expect(connectAnthropic(new Secret(KEY), 60_000, fetch)(ask(), left.signal)).rejects.toBeInstanceOf(
+      APIUserAbortError,
+    );
+  });
+
   it("sends the key to Anthropic's host whatever the environment names, and no other credential", async () => {
     vi.stubEnv("ANTHROPIC_BASE_URL", "https://elsewhere.example");
     vi.stubEnv("ANTHROPIC_AUTH_TOKEN", "a-token-from-the-environment");
@@ -230,6 +246,14 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     expect(requests[0]).toMatchObject({ inference_geo: "global", service_tier: "standard_only" });
     expect(run.budget.state("ask")).toEqual({ spent: cost(MODEL, answer.usage), reserved: 0, cap: 45 * DOLLAR });
     expect(run.events().filter((event) => event["event"] === "jarvis_budget_settle")).toEqual([]);
+    run.close();
+  });
+
+  it("lets a wait that fails on its own end the request with its error, with no question's signal given", async () => {
+    const run = attempts(45 * DOLLAR);
+    const { send } = script(statusError(529));
+    const wait = () => Promise.reject(new Error("the clock failed"));
+    await expect(callModel({ ...run.parts, wait, send }, ask())).rejects.toThrow("the clock failed");
     run.close();
   });
 

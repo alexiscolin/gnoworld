@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
-import { APIConnectionTimeoutError, APIError } from "@anthropic-ai/sdk";
+import { getEventListeners } from "node:events";
+import { setTimeout as sleep } from "node:timers/promises";
+import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk";
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import { allowlist } from "./allowlist.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 import type { Ran } from "./gnomcp.ts";
 import { makeLoop } from "./loop.ts";
-import type { Request } from "./model.ts";
+import type { Request, Wait } from "./model.ts";
 import { cost, worstCost } from "./prices.ts";
 import { message, script, text, thinking, toolUse, usage, type Step } from "./testing/fakeModel.ts";
 import { budgetFor, capture, spans } from "./testing/kit.ts";
@@ -64,6 +66,8 @@ interface Setup {
   // The turn's random source; null for node:crypto's.
   source?: ((size: number) => Uint8Array) | null;
   toolTimeoutMs?: number;
+  // The wait before a retry: none by default.
+  wait?: Wait;
 }
 const setup = ({
   steps,
@@ -74,6 +78,7 @@ const setup = ({
   chains = ["onyx", "betanet"],
   source = random(),
   toolTimeoutMs = 30_000,
+  wait = () => Promise.resolve(),
 }: Setup) => {
   const { budget, close } = budgetFor(cap);
   const { log, events, raw } = capture();
@@ -96,7 +101,7 @@ const setup = ({
     tools: { allowlist: tools, run: ran },
     random: source ?? undefined,
     toolTimeoutMs,
-    wait: () => Promise.resolve(),
+    wait,
   });
   return { loop, model, ran, events, raw, finished, budget, tools, close };
 };
@@ -756,6 +761,216 @@ describe("the loop: where it stops", () => {
     const day = run.budget.state("ask");
     expect(day.spent).toBeLessThanOrEqual(day.cap);
     expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+});
+
+// The door's request closed: its asker left, or the stop on SIGTERM cut it. The question stops there, its model
+// request and its tools' runs told, nothing more asked and nothing reserved after, each hold settled.
+describe("the loop: a question whose asker left", () => {
+  // A model request the SDK ends as it does when its signal fires, the signal fired by the test from inside the request.
+  const leaving =
+    (leave: () => void): Step =>
+    (_request, signal) =>
+      new Promise((_resolve, reject) => {
+        signal?.addEventListener("abort", () => {
+          reject(new APIUserAbortError());
+        });
+        leave();
+      });
+
+  it("asks nothing and reserves nothing for a question whose asker left before it began", async () => {
+    const run = setup({ steps: [ended()] });
+    const left = new AbortController();
+    left.abort();
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(run.model.requests).toEqual([]);
+    expect(run.budget.state("ask")).toEqual({ spent: 0, reserved: 0, cap: 45 * DOLLAR });
+    expect(run.events().find(({ event }) => event === "jarvis_answered")?.["reason"]).toBe("gone");
+    run.close();
+  });
+
+  it("stops the model's request the asker left, settles its hold at its worst, and asks nothing more", async () => {
+    const worst = await worstOfOneTurn();
+    const left = new AbortController();
+    const run = setup({
+      steps: [
+        leaving(() => {
+          left.abort();
+        }),
+        ended(),
+      ],
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(run.model.requests).toHaveLength(1);
+    expect(run.budget.state("ask")).toEqual({ spent: worst, reserved: 0, cap: 45 * DOLLAR });
+    run.close();
+  });
+
+  it("hands the model's request the question's own signal", async () => {
+    const seen: (AbortSignal | undefined)[] = [];
+    const left = new AbortController();
+    const run = setup({
+      steps: [
+        (_request, signal) => {
+          seen.push(signal);
+          return Promise.resolve(ended());
+        },
+      ],
+    });
+    await run.loop.ask(QUESTION, left.signal);
+    expect(seen[0]?.aborted).toBe(false);
+    left.abort();
+    expect(seen[0]?.aborted).toBe(true);
+    run.close();
+  });
+
+  it("makes no retry once the asker left during a failed attempt", async () => {
+    const left = new AbortController();
+    const run = setup({
+      steps: [
+        () => {
+          left.abort();
+          return Promise.reject(statusError(529));
+        },
+        ended(),
+      ],
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  it("ends the wait before a retry once the asker leaves, as node:timers' wait ends, and asks nothing more", async () => {
+    const left = new AbortController();
+    const waits: (AbortSignal | undefined)[] = [];
+    const run = setup({
+      steps: [statusError(529), ended()],
+      // As node:timers/promises' setTimeout does: rejected with an AbortError once its signal fires.
+      wait: (_ms, _value, options) =>
+        new Promise((_resolve, reject) => {
+          waits.push(options?.signal);
+          options?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted", "AbortError"));
+          });
+          left.abort();
+        }),
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(waits.map((signal) => signal?.aborted)).toEqual([true]);
+    expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  it("lets a wait that fails on its own, the asker still there, end the question with its error", async () => {
+    const run = setup({
+      steps: [statusError(529), ended()],
+      wait: () => Promise.reject(new Error("the clock failed")),
+    });
+    await expect(run.loop.ask(QUESTION, new AbortController().signal)).rejects.toThrow("the clock failed");
+    run.close();
+  });
+
+  // Its AbortError, rejected once the asker leaves during the wait, ends the question as gone, never as thrown.
+  it("ends node:timers' own wait before a retry once the asker leaves, its rejection read as gone", async () => {
+    const left = new AbortController();
+    const run = setup({
+      steps: [
+        () => {
+          setImmediate(() => {
+            left.abort();
+          });
+          return Promise.reject(statusError(529));
+        },
+        ended(),
+      ],
+      wait: sleep,
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  it("tells a tool's run the asker left, through its own signal, and asks the model nothing more", async () => {
+    const left = new AbortController();
+    const signals: AbortSignal[] = [];
+    const run = setup({
+      steps: [asking(status()), ended()],
+      run: (_call, asked) => {
+        signals.push(asked.signal);
+        left.abort();
+        // A run that only ends once its signal says so, as a card's reads do.
+        return new Promise((resolve) => {
+          asked.signal.addEventListener("abort", () => {
+            resolve({ ok: false, reason: "down" });
+          });
+        });
+      },
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(signals.map((signal) => signal.aborted)).toEqual([true]);
+    expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  it("stops at once when the asker leaves during a run that never ends, never waiting the tool's time", async () => {
+    const left = new AbortController();
+    const run = setup({
+      steps: [asking(status()), ended()],
+      toolTimeoutMs: 600_000,
+      run: () => {
+        left.abort();
+        return new Promise<Ran>(() => undefined);
+      },
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  // The SDK never resolves a request after its signal fired (the verifier, 4,000 runs): this pins a guard for a send
+  // that does, as a fake can (the reviewer's V5).
+  it("stops a run at once when the asker left as the model's answer came, never waiting the tool's time", async () => {
+    const left = new AbortController();
+    const signals: AbortSignal[] = [];
+    const run = setup({
+      steps: [
+        () => {
+          left.abort();
+          return Promise.resolve(asking(status()));
+        },
+        ended(),
+      ],
+      run: (_call, asked) => {
+        signals.push(asked.signal);
+        return new Promise((resolve) => {
+          asked.signal.addEventListener("abort", () => {
+            resolve({ ok: false, reason: "down" });
+          });
+        });
+      },
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(signals.map((signal) => signal.aborted)).toEqual([true]);
+    run.close();
+  });
+
+  it("leaves no listener on the question's signal once it ended, whatever its calls", async () => {
+    const left = new AbortController();
+    const eight = () => asking(...Array.from({ length: 8 }, (_, at) => status(`toolu_${String(at)}`)));
+    const run = setup({ steps: [eight(), eight(), ended()] });
+    expect(await run.loop.ask(QUESTION, left.signal)).toMatchObject({ kind: "answer" });
+    expect(getEventListeners(left.signal, "abort")).toEqual([]);
+    run.close();
+  });
+
+  it("ends a question whose asker left with its trace's result, gone", async () => {
+    const left = new AbortController();
+    left.abort();
+    const run = setup({ steps: [] });
+    await run.loop.ask(QUESTION, left.signal);
+    const [question] = run.finished().filter((span) => span.name === "jarvis.question");
+    expect(question?.attributes["jarvis.result"]).toBe("gone");
     run.close();
   });
 });

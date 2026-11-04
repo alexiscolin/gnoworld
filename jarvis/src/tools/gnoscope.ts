@@ -7,7 +7,7 @@ import { Client, SdkError, SdkErrorCode, StreamableHTTPClientTransport, type Too
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
 import { send } from "@gnoworld/service/net";
-import type { Ran } from "../gnomcp.ts";
+import { unchecked, type Ran } from "../gnomcp.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 
 interface Setup {
@@ -20,7 +20,8 @@ interface Setup {
 
 interface Gnoscope {
   readonly definitions: readonly ReturnType<typeof gnoscopeTools>[number][];
-  call(name: string, args: unknown): Promise<Ran>;
+  // A read, ended by `signal` too, answering `timeout` then (F5290).
+  call(name: string, args: unknown, signal?: AbortSignal): Promise<Ran>;
   close(): Promise<void>;
 }
 
@@ -86,16 +87,14 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
   let closed = false;
   return {
     definitions,
-    async call(name, args) {
+    async call(name, args, signal) {
       const parsed = definitions.find((definition) => definition.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       if (closed) return { ok: false, reason: "down" };
       try {
         // Our own definition, with no output schema: the client checks none of gnoscope's against a result (S1).
-        const toolDefinition = { name, inputSchema: { type: "object" as const } };
-        return read(
-          await client.callTool({ name, arguments: parsed.data }, { timeout: setup.timeoutMs, toolDefinition }),
-        );
+        const options = { timeout: setup.timeoutMs, toolDefinition: unchecked(name), ...(signal && { signal }) };
+        return read(await client.callTool({ name, arguments: parsed.data }, options));
       } catch (error) {
         return { ok: false, reason: failureOf(error) };
       }

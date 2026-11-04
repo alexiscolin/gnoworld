@@ -5,7 +5,7 @@
 // here are first values alone: the database keeps them from the first start (quota.ts).
 import { Address, DOOR_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { isOrigin, list, port, whole } from "@gnoworld/service/settings";
+import { host, isOrigin, list, port, whole } from "@gnoworld/service/settings";
 
 export interface DoorConfig {
   // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
@@ -53,7 +53,7 @@ export function doorSettings() {
       .string()
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,49}$/)
       .default("gnoland-1"),
-    ADMIN_HOST: z.string().min(1).max(253).default("127.0.0.1"),
+    ADMIN_HOST: host(),
     ADMIN_PORT: port().optional(),
     ADMIN_ORIGINS: list(z.string().refine(isOrigin)),
   };

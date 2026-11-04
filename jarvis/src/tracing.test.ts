@@ -7,15 +7,17 @@ import { message, text, toolUse, usage } from "./testing/fakeModel.ts";
 import { spans } from "./testing/kit.ts";
 import { startTracing, traceQuestion } from "./tracing.ts";
 
-// A collector on a port of its own that keeps each request's method, path and body.
-const collector = async () => {
+// A collector on a port of its own that keeps each request's method, path and body, and answers after `delayMs`.
+const collector = async (delayMs = 0) => {
   const received: { method: string; path: string; body: string }[] = [];
   const server = createServer((request: IncomingMessage, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received.push({ method: request.method ?? "", path: request.url ?? "", body: Buffer.concat(chunks).toString() });
-      response.writeHead(200, { "content-type": "application/json" }).end("{}");
+      setTimeout(() => {
+        response.writeHead(200, { "content-type": "application/json" }).end("{}");
+      }, delayMs);
     });
   });
   server.listen(0, "127.0.0.1");
@@ -60,12 +62,37 @@ describe("startTracing: where the spans go", () => {
   it("loses the spans, never the question, when the collector cannot be reached", async () => {
     const { url } = await collector();
     await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
-    const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` });
+    // An export of 50 ms makes one attempt: the exporter's first retry waits 0.8 s at least, past it (F5112). With its
+    // 5 s, the retries take 2 to 5 s, so the bound sits between the two.
+    const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` }, { exportTimeoutMs: 50 });
     traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);
     const started = performance.now();
     expect(await tracing.shutdown()).toBe(false);
-    expect(performance.now() - started).toBeLessThan(8_000);
-  }, 15_000);
+    expect(performance.now() - started).toBeLessThan(1_500);
+  });
+
+  it("gives up an export by default once its 5 s are out, to a collector that never answers", async () => {
+    const server = createServer(() => undefined);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    servers.push(server);
+    const { port } = server.address() as AddressInfo;
+    const tracing = startTracing({ JARVIS_TRACES_URL: `http://127.0.0.1:${String(port)}/v1/traces` });
+    traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);
+    const started = performance.now();
+    expect(await tracing.shutdown()).toBe(false);
+    // 5 s and one attempt, the exporter's next retry being past them: far below 20 s, far above the work.
+    expect(performance.now() - started).toBeLessThan(20_000);
+    server.closeAllConnections();
+  }, 30_000);
+
+  it("waits 5 s for an export by default: a collector that answers after 300 ms gets the spans", async () => {
+    const { url, received } = await collector(300);
+    const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` });
+    traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);
+    expect(await tracing.shutdown()).toBe(true);
+    expect(received).toHaveLength(1);
+  });
 
   it.each([
     "shttp://collector.example/v1/traces",

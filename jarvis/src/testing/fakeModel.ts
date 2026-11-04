@@ -55,18 +55,18 @@ export const message = ({ content, stop, usage: used = usage(), model = "claude-
     usage: used,
   }) satisfies Anthropic.Message;
 
-/** One step of a fake model: an answer, or an error the SDK would throw. */
-export type Step = Anthropic.Message | Error | ((request: Request) => Promise<Anthropic.Message>);
+/** One step of a fake model: an answer, an error the SDK would throw, or a function of the request and its signal. */
+export type Step = Anthropic.Message | Error | ((request: Request, signal?: AbortSignal) => Promise<Anthropic.Message>);
 
 /** A model that takes each step in turn, then fails the test; its requests are kept as JSON copies. */
 export const script = (...steps: Step[]) => {
   const requests: Request[] = [];
-  const send: Send = async (request) => {
+  const send: Send = async (request, signal) => {
     requests.push(structuredClone(request));
     const step = steps.shift();
     if (step === undefined) throw new Error("the fake model was asked once more than its script");
     if (step instanceof Error) throw step;
-    return typeof step === "function" ? step(request) : structuredClone(step);
+    return typeof step === "function" ? step(request, signal) : structuredClone(step);
   };
   return { send, requests };
 };

@@ -11,6 +11,8 @@ import { z } from "zod";
 interface Tool {
   name: string;
   inputSchema: { type: "object"; properties: Record<string, unknown> };
+  // A schema the MCP client would compile and check a result against, unless a call hands it a definition (F5111).
+  outputSchema?: Record<string, unknown>;
 }
 interface Profile {
   name: string;

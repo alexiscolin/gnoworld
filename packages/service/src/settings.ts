@@ -33,6 +33,9 @@ export const whole = (max: number, otherwise: number) =>
     .pipe(z.number().max(max))
     .default(otherwise);
 
+// A host to listen on or reach, by name or address, the loopback unless a setting says otherwise.
+export const host = () => z.string().min(1).max(253).default("127.0.0.1");
+
 // A port, written plainly, 0 for one the system picks.
 export const port = () =>
   z

@@ -102,8 +102,10 @@ export default defineConfig({
         "app/src/entry.server.tsx",
         "packages/ui/src/**/*.stories.tsx",
         "packages/ui/src/Overview/Overview.tsx",
-        // The server's entry runs in child processes, which coverage does not follow: main.test.ts drives it.
+        // The server's entry and jarvis's run in child processes, which coverage does not follow: their main.test.ts
+        // drive them.
         "server/src/main.ts",
+        "jarvis/src/main.ts",
       ],
       reporter: ["text-summary", "json"],
       // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.

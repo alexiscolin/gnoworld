@@ -3,6 +3,7 @@
 import { allowlist, type Definition } from "../allowlist.ts";
 import type { Ran } from "../gnomcp.ts";
 import { makeLoop } from "../loop.ts";
+import { DOLLAR } from "../prices.ts";
 import type { Asked } from "../tools/kept.ts";
 import { script, type Step } from "./fakeModel.ts";
 import { budgetFor, capture, spans } from "./kit.ts";
@@ -16,7 +17,7 @@ interface With {
 export const TAG = "ab".repeat(16);
 
 export function loopWith({ steps, definitions, run }: With) {
-  const { budget, close } = budgetFor(45 * 1_000_000_000);
+  const { budget, close } = budgetFor(45 * DOLLAR);
   const { log, events } = capture();
   const model = script(...steps);
   const table = allowlist(definitions, log);
