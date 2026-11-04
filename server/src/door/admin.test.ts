@@ -258,6 +258,8 @@ describe("the admin API, a change", () => {
     expect(events().at(-1)).toContain(
       '"event":"admin_refused","route":"/api/admin/jarvis/change","status":503,"error":"unapplied"',
     );
+    // Jarvis may have applied what it did not answer: the line says what was asked (F5107).
+    expect(events().at(-1)).toContain('"setting":"budget_translate","value":3');
     expect(events().join("")).not.toContain('"admin_change"');
   });
 
@@ -400,6 +402,19 @@ describe("the admin API, a change", () => {
       { error: "forbidden" },
     ]);
     expect((await change(prove(made))).status).toBe(200);
+  });
+
+  it("says what was asked in a refusal that follows a verified proof: another member's challenge, a full allowlist (F5107)", async () => {
+    const { db, challenge, prove, change, events, outsider, lead, second } = setup();
+    const made = await challenge({ setting: "quota", questions: 50 });
+    await change(prove(made, { by: second }), { token: "second" });
+    expect(events().at(-1)).toMatch(/"error":"by",.*"setting":"quota","value":50\}\n$/);
+    const add = db.prepare("INSERT INTO jarvis_unlimited (address, added_at) VALUES (?, ?)");
+    for (let at = 0; at < 1000; at += 1) add.run(toAddress(Buffer.from(String(at).padStart(20, "0"))), T0);
+    await change(prove(await challenge({ setting: "unlimited", account: outsider.address, unlimited: true })));
+    expect(events().at(-1)).toContain(
+      `"error":"unlimited","account":"${hmac(lead.address)}","setting":"unlimited","value":1`,
+    );
   });
 
   it("refuses a 1,001st account with no quota as full", async () => {

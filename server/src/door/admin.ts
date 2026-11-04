@@ -131,12 +131,14 @@ export function adminRoutes(options: Options): Hono<Guarded> {
     const proved = await signed.proveAction(body.data, c.get("host"));
     if (typeof proved === "string") return refuse(c, proved, { account: who });
     const { by, change } = Stored.parse(JSON.parse(proved.action));
-    // Asked by this account: another team member's challenge is not this one's to sign.
-    if (by !== who) return refuse(c, "by", { account: who });
     const parsed = JarvisChange.parse(change);
+    // Past a verified proof, a refusal says what was asked: jarvis may have applied a budget it did not answer (F5107).
+    const asked = { account: who, ...logged(parsed) };
+    // Asked by this account: another team member's challenge is not this one's to sign.
+    if (by !== who) return refuse(c, "by", asked);
     const result = await apply(parsed);
-    if (result !== "changed") return refuse(c, result, { account: who });
-    log("admin_change", { route: c.req.path, status: 200, account: who, ...logged(parsed) });
+    if (result !== "changed") return refuse(c, result, asked);
+    log("admin_change", { route: c.req.path, status: 200, ...asked });
     return c.json(await values());
   });
 
