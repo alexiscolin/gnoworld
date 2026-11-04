@@ -70,7 +70,7 @@ const chainRoutes = (paths: string[], over: Routes = {}): Routes => ({
 
 interface Run {
   file: string;
-  logged: { event: string; error?: string | undefined }[];
+  logged: { event: string; error?: string | undefined; ms?: number | undefined }[];
   chain: ReturnType<typeof fakeChain>;
   outcome: Awaited<ReturnType<typeof runWorlds>>;
   /** The pause asked before each wait, in order. */
@@ -98,7 +98,7 @@ async function run(
   const waits: number[] = [];
   const outcome = await runWorlds({
     file,
-    log: (event, fields) => void logged.push({ event, error: fields?.error }),
+    log: (event, fields) => void logged.push({ event, error: fields?.error, ms: fields?.ms }),
     send: chain.send,
     universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
     now: extra.clock ?? (() => extra.now ?? NOW),
@@ -208,7 +208,7 @@ describe("runWorlds", () => {
     const realm = written(file).worlds[0]?.realms[0];
     expect(realm?.deployerName).toBeNull();
     expect(realm?.calls).toBe(2);
-    expect(logged).toEqual([]);
+    expect(logged).toEqual([{ event: "worlds_written", ms: 0 }]);
   });
 
   it("goes out to the RPC's host and the indexer's, and to no other", async () => {
@@ -256,6 +256,14 @@ describe("runWorlds", () => {
     expect(chain.asked.length).toBeGreaterThan(5);
     expect(starts.slice(1).map((start, i) => start - (starts[i] ?? 0))).toEqual(starts.slice(1).map(() => PAUSE_MS));
     expect(waits).toEqual(starts.slice(1).map(() => PAUSE_MS - 100));
+  });
+
+  it("logs the pass's length once it wrote its files, on its clock", async () => {
+    const clock = { at: NOW };
+    const { routes } = slowChain(clock);
+    const { logged } = await run(routes, { clock: () => clock.at, onWait: (ms) => void (clock.at += ms) });
+    expect(clock.at - NOW).toBeGreaterThan(1_000);
+    expect(logged).toEqual([{ event: "worlds_written", ms: clock.at - NOW }]);
   });
 
   it("runs a pass every half hour unless told otherwise: the pause times the calls of a first pass stay far under it", () => {
@@ -492,7 +500,7 @@ describe("runWorlds", () => {
       expect(outcome).toEqual({ wrote: true });
       const realm = written(file).worlds[0]?.realms[0];
       expect(realm).toMatchObject({ deployer: A, functions: ["Swap"], calls: null, callers: null, lastHeight: null });
-      expect(logged.map(({ event }) => event)).toEqual(["worlds_indexer_failed"]);
+      expect(logged.map(({ event }) => event)).toEqual(["worlds_indexer_failed", "worlds_written"]);
     });
 
     it("stops asking the indexer for the pass once it is silent: not a request for every realm", async () => {
@@ -507,7 +515,10 @@ describe("runWorlds", () => {
       const { chain, logged, outcome } = await run(chainRoutes(paths, { indexer: () => wrong }));
       expect(outcome).toEqual({ wrote: true });
       expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(1);
-      expect(logged).toEqual([{ event: "worlds_indexer_failed", error: "shape" }]);
+      expect(logged).toEqual([
+        { event: "worlds_indexer_failed", error: "shape" },
+        { event: "worlds_written", ms: 0 },
+      ]);
     });
 
     it("keeps every realm's earlier counts when the indexer cannot answer now: no realm is read from half the chain", async () => {
@@ -661,7 +672,7 @@ describe("runWorlds", () => {
         .filter((line) => line !== "");
       const { chain, file, logged, outcome } = await run(chainRoutes(onyx));
       expect(outcome).toEqual({ wrote: true });
-      expect(logged).toEqual([]);
+      expect(logged).toEqual([{ event: "worlds_written", ms: 0 }]);
       expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ calls }) => calls))).toEqual(onyx.map(() => 2));
       const count = (kind: string) => chain.asked.filter((asked) => asked.kind === kind).length;
       expect(onyx).toHaveLength(743);

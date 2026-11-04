@@ -145,6 +145,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */
 export async function runWorlds(options: RunOptions): Promise<Outcome> {
   const settings = settingsOf(options);
+  const start = settings.now();
   const fail = (kind: Kind): Outcome => {
     settings.log("worlds_failed", { error: kind });
     return { wrote: false, kind };
@@ -169,6 +170,7 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
       { file: besideOf(settings.file, "count"), text: `${JSON.stringify(count)}\n` },
     ]);
     if (!written) return fail("write");
+    settings.log("worlds_written", { ms: settings.now() - start });
     settings.trends?.passed(file.data, read.histories);
     return { wrote: true };
   } catch (error) {
