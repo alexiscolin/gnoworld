@@ -367,6 +367,30 @@ describe("Gnomcp.call: one read", BOOTS, () => {
     ]);
   });
 
+  // The asker left: the call ends at once and gnomcp is told, never waiting its 30 s (F5290, the reviewer's V6).
+  it("ends a call once its signal fires, telling gnomcp, the child still answering the next one", async () => {
+    // A call's time of 10 minutes: only the signal can end it within the test's minute.
+    const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 600_000 });
+    const left = new AbortController();
+    const asked = (name: string) =>
+      fake.requests().some(({ method, params }) => method === "tools/call" && JSON.stringify(params).includes(name));
+    const ran = gnomcp.call("gno_status", { profile: "onyx" }, left.signal);
+    await until(() => asked("gno_status"));
+    left.abort();
+    expect(await ran).toEqual({ ok: false, reason: "timeout" });
+    await until(() => fake.requests().some(({ method }) => method === "notifications/cancelled"));
+    expect(await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" })).toMatchObject({ ok: true });
+    expect(fake.starts()).toHaveLength(1);
+  });
+
+  it("sends nothing for a call whose signal fired before it", async () => {
+    const { gnomcp, fake } = await start();
+    const left = new AbortController();
+    left.abort();
+    expect(await gnomcp.call("gno_status", { profile: "onyx" }, left.signal)).toEqual({ ok: false, reason: "timeout" });
+    expect(fake.requests().filter(({ method }) => method === "tools/call")).toHaveLength(1);
+  });
+
   it("gives up a call at its timeout, the child still answering the next one", async () => {
     // 2 s for a call, far from a quiet round trip with the child, and the bound far below gnomcp's own 30 s (F5138).
     const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 2_000 });

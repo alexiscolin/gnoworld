@@ -39,8 +39,9 @@ export function toolbox(box: Box) {
     [...reads, box.skills.tool, box.places.definition, ...button, ...box.gnoscope.definitions],
     box.log,
   );
-  const read: Runner = (call) => box.gnomcp.call(call.name, call.args);
-  const scope: Runner = (call) => box.gnoscope.call(call.name, call.args);
+  // Each told when its call's time is up or its asker left (D177, F5290).
+  const read: Runner = (call, asked) => box.gnomcp.call(call.name, call.args, asked.signal);
+  const scope: Runner = (call, asked) => box.gnoscope.call(call.name, call.args, asked.signal);
   const runners = new Map<string, Runner>([
     ...reads.map(({ name }) => [name, read] as const),
     [box.skills.tool.name, (call) => skill(box.skills, call.args)],

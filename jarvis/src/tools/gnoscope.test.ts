@@ -210,6 +210,25 @@ describe("startGnoscope: its tools listed at start, ours alone taken", () => {
 });
 
 describe("Gnoscope.call: one read, its time bounded, its answer through Zod", () => {
+  // The asker left: the call ends at once, never waiting gnoscope's answer nor its own time (F5290, V6).
+  it("ends a call once its signal fires, before gnoscope answers", async () => {
+    const arrived = Promise.withResolvers<undefined>();
+    const server = await serve({
+      delayMs: (method) => {
+        if (method !== "tools/call") return 0;
+        arrived.resolve(undefined);
+        return 60_000;
+      },
+    });
+    const started = await start(server.url, { timeoutMs: 60_000 }).gnoscope;
+    const left = new AbortController();
+    const ran = started.call("get_realm_state", state(), left.signal);
+    await arrived.promise;
+    left.abort();
+    expect(await ran).toEqual({ ok: false, reason: "timeout" });
+    await started.close();
+  });
+
   it("sends our read with the arguments our schema took, and gives its text", async () => {
     const server = await serve({ answer: (name) => ({ content: [{ type: "text", text: `{"read":"${name}"}` }] }) });
     const started = await start(server.url).gnoscope;

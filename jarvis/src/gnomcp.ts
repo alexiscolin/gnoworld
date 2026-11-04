@@ -32,7 +32,8 @@ interface Setup {
 type Failed = "timeout" | "down" | "malformed" | "error" | "refused";
 export type Ran = { ok: true; text: string; isError: boolean } | { ok: false; reason: Failed };
 export interface Gnomcp {
-  call(name: string, args: unknown): Promise<Ran>;
+  /** A read, ended by `signal` too: gnomcp is then told it is cancelled, and the call answers `timeout` (F5290). */
+  call(name: string, args: unknown, signal?: AbortSignal): Promise<Ran>;
   close(): Promise<void>;
 }
 interface Child {
@@ -79,13 +80,13 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
     return starting;
   };
   return {
-    async call(name, args) {
+    async call(name, args, signal) {
       // ponytail: a find over 10b's table of seven reads.
       const parsed = tools.find((tool) => tool.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       const current = closed ? undefined : await live();
       if (current === undefined) return { ok: false, reason: "down" };
-      return sent(current, { name, arguments: parsed.data }, timeout);
+      return sent(current, { name, arguments: parsed.data }, { timeout, ...(signal && { signal }) });
     },
     async close() {
       // A start under way ends first, so the child it makes is the one closed.
@@ -97,15 +98,17 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   };
 }
 
+type CallTool = Client["callTool"];
 const timedOut = (error: unknown) => error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout;
 
 /** A tool as our own definition hands it to the MCP client, with no output schema: the client compiles and checks
  * none a server listed, which a schema built to backtrack would hold the process with (F5253, F5111). */
 export const unchecked = (name: string) => ({ name, inputSchema: { type: "object" as const } });
 
-async function sent(child: Child, params: Parameters<Client["callTool"]>[0], timeout: number): Promise<Ran> {
+// A call its signal ended, the MCP client sends gnomcp the cancellation and answers as a timeout of its own.
+async function sent(child: Child, params: Parameters<CallTool>[0], options: Parameters<CallTool>[1]): Promise<Ran> {
   try {
-    return read(await child.client.callTool(params, { timeout, toolDefinition: unchecked(params.name) }));
+    return read(await child.client.callTool(params, { ...options, toolDefinition: unchecked(params.name) }));
   } catch (error) {
     if (timedOut(error)) return { ok: false, reason: "timeout" };
     // The client calls onclose before it fails the requests a closed connection leaves (its Protocol's _onclose).

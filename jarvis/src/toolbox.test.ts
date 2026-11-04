@@ -20,6 +20,7 @@ afterAll(() => {
 const SKILLS = fileURLToPath(new URL("../skills", import.meta.url));
 const PROFILES = { chains: ["onyx", "gnoland"], indexed: ["onyx"] };
 const said = (text: string): Ran => ({ ok: true, text, isError: false });
+type Read = (name: string, args: unknown, signal?: AbortSignal) => Promise<Ran>;
 
 // The tools as the entry wires them, each runner a fake that says who ran: gnomcp's reads, the skills, the places, the
 // cards and gnoscope's reads (on unless a test turns it off).
@@ -27,11 +28,15 @@ const box = ({ gnoscope = true }: { gnoscope?: boolean } = {}) => {
   const { log, events } = capture();
   const places = loadPlaces(data.folderOf());
   const read = vi.fn((name: string) => Promise.resolve(said(`gnomcp read ${name}`)));
-  const gnomcp = { call: vi.fn((name: string) => Promise.resolve(said(`gnomcp ${name}`))) };
+  // Each fake takes what its runner hands it: a call's name, its arguments and its signal.
+  const gnomcp = { call: vi.fn<Read>((name) => Promise.resolve(said(`gnomcp ${name}`))) };
   const cards = cardTools({ chains: PROFILES.chains, places, read });
   const cardRun = vi.spyOn(cards, "run").mockResolvedValue(said("cards"));
   const definitions = gnoscope ? gnoscopeTools(["mainnet", "onyx"]) : [];
-  const scope = { definitions, call: vi.fn((name: string) => Promise.resolve(said(`gnoscope ${name}`))) };
+  const scope = {
+    definitions,
+    call: vi.fn<Read>((name) => Promise.resolve(said(`gnoscope ${name}`))),
+  };
   const tools = toolbox({
     profiles: PROFILES,
     gnomcp,
@@ -124,8 +129,11 @@ describe("each allowed call, run by its own runner", () => {
         gno_activity: { profile: "onyx", realm: "gno.land/r/gov/dao" },
       }[name];
       const call = allowed(tools, name, args);
-      expect(await tools.run(call, asked())).toEqual(said(`gnomcp ${name}`));
+      const question = asked();
+      expect(await tools.run(call, question)).toEqual(said(`gnomcp ${name}`));
       expect(gnomcp.call.mock.calls.map((made) => made.slice(0, 2))).toEqual([[name, call.args]]);
+      // The call's own signal, which the question's leaving and the tool's time fire (F5290).
+      expect(gnomcp.call.mock.calls[0]?.[2]).toBe(question.signal);
       expect(cardRun).not.toHaveBeenCalled();
       expect(scope.call).not.toHaveBeenCalled();
     },
@@ -171,8 +179,10 @@ describe("each allowed call, run by its own runner", () => {
       }[name];
       const call = tools.allowlist.check(name, args);
       if (!call.ok) throw new Error(`the allowlist refused ${name}: its test's arguments are wrong`);
-      expect(await tools.run(call, asked())).toEqual(said(`gnoscope ${name}`));
+      const question = asked();
+      expect(await tools.run(call, question)).toEqual(said(`gnoscope ${name}`));
       expect(scope.call.mock.calls.map((made) => made.slice(0, 2))).toEqual([[name, call.args]]);
+      expect(scope.call.mock.calls[0]?.[2]).toBe(question.signal);
       expect(gnomcp.call).not.toHaveBeenCalled();
     },
   );
