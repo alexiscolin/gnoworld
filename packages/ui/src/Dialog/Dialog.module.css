@@ -24,8 +24,8 @@
     background: var(--color-scrim);
   }
 
-  /* The drawer: the screen's start, its full height, 360 px, on the night, the page faintly under it (frames 98 to 100);
-     Close in its top end corner, the page beside it seen whole. */
+  /* The drawer: the screen's start, its full height, 360 px, on the surface the dock and the plates use, so no word of the page reads
+     through it (frames 98 to 100); Close in its top end corner, the page beside it seen whole. */
   .dialog[data-side="start"] {
     /* raw: 360 px, frame 99 */
     --_w: 360px;
@@ -42,8 +42,6 @@
     border-block: 0;
     border-inline-start: 0;
     border-radius: 0;
-    /* raw: the night at 96% over the page, as frame 99's drawer */
-    background: color-mix(in oklab, var(--color-surface) 96%, transparent);
   }
 
   /* Its column fills it with no gap: the title row holds nothing drawn, and what the page gives it lays itself out, a list that scrolls
