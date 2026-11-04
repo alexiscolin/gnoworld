@@ -17,12 +17,19 @@ interface Fields {
   // A tool Jarvis's allowlist names, or its fixed word for a name the model made up, and why a call was refused.
   tool?: string;
   reason?: string;
+  // An admin's change (10g): the setting, its value, and the account it names, written as its HMAC like the account.
+  setting?: string;
+  value?: number;
+  subject?: string;
 }
 export type Log = (event: string, fields?: Fields) => void;
 
 export function logger(pepper: string, write: (line: string) => void): Log {
-  return (event, { account, method, route, status, port, error, ms, room, msgid, tool, reason } = {}) => {
-    const hashed = account === undefined ? undefined : createHmac("sha256", pepper).update(account).digest("hex");
+  const hmac = (who: string | undefined): string | undefined =>
+    who === undefined ? undefined : createHmac("sha256", pepper).update(who).digest("hex");
+  return (event, fields = {}) => {
+    const { account, method, route, status, port, error, ms, room, msgid, tool, reason, setting, value, subject } =
+      fields;
     const line = {
       time: new Date().toISOString(),
       event,
@@ -36,7 +43,10 @@ export function logger(pepper: string, write: (line: string) => void): Log {
       msgid,
       tool,
       reason,
-      account: hashed,
+      account: hmac(account),
+      setting,
+      value,
+      subject: hmac(subject),
     };
     write(`${JSON.stringify(line)}\n`);
   };
