@@ -127,16 +127,18 @@ LAB_HOSTS="$host,$(tailscale ip -4 | head -n 1)" node_modules/.bin/vite --config
 ~/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh up workshop 5199
 ```
 
-The dev server listens on 127.0.0.1:5199 alone and answers only the names `LAB_HOSTS` lists, exactly (`lab.config.ts`). The
+The dev server listens on 127.0.0.1:5199 alone and answers only the names `LAB_HOSTS` lists, exactly. By path it serves the app,
+the packages and their store, never the repository's root, whose `deploy/` holds secrets (`lab.config.ts`). The
 `tailnet-preview` skill's script prints two links. On the MacBook or the phone, open the https one with `/realism.html` after it:
 `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for the site's own scene
 (`&arrive=<system>` for a system's view). The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS.
 It is not a secure context, so Copy cannot reach the clipboard there; select the list instead. Stop the workshop with
 `tailnet-preview.sh down workshop`, then end the dev server.
 
-**The panel:** T shows and hides it, on either page.
+**The panel:** T shows and hides it, on either page, and so does its Tuning button in the corner, for a phone.
 - **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home
-  (`LEAN`) and, at a system's view, Lean at a system (`ARRIVAL_LEAN`), both in `packages/core/src/space/drift.ts`.
+  (`LEAN`) and, at a system's view, its share of that lean (`ARRIVAL_LEAN = LEAN / 2.2`), both in
+  `packages/core/src/space/drift.ts`. A Plan keeps its own share.
 - **Colours.** The palette's primitives (`--p-*`, read from the design system's sheet).
 - **Sizes.** The labels' font sizes (`--font-ui`, `--font-data`) and paddings (`--space-2xs`, `--space-xs`).
 
@@ -145,7 +147,7 @@ inside the panel stay there. Copy lists the values changed, one line each, with 
 code's values. A code edit reloads the page and loses the panel's values, so copy first.
 
 **Making a value tunable:**
-- **A custom property of `tokens.css`** needs only its name in `app/lab/panel.ts`'s lists.
+- **A size token of `tokens.css`** needs only its name in `app/lab/panel.ts`'s lists; every primitive colour is offered already.
 - **A scene value** gets a name in `TUNABLES` and a row in `app/lab/controls.ts`. It also gets one read where the value is used,
   written on the lab's switch: `import.meta.env.GNOWORLD_TUNING === "1" ? tuned(name, VALUE) : VALUE`, or `applyTuned` for a value
   set once on an object, as the renderer's exposure.
