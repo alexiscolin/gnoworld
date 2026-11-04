@@ -8,6 +8,7 @@ const FILES: readonly (readonly string[])[] = [
   ["carina"],
   ["veil"],
   ["cliffs"],
+  ["far-mars", "far-venus", "far-jupiter", "far-neptune", "saturn"],
 ];
 
 /** CREDITS, each row with the files it credits. */

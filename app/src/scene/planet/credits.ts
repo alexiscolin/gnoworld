@@ -57,4 +57,12 @@ export const CREDITS: readonly Credit[] = [
     read: "2026-11-02",
     line: "Nebula: NASA, ESA, CSA, and STScI, ESA/Webb, CC BY 4.0; cropped, stars removed, recoloured and warped",
   },
+  {
+    author: "Solar System Scope",
+    licence: "CC BY 4.0",
+    licenceUrl: CC_BY,
+    source: "https://www.solarsystemscope.com/textures/",
+    read: "2026-11-04",
+    line: "Planets: Solar System Scope, CC BY 4.0; scaled to 1024 by 512, drawn as they came",
+  },
 ];

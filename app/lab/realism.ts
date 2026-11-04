@@ -6,22 +6,11 @@ import type { WebGLRenderer } from "three";
 import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
-import { pathOf, type Choice, type Tier, type ViewName } from "./choice.ts";
+import { pathOf, VIEWS, type Choice, type Tier, type ViewName } from "./choice.ts";
 import { tuningPanel } from "./panel.ts";
 import { probes } from "./probes.ts";
 import { buildView, type View } from "./views.ts";
 
-const VIEWS: readonly ViewName[] = [
-  "gallery",
-  "gallery24",
-  "real24",
-  "class24",
-  "variety",
-  "close",
-  "eclipse",
-  "earth",
-  "stages",
-];
 const KEYS: Partial<Record<string, ViewName>> = {
   "1": "gallery",
   "2": "close",

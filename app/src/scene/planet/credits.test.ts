@@ -29,12 +29,14 @@ describe("the textures' credits", () => {
       "https://esahubble.org/images/heic0707a/",
       "https://esahubble.org/images/heic1520a/",
       "https://esawebb.org/images/weic2205a/",
+      "https://www.solarsystemscope.com/textures/",
     ]);
     expect(CREDITS[0]?.line).toContain("warped and recoloured");
     expect(CREDITS[1]?.line).toContain("scaled to 4096 by 2048");
     expect(CREDITS[2]?.line).toContain("cropped, stars removed, recoloured and warped");
     expect(CREDITS[3]?.line).toContain("cropped, stars removed, recoloured and warped");
     expect(CREDITS[4]?.line).toContain("cropped, stars removed, recoloured and warped");
+    expect(CREDITS[5]?.line).toContain("scaled to 1024 by 512, drawn as they came");
   });
 
   it("names every file in the folder, and no file that is not there", () => {
