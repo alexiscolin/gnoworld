@@ -6,6 +6,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
+import { makeRecentLines, type RecentLines } from "./door/lines.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
 import { ircLink, type Link, type Said } from "./irc/link.ts";
@@ -45,6 +46,8 @@ export interface Chat {
   mayPin: (room: string, who: string) => boolean;
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
+  // A public room's last lines moderation let through, for Jarvis's door (10g).
+  recent: RecentLines["recent"];
   stop: () => Promise<void>;
 }
 
@@ -144,7 +147,9 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
   const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
-  const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
+  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room) });
+  const run = moderate({ db, check, send, stream, progress, strike, passed: recent.passed });
+  const queue = makeQueue<Said>({ run, log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
   const reconciler = reconcilerFor(db, settings, {
@@ -173,9 +178,14 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           onJoin: reconciler.joined,
           ...kept.hooks,
+          onRedact: (room, msgid) => {
+            kept.hooks.onRedact(room, msgid);
+            recent.taken(room, msgid);
+          },
           onChannels: unknownChannels(db, log),
           onMessage: (said, replayed) => {
             kept.onEdit(said);
+            recent.edited(said);
             // A line of a history page is no activity now, whatever its time.
             if (!replayed) activity.count(said.room, said.account, now());
             progress.heard(said);
@@ -196,6 +206,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
+    recent: recent.recent,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

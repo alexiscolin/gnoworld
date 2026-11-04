@@ -1,5 +1,5 @@
 // A line's way once heard (slice 3's plan, 3h to 3k), as the chat runs it through its fair queue: checked, acted on,
-// streamed and struck toward a mute, then settled in its room's mark.
+// streamed and struck toward a mute, or kept among its room's recent lines (10g), then settled in its room's mark.
 import type { DatabaseSync } from "node:sqlite";
 import type { Said } from "../irc/link.ts";
 import type { Command } from "../irc/lines.ts";
@@ -15,10 +15,12 @@ export interface Steps {
   stream: Stream;
   progress: Progress;
   strike: (said: Said) => void;
+  // A line moderation let through (the door's recent lines, 10g).
+  passed: (said: Said) => void;
 }
 
 /** A line's way once heard: checked, acted on, streamed and struck, then settled in its room's mark. */
-export function moderate({ db, check, send, stream, progress, strike }: Steps): (said: Said) => Promise<void> {
+export function moderate({ db, check, send, stream, progress, strike, passed }: Steps): (said: Said) => Promise<void> {
   return async (said) => {
     let done = true;
     try {
@@ -37,6 +39,7 @@ export function moderate({ db, check, send, stream, progress, strike }: Steps): 
         const state = stateOf(verdict.action);
         if (state !== undefined) stream.publish({ msgid: said.msgid, room: said.room, state });
         if (verdict.action === "hide") strike(said);
+        else if (verdict.action === "pass") passed(said);
       }
     } finally {
       if (done) progress.settled(said);
