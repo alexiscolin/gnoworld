@@ -171,7 +171,7 @@ describe("a line's country", () => {
 
   it(
     "shows a code when the table of countries holds it, and only then: head, list and Earth agree on what a country is",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     () => {
       const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
       const wrong = letters

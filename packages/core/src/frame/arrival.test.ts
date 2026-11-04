@@ -174,14 +174,14 @@ const normalOf = ({ tilt, node }: StarSystem) => ({
   z: Math.cos(node) * Math.sin(tilt),
 });
 
-// Each runs every case's whole search two or three times: 2.5 s alone at load 60, past 5 s in the gate's parallel run (7v). Their own time
-// is no cost bound; `holds in a file of 10,000 worlds` is.
-const WHOLE_SEARCHES = 20_000;
+// Each runs every case's whole search two or three times: 2.5 s alone at load 60, past 5 s in the gate's parallel run (7v), past 20 s
+// at a load of 80 (lot 2's R2). Their own time is no cost bound; `holds in a file of 10,000 worlds` is.
+const WHOLE_SEARCHES = 60_000;
 
 describe("a system's arrival: the same address, the same postcard", () => {
   it(
     "gives a system the same arrival each time it is asked, in the same set, in any order",
-    { tags: ["timing"], timeout: WHOLE_SEARCHES },
+    { timeout: WHOLE_SEARCHES },
     () => {
       for (const { system, systems } of allCases()) {
         const arrival = arrivalOf(system, systems);
@@ -350,7 +350,7 @@ describe("a system's arrival: a good angle", () => {
   // the sway, rather than lose a world.
   it(
     "holds seven views in ten or more through a mouse's lean: the others whole and off the star's heart, the near one on the screen",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     () => {
       const cases = allCases().filter(({ system, systems }) => arrivalOf(system, systems).postcard.worlds.length > 0);
       const holding = cases.filter(({ system, systems }) => {

@@ -194,7 +194,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
 
   it(
     "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     async () => {
       const ergo = await fakeErgo();
       const env = settings();

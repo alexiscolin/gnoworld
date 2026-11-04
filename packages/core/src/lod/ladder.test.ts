@@ -210,7 +210,7 @@ describe("the draw bound", () => {
 
   it(
     "holds its counts past the cap: 100,000 systems draw what 10,000 do, not ten times it",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     () => {
       const huge = universe(100_000, 1);
       const eye = { x: 200, y: 60, z: 200 };
@@ -223,7 +223,7 @@ describe("the draw bound", () => {
     },
   );
 
-  it("asks a look about what is around the eye, never the whole universe", { tags: ["timing"] }, () => {
+  it("asks a look about what is around the eye, never the whole universe", { timeout: 60_000 }, () => {
     const eye = { x: 100, y: 60, z: 100 };
     const [large, huge] = [new Ladder(universe(10_000, 1)), new Ladder(universe(100_000, 1))];
     look(large, eye);
