@@ -92,12 +92,13 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   };
 }
 
+const timedOut = (error: unknown) => error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout;
+
 async function sent(child: Child, params: Parameters<Client["callTool"]>[0], timeout: number): Promise<Ran> {
   try {
     return read(await child.client.callTool(params, { timeout }));
   } catch (error) {
-    if (error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout)
-      return { ok: false, reason: "timeout" };
+    if (timedOut(error)) return { ok: false, reason: "timeout" };
     // The client calls onclose before it fails the requests a closed connection leaves (its Protocol's _onclose).
     return { ok: false, reason: child.alive ? "error" : "down" };
   }
@@ -139,8 +140,7 @@ async function atStart<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;
   } catch (cause) {
-    const late = cause instanceof SdkError && cause.code === SdkErrorCode.RequestTimeout;
-    throw new Error(late ? "gnomcp: it did not answer at start" : "gnomcp: it stopped at start", { cause });
+    throw new Error(timedOut(cause) ? "gnomcp: it did not answer at start" : "gnomcp: it stopped at start", { cause });
   }
 }
 
@@ -162,13 +162,10 @@ async function checked(client: Client, setup: Setup, timeout: number): Promise<v
     if (missing !== undefined) throw new Error(`gnomcp: ${name} has no field ${missing}`);
   }
   const Profile = z.object({ name: z.string(), kind: z.string(), tx_indexer_url: z.string() });
-  const Listed = z.object({
-    isError: z.literal(false).optional(),
-    structuredContent: z.object({ profiles: z.array(Profile) }),
-  });
-  const listed = Listed.safeParse(
-    await atStart(client.callTool({ name: "gno_profile_list", arguments: {} }, { timeout })),
-  );
+  const Profiles = z.object({ profiles: z.array(Profile) });
+  const Listed = z.object({ isError: z.literal(false).optional(), structuredContent: Profiles });
+  const answer = await atStart(client.callTool({ name: "gno_profile_list", arguments: {} }, { timeout }));
+  const listed = Listed.safeParse(answer);
   if (!listed.success) throw new Error("gnomcp: its profile list is not gnomcp 0.11.0's");
   readOnly(listed.data.structuredContent.profiles, setup.profiles);
 }
@@ -225,11 +222,11 @@ function logLine(log: Log, line: string): void {
     value = undefined;
   }
   const audit = z.object({ tool: z.string(), result: z.string(), duration_ms: z.number() }).safeParse(value);
-  if (!audit.success) log("jarvis_gnomcp_audit", { tool: "<malformed>", reason: "<malformed>" });
-  else
-    log("jarvis_gnomcp_audit", {
-      tool: shown(audit.data.tool),
-      reason: shown(audit.data.result),
-      ms: audit.data.duration_ms,
-    });
+  // A malformed line's tool and result are no names, so shown as <malformed>, with no time.
+  const {
+    tool,
+    result,
+    duration_ms: ms,
+  } = audit.success ? audit.data : { tool: "", result: "", duration_ms: undefined };
+  log("jarvis_gnomcp_audit", { tool: shown(tool), reason: shown(result), ...(ms === undefined ? {} : { ms }) });
 }
