@@ -2,6 +2,7 @@
 // anti-spam rules; since 3m, each world's groups of accounts and the type of its rooms; since 4b, the
 // sections its rooms are listed in. Who may do what is answered from it alone. Read whole in review: a
 // wrong line here hands out power.
+import { jsonOf } from "@gnoworld/core";
 import { readFileSync } from "node:fs";
 import { Address, RoomName } from "@gnoworld/schemas";
 import { z } from "zod";
@@ -162,7 +163,7 @@ export function loadRoles(path: string): Roles {
     throw new Error(`roles file ${path}: unreadable`, { cause });
   }
   // The place and the kind only: JSON.parse and Zod may quote what the file holds.
-  const parsed = schema().safeParse(json(text));
+  const parsed = schema().safeParse(jsonOf(text));
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const place = issue === undefined || issue.path.length === 0 ? "(top)" : issue.path.join(".");
@@ -185,15 +186,6 @@ export function loadRoles(path: string): Roles {
       ]),
     ),
   };
-}
-
-// What is not JSON reaches the schema as a value it refuses, so the error names no content.
-function json(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return Symbol("not JSON");
-  }
 }
 
 export const isTeam = (roles: Roles, who: Address): boolean => roles.team.has(who);

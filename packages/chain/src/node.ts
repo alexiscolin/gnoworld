@@ -2,6 +2,7 @@
 // paths gnoworld asks, a realm's page (vm/qrender), one expression (vm/qeval) and a realm's functions (vm/qfuncs). One
 // request a read. What the realm wrote is returned as text and never interpreted; its error text, Log and Info reach no failure
 // and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
+import { jsonOf } from "@gnoworld/core";
 import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
 import { FunctionList } from "@gnoworld/schemas/functions";
 import {
@@ -118,13 +119,7 @@ type Functions = NonNullable<FunctionList>;
 
 // A realm's functions as qfuncs lists them, none for a realm with none; null for a text that is no such list.
 function functionListOf(text: string): Functions | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const list = FunctionList.safeParse(json);
+  const list = FunctionList.safeParse(jsonOf(text));
   return list.success ? (list.data ?? []) : null;
 }
 

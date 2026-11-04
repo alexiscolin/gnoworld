@@ -4,7 +4,7 @@
 // proposal's or a button's arguments alone (D107). A refused card goes back to the model naming what is missing.
 import { readFunctionList } from "@gnoworld/chain/node";
 import type { ChainFetch } from "@gnoworld/chain/read";
-import { placeAt } from "@gnoworld/core";
+import { jsonOf, placeAt } from "@gnoworld/core";
 import { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
@@ -54,14 +54,8 @@ function definitionsOf([first, ...rest]: readonly string[]) {
 // The height its node's status gives, when its node and gnomcp's profile are both its universe's chain.
 function heightOf(status: Ran, universe: Universe): number | undefined {
   if (!status.ok || status.isError) return undefined;
-  let json: unknown;
-  try {
-    json = JSON.parse(status.text);
-  } catch {
-    return undefined;
-  }
   const Status = z.object({ height: z.int().positive(), chain_id: z.string(), node_chain_id: z.string() });
-  const parsed = Status.safeParse(json);
+  const parsed = Status.safeParse(jsonOf(status.text));
   if (!parsed.success) return undefined;
   const { height, chain_id: declared, node_chain_id: node } = parsed.data;
   return declared === universe.chainId && node === universe.chainId ? height : undefined;

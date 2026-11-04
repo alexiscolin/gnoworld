@@ -4,6 +4,7 @@
 // package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
 // logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
+import { jsonOf } from "@gnoworld/core";
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { readHeight } from "@gnoworld/chain/node";
 import type { Failure as ReadFailure, FailureKind } from "@gnoworld/chain/read";
@@ -143,11 +144,9 @@ export function startPrices(options: Options): Prices {
       if (error instanceof Failure) throw error;
       throw new Failure(named(error) ? "timeout" : "request");
     }
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Failure("not_json");
-    }
+    const value = jsonOf(text);
+    if (value === undefined) throw new Failure("not_json");
+    return value;
   }
 
   async function read(): Promise<void> {

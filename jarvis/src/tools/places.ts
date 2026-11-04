@@ -4,7 +4,7 @@
 // them alone; a fault stops the start, naming its file and nothing it holds.
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { placesOf, type Place } from "@gnoworld/core";
+import { jsonOf, type Place, placeIn, placesOf } from "@gnoworld/core";
 import { Ecosystems, Hubs, Stations, Universes } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
@@ -45,23 +45,15 @@ function fileOf<T>(folder: string, name: string, schema: z.core.$ZodType<T>): T 
   } catch (cause) {
     throw new Error(`places: ${file}: unreadable`, { cause });
   }
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    // A parse error quotes the text, so no JSON reaches the schema as nothing, which it refuses by its place.
-    value = undefined;
-  }
-  const parsed = z.safeParse(schema, value);
+  // A parse error quotes the text, so no JSON reaches the schema as nothing, which it refuses by its place.
+  const parsed = z.safeParse(schema, jsonOf(text));
   if (parsed.success) return parsed.data;
   throw faultOf(file, parsed.error.issues);
 }
 
 // A refused file's first fault, by its place in the file (`[0].slug`: every file is a list) and its kind.
 function faultOf(file: string, [issue]: readonly z.core.$ZodIssue[]): Error {
-  const place = (issue?.path ?? []).map((key) => (typeof key === "number" ? `[${String(key)}]` : `.${String(key)}`));
-  const at = place.join("");
-  return new Error(`places: ${file}: ${at === "" ? "(file)" : at}: ${issue?.code ?? "invalid"}`);
+  return new Error(`places: ${file}: ${placeIn(issue?.path ?? [])}: ${issue?.code ?? "invalid"}`);
 }
 
 /** The places of a data folder and its universes by id; throws on a file missing, past 1 MiB, or refused. */

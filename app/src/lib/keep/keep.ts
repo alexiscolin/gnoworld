@@ -3,6 +3,7 @@
 // of the page's storage under its address. Neither goes to any other device. What the device gives back is checked: a
 // line or a place that is none is dropped and the good ones kept; text that is no list forgets the key; a device that
 // refuses (blocked, full) keeps nothing and says so.
+import { jsonOf } from "@gnoworld/core";
 import type { Line } from "@gnoworld/core";
 import { Address, PinId, RoomId, Time } from "@gnoworld/schemas";
 import type { DraftStorage } from "../drafts/drafts.ts";
@@ -60,14 +61,8 @@ export function keep(storage: () => DraftStorage, account: Address): Keep {
     try {
       const held = storage().getItem(key);
       if (held === null) return [];
-      let value: unknown;
-      try {
-        value = JSON.parse(held);
-      } catch {
-        // Text that is no JSON is no list, and forgotten as any other shape is.
-        value = undefined;
-      }
-      const got = pick(value);
+      // Text that is no JSON is no list, and forgotten as any other shape is.
+      const got = pick(jsonOf(held));
       if (got === undefined) storage().removeItem(key);
       return got ?? [];
     } catch {

@@ -2,6 +2,7 @@
 // the SASL account and a ticket as its passphrase, and reads one line back (irc/authscript.go). A ticket is
 // spent whatever the answer; failures count per visitor, never per account, so nobody locks another out.
 // The bot's own account, gnoworld, logs in with the operator's password alone (slice 3's max review).
+import { jsonOf } from "@gnoworld/core";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { lstatSync, unlinkSync } from "node:fs";
@@ -43,13 +44,8 @@ export function authServer(db: DatabaseSync, { log, now = Date.now, deadlineMs =
   };
 
   const check = (line: string): Outcome => {
-    let json: unknown;
-    try {
-      json = JSON.parse(line);
-    } catch {
-      return { error: "frame" };
-    }
-    const input = Input.safeParse(json);
+    // A line that is no JSON is a frame of no shape, as one of another shape is.
+    const input = Input.safeParse(jsonOf(line));
     if (!input.success) return { error: "frame" };
     const { accountName, passphrase, ip } = input.data;
     // Ergo leaves the address out when it has none: those lines share one count, as does any ip that is

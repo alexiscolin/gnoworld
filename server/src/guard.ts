@@ -1,6 +1,7 @@
 // The guard of every route that changes something (slice 3's plan, 3c, 3l): no answer is cached, and a
 // request that is no GET comes from a listed Origin and in JSON, the CSRF guard: Hono's own csrf() checks
 // form types only.
+import { jsonOf } from "@gnoworld/core";
 import type { Context, MiddlewareHandler } from "hono";
 
 // The host of the request's Origin, which the guard checked.
@@ -30,10 +31,5 @@ export function guard(
 // body. Hono's body limit checks a declared length at once, and reads a body with none (chunked) whole before
 // a route runs (hono/body-limit, 4.13.13).
 export async function json(c: Context): Promise<unknown> {
-  const text = await c.req.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  return jsonOf(await c.req.text());
 }

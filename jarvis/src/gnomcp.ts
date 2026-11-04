@@ -4,6 +4,7 @@
 // reads there with every field ours allows, and every profile read-only (D86). A call goes only to a read of 10b's
 // table with arguments its schema takes, has its timeout, and its result passes Zod; a child that ended starts again
 // at the next call, 3 times in 10 minutes at most (D87).
+import { jsonOf } from "@gnoworld/core";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -225,13 +226,7 @@ function logLine(log: Log, line: string): void {
     return;
   }
   // What is no JSON reaches the schema as nothing, which it refuses.
-  let value: unknown;
-  try {
-    value = JSON.parse(line);
-  } catch {
-    value = undefined;
-  }
-  const audit = z.object({ tool: z.string(), result: z.string(), duration_ms: z.number() }).safeParse(value);
+  const audit = z.object({ tool: z.string(), result: z.string(), duration_ms: z.number() }).safeParse(jsonOf(line));
   // A malformed line's tool and result are no names, so shown as <malformed>, with no time.
   const {
     tool,

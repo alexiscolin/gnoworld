@@ -1,6 +1,8 @@
 // The one way out of the server (ADR-0002 §7): a call carries its timeout and follows no redirect,
 // whatever the caller asks, and what comes back is read up to a size. Where it may go is the egress
 // proxy's to decide (slice 3e).
+import { jsonOf } from "@gnoworld/core";
+
 /** The one way out's shape, which a caller's test stands in for. */
 export type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
 
@@ -42,10 +44,6 @@ export async function readJson(response: Response, max: number): Promise<unknown
     return undefined;
   }
   const text = await readCapped(response, max);
-  try {
-    return text === undefined ? undefined : JSON.parse(text);
-  } catch {
-    // Text that is no JSON is an answer of no shape, as one too long is.
-    return undefined;
-  }
+  // Text that is no JSON is an answer of no shape, as one too long is.
+  return text === undefined ? undefined : jsonOf(text);
 }
