@@ -66,6 +66,7 @@ const setup = (
 ) => {
   const calls: Call[] = [];
   const asked: string[] = [];
+  const requests: Call[] = [];
   const lines: unknown[][] = [];
   const clock = { now: T0 };
   const named = makeNames({
@@ -75,6 +76,7 @@ const setup = (
     log: (...line) => lines.push(line),
     send: (url, init, ms) => {
       asked.push(url);
+      requests.push({ url, init, ms });
       if (url === `${RPC}/status`) return status?.() ?? Promise.resolve(statusOf(network));
       calls.push({ url, init, ms });
       const next = answers.shift();
@@ -82,18 +84,32 @@ const setup = (
     },
     ...(max === undefined ? {} : { max }),
   });
-  return { calls, asked, lines, clock, named };
+  return { calls, asked, requests, lines, clock, named };
 };
 
 describe("a mainnet name", () => {
   it("asks r/sys/users whether the account's record is missing, by vm/qeval through the chain package, with a 3 s timeout", async () => {
-    const { calls, asked, named } = setup([NAMED]);
+    const { requests, named } = setup([NAMED]);
     expect(await named(ANNA)).toBe(true);
     const expression = `gno.land/r/sys/users.ResolveAddress("${ANNA}").IsDeleted()`;
     const url = `${RPC}/abci_query?path=%22vm%2Fqeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
-    expect(asked).toEqual([`${RPC}/status`, url]);
-    expect(calls).toMatchObject([
-      { url, init: { method: "GET", redirect: "error", headers: { accept: "application/json" } }, ms: 3000 },
+    // Each request whole (10h's review, V3): a GET with no cookie, no redirect followed, no cache, and no header but accept.
+    const init = {
+      method: "GET",
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    };
+    const whole = requests.map(({ url: asked, init: { signal, ...rest }, ms }) => ({
+      url: asked,
+      init: rest,
+      ms,
+      signal: signal instanceof AbortSignal,
+    }));
+    expect(whole).toEqual([
+      { url: `${RPC}/status`, init, ms: 3000, signal: true },
+      { url, init, ms: 3000, signal: true },
     ]);
   });
 
