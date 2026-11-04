@@ -5,7 +5,7 @@
 // its worst once its deadline passes (D62). The alerts are values the loop logs (D63, D64).
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import { transaction } from "../../server/src/db.ts";
+import { transaction } from "@gnoworld/service/db";
 
 export const BUDGET_TABLES = `
 CREATE TABLE budget_days (

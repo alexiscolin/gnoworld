@@ -3,7 +3,7 @@
 // stopped with the request that asked. It forwards no session, no cookie and no account. What comes back is read up to
 // 1 MiB and parsed with the client's own schema before anything passes it on; a failure is a value, never a hang.
 import { JARVIS_PATHS, JarvisAnswer, JarvisBudgets, type JarvisAsk, type JarvisBudget } from "@gnoworld/schemas";
-import { readJson, send as netSend, type Send } from "../net.ts";
+import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 
 type Failure = "down" | "slow" | "failed" | "shape" | "gone";
 type Called<T> = { ok: true; value: T } | { ok: false; error: Failure };

@@ -10,7 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { limiter } from "../limit.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { NICK } from "../irc/lines.ts";
 import { makeTickets } from "../login/ticket.ts";
 import { visitor } from "../visitor.ts";

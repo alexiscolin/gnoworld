@@ -7,7 +7,7 @@ import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
 import { Address, type Proof } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import {
   LOGIN_TABLES,

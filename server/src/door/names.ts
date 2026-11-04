@@ -2,7 +2,7 @@
 // mainnet's RPC, the one way out (net.ts), with its timeout and its answer capped. A failed read means none, the lower
 // quota, never the higher. The answers are kept 10,000 accounts at most: a name an hour, none ten minutes, a failure a minute.
 import { QueryAnswer, type Address } from "@gnoworld/schemas";
-import { readJson, send as netSend, type Send } from "../net.ts";
+import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 import { remember } from "../remember.ts";
 
 interface Options {

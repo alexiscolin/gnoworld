@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { accountKey, VERDICT_TABLES } from "./check.ts";
 import { editsOwn, lineKnown } from "./edits.ts";
 

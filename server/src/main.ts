@@ -3,8 +3,8 @@
 // node --disallow-code-generation-from-strings server/src/main.ts
 import { listen, makeApp, stop } from "./app.ts";
 import { loadConfig } from "./config.ts";
-import { openDatabase } from "./db.ts";
-import { logger } from "./log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
 import { adminRoutes } from "./door/admin.ts";
 import { askRoutes } from "./door/ask.ts";

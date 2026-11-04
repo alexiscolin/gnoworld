@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { logger } from "../../server/src/log.ts";
+import { logger } from "@gnoworld/service/log";
 import { allowlist, isName } from "./allowlist.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 

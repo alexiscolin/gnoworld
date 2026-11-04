@@ -3,7 +3,7 @@
 // every refusal is logged by the tool's name, a name the model made up as one fixed word, and never with the arguments,
 // which are model output.
 import { z } from "zod";
-import type { Log } from "../../server/src/log.ts";
+import type { Log } from "@gnoworld/service/log";
 
 /** A tool: its name, what the model reads of it, and the strict Zod object its arguments must pass. */
 export interface Definition<

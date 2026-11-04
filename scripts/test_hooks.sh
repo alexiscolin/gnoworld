@@ -1853,7 +1853,7 @@ fi
 
 if part migrations; then
 # check_migrations: a migration main has keeps its text and its place, since the server applies them by index
-# (server/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
+# (packages/service/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
 # the gate does; what it cannot read is refused, never passed over.
 mig="$here"/check_migrations.py
 r="$t/migrations"

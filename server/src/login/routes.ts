@@ -10,7 +10,7 @@ import { routePath } from "hono/route";
 import type { Config } from "../config.ts";
 import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { visitor } from "../visitor.ts";
 import { makeLogin, type Login } from "./login.ts";
 import { makeTickets, type Tickets } from "./ticket.ts";

@@ -7,7 +7,7 @@ import { getCookie } from "hono/cookie";
 import { routePath } from "hono/route";
 import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { mayCreateRoom, type Roles } from "../roles/roles.ts";
 import type { Rooms } from "./create.ts";
 

@@ -3,7 +3,7 @@
 // 3m and its max review).
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { line, NICK } from "./lines.ts";
 import type { State } from "./session.ts";
 

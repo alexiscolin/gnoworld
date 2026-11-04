@@ -4,7 +4,7 @@
 // configuration, and the chain profiles it may read. An error names the setting and its fault, never its value.
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "../../server/src/settings.ts";
+import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "@gnoworld/service/settings";
 import { MODELS, type Model } from "./prices.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 

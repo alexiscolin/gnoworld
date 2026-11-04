@@ -9,7 +9,7 @@ import {
 import { trace as otel } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Secret } from "../../server/src/settings.ts";
+import { Secret } from "@gnoworld/service/settings";
 import { callModel, connectAnthropic, type Request as ModelRequest } from "./model.ts";
 import { cost, worstCost, type Model } from "./prices.ts";
 import { message, script, text, usage } from "./testing/fakeModel.ts";

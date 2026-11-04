@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeMutes, MUTE_TABLES } from "./mute.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");

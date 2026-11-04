@@ -17,7 +17,7 @@ import {
   readWord,
   Secret,
   whole,
-} from "./settings.ts";
+} from "@gnoworld/service/settings";
 
 export interface Config {
   host: string;

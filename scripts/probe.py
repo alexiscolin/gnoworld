@@ -671,6 +671,7 @@ try:
             ("node.ts", uses(name="readFileSync", path="node:fs"), None),
             ("workspace.ts", uses(name="parseLine", path="@gnoworld/core"), None),
             ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
+            ("service.ts", uses(name="logger", path="@gnoworld/service/log"), None),
             ("sibling.ts", uses(name="used", path="./framework.ts"), None),
             # A name that only starts like a banned one is another package.
             ("reactor.ts", uses(name="x", path="reactor"), None),
@@ -688,9 +689,6 @@ try:
         ]
         lint_cases(server, src, "server")
         shutil.rmtree(src)
-        # The one file that may reach out, as it is.
-        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", "server/src/net.ts"])
-        expect(out.returncode == 0, "eslint server: net.ts calls fetch " + out.stdout[-300:])
         # The gate's typecheck reaches the server, with the flags and Node's types: the planted error alone.
         plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
         out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
@@ -715,7 +713,8 @@ try:
             ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
             ("sdk.ts", uses(name="Anthropic", path="@anthropic-ai/sdk"), None),
             ("sibling.ts", uses(name="used", path="./node.ts"), None),
-            ("server_shared.ts", uses(name="logger", path="../../../server/src/log.ts"), None),
+            ("service.ts", uses(name="logger", path="@gnoworld/service/log"), None),
+            ("server_path.ts", uses(name="loadConfig", path="../../../server/src/config.ts"), "import-x/no-restricted-paths"),
             *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
               for name in ("react", "three", "@gnoworld/ui")],
             ("app_path.ts", uses(name="Layout", path="../../../app/src/root.tsx"), "import-x/no-restricted-paths"),
@@ -738,6 +737,29 @@ try:
         plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"}, where=src)
         out = run(["node_modules/.bin/knip", "--no-progress"])
         expect(out.returncode != 0 and f"{src}/unused.ts" in out.stdout, "knip reports an unused file in Jarvis")
+        shutil.rmtree(src)
+
+    if part("service"):
+        # What the server and Jarvis share (D111): linted as they are, fetch in its net.ts alone, the one way out.
+        src = "packages/service/src/__probe__"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        lint = dict((n, c) for n, c, _ in LINT)
+        service = [
+            ("node.ts", uses(name="readFileSync", path="node:fs"), None),
+            ("react.ts", uses(name="x", path="react"), "no-restricted-imports"),
+            ("fetch.ts", "export function load(): unknown {\n  return fetch(\"http://x\");\n}\n", "no-restricted-globals: Unexpected use of 'fetch'."),
+            ("console.ts", 'export function say(): void {\n  console.log("x");\n}\n', "no-console"),
+            ("module_map.ts", lint["module_map.ts"], MODULE),
+        ]
+        lint_cases(service, src, "service")
+        shutil.rmtree(src)
+        # The one file that may reach out, as it is.
+        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", "packages/service/src/net.ts"])
+        expect(out.returncode == 0, "eslint service: net.ts calls fetch " + out.stdout[-300:])
+        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
+        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
+        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in the service package, and only it: {errors[:3]}")
         shutil.rmtree(src)
 
     if part("react_warn"):
@@ -946,6 +968,7 @@ finally:
     shutil.rmtree(FIELD, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
     shutil.rmtree("jarvis/src/__probe__", ignore_errors=True)
+    shutil.rmtree("packages/service/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { logger } from "../../server/src/log.ts";
+import { logger } from "@gnoworld/service/log";
 import { allowlist } from "./allowlist.ts";
 import { loadSkills } from "./skills.ts";
 

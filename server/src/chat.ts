@@ -11,7 +11,7 @@ import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
 import { ircLink, type Link, type Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
-import type { Log } from "./log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { makeProgress } from "./moderation/catchup.ts";
 import { makeChecker } from "./moderation/check.ts";
 import { makeMutes } from "./moderation/mute.ts";

@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "include": ["packages/*/src"],
-  // ui draws in the browser: its own tsconfig gives it the DOM, which core must not see.
-  "exclude": ["packages/ui"]
+  // ui draws in the browser, service runs on Node: each has its own tsconfig, which gives it the DOM or Node's types,
+  // which core must not see.
+  "exclude": ["packages/ui", "packages/service"]
 }

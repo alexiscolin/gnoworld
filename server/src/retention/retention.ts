@@ -7,7 +7,7 @@ import { lstatSync, readdirSync, type Stats } from "node:fs";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 
 // Ergo's `expire-time` (deploy/ergo/ircd.yaml.tmpl): a line older than that is gone from Ergo, and so is its pin.
 const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;

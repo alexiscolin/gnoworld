@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { bench, describe } from "vitest";
-import { openDatabase } from "../../server/src/db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeBudget, type Budget } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
 

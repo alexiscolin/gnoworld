@@ -2,8 +2,8 @@
 // file, and a tracer whose finished spans a test reads.
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { z } from "zod";
-import { openDatabase } from "../../../server/src/db.ts";
-import { logger } from "../../../server/src/log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { makeBudget } from "../budget.ts";
 import { jarvisMigrations } from "../migrations.ts";
 

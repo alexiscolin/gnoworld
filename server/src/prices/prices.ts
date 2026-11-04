@@ -6,8 +6,8 @@
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
-import type { Log } from "../log.ts";
-import { readCapped, send as netSend, type Send } from "../net.ts";
+import type { Log } from "@gnoworld/service/log";
+import { readCapped, send as netSend, type Send } from "@gnoworld/service/net";
 
 interface Options {
   file: string;

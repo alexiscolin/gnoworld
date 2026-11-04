@@ -1,6 +1,6 @@
 import { once } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import fc from "fast-check";
 import { freePort } from "../testing/ergo.ts";
 import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../testing/fakeErgo.ts";

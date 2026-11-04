@@ -1,6 +1,6 @@
 """check_migrations.py: a migration main has keeps its text and its place (F466).
 
-The server applies its migrations by index (server/src/db.ts): one edited in place, moved or removed never
+The server applies its migrations by index (packages/service/src/db.ts): one edited in place, moved or removed never
 reaches a database made before it. Each migration server/src/main.ts lists at the base must stand in the
 working tree (what the gate tests) in the same place (main.ts's list, or the one it imports from
 server/src/migrations.ts), its text the same; new ones may follow. What it cannot
@@ -71,4 +71,4 @@ before, after = listed(*at_base(base)), listed(here, held_here)
 changed = [name for i, (name, text) in enumerate(before) if i >= len(after) or after[i][1] != text]
 if changed:
     sys.exit(f"check_migrations: main's migrations changed, moved or removed: {', '.join(changed)}. A migration on"
-             " main keeps its text and its place (server/src/db.ts): add a new one after the others (F466)")
+             " main keeps its text and its place (packages/service/src/db.ts): add a new one after the others (F466)")

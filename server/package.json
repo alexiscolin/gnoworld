@@ -6,6 +6,7 @@
     "@adena-wallet/sdk": "0.1.1",
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
+    "@gnoworld/service": "workspace:*",
     "@hono/node-server": "2.1.3",
     "@hono/zod-validator": "0.9.1",
     "hono": "4.13.13",

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "../../server/src/db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { jarvisMigrations } from "./migrations.ts";
 
 // Append-only, as the server's (server/src/migrations.test.ts): one SHA-256 for each of jarvis's migrations, in the

@@ -12,7 +12,7 @@ import { StringDecoder } from "node:string_decoder";
 import { Client, SdkError, SdkErrorCode } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
-import type { Log } from "../../server/src/log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { gnomcpTools } from "./gnomcpTools.ts";
 import { shown } from "./tracing.ts";
 import { visible } from "./untrusted.ts";

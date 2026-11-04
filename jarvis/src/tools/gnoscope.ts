@@ -5,8 +5,8 @@
 // through Zod. Down, slow or no MCP at start, it offers nothing until jarvis starts again.
 import { Client, SdkError, SdkErrorCode, StreamableHTTPClientTransport, type Tool } from "@modelcontextprotocol/client";
 import { z } from "zod";
-import type { Log } from "../../../server/src/log.ts";
-import { send } from "../../../server/src/net.ts";
+import type { Log } from "@gnoworld/service/log";
+import { send } from "@gnoworld/service/net";
 import type { Ran } from "../gnomcp.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 

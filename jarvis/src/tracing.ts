@@ -7,7 +7,7 @@ import { ROOT_CONTEXT, SpanStatusCode, trace, type Span, type Tracer } from "@op
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { z } from "zod";
-import { parseSettings } from "../../server/src/settings.ts";
+import { parseSettings } from "@gnoworld/service/settings";
 import { isName } from "./allowlist.ts";
 
 /** jarvis's tracer, its spans exported to JARVIS_TRACES_URL when set; throws naming the setting when it is no URL.

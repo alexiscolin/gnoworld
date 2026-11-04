@@ -4,8 +4,8 @@ import { Challenge, toAddress, type JarvisBudget, type JarvisSettings } from "@g
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { BODY_LIMIT, makeApp } from "../app.ts";
-import { openDatabase } from "../db.ts";
-import { logger } from "../log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_HOST } from "../login/login.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { adminRoutes } from "./admin.ts";

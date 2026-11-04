@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import fc from "fast-check";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { openDatabase } from "../../server/src/db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeBudget, type Budget, type Kind } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
 

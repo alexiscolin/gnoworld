@@ -17,7 +17,7 @@ import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import type { Signed } from "../login/login.ts";
 import type { Jarvis } from "./jarvis.ts";
 import type { Quota } from "./quota.ts";

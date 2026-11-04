@@ -6,6 +6,7 @@
     "@anthropic-ai/sdk": "1.4.0",
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
+    "@gnoworld/service": "workspace:*",
     "@modelcontextprotocol/client": "2.4.0",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
