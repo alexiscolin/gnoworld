@@ -6,7 +6,7 @@
     transition: opacity var(--motion-base) var(--ease-standard);
   }
 
-  .layer[data-shown="true"] {
+  .shown {
     opacity: 1;
   }
 
@@ -27,6 +27,7 @@
   }
 
   .line {
+    /* layout: the caption's line under its title, frame 4's small step */
     margin-block-start: var(--space-2xs);
     color: var(--color-text-muted);
     font: var(--font-meta);

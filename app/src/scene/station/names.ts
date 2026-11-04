@@ -111,8 +111,7 @@ export class StationNames {
   /** Shows the names or not, fading; none while the scene's canvas stands still. */
   show(shown: boolean): void {
     this.#wanted = shown;
-    const written = String(shown && this.#running);
-    if (this.#layer.dataset["shown"] !== written) this.#layer.dataset["shown"] = written;
+    this.#layer.classList.toggle(styles["shown"] ?? "", shown && this.#running);
   }
 
   /** Each name over its station at `spots`, and the caption over them at `caption` of its strength, its centre kept within `width`: as the
