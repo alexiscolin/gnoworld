@@ -379,6 +379,8 @@ costs context in every session.
 - **The history scan is defence in depth;** the staged scan is the barrier (F141 to F143).
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine;**
   the overrun is printed and logged every time.
+  Every step of every gate keeps its time, the run's mode and the load as its lanes started in
+  `~/.cache/gnoworld-tools/gate-times.log`, a line a step, which nothing prunes (about 3 KB a run).
 - **A commit's lint trusts TypeScript's graph** (`scripts/lint_scope.py`): a file whose lint would read another it neither imports
   nor reaches through a type (a rule reading the disk) is linted at a part's end (`--tests-all`) and in the merge check, which lint the
   whole repository. Two gates at once in one worktree share its `.tsbuildinfo`, so one may read the graph the other wrote.

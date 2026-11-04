@@ -2758,6 +2758,58 @@ for run in config --tests-all --full --merge; do
 done
 fi
 
+if part gate_step_log; then
+gate_fixture gate_step_log
+# Every step of every gate keeps its time (Alexis, 2026-11-04: "Oui, les trois"; the audit could see only the runs past their budget):
+# one line a step in the tools' cache, which every worktree shares and none removes, tab-separated: the run's start (UTC), the
+# repository, the mode, the lane, the step, its seconds as the run printed them, and the load read as the lanes started. A log it
+# cannot write costs the measure, never the run.
+times=$g.home/.cache/gnoworld-tools/gate-times.log
+repo=$(cd "$g" && pwd -P)
+kept() { # $1: the run's output; $2: its mode. Each step the run printed has its line, and every line is of that run
+	printf '%s\n' "$1" | sed -n 's/^lane \([a-z]*\) [0-9.]* s: \(.*\)$/\1 \2/p' | tr ',' '\n' | awk 'NF == 3 {lane = $1; print lane, $2, $3; next} NF == 2 {print lane, $1, $2}' >"$t/printed"
+	[ -s "$t/printed" ] || fail "the run printed no step's time: $1"
+	while read -r lane name took; do
+		grep -qxF "$(printf '%s\t%s\t%s\t%s\t%s' "$repo" "$2" "$lane" "$name" "$took")" "$t/kept" || fail "check.sh did not keep lane $lane's step $name, $took s, of its $2 run: $(cat "$t/kept")"
+	done <"$t/printed"
+	[ "$(grep -c "" "$t/kept")" = "$(grep -c "" "$t/printed")" ] || fail "check.sh kept $(grep -c "" "$t/kept") lines for the $(grep -c "" "$t/printed") steps its $2 run printed: $(cat "$t/kept")"
+}
+out=$(LOAD_1="23 160" gate) || fail "check.sh failed a run whose every step passes: $out"
+[ -s "$times" ] || fail "check.sh kept no time of its steps"
+awk -F '\t' 'NF != 7 || $1 !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$/ || $6 !~ /^[0-9]+\.[0-9]$/ || $7 != "load 2.3 on 16 cores" { bad = 1 } END { exit bad }' "$times" ||
+	fail "check.sh's step log lacks the run's start, the seconds or the load as the lanes started: $(cat "$times")"
+[ "$(cut -f1 "$times" | sort -u | grep -c .)" = 1 ] || fail "check.sh stamped the steps of one run with more than one time: $(cut -f1 "$times" | sort -u)"
+cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" fast
+# Kept: a second run adds its own lines after the first's, which stay.
+first=$(cat "$times")
+sleep 1 && out=$(gate) || fail "check.sh failed a second run whose every step passes: $out"
+case $(cat "$times") in "$first"*) ;; *) fail "check.sh's second run did not keep the first's lines: $(cat "$times")" ;; esac
+[ "$(cut -f1 "$times" | sort -u | grep -c .)" = 2 ] || fail "check.sh's two runs share one start: $(cut -f1 "$times" | sort -u)"
+# A run that fails keeps its times too, the failed lane's included: the slow gates of the audit were passes and failures alike.
+rm -f "$times" && out=$(FAIL=lint gate) && fail "check.sh passed with lint failing: $out"
+grep -q "	fast	types	typecheck	" "$times" || fail "check.sh kept no time of a run that failed: $(cat "$times" 2>&1)"
+# The mode is the run's: --tests-all, the staged copy of pre-commit (no repository: the one whose packages it borrows, else its own
+# path), --full and --merge, whose later phases keep theirs.
+rm -f "$times" && out=$(gate --tests-all) || fail "check.sh --tests-all failed a run whose every step passes: $out"
+cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" tests-all
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+out=$(g=$c gate) || fail "check.sh failed a staged copy whose every step passes: $out" # gate() gives it the home $c.home
+cut -f2- "$c.home/.cache/gnoworld-tools/gate-times.log" | cut -f1-5 >"$t/kept" && repo=$(cd "$c" && pwd -P) && kept "$out" staged
+rm -rf "${c:?}/node_modules" "$c.home" && ln -s "$g/node_modules" "$c/node_modules"
+out=$(g=$c gate) || fail "check.sh failed a staged copy that borrows its packages: $out"
+cut -f2- "$c.home/.cache/gnoworld-tools/gate-times.log" | cut -f1-5 >"$t/kept" && repo=$(cd "$g" && pwd -P) && kept "$out" staged
+for mode in full merge; do
+	rm -f "$times" && out=$(AUDIT_ANSWER=x gate --"$mode") || fail "check.sh --$mode failed a run whose every step passes: $out"
+	cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" "$mode"
+	grep -q "	$mode	history	batch_size	" "$times" || fail "check.sh --$mode kept no time of its later phases: $(cat "$times")"
+done
+# A log it cannot write (a folder in its place) costs the measure alone: the run passes, and records what it passed.
+rm -f "$times" "$g/.claude/tmp/green-fast" && mkdir -p "$times"
+out=$(gate) || fail "check.sh failed a run because its step log cannot be written: $out"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh recorded nothing of a run whose step log cannot be written"
+rmdir "$times"
+fi
+
 if part gate_light; then
 gate_fixture gate_light
 # The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice): while git's own hooks folder holds `radical-mode` reading

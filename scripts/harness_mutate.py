@@ -65,7 +65,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -434,6 +434,11 @@ def mutants():
     yield from each(ck, '\tcase $lint in *" .") ;; *)\n', "\tcase $lint in *) ;; *)\n", "hooks", "check.sh names no file to a lint script of another shape")
     yield from each(ck, '"${lint% .} --no-warn-ignored $scope"', '"${lint% .} $scope"', "hooks", "check.sh tells ESLint to pass over a file it does not lint")
     yield from each(ck, "*) grep -E '^(check\\.sh|lint_scope|stryker_lines)[ :]' \"$logs/$l.log\" || : ;;", "*) ;;", "hooks", "check.sh says how a lane that passed ran")
+    # Every gate step's time, kept.
+    yield from each(ck, ' >>"$step_log"; } 2>/dev/null || :', ' >/dev/null; } 2>/dev/null || :', "hooks", "check.sh keeps every step's time")
+    yield from each(ck, '"$run_at" "$repository" "$mode"', '"$run_at" "$repository" fast', "hooks", "check.sh's step log says the run's mode")
+    yield from each(ck, '[ -n "$tested" ] || mode=staged\n', "", "hooks", "check.sh's step log tells pre-commit's staged copy from a repository's run")
+    yield from each(ck, "} 2>/dev/null || : # the measure, never the run", "} # the measure, never the run", "hooks", "check.sh passes a run whose step log it cannot write")
     ls = "scripts/lint_scope.py"
     yield from each(ls, "            todo.extend(importers.get(file, ()))\n", "", "hooks", "lint_scope.py follows the importers at any depth")
     yield from each(ls, "    if global_scope.intersection(todo):\n", "    if False:\n", "hooks", "lint_scope.py lints the whole repository on a change of the global scope")

@@ -282,6 +282,15 @@ if ! $all && ! $tests_all && common=$(git -C "$repository" rev-parse --path-form
 	light=true
 	echo "check.sh: the radical mode's light gate (no tier-1 path, no harness file): the types, the lint, the build with the first screen's cap, jscpd"
 fi
+# Every step's time, kept for the next audit, pass or fail (Alexis, 2026-11-04: "Oui, les trois"; it could read the runs past their budget
+# alone): a line a step in the tools' cache, which every worktree shares and none removes, `<start> <repository> <mode> <lane> <step> <s> load
+# <l> on <n> cores`, the load the one read as the lanes start. A log it cannot write costs the measure, never the run.
+step_log=$HOME/.cache/gnoworld-tools/gate-times.log run_at=$(date -u +%Y-%m-%dT%H:%M:%SZ) mode=fast
+! $tests_all || mode=tests-all
+! $full || mode=full
+! $merge || mode=merge
+[ -n "$tested" ] || mode=staged
+! $light || mode=$([ -n "$tested" ] && echo light || echo staged-light)
 retry() { # retry <tool> <report> <output> <command...>: <report>'s failed files, given to <command>, run once more; <output>, the first run's console, is shown first
 	tool=$1 report=$2 output=$3
 	shift 3
@@ -345,6 +354,8 @@ finish() {
 		total=0 parts=
 		while read -r name took_ms; do
 			total=$((total + took_ms)) parts="$parts${parts:+, }$name $(seconds "$took_ms")"
+			{ mkdir -p "${step_log%/*}" && printf '%s\t%s\t%s\t%s\t%s\t%s\tload %s.%s on %s cores\n' "$run_at" "$repository" "$mode" "$l" "$name" "$(seconds "$took_ms")" \
+				"$((${load_start% *} / 10))" "$((${load_start% *} % 10))" "$((${load_start#* } / 10))" >>"$step_log"; } 2>/dev/null || : # the measure, never the run
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
 		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
