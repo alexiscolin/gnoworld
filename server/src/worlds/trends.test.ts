@@ -190,6 +190,20 @@ describe("the chain's window", () => {
     expect(await trendingOf({ chain: trends.chain().worlds, now: later })).toBeUndefined();
   });
 
+  // The third round of 7t3's review: no test read a world's realms at different times.
+  it("spans a world's window from its realms' first read in the last pass to their last in this one", () => {
+    const { trends } = keeper();
+    const reads2 = (pool: number, pool1: number, recent: ReturnType<typeof reads>) =>
+      new Map([...recent].map(([path, value]) => [path, { ...value, at: path === POOL ? pool : pool1 }] as const));
+    trends.passed(file(T1, WORLDS), reads2(T1 - 2 * MINUTE, T1 - MINUTE, reads({ [POOL]: null, [POOL1]: null })));
+    trends.passed(file(T2, WORLDS), reads2(T2 - 3 * MINUTE, T2, reads({ [POOL]: [10, [A, B]], [POOL1]: [5, [C]] })));
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
+      since: at(T1 - 2 * MINUTE),
+      at: at(T2),
+      transactions: { count: 15, now: Math.round((15 * 60) / 33) },
+    });
+  });
+
   it("has no window on a first pass, for there is nothing to compare with", () => {
     const { trends, pass } = keeper();
     pass(T2, WORLDS, reads({ [POOL]: [40, [A, B]] }));

@@ -78,6 +78,8 @@ async function run(
   extra: {
     file?: string;
     now?: number;
+    /** A clock of the test's own, in place of `now`. */
+    clock?: () => number;
     maxBytes?: number;
     delayMs?: number;
     historyMax?: number;
@@ -93,7 +95,7 @@ async function run(
     log: (event, fields) => void logged.push({ event, error: fields?.error }),
     send: chain.send,
     universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
-    now: () => extra.now ?? NOW,
+    now: extra.clock ?? (() => extra.now ?? NOW),
     wait: (ms) => Promise.resolve(void waits.push(ms)),
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
     ...(extra.historyMax === undefined ? {} : { historyMax: extra.historyMax }),
@@ -877,6 +879,25 @@ describe("the trends it tells", () => {
       calls: 5,
       lastHeight: 104,
     });
+  });
+
+  // The third round of 7t3's review: the stamp's test ran on a fixed clock, so stamping every read once a pass would have passed it.
+  it("stamps each realm's read by the job's clock as its answer comes, never once a pass", async () => {
+    const clock = { at: NOW };
+    const answered = new Map<string, number>();
+    const routes = chainRoutes([POOL, ROUTER], {
+      indexer: ({ variables }) => {
+        clock.at += 1000;
+        answered.set(pathOf(variables), clock.at);
+        return history(2, pathOf(variables));
+      },
+    });
+    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
+    await run(routes, { clock: () => clock.at, trends: { passed: (_worlds, read) => void told.push(read) } });
+    const [pool, router] = [told[0]?.get(POOL)?.at, told[0]?.get(ROUTER)?.at];
+    expect(pool).toBe(answered.get(POOL));
+    expect(router).toBe(answered.get(ROUTER));
+    expect(pool).not.toBe(router);
   });
 
   it("counts every call of a realm the last file read with none yet, and gives no window to one it never read", async () => {
