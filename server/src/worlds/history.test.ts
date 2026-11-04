@@ -128,7 +128,9 @@ describe("readHistory", () => {
         { block_height: 101, messages: [{ value: { __typename: "MsgCall", pkg_path: PATH } }] },
         call(102, CALLER_A),
       ];
-      expect(await since(rows, 100)).toMatchObject({ history: { recent: { transactions: 2, callers: [CALLER_A] } } });
+      expect(await since(rows, 100)).toMatchObject({
+        history: { calls: 2, callers: 1, recent: { transactions: 2, callers: [CALLER_A] } },
+      });
     });
 
     it("gives no window when it is given no height: a realm the last file never read", async () => {

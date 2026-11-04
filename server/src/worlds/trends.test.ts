@@ -245,6 +245,15 @@ describe("the chain's window", () => {
     expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 7 } });
   });
 
+  it("says when one habit's folder refuses its file though the other takes it", () => {
+    const blocked = join(folderOf(), "a-file", "habit.json");
+    writeFileSync(join(blocked, ".."), "a file where a folder should be");
+    const { pass, logged } = keeper({ transactions: blocked, addresses: join(folderOf(), "habit.json") });
+    pass(T1, WORLDS, reads({ [POOL]: null }));
+    pass(T2, WORLDS, reads({ [POOL]: [7, [A, B]] }));
+    expect(logged).toContainEqual(["alert", { error: "trends_write" }]);
+  });
+
   it("reads the file it was given once, as the pass ends, however often its trends are asked (the route asks at each request)", () => {
     let count = 0;
     const counted = (time: number) =>
@@ -513,6 +522,31 @@ describe("Trending, a score relative to each world's habit", () => {
     expect(await trendingOf({ chain: [tiny, ...busy, ...spam] })).toBeUndefined();
   });
 
+  it("never lets a room with no message, nor one with a single person, lower its signal's middle", async () => {
+    const steady = (slug: string) => chatOf(slug, [3, 3], [0, 0]);
+    const quiet = [
+      chatOf("bubble", [3, 3], [30, 10]),
+      chatOf("govdao", [3, 3], [60, 60]),
+      steady("earth"),
+      steady("dex"),
+    ];
+    expect(await trendingOf({ chat: quiet }), "two rooms with no message").toBeUndefined();
+    const lone = (slug: string) => chatOf(slug, [1, 0]);
+    const people = [chatOf("bubble", [3, 1]), chatOf("govdao", [5, 5]), lone("earth"), lone("dex")];
+    expect(await trendingOf({ chat: people }), "two rooms of one person").toBeUndefined();
+    expect(await trendingOf({ chat: [chatOf("bubble", [3, 1]), lone("earth"), lone("dex")] })).toMatchObject({
+      world: "bubble",
+    });
+  });
+
+  it("ranks by the score before the key: a higher sum wins, wherever it stands and whatever its id", async () => {
+    const low = chainOf("alexis/blog", [6, 3], [4, 2]);
+    const high = chainOf("zeta/dex", [12, 3], [8, 2]);
+    const middle = chainOf("mid/game", [6, 6], [4, 4]);
+    expect(await trendingOf({ chain: [low, high, middle] })).toMatchObject({ world: "zeta/dex" });
+    expect(await trendingOf({ chain: [high, low, middle] })).toMatchObject({ world: "zeta/dex" });
+  });
+
   it("counts a world with no habit yet in the middle, for its activity is real, though it cannot trend itself", async () => {
     const fresh = chainOf("fresh/dex", [1000, null], [300, null]);
     expect(await trendingOf({ chain: [fresh, chainOf("gnoswap/pool", [6, 3], [4, 2])] })).toBeUndefined();
@@ -681,7 +715,7 @@ describe("GET /api/trends", () => {
 
   it("names as rising no world already Trending, by its rooms or by its realms, and takes the next", async () => {
     const rising = [hub("bubble", 12, 2), hub("govdao", 7, 0.75), hub("earth", 5, 0.25)];
-    const byChat = await ask({ chat: [chatOf("bubble", [12, 4])], rising });
+    const byChat = await ask({ chat: [chatOf("bubble", [12, 12], [240, 60])], rising });
     expect(byChat.body.items.map(({ kind, world }) => [kind, world])).toEqual([
       ["trending", "bubble"],
       ["rising", "govdao"],
