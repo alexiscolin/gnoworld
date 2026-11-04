@@ -7,15 +7,17 @@ import { message, text, toolUse, usage } from "./testing/fakeModel.ts";
 import { spans } from "./testing/kit.ts";
 import { startTracing, traceQuestion } from "./tracing.ts";
 
-// A collector on a port of its own that keeps each request's method, path and body.
-const collector = async () => {
+// A collector on a port of its own that keeps each request's method, path and body, and answers after `delayMs`.
+const collector = async (delayMs = 0) => {
   const received: { method: string; path: string; body: string }[] = [];
   const server = createServer((request: IncomingMessage, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received.push({ method: request.method ?? "", path: request.url ?? "", body: Buffer.concat(chunks).toString() });
-      response.writeHead(200, { "content-type": "application/json" }).end("{}");
+      setTimeout(() => {
+        response.writeHead(200, { "content-type": "application/json" }).end("{}");
+      }, delayMs);
     });
   });
   server.listen(0, "127.0.0.1");
@@ -66,6 +68,14 @@ describe("startTracing: where the spans go", () => {
     expect(await tracing.shutdown()).toBe(false);
     expect(performance.now() - started).toBeLessThan(8_000);
   }, 15_000);
+
+  it("waits 5 s for an export by default: a collector that answers after 300 ms gets the spans", async () => {
+    const { url, received } = await collector(300);
+    const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` });
+    traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);
+    expect(await tracing.shutdown()).toBe(true);
+    expect(received).toHaveLength(1);
+  });
 
   it.each([
     "shttp://collector.example/v1/traces",
