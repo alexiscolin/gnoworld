@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y, 2026-11-04): JavaScript before the first usable screen, 3 MB
-// in all with the worker's precache; steps in docs/decisions.md. The first screen: slice 8's header and 8b's plug and Go explore's pill,
-// 182,162 B measured, under Alexis's 180 KiB (182,338 B in this measure), its last 176 B 8c's bell's.
-const FIRST_SCREEN_JS = 182_162;
+// in all with the worker's precache; steps in docs/decisions.md. The first screen: slice 8's header, 8b's plug and Go explore's pill, and
+// 8c's bell, share and rail's follows, 182,725 B measured; the ceiling is now 182,784 B, by Alexis, 2026-11-04, for 8c's bell.
+const FIRST_SCREEN_JS = 182_725;
 const TOTAL = 3_135_286;
 
 // A text's hashed names of other files (`scene-B9x_Qa1z.js`) weigh as one fixed string: a chunk renamed moved another's weight 1 to 3 B
@@ -60,7 +60,7 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
-const LATE_CHAT_JS = 21_091;
+const LATE_CHAT_JS = 21_094;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
