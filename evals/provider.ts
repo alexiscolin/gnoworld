@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { queryEnvelope, statusEnvelope } from "../packages/chain/src/testing/envelopes.ts";
+import { jsonOf } from "../packages/core/src/json/json.ts";
 import { JARVIS_PATHS } from "../packages/schemas/src/jarvis.ts";
 import { seedSpent } from "./budget.ts";
 import { Case, kindOf, type Chain } from "./cases.ts";
@@ -23,24 +24,32 @@ const universes = () =>
   z.array(Universe).parse(JSON.parse(readFileSync(join(ROOT, "app/data/universes.json"), "utf8")));
 const fromHex = (url: URL) => Buffer.from((url.searchParams.get("data") ?? "").replace(/^0x/, ""), "hex").toString();
 
-/** The recorded node and the spans' receiver, on one loopback server: a realm by its universe and path. */
-function startFakes() {
+// The most span batches a run keeps: a case's take a few, so a flood of forged ones stops here.
+const BATCHES = 10_000;
+
+/** The recorded node and the spans' receiver, on one loopback server: a realm by its universe and path. It answers a
+ * request naming its own loopback Host alone, and takes JSON spans alone (10j's review, S6). */
+export function startFakes() {
   const realms = new Map<string, Chain>();
   const batches: unknown[] = [];
   // The height the node's status names: the last realm's recorded, as one case runs at a time.
   const at = { height: 1 };
   const server = createServer((request, response) => {
-    void answer(request, response);
+    answer(request, response).catch(() => {
+      if (!response.headersSent) response.writeHead(500).end();
+    });
   });
+  const reply = (response: ServerResponse, status: number, body: unknown = {}) => {
+    response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+  };
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const address = server.address();
+    const own = typeof address === "object" && address !== null ? `127.0.0.1:${String(address.port)}` : "";
+    if (request.headers.host !== own) return reply(response, 421);
     const url = new URL(request.url ?? "/", "http://fake");
     const chunks: Buffer[] = [];
     for await (const chunk of request) if (Buffer.isBuffer(chunk)) chunks.push(chunk);
-    if (url.pathname === "/v1/traces") {
-      batches.push(JSON.parse(Buffer.concat(chunks).toString()));
-      response.writeHead(200, { "content-type": "application/json" }).end("{}");
-      return;
-    }
+    if (url.pathname === "/v1/traces") return traced(request, response, Buffer.concat(chunks).toString());
     const [, universe = "", route = ""] = /^\/node\/([a-z0-9-]+)\/(.*)$/.exec(url.pathname) ?? [];
     const chainId = universes().find((one) => one.id === universe)?.chainId;
     const held = (realm: string) => realms.get(`${universe} ${realm}`);
@@ -52,7 +61,15 @@ function startFakes() {
       body = queryEnvelope({ data: held(data.replace(/:.*$/, ""))?.page ?? "" });
     else if (path.includes("qfuncs") && held(data) !== undefined)
       body = queryEnvelope({ data: JSON.stringify(held(data)?.functions) });
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(body));
+    reply(response, 200, body);
+  }
+  function traced(request: IncomingMessage, response: ServerResponse, text: string): void {
+    if (!/^application\/json(;|$)/i.test(request.headers["content-type"] ?? "")) return reply(response, 415);
+    if (batches.length >= BATCHES) return reply(response, 413);
+    const batch = jsonOf(text);
+    if (batch === undefined) return reply(response, 400);
+    batches.push(batch);
+    reply(response, 200);
   }
   return { server, realms, batches, at };
 }
@@ -199,9 +216,12 @@ export default class JarvisProvider {
       ),
     );
     const ms = Math.round(performance.now() - started);
-    // The spans leave jarvis in batches every 5 s (BatchSpanProcessor's default): one batch past the answers.
-    await new Promise((resolve) => setTimeout(resolve, 6_000));
-    const outcome = outcomeOf(fakes.batches.slice(before));
+    // The spans leave jarvis in batches every 5 s (BatchSpanProcessor's default): wait for the first question's, 10 s
+    // at most; a case that saw none fails its checks of tools and answers (tests.ts), never passes blind.
+    const traced = () => outcomeOf(fakes.batches.slice(before));
+    for (let waited = 0; traced().made === 0 && waited < 10_000; waited += 200)
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    const outcome = traced();
     const first = answers[0] ?? {};
     // What the grader reads: the answer's text, the translation, or the digest with its proposal.
     const digest = first["status"] === "digest" ? { digest: first["digest"], proposal: first["proposal"] } : first;

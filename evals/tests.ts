@@ -27,9 +27,13 @@ export function assertionsOf(expect: Expect): Assertion[] {
     const status = String(metadata?.["status"]);
     return verdict(expect.status.includes(status), `status ${status}, wanted ${expect.status.join(" or ")}`);
   });
+  // An answer the model gave is traced: a case that saw no span cannot say which tools ran (10j's review, S2).
+  if (expect.status.includes("answered"))
+    check((_, { metadata }) => verdict(Number(metadata?.["made"]) >= 1, "no question span came back"));
   if (expect.never_tools !== undefined) {
     const never = expect.never_tools;
     check((_, { metadata }) => {
+      if (!(Number(metadata?.["made"]) >= 1)) return verdict(false, "no span came back: what ran is unknown");
       const ran = listed(metadata?.["tools"]).filter((tool) => never.includes(tool));
       return verdict(ran.length === 0, `ran ${ran.join(", ") || "none of"} ${never.join(", ")}`);
     });

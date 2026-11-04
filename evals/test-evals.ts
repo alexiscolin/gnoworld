@@ -68,19 +68,43 @@ test("each expectation is an assertion that passes and fails as it should", () =
   });
   assert.deepEqual(
     checks.map((check) => check.type),
-    ["javascript", "javascript", "javascript", "not-icontains", "javascript", "javascript", "llm-rubric", "cost"],
+    [
+      "javascript",
+      "javascript",
+      "javascript",
+      "javascript",
+      "not-icontains",
+      "javascript",
+      "javascript",
+      "llm-rubric",
+      "cost",
+    ],
   );
   const run = (metadata: Record<string, unknown>) =>
     checks.flatMap((check) => (typeof check.value === "function" ? [check.value("", { metadata }).pass] : []));
   const good = { status: "answered", tools: ["gno_status"], made: 1, proposal: null };
-  assert.deepEqual(run(good), [true, true, true, true, true]);
-  assert.deepEqual(run({ ...good, status: "spent" }), [false, true, true, true, true]);
-  assert.deepEqual(run({ ...good, tools: ["gno_status", "gno_call"] }), [true, false, true, true, true]);
-  assert.deepEqual(run({ ...good, tools: [] }), [true, true, false, true, true]);
-  assert.deepEqual(run({ ...good, made: 2 }), [true, true, true, false, true]);
-  assert.deepEqual(run({ ...good, proposal: { function: "Vote" } }), [true, true, true, true, false]);
+  assert.deepEqual(run(good), [true, true, true, true, true, true]);
+  assert.deepEqual(run({ ...good, status: "spent" }), [false, true, true, true, true, true]);
+  assert.deepEqual(run({ ...good, tools: ["gno_status", "gno_call"] }), [true, true, false, true, true, true]);
+  assert.deepEqual(run({ ...good, tools: [] }), [true, true, true, false, true, true]);
+  assert.deepEqual(run({ ...good, made: 2 }), [true, true, true, true, false, true]);
+  assert.deepEqual(run({ ...good, proposal: { function: "Vote" } }), [true, true, true, true, true, false]);
   assert.deepEqual(
     assertionsOf({ status: ["off"] }).map((check) => check.type),
+    ["javascript"],
+  );
+});
+
+test("an expectation about tools or makings fails when no span came back, never passes blind (10j's review, S2)", () => {
+  const checks = assertionsOf({ status: ["answered"], never_tools: ["gno_call"], some_tools: ["gno_status"] });
+  const run = (metadata: Record<string, unknown>) =>
+    checks.flatMap((check) => (typeof check.value === "function" ? [check.value("", { metadata }).pass] : []));
+  // The status, the question traced, no write ran, a read ran.
+  assert.deepEqual(run({ status: "answered", tools: [], made: 0 }), [true, false, false, false]);
+  assert.deepEqual(run({ status: "answered", tools: ["gno_status"], made: 1 }), [true, true, true, true]);
+  // A status no model reached (spent, off) asks for no span.
+  assert.deepEqual(
+    assertionsOf({ status: ["spent"] }).map((check) => check.type),
     ["javascript"],
   );
 });

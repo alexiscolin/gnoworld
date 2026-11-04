@@ -3,13 +3,14 @@
 // spans, and the same case again costs no model call. No key, no chain: the tool is find_place, on the places' data.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { z } from "zod";
 import { fakeAnthropic } from "../jarvis/src/testing/fakeAnthropic.ts";
 import { message, text, toolUse } from "../jarvis/src/testing/fakeModel.ts";
-import JarvisProvider from "./provider.ts";
+import JarvisProvider, { startFakes } from "./provider.ts";
 
 test("a case asks jarvis's real entry, gives its tools and cost, and is kept for the next run", async () => {
   const dir = mkdtempSync(join(tmpdir(), "gnoworld-evals-test-"));
@@ -49,5 +50,34 @@ test("a case asks jarvis's real entry, gives its tools and cost, and is kept for
     await provider.cleanup();
     await model.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the loopback receiver takes jarvis's JSON spans alone, by its own Host, and refuses the rest (10j's review, S6)", async () => {
+  const fakes = startFakes();
+  await new Promise<void>((resolve) => fakes.server.listen(0, "127.0.0.1", resolve));
+  const address = fakes.server.address();
+  const port = typeof address === "object" && address !== null ? address.port : 0;
+  const origin = `http://127.0.0.1:${String(port)}`;
+  const post = (body: string, headers: Record<string, string>) =>
+    fetch(`${origin}/v1/traces`, { method: "POST", body, headers }).then((response) => response.status);
+  try {
+    const json = { "content-type": "application/json" };
+    assert.equal(await post(JSON.stringify({ resourceSpans: [] }), json), 200);
+    assert.equal(await post("{}", { "content-type": "text/plain" }), 415);
+    assert.equal(await post("{nope", json), 400);
+    // A page another site's DNS steers here names its own host.
+    const steered = await new Promise<number>((resolve, reject) => {
+      const request = httpRequest(
+        { host: "127.0.0.1", port, path: "/v1/traces", method: "POST", headers: { ...json, host: "evil.test" } },
+        (response) => resolve(response.statusCode ?? 0),
+      );
+      request.on("error", reject);
+      request.end("{}");
+    });
+    assert.equal(steered, 421);
+    assert.equal(fakes.batches.length, 1);
+  } finally {
+    fakes.server.close();
   }
 });
