@@ -105,6 +105,13 @@ test(
           .sort(),
       )
       .toEqual(later);
+    // The guard of every page's run names them: asked, and under no cap.
+    expect(
+      uncounted(
+        seen.scripts,
+        early.map((file) => new URL(`/__first/${file}`, page.url()).href),
+      ),
+    ).toEqual(later);
   },
 );
 
@@ -121,8 +128,10 @@ const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 const LATE_CHAT_JS = 21_210;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
-// screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
+// screen, and the scripts only it needs with it. The first screen counts the scripts the others need, its own cap the rest: first its
+// measured 21,265 B and the 256 B margin given ahead (the chief, 2026-11-04).
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+const PROPOSALS_JS = 21_521;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
@@ -320,6 +329,15 @@ const closureOf = (url: string) => filesOf(ASSETS, fileOfUrl(url)).map((file) =>
 // carry its code out of every cap (7e's review, B2-1).
 const ownOf = (late: string, there: readonly string[]) => closureOf(late).filter((each) => !there.includes(each));
 
+// The scripts a page asked that none of its caps' files holds, by name.
+const uncounted = (asked: Iterable<string>, ...caps: readonly (readonly string[])[]) => {
+  const counted = new Set(caps.flat());
+  return [...asked]
+    .filter((url) => !counted.has(url))
+    .map(fileOfUrl)
+    .sort();
+};
+
 // What a late chunk brings once it runs: its own, and each chunk its files name in a dynamic import that the page asked, with that one's
 // own, at any depth (the chief, 2026-11-04: the chat's RoomsDrawer, asked once its box is narrow, fell between two cuts).
 function openedOf(late: string, there: readonly string[], asked: ReadonlySet<string>): string[] {
@@ -396,11 +414,20 @@ for (const path of PAGES) {
     const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
     const firstScreen = await without(page, early, late);
     const lateChunk = late.find((url) => CHAT.test(url));
+    const chatOpened = lateChunk === undefined ? [] : openedOf(lateChunk, firstScreen, scripts);
     if (lateChunk !== undefined)
-      expect(
-        await compressed(page, openedOf(lateChunk, firstScreen, scripts)),
-        "the late chat stays within its cap",
-      ).toBeLessThanOrEqual(LATE_CHAT_JS);
+      expect(await compressed(page, chatOpened), "the late chat stays within its cap").toBeLessThanOrEqual(
+        LATE_CHAT_JS,
+      );
+    const proposals = asked[0] === undefined ? [] : openedOf(asked[0], [...firstScreen, ...chatOpened], scripts);
+    if (asked[0] !== undefined)
+      expect(await compressed(page, proposals), "the proposals stay within their cap").toBeLessThanOrEqual(
+        PROPOSALS_JS,
+      );
+    // Every script the page asked is under one of its caps: a chunk between two cuts fails here (the chief, 2026-11-04).
+    expect(uncounted(scripts, firstScreen, chatOpened, proposals), "every chunk the page asks is under a cap").toEqual(
+      [],
+    );
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),
