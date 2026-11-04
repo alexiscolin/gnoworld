@@ -1,5 +1,19 @@
 /* A realm's view (5h): where the page was read, in the page's own small type. */
 @layer components {
+  /* The top centre's slot (DESIGN-SYSTEM.md, Layout: the flight panel, the expedition pill, the flash) stays free above the view's first
+     line, so an arrival's pill covers none of it and nothing moves when it comes: one row of the pill (its actions' height and its
+     padding) and a step under it. */
+  .view {
+    padding-block-start: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
+  }
+
+  /* raw: the phone layout's breakpoint (DESIGN-SYSTEM.md, Breakpoints), where the pill's actions wrap under its words: two rows */
+  @media (max-width: 900px) {
+    .view {
+      padding-block-start: calc(var(--control-s) * 2 + var(--space-m) + var(--space-2xs) * 2 + var(--space-s));
+    }
+  }
+
   .meta {
     color: var(--color-text-muted);
     font: var(--font-meta);

@@ -102,8 +102,9 @@ export const Events = byId(
 const oneWorld = (row: { hub?: string | undefined; realm?: string | undefined }) =>
   (row.hub === undefined) !== (row.realm === undefined);
 
-/** The pool of the daily expedition's stops (ADR-0002 §1, "Daily expedition"): each a world the team curates, with a line on why to go;
- * `live` marks a world where something moves every day, which the first stop of a day is chosen among (core's `expeditionOf`). */
+/** The pool of the daily expedition's stops (ADR-0002 §1, "Daily expedition"): each a world the team curates, a realm's with its name, with a
+ * line on why to go; `live` marks a world where something moves every day, which the first stop of a day is chosen among (core's
+ * `expeditionOf`). */
 export const Expedition = byId(
   z
     .strictObject({
@@ -111,11 +112,17 @@ export const Expedition = byId(
       universe: Key,
       hub: z.optional(Key),
       realm: z.optional(RealmPath),
-      name: text(DATA_CAPS.name),
+      name: z.optional(text(DATA_CAPS.name)),
       why: text(DATA_CAPS.title),
       live: z.optional(z.boolean()),
     })
-    .check(z.refine(oneWorld, "a stop names a hub or a realm, one of them")),
+    // A hub's name is hubs.json's, one source for the arrival's pill and the expedition; a realm's is the stop's.
+    .check(
+      z.refine(
+        (stop) => oneWorld(stop) && (stop.realm === undefined) === (stop.name === undefined),
+        "a hub, or a named realm",
+      ),
+    ),
 );
 
 /** The most steps a quest holds, and the fewest. */

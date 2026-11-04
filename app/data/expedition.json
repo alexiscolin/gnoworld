@@ -3,7 +3,6 @@
     "id": "govdao",
     "universe": "onyx",
     "hub": "govdao",
-    "name": "GovDAO",
     "why": "The chain's own proposals, and the votes that accept or refuse them",
     "live": true
   },
@@ -27,7 +26,6 @@
     "id": "bubble",
     "universe": "onyx",
     "hub": "bubble",
-    "name": "Bubble",
     "why": "The BUBBLE token's world: its rooms and the people in them"
   },
   {

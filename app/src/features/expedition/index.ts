@@ -1,3 +1,3 @@
-// Today's expedition (slice 8): its stops and where it goes next, for "Go explore" and the quests.
+// Today's expedition (slice 8): its stops and where it goes next, for "Go explore", the quests and the arrival's pill.
 export { nextStop } from "./next.ts";
-export { worldOf } from "./stops.ts";
+export { worldName, worldOf } from "./stops.ts";

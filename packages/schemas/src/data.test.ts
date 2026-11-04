@@ -33,7 +33,7 @@ const world = { slug: "moon", name: "Moon", description: "d".repeat(60), univers
 const eco = { slug: "tokens", name: "Tokens", description: "Tokens.", universe: "onyx" };
 const genre = { slug: "game", name: "Game" };
 const event = { id: "launch", title: "Launch", start: "2026-11-01T18:00:00.000Z", link: "https://gno.land/" };
-const stop = { id: "start", universe: "onyx", hub: "bubble", name: "Start", why: "Begin here." };
+const stop = { id: "start", universe: "onyx", realm: "gno.land/r/demo/start", name: "Start", why: "Begin here." };
 const quest = {
   id: "first",
   universe: "onyx",

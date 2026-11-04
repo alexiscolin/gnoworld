@@ -21,17 +21,32 @@ export interface Stop {
   readonly path: string;
 }
 
-/** The device's key of a named world of `universe`, and its page; none for a hub the site does not hold. */
-export function worldOf(universe: string, { hub, realm }: Named): { key: string; path: string } | undefined {
+// A realm's view in a universe: at its plain path in the default one, under /net/<id> elsewhere.
+const realmPage = (view: { id: string; isDefault: boolean }, realm: string) =>
+  `${view.isDefault ? "" : `/net/${view.id}`}/r/${realm.slice(REALM_PREFIX.length)}`;
+
+/** A named world of `universe`: its id as the cosmos holds it, the device's key and its page; none for a hub the site does not hold. */
+export function worldOf(
+  universe: string,
+  { hub, realm }: Named,
+): { id: string; key: string; path: string } | undefined {
   const view = site.universes.find((each) => each.id === universe);
   if (view === undefined) return undefined;
-  const id = realm === undefined ? undefined : worldIdOf(realm);
+  const fromRealm = realm === undefined ? undefined : worldIdOf(realm);
   // A realm whose world is a hub's opens the hub's page, where its planet and its room are.
-  const page = view.worlds.find((world) => (hub === undefined ? hubWorldOf(world) === id : world.slug === hub));
-  if (page !== undefined) return { key: stampKey(universe, hubWorldOf(page)), path: page.path };
-  if (realm === undefined || id === undefined) return undefined;
-  const prefix = view.isDefault ? "" : `/net/${universe}`;
-  return { key: stampKey(universe, id), path: `${prefix}/r/${realm.slice(REALM_PREFIX.length)}` };
+  const page = view.worlds.find((world) => (hub === undefined ? hubWorldOf(world) === fromRealm : world.slug === hub));
+  if (page !== undefined) return { id: hubWorldOf(page), key: stampKey(universe, hubWorldOf(page)), path: page.path };
+  if (realm === undefined || fromRealm === undefined) return undefined;
+  return { id: fromRealm, key: stampKey(universe, fromRealm), path: realmPage(view, realm) };
+}
+
+/** A world's display name in `universe`, the one the arrival's pill and the expedition both say: its hub's, else the name the expedition's
+ * pool gives its realm; none for a world neither names. */
+export function worldName(universe: string, world: string): string | undefined {
+  const hub = site.universes.find((each) => each.id === universe)?.worlds.find((each) => hubWorldOf(each) === world);
+  if (hub !== undefined) return hub.name;
+  const stop = pool.find((each) => each.universe === universe && "realm" in each && worldIdOf(each.realm) === world);
+  return stop !== undefined && "name" in stop ? stop.name : undefined;
 }
 
 /** The stops of `universe` on the UTC day `day`, in their order. */
@@ -41,6 +56,9 @@ export function stopsOn(universe: string, day: string): Stop[] {
     pool.filter((stop) => stop.universe === universe),
   ).flatMap((stop) => {
     const world = worldOf(universe, stop);
-    return world === undefined ? [] : [{ id: stop.id, name: stop.name, why: stop.why, ...world }];
+    const name = world === undefined ? undefined : worldName(universe, world.id);
+    return world === undefined || name === undefined
+      ? []
+      : [{ id: stop.id, name, why: stop.why, key: world.key, path: world.path }];
   });
 }

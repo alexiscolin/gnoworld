@@ -86,7 +86,8 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
       <Cluster space="m">
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
-          {line === undefined ? null : <p className={styles["line"]}>{line}</p>}
+          {/* A banner's line is in the one label style, as frames 18, 23 and 93 draw it ("TODAY'S EXPEDITION · 1 OF 3"). */}
+          {line === undefined ? null : <p className={banner ? "label" : styles["line"]}>{line}</p>}
         </Stack>
         <Cluster space="2xs">
           {action === undefined ? null : (

@@ -5,6 +5,7 @@
 import { markFirst, stampedIn, stampKey, utcDay } from "@gnoworld/core";
 import { useEffect, useEffectEvent } from "react";
 import { useDeviceView } from "../../deviceViews.ts";
+import { worldName } from "../expedition/index.ts";
 import { slot } from "../../slots.tsx";
 import { raisePill } from "../../topPill.tsx";
 import { useApp, useAppStore } from "../../storeContext.tsx";
@@ -20,7 +21,9 @@ export interface ArrivalProps {
 
 const stampsSaid = (count: number) => `${String(count)} ${count === 1 ? "stamp" : "stamps"} in your passport`;
 
-export function Arrival({ universe, world, name, path }: ArrivalProps) {
+export function Arrival({ universe, world, name: given, path }: ArrivalProps) {
+  // The world's display name, the one the expedition says too (a realm's "Connect 4", not its folder's "connect4"); the page's otherwise.
+  const name = worldName(universe, world) ?? given;
   const store = useAppStore();
   const readable = useApp(({ device }) => device.readable);
   const [, open] = useDeviceView();
