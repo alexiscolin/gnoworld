@@ -62,6 +62,15 @@ describe("defaultUniverse", () => {
     const file = join(dir, "missing.json");
     expect(() => defaultUniverse(file)).toThrow(file);
   });
+
+  it("refuses a file past 1 MiB before reading it, as Jarvis's places and the app's build do (10h's review, V8)", () => {
+    const at = JSON.stringify([ONYX]);
+    const exact = planted(at.replace("[", `[${" ".repeat(1024 * 1024 - at.length)}`));
+    expect(defaultUniverse(exact)).toEqual({ rpc: "https://rpc.default.example:443", chainId: "onyx-1" });
+    const past = planted(at.replace("[", `[${" ".repeat(1024 * 1024 + 1 - at.length)}`));
+    expect(() => defaultUniverse(past)).toThrow(`universes: ${past} cannot be read`);
+    expect(() => defaultUniverse(past)).toThrow(expect.objectContaining({ cause: new RangeError("past 1 MiB") }));
+  });
 });
 
 // The egress proxy's list gains the default universe's RPC host from the data, and nothing else (decision of 2026-10-31). Docker is
