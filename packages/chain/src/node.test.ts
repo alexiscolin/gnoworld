@@ -198,3 +198,124 @@ describe("a node read given its universe's chain", () => {
     expect(read.source.url).toMatch(/\/abci_query\?path=%22vm%2Fqfuncs%22&data=0x/);
   });
 });
+
+// The answer inside a node's envelope, read by the package's own reads (the app's rpc.test.ts reads it through its wrappers,
+// which StrykerJS does not see: its sandbox links the workspaces' packages to the tree).
+describe("a node's answer inside its envelope", () => {
+  const answering =
+    (body: unknown): ChainFetch =>
+    () =>
+      Promise.resolve(Response.json(body));
+  const based = (base: Record<string, unknown>) => ({
+    jsonrpc: "2.0",
+    id: "",
+    result: { response: { ResponseBase: { Error: null, Data: null, Log: "", Info: "", ...base } } },
+  });
+
+  it("asks qfuncs with the realm's path in hex, at the address the read names", async () => {
+    const node = fakeNode();
+    await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: node.fetch });
+    expect(node.asked).toEqual([
+      `${RPC}/abci_query?path=%22vm%2Fqfuncs%22&data=0x676e6f2e6c616e642f722f64656d6f2f706f6c6c`,
+    ]);
+  });
+
+  it("gives a page's text, and an empty list for a realm with none", async () => {
+    expect(
+      await readRender(RPC, "gno.land/r/demo/poll:", { fetch: answering(queryEnvelope({ data: "# Poll" })) }),
+    ).toMatchObject({ ok: true, value: "# Poll" });
+    const none = await readFunctionList(RPC, "gno.land/r/demo/poll", {
+      fetch: answering(queryEnvelope({ data: "null" })),
+    });
+    expect(none).toMatchObject({ ok: true, value: [] });
+  });
+
+  it.each([
+    [
+      "a realm the chain has not",
+      queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } }),
+      "no-realm",
+    ],
+    ["a realm with no page", queryEnvelope({ data: null, error: { "@type": "/vm.NoRenderDeclError" } }), "no-page"],
+    ["another refusal", queryEnvelope({ data: null, error: { "@type": "/std.InternalError" } }), "chain-refused"],
+    [
+      "a refusal beside data",
+      based({ Data: btoa("(1 int)"), Error: { "@type": "/std.InternalError" } }),
+      "chain-refused",
+    ],
+    ["the node's error, with no result", rpcErrorEnvelope("boom"), "chain-refused"],
+    ["neither a result nor an error", { jsonrpc: "2.0", id: "" }, "wrong-shape"],
+    ["no data and no refusal", queryEnvelope({ data: null }), "wrong-shape"],
+    ["data that is no base64", based({ Data: "%%%" }), "wrong-shape"],
+    ["bytes that are no UTF-8", based({ Data: btoa(String.fromCharCode(0xff, 0xfe)) }), "wrong-shape"],
+  ])("gives %s as its kind, never a value", async (_case, body, kind) => {
+    expect(kindOf(await readRender(RPC, "gno.land/r/demo/poll:", { fetch: answering(body) }))).toBe(kind);
+  });
+
+  it("refuses a function list that is no list, and keeps a failed request's status", async () => {
+    const odd = await readFunctionList(RPC, "gno.land/r/demo/poll", {
+      fetch: answering(queryEnvelope({ data: "nope" })),
+    });
+    expect(kindOf(odd)).toBe("wrong-shape");
+    const down = await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", { fetch: fakeNode({ status: 502 }).fetch });
+    expect(down).toMatchObject({ ok: false, failure: { kind: "down", status: 502 } });
+  });
+
+  it("refuses a height past what a number holds whole", async () => {
+    const status = statusEnvelope(1, "2026-11-04T03:34:18Z");
+    const huge = {
+      ...status,
+      result: { ...status.result, sync_info: { ...status.result.sync_info, latest_block_height: "9".repeat(20) } },
+    };
+    expect(kindOf(await readHeight(RPC, { fetch: answering(huge) }))).toBe("wrong-shape");
+  });
+});
+
+describe("the node reads' edges", () => {
+  const answering =
+    (body: unknown): ChainFetch =>
+    () =>
+      Promise.resolve(Response.json(body));
+
+  it("writes a byte under 0x10 with its two hex digits", async () => {
+    const node = fakeNode();
+    await readRender(RPC, "a\n", { fetch: node.fetch });
+    expect(node.asked[0]).toMatch(/&data=0x610a$/);
+  });
+
+  it("reads a body with no Error key as a good one", async () => {
+    const body = { jsonrpc: "2.0", id: "", result: { response: { ResponseBase: { Data: btoa("(12 int)") } } } };
+    expect(await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", { fetch: answering(body) })).toMatchObject({
+      ok: true,
+      value: "(12 int)",
+    });
+  });
+
+  it("refuses a function list whose bytes are no UTF-8, never an empty list", async () => {
+    const body = {
+      jsonrpc: "2.0",
+      id: "",
+      result: { response: { ResponseBase: { Error: null, Data: btoa("\xff\xfe") } } },
+    };
+    expect(kindOf(await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: answering(body) }))).toBe("wrong-shape");
+  });
+
+  it("refuses an http RPC as the address it was given, for every read", async () => {
+    const node = fakeNode({ network: "onyx-1" });
+    for (const read of [
+      readHeight("http://rpc.onyx.example", { fetch: node.fetch }),
+      readRender("http://rpc.onyx.example", "x:", { fetch: node.fetch, chainId: "onyx-1" }),
+    ])
+      expect(await read).toMatchObject({
+        ok: false,
+        failure: { kind: "refused" },
+        source: { url: "http://rpc.onyx.example" },
+      });
+    expect(node.asked).toEqual([]);
+  });
+
+  it("reads the height of a node that names a network when no chain is asked, as the app does", async () => {
+    const node = fakeNode({ network: "test5" });
+    expect(await readHeight(RPC, { fetch: node.fetch })).toMatchObject({ ok: true, value: { height: 1204 } });
+  });
+});

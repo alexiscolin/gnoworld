@@ -756,6 +756,7 @@ describe("the prices timer: the block height", () => {
   // A failed height keeps the prices and leaves the height out, logged by its kind.
   it.each([
     ["a 503", () => Promise.resolve(new Response("down", { status: 503 })), "status"],
+    ["a 429", () => Promise.resolve(new Response("slow down", { status: 429 })), "rate_limited"],
     ["a request that fails", () => Promise.reject(new Error("secret-detail-https://x.test")), "request"],
     ["a body that is no JSON", text("<html>"), "not_json"],
     ["a body of another shape", json({ result: {} }), "shape"],
@@ -805,6 +806,15 @@ describe("the prices timer: the block height", () => {
     const { lines } = withRpc({ prices: text("", 500) }, { folder });
     await failed(lines);
     expect(readFileSync(join(folder, "markets.json"), "utf8")).toBe(KEPT);
+  });
+
+  it("hands the way out the chain package's request whole: a GET, no redirect, no cookie, its signal and the time limit", async () => {
+    const { calls, file } = withRpc({});
+    await wrote(file);
+    const call = calls.find(({ url }) => url === STATUS_URL);
+    expect(call?.init).toMatchObject({ method: "GET", redirect: "error", credentials: "omit" });
+    expect(call?.init.signal).toBeInstanceOf(AbortSignal);
+    expect(call?.ms).toBe(10_000);
   });
 
   // The default universe's chain (D118): its node's status must name it, or the height is no height of that universe.

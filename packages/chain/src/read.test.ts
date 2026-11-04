@@ -515,3 +515,29 @@ describe("hostOf", () => {
     expect(hostOf("")).toBe("");
   });
 });
+
+describe("readChain, its request", () => {
+  it("asks with no cookie, no cache and no redirect followed", async () => {
+    const inits: (RequestInit | undefined)[] = [];
+    const fetch: ChainFetch = (_url, init) => {
+      inits.push(init);
+      return Promise.resolve(Response.json({}));
+    };
+    await readChain("https://rpc.onyx.example/status", z.object({}), { fetch });
+    expect(inits[0]).toMatchObject({ method: "GET", credentials: "omit", cache: "no-store", redirect: "error" });
+  });
+
+  it.each(["https://user@rpc.onyx.example/status", "https://:secret@rpc.onyx.example/status"])(
+    "refuses %s, an address that carries a user or a password alone, asking nothing",
+    async (url) => {
+      let asked = 0;
+      const fetch: ChainFetch = () => {
+        asked += 1;
+        return Promise.resolve(Response.json({}));
+      };
+      const read = await readChain(url, z.object({}), { fetch });
+      expect(read.ok || read.failure.kind).toBe("refused");
+      expect(asked).toBe(0);
+    },
+  );
+});
