@@ -3,12 +3,14 @@
 // the whole cosmos (7d5), and comes back, a drag moves the eye round it. `arrive=<system>` shows that system's arrival instead (7d3), as
 // 7g's flights will land on it, with no hero's room and no wheel.
 import { HERO_ZONE, HOME } from "@gnoworld/core";
+import { Scene, type Camera, type Object3D, type WebGLRenderer } from "three";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { Web } from "../src/scene/cosmos/web.ts";
 import { startScene } from "../src/scene/scene.ts";
 import read from "./imports.json" with { type: "json" };
 import { linked } from "./linked.ts";
 import { paletteNamed } from "./palettes.ts";
+import { frameCost } from "./probes.ts";
 import { tuningPanel } from "./panel.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
@@ -26,6 +28,24 @@ const footer = document.querySelector("footer");
 if (footer !== null) footer.textContent = CREDITS.map((credit) => credit.line).join(" · ");
 const panel = document.querySelector("main");
 if (panel !== null) panel.hidden = true;
+
+// What a frame of the site's scene costs, for the frame budget's measure: the renderer, stage and camera of its last frame, which three
+// hands a stage's onBeforeRender (WebGLRenderer.js:1682), drawn `count` times by the realism page's probe.
+const last: { renderer?: WebGLRenderer; stage?: Scene; camera?: Camera } = {};
+Scene.prototype.onBeforeRender = (renderer: WebGLRenderer, stage: Object3D, camera: Camera) => {
+  if (stage instanceof Scene) Object.assign(last, { renderer, stage, camera });
+};
+Reflect.set(globalThis, "__labCost", (count: number) => {
+  const { renderer, stage, camera } = last;
+  if (renderer === undefined || stage === undefined || camera === undefined) return Number.NaN;
+  return frameCost(
+    renderer,
+    () => {
+      renderer.render(stage, camera);
+    },
+    count,
+  );
+});
 
 const scene = startScene({ canvas, remembered: undefined, remember: () => undefined, onLost: () => undefined });
 const file = linked(recorded, read);
