@@ -37,8 +37,9 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 // 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk; 160,000 B for
 // the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03). Lowered to 158,208 B once
-// the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
-const SCENE_JS = 158_208;
+// the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air. 160,109 B with the
+// three classes the Earth's stations draw with, which three's one module brings into the scene's (Alexis, 2026-11-04, "Oui, 160 256").
+const SCENE_JS = 160_109;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
