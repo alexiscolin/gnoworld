@@ -8,7 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
-import { TRANSLATION_CAPS, type JarvisTranslate } from "@gnoworld/schemas";
+import { JarvisTranslation, TRANSLATION_CAPS, type JarvisTranslate } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import type { Tracer } from "@opentelemetry/api";
 import { z } from "zod";
@@ -77,13 +77,23 @@ const VERSION = createHash("sha256").update(SYSTEM).digest("hex");
 
 const translated = (text: string): Translated => ({ kind: "translated", text });
 
+// A row as the wire would carry it, or none: a row a deploy's tighter schema refuses is made again (V2).
+function keptOf(row: unknown): Translated | undefined {
+  const parsed = z.object({ text: z.string().nullable() }).safeParse(row);
+  if (!parsed.success) return undefined;
+  const { text } = parsed.data;
+  if (text === null) return { kind: "original" };
+  return JarvisTranslation.safeParse({ status: "translated", text }).success ? translated(text) : undefined;
+}
+
 /** The translator on jarvis's file. */
 export function makeTranslator(parts: Parts) {
-  const Row = z.object({ text: z.string().nullable() });
   const sql = {
     find: parts.db.prepare("SELECT text FROM translations WHERE hash = ? AND language = ? AND made > ?"),
+    bytes: parts.db.prepare("SELECT bytes FROM translations WHERE hash = ? AND language = ?"),
     keep: parts.db.prepare(
-      "INSERT INTO translations (hash, language, made, text, bytes) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING RETURNING rowid",
+      `INSERT INTO translations (hash, language, made, text, bytes) VALUES (?, ?, ?, ?, ?) ON CONFLICT (hash, language)
+      DO UPDATE SET made = excluded.made, text = excluded.text, bytes = excluded.bytes RETURNING rowid`,
     ),
   };
   const bound = boundOf(parts.db, "translations", parts.keepBytes ?? CACHE_BYTES);
@@ -91,11 +101,10 @@ export function makeTranslator(parts: Parts) {
   const keep = (hash: string, language: string, text: string | null): void => {
     const bytes = Buffer.byteLength(hash + language + (text ?? ""));
     bound.expire(parts.now() - LIFE_MS);
-    const row = z
-      .object({ rowid: z.number() })
-      .optional()
-      .parse(sql.keep.get(hash, language, parts.now(), text, bytes));
-    if (row !== undefined) bound({ rowid: row.rowid, bytes, replaced: 0 });
+    // A row made at once by another, or refused by the wire's schema, is replaced: its bytes leave the bound's count.
+    const old = z.object({ bytes: z.number() }).optional().parse(sql.bytes.get(hash, language));
+    const row = z.object({ rowid: z.number() }).parse(sql.keep.get(hash, language, parts.now(), text, bytes));
+    bound({ rowid: row.rowid, bytes, replaced: old?.bytes ?? 0 });
   };
   const make = async (asked: JarvisTranslate, hash: string, signal: AbortSignal): Promise<Translated> => {
     const made = await translation(parts, asked, signal);
@@ -107,11 +116,8 @@ export function makeTranslator(parts: Parts) {
     /** The line's translation, from the file or made once; the original when one would add what the line lacks. */
     translate: async (asked: JarvisTranslate, signal: AbortSignal): Promise<Translated> => {
       const hash = createHash("sha256").update(asked.text).digest("hex");
-      const row = sql.find.get(hash, asked.language, parts.now() - LIFE_MS);
-      if (row !== undefined) {
-        const { text } = Row.parse(row);
-        return text === null ? { kind: "original" } : translated(text);
-      }
+      const kept = keptOf(sql.find.get(hash, asked.language, parts.now() - LIFE_MS));
+      if (kept !== undefined) return kept;
       const result = await shared(`${hash} ${asked.language}`, (stop) => make(asked, hash, stop), signal);
       return result === "gone" ? { kind: "gone" } : result;
     },

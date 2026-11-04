@@ -401,3 +401,15 @@ describe("a translation's life in jarvis's file (the security review's S4)", () 
     expect(kit.db.prepare("SELECT text FROM translations").all()).toEqual([{ text: "Deux." }]);
   });
 });
+
+describe("a cached translation the wire now refuses (the review's V2)", () => {
+  it("is made again, its row replaced, never served past the wire's bound", async () => {
+    const { translator, model, kit, signal } = setup({ steps: [said(FRENCH), said(FRENCH)] });
+    const asked = { text: ORIGINAL, language: "fr" } as const;
+    await translator.translate(asked, signal());
+    kit.db.prepare("UPDATE translations SET text = ?").run(`${"ab ".repeat(5_333)}ab`);
+    expect(await translator.translate(asked, signal())).toEqual({ kind: "translated", text: FRENCH });
+    expect(await translator.translate(asked, signal())).toEqual({ kind: "translated", text: FRENCH });
+    expect(model.requests).toHaveLength(2);
+  });
+});

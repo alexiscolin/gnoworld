@@ -57,9 +57,11 @@ const SYSTEM = [
 const Card = z.object({ digest: Digest, proposal: z.nullable(ProposedAction) });
 const Row = z.object({ made: z.number(), height: z.number(), source: z.string(), card: z.string().nullable() });
 type Row = z.infer<typeof Row>;
+// A row as read, its card through the wire's schemas.
+type Cached = Omit<Row, "card"> & { readonly card: z.infer<typeof Card> | null };
 
-const answerOf = ({ height, card }: Pick<Row, "height" | "card">): Digested =>
-  card === null ? { kind: "none" } : { kind: "digest", ...Card.parse(jsonOf(card)), height };
+const answerOf = ({ height, card }: Pick<Cached, "height" | "card">): Digested =>
+  card === null ? { kind: "none" } : { kind: "digest", ...card, height };
 
 /** The digests on jarvis's file. */
 export function makeDigests(parts: Parts) {
@@ -76,9 +78,13 @@ export function makeDigests(parts: Parts) {
   // The universes' nodes seen on their chain, an entry a universe (D126).
   const seen = new Map<string, number>();
   const shared = together<Digested>();
-  const cached = (asked: JarvisDigestRequest): Row | undefined => {
-    const row = sql.find.get(asked.universe, asked.realm);
-    return row === undefined ? undefined : Row.parse(row);
+  // A row its schemas refuse, such as one kept before a deploy tightened them, is none: it is made again (V2).
+  const cached = (asked: JarvisDigestRequest): Cached | undefined => {
+    const row = Row.safeParse(sql.find.get(asked.universe, asked.realm));
+    if (!row.success) return undefined;
+    if (row.data.card === null) return { ...row.data, card: null };
+    const card = Card.safeParse(jsonOf(row.data.card));
+    return card.success ? { ...row.data, card: card.data } : undefined;
   };
   const keep = (asked: JarvisDigestRequest, { height, source, card }: Omit<Row, "made">): void => {
     const bytes = Buffer.byteLength(asked.universe + asked.realm + source + (card ?? ""));

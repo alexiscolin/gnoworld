@@ -564,3 +564,16 @@ describe("a digest the model ends without (the security review's S1)", () => {
     expect(model.requests).toHaveLength(asked);
   });
 });
+
+describe("a cached digest its schema now refuses (the review's V2)", () => {
+  it("is made again, never thrown at its readers, its row replaced", async () => {
+    const { ask, model, kit } = setup({ steps: [give(digest()), done(), give(digest()), done()] });
+    await ask();
+    // A deploy tightened the schema: the card kept no longer parses.
+    kit.db.prepare("UPDATE digests SET card = ?").run(JSON.stringify({ digest: { blocks: [] }, proposal: null }));
+    expect(await ask()).toEqual({ kind: "digest", digest: digest(), proposal: null, height: 1204 });
+    expect(model.requests).toHaveLength(4);
+    expect(await ask()).toEqual({ kind: "digest", digest: digest(), proposal: null, height: 1204 });
+    expect(model.requests).toHaveLength(4);
+  });
+});
