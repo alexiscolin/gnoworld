@@ -17,7 +17,6 @@ const WAITING: ReturnType<Resting["drawn"]> = {
   pointShare: () => 0,
   needsHalo: (system: number) => system === 0,
   planeOf: () => undefined,
-  still: undefined,
   limb: () => 1,
   main: 0,
   hidden: new Set(),

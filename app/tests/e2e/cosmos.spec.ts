@@ -4,12 +4,11 @@ import { BOUNDS } from "../../../packages/core/src/lod/ladder.ts";
 import { NEBULA_IMAGES } from "../../../packages/core/src/space/nebulae.ts";
 import { EARTH_PLACE, systemsOf } from "../../../packages/core/src/cosmos/system.ts";
 import { distanceOf } from "../../../packages/core/src/space/cell.ts";
-import { coveredShare, offLine } from "../../../packages/core/src/frame/composition.ts";
 import { arrivalOf } from "../../../packages/core/src/frame/arrival.ts";
 import { STAR_HEART } from "../../../packages/core/src/frame/restLook.ts";
 import { BLOCK_MS } from "../../../packages/core/src/planet/activity.ts";
 import { beatAt } from "../../../packages/core/src/space/beat.ts";
-import { FIELD_OF_VIEW, postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
+import { earthEye } from "../../../packages/core/src/station/scenery.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { heldOf } from "../../src/scene/cosmos/cosmosWorld.ts";
 import { FILED as CREDITS } from "../../src/scene/planet/creditFiles.ts";
@@ -63,8 +62,10 @@ const NOT_YET: CosmosStats = {
 };
 const served = (page: Page, body: string, status = 200) =>
   page.route("**/worlds.json", (route) => route.fulfill({ status, body, contentType: "application/json" }));
-// More than `bodies` bodies held, and each on the screen: a body waits off it until its programs are compiled.
-async function standing(page: Page, bodies = 2) {
+// The Earth's view standing (7x2): the Earth and its stations, then more than `bodies` bodies held, each on the screen: a body waits off
+// it until its programs are compiled. The view at rest draws none of a system, so it asks none by default.
+async function standing(page: Page, bodies = -1) {
+  await expect.poll(async () => (await cosmos(page)).earth && ((await cosmos(page)).stations?.close ?? 0) > 0, SLOW).toBe(true);
   await expect.poll(async () => (await cosmos(page)).bodies, SLOW).toBeGreaterThan(bodies);
   await expect
     .poll(async () => {
@@ -281,132 +282,7 @@ test("gives a phone nothing of it before View in space", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
 });
 
-// The view at rest (7d6): three systems' bodies at most, measured on the screen as frame 4 was.
-const byId = new Map(
-  (JSON.parse(RECORDED) as { worlds: { id: string; namespace: string }[] }).worlds.map(({ id, namespace }) => [
-    id,
-    namespace,
-  ]),
-);
 type Body = Awaited<ReturnType<typeof cosmos>>["screen"]["bodies"][number];
-interface Spot {
-  x: number;
-  y: number;
-  radius: number;
-}
-const heroZone = (spot: Spot, size: typeof COMPUTER) =>
-  spot.x - spot.radius < 0.45 * size.width && spot.y + spot.radius > 0.58 * size.height;
-const cutBy = (body: Body, size: typeof COMPUTER) => body.x - body.radius < 0 || body.x + body.radius > size.width;
-// Frame 4's densest group: four bodies in about 200 by 120 pixels.
-const groupOf = (bodies: readonly Spot[], one: Spot) =>
-  bodies.filter(({ x, y }) => Math.abs(x - one.x) <= 100 && Math.abs(y - one.y) <= 60).length;
-// A body that is not the close world stands whole; none covers the Earth from in front, the great star's heart or the hero.
-function holdsItsPlace(body: Body, screen: { earth: Spot; sun: Spot }, size: typeof COMPUTER) {
-  if (!cutBy(body, size)) {
-    expect(body.y - body.radius).toBeGreaterThanOrEqual(0);
-    expect(body.y + body.radius).toBeLessThanOrEqual(size.height);
-  }
-  const { earth, sun } = screen;
-  expect(body.away < 30 && Math.hypot(body.x - earth.x, body.y - earth.y) < body.radius + earth.radius).toBe(false);
-  expect(Math.hypot(body.x - sun.x, body.y - sun.y)).toBeGreaterThan(body.radius + 40);
-  expect(heroZone(body, size)).toBe(false);
-}
-
-// The file's systems as the cosmos holds them, and the view the core gives them: what the screen must show.
-const viewOf = () => {
-  const { worlds } = JSON.parse(RECORDED) as {
-    worlds: { id: string; namespace: string; realms: { callers: number | null }[] }[];
-  };
-  const systems = systemsOf(
-    worlds.map(({ id, namespace, realms }) => ({
-      id,
-      namespace,
-      use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), realms.length),
-    })),
-  );
-  return { systems, view: restView(systems) };
-};
-
-// Alexis, 2026-11-02: each postcard draws as many bodies as its system stands apart in its cell; the close world first, where one stands.
-for (const size of [COMPUTER, WIDE])
-  test(`draws its postcards whole, each with the bodies its cell holds apart, and its close world cut by the frame, at ${String(size.width)} by ${String(size.height)}`, async ({
-    page,
-  }) => {
-    const { systems, view } = viewOf();
-    await served(page, RECORDED);
-    await arrived(page, HOME, size);
-    await standing(page);
-    await expect.poll(async () => (await cosmos(page)).screen.earth !== undefined, SLOW).toBe(true);
-    const { earth, sun, bodies } = (await cosmos(page)).screen;
-    if (earth === undefined) throw new Error("no Earth");
-    // 7p (Alexis, 2026-11-03, "la perspective doit être partout"): beside the view's own three systems, four more stand a body each.
-    const own = new Set(
-      [...view.postcards, ...(view.close === undefined ? [] : [view.close.system])].map((at) => systems[at]?.id),
-    );
-    const deep = bodies.filter(({ id }) => !own.has(byId.get(id)));
-    expect(new Set(deep.map(({ id }) => byId.get(id))).size).toBe(deep.length);
-    expect(deep.length).toBeLessThanOrEqual(4);
-    expect(new Set(bodies.map(({ id }) => byId.get(id))).size).toBeLessThanOrEqual(3 + 4);
-    const close = bodies.filter((body) => cutBy(body, size));
-    expect(close).toHaveLength(view.close === undefined ? 0 : 1);
-    for (const one of close) expect(one.radius).toBeGreaterThanOrEqual(2 * earth.radius);
-    const postcards = new Map<string, number>();
-    for (const body of bodies.filter((one) => !cutBy(one, size) && !deep.includes(one))) {
-      const system = byId.get(body.id) ?? body.id;
-      postcards.set(system, (postcards.get(system) ?? 0) + 1);
-    }
-    const wanted = new Map(
-      view.postcards.flatMap((index) => {
-        const system = systems[index];
-        return system === undefined ? [] : [[system.id, postcardOf(system, view.eye).worlds.length] as const];
-      }),
-    );
-    expect(postcards).toEqual(wanted);
-    for (const one of [earth, ...bodies]) expect(groupOf([earth, ...bodies], one)).toBeLessThanOrEqual(4);
-    for (const body of bodies) holdsItsPlace(body, { earth, sun }, size);
-    // The chief, 2026-11-02: two bodies at a like distance keep a third of the smaller one's width apart; one 1.5 times nearer covers a
-    // farther one by half at most; the Earth among them.
-    const { eye } = view;
-    const all = [
-      { ...earth, id: "earth", away: Math.hypot(eye.x - EARTH_PLACE.x, eye.y - EARTH_PLACE.y, eye.z - EARTH_PLACE.z) },
-      ...bodies,
-    ];
-    all.forEach((one, at) => {
-      for (const other of all.slice(at + 1)) {
-        const [near, far] = one.away <= other.away ? [one, other] : [other, one];
-        if (far.away / near.away >= 1.5) expect(coveredShare(near, far)).toBeLessThanOrEqual(0.5);
-        else
-          expect(Math.hypot(near.x - far.x, near.y - far.y) - near.radius - far.radius).toBeGreaterThanOrEqual(
-            (2 / 3) * Math.min(near.radius, far.radius),
-          );
-      }
-    });
-  });
-
-test("reads in depth and in 3D at rest: sizes four times apart, distances two and a half, no line of bodies", async ({
-  page,
-}) => {
-  await served(page, RECORDED);
-  await arrived(page);
-  await standing(page);
-  const { earth, bodies } = (await cosmos(page)).screen;
-  if (earth === undefined) throw new Error("no Earth");
-  const shown = bodies.filter(
-    ({ x, y, radius }) =>
-      x + radius > 0 && x - radius < COMPUTER.width && y + radius > 0 && y - radius < COMPUTER.height,
-  );
-  const sizes = [earth.radius, ...shown.map(({ radius }) => radius)];
-  expect(Math.max(...sizes) / Math.min(...sizes)).toBeGreaterThanOrEqual(4);
-  const { eye } = viewOf().view;
-  const distances = [
-    Math.hypot(eye.x - EARTH_PLACE.x, eye.y - EARTH_PLACE.y, eye.z - EARTH_PLACE.z),
-    ...shown.map(({ away }) => away),
-  ];
-  expect(Math.max(...distances) / Math.min(...distances)).toBeGreaterThanOrEqual(2.5);
-  // Three points make a triangle: a line shows from four, the Earth among them. A view with a close world stands low: a tenth across.
-  expect(shown.length + 1).toBeGreaterThanOrEqual(4);
-  expect(offLine([earth, ...shown])).toBeGreaterThan(viewOf().view.close === undefined ? 0.2 : 0.1);
-});
 
 // F4250, and Alexis's "on devrait avoir de la profondeur": with motion on the eye drifts, the near worlds slide past the far ones,
 // and the Earth stays at the centre.
@@ -541,9 +417,9 @@ for (const size of [COMPUTER, WIDE])
     expect(seen.some(({ share, along }) => share === 0 && along > 0 && along < 1)).toBe(true);
     for (const [at, { along }] of seen.entries()) expect(along).toBeGreaterThanOrEqual(seen[at - 1]?.along ?? 0);
     for (const { earth } of seen) centred(earth, size);
-    // It lands on 7d6's eye, swayed: the view at rest the core searched on the same file.
+    // It lands on the Earth's view's eye (7x2), swayed.
     const rest = { x: 0, y: 0, z: 0 };
-    toScene(viewOf().view.eye, rest);
+    toScene(earthEye(), rest);
     const landed_ = seen.at(-1);
     if (landed_ === undefined) throw new Error("no frame");
     expect(distanceOf(landed_.eye, rest)).toBeLessThan(0.3);
@@ -653,40 +529,6 @@ test("gives the release's page the cosmos as a view, from the recorded file, for
 }) => {
   await inTheLab(page);
   expect((await cosmos(page)).stars).toBeGreaterThan(40);
-});
-
-// Alexis, 2026-11-03, on the lab: "la grosse planète à gauche disparaît si on bouge en rétrécissant". The lab keeps the home's hero room,
-// which has no text there, so a drag or the wheel slid the close world under it, shrank it and put it out. The room is the rest's alone.
-test("keeps the close world at its size in the lab as a drag or the wheel takes the eye off the rest", async ({
-  page,
-}) => {
-  const { systems, view } = viewOf();
-  const world = systems[view.close?.system ?? -1]?.worlds[view.close?.world ?? -1];
-  if (world === undefined) throw new Error("the recorded file gives no close world");
-  const focal = COMPUTER.height / 2 / Math.tan((FIELD_OF_VIEW * Math.PI) / 360);
-  await inTheLab(page);
-  // The lab's own moves: a drag takes the eye 0.06 units a pixel at rest (3 units, within the view at rest's reach, then 6, past it), the
-  // "0" key brings it back, a wheel's step backs it off by a share of the way. F4271's journey holds the room kept at rest.
-  const moves = [
-    ...[50, 50].map(
-      (pixels) => `dispatchEvent(new PointerEvent("pointermove", { buttons: 1, movementX: ${String(pixels)} }))`,
-    ),
-    `dispatchEvent(new KeyboardEvent("keydown", { key: "0" }))`,
-    ...Array.from({ length: 6 }, () => `dispatchEvent(new WheelEvent("wheel", { deltaY: 20 }))`),
-  ];
-  // A step under the cosmos's own (4 units) takes no look, and reduced motion draws the one frame a change owes: it poses the bodies.
-  for (const move of moves) {
-    const { frames } = await stats(page);
-    await page.evaluate(move);
-    await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames);
-    const spot = (await cosmos(page)).screen.bodies.find(({ id }) => id === world.id);
-    if (spot === undefined) throw new Error(`the close world went after ${move}`);
-    // Its depth along the view is its distance or less, and more than 0.8 of it within the lens's corners: drawn whole, it stands as
-    // large as its distance says, or up to a quarter larger off the view's axis.
-    const truly = (world.radius * focal) / spot.away;
-    expect(spot.radius).toBeGreaterThanOrEqual(0.98 * truly);
-    expect(spot.radius).toBeLessThanOrEqual(1.25 * truly);
-  }
 });
 
 // The nebulae: real images, warped and recoloured, in layers behind the worlds (ADR-0002 §10, "Space views"), seen from a system's

@@ -3,7 +3,8 @@
 import { stationOf } from "@gnoworld/core";
 import { PerspectiveCamera, Scene, Vector3 } from "three";
 import { StationsDrawn } from "../src/scene/station/stations.ts";
-import { lightsOf, pin, SAMPLE, studyView } from "./earthParts.ts";
+import { lightsOf } from "../src/scene/station/earthView.ts";
+import { pin, SAMPLE, studyView } from "./earthParts.ts";
 import { starField } from "./sky.ts";
 import type { Device, View } from "./views.ts";
 

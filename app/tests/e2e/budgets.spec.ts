@@ -83,11 +83,11 @@ const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
 const ARRIVAL_JS = 2070;
-// The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
-// program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
-// (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
-const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 3616;
+// A system's dynamic view's rocks (7v), laid in a chunk the view at rest's names, drawn by one the labels' name, their program in no chunk
+// loaded first. First caps their sizes and a tenth (rocks 1,204 B, the depth's 2,534 B); the depth, the home's far worlds, went with the
+// Earth's view (7x2), leaving the laying at 1,392 B: 1.5 KiB.
+const LAID_NAMED = /\.\/(restRocks-[\w-]+\.js)/;
+const LAID_JS = 1.5 * 1024;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
@@ -319,10 +319,10 @@ test("a system's arrival's chunk stays within its cap, apart from the view at re
   await restLateWithin(page, { named: ARRIVAL_NAMED, cap: ARRIVAL_JS });
 });
 
-test("the view at rest's depth chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
+test("a system's view's rocks' laying chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, { named: DEEP_NAMED, cap: DEEP_JS });
+  await restLateWithin(page, { named: LAID_NAMED, cap: LAID_JS });
 });
 
 test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({

@@ -21,6 +21,19 @@ export interface Scenery {
 /** The Earth's view at rest: the eye 26 units from the Earth, 15 degrees over the disc, the great star at the Earth's right. */
 export const earthEye = (): Point => eyeAt(26, 15 * DEGREE, 0);
 export const earthCamera = (): Camera => cameraTowards(earthEye(), EARTH_PLACE);
+/** The Earth's top view (Alexis, 2026-11-04): the eye 30 units from the Earth, 1.25 radians over the disc, on the view at rest's side, the
+ * Earth, its Moon, the stations and their orbits in the frame, the scenery out of it. */
+export const earthTopEye = (): Point => eyeAt(30, 1.25, 0);
+
+/** How far `point`, on the map, stands from the way between the Earth's two eyes, at rest and from above, which the eye glides along. */
+export function offEarthViews({ x, y, z }: Point): number {
+  const [from, to] = [earthEye(), earthTopEye()];
+  const way = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };
+  const along =
+    ((x - from.x) * way.x + (y - from.y) * way.y + (z - from.z) * way.z) / (way.x ** 2 + way.y ** 2 + way.z ** 2);
+  const share = Math.min(1, Math.max(0, along));
+  return Math.hypot(x - from.x - way.x * share, y - from.y - way.y * share, z - from.z - way.z * share);
+}
 
 // Where a point stands on the map that the video's screen shows `across` and `down` pixels from its middle, `depth` units ahead.
 function placeAt(camera: Camera, [across, down]: readonly [number, number], depth: number): Point {

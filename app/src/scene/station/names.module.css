@@ -1,0 +1,34 @@
+/* The stations' names and their caption (part 7x2; frame 4): a name over its station in the Plan's words (orbits.module.css), the caption's
+   "STATIONS" in the label style over a muted line, as frame 4 writes them over the group. The layer fades as the scene shows it. */
+@layer components {
+  .layer {
+    opacity: 0;
+    transition: opacity var(--motion-base) var(--ease-standard);
+  }
+
+  .layer[data-shown="true"] {
+    opacity: 1;
+  }
+
+  /* A name stands centred over its station, its foot on the point the script writes. */
+  .name {
+    translate: -50% -100%;
+  }
+
+  /* A name with nowhere to lead takes no pointer: the hand is a link's alone. */
+  span.name {
+    pointer-events: none;
+  }
+
+  .caption {
+    translate: -50% -100%;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .line {
+    margin-block-start: var(--space-2xs);
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

@@ -3,7 +3,7 @@ import { EARTH_PLACE, systemsOf, type WorldHeld } from "../cosmos/system.ts";
 import { distanceOf, type Point } from "../space/cell.ts";
 import { wholeShare } from "../space/whole.ts";
 import { DIVE, diveAt } from "./dive.ts";
-import { restView } from "./rest.ts";
+import { earthEye } from "../station/scenery.ts";
 import { cameraOf, DEGREE, eyeAt, Look } from "./restLook.ts";
 
 // The home's dive (7d7; Alexis, 2026-11-02): from the whole cosmos down to the view at rest's eye, in a few seconds, the Earth ahead all
@@ -144,7 +144,7 @@ describe("the stars as the eye comes in", () => {
   // gaps are all alike (spread 0); Onyx's read 0.55 to 0.74 and these sets 0.58 or more along the dive (the part's probe, 2026-11-03).
   it.each(SETS)("shows the stars in no lattice as the eye comes in, on %s", (_, file) => {
     const systems = systemsOf(file());
-    const { eye: rest } = restView(systems);
+    const rest = earthEye();
     let judged = 0;
     for (let step = 0; step < 12; step += 1) {
       const { distance, slant, turn } = polar(at(rest, step / 12));

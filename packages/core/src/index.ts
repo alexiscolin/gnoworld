@@ -63,28 +63,18 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
 export { PART_KINDS, type Finish, type Part, type PartKind } from "./station/parts.ts";
 export { stationOf, type Station } from "./station/station.ts";
-export { earthCamera, earthEye, sceneryOf, type Scenery } from "./station/scenery.ts";
-export { stationsRound, type Placed as PlacedStation } from "./station/round.ts";
+export { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf, type Scenery } from "./station/scenery.ts";
+export { onOrbit, stationsRound, type Placed as PlacedStation } from "./station/round.ts";
 export { alikeStations, lookOf as stationLookOf } from "./station/variety.ts";
-export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
-export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
+export { planOf, plannedOf } from "./frame/plan.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
-export { rocksAt, rocksOf } from "./frame/rocks.ts";
+export { rocksAt } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
 export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
-export {
-  FIELD_OF_VIEW,
-  HERO_ZONE,
-  REST_DISTANCE,
-  REST_SCREENS,
-  restView,
-  STAR_HEART,
-  type RestView,
-} from "./frame/rest.ts";
+export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -174,7 +164,7 @@ export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
 export { beatAt } from "./space/beat.ts";
 export { ARRIVAL_LEAN, driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
-export { smoothstep } from "./space/smooth.ts";
+export { smootherstep, smoothstep } from "./space/smooth.ts";
 export {
   NEBULA_IMAGES,
   NEBULA_LAYERS,

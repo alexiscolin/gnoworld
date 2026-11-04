@@ -41,8 +41,8 @@ const PHONE = { width: 390, height: 844 };
 /** A station's reach for its size, in world units: a satellite two fifths of the Earth's, an artificial world nearly the Earth's. */
 const radiusOf = (size: number): number => SMALLEST + (LARGEST - SMALLEST) * Math.min(1, Math.max(0, size));
 
-// A place on an orbit: `reach` out, leaning `tilt` off the disc round the line at `node`, `phase` round it.
-function onOrbit({ reach, tilt, node }: Placed["orbit"], phase: number): Point {
+/** A place on an orbit: `reach` out, leaning `tilt` off the disc round the line at `node`, `phase` round it, on the map. */
+export function onOrbit({ reach, tilt, node }: Placed["orbit"], phase: number): Point {
   const [x, z] = [reach * Math.cos(phase), reach * Math.sin(phase)];
   const [y, flat] = [z * Math.sin(tilt), z * Math.cos(tilt)];
   return {

@@ -132,6 +132,7 @@ class LiveScene implements Scene {
     this.#parts.flights.part?.advance(delta);
     this.#viewport.settle();
     this.#eye.advance(delta, this.#motion.matches);
+    if (this.#eye.gliding) this.#loop.redraw();
     this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
@@ -172,8 +173,8 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  readonly moveTo = (to: Point, lens?: number): void => {
-    this.#eye.moveTo(to);
+  readonly moveTo = (to: Point, lens?: number, glide?: boolean): void => {
+    this.#eye.moveTo(to, glide);
     this.#viewport.view(lens);
     this.#loop.redraw();
   };
