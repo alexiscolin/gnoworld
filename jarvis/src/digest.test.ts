@@ -577,3 +577,42 @@ describe("a cached digest its schema now refuses (the review's V2)", () => {
     expect(model.requests).toHaveLength(4);
   });
 });
+
+describe("whether the model made a reader's digest (10k-1)", () => {
+  const told = (digests: ReturnType<typeof makeDigests>, realm = REALM) => {
+    let made = 0;
+    const result = digests.digest({ universe: "onyx", realm }, new AbortController().signal, () => {
+      made += 1;
+    });
+    return result.then((answer) => ({ kind: answer.kind, made }));
+  };
+
+  it("tells a reader whose digest the model made, never one served from the file or reused unchanged", async () => {
+    const { digests, kit } = setup({ steps: [give(digest()), done()] });
+    expect(await told(digests)).toEqual({ kind: "digest", made: 1 });
+    expect(await told(digests)).toEqual({ kind: "digest", made: 0 });
+    kit.clock.now += 10 * 60_000;
+    expect(await told(digests)).toEqual({ kind: "digest", made: 0 });
+  });
+
+  it("tells a reader of a none the model made, never a reader of a budget spent or a read that failed", async () => {
+    const spent = setup({ steps: [give(digest())], cap: 1 });
+    expect(await told(spent.digests)).toEqual({ kind: "spent", made: 0 });
+    const ungrounded = setup({ steps: [give(digest("4,321")), done()] });
+    expect(await told(ungrounded.digests)).toEqual({ kind: "none", made: 1 });
+    expect(await told(ungrounded.digests, "gno.land/r/demo/none")).toEqual({ kind: "none", made: 0 });
+  });
+
+  it("tells each reader who waited on one making", async () => {
+    let answer: (value: Anthropic.Message) => void = () => undefined;
+    const held = new Promise<Anthropic.Message>((resolve) => (answer = resolve));
+    const { digests, model } = setup({ steps: [() => held, done()] });
+    const readers = [told(digests), told(digests)];
+    await expect.poll(() => model.requests.length, { timeout: 30_000 }).toBe(1);
+    answer(give(digest()));
+    expect(await Promise.all(readers)).toEqual([
+      { kind: "digest", made: 1 },
+      { kind: "digest", made: 1 },
+    ]);
+  });
+});

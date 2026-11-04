@@ -27,7 +27,7 @@ afterEach(async () => {
 
 type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
 type Translate = (asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>;
-type DigestOf = (asked: JarvisDigestRequest, signal: AbortSignal) => Promise<Digested>;
+type DigestOf = (asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>;
 const asking = (result: Result) => vi.fn<Ask>(() => Promise.resolve(result));
 
 // jarvis's routes on a port of their own, with the loop's ask the test gives (none: switched off) and a budget whose
@@ -423,6 +423,7 @@ describe("POST /digest: a realm's digest", () => {
     digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
     proposal: null,
     height: 1204,
+    made: false,
   });
   const digesting = (result: Digested) => vi.fn<DigestOf>(() => Promise.resolve(result));
 
@@ -445,7 +446,7 @@ describe("POST /digest: a realm's digest", () => {
   });
 
   it.each([
-    ["none", { kind: "none" }, [200, { status: "none" }]],
+    ["none", { kind: "none" }, [200, { status: "none", made: false }]],
     ["spent", { kind: "spent" }, [200, { status: "spent" }]],
     ["a universe jarvis does not read", { kind: "invalid" }, [400, { error: "refused" }]],
     ["a failure", { kind: "failed" }, [502, { error: "internal" }]],
@@ -461,5 +462,15 @@ describe("POST /digest: a realm's digest", () => {
     const routes = jarvisRoutes({ ask: undefined, budget: budgetFor(DOLLAR).budget, log });
     expect(Object.keys(routes[JARVIS_PATHS.translate] ?? {})).toEqual(["POST"]);
     expect(Object.keys(routes[JARVIS_PATHS.digest] ?? {})).toEqual(["POST"]);
+  });
+
+  it("says jarvis made the digest when its making told so, and only then (10k-1)", async () => {
+    const result = { kind: "digest", digest: made().digest, proposal: null, height: 1204 } as const;
+    const digest = vi.fn<DigestOf>((_asked, _signal, wasMade) => {
+      wasMade?.();
+      return Promise.resolve(result);
+    });
+    const { post } = await served({ digest });
+    expect(await (await post(JARVIS_PATHS.digest, asked())).json()).toEqual({ ...made(), made: true });
   });
 });

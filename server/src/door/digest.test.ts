@@ -1,21 +1,29 @@
 import { createHmac } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 import type { JarvisDigest, JarvisDigestRequest } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { openDatabase } from "@gnoworld/service/db";
+import { afterEach, describe, expect, it } from "vitest";
 import { BODY_LIMIT } from "../app.ts";
 import { answerOf, DOOR, doorApp, sessionOf } from "../testing/door.ts";
 import { digestRoutes } from "./digest.ts";
 import type { Jarvis } from "./jarvis.ts";
+import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
-// 10k: POST /api/jarvis/digest, a realm's digest, the same for every reader. Each check before any work, in order: the
-// site and the type, the session, the switch, the account's rate, the body; then jarvis, its answer passed on once it
-// parses. No room and no quota: the digest is cached in jarvis, its making held by the budget (D195).
+// 10k: POST /api/jarvis/digest. Each check before any work, in order: the site and the type, the session, the switch,
+// the rate, the body, a question left; then jarvis, its answer passed on once it parses. A digest jarvis made takes
+// one question of the asker's quota, one from its cache none (10k-1, D195).
 type Digested = Awaited<ReturnType<Jarvis["digest"]>>;
+const opened: DatabaseSync[] = [];
+afterEach(() => {
+  for (const db of opened.splice(0)) db.close();
+});
 const REQUEST = (): JarvisDigestRequest => ({ universe: "onyx", realm: "gno.land/r/demo/poll" });
-const made = (): JarvisDigest => ({
+const made = (): Extract<JarvisDigest, { status: "digest" }> => ({
   status: "digest",
   digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
   proposal: null,
   height: 1204,
+  made: false,
 });
 
 interface Options {
@@ -23,9 +31,14 @@ interface Options {
   // null builds the route with its own default rate.
   perMinute?: number | null;
   answer?: () => Promise<Digested>;
+  quota?: number;
 }
-const setup = ({ on = true, perMinute = 10, answer }: Options = {}) => {
+const setup = ({ on = true, perMinute = 10, answer, quota: questions = 20 }: Options = {}) => {
   const rate = perMinute === null ? {} : { perMinute };
+  const db = openDatabase(":memory:", [QUOTA_TABLES]);
+  opened.push(db);
+  const quota = makeQuota(db, { first: { quota: questions, quotaUnnamed: 1, unlimited: [] }, now: () => clock.now });
+  const counted = () => db.prepare("SELECT account, count FROM jarvis_asked").all();
   const clock = { now: DOOR.t0 };
   const sent: { request: JarvisDigestRequest; signal: AbortSignal }[] = [];
   const door = doorApp(
@@ -39,6 +52,8 @@ const setup = ({ on = true, perMinute = 10, answer }: Options = {}) => {
             return answer === undefined ? Promise.resolve({ ok: true, answer: made() }) : answer();
           },
         },
+        quota,
+        named: () => Promise.resolve(true),
         on,
         ...rate,
         log,
@@ -47,7 +62,7 @@ const setup = ({ on = true, perMinute = 10, answer }: Options = {}) => {
     "/digest",
   );
   const digest = (over: Parameters<typeof door.post>[0] = {}) => door.post({ body: REQUEST(), ...over });
-  return { digest, sent, clock, events: door.events };
+  return { digest, sent, clock, events: door.events, counted };
 };
 
 describe("a realm's digest through the door", () => {
@@ -111,7 +126,11 @@ describe("a realm's digest through the door", () => {
   });
 
   it.each([
-    ["none", () => ({ ok: true, answer: { status: "none" } }) as const, [200, { status: "none" }]],
+    [
+      "none",
+      () => ({ ok: true, answer: { status: "none", made: false } }) as const,
+      [200, { status: "none", made: false }],
+    ],
     ["spent", () => ({ ok: true, answer: { status: "spent" } }) as const, [200, { status: "spent" }]],
     ["jarvis's failure", () => ({ ok: false, error: "failed" }) as const, [502, { error: "internal" }]],
     ["an answer of the wrong shape", () => ({ ok: false, error: "shape" }) as const, [502, { error: "internal" }]],
@@ -173,5 +192,33 @@ describe("a realm's digest through the door", () => {
     expect(events().at(-1)).toMatch(
       /^\{"event":"jarvis_failed","route":"\/api\/jarvis\/digest","status":400,"error":"refused",/,
     );
+  });
+
+  it("takes one question of the asker's quota for a digest jarvis made, none for one from its cache (10k-1)", async () => {
+    const answers: Digested[] = [
+      { ok: true, answer: { ...made(), made: true } },
+      { ok: true, answer: made() },
+      { ok: true, answer: { status: "none", made: true } },
+      { ok: true, answer: { status: "spent" } },
+    ];
+    const { digest, counted } = setup({
+      answer: () => Promise.resolve(answers.shift() ?? { ok: false, error: "down" }),
+    });
+    for (let at = 0; at < 4; at += 1) expect((await digest()).status).toBe(200);
+    expect(counted()).toEqual([{ account: DOOR.anna, count: 2 }]);
+  });
+
+  it("refuses a digest once the asker's quota is used, before jarvis is asked (10k-1)", async () => {
+    const { digest, sent, events } = setup({
+      quota: 1,
+      answer: () => Promise.resolve({ ok: true, answer: { ...made(), made: true } }),
+    });
+    expect((await digest()).status).toBe(200);
+    expect(await answerOf(await digest())).toEqual([429, { error: "full" }]);
+    expect(sent).toHaveLength(1);
+    expect(events().at(-1)).toMatch(
+      /"event":"jarvis_refused","route":"\/api\/jarvis\/digest","status":429,"error":"quota"/,
+    );
+    expect((await digest({ token: DOOR.benToken })).status).toBe(200);
   });
 });

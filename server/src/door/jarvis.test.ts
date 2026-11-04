@@ -225,6 +225,7 @@ describe("a translation and a digest from jarvis (10k)", () => {
     digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
     proposal: null,
     height: 1204,
+    made: true,
   });
 
   it("posts a line's text and its language to /translate, and reads the translation through its schema", async () => {

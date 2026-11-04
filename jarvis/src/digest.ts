@@ -57,6 +57,11 @@ const SYSTEM = [
 const Card = z.object({ digest: Digest, proposal: z.nullable(ProposedAction) });
 const Row = z.object({ made: z.number(), height: z.number(), source: z.string(), card: z.string().nullable() });
 type Row = z.infer<typeof Row>;
+// A making's digest, and whether the model made it.
+interface Made {
+  readonly digested: Digested;
+  readonly made: boolean;
+}
 // A row as read, its card through the wire's schemas.
 type Cached = Omit<Row, "card"> & { readonly card: z.infer<typeof Card> | null };
 
@@ -77,7 +82,7 @@ export function makeDigests(parts: Parts) {
   const bound = boundOf(parts.db, "digests", parts.keepBytes ?? CACHE_BYTES);
   // The universes' nodes seen on their chain, an entry a universe (D126).
   const seen = new Map<string, number>();
-  const shared = together<Digested>();
+  const shared = together<Made>();
   // A row its schemas refuse, such as one kept before a deploy tightened them, is none: it is made again (V2).
   const cached = (asked: JarvisDigestRequest): Cached | undefined => {
     const row = Row.safeParse(sql.find.get(asked.universe, asked.realm));
@@ -95,35 +100,38 @@ export function makeDigests(parts: Parts) {
     bound({ rowid: row.rowid, bytes, replaced: old?.bytes ?? 0 });
   };
   // The model's digest of the reads made, kept with its reads' hash; a failure, a stop or a reader gone keeps nothing.
-  const fresh = async (asked: JarvisDigestRequest, realm: RealmRead, signal: AbortSignal): Promise<Digested> => {
+  const fresh = async (asked: JarvisDigestRequest, realm: RealmRead, signal: AbortSignal): Promise<Made> => {
     const result = await digestOf(parts, realm, signal);
     const card = cardOf(result, asked.realm);
-    if (card === undefined) return failureOf(result);
+    if (card === undefined) return { digested: failureOf(result), made: false };
     keep(asked, {
       height: realm.at.height,
       source: sourceOf(realm),
       card: card === null ? null : JSON.stringify(card),
     });
-    return card === null ? { kind: "none" } : { kind: "digest", ...card, height: realm.at.height };
+    return { digested: answerOf({ card, height: realm.at.height }), made: true };
   };
-  const make = async (asked: JarvisDigestRequest, universe: Universe, signal: AbortSignal): Promise<Digested> => {
+  const make = async (asked: JarvisDigestRequest, universe: Universe, signal: AbortSignal): Promise<Made> => {
     const realm = await readOn({ ...parts, seen }, { universe, realm: asked.realm, signal });
-    if (realm === undefined) return { kind: "none" };
+    if (realm === undefined) return { digested: { kind: "none" }, made: false };
     const before = cached(asked);
     // A digest whose reads are unchanged serves again at the new height; a none is made again (D193).
     if (before?.source !== sourceOf(realm) || before.card === null) return fresh(asked, realm, signal);
     sql.renew.run(parts.now(), realm.at.height, asked.universe, asked.realm);
-    return answerOf({ ...before, height: realm.at.height });
+    return { digested: answerOf({ ...before, height: realm.at.height }), made: false };
   };
   return {
-    /** The realm's digest, from the file within 10 minutes, else read again and made once for its readers. */
-    digest: async (asked: JarvisDigestRequest, signal: AbortSignal): Promise<Digested> => {
+    /** The realm's digest, from the file within 10 minutes, else read again and made once for its readers; `made` is
+     * called for each reader whose digest, or none, the model made (10k-1). */
+    digest: async (asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void): Promise<Digested> => {
       const universe = parts.places.universes.get(asked.universe);
       if (universe === undefined || !parts.cards.chains.includes(asked.universe)) return { kind: "invalid" };
       const before = cached(asked);
       if (before !== undefined && parts.now() - before.made < FRESH_MS) return answerOf(before);
       const result = await shared(`${asked.universe} ${asked.realm}`, (stop) => make(asked, universe, stop), signal);
-      return result === "gone" ? { kind: "gone" } : result;
+      if (result === "gone") return { kind: "gone" };
+      if (result.made) made?.();
+      return result.digested;
     },
   };
 }

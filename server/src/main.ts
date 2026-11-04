@@ -95,20 +95,22 @@ const door =
 // The door's routes: a question, and since 10k a line's translation and a realm's digest, each its own path and rate.
 if (door !== undefined) {
   const front = { session, origins: config.origins, on: door.settings.on, log, now: Date.now };
+  // One memory of the accounts' mainnet names for the question's quota and the digest's (10k-1).
+  const named = makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log });
   app.route(
     "/api/jarvis",
     askRoutes({
       ...front,
       mayRead: chat.mayRead,
       recent: chat.recent,
-      named: makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log }),
+      named,
       quota: door.quota,
       jarvis: door.jarvis,
       questionChars: door.settings.questionChars,
     }),
   );
   app.route("/api/jarvis", translateRoutes({ ...front, mayRead: chat.mayRead, line: chat.line, jarvis: door.jarvis }));
-  app.route("/api/jarvis", digestRoutes({ ...front, jarvis: door.jarvis }));
+  app.route("/api/jarvis", digestRoutes({ ...front, jarvis: door.jarvis, quota: door.quota, named }));
 }
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.

@@ -645,12 +645,13 @@ describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000
     ];
     const { env, model, node } = await setup(steps);
     const url = await listening(start(env));
-    for (let at = 0; at < 2; at += 1)
+    for (const made of [true, false])
       expect(JarvisDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({
         status: "digest",
         digest,
         proposal: null,
         height: 1204,
+        made,
       });
     expect(model.seen.map(({ body }) => namesOf(body))).toEqual([
       ["give_digest", "propose_action"],

@@ -29,7 +29,8 @@ interface Parts {
   // The loop's ask, the translator's and the digests', or none while jarvis is off.
   readonly ask: Ask | undefined;
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
-  readonly digest?: ((asked: JarvisDigestRequest, signal: AbortSignal) => Promise<Digested>) | undefined;
+  readonly digest?:
+    ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
   readonly budget: Pick<Budget, "caps" | "change">;
   readonly log: Log;
 }
@@ -73,7 +74,11 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
         const asked = JarvisDigestRequest.safeParse(body);
         if (!asked.success) return refused(JARVIS_PATHS.digest);
         if (digest === undefined) return { status: 200, body: { status: "off" } satisfies JarvisDigest };
-        return digestOf(await digest(asked.data, signal));
+        let made = false;
+        const result = await digest(asked.data, signal, () => {
+          made = true;
+        });
+        return digestOf(result, made);
       },
     },
     [JARVIS_PATHS.budgets]: {
@@ -134,11 +139,14 @@ function translationOf(result: Translated): Reply {
   return { status: 200, body };
 }
 
-function digestOf(result: Digested): Reply {
+// A digest on the wire, with whether the model made it for this request, which the door charges to its asker (10k-1).
+function digestOf(result: Digested, made: boolean): Reply {
   if (result.kind === "failed" || result.kind === "gone" || result.kind === "invalid") return failureOf(result.kind);
   const body: JarvisDigest =
     result.kind === "digest"
-      ? { status: "digest", digest: result.digest, proposal: result.proposal, height: result.height }
-      : { status: result.kind };
+      ? { status: "digest", digest: result.digest, proposal: result.proposal, height: result.height, made }
+      : result.kind === "none"
+        ? { status: "none", made }
+        : { status: result.kind };
   return { status: 200, body };
 }

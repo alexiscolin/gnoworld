@@ -528,21 +528,29 @@ describe("the digest's contract (10k)", () => {
     expect(asked({ page: "# forged" })).toBe(false);
   });
 
-  it("answers a digest with the height it was read at and at most one proposal, none, spent or off", () => {
+  it("answers a digest with the height it was read at, at most one proposal and whether jarvis made it, none, spent or off", () => {
     const answer = (value: unknown) => JarvisDigest.safeParse(value).success;
     const digest = { blocks: [blocks().facts] };
-    expect(answer({ status: "digest", digest, proposal: null, height: 1204 })).toBe(true);
-    expect(answer({ status: "digest", digest, proposal: action(), height: 1204 })).toBe(true);
-    expect(answer({ status: "digest", digest, proposal: null })).toBe(false);
-    expect(answer({ status: "digest", digest, proposal: null, height: 0 })).toBe(false);
-    expect(answer({ status: "digest", digest, proposal: null, height: 1.5 })).toBe(false);
-    expect(answer({ status: "digest", digest: { blocks: [] }, proposal: null, height: 1 })).toBe(false);
-    expect(answer({ status: "digest", digest, proposal: { ...action(), coins: "5ugnot" }, height: 1 })).toBe(false);
-    expect([answer({ status: "none" }), answer({ status: "spent" }), answer({ status: "off" })]).toEqual([
-      true,
-      true,
-      true,
-    ]);
-    expect(answer({ status: "none", digest })).toBe(false);
+    const made = (over: Record<string, unknown>) => ({
+      status: "digest",
+      digest,
+      proposal: null,
+      height: 1204,
+      made: true,
+      ...over,
+    });
+    expect(answer(made({}))).toBe(true);
+    expect(answer(made({ proposal: action(), made: false }))).toBe(true);
+    expect(answer(made({ height: undefined }))).toBe(false);
+    expect(answer(made({ height: 0 }))).toBe(false);
+    expect(answer(made({ height: 1.5 }))).toBe(false);
+    expect(answer(made({ digest: { blocks: [] } }))).toBe(false);
+    expect(answer(made({ proposal: { ...action(), coins: "5ugnot" } }))).toBe(false);
+    expect(answer(made({ made: undefined }))).toBe(false);
+    expect(answer(made({ made: "yes" }))).toBe(false);
+    expect([answer({ status: "none", made: true }), answer({ status: "none", made: false })]).toEqual([true, true]);
+    expect(answer({ status: "none" })).toBe(false);
+    expect([answer({ status: "spent" }), answer({ status: "off" })]).toEqual([true, true]);
+    expect(answer({ status: "none", made: true, digest })).toBe(false);
   });
 });

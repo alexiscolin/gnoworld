@@ -213,3 +213,16 @@ describe("a line's translation through the door", () => {
     expect([statuses.slice(0, 30).every((status) => status === 200), statuses[30]]).toEqual([true, 429]);
   });
 });
+
+describe("an account's translations a day (the review's V1, D194)", () => {
+  it("takes 200 translations a day an account, the 201st refused before any work, the next day open again", async () => {
+    const { translate, clock, work } = setup({ perMinute: 1_000 });
+    const statuses: number[] = [];
+    for (let at = 0; at < 201; at += 1) statuses.push((await translate()).status);
+    expect([statuses.slice(0, 200).every((status) => status === 200), statuses[200]]).toEqual([true, 429]);
+    expect(work.filter((step) => step === "jarvis")).toHaveLength(200);
+    expect((await translate({ token: DOOR.benToken })).status).toBe(200);
+    clock.now += 24 * 60 * 60_000;
+    expect((await translate()).status).toBe(200);
+  });
+});
