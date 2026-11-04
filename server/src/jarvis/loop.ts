@@ -143,6 +143,8 @@ const requestOf = (parts: Parts, system: string, messages: Anthropic.MessagePara
   tools: parts.tools.allowlist.offered(),
   messages: [...messages],
   cache_control: { type: "ephemeral" },
+  // Thinking counts toward max_tokens; at low effort the model thinks little on a plain question (D84).
+  output_config: { effort: "low" },
 });
 
 // A tool_use with no call in it would send an empty message; pause_turn, stop_sequence and a full context window are

@@ -131,6 +131,8 @@ describe("the loop: what it sends", () => {
     expect(request?.cache_control).toEqual({ type: "ephemeral" });
     expect(request?.tools).toEqual(run.tools.offered());
     expect(request).not.toHaveProperty("tool_choice");
+    // Sonnet 5.5 thinks by default, and thinking counts toward max_tokens (the claude-api skill): low effort, set.
+    expect(request?.output_config).toEqual({ effort: "low" });
     const turn = blocks();
     expect(request?.messages).toEqual([
       {
