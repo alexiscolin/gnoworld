@@ -5,8 +5,8 @@
 # hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
 # copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
 # own, each tree writing them. StrykerJS's incremental file is the one the gate's every run shares (check.sh).
-# worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, keeps its
-# branch, and prunes the records of the worktrees gone.
+# worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, and keeps its
+# branch.
 set -eu
 # A bare <dir> is a folder of the root (below), so `remove` names no tree.
 case $#:${1-} in
@@ -21,13 +21,13 @@ esac
 for arg in "$dir" "$branch" "$base"; do
 	case $arg in -*) echo "worktree.sh: $arg starts with -, which git would read as an option" >&2; exit 2 ;; esac
 done
-# It may run outside the sandbox, which denies every worktree's harness to every session (F5058): it makes and removes the
-# folders of one root alone, which no variable moves. The folder's parent is resolved, so a `..`, a link on the way or another
-# path is refused, and compared with the root as written, never resolved; the name's letters are spelled out, as sh's [a-z]
-# takes a capital or an accented letter in a UTF-8 locale (bash 3.2). The folder is then named by that resolved path, so no
-# trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as the folder is refused,
-# as git makes the branch before failing on one, and removes the tree a link leads to, wherever it is.
-root=/private/tmp/claude-$(id -u)/gnoworld-wt
+# It may run outside the sandbox (F5058): it makes and removes the folders of one root alone, in this user's home, where no
+# session writes but its own folder (Alexis, 2026-11-04), and which no argument moves. The folder's parent is resolved, so a
+# `..`, a link on the way or another path is refused, and compared with the root as written, never resolved; the name's letters
+# are spelled out, as sh's [a-z] takes a capital or an accented letter in a UTF-8 locale (bash 3.2). The folder is then named by
+# that resolved path, so no trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as
+# the folder is refused, as git makes the branch before failing on one, and removes the tree a link leads to, wherever it is.
+root=$HOME/Server/gnoworld-wt
 case $dir in */*) ;; *) dir=$root/$dir ;; esac # a bare name is a folder of the root
 name=$(basename "$dir")
 parent=$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P) || parent=
@@ -39,7 +39,7 @@ src=$(pwd -P)
 # Every git below, and every git it starts in another tree, reads this tree's common folder and so its config, never one a
 # commondir names: Claude Code denies writing a commondir only for the trees that stood when the session started, and outside
 # the sandbox an fsmonitor of another config would run (F5097). That folder is found from the .git of the tree this runs at the
-# root of, which the sandbox denies every session: the main checkout's folder, or a worktree's file naming <common>/worktrees/<id>.
+# root of, which the settings deny every session: the main checkout's folder, or a worktree's file naming <common>/worktrees/<id>.
 if [ -d "$src/.git" ]; then
 	GIT_COMMON_DIR=$src/.git
 else
@@ -48,11 +48,11 @@ else
 fi
 export GIT_COMMON_DIR
 if [ "$action" = remove ]; then
-	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder, the prune failing. git
-	# removes only a clean worktree of this repository (no --force), its ignored files with it, never what a link in it leads to.
+	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder. git removes only a clean
+	# worktree of this repository (no --force), its ignored files and its own record with it, never what a link in it leads to. No
+	# other record is pruned: a session can point another tree's at nothing (reviewer, second review); Alexis prunes by hand.
 	case $src/ in "$dir"/*) echo "worktree.sh: $dir is the tree this runs in; remove it from another" >&2; exit 1 ;; esac
 	git worktree remove "$dir"
-	git worktree prune
 	echo "worktree.sh: $dir removed, its branch kept"
 	exit 0
 fi
@@ -64,10 +64,10 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.s
 # run the gate on packages its own lockfile does not name, and a `pnpm install` in the new tree would write into this tree's
 # install (the links lead there), so a base whose package files differ from this tree's is refused (security-S5). So is one
 # whose harness differs (records.sh's list, the package files in it): out of the sandbox, a base a session wrote by plumbing
-# would check its own settings and hooks out into a tree a session is later started in (F5098). No nested repository is
-# entered: git would run it with its own config (F5097).
+# would check its own settings, hooks and CLAUDE.md out into a tree a session is later started in (F5098). No nested repository
+# is entered: git would run it with its own config (F5097).
 . "$(dirname "$0")/../.githooks/records.sh"
-differ=$(harness --ignore-submodules=all --name-only "$base") # a base git cannot read stops here
+differ=$(harness --ignore-submodules=all --name-only "$base" && git diff --name-only "$base" -- CLAUDE.md) # a base git cannot read stops here
 [ -z "$differ" ] || {
 	echo "worktree.sh: $base's harness or package files are not this tree's, whose installed packages the new tree would link; install them here first, or make the tree by hand: $(echo "$differ" | tr '\n' ' ')" >&2
 	exit 1

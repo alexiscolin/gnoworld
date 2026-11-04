@@ -848,24 +848,30 @@ def mutants():
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
     yield from each("scripts/worktree.sh", 'sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"', ":", "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
     yield from each("scripts/worktree.sh", 'rm "${dir:?}/node_modules"\n', "", "hooks", "worktree.sh's root node_modules is a folder of links, not one link")
-    yield from each("scripts/worktree.sh", 'differ=$(harness --ignore-submodules=all --name-only "$base")', "differ=", "hooks", "worktree.sh compares a base's harness and package files with this tree's (security-S5, F5098)")
+    yield from each("scripts/worktree.sh", 'harness --ignore-submodules=all --name-only "$base" && ', "", "hooks", "worktree.sh compares a base's harness and package files with this tree's (security-S5, F5098)")
     yield from each("scripts/worktree.sh", "--ignore-submodules=all ", "", "hooks", "worktree.sh enters no nested repository, whose config would run outside the sandbox (F5097)")
     # Through records.sh's list, the one harness list: each file worktree_script plants is in it.
     for name in (" pnpm-lock.yaml", " pnpm-workspace.yaml", " .pnpmfile.cjs", " .pnpmfile.mjs", " .npmrc", " app/package.json", " .claude ", " scripts "):
         yield from each(".githooks/records.sh", name, " " if name.endswith(" ") else "", "hooks", f"the harness list holds {name.strip()}, which worktree.sh compares (security-S5, F5098)")
     yield from each("scripts/worktree.sh", '[ -z "$differ" ] ||', "true ||", "hooks", "worktree.sh refuses a base whose package files are not this tree's (security-S5)")
     yield from each("scripts/worktree.sh", "export GIT_COMMON_DIR\n", "\n", "hooks", "worktree.sh's git reads this tree's config, never the one a worktree's commondir names (F5097)")
+    yield from each("scripts/worktree.sh", 'cd "$gitdir/../.."', 'cd "$gitdir/.."', "hooks", "worktree.sh finds a worktree's common folder two folders above its record (F5097)")
+    yield from each("scripts/worktree.sh", '[ -d "$src/.git" ]', '[ -e "$src/.git" ]', "hooks", "worktree.sh tells the main checkout's .git folder from a worktree's .git file (F5097)")
     rev_parse = "$(git rev-parse --path-format=absolute --git-common-dir)"
     yield from each("scripts/worktree.sh", 'GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)', f"GIT_COMMON_DIR={rev_parse}", "hooks", "worktree.sh finds a worktree's common folder from its .git, never its commondir (F5097)")
     yield from each("scripts/worktree.sh", "\tGIT_COMMON_DIR=$src/.git\n", f"\tGIT_COMMON_DIR={rev_parse}\n", "hooks", "worktree.sh takes the main checkout's .git folder, never a commondir in it (F5097)")
     yield from each("scripts/worktree.sh", "case $dir in */*) ;; *) dir=$root/$dir ;; esac", ":", "hooks", "worktree.sh takes a bare name for a folder of its root (F5096)")
     yield from each("scripts/worktree.sh", "3:remove) action= ;;\n", "", "hooks", "worktree.sh takes remove and two words for no call")
     yield from each("scripts/borrow_node_modules.sh", '-name "*$nl*" -print | grep -q . ||', '-name "*$nl*" -print | grep -q . || true ||', "hooks", "borrow_node_modules.sh refuses a name holding a newline (F5099)")
+    yield from each("scripts/borrow_node_modules.sh", "-o -path ./.claude -o", "-o -name .claude -o", "hooks", "borrow_node_modules.sh looks for a newline wherever its loop looks (F5099)")
+    yield from each("scripts/borrow_node_modules.sh", 'unlinked "$1" "$m" ||', "true ||", "hooks", "borrow_node_modules.sh writes through no link of the copy's tree (F5099)")
+    yield from each("scripts/borrow_node_modules.sh", "in */node_modules/.bin) ;;", "in *) ;;", "hooks", "borrow_node_modules.sh copies a linked .bin from a node_modules/.bin alone (F5099)")
+    yield from each("scripts/worktree.sh", ' && git diff --name-only "$base" -- CLAUDE.md', "", "hooks", "worktree.sh refuses a base whose CLAUDE.md is not this tree's (F5098)")
     yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -P)", "hooks", "worktree.sh says why it refuses a folder whose parent does not exist")
     # F5058: it may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
     # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.
     yield from each("scripts/worktree.sh", '[ "$parent" = "$root" ] ||', "true ||", "hooks", "worktree.sh makes and removes the folders of its root alone (F5058)")
-    yield from each("scripts/worktree.sh", "root=/private/tmp/claude-$(id -u)/gnoworld-wt", "root=/private/tmp/claude-$(id -u)", "hooks", "worktree.sh's root is /private/tmp/claude-<uid>/gnoworld-wt (F5058)")
+    yield from each("scripts/worktree.sh", "root=$HOME/Server/gnoworld-wt", "root=$HOME/Server", "hooks", "worktree.sh's root is $HOME/Server/gnoworld-wt (F5058)")
     yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -L) || parent=", "hooks", "worktree.sh resolves the folder's parent, never through a link (F5058)")
     for char in "._":
         yield from each("scripts/worktree.sh", "*[!abcdefghijklmnopqrstuvwxyz0123456789-]*)", f"*[!{char}abcdefghijklmnopqrstuvwxyz0123456789-]*)", "hooks", f"worktree.sh refuses a {char} in its folder's name (F5058)")
@@ -875,7 +881,6 @@ def mutants():
     yield from each("scripts/worktree.sh", "src=$(pwd -P)\n", "src=$PWD\n", "hooks", "worktree.sh sees the tree it runs in, entered through a link")
     yield from each("scripts/worktree.sh", 'case $src/ in "$dir"/*)', "case $src/ in -none-)", "hooks", "worktree.sh never removes the tree it runs in")
     yield from each("scripts/worktree.sh", '\tgit worktree remove "$dir"\n', '\tgit worktree remove --force "$dir"\n', "hooks", "worktree.sh removes a clean worktree alone")
-    yield from each("scripts/worktree.sh", "\tgit worktree prune\n", "\tgit worktree prune || :\n", "hooks", "worktree.sh prunes the records of the worktrees gone, and fails when it cannot")
     yield from each("scripts/worktree.sh", "-, which git would read as an option\" >&2; exit 2", "-, which git would read as an option\" >&2; exit 1", "hooks", "worktree.sh refuses a leading dash as a wrong call")
     yield from each("scripts/bench.py", "    if mean > budget:", "    if False:", "hooks", "bench.py fails a bench over its budget")
     yield from each("scripts/bench.py", "    if found is None:", "    if False:", "hooks", "bench.py fails a bench with no budget")
