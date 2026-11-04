@@ -3,15 +3,16 @@
 // fails when it should, and the cache's key moved by any setting.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { expanded, readCases } from "./cases.ts";
 import { fingerprint } from "./fingerprint.ts";
 import { outcomeOf } from "./spans.ts";
 import { assertionsOf } from "./tests.ts";
 
-const ROOT = new URL("../", import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
-test("every case reads by its schema, ids unique, the hidden characters written as code points", () => {
-  const cases = readCases(new URL("cases", import.meta.url).pathname);
+await test("every case reads by its schema, ids unique, the hidden characters written as code points", () => {
+  const cases = readCases(fileURLToPath(new URL("cases", import.meta.url)));
   assert.ok(cases.length >= 40);
   assert.equal(new Set(cases.map((one) => one.id)).size, cases.length);
   const bidi = cases.find((one) => one.id === "bidi-mark-dropped");
@@ -20,7 +21,7 @@ test("every case reads by its schema, ids unique, the hidden characters written 
   assert.equal(expanded("a<U+202C>b<U+110000>"), `a${String.fromCodePoint(0x202c)}b<U+110000>`);
 });
 
-test("the spans give the tools run, those refused, the makings, the cost and the version", () => {
+await test("the spans give the tools run, those refused, the makings, the cost and the version", () => {
   const attribute = (key: string, value: string | number) => ({
     key,
     value: typeof value === "string" ? { stringValue: value } : { intValue: String(value) },
@@ -55,7 +56,7 @@ test("the spans give the tools run, those refused, the makings, the cost and the
   assert.throws(() => outcomeOf([{ spans: [] }]));
 });
 
-test("each expectation is an assertion that passes and fails as it should", () => {
+await test("each expectation is an assertion that passes and fails as it should", () => {
   const checks = assertionsOf({
     status: ["answered"],
     never_tools: ["gno_call"],
@@ -95,7 +96,7 @@ test("each expectation is an assertion that passes and fails as it should", () =
   );
 });
 
-test("an expectation about tools or makings fails when no span came back, never passes blind (10j's review, S2)", () => {
+await test("an expectation about tools or makings fails when no span came back, never passes blind (10j's review, S2)", () => {
   const checks = assertionsOf({ status: ["answered"], never_tools: ["gno_call"], some_tools: ["gno_status"] });
   const run = (metadata: Record<string, unknown>) =>
     checks.flatMap((check) => (typeof check.value === "function" ? [check.value("", { metadata }).pass] : []));
@@ -109,7 +110,7 @@ test("an expectation about tools or makings fails when no span came back, never 
   );
 });
 
-test("the cache's key moves with a setting, and stays for the same ones", () => {
+await test("the cache's key moves with a setting, and stays for the same ones", () => {
   const one = fingerprint(ROOT, { JARVIS_MODEL: "claude-sonnet-5-5" });
   assert.equal(fingerprint(ROOT, { JARVIS_MODEL: "claude-sonnet-5-5" }), one);
   assert.notEqual(fingerprint(ROOT, { JARVIS_MODEL: "claude-opus-5-5" }), one);

@@ -135,8 +135,10 @@ rules, and its own lockfile): `cd evals && pnpm install`, once, in your shell. T
 and gnomcp 0.11.0, and cost money for each case not kept in `evals/.cache`:
 `ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh`. `run.sh` checks the evals' own types
 and Node tests first (`evals/test-*.ts`), then runs promptfoo's `eval` script, its results in `evals/results/`.
-ESLint and knip leave `evals/` to those checks, as no tree's gate holds its install; `jarvis/src/routes.test.ts`
-holds the cases to jarvis's wire in the gate.
+The gate lints `evals/` (its tsconfig takes zod's and Node's types from jarvis's install, which every tree has); knip
+leaves it out, as promptfoo's binary resolves only where `evals/` is installed; `jarvis/src/routes.test.ts` holds the
+cases to jarvis's wire. `run.sh` runs the branch's own code with the key, in your shell: run it on a commit you have
+read (10j's security review, S1; question 10j-5).
 
 ## Slices
 

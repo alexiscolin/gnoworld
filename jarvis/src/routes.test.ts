@@ -712,13 +712,13 @@ describe("the evals' run", () => {
     expect(config).toMatch(/^ {2}- id: file:\/\/provider\.ts$/m);
     expect(config).toMatch(/^tests: file:\/\/tests\.ts$/m);
     expect(config).toMatch(/^ {2}cache: true$/m);
-    expect(evals("tests.ts")).toContain(`readCases(new URL("cases", import.meta.url).pathname)`);
-    const provider = evals("provider.ts");
-    expect(provider).toContain(`join(ROOT, "jarvis/src/main.ts")`);
-    expect(provider).toContain(`"--disallow-code-generation-from-strings"`);
+    expect(evals("tests.ts")).toContain(`readCases(fileURLToPath(new URL("cases", import.meta.url)))`);
+    const started = evals("jarvis.ts");
+    expect(started).toContain(`join(setup.root, "jarvis/src/main.ts")`);
+    expect(started).toContain(`"--disallow-code-generation-from-strings"`);
     // The preload moves the universes' nodes alone; Anthropic's API is the real one.
-    expect(provider).toMatch(/universes\(\)\.map\(\(one\) => \[new URL\(one\.rpc\)\.origin/);
-    expect(provider).not.toMatch(/anthropic\.com/);
+    expect(started).toMatch(/setup\.universes\.map\(\(one\) => \[new URL\(one\.rpc\)\.origin/);
+    for (const path of ["jarvis.ts", "provider.ts", "fakes.ts"]) expect(evals(path)).not.toMatch(/anthropic\.com/);
   });
 
   it("is installed apart, from its own package file, promptfoo pinned", () => {

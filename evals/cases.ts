@@ -1,6 +1,6 @@
 // gnoworld's eval cases (ADR-0002 §5, "Evals"): plain JSON, one file a suite in cases/, so they outlive the tool that
 // runs them; read and checked here, by jarvis's own wire schemas, then handed to promptfoo as its tests (tests.ts) and
-// to the provider (provider.ts). jarvis/src/evals.test.ts holds the same files to the same schemas in the gate.
+// to the provider (provider.ts). jarvis/src/routes.test.ts holds the same files to the same schemas in the gate.
 import { readdirSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import { FunctionList } from "../packages/schemas/src/functions.ts";

@@ -15,6 +15,8 @@ const FOLDERS = [
   "packages/chain/src",
   "app/data",
 ];
+// The evals' own files that read a case's answers or run it: a fix of one reads every kept answer again (V8).
+const EVALS = ["provider.ts", "fakes.ts", "jarvis.ts", "spans.ts", "budget.ts", "cases.ts", "fingerprint.ts"];
 const kept = (path: string) => !/\.(test|bench)\.ts$/.test(path);
 
 export function fingerprint(root: string, settings: Readonly<Record<string, string>>): string {
@@ -24,7 +26,7 @@ export function fingerprint(root: string, settings: Readonly<Record<string, stri
       .filter((entry) => entry.isFile())
       .map((entry) => join(entry.parentPath, entry.name).slice(root.length)),
   )
-    .concat("deploy/jarvis/gnomcp.toml")
+    .concat("deploy/jarvis/gnomcp.toml", ...EVALS.map((name) => `evals/${name}`))
     .filter(kept)
     .sort();
   for (const path of files)
