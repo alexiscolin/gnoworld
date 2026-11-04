@@ -5,8 +5,6 @@
 import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
-const FACTS_QUERY = "query($path: String!) { realmFacts(path: $path) { path deployer firstBlock } }";
-
 /** A realm's facts from the indexer at `indexer` (its GraphQL address), for a path its caller checked, or why not. */
 export async function readFacts(
   indexer: string,
@@ -15,7 +13,8 @@ export async function readFacts(
 ): Promise<ChainRead<RealmFactsValue>> {
   // A name past the cap is refused before anything is asked.
   if (path.length > REALM_FACTS_CAPS.path) return failedRead("bad-name", sourceOf(indexer, options));
-  const asked = `${indexer}?query=${encodeURIComponent(FACTS_QUERY)}&variables=${encodeURIComponent(JSON.stringify({ path }))}`;
+  const query = "query($path: String!) { realmFacts(path: $path) { path deployer firstBlock } }";
+  const asked = `${indexer}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify({ path }))}`;
   const answer = await readChain(asked, RealmFactsAnswer, options);
   if (!answer.ok) return answer;
   const facts = answer.value.data.realmFacts;
