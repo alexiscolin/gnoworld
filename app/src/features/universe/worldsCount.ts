@@ -3,27 +3,21 @@
 // Apart from the scene's chunk, so the door and the chunk it opens do not import each other.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { readWorldsCount } from "../../lib/chain/worldsCount.ts";
+import { Heard } from "./heard.ts";
 
 let drawnWorlds: number | undefined;
-const counting = new Set<() => void>();
+const counting = new Heard();
 
 /** Says how many worlds the cosmos draws, once a read has brought it: the worlds' count the home reads, or the file the scene draws. */
 export function worldsDrawn(count: number): void {
   drawnWorlds = count;
-  for (const tell of counting) tell();
+  counting.tell();
 }
-
-const countedBy = (tell: () => void) => {
-  counting.add(tell);
-  return () => {
-    counting.delete(tell);
-  };
-};
 
 /** How many worlds the cosmos draws, once a read has said; nothing before, nor in the build. */
 export const useWorldsDrawn = (): number | undefined =>
   useSyncExternalStore(
-    countedBy,
+    counting.subscribe,
     () => drawnWorlds,
     () => undefined,
   );

@@ -2,6 +2,7 @@
 // holds a slot of a sunflower's lattice: its hash picks the slot, so an arrival moves only a world it meets, and the lattice keeps any
 // number of worlds apart in the room a cell leaves. A system turns as one, so none ever crosses another. The disc lies tilted on the stage.
 import { cellHash, nextState, textHash, unitOf, type Point } from "../space/cell.ts";
+import { GOLDEN } from "../space/golden.ts";
 import { lerp } from "../space/smooth.ts";
 import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos.ts";
 
@@ -20,7 +21,8 @@ export const EARTH_RADIUS = 1.2176;
 const WORLD_LEAST = 1.05;
 const WORLD_MOST = 1.7;
 const STAR_MOST = 1024;
-const GOLDEN = 2.399963229728653;
+// The golden angle, a turn's share past the golden ratio's: 2.39996 radians.
+const GOLDEN_ANGLE = 2 * Math.PI * (1 - GOLDEN);
 // A lattice's closest two stand this many times sqrt(its area / pi / its count) apart, measured from 4 to 2,048 slots; a world takes under half of that.
 const PACKING = (0.49 * 1.65) ** 2;
 /** Under this radius a world is grain: dust round its star, never a body. */
@@ -137,7 +139,7 @@ function latticeOf(
   return ranked(worlds).map(({ id, use }) => {
     const slot = places.get(id) ?? 0;
     const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
-    const placed = { orbit, phase: start + slot * GOLDEN };
+    const placed = { orbit, phase: start + slot * GOLDEN_ANGLE };
     const own = worldSize(use);
     return { id, ...sized(own, Math.min(own, most)), ...(crowd ? scattered(id, placed, { start, outer }) : placed) };
   });

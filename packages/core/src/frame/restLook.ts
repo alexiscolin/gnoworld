@@ -2,6 +2,7 @@
 // covers on the screens the view is composed for. Plain numbers, for the search reads thousands of them.
 import { EARTH_PLACE, EARTH_RADIUS, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
+import { BANDS } from "./bands.ts";
 import { orbitPlace } from "./disc.ts";
 import { outlineOf, type Outline } from "./outline.ts";
 
@@ -21,9 +22,6 @@ export const HERO_ZONE = { right: 0.45, top: 0.58 } as const;
 export const CARD_ZONE = { right: 0.25, bottom: 0.2 } as const;
 /** The great star's heart, in pixels: no body stands on it. */
 export const STAR_HEART = 40;
-
-// The header's band, a share of the height: a whole body stands under it.
-const HEADER = 0.09;
 
 /** An eye at rest: its distance from the Earth, its slant over the disc and its turn round from the map's z, in radians. */
 export interface Candidate {
@@ -183,9 +181,9 @@ export class Look {
   }
 
   /** Whether a body there stands whole on the screen, under the header, `margin` pixels in. */
-  whole(at: Seen, margin: number): boolean {
+  whole(at: Pick<Seen, "left" | "right" | "top" | "bottom" | "depth">, margin: number): boolean {
     const across = at.left >= margin && at.right <= this.width - margin;
-    return at.depth > 0 && across && at.top >= HEADER * this.height && at.bottom <= this.height - margin;
+    return at.depth > 0 && across && at.top >= BANDS.header * this.height && at.bottom <= this.height - margin;
   }
 
   /** Whether a body there shows nothing on the screen. */

@@ -55,6 +55,15 @@ interface Recorded {
   readonly namespace: string;
   readonly realms: readonly { readonly callers: number | null }[];
 }
+// Onyx's recorded systems, each world's use its realms' callers and its realms (F4468), as the dynamic view's tests read them.
+const onyxSystems = () =>
+  systemsOf(
+    (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
+      id,
+      namespace,
+      use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
+    })),
+  );
 // A row names a system by its set and its id: each test builds the set again, so what it asserts is computed while it runs.
 const ROWS = (Object.keys(SETS) as SetName[]).flatMap((name) =>
   SETS[name]()
@@ -568,13 +577,7 @@ describe("a system's arrival: a good angle", () => {
   // three of gnoswap's thirteen bodies, bound by the home's four and by the room its worlds keep to turn apart. Held still, they need only
   // stand apart in space, each at its own size under its crowd's cap, the nearest 1.5 times every other's at rest.
   it("draws up to six of a system's worlds in its dynamic view, gnoswap's five or more on Onyx, while the home's postcards keep four", () => {
-    const systems = systemsOf(
-      (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
-        id,
-        namespace,
-        use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
-      })),
-    );
+    const systems = onyxSystems();
     const counts = systems.map((system) => arrivalOf(system, systems).postcard.worlds.length);
     expect(Math.max(...counts)).toBe(6);
     expect(counts.filter((count) => count >= 5).length).toBeGreaterThanOrEqual(5);
@@ -588,13 +591,7 @@ describe("a system's arrival: a good angle", () => {
   it(
     "keeps the system's card's room at the top left clear of every world it draws, on both screens, Onyx's too",
     () => {
-      const onyx = systemsOf(
-        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
-          id,
-          namespace,
-          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
-        })),
-      );
+      const onyx = onyxSystems();
       const cases = [...allCases(), ...onyx.map((system) => ({ system, systems: onyx }))];
       for (const { system, systems } of cases) {
         const arrival = arrivalOf(system, systems);
@@ -812,13 +809,7 @@ describe("a system's dynamic view's rocks (7v)", () => {
   it(
     "clamps each view's lean so its nearest stays in the frame's room, never under the ticker or the header, Onyx's too",
     () => {
-      const onyx = systemsOf(
-        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
-          id,
-          namespace,
-          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
-        })),
-      );
+      const onyx = onyxSystems();
       let clamped = 0;
       for (const { system, systems } of [...allCases(), ...onyx.map((one) => ({ system: one, systems: onyx }))]) {
         const arrival = arrivalOf(system, systems);
@@ -839,13 +830,7 @@ describe("a system's dynamic view's rocks (7v)", () => {
   it(
     "never cuts the nearest beside a single other: a view of two stands both whole, Onyx's too",
     () => {
-      const onyx = systemsOf(
-        (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
-          id,
-          namespace,
-          use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
-        })),
-      );
+      const onyx = onyxSystems();
       for (const { system, systems } of [...allCases(), ...onyx.map((one) => ({ system: one, systems: onyx }))]) {
         const arrival = arrivalOf(system, systems);
         if (arrival.postcard.worlds.length !== 2) continue;
@@ -860,13 +845,7 @@ describe("a system's dynamic view's rocks (7v)", () => {
   // The design review's second pass (F4468, the mock-up's rocks in front): at a system the hero gives way and its card stands at the top left,
   // yet the rocks kept the hero's room and stood on the card; gnoswap's seven were all pebbles there, no near one in front.
   it("lays a dynamic view's rocks off the system's card, not the hero's room, and a near one in front of gnoswap", () => {
-    const onyx = systemsOf(
-      (recorded as { worlds: readonly Recorded[] }).worlds.map(({ id, namespace, realms }) => ({
-        id,
-        namespace,
-        use: realms.reduce((sum, { callers }) => sum + (callers ?? 0), 0) + realms.length,
-      })),
-    );
+    const onyx = onyxSystems();
     for (const system of onyx.filter(({ worlds }) => worlds.length > 0)) {
       const arrival = arrivalOf(system, onyx);
       for (const screen of REST_SCREENS) {

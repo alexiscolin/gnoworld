@@ -36,7 +36,6 @@ const NEAR_BEST = 0.8;
 // A name's room under its world, in pixels: its height, and half its width at the least.
 const NAME_HIGH = 30;
 const NAME_HALF = 60;
-const HEADER = 0.09;
 const MARGIN = 16;
 
 // A world's own size, its use's, before its system's room caps it (7v's design review, F4470: gnoswap's 16 stood at their crowd's cap).
@@ -93,23 +92,18 @@ function readable(
   return looksFrom(camera, PLAN_LENS).every((look) => {
     const star = look.seen(system.place);
     const spots = worlds.map((world) => look.seen(placeOf(system, world, 0), world.radius));
-    const boxes = spots.map(({ x, y, radius }) => ({
+    const boxes = spots.map(({ x, y, radius, depth }) => ({
       left: x - Math.max(radius, NAME_HALF),
       right: x + Math.max(radius, NAME_HALF),
       top: y - radius,
       bottom: y + radius + NAME_HIGH,
+      depth,
     }));
     const meet = (a: (typeof boxes)[number], b: (typeof boxes)[number]) =>
       a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
     return (
       spots.every(({ x, y, radius }) => Math.hypot(x - star.x, y - star.y) - radius >= heart) &&
-      boxes.every(
-        (box) =>
-          box.left >= MARGIN &&
-          box.right <= look.width - MARGIN &&
-          box.top >= HEADER * look.height &&
-          box.bottom <= look.height - MARGIN,
-      ) &&
+      boxes.every((box) => look.whole(box, MARGIN)) &&
       boxes.every((box, at) => boxes.slice(at + 1).every((other) => !meet(box, other)))
     );
   });

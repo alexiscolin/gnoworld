@@ -6,6 +6,7 @@ import { drawnOf, type Postcard } from "./postcard.ts";
 import type { Point } from "../space/cell.ts";
 import { ARRIVAL_LEAN } from "../space/drift.ts";
 import { CENTRE, toMap } from "./disc.ts";
+import { BANDS } from "./bands.ts";
 import {
   along,
   CARD_ZONE,
@@ -24,7 +25,7 @@ import {
 const [SHOWN_AT_REST, SHOWN_SWAYED] = [0.3, 0.25];
 const [NEAR_OVER, NEAR_SWAYED] = [1.5, 1.35];
 const [NEAR_LEAST, NEAR_MOST] = [0.1, 0.5];
-const [MARGIN, HEADER] = [24, 0.09];
+const MARGIN = 24;
 
 /** A system as a view draws it: its plane, its worlds and their shares of their size. */
 export type Card = Pick<Postcard, "system" | "worlds" | "depth">;
@@ -39,7 +40,7 @@ export function seenOf(look: Look, card: Card): { star: Seen; worlds: Seen[] } {
 function leastShown({ width, height }: Look, at: Seen, foot: number): number {
   const shown = (Math.min(at.right, width) - Math.max(at.left, 0)) / (at.right - at.left);
   const up = (Math.min(at.bottom, foot * height) - at.top) / (at.bottom - at.top);
-  return at.depth > 0 && at.top >= HEADER * height ? Math.min(shown, up) : -Infinity;
+  return at.depth > 0 && at.top >= BANDS.header * height ? Math.min(shown, up) : -Infinity;
 }
 
 // Whether a body there is cut by the frame's sides or its foot, never its head, which the header holds: `least` of it shown each way.
@@ -77,12 +78,12 @@ export interface LeanRoom {
  * fifth less at a time, none under a fifth; each way on its own, then each corner both its ways less till it holds. */
 export function roomOf(camera: Camera, card: Card): LeanRoom {
   const room = { right: 1, left: 1, up: 1, down: 1 };
-  // The nearest keeps a seventh of itself each way under the header and over the ticker, 34 px of 1,080 (gnoswap's pool, cut by the foot,
+  // The nearest keeps a seventh of itself each way under the header and over the ticker (gnoswap's pool, cut by the foot,
   // keeps a third at rest), on each screen: a mouse's lean moved it under the ticker (F4468).
   const kept = (across: number, up: number) =>
     looksFrom(leaned(camera, [across, up], card.system.place)).every((look) => {
       const [near] = seenOf(look, card).worlds;
-      return near === undefined || leastShown(look, near, 1 - 34 / 1080) >= 0.15;
+      return near === undefined || leastShown(look, near, 1 - BANDS.ticker / look.height) >= 0.15;
     });
   for (const [across, up] of LEANS) {
     const [x, y] = [across < 0 ? "left" : "right", up < 0 ? "down" : "up"] as const;
