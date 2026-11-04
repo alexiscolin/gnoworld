@@ -23,6 +23,9 @@ const DOTS_A_STAR = 1024;
 const DOTS_FLOOR = BOUNDS.dots / BOUNDS.stars;
 /** A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world. */
 export const BODY_PIXELS = 6;
+/** The least radius the view at rest draws a world at, in pixels (7p): 1.5 times a body's, so it is a body still on a screen a third
+ * smaller. */
+export const DRAWN_LEAST = 1.5 * BODY_PIXELS;
 // A point's radius in pixels never falls under this: a pixel across, and it goes out by `MIDDLE`.
 const LEAST_DOT = 0.75;
 const DOT_FADE = 0.6;

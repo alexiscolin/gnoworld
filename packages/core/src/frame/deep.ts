@@ -4,7 +4,7 @@
 // neighbour, the whole judged as the view is, on the way down too. Nothing invented: a world drawn is one of the file's. In a chunk of its
 // own: it reads the view with the functions the search lends it.
 import { EARTH_PLACE, GRAIN, type Orbiter, type StarSystem } from "../cosmos/system.ts";
-import { BODY_PIXELS } from "../lod/ladder.ts";
+import { DRAWN_LEAST } from "../lod/ladder.ts";
 import { distanceOf } from "../space/cell.ts";
 import { SWAY_CORNERS } from "../space/drift.ts";
 import { offMoon, type MoonRing } from "./earthMoon.ts";
@@ -112,11 +112,10 @@ function glowing({ looks: [first], stars, lent }: Judge, systems: readonly StarS
   });
 }
 
-// Four at most, each 1.5 times a body's least size or more, pixels of room round it, and twice the Earth's radius round the Earth, where
+// Four at most, each the view's least drawn size or more, pixels of room round it, and twice the Earth's radius round the Earth, where
 // its Moon's ring stands; never of one size with a neighbour, level with it or above it, 40 degrees off at most; never the fourth of a
 // row, marks within a twentieth of the height across more than 0.15 of the width; off the great star's glow (the design review of 7p).
 const MOST = 4;
-const LEAST = 1.5 * BODY_PIXELS;
 const MARGIN = 24;
 const APART = 1.5;
 const UPRIGHT = Math.tan((40 * Math.PI) / 180);
@@ -173,7 +172,7 @@ function standsAt(judge: Judge, card: Pick<Card, "system" | "worlds">, seconds: 
     ({ x, y }) => x >= 0 && x <= first.width && y >= 0 && y <= first.height,
   );
   return (
-    spot.radius >= LEAST &&
+    spot.radius >= DRAWN_LEAST &&
     gap(spot, first.star) >= GLOW * first.height &&
     !paired(spot, all, (one, other) => lent.atOneHeight(one, other, first.height)) &&
     !paired(spot, all, (one, other) => Math.abs(one.x - other.x) < UPRIGHT * Math.abs(one.y - other.y)) &&
@@ -221,7 +220,7 @@ export function deepOf(systems: readonly StarSystem[], view: RestView, judge: Ju
     const card = { system, worlds: [world] };
     const spins = [...cards, card].map(({ system: { spin } }) => spin).filter((spin) => spin !== 0);
     return (
-      first.seen(lent.placeOf(system, world, 0), world.radius).radius >= LEAST &&
+      first.seen(lent.placeOf(system, world, 0), world.radius).radius >= DRAWN_LEAST &&
       looks.every((look, at) => clearOn(look, look.ball(system.place, world.orbit + world.radius), balls[at] ?? [])) &&
       lent.instantsOf(spins).every((seconds) => standsAt(judge, card, seconds)) &&
       !judge.rowDown([...cards, card])
