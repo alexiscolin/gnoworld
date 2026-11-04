@@ -39,7 +39,9 @@ export function trendsRoutes(options: {
       { chain, chat: options.chat?.() ?? [], hubs: options.hubs ?? new Map<string, string>() },
       at,
     );
-    const rising = options.presence === undefined ? [] : risingOf(options.presence(), at, trending?.rooms);
+    // A world Trending by its people says its rise this hour itself: a Rising item beside it would say a second (the chief, 2026-11-04).
+    const byPeople = trending?.item.kind === "trending" && trending.item.by === "here";
+    const rising = options.presence === undefined || byPeople ? [] : risingOf(options.presence(), at, trending?.rooms);
     const ranked = [trending?.item, ...rising, fresh.find((item) => at - Date.parse(item.at) <= NEW_MS)];
     const answer: Trends = { items: ranked.flatMap((item) => Trend.safeParse(item).data ?? []) };
     c.header("cache-control", "public, max-age=60");

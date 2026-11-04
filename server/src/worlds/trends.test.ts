@@ -732,6 +732,16 @@ describe("GET /api/trends", () => {
     ]);
   });
 
+  // The chief, 2026-11-04, after 7t3's design review: a world Trending by its people says "+N% this hour" itself, the video's one item of the
+  // form (frame 6); a Rising item beside it, maybe a larger rise, would contradict it.
+  it("answers no Rising item beside a world Trending by its people, and one beside a world Trending by anything else", async () => {
+    const rising = [hub("bubble", 12, 2), hub("govdao", 7, 0.75)];
+    const kinds = async (asked: Asked) => (await ask({ ...asked, rising })).body.items.map(({ kind }) => kind);
+    expect(await kinds({ chat: [chatOf("earth", [12, 4])] })).toEqual(["trending"]);
+    expect(await kinds({ chat: [chatOf("earth", [12, 12], [240, 60])] })).toEqual(["trending", "rising"]);
+    expect(await kinds({ chain: [chainOf("gnoswap/pool", [6, 3], [4, 2])] })).toEqual(["trending", "rising"]);
+  });
+
   it("answers no trend, and never fails, with no worlds job and no count of who is here", async () => {
     const routes = trendsRoutes({ chain: () => ({ worlds: [], newest: [] }), now: () => T2 });
     const response = await routes.request("/");
