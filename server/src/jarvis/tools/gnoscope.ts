@@ -35,7 +35,7 @@ const cappedFetch = (timeoutMs: number) => async (url: string | URL, init?: Requ
   const cap = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       size += chunk.byteLength;
-      if (size > MAX_BYTES) controller.error(new TooLarge(`gnoscope: an answer past ${String(MAX_BYTES)} bytes`));
+      if (size > MAX_BYTES) controller.error(new TooLarge());
       else controller.enqueue(chunk);
     },
   });
@@ -65,7 +65,8 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
   let listed: Tool[];
   try {
     await client.connect(transport, { timeout: setup.timeoutMs });
-    listed = await everyPage(client, setup.timeoutMs);
+    // The client reads every page of the list itself (listTools at 2.4.0), each within its time.
+    ({ tools: listed } = await client.listTools(undefined, { timeout: setup.timeoutMs }));
   } catch {
     // A third party never stops jarvis's start: without it, Jarvis answers from gnomcp.
     setup.log("jarvis_gnoscope_down", { reason: "start" });
@@ -91,19 +92,6 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
       await client.close();
     },
   };
-}
-
-// ponytail: ten pages of tools at most, each within its time; gnoscope listed seven tools on one page (2026-11-04).
-async function everyPage(client: Client, timeout: number): Promise<Tool[]> {
-  const tools: Tool[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < 10; page += 1) {
-    const listed = await client.listTools(cursor === undefined ? undefined : { cursor }, { timeout });
-    tools.push(...listed.tools);
-    cursor = listed.nextCursor;
-    if (cursor === undefined) break;
-  }
-  return tools;
 }
 
 // Ours that gnoscope lists with every field of ours; each other one left out, and logged.

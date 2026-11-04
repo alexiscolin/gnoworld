@@ -20,7 +20,7 @@ export interface Universe {
 
 interface Shown {
   readonly kind: Place["kind"];
-  readonly name?: string;
+  readonly name: string | undefined;
   readonly universe: string;
   readonly path: string;
   readonly canonical: string;
@@ -48,9 +48,8 @@ function fileOf<T>(folder: string, name: string, schema: z.core.$ZodType<T>): T 
   let value: unknown;
   try {
     value = JSON.parse(text);
-  } catch (error) {
+  } catch {
     // A parse error quotes the text, so no JSON reaches the schema as nothing, which it refuses by its place.
-    if (!(error instanceof SyntaxError)) throw error;
     value = undefined;
   }
   const parsed = z.safeParse(schema, value);
@@ -82,8 +81,9 @@ export function loadPlaces(folder: string): Places {
   for (const { slug, universe, name } of [...all.hubs, ...all.stations]) names.set(`${universe} world ${slug}`, name);
   for (const { slug, universe, name } of all.ecosystems) names.set(`${universe} ecosystem ${slug}`, name);
   const found = places.map(({ kind, universe, slug, path, canonical }) => {
-    const name = slug === undefined ? undefined : names.get(`${universe} ${kind} ${slug}`);
-    const shown = { kind, ...(name === undefined ? {} : { name }), universe, path, canonical };
+    // The cosmos and the Earth have no name; JSON leaves an undefined one out.
+    const name = names.get(`${universe} ${kind} ${slug ?? ""}`);
+    const shown = { kind, name, universe, path, canonical };
     const words = [kind, slug, name, universe, byId.get(universe)?.name].join(" ").toLowerCase();
     return { shown, words };
   });
@@ -111,7 +111,7 @@ export function placesTool(data: Places) {
       if (!parsed.success) return Promise.resolve({ ok: false, reason: "refused" });
       const words = parsed.data.query
         .toLowerCase()
-        .split(/\s+/)
+        .split(/\s/)
         .filter((word) => word !== "");
       // ponytail: a pass over every place, about 3,000 at most (three files of 1,000 rows, two places a universe).
       const matched =

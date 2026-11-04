@@ -66,15 +66,17 @@ function heightOf(status: Ran, universe: Universe): number | undefined {
   }
   const Status = z.object({ height: z.int().positive(), chain_id: z.string(), node_chain_id: z.string() });
   const parsed = Status.safeParse(json);
-  const chains = parsed.success ? [parsed.data.chain_id, parsed.data.node_chain_id] : [];
-  return chains.length > 0 && chains.every((id) => id === universe.chainId) ? parsed.data?.height : undefined;
+  if (!parsed.success) return undefined;
+  const { height, chain_id: declared, node_chain_id: node } = parsed.data;
+  return declared === universe.chainId && node === universe.chainId ? height : undefined;
 }
 
 // The page inside gnomcp 0.11.0's wrapping (read live, 2026-11-04), cut to its last whole line within 64 KiB.
 function pageOf(text: string, realm: string): string {
   const [open, close] = [`<untrusted_content kind="render" source="${realm}">\n`, "\n</untrusted_content>"];
   const page = text.startsWith(open) && text.endsWith(close) ? text.slice(open.length, -close.length) : text;
-  const { read } = new TextEncoder().encodeInto(page.slice(0, PAGE_BYTES), new Uint8Array(PAGE_BYTES));
+  // encodeInto reads no more of the page than its 64 KiB hold, whatever the page's size.
+  const { read } = new TextEncoder().encodeInto(page, new Uint8Array(PAGE_BYTES));
   if (read === page.length) return page;
   return page.slice(0, page.lastIndexOf("\n", read - 1) + 1);
 }
@@ -105,10 +107,9 @@ const withQuestion = (read: Read, asked: Asked): Read => ({
 function whyOf(
   checked: { reason: "shape" | "nothing" } | { reason: "missing"; missing: { kind: string; value: string }[] },
 ) {
+  // Its schema passed already, so a card is never refused for its shape: it states nothing checkable.
   if (checked.reason !== "missing")
-    return checked.reason === "shape"
-      ? "it is not that card's shape."
-      : "it states nothing a read can hold: give a number, a link, an account or a form of the realm's page.";
+    return "it states nothing a read can hold: give a number, a link, an account or a form of the realm's page.";
   const missing = checked.missing.map(({ kind, value }) => `${kind} ${value}`).join("; ");
   return `the chain's reads lack ${missing}. State only what they hold.`;
 }
