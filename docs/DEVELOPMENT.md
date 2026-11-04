@@ -130,6 +130,12 @@ else is said, never taken. Ctrl+C stops both and takes them off the tailnet, and
 `pnpm workshop` in the same checkout replaces the first, and a run killed hard stays on the tailnet until the next one, or
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
+**The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
+a turn of Claude's in it ends without the gate, so each retouch shows live in a couple of minutes; the gate, the tests and the
+review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
+running this checkout's `scripts/workshop.sh` from it, outside every sandbox: a session cannot start one that counts. Stop the
+workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that checkout's turns gate-free.
+
 Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
 the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
 which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is

@@ -6270,6 +6270,102 @@ grep -q '^coverage ' "$log" || fail "check.sh --full ran no coverage"
 grep '^coverage ' "$log" | grep -q -- "--tags-filter" && fail "check.sh --full left the timing tests out of its coverage: $(grep '^coverage ' "$log")"
 fi
 
+if part stop_gate_pingpong; then
+# The ping-pong (Alexis, 2026-11-04: each retouch seen live in two minutes, the tests, the gate and the review once the batch is accepted):
+# while Alexis's own `pnpm workshop` serves this checkout, a turn ends without the gate, which pre-commit still runs on every commit. Its
+# sign is one no sandboxed command can plant (the chief): a shell running this checkout's scripts/workshop.sh, from this checkout's folder,
+# its parent alive, that macOS's sandbox_check finds in no sandbox. Here the hook runs as it is but for its system tools' paths, turned to
+# stubs that read one table of processes, each answering for its own pid: several run at once, as on a machine of many checkouts (F4851).
+r="$t/pp" && mkdir -p "$r/scripts" "$r/.claude/tmp" "$t/ppbin" "$t/pphome" && cp "$here/code_changed.sh" "$r/scripts/" && printf '.claude/tmp/\n' >"$r/.gitignore"
+git -C "$r" init -q && git -C "$r" add -A && git -C "$r" commit -qm init && echo 'package x' >"$r/x.go"
+root=$(cd "$r" && pwd -P) && python=$(command -v python3) && table="$t/pp.table"
+turned() { # $1: the copy; the tools after it are turned to the stubs, each of which the hook must name by its system path
+	from="$1" && shift
+	cp "$here/stop_gate.sh" "$from"
+	for tool in "$@"; do
+		case $tool in ps) system=/bin/ps ;; lsof) system=/usr/sbin/lsof ;; python3) system=/usr/bin/python3 ;; esac
+		grep -qF "$system -" "$from" || fail "stop_gate.sh no longer asks the system's own $tool by its path ($system): update stop_gate_pingpong"
+		sed "s|$system -|$t/ppbin/$tool -|g" "$from" >"$from.new" && mv "$from.new" "$from"
+	done
+}
+turned "$t/stop_gate.sh" ps lsof python3
+turned "$t/stop_gate.real.sh" ps lsof # the real python3 and macOS's own sandbox_check
+cat >"$t/ppbin/ps" <<SH
+#!/bin/sh
+while IFS='|' read -r pid ppid age cwd box cmd; do printf '%6s %5s %11s %s\n' "\$pid" "\$ppid" "\$age" "\$cmd"; done <"$table"
+SH
+cat >"$t/ppbin/lsof" <<SH
+#!/bin/sh
+want= prev=
+for a in "\$@"; do [ "\$prev" != -p ] || want=\$a; prev=\$a; done
+while IFS='|' read -r pid ppid age cwd box cmd; do [ -z "\$want" ] || [ "\$want" = "\$pid" ] || continue; printf 'p%s\nfcwd\nn%s\n' "\$pid" "\$cwd"; done <"$table"
+SH
+cat >"$t/ppbin/python3" <<SH
+#!/bin/sh
+case "\$*" in *sandbox_check*) ;; *) exec "$python" "\$@" ;; esac
+for last; do :; done
+while IFS='|' read -r pid ppid age cwd box cmd; do [ "\$pid" != "\$last" ] || exit "\$box"; done <"$table"
+exit 1
+SH
+chmod +x "$t/ppbin/ps" "$t/ppbin/lsof" "$t/ppbin/python3"
+procs() { printf '%s\n' "$@" >"$table"; } # each: pid|ppid|age|folder|sandbox_check's answer as an exit|command
+hook() { rm -f "$r/.claude/tmp/gate-blocked"; printf '{"stop_hook_active":false}' | HOME="$t/pphome" PATH="$t/ppbin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "${1:-$t/stop_gate.sh}" 2>/dev/null; }
+ends() { code=0; hook "${2:-}" || code=$?; [ "$code" = 0 ] || fail "stop_gate blocked a turn while this checkout's workshop ran outside the sandbox, $1 (exit $code)"; }
+blocks() { code=0; hook "${2:-}" || code=$?; [ "$code" = 2 ] || fail "stop_gate let a turn end without the gate when $1 (exit $code)"; }
+procs "4001|4000|05:00|$root|0|sleep 600" && blocks "no workshop ran"
+for form in "sh scripts/workshop.sh" "/bin/sh $root/scripts/workshop.sh" "bash ./scripts/workshop.sh" "zsh scripts/workshop.sh" "dash scripts/workshop.sh"; do
+	procs "4001|4000|05:00|$root|0|$form" && ends "as '$form'"
+done
+# The gate's own record and its block are left as they were: the ping-pong ends a turn, it passes no gate.
+[ ! -e "$r/.claude/tmp/gate-green" ] && [ ! -e "$r/.claude/tmp/gate-blocked" ] || fail "stop_gate wrote a record of the gate during a ping-pong"
+# Beside others (F4851): a session's sandboxed workshop of this checkout, Alexis's of a sibling checkout whose folder this one's begins, a
+# workshop's server in this checkout's app; then Alexis's own of this one, last.
+w="sh scripts/workshop.sh"
+n1="4001|4000|05:00|$root|1|$w" n2="4002|4000|05:00|${root}3|0|$w" n3="4003|4000|05:00|$root/app|0|$w"
+procs "$n1" "$n2" "$n3" && blocks "a sandboxed workshop of this checkout ran beside Alexis's of another"
+procs "$n1" "$n2" "$n3" "4004|4000|05:00|$root|0|$w" && ends "beside a sandboxed one and another checkout's"
+# What a session could plant, or a sign that is not the workshop's: each blocks, as before.
+procs "4001|4000|05:00|$root|1|$w" && blocks "the workshop ran in the sandbox"
+procs "4001|4000|05:00|/elsewhere|0|$w" && blocks "the workshop ran from another folder"
+procs "4001|4000|05:00|$root|0|sh /elsewhere/scripts/workshop.sh" && blocks "another checkout's workshop.sh ran from this folder"
+procs "4001|4000|05:00|$root|0|vim scripts/workshop.sh" && blocks "an editor named the workshop's script"
+procs "4001|4000|05:00|$root|0|sh -c sleep 1 # scripts/workshop.sh" && blocks "a comment named the workshop's script"
+procs "4001|4000|05:00|$root|0|sh scripts/workshop.sh.old" && blocks "a file named like the workshop's script ran"
+procs "4001|4000|05:00|$root|0|sh scripts/workshop.sh --again" && blocks "the workshop's script ran with an argument it takes none of"
+procs "4001|4000|05:00|$root|0|node scripts/workshop.sh" && blocks "another program than a shell ran the workshop's script"
+# F4852: a look-alike that code the workshop runs started, outliving the workshop's Ctrl+C, is launchd's (its parent gone).
+procs "4001|1|05:00|$root|0|$w" && blocks "a workshop.sh whose parent is gone ran"
+printf '4001 4001 5198\n' >"$r/.claude/tmp/workshop.pid" && procs "4001|4000|05:00|$root|0|sleep 600" && blocks "a pid file named a process outside the sandbox"
+rm "$r/.claude/tmp/workshop.pid"
+# Each tool it needs, missing (127) or failing (1).
+for tool in ps lsof python3; do
+	for status in 127 1; do
+		cp "$t/ppbin/$tool" "$t/ppbin/$tool.saved" && printf '#!/bin/sh\nexit %s\n' "$status" >"$t/ppbin/$tool"
+		procs "4001|4000|05:00|$root|0|$w" && blocks "$tool exited $status"
+		mv "$t/ppbin/$tool.saved" "$t/ppbin/$tool"
+	done
+done
+# F4852: the reaper runs at every turn's end, a ping-pong's too: a node of this project left by a dead parent an hour ago is stopped.
+rm -f "$t/pphome/Library/Logs/gnoworld-reaped.log"
+procs "4001|4000|05:00|$root|0|$w" "999999|1|01:00:00|/x|0|node /x/gnoworld/stray.js" && ends "with a stray node to reap"
+grep -q '^999999 ' "$t/pphome/Library/Logs/gnoworld-reaped.log" 2>/dev/null || fail "stop_gate's reaper did not run at a ping-pong's end"
+# macOS's own sandbox_check, asked by the real python3 (F4850): launchd, pid 1, is in no sandbox; this test's own process is in Claude
+# Code's when the suite runs there. A module planted in the project's folder, as a session can, is never imported: Python runs isolated.
+if [ "$(uname)" = Darwin ]; then
+	printf 'open(%s, "w").write("imported")\nclass CDLL:\n    def __init__(self, path):\n        self.sandbox_check = lambda *a: 0\nc_int = c_char_p = int\n' "'$t/pp.planted'" >"$r/ctypes.py"
+	procs "1|0|05:00|$root|x|$w" && ends "as pid 1, which macOS's sandbox_check finds in no sandbox" "$t/stop_gate.real.sh"
+	sleep 600 </dev/null >/dev/null 2>&1 &
+	held=$!
+	procs "$held|$$|05:00|$root|x|$w" && hook "$t/stop_gate.real.sh" >/dev/null || :
+	[ ! -e "$t/pp.planted" ] || fail "stop_gate's python3 imported a module planted in the project's folder"
+	if "$python" -Ic 'import ctypes, sys; c = ctypes.CDLL("/usr/lib/libSystem.dylib").sandbox_check; c.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]; sys.exit(c(int(sys.argv[1]), None, 0) == 0)' "$held"; then
+		blocks "the real sandbox_check let a process of a sandbox pass" "$t/stop_gate.real.sh"
+	fi
+	kill "$held"
+	rm "$r/ctypes.py"
+fi
+fi
+
 if part harness_timeout; then
 shards_fixture
 # F3382: a suite past its limit (600 s) counts as a caught mutant and its process group is stopped, TERM then KILL; the verdict won by time

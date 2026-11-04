@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
@@ -464,6 +464,19 @@ def mutants():
     yield from each(ls, "{real[file] for file in seen if file in real}", "set(seen)", "hooks", "lint_scope.py names each file in its own case")
     yield from each(ls, "shlex.quote(path) for path", "path for path", "hooks", "lint_scope.py quotes each path for the shell")
     yield from each(ls, "os.path.abspath(info.parent)", "os.path.realpath(info.parent)", "hooks", "lint_scope.py reads the names from the folder as tsc was told it")
+    # The ping-pong (stop_gate.sh's pingpong): the one exception to the gate at a turn's end, its sign one no sandboxed command plants.
+    sg = "scripts/stop_gate.sh"
+    yield from each(sg, "pingpong && exit 0 # its record", ": && exit 0 # its record", "hooks", "stop_gate.sh ends a turn without the gate during a ping-pong")
+    yield from each(sg, "reap || : # set -e is off", "pingpong && exit 0; reap || : # set -e is off", "hooks", "stop_gate.sh reaps at a ping-pong's end too (F4852)")
+    yield from each(sg, "$2 != 1 && NF == 5 && ", "NF == 5 && ", "hooks", "stop_gate.sh's ping-pong takes no workshop.sh whose parent is gone (F4852)")
+    yield from each(sg, "$2 != 1 && NF == 5 && ", "$2 != 1 && ", "hooks", "stop_gate.sh's ping-pong takes no workshop.sh run with an argument")
+    yield from each(sg, "shell ~ /^(sh|bash|dash|zsh)$/ && ", "", "hooks", "stop_gate.sh's ping-pong takes a shell's workshop.sh alone")
+    yield from each(sg, '$5 == here "/scripts/workshop.sh"', 'index($5, "/scripts/workshop.sh")', "hooks", "stop_gate.sh's ping-pong takes this checkout's workshop.sh alone")
+    yield from each(sg, '/usr/sbin/lsof -a -p "$pid" -d cwd', "/usr/sbin/lsof -d cwd", "hooks", "stop_gate.sh's ping-pong reads each workshop's own folder (F4851)")
+    yield from each(sg, '/usr/bin/sed -n \'s/^n//p\')" = "$here" ] || continue', '/usr/bin/sed -n \'s/^n//p\' | /usr/bin/cut -c1-${#here})" = "$here" ] || continue', "hooks", "stop_gate.sh's ping-pong takes this checkout's folder, not one it begins (F4851)")
+    yield from each(sg, "/usr/bin/python3 -Ic 'import ctypes", "/usr/bin/python3 -c 'import ctypes", "hooks", "stop_gate.sh's ping-pong runs Python isolated from the folder (F4850)")
+    yield from each(sg, "check(int(sys.argv[1]), None, 0)", "check(__import__(\"os\").getpid(), None, 0)", "hooks", "stop_gate.sh's ping-pong asks the sandbox of the workshop's process, not its own")
+    yield from each(sg, "sys.exit(0 if check(", "sys.exit(0 if 1 or check(", "hooks", "stop_gate.sh's ping-pong wants the workshop out of every sandbox")
     # The workshop: the app's screens and the lab's, each on its server and its tailnet name, by one function.
     ws = "scripts/workshop.sh"
     yield from each(ws, '\tif lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then\n', "\tif false; then\n", "hooks", "workshop.sh never takes a port another process holds")
