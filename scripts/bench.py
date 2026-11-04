@@ -22,7 +22,9 @@ from repo_files import BENCH, BENCH_FILE, BUDGET, listed
 
 VITEST = "node_modules/.bin/vitest"  # relative to the root the script runs from: a test puts its stub there
 LOAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "load.py")
-CEILING, STEP = 600.0, 10.0  # s: how long to wait for a quiet machine, and between two reads of the load
+# s: how long to wait for a quiet machine (60, the harness audit, 2026-11-04: 600 at loads of 48 to 142 ended on a refusal all the same),
+# and between two reads of the load
+CEILING, STEP = 60.0, 10.0
 
 
 def seen():

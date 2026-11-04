@@ -49,9 +49,11 @@ open_files=$(ulimit -S -n)
 if [ "$open_files" != 10240 ]; then
 	ulimit -S -n 10240 2>/dev/null || echo "check.sh: could not set the limit of open files from $open_files to 10240 (its hard limit is $(ulimit -H -n)): the e2e web server may die of EMFILE" >&2
 fi
-full=false merge=false
+full=false merge=false tests_all=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
+# --tests-all: the fast gate with every test, a part's last step before its report (Alexis, 2026-11-04): a commit runs the related ones.
+[ "${1:-}" = "--tests-all" ] && tests_all=true
 # `--full|--merge --base <ref>`: what this run's branch is measured against, in every lane that reads a base (the batch, the fixes, the
 # regressions, the migrations, the patch's coverage, the harness's mutants, what counts as product code, the survivors listed): the
 # merge-base with <ref>, origin/main when absent. A branch cut from an integration branch names it (F2531): from main its range holds
@@ -167,26 +169,29 @@ fi
 # What a fast run checks: the areas its change touches, against HEAD, untracked files included; in
 # pre-commit's staged copy, no repository, those GATE_CHANGED lists, one path a line, which the hook
 # reads from git. Everything when nothing changed, or once any
-# path outside these areas changed: a config, the lockfile, the harness, the schemas both sides
-# read, the deployment. What a commit leaves out, the full gate runs before main takes it (pre-push).
-# The tests are Vitest's related ones only for a change of the app's or the design system's
-# TypeScript: main.test.ts runs the server, which imports core, as a child process, outside Vitest's
-# module graph, and a fixture read from disk is outside it too. ESLint reads no cache: one is keyed
-# on a file's own text, so a type changed elsewhere would hide the error it brings there.
-all=true ts=false app=false gno=false tokens=false related=true changed=
+# path outside these areas changed: a config, the lockfile, the harness, the deployment. What a commit
+# leaves out, the full gate runs before main takes it (pre-push).
+# The tests are the ones related to the change, in every area (Alexis, 2026-11-04: Vitest was the slowest step of 210 of the 212
+# slow gates): Vitest's own `related` command, given the paths scripts/related.py prints, which adds main.test.ts for the server's
+# process and the readers of a file on disk, both outside Vitest's module graph. Every test when everything runs, and at --tests-all.
+# ESLint reads no cache: one is keyed on a file's own text, so a type changed elsewhere would hide the error it brings there.
+# test_hooks.sh runs when the change holds what it tests (the harness audit, 2026-11-04: 99 to 228 s on each of 17 config commits a
+# slice): every path but a config of the tools it does not read, the lockfile, the roles, the deployment's other files.
+all=true ts=false app=false gno=false tokens=false hooks=true changed=
 regressions=false audit=false # a test file touched; the lockfile changed (below)
 if ! $full && [ -z "$tested" ]; then
-	changed=${GATE_CHANGED:-} related=false # Vitest finds the related tests through git, which a copy has not
+	changed=${GATE_CHANGED:-}
 elif ! $full; then
-	# The borrowed node_modules of a worktree is a link, which .gitignore's folder rule misses.
+	# The borrowed node_modules of a worktree is a link, which .gitignore's folder rule misses. Markdown is listed, prose to the
+	# areas below but a fixture to the related tests under the sources (a recorded chain page, F4740).
 	changed=$(
-		set -- . ':!docs' ':!adr' ':!*.md' ':!node_modules'
+		set -- . ':!docs' ':!adr' ':!node_modules'
 		git -c core.quotePath=false diff --no-renames --name-only HEAD -- "$@" &&
 			git -c core.quotePath=false ls-files --others --exclude-standard -- "$@"
 	)
 fi
 if [ -n "$changed" ]; then
-	all=false code=false
+	all=false code=false hooks=false
 	while IFS= read -r path; do
 		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
 		code=true
@@ -198,22 +203,30 @@ if [ -n "$changed" ]; then
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
-		server/src/*) ts=true related=false ;;
+		server/src/*) ts=true ;;
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
-		app/tests/*.ts) ts=true ;; # the journeys and their helpers run in the merge check and --full alone
+		app/tests/*) ts=true ;; # the journeys, their helpers and recordings: the merge check and --full walk them
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
-		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
-		app/tests/*) ts=true related=false ;;
-		app/src/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		packages/ui/src/tokens.css) ts=true app=true tokens=true ;; # the tokens story lists every token (F1190)
+		app/src/* | app/data/* | app/lab/* | app/public/* | packages/core/src/* | packages/schemas/src/* | packages/ui/src/*) ts=true app=true ;;
 		gno/*) gno=true ;;
-		*) all=true ;;
+		*)
+			all=true
+			case $path in
+			lint/shared.config.ts | app/vitest.compiled.config.ts | deploy/test.sh | deploy/web/nginx.conf) hooks=true ;; # its own cases read them
+			pnpm-lock.yaml | knip.json | .jscpd.json | .prettierignore | eslint.config.ts | tsconfig.json | tsconfig.base.json | */tsconfig.json | app/*.config.ts | lint/* | server/roles.json | deploy/*) ;;
+			*) hooks=true ;;
+			esac
+			;;
 		esac
 	done <<EOF
 $changed
 EOF
-	$code || all=true # prose alone is no change of code, as in a repository
+	$code || all=true hooks=true # prose alone is no change of code, as in a repository
 fi
-$all && ts=true app=true gno=true related=false
+$all && ts=true app=true gno=true
+related=true
+if $all || $tests_all; then related=false; fi
 # check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
 # runs it (and the audit) whole. Its base is where the branch left main, so a `Removed-test:` line of an earlier commit of the
 # branch counts; with no origin/main, HEAD; with no commit yet, or no repository, nothing to compare (no base).
@@ -228,8 +241,6 @@ budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit 
 # A run that builds the app has the build to wait for, and the lint and types of a whole project: the budget of a run of everything. A commit's gate walks no journey (Alexis, 2026-10-31): the merge check and --full do.
 $all || $app || budget=30
 [ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null && budget=$GATE_BUDGET # a test lowers it; nothing raises it
-tests_scope=
-$related && tests_scope="--changed --passWithNoTests"
 
 # The tools run as package.json's scripts, the one place their commands are written, with
 # node_modules/.bin first on PATH: what `pnpm run` does, minus its install check, which fails in
@@ -402,9 +413,25 @@ lane_tests() {
 	$ts || return 0
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
-	$full || step vitest # --full runs the tests once, with coverage
-	$full || run test "$tests_scope --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
-		retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+	if ! $full; then # --full runs the tests once, with coverage
+		step vitest
+		tests=$(node -p "require('./package.json').scripts.test")
+		if $related; then
+			# Vitest's own `related` command, which a path at a time follows to every test importing it (Vitest 4.1.12 has no `run --related`:
+			# its cac refuses the option), with the projects the test script keeps; a script of another shape is refused, never run as it is.
+			case $tests in "vitest run "*) ;; *)
+				echo "check.sh: package.json's test script does not start with 'vitest run ': its related tests cannot be asked for" >&2
+				exit 1
+				;;
+			esac
+			files=$(printf '%s\n' "$changed" | python3 -I scripts/related.py)
+			tests="vitest related --run ${tests#vitest run } $files"
+		else
+			python3 -I scripts/related.py --check </dev/null # the map's own test: a read it cannot follow refuses, whatever runs
+		fi
+		sh -c "$tests --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
+			retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+	fi
 	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
 	# render counts run here instead, once, beside the coverage lane's work.
 	if $full; then
@@ -456,7 +483,7 @@ lane_docs() {
 	step parse
 	# Some scripts run only in --full: a broken one would pass every commit (finding F084).
 	python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
-	$all || return 0 # the hooks' tests read the harness, whose change runs everything
+	$hooks || return 0 # the hooks' tests run when the change holds what they test (above)
 	step hooks
 	sh scripts/test_hooks.sh
 }
@@ -502,15 +529,29 @@ if $full; then
 	printf '%s\n' "$changes" >"$logs/changed" && changed_list="$logs/changed"
 	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
 	# the linters' configs alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
-	product=true
-	if $merge; then
-		product=false
-		while IFS= read -r path; do
-			case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
-		done <<EOF
+	# check_nginx.py and check_migrations.py run when what they read changed since the base (the harness audit, 2026-11-04): nginx's,
+	# the image's web files, the build's table and the pages it lists, the check and its pin; the migrations', the server's code.
+	product=true nginx=false migrations=false
+	! $merge || product=false
+	while IFS= read -r path; do
+		case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
+		case $path in deploy/web/* | app/react-router.config.ts | app/src/csp.ts | app/src/routes.ts | scripts/check_nginx.py | scripts/nginx.sha256) nginx=true ;; esac
+		case $path in server/src/* | scripts/check_migrations.py) migrations=true ;; esac
+	done <<EOF
 $changes
 EOF
-		$product || echo "check.sh --merge: no product code since $base: the stories, the coverage lane and prove_fix do not run"
+	$product || echo "check.sh --merge: no product code since $base: the stories, the coverage lane and prove_fix do not run"
+	# probe.py and harness_mutate.py in --full: skipped when no harness file (records.sh's list) changed since the last green --full,
+	# whose commit .claude/tmp/green-harness names, and nothing is untracked, which git diff does not see (the harness audit, 2026-11-04:
+	# the mutants took 173 s warm, up to 3,766 s). The record must name a commit by its whole id; anything else runs both.
+	harness_judged=false
+	if ! $merge && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+		judged=$(cat .claude/tmp/green-harness 2>/dev/null || :)
+		case $judged in *[!0-9a-f]*) judged= ;; esac # a name, an option, a second line, a carriage return: no id
+		if [ "${#judged}" = 40 ] && git rev-parse -q --verify "$judged^{commit}" >/dev/null && harness --quiet "$judged"; then
+			harness_judged=true
+			echo "check.sh --full: no harness file changed since the last green --full ($judged): probe.py and harness_mutate.py do not run"
+		fi
 	fi
 	# The merge check's two speeds (slice 7, question 21; scripts/speeds.py reads docs/REVIEW.md's tiers): a change of interface alone runs no
 	# StrykerJS, and any other, or any doubt, runs the whole control. Only the word `interface`, as the one line the script prints, lowers it.
@@ -524,11 +565,17 @@ EOF
 	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
 	# check_regressions' list, StrykerJS, the stories' build) would read its files as they come and go.
 	lane_probe() {
-		step probe # the harness keeps its promises
-		python3 -I scripts/probe.py
-		step bench # the budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load
-		python3 -I scripts/bench.py
-		if $merge; then
+		if ! $harness_judged; then
+			step probe # the harness keeps its promises
+			python3 -I scripts/probe.py
+		fi
+		# The budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load. At a slice's end alone (--full):
+		# a part's merge check waited up to 600 s for a quiet machine, at loads of 48 to 142, to refuse with no verdict (the harness audit).
+		if ! $merge; then
+			step bench
+			python3 -I scripts/bench.py
+		fi
+		if $merge && $nginx; then
 			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
 			python3 -I scripts/check_nginx.py
 		fi
@@ -587,14 +634,17 @@ EOF
 		fi
 		step regressions # no test gone, no floor lower, no approved screenshot changed, unless a commit says why
 		python3 -I scripts/check_regressions.py "$base"
-		step migrations # a migration main has keeps its text and its place (F466)
-		python3 -I scripts/check_migrations.py "$base"
+		if $migrations; then
+			step migrations # a migration main has keeps its text and its place (F466)
+			python3 -I scripts/check_migrations.py "$base"
+		fi
 		step secrets # no secret anywhere in the history, no known vulnerability in a dependency
 		sh scripts/scan_secrets.sh
 		step audit
 		python3 -I scripts/audit.py
 	}
 	lane_harness() {
+		! $harness_judged || return 0 # judged by the last green --full (above)
 		harness --quiet "$base" && return 0 # records.sh's list
 		step harness_mutate # each guard switched off must fail a test (several minutes)
 		if $merge; then
@@ -640,6 +690,11 @@ fi
 
 if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
+	# The harness a green --full judged, by its commit, for the next --full to skip the probe and the mutants on (above): only a tree
+	# whose harness is committed, with nothing untracked, and that did not change while the gate ran, is named by one.
+	if $full && ! $merge && [ "$(worktree_print)" = "$tested" ] && harness --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+		git rev-parse HEAD >.claude/tmp/green-harness
+	fi
 	! $merge || full=false # --merge records the fast gate only: main wants --full's record
 	gate_passed "$tested" "$full" # for the hooks outside the sandbox, which run no gate (F076)
 fi
