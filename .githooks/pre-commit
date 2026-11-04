@@ -4,6 +4,9 @@ set -eu
 # staged rather than on the working tree. Only prose is exempt (scripts/code_changed.sh),
 # so a new code folder or a settings change is gated; scripts/test_hooks.sh checks the hooks.
 # Every script it runs comes from the staged copy, the one the commit holds (finding F067).
+# Git hands a hook GIT_DIR and GIT_INDEX_FILE, never these: a caller's object folder, or a copy of its common folder, served the
+# staged copy a planted object under a staged file's name, and the gate passed code the commit does not hold (7w2, F4923).
+unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 . "$(dirname "$0")/records.sh"
 if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# Outside Claude Code's sandbox, in Alexis's shell, no gate runs, so no code Claude can edit

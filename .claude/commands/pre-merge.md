@@ -44,7 +44,9 @@ on the slice's last merge.
    A fourth round does not run: stop and reconsider with Alexis.
 6. **The operator's tests.** Every branch asks Alexis once, after every fix is committed, for
    `deploy/test.sh` on the host (and its `--mutants` for a branch that changes `deploy/`), run in the
-   background while the review goes on; never in between. An app change alone broke the web image
+   background while the review goes on; never in between. He runs it from a checked copy of the commit
+   he reviewed, never from the worktree: hand him `docs/OPERATIONS.md`'s "Run test.sh from the commit
+   you reviewed" with that commit's full sha (F4927). An app change alone broke the web image
    in slice 4, found days later at the slice's end (F2133-F2136).
 7. **Report** to Alexis, in French: the review card of `CLAUDE.md` (in the first slices, its
    items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");

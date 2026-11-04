@@ -12,6 +12,7 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+import speeds
 from repo_files import listed
 
 # As Anthropic sorts its reviewer's comments: fixed, wrong (rejected), wanted (intended), of no
@@ -150,5 +151,24 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
-if missing or problems or orphans or unnamed or lost or rules:
+# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways (F2530): pre-commit runs this on every commit,
+# prose alone included, so a row the table gains or loses without the workflow stops at its own commit, which took a change of the
+# table for prose and ran no gate (7y's c160019e, F4928). The table is read as speeds.py reads it, one reader for both. The harness's
+# folders and gno/ are tier 1 by the harness's own rule: TIER1 must hold them; the realms' two folders are the table's `gno/r/` and
+# `gno/p/`. A comment in the list is no entry. A root with no tier-1 row (a test's) has none to compare.
+review = root / "docs/REVIEW.md"
+named = set(speeds.rows(str(root))["1"]) - {"gno/r/", "gno/p/"} if review.is_file() else set()
+workflow = root / ".claude/workflows/branch.js"
+src = workflow.read_text() if workflow.is_file() else ""
+block = src[src.find("const TIER1 = ["):src.find("...(A.tier1")] if "const TIER1 = [" in src else ""
+entries = set(re.findall(r'^\s+"([^"]+)",$', re.sub(r"/\*.*?\*/|//[^\n]*", "", block, flags=re.S), re.M))
+OWN = {"scripts/", ".githooks/", ".github/", ".claude/", "gno/"}
+tier1 = entries - OWN
+drift = [] if not named else [".claude/workflows/branch.js holds no TIER1 list to compare with"] if len(tier1) < 10 else []
+drift += [f"branch.js's TIER1 lacks {p}, tier 1 by the harness's own rule" for p in sorted(OWN - entries) if named and tier1]
+drift += [f"branch.js's TIER1 holds {p}, which no tier-1 row of docs/REVIEW.md names in backticks" for p in sorted(tier1 - named) if named]
+drift += [f"docs/REVIEW.md names {p} as tier 1 in backticks, which branch.js's TIER1 lacks" for p in sorted(named - tier1) if tier1]
+if drift:
+    print("check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", *drift, sep="\n  ", file=sys.stderr)
+if missing or problems or orphans or unnamed or lost or rules or drift:
     sys.exit(1)

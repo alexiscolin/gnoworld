@@ -500,6 +500,35 @@ rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
+# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways, on every commit, prose alone included (F4928;
+# workflow_branch held it, which a commit of the table alone never ran: 7y's c160019e). A row added without the workflow, an entry no
+# row names, and no TIER1 to compare with each fail; a row of another tier, the harness's folders and the realms' two do not count.
+v="$t/tiers-root" && mkdir -p "$v/docs" "$v/.claude/workflows" && : >"$v/CLAUDE.md" && good_rules "$v"
+{ printf 'const TIER1 = [\n'; for p in scripts .githooks .github .claude gno; do printf '  "%s/",\n' "$p"; done
+	for p in a b c d e f g h i j; do printf '  "src/%s/",\n' "$p"; done; printf '  ...(A.tier1 ?? []),\n];\n'; } >"$t/branch.js"
+cp "$t/branch.js" "$v/.claude/workflows/branch.js"
+{ printf '| Tier | What |\n|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) |\n'; for p in a b c d e f g h i j; do printf '| 1 | The %s (`src/%s/`) |\n' "$p" "$p"; done; printf '| 3 | Interface (`src/z/`) |\n'; } >"$t/tiers.md"
+tiers() { python3 -I "$docs" "$v" 2>&1; }
+cp "$t/tiers.md" "$v/docs/REVIEW.md"
+out=$(tiers) || fail "check_docs refused a tier-1 table and a TIER1 that name the same paths: $out"
+printf '| 1 | The new guard (`src/new.ts`) |\n' >>"$v/docs/REVIEW.md"
+out=$(tiers) && fail "check_docs accepted a tier-1 row the workflow's TIER1 lacks (7y's c160019e)"
+printf '%s' "$out" | grep -qF "names src/new.ts as tier 1" || fail "check_docs did not name the row TIER1 lacks: $out"
+grep -v 'src/j/' "$t/tiers.md" >"$v/docs/REVIEW.md"
+out=$(tiers) && fail "check_docs accepted a TIER1 entry no tier-1 row names"
+printf '%s' "$out" | grep -qF "TIER1 holds src/j/" || fail "check_docs did not name the TIER1 entry no row names: $out"
+cp "$t/tiers.md" "$v/docs/REVIEW.md" && rm "$v/.claude/workflows/branch.js"
+out=$(tiers) && fail "check_docs accepted a tier-1 table with no TIER1 to compare with"
+# The table as speeds.py reads it, a row spelled `|1|` too; the harness's own folders required in TIER1; an entry in a comment no
+# entry (7w2's second lot, S2-10, S2-9, S2-12).
+cp "$t/branch.js" "$v/.claude/workflows/branch.js" && printf '|1| The relay (`src/relay/`) |\n' >>"$v/docs/REVIEW.md"
+out=$(tiers) && fail "check_docs accepted a tier-1 row spelled |1|, which speeds.py reads as tier 1"
+cp "$t/tiers.md" "$v/docs/REVIEW.md" && grep -v '"scripts/"' "$t/branch.js" >"$v/.claude/workflows/branch.js"
+out=$(tiers) && fail "check_docs accepted a TIER1 without scripts/, tier 1 by the harness's own rule"
+printf '%s' "$out" | grep -qF "TIER1 lacks scripts/" || fail "check_docs did not name the harness's folder TIER1 lacks: $out"
+{ printf 'const TIER1 = [\n  /*\n  "src/k/",\n  */\n'; tail -n +2 "$t/branch.js"; } >"$v/.claude/workflows/branch.js" && printf '| 1 | The k (`src/k/`) |\n' >>"$v/docs/REVIEW.md"
+out=$(tiers) && fail "check_docs took an entry in a comment of TIER1 for an entry"
+cp "$t/branch.js" "$v/.claude/workflows/branch.js" && cp "$t/tiers.md" "$v/docs/REVIEW.md"
 # The rules the review depends on, which no other check reads: each of the four agents' briefs says the git-index rule,
 # in its full sentence, and the review card keeps its item 8 (G12); a missing file, folder or sentence fails (CR2).
 r="$t/rules-root" && mkdir -p "$r" && : >"$r/CLAUDE.md" && good_rules "$r"
@@ -1461,7 +1490,7 @@ if part pre_commit; then
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 [ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
@@ -1530,6 +1559,30 @@ git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && precommit || fail "pre-com
 rm -f "$c2/.git/MERGE_HEAD" "$c2/.claude/tmp/green-fast" # a work commit of a recorded tree would run no second gate to ask
 GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
 git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
+# The staged copy holds what the commit holds, whatever store its caller names (F4923): git does not check an object against its
+# name as it reads it, so a caller's GIT_OBJECT_DIRECTORY (the real store behind it as an alternate) or GIT_COMMON_DIR (a copy of
+# .git) holding a planted object under the staged file's name had the gate pass code the commit does not hold.
+c3="$t/precommit-store"
+mkdir -p "$c3/scripts" && git -C "$c3" init -q && good_rules "$c3"
+printf '#!/bin/sh\ncat "$(dirname "$0")/../a.ts" >"%s/store-saw"\n! grep -q bad "$(dirname "$0")/../a.ts"\n' "$t" >"$c3/scripts/check.sh"
+cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$c3/scripts/" && secrets_into "$c3/scripts/"
+git -C "$c3" add -A && git -C "$c3" commit -qm base && echo bad >"$c3/a.ts" && git -C "$c3" add a.ts
+blob=$(git -C "$c3" rev-parse :a.ts)
+plant() { # $1: an objects folder, given a loose object named $blob that holds another text
+	mkdir -p "$1/${blob%"${blob#??}"}" && rm -f "$1/${blob%"${blob#??}"}/${blob#??}"
+	python3 -I -c 'import sys, zlib; b = b"good\n"; open(sys.argv[1], "wb").write(zlib.compress(b"blob %d\0" % len(b) + b))' "$1/${blob%"${blob#??}"}/${blob#??}"
+}
+stored() { # $@: the caller's environment; the gate must run, see the staged text and refuse it
+	rm -f "$t/store-saw"
+	(cd "$c3" && env "$@" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed a gate that refuses the staged code, given $*"
+	[ "$(cat "$t/store-saw" 2>/dev/null)" = bad ] || fail "pre-commit gated what the caller's store holds under the staged file's name ($(cat "$t/store-saw" 2>/dev/null || echo no gate ran)), not the staged file, given $*"
+}
+stored GIT_PAGER=cat
+plant "$t/store"
+stored GIT_OBJECT_DIRECTORY="$t/store" GIT_ALTERNATE_OBJECT_DIRECTORIES="$c3/.git/objects"
+cp -R "$c3/.git" "$t/common" && plant "$t/common/objects"
+stored GIT_COMMON_DIR="$t/common"
+[ "$(git -C "$c3" cat-file -p "$blob")" = bad ] || fail "the store test planted its object in the repository itself"
 fi
 
 if part outside; then
@@ -3260,7 +3313,7 @@ regr_fixture() { # $1: a folder
 	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
 	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
 	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
-	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$1/scripts/" && secrets_into "$1/scripts/"
 	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
 }
 logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
@@ -3636,6 +3689,107 @@ sh_ "git config --global alias.c 'commit -n'" 2
 sh_ "git send-pack https://github.com/x/y.git HEAD:refs/heads/x" 2
 sh_ "git http-push https://example.org/y.git main" 2
 sh_ "git config --get user.name" 0
+# git's own folders, never a command's (7y's lot 1, S5; F4924): a commit pointed at another common folder, git folder or work tree
+# runs that folder's hooks, or none (GIT_COMMON_DIR=... git commit ran no hook). Given before the program, through env, exported or
+# declared, inside sh -c, eval, $(...) or a function, or as git's own options: each is refused. Removing one and reading one pass.
+for cmd in 'GIT_COMMON_DIR=/tmp/f git commit -m x' 'GIT_DIR=/tmp/f git commit -m x' 'GIT_WORK_TREE=/tmp/f git commit -m x' \
+	'git --git-dir=/tmp/f commit -m x' 'git --git-dir /tmp/f commit -m x' 'git --work-tree=/tmp/f commit -m x' \
+	'git --work-tree /tmp/f status' '/usr/bin/git -C . --git-dir=/tmp/f commit -m x' 'git -c user.name=t --work-tree=/tmp/f commit -m x' \
+	'git -c core.worktree=/tmp/f commit -m x' 'git --config-env=core.worktree=HOME commit -m x' \
+	'env GIT_COMMON_DIR=/tmp/f git commit -m x' 'env -i PATH=/usr/bin GIT_DIR=/tmp/f git commit -m x' \
+	'timeout 60 env GIT_WORK_TREE=/tmp/f git commit -m x' "env -S 'GIT_DIR=/tmp/f git commit -m x'" \
+	'export GIT_COMMON_DIR=/tmp/f; git commit -m x' 'GIT_DIR=/tmp/f; export GIT_DIR; git commit -m x' \
+	'declare -x GIT_WORK_TREE=/tmp/f' 'typeset -x GIT_DIR=/tmp/f' 'readonly GIT_COMMON_DIR=/tmp/f' \
+	"sh -c 'GIT_COMMON_DIR=/tmp/f git commit -m x'" "GIT_COMMON_DIR=/tmp/f sh -c 'git commit -m x'" \
+	'eval "GIT_DIR=/tmp/f git commit -m x"' 'echo $(GIT_DIR=/tmp/f git rev-parse HEAD)' 'GIT_COMMON_DIR=/tmp/f sh scripts/check.sh' \
+	'f() { local GIT_DIR=/tmp/f; git commit -m x; }; f' 'true;(GIT_DIR=/tmp/f git commit -m x)' \
+	'GIT_DIR+=/tmp/f git commit -m x' 'export GIT_DIR+=/tmp/f' "env -S 'FOO=1 GIT_DIR=/tmp/f git commit -m x'" \
+	"env -S'GIT_DIR=/tmp/f git commit -m x'" 'git --config-env core.worktree=HOME commit -m x' 'git -c Core.WorkTree=/tmp/f commit -m x'; do
+	sh_ "$cmd" 2
+done
+for cmd in 'unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE' 'env -u GIT_DIR -u GIT_COMMON_DIR git status' 'git rev-parse --git-dir --git-common-dir' \
+	'git worktree list' 'grep -n GIT_COMMON_DIR scripts/check.sh' 'git commit -m "refuse GIT_DIR=x and --git-dir"' 'echo "$GIT_DIR"' \
+	'GIT_DIRECTORY=1 git status' 'GIT_PAGER=cat GIT_INDEX_FILE=/tmp/i git status' 'git log --format=%h -- core.worktree' \
+	'grep -rn GIT_COMMON_DIR= scripts' 'echo GIT_DIR=x'; do
+	sh_ "$cmd" 0
+done
+# A global option whose argument came as the next word was taken for the subcommand (F4920): `commit -n` and a forced push passed,
+# and a push got no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
+sh_ 'git --namespace x commit -n -m y' 2
+sh_ 'git --config-env user.name=HOME commit -n -m y' 2
+sh_ 'git --attr-source HEAD commit -n -m y' 2
+sh_ 'git --shallow-file /tmp/f commit -n -m y' 2
+sh_ 'git --namespace x push --force origin main' 2
+sh_ 'git --namespace=x commit -m y' 0
+# A function's body, a subshell or a process written against its separator, an env -S line and a `+=` before the program are commands
+# like any other (F4922, F4924): each hid every call in it from the checks.
+sh_ 'f() { git commit --no-verify -m x; }; f' 2
+sh_ 'f(){ git push --force origin main; }; f' 2
+sh_ 'function f { git commit -n -m x; }; f' 2
+sh_ 'f()(git commit -n -m x); f' 2
+sh_ 'true;(git commit -n -m x)' 2
+sh_ 'a&&(git push --force origin main)' 2
+sh_ 'false||(git commit --no-verify -m x)' 2
+sh_ 'true;(gnokey list)' 2
+sh_ 'cat <(git commit -n -m x)' 2
+sh_ 'tee >(git commit -n -m x)' 2
+sh_ "env -S 'git commit --no-verify -m x'" 2
+sh_ "env -u HOME -S 'git commit -n -m x'" 2
+sh_ "env --split-string='git commit -n -m x'" 2
+sh_ 'X+=1 git commit --no-verify -m x' 2
+# Read so, a clobbering >| stays one redirection, and -S among env's short options is still -S (7w2's review, S8, S9); a config file
+# included sets hooksPath as -c would (S10).
+sh_ 'git commit >|/dev/null -n -m x' 2
+sh_ 'git push >|/tmp/log --force origin main' 2
+sh_ "env -iS 'git commit --no-verify -m x'" 2
+sh_ "env -vS'git commit -n -m x'" 2
+sh_ 'git -c include.path=/tmp/x.cfg commit -m x' 2
+sh_ 'git -c includeIf.gitdir:/tmp/.path=/tmp/x.cfg commit -m x' 2
+sh_ 'git --config-env include.path=HOME commit -m x' 2
+sh_ "env --split-string 'git commit -n -m x'" 2
+sh_ "env -S 'FOO=1 GIT_CONFIG_COUNT=1 git commit -m x'" 2
+# A mark in quotes is a word, never a separator (7w2's review, R1): `-m '{' -n` and `-m ';' -n` split the commit in two, its -n unread.
+for cmd in "git commit -m '{' -n" "git commit -m '<(' -n" "git commit -m x ';(' -n" "git commit -m '(' -n" "git commit -m ';' -n" \
+	"git commit -m '&&' --no-verify" 'git commit -m "|" --no-verify' 'git commit -m \; -n'; do
+	sh_ "$cmd" 2
+done
+sh_ "git commit -m 'a; b (c) {d} <e> && f'" 0
+sh_ "echo '\\;' \"a|b\" && git status" 0
+# 7w2's second lot: `{` opens a command only where one starts (S2-1); -S among env's options that take no argument alone (S2-2); a `#`
+# inside a word (S2-5); a substitution used as an argument, nested too, closed or not (S2-6); a newline in quotes (S2-7), a heredoc's
+# body read line by line; env -S's escapes and variables (S2-8); $'...' (S2-11).
+for cmd in 'git commit -m { -n' 'git commit -m x { -n' 'git commit -m { --no-verify' 'env -uSHELL git commit -n -m x' \
+	'env -CSdir git commit -n -m x' 'echo a#; git commit -n -m x' 'git commit -m x#y -n' 'git commit -F <(echo x) -n' \
+	'git commit -m $(echo x) -n' 'git commit -m "$(echo x)" -n' 'echo $(echo $(git commit -n -m x))' 'cat <(cat <(gnokey list))' \
+	'cat <(git commit -n -m x' 'tee >(git commit -n -m x' "env -S'git\\_commit\\_-n'" "env -S 'git commit \$X'" \
+	"git commit -m \$'\\';' -n" 'git commit -m "a
+
+b" --no-verify' "git commit -m 'a
+b' -n" "cat <<EOF
+it's fine
+EOF
+git commit --no-verify -m x" "cat <<EOF
+it's
+\$(git commit -n -m x)
+EOF" "cat <<EOF
+it's
+EOF
+git commit -m \"a
+b\" --no-verify"; do
+	sh_ "$cmd" 2
+done
+for cmd in "cat <<EOF
+it's fine
+EOF
+git status" "git log --format='%h #1'" 'echo "$(git rev-parse HEAD)"' 'echo x # a comment' '{ git status; }' \
+	'function f { git status; }; f' 'find . -name x -exec echo {} +' "git commit -m 'subject
+
+body'" "echo '\$((1+2))' && git status"; do
+	sh_ "$cmd" 0
+done
+sh_ 'f() { git status; }; f' 0
+sh_ 'git status >>/tmp/log 2>&1 && ls &>/dev/null' 0
+sh_ 'echo x >|/tmp/f && git status' 0
 # A recursive delete takes no path from a variable that may be empty (wt-3e's folder, emptied by a find -delete
 # whose variable was unset): ${name:?} stops the shell first. BSD's and GNU's options before find's paths, a
 # wrapper, or a :? in a comment or another command change nothing.
@@ -3645,7 +3799,10 @@ for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}/x"
 	'find -x "$d" -delete' 'find -E "$d" -delete' 'find -d "$d" -delete' 'find -s "$d" -delete' 'find -Ex "$d" -delete' \
 	'find -f "$d" -delete' 'find -D tree "$d" -delete' 'find -O3 "$d" -delete' 'find -- "$d" -delete' \
 	'rm -rf `pwd`/x' 'find "$d" -execdir rm -rf {} \;' 'find "$d" -ok rm {} \;' 'find "$d" -exec /bin/rm {} +' \
-	'rm -r "$d" # ${d:?}' ': "${d:?}"; rm -r "$d"' 'sudo rm -r "$d"' 'timeout 5 rm -r "$d"' 'VAR=1 rm -r "$d"'; do
+	'rm -r "$d" # ${d:?}' ': "${d:?}"; rm -r "$d"' 'sudo rm -r "$d"' 'timeout 5 rm -r "$d"' 'VAR=1 rm -r "$d"' 'sh <<EOF
+rm -r $(
+pwd)/x
+EOF'; do
 	sh_ "$cmd" 2
 done
 for cmd in 'find "${dir:?}" -delete' 'rm -r "${dir:?no dir}/x"' 'find . -name "$pat" -delete' 'rm -f "$file"' \
@@ -3661,6 +3818,10 @@ asks "git push origin slice-1a"
 asks "git -C . push origin slice-1a"
 asks "cd gno && git push"
 asks "git -c push.default=current push"
+asks "git --namespace x push origin slice-1a"
+asks "git --config-env user.name=HOME push origin slice-1a"
+asks "git --attr-source HEAD push origin slice-1a"
+asks "git --shallow-file /tmp/f push origin slice-1a"
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
 fi
 
@@ -5254,18 +5415,7 @@ const base = (files) => (l) =>
     const table = readFileSync(root + "/docs/REVIEW.md", "utf8").split("\n").filter((l) => l.startsWith("| 1 |"));
     const paths = [...new Set(table.flatMap((l) => [...l.matchAll(/`([^`]*\/[^`]*)`/g)].map((m) => m[1])))];
     ok(paths.length >= 3, `the tier-1 rows of docs/REVIEW.md name no path I can read: ${paths}`);
-    // Both ways (F2530): a path of TIER1 that no tier-1 row names is a review nobody asked for, and a row written in prose, with
-    // no path in backticks, would pass the loop above unseen. The harness's folders and gno/ are tier 1 by the harness's own rule;
-    // the realms' two folders are the table's `gno/r/` and `gno/p/`.
-    {
-      const src = readFileSync(root + "/.claude/workflows/branch.js", "utf8");
-      const block = src.slice(src.indexOf("const TIER1 = ["), src.indexOf("...(A.tier1"));
-      const listed = [...block.matchAll(/^\s+"([^"]+)",$/gm)].map((m) => m[1]).filter((e) => !["scripts/", ".githooks/", ".github/", ".claude/", "gno/"].includes(e));
-      const named = paths.filter((e) => !["gno/r/", "gno/p/"].includes(e));
-      ok(listed.length >= 10, `I read no TIER1 list in branch.js: ${listed}`);
-      for (const e of listed) ok(named.includes(e), `branch.js's TIER1 holds ${e}, which no tier-1 row of docs/REVIEW.md names in backticks`);
-      for (const e of named) ok(listed.includes(e), `docs/REVIEW.md names ${e} as tier 1 in backticks, which branch.js's TIER1 lacks`);
-    }
+    // Both ways, the table against TIER1 (F2530): scripts/check_docs.py, on every commit, prose alone included (F4928).
     for (const path of paths) {
       const files = tracked.filter((f) => (f.startsWith(path) || f.includes("/" + path)) && !f.endsWith(".test.ts"));
       if (!files.length) continue;

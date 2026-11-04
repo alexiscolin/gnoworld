@@ -45,8 +45,9 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   An agent that gives no report blocks it; the harness's and the realms' files bring their reviews
   whatever its arguments say, and so does every tier-1 path of `docs/REVIEW.md`'s table that exists (the relay's auth script,
   the CSP, `deploy/`, `core/markdown`, `lib/adena`, the login of the server and of the client, the server's roles, the worker): the
-  table writes each path in backticks, and a `workflow_branch` case fails when the table names one its `TIER1` lacks, or `TIER1` holds
-  one the table does not name. Its argument `base` (`main` when absent) is the branch the
+  table writes each path in backticks, and `scripts/check_docs.py`, which pre-commit runs on every commit, prose alone included, fails
+  when the table names one its `TIER1` lacks, or `TIER1` holds one the table does not name (F4928: a commit of the table alone was
+  prose, and the `workflow_branch` case that held it never ran). Its argument `base` (`main` when absent) is the branch the
   work is cut from: the merge check's file list, the reviewer's diff and `since` read from it. The merge check
   reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them: StrykerJS's survivors on the
   files the branch changed, one `survivors not listed:` count for the rest, and every harness mutant. With a base the loop runs
@@ -92,7 +93,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), each finding reproduced, high and medium fixed,
    low ones listed for Alexis, then a recorded review pass (`scripts/review_pass.py`).
-8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch. It takes a lock per Docker project
+8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch, from a copy of the commit he reviewed
+   whose commit and files hash to its name (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed"), never from a worktree. It takes a lock per Docker project
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
    command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
@@ -330,10 +332,24 @@ with `/cd`:
   caches, never in `.git/hooks`, `.git/config` or `.git/worktrees` (so a stale worktree is pruned
   by Alexis: `git worktree prune`); they reach only the npm and Go registries and github.com.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
-  forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
+  forced push, no git pointed at folders of the command's own (`GIT_DIR`, `GIT_COMMON_DIR`,
+  `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
+  run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used. It reads through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
-  the call is blocked.
+  and gnomcp was used. It reads through wrappers, `sh -c`, `eval`, env's `-S` line, `$(...)`, `<(...)`,
+  a function's body and a command whose quotes hold a newline, takes a quoted mark for a word, and reads
+  past git's global options that take their argument apart; if it crashes, the call is blocked.
+  `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which served
+  the staged copy a planted object under a staged file's name (F4923).
+- **Alexis's user settings** (`~/.claude/settings.json`, every project; 7w2's `apply-7w2-user.sh`): the
+  file tools, which the sandbox does not hold and bypass mode does not ask for, are denied the programs that
+  run outside the sandbox with his rights: the folders on `PATH` he owns and where their links lead (`~/.local`,
+  `~/.opencode`, `/opt/homebrew`, `~/.orbstack`, `/Applications`), what those settings run (`~/.claude/skills`,
+  `hooks`, `statusline.sh`, `plugins`, `dev-mods`, `agents`, `commands`, the file itself, `~/.claude.json`), the
+  same of the second profile `~/.claude-work`, launchd's agents, zsh's startup files and what they source, the
+  tools' config (`~/.config`, `~/.npmrc`, `~/.gitconfig`, `~/.docker`), python3's user site, `~/.ssh`, `~/.nvm`,
+  every project's settings under `~/Server`, and the main checkout's git config and hooks. A deny holds in every
+  mode, bypass included.
 
 The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
 protected with the CI required, which this repository's plan does not offer yet (below).
@@ -404,8 +420,16 @@ costs context in every session.
 - **The three-round limit is a written rule;** nothing counts the rounds.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks it
   matches the tree, not who wrote it.
-- **Product files Claude writes run outside the sandbox** (F204): `deploy/test.sh`, the compose
-  file, and the app's code that `pnpm dev` runs in Alexis's shell.
+- **Product files Claude writes run outside the sandbox** (F204): the compose file the demo starts
+  from, and the app's code that `pnpm dev` and the workshop run in Alexis's shell; `deploy/test.sh`
+  runs from a checked copy of the commit he reviewed, so what it runs is what he read.
+- **The file tools write anywhere else Alexis can** (F4926): the user settings deny a list of places
+  (above), not every place outside the sessions' folders. `permissions.blockWritesOutsideWorkingDirectories`
+  would refuse them all, in every mode; it is Alexis's choice, for what it costs (7w2's report).
+- **The guard reads a command's text** (F4924): a variable set with `set -a` and `read`, `for` or
+  `printf -v`, a word an expansion yields (`v=GIT_DIR=x; env "$v" git commit`), a script that sets git's
+  folders itself, and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. A heredoc's
+  line that reads as a refused command is refused: a commit message goes in a file (`git commit -F`).
 
 ## Files
 
