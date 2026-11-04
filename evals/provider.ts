@@ -73,7 +73,7 @@ function requestOf(one: Case) {
 
 export default class JarvisProvider {
   private readonly options: Options;
-  private fakes: Promise<{ fakes: Fakes; origin: string }> | undefined;
+  private fakes: Promise<Fakes> | undefined;
   private readonly started = new Map<boolean, Promise<Started>>();
 
   constructor(options: unknown = {}) {
@@ -105,17 +105,11 @@ export default class JarvisProvider {
     await Promise.all(started.flatMap((one) => (one.status === "fulfilled" ? [one.value.stop()] : [])));
     const fakes = await this.fakes;
     this.fakes = undefined;
-    fakes?.fakes.server.close();
+    await fakes?.close();
   }
 
-  private async startedFakes() {
-    this.fakes ??= (async () => {
-      const fakes = startFakes(universes());
-      await new Promise<void>((resolve) => fakes.server.listen(0, "127.0.0.1", resolve));
-      const address = fakes.server.address();
-      const port = typeof address === "object" && address !== null ? address.port : 0;
-      return { fakes, origin: `http://127.0.0.1:${String(port)}` };
-    })();
+  private async startedFakes(): Promise<Fakes> {
+    this.fakes ??= startFakes(universes());
     return this.fakes;
   }
 
@@ -132,7 +126,7 @@ export default class JarvisProvider {
 
   private async run(one: Case, request: ReturnType<typeof requestOf>): Promise<Kept> {
     const jarvis = await this.jarvis(request.spent);
-    const { fakes } = await this.startedFakes();
+    const fakes = await this.startedFakes();
     if ("chain" in one) {
       fakes.realms.set(`${one.digest.universe} ${one.digest.realm}`, one.chain);
       fakes.at.height = one.chain.height;

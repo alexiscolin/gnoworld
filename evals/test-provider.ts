@@ -94,10 +94,8 @@ await test("a run's end waits for jarvis to stop and leaves no folder behind (10
 });
 
 await test("the loopback receiver takes jarvis's JSON spans alone, by its own Host, and refuses the rest (10j's review, S6)", async () => {
-  const fakes = startFakes([]);
-  await new Promise<void>((resolve) => fakes.server.listen(0, "127.0.0.1", resolve));
-  const address = fakes.server.address();
-  const port = typeof address === "object" && address !== null ? address.port : 0;
+  const fakes = await startFakes([]);
+  const port = Number(new URL(fakes.origin).port);
   const post = (body: string, headers: Record<string, string>) =>
     new Promise<number>((resolve, reject) => {
       const sent = httpRequest({ host: "127.0.0.1", port, path: "/v1/traces", method: "POST", headers }, (response) => {
@@ -115,6 +113,6 @@ await test("the loopback receiver takes jarvis's JSON spans alone, by its own Ho
     assert.equal(await post("{}", { ...json, host: "evil.test" }), 421);
     assert.equal(fakes.batches.length, 1);
   } finally {
-    fakes.server.close();
+    await fakes.close();
   }
 });
