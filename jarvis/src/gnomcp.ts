@@ -99,9 +99,13 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
 
 const timedOut = (error: unknown) => error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout;
 
+/** A tool as our own definition hands it to the MCP client, with no output schema: the client compiles and checks
+ * none a server listed, which a schema built to backtrack would hold the process with (F5253, F5111). */
+const unchecked = (name: string) => ({ name, inputSchema: { type: "object" as const } });
+
 async function sent(child: Child, params: Parameters<Client["callTool"]>[0], timeout: number): Promise<Ran> {
   try {
-    return read(await child.client.callTool(params, { timeout }));
+    return read(await child.client.callTool(params, { timeout, toolDefinition: unchecked(params.name) }));
   } catch (error) {
     if (timedOut(error)) return { ok: false, reason: "timeout" };
     // The client calls onclose before it fails the requests a closed connection leaves (its Protocol's _onclose).
@@ -175,7 +179,8 @@ async function checked(client: Client, setup: Setup, timeout: number): Promise<v
   const Profile = z.object({ name: z.string(), kind: z.string(), tx_indexer_url: z.string() });
   const Profiles = z.object({ profiles: z.array(Profile) });
   const Listed = z.object({ isError: z.literal(false).optional(), structuredContent: Profiles });
-  const answer = await atStart(client.callTool({ name: "gno_profile_list", arguments: {} }, { timeout }));
+  const list = { name: "gno_profile_list", arguments: {} };
+  const answer = await atStart(client.callTool(list, { timeout, toolDefinition: unchecked(list.name) }));
   const listed = Listed.safeParse(answer);
   if (!listed.success) throw new Error("gnomcp: its profile list is not gnomcp 0.11.0's");
   readOnly(listed.data.structuredContent.profiles, setup.profiles);

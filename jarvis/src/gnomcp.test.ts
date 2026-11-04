@@ -268,6 +268,29 @@ describe("Gnomcp.call: one read", BOOTS, () => {
     expect(fake.requests().filter((request) => request.method === "tools/call")).toHaveLength(1);
   });
 
+  // The MCP client compiles and checks the output schema a server lists, unless the call hands it a definition (F5111,
+  // F5253's class): a schema built to backtrack would hold the process; one the result fails, or none compiles, shows it.
+  it.each([
+    ["a schema its result fails", { type: "object", properties: { x: { type: "string" } }, required: ["x"] }],
+    ["a schema that does not compile", { type: "object", properties: { x: { type: "no-such-type" } } }],
+  ])("never checks a read's result against an output schema gnomcp lists: %s", async (_case, outputSchema) => {
+    const tools = gnomcpListing().map((tool) => (tool.name === "gno_status" ? { ...tool, outputSchema } : tool));
+    const answers = { gno_status: { content: [{ type: "text", text: "height 7" }], structuredContent: { x: 1 } } };
+    const { gnomcp } = await start({ tools, answers });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({
+      ok: true,
+      text: "height 7",
+      isError: false,
+    });
+  });
+
+  it("starts whatever output schema gnomcp lists for its profiles, read by our own schema alone", async () => {
+    const outputSchema = { type: "object", properties: { profiles: { type: "string" } }, required: ["profiles"] };
+    const tools = gnomcpListing().map((tool) => (tool.name === "gno_profile_list" ? { ...tool, outputSchema } : tool));
+    const { gnomcp } = await start({ tools });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toMatchObject({ ok: true });
+  });
+
   it("joins a text and a resource's text, as gno_read gives a package's source", async () => {
     const answers = {
       gno_read: {
