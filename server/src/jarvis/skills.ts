@@ -59,7 +59,12 @@ export function loadSkills(folder: string, limits: Limits = { file: 64 * 1024, t
   const skills = walk.list("").map((name) => skillOf(walk, name));
   const [first, ...rest] = skills.map((skill) => skill.name);
   if (first === undefined) throw new Error("skills: no skill");
-  const references = [...new Set(skills.flatMap((skill) => skill.references))].sort();
+  const offered = new Set(
+    skills.flatMap(({ name, references }) =>
+      references.filter((reference) => offers(name, reference)).map((reference) => `${name}/references/${reference}`),
+    ),
+  );
+  const references = [...new Set([...offered].map((path) => path.slice(path.lastIndexOf("/") + 1)))].sort();
   const hash = createHash("sha256");
   // By the paths' code units, never a locale's, each framed by its path and length (paths are unique).
   for (const [path, { bytes }] of [...files].sort(([a], [b]) => (a < b ? -1 : 1))) {
@@ -67,12 +72,14 @@ export function loadSkills(folder: string, limits: Limits = { file: 64 * 1024, t
   }
   return {
     index: skills.map(({ name, description }) => ({ name, description })),
-    tool: toolOf([first, ...rest], references, (path) => files.has(path)),
+    tool: toolOf([first, ...rest], references, (path) => offered.has(path)),
     /** A skill's SKILL.md, or one of its references; throws for one that was not loaded. */
     read({ skill, reference }: { readonly skill: string; readonly reference?: string | undefined }): string {
       const path = reference === undefined ? `${skill}/SKILL.md` : `${skill}/references/${reference}`;
       const file = files.get(path);
       if (file === undefined) throw new Error(`skills: ${visible(path, false)} was not loaded`);
+      if (reference !== undefined && !offered.has(path))
+        throw new Error(`skills: ${visible(path, false)} is not offered`);
       return file.text;
     },
     digest: hash.digest("hex"),
@@ -134,9 +141,26 @@ function descriptionOf(name: string, path: string, text: string): string {
 }
 
 // load_skill: a skill by its name, or one of its references by its file's name, both from what was loaded.
-function toolOf(names: [string, ...string[]], references: readonly string[], loaded: (path: string) => boolean) {
+// gnomcp's gno skill, copied whole (D50), is offered its nine reading references alone, never the five that teach an
+// agent that writes, signs and sends coins (Alexis, 2026-11-04); a skill of ours, each of its references.
+function offers(skill: string, reference: string): boolean {
+  const reading = [
+    "audit",
+    "interrealm",
+    "memory",
+    "networks",
+    "patterns",
+    "render",
+    "security",
+    "stdlib",
+    "sysrealms",
+  ];
+  return skill !== "gno" || reading.some((name) => reference === `${name}.md`);
+}
+
+function toolOf(names: [string, ...string[]], references: readonly string[], offered: (path: string) => boolean) {
   const description =
-    "Gives the text of one of the skills the instructions list, or of one of its references. A skill that another names and its schema does not list is none.";
+    "Gives the text of one of the skills the instructions list, or of one of its references. A skill that another names and its schema does not list is none. A reference that a skill names and the schema does not list is none either.";
   const skill = z.enum(names).describe("The skill's name.");
   const [first, ...rest] = references;
   if (first === undefined) return { name: "load_skill" as const, description, args: z.strictObject({ skill }) };
@@ -147,6 +171,6 @@ function toolOf(names: [string, ...string[]], references: readonly string[], loa
   // The allowlist answers a refused call as bad arguments, never with why, so the refusal carries no message.
   const args = z
     .strictObject({ skill, reference })
-    .refine((value) => value.reference === undefined || loaded(`${value.skill}/references/${value.reference}`));
+    .refine((value) => value.reference === undefined || offered(`${value.skill}/references/${value.reference}`));
   return { name: "load_skill" as const, description, args };
 }
