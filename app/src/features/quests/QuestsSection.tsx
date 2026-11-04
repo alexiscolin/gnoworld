@@ -5,13 +5,7 @@ import { useApp } from "../../storeContext.tsx";
 import { questsOf, type QuestView, type StepView } from "./progress.ts";
 
 function Step({ step }: { step: StepView }) {
-  if (step.kind === "call")
-    return (
-      <ComingSoon name={step.title}>
-        <Icon name="seal" />
-        {` ${step.title} · needs a wallet, soon`}
-      </ComingSoon>
-    );
+  if (step.kind === "call") return <ComingSoon name={step.title}>{`${step.title} · needs a wallet, soon`}</ComingSoon>;
   return (
     <Row
       title={step.title}
