@@ -355,7 +355,8 @@ def self_test():
     hidden = "a > breaks " + chr(0x2028) + " and turns " + chr(0x202E) + chr(0xE0067)
     escaped = ["Removed-test: a > breaks <U+2028> and turns <U+202E><U+E0067> - moved to b"]
     assert removed_tests({hidden}, set(), declared(escaped, "Removed-test")) == [], "a test named with a hidden character could not be declared"
-    assert declared(["Removed-test: a > <U+20> - moved"], "Removed-test") == {"a > <U+20>"}, "a code point of fewer than four digits read"
+    # A hidden character, U+00AD, so only the count of digits keeps it text (since D125 a shown one stays text anyway).
+    assert declared(["Removed-test: a > <U+AD> - moved"], "Removed-test") == {"a > <U+AD>"}, "a code point of fewer than four digits read"
     # Only what a message may not hold is written so (S6, F5280): a letter stays its escape, so `<U+0061>pp/**` excuses no
     # `app/**` unread, and a number past the last code point stays text, never a crash.
     assert declared(["Lowered-floor: ignore <U+0061>pp/** - x"], "Lowered-floor") == {"ignore <U+0061>pp/**"}, "an escape of a letter read"
