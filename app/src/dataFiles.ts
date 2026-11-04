@@ -87,7 +87,16 @@ export function loadData(dir: string): Data {
       ? []
       : [`earthOrbit.json: [${String(index)}].slug: no hub of hubs.json is named "${slug}"`],
   );
-  const faults = [...unknown, ...discoveryFaults(data, universes), ...eventsNowhere(data.events, hubs)];
+  // A world's genre names one of genres.json, which its crumb says by name.
+  const genres = new Set(data.genres.map(({ slug }) => slug));
+  const noGenre = (["hubs", "stations"] as const).flatMap((name) =>
+    data[name].flatMap(({ genre }, index) =>
+      genre === undefined || genres.has(genre)
+        ? []
+        : [`${name}.json: [${String(index)}].genre: no genre of genres.json is named "${genre}"`],
+    ),
+  );
+  const faults = [...unknown, ...noGenre, ...discoveryFaults(data, universes), ...eventsNowhere(data.events, hubs)];
   if (faults.length > 0) throw new Error(faults.join("\n"));
   return data;
 }

@@ -107,6 +107,7 @@ export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
+export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";
 export { CONTINENTS_SEA, planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";

@@ -48,6 +48,11 @@
     --_dot: var(--color-signal);
   }
 
+  /* The place's own colour, as a plate's kickers have it (frames 26, 40). */
+  .dot[data-tone="world"] {
+    --_dot: var(--world);
+  }
+
   /* A bar of controls over the page and the scene: a pill with a line round it, four pixels in, the night at 45% behind it (the prototype's
      #hnav .links): the header's views, and space's two views apart from them on a phone (F4691). No blur until the scene has a sky. */
   .control-bar {
@@ -61,6 +66,11 @@
   }
 
   /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
+  /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit (8g's plates). */
+  .nowrap {
+    white-space: nowrap;
+  }
+
   .truncate {
     min-inline-size: 0;
     overflow: clip;

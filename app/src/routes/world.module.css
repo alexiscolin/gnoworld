@@ -6,6 +6,20 @@
     block-size: 100%;
   }
 
+  .realm {
+    /* raw: the realm card with its three facts and its source line, and the links out under it, as 8g draws them: a phone's column wraps
+       the card's lines, 219 px measured at 390 px */
+    min-block-size: 14rem;
+  }
+
+  /* raw: the plate's column beside the dock (Panel.module.css), where the card's lines hold on one line each: 181 px measured at 1728 px */
+  @media (min-width: 1280px) {
+    .realm {
+      /* raw: 181 px measured at 1728 px, its lines on one line each */
+      min-block-size: 11.5rem;
+    }
+  }
+
   /* raw: the dock's breakpoint (ChatScreen.tsx, Panel.module.css) */
   @media (min-width: 1280px) {
     .actions {

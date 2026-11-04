@@ -348,7 +348,8 @@ test.describe("a texture that does not come", () => {
   test("leaves the page whole, says so, keeps the plate shut, and shows no credit", async ({ page }) => {
     await page.route(NIGHT, (route) => route.fulfill({ status: 404, body: "" }));
     await givenUp(page);
-    await expect(page.getByRole("link", { name: "Bubble" }).first()).toBeVisible();
+    // 8g: the plate's own links stand, the Earth's list of worlds gone.
+    await expect(page.getByRole("link", { name: /Docs/ }).first()).toBeVisible();
   });
 
   test("tries again on the next visit, and draws", async ({ page }) => {

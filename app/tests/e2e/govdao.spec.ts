@@ -131,8 +131,8 @@ test.describe("GovDAO at the video's size", () => {
     await chain(page);
     await page.goto("/w/govdao");
     await hydrated(page);
-    const label = "[data-look='plate'] p.label:not([data-orientation])";
-    const kicker = await box(page, label);
+    // 8g: the kicker is frame 26's crumb, "UNIVERSE › DAO".
+    const kicker = await box(page, "[data-look='plate'] nav[aria-label='You are here']");
     const title = await box(page, "[data-look='plate'] h1");
     const line = await box(page, "[data-look='plate'] h1 + p");
     near(kicker.x, 100, "the kicker's left");

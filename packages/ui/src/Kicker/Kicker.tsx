@@ -3,7 +3,7 @@ import styles from "./Kicker.module.css";
 
 export interface KickerProps {
   children: ReactNode;
-  dot?: "warm" | "mine" | "signal";
+  dot?: "warm" | "mine" | "signal" | "world";
   vertical?: boolean;
 }
 

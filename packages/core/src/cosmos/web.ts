@@ -4,15 +4,12 @@
 import { textHash, type Point } from "../space/cell.ts";
 import { moodAt, newMood } from "../space/mood.ts";
 import { lerp } from "../space/smooth.ts";
+import { holders, importsOf, type LinkedWorld } from "./links.ts";
+
+export type { LinkedWorld } from "./links.ts";
 
 /** The most lines drawn, one draw whatever the file: more than twice the worlds a file may hold. */
 export const LINKS_MOST = 40_960;
-
-/** A world of the file, as its links read it: its realms' paths and what each imports. */
-export interface LinkedWorld {
-  readonly id: string;
-  readonly realms: readonly { readonly path?: string; readonly imports?: readonly string[] }[];
-}
 
 /** A soft point: its radius on screen in pixels, and how much of its light shows at its heart, 0 to 1. */
 export interface Soft {
@@ -20,7 +17,6 @@ export interface Soft {
   light: number;
 }
 
-const REALM = "gno.land/r/";
 // A world's soft point reaches this many times its body's radius; under the least size it dims instead of shrinking.
 const GLOW = 3.2;
 const LEAST = 0.75;
@@ -33,27 +29,6 @@ const PEACH_SHARE = 0.5;
 const GREY = 0.15;
 // A dark mood is lifted to its full light no further than from this: where its hue turns, it turns as smoothly as the mood.
 const DARKEST = 0.25;
-
-// Which world holds each realm the file names: of two that name one, the first by id, in any order.
-function holders(worlds: readonly LinkedWorld[]): Map<string, number> {
-  const held = new Map<string, number>();
-  worlds.forEach(({ id, realms }, at) => {
-    for (const { path } of realms) {
-      const before = path === undefined ? undefined : held.get(path);
-      if (path !== undefined && (before === undefined || id < (worlds[before]?.id ?? ""))) held.set(path, at);
-    }
-  });
-  return held;
-}
-
-// The worlds a world's realms import, by index: realms only, each one the file holds.
-const importsOf = (realms: LinkedWorld["realms"], held: ReadonlyMap<string, number>): number[] =>
-  realms.flatMap(({ imports = [] }) =>
-    imports.flatMap((path) => {
-      const to = path.startsWith(REALM) ? held.get(path) : undefined;
-      return to === undefined ? [] : [to];
-    }),
-  );
 
 /** The links of a set, as pairs of indices into it: a pair once for each two worlds a realm of one imports a realm of the other, at most
  * `most`. Past the bound the pairs kept go by a hash of their two names, so the same set keeps the same lines in any order, spread over it. */
