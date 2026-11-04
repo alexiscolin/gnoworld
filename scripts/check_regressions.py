@@ -32,8 +32,10 @@ IGNORE_FILES = [".jscpd.json", "knip.json", "stryker.config.json", "eslint.confi
 def declared(lines, key):
     """The items a commit names on a `Key: <item> - why` line, one a line; a line without its reason names nothing. The item runs
     to the line's last ` - ` that a reason follows: it may hold ` - ` itself (a gap on `a - b`, F5000), its reason may not, and
-    the line never also names the shorter item its text starts with (F5023)."""
-    return {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \S.*", line.strip()))}
+    the line never also names the shorter item its text starts with (F5023). A character no commit message may hold
+    (scripts/hidden.py's) is written `<U+XXXX>`, four to six hex digits, as a test may be named with one (10h, D117)."""
+    items = {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \S.*", line.strip()))}
+    return {re.sub(r"<U\+([0-9A-F]{4,6})>", lambda c: chr(int(c.group(1), 16)), item) for item in items}
 
 
 def removed_tests(before, after, excused):
@@ -341,6 +343,11 @@ def self_test():
     one = declared(["Removed-test: app/a.test.ts > renders - with a signature - merged into b"], "Removed-test")
     assert removed_tests(both, set(), one) == ["app/a.test.ts > renders"], "one line excused two tests"
     assert removed_tests({"a > x", "a > y", "a > z"}, set(), declared(log, "Removed-test")) == ["a > x", "a > z"]
+    # A test named with a character no commit message may hold (scripts/hidden.py's) is declared with it as `<U+XXXX>` (10h, D117).
+    hidden = "a > breaks " + chr(0x2028) + " and turns " + chr(0x202E) + chr(0x1F3F4)
+    escaped = ["Removed-test: a > breaks <U+2028> and turns <U+202E><U+1F3F4> - moved to b"]
+    assert removed_tests({hidden}, set(), declared(escaped, "Removed-test")) == [], "a test named with a hidden character could not be declared"
+    assert declared(["Removed-test: a > <U+20> - moved"], "Removed-test") == {"a > <U+20>"}, "a code point of fewer than four digits read"
     vitest = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 100, branches: 95 },\n}'
     before = floors(vitest, '{"thresholds": {"break": 80}}')
     assert before == {"coverage everywhere lines": 85, "coverage packages/core/** lines": 100, "coverage packages/core/** branches": 95, "mutation break": 80}

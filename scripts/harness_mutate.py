@@ -567,6 +567,8 @@ def mutants():
     yield from each("scripts/check.sh", '"$GNO" test ./...', '"$GNO" test ./r/...', "hooks", "check.sh gno scope")
     yield from each("vitest.config.ts", "requireAssertions: true", "requireAssertions: false", "probe", "vitest requires an assertion")
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
+    yield from each("scripts/check_regressions.py", 'lambda c: chr(int(c.group(1), 16)), item)', "lambda c: c.group(0), item)", "hooks", "check_regressions reads a hidden character written <U+XXXX> (D117)")
+    yield from each("scripts/check_regressions.py", "([0-9A-F]{4,6})>", "([0-9A-F]{2,6})>", "hooks", "check_regressions reads four hex digits at least (D117)")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
     yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
