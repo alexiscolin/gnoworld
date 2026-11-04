@@ -546,3 +546,21 @@ describe("a digest's reads and what it keeps (StrykerJS, the review's V4, V5)", 
     expect(await tools.run({ name: "give_button", args: {} }, asked)).toEqual({ ok: false, reason: "refused" });
   });
 });
+
+describe("a digest the model ends without (the security review's S1)", () => {
+  it.each([
+    ["its turns used up", () => Array.from({ length: 4 }, () => give(digest("4,321")))],
+    ["max_tokens", () => [message({ content: [text("cut")], stop: "max_tokens", model: "claude-haiku-5-5" })]],
+    ["a refusal", () => [message({ content: [], stop: "refusal", model: "claude-haiku-5-5" })]],
+    [
+      "a stop it never asked for",
+      () => [message({ content: [text("x")], stop: "pause_turn", model: "claude-haiku-5-5" })],
+    ],
+  ])("is a none kept for its 10 minutes after %s, so its next readers pay nothing", async (_, steps) => {
+    const { ask, model } = setup({ steps: steps() });
+    expect(await ask()).toEqual({ kind: "none" });
+    const asked = model.requests.length;
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(asked);
+  });
+});

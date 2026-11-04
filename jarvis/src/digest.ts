@@ -180,8 +180,17 @@ function digestOf(parts: Parts, realm: RealmRead, signal: AbortSignal): Promise<
   return loop.ask(question, signal);
 }
 
-// The card an answer kept for this realm, null for an answer with no digest, or none when the loop gave no answer.
+// The model's own ends with no answer: kept as a none, so a page that steers it there costs one run in 10 minutes (S1).
+const ended = (result: Result): boolean =>
+  result.kind === "turns" ||
+  result.kind === "max_tokens" ||
+  result.kind === "refusal" ||
+  (result.kind === "failed" && result.reason === "stop");
+
+// The card an answer kept for this realm, null for an answer with no digest or the model's own end, or none when the
+// call failed, the budget is spent or its readers left.
 function cardOf(result: Result, realm: string): z.infer<typeof Card> | null | undefined {
+  if (ended(result)) return null;
   if (result.kind !== "answer") return undefined;
   const digest = result.cards.digests.find((kept) => kept.realm === realm)?.digest;
   return digest === undefined ? null : { digest, proposal: result.cards.proposals[0]?.action ?? null };
