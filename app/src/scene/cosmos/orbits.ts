@@ -8,6 +8,7 @@ import { OPEN } from "../openEvent.ts";
 import type { Projector } from "./labels.ts";
 import labelStyles from "./labels.module.css";
 import styles from "./orbits.module.css";
+import { Placed } from "./placed.ts";
 import { external, linkable, namedOf, type Named, type Words } from "./planWords.ts";
 import { watchScene } from "./sceneRuns.ts";
 
@@ -39,8 +40,7 @@ export class Orbits {
   readonly #projector: Pick<Projector, "seen" | "fromEye">;
   readonly #open: (href: string) => void;
   readonly #at = new Vector3();
-  // Where each name was written last, across and down, in the page's pixels to a tenth: a name is written only when it moved.
-  #written = new Float64Array(0);
+  readonly #placed = new Placed();
   #plan: Named | undefined;
   #shown: { plan: Planned | undefined; words: Words | undefined } = { plan: undefined, words: undefined };
   #names: HTMLAnchorElement[] = [];
@@ -102,7 +102,7 @@ export class Orbits {
     this.#lines.visible = plan !== undefined;
     this.#named = undefined;
     this.#names = plan === undefined ? [] : plan.worlds.map(({ id }) => this.#nameOf(plan, id));
-    this.#written = new Float64Array(2 * this.#names.length).fill(NaN);
+    this.#placed.set(this.#names);
     this.#layer.replaceChildren(...this.#names);
     this.#hide();
     if (plan !== undefined) this.#ellipses(plan);
@@ -203,16 +203,8 @@ export class Orbits {
       if (name === undefined || world === undefined || place === undefined) continue;
       const spot = this.#projector.seen(this.#projector.fromEye(place, eye, this.#at), world.radius);
       name.hidden = spot.depth <= 0;
-      this.#placeName(at, spot.x, spot.y + spot.radius + UNDER);
+      this.#placed.place(at, spot.x, spot.y + spot.radius + UNDER);
     }
-  }
-
-  #placeName(at: number, x: number, y: number): void {
-    const [left, top] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
-    if (this.#written[2 * at] === left && this.#written[2 * at + 1] === top) return;
-    this.#written[2 * at] = left;
-    this.#written[2 * at + 1] = top;
-    this.#names[at]?.style.setProperty("transform", "translate(" + String(left) + "px, " + String(top) + "px)");
   }
 
   /** Off the stage and the page, its buffers and program freed. */
