@@ -1,7 +1,8 @@
 import { once } from "node:events";
 import { connect, type AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { BODY_LIMIT, listen, makeApp, stop } from "./app.ts";
+import { BODY_LIMIT, listen, makeApp } from "./app.ts";
+import { stop } from "@gnoworld/service/http";
 import { logger } from "@gnoworld/service/log";
 
 const PEPPER = "a-pepper-of-forty-characters-0123456789";

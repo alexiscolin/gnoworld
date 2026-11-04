@@ -1,9 +1,10 @@
 // The server's process (ADR-0002 §7): settings, the database held alone, the HTTP server. On SIGTERM
 // it stops being ready, lets what it serves finish, cuts what stalls, and exits by itself. Started as the image starts it:
 // node --disallow-code-generation-from-strings server/src/main.ts
-import { listen, makeApp, stop } from "./app.ts";
+import { listen, makeApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "@gnoworld/service/db";
+import { stop } from "@gnoworld/service/http";
 import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
 import { adminRoutes } from "./door/admin.ts";
