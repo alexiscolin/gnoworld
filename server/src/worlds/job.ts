@@ -1,7 +1,7 @@
 // The worlds job (slice 7, 7c; plan §3 "The server's new reads"): every half hour it reads a universe's realm list, groups the realms into
 // worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions, imports), the chain
 // for each deployer's name and its indexer for every call (7k3), and writes worlds.json and its count (7n2) beside and renamed over. One
-// call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last files; a silent
+// call at a time, each started a pause after the last, every answer capped and parsed. A fault of the list keeps the last files; a silent
 // indexer leaves a world at rest (its last counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind.
 import { worldsDrawn } from "@gnoworld/core";
 import type { WorldsCount } from "@gnoworld/schemas";
@@ -36,7 +36,7 @@ export interface RunOptions {
   now?: () => number;
   /** Waits `ms` between two calls. */
   wait?: (ms: number) => Promise<void>;
-  /** The pause between two calls of a pass. */
+  /** The least time between the starts of two calls of a pass. */
   pauseMs?: number;
   maxBytes?: number;
   /** The transactions a page of the indexer's read asks, history.ts's unless a test says less. */
@@ -114,7 +114,7 @@ async function readCalls(
 // The list, the packages, the names and the histories, in that order, or the kind of fault that ends the pass.
 async function gather(settings: Settings): Promise<Gathered | Kind> {
   const { send, universe, isStopped } = settings;
-  const pace = pacer(settings.wait, settings.pauseMs);
+  const pace = pacer(settings.wait, settings.pauseMs, settings.now);
   const list = await readRealmPaths({ send, rpc: universe.rpc, pace });
   if (!list.ok) return list.kind;
   if (list.partial === true) settings.log("worlds_shed", { error: "list" });

@@ -87,6 +87,8 @@ async function run(
     delayMs?: number;
     /** The transactions a page of the indexer's read asks. */
     historyPage?: number;
+    /** Told each wait, as it begins: a test's clock may move by it. */
+    onWait?: (ms: number) => void;
     trends?: RunOptions["trends"];
   } = {},
 ): Promise<Run> {
@@ -100,7 +102,11 @@ async function run(
     send: chain.send,
     universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
     now: extra.clock ?? (() => extra.now ?? NOW),
-    wait: (ms) => Promise.resolve(void waits.push(ms)),
+    wait: (ms) => {
+      waits.push(ms);
+      extra.onWait?.(ms);
+      return Promise.resolve();
+    },
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
     ...(extra.historyPage === undefined ? {} : { historyPage: extra.historyPage }),
     ...(extra.trends === undefined ? {} : { trends: extra.trends }),
@@ -223,6 +229,33 @@ describe("runWorlds", () => {
     expect(waits.every((ms) => ms === PAUSE_MS)).toBe(true);
     expect(PAUSE_MS).toBeGreaterThan(0);
     expect(PAUSE_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  // A clock that each answer moves by 100 ms and each wait by what it waits: the calls must start a pause apart, the waits be what is left.
+  const slowChain = (clock: { at: number }) => {
+    const starts: number[] = [];
+    const later = <T>(answer: T): T => {
+      starts.push(clock.at);
+      clock.at += 100;
+      return answer;
+    };
+    const routes = chainRoutes([POOL, ROUTER], {
+      paths: () => later([POOL, ROUTER].join("\n")),
+      doc: (path) => later(doc(path)),
+      file: () => later(`[addpkg]\n  creator = "${A}"\n`),
+      eval: () => later(named("alexis")),
+      indexer: (request) => later(eachCalled([POOL, ROUTER], 2)(request)),
+    });
+    return { routes, starts };
+  };
+
+  it("starts its calls a pause apart on its clock, not a pause after each answer: a slow answer leaves less to wait (7k3)", async () => {
+    const clock = { at: NOW };
+    const { routes, starts } = slowChain(clock);
+    const { chain, waits } = await run(routes, { clock: () => clock.at, onWait: (ms) => void (clock.at += ms) });
+    expect(chain.asked.length).toBeGreaterThan(5);
+    expect(starts.slice(1).map((start, i) => start - (starts[i] ?? 0))).toEqual(starts.slice(1).map(() => PAUSE_MS));
+    expect(waits).toEqual(starts.slice(1).map(() => PAUSE_MS - 100));
   });
 
   it("runs a pass every half hour unless told otherwise: the pause times the calls of a first pass stay far under it", () => {

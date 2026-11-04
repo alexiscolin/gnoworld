@@ -15,12 +15,56 @@ describe("kindOf", () => {
 describe("pacer", () => {
   it("waits before every call but the first, by the pause it was given", async () => {
     const waits: number[] = [];
-    const pace = pacer((ms) => Promise.resolve(void waits.push(ms)), 250);
+    const pace = pacer(
+      (ms) => Promise.resolve(void waits.push(ms)),
+      250,
+      () => 0,
+    );
     await pace();
     expect(waits).toEqual([]);
     await pace();
     await pace();
     expect(waits).toEqual([250, 250]);
+  });
+
+  // 7k3: a pause after each answer made a first pass of onyx-1 13.2 minutes, 1,628 calls at about 233 ms each plus 250 of pause. Here the
+  // wait moves the clock, as time does, and each call takes the time given: the calls start a pause apart, or later after a slow one.
+  it("starts the calls a pause apart on its clock: it waits what is left of the pause, and nothing after a call slower than it", async () => {
+    const waits: number[] = [];
+    const starts: number[] = [];
+    const clock = { at: 0 };
+    const pace = pacer(
+      (ms) => {
+        waits.push(ms);
+        clock.at += ms;
+        return Promise.resolve();
+      },
+      250,
+      () => clock.at,
+    );
+    for (const took of [100, 100, 300, 250, 0]) {
+      await pace();
+      starts.push(clock.at);
+      clock.at += took;
+    }
+    await pace();
+    starts.push(clock.at);
+    expect(starts).toEqual([0, 250, 500, 800, 1050, 1300]);
+    expect(waits).toEqual([150, 150, 250]);
+  });
+
+  it("waits no more than the pause when its clock steps back", async () => {
+    const waits: number[] = [];
+    const clock = { at: 3_600_000 };
+    const pace = pacer(
+      (ms) => Promise.resolve(void waits.push(ms)),
+      250,
+      () => clock.at,
+    );
+    await pace();
+    clock.at = 0;
+    await pace();
+    expect(waits).toEqual([250]);
   });
 });
 
