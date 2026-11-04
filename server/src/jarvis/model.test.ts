@@ -419,7 +419,9 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     const run = attempts(45 * DOLLAR);
     const answer = message({ content: [text("Block 42.")], stop: "end_turn" });
     await callModel({ ...run.parts, send: script(statusError(429, headers), answer).send }, ask());
-    expect(run.waits).toEqual([wait]);
+    // No wait asked is its own first wait, which a quarter below may be.
+    if (wait === 500) expectWaits(run.waits, [500]);
+    else expect(run.waits).toEqual([wait]);
     run.close();
   });
 
