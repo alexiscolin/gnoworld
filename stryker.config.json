@@ -22,6 +22,7 @@
     "!server/src/testing/**",
     "jarvis/src/**/*.ts",
     "!jarvis/src/**/*.test.ts",
+    "!jarvis/src/main.ts",
     "!jarvis/src/**/*.bench.ts",
     "!jarvis/src/testing/**"
   ],
