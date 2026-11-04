@@ -3,4 +3,5 @@
 import "./features/expedition/plug.tsx";
 import "./features/notifications/plug.ts";
 import "./features/previews/plug.ts";
+import "./features/realms/plug.ts";
 import "./features/share/plug.ts";

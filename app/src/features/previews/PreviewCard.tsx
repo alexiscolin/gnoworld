@@ -5,8 +5,8 @@ import type { Capture } from "@gnoworld/schemas/indexer";
 import { page } from "@gnoworld/core";
 import { Button, Cluster, Dialog, Sidebar, Stack } from "@gnoworld/ui";
 import { useState, type KeyboardEvent } from "react";
+import type { PageDrawing } from "../../slots.tsx";
 import type { Drawing } from "../chat/index.ts";
-import { RealmBlocks } from "../realms/index.ts";
 import { shortPath } from "./previews.ts";
 import styles from "./Preview.module.css";
 
@@ -16,6 +16,8 @@ export interface PreviewCardProps {
   /** The default universe's gnoweb, which the capture's links to a path resolve against. */
   gnoweb: string;
   via: Drawing;
+  /** The realm page's drawing (5h's RealmBlocks), which comes through its slot. */
+  Blocks: PageDrawing;
   /** The realm's view on this site: the page as it is now. */
   live: string;
   /** Whether the card is a Tab stop: under a line, on the list's stop alone (U1). */
@@ -29,7 +31,7 @@ const kept = (event: KeyboardEvent) => {
   event.stopPropagation();
 };
 
-export function PreviewCard({ capture, look, gnoweb, via, live, tabbable = true }: PreviewCardProps) {
+export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable = true }: PreviewCardProps) {
   const [open, setOpen] = useState(false);
   const read = page(capture.text, { origin: gnoweb });
   const blocks = read.kind === "page" ? read.blocks : [];
@@ -37,7 +39,7 @@ export function PreviewCard({ capture, look, gnoweb, via, live, tabbable = true 
   const thumb = (
     <div className={styles["thumb"]} data-preview-thumb="" inert aria-hidden="true">
       <div className={styles["page"]}>
-        <RealmBlocks blocks={blocks} origin={gnoweb} via={via} />
+        <Blocks blocks={blocks} origin={gnoweb} via={via} />
       </div>
     </div>
   );
@@ -84,7 +86,7 @@ export function PreviewCard({ capture, look, gnoweb, via, live, tabbable = true 
               it.
             </p>
             {/* Drawn at size only while open: a chat of many linking lines holds one small drawing each. */}
-            {open ? <RealmBlocks blocks={blocks} origin={gnoweb} via={via} /> : null}
+            {open ? <Blocks blocks={blocks} origin={gnoweb} via={via} /> : null}
             <Cluster>
               <Button href={live}>Open the page</Button>
             </Cluster>

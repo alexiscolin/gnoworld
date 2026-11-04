@@ -1,6 +1,7 @@
 // The places slice 8's other parts fill (the chief, 2026-11-04): named and typed here, filled from their own features through `plug`, one
 // import line each in plugs.ts, so the header, the passport and the arrival import nothing of theirs. A slot nobody filled draws nothing.
 import { createElement, type ComponentType } from "react";
+import type { RealmBlocks } from "./features/realms/RealmBlocks.tsx";
 import type { DeviceSlice } from "./store/keep.ts";
 
 /** A first visit's place, as the arrival pill asks 8b's line for it. */
@@ -21,6 +22,9 @@ interface PassportSectionProps {
   readonly universe: string;
 }
 
+/** A realm page's drawing (5h's RealmBlocks), which a page's capture draws with (8f). */
+export type PageDrawing = typeof RealmBlocks;
+
 export interface Slots {
   /** 8c's bell, in the header's right group, before the account. */
   bell: ComponentType;
@@ -38,6 +42,9 @@ export interface Slots {
   share: (place: { readonly name: string; readonly path: string }) => void;
   /** 8f's capture of a page under a chat line: the realm whose home the line links to, and whether its card is a Tab stop. */
   linePreview: ComponentType<{ readonly path: string; readonly tabbable: boolean }>;
+  /** 5h's drawing of a realm page, for 8f's capture: asked as a capture draws, in a chunk of its own (the realms' door would bring the
+   * realm view's whole chunk to a chat line that links a page, 8f's review). */
+  pageDrawing: () => Promise<PageDrawing>;
 }
 
 const filled: Partial<Slots> = {};

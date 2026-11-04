@@ -2,6 +2,8 @@
 import { act } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { all, click, modals, mount, one } from "../../../tests/mount.tsx";
+import "../../plugs.ts";
+import { slot } from "../../slots.tsx";
 import { drawing } from "../chat/index.ts";
 import { PreviewCard, type PreviewCardProps } from "./PreviewCard.tsx";
 
@@ -9,6 +11,8 @@ import { PreviewCard, type PreviewCardProps } from "./PreviewCard.tsx";
 // chat line (frames 104, 107). The capture is drawn small as a picture of the page, never a part of it a reader can use; Open large
 // shows it at size, with when it was captured and the way to the page as it is now.
 const via = await drawing();
+// The realm page's drawing as the page gets it, through its slot (plugs.ts).
+const Blocks = await (slot("pageDrawing") ?? (() => Promise.reject(new Error("no drawing plugged"))))();
 const GNOWEB = "https://onyx.testnets.gno.land";
 const CAPTURE = {
   path: "gno.land/r/gov/dao",
@@ -30,7 +34,17 @@ const HOSTILE = [
 beforeAll(modals);
 
 const card = (over: Partial<PreviewCardProps> = {}) =>
-  mount(<PreviewCard capture={CAPTURE} look="plate" gnoweb={GNOWEB} via={via} live="/r/gov/dao" {...over} />);
+  mount(
+    <PreviewCard
+      capture={CAPTURE}
+      look="plate"
+      gnoweb={GNOWEB}
+      via={via}
+      Blocks={Blocks}
+      live="/r/gov/dao"
+      {...over}
+    />,
+  );
 const opener = (box: HTMLElement) => one(box, "button[data-preview]");
 
 describe("PreviewCard", () => {
@@ -106,7 +120,7 @@ describe("PreviewCard", () => {
     const box = mount(
       <ol onKeyDown={list}>
         <li>
-          <PreviewCard capture={CAPTURE} look="line" gnoweb={GNOWEB} via={via} live="/r/gov/dao" />
+          <PreviewCard capture={CAPTURE} look="line" gnoweb={GNOWEB} via={via} Blocks={Blocks} live="/r/gov/dao" />
         </li>
       </ol>,
     );

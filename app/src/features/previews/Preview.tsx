@@ -4,6 +4,7 @@
 import type { Capture, Previews } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
 import { realmView } from "../../places.ts";
+import { slot, type PageDrawing } from "../../slots.tsx";
 import { drawing, type Drawing } from "../chat/index.ts";
 import { PreviewCard } from "./PreviewCard.tsx";
 import { captured, sharedPreviews } from "./previews.ts";
@@ -18,14 +19,17 @@ export interface PreviewProps {
 }
 
 export function Preview({ path, look, tabbable = true, read = sharedPreviews }: PreviewProps) {
-  const [shown, setShown] = useState<{ capture: Capture; via: Drawing }>();
+  const [shown, setShown] = useState<{ capture: Capture; via: Drawing; Blocks: PageDrawing }>();
   useEffect(() => {
     let live = true;
     const universe = captured().id;
-    Promise.all([read(), drawing()]).then(
-      ([file, via]) => {
+    // The realm page's drawing comes through its slot (slots.tsx): none filled, no capture is drawn.
+    const blocks = slot("pageDrawing");
+    if (blocks === undefined) return;
+    Promise.all([read(), drawing(), blocks()]).then(
+      ([file, via, Blocks]) => {
         const capture = file?.universe === universe ? file.previews.find((each) => each.path === path) : undefined;
-        if (live && capture !== undefined) setShown({ capture, via });
+        if (live && capture !== undefined) setShown({ capture, via, Blocks });
       },
       (error: unknown) => {
         reportError(error);
@@ -43,6 +47,7 @@ export function Preview({ path, look, tabbable = true, read = sharedPreviews }: 
       look={look}
       gnoweb={universe.gnoweb ?? ""}
       via={shown.via}
+      Blocks={shown.Blocks}
       live={realmView(path, universe)}
       tabbable={tabbable}
     />

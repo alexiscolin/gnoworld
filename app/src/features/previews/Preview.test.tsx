@@ -3,6 +3,8 @@ import type { Previews } from "@gnoworld/schemas/indexer";
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
+// The page's slots filled as the shell fills them: the realm page's drawing comes through one (plugs.ts).
+import "../../plugs.ts";
 import { Preview } from "./Preview.tsx";
 
 // A page's preview where a page asks for one (8f): the captures' file read, the page's capture found by its path, drawn as its card.
