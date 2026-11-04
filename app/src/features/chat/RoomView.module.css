@@ -117,6 +117,26 @@
     translate: 0 1px;
   }
 
+  /* An account's first words in the room: the video's mint "new here" tag after the name (frame 56). */
+  .newHere {
+    /* raw: the frame's tag, a pixel above and under its words */
+    padding: 1px var(--space-2xs);
+    border-radius: var(--radius-s);
+    background: var(--color-mine-soft);
+    color: var(--color-mine);
+    font-family: var(--family-mono);
+    /* raw: the frame's tag, 10 px, under every text token */
+    font-size: 10px;
+  }
+
+  /* The country's name after its code, in who is here (frame 56): mono, muted, at the row's end. */
+  .countryName {
+    color: var(--color-text-muted);
+    font-family: var(--family-mono);
+    /* raw: the frame's 11 px, under every text token */
+    font-size: 11px;
+  }
+
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
      bar, as the divider's rule does (the bar covers it only while pointed at). */
   .head {

@@ -122,6 +122,13 @@ function completes({ options }: Completion): string {
   return `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.`;
 }
 
+/** How a poll is asked, said under a draft that asks one wrong. */
+const POLL_FORM = "A poll is /poll A question? | an answer | another: two to nine answers.";
+
+// What an unknown command is told: a poll asked wrong, how to ask one (polling.ts).
+const unknownOf = (command: string): string =>
+  command === "/poll" ? POLL_FORM : `${command} is not a command. /me sends an action.`;
+
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
  * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
  * help near the end or on an action; or nothing. */
@@ -136,7 +143,7 @@ export function said(
   const refusing = refusal(composed, multiline);
   if (refusing !== undefined) return { error: refusing };
   if (completion !== undefined) return { help: completes(completion) };
-  if (composed.kind === "unknown") return { error: `${composed.command} is not a command. /me sends an action.` };
+  if (composed.kind === "unknown") return { error: unknownOf(composed.command) };
   const help = nearEnd(composed, context) ?? actionOnly(composed, context);
   return help === undefined ? {} : { help };
 }

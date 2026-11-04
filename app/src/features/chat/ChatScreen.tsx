@@ -2,12 +2,14 @@
 // (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
 import { ChatLayout, Dialog } from "@gnoworld/ui";
+import type { Line } from "@gnoworld/core";
 import { useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
-import { PlaceInfo } from "./PlaceInfo.tsx";
+import { Info } from "./Info.tsx";
+import type { UniverseView } from "../../places.ts";
 import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
@@ -36,6 +38,12 @@ export interface ChatPlace {
   worlds: readonly { slug: string; name: string; href: string }[];
   /** Under the dock's width the chat stays a block of the page, and never takes it: the Earth's globe is what its page shows. */
   inPage?: boolean | undefined;
+  /** The Earth's general chat, whose pills are its own (QuickActions.tsx). */
+  earth?: boolean | undefined;
+  /** The world's realms on the chain (`gno.land/r/gov/dao`), and its universe: Realm opens the first's view, the panel links it on
+   * gnoweb. */
+  realms?: readonly string[] | undefined;
+  universe: Pick<UniverseView, "id" | "isDefault" | "gnoweb">;
 }
 
 /** What Who's here does: where the chat has an info panel it takes the reader to the people in it, closing the thread that
@@ -124,6 +132,8 @@ export interface ChatScreenProps {
   unread: number;
   /** How many are talking here now, in the panel; none draws no figure. */
   talking?: number | undefined;
+  /** The room's lines and who is here: the countries they declared, counted in the panel. */
+  here?: { lines: readonly Line[]; members: readonly string[] } | undefined;
   /** Who is here, drawn under Here now. */
   people: ReactNode;
   /** What the room's thread adds: its panel, which takes the info panel's place while one is open. */
@@ -144,21 +154,9 @@ const threadAside = (threads: ChatScreenProps["threads"]) =>
 // Under the dock's width the chat takes the page, unless the place keeps it a block of its own.
 const takesPage = (dockable: boolean, { inPage }: ChatPlace) => !dockable && inPage !== true;
 
-export function ChatScreen({
-  place,
-  title,
-  kicker,
-  chips,
-  menu,
-  mark,
-  rail,
-  unread,
-  talking,
-  people,
-  threads,
-  status,
-  children,
-}: ChatScreenProps) {
+export function ChatScreen(props: ChatScreenProps) {
+  const { place, title, kicker, chips, menu, mark, rail, unread, talking, here: room, people, threads } = props;
+  const { status, children } = props;
   const dockable = useMedia(DOCKABLE);
   const [params, setParams] = useSearchParams();
   const full = takesPage(dockable, place) || asksFull(params);
@@ -203,14 +201,7 @@ export function ChatScreen({
           info={
             thread ??
             (compact ? undefined : (
-              <PlaceInfo
-                kicker={place.kicker}
-                name={place.name}
-                description={place.description}
-                talking={talking}
-                here={people}
-                panelRef={here.panel}
-              />
+              <Info place={place} talking={talking} room={room} people={people} panelRef={here.panel} />
             ))
           }
           infoFirst={thread !== undefined}

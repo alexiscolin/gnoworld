@@ -1,7 +1,7 @@
 // The places the app knows, from the data files (slice 5's 5c and 5d; the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
 // request's path, exactly as written: the path's case is part of the address (F376), a trailing slash is not.
-import { placeAt, type Place, type PlaceKind } from "@gnoworld/core";
+import { placeAt, REALM_PREFIX, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
@@ -9,7 +9,6 @@ import hubs from "../data/hubs.json" with { type: "json" };
 import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
-import type { ChatPlace } from "./features/chat/index.ts";
 
 /** A world or an ecosystem: what the site shows of it, with its one address. */
 export interface Listed {
@@ -36,6 +35,8 @@ export interface UniverseView {
   isDefault: boolean;
   /** A testnet's pages are not indexed (ADR-0002 §2). */
   testnet: boolean;
+  /** Its chain's gnoweb, the chat's link out (8d); none in data that names none. */
+  gnoweb?: string | undefined;
   home: { path: string; canonical: string };
   earth: { path: string; canonical: string };
   worlds: Listed[];
@@ -50,7 +51,13 @@ interface Row {
   realms?: readonly string[] | undefined;
 }
 interface Source {
-  universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
+  universes: {
+    id: string;
+    name: string;
+    gnoweb?: string | undefined;
+    default?: boolean | undefined;
+    testnet?: boolean | undefined;
+  }[];
   hubs: Row[];
   ecosystems: Row[];
   stations: Row[];
@@ -165,6 +172,7 @@ function build(source: Source) {
       name: universe.name,
       isDefault: universe.default === true,
       testnet: testnets.has(universe.id),
+      gnoweb: universe.gnoweb,
       home: { path: at("cosmos").path, canonical: at("cosmos").canonical },
       earth: { path: at("earth").path, canonical: at("earth").canonical },
       worlds: worlds.filter((world) => world.universe === universe.id),
@@ -222,14 +230,9 @@ function build(source: Source) {
 
 export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
 
-/** What the chat's header, its column of worlds and its info panel say of a place in `universe`: `kicker` says where it is. */
-export const chatPlace = (
-  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage">,
-  universe: UniverseView,
-  kicker = `${universe.name} · ${place.name}`,
-): ChatPlace => ({
-  ...place,
-  kicker,
-  home: universe.home.path,
-  worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
-});
+/** A world's realm's view on the site: /r/<path> in the default universe, /net/<id>/r/<path> in another. */
+export const realmView = (realm: string, universe: Pick<UniverseView, "id" | "isDefault">): string =>
+  `${universe.isDefault ? "" : `/net/${universe.id}`}${realmPath(realm)}`;
+
+// A realm's path on a site or on gnoweb, `gno.land/r/gov/dao` -> `/r/gov/dao`: the data's realms, which dataFiles.ts checks.
+export const realmPath = (realm: string): string => `/r/${realm.slice(REALM_PREFIX.length)}`;

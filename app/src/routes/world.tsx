@@ -2,10 +2,11 @@
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { lazy, Suspense, useState } from "react";
 import { useLoaderData, useNavigate, useRouteError, useSearchParams, type MetaArgs } from "react-router";
-import { hubWorldOf, REALM_PREFIX, stampKey } from "@gnoworld/core";
+import { hubWorldOf, stampKey } from "@gnoworld/core";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, worldMeta } from "../meta.ts";
-import { chatPlace, pageOf, site } from "../places.ts";
+import { chatPlace } from "../chatPlace.ts";
+import { pageOf, realmView, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
@@ -61,10 +62,7 @@ export default function World() {
   useEntered();
   const chatDue = useWorldSpace(world, universe.id, ring);
   const realm = world.realms?.[0];
-  const realmPath =
-    realm === undefined
-      ? undefined
-      : `${universe.isDefault ? "" : `/net/${universe.id}`}/r/${realm.slice(REALM_PREFIX.length)}`;
+  const realmPath = realm === undefined ? undefined : realmView(realm, universe);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).

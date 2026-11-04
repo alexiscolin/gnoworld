@@ -4,7 +4,8 @@
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import { compose, type Composed } from "@gnoworld/core";
+import type { Composed } from "@gnoworld/core";
+import { composeDraft } from "./polling.ts";
 import { Field, Stack } from "@gnoworld/ui";
 import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
 import { completed } from "./complete.ts";
@@ -111,7 +112,7 @@ export function Composer(props: ComposerProps) {
   const [failed, setFailed] = useState<boolean | string>(false);
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
-  const composed = compose(room, draft, nick);
+  const composed = composeDraft(room, draft, nick);
   const completion = completionOf(draft, { rooms, members, nick, group: to === undefined });
   const { coarse, shown, goes } = useHelp(composed, props, { failed, completion, draft });
   // The selection an edit leaves is put back in the box once it shows the new draft.

@@ -81,7 +81,8 @@ describe("Embed", () => {
     };
     const play = () => {
       act(() => {
-        host.querySelector("button")?.click();
+        // The player's button: the author's name before it opens their card (8d).
+        host.querySelector<HTMLButtonElement>("button:not([aria-haspopup])")?.click();
       });
     };
     // jsdom has no layout: the frame's scrollIntoView is not there.

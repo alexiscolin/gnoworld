@@ -1,0 +1,49 @@
+/* A poll as the video's frames 73 and 76 draw it: a bar an answer, 36 px high, filled to its share in a dark mint, the share at
+   its end, the reader's own edged in mint. */
+@layer components {
+  .bar {
+    /* layout: the fill behind the answer and its share */
+    position: relative;
+    /* layout: the answer at the start, its share at the end */
+    display: grid;
+    /* layout: the answer at the start, its share at the end */
+    grid-template-columns: 1fr auto;
+    /* layout: the one row of words on the bar's middle */
+    align-content: center;
+    inline-size: 100%;
+    /* raw: the video's bar, 36 px high (frame 76) */
+    block-size: 36px;
+    padding-inline: var(--space-s);
+    overflow: hidden;
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-s);
+    background: transparent;
+  }
+
+  .bar[aria-pressed="true"] {
+    border-color: var(--color-mine-line);
+  }
+
+  .fill {
+    --_share: 0%;
+
+    /* layout: the share of the bar from its start, behind its words */
+    position: absolute;
+    inset: 0 auto 0 0;
+    inline-size: var(--_share);
+    background: var(--color-mine-soft);
+  }
+
+  .answer {
+    /* layout: over the fill */
+    position: relative;
+    /* layout: at the bar's start, as the video's frame 73 */
+    justify-self: start;
+  }
+
+  .share {
+    /* layout: over the fill */
+    position: relative;
+    font-variant-numeric: tabular-nums;
+  }
+}

@@ -1,6 +1,7 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
 // grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
-import { COMMANDS, type Composed } from "@gnoworld/core";
+import type { Composed } from "@gnoworld/core";
+import { DRAFT_COMMANDS } from "./polling.ts";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
 import { completions, type Completion } from "./complete.ts";
@@ -139,5 +140,5 @@ export function completionOf(
   }: { rooms: readonly string[]; members: readonly string[]; nick: string; group: boolean },
 ) {
   const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
-  return completions(draft, { commands: COMMANDS, rooms, people, group });
+  return completions(draft, { commands: DRAFT_COMMANDS, rooms, people, group });
 }

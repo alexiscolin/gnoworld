@@ -1,34 +1,23 @@
 // A line's head (slice 4's 4b, moved out of LineView.tsx): the face, the name, the marks and the time.
 import type { Line, ShownLine } from "@gnoworld/core";
 import { Avatar, Cluster, Icon } from "@gnoworld/ui";
+import { Country } from "./Country.tsx";
 import { Person } from "./Person.tsx";
+import { PersonCard } from "./PersonCard.tsx";
 import styles from "./RoomView.module.css";
 
 const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const REGIONS = new Intl.DisplayNames("en", { type: "region", fallback: "none" });
-// What the browser names and the table of countries does not: old codes, unions, test regions. The table stays out of these lines' chunk, every
-// reader's, 3.8 KB for a title; LineView.test.tsx holds the two together, code by code.
-const NOT_COUNTRIES = "AC AN BU CP CQ CS DD DG DY EA EU EZ FX HV IC NH QO RH SU TA TP UK UN VD XA XB YD YU ZR ZZ";
 
-// A line's author: its account's address shortened or its guest's nick, then "you" if it is mine.
-function Author({ line, mine }: { line: Line; mine: boolean }) {
+// A line's author: its account's address shortened or its guest's nick, which opens their card, then "you" if it is mine.
+function Author({ line, mine, me, stop }: { line: Line; mine: boolean; me: string | undefined; stop: boolean }) {
+  const name = line.account ?? line.from;
+  const guest = line.account === undefined;
   return (
     <span className={styles["author"]}>
-      <Person name={line.account ?? line.from} guest={line.account === undefined} />
+      <PersonCard name={name} guest={guest} country={line.country} me={me} tabbable={stop}>
+        <Person name={name} guest={guest} />
+      </PersonCard>
       {mine ? " you" : null}
-    </span>
-  );
-}
-
-// The country a line declares (+gnoworld/country): its code to the eye, as the video's frames 40 and 60 draw it, its name to a reader and a
-// screen reader. Any client may write anything there: what is no country draws nothing.
-function Country({ code }: { code: string | undefined }) {
-  const name = code === undefined || NOT_COUNTRIES.includes(code) ? undefined : REGIONS.of(code);
-  if (name === undefined) return null;
-  return (
-    <span className={styles["country"]} title={name} data-line-country="">
-      <span aria-hidden="true">{code}</span>
-      <span className="visually-hidden">{name}</span>
     </span>
   );
 }
@@ -72,6 +61,10 @@ function Marks({
 }
 
 interface HeadProps {
+  newHere?: boolean | undefined;
+  me: string | undefined;
+  /** Whether the line's controls are Tab stops: the name that opens a card is one. */
+  stop?: boolean;
   line: ShownLine;
   mine: boolean;
   mentioned: boolean;
@@ -80,14 +73,15 @@ interface HeadProps {
 }
 
 // The head: the face, the name, what the line is marked, and the time at the far end.
-export function Head({ line, mine, mentioned, saved, pinned }: HeadProps) {
+export function Head({ line, mine, me, stop = false, mentioned, saved, pinned, newHere }: HeadProps) {
   return (
     <div className={styles["head"]} data-line-head="">
       <Cluster space="2xs">
         <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
         <Country code={line.country} />
         {line.kind === "action" ? "* " : null}
-        <Author line={line} mine={mine} />{" "}
+        <Author line={line} mine={mine} me={me} stop={stop} />{" "}
+        {newHere === true ? <span className={styles["newHere"]}>new here</span> : null}
         <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
         <Edited edited={line.edited} />
         <time dateTime={line.time} className={styles["time"]}>

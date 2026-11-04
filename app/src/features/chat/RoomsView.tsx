@@ -24,7 +24,8 @@ export interface RoomsViewProps {
   badges?: Readonly<Record<string, number>> | undefined;
   /** What the account was told: none for a guest (4f-n). */
   notices?: NoticesProps | undefined;
-  /** What stands between the rooms and the direct messages: an account's saved messages (4d). */
+  /** What stands between the rooms and the direct messages: the room's media (8d) and an account's saved messages (4d). */
+  media?: ReactNode;
   saved?: ReactNode;
 }
 
@@ -50,6 +51,8 @@ export interface DmsProps {
   onOnlyKnown: (only: boolean) => void;
   /** Whether the device failed to keep that choice and those written to (CR5). */
   notKept?: boolean | undefined;
+  /** Everyone in a room the page follows, space-separated: a partner among them gets the video's green dot (frame 56). */
+  present?: string | undefined;
 }
 
 // What a notice says moved to names.ts, which the bell shares (slice 8); its tests stay here.
@@ -100,14 +103,19 @@ function Notices({
   );
 }
 
+// A partner in a room the page follows, with nothing unread: the video's dot at the row's end (frame 56), said "online".
+const ONLINE = { said: "online" };
+
 function Dms({
   world,
   partners,
   current,
   badges,
   notKept,
-}: Pick<DmsProps, "world" | "partners" | "current" | "notKept"> & { badges: RoomsViewProps["badges"] }) {
+  present,
+}: Pick<DmsProps, "world" | "partners" | "current" | "notKept" | "present"> & { badges: RoomsViewProps["badges"] }) {
   const full = useFull();
+  const here = new Set(present?.split(" "));
   return (
     <Stack space="2xs" as="section">
       <h2 className={styles["section"]}>Direct messages</h2>
@@ -123,7 +131,7 @@ function Dms({
                   href={dmHref(world, partner, full)}
                   current={partner === current}
                   lead={<Avatar address={partner} name={partner} size="s" decorative />}
-                  badge={badged(badges?.[partner], true)}
+                  badge={badged(badges?.[partner], true) ?? (here.has(partner) ? ONLINE : undefined)}
                 >
                   {shortAddress(partner)}
                 </NavItem>
@@ -153,7 +161,7 @@ export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" |
   );
 }
 
-export function RoomsView({ sections, current, dms, failed, badges, notices, saved }: RoomsViewProps) {
+export function RoomsView({ sections, current, dms, failed, badges, notices, media, saved }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
   const listed = (
     <RoomSections sections={sections} current={current} failed={failed} badge={(room) => badged(badges?.[room])} />
@@ -165,7 +173,12 @@ export function RoomsView({ sections, current, dms, failed, badges, notices, sav
       <Stack space="l">
         {listed}
         {/* Between the rooms and the conversations, under a rule, as the video's column has it. */}
-        {saved === undefined ? null : <div className={styles["saved"]}>{saved}</div>}
+        {saved === undefined && media === undefined ? null : (
+          <div className={styles["saved"]}>
+            {media}
+            {saved}
+          </div>
+        )}
         <Dms {...dms} badges={badges} />
       </Stack>
     );

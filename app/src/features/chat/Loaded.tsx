@@ -1,8 +1,8 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
+import type { Line } from "@gnoworld/core";
 import type { Address, RoomList } from "@gnoworld/schemas";
-import { useId, useState, type ReactNode, type RefObject } from "react";
-import { useSearchParams } from "react-router";
+import { useId, type ReactNode, type RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
@@ -10,8 +10,7 @@ import type { ChatLink } from "./link.ts";
 import { useComposing } from "./composing.ts";
 import { dmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
-import { asksFull } from "./full.ts";
-import { dmParams, groupsAt, roomIds, talkingOf } from "./names.ts";
+import { groupsAt, roomIds, talkingOf } from "./names.ts";
 import { NoticeModes } from "./NoticeModes.tsx";
 import { OnlyKnown } from "./OnlyKnown.tsx";
 import { RoomMenu } from "./RoomMenu.tsx";
@@ -19,12 +18,13 @@ import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomChips } from "./RoomChips.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
-import { Dock } from "./QuickActions.tsx";
+import { Dock } from "./Dock.tsx";
 import { CountryChoice } from "./CountryChoice.tsx";
 import { Saved } from "./Saved.tsx";
+import { Media } from "./Media.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
 import { unreadOf } from "./unread.ts";
-import { People } from "./People.tsx";
+import { useOpened, useWhoIsHere } from "./whoIsHere.tsx";
 import { RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
@@ -34,35 +34,8 @@ import type { Noticing } from "./useNotices.ts";
 import { useThreads } from "./Threading.tsx";
 import { Writer } from "./Writer.tsx";
 
-// The conversation opened from who is here, whose composer takes the focus as its button goes (U12): asked while it is
-// in view, `partner` the one in view, never again once the reader left it (CR6).
-function useOpened(partner: string | undefined) {
-  const [opened, setOpened] = useState<{ partner: string; seen: boolean }>();
-  if (opened?.seen === false && partner === opened.partner) setOpened({ ...opened, seen: true });
-  if (opened?.seen === true && partner !== opened.partner) setOpened(undefined);
-  return {
-    focus: opened !== undefined && opened.partner === partner,
-    open: (other: string) => {
-      setOpened({ partner: other, seen: false });
-    },
-  };
-}
-
-// Who is here, a button on each to write to them: it opens the conversation (`open`) and asks for it in the address.
-// Apart from the room's element, which each line draws again: who is here keeps its drawing (the compiler).
-function useWhoIsHere(
-  members: readonly string[],
-  { connected, me }: { connected: boolean; me: string | undefined },
-  open: (partner: string) => void,
-) {
-  const [params, setParams] = useSearchParams();
-  const full = asksFull(params);
-  const onMessage = (other: string) => {
-    open(other);
-    setParams(dmParams(other, full));
-  };
-  return <People members={members} connected={connected} me={me} onMessage={onMessage} canFollow />;
-}
+const NO_LINES: readonly Line[] = [];
+const NO_MEMBERS: readonly string[] = [];
 
 // A room's notification modes, an account's; a direct message has none of its own (4f-n).
 const modesOf = (room: string | undefined, notify: Noticing["notify"]) =>
@@ -106,10 +79,15 @@ function Rail({
   signedIn,
   sections,
   current,
+  lines,
   dms,
   failed,
   noticing,
-}: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & { signedIn: boolean; current: string | undefined }) {
+}: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & {
+  signedIn: boolean;
+  current: string | undefined;
+  lines: readonly Line[];
+}) {
   return (
     <RoomsView
       sections={sections}
@@ -118,6 +96,7 @@ function Rail({
       failed={failed}
       badges={noticing.badges}
       notices={noticing.list}
+      media={<Media room={current} lines={lines} />}
       saved={signedIn ? <Saved /> : undefined}
     />
   );
@@ -135,14 +114,15 @@ function useConversation(props: LoadedProps) {
   const me = addressOf(session);
   const opened = useOpened(dms.partner);
   const noteId = useId();
-  const people = useWhoIsHere(state?.members ?? [], { connected: chat === "connected", me }, opened.open);
+  const people = useWhoIsHere(state, { connected: chat === "connected", me }, opened.open);
   const bar = dms.partner === undefined ? undefined : dmActs(link, dms.partner, dmDismissed);
   const shown = shownOf(
     dms,
     { id: room, state, acts },
     { sayTo, focus: opened.focus, noteId, seen: noticing.seen, acts: bar },
   );
-  return { room, acts, me, noteId, people, shown };
+  const lines = state?.lines ?? NO_LINES;
+  return { room, acts, me, noteId, people, shown, lines, members: state?.members ?? NO_MEMBERS };
 }
 
 /** The conversation in view: a direct message's problem, said in the room's place, then the room with its composer. */
@@ -170,13 +150,15 @@ const kickerOf = (shown: Shown | undefined) => (shown?.kind === "dm" ? "Direct m
 
 export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
-  const { room, acts, me, noteId, people, shown } = useConversation(props);
+  const { room, acts, me, noteId, people, shown, lines, members } = useConversation(props);
   const ids = roomIds(sections);
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const composing = useComposing(shown, me);
   const threads = useThreads({ shown, state: props.state, session, rooms: ids, acts });
-  const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
+  const rail = (
+    <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} lines={lines} noticing={noticing} />
+  );
   const writer =
     shown === undefined ? undefined : (
       <Writer
@@ -207,6 +189,7 @@ export function Loaded(props: LoadedProps) {
       rail={rail}
       unread={unreadOf(noticing.badges)}
       talking={talkingOf(props.state?.members, chat === "connected")}
+      here={{ lines, members }}
       people={people}
       threads={threads}
       status={<NoticeStatus notices={noticing.list} />}
@@ -226,7 +209,7 @@ export function Loaded(props: LoadedProps) {
             ...threads.view,
           }}
           composer={
-            <Dock onWhoIsHere={ask} world={place.slug}>
+            <Dock onWhoIsHere={ask} place={place} dm={shown?.kind === "dm"} writes={session.kind === "in"}>
               {writer}
             </Dock>
           }
