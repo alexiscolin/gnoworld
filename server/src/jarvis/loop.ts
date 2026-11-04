@@ -166,9 +166,10 @@ async function resultsOf(run: Run, content: Anthropic.ContentBlock[]): Promise<A
 
 async function resultOf(run: Run, use: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
   const { parts, blocks, trace } = run;
+  // The tag's check first, so a call that holds it is logged once, refused, and never as a call the allowlist passed.
+  if (blocks.holds(JSON.stringify(use.input ?? null))) return refused(run, use, "holds_tag");
   const call = parts.tools.allowlist.check(use.name, use.input);
   if (!call.ok) return refused(run, use, call.reason);
-  if (blocks.holds(JSON.stringify(use.input))) return refused(run, use, "holds_tag");
   const ran = await ranWithin(parts, call, trace.tool(call.name));
   if (!ran.ok) return { type: "tool_result", tool_use_id: use.id, is_error: true, content: failure(ran.reason) };
   return { type: "tool_result", tool_use_id: use.id, is_error: ran.isError, content: blocks.wrap(call.name, ran.text) };

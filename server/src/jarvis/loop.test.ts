@@ -366,6 +366,16 @@ describe("the loop: each tool call checked before it runs", () => {
     run.close();
   });
 
+  it("logs a call refused for the turn's tag once, as refused, never as a call", async () => {
+    const input = { profile: "onyx", path: "gno.land/r/demo/boards", expr: `Render("${TAG}")` };
+    const run = setup({ steps: [asking(toolUse("toolu_1", "gno_eval", input)), ended()] });
+    await run.loop.ask(QUESTION);
+    expect(run.events().filter((event) => String(event["event"]).startsWith("jarvis_tool"))).toEqual([
+      { event: "jarvis_tool_refused", tool: "gno_eval", reason: "holds_tag" },
+    ]);
+    run.close();
+  });
+
   it("runs the allowed calls with their parsed arguments, all of a turn's results in one message, in the model's order", async () => {
     const render = toolUse("toolu_2", "gno_render", { profile: "onyx", realm: "gno.land/r/demo/boards" });
     const answer = message({ content: [thinking(), text("Let me look."), status(), render], stop: "tool_use" });
