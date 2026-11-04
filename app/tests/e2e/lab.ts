@@ -32,6 +32,7 @@ type Asked =
   | "looks"
   | "stages"
   | "ids"
+  | "paths"
   | "minors"
   | "surfaces"
   | "centres"
