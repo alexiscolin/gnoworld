@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
@@ -464,6 +464,23 @@ def mutants():
     yield from each(ls, "{real[file] for file in seen if file in real}", "set(seen)", "hooks", "lint_scope.py names each file in its own case")
     yield from each(ls, "shlex.quote(path) for path", "path for path", "hooks", "lint_scope.py quotes each path for the shell")
     yield from each(ls, "os.path.abspath(info.parent)", "os.path.realpath(info.parent)", "hooks", "lint_scope.py reads the names from the folder as tsc was told it")
+    # The workshop: the app's screens and the lab's, each on its server and its tailnet name, by one function.
+    ws = "scripts/workshop.sh"
+    yield from each(ws, '\tif lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then\n', "\tif false; then\n", "hooks", "workshop.sh never takes a port another process holds")
+    yield from each(ws, '\t\tkill "$old_script" 2>/dev/null || kill "$old_server" 2>/dev/null || :\n', "", "hooks", "workshop.sh stops its checkout's last run")
+    yield from each(ws, ' && lsof -a -p "$old_server" -d cwd -Fn 2>/dev/null | grep -qxF "n$root/app" || continue', " || continue", "hooks", "workshop.sh stops no process of another folder its pid file names")
+    yield from each(ws, '\tfor name in $names; do "$preview" down "workshop-$name" >/dev/null 2>&1 || :; done\n', "", "hooks", "workshop.sh takes its servers off the tailnet at its end")
+    yield from each(ws, '\tfor pid in $servers; do kill "${pid%%:*}" 2>/dev/null || :; done\n', "", "hooks", "workshop.sh stops its servers at its end")
+    yield from each(ws, '[ "$(head -n 1 "$pidfile" 2>/dev/null | cut -d\' \' -f1)" != "$$" ] || rm -f', "rm -f", "hooks", "workshop.sh leaves a later run's pid file")
+    yield from each(ws, "trap 'exit 130' HUP INT TERM", "trap 'exit 130' INT TERM", "hooks", "workshop.sh ends on a closed terminal as on Ctrl+C")
+    yield from each(ws, '|| { echo "workshop: the ${each#*:}\'s dev server stopped" >&2; exit 1; }', "|| :", "hooks", "workshop.sh ends when either server stops")
+    yield from each(ws, '\t\tkill -0 "$pid" 2>/dev/null || { echo "workshop: $what stopped before it listened" >&2; exit 1; }\n', "", "hooks", "workshop.sh ends on a server that stops before it listens")
+    yield from each(ws, '\t(cd app && WORKSHOP_HOSTS=$hosts exec "$@" --port "$port") &\n', '\t(cd app && exec "$@" --port "$port") &\n', "hooks", "workshop.sh gives each server the tailnet's names")
+    yield from each(ws, '\t\t"$preview" down "workshop-$name" >/dev/null 2>&1 || :\n\t\tnames=', "\t\tnames=", "hooks", "workshop.sh takes down what a run cut short left under a name")
+    yield from each(ws, 'names="$names $name" # first: an `up` that fails half way leaves entries the end must take down\n\t\tif shown=$("$preview" up "workshop-$name" "$port"); then\n',
+                    'if shown=$("$preview" up "workshop-$name" "$port"); then\n\t\t\tnames="$names $name"\n', "hooks", "workshop.sh takes down at its end a name whose up failed half way (F4759)")
+    yield from each(ws, 'sed "s/^/workshop-$name: /"', "cat", "hooks", "workshop.sh says each link beside the name it opens")
+    yield from each(ws, 'echo "$$ $pid $port" >>"$pidfile"', ":", "hooks", "workshop.sh writes each server's pid and port")
     yield from each(hm, '"probe": "scripts/' 'probe.py"}', '"probe": "scripts/nowhere.py"}', "hooks", "a cached verdict reads probe.py as test_hooks.sh (G5)")
     # The find is split in two, so that this line holds it nowhere itself: a spot of its own would be a mutant of no guard.
     yield from each(hm, 'SUITE_OF = {"hooks": "scripts/test_hooks.sh' '", ', 'SUITE_OF = {', "hooks", "a cached verdict reads both suites (G5)")

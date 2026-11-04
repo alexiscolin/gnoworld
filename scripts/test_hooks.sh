@@ -6600,6 +6600,142 @@ out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deplo
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
 fi
 
+if part workshop; then
+# pnpm workshop (scripts/workshop.sh) serves the app's screens and the lab's pages, each on its dev server at 127.0.0.1, both put on the
+# tailnet through the tailnet-preview skill's script under a name each (workshop-app, workshop-lab), each link said beside its name
+# (Alexis, 2026-11-04: "il me faudra une adresse tailscale aussi pour regarder à distance"). One function starts each: a port held by
+# another process is said and never taken, its pid and port go to .claude/tmp/workshop.pid, the last run of this checkout is stopped first
+# (killed hard too), what it left on the tailnet taken down; its end, Ctrl+C, a closed terminal or either server stopping, takes both off
+# the tailnet and stops them. The script itself stays in the checkout's folder. Here the servers are Python's.
+w="$t/workshop" && want="v$(cat "$here/../.node-version")"
+mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skills/tailnet-preview/scripts" "$w/bin" "$w/nvm/versions/node/$want/bin"
+cp "$here/workshop.sh" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
+root=$(cd "$w/root" && pwd -P)
+printf '#!/bin/sh\necho %s\n' "$want" >"$w/nvm/versions/node/$want/bin/node"
+cat >"$w/server" <<'SH'
+#!/bin/sh
+echo "$(basename "$0") $* hosts=${WORKSHOP_HOSTS-unset} cwd=$(pwd -P)" >>"$W_LOG"
+[ "${DIE:-}" != "$(basename "$0")" ] || exit 1
+port= prev=
+for a in "$@"; do [ "$prev" != --port ] || port=$a; prev=$a; done
+exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$port"
+SH
+cp "$w/server" "$w/root/app/node_modules/.bin/react-router" && cp "$w/server" "$w/root/app/node_modules/.bin/vite"
+printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exit 1 ;; esac\n' "'{\"BackendState\": \"Running\", \"Self\": {\"DNSName\": \"box.tail.ts.net.\"}}'" >"$w/bin/tailscale"
+preview="$w/home/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
+printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
+chmod +x "$w/nvm/versions/node/$want/bin/node" "$w/root/app/node_modules/.bin/react-router" "$w/root/app/node_modules/.bin/vite" "$w/bin/tailscale" "$preview"
+eval "$(sed -n '/^free_ports() {/,/^}/p' "$here/check.sh")"
+port=$(free_ports 2) && app_port=$port && lab_port=$((port + 1))
+shop() { # $1: the run's name; in the background, its pid in $shop
+	(cd "$t" && W_LOG="$w/log" HOME="$w/home" NVM_DIR="$w/nvm" PATH="$w/bin:$PATH" WORKSHOP_APP_PORT=$app_port WORKSHOP_LAB_PORT=$lab_port exec "${under:-sh}" "$root/scripts/workshop.sh") >"$w/$1.out" 2>&1 &
+	shop=$!
+}
+serving() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null; } # the pid that listens on port $1
+until_() { n=0; until eval "$1"; do n=$((n + 1)); [ "$n" -lt 150 ] || return 1; sleep 0.2; done; }
+up() { until_ 'grep -q "^up workshop-lab " "$w/log.preview" 2>/dev/null && [ -n "$(serving "$lab_port")" ]'; } # both servers up
+ended() { gone=$1 && until_ '! kill -0 "$gone" 2>/dev/null' && until_ '[ -z "$(serving "$app_port")$(serving "$lab_port")" ]'; } # $1, the run, and its servers gone
+order() { # down before up, for each name
+	for name in workshop-app workshop-lab; do
+		[ "$(grep -n "^down $name\$" "$w/log.preview" | head -1 | cut -d: -f1)" -lt "$(grep -n "^up $name " "$w/log.preview" | head -1 | cut -d: -f1)" ] ||
+			fail "workshop.sh did not take down what a run cut short left under $name before putting it up: $(cat "$w/log.preview")"
+	done
+}
+listen_on() { python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$1" >/dev/null 2>&1 & }
+# The defaults, which every case below replaces: two ports, the lab's its config's preview's.
+grep -q 'WORKSHOP_APP_PORT:-5198' "$here/workshop.sh" && grep -q 'WORKSHOP_LAB_PORT:-5199' "$here/workshop.sh" && grep -q 'port: 5199,' "$here/../app/lab.config.ts" ||
+	fail "workshop.sh's default ports are not 5198 for the app and 5199 for the lab, as lab.config.ts's preview"
+shop one && first=$shop
+up || fail "workshop.sh did not put both servers on the tailnet: $(cat "$w/one.out")"
+# The configs hold each server to 127.0.0.1 and its port (app/vite.config.ts's workshopServer); the script gives it its port and its names.
+grep -qxF "react-router dev --port $app_port hosts=box.tail.ts.net,100.64.0.1 cwd=$root/app" "$w/log" ||
+	fail "workshop.sh did not start the app's dev server on its port, the tailnet's names its hosts, from the app: $(cat "$w/log")"
+grep -qxF "vite --config lab.config.ts --port $lab_port hosts=box.tail.ts.net,100.64.0.1 cwd=$root/app" "$w/log" ||
+	fail "workshop.sh did not start the lab's dev server alike: $(cat "$w/log")"
+order
+grep -q "^workshop-app: .*https://box.tail.ts.net:$((app_port + 1000)) " "$w/one.out" && grep -q "^workshop-lab: .*https://box.tail.ts.net:$((lab_port + 1000)) " "$w/one.out" ||
+	fail "workshop.sh did not say each tailnet link beside the name it opens: $(cat "$w/one.out")"
+grep -q "workshop-app is the app's screens" "$w/one.out" && grep -q "workshop-lab is the lab.*realism.html" "$w/one.out" || fail "workshop.sh did not say what each name opens: $(cat "$w/one.out")"
+[ "$(lsof -a -p "$first" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$root" ] || fail "workshop.sh left its checkout's folder"
+app_pid=$(serving "$app_port") && lab_pid=$(serving "$lab_port") || fail "workshop.sh's servers do not listen on their ports"
+[ "$(cat "$root/.claude/tmp/workshop.pid")" = "$(printf '%s %s %s\n%s %s %s' "$first" "$app_pid" "$app_port" "$first" "$lab_pid" "$lab_port")" ] ||
+	fail "workshop.sh did not write its pid, each server's and its port: $(cat "$root/.claude/tmp/workshop.pid")"
+# A second run of the checkout stops the first, its servers and its tailnet names, and serves in its place.
+: >"$w/log.preview" && shop two && second=$shop
+up || fail "a second workshop.sh did not serve in place of the first: $(cat "$w/two.out")"
+kill -0 "$first" 2>/dev/null && fail "a second workshop.sh left the first running"
+! kill -0 "$app_pid" 2>/dev/null && ! kill -0 "$lab_pid" 2>/dev/null || fail "a second workshop.sh left the first's servers running"
+head -n 1 "$root/.claude/tmp/workshop.pid" | grep -q "^$second " || fail "the second workshop.sh did not write its own pids: $(cat "$root/.claude/tmp/workshop.pid")"
+# Either server that stops ends the run, saying so: the other stopped, both off the tailnet, its pid file gone.
+for which in app lab; do
+	[ "$which" = app ] || { : >"$w/log.preview" && shop again && second=$shop && up || fail "workshop.sh did not start again: $(cat "$w/again.out")"; }
+	: >"$w/log.preview" && eval "kill \"\$(serving \"\$${which}_port\")\""
+	ended "$second" || fail "workshop.sh lived on, or left a server, after its $which's server stopped"
+	wait "$second" && fail "workshop.sh exited 0 after its $which's server stopped"
+	grep -q "the $which's dev server stopped" "$w/$([ "$which" = app ] && echo two || echo again).out" || fail "workshop.sh did not say its $which's server stopped"
+	grep -qx "down workshop-app" "$w/log.preview" && grep -qx "down workshop-lab" "$w/log.preview" || fail "workshop.sh did not take both off the tailnet at its end: $(cat "$w/log.preview")"
+	[ ! -e "$root/.claude/tmp/workshop.pid" ] || fail "workshop.sh left its pid file at its end"
+done
+# A server that dies before it listens (a config it cannot load) ends the run, saying which, and puts nothing on the tailnet for it.
+: >"$w/log.preview" && export DIE=vite && shop dies && dies=$shop
+ended "$dies" || fail "workshop.sh lived on after its lab's server died before it listened"
+unset DIE
+grep -q "the lab's dev server stopped before it listened" "$w/dies.out" || fail "workshop.sh did not say its lab's server died before it listened: $(cat "$w/dies.out")"
+grep -q "^up workshop-lab" "$w/log.preview" && fail "workshop.sh put a server that never listened on the tailnet"
+# Ctrl+C (TERM here) and a closed terminal (HUP) end it alike; HUP under dash, which macOS can make its sh (/private/var/select/sh): bash
+# runs the EXIT trap on HUP by itself, dash only through the script's own trap.
+for signal in TERM HUP; do
+	under=$([ "$signal" = TERM ] && echo sh || echo /bin/dash)
+	: >"$w/log.preview" && shop "$signal" && run=$shop && up || fail "workshop.sh did not start again under $under: $(cat "$w/$signal.out")"
+	unset under
+	: >"$w/log.preview" && kill -s "$signal" "$run"
+	ended "$run" || fail "workshop.sh lived through $signal, or left a server running"
+	[ "$(grep -c '^down ' "$w/log.preview")" = 2 ] || fail "workshop.sh did not take both off the tailnet after $signal: $(cat "$w/log.preview")"
+done
+# A run killed hard leaves its servers and its tailnet names: the next run stops those servers, from this checkout's app, and takes the
+# names down before it puts them up again.
+: >"$w/log.preview" && shop hard && hard=$shop && up || fail "workshop.sh did not start again: $(cat "$w/hard.out")"
+old_app=$(serving "$app_port") && kill -9 "$hard" && : >"$w/log.preview" && shop after && after=$shop
+up || fail "workshop.sh did not serve after a run killed hard: $(cat "$w/after.out")"
+kill -0 "$old_app" 2>/dev/null && fail "workshop.sh left the servers of a run killed hard"
+order
+kill "$after" && ended "$after" || fail "workshop.sh lived through TERM"
+# A pid file the run left, or one naming a process of another folder: nothing of it is stopped but this checkout's own servers.
+listen_on "$app_port" && other=$! && until_ '[ -n "$(serving "$app_port")" ]' || fail "the test's own server did not listen"
+printf '%s %s %s\n' "$other" "$other" "$app_port" >"$root/.claude/tmp/workshop.pid"
+shop named && named=$shop && until_ '! kill -0 "$named" 2>/dev/null' || fail "workshop.sh waited on a port another process holds"
+kill -0 "$other" 2>/dev/null || fail "workshop.sh stopped a process of another folder its pid file named"
+grep -q "port $app_port is held by another process" "$w/named.out" || fail "workshop.sh did not say its app's port is held: $(cat "$w/named.out")"
+until_ '[ -z "$(serving "$lab_port")" ]' || fail "workshop.sh started its lab's server though the app's port was held"
+kill "$other"
+printf '999999 999998 %s\n' "$app_port" >"$root/.claude/tmp/workshop.pid" && : >"$w/log.preview" && shop stale && stale=$shop
+up || fail "workshop.sh did not serve past a pid file of gone processes: $(cat "$w/stale.out")"
+# A later run's pid file, written while this one ends, stays.
+printf '1 2 %s\n' "$app_port" >"$root/.claude/tmp/workshop.pid" && kill "$stale" && ended "$stale" || fail "workshop.sh lived through TERM"
+[ "$(cat "$root/.claude/tmp/workshop.pid" 2>/dev/null)" = "1 2 $app_port" ] || fail "workshop.sh removed a later run's pid file at its end"
+# The lab's port held by another process: said, that process left as it is, no server of the run left behind.
+listen_on "$lab_port" && other=$! && until_ '[ -n "$(serving "$lab_port")" ]' || fail "the test's own server did not listen"
+shop four && four=$shop && until_ '! kill -0 "$four" 2>/dev/null' || fail "workshop.sh waited on a port another process holds"
+wait "$four" && fail "workshop.sh exited 0 on a port another process holds"
+grep -q "port $lab_port is held by another process" "$w/four.out" || fail "workshop.sh did not say its lab's port is held: $(cat "$w/four.out")"
+kill -0 "$other" 2>/dev/null || fail "workshop.sh stopped a process it did not start"
+until_ '[ -z "$(serving "$app_port")" ]' || fail "workshop.sh left its app's server running when the lab's port was held"
+kill "$other"
+# The tailnet refusing one name half way (F4759): the run goes on, that server here alone, and both names come down at its end.
+: >"$w/log.preview" && export FAIL_UP=workshop-lab && shop refused && refused=$shop
+until_ 'grep -q "the tailnet refused the lab" "$w/refused.out" && [ -n "$(serving "$lab_port")" ]' || fail "workshop.sh did not say the tailnet refused its lab: $(cat "$w/refused.out")"
+unset FAIL_UP
+kill "$refused" && ended "$refused" || fail "workshop.sh lived through TERM"
+[ "$(grep -c '^down workshop-lab$' "$w/log.preview")" = 2 ] || fail "workshop.sh left on the tailnet a name whose up failed half way: $(cat "$w/log.preview")"
+# With no Tailscale here, it serves on this machine alone and says the local addresses, no tailnet name asked.
+: >"$w/log.preview" && printf '#!/bin/sh\nexit 1\n' >"$w/bin/tailscale" && shop five && five=$shop
+until_ 'grep -q "127.0.0.1:$lab_port" "$w/five.out"' || fail "workshop.sh with no tailnet did not say its local addresses: $(cat "$w/five.out")"
+grep -q "127.0.0.1:$app_port" "$w/five.out" || fail "workshop.sh with no tailnet did not say the app's local address: $(cat "$w/five.out")"
+[ ! -s "$w/log.preview" ] || fail "workshop.sh asked the tailnet with no Tailscale running: $(cat "$w/log.preview")"
+grep -q "hosts= cwd=" "$w/log" || fail "workshop.sh gave the servers hosts with no tailnet: $(cat "$w/log")"
+kill "$five" && ended "$five" || fail "workshop.sh lived through TERM"
+fi
+
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"
 echo "hooks: ok"
 finished=1

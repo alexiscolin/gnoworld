@@ -1,7 +1,7 @@
 import { reactRouter } from "@react-router/dev/vite";
 import babel from "@rolldown/plugin-babel";
 import { reactCompilerPreset } from "@vitejs/plugin-react";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, defineConfig, parseSync, type Plugin } from "vite";
@@ -80,6 +80,23 @@ const CHUNKS = [
   { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
 ];
 
+// The workshop's dev servers, the app's and the lab's (scripts/workshop.sh gives each its port): this machine alone, the exact names
+// WORKSHOP_HOSTS lists (its tailnet's), and by path the app, the packages and their store, which a worktree links into the main
+// checkout's (the fonts' files); never the repository's root, whose deploy/ holds secrets.
+export const workshopHosts = () => process.env["WORKSHOP_HOSTS"]?.split(",").filter(Boolean) ?? [];
+export const workshopServer = () => ({
+  host: "127.0.0.1",
+  strictPort: true,
+  allowedHosts: workshopHosts(),
+  // A build of a copy of app/ alone (dataFiles.test.ts) has no packages beside it: a folder that is not there is allowed to no one.
+  fs: {
+    allow: ["./", "../packages", "../node_modules/.pnpm"]
+      .map((path) => new URL(path, import.meta.url))
+      .filter((url) => existsSync(url))
+      .map((url) => realpathSync(url)),
+  },
+});
+
 /** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
 export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
@@ -93,4 +110,5 @@ export default defineConfig({
     serviceWorker,
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
+  server: workshopServer(),
 });
