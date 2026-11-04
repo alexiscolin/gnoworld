@@ -14,7 +14,7 @@ import { heldOf } from "../../src/scene/cosmos/cosmosWorld.ts";
 import { FILED as CREDITS } from "../../src/scene/planet/creditFiles.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
-import { held, hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
+import { earthStanding, held, hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";
 
 // The cosmos (frames 1 to 8, 16, 17, 143, 144) on the gate's software GPU, under the page's real CSP, from Onyx's 743 recorded paths grouped
 // by the server's code (app/lab/worlds.json, no deployer or calls). Reduced motion owes a frame a change. The canvas is not pixel-compared
@@ -65,9 +65,7 @@ const served = (page: Page, body: string, status = 200) =>
 // The Earth's view standing (7x2): the Earth and its stations, then more than `bodies` bodies held, each on the screen: a body waits off
 // it until its programs are compiled. The view at rest draws none of a system, so it asks none by default.
 async function standing(page: Page, bodies = -1) {
-  await expect
-    .poll(async () => (await cosmos(page)).earth && ((await cosmos(page)).stations?.close ?? 0) > 0, SLOW)
-    .toBe(true);
+  await earthStanding(page);
   await expect.poll(async () => (await cosmos(page)).bodies, SLOW).toBeGreaterThan(bodies);
   await expect
     .poll(async () => {
