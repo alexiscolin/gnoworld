@@ -17,8 +17,8 @@ import { cost, worstCost, type Model } from "./prices.ts";
 import type { Trace } from "./tracing.ts";
 
 export type Request = Anthropic.MessageCreateParamsNonStreaming;
-/** One attempt of a model request: its answer, or the SDK's error. */
-export type Send = (request: Request) => Promise<Anthropic.Message>;
+/** One attempt of a model request, which the question's signal ends: its answer, or the SDK's error. */
+export type Send = (request: Request, signal?: AbortSignal) => Promise<Anthropic.Message>;
 
 // Where and how every request is billed, whatever the caller sent.
 const pinned = (request: Request): Request => ({ ...request, inference_geo: "global", service_tier: "standard_only" });
@@ -39,18 +39,22 @@ export function connectAnthropic(key: Secret, timeoutMs: number, fetch?: ClientO
     fetchOptions: { redirect: "error" },
     fetch,
   });
-  return (request) => client.messages.create(pinned(request));
+  return (request, signal) => client.messages.create(pinned(request), { signal });
 }
 
+/** The wait before a retry, ended by the question's signal, as node:timers' own is. */
+export type Wait = (ms: number, value?: undefined, options?: { signal?: AbortSignal | undefined }) => Promise<unknown>;
 interface Attempts {
   readonly send: Send;
   readonly budget: Budget;
   readonly retries: number;
   readonly log: Log;
   readonly trace: Trace;
-  readonly wait?: ((ms: number) => Promise<void>) | undefined;
+  readonly wait?: Wait | undefined;
+  // The question's: once its asker left, nothing more is sent, waited for or retried (D177).
+  readonly signal?: AbortSignal | undefined;
 }
-type Called = { ok: true; answer: Anthropic.Message } | { ok: false; reason: "spent" | "failed" | "timeout" };
+type Called = { ok: true; answer: Anthropic.Message } | { ok: false; reason: "spent" | "failed" | "timeout" | "gone" };
 type Tried = Called | { ok: false; reason: "error"; error: AnthropicError };
 
 /** One model request: each attempt reserved at its worst before it is sent and settled once it ends. */
@@ -58,14 +62,19 @@ export async function callModel(attempts: Attempts, request: Request & { model: 
   const sent = pinned(request);
   const inputBytes = Buffer.byteLength(JSON.stringify(sent));
   const worst = worstCost(request.model, { inputBytes, maxTokens: request.max_tokens });
+  const { signal } = attempts;
   for (let attempt = 1; ; attempt += 1) {
+    if (signal?.aborted === true) return { ok: false, reason: "gone" };
     const tried = await tryOnce(attempts, { sent, worst }, attempt);
     if (tried.ok || tried.reason !== "error") return tried;
     const delay = attempt > attempts.retries ? undefined : delayOf(tried.error, attempt);
     if (delay === undefined) {
       return { ok: false, reason: tried.error instanceof APIConnectionTimeoutError ? "timeout" : "failed" };
     }
-    await (attempts.wait ?? sleep)(delay);
+    // node:timers' wait rejects once the signal fires: the next attempt then finds the asker gone.
+    await (attempts.wait ?? sleep)(delay, undefined, { signal }).catch((error: unknown) => {
+      if (signal?.aborted !== true) throw error;
+    });
   }
 }
 
@@ -83,12 +92,14 @@ async function tryOnce(
   if (!held.ok) return { ok: false, reason: "spent" };
   const span = trace.request(attempt);
   try {
-    const answer = await attempts.send(sent);
+    const answer = await attempts.send(sent, attempts.signal);
     span.answered(answer, settled(attempts, held.hold, cost(answer.model, answer.usage)));
     return { ok: true, answer };
   } catch (error) {
     // The attempt is over either way: its hold is settled at its worst, for it may have been billed (D69).
     span.failed(error instanceof Error ? error.constructor.name : "unknown", settled(attempts, held.hold, undefined));
+    // The SDK ends a request whose signal fired with its own error: the asker left, no model's fault.
+    if (attempts.signal?.aborted === true) return { ok: false, reason: "gone" };
     if (!(error instanceof AnthropicError)) throw error;
     const status = answeredOf(error)?.status;
     log("jarvis_model_error", { error: error.constructor.name, ...(status === undefined ? {} : { status }) });
