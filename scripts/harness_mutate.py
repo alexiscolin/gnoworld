@@ -365,6 +365,7 @@ def mutants():
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
     yield from each("package.json", " && tsc -p app/tsconfig.json", "", "probe", "typecheck covers the app")
     yield from each("package.json", " && tsc -p packages/ui/tsconfig.json", "", "probe", "typecheck covers ui")
+    yield from each("package.json", 'app/tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/app.tsbuildinfo\\"', "app/tsconfig.json", "hooks", "typecheck builds the app incrementally into its own file of TSC_CACHE")
     # ui: React's lint reaches it, and its tests run in jsdom, all of them, each on an empty page.
     yield from each(REACT, ', "packages/ui/src/**/*.{ts,tsx}"]', "]", "probe", "eslint reads ui as React")
     yield from each("vitest.config.ts", 'environment: "jsdom",', "", "probe", "ui's tests run in jsdom")
