@@ -5,17 +5,20 @@
 import { readFileSync } from "node:fs";
 import { Universes } from "@gnoworld/schemas";
 
+// A data file's rows as JSON, or undefined for a file that is no JSON: a parse error quotes the text, so it stays out of any message, and a
+// file that is not there says its path in its own.
+function dataOf(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
+  }
+}
+
 /** The id, RPC and indexer of the universe marked default. */
 export function defaultUniverse(file: string): { id: string; rpc: string; indexer: string } {
-  let rows: unknown;
-  try {
-    rows = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    // A parse error quotes the text, so it stays out of the message; a file that is not there says its path in its own.
-    if (error instanceof SyntaxError) rows = undefined;
-    else throw error;
-  }
-  const parsed = Universes.safeParse(rows);
+  const parsed = Universes.safeParse(dataOf(file));
   const chosen = parsed.success ? parsed.data.find((universe) => universe.default === true) : undefined;
   if (chosen === undefined) throw new Error(`universes: ${file} does not hold a good list with a default universe`);
   return { id: chosen.id, rpc: chosen.rpc, indexer: chosen.indexer };

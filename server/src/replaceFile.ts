@@ -29,3 +29,6 @@ export function replaceFiles(files: readonly Replacement[]): boolean {
 
 /** One file through `replaceFiles`. */
 export const replaceFile = (file: string, text: string): boolean => replaceFiles([{ file, text }]);
+
+/** A file kept beside `file`, named after it (worlds.json, worlds-count.json), so the two never share a path. */
+export const besideOf = (file: string, name: string): string => `${file.replace(/\.json$/, "")}-${name}.json`;
