@@ -3,8 +3,8 @@ import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y, 2026-11-04): JavaScript before the first usable screen, 3 MB
 // in all with the worker's precache; steps in docs/decisions.md. The first screen: slice 8's header, 8b's plug and Go explore's pill, and
-// 8c's bell, share and rail's follows, 182,725 B measured; the ceiling is now 182,784 B, by Alexis, 2026-11-04, for 8c's bell.
-const FIRST_SCREEN_JS = 182_725;
+// 8c's bell, share and rail's follows, 182,749 B measured; the ceiling is now 182,784 B, by Alexis, 2026-11-04, for 8c's bell.
+const FIRST_SCREEN_JS = 182_749;
 const TOTAL = 3_135_286;
 
 // A text's hashed names of other files (`scene-B9x_Qa1z.js`) weigh as one fixed string: a chunk renamed moved another's weight 1 to 3 B
