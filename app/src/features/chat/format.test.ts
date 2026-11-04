@@ -286,6 +286,17 @@ describe("formatted, underline", () => {
     );
   });
 
+  // The bar's escapes come off with its run: U twice reads as the draft did, the writer's `+` beside or in the words.
+  it.each(["«+hi+»", "I like «c++» lots", "«1»+1", "«c++ lots»"])(
+    "takes the underline of %j off again, its `+` escaped: U twice reads as the draft did",
+    (marked) => {
+      const once = apply(marked, "underline");
+      const twice = formatted(once, "underline");
+      expect(markdown(twice.text)).toStrictEqual(markdown(draft(marked).text));
+      expect(markdown(once.text)).not.toStrictEqual(markdown(twice.text));
+    },
+  );
+
   it("reads a bare address the bar underlined as an underlined link", () => {
     const { text } = apply("see «https://a.example/x» now", "underline");
     expect(markdown(text)).toStrictEqual([
