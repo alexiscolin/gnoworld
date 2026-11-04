@@ -60,6 +60,15 @@
     background: color-mix(in oklab, var(--color-surface) 45%, transparent);
   }
 
+  /* A control whose press covers its whole card: its box drawn over the card, which places it (position: relative); a column's item, a
+     page's capture (8f). */
+  .covers::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    content: "";
+  }
+
   /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
   .truncate {
     min-inline-size: 0;

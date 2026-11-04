@@ -38,14 +38,6 @@
     text-decoration: none;
   }
 
-  /* The whole pill is the link: its sides and its count too (review 25 of 5q). */
-  .main::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-  }
-
   /* The item in view says so on its link too, a half step heavier, as a Row's current link does. */
   .main[aria-current="true"] {
     font-weight: 500;
