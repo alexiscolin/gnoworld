@@ -72,11 +72,12 @@ const written = (pattern: RegExp) =>
   );
 
 describe("what the depth's chunk shares", () => {
-  it("defines a drawn body's least size, 1.5 times a body's, once", () => {
-    expect(written(/\b1\.5\s*\*\s*BODY_PIXELS\b|\bBODY_PIXELS\s*\*\s*1\.5\b/g)).toHaveLength(1);
+  it("defines a drawn body's least size, 1.5 times a body's, once, beside a body's in the ladder", () => {
+    expect(written(/\b1\.5\s*\*\s*BODY_PIXELS\b|\bBODY_PIXELS\s*\*\s*1\.5\b/g)).toEqual(["lod/ladder.ts"]);
   });
 
-  it("writes a label's place by its body, its stem and its gap, once", () => {
-    expect(written(/\b(?:stem|gap)\s*[:=]\s*(?:12|22)\b/g)).toHaveLength(2);
+  it("writes a label's stem and its gap by its body once each, in the layout's place", () => {
+    expect(written(/\bstem\s*[:=]\s*12\b/g)).toEqual(["lod/place.ts"]);
+    expect(written(/\bgap\s*[:=]\s*22\b/g)).toEqual(["lod/place.ts"]);
   });
 });
