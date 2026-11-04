@@ -214,6 +214,7 @@ describe("startGnomcp: gnomcp started read-only", () => {
   it.each([
     ["another version", { name: "gnomcp", version: "0.12.0" }, "gnomcp 0.12.0"],
     ["another server", { name: "not-gnomcp", version: "0.11.0" }, "not-gnomcp 0.11.0"],
+    ["a name with a line break, shown", { name: "gno\nmcp", version: "0.11.0" }, "gno[U+000A]mcp 0.11.0"],
   ])(
     "refuses to start on %s than gnomcp 0.11.0, whose meaning of read-only it checks",
     async (_case, server, named) => {
@@ -322,7 +323,13 @@ describe("Gnomcp.call: one read", () => {
     expect(await gnomcp.call("gno_status", { profile: "onyx" })).toMatchObject({ ok: true });
     expect(fake.starts()).toHaveLength(5);
     expect(events()).not.toContainEqual({ event: "jarvis_gnomcp_down", reason: "restarts" });
-    expect(events().filter((event) => event["reason"] === "oversized")).toHaveLength(4);
+    const oversized = { event: "jarvis_gnomcp_down", reason: "oversized" };
+    expect(events().filter((event) => event["reason"] === "oversized")).toEqual([
+      oversized,
+      oversized,
+      oversized,
+      oversized,
+    ]);
   });
 
   it("gives up a call at its timeout, the child still answering the next one", async () => {
@@ -358,6 +365,17 @@ describe("Gnomcp.call: one read", () => {
     ]);
     expect(both.map((ran: Ran) => ran.ok)).toEqual([true, true]);
     expect(fake.starts()).toHaveLength(2);
+  });
+
+  it("spends the window on a crash after a stray line of its transport's, which is no message's size", async () => {
+    const { gnomcp, fake } = await start({ crash: { tool: "gno_render", starts: 99 }, stdoutJunk: true });
+    for (let crash = 0; crash < 4; crash += 1) {
+      expect(await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" })).toEqual({
+        ok: false,
+        reason: "down",
+      });
+    }
+    expect(fake.starts()).toHaveLength(3);
   });
 
   it("starts it 3 times in 10 minutes at most, then answers down until the window moves on", async () => {

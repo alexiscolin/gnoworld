@@ -34,6 +34,8 @@ export interface Scenario {
   stderrSplit?: boolean;
   stderrBefore?: string;
   exitAtStart?: boolean;
+  // A line of JSON that is no JSON-RPC message, written on stdout at start.
+  stdoutJunk?: boolean;
   // The name and version it gives at initialize, gnomcp 0.11.0 by default.
   server?: { name: string; version: string };
 }
@@ -90,6 +92,7 @@ for (const line of scenario.stderr ?? []) {
   }
 }
 if (scenario.exitAtStart) process.exit(3);
+if (scenario.stdoutJunk) process.stdout.write(JSON.stringify({ not: "a JSON-RPC message" }) + "\\n");
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 const call = (id, name, args) => {
   if (scenario.crash && scenario.crash.tool === name && started < scenario.crash.starts) process.exit(1);
