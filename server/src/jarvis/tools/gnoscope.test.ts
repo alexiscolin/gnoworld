@@ -52,6 +52,14 @@ describe("startGnoscope: off by default, and then nothing of it", () => {
 });
 
 describe("startGnoscope: its tools listed at start, ours alone taken", () => {
+  it("refuses a network list our tools cannot name before it asks gnoscope anything", async () => {
+    const server = await serve();
+    const { log } = capture();
+    const begun = startGnoscope({ on: true, url: server.url, timeoutMs: 2_000, networks: ["Main Net"], log });
+    await expect(begun).rejects.toThrow(/^gnoscope tools: the network "Main Net" is no network's name$/);
+    expect(server.requests).toEqual([]);
+  });
+
   it("offers our four reads, each with our own schema, once gnoscope lists them with our fields", async () => {
     const server = await serve();
     const started = await start(server.url).gnoscope;

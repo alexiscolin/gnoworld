@@ -55,9 +55,11 @@ const none = (): Gnoscope => ({
   close: () => Promise.resolve(),
 });
 
-/** gnoscope's reads Jarvis takes: none when its switch is off or it does not answer at start; never throws. */
+/** gnoscope's reads Jarvis takes: none when its switch is off or it does not answer at start; throws, before any
+ * request, only on a network list our tools cannot name (the settings check it first). */
 export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
   if (!setup.on) return none();
+  const ours = gnoscopeTools(setup.networks);
   // Four pages of tools at most, each within its time; gnoscope listed seven on one page (2026-11-04).
   const client = new Client({ name: "jarvis", version: "1.0.0" }, { listMaxPages: 4 });
   const transport = new StreamableHTTPClientTransport(new URL(setup.url), {
@@ -80,7 +82,7 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
     await client.close();
     return none();
   }
-  const definitions = taken(listed, setup);
+  const definitions = taken(ours, listed, setup.log);
   let closed = false;
   return {
     definitions,
@@ -106,9 +108,9 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
 }
 
 // Ours that gnoscope lists with every field of ours; each other one left out, and logged.
-function taken(listed: readonly Tool[], setup: Setup): Gnoscope["definitions"] {
+function taken(ours: Gnoscope["definitions"], listed: readonly Tool[], log: Log): Gnoscope["definitions"] {
   const fields = new Map(listed.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]));
-  return gnoscopeTools(setup.networks).filter(({ name, args }) => {
+  return ours.filter(({ name, args }) => {
     const theirs = fields.get(name);
     const reason =
       theirs === undefined
@@ -116,7 +118,7 @@ function taken(listed: readonly Tool[], setup: Setup): Gnoscope["definitions"] {
         : Object.keys(args.shape).every((field) => theirs.includes(field))
           ? ""
           : "fields";
-    if (reason !== "") setup.log("jarvis_gnoscope_dropped", { tool: name, reason });
+    if (reason !== "") log("jarvis_gnoscope_dropped", { tool: name, reason });
     return reason === "";
   });
 }
