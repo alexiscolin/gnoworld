@@ -50,3 +50,4 @@ export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { fold } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
 export { placeAt, placesOf, type Place, type PlaceKind, type PlaceSource } from "./places/places.ts";
+export { jsonOf, placeIn } from "./json/json.ts";

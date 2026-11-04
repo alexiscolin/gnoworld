@@ -1,6 +1,7 @@
 // An account's direct-message preferences, on the device (slice 4's 4e; ADR-0002's "only from people I have talked
 // with"): whether it hears from those it wrote to alone, and who those are. What the device gives back is checked:
 // a list of addresses, else nothing, and forgotten. A device that refuses (blocked, full) keeps nothing and says so.
+import { jsonOf } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 import type { DraftStorage } from "../drafts/drafts.ts";
@@ -56,7 +57,7 @@ export function readKept<T>(
   try {
     const held = storage().getItem(key);
     if (held === null) return empty;
-    const read = check(parsed(held));
+    const read = check(jsonOf(held));
     if (read !== undefined) return read;
     storage().removeItem(key);
     return empty;
@@ -72,14 +73,5 @@ export function writeKept(storage: () => DraftStorage, key: string, text: string
     return true;
   } catch {
     return false;
-  }
-}
-
-/** The device's text as JSON, or nothing. */
-function parsed(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
   }
 }

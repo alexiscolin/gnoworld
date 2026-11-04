@@ -3,6 +3,7 @@
 // `<file>: <row>.<field>: <what is wrong>`, e.g. `news.json: [1].id: duplicate id "n1"`.
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { placeIn } from "@gnoworld/core";
 import type { output } from "zod/mini";
 import {
   BubbleRules,
@@ -58,7 +59,9 @@ export function loadData(dir: string): Data {
     }
     const parsed = schema.safeParse(json);
     if (!parsed.success)
-      throw new Error(parsed.error.issues.map((issue) => `${file}: ${where(issue.path)}: ${issue.message}`).join("\n"));
+      throw new Error(
+        parsed.error.issues.map((issue) => `${file}: ${placeIn(issue.path)}: ${issue.message}`).join("\n"),
+      );
     found[name] = parsed.data;
   }
   const data = found as Data;
@@ -72,13 +75,4 @@ export function loadData(dir: string): Data {
     if (faults.length > 0) throw new Error(faults.join("\n"));
   }
   return data;
-}
-
-function where(path: readonly PropertyKey[]): string {
-  return path.length === 0
-    ? "(file)"
-    : path
-        .map((key) => (typeof key === "number" ? `[${String(key)}]` : `.${String(key)}`))
-        .join("")
-        .replace(/^\./, "");
 }
