@@ -140,8 +140,8 @@ gate fails, run the failing lane alone before running the whole gate again.
 **The related tests** (Alexis, 2026-11-04: 212 fast gates past their budget in two days, a mean of 141 s, the whole Vitest
 suite the slowest step in 210): a commit's Vitest runs only the tests its change asks for, in every area, through Vitest's own
 `related` command (`vitest related --run`, with the projects of package.json's `test` script, which must start with `vitest run`;
-Vitest 4.1.12 has no `run --related`). `scripts/related.py` gives it the paths: the changed paths of the sources (`app/src`, `app/tests`,
-`server/src`, `packages/*/src`), whose importers, at any depth, Vitest finds; `server/src/main.test.ts` for any code of the server, core
+Vitest 4.1.12 has no `run --related`). `scripts/related.py` gives it the paths: every changed path but prose (a JSON of `app/data` too), whose
+importers, at any depth, Vitest finds; `server/src/main.test.ts` for any code of the server, core
 or the schemas, as it runs the server as a child process, outside that graph (the server loads core's whole index, 193 of their 216
 files); and the code that reads a changed place from disk, found by a grep of `new URL(<place>, import.meta.url)`, of a path written
 from the repository's root (`` `packages/ui/src/${file}` ``) and of `join("deploy", ...)`. A place that is a workspace's or the
