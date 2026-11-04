@@ -272,7 +272,7 @@ test.describe("a computer", () => {
     await views.getByRole("link", { name: "Earth" }).click();
     await painted(page);
     await expect.poll(async () => (await stats(page)).textures, SLOW).toBeGreaterThan(before.textures);
-    await views.getByRole("link", { name: "Cosmos" }).click();
+    await views.getByRole("link", { name: "Universe" }).click();
     await expect(kept(page)).toHaveCount(0);
     await expect.poll(async () => (await stats(page)).textures, SLOW).toBe(before.textures);
     await expect.poll(async () => (await stats(page)).geometries, SLOW).toBe(before.geometries);
@@ -362,7 +362,7 @@ test.describe("a texture that does not come", () => {
     await page.goto(EARTH);
     await expect(page.getByRole("status").filter({ hasText: SORRY })).toBeVisible(SLOW);
     const views = page.getByRole("navigation", { name: "Views" });
-    await views.getByRole("link", { name: "Cosmos" }).click();
+    await views.getByRole("link", { name: "Universe" }).click();
     await views.getByRole("link", { name: "Earth" }).click();
     await painted(page);
     await expect(page.getByRole("status").filter({ hasText: SORRY })).toHaveCount(0);

@@ -275,7 +275,7 @@ test.describe("a newcomer", () => {
   test("sees no opening on the home after a shared link to a world", async ({ page }) => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
-    await page.getByRole("link", { name: "Cosmos", exact: true }).click();
+    await page.getByRole("link", { name: "Universe", exact: true }).click();
     await expect(page).toHaveURL(/\/(\?test-gpu)?$/, SLOW);
     await running(page);
     await expect(opening(page)).toHaveCount(0);
@@ -345,7 +345,7 @@ test.describe("a reader who came back", () => {
     await expect(views.getByRole("link", { name: "Earth", exact: true })).toHaveAccessibleDescription(
       "where everyone talks",
     );
-    await expect(views.getByRole("link", { name: "Cosmos", exact: true })).toHaveAccessibleDescription("every world");
+    await expect(views.getByRole("link", { name: "Universe", exact: true })).toHaveAccessibleDescription("every world");
     await expect(views.getByRole("link", { name: "List", exact: true })).toHaveAccessibleDescription(
       "every world, as text",
     );
@@ -452,7 +452,7 @@ test.describe("a newcomer's Earth label", () => {
   test("sees no Start here after a shared link to a world: a place was entered", async ({ page }) => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
-    await page.getByRole("link", { name: "Cosmos", exact: true }).click();
+    await page.getByRole("link", { name: "Universe", exact: true }).click();
     await expect(earthLabel(page)).toContainText("Earth", SLOW);
     await expect(earthLabel(page)).not.toContainText("Start here");
   });

@@ -135,7 +135,7 @@ test.describe("a computer", () => {
     await hydrated(page);
     await page.evaluate(() => new Promise(requestAnimationFrame));
     expect(asked).toEqual([]);
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Cosmos" }).click();
+    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Universe" }).click();
     await expect(page.locator("canvas")).toBeAttached();
     expect(asked.length).toBeGreaterThan(0);
   });
@@ -224,7 +224,7 @@ test.describe("the loop", () => {
     await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
     await page.evaluate(() => new Promise(requestAnimationFrame));
     expect(await servedOver(page, 500)).toBe(0);
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Cosmos" }).click();
+    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Universe" }).click();
     await running(page);
     await expect.poll(() => servedOver(page, 200)).toBeGreaterThan(0);
     expect(await first.evaluate((was) => was === Reflect.get(globalThis, "__gnoworldScene"))).toBe(true);

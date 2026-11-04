@@ -28,6 +28,19 @@
     display: contents;
   }
 
+  /* What drops when the header runs short, the network and the account kept: Jarvis, the chat and the counter (the menu keeps the
+     passport), on a phone too. */
+  .drops {
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .drops {
+      /* layout: the control itself is the row's item */
+      display: contents;
+    }
+  }
+
   .network {
     /* layout: the network on its own row under the logo and the account on a phone */
     grid-column: 1 / -1;

@@ -220,12 +220,12 @@ test.describe("a realm's view", () => {
         for (const path of ["/r/gnoland/coins", "/w/bubble"]) {
           await page.goto(path);
           await hydrated(page);
-          await expect(views.getByRole("link", { name: "Cosmos" })).toBeVisible();
+          await expect(views.getByRole("link", { name: "Universe" })).toBeVisible();
           await expect(views.locator("[aria-current]")).toHaveCount(0);
         }
         await page.goto("/");
         await hydrated(page);
-        await expect(views.locator("[aria-current='page']")).toHaveText("Cosmos");
+        await expect(views.locator("[aria-current='page']")).toHaveText("Universe");
       });
     }
   });
