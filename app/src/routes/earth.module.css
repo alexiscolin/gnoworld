@@ -6,6 +6,14 @@
     block-size: 70vb;
   }
 
+  /* raw: under the dock's breakpoint (ChatScreen.tsx) the plate is a block at the page's top: it keeps the arrival pill's room
+     above it, as a realm's view does (tokens.css), so the pill covers neither its trail nor its title */
+  @media (max-width: 1279px) {
+    .earth + * {
+      padding-block-start: var(--banner-room);
+    }
+  }
+
   /* raw: the dock's breakpoint (ChatScreen.tsx) */
   @media (min-width: 1280px) {
     .earth,

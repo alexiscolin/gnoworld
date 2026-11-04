@@ -15,18 +15,22 @@
     z-index: 3;
   }
 
-  /* Full bleed, its own header is the one in view: the top centre's slot stands a step under it, and the conversation keeps
-     the slot's room free above its lines, as a realm's view does (tokens.css), so an arrival's pill covers none of them. */
+  /* Full bleed on a wide screen, the arrival's pill stands in its header's empty centre (frame 73), the 52 px band holding its
+     one row: the lines keep their place under the header (frame 66). */
   :root:has(.screen[data-full]) {
-    --banner-under: calc(var(--flash-room) + var(--chat-head));
+    --banner-top: calc(
+      var(--flash-room) + (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
+    );
   }
 
-  /* A narrow chat's header has two rows (ChatHeader.module.css): two controls' height, the header's step and its line. */
+  /* A narrow chat's header has two rows and no free centre (ChatHeader.module.css: two controls' height, its step and its
+     line): the pill stands a step under it, and the conversation keeps its room free above the lines (tokens.css). */
   :root:has(.screen[data-full][data-compact]) {
     --banner-under: calc(var(--flash-room) + var(--control-s) * 2 + var(--space-m) + var(--line-width));
+    --banner-top: calc(var(--banner-under) + var(--space-s));
   }
 
-  .screen[data-full] [data-region="conversation"] {
+  .screen[data-full][data-compact] [data-region="conversation"] {
     padding-block-start: var(--banner-room);
   }
 

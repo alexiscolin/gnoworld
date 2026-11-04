@@ -6,7 +6,8 @@
     /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
     margin: 0 auto;
     inline-size: fit-content;
-    max-inline-size: 100%;
+    /* The page's gutter on both sides, never edge to edge on a phone (8j). */
+    max-inline-size: calc(100% - var(--space-s) * 2);
     padding-block: var(--space-2xs);
     /* Its Close sits close to the edge, as a pill's last control does. */
     padding-inline: var(--space-m) var(--space-2xs);
