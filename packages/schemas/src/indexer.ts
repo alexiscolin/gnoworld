@@ -41,6 +41,14 @@ export {
   WORLDS_MAX_BYTES,
 } from "./worlds.ts";
 // Who is here (7h) behind the same door: only the universe's feed reads it, after the first screen.
-export { Presence, PRESENCE_ANSWER_MAX } from "./presence.ts";
+export {
+  COUNTRIES_MOST,
+  Presence,
+  PRESENCE_ANSWER_MAX,
+  PresencePeople,
+  PRESENCE_PEOPLE_MAX_BYTES,
+} from "./presence.ts";
+// The prices' history (8i) too: only the markets row's sparklines read it, from a chunk of their own.
+export { MARKETS_HISTORY_MAX_BYTES, MARKETS_HISTORY_MOST, MarketsHistory } from "./marketsHistory.ts";
 // The ticker's trends (7t) behind it too: only the home reads them, and the store's chunk, on every page, holds none of them.
 export { Trend, Trends, TRENDS_MAX_BYTES, TRENDS_MOST } from "./trends.ts";

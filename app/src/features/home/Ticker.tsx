@@ -1,6 +1,6 @@
 // The strip at the foot of the home (frame 6): the chain's trends and the data's news and events in a line that scrolls, 34 px high, with a
-// button that pauses it, first in the page's order so a keyboard reaches it before any link. With nothing to show it is not drawn. A trend
-// opens its world here, through the router; a news or an event opens another site.
+// button that pauses it, first in the page's order so a keyboard reaches it before any link. With nothing to show it is not drawn. A trend,
+// or an on-air line of a world, opens its world here, through the router; a news, an event or an on-air line of another site opens that site.
 import { Icon } from "@gnoworld/ui";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -14,6 +14,7 @@ const KINDS: Record<TickerItem["kind"], string> = {
   new: "New",
   news: "News",
   event: "Event",
+  onair: "On air",
 };
 
 export function Ticker({ items }: { items: TickerItem[] }) {
@@ -39,7 +40,8 @@ export function Ticker({ items }: { items: TickerItem[] }) {
               <b className={styles["kind"]} data-kind={item.kind}>
                 {KINDS[item.kind]}
               </b>
-              {item.kind === "news" || item.kind === "event" ? (
+              {/* Another site's address opens a new tab; the site's own page opens here, through the router. */}
+              {item.link.startsWith("https://") ? (
                 <a href={item.link} target="_blank" rel="noopener noreferrer" className={styles["link"]}>
                   {item.text}
                 </a>

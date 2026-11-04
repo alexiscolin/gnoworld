@@ -69,9 +69,10 @@ const trendsServed = (page: Page, answer: { body: unknown } | { status: number }
       ? route.fulfill({ contentType: "application/json", body: JSON.stringify(answer.body) })
       : route.fulfill({ status: answer.status }),
   );
-/** Waits for the server's trends to lead the ticker, before the news: the strip then holds the line it keeps. */
+/** Waits for the server's trends to lead the ticker, before what is on air (8i, onAir.json) and the news: the strip then holds the line it
+ * keeps, six items. */
 const trendsShown = (page: Page) =>
-  expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["Trending", "Rising", "New", "News", "News", "News"]);
+  expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["Trending", "Rising", "New", "On air", "News", "News"]);
 /** The home with its reads answered, hydrated: the prices' file, and the server's trends. */
 async function openHome(page: Page, options: Options = { markets: MARKETS }, path = "/") {
   await trendsServed(page);
@@ -118,7 +119,8 @@ test.describe("the home at the video's size", () => {
     expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
     near(lefts[0] ?? 0, 48, "the first token's left");
     await expect(row).toContainText("CoinGecko");
-    await expect(row).toContainText(/\$1\.23\b/);
+    // 8i: frame 6's "0.398 USD", the price and its unit raised.
+    await expect(row).toContainText(/T1\.23 USD/);
     await expect(row).not.toContainText(/online/i);
   });
 
@@ -237,7 +239,7 @@ test.describe("the home at the video's size", () => {
       await read;
       // The answer is in: a trend drawn from it would show within this second.
       await page.waitForTimeout(1000);
-      await expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["News", "News", "News"]);
+      await expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["On air", "News", "News", "News"]);
       await expect(page.locator("[data-ticker]")).not.toContainText(/date to be confirmed/i);
     });
   }

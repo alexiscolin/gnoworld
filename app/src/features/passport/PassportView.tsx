@@ -11,13 +11,11 @@ import {
   stampedIn,
   stampKey,
 } from "@gnoworld/core";
-import type { Worlds } from "@gnoworld/schemas/indexer";
 import { Dialog, Kicker, Progress, Row, Stack, Stat } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
-import { readWorlds } from "../../lib/chain/realms.ts";
 import { site } from "../../places.ts";
 import { PassportSlot } from "../../slots.tsx";
 import { useApp } from "../../storeContext.tsx";
+import { useWorldsFile } from "../../worldsFile.ts";
 import { useWorldsCount } from "../universe/index.ts";
 import styles from "./Passport.module.css";
 
@@ -30,28 +28,6 @@ function namesOf(universe: string): (id: string) => string {
     site.worlds.filter((world) => world.universe === universe).map((world) => [hubWorldOf(world), world.name]),
   );
   return (id) => hubs.get(id) ?? (id === EARTH ? "Earth" : (labelName(id) ?? id));
-}
-
-// The worlds' file, read once the dialog opens: the constellations need every world, which only the cosmos's file lists.
-function useWorlds(open: boolean): Worlds["worlds"] | undefined {
-  const [worlds, setWorlds] = useState<Worlds["worlds"]>();
-  useEffect(() => {
-    if (!open || worlds !== undefined) return;
-    const leaving = new AbortController();
-    // A read that fails leaves the constellations to the stamps alone: the list is the passport's, not the file's.
-    readWorlds(import.meta.env.BASE_URL, { signal: leaving.signal })
-      .then((file) => {
-        setWorlds(file?.worlds ?? []);
-      })
-      .catch((error: unknown) => {
-        if (!leaving.signal.aborted) setWorlds([]);
-        reportError(error);
-      });
-    return () => {
-      leaving.abort();
-    };
-  }, [open, worlds]);
-  return worlds;
 }
 
 type Named = (id: string) => string;
@@ -143,7 +119,7 @@ export function PassportView({ universe, open, onClose }: { universe: string; op
   const notKept = useApp(({ device }) => device.notKept);
   const stamped = stampedIn(stamps, universe);
   const count = passportCount(stamped.size, useWorldsCount(open) ?? undefined);
-  const worlds = useWorlds(open);
+  const worlds = useWorldsFile(open);
   const constellations = constellationsOf(worlds ?? [], stamped).filter(({ stamped: some }) => some > 0);
   const nameOf = namesOf(universe);
   const recent = [...stamped]

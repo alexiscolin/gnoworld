@@ -20,6 +20,7 @@ export {
   Stations,
   Universes,
 } from "./data.ts";
+export { OnAir, XPosts } from "./feeds.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";

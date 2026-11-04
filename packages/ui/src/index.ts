@@ -29,6 +29,7 @@ export { Progress, type ProgressProps } from "./Progress/Progress.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";
 export { Select, type SelectOption, type SelectProps } from "./Field/Select.tsx";
 export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
+export { Sparkline, type SparklineProps } from "./Sparkline/Sparkline.tsx";
 export { Stat, type StatProps } from "./Stat/Stat.tsx";
 export { Tabs, type Tab, type TabsProps } from "./Tabs/Tabs.tsx";
 export { Tooltip, type TooltipProps } from "./Tooltip/Tooltip.tsx";

@@ -84,8 +84,9 @@
     gap: 8px;
   }
 
+  /* Every kind in mint, as frames 6 and 16 draw TRENDING, AMA, VOTE, POT, ON AIR and NEW alike. */
   .kind {
-    color: var(--color-warm);
+    color: var(--color-mine);
     text-transform: uppercase;
   }
 

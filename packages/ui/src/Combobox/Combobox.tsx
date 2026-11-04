@@ -1,5 +1,5 @@
-import { useEffect, useId, useState, type KeyboardEvent } from "react";
-import { Stack } from "../compositions/index.ts";
+import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { IconButton } from "../Button/IconButton.tsx";
 import field from "../Field/Field.module.css";
 import menu from "../Popover/Popover.module.css";
 import styles from "./Combobox.module.css";
@@ -8,6 +8,10 @@ export interface ComboboxOption {
   /** What onSelect is given: unique among all the options. */
   id: string;
   label: string;
+  /** Drawn before the label, for the eye alone: a place's planet as a dot. */
+  lead?: ReactNode;
+  /** Drawn at the row's end, read after the label: a place's people (frame 98's "214"). */
+  trail?: string;
 }
 export interface ComboboxGroup {
   id: string;
@@ -21,6 +25,13 @@ export interface ComboboxProps {
   /** The options, grouped. Each group is named with the count of its options. */
   groups: ComboboxGroup[];
   onSelect: (id: string) => void;
+  /** The words in the empty field (frame 98: "Where to? A hub, a topic, a #tag"). */
+  placeholder?: string;
+  /** A Clear at the field's end while it holds words, which empties it and keeps the focus there. */
+  clearable?: boolean;
+  /** A group that follows the options in the list's scroll, outside the listbox, under its own head: one a later slice brings, drawn as
+   * coming soon. */
+  footer?: { label: string; content: ReactNode } | undefined;
 }
 
 /** A group draws its first options only: a list of thousands is a page's weight, and a query narrows it. */
@@ -60,8 +71,8 @@ function Listbox({
     <div id={id} role="listbox" aria-label={label} className={styles["list"]}>
       {groups.map((group) => (
         <div key={group.id} role="group" aria-labelledby={`${id}-${group.id}`}>
-          <div id={`${id}-${group.id}`} className={styles["group"]}>
-            {group.label} {group.options.length}
+          <div id={`${id}-${group.id}`} className={`label ${styles["group"] ?? ""}`}>
+            {group.label} · {group.options.length}
           </div>
           {group.drawn.map((option, n) => (
             <div
@@ -69,7 +80,7 @@ function Listbox({
               id={optionId(group.first + n)}
               role="option"
               aria-selected={optionId(group.first + n) === active}
-              className={menu["item"]}
+              className={[menu["item"], styles["option"]].join(" ")}
               // The click chooses, and the field keeps the focus.
               onMouseDown={(event) => {
                 event.preventDefault();
@@ -78,7 +89,9 @@ function Listbox({
                 onSelect(option.id);
               }}
             >
-              {option.label}
+              {option.lead === undefined ? null : <span aria-hidden="true">{option.lead}</span>}
+              <span className="truncate">{option.label}</span>
+              {option.trail === undefined ? null : <span className={styles["trail"]}>{option.trail}</span>}
             </div>
           ))}
         </div>
@@ -87,9 +100,47 @@ function Listbox({
   );
 }
 
+// The field's own attributes: a combobox of text whose list follows it, no help from the browser.
+const fieldLook = {
+  className: [field["box"], styles["field"]].join(" "),
+  type: "text",
+  role: "combobox",
+  autoComplete: "off",
+  spellCheck: false,
+  "aria-autocomplete": "list",
+} as const;
+
+// A group after the listbox, under its own head.
+function After({ label, content }: { label: string; content: ReactNode }) {
+  return (
+    <div>
+      <div className={`label ${styles["group"] ?? ""}`}>{label}</div>
+      {content}
+    </div>
+  );
+}
+
+// Clear, at the field's end while it holds words.
+function Clear({ onClear }: { onClear: () => void }) {
+  return (
+    <span className={styles["clear"]}>
+      <IconButton icon="close" label="Clear" emphasis="plain" size="s" onClick={onClear} />
+    </span>
+  );
+}
+
 /** WAI-ARIA's combobox with a listbox popup, always open: the focus stays in the field, the arrows move the active option,
  * Enter chooses it. Escape is left to what holds it (a dialog). */
-export function Combobox({ label, value, onValueChange, groups, onSelect }: ComboboxProps) {
+export function Combobox({
+  label,
+  value,
+  onValueChange,
+  groups,
+  onSelect,
+  placeholder,
+  clearable = false,
+  footer,
+}: ComboboxProps) {
   const rootId = useId();
   const drawnOf = groups.map((group) => group.options.slice(0, SHOWN));
   const shown: DrawnGroup[] = groups.map((group, n) => ({
@@ -119,35 +170,46 @@ export function Combobox({ label, value, onValueChange, groups, onSelect }: Comb
   }
 
   const listId = `${rootId}-list`;
+  const fieldId = `${rootId}-field`;
   return (
-    <Stack space="2xs">
-      <label htmlFor={`${rootId}-field`} className="visually-hidden">
+    <div className={styles["combobox"]}>
+      <label htmlFor={fieldId} className="visually-hidden">
         {label}
       </label>
-      <input
-        id={`${rootId}-field`}
-        className={[field["box"], styles["field"]].join(" ")}
-        type="text"
-        role="combobox"
-        autoComplete="off"
-        spellCheck={false}
-        aria-autocomplete="list"
-        aria-expanded={flat.length > 0}
-        aria-controls={flat.length > 0 ? listId : undefined}
-        aria-activedescendant={active}
-        value={value}
-        onChange={(event) => {
-          setActiveId(null);
-          onValueChange(event.target.value);
-        }}
-        onKeyDown={onKeyDown}
-      />
-      {flat.length > 0 ? (
-        <Listbox id={listId} label={label} groups={shown} optionId={optionId} active={active} onSelect={onSelect} />
-      ) : null}
-      <p role="status" className={styles["status"]}>
-        {flat.length > 0 ? "" : "No place matches."}
-      </p>
-    </Stack>
+      <div className={styles["box"]}>
+        <input
+          id={fieldId}
+          {...fieldLook}
+          aria-expanded={flat.length > 0}
+          aria-controls={flat.length > 0 ? listId : undefined}
+          aria-activedescendant={active}
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => {
+            setActiveId(null);
+            onValueChange(event.target.value);
+          }}
+          onKeyDown={onKeyDown}
+        />
+        {clearable && value !== "" ? (
+          <Clear
+            onClear={() => {
+              setActiveId(null);
+              onValueChange("");
+              document.getElementById(fieldId)?.focus();
+            }}
+          />
+        ) : null}
+      </div>
+      <div className={styles["scroll"]}>
+        {flat.length > 0 ? (
+          <Listbox id={listId} label={label} groups={shown} optionId={optionId} active={active} onSelect={onSelect} />
+        ) : null}
+        <p role="status" className={styles["status"]}>
+          {flat.length > 0 ? "" : "No place matches."}
+        </p>
+        {footer === undefined ? null : <After {...footer} />}
+      </div>
+    </div>
   );
 }

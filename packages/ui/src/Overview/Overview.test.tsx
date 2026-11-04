@@ -42,6 +42,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Progress: ["Stats", "[role='progressbar']"],
   ComingSoon: ["Stats", "button[aria-disabled='true'][aria-label$='coming soon']"],
   ActivityChart: ["Activity", "svg [data-hour]"],
+  Sparkline: ["Activity", "svg[data-tone]"],
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],
   LinkProvider: ["Links", "a[data-page-link]"],

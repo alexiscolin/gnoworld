@@ -12,6 +12,7 @@ import { migrations } from "./migrations.ts";
 import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
+import { historyRoutes } from "./prices/history.ts";
 import { startPrices } from "./prices/prices.ts";
 import { defaultRpc, defaultUniverse, hubWorlds } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
@@ -85,6 +86,8 @@ const chat = startChat(
 );
 app.route("/api/activity", chat.activity);
 if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
+// The markets row's sparklines (8i): the prices timer's day, a 404 while it has none or without the timer.
+app.route("/api/markets/history", historyRoutes(prices?.history ?? (() => undefined)));
 // The home's ticker's trends (7t): the worlds job's last passes and who is here, a few items; none without either, never a 404.
 app.route(
   "/api/trends",

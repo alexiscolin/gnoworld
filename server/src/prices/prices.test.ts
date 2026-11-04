@@ -175,13 +175,14 @@ describe("the prices timer: a good answer", () => {
     expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual(TOKENS);
     // A write in place keeps the file's inode; a rename brings another one.
     expect(statSync(file).ino).not.toBe(before);
-    expect(readdirSync(folder)).toEqual(["markets.json"]);
+    // The prices' day beside it (8i), and no temporary.
+    expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
   });
 
   it("creates the file when there is none, and leaves no temporary file next to it", async () => {
     const { folder, file } = setup([json(ANSWER)]);
     await wrote(file);
-    expect(readdirSync(folder)).toEqual(["markets.json"]);
+    expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
   });
 });
 

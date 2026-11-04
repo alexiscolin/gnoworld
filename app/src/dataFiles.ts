@@ -15,9 +15,11 @@ import {
   Genres,
   Hubs,
   News,
+  OnAir,
   Quests,
   Stations,
   Universes,
+  XPosts,
 } from "@gnoworld/schemas";
 
 const SCHEMAS = {
@@ -33,6 +35,8 @@ const SCHEMAS = {
   earthRooms: EarthRooms,
   earthOrbit: EarthOrbit,
   news: News,
+  xPosts: XPosts,
+  onAir: OnAir,
 };
 
 /** The most a data file may weigh: a file past it is refused before it is read (the plan's "a huge file"). */
@@ -40,7 +44,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The twelve files of a directory, checked; throws every fault found in the first file that has one. */
+/** The fourteen files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {
@@ -88,7 +92,7 @@ export function loadData(dir: string): Data {
   return data;
 }
 
-// The expedition's stops and the quests' steps name worlds the site holds: a universe of universes.json, a hub or a station of it by its slug;
+// The expedition's stops, the quests' steps and what is on air name worlds the site holds: a universe of universes.json, a hub or a station of it by its slug;
 // two stops of one world would make one visit reach both.
 function discoveryFaults(data: Data, universes: ReadonlySet<string>): string[] {
   const worlds = new Map([...data.hubs, ...data.stations].map((world) => [`${world.universe}/${world.slug}`, world]));
@@ -107,6 +111,9 @@ function discoveryFaults(data: Data, universes: ReadonlySet<string>): string[] {
     if (id === undefined) return;
     if (seen.has(`${stop.universe}:${id}`)) faults.push(`${at}: a second stop of the world "${id}"`);
     seen.add(`${stop.universe}:${id}`);
+  });
+  data.onAir.forEach((row, index) => {
+    check(`onAir.json: [${String(index)}]`, row.universe, row.hub);
   });
   data.quests.forEach((quest, index) => {
     check(`quests.json: [${String(index)}]`, quest.universe, undefined);

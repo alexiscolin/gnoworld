@@ -69,12 +69,11 @@ const CHUNKS = [
   // saveData goes with the store: the chat and the universe share it, and a file of its own costs a world's first screen 131 B. So does its
   // React binding, now the Earth's page and the chat both read it.
   { name: "store", test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts)/ },
-  // The activity chart is no part of it: a world's page loads the bars apart, once it has a history (F304, slice 5j).
-  // The stat is none of it either: the figure of who is here comes once the chat has someone to count (F2868).
-  // Nor are Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState, Combobox, Field (7.7 KB, F2976).
+  // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
+  // Combobox, Field (7.7 KB, F2976), Progress and Sparkline (8i): the chunks that need them load them after the first screen.
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row)\/)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Progress|Sparkline)\/)/,
   },
   // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
   { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },

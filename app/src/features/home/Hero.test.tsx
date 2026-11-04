@@ -151,9 +151,9 @@ describe("the hero's parts", () => {
   test("opens with the kicker and its warm dot, the universe's name in the one label style", async () => {
     const html = await heroOf("main");
     expect(html).toMatch(
-      /<p class="label [^"]*"><span class="[^"]*" data-tone="warm" aria-hidden="true"><\/span>gno\.world<\/p>/,
+      /<p class="label [^"]*"><span class="[^"]*" data-tone="warm" aria-hidden="true"><\/span>gno\.land · live now<\/p>/,
     );
-    expect(html.indexOf("gno.world")).toBeLessThan(html.indexOf('data-hero="number"'));
+    expect(html.indexOf("gno.land · live now")).toBeLessThan(html.indexOf('data-hero="number"'));
   });
 
   test("names a universe that is not the default by its own name", async () => {

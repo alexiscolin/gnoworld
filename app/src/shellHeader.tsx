@@ -58,7 +58,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             <span className={styles["divider"]} aria-hidden="true" />
           </ViewSwitch>
         ) : null}
-        <SearchPalette />
+        <SearchPalette universe={universe} />
       </nav>
       <div className={styles["end"]}>
         <p className={styles["network"]}>

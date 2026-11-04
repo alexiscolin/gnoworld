@@ -25,16 +25,48 @@
     color: var(--color-text-muted);
   }
 
+  /* A token: its words, then its day's line, 18 px past the widest of them (frame 6: the lefts 48, 237, 434, then the block at 617). */
+  .token {
+    /* layout: the words and the line side by side */
+    display: flex;
+    /* layout: the line beside the price's line */
+    align-items: center;
+    /* raw: 18 px between the words and the line, frame 6 */
+    /* layout: the arrangement the frames draw */
+    gap: 18px;
+  }
+
+  .spark {
+    /* raw: the sparkline's 58 by 22 px kept while it comes (Sparkline.module.css) */
+    inline-size: 58px;
+    /* raw: the same */
+    block-size: 22px;
+  }
+
   .value {
     display: block;
-    /* raw: 16 px, regular (the prototype's .stat .big) */
-    font: 400 16px/1.2 var(--family-mono);
+    /* raw: 17 px, regular, in the sans (frame 6's "0.398") */
+    font: 400 17px/1.2 var(--family-sans);
+  }
+
+  /* "USD" raised beside the price, small and muted (frame 6). */
+  .unit {
+    /* raw: 8 px mono, raised to the digits' top (frame 6) */
+    font: 400 8px/1 var(--family-mono);
+    /* raw: the frame's tracking for the unit */
+    letter-spacing: 0.08em;
+    vertical-align: super;
+    color: var(--color-text-muted);
   }
 
   .delta {
     display: block;
+    /* raw: 2 px over the change (frame 6) */
+    padding-block-start: 2px;
     /* raw: 10.5 px mono (the prototype's .stat .delta) */
     font: 400 10.5px/1 var(--family-mono);
+    /* raw: the frame's mono tracking for the change */
+    letter-spacing: 0.04em;
   }
 
   .delta[data-delta="up"] {

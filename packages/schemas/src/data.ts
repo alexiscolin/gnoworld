@@ -17,13 +17,13 @@ export const DATA_CAPS = {
   link: 2048,
 } as const;
 
-const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
+export const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
 
 /** A name in a path, and the id of a universe: lower case, digits, single hyphens. */
-const Key = Slug.check(z.maxLength(DATA_CAPS.key));
+export const Key = Slug.check(z.maxLength(DATA_CAPS.key));
 
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
-const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
+export const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
 
 /** An origin: https, a lower-case host and an optional port, no path, query, fragment or credentials (what a page's address is put under). */
 const Origin = z
@@ -68,7 +68,7 @@ function unique<T extends z.ZodMiniType>(rows: T, field: string, key: (row: neve
 }
 
 const list = <T extends z.ZodMiniType>(row: T) => z.array(row).check(z.maxLength(DATA_CAPS.rows));
-const byId = <T extends z.ZodMiniType>(row: T) => unique(list(row), "id", (r: { id: string }) => r.id);
+export const byId = <T extends z.ZodMiniType>(row: T) => unique(list(row), "id", (r: { id: string }) => r.id);
 const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r: { slug: string }) => r.slug);
 const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);

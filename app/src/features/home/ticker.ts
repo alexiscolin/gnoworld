@@ -1,8 +1,9 @@
-// The ticker's items: the chain's trends first (7t), as the server ranks them, then the data's events still to come (the soonest), then its
-// news (the newest), at most six. An event that has begun is news of the past, and one that waits for its date is not shown.
+// The ticker's items: the chain's trends first (7t), as the server ranks them, then the data's events still to come (the soonest), then what
+// is on air (8i, frame 16's "ON AIR"), then its news (the newest), at most six. An event that has begun is news of the past, and one that waits
+// for its date is not shown; an on-air line past its `until` is over.
 export interface TickerItem {
   id: string;
-  kind: "trending" | "rising" | "new" | "news" | "event";
+  kind: "trending" | "rising" | "new" | "news" | "event" | "onair";
   text: string;
   link: string;
   /** Where a trend's data comes from and when, said on its link. */
@@ -30,6 +31,19 @@ export function tickerItems(
     .toSorted((a, b) => b.date.localeCompare(a.date))
     .map((row): TickerItem => ({ id: row.id, kind: "news", text: row.title, link: row.link }));
   return [...coming, ...latest].slice(0, MOST);
+}
+
+/** What is on air now (8i), placed after the events `items` holds and before its news: a line past its `until` is over. */
+export function withOnAir(
+  items: readonly TickerItem[],
+  onAir: readonly (Row & { until?: string | undefined })[],
+  now: Date,
+): TickerItem[] {
+  const live = onAir
+    .filter((row) => row.until === undefined || Date.parse(row.until) > now.getTime())
+    .map((row): TickerItem => ({ id: row.id, kind: "onair", text: row.title, link: row.link }));
+  const at = items.findLastIndex((item) => item.kind === "event") + 1;
+  return [...items.slice(0, at), ...live, ...items.slice(at)].slice(0, MOST);
 }
 
 /** The chain's trends before the data's items, as the server ranks them, six in all at most. */
