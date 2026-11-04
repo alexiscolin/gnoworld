@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { startGnomcp, type Gnomcp, type Ran } from "./gnomcp.ts";
-import { gnomcpTools } from "./gnomcpTools.ts";
 import { fakeGnomcp, gnomcpListing, readOnlyProfiles, type Scenario } from "./testing/fakeGnomcp.ts";
 import { capture } from "./testing/kit.ts";
 
@@ -28,7 +27,6 @@ const setupOf = (
     command: fake.command,
     config: CONFIG,
     profiles: PROFILES,
-    tools: gnomcpTools({ chains: PROFILES.read, indexed: PROFILES.indexed }),
     log,
     ...extra,
   };

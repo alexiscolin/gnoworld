@@ -13,7 +13,7 @@ import { Client, SdkError, SdkErrorCode } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
 import type { Log } from "../log.ts";
-import type { Definition } from "./allowlist.ts";
+import { gnomcpTools } from "./gnomcpTools.ts";
 import { shown } from "./tracing.ts";
 import { visible } from "./untrusted.ts";
 
@@ -21,7 +21,6 @@ interface Setup {
   readonly command: string;
   readonly config: string;
   readonly profiles: { readonly read: readonly string[]; readonly indexed: readonly string[] };
-  readonly tools: readonly Definition[];
   readonly log: Log;
   // A call's time and a start's, 30 s each by default, and the clock the restarts are counted on.
   readonly callTimeoutMs?: number | undefined;
@@ -43,6 +42,7 @@ interface Child {
 
 /** gnomcp started and checked; throws, the child ended and its folder removed, when a check fails. */
 export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
+  const tools = toolsOf(setup);
   const timeout = setup.callTimeoutMs ?? 30_000;
   const starts = [setup.now?.() ?? Date.now()];
   let child = await spawn(setup);
@@ -76,7 +76,7 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   return {
     async call(name, args) {
       // ponytail: a find over 10b's table of seven reads.
-      const parsed = setup.tools.find((tool) => tool.name === name)?.args.safeParse(args);
+      const parsed = tools.find((tool) => tool.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       const current = closed ? undefined : await live();
       if (current === undefined) return { ok: false, reason: "down" };
@@ -144,11 +144,14 @@ async function atStart<T>(request: Promise<T>): Promise<T> {
   }
 }
 
+// 10b's reads for Jarvis's profiles, the one source of what a call may name and what gnomcp must list.
+const toolsOf = ({ profiles }: Setup) => gnomcpTools({ chains: profiles.read, indexed: profiles.indexed });
+
 async function checked(client: Client, setup: Setup, timeout: number): Promise<void> {
   // The client parsed the list by MCP's own schema: each tool a name and an input schema of properties.
   const { tools } = await atStart(client.listTools(undefined, { timeout }));
   const fields = new Map(tools.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]));
-  for (const { name, args } of setup.tools) {
+  for (const { name, args } of toolsOf(setup)) {
     const theirs = fields.get(name);
     if (theirs === undefined) throw new Error(`gnomcp: no tool ${name}`);
     const missing = Object.keys(args.shape).find((field) => !theirs.includes(field));
