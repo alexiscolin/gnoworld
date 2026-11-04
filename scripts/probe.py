@@ -897,8 +897,12 @@ try:
             ("indexer.ts", 'export const indexer = "https://indexer.onyx.example/graphql/query";\n', None),
             ("route.ts", 'export const route = "/status";\n', None),
             ("word.ts", 'export const word = "the status of a block";\n', None),
-            # A known gap (D113): an address joined from a route alone and a base, by a call, reads as no read here.
+            # A sum made by `+=` (10h's review, V4): its left side is a value, as a sum's unknown side is.
+            ("assigned.ts", 'export function url(rpc: string): string {\n  let url = rpc;\n  url += "/status";\n  return url;\n}\n', rule),
+            ("assigned_route.ts", 'export function route(): string {\n  let route = "";\n  route = "/status";\n  return route;\n}\n', None),
+            # Known gaps (D113, D124): an address joined from a route alone and a base, by a call, reads as no read here.
             ("joined_call.ts", 'export function url(rpc: string): string {\n  return [rpc, "status"].join("/");\n}\n', None),
+            ("concat_call.ts", 'export function url(rpc: string): string {\n  return rpc.concat("/", "status");\n}\n', None),
             # Free: a test helper's own imports of another (S2, F5276), as under testing/ a fake may build on a fake.
             ("testing/fakes.ts", 'import { path } from "./fake.ts";\n\nexport const used: unknown = path;\n', None),
             ("free.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect("vm/qfuncs").toMatch(/qfuncs/);\n});\n', None),

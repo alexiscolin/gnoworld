@@ -26,11 +26,13 @@ interface Part {
 }
 
 // A string's text as a request would send it: a literal's value, a template's with `${}` for each value, a sum of both
-// joined the same way; nothing for any other node.
+// joined the same way, `+=` a sum whose left side is a value (V4); nothing for any other node.
 function textOf(node: Part): string | undefined {
   if (node.type === "Literal") return typeof node.value === "string" ? node.value : undefined;
   if (node.type === "TemplateLiteral")
     return node.quasis?.map((quasi) => quasi.value.cooked ?? quasi.value.raw).join("${}");
+  if (node.type === "AssignmentExpression" && node.operator === "+=" && node.right !== undefined)
+    return `\${}${textOf(node.right) ?? "${}"}`;
   return node.type === "BinaryExpression" ? sumOf(node) : undefined;
 }
 
@@ -81,6 +83,7 @@ const chainRead: Rule.RuleModule = {
       Literal: check,
       TemplateLiteral: check,
       BinaryExpression: check,
+      AssignmentExpression: check,
       ObjectExpression: (node) => {
         if (rpcCall(node)) call(node);
       },
