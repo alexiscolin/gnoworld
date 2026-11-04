@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last on 2026-11-04: 174 KiB for the phone's view switch), 3 MB in all, the worker's
-// precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 174 * 1024;
+// hydrated; its steps in docs/decisions.md, the last on 2026-11-04: slice 8's header at 183,723 B, under its 180 KiB, the rest
+// 8c's bell), 3 MB in all, the worker's precache included, as gzip sends them.
+const FIRST_SCREEN_JS = 183_723;
 const TOTAL = 3 * 1024 * 1024;
 
 const compressed = (page: Page, urls: readonly string[]) =>
