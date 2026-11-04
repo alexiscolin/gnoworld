@@ -145,10 +145,14 @@ async function aimAtTheGreatStar(page: Page) {
   await page.mouse.click(sun.x, sun.y);
 }
 
-const fly = (page: Page, goal: unknown) =>
-  page.evaluate((to) => {
+// Asks a flight of the scene and waits till it starts: a star's starts once its arrival is bound (7g2).
+async function fly(page: Page, goal: unknown) {
+  const before = (await flightOf(page))?.flights ?? 0;
+  await page.evaluate((to) => {
     (Reflect.get(globalThis, "__gnoworldScene") as { fly: (goal: unknown) => void }).fly(to);
   }, goal);
+  await expect.poll(async () => (await flightOf(page))?.flights ?? 0, SLOW).toBeGreaterThan(before);
+}
 
 const flown = (page: Page) => expect.poll(async () => (await flightOf(page))?.flying, SLOW).toBe(false);
 
@@ -279,8 +283,11 @@ test("jumps to the star aimed at, lands at once on Escape, and comes back on Esc
   expect(await flightOf(page)).toMatchObject({ kind: "star", target: "gno.land" });
   expect(before).toBeLessThan(1);
   expect({ flying, along }).toEqual({ flying: false, along: 1 });
+  // Landed on the star's arrival, the page told where it is (7g2): with no world in the file, no view at rest takes the eye over, which
+  // stays at the arrival's eye, its way kept.
   const there = (await flightOf(page))?.travel ?? { x: 0, y: 0, z: 0 };
   expect(Math.hypot(there.x, there.y, there.z)).toBeGreaterThan(1);
+  await expect(page.getByRole("navigation", { name: "Where you are" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await flightOf(page))?.kind).toBe("rest");
   await flown(page);

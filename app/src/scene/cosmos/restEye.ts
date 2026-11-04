@@ -1,6 +1,7 @@
 // Where the eye stands at rest among the worlds (slice 7d6): the view at rest's own eye, which the core placed from the data, about which the
 // eye sways, and the camera that keeps the Earth at the canvas's centre, the disc's horizon level; or, come to a system (7d3), its arrival's
-// eye and what it looks at; or what a flight looks at while it does (7g). Plain numbers: this chunk holds no three.
+// eye and what it looks at; or what a flight looks at while it does (7g), and the arrival it is bound for, its eye handed over at the end
+// (7g2). Plain numbers: this chunk holds no three.
 import {
   ARRIVAL_LEAN,
   EARTH_PLACE,
@@ -16,11 +17,11 @@ import {
 import type { Asking, Landing } from "./restArrival.ts";
 import type { PerspectiveCamera } from "three";
 import type { EarthDevice } from "../earth/device.ts";
+import { Hand, loadArrival } from "./restHand.ts";
 import { tuned } from "../tuning.ts";
 
-// A system's arrival is looked for in a chunk of its own, asked the first time a system is: the view at rest's stays within its cap; so are
-// the Plans, a system's and the Earth's, in one of their own (7v).
-const loadArrival = () => import("./restArrival.ts");
+// A system's arrival is looked for in a chunk of its own (restHand.ts): the view at rest's stays within its cap; so are the Plans, a
+// system's and the Earth's, in one of their own (7v).
 const loadPlan = () => import("./restPlan.ts");
 
 interface Spot {
@@ -54,6 +55,10 @@ export class RestEye {
   landing: Landing | undefined;
   /** Whether the last move goes between the Earth's view at rest and its top view (7x2), which the eye glides along. */
   gliding = false;
+  /** A flight's hand-over at a system's arrival (7g2). */
+  readonly hand: Hand;
+  // Where the scene's eye rests.
+  #rests: Point = HOME;
   // Whether it stands at one of the Earth's two views: the home opens on its view at rest.
   #onEarth = true;
   // The map's up, on the stage; from where the scene's eye rests (HOME) to the view at rest's; the axes the eye sways along, across and up.
@@ -78,6 +83,7 @@ export class RestEye {
   /** On `device`, whose eye a flight may turn to a star (7g). */
   constructor(device: Pick<EarthDevice, "eye">) {
     this.#device = device;
+    this.hand = new Hand(device);
     toScene(EARTH_PLACE, this.looked);
     this.#upFor(undefined);
   }
@@ -112,6 +118,7 @@ export class RestEye {
   arrive(systems: readonly StarSystem[], asking: Asking, came: (asking: Asking, to: Point) => void): void {
     this.#turn += 1;
     const [turn, { id, plan }] = [this.#turn, asking];
+    const bound = id === undefined ? undefined : this.hand.boundAt(systems, id);
     const landed = (landing: Landing | undefined) => {
       if (turn === this.#turn) this.#come(asking, landing, came);
     };
@@ -123,6 +130,8 @@ export class RestEye {
         () => undefined,
       );
     else if (id === undefined) this.#come(asking, undefined, came);
+    // The arrival a flight is bound for is there already: its eye is handed over in the frame the flight lands (7g2).
+    else if (bound !== undefined) landed(bound);
     else
       loadArrival().then(
         ({ landingAt }) => {
@@ -135,6 +144,7 @@ export class RestEye {
   #come(asking: Asking, landing: Landing | undefined, came: (asking: Asking, to: Point) => void): void {
     if (asking !== this.#asked) this.#went = undefined;
     const onEarth = landing === undefined || landing.view.postcards.length === 0;
+    const [keep, from, looked] = [this.hand.comes(landing), this.#rests, { ...this.looked }];
     this.gliding = this.#onEarth && onEarth;
     this.#onEarth = onEarth;
     this.#asked = asking;
@@ -143,7 +153,14 @@ export class RestEye {
     const [to, went] = [this.#land(landing), this.#went];
     if (went !== undefined && Math.hypot(to.x - went.x, to.y - went.y, to.z - went.z) < MOVED) return;
     this.#went = to;
+    this.#rests = to;
+    this.hand.moved(to, { keep, from, looked });
     came(asking, to);
+  }
+
+  /** Whether the eye rests at a system's dynamic view (7g2). */
+  get at(): boolean {
+    return !this.#onEarth && this.landing?.plan === undefined;
   }
 
   // The camera turned to what `landing` looks at, or the Earth with none, the eye swaying along its own axes; the scene's eye there.
@@ -163,8 +180,14 @@ export class RestEye {
     return { x: at.x - this.#offset.x, y: at.y - this.#offset.y, z: at.z - this.#offset.z };
   }
 
-  /** The eye `seconds` on, from the scene's `eye`, into `out`: the view at rest's, swayed. */
+  /** The eye `seconds` on, from the scene's `eye`, into `out`: the view at rest's, swayed, and a flight's hand-over gliding out (7g2). */
   place(eye: Point, seconds: number, out: Spot): void {
+    this.still(eye, seconds, out);
+    this.hand.carry(seconds, out);
+  }
+
+  /** The same with no hand-over gliding out: where the eye stands, swayed `seconds` on. */
+  still(eye: Point, seconds: number, out: Spot): void {
     // A journey holds the sway still to read the sun's beat alone (Alexis, 2026-11-04, "Figer le balancement"): in a test build only.
     const held =
       import.meta.env.VITE_GNOWORLD_TEST_GPU === "1" && Reflect.get(globalThis, "__gnoworldSwayHeld") === true;

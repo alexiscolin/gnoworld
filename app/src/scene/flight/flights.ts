@@ -2,7 +2,7 @@
 import { Dissolve } from "../dissolve.ts";
 import { MOTION } from "../watch.ts";
 import { Flights } from "./flight.ts";
-import type { CosmosSight, FlightScene } from "./goal.ts";
+import type { CosmosSight, FlightDevice, FlightScene } from "./goal.ts";
 
 export { Flights };
 export type { CosmosSight, FlightDevice, FlightGoal, FlightSaid, FlightScene } from "./goal.ts";
@@ -10,7 +10,13 @@ export type { CosmosSight, FlightDevice, FlightGoal, FlightSaid, FlightScene } f
 /** The flights on the scene's device, the cosmos as the scene holds it: reduced motion, the panel's ear and a frame owed wired here, in
  * this chunk, so the scene's carries only their door; the approach the views read, which only a flight changes; and the dissolve, which
  * this chunk holds, lent to the dive. */
-export function flightsOn(scene: FlightScene, cosmos: { readonly sight: CosmosSight | undefined }): Flights {
+export function flightsOn(
+  scene: FlightScene,
+  {
+    cosmos,
+    arrive,
+  }: { readonly cosmos: { readonly sight: CosmosSight | undefined }; readonly arrive: FlightDevice["arrive"] },
+): Flights {
   const motion = matchMedia(MOTION);
   const arrival = { approach: 1, aside: 0 };
   scene.arrival = arrival;
@@ -26,5 +32,6 @@ export function flightsOn(scene: FlightScene, cosmos: { readonly sight: CosmosSi
     moved,
     still: () => motion.matches,
     cosmos: () => cosmos.sight,
+    arrive,
   });
 }

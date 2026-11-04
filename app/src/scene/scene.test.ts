@@ -118,7 +118,7 @@ vi.mock("./cosmos/cosmos.ts", () => ({
   },
 }));
 vi.mock("./flight/flights.ts", () => ({
-  flightsOn: (device: FlightDeviceSeen, cosmos: { readonly sight: unknown }) => {
+  flightsOn: (device: FlightDeviceSeen, { cosmos }: { readonly cosmos: { readonly sight: unknown } }) => {
     flight.made.push(device);
     flight.cosmos.push(cosmos);
     return {

@@ -141,10 +141,21 @@ function everywhere(systems: readonly StarSystem[], drawn: Drawn, postcards: Rea
   return wanted;
 }
 
-/** What is drawn from `sight`: `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, the eye less the glide and
- * the sway), the ladder's `drawn` elsewhere, the postcards as drawn in both (7d9, 7p); the main light, the specks left out for they would
- * stand on a body, and whether the bodies are lit as up close, as at a system's arrival (7d3). */
+/** What is drawn from `sight`: `shown`'s, or off the Earth's views the arrival a flight is `coming` to, as though shown: its postcard comes
+ * as the eye nears it, and stands whole before the eye lands (7g2). */
 export function drawnFrom(
+  systems: readonly StarSystem[],
+  { shown, drawn, coming }: { shown: Shown; drawn: Drawn; coming?: Shown | undefined },
+  sight: { eye: Point; focal: number; resting: Point },
+): ReturnType<typeof drawnAt> {
+  const off = shown.postcards.size === 0 ? offEarthViews(sight.resting) : 0;
+  return drawnAt(systems, { shown: coming !== undefined && off > REST_REACH ? coming : shown, drawn }, sight);
+}
+
+// `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, the eye less the glide and the sway), the ladder's
+// `drawn` elsewhere, the postcards as drawn in both (7d9, 7p); the main light, the specks left out for they would stand on a body, and
+// whether the bodies are lit as up close, as at a system's arrival (7d3).
+function drawnAt(
   systems: readonly StarSystem[],
   { shown, drawn }: { shown: Shown; drawn: Drawn },
   sight: { eye: Point; focal: number; resting: Point },
