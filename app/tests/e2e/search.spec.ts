@@ -135,6 +135,9 @@ test.describe("⌘K", () => {
 
   test("typing in it sends no request", async ({ page }) => {
     await ready(page);
+    // The arrival's code and the expedition's come a second after load (Later.tsx), past a networkidle some runs (8i): its
+    // pill says both came, so neither lands in the count.
+    await expect(page.getByRole("status").getByText("Stamped · Earth")).toBeVisible();
     await page.keyboard.press("Control+k");
     await expect(page.getByRole("option").first()).toBeVisible();
     // The page's own settling (the worker, a poll) and the palette's first words (the label font, loaded when first drawn) are over
