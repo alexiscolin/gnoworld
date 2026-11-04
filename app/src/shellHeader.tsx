@@ -31,7 +31,9 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
       <nav aria-label="Views" className={`${styles["views"] ?? ""} control-bar`}>
         {views.map((view) => (
           <Link
-            key={view.view}
+            // Drawn anew once the page wakes: a path served the page written at / hydrates the light that page holds, as hydration
+            // patches no attribute (react-dom 19.3.1), and a new link takes the path's own (F4880).
+            key={`${view.view}:${String(woken)}`}
             to={view.path}
             className={styles["view"]}
             aria-current={view.view === current ? "page" : undefined}
