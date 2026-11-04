@@ -329,8 +329,9 @@ describe("callModel: one model request, each attempt reserved and settled", () =
 
   it("retries a 500 that came with no headers, at its own pace", async () => {
     const run = attempts(45 * DOLLAR);
+    // APIError.generate would make a connection error of a status with no headers: the class itself keeps both.
     const bare = () =>
-      APIError.generate(500, { type: "error", error: { type: "api_error", message: "made-up" } }, "made-up", undefined);
+      new APIError(500, { type: "error", error: { type: "api_error", message: "made-up" } }, "made-up", undefined);
     const { send, requests } = script(bare(), bare(), bare());
     expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: false, reason: "failed" });
     expect(requests).toHaveLength(3);

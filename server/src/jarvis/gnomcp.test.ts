@@ -100,6 +100,7 @@ describe("startGnomcp: gnomcp started read-only", () => {
       .requests()
       .map(({ method, params }) => (method === "tools/call" ? `${method} ${Named.parse(params).name}` : method));
     expect(methods).toEqual(["initialize", "notifications/initialized", "tools/list", "tools/call gno_profile_list"]);
+    expect(fake.requests()[0]?.params).toMatchObject({ clientInfo: { name: "jarvis", version: "1.0.0" } });
   });
 
   it("removes its folder once closed", async () => {

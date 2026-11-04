@@ -573,6 +573,8 @@ describe("the loop: each tool call checked before it runs", () => {
         content: blocks().wrap("gno_status", "no chain client for profile"),
       },
     ]);
+    const tool = run.finished().find((span) => span.name === "jarvis.tool_call");
+    expect(tool?.attributes["error.type"]).toBe("tool_error");
     run.close();
   });
 });
