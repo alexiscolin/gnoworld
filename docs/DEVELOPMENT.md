@@ -55,6 +55,9 @@ its branch. It prunes no other record, which a session can point at nothing: `gi
 is run in your shell. In Claude Code it runs outside the sandbox: write the call alone, from the
 checkout's root, with plain words (a bare `<name>`); the guard refuses any other form (a `cd`, a
 `$(...)`, a `~`, an assignment, a redirect or another command in the call).
+A branch with an upstream is deleted in your shell: in a session `git branch -D` cannot write
+`.git/config`, so it deletes the branch but keeps its `branch.<name>` section, which a new branch
+of that name would inherit (F5113). A branch `worktree.sh` made has no such section.
 After a merge that changes the lockfile, install in the main checkout
 (`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
 
