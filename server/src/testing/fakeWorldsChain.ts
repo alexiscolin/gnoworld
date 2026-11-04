@@ -45,6 +45,31 @@ const abci = (text: string): Response =>
 export const abciRefused = (type = "/vm.InvalidPkgPathError"): Response =>
   Response.json({ result: { response: { ResponseBase: { Error: { "@type": type }, Data: null } } } });
 
+/** A transaction as the indexer gives it: its height and its messages. */
+export interface CallRow {
+  readonly block_height: number;
+  readonly messages: readonly { readonly value: Readonly<Record<string, unknown>> }[];
+}
+
+/**
+ * The indexer's answer to the worlds job's read of the chain's calls, as onyx-1 gives it (worlds/onyxIndexer.json): a block's rows when asked
+ * its `height`, else the rows above `above` (from the first without it), at most `limit`, by height; an empty answer is null. A request with
+ * neither a page's size nor a height is 7c's per-realm filter, which onyx-1 refused (422).
+ */
+export function pagedCalls(rows: readonly CallRow[]) {
+  const sorted = [...rows].sort((a, b) => a.block_height - b.block_height);
+  return ({ variables }: { variables: Record<string, unknown> }): string | Response => {
+    const { above, limit, height } = variables;
+    if (typeof limit !== "number" && typeof height !== "number")
+      return new Response('{"errors":[{"message":"refused"}],"data":null}', { status: 422 });
+    const page =
+      typeof height === "number"
+        ? sorted.filter((row) => row.block_height === height)
+        : sorted.filter((row) => row.block_height > (typeof above === "number" ? above : -1)).slice(0, Number(limit));
+    return JSON.stringify({ data: { getTransactions: page.length === 0 ? null : page } });
+  };
+}
+
 const asResponse = (given: Given, plain: (text: string) => Response): Response | Error =>
   typeof given === "string" ? plain(given) : given;
 

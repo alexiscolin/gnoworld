@@ -1,22 +1,31 @@
-// What the worlds job asks an indexer for a realm (slice 7, 7c): the transactions whose messages target that path, counted as calls,
-// callers and the last height of a call. THE ANSWER'S SHAPE IS OURS, NOT RECORDED (F2950, as app/src/lib/chain/indexer.ts's is):
-// no indexer answer was read through gnomcp, so the first live proof is deploy/test.sh. History holds DIRECT calls only
-// (chain-feasibility.md, "Corrections"), and a line may be a failed transaction: a count is a count of attempts, and a realm with
-// none is not dead. The query asks for no file body (a deploy carries its whole source) and sends the path as a variable.
+// What the worlds job reads of an indexer (slice 7, 7c; 7k3): every call of the chain, a page at a time by height, each counted for the realm
+// it names: calls, callers and the last height of a call. The queries are those onyx-1's indexer answered on 2026-11-04 (onyxIndexer.json):
+// it refused 7c's per-realm filter, and took 1.2 to 1.5 s for each realm's. History holds DIRECT calls only, and a line may be a failed
+// transaction: a count is a count of attempts, and a realm with none is not dead. No file body is asked (a deploy carries its whole source).
 import { isAddress } from "@gnoworld/core";
-import { ChainCount, RealmPath } from "@gnoworld/schemas/indexer";
+import { ChainCount } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
 import { jsonOf } from "../net.ts";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 
-/** The most bytes of one answer: about 38,000 lines of a call, far past the busiest realm recorded. */
+/** The most bytes of one answer: ten pages' worth at onyx-1's 194 bytes a transaction (387 KB for 2,000, 2026-11-04). */
 export const HISTORY_MAX_BYTES = 4 * 1024 * 1024;
+/** The transactions a page asks: onyx-1's 6,860 in four pages. */
+export const HISTORY_PAGE = 2_000;
+/** The most requests one read makes, each a page: a million transactions. ponytail: past it the read gives up; the next step reads only
+ * above the last pass's height, which needs each realm's callers kept. */
+export const HISTORY_MAX_PAGES = 500;
 const HISTORY_MS = 20_000;
-/** The most indexer calls one pass makes: 10,000 calls are about 42 minutes at the pause between calls, a little past the cycle. */
-export const HISTORY_MAX_CALLS = 10_000;
 
-const QUERY =
-  "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }";
+// A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
+// transactions are chosen by a call's type and a message that is no call is left out here. A negative bound answers nothing: the first page
+// has none.
+const FIELDS = "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
+const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
+const ORDER = "order: { heightAndIndex: ASC }";
+const FIRST = `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`;
+const ABOVE = `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`;
+const BLOCK = `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${FIELDS} } }`;
 
 /** What a realm drew above a height (7t3's window): a mark for each transaction with a call to it, its height and its senders, so a
  * transaction is one however many calls it bundles, to one realm or several of a world; and the different addresses that sent them. Both
@@ -36,98 +45,199 @@ export interface History {
   readonly recent?: Recent;
 }
 
-/** A realm's history as the job read it, stamped by its clock as it came (7t3: a world's window runs from read to read). */
+/** A realm's history as the job read it, stamped by its clock once the read ended (7t3: a world's window runs from read to read). */
 export type StampedHistory = History & { readonly at: number };
 
-export type HistoryRead = { ok: true; history: History } | { ok: false; kind: Kind };
+/** Every realm's history, and the calls left out: one that names no path, or whose caller is no address (counted with none). */
+export type HistoriesRead = { ok: true; histories: Map<string, History>; skipped: number } | { ok: false; kind: Kind };
 
-const Answer = z.object({
+// An empty page is null, not an empty list (onyx-1). A caller is checked where it is read, so one odd call costs that call alone.
+const Page = z.object({
   data: z.object({
-    getTransactions: z.array(
-      z.object({
-        block_height: ChainCount,
-        messages: z.array(
-          z.object({
-            value: z.object({
-              __typename: z.string(),
-              pkg_path: z.optional(z.string()),
-              caller: z.optional(z.string().check(z.refine(isAddress, { message: "an address" }))),
+    getTransactions: z.nullable(
+      z.array(
+        z.object({
+          block_height: ChainCount,
+          messages: z.array(
+            z.object({
+              value: z.object({
+                __typename: z.string(),
+                pkg_path: z.optional(z.string()),
+                caller: z.optional(z.string()),
+              }),
             }),
-          }),
-        ),
-      }),
+          ),
+        }),
+      ),
     ),
   }),
   errors: z.optional(z.never()),
 });
 
-/**
- * The realms this pass asks the indexer about: all of them up to `max`; past it a run of `max`, starting `max` further on at each
- * pass number and wrapping round, so every realm is reached within ceil(n / max) passes in a row. No state is stored.
- */
-export function realmsOfPass(paths: readonly string[], pass: number, max = HISTORY_MAX_CALLS): string[] {
-  if (paths.length <= max) return [...paths];
-  const start = (pass * max) % paths.length;
-  return Array.from({ length: max }, (_, i) => paths[(start + i) % paths.length] ?? "");
+interface Call {
+  readonly path: string;
+  readonly caller: string | undefined;
+}
+interface Row {
+  readonly height: number;
+  readonly calls: readonly Call[];
+  readonly skipped: number;
 }
 
-// The transactions above `since`, each marked by its height and the senders of all its calls, and the different addresses that called it.
-function recentOf(
-  rows: readonly { height: number; callers: readonly string[]; senders: readonly string[] }[],
-  since: number,
-): Recent {
-  const above = rows.filter(({ height }) => height > since);
-  const marks = new Set(above.map(({ height, senders }) => `${String(height)}:${senders.join(",")}`));
-  return { transactions: [...marks].sort(), callers: [...new Set(above.flatMap(({ callers }) => callers))].sort() };
-}
-
-/** A realm's history, and with `since` its window above that height (the last file's for the realm). */
-export async function readHistory(
-  reader: { send: Send; indexer: string; pace?: () => Promise<void> },
-  path: string,
-  since?: number,
-): Promise<HistoryRead> {
-  if (!RealmPath.safeParse(path).success) return { ok: false, kind: "path" };
-  try {
-    await reader.pace?.();
-    const init = {
-      method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ query: QUERY, variables: { path } }),
-    };
-    const text = await fetchText(
-      reader.send,
-      { url: reader.indexer, init },
-      { ms: HISTORY_MS, maxBytes: HISTORY_MAX_BYTES },
-    );
-    const answer = Answer.safeParse(jsonOf(text));
-    if (!answer.success) throw new Failure("shape");
-    // A transaction may bundle calls to several realms: only the messages aimed at this path count, and a transaction with none is left out.
-    // Each row keeps its calls, the different addresses that sent them and the senders of all its calls (its mark's), each sorted; a call
-    // that names none adds no address.
-    const known = (calls: readonly { caller?: string | undefined }[]): string[] =>
-      [...new Set(calls.flatMap(({ caller }) => (caller === undefined ? [] : [caller])))].sort();
-    const rows = answer.data.data.getTransactions.flatMap((row) => {
-      const calls = row.messages.flatMap(({ value }) => {
-        if (value.__typename !== "MsgCall") return [];
-        if (value.pkg_path === undefined) throw new Failure("shape");
-        return [{ path: value.pkg_path, caller: value.caller }];
-      });
-      const aimed = calls.filter((call) => call.path === path);
-      return aimed.length === 0
-        ? []
-        : [{ height: row.block_height, calls: aimed.length, callers: known(aimed), senders: known(calls) }];
+// A page's rows, each at `from` or above and none below the one before it, or at most `to`: the order is what the next page's bound
+// stands on. A call with no path is left out and one whose caller is no address keeps no caller, both counted as skipped.
+function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[] {
+  const page = Page.safeParse(json);
+  if (!page.success) throw new Failure("shape");
+  let floor = from;
+  return (page.data.data.getTransactions ?? []).map(({ block_height: height, messages }) => {
+    if (height < floor || height > to) throw new Failure("shape");
+    floor = height;
+    let skipped = 0;
+    const calls = messages.flatMap(({ value: { __typename, pkg_path: path, caller } }) => {
+      if (__typename !== "MsgCall") return [];
+      const odd = path === undefined || (caller !== undefined && !isAddress(caller));
+      if (odd) skipped += 1;
+      return path === undefined ? [] : [{ path, caller: odd ? undefined : caller }];
     });
-    return {
-      ok: true,
-      history: {
-        calls: rows.reduce((sum, { calls }) => sum + calls, 0),
-        callers: new Set(rows.flatMap(({ callers }) => callers)).size,
-        lastHeight: rows.length === 0 ? null : rows.reduce((last, { height }) => Math.max(last, height), 0),
-        ...(since === undefined ? {} : { recent: recentOf(rows, since) }),
-      },
-    };
+    return { height, calls, skipped };
+  });
+}
+
+interface Reader {
+  readonly send: Send;
+  readonly indexer: string;
+  readonly pace?: (() => Promise<void>) | undefined;
+}
+// One read under way: where it asks, the rows a page asks, and the requests it made.
+interface Reading {
+  readonly reader: Reader;
+  readonly limit: number;
+  readonly isStopped: () => boolean;
+  asked: number;
+}
+
+// One request of the read, if its pages are not spent and the pass goes on: the JSON it answers.
+async function request(reading: Reading, body: { query: string; variables: object }): Promise<unknown> {
+  const { reader } = reading;
+  if (reading.asked >= HISTORY_MAX_PAGES) throw new Failure("too_many");
+  if (reading.isStopped()) throw new Failure("stopped");
+  reading.asked += 1;
+  await reader.pace?.();
+  const init = {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(body),
+  };
+  const text = await fetchText(
+    reader.send,
+    { url: reader.indexer, init },
+    { ms: HISTORY_MS, maxBytes: HISTORY_MAX_BYTES },
+  );
+  return jsonOf(text);
+}
+
+// The page above `above`: one past the byte cap is asked again with half its rows, down to one.
+async function pageOf(reading: Reading, above: number | undefined): Promise<Row[]> {
+  for (let size = reading.limit; ; size = Math.ceil(size / 2)) {
+    const body =
+      above === undefined
+        ? { query: FIRST, variables: { limit: size } }
+        : { query: ABOVE, variables: { above, limit: size } };
+    try {
+      return rowsOf(await request(reading, body), above === undefined ? 0 : above + 1);
+    } catch (error) {
+      if (size === 1 || !(error instanceof Failure) || error.kind !== "too_large") throw error;
+    }
+  }
+}
+
+interface Tally {
+  calls: number;
+  readonly callers: Set<string>;
+  last: number | null;
+  readonly marks: Set<string>;
+  readonly recent: Set<string>;
+}
+
+// The different addresses of some calls, sorted; a call that names none adds none.
+const known = (calls: readonly Call[]): string[] =>
+  [...new Set(calls.flatMap(({ caller }) => (caller === undefined ? [] : [caller])))].sort();
+
+// A row's calls added to the realms they aim at: each realm its own calls and callers, and above its height a mark of the row's height and
+// the senders of all its calls, so a world's realms give one transaction one mark (F4862).
+function count(tallies: ReadonlyMap<string, Tally>, row: Row, sinceOf: (path: string) => number | undefined): void {
+  const aimed = new Map<string, { tally: Tally; calls: Call[] }>();
+  for (const call of row.calls) {
+    const tally = tallies.get(call.path);
+    if (tally === undefined) continue;
+    const entry = aimed.get(call.path) ?? { tally, calls: [] };
+    entry.calls.push(call);
+    aimed.set(call.path, entry);
+  }
+  const mark = `${String(row.height)}:${known(row.calls).join(",")}`;
+  for (const [path, { tally, calls }] of aimed) {
+    const callers = known(calls);
+    tally.calls += calls.length;
+    tally.last = Math.max(tally.last ?? 0, row.height);
+    for (const caller of callers) tally.callers.add(caller);
+    const since = sinceOf(path);
+    if (since === undefined || row.height <= since) continue;
+    tally.marks.add(mark);
+    for (const caller of callers) tally.recent.add(caller);
+  }
+}
+
+function historyOf(tally: Tally, since: number | undefined): History {
+  const counts = { calls: tally.calls, callers: tally.callers.size, lastHeight: tally.last };
+  return since === undefined
+    ? counts
+    : { ...counts, recent: { transactions: [...tally.marks].sort(), callers: [...tally.recent].sort() } };
+}
+
+/**
+ * Every realm's history in `paths` from one read of the chain's calls: a page's rows below its last height, then the next page above them, so
+ * a block cut by a page's end is read again whole; a page of one height is read as that block alone; only an empty page ends the read, for
+ * an indexer may give fewer rows than asked. A fault of any request fails the whole read: no realm is counted from half the chain.
+ */
+export async function readHistories(
+  reader: Reader & { readonly page?: number },
+  paths: readonly string[],
+  hooks: { sinceOf: (path: string) => number | undefined; isStopped?: () => boolean },
+): Promise<HistoriesRead> {
+  const reading: Reading = {
+    reader,
+    limit: reader.page ?? HISTORY_PAGE,
+    isStopped: hooks.isStopped ?? (() => false),
+    asked: 0,
+  };
+  const tallies = new Map<string, Tally>(
+    paths.map((path) => [path, { calls: 0, callers: new Set(), last: null, marks: new Set(), recent: new Set() }]),
+  );
+  let skipped = 0;
+  const counted = (rows: readonly Row[]): void => {
+    for (const row of rows) {
+      count(tallies, row, hooks.sinceOf);
+      skipped += row.skipped;
+    }
+  };
+  try {
+    for (let above: number | undefined; ;) {
+      const rows = await pageOf(reading, above);
+      const last = rows.at(-1)?.height;
+      if (last === undefined) break;
+      const whole = rows.filter(({ height }) => height < last);
+      if (whole.length > 0) {
+        counted(whole);
+        above = last - 1;
+        continue;
+      }
+      counted(rowsOf(await request(reading, { query: BLOCK, variables: { height: last } }), last, last));
+      above = last;
+    }
   } catch (error) {
     return { ok: false, kind: kindOf(error) };
   }
+  const histories = new Map([...tallies].map(([path, tally]) => [path, historyOf(tally, hooks.sinceOf(path))]));
+  return { ok: true, histories, skipped };
 }
