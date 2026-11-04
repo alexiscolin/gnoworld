@@ -7,7 +7,7 @@ import type { Trend, Worlds } from "@gnoworld/schemas/indexer";
 import type { Log } from "../log.ts";
 import type { Recent } from "./history.ts";
 import { makePresence, type Presence as Hours } from "./presence.ts";
-import { chainClears, type ChainWorld, type Place } from "./score.ts";
+import { chainClears, type ChainSignal, type ChainWorld, type Place } from "./score.ts";
 import { callsOf } from "./shed.ts";
 
 const HOUR = 3_600_000;
@@ -92,17 +92,22 @@ function windowsOf(
       ),
     );
   };
+  // Each count at its pace an hour, as a habit keeps it: a window twice as long as usual is no rise.
+  const pace = (count: number): number => Math.round((count * HOUR) / span);
   if (habits !== undefined) {
-    keep(habits.transactions, ({ transactions }) => transactions);
-    keep(habits.addresses, ({ addresses }) => addresses);
+    keep(habits.transactions, ({ transactions }) => pace(transactions));
+    keep(habits.addresses, ({ addresses }) => pace(addresses));
   }
-  const usual = (kept: Hours | undefined, id: string): number | null =>
-    kept === undefined ? null : usualOf(kept.history(id), at);
+  const signal = (count: number, kept: Hours | undefined, id: string): ChainSignal => ({
+    now: pace(count),
+    usual: kept === undefined ? null : usualOf(kept.history(id), at),
+    count,
+  });
   return counted.map(({ world, transactions, addresses }) => ({
     world: world.id,
     place: placed(world),
-    transactions: { now: transactions, usual: usual(habits?.transactions, world.id) },
-    addresses: { now: addresses, usual: usual(habits?.addresses, world.id) },
+    transactions: signal(transactions, habits?.transactions, world.id),
+    addresses: signal(addresses, habits?.addresses, world.id),
     since: last.at,
     at: worlds.updated,
   }));
@@ -130,6 +135,7 @@ export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendK
   const { habits, log = () => undefined } = options;
   let last: { at: string; read: ReadonlySet<string> } | undefined;
   let kept: ChainRead = { worlds: [], newest: [] };
+  // ponytail: each habit writes its whole file at once, about 44 ms for a full one (5.7 MB, 7t3's review), twice a pass.
   const save = (): void => {
     if (habits !== undefined && ![habits.transactions.save(), habits.addresses.save()].every(Boolean))
       log("alert", { error: "trends_write" });

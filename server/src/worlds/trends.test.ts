@@ -113,16 +113,19 @@ describe("the chain's window", () => {
     expect(windowOf(trends.chain(), "gnoswap/pool")).toEqual<ChainWorld>({
       world: "gnoswap/pool",
       place: { title: "pool", realm: POOL },
-      transactions: { now: 5, usual: null },
-      addresses: { now: 3, usual: null },
+      transactions: { now: 10, usual: null, count: 5 },
+      addresses: { now: 6, usual: null, count: 3 },
       since: at(T1),
       at: at(T2),
     });
     expect(windowOf(trends.chain(), "gnoswap/router")).toMatchObject({
-      transactions: { now: 1 },
-      addresses: { now: 1 },
+      transactions: { count: 1 },
+      addresses: { count: 1 },
     });
-    expect(windowOf(trends.chain(), "alexis/blog")).toMatchObject({ transactions: { now: 0 }, addresses: { now: 0 } });
+    expect(windowOf(trends.chain(), "alexis/blog")).toMatchObject({
+      transactions: { count: 0 },
+      addresses: { count: 0 },
+    });
   });
 
   // 7t3's security review: one transaction calling K realms of a world counted K times. Its mark is the same in each realm's window.
@@ -143,7 +146,24 @@ describe("the chain's window", () => {
         ],
       }),
     );
-    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 2 }, addresses: { now: 2 } });
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
+      transactions: { count: 2 },
+      addresses: { count: 2 },
+    });
+  });
+
+  // 7t3's review (high, reproduced): a failed pass, or a slower gather, makes a window longer than the habit's; read as counts, a steady
+  // world's doubled and it trended. A window is read at its pace an hour; its count stays what the ticker says.
+  it("reads a window at its pace an hour, so a steady world's window twice as long as usual is no rise", async () => {
+    const files = { transactions: habitOf(48, 10), addresses: habitOf(48, 4) };
+    const { trends, pass } = keeper(files, T1 - HOUR);
+    pass(T1 - HOUR, WORLDS, reads({ [POOL]: null }));
+    pass(T1 + HOUR, WORLDS, reads({ [POOL]: [20, ["g1a", "g1b", "g1c", "g1d", "g1e", "g1f", "g1g", "g1h"]] }));
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
+      transactions: { now: 10, usual: 10, count: 20 },
+      addresses: { now: 4, usual: 4, count: 8 },
+    });
+    expect(await trendingOf({ chain: trends.chain().worlds, now: T1 + HOUR + MINUTE })).toBeUndefined();
   });
 
   it("has no window on a first pass, for there is nothing to compare with", () => {
@@ -156,7 +176,10 @@ describe("the chain's window", () => {
     const { trends, pass } = keeper();
     pass(T1, WORLDS, reads({ [POOL]: null, [BLOG]: null }));
     pass(T2, WORLDS, reads({ [POOL]: [2, [A]], [POOL1]: [9, [B]], [ROUTER]: [900, [A, B]], [BLOG]: null }));
-    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 2 }, addresses: { now: 1 } });
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
+      transactions: { count: 2 },
+      addresses: { count: 1 },
+    });
     expect(windowOf(trends.chain(), "gnoswap/router"), "unread at the first pass").toBeUndefined();
     expect(windowOf(trends.chain(), "alexis/blog"), "read with no height to count from").toBeUndefined();
   });
@@ -181,7 +204,7 @@ describe("the chain's window", () => {
     pass(T1, WORLDS, reads({ [ROUTER]: null }));
     pass(T2, WORLDS, reads({ [ROUTER]: [50, [A, B]] }));
     pass(T2 + 30 * MINUTE, WORLDS, reads({ [ROUTER]: [7, [A]] }));
-    expect(windowOf(trends.chain(), "gnoswap/router")).toMatchObject({ transactions: { now: 7 }, since: at(T2) });
+    expect(windowOf(trends.chain(), "gnoswap/router")).toMatchObject({ transactions: { count: 7 }, since: at(T2) });
   });
 
   it("gives a world only an address names no place: it counts in the universe's middle, never as a trend's world", () => {
@@ -190,7 +213,7 @@ describe("the chain's window", () => {
     pass(T1, [world(C, [named])], reads({ [named]: null }));
     pass(T2, [world(C, [named])], reads({ [named]: [6, [A, B]] }));
     const unnamed = windowOf(trends.chain(), C);
-    expect(unnamed).toMatchObject({ transactions: { now: 6 } });
+    expect(unnamed).toMatchObject({ transactions: { count: 6 } });
     expect(unnamed?.place).toBeUndefined();
   });
 
@@ -203,7 +226,7 @@ describe("the chain's window", () => {
     const { trends, pass } = keeper();
     pass(T1, worlds, reads({ [realmOfEarth]: null }));
     pass(T2, worlds, reads({ [realmOfEarth]: [6, [A, B]] }));
-    expect(windowOf(trends.chain(), "earth")).toMatchObject({ place: undefined, transactions: { now: 6 } });
+    expect(windowOf(trends.chain(), "earth")).toMatchObject({ place: undefined, transactions: { count: 6 } });
     expect(trends.chain().newest).toMatchObject([{ world: "gnoswap/router" }]);
   });
 
@@ -215,7 +238,7 @@ describe("the chain's window", () => {
     const hour = Math.floor(T2 / HOUR) * HOUR;
     expect(habits?.transactions.history("alexis/blog").at(-1)).toEqual({ at: hour, people: 0 });
     expect(habits?.addresses.history("alexis/blog").at(-1)).toEqual({ at: hour, people: 0 });
-    expect(windowOf(trends.chain(), "alexis/blog")).toMatchObject({ transactions: { now: 0, usual: 3 } });
+    expect(windowOf(trends.chain(), "alexis/blog")).toMatchObject({ transactions: { count: 0, usual: 3 } });
   });
 
   it("lets a world into its habits only once its window clears the chain's floor: one address's calls never take a place there", () => {
@@ -234,11 +257,11 @@ describe("the chain's window", () => {
     pass(T1, WORLDS, reads({ [POOL]: null }));
     pass(T2, WORLDS, reads({ [POOL]: [7, [A, B, C]] }));
     expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
-      transactions: { now: 7, usual: 3 },
-      addresses: { now: 3, usual: 2 },
+      transactions: { now: 14, usual: 3, count: 7 },
+      addresses: { now: 6, usual: 2, count: 3 },
     });
     const hour = Math.floor(T2 / HOUR) * HOUR;
-    expect(habits?.transactions.history("gnoswap/pool").at(-1)).toEqual({ at: hour, people: 7 });
+    expect(habits?.transactions.history("gnoswap/pool").at(-1), "its pace an hour").toEqual({ at: hour, people: 14 });
     expect(
       makePresence({ file: files.addresses, now: () => T2 })
         .history("gnoswap/pool")
@@ -246,7 +269,7 @@ describe("the chain's window", () => {
       "saved",
     ).toEqual({
       at: hour,
-      people: 3,
+      people: 6,
     });
   });
 
@@ -266,7 +289,7 @@ describe("the chain's window", () => {
     pass(T1, WORLDS, reads({ [POOL]: null }));
     pass(T2, WORLDS, reads({ [POOL]: [7, [A, B]] }));
     expect(logged).toContainEqual(["alert", { error: "trends_write" }]);
-    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 7 } });
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { count: 7 } });
   });
 
   it("says when one habit's folder refuses its file though the other takes it", () => {
@@ -293,7 +316,7 @@ describe("the chain's window", () => {
     const after = count;
     for (let ask = 0; ask < 100; ask += 1) trends.chain();
     expect(count).toBe(after);
-    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 7 } });
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { count: 7 } });
   });
 });
 
@@ -383,8 +406,8 @@ const chainOf = (
 ): ChainWorld => ({
   world: id,
   place: { title: id.split("/").at(-1) ?? id, realm: `gno.land/r/${id}` },
-  transactions: signal(...transactions),
-  addresses: signal(...addresses),
+  transactions: { ...signal(...transactions), count: transactions[0] },
+  addresses: { ...signal(...addresses), count: addresses[0] },
   since: at(T1),
   at: at(T2),
 });
@@ -437,8 +460,8 @@ describe("Trending, a score relative to each world's habit", () => {
     burst.pass(T1, WORLDS, reads({ [POOL]: null, [ROUTER]: null }));
     burst.pass(T2, WORLDS, reads({ [POOL]: [1, [A]], [ROUTER]: [0, []] }));
     expect(windowOf(burst.trends.chain(), "gnoswap/pool"), "a quiet habit is known").toMatchObject({
-      transactions: { now: 1, usual: 0 },
-      addresses: { now: 1, usual: 0 },
+      transactions: { now: 2, usual: 0, count: 1 },
+      addresses: { now: 2, usual: 0, count: 1 },
     });
     expect(await trendingOf({ chain: burst.trends.chain().worlds })).toBeUndefined();
     const twice = keeper({ transactions: habitOf(48, 0), addresses: habitOf(48, 0) });

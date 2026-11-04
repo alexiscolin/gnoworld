@@ -15,13 +15,18 @@ export interface Place {
   readonly title: string;
   readonly realm: string;
 }
+/** A chain's signal: its pace an hour now beside its usual one, which the score reads, and the window's own count, which the floor and the
+ * ticker's words read. A window's length varies with the gather and a failed pass: its pace does not. */
+export interface ChainSignal extends Signal {
+  readonly count: number;
+}
 /** A world's chain over the window between the job's last two passes, each signal beside its usual window of 14 days. */
 export interface ChainWorld {
   readonly world: string;
   /** Its title and first realm; none for a world only an address names, which counts in the universe's middle and never trends. */
   readonly place: Place | undefined;
-  readonly transactions: Signal;
-  readonly addresses: Signal;
+  readonly transactions: ChainSignal;
+  readonly addresses: ChainSignal;
   readonly since: string;
   readonly at: string;
 }
@@ -60,7 +65,7 @@ function candidatesOf(
 
 // A side's floor: a chain's window that clears it, rooms with two people.
 const chainCounts = ({ transactions, addresses }: ChainWorld): boolean =>
-  chainClears({ transactions: transactions.now, addresses: addresses.now });
+  chainClears({ transactions: transactions.count, addresses: addresses.count });
 const chatCounts = ({ here }: ChatWorld): boolean => here.now >= SCORE.people;
 
 // Each signal's middle among the worlds whose side clears its floor and where it is more than none, named or not, its habit known or not: a
@@ -98,7 +103,7 @@ function signalsOf({ chain, chat }: Candidate): Said[] {
               by: name,
               world: chain.world,
               ...chain.place,
-              count: chain[name].now,
+              count: chain[name].count,
               rise,
               since: chain.since,
               at: chain.at,

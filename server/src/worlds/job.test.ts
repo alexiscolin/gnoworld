@@ -968,8 +968,8 @@ describe("startWorlds", () => {
     job.stop();
     expect(job.trends().worlds[0]).toMatchObject({
       world: "gnoswap/pool",
-      transactions: { now: 6 },
-      addresses: { now: 2 },
+      transactions: { count: 6 },
+      addresses: { count: 2 },
     });
   });
 
@@ -987,12 +987,18 @@ describe("startWorlds", () => {
       transactions: join(folder, "trends-transactions.json"),
       addresses: join(folder, "trends-addresses.json"),
     };
-    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20, habits });
+    // A clock a minute on at each read, so a window spans minutes and its pace an hour stays within what a habit holds.
+    const clock = { at: NOW };
+    const now = () => (clock.at += 60_000);
+    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20, habits, now });
     await until(() => job.trends().worlds.length > 0);
     job.stop();
-    const kept = (habit: string) => makePresence({ file: habit, now: Date.now }).history("gnoswap/pool").at(-1)?.people;
-    expect(kept(habits.transactions)).toBe(6);
-    expect(kept(habits.addresses)).toBe(2);
+    const [window] = job.trends().worlds;
+    const kept = (habit: string) => makePresence({ file: habit, now }).history("gnoswap/pool").at(-1)?.people;
+    expect(window?.transactions.count).toBe(6);
+    expect(kept(habits.transactions)).toBe(window?.transactions.now);
+    expect(kept(habits.addresses)).toBe(window?.addresses.now);
+    expect(window?.transactions.now).toBeGreaterThan(6);
   });
 
   it("writes its habits as it stops, where it was told, though no pass wrote a window (7t3)", () => {
