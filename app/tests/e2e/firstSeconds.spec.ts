@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { reading } from "./pixels.ts";
 import { landed, running, stats } from "./sceneStage.ts";
 
 // The first seconds (ADR-0003): a newcomer's arrival says what gnoworld is over the dive, and "Start here" in the Earth's label is the one
@@ -45,6 +46,106 @@ async function arrive(
   await page.emulateMedia({ reducedMotion: motion });
   await page.goto(path);
   await hydrated(page);
+}
+
+interface Part {
+  readonly name: string;
+  readonly colour: readonly [number, number, number];
+  readonly lines: readonly (readonly [number, number, number, number])[];
+}
+
+// The opening's words, each part's colour in sRGB and the boxes of its lines in the clip that holds them all, their fill then taken off.
+function wordsOf(words: HTMLElement) {
+  const pieces = [
+    words.querySelector("p > span"),
+    ...words.querySelectorAll(":scope > p:nth-of-type(n + 2)"),
+    words.querySelector("a"),
+  ].filter((piece): piece is HTMLElement => piece instanceof HTMLElement);
+  const paint = new OffscreenCanvas(1, 1).getContext("2d", { willReadFrequently: true });
+  const rgb = (colour: string): [number, number, number] => {
+    if (paint === null) throw new Error("no canvas");
+    paint.clearRect(0, 0, 1, 1);
+    paint.fillStyle = colour;
+    paint.fillRect(0, 0, 1, 1);
+    const [red = 0, green = 0, blue = 0] = paint.getImageData(0, 0, 1, 1).data;
+    return [red, green, blue];
+  };
+  const rects = pieces.map((piece) => {
+    const range = document.createRange();
+    range.selectNodeContents(piece);
+    return [...range.getClientRects()];
+  });
+  const all = rects.flat();
+  const [left, top] = [Math.min(...all.map((r) => r.left)), Math.min(...all.map((r) => r.top))];
+  const [right, bottom] = [Math.max(...all.map((r) => r.right)), Math.max(...all.map((r) => r.bottom))];
+  const clip = {
+    x: Math.floor(left),
+    y: Math.floor(top),
+    width: Math.ceil(right - left) + 1,
+    height: Math.ceil(bottom - top) + 1,
+  };
+  const parts = pieces.map((piece, at) => ({
+    name: piece.textContent.slice(0, 24),
+    colour: rgb(getComputedStyle(piece).color),
+    lines: (rects[at] ?? []).map(
+      (r) =>
+        [
+          Math.round(r.left) - clip.x,
+          Math.round(r.top) - clip.y,
+          Math.round(r.right) - clip.x,
+          Math.round(r.bottom) - clip.y,
+        ] as const,
+    ),
+  }));
+  // The link's focus ring, which the reading's hold draws, is no word.
+  for (const piece of pieces) {
+    piece.style.setProperty("color", "transparent");
+    piece.style.setProperty("outline", "none");
+  }
+  return { clip, parts };
+}
+
+// Whether the dive came to rest, its dissolve over.
+const landedNow = async (page: Page) => {
+  const dive = (await stats(page)).cosmos?.dive;
+  return dive?.along === 1 && dive.veil === 0;
+};
+
+// The words over white, the brightest the dive can stand behind them: the scene hidden, the page's ground white, then both given back.
+async function overWhite(page: Page, clip: { x: number; y: number; width: number; height: number }) {
+  const ground = (white: boolean) =>
+    page.evaluate((on) => {
+      document.documentElement.style.setProperty("background", on ? "white" : "");
+      document.querySelector<HTMLElement>("canvas[data-scene]")?.style.setProperty("visibility", on ? "hidden" : "");
+    }, white);
+  await ground(true);
+  const frame = await page.screenshot({ clip });
+  await ground(false);
+  return frame;
+}
+
+// Each part's worst contrast over the frames (WCAG's), against the brightest hundredth of what its lines stand on: a lone star's pixels
+// aside, a sun's glow counts.
+function contrasts(parts: readonly Part[]) {
+  const { images, rgbAt } = Reflect.get(globalThis, "__pixels") as import("./pixels.ts").Tools;
+  const linear = (value: number) =>
+    value / 255 <= 0.04045 ? value / 255 / 12.92 : ((value / 255 + 0.055) / 1.055) ** 2.4;
+  const luminance = ([red, green, blue]: readonly number[]) =>
+    0.2126 * linear(red ?? 0) + 0.7152 * linear(green ?? 0) + 0.0722 * linear(blue ?? 0);
+  return parts.map(({ name, colour, lines }) => {
+    let [ratio, frame] = [Infinity, -1];
+    images.forEach((image, at) => {
+      const behind: number[] = [];
+      for (const [x0, y0, x1, y1] of lines)
+        for (let y = Math.max(0, y0); y < y1; y++)
+          for (let x = Math.max(0, x0); x < x1; x++) behind.push(luminance(rgbAt(image, x, y)));
+      behind.sort((a, b) => a - b);
+      const bright = behind[Math.floor(behind.length * 0.99)] ?? 0;
+      const here = (luminance(colour) + 0.05) / (bright + 0.05);
+      if (here < ratio) [ratio, frame] = [here, at];
+    });
+    return { name, ratio: Math.round(ratio * 100) / 100, frame };
+  });
 }
 
 test.describe("a newcomer", () => {
@@ -103,6 +204,31 @@ test.describe("a newcomer", () => {
     await expect(explore(page)).toBeVisible();
     expect(await filled(explore(page))).toBe(false);
     await expect(chat(page)).toBeHidden();
+  });
+
+  // F4643: the line crossed the dive's brightest stars, "what's being built", "trending" and "and" lost behind them (7o's pictures). Each
+  // part of the words, the link included, keeps 4.5:1 against the brightest hundredth of what stands behind its lines, over white, the
+  // brightest the dive can show, and on frames of the whole dive, the focus on the link holding the words; their fill off for the reading.
+  test("keeps the opening's words at 4.5:1 against the dive behind them, until the camera lands", async ({ page }) => {
+    await served(page);
+    await arrive(page);
+    await expect(opening(page)).toBeVisible();
+    const { clip, parts } = await opening(page).evaluate(wordsOf);
+    await opening(page).getByRole("link").focus();
+    const frames = [await overWhite(page, clip)];
+    await running(page);
+    // Through the dive and into its landing, where the labels come: three frames at least, however fast a loaded machine lands it.
+    let dived = 0;
+    while ((dived < 3 || !(await landedNow(page))) && dived < 40) {
+      frames.push(await page.screenshot({ clip }));
+      dived += 1;
+    }
+    await expect(opening(page)).not.toHaveAttribute("data-left");
+    const worst = await reading(page, frames, [contrasts, parts]);
+    for (const { name, ratio, frame } of worst)
+      expect
+        .soft(ratio, `${name}, at its worst on frame ${String(frame)} of ${String(frames.length)}`)
+        .toBeGreaterThanOrEqual(4.5);
   });
 
   test("shortens the opening at a key, before the camera landed", async ({ page }) => {
