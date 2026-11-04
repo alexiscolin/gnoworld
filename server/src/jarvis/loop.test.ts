@@ -262,6 +262,17 @@ describe("the loop: the question it takes", () => {
     run.close();
   });
 
+  it.each(["200B", "2800", "202E", "3164", "FE0F"])(
+    "refuses a question of nothing but U+%s, which draws nothing, before any reservation",
+    async (point) => {
+      const run = setup({ steps: [] });
+      const words = String.fromCodePoint(Number.parseInt(point, 16)).repeat(2);
+      expect(await run.loop.ask({ text: words, room: [] })).toEqual({ kind: "invalid" });
+      expect(run.model.requests).toEqual([]);
+      run.close();
+    },
+  );
+
   it("counts a question's characters by code point, as the door does", async () => {
     const run = setup({ steps: [ended()] });
     const astral = String.fromCodePoint(0x1f30d).repeat(CAPS.questionChars);

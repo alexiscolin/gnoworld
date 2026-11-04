@@ -6,6 +6,7 @@
 // error, a stop it never asks for, or the day's budget (D84).
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
+import { isBlank } from "@gnoworld/core";
 import type { Tracer } from "@opentelemetry/api";
 import type { Log } from "../log.ts";
 import type { Allowlist, Definition } from "./allowlist.ts";
@@ -102,9 +103,10 @@ async function ask(parts: Parts, prompt: Prompt, question: Question): Promise<Re
 }
 
 const invalid = (): Result => ({ kind: "invalid" });
-// Some visible character, and no more code points than the cap: a text of more than twice as many code units has more.
+// A character that draws something (core's isBlank), and no more code points than the cap: a text of more than twice as
+// many code units has more.
 const askable = (text: string, cap: number) =>
-  text.length <= 2 * cap && Array.from(text).length <= cap && /\S/u.test(text);
+  text.length <= 2 * cap && Array.from(text).length <= cap && !isBlank(text);
 
 function opening(blocks: Untrusted, { text, room }: Question): Anthropic.TextBlockParam[] {
   const lines = room.length === 0 ? [] : [blocks.wrap("room", room.join("\n"))];
