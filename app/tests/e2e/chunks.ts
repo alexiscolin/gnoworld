@@ -36,9 +36,9 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
-  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md); 13,523 B with 7v2's one route to a world's page and the
-  // page's bands, their modules of their own (the margin given ahead).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_523 },
+  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md); 13,534 B with 7v2's shared route to a world's page, the
+  // page's bands and the column's test (the margin given ahead).
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_534 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2401 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
