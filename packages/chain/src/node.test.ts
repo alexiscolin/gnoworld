@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { readEvaluated, readFunctionList, readHeight, readRender } from "./node.ts";
-import type { ChainFetch, ChainRead, ReadOptions } from "./read.ts";
+import { readEvaluated, readFunctionList, readHeight, readRender, type NodeOptions } from "./node.ts";
+import type { ChainFetch, ChainRead } from "./read.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "./testing/envelopes.ts";
 
 // The universe check (D118; 10f's security review): a read given a chain's id asks the node's /status first and reads
@@ -43,9 +43,9 @@ const paths = (asked: readonly string[]) =>
 
 const reads = () =>
   [
-    ["readRender", (o: ReadOptions) => readRender(RPC, "gno.land/r/demo/poll:", o), "vm%2Fqrender"],
-    ["readEvaluated", (o: ReadOptions) => readEvaluated(RPC, "gno.land/r/demo/poll.Count()", o), "vm%2Fqeval"],
-    ["readFunctionList", (o: ReadOptions) => readFunctionList(RPC, "gno.land/r/demo/poll", o), "vm%2Fqfuncs"],
+    ["readRender", (o: NodeOptions) => readRender(RPC, "gno.land/r/demo/poll:", o), "vm%2Fqrender"],
+    ["readEvaluated", (o: NodeOptions) => readEvaluated(RPC, "gno.land/r/demo/poll.Count()", o), "vm%2Fqeval"],
+    ["readFunctionList", (o: NodeOptions) => readFunctionList(RPC, "gno.land/r/demo/poll", o), "vm%2Fqfuncs"],
   ] as const;
 
 const kindOf = (read: ChainRead<unknown>) => (read.ok ? "ok" : read.failure.kind);
@@ -157,9 +157,9 @@ describe("a node read given its universe's chain", () => {
     expect(node.asked).toHaveLength(1);
   });
 
-  it.each(reads())("%s asks no status when no chain is named, as the app reads", async (_name, run, path) => {
+  it.each(reads())("%s asks no status when its chain is null, as the app reads", async (_name, run, path) => {
     const node = fakeNode({ network: "test5" });
-    expect(kindOf(await run({ fetch: node.fetch }))).toBe("ok");
+    expect(kindOf(await run({ fetch: node.fetch, chainId: null }))).toBe("ok");
     expect(paths(node.asked)).toEqual([path]);
   });
 
@@ -345,8 +345,11 @@ describe("the node reads' edges", () => {
     expect(node.asked).toEqual([]);
   });
 
-  it("reads the height of a node that names a network when no chain is asked, as the app does", async () => {
+  it("reads the height of a node that names a network when its chain is null, as the app does", async () => {
     const node = fakeNode({ network: "test5" });
-    expect(await readHeight(RPC, { fetch: node.fetch })).toMatchObject({ ok: true, value: { height: 1204 } });
+    expect(await readHeight(RPC, { fetch: node.fetch, chainId: null })).toMatchObject({
+      ok: true,
+      value: { height: 1204 },
+    });
   });
 });

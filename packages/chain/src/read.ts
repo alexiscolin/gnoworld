@@ -48,9 +48,6 @@ export interface ReadOptions {
   now?: () => Date;
   /** Ends the request early: a page that left. */
   signal?: AbortSignal;
-  /** The universe's chain a node read must be on: the node's status is read first, and a node naming another, or none, is
-   * read no further (D118). None: no check, as the app's reads. */
-  chainId?: string;
 }
 
 const NEXT: Record<FailureKind, string> = {
