@@ -16,6 +16,7 @@ import {
 import type { Asking, Landing } from "./restArrival.ts";
 import type { PerspectiveCamera } from "three";
 import type { EarthDevice } from "../earth/device.ts";
+import { tuned } from "../tuning.ts";
 
 // A system's arrival is looked for in a chunk of its own, asked the first time a system is: the view at rest's stays within its cap; so are
 // the Plans, a system's and the Earth's, in one of their own (7v).
@@ -40,6 +41,11 @@ const cross = (a: Spot, b: Spot, out: Spot) => {
   out.y = y / length;
   out.z = z / length;
 };
+
+// The workshop's share of the scene's lean at a system's view, in the lab alone (tuning.ts), read at each frame so a slider moves the view
+// with no new arrival. A share, as the code's ARRIVAL_LEAN = LEAN / 2.2: the home's lean is the scene's eye's (eye.ts). A Plan keeps its own.
+const retuned = (lean: number, landing: Landing | undefined): number =>
+  landing !== undefined && landing.lean === undefined ? tuned("eye.arrivalShare", lean) : lean;
 
 export class RestEye {
   /** What the camera looks at, on the stage: the Earth, or what the arrival looks at. */
@@ -154,7 +160,12 @@ export class RestEye {
   place(eye: Point, seconds: number, out: Spot): void {
     swayAt(this.#sway, seconds);
     const { across, up } = this.#sway;
-    const [rest, lean, room] = [this.#went ?? eye, this.#lean, this.#room];
+    // In the lab, the panel's leans (tuning.ts); a site's build reads the landing's, as the line folds.
+    const [rest, lean, room] = [
+      this.#went ?? eye,
+      import.meta.env.GNOWORLD_TUNING === "1" ? retuned(this.#lean, this.landing) : this.#lean,
+      this.#room,
+    ];
     // Each way across and up the stage as far as the view's room says (the design review's second pass, F4468).
     const [leanX, leanY] = [eye.x >= rest.x ? room.right : room.left, eye.y >= rest.y ? room.up : room.down];
     out.x = rest.x + lean * leanX * (eye.x - rest.x) + this.#offset.x + this.#across.x * across + this.#upward.x * up;

@@ -6,7 +6,7 @@ import { WorldFeed } from "./feed.ts";
 import { readingOf } from "./reading.ts";
 
 // What a world's view is told, and from where (ADR-0002 §3): the people present in the world's rooms, the times of their lines, the
-// worlds' file read once, and whether this reader came before, which a first visit records so a reload never wakes a world twice.
+// worlds' file read once, and whether this reader came before: the view keeps the visit once its appearance starts (F4533).
 const NOW = Date.parse("2026-11-02T12:00:00Z");
 const DAY = 86_400_000;
 const FRESH: Worlds = {
@@ -56,17 +56,15 @@ function parts(file: Worlds | null = FRESH, visited = false) {
     },
   }));
   const view = { read: vi.fn(), ring: vi.fn() };
-  const remember = vi.fn();
   const feed = new WorldFeed(view, {
     universe: "onyx",
     id: "bubble",
     page: { store, open: vi.fn(), slug: "bubble", room: null, universe: "onyx", path: "/w/bubble" },
     file: () => Promise.resolve(file ?? undefined),
     visited,
-    remember,
     now: () => NOW,
   });
-  return { store, view, feed, remember };
+  return { store, view, feed };
 }
 
 function never(): never {
@@ -93,37 +91,32 @@ describe("a world's feed", () => {
     );
   });
 
-  it("wakes a fresh world on this reader's first visit and has it remembered; a reader who came before sees no wake", async () => {
+  it("wakes a fresh world on this reader's first visit; a reader who came before sees no wake", async () => {
     const first = parts();
     await settled();
     first.feed.refresh();
     expect(first.view.read.mock.lastCall?.[0]).toMatchObject({ wake: true });
-    expect(first.remember).toHaveBeenCalled();
     first.feed.dispose();
     const again = parts(FRESH, true);
     await settled();
     again.feed.refresh();
     expect(again.view.read.mock.lastCall?.[0]).toMatchObject({ wake: false });
-    expect(again.remember).not.toHaveBeenCalled();
   });
 
-  // The appearance plays on any world's first visit (Alexis, 2026-11-03), kept as the wake is: an old world, or one whose file never came.
-  it("has any world's first visit remembered, a seed or not, so a reload never plays its appearance again", async () => {
+  // The appearance plays on any world's first visit (Alexis, 2026-11-03): an old world's, or one whose file never came.
+  it("reads any world's first visit as one, a seed or not, so its appearance plays", async () => {
     const old = parts({ ...FRESH, worlds: FRESH.worlds.map((world) => ({ ...world, seen: "2026-01-01T00:00:00Z" })) });
     await settled();
     expect(old.view.read.mock.lastCall?.[0]).toMatchObject({ first: true, wake: false });
-    expect(old.remember).toHaveBeenCalled();
     const lost = parts(null);
     await settled();
     expect(lost.view.read.mock.lastCall?.[0]).toMatchObject({ first: true, wake: false });
-    expect(lost.remember).toHaveBeenCalled();
     const again = parts(FRESH, true);
     await settled();
     expect(again.view.read.mock.lastCall?.[0]).toMatchObject({ first: false });
-    expect(again.remember).not.toHaveBeenCalled();
   });
 
-  it("keeps the wake through the visit though it was remembered at its start, so it plays to its end", async () => {
+  it("keeps the wake through the visit, whether this reader came before told once, so it plays to its end", async () => {
     const { view, feed } = parts();
     await settled();
     feed.refresh();

@@ -17,7 +17,7 @@ import type { Circle } from "../earth/device.ts";
 import { createWorld, worldOf } from "../planet/generated.ts";
 import type { WorldReading } from "./reading.ts";
 import { CLOSE_WIDTH } from "./standing.ts";
-import { WorldView, type MoonMark } from "./view.ts";
+import { WorldView, type MoonMark, type WorldPlace } from "./view.ts";
 
 const maps = vi.hoisted(() => ({ load: vi.fn(), made: [] as unknown[] }));
 vi.mock("../planet/maps.ts", async (original) => ({
@@ -34,6 +34,8 @@ const HEIGHT = 1080;
 const PLATE = { left: 24, top: 98, right: 900, bottom: 1056, fill: [24, 31, 50] as const };
 const PLACE: Circle = { x: 960, y: 561, radius: 300, plate: PLATE };
 const ID = "gov/dao";
+// What the page asks for world `id`: its circle, and what keeps this reader's visit.
+const askFor = (id = ID, remember: () => void = () => undefined): WorldPlace => ({ circle: PLACE, id, remember });
 
 // `arrival` is what a flight writes as it brings the world (7g): none, as on a page loaded by itself, is a world at rest.
 interface Arrival {
@@ -89,15 +91,16 @@ async function opened({ halved = false, id = ID, arrival }: { halved?: boolean; 
   const made = device({ halved, ...(arrival === undefined ? {} : { arrival }) });
   const said: string[] = [];
   const colours: string[] = [];
+  const remember = vi.fn();
   made.view.resize(WIDTH, HEIGHT, 1);
-  made.view.show({ circle: PLACE, id }, (state, colour) => {
+  made.view.show(askFor(id, remember), (state, colour) => {
     said.push(state);
     if (colour !== undefined) colours.push(colour);
   });
   made.view.read(reading({ look: worldLook(id) }));
   await settled();
   made.view.tick(0);
-  return { ...made, said, colours };
+  return { ...made, said, colours, remember };
 }
 
 const mark = (room: string, size = 0.5) => {
@@ -236,7 +239,7 @@ describe("the world in its circle", () => {
     maps.load.mockImplementation(() => Promise.reject(new Error("404")));
     const { view } = await opened();
     const asked = maps.load.mock.calls.length;
-    for (let again = 0; again < 5; again += 1) view.show({ circle: PLACE, id: ID }, () => undefined);
+    for (let again = 0; again < 5; again += 1) view.show(askFor(), () => undefined);
     await settled();
     expect(maps.load.mock.calls.length).toBe(asked);
   });
@@ -267,9 +270,9 @@ describe("the world in its circle", () => {
         }),
     );
     made.view.resize(WIDTH, HEIGHT, 1);
-    made.view.show({ circle: PLACE, id: ID }, () => undefined);
+    made.view.show(askFor(), () => undefined);
     await settled();
-    made.view.show({ circle: PLACE, id: "gnoland/blog" }, () => undefined);
+    made.view.show(askFor("gnoland/blog"), () => undefined);
     await settled();
     compiled();
     await settled();
@@ -302,8 +305,8 @@ describe("the world in its circle", () => {
     );
     const { view } = device();
     view.resize(WIDTH, HEIGHT, 1);
-    view.show({ circle: PLACE, id: ID }, () => undefined);
-    view.show({ circle: PLACE, id: "gnoland/blog" }, () => undefined);
+    view.show(askFor(), () => undefined);
+    view.show(askFor("gnoland/blog"), () => undefined);
     view.read(reading({ look: worldLook("gnoland/blog") }));
     await settled();
     arrive(new Texture({ width: 4, height: 2, close: vi.fn() }));
@@ -514,7 +517,7 @@ describe("its appearance on this reader's first visit", () => {
     view.tick(10);
     view.tick(10.8);
     view.read(reading({ first: true, heat: 0.2 }));
-    view.show({ circle: PLACE, id: ID }, () => undefined);
+    view.show(askFor(), () => undefined);
     view.tick(10.9);
     expect(Math.abs(appearance(view).band), "carried on, not back at the pole").toBeLessThan(0.3);
     view.tick(13);
@@ -645,12 +648,110 @@ describe("its appearance on this reader's first visit", () => {
     view.read(reading({ first: true }));
     view.tick(0);
     view.tick(3);
-    view.show({ circle: PLACE, id: "gnoland/blog" }, () => undefined);
+    view.show(askFor("gnoland/blog"), () => undefined);
     view.read(reading({ first: true, look: worldLook("gnoland/blog") }));
     await settled();
     view.tick(4);
     expect(appearance(view).grid).toBe(1);
     expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// Alexis, 2026-11-04 (F4533): the visit is kept as the grid starts, no longer as the page's feed first reads the world, so a reader who backs
+// out of the flight, a world whose maps never come and a tab closed while they load all see the appearance next time.
+describe("this reader's visit, kept as its appearance starts", () => {
+  it("is kept once, on the frame the grid starts as the world rests, and never again that visit", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view, remember } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    view.show(askFor(ID, remember), () => undefined);
+    view.tick(1.5);
+    expect(remember).not.toHaveBeenCalled();
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(2);
+    expect(appearance(view).grid).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+    for (const second of [2.5, 3, 5]) view.tick(second);
+    view.read(reading({ first: true, heat: 0.2 }));
+    view.show(askFor(ID, remember), () => undefined);
+    view.tick(6);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is kept as a seed wakes, on the frame its growth starts", async () => {
+    const { view, remember } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(5);
+    expect(view.stats().wake).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is kept as the still grid shows under reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, remember } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    expect(appearance(view).grid).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not kept on a return", async () => {
+    const { view, remember } = await opened();
+    view.read(reading({ first: false }));
+    for (const second of [0, 1, 2, 3]) view.tick(second);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it("is not kept for a flight backed out of: brought to the last of its approach, then the page left before it landed", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view, remember } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    for (const [second, approach] of [
+      [1, 4],
+      [2, 1.5],
+      [3, 1.001],
+    ] as const) {
+      Object.assign(arrival, { approach });
+      view.tick(second);
+    }
+    view.show(undefined, () => undefined);
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(4);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it("is not kept for a world whose maps never come, nor for one whose maps fail", async () => {
+    maps.load.mockImplementation(() => new Promise<Texture>(() => undefined));
+    const hung = await opened();
+    hung.view.read(reading({ first: true }));
+    for (const second of [1, 2, 3]) hung.view.tick(second);
+    expect(hung.said).toEqual(["loading"]);
+    expect(hung.remember).not.toHaveBeenCalled();
+    maps.load.mockImplementation(() => Promise.reject(new Error("404")));
+    const lost = await opened();
+    lost.view.read(reading({ first: true }));
+    for (const second of [1, 2, 3]) lost.view.tick(second);
+    expect(lost.said).toEqual(["loading", "failed"]);
+    expect(lost.remember).not.toHaveBeenCalled();
+  });
+
+  it("is kept once across a lost context, and for each world the page names, its own", async () => {
+    const { view, remember } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.restored();
+    await settled();
+    view.tick(0.8);
+    expect(remember).toHaveBeenCalledTimes(1);
+    const blog = vi.fn();
+    view.show(askFor("gnoland/blog", blog), () => undefined);
+    view.read(reading({ first: true, look: worldLook("gnoland/blog") }));
+    await settled();
+    view.tick(4);
+    expect(blog).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -748,7 +849,7 @@ describe("brought by a flight (7g)", () => {
       arrival,
     });
     view.resize(WIDTH, HEIGHT, 1);
-    view.show({ circle: PLACE, id: ID }, () => undefined);
+    view.show(askFor(), () => undefined);
     view.read(reading());
     await settled();
     view.tick(0);
@@ -783,7 +884,7 @@ describe("brought by a flight (7g)", () => {
       arrival,
     });
     view.resize(WIDTH, HEIGHT, 1);
-    view.show({ circle: PLACE, id: ID }, () => undefined);
+    view.show(askFor(), () => undefined);
     view.read(reading());
     await settled();
     view.tick(0);

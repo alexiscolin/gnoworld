@@ -2,11 +2,12 @@
 // a real GPU; the nebulae are the cosmos's (7d4). Not shipped: lab.config.ts builds it, and only the journeys and his link see it. Under
 // reduced motion it draws once a change, which is also what a software GPU's journeys want.
 import { ANCHORS, pixelRatioFor, STAGES, type Stage } from "@gnoworld/core";
-import { ACESFilmicToneMapping, type WebGLRenderer } from "three";
+import type { WebGLRenderer } from "three";
 import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
 import { pathOf, type Choice, type Tier, type ViewName } from "./choice.ts";
+import { tuningPanel } from "./panel.ts";
 import { probes } from "./probes.ts";
 import { buildView, type View } from "./views.ts";
 
@@ -32,8 +33,6 @@ const KEYS: Partial<Record<string, ViewName>> = {
   "9": "class24",
   "0": "variety",
 };
-// The grade 7a2 gives the renderer itself, once it lands.
-const EXPOSURE = 0.8;
 
 function need(selector: string): HTMLElement {
   const found = document.querySelector<HTMLElement>(selector);
@@ -102,8 +101,6 @@ const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tier: Tier = new URLSearchParams(location.search).get("tier") === "low" ? "low" : "high";
 const ratio = pixelRatioFor(devicePixelRatio, false, tier);
 const renderer: WebGLRenderer = createRenderer(canvas, true);
-renderer.toneMapping = ACESFilmicToneMapping;
-renderer.toneMappingExposure = EXPOSURE;
 renderer.setPixelRatio(ratio);
 const gpu = gpuName(renderer.getContext() as WebGL2RenderingContext);
 
@@ -231,5 +228,8 @@ if (!still)
   });
 
 Reflect.set(globalThis, "__lab", lab);
+tuningPanel(() => {
+  if (view !== undefined) draw(view);
+});
 
 step({});

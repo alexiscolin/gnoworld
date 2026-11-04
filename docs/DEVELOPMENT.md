@@ -112,6 +112,57 @@ To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
 Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
 Anthropic key is Alexis's own for tests, then the company's.
 
+## The workshop
+
+Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the lab's pages on Vite's dev server, with hot reload,
+and their tuning panel on the real renderer, opened from the MacBook or a phone over Tailscale. No gate runs per tweak. An accepted
+batch then lands once, in a part of its own: test first, through the gate and one review, with pictures where it moves an approved
+one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the fast lane instead: its test seen failing,
+the gate, the journeys that watch it, one `reviewer`.
+
+**Start it** in your own terminal, from a worktree or the main checkout (the sandbox reaches neither Tailscale's socket nor a server
+it could stop):
+
+```sh
+cd app
+export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"
+host=$(tailscale status --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
+LAB_HOSTS="$host,$(tailscale ip -4 | head -n 1)" node_modules/.bin/vite --config lab.config.ts &
+~/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh up workshop 5199
+```
+
+The dev server listens on 127.0.0.1:5199 alone and answers only the names `LAB_HOSTS` lists, exactly. By path it serves the app,
+the packages and their store, never the repository's root, whose `deploy/` holds secrets (`lab.config.ts`). The
+`tailnet-preview` skill's script prints two links. On the MacBook or the phone, open the https one with `/realism.html` after it:
+`https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for the site's own scene
+(`&arrive=<system>` for a system's view). The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS.
+It is not a secure context, so Copy cannot reach the clipboard there; select the list instead. Stop the workshop with
+`tailnet-preview.sh down workshop`, then end the dev server.
+
+**The panel:** T shows and hides it, on either page, and so does its Tuning button in the corner, for a phone.
+- **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home
+  (`LEAN`) and, at a system's view, its share of that lean (`ARRIVAL_LEAN = LEAN / 2.2`), both in
+  `packages/core/src/space/drift.ts`. A Plan keeps its own share.
+- **Colours.** The palette's primitives (`--p-*`, read from the design system's sheet).
+- **Sizes.** The labels' font sizes (`--font-ui`, `--font-data`) and paddings (`--space-2xs`, `--space-xs`).
+
+Colours and sizes are set on `:root`'s own style; no product code is touched. Every change draws at once. Keys, drags and wheels
+inside the panel stay there. Copy lists the values changed, one line each, with where each lives in code; Reset puts back the
+code's values. A code edit reloads the page and loses the panel's values, so copy first.
+
+**Making a value tunable:**
+- **A size token of `tokens.css`** needs only its name in `app/lab/panel.ts`'s lists; every primitive colour is offered already.
+- **A scene value** gets a name in `TUNABLES` and a row in `app/lab/controls.ts`. It also gets one read where the value is used,
+  written on the lab's switch: `import.meta.env.GNOWORLD_TUNING === "1" ? tuned(name, VALUE) : VALUE`, or `applyTuned` for a value
+  set once on an object, as the renderer's exposure.
+
+Only `lab.config.ts` defines the switch. The site's build folds each read back to `VALUE` and drops the registry
+(`app/src/scene/tuning.ts`). Write the read so that it folds to the code that was there: in an expression, not a new variable the
+minifier keeps. Then build the site before and after and compare every file (`tuning.spec.ts` holds the names out of the site's
+build, and the budgets hold the bytes).
+
+**Landing a batch:** paste Copy's list to Claude. The values land in code as one part, test first.
+
 ## Slices
 
 One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session

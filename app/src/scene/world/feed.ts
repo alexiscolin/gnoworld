@@ -1,6 +1,6 @@
 // What a world's view is told, and from where (ADR-0002 §3): the people present in its rooms and the times of their lines, from the page's
-// store; the worlds' file, read once; whether this reader came before, told once a visit, so a first visit's appearance plays to its end,
-// and remembered for any world, so a reload never plays it again. The page reads and keeps both: the scene holds no storage.
+// store; the worlds' file, read once; whether this reader came before, told once a visit, so a first visit's appearance plays to its end.
+// The view keeps the visit as the appearance starts (F4533); the page reads and keeps it: the scene holds no storage.
 import { statusOrbit } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { StoreApi } from "zustand/vanilla";
@@ -34,8 +34,6 @@ export interface FeedOptions {
   readonly file: () => Promise<Worlds | undefined>;
   /** This reader came before. */
   readonly visited: boolean;
-  /** Remembers this visit, for the next. */
-  readonly remember: () => void;
   readonly now?: () => number;
 }
 
@@ -75,7 +73,7 @@ export class WorldFeed {
 
   /** Reads the world now. */
   refresh(): void {
-    const { universe, id, page, visited, remember, now = Date.now } = this.#options;
+    const { universe, id, page, visited, now = Date.now } = this.#options;
     const prefix = `#${page.slug}`;
     const people = new Set<string>();
     const lines: number[] = [];
@@ -93,7 +91,6 @@ export class WorldFeed {
       now: now(),
     });
     this.#view.read(reading);
-    if (reading.first) remember();
   }
 
   /** What the realm reports now, for the status ring. */

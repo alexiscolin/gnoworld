@@ -4,6 +4,7 @@ import type { Vector3, Vector4 } from "three";
 import type { EarthState } from "../earth/device.ts";
 import type { WorldReading } from "./reading.ts";
 import type { Standing } from "./standing.ts";
+import type { Wake } from "./wake.ts";
 
 interface Held {
   readonly state: EarthState;
@@ -11,8 +12,7 @@ interface Held {
   readonly centre: Vector3 | undefined;
   readonly disc: number;
   readonly fit: number;
-  readonly wake: number;
-  readonly appearance: { readonly band: number; readonly grid: number };
+  readonly waking: Pick<Wake, "left" | "band" | "grid">;
   readonly orbit: StatusOrbit | undefined;
   readonly reading: WorldReading | undefined;
   readonly shadows: number;
@@ -47,8 +47,8 @@ export function statsOf(held: Held) {
     anchor: standing?.look.anchor,
     centre: { x: centre?.x ?? 0, y: centre?.y ?? 0, radius: held.disc },
     size: held.fit,
-    wake: held.wake,
-    appearance: { ...held.appearance },
+    wake: held.waking.left,
+    appearance: { band: held.waking.band, grid: held.waking.grid },
     ring: ringOf(held),
     signs: signsOf(held.reading),
     moons: (standing?.moons?.spots ?? []).map((spot) => ({ ...spot })),

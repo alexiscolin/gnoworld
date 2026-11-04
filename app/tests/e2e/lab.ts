@@ -18,6 +18,8 @@ interface LabStats {
   calls: number;
   mapBytes: number;
   renderer: string;
+  /** The renderer's exposure, which the tuning panel sets. */
+  exposure: number;
 }
 export interface Circle {
   x: number;
