@@ -789,6 +789,7 @@ try:
         later = 'export function load(): Promise<unknown> {{\n  return import("{path}");\n}}\n'.format
         hushed = "// eslint-disable-next-line import-x/no-restricted-paths, no-restricted-imports\n"
         zone, name = "import-x/no-restricted-paths", "no-restricted-imports"
+        other = "no-restricted-syntax: A module of the product is TypeScript"
 
         def apart(other, path, banned):
             """The bypasses toward one folder, from a planted file's place: `path` reaches a file of it."""
@@ -809,18 +810,34 @@ try:
                     ("server_test.test.ts", tested(name="wallet", path="../../../server/src/testing/signer.ts"), zone),
                     # A package whose name only starts like a banned one is another package.
                     ("serverless.ts", uses(name="x", path="@gnoworld/serverless"), None),
+                    # A module in another extension, which the walls would read as nothing (S1, F5277), and a require made by
+                    # hand (S4, F5278).
+                    ("bridge.mts", again(name="loadConfig", path="../../../server/src/config.ts"), other),
+                    ("bridge.js", 'export const path = "vm/qeval";\n', other),
+                    ("bridge.tsx", 'export const path = "vm/qeval";\n', other),
+                    # An import at run time of a computed name, which no wall can read (F5282).
+                    ("computed.ts", "export function load(where: string): Promise<unknown> {\n  return import(where);\n}\n", "gnoworld/named-import"),
+                    ("templated.ts", "export function load(name: string): Promise<unknown> {\n  return import(`../../../server/src/${name}.ts`);\n}\n", "gnoworld/named-import"),
+                    ("named.ts", 'export function load(): Promise<unknown> {\n  return import("./node.ts");\n}\n', None),
+                    ("required.ts", 'import { createRequire } from "node:module";\n\nexport const load: unknown = createRequire(import.meta.url);\n', name),
+                    ("required_bare.ts", 'import * as module from "module";\n\nexport const load: unknown = module.createRequire;\n', name),
                     ("testing/server_helper.ts", uses(name="wallet", path="../../../../server/src/testing/signer.ts"), zone)],
                    "jarvis/src/__probe__", "walls jarvis")
         shutil.rmtree("jarvis/src/__probe__")
         lint_cases([*apart("jarvis", "../../../jarvis/src/loop.ts", ["@gnoworld/jarvis", "@gnoworld/jarvis/src/loop.ts"]),
                     ("jarvis_test.test.ts", tested(name="kit", path="../../../jarvis/src/testing/kit.ts"), zone),
+                    ("bridge.cts", 'export const path = "vm/qeval";\n', other),
                     ("testing/jarvis_helper.ts", uses(name="kit", path="../../../../jarvis/src/testing/kit.ts"), zone)],
                    "server/src/__probe__", "walls server")
         shutil.rmtree("server/src/__probe__")
         # Each package apart from the other: the chain package runs in the browser too, so no Node module either (D112).
         own = {
-            "service": [("chain_name.ts", uses(name="readChain", path="@gnoworld/chain/read"), name)],
+            # The schemas by a path, which resolves in any tree, where their name may not (harness_mutate's worktrees).
+            "service": [("chain_name.ts", uses(name="readChain", path="@gnoworld/chain/read"), name),
+                        ("schemas_path.ts", uses(name="QueryAnswer", path="../../../schemas/src/index.ts"), None)],
             "chain": [("service_name.ts", uses(name="logger", path="@gnoworld/service/log"), name),
+                      ("bridge.mjs", 'export const path = "abci_query";\n', other),
+                      ("server_test.test.ts", tested(name="x", path="@gnoworld/server"), name),
                       ("node_fs.ts", uses(name="readFileSync", path="node:fs"), "import-x/no-nodejs-modules"),
                       ("bare_fs.ts", uses(name="readFileSync", path="fs"), "import-x/no-nodejs-modules"),
                       ("node_test.test.ts", tested(name="readFileSync", path="node:fs"), None)],
@@ -864,6 +881,17 @@ try:
             ("prose.ts", 'export const why = "Jarvis reads vm/qfuncs through the server.";\n', rule),
             ("helpers.ts", 'import { statusEnvelope } from "@gnoworld/chain/testing/envelopes";\n\nexport const used: unknown = statusEnvelope;\n', rule),
             ("hushed.ts", '// eslint-disable-next-line gnoworld/chain-read\nexport const path = "vm/qeval";\n', rule),
+            # The security review's words (S3, F5275): a JSON-RPC call's method, a route given to URL, GraphQL's shorthand, an
+            # ABCI path URL-encoded.
+            ("rpc_post.ts", 'export const body = { jsonrpc: "2.0", id: 1, method: "status" };\n', rule),
+            ("rpc_text.ts", 'export const body = \'{"jsonrpc":"2.0","method":"block","params":{}}\';\n', rule),
+            ("url_route.ts", 'export function url(rpc: string): string {\n  return new URL("/status", rpc).href;\n}\n', rule),
+            ("shorthand.ts", 'export const ask = "{ getBlocks(where: {}) { height } }";\n', rule),
+            ("encoded.ts", 'export const path = "%22vm%2Fqeval%22";\n', rule),
+            ("mcp.ts", 'export const call = { jsonrpc: "2.0", id: 1, method: "tools/call" };\n', None),
+            ("method_only.ts", 'export const option = { method: "status" };\n', None),
+            ("route_class.ts", 'class Route {\n  readonly path: string;\n  constructor(path: string) {\n    this.path = path;\n  }\n}\n\nexport const status = new Route("/status");\n', None),
+            ("object.ts", 'export const text = "{ a: 1 }";\n', None),
             ("comment.ts", "// vm/qfuncs and abci_query are the package's words.\nexport const n = 1;\n", None),
             ("address.ts", 'export const rpc = "https://rpc.onyx.example:443";\n', None),
             ("indexer.ts", 'export const indexer = "https://indexer.onyx.example/graphql/query";\n', None),
@@ -871,6 +899,8 @@ try:
             ("word.ts", 'export const word = "the status of a block";\n', None),
             # A known gap (D113): an address joined from a route alone and a base, by a call, reads as no read here.
             ("joined_call.ts", 'export function url(rpc: string): string {\n  return [rpc, "status"].join("/");\n}\n', None),
+            # Free: a test helper's own imports of another (S2, F5276), as under testing/ a fake may build on a fake.
+            ("testing/fakes.ts", 'import { path } from "./fake.ts";\n\nexport const used: unknown = path;\n', None),
             ("free.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect("vm/qfuncs").toMatch(/qfuncs/);\n});\n', None),
             ("free.spec.ts", 'export const path = "vm/qfuncs";\n', None),
             ("free.bench.ts", 'export const path = "vm/qfuncs";\n', None),
@@ -879,6 +909,29 @@ try:
         for where in ("app/src/__probe__", "server/src/__probe__", "jarvis/src/__probe__", "packages/schemas/src/__probe__", "packages/service/src/__probe__"):
             lint_cases(reads, where, f"chain reads in {where}")
             shutil.rmtree(where)
+        # A test helper reached from product code, by a path or by the package's name (S2, F5276): the helpers are free of the
+        # rule only while no module of the product imports them.
+        helpers = "gnoworld/test-helpers"
+        lint_cases([("helper.ts", 'import { kit } from "../testing/kit.ts";\n\nexport const used: unknown = kit;\n', helpers),
+                    ("envelopes.ts", 'import { statusEnvelope } from "../../../packages/chain/src/testing/envelopes.ts";\n\nexport const used: unknown = statusEnvelope;\n', helpers),
+                    ("later.ts", 'export function load(): Promise<unknown> {\n  return import("../testing/kit.ts");\n}\n', helpers),
+                    ("again.ts", 'export { kit } from "../testing/kit.ts";\n', helpers),
+                    ("all_helpers.ts", 'export * from "../testing/kit.ts";\n', helpers),
+                    ("kit.test.ts", 'import { kit } from "../testing/kit.ts";\nimport { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(kit).toBeDefined();\n});\n', None)],
+                   "jarvis/src/__probe__", "test helpers in Jarvis")
+        shutil.rmtree("jarvis/src/__probe__")
+        # The one expression sender (S5, F5279): readEvaluated, imported by the app's rpc.ts (evalCall's) and the door's names.ts.
+        lint_cases([("evaluates.ts", 'import { readEvaluated } from "@gnoworld/chain/node";\n\nexport const used: unknown = readEvaluated;\n', "gnoworld/chain-eval"),
+                    ("renamed.ts", 'import { readEvaluated as run } from "@gnoworld/chain/node";\n\nexport const used: unknown = run;\n', "gnoworld/chain-eval"),
+                    ("whole.ts", 'import * as node from "@gnoworld/chain/node";\n\nexport const used: unknown = node.readEvaluated;\n', "gnoworld/chain-eval"),
+                    ("later_node.ts", 'export function load(): Promise<unknown> {\n  return import("@gnoworld/chain/node");\n}\n', "gnoworld/chain-eval"),
+                    ("all.ts", 'export * from "@gnoworld/chain/node";\n', "gnoworld/chain-eval"),
+                    ("again_sender.ts", 'export { readEvaluated } from "@gnoworld/chain/node";\n', "gnoworld/chain-eval"),
+                    ("reads.ts", 'import { readFunctionList } from "@gnoworld/chain/node";\n\nexport const used: unknown = readFunctionList;\n', None)],
+                   "server/src/__probe__", "the expression sender in the server")
+        shutil.rmtree("server/src/__probe__")
+        out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", "app/src/lib/chain/rpc.ts", "server/src/door/names.ts"])
+        expect(out.returncode == 0, "eslint lets rpc.ts and names.ts send an expression " + out.stdout[-300:])
         # The app's components read the chain no more than its modules do; its journeys and their helpers are free.
         lint_cases([("page.tsx", 'export function Page() {\n  return <p title="vm/qrender">x</p>;\n}\n', rule)], APP, "chain reads in a component")
         shutil.rmtree(APP)

@@ -14,10 +14,12 @@ const JARVIS =
 const SERVICE =
   "The service package imports core, schemas, Node and its dependencies, never the server, Jarvis, the app or the chain package (D111).";
 const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "packages/service/**/*.ts"];
-// By name, so the ban holds wherever node_modules sits (F385): the browser's code, and the workspaces a folder never imports.
+// By name, so the ban holds wherever node_modules sits (F385): the browser's code, the workspaces a folder never imports, and
+// a require made by hand, which crosses the zones unread (D123, F5278).
 const banned = (workspaces: string, message: string): Linter.RuleEntry => [
   "error",
   {
+    paths: ["node:module", "module"].map((name) => ({ name, importNames: ["createRequire"], message })),
     patterns: [
       { regex: "^(react|react-dom|three|@gnoworld/ui)(/|$)", message },
       { regex: `^@gnoworld/(${workspaces})(/|$)`, message },

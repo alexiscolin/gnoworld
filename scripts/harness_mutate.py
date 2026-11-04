@@ -40,17 +40,18 @@ GAPS = {  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 # The lint config and its parts: each rule, selector and restricted name lives in one of them.
-ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts", "lint/chain.config.ts"]
+ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts", "lint/chain.config.ts", "lint/gnoworld.config.ts"]
 REACT = "lint/react.config.ts"
 APP = "lint/app.config.ts"
 SERVER = "lint/server.config.ts"
 CHAIN = "lint/chain.config.ts"
+RULES = "lint/gnoworld.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
     "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
     "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
-    "lint/chain.config.ts": "chain,walls,chain_reads",
+    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
@@ -212,7 +213,7 @@ def mutants():
         for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
             at = text.find('"error"', m.end())
             yield f"eslint {m.group(1)} ({path}:{text.count(chr(10), 0, m.start()) + 1})", path, text[:at] + '"off"' + text[at + 7:], "probe"
-        if path not in (SERVER, CHAIN, "eslint.config.ts"):  # the services' and the chain's parts ban by name and path; the root config composes the parts
+        if path not in (SERVER, CHAIN, RULES, "eslint.config.ts"):  # the services', the chain's and our rules' parts ban by name, path and words; the root config composes the parts
             yield from selectors(path, "probe")
     for path in ("lint/core.config.ts", REACT, APP):
         yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
@@ -235,43 +236,70 @@ def mutants():
     for name in ("server|", "jarvis|", "app|", "|chain"):
         yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
     yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
+    # A module in another extension, and a require made by hand (D123): each pattern and each module name.
+    yield from each("eslint.config.ts", '"{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
+    yield from each("eslint.config.ts", '"{server,jarvis,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
+    yield from each(SERVER, '["node:module", "module"]', '["module"]', "probe", "eslint the services refuse createRequire from node:module")
+    yield from each(SERVER, '["node:module", "module"]', '["node:module"]', "probe", "eslint the services refuse createRequire from module")
     yield from each(CHAIN, 'target: "./packages/chain"', 'target: "./nowhere"', "probe", "eslint the chain package reaches no path out of its folder")
     for name in ('"./packages/core"', '"./packages/schemas"', '"./packages/chain"'):
         yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
     for name in ("server|", "jarvis|", "app|", "|service"):
         yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
-    # A read's words outside the chain package (decision-onchain.md, D113): each word, each way a string is read, the files.
+    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package,
+    # each word and each way a string is read; a test helper or the expression sender imported by product code; an import at
+    # run time of a computed name; the files each reaches or leaves free.
     for find, replace, label in (
-        ("/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
-        ("/\\bvm\\/q|\\b(?:auth\\/accounts|bank\\/balances)\\//", "/(?!)/", "an ABCI path"),
-        ("|\\b(?:auth\\/accounts|bank\\/balances)\\//", "/", "an account's or a balance's ABCI path"),
-        ("/(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)\\/(?:status|", "/(?!)(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)\\/(?:status|", "a node's RPC route"),
-        ("(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)", "(?:\\$\\{\\})", "a node's RPC route after a full address"),
-        ("(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)", "(?::\\/\\/[^/?#\\s]+)", "a node's RPC route after an interpolation"),
-        ("\\/(?:status|block|", "\\/(?:block|", "the status route"),
+        (r"/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
+        (r"/(?<![A-Za-z])vm(?:\/|%2[Ff])q|\b(?:auth\/accounts|bank\/balances)\//", "/(?!)/", "an ABCI path"),
+        (r"|\b(?:auth\/accounts|bank\/balances)\//", "/", "an account's or a balance's ABCI path"),
+        (r"(?:\/|%2[Ff])q", r"\/q", "an ABCI path URL-encoded"),
+        (r"`(?:\\$\\{\\}|://[^/?#\\s]+)/(?:${ROUTES})(?![\\w-])`", "`(?!)`", "a node's RPC route"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:\\$\\{\\})", "a node's RPC route after a full address"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:://[^/?#\\s]+)", "a node's RPC route after an interpolation"),
+        ('"status|block|', '"block|', "the status route"),
         ("|block|block_results|", "|block_results|", "the block route"),
-        ("/:26657(?!\\d)/", "/(?!)/", "the RPC port"),
-        ("/^\\s*(?:query|subscription|mutation)\\b[^{]*\\{/", "/(?!)/", "a GraphQL operation"),
+        (r'`"method"\\s*:\\s*"(?:${ROUTES})"`', "`(?!)`", "a JSON-RPC method in a text"),
+        (r"/:26657(?!\d)/", "/(?!)/", "the RPC port"),
+        (r"/^\s*(?:(?:query|subscription|mutation)\b[^{]*\{|\{\s*[A-Za-z_]\w*\s*[({])/", "/(?!)/", "a GraphQL operation"),
         ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
-        ("/^@gnoworld\\/chain\\/testing(?:\\/|$)/", "/(?!)/", "the chain package's fake node"),
+        (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
+        (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
         ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
         ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
         ('.join("${}")', '.join("")', "a template's interpolation"),
         ('if (operator !== "+" ||', "if (true ||", "a sum's text"),
         ('${textOf(left) ?? "${}"}', '${textOf(left) ?? ""}', "a sum's value on its left"),
-        ("Literal: check, ", "", "the rule's literals"),
-        ("TemplateLiteral: check, ", "", "the rule's templates"),
-        (", BinaryExpression: check", "", "the rule's sums"),
-        ('"app/src/**/*.{ts,tsx}", "server/**/*.ts"', '"server/**/*.ts"', "the rule's reach in the app"),
-        ('"server/**/*.ts", "jarvis/**/*.ts"', '"jarvis/**/*.ts"', "the rule's reach in the server"),
-        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', '"packages/*/src/**/*.{ts,tsx}"', "the rule's reach in Jarvis"),
-        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"]', '"jarvis/**/*.ts"]', "the rule's reach in the packages"),
+        ("      Literal: check,\n", "", "the rule's literals"),
+        ("      TemplateLiteral: check,\n", "", "the rule's templates"),
+        ("      BinaryExpression: check,\n", "", "the rule's sums"),
+        ('keyed("jsonrpc") !== undefined && ', "", "a JSON-RPC call's version key"),
+        ("if (rpcCall(node)) call(node);", "", "a JSON-RPC call to a node"),
+        ('node.callee?.name === "URL" && ', "", "a route given to URL alone"),
+        ("if (routed(node)) url(node);", "", "a route given to URL"),
+        ('"app/src/**/*.{ts,tsx}", "server/**/*.ts"', '"server/**/*.ts"', "the rules' reach in the app"),
+        ('"server/**/*.ts", "jarvis/**/*.ts"', '"jarvis/**/*.ts"', "the rules' reach in the server"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', '"packages/*/src/**/*.{ts,tsx}"', "the rules' reach in Jarvis"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"]', '"jarvis/**/*.ts"]', "the rules' reach in the packages"),
         ('"packages/chain/src/**", ', "", "the chain package's own words free"),
         ('"**/testing/**", ', "", "the fakes free"),
         ("...TESTS, ...BENCHES]", "...BENCHES]", "the tests free"),
         ("...TESTS, ...BENCHES]", "...TESTS]", "the benches free"),
+        (r"/(?:^|\/)testing(?:\/|$)/", "/(?!)/", "a test helper imported by product code"),
+        ("      ImportDeclaration: check,\n", "", "an import's module"),
+        ("      ExportNamedDeclaration: check,\n", "", "a re-export's module"),
+        ("      ExportAllDeclaration: check,\n", "", "a whole re-export's module"),
+        ("      ImportExpression: check,\n", "", "a run-time import's module"),
+        ('type === "ImportNamespaceSpecifier" || ', "", "a namespace import of the expression sender"),
+        ('(imported ?? local)?.name === "readEvaluated"', "false", "the expression sender by its name"),
+        ('node.type === "ImportExpression" || ', "", "a run-time import of the expression sender's module"),
+        (' || node.type === "ExportAllDeclaration"', "", "a whole re-export of the expression sender's module"),
+        ('"app/src/lib/chain/rpc.ts", ', "", "evalCall's builder free"),
+        ('"server/src/door/names.ts"]', "]", "the door's builder free"),
+        ("text === undefined || ", "", "a computed import"),
+        (' || text.includes("${}")', "", "a templated import"),
     ):
-        yield from each(CHAIN, find, replace, "probe", f"eslint chain-read refuses {label} outside the package")
+        yield from each(RULES, find, replace, "probe", f"eslint our rules refuse {label}")
     # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
     for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
         yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")
@@ -621,7 +649,9 @@ def mutants():
     yield from each("scripts/check.sh", '"$GNO" test ./...', '"$GNO" test ./r/...', "hooks", "check.sh gno scope")
     yield from each("vitest.config.ts", "requireAssertions: true", "requireAssertions: false", "probe", "vitest requires an assertion")
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
-    yield from each("scripts/check_regressions.py", 'lambda c: chr(int(c.group(1), 16)), item)', "lambda c: c.group(0), item)", "hooks", "check_regressions reads a hidden character written <U+XXXX> (D117)")
+    yield from each("scripts/check_regressions.py", "chr(n) if n <= 0x10FFFF and HIDDEN.fullmatch(chr(n)) else match.group(0)", "match.group(0)", "hooks", "check_regressions reads a hidden character written <U+XXXX> (D117)")
+    yield from each("scripts/check_regressions.py", " and HIDDEN.fullmatch(chr(n))", "", "hooks", "check_regressions reads no other escape (D125, F5280)")
+    yield from each("scripts/check_regressions.py", "n <= 0x10FFFF and ", "", "hooks", "check_regressions reads a number past Unicode as text (D125, F5280)")
     yield from each("scripts/check_regressions.py", "([0-9A-F]{4,6})>", "([0-9A-F]{2,6})>", "hooks", "check_regressions reads four hex digits at least (D117)")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")

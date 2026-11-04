@@ -22,6 +22,7 @@ import tempfile
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
+from hidden import HIDDEN
 from repo_files import BENCH_FILE, benches, git, worktree
 
 SHOT = re.compile(r"(-snapshots|__screenshots__)/.+\.(png|jpe?g)$")
@@ -35,7 +36,14 @@ def declared(lines, key):
     the line never also names the shorter item its text starts with (F5023). A character no commit message may hold
     (scripts/hidden.py's) is written `<U+XXXX>`, four to six hex digits, as a test may be named with one (10h, D117)."""
     items = {m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \S.*", line.strip()))}
-    return {re.sub(r"<U\+([0-9A-F]{4,6})>", lambda c: chr(int(c.group(1), 16)), item) for item in items}
+    return {re.sub(r"<U\+([0-9A-F]{4,6})>", unescaped, item) for item in items}
+
+
+def unescaped(match):
+    """The character a `<U+XXXX>` names when scripts/hidden.py hides it; any other escape stays as written, so it excuses
+    nothing the character itself would not, and a number past Unicode is text (D125, F5280)."""
+    n = int(match.group(1), 16)
+    return chr(n) if n <= 0x10FFFF and HIDDEN.fullmatch(chr(n)) else match.group(0)
 
 
 def removed_tests(before, after, excused):
@@ -344,10 +352,14 @@ def self_test():
     assert removed_tests(both, set(), one) == ["app/a.test.ts > renders"], "one line excused two tests"
     assert removed_tests({"a > x", "a > y", "a > z"}, set(), declared(log, "Removed-test")) == ["a > x", "a > z"]
     # A test named with a character no commit message may hold (scripts/hidden.py's) is declared with it as `<U+XXXX>` (10h, D117).
-    hidden = "a > breaks " + chr(0x2028) + " and turns " + chr(0x202E) + chr(0x1F3F4)
-    escaped = ["Removed-test: a > breaks <U+2028> and turns <U+202E><U+1F3F4> - moved to b"]
+    hidden = "a > breaks " + chr(0x2028) + " and turns " + chr(0x202E) + chr(0xE0067)
+    escaped = ["Removed-test: a > breaks <U+2028> and turns <U+202E><U+E0067> - moved to b"]
     assert removed_tests({hidden}, set(), declared(escaped, "Removed-test")) == [], "a test named with a hidden character could not be declared"
     assert declared(["Removed-test: a > <U+20> - moved"], "Removed-test") == {"a > <U+20>"}, "a code point of fewer than four digits read"
+    # Only what a message may not hold is written so (S6, F5280): a letter stays its escape, so `<U+0061>pp/**` excuses no
+    # `app/**` unread, and a number past the last code point stays text, never a crash.
+    assert declared(["Lowered-floor: ignore <U+0061>pp/** - x"], "Lowered-floor") == {"ignore <U+0061>pp/**"}, "an escape of a letter read"
+    assert declared(["Removed-test: a > <U+110000> - x"], "Removed-test") == {"a > <U+110000>"}, "a number past Unicode read"
     vitest = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 100, branches: 95 },\n}'
     before = floors(vitest, '{"thresholds": {"break": 80}}')
     assert before == {"coverage everywhere lines": 85, "coverage packages/core/** lines": 100, "coverage packages/core/** branches": 95, "mutation break": 80}

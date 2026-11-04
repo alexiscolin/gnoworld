@@ -9,6 +9,7 @@ import tseslint from "typescript-eslint";
 import app from "./lint/app.config.ts";
 import chain from "./lint/chain.config.ts";
 import core from "./lint/core.config.ts";
+import gnoworld from "./lint/gnoworld.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
 import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } from "./lint/shared.config.ts";
@@ -73,6 +74,7 @@ export default defineConfig(
   app,
   server,
   chain,
+  gnoworld,
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,
@@ -109,4 +111,24 @@ export default defineConfig(
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
   // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
   { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
+  {
+    // A module of the app, the services or the packages is TypeScript: one in another extension would pass the walls and
+    // gnoworld/chain-read unread, which read .ts and .tsx (D123, F5277). Last, so no later list replaces it.
+    files: [
+      "{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
+      // The services hold no JSX: a .tsx there would pass their walls unread (F5281).
+      "{server,jarvis,packages/service}/**/*.tsx",
+    ],
+    languageOptions: { parser: tseslint.parser },
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Program",
+          message:
+            "A module of the product is TypeScript, .ts or .tsx: another extension passes the lint's walls unread (D123).",
+        },
+      ],
+    },
+  },
 );

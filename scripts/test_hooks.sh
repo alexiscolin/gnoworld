@@ -4746,7 +4746,7 @@ python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_re
 # ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
 # refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
 rx="$t/regrname" && mkdir -p "$rx/scripts"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
 git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
 mkdir -p "$rx/node_modules/.bin" && printf '#!/bin/sh\necho "[]"\n' >"$rx/node_modules/.bin/vitest" && chmod +x "$rx/node_modules/.bin/vitest" # no test to list
 printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**"] } };\n' >"$rx/vitest.config.ts"
@@ -4879,7 +4879,7 @@ nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
 git -C "$rg" init -q
 printf 'bench("a line [0.2 ms]", f);\nbench("a room [100 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts"
 printf 'bench("a call in a file that is no bench [1 ms]", f);\n' >"$rg/app/src/x.ts" # only a `*.bench.ts(x)` file holds benches
@@ -4922,7 +4922,7 @@ git -C "$rg" reset -q --hard "$base"
 # and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
 # its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
 rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
 cat >"$rq/node_modules/.bin/vitest" <<'EOF'
 #!/usr/bin/env python3
 import json, os, re, sys
