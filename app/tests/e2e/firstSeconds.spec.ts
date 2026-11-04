@@ -105,19 +105,28 @@ function wordsOf(words: HTMLElement) {
   return { clip, parts };
 }
 
-// A newcomer's phone once `press` pressed View in space, the scene come and the focus handed to its heading: the hero, the words over it.
+// A newcomer's phone once `press` pressed View in space, the scene come and the focus handed to its heading. What is read then is the
+// yield's rule, not its 600 ms fade, which a loaded machine stretches past a poll.
 async function spaceOnAPhone(page: Page, press: (button: ReturnType<Page["getByRole"]>) => Promise<void>) {
   await served(page);
   await arrive(page, PHONE);
   await press(page.getByRole("button", { name: "View in space" }));
   await expect(opening(page)).toBeVisible(SLOW);
   await expect.poll(() => page.evaluate(() => document.activeElement?.tagName), SLOW).toBe("H1");
-  const hero = page.locator("[data-hero='number']").locator("..");
-  await expect(hero).toHaveAttribute("data-yield", "opening");
-  return hero;
+  await page.evaluate(() => {
+    for (const part of document.querySelectorAll<HTMLElement>("[data-yield]"))
+      part.style.setProperty("transition", "none");
+  });
 }
 
-const opacityOf = (box: ReturnType<Page["locator"]>) => box.evaluate((element) => getComputedStyle(element).opacity);
+// In one reading, for the words may leave as the dive lands: whether the hero gives way to them, and the hero's and the list's opacity.
+const yielded = (page: Page) =>
+  page.evaluate(() => {
+    const hero = document.querySelector("[data-hero='number']")?.parentElement;
+    const list = document.querySelector("nav[aria-label='Worlds']");
+    const opacity = (part: Element | null | undefined) => (part ? getComputedStyle(part).opacity : "");
+    return { words: hero?.getAttribute("data-yield"), hero: opacity(hero), list: opacity(list) };
+  });
 
 // Whether the dive came to rest, its dissolve over.
 const landedNow = async (page: Page) => {
@@ -286,25 +295,21 @@ test.describe("a newcomer", () => {
   test("on a phone, gives the hero's place to the opening once View in space is pressed, and back to the keyboard", async ({
     page,
   }) => {
-    const hero = await spaceOnAPhone(page, (button) => button.click());
-    await expect.poll(() => opacityOf(hero)).toBe("0");
+    await spaceOnAPhone(page, (button) => button.click());
     // F4648: the page's list of worlds, under the hero on a phone, gives way with it.
-    const list = page.getByRole("navigation", { name: "Worlds" });
-    await expect.poll(() => opacityOf(list)).toBe("0");
+    await expect.poll(() => yielded(page)).toEqual({ words: "opening", hero: "0", list: "0" });
     await page.keyboard.press("Tab");
-    await expect.poll(() => opacityOf(hero)).toBe("1");
-    expect(await opacityOf(list)).toBe("0");
     // Still the words' time: the hero came back for the keyboard, not because they left.
-    await expect(hero).toHaveAttribute("data-yield", "opening");
+    await expect.poll(() => yielded(page)).toEqual({ words: "opening", hero: "1", list: "0" });
   });
 
   // F4651: pressed with the keyboard, View in space hands its heading a focus the browser draws, which brought the hero back under the words.
   test("on a phone, keeps the hero given way when View in space is pressed with the keyboard", async ({ page }) => {
-    const hero = await spaceOnAPhone(page, async (button) => {
+    await spaceOnAPhone(page, async (button) => {
       await button.focus();
       await page.keyboard.press("Enter");
     });
-    await expect.poll(() => opacityOf(hero)).toBe("0");
+    await expect.poll(() => yielded(page)).toEqual({ words: "opening", hero: "0", list: "0" });
   });
 
   // F4518: where no cosmos stands, no "Start here" either: the filled call and the way to the chat stay.
