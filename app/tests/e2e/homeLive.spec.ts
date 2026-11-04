@@ -303,7 +303,8 @@ test.describe("the home at the video's size", () => {
   });
 
   test("keeps the strip out of the way of the hero: the actions stay above it and take the click", async ({ page }) => {
-    // Nobody anywhere: Go explore goes to the Earth (ADR-0003 §3), so its click lands on one page (F4516).
+    // Nobody anywhere: Go explore goes to today's next stop (slice 8, a hub's or a realm's page, by the UTC day), so its click lands on one
+    // page (F4516).
     await page.route("**/api/presence", (route) =>
       route.fulfill({ body: JSON.stringify({ worlds: [] }), contentType: "application/json" }),
     );
@@ -313,7 +314,7 @@ test.describe("the home at the video's size", () => {
     const live = await box(page, "[data-hero='markets']");
     expect(live.y + live.height).toBeLessThanOrEqual(strip.y);
     await page.getByRole("link", { name: /go explore/i }).click();
-    await expect(page).toHaveURL(/\/earth$/);
+    await expect(page).toHaveURL(/\/(?:w|r)\/[^/]/);
   });
 
   test("has no accessibility violation, the live line and the ticker included", async ({ page }) => {
