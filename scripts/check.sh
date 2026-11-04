@@ -174,7 +174,8 @@ fi
 # The tests are the ones related to the change, in every area (Alexis, 2026-11-04: Vitest was the slowest step of 210 of the 212
 # slow gates): Vitest's own `related` command, given the paths scripts/related.py prints, which adds main.test.ts for the server's
 # process and the readers of a file on disk, both outside Vitest's module graph. Every test when everything runs, and at --tests-all.
-# ESLint reads no cache: one is keyed on a file's own text, so a type changed elsewhere would hide the error it brings there.
+# ESLint reads no cache: one is keyed on a file's own text, so a type changed elsewhere would hide the error it brings there. A
+# commit's lint reads its change and every file that imports it instead, from the type check's graph (scripts/lint_scope.py).
 # test_hooks.sh runs when the change holds what it tests (the harness audit, 2026-11-04: 99 to 228 s on each of 17 config commits a
 # slice): every path but a config of the tools it does not read, the lockfile, the roles, the deployment's other files.
 all=true ts=false app=false gno=false tokens=false hooks=true changed=
@@ -251,8 +252,15 @@ run() { sh -c "$(node -p "require('./package.json').scripts['$1']") ${2:-}"; }
 # A Vitest file or a journey that fails runs once more, alone; the ones that then pass are logged for /pre-merge, a gate
 # that fails twice fails (scripts/unsteady.py, F1700). The log is the repository's own: pre-commit's copy has no repository,
 # but its node_modules is a link to the repository's.
-unsteady_log=.claude/tmp/unsteady.log
-[ -n "$tested" ] || ! [ -L node_modules ] || unsteady_log=$(dirname "$(readlink node_modules)")/.claude/tmp/unsteady.log
+repository=$(pwd -P)
+[ -n "$tested" ] || ! [ -L node_modules ] || repository=$(cd "$(dirname "$(readlink node_modules)")" && pwd -P)
+unsteady_log=$repository/.claude/tmp/unsteady.log
+# The type check builds incrementally (Alexis, 2026-11-04: "Oui, les trois"), from the worktree's own .claude/tmp/tsc in a repository's fast
+# gate; pre-commit's staged copy, which does not hold that folder, --full and --merge from one of this run's own, gone at its end: they read
+# no writable cache, as Prettier's. TypeScript keys each file of its .tsbuildinfo on its text, and the whole on the options and its version.
+TSC_CACHE=$logs/tsc
+{ $full || [ -z "$tested" ]; } || TSC_CACHE=$PWD/.claude/tmp/tsc
+mkdir -p "$TSC_CACHE" && export TSC_CACHE
 retry() { # retry <tool> <report> <output> <command...>: <report>'s failed files, given to <command>, run once more; <output>, the first run's console, is shown first
 	tool=$1 report=$2 output=$3
 	shift 3
@@ -319,6 +327,8 @@ finish() {
 		done <"$logs/$l.times"
 		echo "lane $l $(seconds "$total") s: $parts"
 		grep '^unsteady: ' "$logs/$l.log" || : # a test that failed and then passed is said, not only logged
+		# How a lane that passed ran, as its scripts say it (the whole repository linted, StrykerJS on no line): a failed one shows its log.
+		case " $failed " in *" $l "*) ;; *) grep -E '^(check\.sh|lint_scope|stryker_lines)[ :]' "$logs/$l.log" || : ;; esac
 		survivors "$logs/$l.log"
 	done
 	for l in $failed; do
@@ -407,7 +417,25 @@ lane_types() {
 	step typecheck
 	run typecheck
 	step lint
-	run lint
+	if ! $related; then
+		run lint
+		return 0
+	fi
+	# A commit's: its change and what imports it, from the graph the type check just wrote (scripts/lint_scope.py, `.` for the whole
+	# repository), in place of the lint script's own `.`; a script of another shape is refused, never run as it is.
+	scope=$(printf '%s\n' "$changed" | python3 -I scripts/lint_scope.py "$TSC_CACHE") || { echo "check.sh: lint_scope.py failed: the whole repository is linted"; scope=.; }
+	if [ "$scope" = . ]; then
+		run lint
+		return 0
+	fi
+	[ -n "$scope" ] || { echo "check.sh: nothing the change holds or reaches is ESLint's to read"; return 0; }
+	lint=$(node -p "require('./package.json').scripts.lint")
+	case $lint in *" .") ;; *)
+		echo "check.sh: package.json's lint script does not end with ' .': the files of a change cannot be named in its place" >&2
+		exit 1
+		;;
+	esac
+	sh -c "${lint% .} --no-warn-ignored $scope"
 }
 
 lane_tests() {

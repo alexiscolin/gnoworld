@@ -65,7 +65,7 @@ SECTIONS = {
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,gate_speeds", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -423,6 +423,28 @@ def mutants():
     yield from each(rf, "(start, start + 1)" " if removals", "() if removals", "hooks", "harness_mutate --changed: a removed line touches the two beside it")
     yield from each(rf, "(start, start + 1)" " if removals", "(start,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line after it")
     yield from each(rf, "(start, start + 1)" " if removals", "(start + 1,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line before it")
+    # A commit's lint: its change and the files that import it, from the type check's own graph, in a folder of the run's or the worktree's.
+    ck = "scripts/check.sh"
+    yield from each(ck, "|| TSC_CACHE=$PWD/.claude/tmp/tsc", "|| TSC_CACHE=$logs/tsc", "hooks", "check.sh builds a repository's types from the worktree's own cache")
+    yield from each(ck, '{ $full || [ -z "$tested" ]; } || TSC_CACHE=', "TSC_CACHE=", "hooks", "check.sh's full gate and staged copy read no type cache they keep")
+    yield from each(ck, "\tif ! $related; then\n\t\trun lint\n\t\treturn 0\n\tfi\n", "", "hooks", "check.sh lints the whole repository when every test runs")
+    yield from each(ck, '|| { echo "check.sh: lint_scope.py failed: the whole repository is linted"; scope=.; }', "|| scope=", "hooks", "check.sh lints the whole repository when lint_scope.py fails")
+    yield from each(ck, '\tif [ "$scope" = . ]; then\n', "\tif false; then\n", "hooks", "check.sh lints the whole repository on lint_scope.py's '.'")
+    yield from each(ck, '\t[ -n "$scope" ] || { echo', "\t! false || { echo", "hooks", "check.sh runs no ESLint with no file to read")
+    yield from each(ck, '\tcase $lint in *" .") ;; *)\n', "\tcase $lint in *) ;; *)\n", "hooks", "check.sh names no file to a lint script of another shape")
+    yield from each(ck, '"${lint% .} --no-warn-ignored $scope"', '"${lint% .} $scope"', "hooks", "check.sh tells ESLint to pass over a file it does not lint")
+    yield from each(ck, "*) grep -E '^(check\\.sh|lint_scope|stryker_lines)[ :]' \"$logs/$l.log\" || : ;;", "*) ;;", "hooks", "check.sh says how a lane that passed ran")
+    ls = "scripts/lint_scope.py"
+    yield from each(ls, "            todo.extend(importers.get(file, ()))\n", "", "hooks", "lint_scope.py follows the importers at any depth")
+    yield from each(ls, "    if global_scope.intersection(todo):\n", "    if False:\n", "hooks", "lint_scope.py lints the whole repository on a change of the global scope")
+    yield from each(ls, "importers.setdefault(path[i - 1], set()).add(path[ref[0] - 1])", "importers.setdefault(path[ref[0] - 1], set()).add(path[i - 1])", "hooks", "lint_scope.py follows a file to its importers, not to its imports")
+    yield from each(ls, "1 <= value <= most", "0 <= value <= most", "hooks", "lint_scope.py reads TypeScript's ids from 1")
+    yield from each(ls, '            raise ValueError("a fileIdsList entry of no known form")\n', "            pass\n", "hooks", "lint_scope.py refuses a graph whose lists name no file")
+    yield from each(ls, '            raise ValueError("none")\n', "            pass\n", "hooks", "lint_scope.py lints the whole repository with no graph")
+    yield from each(ls, "{path for path in changed if os.path.isfile(path)}", "set(changed)", "hooks", "lint_scope.py leaves out a changed path that is gone")
+    yield from each(ls, "{real[file] for file in seen if file in real}", "set(seen)", "hooks", "lint_scope.py names each file in its own case")
+    yield from each(ls, "shlex.quote(path) for path", "path for path", "hooks", "lint_scope.py quotes each path for the shell")
+    yield from each(ls, "os.path.abspath(info.parent)", "os.path.realpath(info.parent)", "hooks", "lint_scope.py reads the names from the folder as tsc was told it")
     yield from each(hm, '"probe": "scripts/' 'probe.py"}', '"probe": "scripts/nowhere.py"}', "hooks", "a cached verdict reads probe.py as test_hooks.sh (G5)")
     # The find is split in two, so that this line holds it nowhere itself: a spot of its own would be a mutant of no guard.
     yield from each(hm, 'SUITE_OF = {"hooks": "scripts/test_hooks.sh' '", ', 'SUITE_OF = {', "hooks", "a cached verdict reads both suites (G5)")
@@ -916,8 +938,8 @@ def mutants():
     yield from each("scripts/check.sh", "--outputFile.json=$logs/vitest.json", "--outputFile.jsn=$logs/vitest.json", "hooks", "check.sh asks Vitest for its report")
     yield from each("scripts/check.sh", 'export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"', ":", "hooks", "check.sh asks Playwright for its report")
     yield from each("scripts/check.sh", "--reporter=dot,json", "--reporter=dot", "hooks", "check.sh asks Playwright for its JSON reporter")
-    yield from each("scripts/check.sh", "unsteady_log=.claude/tmp/unsteady.log\n", "unsteady_log=/dev/null\n", "hooks", "check.sh logs an unsteady test in .claude/tmp")
-    yield from each("scripts/check.sh", 'unsteady_log=$(dirname "$(readlink node_modules)")/', "unsteady_log=", "hooks", "check.sh logs a staged copy's unsteady test in the repository")
+    yield from each("scripts/check.sh", "unsteady_log=$repository/.claude/tmp/unsteady.log\n", "unsteady_log=/dev/null\n", "hooks", "check.sh logs an unsteady test in .claude/tmp")
+    yield from each("scripts/check.sh", 'repository=$(cd "$(dirname "$(readlink node_modules)")" && pwd -P)', "repository=$(pwd -P)", "hooks", "check.sh logs a staged copy's unsteady test in the repository")
     yield from each("scripts/check.sh", """grep '^unsteady: ' "$logs/$l.log" || :""", ":", "hooks", "check.sh says an unsteady test it ran again")
     un = "scripts/unsteady.py"
     yield from each(un, ".returncode != 0:", ".returncode == 99:", "hooks", "unsteady: a file that fails twice fails the gate")

@@ -2072,6 +2072,22 @@ fi
 # The folder a build or a journey run is told to build and serve (F4249): GNOWORLD_BUILD, empty for app/build.
 case "$n" in build:app | playwright) echo "$n build=${GNOWORLD_BUILD-}" >>"$GATE_LOG.build" ;; esac
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+# The lint's arguments, one a line: a path with a space or a quote stays whole (the red pass, F4853).
+[ "$n" != lint ] || printf '%s\n' "$@" >"$GATE_LOG.lint-args"
+# The type check's incremental build: the folder it was told, and that folder's state as it ran.
+[ "$n" != typecheck ] || echo "typecheck cache=${TSC_CACHE-unset} $(test -d "${TSC_CACHE:-/nowhere}" && echo there || echo missing)" >>"$GATE_LOG.tsc"
+# The files a commit's lint reads: the changed paths it was given on stdin, and LINT_SCOPE's answer (a lint of the whole repository by
+# default), LINT_SCOPE_EXIT its exit.
+if [ "$n" = py:lint_scope ]; then
+	cat >"$GATE_LOG.scope-in"
+	printf '%s\n' "${LINT_SCOPE-.}"
+	exit "${LINT_SCOPE_EXIT:-0}"
+fi
+# The merge check's lines for StrykerJS: STRYKER_LINES_EXIT its exit (3: no line), the config it writes otherwise.
+if [ "$n" = py:stryker_lines ]; then
+	[ "${STRYKER_LINES_EXIT:-0}" != 0 ] || printf '{"mutate":["app/src/a.tsx:1-1"]}' >"$2"
+	exit "${STRYKER_LINES_EXIT:-0}"
+fi
 # The patch's coverage reads the report of a coverage run that passed (or passed on its retry); a failed one leaves none, and the real script fails.
 [ "$n" != py:patch_coverage ] || grep -qx "done coverage" "$GATE_LOG" || { echo "patch_coverage: no coverage report" >&2; exit 1; }
 [ "$n" != build:app ] || [ -z "${PW_EDIT:-}" ] || printf '\n' >>app/package.json # a build that installs edits a package file
@@ -2141,7 +2157,7 @@ printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx lint_scope stryker_lines; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -2153,6 +2169,7 @@ import json, sys
 names = ["build:app", "format:check", "typecheck", "lint", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
 scripts = {n: f"sh {sys.argv[2]} {n}" for n in names}
 scripts["test"] = "vitest run --project node --project ui --project compiled"  # the related run keeps its projects (check.sh)
+scripts["lint"] += " ."  # the whole repository, as package.json's: a commit's lint names its files in its place (check.sh)
 json.dump({"scripts": scripts}, open(sys.argv[1], "w"))
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
@@ -2659,6 +2676,88 @@ sh -c 'set -e; eval "$1"; E2E_PORT=$( (ulimit -n 24 && free_ports 40) 2>/dev/nul
 	fail "an assignment of free_ports went on after it found no free ports: $(cat "$t/ports.out")"
 fi
 
+if part gate_tsc_cache; then
+gate_fixture gate_tsc_cache
+# The type check builds incrementally from the worktree's own .claude/tmp/tsc in a repository's fast gate, --tests-all included (Alexis,
+# 2026-11-04: "Oui, les trois"); pre-commit's staged copy, which does not hold that folder, --full and --merge build from a folder of
+# their own run, there as the check runs and gone at its end: they read no writable cache, as Prettier's. A caller's TSC_CACHE counts for nothing.
+cache() { sed -n 's/^typecheck cache=//p' "$log.tsc"; }
+own="$(cd "$g" && pwd -P)/.claude/tmp/tsc"
+for args in "" --tests-all; do
+	rm -f "$log.tsc" && out=$(TSC_CACHE=/elsewhere gate $args) || fail "check.sh $args failed a run whose every step passes: $out"
+	[ "$(cache)" = "$own there" ] || fail "check.sh $args did not build the types from the worktree's own cache, $own: $(cache)"
+done
+rm -f "$log.tsc" && echo 'y' >>"$g/server/src/a.ts" && out=$(gate) || fail "check.sh failed a change of the server: $out"
+[ "$(cache)" = "$own there" ] || fail "check.sh did not build a change's types from the worktree's own cache: $(cache)"
+reset
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+for run in staged full merge; do
+	rm -f "$log.tsc"
+	case $run in
+	staged) out=$(g=$c TSC_CACHE="$own" gate) || fail "check.sh failed a staged copy whose every step passes: $out" ;;
+	*) out=$(AUDIT_ANSWER=x TSC_CACHE="$own" gate --"$run") || fail "check.sh --$run failed a run whose every step passes: $out" ;;
+	esac
+	set -- $(cache)
+	[ "${2:-}" = there ] && [ -n "$1" ] && [ "$1" != "$own" ] && [ "$1" != "$(cd "$c" && pwd -P)/.claude/tmp/tsc" ] || fail "check.sh's $run run built the types from a cache it keeps: $(cache)"
+	case $1 in "${TMPDIR:-/tmp}"/check.*/tsc | "${TMPDIR%/}"/check.*/tsc) ;; *) fail "check.sh's $run run built the types elsewhere than in its own folder of \$TMPDIR: $1" ;; esac
+	[ ! -e "$1" ] || fail "check.sh's $run run left its own type check's folder behind: $1"
+done
+fi
+
+if part gate_lint_scope; then
+gate_fixture gate_lint_scope
+# A commit's lint reads the files it changed and every file that imports them, at any depth, from the type check's own graph
+# (scripts/lint_scope.py, given the paths on stdin and the type check's folder): ESLint's own cache keys a file on its own text, so a
+# type changed elsewhere would leave the verdict it holds stale (the chief, for Alexis, 2026-11-04, in place of "ESLint with its cache").
+# Its answer `.`, or a run of it that fails, lints the whole repository; nothing to read, no lint. Everything that runs every test, a
+# config, --tests-all and the full gate, lints the whole repository, never asking it. The files go to package.json's lint script in
+# place of its `.`, ESLint told not to warn of a file it ignores; a script of another shape is refused, never run as it is.
+lint() { sed -n 's/^lint //p' "$log"; }
+own="$(cd "$g" && pwd -P)/.claude/tmp/tsc"
+echo 'y' >>"$g/app/src/a.tsx"
+# The files as lint_scope.py quotes them for the shell, each reaching ESLint whole, never run: a space, a quote, a command substitution.
+out=$(LINT_SCOPE="app/src/a.tsx 'app/src/b c.tsx' 'it'\"'\"'s.tsx' 'a\$(touch pwned).tsx' 'b\`touch pwned\`;x.tsx'" gate) || fail "check.sh failed a change whose lint passes: $out"
+[ "$(cat "$log.scope-in")" = app/src/a.tsx ] || fail "check.sh did not give lint_scope.py the changed paths: $(cat "$log.scope-in")"
+grep -qx "py:lint_scope $own" "$log" || fail "check.sh did not give lint_scope.py the type check's folder, $own: $(grep '^py:lint_scope' "$log")"
+before typecheck py:lint_scope || fail "check.sh read the lint's files before the type check had built its graph"
+[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored app/src/a.tsx 'app/src/b c.tsx' "it's.tsx" 'a$(touch pwned).tsx' 'b`touch pwned`;x.tsx')" ] ||
+	fail "check.sh did not give ESLint the files lint_scope.py named, alone and whole: $(cat "$log.lint-args")"
+[ ! -e "$g/pwned" ] && [ ! -e "$g/app/pwned" ] || fail "check.sh ran a command a file's name held"
+nocache "a change of the app"
+for answer in . "fail"; do
+	if [ "$answer" = fail ]; then out=$(LINT_SCOPE= LINT_SCOPE_EXIT=1 gate) || fail "check.sh failed when lint_scope.py failed: $out"; else out=$(LINT_SCOPE=. gate) || fail "check.sh failed on lint_scope.py's '.': $out"; fi
+	[ "$(lint)" = "." ] || fail "check.sh did not lint the whole repository when lint_scope.py answered '$answer': $(lint)"
+done
+printf '%s\n' "$out" | grep -q "lint_scope.py failed" || fail "check.sh did not say lint_scope.py failed: $out"
+out=$(LINT_SCOPE= gate) || fail "check.sh failed a change whose lint reads nothing: $out"
+ran lint && fail "check.sh ran ESLint with no file to read: $(lint)"
+# The staged copy has no repository, the lint's files come from its list; a script of another shape is refused.
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx LINT_SCOPE=app/src/a.tsx gate) || fail "check.sh failed a staged copy whose lint passes: $out"
+[ "$(lint)" = "--no-warn-ignored app/src/a.tsx" ] || fail "check.sh did not lint a staged copy's files alone: $(lint)"
+# A lint script of another shape, committed (a change of package.json runs everything): the change of a.tsx alone asks for its files.
+python3 -I - "$g/package.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["scripts"]["lint"] = p["scripts"]["lint"] + " app"
+json.dump(p, open(sys.argv[1], "w"))
+PY
+git -C "$g" commit -qm "a lint script of another shape" package.json
+out=$(LINT_SCOPE=app/src/a.tsx gate) && fail "check.sh named files to a lint script that does not end on its '.': $out"
+printf '%s\n' "$out" | grep -q "package.json's lint script" || fail "check.sh did not say why it refused the lint script: $out"
+ran lint && fail "check.sh ran a lint script of another shape: $(lint)"
+git -C "$g" reset -q --hard HEAD~1
+# Every test, every file: a config, --tests-all, --full and --merge never ask lint_scope.py.
+for run in config --tests-all --full --merge; do
+	case $run in
+	config) echo '{}' >"$g/knip.json" && out=$(LINT_SCOPE=app/src/a.tsx gate) ;;
+	*) out=$(AUDIT_ANSWER=x LINT_SCOPE=app/src/a.tsx gate "$run") ;;
+	esac || fail "check.sh $run failed a run whose every step passes: $out"
+	[ "$(lint)" = "." ] && ! ran py:lint_scope || fail "check.sh $run did not lint the whole repository: $(lint)"
+	reset
+done
+fi
+
 full_fixture() { # $1: its folder's name
 	gate_fixture "$1"
 	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
@@ -3091,6 +3190,88 @@ AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folde
 rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
 AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
 [ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+if part lint_scope; then
+# lint_scope.py on a real type check's graph, TypeScript's own .tsbuildinfo, so that an upgrade that moves its format fails here (the
+# chief, 2026-11-04). A type changed in a.ts turns b.ts red, which imports it and did not change: the scope names a.ts and its importers at
+# any depth, across two programs and through a folder in capitals, in their own case, and nothing apart; ESLint on its files fails on b.ts
+# alone. TypeScript's references count as imports: an ambient module of a .d.ts, an augmentation, a JSON file. A file in no program (a
+# stylesheet) is named itself; a path is quoted for the shell, one gone is left out. A change of the global scope, wherever it comes in
+# the list, a graph it cannot read, or none, is the whole repository (`.`). Its folder is read as TypeScript wrote it, through a link.
+ls_="$t/lint_scope" && mkdir -p "$ls_/src/Deep" "$ls_/other" "$ls_/cache"
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+modules=$(cd "$here/../node_modules" && pwd -P)
+cat >"$ls_/tsconfig.json" <<'JSON'
+{ "compilerOptions": { "strict": true, "target": "es2024", "lib": ["es2024"], "module": "nodenext", "noEmit": true, "allowImportingTsExtensions": true, "resolveJsonModule": true, "types": [] }, "include": ["src"] }
+JSON
+printf '{ "extends": "../tsconfig.json", "include": ["."] }\n' >"$ls_/other/tsconfig.json"
+printf '{ "type": "module" }\n' >"$ls_/package.json"
+printf 'import tseslint from "%s/typescript-eslint/dist/index.js";\nexport default [{ files: ["**/*.ts"], languageOptions: { parser: tseslint.parser, parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } }, plugins: { "@typescript-eslint": tseslint.plugin }, rules: { "@typescript-eslint/no-floating-promises": "error" } }];\n' "$modules" >"$ls_/eslint.config.mjs"
+printf 'export interface Shape {\n  x: number;\n}\nexport function later(): void {}\n' >"$ls_/src/a.ts"
+printf 'import { later } from "./a.ts";\nexport function run(): void {\n  later();\n}\n' >"$ls_/src/b.ts"
+printf 'import { run } from "./b.ts";\nexport const user = run;\n' >"$ls_/src/user.ts"
+printf 'import { user } from "./user.ts";\nexport const deep = user;\n' >"$ls_/src/deep.ts"
+printf 'import { later } from "./a.ts";\nexport const uses = later;\n' >"$ls_/src/Uses.ts"
+printf 'import { later } from "../a.ts";\nexport const importer = later;\n' >"$ls_/src/Deep/Importer.ts"
+printf 'import { later } from "../src/a.ts";\nexport const other = later;\n' >"$ls_/other/o.ts"
+printf 'export const apart = 1;\n' >"$ls_/src/apart.ts"
+printf 'import { two } from "./c2.ts";\nexport const one = (): number => two();\n' >"$ls_/src/c1.ts"
+printf 'import { one } from "./c1.ts";\nexport const two = (): number => one();\n' >"$ls_/src/c2.ts"
+printf 'declare module "virtual:planted" {\n  export const planted: number;\n}\n' >"$ls_/src/amb.d.ts"
+printf 'import { planted } from "virtual:planted";\nexport const seen = planted;\n' >"$ls_/src/v.ts"
+printf 'import type { Shape } from "./a.ts";\ndeclare module "./a.ts" {\n  interface Shape {\n    extra?: number;\n  }\n}\nexport type Augmented = Shape;\n' >"$ls_/src/aug.ts"
+printf '{ "n": 1 }\n' >"$ls_/src/data.json" && printf 'import data from "./data.json" with { type: "json" };\nexport const n = data.n;\n' >"$ls_/src/j.ts"
+printf 'declare global {\n  interface Planted {\n    x: number;\n  }\n}\nexport {};\n' >"$ls_/src/global.ts"
+for odd in 'with space' "it's" 'a$(touch pwned)'; do printf 'export const odd = 1;\n' >"$ls_/src/$odd.ts"; done
+printf 'a {\n  color: red;\n}\n' >"$ls_/src/style.css"
+types() { # $1: the folder of the buildinfo files, as tsc is told it
+	for project in root:tsconfig.json other:other/tsconfig.json; do
+		(cd "$ls_" && PATH="$nodebin:$PATH" node "$modules/typescript/bin/tsc" -p "${project#*:}" --incremental --tsBuildInfoFile "${1:-cache}/${project%%:*}.tsbuildinfo") || fail "tsc failed on lint_scope's fixture ($project)"
+	done
+}
+lint() { (cd "$ls_" && PATH="$nodebin:$PATH" node "$modules/eslint/bin/eslint.js" --max-warnings 0 --no-warn-ignored "$@") >"$t/lint_scope.out" 2>&1; }
+scope() { printf '%s\n' "$@" | (cd "$ls_" && python3 -I "$here/lint_scope.py" "${SCOPE_IN:-cache}"); }
+names() { # $1: the scope; then the files it must name, "-", the files it must not
+	words=$(eval "printf '%s\n' $1")
+	shift
+	must=true
+	for f in "$@"; do
+		if [ "$f" = - ]; then must=false; elif $must; then printf '%s\n' "$words" | grep -qxF "$f" || fail "lint_scope.py did not name $f: $words"; else printf '%s\n' "$words" | grep -qxF "$f" && fail "lint_scope.py named $f: $words"; fi
+	done
+	:
+}
+types && lint src/b.ts || fail "ESLint failed on lint_scope's fixture before the change: $(cat "$t/lint_scope.out")"
+printf 'export interface Shape {\n  x: number;\n}\nexport async function later(): Promise<void> {}\n' >"$ls_/src/a.ts" && types
+s=$(scope src/a.ts)
+names "$s" src/a.ts src/b.ts src/user.ts src/deep.ts src/Uses.ts src/Deep/Importer.ts other/o.ts - src/apart.ts src/c1.ts src/j.ts src/v.ts src/global.ts
+lint src/a.ts || fail "ESLint failed on a.ts alone, which is sound: $(cat "$t/lint_scope.out")"
+eval "set -- $s" && lint "$@" && fail "ESLint passed on the files lint_scope.py named, with b.ts's promise floating: $(cat "$t/lint_scope.out")"
+grep -q "no-floating-promises" "$t/lint_scope.out" && grep -q "src/b.ts" "$t/lint_scope.out" || fail "ESLint did not fail b.ts on its floating promise: $(cat "$t/lint_scope.out")"
+names "$(scope src/amb.d.ts)" src/v.ts - src/apart.ts
+names "$(scope src/aug.ts)" src/b.ts - src/apart.ts
+names "$(scope src/data.json)" src/j.ts - src/apart.ts
+names "$(scope src/c1.ts)" src/c1.ts src/c2.ts - src/apart.ts
+[ "$(scope src/style.css)" = src/style.css ] || fail "lint_scope.py did not name a changed file of no program: $(scope src/style.css)"
+eval "set -- $(scope 'src/with space.ts' "src/it's.ts" 'src/a$(touch pwned).ts' src/gone.ts)"
+[ "$*" = 'src/a$(touch pwned).ts src/it'"'"'s.ts src/with space.ts' ] && [ $# = 3 ] || fail "lint_scope.py did not quote each path whole, or named one that is gone: $#: $*"
+[ ! -e "$ls_/pwned" ] && [ ! -e "$t/pwned" ] || fail "lint_scope.py's answer ran a command a file's name held"
+[ -z "$(scope src/gone.ts)" ] || fail "lint_scope.py named a file that is gone: $(scope src/gone.ts)"
+for list in src/global.ts "src/a.ts src/global.ts"; do
+	[ "$(scope $list)" = . ] || fail "lint_scope.py did not lint the whole repository for a change of the global scope in '$list': $(scope $list)"
+done
+# The folder as tsc was told it, here through a link at another depth of the same tree (spelled physically: through /tmp, the names climb
+# to the root and any reading lands): the names are relative to it, never to where it leads.
+phys=$(cd "$t" && pwd -P) && mkdir -p "$phys/at/another" && ln -s "$phys/lint_scope/cache" "$phys/at/another/cache" && types "$phys/at/another/cache"
+names "$(SCOPE_IN="$phys/at/another/cache" scope src/a.ts)" src/b.ts src/deep.ts other/o.ts
+# A graph it cannot read, or none, is the whole repository: never fewer files, one bad among good ones too.
+good=$(cat "$ls_/cache/root.tsbuildinfo")
+for bad in 'not json' '[]' '{"fileNames": 1}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[0, 1]], "fileIdsList": [[1]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[1, 9]], "fileIdsList": [[1]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[1, 1]], "fileIdsList": [[7]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": [7]}'; do
+	printf '%s' "$bad" >"$ls_/cache/root.tsbuildinfo"
+	[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph that is not one ($bad): $(scope src/a.ts 2>&1)"
+done
+rm "$ls_/cache/root.tsbuildinfo" "$ls_/cache/other.tsbuildinfo" && [ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read no graph as an empty one: $(scope src/a.ts 2>&1)"
+printf '%s' "$good" >"$ls_/cache/root.tsbuildinfo"
 fi
 
 # Vitest does not bench what a StrykerJS sandbox holds: on a copy of the config, a bench in .stryker-tmp is not measured. Only a

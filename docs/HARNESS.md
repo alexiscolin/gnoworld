@@ -207,10 +207,11 @@ refuses another Node (F816).
 | Step | What it catches |
 |---|---|
 | Prettier | unformatted code |
-| `tsc` | type errors; `core` sees no DOM and no Node, so it cannot reach the network |
+| `tsc` | type errors; `core` sees no DOM and no Node, so it cannot reach the network. It builds incrementally, into `TSC_CACHE`: in a repository's fast gate the worktree's `.claude/tmp/tsc`; in pre-commit's staged copy, `--full` and `--merge` a folder of the run's own, gone at its end |
 | ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), a test switched off (`.skip`, `.only`, `.todo`, `.fails`), invalid or unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, raw HTML into the DOM, a folder's import against ARCHITECTURE.md's table, the network or storage outside `lib` and `sw`, `console`; the config is `eslint.config.ts` and its parts in `lint/` |
 | Vitest, with fast-check | failing tests (the related ones, or every one: above); a test with no assertion; the `compiled` project (`app/vitest.compiled.config.ts`), which counts what a re-render recomputes |
 | `scripts/related.py` | a place on disk named in a form its map cannot follow |
+| `scripts/lint_scope.py` | the files a commit's ESLint reads: those it changed and every file that imports one at any depth, from the type check's own graph (its `.tsbuildinfo`), in place of package.json's `lint`'s `.`; ESLint keeps no cache, which keys a file on its own text while its typed rules read other files' types. A change of the global scope, a graph it cannot read or a run of it that fails lints the whole repository, as a config, `--tests-all`, `--merge` and `--full` do |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |
@@ -367,6 +368,9 @@ costs context in every session.
 - **The history scan is defence in depth;** the staged scan is the barrier (F141 to F143).
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine;**
   the overrun is printed and logged every time.
+- **A commit's lint trusts TypeScript's graph** (`scripts/lint_scope.py`): a file whose lint would read another it neither imports
+  nor reaches through a type (a rule reading the disk) is linted at a part's end (`--tests-all`) and in the merge check, which lint the
+  whole repository. Two gates at once in one worktree share its `.tsbuildinfo`, so one may read the graph the other wrote.
 - **A commit's gate trusts Vitest's module graph, `main.test.ts` and the map's grep** (`scripts/related.py`): a test
   that runs code in a child process other than the server's (`app/src/dataFiles.test.ts` builds the app) runs for a change
   of code only when the graph holds it, and a read through a place built from another's (`join(APP, "..", "deploy")`) is seen
@@ -403,6 +407,7 @@ costs context in every session.
 | `scripts/check.sh` | the gate |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
+| `scripts/lint_scope.py` | the files a commit's lint reads, from the type check's graph |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
