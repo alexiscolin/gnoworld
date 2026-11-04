@@ -1,6 +1,7 @@
 // The data files, read and checked when the app builds (slice 5's 5c; docs/plans/slice-5.md §3, "Data files"): each is
 // JSON in app/data, parsed by its Zod schema in packages/schemas, and a fault stops the build with one line a fault:
-// `<file>: <row>.<field>: <what is wrong>`, e.g. `news.json: [1].id: duplicate id "n1"`.
+// `<file>: <row>.<field>: <what is wrong>`, e.g. `news.json: [1].id: duplicate id "n1"`. The services read theirs the
+// same way through @gnoworld/service's readDataFile, a package the app's build does not depend on (D129).
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { placeIn } from "@gnoworld/core";

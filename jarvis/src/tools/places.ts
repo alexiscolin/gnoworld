@@ -2,10 +2,10 @@
 // stations, read once at start from the folder JARVIS_DATA_DIR names, each through packages/schemas' own schema, as
 // the site's build reads them, then core's placesOf. find_place answers a place's path and canonical address from
 // them alone; a fault stops the start, naming its file and nothing it holds.
-import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { jsonOf, type Place, placeIn, placesOf } from "@gnoworld/core";
 import { Ecosystems, Hubs, Stations, Universes } from "@gnoworld/schemas";
+import { readDataFile } from "@gnoworld/service/files";
 import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
 
@@ -40,8 +40,7 @@ function fileOf<T>(folder: string, name: string, schema: z.core.$ZodType<T>): T 
   const path = join(folder, file);
   let text: string;
   try {
-    if (statSync(path).size > 1024 * 1024) throw new RangeError("past 1 MiB");
-    text = readFileSync(path, "utf8");
+    text = readDataFile(path);
   } catch (cause) {
     throw new Error(`places: ${file}: unreadable`, { cause });
   }
