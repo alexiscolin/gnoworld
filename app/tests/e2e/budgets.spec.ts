@@ -1,22 +1,55 @@
 import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
-// ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last on 2026-11-04: 174 KiB for the phone's view switch), 3 MB in all, the worker's
-// precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 174 * 1024;
-const TOTAL = 3 * 1024 * 1024;
+// ADR-0001 §12's budgets, as gzip sends them: compressed JavaScript before the first usable screen (the page hydrated), 3 MB in all with
+// the worker's precache; their steps in docs/decisions.md. Every cap came down on 2026-11-04 by what its files' hashed names weighed
+// before the measure left them out (part 7y), its margin kept: the comments give the values before.
+const FIRST_SCREEN_JS = 176_598;
+const TOTAL = 3_135_286;
 
+// A text's hashed names of other files (`scene-B9x_Qa1z.js`) weigh as one fixed string: a chunk renamed moved another's weight 1 to 3 B
+// (7p2's review: restDeep 3,605 B in the test build, 3,608 B in production). A file that is no text weighs its own bytes.
+const HASHED = /-[\w-]{8}\.(js|css|woff2)\b/;
 const compressed = (page: Page, urls: readonly string[]) =>
-  page.evaluate(async (list) => {
-    let total = 0;
-    for (const url of list) {
-      const body = (await fetch(url, { cache: "no-store" })).body;
-      if (body !== null)
-        total += (await new Response(body.pipeThrough(new CompressionStream("gzip"))).arrayBuffer()).byteLength;
-    }
-    return total;
-  }, urls);
+  page.evaluate(
+    async ([list, hashed]) => {
+      let total = 0;
+      for (const url of list) {
+        const response = await fetch(url, { cache: "no-store" });
+        const text = /^(?:text\/|application\/(?:javascript|json))/.test(response.headers.get("content-type") ?? "");
+        const body = text
+          ? new Blob([(await response.text()).replace(new RegExp(hashed, "g"), "-xxxxxxxx.$1")]).stream()
+          : response.body;
+        if (body !== null)
+          total += (await new Response(body.pipeThrough(new CompressionStream("gzip"))).arrayBuffer()).byteLength;
+      }
+      return total;
+    },
+    [urls, HASHED.source] as const,
+  );
+
+test("a chunk weighs the same whatever hashed names it holds, and a file that is no text its own bytes", async ({
+  page,
+}) => {
+  const chunk = (hash: string, type: string) =>
+    `data:${type},import"./scene-${hash}.js";import"./cosmos-${hash}.css";url(./font-${hash}.woff2);export const x=1;`;
+  for (const type of ["text/javascript", "text/css;charset=utf-8", "application/json"])
+    expect(await compressed(page, [chunk("AAAAAAAA", type)]), type).toBe(
+      await compressed(page, [chunk("Zq7_x9-K", type)]),
+    );
+  // Every byte once, most of them no UTF-8: read as text, each would grow to three before gzip.
+  const bytes = Array.from({ length: 256 }, (_, i) => (i * 167 + 13) % 256);
+  const own = await page.evaluate(
+    async (list) =>
+      (
+        await new Response(
+          new Blob([new Uint8Array(list)]).stream().pipeThrough(new CompressionStream("gzip")),
+        ).arrayBuffer()
+      ).byteLength,
+    bytes,
+  );
+  expect(await compressed(page, [`data:image/png;base64,${btoa(String.fromCharCode(...bytes))}`])).toBe(own);
+});
 
 // A world's chat comes after hydration (Chat.tsx's boundary), its lines' view only once a room holds a line
 // (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
@@ -27,7 +60,7 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
-const LATE_CHAT_JS = 21 * 1024;
+const LATE_CHAT_JS = 21_091;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
@@ -38,40 +71,40 @@ const SCENE = /\/assets\/scene-[\w-]+\.js$/;
 // 156 KiB since 7e (Alexis, 2026-11-02): a second lazy part made rolldown split the scene's shared modules out of its chunk; 160,000 B for
 // the rail's planet portraits, drawn by the planets' own code through the scene's renderer (Alexis, 2026-11-03). Lowered to 158,208 B once
 // the shaders' spaces were stripped (Alexis, 2026-11-03, after 7v), keeping room for 7i's portraits and 7b8's warm air.
-const SCENE_JS = 158_208;
+const SCENE_JS = 157_799;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
 // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
-const COSMOS_JS = 17 * 1024;
+const COSMOS_JS = 17_019;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
-const WHOLE_JS = 5 * 1024;
+const WHOLE_JS = 5044;
 // The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks once
 // its cosmos shows, first capped a tenth or so over their weight (7d7: 6,771 B and 3,492 B). The view at rest's: 10 KiB since 7p's depth,
 // 10.5 KiB with 7v's views (Alexis, 2026-11-03, docs/decisions.md).
 const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const REST_JS = 10.5 * 1024;
+const REST_JS = 10_442;
 const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
-const NEBULAE_JS = 3.75 * 1024;
+const NEBULAE_JS = 3790;
 // The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them; first
 // the part's 5,960 B, 6 KiB once the rail shared their ranking, titles, reading and band (Alexis, 2026-11-03: two chunks of their own, the
 // price of sharing), 6.5 KiB with 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
 const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-const LABELS_JS = 6.5 * 1024;
+const LABELS_JS = 6502;
 // The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
 // cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
 // camera-controls' own warning, which no minifier renames.
 const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
-const FLIGHTS_JS = 18 * 1024;
+const FLIGHTS_JS = 18_391;
 const FLIGHTS_MARK = "camera-controls:";
 // The rail (7i) and its planets' portraits: chunks of their own, asked once the cosmos's worlds stand on a computer, outside the scene's and
 // the cosmos's caps. Their first caps are the part's (the chief, 2026-11-03): 6,408 B and 1,712 B measured, and about a tenth.
 const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
-const RAIL_JS = 7 * 1024;
+const RAIL_JS = 7026;
 const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
-const PORTRAITS_JS = 1900;
+const PORTRAITS_JS = 1797;
 const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
 // chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
@@ -79,32 +112,32 @@ const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.met
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const ARRIVAL_JS = 2 * 1024;
+const ARRIVAL_JS = 2027;
 // The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
 // program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
 // (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
 const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 3616;
+const DEEP_JS = 3573;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
-const ROCKS_JS = 1325;
+const ROCKS_JS = 1318;
 const ROCKS_MARK = "aRock";
 // A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
 // which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps, each its
 // size once its reviews' fixes landed and about a tenth: 2,248 B (the design review's lens, level and spacing, F4470) and 2,147 B.
 const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
-const PLAN_JS = 2470;
+const PLAN_JS = 2419;
 const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
-const ORBITS_JS = 2360;
+const ORBITS_JS = 2304;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
-const WORLD_JS = 12 * 1024;
+const WORLD_JS = 12_066;
 const THREE_MARK = "isWebGLRenderer";
 // Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
 // the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
 // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
 // cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave.
-const GENERATED_JS = 10 * 1024;
+const GENERATED_JS = 10_189;
 const GENERATED_MARK = "minorShare";
 
 // A static import between two built files (`from"./x.js"`, `import"./x.js"`), never a dynamic `import("./x.js")`.
