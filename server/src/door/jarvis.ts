@@ -5,7 +5,7 @@
 import { JARVIS_PATHS, JarvisAnswer, JarvisBudgets, type JarvisAsk, type JarvisBudget } from "@gnoworld/schemas";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 
-type Failure = "down" | "slow" | "failed" | "shape" | "gone";
+export type Failure = "down" | "slow" | "failed" | "shape" | "gone";
 type Called<T> = { ok: true; value: T } | { ok: false; error: Failure };
 interface Schema<T> {
   safeParse: (value: unknown) => { success: true; data: T } | { success: false };
