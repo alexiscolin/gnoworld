@@ -55,6 +55,18 @@ describe("PreviewCard", () => {
     expect(words).toContain("Open large");
   });
 
+  // Frame 104 draws the page alone under jonas's line (8f's review, finding 3): the card's words are its button's name, said, not shown.
+  it("draws the picture alone under a line, its words for assistive technology alone", () => {
+    const box = card({ look: "line" });
+    const words = all(opener(box), "span");
+    expect(words.length).toBeGreaterThan(0);
+    expect(words.every((word) => word.classList.contains("visually-hidden"))).toBe(true);
+    expect(opener(box).textContent).toContain("gno.land/r/gov/dao · captured");
+    expect(one(box, "[data-preview-thumb]").getAttribute("aria-hidden")).toBe("true");
+    const plate = all(opener(card()), "span");
+    expect(plate.some((word) => word.classList.contains("visually-hidden"))).toBe(false);
+  });
+
   it("cuts a long path's middle, as frame 104's plate does", () => {
     const box = card({ capture: { ...CAPTURE, path: "gno.land/r/sample/bubble" } });
     expect(opener(box).textContent).toContain("gno.land/r/…/bubble · captured");

@@ -16,7 +16,7 @@
     overflow: hidden;
     aspect-ratio: 2 / 1;
     border: var(--line-width) solid var(--color-line);
-    border-radius: inherit;
+    border-radius: var(--radius-m);
     background: var(--color-surface);
   }
 
@@ -38,7 +38,7 @@
     pointer-events: none;
   }
 
-  /* The card's words: one under the other on a plate, in one run under a line. Its press covers the card (`covers`): its radius is the card's. */
+  /* The card's words, one under the other on a plate. Its press covers the card (`covers`), its corners the card's. */
   .open {
     /* layout: the words one under the other, each as wide as itself */
     display: grid;
@@ -48,7 +48,7 @@
     justify-items: start;
     /* layout: the words packed in the middle of the card's height, a step apart, as frame 26 sets them */
     align-content: center;
-    border-radius: inherit;
+    border-radius: var(--radius-m);
     text-align: start;
     cursor: zoom-in;
   }
@@ -62,19 +62,10 @@
     outline-offset: var(--focus-offset);
   }
 
+  /* Under a line the button holds no word in view (they are its name alone): it lies over the picture, which it opens. */
   .card[data-look="line"] .open {
-    /* layout: under a line, the path then Open large, on one line: the path is cut, never wrapped */
-    grid-template-columns: minmax(0, 1fr) auto;
-    /* layout: in one run */
-    grid-auto-flow: column;
-    /* layout: the step between them */
-    column-gap: var(--space-2xs);
-    /* layout: each word as wide as its column, so the path is cut at its column's end */
-    justify-items: stretch;
-  }
-
-  .card[data-look="line"] .title {
-    display: none;
+    position: absolute;
+    inset: 0;
   }
 
   .when {

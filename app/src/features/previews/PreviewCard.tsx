@@ -36,6 +36,8 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
   const read = page(capture.text, { origin: gnoweb });
   const blocks = read.kind === "page" ? read.blocks : [];
   const when = CLOCK.format(Date.parse(capture.captured));
+  // Under a line the page alone, as frame 104 draws it: the card's words are its button's name, for assistive technology alone.
+  const said = look === "line" ? "visually-hidden" : undefined;
   const thumb = (
     <div className={styles["thumb"]} data-preview-thumb="" inert aria-hidden="true">
       <div className={styles["page"]}>
@@ -53,9 +55,9 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
         setOpen(true);
       }}
     >
-      <span className={styles["title"]}>Preview</span>
-      <span className="label truncate">{`${shortPath(capture.path)} · captured`}</span>
-      <span className="label">Open large</span>
+      <span className={said}>Preview</span>
+      <span className={said ?? "label truncate"}>{`${shortPath(capture.path)} · captured`}</span>
+      <span className={said ?? "label"}>Open large</span>
     </button>
   );
   return (
