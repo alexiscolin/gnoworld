@@ -102,6 +102,7 @@ export function probes(page: Probed) {
     live: () => live(page),
     looks: () => shown().map(({ look }) => look),
     ids: () => shown().map(({ id }) => id),
+    paths: () => shown().map(({ path }) => String.fromCharCode(...path)),
     minors: () => shown().map(({ recipe }) => recipe.minorShare),
     surfaces: () => shown().map(({ recipe }) => recipe.surface),
     // What a glance takes for a world's colours: its land palette's centre, and its sea's two colours where it has a sea.
