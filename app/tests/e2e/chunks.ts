@@ -17,13 +17,13 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
  * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // 156 KiB since 7e, 160,000 B for the rail's portraits, 158,208 B once the shaders' spaces were stripped (Alexis, 2026-11-02 and 03);
-  // 159,648 B with the three classes the Earth's stations draw with (Alexis, 2026-11-04, "Oui, 160 256" in the old measure, 159,847 in
-  // this one), 7x2's merge measured.
-  { chunk: "scene", after: ["mountUniverse"], cap: 159_648 },
-  // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
-  // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
-  // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead).
-  { chunk: "cosmos", after: ["scene"], cap: 17_130 },
+  // 159,648 B with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 159,835 B once the star's warmth took the
+  // hashes to a chunk the generated worlds share, and the warm air (7b9, inside the margin given ahead).
+  { chunk: "scene", after: ["mountUniverse"], cap: 159_835 },
+  // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
+  // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead);
+  // 17,322 B with the star's warmth in a chunk the system and the generated worlds share (7b9, inside the margin given ahead).
+  { chunk: "cosmos", after: ["scene"], cap: 17_322 },
   { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
@@ -36,7 +36,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
   // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_442 },
+  // 13,444 B: the names of 7b9's two new shared chunks in its imports.
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_444 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2401 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
