@@ -48,7 +48,8 @@ function placed(world: World): Place | undefined {
 }
 
 // A world's window over the realms both passes read: its transactions, and the different addresses that sent them, each counted once across
-// its realms, from its realms' first read in the last pass to their last in this one; none for a world with no such realm.
+// its realms, from its realms' first read in the last pass to their last in this one; none for a world with no such realm, nor past the
+// window's most (F4867).
 function windowOf(
   world: World,
   before: ReadonlyMap<string, number>,
@@ -63,7 +64,9 @@ function windowOf(
     for (const mark of read.recent.transactions) transactions.add(mark);
     for (const caller of read.recent.callers) addresses.add(caller);
   }
-  return to > from ? { transactions: transactions.size, addresses: addresses.size, from, to } : undefined;
+  return to > from && to - from <= WINDOW_MOST_MS
+    ? { transactions: transactions.size, addresses: addresses.size, from, to }
+    : undefined;
 }
 
 // Each world's window since the pass before, kept in its habits, beside its usual; none on a first pass or past the window. ponytail: a

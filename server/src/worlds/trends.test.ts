@@ -204,6 +204,18 @@ describe("the chain's window", () => {
     });
   });
 
+  // The third round of 7t3's review (F4867): the stamps' check let a world's own window run past it, from a read long before the last stamp.
+  it(`has no window for a world whose own reads stand more than ${String(WINDOW_MOST_MS / HOUR)} h apart, though the stamps are within`, () => {
+    const { trends, pass } = keeper();
+    pass({ file: T1, read: T1 - 40 * MINUTE }, WORLDS, reads({ [POOL]: null }));
+    pass({ file: T1 + 119 * MINUTE, read: T1 + 119 * MINUTE }, WORLDS, reads({ [POOL]: [9, [A, B]] }));
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toBeUndefined();
+    const { trends: within, pass: passWithin } = keeper();
+    passWithin({ file: T1, read: T1 - MINUTE }, WORLDS, reads({ [POOL]: null }));
+    passWithin({ file: T1 + 119 * MINUTE, read: T1 + 119 * MINUTE }, WORLDS, reads({ [POOL]: [9, [A, B]] }));
+    expect(windowOf(within.chain(), "gnoswap/pool"), "120 min to the ms").toMatchObject({ transactions: { count: 9 } });
+  });
+
   it("has no window on a first pass, for there is nothing to compare with", () => {
     const { trends, pass } = keeper();
     pass(T2, WORLDS, reads({ [POOL]: [40, [A, B]] }));
