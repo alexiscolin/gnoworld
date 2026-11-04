@@ -66,4 +66,10 @@ export class Eye {
     this.#aimX = x;
     this.#aimY = y;
   };
+
+  /** Holds the lean where it is, as though the mouse aimed there. */
+  readonly hold = (): void => {
+    this.#aimX = this.#leanX;
+    this.#aimY = this.#leanY;
+  };
 }

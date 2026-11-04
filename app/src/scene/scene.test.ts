@@ -1342,6 +1342,34 @@ describe("the eye", () => {
     layer.remove();
   });
 
+  // F4646: a real mouse comes onto a label over a few moves, the last one off it; the lean eased on toward that last aim for a second and
+  // slid the label away all the same. On a label the eye holds the lean it has.
+  it("holds the lean it has once a mouse that was leaning it comes onto a label", () => {
+    const layer = document.createElement("div");
+    layer.dataset["labels"] = "";
+    const label = layer.appendChild(document.createElement("div"));
+    document.body.append(layer);
+    const leaning = { ...mouse(1024, 0), on: document.body };
+    const before = eyeAfter([{ events: [leaning], ms: 300 }]).x - eyeAfter([{ ms: 300 }]).x;
+    const held = eyeAfter([
+      { events: [leaning], ms: 300 },
+      { events: [{ ...mouse(1024, 0), on: label }], ms: 3000 },
+    ]);
+    expect(before).toBeGreaterThan(0.1);
+    expect(held.x - eyeAfter([{ ms: 3300 }]).x).toBeCloseTo(before, 6);
+    layer.remove();
+  });
+
+  // F4647: a Plan's names are links the scene places from the eye, as the labels (7v): a mouse on one leans nothing.
+  it("takes no lean from a mouse on a Plan's name", () => {
+    const plan = document.createElement("nav");
+    plan.dataset["plan"] = "";
+    const name = plan.appendChild(document.createElement("a"));
+    document.body.append(plan);
+    expect(eyeAfter([{ events: [{ ...mouse(1024, 0), on: name }], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
+    plan.remove();
+  });
+
   it("takes no lean under reduced motion", () => {
     query(MOTION).matches = true;
     expect(eyeAfter([{ events: [mouse(1024, 0)], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));

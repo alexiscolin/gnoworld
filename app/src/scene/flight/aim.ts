@@ -3,14 +3,14 @@
 // its namespace gives, or its first world's, never an address (core's labelName, as the labels name them).
 import { labelName, type Point, type StarSystem } from "@gnoworld/core";
 import { Vector3, type PerspectiveCamera } from "three";
+import { OVER_SCENE } from "../overScene.ts";
 import type { CosmosSight } from "./goal.ts";
 
 // Within this many pixels of a star's centre, a click aims at it.
 const REACH = 24;
-// What a click aims through, and so at nothing in space: the page's controls, its fields and its words.
-// A label of the cosmos is a door to its world (ADR-0003, 2e), never space.
-const NOT_SPACE =
-  "a, button, input, select, textarea, summary, label, dialog, [role], [contenteditable]:not([contenteditable='false']), p, h1, h2, h3, h4, h5, h6, li, dt, dd, section, aside, header, nav, form, [data-labels]";
+// What a click aims through, and so at nothing in space: the page's controls, its fields and its words, and what the scene places over
+// itself, a label of the cosmos a door to its world (ADR-0003, 2e).
+const NOT_SPACE = `a, button, input, select, textarea, summary, label, dialog, [role], [contenteditable]:not([contenteditable='false']), p, h1, h2, h3, h4, h5, h6, li, dt, dd, section, aside, header, nav, form, ${OVER_SCENE}`;
 
 const seat = new Vector3();
 

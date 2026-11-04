@@ -108,11 +108,7 @@ class LiveScene implements Scene {
     this.#loop = new FrameLoop(clock, this.#draw);
     this.#loop.set({ busy: this.#probe.running });
     const { changed, resized } = this.#viewport;
-    watchScene(
-      canvas,
-      { loop: this.#loop, aim: this.#eye.aim, changed, resized, lost: this.#lostNow },
-      this.#owner.signal,
-    );
+    watchScene(canvas, { loop: this.#loop, eye: this.#eye, changed, resized, lost: this.#lostNow }, this.#owner.signal);
   }
 
   readonly #lostNow = (now: boolean): void => {
