@@ -175,7 +175,7 @@ function readOnly(profiles: { name: string; kind: string; tx_indexer_url: string
   const byName = new Map(profiles.map((profile) => [profile.name, profile]));
   const missing = ours.read.find((name) => !byName.has(name));
   if (missing !== undefined) throw new Error(`gnomcp: no profile ${missing}`);
-  const blind = ours.indexed.find((name) => byName.get(name)?.tx_indexer_url === "");
+  const blind = ours.indexed.find((name) => (byName.get(name)?.tx_indexer_url ?? "") === "");
   if (blind !== undefined) throw new Error(`gnomcp: the profile ${blind} has no indexer`);
 }
 

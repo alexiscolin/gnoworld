@@ -198,6 +198,13 @@ describe("startGnomcp: gnomcp started read-only", () => {
     expect(running(fake.starts()[0]?.pid ?? 0)).toBe(false);
   });
 
+  it("refuses to start when a profile Jarvis reads the indexer of is not gnomcp's", async () => {
+    const made = setupOf();
+    const setup = { ...made.setup, profiles: { read: PROFILES.read, indexed: ["onyx", "sapphire"] } };
+    const error: unknown = await startGnomcp(setup).catch((caught: unknown) => caught);
+    expect(error instanceof Error ? error.message : error).toBe("gnomcp: the profile sapphire has no indexer");
+  });
+
   it("refuses a gnomcp that stops at start, its last words logged", async () => {
     const { message, events } = await refusal({ exitAtStart: true, stderr: ["load config: bad rpc-url"] });
     expect(message).toBe("gnomcp: it stopped at start");
