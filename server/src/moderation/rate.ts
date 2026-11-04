@@ -1,6 +1,8 @@
 // A second rate rule, beside check.ts's 20 messages a minute (decisions f0c19ce, F1123): 100 lines a minute an account,
 // a message of several lines counting each of its lines. Counted in memory, so a restart forgets it and the database
 // keeps its shape.
+import { remember } from "../remember.ts";
+
 const LIMIT = 100;
 const MS = 60_000;
 const ACCOUNTS = 10_000;
@@ -26,13 +28,11 @@ export function lineRate(): LineRate {
   return {
     add: (account, { id, at, lines }) => {
       const seen = accounts.get(account) ?? [];
-      accounts.delete(account);
       if (!seen.some((each) => each.id === id)) seen.push({ id, at, lines });
       // 101 messages hold more than the limit, so an older one is never needed to say a flood is one.
       if (seen.length > LIMIT + 1) seen.shift();
-      accounts.set(account, seen);
       // The check queue's own cap on lines: a backlog serves lines minutes after Ergo stamped them, so no clock decides.
-      if (accounts.size > ACCOUNTS) accounts.delete(accounts.keys().next().value ?? account);
+      remember(accounts, [account, seen], ACCOUNTS);
       const inMinute = seen.filter((each) => each.at > at - MS && each.at <= at);
       return inMinute.reduce((sum, each) => sum + each.lines, 0) > LIMIT;
     },

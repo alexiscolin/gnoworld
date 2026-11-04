@@ -6,6 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { PinnedLine } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { Fetched } from "../irc/link.ts";
+import { remember } from "../remember.ts";
 
 export const PIN_TABLES = `
 CREATE TABLE pins (
@@ -53,14 +54,6 @@ interface Options {
 // The edits heard, as many as are remembered, the oldest forgotten first (heard on this connection alone: the table
 // has no column for them).
 const EDITS_KEPT = 2000;
-const remember = <V>(map: Map<string, V>, key: string, value: V): void => {
-  map.delete(key);
-  map.set(key, value);
-  for (const old of map.keys()) {
-    if (map.size <= EDITS_KEPT) break;
-    map.delete(old);
-  }
-};
 
 /** An edit: the account that made it and its own msgid. */
 interface Editor {
@@ -139,9 +132,9 @@ export function makePins({ db, fetch, now, max }: Options): Pins {
       const [by, edit] = typeof editor === "string" ? [editor, undefined] : [editor.account, editor.msgid];
       const chain = `${room} ${msgid} ${by}`;
       const before = newest.get(chain);
-      if (edit !== undefined) remember(newest, chain, edit);
+      if (edit !== undefined) remember(newest, [chain, edit], EDITS_KEPT);
       for (const id of before === undefined ? [msgid] : [msgid, before]) {
-        remember(replaced, `${room} ${id} ${by}`, true);
+        remember(replaced, [`${room} ${id} ${by}`, true], EDITS_KEPT);
         db.prepare("DELETE FROM pins WHERE room = ? AND msgid = ? AND account = ?").run(room, id, by);
       }
     },

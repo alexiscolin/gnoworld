@@ -9,7 +9,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "../db.ts";
 import { logger } from "../log.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin, NONCE_HOST } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_ACTION, NONCE_HOST } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
   opened.push(db);
   const clock = { now: T0 };
   const now = (): number => clock.now;
@@ -633,7 +633,7 @@ describe("the routes", () => {
 describe("the login from the settings", () => {
   const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
   const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
     opened.push(db);
     const log = logger(PEPPER, () => true);
     const app = makeApp(log, () => true);
@@ -686,6 +686,18 @@ describe("the login from the settings", () => {
       .parse(opened.at(-1)?.prepare("SELECT expires_at AS at FROM tickets").get());
     expect(at).toBeGreaterThanOrEqual(before + MINUTE);
     expect(at).toBeLessThanOrEqual(Date.now() + MINUTE);
+  });
+
+  it("gives the public site's session of 90 days by default, and the console's of an hour when asked (10g-7)", async () => {
+    const maxAge = async (options: { log: ReturnType<typeof logger>; console?: boolean }) => {
+      const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+      opened.push(db);
+      const app = makeApp(options.log, () => true);
+      app.route("/api/login", loginFrom(db, SETTINGS, options));
+      return /Max-Age=(\d+)/.exec((await login(app)).headers.get("set-cookie") ?? "")?.[1];
+    };
+    const log = logger(PEPPER, () => true);
+    expect([await maxAge({ log }), await maxAge({ log, console: true })]).toEqual([String(90 * 24 * 60 * 60), "3600"]);
   });
 
   it("keeps the system's time by default", async () => {

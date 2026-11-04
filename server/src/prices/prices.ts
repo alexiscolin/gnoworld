@@ -7,9 +7,7 @@
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
-import { send as netSend } from "../net.ts";
-
-type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
+import { readCapped, send as netSend, type Send } from "../net.ts";
 
 interface Options {
   file: string;
@@ -48,30 +46,6 @@ class Failure extends Error {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-// The body, at most MAX_BYTES of it; a longer one is cut off and refused.
-async function readCapped(response: Response): Promise<string> {
-  const reader = response.body?.getReader();
-  if (reader === undefined) return "";
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const part: { done: boolean; value?: Uint8Array } = await reader.read();
-    if (part.done || part.value === undefined) break;
-    size += part.value.byteLength;
-    if (size > MAX_BYTES) {
-      try {
-        await reader.cancel();
-      } catch {
-        // Cut off already, or failing to be: the answer is refused either way.
-        throw new Failure("too_large");
-      }
-      throw new Failure("too_large");
-    }
-    chunks.push(part.value);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
 
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
@@ -121,7 +95,9 @@ export function startPrices(options: Options): Prices {
       const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
       if (response.status === 429) throw new Failure("rate_limited");
       if (!response.ok) throw new Failure("status");
-      text = await readCapped(response);
+      const capped = await readCapped(response, MAX_BYTES);
+      if (capped === undefined) throw new Failure("too_large");
+      text = capped;
     } catch (error) {
       if (error instanceof Failure) throw error;
       throw new Failure(named(error) ? "timeout" : "request");

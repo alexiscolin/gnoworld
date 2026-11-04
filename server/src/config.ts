@@ -3,9 +3,21 @@
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { adminOf, apartFromPublic, doorOf, doorSettings, type AdminConfig, type DoorConfig } from "./door/settings.ts";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
-import { absolute, databasePath, parseSettings, readSecret, readWord, Secret, whole } from "./settings.ts";
+import {
+  absolute,
+  databasePath,
+  isOrigin,
+  list,
+  parseSettings,
+  port,
+  readSecret,
+  readWord,
+  Secret,
+  whole,
+} from "./settings.ts";
 
 export interface Config {
   host: string;
@@ -33,95 +45,91 @@ export interface Config {
     // An account hidden `strikes` times in `windowMinutes` is muted for `minutes`, `max` at once a world.
     mute: { strikes: number; windowMinutes: number; minutes: number; max: number };
   };
+  // Jarvis's door (10g): none without jarvis's address.
+  jarvis: DoorConfig | undefined;
+  // The admin API's own listener (ADR-0002 §6): none without its port.
+  admin: AdminConfig | undefined;
 }
 
-// An origin as a browser sends it: scheme, host and port, nothing else (an Origin header compares to it).
-function isOrigin(text: string): boolean {
-  const url = URL.parse(text);
-  return url !== null && ["http:", "https:"].includes(url.protocol) && url.origin === text;
-}
-
-const Env = z.object({
-  HOST: z.string().min(1).max(253).default("127.0.0.1"),
-  PORT: z
-    .string()
-    .regex(/^(0|[1-9]\d{0,4})$/)
-    .transform(Number)
-    .pipe(z.number().max(65_535))
-    .default(8080),
-  DATABASE: databasePath,
-  TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
-  LOG_PEPPER_FILE: z.string().min(1),
-  // The roles file the server ships (server/roles.json), unless a deployment names another.
-  ROLES_FILE: z
-    .string()
-    .min(1)
-    .default(fileURLToPath(new URL("../roles.json", import.meta.url))),
-  // The chains a login may name (decision 142), the demo's by default; never none.
-  CHAINS: z
-    .string()
-    .default("onyx-1,gnoland-1")
-    .transform((list) => list.split(","))
-    .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
-  // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
-  ORIGINS: z
-    .string()
-    .default("")
-    .transform((list) => (list === "" ? [] : list.split(",")))
-    .pipe(z.array(z.string().refine(isOrigin))),
-  NEW_ACCOUNTS_PER_HOUR: z
-    .string()
-    .regex(/^[1-9]\d{0,3}$/)
-    .transform(Number)
-    .pipe(z.number().max(1000))
-    .default(5),
-  // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
-  AUTH_SOCKET: z
-    .string()
-    .regex(/^\/./)
-    .refine((path) => Buffer.byteLength(path) <= 100)
-    .optional(),
-  ERGO_HOST: z.string().min(1).max(253).default("127.0.0.1"),
-  ERGO_PORT: z
-    .string()
-    .regex(/^[1-9]\d{0,4}$/)
-    .transform(Number)
-    .pipe(z.number().max(65_535))
-    .default(6667),
-  ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
-  // Ergo's data folder, measured (3n-b): absolute, each part a name (no "", "." or ".."), so never the root a
-  // walk would take whole, however spelled (F636).
-  ERGO_DATA: absolute.optional(),
-  ERGO_DATA_MB: whole(1_048_576, 1024),
-  // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
-  MARKETS_FILE: absolute.optional(),
-  UNIVERSES_FILE: absolute.optional(),
-  OPENAI_API_KEY_FILE: z.string().min(1).optional(),
-  // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
-  MODERATION_THRESHOLDS: z
-    .string()
-    .transform((text, ctx) => {
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        ctx.addIssue({ code: "custom", message: "json" });
-        return z.NEVER;
-      }
+// Built at each read, not at import: StrykerJS can only turn on a mutant that runs inside a test (F412).
+const settingsSchema = () =>
+  z
+    .object({
+      HOST: z.string().min(1).max(253).default("127.0.0.1"),
+      PORT: port().default(8080),
+      DATABASE: databasePath,
+      TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
+      LOG_PEPPER_FILE: z.string().min(1),
+      // The roles file the server ships (server/roles.json), unless a deployment names another.
+      ROLES_FILE: z
+        .string()
+        .min(1)
+        .default(fileURLToPath(new URL("../roles.json", import.meta.url))),
+      // The chains a login may name (decision 142), the demo's by default; never none.
+      CHAINS: z
+        .string()
+        .default("onyx-1,gnoland-1")
+        .transform((list) => list.split(","))
+        .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
+      // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
+      ORIGINS: list(z.string().refine(isOrigin)),
+      NEW_ACCOUNTS_PER_HOUR: z
+        .string()
+        .regex(/^[1-9]\d{0,3}$/)
+        .transform(Number)
+        .pipe(z.number().max(1000))
+        .default(5),
+      // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
+      AUTH_SOCKET: z
+        .string()
+        .regex(/^\/./)
+        .refine((path) => Buffer.byteLength(path) <= 100)
+        .optional(),
+      ERGO_HOST: z.string().min(1).max(253).default("127.0.0.1"),
+      ERGO_PORT: z
+        .string()
+        .regex(/^[1-9]\d{0,4}$/)
+        .transform(Number)
+        .pipe(z.number().max(65_535))
+        .default(6667),
+      ERGO_OPER_PASSWORD_FILE: z.string().min(1).optional(),
+      // Ergo's data folder, measured (3n-b): absolute, each part a name (no "", "." or ".."), so never the root a
+      // walk would take whole, however spelled (F636).
+      ERGO_DATA: absolute.optional(),
+      ERGO_DATA_MB: whole(1_048_576, 1024),
+      // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
+      MARKETS_FILE: absolute.optional(),
+      UNIVERSES_FILE: absolute.optional(),
+      OPENAI_API_KEY_FILE: z.string().min(1).optional(),
+      // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
+      MODERATION_THRESHOLDS: z
+        .string()
+        .transform((text, ctx) => {
+          try {
+            return JSON.parse(text) as unknown;
+          } catch {
+            ctx.addIssue({ code: "custom", message: "json" });
+            return z.NEVER;
+          }
+        })
+        .pipe(
+          z.strictObject(
+            Object.fromEntries(CATEGORIES.map((category) => [category, z.number().gt(0).max(1).optional()])),
+          ),
+        )
+        .default({}),
+      NEW_ACCOUNT_HOURS: whole(720, 24),
+      MUTE_STRIKES: whole(99, 3),
+      MUTE_WINDOW_MINUTES: whole(1440, 10),
+      MUTE_MINUTES: whole(10_080, 5),
+      // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
+      MUTE_MAX: whole(100, 50),
+      ...doorSettings(),
     })
-    .pipe(
-      z.strictObject(Object.fromEntries(CATEGORIES.map((category) => [category, z.number().gt(0).max(1).optional()]))),
-    )
-    .default({}),
-  NEW_ACCOUNT_HOURS: whole(720, 24),
-  MUTE_STRIKES: whole(99, 3),
-  MUTE_WINDOW_MINUTES: whole(1440, 10),
-  MUTE_MINUTES: whole(10_080, 5),
-  // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
-  MUTE_MAX: whole(100, 50),
-});
+    .superRefine(apartFromPublic);
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
-  const settings = parseSettings(Env, env);
+  const settings = parseSettings(settingsSchema(), env);
   const { HOST, PORT, DATABASE, TRUSTED_PROXY, LOG_PEPPER_FILE, ROLES_FILE, CHAINS, ORIGINS, NEW_ACCOUNTS_PER_HOUR } =
     settings;
   const { AUTH_SOCKET, ERGO_HOST, ERGO_PORT, ERGO_OPER_PASSWORD_FILE, ERGO_DATA, ERGO_DATA_MB } = settings;
@@ -151,6 +159,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },
     },
+    jarvis: doorOf(env, settings),
+    admin: adminOf(env, settings),
   };
 }
 

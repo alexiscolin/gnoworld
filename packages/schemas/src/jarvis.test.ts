@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { AnswerButton, Digest, JARVIS_CAPS, ProposedAction } from "./jarvis.ts";
+import {
+  AnswerButton,
+  Digest,
+  DOOR_CAPS,
+  JARVIS_CAPS,
+  JARVIS_LINES,
+  JARVIS_PATHS,
+  JarvisAnswer,
+  JarvisAsk,
+  JarvisBudget,
+  JarvisBudgets,
+  JarvisChange,
+  JarvisChangeRequest,
+  JarvisQuestion,
+  JarvisSettings,
+  ProposedAction,
+} from "./jarvis.ts";
 
 // 10d: what Jarvis hands the client, as data. Each builder makes a fresh value inside the test (F2356).
 const action = () => ({
@@ -215,5 +231,205 @@ describe("AnswerButton", () => {
     expect(button({ type: "action", label: "Vote", action: { ...action(), send: "5ugnot" } })).toBe(false);
     expect(button({ type: "fly", label: "Go", place: "/", action: action() })).toBe(false);
     expect(button({ type: "action", label: "Vote", action: action(), place: "/" })).toBe(false);
+  });
+});
+
+// 10g: the door's bodies, between the client, the console and the server.
+const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+const fly = () => ({ type: "fly", label: "The poll", place: "/w/bubble" });
+const answered = (over: Record<string, unknown> = {}) => ({
+  status: "answered",
+  markdown: "Yes.",
+  buttons: [],
+  ...over,
+});
+
+describe("DOOR_CAPS", () => {
+  it("are the bounds decided for 10g (D90)", () => {
+    expect(DOOR_CAPS).toEqual({ question: 8000, answer: 8000, buttons: 5, quota: 1000, dollars: 500, unlimited: 1000 });
+  });
+});
+
+describe("JarvisQuestion", () => {
+  it("takes a question and the room it is asked from, nothing else", () => {
+    expect(JarvisQuestion.safeParse({ question: "What is new?", room: "#bubble/news" }).success).toBe(true);
+    expect(JarvisQuestion.safeParse({ question: "What is new?", room: "#bubble", lines: [] }).success).toBe(false);
+    expect(JarvisQuestion.safeParse({ question: "What is new?" }).success).toBe(false);
+    expect(JarvisQuestion.safeParse({ question: "What is new?", room: "bubble" }).success).toBe(false);
+  });
+
+  it("takes a room's id alone: 64 characters at most, one line", () => {
+    const room = (id: string) => JarvisQuestion.safeParse({ question: "What is new?", room: id }).success;
+    expect([room(`#${"a".repeat(63)}`), room(`#${"a".repeat(64)}`), room("#bubble\nNOTICE")]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it("bounds the question in code points, never empty", () => {
+    const asked = (question: string) => JarvisQuestion.safeParse({ question, room: "#bubble" }).success;
+    expect([asked(wide(DOOR_CAPS.question)), asked(wide(DOOR_CAPS.question + 1)), asked("")]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+  });
+});
+
+describe("JarvisAnswer", () => {
+  it("is off while Jarvis is switched off, with nothing else (Alexis, off by default)", () => {
+    expect(JarvisAnswer.safeParse({ status: "off" }).success).toBe(true);
+    expect(JarvisAnswer.safeParse({ status: "off", markdown: "x" }).success).toBe(false);
+  });
+
+  it("is a text with its buttons, or spent", () => {
+    expect(JarvisAnswer.safeParse(answered({ buttons: [fly()] })).success).toBe(true);
+    expect(JarvisAnswer.safeParse({ status: "spent" }).success).toBe(true);
+    expect(JarvisAnswer.safeParse({ status: "spent", markdown: "x" }).success).toBe(false);
+    expect(JarvisAnswer.safeParse({ status: "failed" }).success).toBe(false);
+    expect(JarvisAnswer.safeParse(answered({ html: "<b>" })).success).toBe(false);
+  });
+
+  it("bounds the text in code points and the buttons in count, each one a button", () => {
+    const ok = (over: Record<string, unknown>) => JarvisAnswer.safeParse(answered(over)).success;
+    expect([ok({ markdown: wide(DOOR_CAPS.answer) }), ok({ markdown: wide(DOOR_CAPS.answer + 1) })]).toEqual([
+      true,
+      false,
+    ]);
+    expect(ok({ markdown: "" })).toBe(false);
+    const buttons = (count: number) => Array.from({ length: count }, fly);
+    expect([ok({ buttons: buttons(DOOR_CAPS.buttons) }), ok({ buttons: buttons(DOOR_CAPS.buttons + 1) })]).toEqual([
+      true,
+      false,
+    ]);
+    expect(ok({ buttons: [{ type: "fly", label: "Away", place: "https://evil.test" }] })).toBe(false);
+  });
+});
+
+describe("JarvisChange", () => {
+  const change = (value: unknown) => JarvisChange.safeParse(value).success;
+
+  it("sets a quota and the unnamed one in whole questions, from one to the cap", () => {
+    for (const setting of ["quota", "quota_unnamed"]) {
+      expect([1, DOOR_CAPS.quota].map((questions) => change({ setting, questions }))).toEqual([true, true]);
+      expect([0, DOOR_CAPS.quota + 1, 2.5, "20"].map((questions) => change({ setting, questions }))).toEqual([
+        false,
+        false,
+        false,
+        false,
+      ]);
+    }
+  });
+
+  it("gives an account no quota or its quota again, by its address", () => {
+    expect(change({ setting: "unlimited", account: ADDRESS, unlimited: true })).toBe(true);
+    expect(change({ setting: "unlimited", account: ADDRESS, unlimited: false })).toBe(true);
+    expect(change({ setting: "unlimited", account: ADDRESS.toUpperCase(), unlimited: true })).toBe(false);
+    expect(change({ setting: "unlimited", account: "g1nobody", unlimited: true })).toBe(false);
+  });
+
+  it("sets either budget in whole dollars, from one to the cap", () => {
+    for (const budget of ["ask", "translate"]) {
+      expect([1, DOOR_CAPS.dollars].map((dollars) => change({ setting: "budget", budget, dollars }))).toEqual([
+        true,
+        true,
+      ]);
+      expect([0, DOOR_CAPS.dollars + 1, 4.5].map((dollars) => change({ setting: "budget", budget, dollars }))).toEqual([
+        false,
+        false,
+        false,
+      ]);
+    }
+    expect(change({ setting: "budget", budget: "everything", dollars: 5 })).toBe(false);
+  });
+
+  it("refuses another setting and a field a change does not have", () => {
+    expect(change({ setting: "roles", questions: 5 })).toBe(false);
+    expect(change({ setting: "quota", questions: 5, account: ADDRESS })).toBe(false);
+  });
+
+  it("is asked for on a chain, as a login is", () => {
+    const asked = (value: unknown) => JarvisChangeRequest.safeParse(value).success;
+    expect(asked({ chainId: "onyx-1", change: { setting: "quota", questions: 20 } })).toBe(true);
+    expect(asked({ chainId: "", change: { setting: "quota", questions: 20 } })).toBe(false);
+    expect(asked({ chainId: "onyx-1", change: { setting: "quota", questions: 20 }, by: ADDRESS })).toBe(false);
+  });
+});
+
+describe("JarvisBudget and JarvisBudgets", () => {
+  it("are whole dollars from one to the cap, by kind", () => {
+    expect(JarvisBudget.safeParse({ budget: "ask", dollars: 45 }).success).toBe(true);
+    expect(JarvisBudget.safeParse({ budget: "ask", dollars: 45, setting: "budget" }).success).toBe(false);
+    expect(JarvisBudgets.safeParse({ ask: 45, translate: 5 }).success).toBe(true);
+    expect(JarvisBudgets.safeParse({ ask: 45 }).success).toBe(false);
+    expect(JarvisBudgets.safeParse({ ask: 0, translate: 5 }).success).toBe(false);
+  });
+});
+
+describe("JarvisSettings", () => {
+  it("are the quotas, the accounts with no quota, and jarvis's budgets or none when jarvis did not answer", () => {
+    const settings = (over: Record<string, unknown>) =>
+      JarvisSettings.safeParse({ quota: 20, quotaUnnamed: 5, unlimited: [ADDRESS], budgets: null, ...over }).success;
+    expect(settings({})).toBe(true);
+    expect(settings({ budgets: { ask: 45, translate: 5 } })).toBe(true);
+    expect(settings({ unlimited: Array.from({ length: DOOR_CAPS.unlimited + 1 }, () => ADDRESS) })).toBe(false);
+    expect(settings({ unlimited: ["g1nobody"] })).toBe(false);
+  });
+});
+
+// 10g: what the door sends jarvis, each field bounded, as jarvis's entry (10h) parses it.
+const askLine = (over: Record<string, unknown> = {}) => ({
+  speaker: 1,
+  text: "the poll closes today",
+  time: "2026-11-04T12:00:00.000Z",
+  ...over,
+});
+const ask = (over: Record<string, unknown> = {}) => ({
+  question: "What is new?",
+  room: "#bubble",
+  lines: [askLine()],
+  ...over,
+});
+const takes = (value: unknown): boolean => JarvisAsk.safeParse(value).success;
+
+describe("JarvisAsk", () => {
+  it("is posted to /ask, and the budgets read and changed at /budgets", () => {
+    expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets" });
+  });
+
+  it("is a question, its room and the room's lines, with nothing else", () => {
+    expect(takes(ask())).toBe(true);
+    expect(takes(ask({ lines: [] }))).toBe(true);
+    expect(takes(ask({ account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5" }))).toBe(false);
+    expect(takes(ask({ lines: undefined }))).toBe(false);
+  });
+
+  it("are 30 lines, the asker's numbers from 0 to 30, each with a text and an ISO time or none", () => {
+    expect(JARVIS_LINES).toEqual({ lines: 30, bytes: 8192 });
+    const lines = (count: number) => Array.from({ length: count }, () => askLine());
+    expect([takes(ask({ lines: lines(30) })), takes(ask({ lines: lines(31) }))]).toEqual([true, false]);
+    expect([0, 30].map((speaker) => takes(ask({ lines: [askLine({ speaker })] })))).toEqual([true, true]);
+    expect([-1, 31, 1.5, "1"].map((speaker) => takes(ask({ lines: [askLine({ speaker })] })))).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(takes(ask({ lines: [{ speaker: 1, text: "no time" }] }))).toBe(true);
+    expect(takes(ask({ lines: [askLine({ time: "yesterday" })] }))).toBe(false);
+  });
+
+  it("bounds a line's text, never empty, and refuses a field a line does not have", () => {
+    const text = (value: string) => takes(ask({ lines: [askLine({ text: value })] }));
+    expect([text(wide(8192)), text(wide(8193)), text("")]).toEqual([true, false, false]);
+    expect(takes(ask({ lines: [askLine({ account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5" })] }))).toBe(false);
+  });
+
+  it("bounds the question to the door's widest cap, never empty, and takes a room's id alone", () => {
+    expect([takes(ask({ question: wide(8000) })), takes(ask({ question: wide(8001) }))]).toEqual([true, false]);
+    expect(takes(ask({ question: "" }))).toBe(false);
+    expect(takes(ask({ room: `#${"a".repeat(64)}` }))).toBe(false);
+    expect(takes(ask({ room: "#bubble\nNOTICE" }))).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
+import { toAddress } from "@gnoworld/schemas";
 import { loadConfig } from "./config.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-config-"));
@@ -428,5 +429,178 @@ describe("loadConfig", () => {
 
   it("never reads a secret from the environment itself", () => {
     expect(() => loadConfig({ DATABASE: ENV.DATABASE, LOG_PEPPER: PEPPER })).toThrow(/^setting LOG_PEPPER_FILE: /);
+  });
+});
+
+// 10g: the door's settings and the admin API's listener, each none by default (D93 to D96).
+describe("loadConfig, Jarvis's door and the admin API", () => {
+  const ANNA = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const BEN = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+
+  it("opens no door and no admin API by default", () => {
+    expect(loadConfig(ENV)).toMatchObject({ jarvis: undefined, admin: undefined });
+  });
+
+  it("reads the door's settings once jarvis's address is set, with their defaults", () => {
+    expect(loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090" }).jarvis).toEqual({
+      on: false,
+      url: "http://jarvis:8090",
+      timeoutMs: 1_500_000,
+      questionChars: 2000,
+      first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
+      namesRpc: "https://rpc.gno.land",
+    });
+  });
+
+  it("switches Jarvis on only for JARVIS=on exactly, off for anything else, never stopping the server (Alexis, off by default)", () => {
+    const door = (value: string | undefined) =>
+      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", ...(value === undefined ? {} : { JARVIS: value }) }).jarvis
+        ?.on;
+    expect([undefined, "", "ON", "yes", "1", " on", "on "].map(door)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(door("on")).toBe(true);
+    expect(loadConfig({ ...ENV, JARVIS: "on" }).jarvis).toBeUndefined();
+  });
+
+  it("reads every door setting it is given, the widest each allows", () => {
+    const env = {
+      ...ENV,
+      JARVIS_URL: "https://jarvis.internal:8443",
+      JARVIS_TIMEOUT_S: "3600",
+      JARVIS_QUESTION_CHARS: "8000",
+      JARVIS_QUOTA: "1000",
+      JARVIS_QUOTA_UNNAMED: "1",
+      JARVIS_UNLIMITED: `${ANNA},${BEN}`,
+      JARVIS_NAMES_RPC: "https://rpc.test5.gno.land",
+    };
+    expect(loadConfig({ ...env, JARVIS: "on" }).jarvis).toEqual({
+      on: true,
+      url: "https://jarvis.internal:8443",
+      timeoutMs: 3_600_000,
+      questionChars: 8000,
+      first: { quota: 1000, quotaUnnamed: 1, unlimited: [ANNA, BEN] },
+      namesRpc: "https://rpc.test5.gno.land",
+    });
+  });
+
+  it.each([
+    ["JARVIS_URL", "jarvis:8090"],
+    ["JARVIS_URL", "http://jarvis:8090/ask"],
+    ["JARVIS_URL", "ftp://jarvis"],
+    ["JARVIS_TIMEOUT_S", "0"],
+    ["JARVIS_TIMEOUT_S", "3601"],
+    ["JARVIS_QUESTION_CHARS", "8001"],
+    ["JARVIS_QUOTA", "0"],
+    ["JARVIS_QUOTA", "1001"],
+    ["JARVIS_QUOTA_UNNAMED", "1001"],
+    ["JARVIS_UNLIMITED", "g1nobody"],
+    ["JARVIS_UNLIMITED", `${ANNA},${ANNA}`],
+    ["JARVIS_NAMES_RPC", "http://rpc.gno.land"],
+    ["JARVIS_NAMES_RPC", "https://rpc.gno.land/"],
+    ["JARVIS_URL", ""],
+    ["JARVIS_TIMEOUT_S", "1.5"],
+    ["JARVIS_TIMEOUT_S", "08"],
+    ["JARVIS_QUESTION_CHARS", "0"],
+    ["JARVIS_QUESTION_CHARS", "abc"],
+    ["JARVIS_QUOTA", "-1"],
+    ["JARVIS_QUOTA_UNNAMED", "0"],
+    ["JARVIS_QUOTA_UNNAMED", "2.5"],
+    ["JARVIS_UNLIMITED", ","],
+    ["JARVIS_NAMES_RPC", ""],
+  ])("refuses %s=%s, naming the setting", (name, value) => {
+    expect(failure({ ...ENV, JARVIS_URL: "http://jarvis:8090", [name]: value })).toMatch(
+      new RegExp(`setting ${name}: `),
+    );
+  });
+
+  it("holds 1,000 accounts with no quota at most", () => {
+    const many = Array.from({ length: 1001 }, (_, at) => toAddress(Buffer.from(String(at).padStart(20, "0")))).join(
+      ",",
+    );
+    expect(failure({ ...ENV, JARVIS_URL: "http://jarvis:8090", JARVIS_UNLIMITED: many })).toMatch(
+      /setting JARVIS_UNLIMITED: /,
+    );
+  });
+
+  it("stops when a door setting is set with no jarvis to open the door to", () => {
+    for (const name of ["JARVIS_TIMEOUT_S", "JARVIS_QUESTION_CHARS", "JARVIS_QUOTA", "JARVIS_QUOTA_UNNAMED"])
+      expect(failure({ ...ENV, [name]: "5" })).toMatch(/setting JARVIS_URL: required/);
+    expect(failure({ ...ENV, JARVIS_UNLIMITED: ANNA })).toMatch(/setting JARVIS_URL: required/);
+    expect(failure({ ...ENV, JARVIS_NAMES_RPC: "https://rpc.gno.land" })).toMatch(/setting JARVIS_URL: required/);
+  });
+
+  it("opens the admin API on its own listener once its port is set, on the loopback by default", () => {
+    expect(loadConfig({ ...ENV, ADMIN_PORT: "8081" }).admin).toEqual({ host: "127.0.0.1", port: 8081, origins: [] });
+    expect(
+      loadConfig({ ...ENV, ADMIN_PORT: "0", ADMIN_HOST: "100.64.0.2", ADMIN_ORIGINS: "https://admin.gnoworld.test" })
+        .admin,
+    ).toEqual({ host: "100.64.0.2", port: 0, origins: ["https://admin.gnoworld.test"] });
+  });
+
+  it("takes the public port for the admin API on another address, which the system refuses on the same one", () => {
+    expect(
+      loadConfig({ ...ENV, HOST: "10.0.0.2", PORT: "8080", ADMIN_HOST: "100.64.0.2", ADMIN_PORT: "8080" }).admin,
+    ).toEqual({
+      host: "100.64.0.2",
+      port: 8080,
+      origins: [],
+    });
+  });
+
+  it("stops when the admin API's host or sites are set with no port to open it on", () => {
+    expect(failure({ ...ENV, ADMIN_HOST: "100.64.0.2" })).toMatch(/setting ADMIN_PORT: required/);
+    expect(failure({ ...ENV, ADMIN_ORIGINS: "https://admin.gnoworld.test" })).toMatch(/setting ADMIN_PORT: required/);
+  });
+
+  it("refuses an admin site that a public page is served from, naming its place (ADR-0002 §6)", () => {
+    const env = {
+      ...ENV,
+      ADMIN_PORT: "8081",
+      ORIGINS: "https://gnoworld.test",
+      ADMIN_ORIGINS: "https://admin.gnoworld.test,https://gnoworld.test",
+    };
+    expect(failure(env)).toMatch(/setting ADMIN_ORIGINS: custom \(at 1\)/);
+    expect(failure(env)).not.toContain("https://gnoworld.test");
+  });
+
+  it("refuses an admin site on a public site's host with another port, as cookies ignore ports (F5106)", () => {
+    const env = {
+      ...ENV,
+      ADMIN_PORT: "8081",
+      ORIGINS: "https://gnoworld.land",
+      ADMIN_ORIGINS: "https://admin.gnoworld.land,https://gnoworld.land:8443",
+    };
+    expect(failure(env)).toMatch(/setting ADMIN_ORIGINS: custom \(at 1\)/);
+    expect(failure({ ...env, ORIGINS: "http://gnoworld.land", ADMIN_ORIGINS: "https://gnoworld.land" })).toMatch(
+      /setting ADMIN_ORIGINS: custom \(at 0\)/,
+    );
+  });
+
+  it("holds 1,000 accounts with no quota, the most", () => {
+    const many = Array.from({ length: 1000 }, (_, at) => toAddress(Buffer.from(String(at).padStart(20, "0"))));
+    expect(
+      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", JARVIS_UNLIMITED: many.join(",") }).jarvis?.first
+        .unlimited,
+    ).toHaveLength(1000);
+  });
+
+  it.each([
+    ["ADMIN_PORT", "65536"],
+    ["ADMIN_PORT", "08"],
+    ["ADMIN_PORT", "-1"],
+    ["ADMIN_PORT", ""],
+    ["ADMIN_HOST", ""],
+    ["ADMIN_HOST", "h".repeat(254)],
+    ["ADMIN_ORIGINS", "admin.gnoworld.test"],
+    ["ADMIN_ORIGINS", "https://admin.gnoworld.test/"],
+  ])("refuses %s=%s, naming the setting", (name, value) => {
+    expect(failure({ ...ENV, ADMIN_PORT: "8081", [name]: value })).toMatch(new RegExp(`setting ${name}: `));
   });
 });

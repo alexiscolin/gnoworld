@@ -73,6 +73,17 @@ describe("logger", () => {
     );
   });
 
+  it("writes an admin's change after the account: the setting and its value as they are, the account it names as its HMAC (10g)", () => {
+    const { log, lines } = capture();
+    const other = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    log("admin_change", { account: ADDRESS, setting: "unlimited", value: 1, subject: other });
+    const hmac = (account: string) => createHmac("sha256", PEPPER).update(account).digest("hex");
+    expect(lines[0]?.replace(/^\{"time":"[^"]+",/, "{")).toBe(
+      `{"event":"admin_change","account":"${hmac(ADDRESS)}","setting":"unlimited","value":1,"subject":"${hmac(other)}"}\n`,
+    );
+    expect(lines.join("")).not.toContain(other);
+  });
+
   it("writes a duration in milliseconds as a number", () => {
     const { log, lines } = capture();
     log("moderation_backlog", { ms: 30_000 });

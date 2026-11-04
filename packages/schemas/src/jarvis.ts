@@ -1,7 +1,11 @@
 // What Jarvis hands the client (ADR-0002 §4 and §5; docs/plans/slice-10.md, 10d): a realm's digest, a proposed action and an
 // answer button, data and never HTML, each string bounded in code points (as Zod counts). A proposal names no coins: a field
 // for them fails here, and the person types any amount in the call card. A realm's path and a link are only bounded: they
-// are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts).
+// are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). Since 10g,
+// the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes.
+import { Address } from "./address.ts";
+import { ChallengeRequest } from "./login.ts";
+import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
 
 /** The most a digest, a proposal and a button may hold: blocks, list entries, and each kind of string in code points. */
@@ -70,3 +74,85 @@ export const AnswerButton = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("action"), label: text(JARVIS_CAPS.label), action: ProposedAction }),
 ]);
 export type AnswerButton = z.infer<typeof AnswerButton>;
+
+/** The most the door takes and gives (D90): a question's and an answer's code points, an answer's buttons, a quota in
+ * questions, a budget in whole dollars, and the accounts with no quota. */
+export const DOOR_CAPS = {
+  question: 8000,
+  answer: 8000,
+  buttons: 5,
+  quota: 1000,
+  dollars: 500,
+  unlimited: 1000,
+} as const;
+
+/** A question asked from a room: the server holds it to its own cap and adds the room's lines (D42). */
+export const JarvisQuestion = z.strictObject({ question: text(DOOR_CAPS.question), room: RoomId });
+export type JarvisQuestion = z.infer<typeof JarvisQuestion>;
+
+/** Jarvis's answer as the client reads it: a text and its buttons; or `spent`, the day's budget gone, or `off`, Jarvis
+ * switched off, when the client shows its form without a model (plan §1; Alexis, off by default). */
+export const JarvisAnswer = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal("answered"),
+    markdown: text(DOOR_CAPS.answer),
+    buttons: z.array(AnswerButton).check(z.maxLength(DOOR_CAPS.buttons)),
+  }),
+  z.strictObject({ status: z.literal("spent") }),
+  z.strictObject({ status: z.literal("off") }),
+]);
+export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
+
+/** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
+export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
+
+/** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
+ * share (D42). */
+export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets" } as const;
+
+/** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
+ * by a number for who said it in this question alone, the asker 0, never an account (D91). */
+export const JarvisAsk = z.extend(JarvisQuestion, {
+  lines: z
+    .array(
+      z.strictObject({
+        speaker: z.int().check(z.gte(0), z.lte(JARVIS_LINES.lines)),
+        text: text(JARVIS_LINES.bytes),
+        time: z.optional(z.iso.datetime()),
+      }),
+    )
+    .check(z.maxLength(JARVIS_LINES.lines)),
+});
+export type JarvisAsk = z.infer<typeof JarvisAsk>;
+
+const count = (max: number) => z.int().check(z.gte(1), z.lte(max));
+
+/** One of jarvis's two budgets a day, in whole dollars, as its settings take them (D65). */
+export const JarvisBudget = z.strictObject({ budget: z.enum(["ask", "translate"]), dollars: count(DOOR_CAPS.dollars) });
+export type JarvisBudget = z.infer<typeof JarvisBudget>;
+
+/** Both of jarvis's budgets a day, in whole dollars. */
+export const JarvisBudgets = z.strictObject({ ask: count(DOOR_CAPS.dollars), translate: count(DOOR_CAPS.dollars) });
+export type JarvisBudgets = z.infer<typeof JarvisBudgets>;
+
+/** One change an admin signs afresh (ADR-0002 §6): a quota, an account's quota taken off or given back, a budget. */
+export const JarvisChange = z.discriminatedUnion("setting", [
+  z.strictObject({ setting: z.literal("quota"), questions: count(DOOR_CAPS.quota) }),
+  z.strictObject({ setting: z.literal("quota_unnamed"), questions: count(DOOR_CAPS.quota) }),
+  z.strictObject({ setting: z.literal("unlimited"), account: Address, unlimited: z.boolean() }),
+  z.extend(JarvisBudget, { setting: z.literal("budget") }),
+]);
+export type JarvisChange = z.infer<typeof JarvisChange>;
+
+/** A change asked for on a chain, whose challenge the admin's wallet signs as a login's. */
+export const JarvisChangeRequest = z.extend(ChallengeRequest, { change: JarvisChange });
+
+/** What the admin API answers: the quotas, the accounts with no quota, and jarvis's budgets, or none when it did not
+ * answer. */
+export const JarvisSettings = z.strictObject({
+  quota: count(DOOR_CAPS.quota),
+  quotaUnnamed: count(DOOR_CAPS.quota),
+  unlimited: z.array(Address).check(z.maxLength(DOOR_CAPS.unlimited)),
+  budgets: z.nullable(JarvisBudgets),
+});
+export type JarvisSettings = z.infer<typeof JarvisSettings>;
