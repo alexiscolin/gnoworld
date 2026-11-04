@@ -1,6 +1,6 @@
 // The reads of a chain's node (D112), each one `readChain` of read.ts: the latest block's height, and the three `abci_query`
 // paths gnoworld asks, a realm's page (vm/qrender), one expression (vm/qeval) and a realm's functions (vm/qfuncs). One
-// request a read. What the realm wrote is returned as text and never interpreted; its error text, Log and Info reach no failure
+// request a read, after its node's status when a chain is named, the two under one time limit. What the realm wrote is returned as text and never interpreted; its error text, Log and Info reach no failure
 // and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
 import { jsonOf } from "@gnoworld/core";
 import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
@@ -14,6 +14,7 @@ import {
   type FailureKind,
   type ReadOptions,
 } from "./read.ts";
+import { withinTime } from "./transport.ts";
 
 type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
 
@@ -80,11 +81,21 @@ async function statusOf(rpc: string, options: ReadOptions): Promise<ChainRead<St
   return chainId !== "" && network === chainId ? status : failedRead("other-chain", status.source);
 }
 
-// A read of an https RPC, or a refusal without a request; with a chain named, its node's status first.
-function guarded<T>(rpc: string, options: ReadOptions, run: () => Promise<ChainRead<T>>): Promise<ChainRead<T>> {
+// A read of an https RPC, or a refusal without a request; with a chain named, its node's status first, the two requests
+// under the read's one time limit and its caller's signal (10h's review, V1).
+function guarded<T>(
+  rpc: string,
+  options: ReadOptions,
+  run: (options: ReadOptions) => Promise<ChainRead<T>>,
+): Promise<ChainRead<T>> {
   if (!isHttps(rpc)) return refused(rpc, options);
-  if (options.chainId === undefined) return run();
-  return statusOf(rpc, options).then((status) => (status.ok ? run() : status));
+  if (options.chainId === undefined) return run(options);
+  const source = sourceOf(rpc, options);
+  const ends = { timeout: failedRead<T>("timeout", source), left: failedRead<T>("down", source) };
+  return withinTime(options, ends, async (signal) => {
+    const status = await statusOf(rpc, { ...options, signal });
+    return status.ok ? run({ ...options, signal }) : status;
+  });
 }
 
 /** The latest block's height and its own time (a page's age), its node checked on the same status when a chain is named.
@@ -105,13 +116,13 @@ export async function readHeight(
 
 /** A realm's page as the chain wrote it, for the data `<realm>:<path>` its caller checked. */
 export function readRender(rpc: string, data: string, options: ReadOptions = {}): Promise<ChainRead<string>> {
-  return guarded(rpc, options, () => query(rpc, { path: "vm/qrender", data, decode: (text) => text }, options));
+  return guarded(rpc, options, (read) => query(rpc, { path: "vm/qrender", data, decode: (text) => text }, read));
 }
 
 /** The typed text of one expression, which its caller built with its own checks: the chain runs any expression it is sent. */
 export function readEvaluated(rpc: string, expression: string, options: ReadOptions = {}): Promise<ChainRead<string>> {
-  return guarded(rpc, options, () =>
-    query(rpc, { path: "vm/qeval", data: expression, decode: (text) => text }, options),
+  return guarded(rpc, options, (read) =>
+    query(rpc, { path: "vm/qeval", data: expression, decode: (text) => text }, read),
   );
 }
 
@@ -125,5 +136,5 @@ function functionListOf(text: string): Functions | null {
 
 /** A realm's functions, every one in the chain's order, as `vm/qfuncs` lists them. */
 export function readFunctionList(rpc: string, realm: string, options: ReadOptions = {}): Promise<ChainRead<Functions>> {
-  return guarded(rpc, options, () => query(rpc, { path: "vm/qfuncs", data: realm, decode: functionListOf }, options));
+  return guarded(rpc, options, (read) => query(rpc, { path: "vm/qfuncs", data: realm, decode: functionListOf }, read));
 }

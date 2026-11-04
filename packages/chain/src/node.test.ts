@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readEvaluated, readFunctionList, readHeight, readRender } from "./node.ts";
 import type { ChainFetch, ChainRead, ReadOptions } from "./read.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "./testing/envelopes.ts";
@@ -189,6 +189,37 @@ describe("a node read given its universe's chain", () => {
     const other = fakeNode({ network: "gnoland-1" });
     expect(kindOf(await readHeight(RPC, { fetch: other.fetch, chainId: "onyx-1" }))).toBe("other-chain");
     expect(paths(other.asked)).toEqual(["status"]);
+  });
+
+  it("gives its status and its query one time limit together, never one each (10h's review, V1)", async () => {
+    vi.useFakeTimers();
+    try {
+      const signals: (AbortSignal | undefined)[] = [];
+      const fetch: ChainFetch = (url, init) => {
+        signals.push(init?.signal ?? undefined);
+        if (!url.endsWith("/status")) return new Promise(() => undefined);
+        const body = statusEnvelope(1204, "2026-11-04T03:34:18Z", "onyx-1");
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve(Response.json(body));
+          }, 2900);
+        });
+      };
+      let read: ChainRead<string> | undefined;
+      const options = { fetch, chainId: "onyx-1", timeoutMs: 3000 };
+      const settled = readEvaluated(RPC, "gno.land/r/demo/poll.Count()", options).then((value) => {
+        read = value;
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(read).toMatchObject({ ok: false, failure: { kind: "timeout" }, source: { url: RPC } });
+      expect(signals).toHaveLength(2);
+      expect(signals[1]?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("readFunctionList gives qfuncs' list as the node wrote it, with where it was read", async () => {
