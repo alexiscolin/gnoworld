@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { queryEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
+import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { mount } from "../../../tests/mount.tsx";
 import type { ChainFetch, ChainRead } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";

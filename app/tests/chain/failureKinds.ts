@@ -12,6 +12,7 @@ const KINDS: Record<FailureKind, true> = {
   "no-page": true,
   "chain-refused": true,
   "bad-name": true,
+  "other-chain": true,
 };
 
 export const FAILURE_KINDS = Object.keys(KINDS) as FailureKind[];

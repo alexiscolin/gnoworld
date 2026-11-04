@@ -10,7 +10,7 @@ import {
   STATUS,
   WUGNOT,
 } from "../../../tests/chain/chainFixture.ts";
-import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
+import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { evalCall } from "./evalCall.ts";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";

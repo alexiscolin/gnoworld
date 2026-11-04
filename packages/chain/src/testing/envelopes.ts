@@ -1,4 +1,5 @@
-// The envelopes around chainFixture.ts's answers: NOT recordings, written from gno's source at v1.5.0 (file:line beside each).
+// The envelopes of a node's answers, around the app's recorded ones (app/tests/chain/chainFixture.ts): NOT recordings,
+// written from gno's source at v1.5.0 (file:line beside each).
 
 const base64Of = (text: string): string =>
   btoa(Array.from(new TextEncoder().encode(text), (byte) => String.fromCharCode(byte)).join(""));
@@ -37,12 +38,14 @@ export function queryEnvelope({ data, error, log = "" }: Query) {
 }
 
 // NOT recorded, written from v1.5.0: SyncInfo core/types/responses.go:144, ResultStatus :160. Fields this reader does not read are
-// left out. gnomcp gives whole seconds; the chain writes 0, 3, 6 or 9 fractional digits (amino/wellknown.go:422-428).
-export function statusEnvelope(height: number, time: string) {
+// left out. gnomcp gives whole seconds; the chain writes 0, 3, 6 or 9 fractional digits (amino/wellknown.go:422-428). The node's
+// network, its chain's id, is ResultStatus's `node_info` (responses.go:156, p2p/types/node_info.go:38, read at c4c72fdd288c).
+export function statusEnvelope(height: number, time: string, network?: string) {
   return {
     jsonrpc: "2.0",
     id: "",
     result: {
+      ...(network === undefined ? {} : { node_info: { network } }),
       sync_info: {
         latest_block_hash: "",
         latest_app_hash: "",

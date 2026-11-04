@@ -48,6 +48,9 @@ export interface ReadOptions {
   now?: () => Date;
   /** Ends the request early: a page that left. */
   signal?: AbortSignal;
+  /** The universe's chain a node read must be on: the node's status is read first, and a node naming another, or none, is
+   * read no further (D118). None: no check, as the app's reads. */
+  chainId?: string;
 }
 
 const NEXT: Record<FailureKind, string> = {
@@ -61,6 +64,8 @@ const NEXT: Record<FailureKind, string> = {
   "no-page": "This realm has no page to show. Open it on gnoweb.",
   "chain-refused": "The chain refused this read. Try again later, or open it on gnoweb.",
   "bad-name": "This name cannot be read from here. Open it on gnoweb.",
+  "other-chain":
+    "The node answering is not this universe's chain, so nothing of it was read. Check the universe's RPC in the data.",
 };
 
 /** A failed read of a kind of ours, for a layer above the transport: the failure carries our sentence, never the answer's. */

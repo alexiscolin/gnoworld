@@ -1,5 +1,5 @@
-// The browser's capped, timed GET (5g; 5m's markets read it too): the bytes of an answer under a time limit and a size cap,
-// or a kind of failure. Nothing here reads a schema: `read.ts` does.
+// The capped, timed GET of every chain read (the browser's since 5g, 5m's markets too; the server's and Jarvis's since 10h):
+// the bytes of an answer under a time limit and a size cap, or a kind of failure. Nothing here reads a schema: `read.ts` does.
 
 /** The time an answer has, its body read included. */
 const CHAIN_TIMEOUT_MS = 8_000;
@@ -18,7 +18,8 @@ export type FailureKind =
   | "no-realm"
   | "no-page"
   | "chain-refused"
-  | "bad-name";
+  | "bad-name"
+  | "other-chain";
 
 // A stream not read to its end is cancelled, so its connection is freed; one already closed or broken has nothing to free.
 async function drop(stream: { cancel(): Promise<void> } | null | undefined): Promise<void> {

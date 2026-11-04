@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { FUNCTIONS, PAGES } from "../chain/chainFixture.ts";
-import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
+import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 

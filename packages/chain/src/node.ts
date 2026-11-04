@@ -66,25 +66,40 @@ async function query<T>(rpc: string, { path, data, decode }: Ask<T>, options: Re
   return failedRead("kind" in body ? body.kind : "wrong-shape", answer.source);
 }
 
-// The address of a read, or a refusal without a request when the RPC is no https address.
-function guarded<T>(rpc: string, options: ReadOptions, run: () => Promise<ChainRead<T>>): Promise<ChainRead<T>> {
-  return isHttps(rpc) ? run() : Promise.resolve(failedRead("refused", sourceOf(rpc, options)));
+const refused = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
+  Promise.resolve(failedRead("refused", sourceOf(rpc, options)));
+
+// The node's status; with a chain named, a node that names another, or none, is read no further (D118). An empty name is
+// no chain's: a node that names none matches it nowhere.
+async function statusOf(rpc: string, options: ReadOptions): Promise<ChainRead<StatusAnswer>> {
+  const status = await readChain(`${withoutSlash(rpc)}/status`, StatusAnswer, options);
+  const { chainId } = options;
+  if (!status.ok || chainId === undefined) return status;
+  const network = status.value.result.node_info?.network;
+  return chainId !== "" && network === chainId ? status : failedRead("other-chain", status.source);
 }
 
-/** The latest block's height and its own time (a page's age). `vm` sets no Height of its own, so a page's height is this read. */
-export function readHeight(
+// A read of an https RPC, or a refusal without a request; with a chain named, its node's status first.
+function guarded<T>(rpc: string, options: ReadOptions, run: () => Promise<ChainRead<T>>): Promise<ChainRead<T>> {
+  if (!isHttps(rpc)) return refused(rpc, options);
+  if (options.chainId === undefined) return run();
+  return statusOf(rpc, options).then((status) => (status.ok ? run() : status));
+}
+
+/** The latest block's height and its own time (a page's age), its node checked on the same status when a chain is named.
+ * `vm` sets no Height of its own, so a page's height is this read. */
+export async function readHeight(
   rpc: string,
   options: ReadOptions = {},
 ): Promise<ChainRead<{ height: number; time: string }>> {
-  return guarded(rpc, options, async () => {
-    const status = await readChain(`${withoutSlash(rpc)}/status`, StatusAnswer, options);
-    if (!status.ok) return status;
-    const { latest_block_height: text, latest_block_time: time } = status.value.result.sync_info;
-    const height = Number(text);
-    return Number.isSafeInteger(height)
-      ? { ok: true, value: { height, time }, source: status.source }
-      : failedRead("wrong-shape", status.source);
-  });
+  if (!isHttps(rpc)) return refused(rpc, options);
+  const status = await statusOf(rpc, options);
+  if (!status.ok) return status;
+  const { latest_block_height: text, latest_block_time: time } = status.value.result.sync_info;
+  const height = Number(text);
+  return Number.isSafeInteger(height)
+    ? { ok: true, value: { height, time }, source: status.source }
+    : failedRead("wrong-shape", status.source);
 }
 
 /** A realm's page as the chain wrote it, for the data `<realm>:<path>` its caller checked. */

@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { act, useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { EVALS, FUNCTIONS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
-import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
+import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, mount, nth, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmFunctions } from "./RealmFunctions.tsx";

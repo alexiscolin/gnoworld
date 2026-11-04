@@ -3,7 +3,7 @@ import { act } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
-import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
+import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmView } from "./RealmView.tsx";
