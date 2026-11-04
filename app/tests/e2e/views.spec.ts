@@ -34,6 +34,7 @@ const pressed = async (page: Page) =>
     ["Dynamic view", "Plan view"].map((name) => views(page).getByRole("button", { name }).getAttribute("aria-pressed")),
   );
 const names = (page: Page) => page.locator("[data-plan] a");
+const stations = (page: Page) => page.getByRole("navigation", { name: "The stations round the Earth" });
 // A control's height and whether it is rounded whole, as the pill's views are.
 const shapeOf = (control: Locator) =>
   control.evaluate((element) => {
@@ -41,7 +42,7 @@ const shapeOf = (control: Locator) =>
     return { height, round: Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) >= height / 2 };
   });
 
-test("offers space's two views in the header's pill, V toggling them, and the Earth's Plan at rest naming gnosh.ai", async ({
+test("offers space's two views in the header's pill, V toggling them, and the Earth's top view naming gnosh.ai's station", async ({
   page,
 }) => {
   await home(page);
@@ -53,19 +54,17 @@ test("offers space's two views in the header's pill, V toggling them, and the Ea
     expect(await shapeOf(views(page).getByRole("button", { name }))).toEqual(view);
   await page.keyboard.press("v");
   expect(await pressed(page)).toEqual(["false", "true"]);
-  // The file the team reviews: gnosh.ai among its projects, a link to its own address in a tab of its own.
-  const gnosh = names(page).filter({ hasText: "gnosh.ai" });
-  await expect(gnosh).toHaveCount(1, SLOW);
+  // The Earth's top view (7x2): its stations' orbits drawn, and gnosh.ai's station named among the team's projects, a link that opens its
+  // own address in a tab of its own at once (brief-7x's label rule, F4649's open part), not a system's Plan's first click that names.
+  await expect.poll(async () => (await stats(page)).cosmos?.stations?.orbits, SLOW).toBe(true);
+  const gnosh = stations(page).getByRole("link", { name: "gnosh.ai", exact: true });
+  await expect(gnosh).toBeVisible(SLOW);
   await expect(gnosh).toHaveAttribute("href", "https://gnosh.ai");
   await expect(gnosh).toHaveAttribute("target", "_blank");
-  const popups: unknown[] = [];
-  page.on("popup", (popup) => popups.push(popup));
-  await gnosh.click();
-  await expect(gnosh).toHaveAttribute("aria-current", "true");
-  expect(popups).toEqual([]);
+  await expect(gnosh).toHaveAttribute("rel", "noopener noreferrer");
   await views(page).getByRole("button", { name: "Dynamic view" }).click();
   expect(await pressed(page)).toEqual(["true", "false"]);
-  await expect(names(page)).toHaveCount(0, SLOW);
+  await expect.poll(async () => (await stats(page)).cosmos?.stations?.orbits, SLOW).toBe(false);
   // Every shader compiles, three's and ours, their spaces stripped at build.
 });
 
