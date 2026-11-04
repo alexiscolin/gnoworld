@@ -121,6 +121,19 @@ export const landed = (page: Page) =>
     )
     .toBe(true);
 
+/** The Earth's view standing (7x2): the Earth and its stations drawn. The view at rest draws no system's body (decisions 698 and 701), so
+ * a journey that waits for the cosmos to stand waits for this. */
+export const earthStanding = (page: Page) =>
+  expect
+    .poll(
+      async () => {
+        const cosmos = (await stats(page)).cosmos;
+        return cosmos?.earth === true && (cosmos.stations?.close ?? 0) > 0;
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true);
+
 // Once the iris has opened: before that a picture of the window shows the page's colour, not the stage.
 export const opened = async (page: Page) => {
   await running(page);

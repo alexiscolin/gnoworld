@@ -138,11 +138,39 @@ const watchPanel = (page: Page) =>
   });
 const panelSeen = (page: Page) => page.evaluate(() => Reflect.get(globalThis, "__panelSeen") as PanelSeen);
 
-// The great star on screen, which the view at rest always holds: the star a reader aims at here.
+// The great star on screen, which the view at rest always holds: the star a reader aims at here. The page's frames are held from the read
+// to the click: the view sways, and under load the frames between them took the star past a click's 24 px reach (7g2's report, F5400).
 async function aimAtTheGreatStar(page: Page) {
-  const sun = (await stats(page)).cosmos?.screen.sun;
-  if (sun === undefined) throw new Error("no great star on screen");
-  await page.mouse.click(sun.x, sun.y);
+  const sun = await page.evaluate(
+    () =>
+      new Promise<{ x: number; y: number } | undefined>((resolve) => {
+        const ask = globalThis.requestAnimationFrame.bind(globalThis);
+        const held: FrameRequestCallback[] = [];
+        globalThis.requestAnimationFrame = (run) => {
+          held.push(run);
+          return 0;
+        };
+        Reflect.set(globalThis, "__release", () => {
+          globalThis.requestAnimationFrame = ask;
+          for (const run of held.splice(0)) ask(run);
+        });
+        // The frame the scene asked before the hold runs first; this reads what it drew.
+        ask(() => {
+          const scene = Reflect.get(globalThis, "__gnoworldScene") as {
+            stats: () => { cosmos?: { screen: { sun: { x: number; y: number } } } };
+          };
+          resolve(scene.stats().cosmos?.screen.sun);
+        });
+      }),
+  );
+  try {
+    if (sun === undefined) throw new Error("no great star on screen");
+    await page.mouse.click(sun.x, sun.y);
+  } finally {
+    await page.evaluate(() => {
+      (Reflect.get(globalThis, "__release") as () => void)();
+    });
+  }
 }
 
 // Asks a flight of the scene and waits till it starts: a star's starts once its arrival is bound (7g2).
