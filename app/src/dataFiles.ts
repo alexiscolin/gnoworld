@@ -3,6 +3,7 @@
 // `<file>: <row>.<field>: <what is wrong>`, e.g. `news.json: [1].id: duplicate id "n1"`.
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { hubWorldOf, worldIdOf } from "@gnoworld/core";
 import type { output } from "zod/mini";
 import {
   BubbleRules,
@@ -82,8 +83,38 @@ export function loadData(dir: string): Data {
       ? []
       : [`earthOrbit.json: [${String(index)}].slug: no hub of hubs.json is named "${slug}"`],
   );
-  if (unknown.length > 0) throw new Error(unknown.join("\n"));
+  const faults = [...unknown, ...discoveryFaults(data, universes)];
+  if (faults.length > 0) throw new Error(faults.join("\n"));
   return data;
+}
+
+// The expedition's stops and the quests' steps name worlds the site holds: a universe of universes.json, a hub or a station of it by its slug;
+// two stops of one world would make one visit reach both.
+function discoveryFaults(data: Data, universes: ReadonlySet<string>): string[] {
+  const worlds = new Map([...data.hubs, ...data.stations].map((world) => [`${world.universe}/${world.slug}`, world]));
+  const faults: string[] = [];
+  const check = (at: string, universe: string, hub: string | undefined) => {
+    if (!universes.has(universe)) faults.push(`${at}.universe: no universe of universes.json is named "${universe}"`);
+    else if (hub !== undefined && !worlds.has(`${universe}/${hub}`))
+      faults.push(`${at}.hub: no hub or station of "${universe}" is named "${hub}"`);
+  };
+  const seen = new Set<string>();
+  data.expedition.forEach((stop, index) => {
+    const at = `expedition.json: [${String(index)}]`;
+    check(at, stop.universe, stop.hub);
+    const hub = worlds.get(`${stop.universe}/${stop.hub ?? ""}`);
+    const id = stop.realm === undefined ? (hub === undefined ? undefined : hubWorldOf(hub)) : worldIdOf(stop.realm);
+    if (id === undefined) return;
+    if (seen.has(`${stop.universe}:${id}`)) faults.push(`${at}: a second stop of the world "${id}"`);
+    seen.add(`${stop.universe}:${id}`);
+  });
+  data.quests.forEach((quest, index) => {
+    check(`quests.json: [${String(index)}]`, quest.universe, undefined);
+    quest.steps.forEach((step, n) => {
+      check(`quests.json: [${String(index)}].steps[${String(n)}]`, quest.universe, step.hub);
+    });
+  });
+  return faults;
 }
 
 function where(path: readonly PropertyKey[]): string {

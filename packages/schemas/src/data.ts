@@ -2,6 +2,7 @@
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
 import { Slug } from "./slug.ts";
+import { ExportedName } from "./worlds.ts";
 import { z } from "./zod.ts";
 
 /** The most a data file may hold: rows in a list, and each kind of string, in characters. */
@@ -96,16 +97,70 @@ export const Genres = bySlug(z.strictObject({ slug: Key, name: text(DATA_CAPS.na
 export const Events = byId(
   z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), start: z.iso.datetime(), link: Link }),
 );
+// A world as the expedition and the quests name it (slice 8): a hub or a station of the file's universe by its slug, or a realm by its path,
+// never both; the build checks the slug against hubs.json and stations.json (app/src/dataFiles.ts).
+const oneWorld = (row: { hub?: string | undefined; realm?: string | undefined }) =>
+  (row.hub === undefined) !== (row.realm === undefined);
+
+/** The pool of the daily expedition's stops (ADR-0002 §1, "Daily expedition"): each a world the team curates, with a line on why to go;
+ * `live` marks a world where something moves every day, which the first stop of a day is chosen among (core's `expeditionOf`). */
 export const Expedition = byId(
+  z
+    .strictObject({
+      id: Key,
+      universe: Key,
+      hub: z.optional(Key),
+      realm: z.optional(RealmPath),
+      name: text(DATA_CAPS.name),
+      why: text(DATA_CAPS.title),
+      live: z.optional(z.boolean()),
+    })
+    .check(z.refine(oneWorld, "a stop names a hub or a realm, one of them")),
+);
+
+/** The most steps a quest holds, and the fewest. */
+const QUEST_STEPS = { min: 2, max: 8 } as const;
+
+// A quest's step: a visit to a world, words said in a hub's main room, or a realm's call, which ends every quest (slice 9 signs it).
+const Step = z
+  .strictObject({
+    id: Key,
+    kind: z.enum(["visit", "talk", "call"]),
+    title: text(DATA_CAPS.title),
+    hub: z.optional(Key),
+    realm: z.optional(RealmPath),
+    function: z.optional(ExportedName),
+  })
+  .check(
+    z.refine(
+      (step) =>
+        step.kind === "visit"
+          ? oneWorld(step) && step.function === undefined
+          : step.kind === "talk"
+            ? step.hub !== undefined && step.realm === undefined && step.function === undefined
+            : step.hub === undefined && step.realm !== undefined && step.function !== undefined,
+      "a visit names a hub or a realm, a talk a hub, a call a realm and its function",
+    ),
+  );
+
+/** Quests across worlds (ADR-0002 §1, "Quests"): steps in order, at least two, the last a realm's call; a reward that stays on the device. */
+export const Quests = byId(
   z.strictObject({
-    id: text(DATA_CAPS.key),
+    id: Key,
+    universe: Key,
     title: text(DATA_CAPS.title),
     description: text(DATA_CAPS.description),
-    link: Link,
+    reward: text(DATA_CAPS.name),
+    steps: unique(
+      z.array(Step).check(
+        z.minLength(QUEST_STEPS.min),
+        z.maxLength(QUEST_STEPS.max),
+        z.refine((steps) => steps.at(-1)?.kind === "call", "a quest ends on a realm's call"),
+      ),
+      "id",
+      (step: { id: string }) => step.id,
+    ),
   }),
-);
-export const Quests = byId(
-  z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), description: text(DATA_CAPS.description) }),
 );
 
 const rule = (low: number, high: number) => z.int().check(z.gte(low), z.lte(high));

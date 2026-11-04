@@ -211,8 +211,7 @@ describe("loadData", () => {
       },
     ]);
     // events and news hold the ticker's placeholders, listed below.
-    for (const empty of ["ecosystems", "stations", "genres", "expedition", "quests"] as const)
-      expect(data[empty]).toEqual([]);
+    for (const empty of ["ecosystems", "stations", "genres"] as const) expect(data[empty]).toEqual([]);
   });
 
   it("refuses a list of universes that is empty: no default, so no build", () => {

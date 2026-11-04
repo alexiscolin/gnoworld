@@ -1,1 +1,62 @@
-[]
+[
+  {
+    "id": "named",
+    "universe": "onyx",
+    "title": "A name of your own",
+    "description": "Read who registered lately, then take a nym- name: it lets you deploy realms under it.",
+    "reward": "Named",
+    "steps": [
+      { "id": "read", "kind": "visit", "title": "Visit the User Registry", "realm": "gno.land/r/sys/namereg/v0" },
+      {
+        "id": "register",
+        "kind": "call",
+        "title": "Register a nym- name",
+        "realm": "gno.land/r/sys/namereg/v0",
+        "function": "Register"
+      }
+    ]
+  },
+  {
+    "id": "player",
+    "universe": "onyx",
+    "title": "Player one",
+    "description": "Meet the players in Bubble, look at the live games, then post a game of your own.",
+    "reward": "Player one",
+    "steps": [
+      { "id": "bubble", "kind": "visit", "title": "Visit Bubble", "hub": "bubble" },
+      { "id": "hello", "kind": "talk", "title": "Say hello in Bubble's room", "hub": "bubble" },
+      {
+        "id": "games",
+        "kind": "visit",
+        "title": "Look at the Connect 4 games",
+        "realm": "gno.land/r/samcrew/connect4"
+      },
+      {
+        "id": "offer",
+        "kind": "call",
+        "title": "Post a Connect 4 offer",
+        "realm": "gno.land/r/samcrew/connect4",
+        "function": "Offer"
+      }
+    ]
+  },
+  {
+    "id": "town",
+    "universe": "onyx",
+    "title": "Town square",
+    "description": "Read what the chain is deciding, say what you think, then open a board where others can answer.",
+    "reward": "Town crier",
+    "steps": [
+      { "id": "govdao", "kind": "visit", "title": "Read GovDAO's proposals", "hub": "govdao" },
+      { "id": "say", "kind": "talk", "title": "Say what you think in GovDAO's room", "hub": "govdao" },
+      { "id": "boards", "kind": "visit", "title": "Visit gno.land's boards", "realm": "gno.land/r/gnoland/boards2/v0" },
+      {
+        "id": "board",
+        "kind": "call",
+        "title": "Open a board of your own",
+        "realm": "gno.land/r/gnoland/boards2/v0",
+        "function": "CreateBoard"
+      }
+    ]
+  }
+]

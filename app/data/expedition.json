@@ -1,1 +1,54 @@
-[]
+[
+  {
+    "id": "govdao",
+    "universe": "onyx",
+    "hub": "govdao",
+    "name": "GovDAO",
+    "why": "The chain's own proposals, and the votes that accept or refuse them",
+    "live": true
+  },
+  {
+    "id": "namereg",
+    "universe": "onyx",
+    "realm": "gno.land/r/sys/namereg/v0",
+    "name": "User Registry",
+    "why": "Where newcomers register their nym- names, the latest listed first",
+    "live": true
+  },
+  {
+    "id": "connect4",
+    "universe": "onyx",
+    "realm": "gno.land/r/samcrew/connect4",
+    "name": "Connect 4",
+    "why": "Games staked in GNOT, 90 seconds a move, and who won the most",
+    "live": true
+  },
+  {
+    "id": "bubble",
+    "universe": "onyx",
+    "hub": "bubble",
+    "name": "Bubble",
+    "why": "The BUBBLE token's world: its rooms and the people in them"
+  },
+  {
+    "id": "boards",
+    "universe": "onyx",
+    "realm": "gno.land/r/gnoland/boards2/v0",
+    "name": "Boards",
+    "why": "gno.land's boards, where anyone may open one and start a thread"
+  },
+  {
+    "id": "escrow",
+    "universe": "onyx",
+    "realm": "gno.land/r/samcrew/escrow_v4",
+    "name": "Escrow",
+    "why": "Milestone-based escrow for freelance work, written in Gno"
+  },
+  {
+    "id": "coins",
+    "universe": "onyx",
+    "realm": "gno.land/r/gnoland/coins",
+    "name": "Coins Explorer",
+    "why": "Any address's coin balances, read for free"
+  }
+]

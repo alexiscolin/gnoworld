@@ -2,7 +2,7 @@
 // from above with its orbits drawn, the same at every scale, as the header's two icons and V set it; and the system the eye rests at, as the
 // scene says, for the crumb back and the hero. No React state and no store's shape: the components read it as the universe reads the host.
 import { useSyncExternalStore } from "react";
-import { Heard } from "./heard.ts";
+import { Heard } from "../../lib/heard.ts";
 
 export type Seeing = "dynamic" | "plan";
 
