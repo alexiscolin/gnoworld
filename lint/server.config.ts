@@ -5,8 +5,10 @@
 import { defineConfig } from "eslint/config";
 import { TESTS } from "./shared.config.ts";
 
-const SERVER = "The server imports core, schemas, Node and its framework (docs/ARCHITECTURE.md).";
-const JARVIS = "Jarvis imports core, schemas, Node and its dependencies (docs/ARCHITECTURE.md).";
+const SERVER =
+  "The server imports core, schemas, the service and chain packages, Node and its framework, never Jarvis (docs/ARCHITECTURE.md).";
+const JARVIS =
+  "Jarvis imports core, schemas, the service and chain packages, Node and its dependencies, never the server (docs/ARCHITECTURE.md).";
 const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "packages/service/**/*.ts"];
 
 export default defineConfig(
@@ -25,13 +27,27 @@ export default defineConfig(
             {
               target: "./server",
               from: "./",
-              except: ["./server", "./packages/core", "./packages/schemas", "./packages/service", "./node_modules"],
+              except: [
+                "./server",
+                "./packages/core",
+                "./packages/schemas",
+                "./packages/service",
+                "./packages/chain",
+                "./node_modules",
+              ],
               message: SERVER,
             },
             {
               target: "./jarvis",
               from: "./",
-              except: ["./jarvis", "./packages/core", "./packages/schemas", "./packages/service", "./node_modules"],
+              except: [
+                "./jarvis",
+                "./packages/core",
+                "./packages/schemas",
+                "./packages/service",
+                "./packages/chain",
+                "./node_modules",
+              ],
               message: JARVIS,
             },
           ],

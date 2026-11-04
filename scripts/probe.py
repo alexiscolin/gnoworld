@@ -681,6 +681,7 @@ try:
             ("workspace.ts", uses(name="parseLine", path="@gnoworld/core"), None),
             ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
             ("service.ts", uses(name="logger", path="@gnoworld/service/log"), None),
+            ("chain.ts", uses(name="readChain", path="@gnoworld/chain/read"), None),
             ("sibling.ts", uses(name="used", path="./framework.ts"), None),
             # A name that only starts like a banned one is another package.
             ("reactor.ts", uses(name="x", path="reactor"), None),
@@ -719,6 +720,7 @@ try:
             ("sdk.ts", uses(name="Anthropic", path="@anthropic-ai/sdk"), None),
             ("sibling.ts", uses(name="used", path="./node.ts"), None),
             ("service.ts", uses(name="logger", path="@gnoworld/service/log"), None),
+            ("chain.ts", uses(name="readChain", path="@gnoworld/chain/read"), None),
             ("server_path.ts", uses(name="loadConfig", path="../../../server/src/config.ts"), "import-x/no-restricted-paths"),
             *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
               for name in ("react", "three", "@gnoworld/ui")],
@@ -776,6 +778,111 @@ try:
         lint_cases(chain, src, "chain")
         shutil.rmtree(src)
         typecheck_reaches(src, "the chain package")
+
+    if part("walls"):
+        # Jarvis apart (Alexis, decision-isolation.md; D110): jarvis/ imports nothing of server/, server/ nothing of jarvis/, and
+        # the two packages they share nothing of either or of the app, whatever the form: a name, a type, a re-export, a dynamic
+        # import, a path that climbs out and back, a disable comment (inline config is off, so it is read as nothing).
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        typed = 'import type {{ {name} }} from "{path}";\n\nexport type Used = {name};\n'.format
+        again = 'export {{ {name} }} from "{path}";\n'.format
+        later = 'export function load(): Promise<unknown> {{\n  return import("{path}");\n}}\n'.format
+        hushed = "// eslint-disable-next-line import-x/no-restricted-paths, no-restricted-imports\n"
+        zone, name = "import-x/no-restricted-paths", "no-restricted-imports"
+
+        def apart(other, path, banned):
+            """The bypasses toward one folder, from a planted file's place: `path` reaches a file of it."""
+            climbed = "../__probe__/" + path  # out of the planted folder and back in, then the same way out
+            return [
+                (f"{other}_path.ts", uses(name="x", path=path), zone),
+                (f"{other}_type.ts", typed(name="X", path=path), zone),
+                (f"{other}_again.ts", again(name="x", path=path), zone),
+                (f"{other}_later.ts", later(path=path), zone),
+                (f"{other}_climb.ts", uses(name="x", path=climbed), zone),
+                (f"{other}_hushed.ts", hushed + uses(name="x", path=path), zone),
+                *[(f"{other}_name_{n}.ts", uses(name="x", path=b), name) for n, b in enumerate(banned)],
+            ]
+
+        # A test, and a test's helper, across the wall: Jarvis builds and tests with no server/ in its graph, and the reverse.
+        tested = 'import {{ {name} }} from "{path}";\nimport {{ expect, test }} from "vitest";\n\ntest("x", () => {{\n  expect({name}).toBeDefined();\n}});\n'.format
+        lint_cases([*apart("server", "../../../server/src/config.ts", ["@gnoworld/server", "@gnoworld/server/src/config.ts"]),
+                    ("server_test.test.ts", tested(name="wallet", path="../../../server/src/testing/signer.ts"), zone),
+                    ("testing/server_helper.ts", uses(name="wallet", path="../../../../server/src/testing/signer.ts"), zone)],
+                   "jarvis/src/__probe__", "walls jarvis")
+        shutil.rmtree("jarvis/src/__probe__")
+        lint_cases([*apart("jarvis", "../../../jarvis/src/loop.ts", ["@gnoworld/jarvis", "@gnoworld/jarvis/src/loop.ts"]),
+                    ("jarvis_test.test.ts", tested(name="kit", path="../../../jarvis/src/testing/kit.ts"), zone),
+                    ("testing/jarvis_helper.ts", uses(name="kit", path="../../../../jarvis/src/testing/kit.ts"), zone)],
+                   "server/src/__probe__", "walls server")
+        shutil.rmtree("server/src/__probe__")
+        # Each package apart from the other: the chain package runs in the browser too, so no Node module either (D112).
+        own = {
+            "service": [("chain_name.ts", uses(name="readChain", path="@gnoworld/chain/read"), name)],
+            "chain": [("service_name.ts", uses(name="logger", path="@gnoworld/service/log"), name),
+                      ("node_fs.ts", uses(name="readFileSync", path="node:fs"), "import-x/no-nodejs-modules"),
+                      ("bare_fs.ts", uses(name="readFileSync", path="fs"), "import-x/no-nodejs-modules"),
+                      ("node_test.test.ts", tested(name="readFileSync", path="node:fs"), None)],
+        }
+        for package in ("service", "chain"):
+            src = f"packages/{package}/src/__probe__"
+            cases = [
+                *apart("server", "../../../../server/src/config.ts", ["@gnoworld/server"]),
+                *apart("jarvis", "../../../../jarvis/src/loop.ts", ["@gnoworld/jarvis"]),
+                *apart("app", "../../../../app/src/root.tsx", ["@gnoworld/app"]),
+                *own[package],
+                ("core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+                ("schemas.ts", uses(name="QueryAnswer", path="@gnoworld/schemas"), None),
+                ("sibling.ts", uses(name="used", path="./core.ts"), None),
+            ]
+            lint_cases(cases, src, f"walls {package}")
+            shutil.rmtree(src)
+
+    if part("chain_reads"):
+        # Every read of a chain's node or the indexer goes through packages/chain (Alexis, decision-onchain.md; D113): outside
+        # it, no module holds a read's words, however written (a literal, a template, strings joined, a raw template); a
+        # comment, a node's bare address, a route of our own and a test are free, as is the package itself.
+        rule = "gnoworld/chain-read"
+        reads = [
+            ("abci.ts", 'export const path = "vm/qfuncs";\n', rule),
+            ("query.ts", 'export const method = "abci_query";\n', rule),
+            ("template.ts", "export function url(rpc: string): string {\n  return `${rpc}/abci_query?path=x`;\n}\n", rule),
+            ("joined.ts", 'export function url(rpc: string): string {\n  return rpc + "/status";\n}\n', rule),
+            ("split.ts", 'export const path = "abci" + "_query";\n', rule),
+            ("raw.ts", "export const path = String.raw`vm/qrender`;\n", rule),
+            ("graphql.ts", 'export const ask = "query { blocks { height } }";\n', rule),
+            ("live.ts", 'export const ask = "subscription($n: Int) { transactions(n: $n) { hash } }";\n', rule),
+            ("port.ts", 'export const node = "http://127.0.0.1:26657";\n', rule),
+            ("bank.ts", 'export const path = "bank/balances/g1x";\n', rule),
+            ("routed.ts", 'export const url = "https://rpc.onyx.example:443/block?height=1";\n', rule),
+            ("full.ts", 'export const url = "https://rpc.onyx.example:443/status";\n', rule),
+            ("status.ts", "export function url(rpc: string): string {\n  return `${rpc}/status`;\n}\n", rule),
+            ("prefix.ts", "export function path(kind: string): string {\n  return `vm/q${kind}`;\n}\n", rule),
+            ("prefix_joined.ts", 'export function path(kind: string): string {\n  return "vm/q" + kind;\n}\n', rule),
+            ("escaped.ts", 'export const path = "vm\\x2fqfuncs";\n', rule),
+            ("prose.ts", 'export const why = "Jarvis reads vm/qfuncs through the server.";\n', rule),
+            ("helpers.ts", 'import { statusEnvelope } from "@gnoworld/chain/testing/envelopes";\n\nexport const used: unknown = statusEnvelope;\n', rule),
+            ("hushed.ts", '// eslint-disable-next-line gnoworld/chain-read\nexport const path = "vm/qeval";\n', rule),
+            ("comment.ts", "// vm/qfuncs and abci_query are the package's words.\nexport const n = 1;\n", None),
+            ("address.ts", 'export const rpc = "https://rpc.onyx.example:443";\n', None),
+            ("indexer.ts", 'export const indexer = "https://indexer.onyx.example/graphql/query";\n', None),
+            ("route.ts", 'export const route = "/status";\n', None),
+            ("word.ts", 'export const word = "the status of a block";\n', None),
+            # A known gap (D113): an address made by URL from a route alone and a base reads as no read here.
+            ("url.ts", 'export function url(rpc: string): URL {\n  return new URL("/status", rpc);\n}\n', None),
+            ("free.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect("vm/qfuncs").toMatch(/qfuncs/);\n});\n', None),
+            ("free.spec.ts", 'export const path = "vm/qfuncs";\n', None),
+            ("testing/fake.ts", 'export const path = "vm/qfuncs";\n', None),
+        ]
+        for where in ("app/src/__probe__", "server/src/__probe__", "jarvis/src/__probe__", "packages/schemas/src/__probe__", "packages/service/src/__probe__"):
+            lint_cases(reads, where, f"chain reads in {where}")
+            shutil.rmtree(where)
+        # The app's components read the chain no more than its modules do; its journeys and their helpers are free.
+        lint_cases([("page.tsx", 'export function Page() {\n  return <p title="vm/qrender">x</p>;\n}\n', rule)], APP, "chain reads in a component")
+        shutil.rmtree(APP)
+        lint_cases([("fake.ts", 'export const path = "vm/qfuncs";\n', None)], "app/tests/__probe__", "chain reads in the journeys")
+        shutil.rmtree("app/tests/__probe__")
+        lint_cases([(n, c, None) for n, c, _ in reads if not n.endswith((".test.ts", ".spec.ts"))], "packages/chain/src/__probe__", "chain reads in the package")
+        shutil.rmtree("packages/chain/src/__probe__")
 
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
@@ -985,6 +1092,9 @@ finally:
     shutil.rmtree("jarvis/src/__probe__", ignore_errors=True)
     shutil.rmtree("packages/service/src/__probe__", ignore_errors=True)
     shutil.rmtree("packages/chain/src/__probe__", ignore_errors=True)
+    shutil.rmtree("packages/schemas/src/__probe__", ignore_errors=True)
+    shutil.rmtree("app/tests/__probe__", ignore_errors=True)
+    shutil.rmtree("server/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

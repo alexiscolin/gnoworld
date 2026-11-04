@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -367,4 +367,16 @@ describe("the Anthropic key", () => {
     expect(String(config.anthropicKey)).toBe("[redacted]");
     expect(JSON.stringify({ key: config.anthropicKey })).toBe('{"key":"[redacted]"}');
   });
+});
+
+// Jarvis apart from the server (decision-isolation.md, D110): its package lists nothing of the server's, and its compiler
+// reaches its own folder alone; the lint's walls hold each import (scripts/probe.py, walls).
+it("lists nothing of the server's in its package, and compiles its own folder alone", () => {
+  const read = (name: string): unknown => JSON.parse(readFileSync(new URL(`../${name}`, import.meta.url), "utf8"));
+  const manifest = JSON.stringify(read("package.json"));
+  expect(manifest).not.toMatch(/@gnoworld\/(server|app)|server\//);
+  expect(manifest).toMatch(/"@gnoworld\/service":/);
+  const tsconfig = readFileSync(new URL("../tsconfig.json", import.meta.url), "utf8");
+  expect(tsconfig).toMatch(/"include": \["src"\]/);
+  expect(tsconfig).not.toMatch(/\.\.\/server|"references"|"paths"/);
 });

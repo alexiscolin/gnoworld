@@ -223,7 +223,7 @@ def mutants():
     yield from each(SERVER, 'target: "./server"', 'target: "./nowhere"', "probe", "eslint the server reaches no path out of its folder")
     # Not "./node_modules": this worktree borrows the repository's, outside it, so the zone never sees a
     # package here (F385); in the repository the gate's own lint fails without that exception.
-    for name in ("./server", "./packages/core", "./packages/schemas", "./packages/service"):
+    for name in ("./server", "./packages/core", "./packages/schemas", "./packages/service", "./packages/chain"):
         yield from each(SERVER, f'"{name}"', '"./nowhere"', "probe", f"eslint the server imports from {name}")
     yield from each(SERVER, '"packages/service/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
     yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")

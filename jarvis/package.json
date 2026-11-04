@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "1.4.0",
+    "@gnoworld/chain": "workspace:*",
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
     "@gnoworld/service": "workspace:*",

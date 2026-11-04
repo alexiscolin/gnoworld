@@ -2,27 +2,23 @@
 // button through these tools, and the server keeps it only once 10d's checks pass on what it read itself, that call:
 // the realm's height and page through gnomcp, its `vm/qfuncs` on its universe's node, and the asker's words for a
 // proposal's or a button's arguments alone (D107). A refused card goes back to the model naming what is missing.
+import { readFunctionList } from "@gnoworld/chain/node";
+import type { ChainFetch } from "@gnoworld/chain/read";
 import { placeAt } from "@gnoworld/core";
 import { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";
-import type { FunctionList } from "@gnoworld/schemas/functions";
 import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
 import { grounded, groundedButton, sourcesOf, type Read } from "../ground.ts";
 import { CARDS, type Asked, type ReadAt } from "./kept.ts";
 import type { Places, Universe } from "./places.ts";
 
-/** A realm's `vm/qfuncs` read on a node, by its rpc; the shared chain read's shape (Alexis, 10f's question 2). */
-export type ReadFunctions = (
-  rpc: string,
-  realm: string,
-) => Promise<{ readonly ok: true; readonly value: FunctionList } | { readonly ok: false }>;
-
 interface Setup {
   readonly chains: readonly string[];
   readonly places: Places;
   /** gnomcp's call, for `gno_status` and `gno_render`. */
   readonly read: (name: string, args: unknown) => Promise<Ran>;
-  readonly functions: ReadFunctions;
+  /** The way to a universe's node for its `vm/qfuncs` (D119): the chain package's own, unless a test gives a fake node. */
+  readonly fetch?: ChainFetch;
 }
 
 // A page is read only as far as 64 KiB, cut on its last line's end so no number is read cut (D102).
@@ -92,6 +88,12 @@ const LATE = { ok: false, why: "its call's time is up." } as const;
 // Read through a call, as a signal's state changes across an await, which TypeScript's narrowing does not see.
 const over = (signal: AbortSignal): boolean => signal.aborted;
 
+// A realm's functions on its universe's own node, checked to be its chain (D118), the call's signal ending the read.
+function functionsOn(setup: Setup, universe: Universe, at: Realm) {
+  const node = { chainId: universe.chainId, signal: at.signal };
+  return readFunctionList(universe.rpc, at.realm, setup.fetch === undefined ? node : { ...node, fetch: setup.fetch });
+}
+
 // A realm's reads, that call: its height, its page, and its functions when a form needs them; none more once the call's
 // time is up.
 async function readRealm(setup: Setup, at: Realm): Promise<Sourced> {
@@ -103,7 +105,8 @@ async function readRealm(setup: Setup, at: Realm): Promise<Sourced> {
   const page = await setup.read("gno_render", { profile: at.profile, realm: at.realm });
   if (!page.ok || page.isError) return { ok: false, why: "the realm's page could not be read." };
   if (over(at.signal)) return LATE;
-  const listed = at.forms ? await setup.functions(universe.rpc, at.realm) : { ok: true as const, value: null };
+  const listed = at.forms ? await functionsOn(setup, universe, at) : { ok: true as const, value: null };
+  if (over(at.signal)) return LATE;
   if (!listed.ok) return { ok: false, why: "the realm's functions could not be read." };
   const texts = [{ from: "node" as const, text: pageOf(page.text, at.realm), height }];
   const read = { realm: at.realm, origin: universe.gnoweb, functions: { list: listed.value, height }, texts };
