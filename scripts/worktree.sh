@@ -32,6 +32,17 @@ case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac
 dir=$root/$name
 [ ! -L "$dir" ] || { echo "worktree.sh: $dir is a link; name the folder itself" >&2; exit 1; }
 src=$(pwd -P)
+# Every git below, and every git it starts in another tree, reads this tree's common folder and so its config, never one a
+# commondir names: Claude Code denies writing a commondir only for the trees that stood when the session started, and outside
+# the sandbox an fsmonitor of another config would run (F5097). That folder is found from the .git of the tree this runs at the
+# root of, which the sandbox denies every session: the main checkout's folder, or a worktree's file naming <common>/worktrees/<id>.
+if [ -d "$src/.git" ]; then
+	GIT_COMMON_DIR=$src/.git
+else
+	gitdir=$(sed -n 's/^gitdir: //p' "$src/.git")
+	GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)
+fi
+export GIT_COMMON_DIR
 if [ "$action" = remove ]; then
 	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder, the prune failing. git
 	# removes only a clean worktree of this repository (no --force), its ignored files with it, never what a link in it leads to.
@@ -49,9 +60,10 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.s
 # run the gate on packages its own lockfile does not name, and a `pnpm install` in the new tree would write into this tree's
 # install (the links lead there), so a base whose package files differ from this tree's is refused (security-S5). So is one
 # whose harness differs (records.sh's list, the package files in it): out of the sandbox, a base a session wrote by plumbing
-# would check its own settings and hooks out into a tree a session is later started in (F5098).
+# would check its own settings and hooks out into a tree a session is later started in (F5098). No nested repository is
+# entered: git would run it with its own config (F5097).
 . "$(dirname "$0")/../.githooks/records.sh"
-differ=$(harness --name-only "$base") # a base git cannot read stops here
+differ=$(harness --ignore-submodules=all --name-only "$base") # a base git cannot read stops here
 [ -z "$differ" ] || {
 	echo "worktree.sh: $base's harness or package files are not this tree's, whose installed packages the new tree would link; install them here first, or make the tree by hand: $(echo "$differ" | tr '\n' ' ')" >&2
 	exit 1

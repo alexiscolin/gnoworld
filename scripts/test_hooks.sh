@@ -190,7 +190,7 @@ text = lambda n: open(sys.argv[n]).read()
 assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
-assert 'harness --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
+assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
 assert not [n for n in (1, 2, 3, 6) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
@@ -5149,6 +5149,36 @@ code=0 && out=$(wt remove -x 2>&1) || code=$?
 # Three words starting with remove are a tree named remove, in the folder it runs in: refused as out of the root.
 out=$(wt remove "$wr/rm3" HEAD 2>&1) && fail "worktree.sh took remove and two words for a call: $out"
 printf '%s\n' "$out" | grep -qF "remove is not $wr/<name>" || fail "worktree.sh did not refuse a tree named remove for its root: $out"
+# A worktree's commondir, which Claude Code protects only for the trees that stood when the session started, leads git at no
+# other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run (reviewer, F5097).
+wt "$wr/redirected" redirected HEAD >/dev/null 2>&1 || fail "the redirected worktree of this case could not be made"
+admin=$(sed 's/^gitdir: //' "$wr/redirected/.git")
+cp -R "$ws/src/.git" "$ws/evilgit" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/pwned" >"$ws/fsmonitor" && chmod +x "$ws/fsmonitor"
+git --git-dir="$ws/evilgit" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit" >"$admin/commondir"
+wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git with the config a worktree's commondir led to: its fsmonitor ran (F5097): $(cat "$ws/out")"
+[ ! -d "$admin" ] || echo ../.. >"$admin/commondir"
+# Run from a worktree whose own commondir leads elsewhere, it still reads this repository's config: the common folder comes from
+# the tree's .git, which the sandbox denies every session, never from the commondir git would read (F5097).
+git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
+admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
+cp -R "$ws/src/.git" "$ws/evilgit2" && git --git-dir="$ws/evilgit2" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit2" >"$admin/commondir"
+out=$(cd "$ws/fromwt" && sh "$ws/fenced/worktree.sh" "$wr/fromwt" fromwt2 HEAD 2>&1) || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from a worktree, took its config from the commondir: its fsmonitor ran (F5097): $out"
+echo ../.. >"$admin/commondir"
+# So from the main checkout, whose .git folder holds no commondir unless one was planted there.
+echo "$ws/evilgit2" >"$ws/src/.git/commondir"
+out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
+rm "$ws/src/.git/commondir"
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from the main checkout, took its config from a commondir planted there: its fsmonitor ran (F5097): $out"
+# A nested repository staged in this tree, under a harness path the base check reads, is never entered when worktree.sh compares
+# a base outside the sandbox: git would run its fsmonitor there (security-reviewer, F5097).
+git init -q "$ws/src/.claude/nested" && echo n >"$ws/src/.claude/nested/n" && git -C "$ws/src/.claude/nested" add n
+git -C "$ws/src/.claude/nested" commit -qm n && git -C "$ws/src/.claude/nested" config core.fsmonitor "$ws/fsmonitor"
+git -C "$ws/src" add .claude/nested 2>/dev/null
+out=$(wt "$wr/nested" nested HEAD 2>&1) || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git in a nested repository of this tree: its fsmonitor ran (F5097): $out"
+git -C "$ws/src" rm -q -f --cached .claude/nested
 # A prune that fails fails the call, which then says nothing of a removal.
 mkdir "$ws/badgit" && printf '#!/bin/sh\n[ "$1 $2" != "worktree prune" ] || exit 1\nexec "%s" "$@"\n' "$(command -v git)" >"$ws/badgit/git" && chmod +x "$ws/badgit/git"
 wt "$wr/unpruned" unpruned HEAD >/dev/null 2>&1 || fail "the unpruned worktree of this case could not be made"
