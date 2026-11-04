@@ -88,4 +88,9 @@ describe("keeps", () => {
       }),
     );
   });
+
+  it("keeps a translation whose hidden characters its original holds", () => {
+    const joined = `Bravo ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`;
+    expect(keeps(joined, `Well done ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`)).toBe(true);
+  });
 });
