@@ -2,6 +2,7 @@
 // is; a link made of it; a quote's or a list's start on the line, taken off, or one list's turned to the other's. A
 // mark goes round whole words, the selection's spaces outside: Markdown reads a mark at a word's bounds alone.
 import { inWord } from "@gnoworld/core";
+import { isEscaped, readsOneMore, underlined } from "./underline.ts";
 
 export type Format = "bold" | "italic" | "underline" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
 
@@ -30,8 +31,8 @@ export function inserted({ text, start, end }: Edit, mark: string): Edit {
 export function formatted(edit: Edit, format: Format): Edit {
   if (format === "link") return linked(edit);
   if (format === "quote" || format === "bulleted" || format === "numbered") return started(edit, format);
-  if (format === "underline") return underlined(words(edit));
-  return marked(words(edit), MARKS[format]);
+  const chosen = words(edit);
+  return format === "underline" ? underlineOf(chosen) : marked(chosen, MARKS[format]);
 }
 
 // The selection less its spaces; a selection of spaces alone, a caret at its end.
@@ -57,18 +58,21 @@ function words(edit: Edit): Edit {
   return { text: edit.text, start: from, end: to };
 }
 
+// Whether the character at `at` is `mark`'s own: one a backslash escapes is the writer's text (F5387a).
+const own = (text: string, at: number, mark: string) => text[at] === mark[0] && !isEscaped(text, at);
+
 // The selection begins and ends with `mark`, and no more of its character inside: `*` is not in `**a**`.
 function inside({ text, start: from, end: to }: Edit, mark: string): boolean {
   const size = mark.length;
   const ends = text.slice(from, from + size) === mark && text.slice(to - size, to) === mark;
-  return to - from >= 2 * size && ends && text[from + size] !== mark[0] && text[to - size - 1] !== mark[0];
+  return to - from >= 2 * size && ends && !own(text, from + size, mark) && !own(text, to - size - 1, mark);
 }
 
 // `mark` sits just before the selection and just after it, and no more of its character beyond.
 function around({ text, start: from, end: to }: Edit, mark: string): boolean {
   const size = mark.length;
   const ends = from >= size && text.slice(from - size, from) === mark && text.slice(to, to + size) === mark;
-  return ends && text[from - size - 1] !== mark[0] && text[to + size] !== mark[0];
+  return ends && !own(text, from - size - 1, mark) && !own(text, to + size, mark);
 }
 
 function marked(words: Edit, mark: string): Edit {
@@ -95,34 +99,13 @@ function marked(words: Edit, mark: string): Edit {
   };
 }
 
-// The text from `from` to `to`, each `+` not escaped yet escaped: an odd run of backslashes before one escapes it.
-function escaped(text: string, from: number, to: number): string {
-  let backslashes = 0;
-  for (let at = from - 1; text[at] === "\\"; at -= 1) backslashes += 1;
-  let out = "";
-  for (const char of text.slice(from, to)) {
-    out += char === "+" && backslashes % 2 === 0 ? "\\+" : char;
-    backslashes = char === "\\" ? backslashes + 1 : 0;
-  }
-  return out;
-}
-
-// The words underlined, or no more. The writer's own `+` (C++, 1+1, +33) is text far more often than a star or a tilde:
-// each one in the words and beside them is escaped, so the bar's runs are read whole and the words as written (F5380).
-function underlined(words: Edit): Edit {
-  if (inside(words, MARKS.underline) || around(words, MARKS.underline)) return marked(words, MARKS.underline);
-  const { text, start: from, end: to } = words;
-  let before = from;
-  while (text[before - 1] === "+") before -= 1;
-  let after = to;
-  while (text[after] === "+") after += 1;
-  const lead = `${text.slice(0, before)}${escaped(text, before, from)}${MARKS.underline}`;
-  const inner = escaped(text, from, to);
-  return {
-    text: `${lead}${inner}${MARKS.underline}${escaped(text, to, after)}${text.slice(after)}`,
-    start: lead.length,
-    end: lead.length + inner.length,
-  };
+// The underline taken off where the reader reads one there, or round a caret (the bar's empty pair); else written as the
+// reader reads one (underline.ts).
+function underlineOf(chosen: Edit): Edit {
+  const mark = MARKS.underline;
+  const off = inside(chosen, mark) || around(chosen, mark) ? marked(chosen, mark) : undefined;
+  if (off !== undefined && (chosen.start === chosen.end || readsOneMore(off.text, chosen.text))) return off;
+  return underlined(chosen);
 }
 
 // The selection, less its spaces, as a link's label, the address after it selected to be typed; at a caret, the label

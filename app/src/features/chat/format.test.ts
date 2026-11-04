@@ -1,4 +1,4 @@
-import { markdown, type Inline } from "@gnoworld/core";
+import { inlines, markdown, words as wordsOf, type Inline } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { formatted, inserted, type Edit, type Format } from "./format.ts";
@@ -314,6 +314,83 @@ describe("formatted, underline", () => {
         ],
       },
     ]);
+  });
+
+  // The review (F5387, F5388, F5389, F5387a): the writer's `+` escaped where it need not be broke an address's link and
+  // showed in code, and an escaped `+` beside the bar's run kept U from taking it off. What the bar writes reads as the
+  // draft did, one underline more; U twice reads as the draft did.
+  const link = (href: string): Inline => ({ type: "link", href, children: [{ type: "text", text: href }] });
+  const underline = (...children: Inline[]): Inline => ({ type: "underline", children });
+  const paragraph = (...children: Inline[]) => [{ type: "paragraph", children }];
+
+  it.each([
+    ["see «https://x.example/search?q=a+b» now", "see ++https://x.example/search?q=a+b++ now"],
+    ["«1+1 is 2»", "++1+1 is 2++"],
+    ["«`c++` x»", "++`c++` x++"],
+    ["«`a++b` and c++»", "++`a++b` and c\\+\\+++"],
+  ] as const)("leaves the `+` of %j as written where it joins no run of the bar's: %j", (before, after) => {
+    expect(apply(before, "underline").text).toBe(after);
+  });
+
+  it("keeps a selected address holding a `+` a link, underlined", () => {
+    const read = (marked: string) => markdown(apply(marked, "underline").text);
+    expect(read("see «https://x.example/search?q=a+b» now")).toStrictEqual(
+      paragraph({ type: "text", text: "see " }, underline(link("https://x.example/search?q=a+b")), {
+        type: "text",
+        text: " now",
+      }),
+    );
+    expect(read("«https://en.wikipedia.org/wiki/C++»")).toStrictEqual(
+      paragraph(underline(link("https://en.wikipedia.org/wiki/C++"))),
+    );
+    expect(read("see «https://a.example/C++» now")).toStrictEqual(
+      paragraph({ type: "text", text: "see " }, underline(link("https://a.example/C++")), {
+        type: "text",
+        text: " now",
+      }),
+    );
+    expect(read("«`c++` x»")).toStrictEqual(
+      paragraph(underline({ type: "code", text: "c++" }, { type: "text", text: " x" })),
+    );
+  });
+
+  // F5387a: an escaped `+` beside the bar's run is the writer's text, which kept U from taking the underline off.
+  it.each(["x +«hi»", "a +«hi»+ b", "«https://en.wikipedia.org/wiki/C++»"])(
+    "takes the underline of %j off again: U twice reads as the draft did",
+    (marked) => {
+      const once = apply(marked, "underline");
+      const twice = formatted(once, "underline");
+      expect(markdown(twice.text)).toStrictEqual(markdown(draft(marked).text));
+      expect(markdown(once.text)).not.toStrictEqual(markdown(twice.text));
+    },
+  );
+
+  // The same of a mark the bar writes in one way: an escaped star beside bold is the writer's.
+  it("takes bold off beside an escaped star of the writer's", () => {
+    expect(apply("\\***«a»** x", "bold")).toStrictEqual(draft("\\*«a» x"));
+  });
+
+  it("adds one underline and changes nothing else, with `+` in and beside the word, and U twice reads as before", () => {
+    const pre = fc.stringMatching(/^([a-z]{1,3} )?\+{0,3}$/);
+    const word = fc.stringMatching(/^[a-z+]{0,3}[a-z][a-z+]{0,3}$/);
+    const post = fc.stringMatching(/^\+{0,3}( [a-z]{1,3})?$/);
+    // A one-line draft's words, its marks gone, codes and links by their words.
+    const said = (text: string) =>
+      markdown(text).map((block) => (block.type === "paragraph" ? wordsOf(block.children) : ""));
+    const underlines = (text: string) =>
+      [...inlines(markdown(text))].filter((node) => node.type === "underline").length;
+    fc.assert(
+      fc.property(fc.record({ pre, word, post }), ({ pre: left, word: selected, post: right }) => {
+        const edit = { text: `${left}${selected}${right}`, start: left.length, end: left.length + selected.length };
+        // Already underlined, U takes it off: the case above.
+        fc.pre(underlines(edit.text) === 0);
+        const once = formatted(edit, "underline");
+        expect(underlines(once.text)).toBe(1);
+        expect(said(once.text)).toStrictEqual(said(edit.text));
+        expect(markdown(formatted(once, "underline").text)).toStrictEqual(markdown(edit.text));
+      }),
+      { seed: 20261017, numRuns: 300 },
+    );
   });
 });
 
