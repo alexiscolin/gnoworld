@@ -432,7 +432,9 @@ def mutants():
     yield from each(ck, '\tif [ "$scope" = . ]; then\n', "\tif false; then\n", "hooks", "check.sh lints the whole repository on lint_scope.py's '.'")
     yield from each(ck, '\t[ -n "$scope" ] || { echo', "\t! false || { echo", "hooks", "check.sh runs no ESLint with no file to read")
     yield from each(ck, '\tcase $lint in *" .") ;; *)\n', "\tcase $lint in *) ;; *)\n", "hooks", "check.sh names no file to a lint script of another shape")
-    yield from each(ck, '"${lint% .} --no-warn-ignored $scope"', '"${lint% .} $scope"', "hooks", "check.sh tells ESLint to pass over a file it does not lint")
+    yield from each(ck, '"${lint% .} --no-warn-ignored -- $scope"', '"${lint% .} -- $scope"', "hooks", "check.sh tells ESLint to pass over a file it does not lint")
+    yield from each(ck, '"${lint% .} --no-warn-ignored -- $scope"', '"${lint% .} --no-warn-ignored $scope"', "hooks", "check.sh ends ESLint's options before the files (lot 1, S3)")
+    yield from each(ck, "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "\n: GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "hooks", "check.sh reads git's own folders, never a caller's (lot 1, S5)")
     yield from each(ck, "*) grep -E '^(check\\.sh|lint_scope|stryker_lines)[ :]' \"$logs/$l.log\" || : ;;", "*) ;;", "hooks", "check.sh says how a lane that passed ran")
     # Every gate step's time, kept.
     yield from each(ck, ' >>"$step_log"; } 2>/dev/null || :', ' >/dev/null; } 2>/dev/null || :', "hooks", "check.sh keeps every step's time")
@@ -445,7 +447,8 @@ def mutants():
     yield from each(ls, "importers.setdefault(path[i - 1], set()).add(path[ref[0] - 1])", "importers.setdefault(path[ref[0] - 1], set()).add(path[i - 1])", "hooks", "lint_scope.py follows a file to its importers, not to its imports")
     yield from each(ls, "1 <= value <= most", "0 <= value <= most", "hooks", "lint_scope.py reads TypeScript's ids from 1")
     yield from each(ls, '            raise ValueError("a fileIdsList entry of no known form")\n', "            pass\n", "hooks", "lint_scope.py refuses a graph whose lists name no file")
-    yield from each(ls, '            raise ValueError("none")\n', "            pass\n", "hooks", "lint_scope.py lints the whole repository with no graph")
+    yield from each(ls, "            raise ValueError(\"package.json's typecheck names no .tsbuildinfo\")\n", "            pass\n", "hooks", "lint_scope.py lints the whole repository with no graph")
+    yield from each(ls, "infos = [pathlib.Path(sys.argv[1]) / name for name in named()]", 'infos = sorted(pathlib.Path(sys.argv[1]).glob("*.tsbuildinfo"))', "hooks", "lint_scope.py reads the files the type check names alone (lot 1, R2)")
     yield from each(ls, "{path for path in changed if os.path.isfile(path)}", "set(changed)", "hooks", "lint_scope.py leaves out a changed path that is gone")
     yield from each(ls, "{real[file] for file in seen if file in real}", "set(seen)", "hooks", "lint_scope.py names each file in its own case")
     yield from each(ls, "shlex.quote(path) for path", "path for path", "hooks", "lint_scope.py quotes each path for the shell")
@@ -1048,7 +1051,8 @@ def mutants():
         ("\tif ! $light; then # the light gate keeps jscpd", "\tif true; then # the light gate keeps jscpd", "the light gate runs no Prettier nor knip"),
         ("\tlight=true\n", "\t:\n", "the radical mode's light gate runs"),
         ('[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ]', "true", "the light gate wants git's hooks folder's radical-mode on"),
-        ('[ "$(printf \'%s\\n\' "$changed" | python3 -I scripts/speeds.py --light "$PWD")" = light ]', "true", "the light gate wants no tier-1 path"),
+        ('[ "$(printf \'%s\\n\' "$changed" | python3 -I scripts/speeds.py --light "$PWD" "$logs/main-review.md")" = light ]', "true", "the light gate wants no tier-1 path"),
+        ('git -C "$repository" show origin/main:docs/REVIEW.md >"$logs/main-review.md" 2>/dev/null &&', "{ : >\"$logs/main-review.md\"; } &&", "the light gate wants main's own tier-1 table (lot 1, R1)"),
         ('harnessed=$(harness_of) && [ -z "$harnessed" ]', "true", "the light gate wants no harness file"),
         ("! $all && ! $tests_all && common=", "! $all && common=", "--tests-all runs the whole gate in the radical mode"),
         ("\t$gno || return 0", "\t:", "gno only for a gno change"),
@@ -1182,9 +1186,12 @@ def seven_mutants():
         (" and p.count(\"/\") >= 2", "", "allows no whole top folder as interface"),
         ("p.endswith(\"/\") and plain(", "plain(", "allows only an interface folder written with its slash"),
         (" and plain(p[:-1])", "", "allows only an interface folder spelled as a plain path"),
-        ("if len(args) != 1:", "if False:", "doubts a call with other than one argument"),
-        (" or any(secure(root, path, security) for path in paths):", ":", "--light refuses a tier-1 path"),
-        ("if not security or not paths or any(", "if not paths or any(", "--light doubts a table with no tier-1 path"),
+        ("speed(argv[1], paths) if len(argv) == 2 else FULL", "speed(argv[1], paths) if len(argv) >= 2 else FULL", "doubts a call with other than one argument"),
+        (" or any(secure(root, path, tree + main) for path in paths):", ":", "--light refuses a tier-1 path"),
+        ("if not tree or not main or not paths", "if not main or not paths", "--light doubts a tree's table with no tier-1 path (lot 1, R3)"),
+        ("if not tree or not main or not paths", "if not tree or not paths", "--light doubts main's table with no tier-1 path"),
+        ("secure(root, path, tree + main)", "secure(root, path, tree)", "--light keeps main's tier-1 rows, which the tree may drop (lot 1, R1)"),
+        ("if len(argv) == 4 else FULL", "if len(argv) >= 3 else FULL", "--light wants main's table"),
         ('if argv[1:2] == ["--light"]', 'if argv[1:2] == ["--nothing"]', "--light answers the light gate's question"),
         ("if line.lstrip().startswith(\"|\") and len(cells)", "if len(cells)", "reads a sentence as a row of the table"),
     ))

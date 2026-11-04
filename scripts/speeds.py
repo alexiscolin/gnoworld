@@ -2,8 +2,9 @@
 
 Reads the paths of a change on stdin, one a line (check.sh's own `$changes`), and prints `interface` or `full`; it always exits 0.
 `interface` is for a change of the interface alone: one review and no StrykerJS. Everything else runs the full control, and so does
-any doubt: every path must be on the interface list, or the answer is `full`. With --light it prints `light` when no path is a
-security path, `full` otherwise: the radical mode's light gate (Alexis, 2026-11-04), whose harness files check.sh judges itself.
+any doubt: every path must be on the interface list, or the answer is `full`. `speeds.py --light <root> <main's table>` prints `light`
+when no path is a security path of either table, `full` otherwise: the radical mode's light gate (Alexis, 2026-11-04), whose harness
+files check.sh judges itself.
 
 What counts as security, and what counts as interface, is one place: the tables of <root>/docs/REVIEW.md. Tier 1's backticked paths
 are the security paths (keys, the CSP, chain reads, login, roles, the worker, deployment); tier 3's are the interface. A path under
@@ -20,10 +21,10 @@ FULL, INTERFACE, LIGHT = "full", "interface", "light"
 CELLS = re.compile(r"`([^`]+)`")
 
 
-def rows(root):
-    """({tier: [backticked paths of the cell that names what the tier holds]}) of docs/REVIEW.md's table; none when unreadable."""
+def rows(root, table=None):
+    """({tier: [backticked paths of the cell that names what the tier holds]}) of docs/REVIEW.md's table, or of the file `table`."""
     found = {"1": [], "3": []}
-    with open(os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
+    with open(table or os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
         for line in f:
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if line.lstrip().startswith("|") and len(cells) >= 2 and cells[0] in found:
@@ -71,21 +72,22 @@ def speed(root, paths):
     return INTERFACE
 
 
-def light(root, paths):
-    """`light` when no path is a tier-1 path (the radical mode's light gate, check.sh), `full` otherwise or with nothing to read."""
-    security = [folded(p) for p in rows(root)["1"]]
-    if not security or not paths or any(secure(root, path, security) for path in paths):
+def light(root, main_table, paths):
+    """`light` when no path is a tier-1 path of the tree's table or of main's (the radical mode's light gate, check.sh): a row the change
+    drops from the tree's stays main's. `full` otherwise, or when either table holds no tier-1 row, or with nothing to read."""
+    tree, main = (([folded(p) for p in rows(root, table)["1"]]) for table in (None, main_table))
+    if not tree or not main or not paths or any(secure(root, path, tree + main) for path in paths):
         return FULL
     return LIGHT
 
 
 def main(argv):
     try:
-        judge, args = (light, argv[2:]) if argv[1:2] == ["--light"] else (speed, argv[1:])
-        if len(args) != 1:
-            return FULL
         text = sys.stdin.buffer.read().decode("utf-8")
-        return judge(args[0], [p for p in text.split("\n") if p])
+        paths = [p for p in text.split("\n") if p]
+        if argv[1:2] == ["--light"]:
+            return light(argv[2], argv[3], paths) if len(argv) == 4 else FULL
+        return speed(argv[1], paths) if len(argv) == 2 else FULL
     except (OSError, ValueError):  # a table or a name it cannot read, bytes that are not text
         return FULL
 

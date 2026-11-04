@@ -2720,8 +2720,13 @@ out=$(LINT_SCOPE="app/src/a.tsx 'app/src/b c.tsx' 'it'\"'\"'s.tsx' 'a\$(touch pw
 [ "$(cat "$log.scope-in")" = app/src/a.tsx ] || fail "check.sh did not give lint_scope.py the changed paths: $(cat "$log.scope-in")"
 grep -qx "py:lint_scope $own" "$log" || fail "check.sh did not give lint_scope.py the type check's folder, $own: $(grep '^py:lint_scope' "$log")"
 before typecheck py:lint_scope || fail "check.sh read the lint's files before the type check had built its graph"
-[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored app/src/a.tsx 'app/src/b c.tsx' "it's.tsx" 'a$(touch pwned).tsx' 'b`touch pwned`;x.tsx')" ] ||
+[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored -- app/src/a.tsx 'app/src/b c.tsx' "it's.tsx" 'a$(touch pwned).tsx' 'b`touch pwned`;x.tsx')" ] ||
 	fail "check.sh did not give ESLint the files lint_scope.py named, alone and whole: $(cat "$log.lint-args")"
+# A name that reads as an option is a file: `--` ends ESLint's options (lot 1's security review, S3: `--suppressions-location=x.md` silenced
+# every error).
+out=$(LINT_SCOPE="'--suppressions-location=sup.md' app/src/a.tsx" gate) || fail "check.sh failed a change whose lint passes: $out"
+[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored -- --suppressions-location=sup.md app/src/a.tsx)" ] ||
+	fail "check.sh gave ESLint a file's name where it reads its options: $(cat "$log.lint-args")"
 [ ! -e "$g/pwned" ] && [ ! -e "$g/app/pwned" ] || fail "check.sh ran a command a file's name held"
 nocache "a change of the app"
 for answer in . "fail"; do
@@ -2734,7 +2739,7 @@ ran lint && fail "check.sh ran ESLint with no file to read: $(lint)"
 # The staged copy has no repository, the lint's files come from its list; a script of another shape is refused.
 c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
 out=$(g=$c GATE_CHANGED=app/src/a.tsx LINT_SCOPE=app/src/a.tsx gate) || fail "check.sh failed a staged copy whose lint passes: $out"
-[ "$(lint)" = "--no-warn-ignored app/src/a.tsx" ] || fail "check.sh did not lint a staged copy's files alone: $(lint)"
+[ "$(lint)" = "--no-warn-ignored -- app/src/a.tsx" ] || fail "check.sh did not lint a staged copy's files alone: $(lint)"
 # A lint script of another shape, committed (a change of package.json runs everything): the change of a.tsx alone asks for its files.
 python3 -I - "$g/package.json" <<'PY'
 import json, sys
@@ -2819,9 +2824,9 @@ gate_fixture gate_light
 # tier-1 path, a harness file, a doubt, a part's end or the full gate: the whole gate as before. pre-commit's staged copy reads the mode
 # of the repository whose packages it borrows, and its list of paths.
 cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories"
-printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n' >"$g/docs/REVIEW.md"
+printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n' >"$g/docs/REVIEW.md"
 printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts"
-git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec"
+git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec" && git -C "$g" update-ref refs/remotes/origin/main HEAD
 mode="$g/.git/hooks/radical-mode"
 light_steps="typecheck lint copies build:app playwright"
 heavy_steps="test format:check unused comments py:check_css sh:ergo py:check_docs"
@@ -2845,6 +2850,14 @@ for path in app/src/csp.ts app/tests/stories/pictures.spec.ts; do
 done
 reset && git -C "$g" mv app/src/csp.ts app/src/renamed.ts && out=$(gate) || fail "check.sh failed on a tier-1 file renamed: $out"
 whole "a tier-1 file renamed away in the radical mode"
+# The table the change itself rewrites: its tier-1 row dropped in the same change still counts, as main's (lot 1's review, R1); with no
+# main to read it from, the whole gate.
+reset && grep -v csp.ts "$g/docs/REVIEW.md" >"$g/docs/r" && mv "$g/docs/r" "$g/docs/REVIEW.md" && echo y >>"$g/app/src/csp.ts" && out=$(gate) ||
+	fail "check.sh failed on a tier-1 file whose row the change dropped: $out"
+whole "a tier-1 file whose row the same change dropped"
+reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed with no main to read: $out"
+whole "a change of the app with no main's table to read"
+git -C "$g" update-ref refs/remotes/origin/main HEAD
 reset && echo y >>"$g/app/src/a.tsx"
 for state in missing off "on2" folder planted; do
 	rm -rf "${mode:?}" "$g/.githooks/radical-mode" "$g/.claude/tmp/radical-mode"
@@ -2857,6 +2870,12 @@ for state in missing off "on2" folder planted; do
 	out=$(gate) || fail "check.sh failed with the mode $state: $out"
 	whole "a change of the app with the mode $state"
 done
+# git's own folders, a caller's to name: a common folder of another's holding the mode on is read as no mode (lot 1's security review, S5).
+fake="$t/gate_light.common" && mkdir -p "$fake/hooks" && printf 'on\n' >"$fake/hooks/radical-mode"
+for f in objects refs HEAD config; do ln -s "$g/.git/$f" "$fake/$f"; done
+for hook in commit-msg pre-commit pre-merge-commit pre-push; do ln -s "$g/.git/hooks/$hook" "$fake/hooks/$hook" 2>/dev/null || :; done
+out=$(GIT_COMMON_DIR="$fake" gate) || fail "check.sh failed with a caller's GIT_COMMON_DIR: $out"
+whole "a change of the app with a caller's GIT_COMMON_DIR holding the mode on"
 rm -rf "${mode:?}" "$g/.claude/tmp/radical-mode" && printf 'on\n' >"$mode"
 mv "$g/docs/REVIEW.md" "$g/docs/gone.md" && out=$(gate) || fail "check.sh failed with no tier-1 table: $out"
 whole "a change of the app with no tier-1 table to read"
@@ -3325,7 +3344,8 @@ cat >"$ls_/tsconfig.json" <<'JSON'
 { "compilerOptions": { "strict": true, "target": "es2024", "lib": ["es2024"], "module": "nodenext", "noEmit": true, "allowImportingTsExtensions": true, "resolveJsonModule": true, "types": [] }, "include": ["src"] }
 JSON
 printf '{ "extends": "../tsconfig.json", "include": ["."] }\n' >"$ls_/other/tsconfig.json"
-printf '{ "type": "module" }\n' >"$ls_/package.json"
+# The type check names its files, as package.json's typecheck does: the graph is theirs alone (lot 1's review, R2).
+printf '{ "type": "module", "scripts": { "typecheck": "tsc -p tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/root.tsbuildinfo\\" && tsc -p other/tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/other.tsbuildinfo\\"" } }\n' >"$ls_/package.json"
 printf 'import tseslint from "%s/typescript-eslint/dist/index.js";\nexport default [{ files: ["**/*.ts"], languageOptions: { parser: tseslint.parser, parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } }, plugins: { "@typescript-eslint": tseslint.plugin }, rules: { "@typescript-eslint/no-floating-promises": "error" } }];\n' "$modules" >"$ls_/eslint.config.mjs"
 printf 'export interface Shape {\n  x: number;\n}\nexport function later(): void {}\n' >"$ls_/src/a.ts"
 printf 'import { later } from "./a.ts";\nexport function run(): void {\n  later();\n}\n' >"$ls_/src/b.ts"
@@ -3391,6 +3411,14 @@ for bad in 'not json' '[]' '{"fileNames": 1}' '{"fileNames": ["../src/a.ts"], "f
 done
 rm "$ls_/cache/root.tsbuildinfo" "$ls_/cache/other.tsbuildinfo" && [ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read no graph as an empty one: $(scope src/a.ts 2>&1)"
 printf '%s' "$good" >"$ls_/cache/root.tsbuildinfo"
+# Only the files package.json's typecheck names: one of them missing is the whole repository, a file of no name it gives (left by a hand
+# run, never refreshed) is never read, and a typecheck that names none is the whole repository.
+[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph with one of the type check's files missing: $(scope src/a.ts 2>&1)"
+types && printf '{"fileNames": ["../src/apart.ts", "../src/a.ts"], "fileInfos": ["x", "y"], "referencedMap": [[1, 1]], "fileIdsList": [[2]]}' >"$ls_/cache/stale.tsbuildinfo"
+names "$(scope src/a.ts)" src/b.ts - src/apart.ts
+cp "$ls_/package.json" "$t/lint_scope.package" && printf '{ "scripts": { "typecheck": "tsc -p tsconfig.json" } }\n' >"$ls_/package.json"
+[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph the type check names no file of: $(scope src/a.ts 2>&1)"
+cp "$t/lint_scope.package" "$ls_/package.json"
 fi
 
 # Vitest does not bench what a StrykerJS sandbox holds: on a copy of the config, a bench in .stryker-tmp is not measured. Only a
@@ -5812,7 +5840,8 @@ sp="$here"/speeds.py
 r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/login" "$r/app/src/lib" "$r/server/src"
 printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
 ln -s ../features/login "$r/app/src/lib/login"
-light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" 2>/dev/null || echo crashed; }
+cp "$r/docs/REVIEW.md" "$t/main.review" # main's own table, which check.sh gives it beside the tree's (lot 1's review, R1)
+light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" "$t/main.review" 2>/dev/null || echo crashed; }
 for p in app/src/features/chat/Bubble.tsx server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/csp.test.ts; do
 	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, of no tier-1 row, is not light: $(light "$p")"
 done
@@ -5824,7 +5853,22 @@ for p in app/src/csp.ts app/src/features/login/Form.tsx gno/r/x/realm deploy/web
 done
 # A tier-1 file renamed away: the list holds its old path (check.sh's --no-renames), which is tier 1.
 [ "$(light app/src/csp.ts app/src/lib/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
-[ "$(printf '' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: an empty change is light"
+[ "$(printf '' | python3 -I "$sp" --light "$r" "$t/main.review")" = full ] || fail "speeds.py --light: an empty change is light"
+# A tier-1 path is one of either table, the tree's or main's: a row the tree drops is still main's (R1), a row it adds counts at once.
+grep -v 'csp.ts' "$t/main.review" >"$r/docs/REVIEW.md" && { [ "$(light app/src/csp.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path light"; }
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/lib/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
+[ "$(light app/src/lib/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
+cp "$t/main.review" "$r/docs/REVIEW.md"
+# Either table unreadable, or one it reads with no tier-1 row (a column renamed, R3), is no light; and so is a call with no main's table.
+for broken in tree main; do
+	cp "$t/main.review" "$t/main.saved"
+	if [ "$broken" = tree ]; then grep -v '^| 1 ' "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v '^| 1 ' "$t/main.saved" >"$t/main.review"; fi
+	[ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: the $broken's table with no tier-1 row is light"
+	cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+done
+[ "$(printf 'app/src/lib/other.ts\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
+mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
+mv "$t/main.gone" "$t/main.review"
 mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no table to read is light"; }
 fi
 

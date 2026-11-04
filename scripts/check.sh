@@ -41,6 +41,8 @@ cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled ot
 # Beside the logs' folder, so two gates of one worktree (a hook and a Stop hook) never share it; app/ is where a build finds its node_modules.
 gate_build="$(pwd)/app/build-gate/${logs##*/}"
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
+# Nor a caller's: a common folder of its own would hold the radical mode on and hooks of its choice (lot 1's security review, S5).
+unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES
 unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
 # The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
@@ -273,11 +275,13 @@ harness_of() (
 )
 # The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice; CLAUDE.md): on while git's own hooks folder holds
 # `radical-mode` reading `on`, which Alexis alone writes (no sandboxed command writes there: the check above refuses a run where one could).
-# A change of no tier-1 path (speeds.py --light) and no harness file then runs the types, the lint, the build with the first screen's cap
-# and jscpd, no Vitest, no journey; anything else, a doubt included, the whole gate. pre-commit's secrets scan runs on every commit.
+# A change of no tier-1 path (speeds.py --light, by the tree's table and main's, so a row the change drops still counts) and no harness file
+# then runs the types, the lint, the build with the first screen's cap and jscpd, no Vitest, no journey; anything else, a doubt included,
+# the whole gate. pre-commit's secrets scan runs on every commit.
 light=false
 if ! $all && ! $tests_all && common=$(git -C "$repository" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &&
-	[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ] && [ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --light "$PWD")" = light ] &&
+	[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ] && git -C "$repository" show origin/main:docs/REVIEW.md >"$logs/main-review.md" 2>/dev/null &&
+	[ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --light "$PWD" "$logs/main-review.md")" = light ] &&
 	harnessed=$(harness_of) && [ -z "$harnessed" ]; then
 	light=true
 	echo "check.sh: the radical mode's light gate (no tier-1 path, no harness file): the types, the lint, the build with the first screen's cap, jscpd"
@@ -471,7 +475,7 @@ lane_types() {
 		exit 1
 		;;
 	esac
-	sh -c "${lint% .} --no-warn-ignored $scope"
+	sh -c "${lint% .} --no-warn-ignored -- $scope" # after `--`, a name that reads as an option is a file (lot 1, S3)
 }
 
 lane_tests() {
