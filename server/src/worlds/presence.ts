@@ -1,6 +1,7 @@
 // The presence history (slice 7, 7c): the people present in each world, sampled by a caller, kept as the busiest sample of each hour
 // for 14 days, so a world can be compared with its own past ("rising", plan §9 question 6). It holds a world's id, an hour and a
-// count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store.
+// count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store. The trends
+// keep their other counts in it too (7t3): each world's messages an hour, and its chain's transactions and addresses a window.
 import { WorldId } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
@@ -12,6 +13,12 @@ export const PRESENCE_DAYS = 14;
 export const PRESENCE_WORLDS_MAX = 500;
 const HOUR = 3_600_000;
 const PEOPLE_MAX = 1_000_000;
+
+/** A count now beside its usual hour of the world's last 14 days (core's usualOf): null when the history is too short to say (7t3). */
+export interface Signal {
+  readonly now: number;
+  readonly usual: number | null;
+}
 
 interface Slot {
   readonly at: number;

@@ -51,12 +51,21 @@ export function namesOf(lastRealms: ReadonlyMap<string, RealmRow>): Map<string, 
   return names;
 }
 
-// A realm's counts: this pass's, else the last file's, else not read.
+/** The height each realm's window counts from (7t3): the one the last file wrote for it, none's for a realm it read with no call yet; no
+ * height for a realm it never read. */
+export const sinceOf =
+  (lastRealms: ReadonlyMap<string, RealmRow>) =>
+  (path: string): number | undefined => {
+    const realm = lastRealms.get(path);
+    return realm === undefined || realm.calls === null ? undefined : (realm.lastHeight ?? 0);
+  };
+
+// A realm's counts: this pass's, else the last file's, else not read; the pass's window stays out of the file.
 function countsOf(
   history: History | undefined,
   earlier: RealmRow | undefined,
 ): Pick<RealmRow, "calls" | "callers" | "lastHeight"> {
-  if (history !== undefined) return history;
+  if (history !== undefined) return { calls: history.calls, callers: history.callers, lastHeight: history.lastHeight };
   return { calls: earlier?.calls ?? null, callers: earlier?.callers ?? null, lastHeight: earlier?.lastHeight ?? null };
 }
 

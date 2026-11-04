@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -486,6 +486,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
           },
         ]),
       );
+      writeFileSync(join(dir, "hubs.json"), "[]");
       const server = start({
         ...settings(),
         WORLDS_FILE: join(dir, "worlds.json"),
@@ -498,6 +499,8 @@ describe("the server's process", { timeout: 30_000 }, () => {
       expect(way.seen).toEqual(["rpc.the-default.example:443"]);
       server.child.kill("SIGTERM");
       expect(await exited(server)).toBe(0);
+      // 7t3: the chain's habits are kept beside the database, never beside the file nginx serves.
+      expect(readdirSync(dir).filter((name) => name.startsWith("trends-"))).toEqual([]);
     } finally {
       way.close();
     }
@@ -519,6 +522,10 @@ describe("the server's process", { timeout: 30_000 }, () => {
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
+    expect(
+      JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence-messages.json"), "utf8")),
+      "7t3",
+    ).toEqual({});
   });
 
   it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
@@ -531,7 +538,8 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  it("names at /api/trends the hub that rises against its own 14 days, from who is here in its rooms (7t)", async () => {
+  // 7t3: a hub whose rooms surge against its own 14 days is Trending by its chat, and the Rising item names no world already Trending.
+  it("names at /api/trends the hub whose people here surge against its own 14 days as Trending, and not again as rising (7t, 7t3)", async () => {
     const ergo = await fakeErgo();
     const env = settings();
     const oper = join(folder("gnoworld-oper-"), "oper");
@@ -552,7 +560,38 @@ describe("the server's process", { timeout: 30_000 }, () => {
       .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
         timeout: 10_000,
       })
-      .toMatchObject([{ kind: "rising", world: "bubble", rise: 5 }]);
+      .toEqual([
+        { kind: "trending", by: "here", world: "bubble", count: 6, rise: 5, at: expect.any(String) as unknown },
+      ]);
+  });
+
+  // 7t3: the chain's habits beside the database, counts alone; a database held in memory keeps none.
+  it("keeps each world's chain windows beside its database, and none for a database held in memory", async () => {
+    const habits = (env: Record<string, string>) => {
+      const dir = folder("gnoworld-worlds-");
+      writeFileSync(
+        join(dir, "universes.json"),
+        readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"),
+      );
+      writeFileSync(join(dir, "hubs.json"), "[]");
+      return { ...env, WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: join(dir, "universes.json") };
+    };
+    const env = settings();
+    const kept = start(habits(env));
+    await listening(kept);
+    kept.child.kill("SIGTERM");
+    expect(await exited(kept)).toBe(0);
+    expect(
+      readdirSync(dirname(env["DATABASE"] ?? ""))
+        .filter((name) => name.startsWith("trends-"))
+        .sort(),
+    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
+    const memory = habits({ ...settings(), DATABASE: ":memory:" });
+    const none = start(memory);
+    await listening(none);
+    none.child.kill("SIGTERM");
+    expect(await exited(none)).toBe(0);
+    expect(readdirSync(dirname(memory.WORLDS_FILE)).filter((name) => name.startsWith("trends-"))).toEqual([]);
   });
 
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
@@ -571,6 +610,16 @@ describe("the server's process", { timeout: 30_000 }, () => {
     } finally {
       way.close();
     }
+  });
+
+  // 7t3: the trends read a hub's rooms and its realms as one world, from the hubs beside the universes the job reads.
+  it("does not start a worlds job with no hubs.json beside UNIVERSES_FILE: it fails closed, naming the file", async () => {
+    const dir = folder("gnoworld-worlds-");
+    const universes = join(dir, "universes.json");
+    writeFileSync(universes, readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"));
+    const server = start({ ...settings(), WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: universes });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(join(dir, "hubs.json"));
   });
 
   it("does not start with a UNIVERSES_FILE that holds no default universe: it fails closed, naming the file", async () => {

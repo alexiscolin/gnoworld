@@ -43,10 +43,12 @@ const TRENDS = {
   items: [
     {
       kind: "trending",
+      by: "transactions",
       world: "gnoswap/pool",
       realm: "gno.land/r/gnoswap/pool",
       title: "pool",
-      calls: 45,
+      count: 45,
+      rise: 1.2,
       since: "2026-10-30T09:00:00.000Z",
       at: "2026-10-30T09:31:00.000Z",
     },
@@ -222,7 +224,7 @@ test.describe("the home at the video's size", () => {
   for (const [name, answer] of [
     ["no trend", { body: { items: [] } }],
     ["a failing server", { status: 502 }],
-    ["an answer its schema refuses", { body: { items: [{ kind: "trending", calls: -1 }] } }],
+    ["an answer its schema refuses", { body: { items: [{ kind: "trending", by: "transactions", count: -1 }] } }],
   ] as const) {
     test(`holds the dated news alone with ${name}, and never an event that waits for its date (7t)`, async ({
       page,

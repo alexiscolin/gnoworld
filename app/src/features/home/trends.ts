@@ -42,10 +42,10 @@ export interface TrendPlaces extends WorldPlaces {
   readonly worlds: readonly (WorldPlaces["worlds"][number] & { readonly name: string })[];
 }
 
-// A trend's world as the page names and links it, or none: the Earth rises by its slug, but a chain's world of its id is a realm's under the
-// namespace earth, which the page's Earth is not (F4550), and the rail leaves out too.
+// A trend's world as the page names and links it, or none: a hub's rooms (a rising one, or one Trending by them) and the Earth's by their
+// slug, but a chain's world of its id is a realm's under the namespace earth, which the page's Earth is not (F4550), and the rail leaves out.
 function placeOf(item: Trend, places: TrendPlaces): { name: string; path: string } | undefined {
-  if (item.kind === "rising") {
+  if (!("realm" in item)) {
     if (item.world === EARTH) return { name: "Earth", path: places.earth };
     const hub = places.worlds.find(({ slug }) => slug === item.world);
     return hub === undefined ? undefined : { name: hub.name, path: hub.path };
@@ -56,7 +56,9 @@ function placeOf(item: Trend, places: TrendPlaces): { name: string; path: string
   return path === undefined ? undefined : { name, path };
 }
 
-const callsOf = (calls: number): string => `${String(calls)} ${calls === 1 ? "call" : "calls"}`;
+const countOf = (count: number, one: string): string => `${String(count)} ${one}${count === 1 ? "" : "s"}`;
+const percentOf = (rise: number): string => `+${String(Math.round(rise * 100))}%`;
+const PEOPLE = "People in its rooms against its usual hour of the last 14 days";
 // The length of the busiest world's window, the time between the two reads, in whole minutes, a part of one counting one.
 const minutesOf = (since: string, at: string): number =>
   Math.max(1, Math.ceil((Date.parse(at) - Date.parse(since)) / 60_000));
@@ -64,17 +66,28 @@ const minutesOf = (since: string, at: string): number =>
 // A placed trend's words, as short as the video's (frame 6), and the source its link says, with its times.
 function wordsOf(item: Trend, name: string, now: Date): Pick<TickerItem, "text" | "source"> {
   const at = stampOf(item.at, now);
-  if (item.kind === "trending") {
-    return {
-      text: `${name} · ${callsOf(item.calls)} in ${String(minutesOf(item.since, item.at))} min`,
-      source: `Calls to its realms, as the chain's indexer counts them, from ${stampOf(item.since, now)} to ${at}`,
-    };
+  if (item.kind === "trending" && "realm" in item) {
+    const window = `as the chain's indexer counts them, from ${stampOf(item.since, now)} to ${at}, against its usual of the last 14 days`;
+    const minutes = `in ${String(minutesOf(item.since, item.at))} min`;
+    return item.by === "transactions"
+      ? { text: `${name} · ${countOf(item.count, "call")} ${minutes}`, source: `Transactions to its realms, ${window}` }
+      : {
+          text: `${name} · ${countOf(item.count, "caller")} ${minutes}`,
+          source: `Different addresses calling its realms, ${window}`,
+        };
   }
+  if (item.kind === "trending")
+    return item.by === "here"
+      ? {
+          text: `${name} · ${String(item.count)} here, ${percentOf(item.rise)} this hour`,
+          source: `${PEOPLE}, at ${at}`,
+        }
+      : {
+          text: `${name} · ${String(Math.round(item.count))} messages an hour, ${percentOf(item.rise)}`,
+          source: `Messages in its rooms, the last five minutes at an hour's pace, against its usual hour of the last 14 days, at ${at}`,
+        };
   if (item.kind === "rising")
-    return {
-      text: `${name} · +${String(Math.round(item.rise * 100))}% this hour`,
-      source: `People in its rooms against its usual hour of the last 14 days, at ${at}`,
-    };
+    return { text: `${name} · ${percentOf(item.rise)} this hour`, source: `${PEOPLE}, at ${at}` };
   return { text: `${name} · first seen ${at}`, source: `First on the chain's list of realms at ${at}` };
 }
 

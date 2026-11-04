@@ -29,7 +29,7 @@ import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
-import { startPresent } from "./worlds/present.ts";
+import { startPresent, type ChatWorld, type Present } from "./worlds/present.ts";
 
 export interface Chat {
   activity: Hono;
@@ -49,6 +49,8 @@ export interface Chat {
   // Who is here in each world (7h), where the server keeps its history, and what that route serves, for the ticker's trends (7t).
   presence?: Hono;
   presenceNow?: () => Presence;
+  // Each world's rooms with their usual, for the trends' score (7t3).
+  presenceChat?: () => readonly ChatWorld[];
   stop: () => Promise<void>;
 }
 
@@ -145,6 +147,10 @@ function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => und
   });
 }
 
+// What the chat hands on of who is here (7h, 7t3): its route, what it serves and the trends' signals; none without its file.
+const presentOf = (present: Present | undefined) =>
+  present === undefined ? {} : { presence: present.routes, presenceNow: present.current, presenceChat: present.chat };
+
 // Who is here (7h), in the rooms a guest may see: none without its file.
 function presentFor(
   db: DatabaseSync,
@@ -223,7 +229,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
-    ...(present === undefined ? {} : { presence: present.routes, presenceNow: present.current }),
+    ...presentOf(present),
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

@@ -379,8 +379,11 @@ Slice 3, the server's retention (3n):
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
-  and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history beside the
-  database: rising stays dark until the folder takes it). `scripts/check_docs.py` keeps this list whole.
+  and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or its
+  messages' (7t3), beside the database: rising and Trending by the rooms stay dark until the folder takes it);
+  `trends_write` (the worlds job could not write the chain's habits, trends-transactions.json and
+  trends-addresses.json, beside the database: Trending by the chain loses what the pass learned until the folder
+  takes it). `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 

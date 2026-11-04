@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, INDEXER, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
+import { makePresence } from "./presence.ts";
 
 // The worlds job (slice 7, 7c), one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
 // names, and a capped file written beside and renamed over. Every fault leaves the last file whole and is logged by its kind.
@@ -853,6 +854,49 @@ describe("the trends it tells", () => {
     );
   });
 
+  // 7t3: the window between two passes is counted from the height the last file wrote for each realm it read.
+  it("tells each realm's transactions above the last file's height and who sent them, and writes the file without them", async () => {
+    const file = fresh();
+    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
+    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
+    await run(chainRoutes([POOL, ROUTER]), { file, trends });
+    expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ lastHeight }) => lastHeight))).toEqual([
+      101, 101,
+    ]);
+    const busier = chainRoutes([POOL, ROUTER], {
+      indexer: ({ variables }) => history(pathOf(variables) === POOL ? 5 : 2, pathOf(variables)),
+    });
+    const { outcome } = await run(busier, { file, now: NOW + 5, trends });
+    expect(outcome).toEqual({ wrote: true });
+    expect(told[0]?.get(POOL)?.recent, "a first file has no height to count from").toBeUndefined();
+    expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: 3, callers: [A, B] });
+    expect(told[1]?.get(ROUTER)?.recent).toEqual({ transactions: 0, callers: [] });
+    expect(readFileSync(file, "utf8")).not.toContain("recent");
+    expect(written(file).worlds.find(({ id }) => id === "gnoswap/pool")?.realms[0]).toMatchObject({
+      calls: 5,
+      lastHeight: 104,
+    });
+  });
+
+  it("counts every call of a realm the last file read with none yet, and gives no window to one it never read", async () => {
+    const file = fresh();
+    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
+    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
+    const quiet = chainRoutes([POOL, ROUTER], {
+      indexer: ({ variables }) => (pathOf(variables) === ROUTER ? "{}" : history(0, pathOf(variables))),
+    });
+    await run(quiet, { file, trends });
+    expect(
+      written(file).worlds.flatMap(({ realms }) => realms.map(({ calls, lastHeight }) => [calls, lastHeight])),
+    ).toEqual([
+      [0, null],
+      [null, null],
+    ]);
+    await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5, trends });
+    expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: 2, callers: [A, B] });
+    expect(told[1]?.get(ROUTER)?.recent).toBeUndefined();
+  });
+
   it("tells no read of a pass whose indexer is silent, though it writes the file with the last counts", async () => {
     const file = fresh();
     await run(chainRoutes([POOL]), { file });
@@ -909,7 +953,7 @@ describe("startWorlds", () => {
     expect(chain.asked.filter(({ kind }) => kind === "vm/qpaths")).toHaveLength(1);
   });
 
-  it("keeps the trends of its passes for the ticker's route, each pass against the one before (7t)", async () => {
+  it("keeps the chain's window of its passes for the ticker's route, each pass against the one before (7t)", async () => {
     let reads = 0;
     const counting = chainRoutes([POOL], {
       indexer: () => {
@@ -919,10 +963,51 @@ describe("startWorlds", () => {
     });
     const chain = fakeChain(counting);
     const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20 });
-    expect(job.trends()).toEqual([]);
-    await until(() => job.trends().some(({ kind }) => kind === "trending"));
+    expect(job.trends()).toEqual({ worlds: [], newest: [] });
+    await until(() => job.trends().worlds.length > 0);
     job.stop();
-    expect(job.trends().find(({ kind }) => kind === "trending")).toMatchObject({ world: "gnoswap/pool", calls: 6 });
+    expect(job.trends().worlds[0]).toMatchObject({
+      world: "gnoswap/pool",
+      transactions: { now: 6 },
+      addresses: { now: 2 },
+    });
+  });
+
+  it("keeps each world's window in the habit files it is given, the busiest of each hour, for the next 14 days (7t3)", async () => {
+    let reads = 0;
+    const counting = chainRoutes([POOL], {
+      indexer: () => {
+        reads += 1;
+        return history(6 * reads, POOL);
+      },
+    });
+    const chain = fakeChain(counting);
+    const folder = join(fresh(), "..");
+    const habits = {
+      transactions: join(folder, "trends-transactions.json"),
+      addresses: join(folder, "trends-addresses.json"),
+    };
+    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20, habits });
+    await until(() => job.trends().worlds.length > 0);
+    job.stop();
+    const kept = (habit: string) => makePresence({ file: habit, now: Date.now }).history("gnoswap/pool").at(-1)?.people;
+    expect(kept(habits.transactions)).toBe(6);
+    expect(kept(habits.addresses)).toBe(2);
+  });
+
+  it("writes its habits as it stops, where it was told, though no pass wrote a window (7t3)", () => {
+    const folder = join(fresh(), "..");
+    const habits = {
+      transactions: join(folder, "trends-transactions.json"),
+      addresses: join(folder, "trends-addresses.json"),
+    };
+    const job = startWorlds({ ...base, file: fresh(), universe, habits });
+    job.stop();
+    expect(
+      readdirSync(folder)
+        .filter((name) => name.startsWith("trends-"))
+        .sort(),
+    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
   });
 
   it("runs another pass after the period, once the first has ended", async () => {
