@@ -425,6 +425,39 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
     expect(cards.cards()).toEqual(none());
   });
 
+  it.each([
+    ["its height", "gno_status", ["gno_status"]],
+    ["its page", "gno_render", ["gno_status", "gno_render"]],
+  ])("reads no more once its call's time is up while it reads %s", async (_case, during, made) => {
+    const call = new AbortController();
+    const at = (name: string) => () => {
+      if (name === during) call.abort();
+    };
+    const {
+      tools,
+      read: reads,
+      functions,
+    } = setup({
+      height: (profile) => {
+        at("gno_status")();
+        return Promise.resolve<Ran>({ ok: true, isError: false, text: status({ profile }) });
+      },
+      render: (realm) => {
+        at("gno_render")();
+        return Promise.resolve<Ran>({ ok: true, isError: false, text: wrapped(realm, pollPage()) });
+      },
+    });
+    const { asked, cards } = askedOf(undefined, call.signal);
+    expect(await tools.run(give(digest(facts("1,204"), form())), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: its call's time is up.",
+    });
+    expect(reads.mock.calls.map(([name]) => name)).toEqual(made);
+    expect(functions).not.toHaveBeenCalled();
+    expect(cards.cards()).toEqual(none());
+  });
+
   it("tells the model what it kept: the realm and the block its sources were read at", async () => {
     const { tools } = setup();
     expect(await tools.run(give(digest(facts("1,204"))), askedOf().asked)).toEqual({

@@ -82,15 +82,27 @@ function pageOf(text: string, realm: string): string {
 }
 
 type Sourced = { ok: true; at: ReadAt; read: Read } | { ok: false; why: string };
+interface Realm {
+  readonly profile: string;
+  readonly realm: string;
+  readonly forms: boolean;
+  readonly signal: AbortSignal;
+}
+const LATE = { ok: false, why: "its call's time is up." } as const;
+// Read through a call, as a signal's state changes across an await, which TypeScript's narrowing does not see.
+const over = (signal: AbortSignal): boolean => signal.aborted;
 
-// A realm's reads, that call: its height, its page, and its functions when a form needs them.
-async function readRealm(setup: Setup, at: { profile: string; realm: string; forms: boolean }): Promise<Sourced> {
+// A realm's reads, that call: its height, its page, and its functions when a form needs them; none more once the call's
+// time is up.
+async function readRealm(setup: Setup, at: Realm): Promise<Sourced> {
   const universe = setup.places.universes.get(at.profile);
   if (universe === undefined) return { ok: false, why: "its chain is no universe's." };
   const height = heightOf(await setup.read("gno_status", { profile: at.profile }), universe);
   if (height === undefined) return { ok: false, why: "its chain's height could not be read." };
+  if (over(at.signal)) return LATE;
   const page = await setup.read("gno_render", { profile: at.profile, realm: at.realm });
   if (!page.ok || page.isError) return { ok: false, why: "the realm's page could not be read." };
+  if (over(at.signal)) return LATE;
   const listed = at.forms ? await setup.functions(universe.rpc, at.realm) : { ok: true as const, value: null };
   if (!listed.ok) return { ok: false, why: "the realm's functions could not be read." };
   const texts = [{ from: "node" as const, text: pageOf(page.text, at.realm), height }];
@@ -120,7 +132,7 @@ type Args<At extends 0 | 1 | 2> = z.output<Definitions[At]["args"]>;
 async function digestCard(setup: Setup, args: Args<0>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("digest")) return refused(`an answer holds ${String(CARDS.digests)} digests at most.`);
   const forms = args.digest.blocks.some((block) => block.type === "form");
-  const sourced = await readRealm(setup, { profile: args.profile, realm: args.realm, forms });
+  const sourced = await readRealm(setup, { profile: args.profile, realm: args.realm, forms, signal: asked.signal });
   if (!sourced.ok) return refused(sourced.why);
   const checked = grounded(args.digest, sourcesOf(sourced.read));
   if (!checked.ok) return refused(whyOf(checked));
@@ -131,7 +143,12 @@ async function digestCard(setup: Setup, args: Args<0>, asked: Asked): Promise<Ra
 
 async function proposalCard(setup: Setup, args: Args<1>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("proposal")) return refused(`an answer holds ${String(CARDS.proposals)} proposal at most.`);
-  const sourced = await readRealm(setup, { profile: args.profile, realm: args.action.realm, forms: true });
+  const sourced = await readRealm(setup, {
+    profile: args.profile,
+    realm: args.action.realm,
+    forms: true,
+    signal: asked.signal,
+  });
   if (!sourced.ok) return refused(sourced.why);
   const checked = grounded(
     { blocks: [{ type: "form", action: args.action }] },
@@ -160,7 +177,7 @@ async function buttonCard(setup: Setup, args: Args<2>, asked: Asked): Promise<Ra
   const { button, profile } = args;
   if (button.type === "fly") return flyCard(setup, button, asked);
   if (profile === undefined) return refused("an action's button names its realm's chain profile.");
-  const sourced = await readRealm(setup, { profile, realm: button.action.realm, forms: true });
+  const sourced = await readRealm(setup, { profile, realm: button.action.realm, forms: true, signal: asked.signal });
   if (!sourced.ok) return refused(sourced.why);
   const checked = groundedButton(button, sourcesOf(withQuestion(sourced.read, asked)));
   if (!checked.ok) return refused(whyOf(checked));
