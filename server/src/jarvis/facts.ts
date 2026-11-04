@@ -67,13 +67,13 @@ function numbersIn(plain: string): Set<string> {
 export const groupsOf = (number: string): string => number.replace(/[^\d\p{No}-]/gu, ",");
 
 // A text's words as a person reads them: runs of letters and digits.
-const wordsOf = (plain: string): string[] => Array.from(plain.matchAll(/[\p{L}\p{N}]+/gu), ([word]) => word);
+const wordsOf = (plain: string): Set<string> => new Set(plain.match(/[\p{L}\p{N}]+/gu));
 const isAccount = (word: string): boolean => word.startsWith("g1") || word.length >= 38;
 
 // A number a letter or a mark touches, as written, case and marks kept (`1OOO`, `GRC20`): a figure no number check reads.
 const figuresIn = (shown: string): Set<string> =>
   new Set(
-    Array.from(shown.matchAll(/[\p{L}\p{M}\p{N}]+/gu), ([word]) => word).filter(
+    [...new Set(shown.match(/[\p{L}\p{M}\p{N}]+/gu))].filter(
       (word) => /\p{N}/u.test(word) && /[^\p{Nd}\p{No}]/u.test(word) && !isAccount(word.toLowerCase()),
     ),
   );
@@ -84,27 +84,36 @@ function linksIn(nodes: Iterable<Inline>): Set<string> {
   return links;
 }
 
-/** A text's facts, read as the room reads a message: as what is stated (a digest, a translation), or, `held`, as what a
- * source holds (a translation's original), each the way that asks the most of the sources. */
-export function factsOf(text: string, held = false): Facts {
-  const blocks = markdown(text);
+// What a text's words and figures are as a person reads them, with no Markdown, so none crosses a line break.
+function seen(text: string, held: boolean): Pick<Facts, "addresses" | "numbers" | "figures"> {
   const shown = visible(text, held);
   const plain = unseen(shown);
   return {
-    links: linksIn(inlines(blocks)),
-    addresses: new Set(wordsOf(plain).filter(isAccount)),
+    addresses: new Set([...wordsOf(plain)].filter(isAccount)),
     numbers: numbersIn(plain),
     figures: figuresIn(shown),
-    room: mentionsRoom(blocks),
   };
 }
 
-/** What a source can ground: its links, numbers as written, words, and pieces, which a figure or an argument must be. */
+// What core's reader finds in a text: its links, and whether it names the whole room.
+function markdownFacts(text: string): Pick<Facts, "links" | "room"> {
+  const blocks = markdown(text);
+  return { links: linksIn(inlines(blocks)), room: mentionsRoom(blocks) };
+}
+
+/** A text's facts, read as the room reads a message: as what is stated (a digest, a translation), or, `held`, as what a
+ * source holds (a translation's original), each the way that asks the most of the sources. */
+export function factsOf(text: string, held = false): Facts {
+  return { ...markdownFacts(text), ...seen(text, held) };
+}
+
+/** What a source can ground: its links, numbers as written, words, and pieces, which a figure or an argument must be,
+ * read when first asked, as few digests state either. */
 export interface SourceFacts {
   readonly links: ReadonlySet<string>;
   readonly numbers: ReadonlySet<string>;
   readonly words: ReadonlySet<string>;
-  readonly pieces: ReadonlySet<string>;
+  readonly pieces: () => ReadonlySet<string>;
 }
 
 // A page's inline nodes: core's walk of a message's blocks, and each heading's line.
@@ -132,9 +141,14 @@ function piecesOf(source: string, links: ReadonlySet<string>): Set<string> {
 export function sourceFactsOf(source: string, origin: string): SourceFacts {
   const read = page(source, { origin });
   const links = read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>();
-  const shown = visible(source, true);
-  const plain = unseen(shown);
-  return { links, numbers: numbersIn(plain), words: new Set(wordsOf(plain)), pieces: piecesOf(source, links) };
+  const plain = unseen(visible(source, true));
+  let pieces: Set<string> | undefined;
+  return {
+    links,
+    numbers: numbersIn(plain),
+    words: wordsOf(plain),
+    pieces: () => (pieces ??= piecesOf(source, links)),
+  };
 }
 
 /** What a digest states, the actions its forms propose, and their arguments' pieces, which a call carries as given. */
@@ -179,25 +193,22 @@ const addAll = (into: Set<string>, from: Iterable<string>): void => {
   for (const value of from) into.add(value);
 };
 
-/** A digest's facts, each text read alone, so a fence never closed in one hides nothing of the next. */
+/** A digest's facts, each text read alone by core's reader, so a fence never closed in one hides nothing of the next; its
+ * words and figures read in one pass, each text on its line. */
 export function digestFacts(digest: Digest): DigestFacts {
-  const facts = { links: new Set<string>(), addresses: new Set<string>(), numbers: new Set<string>() };
-  const [figures, pieces] = [new Set<string>(), new Set<string>()];
-  const actions: ProposedAction[] = [];
+  const all = digest.blocks.map(partsOf);
+  const [links, pieces] = [new Set<string>(), new Set<string>()];
   let room = false;
-  for (const block of digest.blocks) {
-    const { texts, links: whole, action } = partsOf(block);
-    for (const found of texts.map((text) => factsOf(text))) {
-      addAll(facts.links, found.links);
-      addAll(facts.addresses, found.addresses);
-      addAll(facts.numbers, found.numbers);
-      addAll(figures, found.figures);
+  for (const { texts, links: whole, action } of all) {
+    for (const found of texts.map(markdownFacts)) {
+      addAll(links, found.links);
       room ||= found.room;
     }
-    addAll(facts.links, whole);
-    if (action !== undefined) actions.push(action);
+    addAll(links, whole);
     for (const value of Object.values(action?.args ?? {}))
       addAll(pieces, Array.from(value.matchAll(/\S+/gu), ([part]) => part).filter(isPiece));
   }
-  return { ...facts, figures, room, actions, pieces };
+  const actions = all.flatMap(({ action }) => (action === undefined ? [] : [action]));
+  const texts = all.flatMap(({ texts: some }) => some).join("\n");
+  return { links, ...seen(texts, false), room, actions, pieces };
 }

@@ -53,7 +53,7 @@ function missingIn(stated: DigestFacts, sources: Sources): Missing[] {
   const link = held((facts) => facts.links);
   const number = held((facts) => facts.numbers);
   const word = held((facts) => facts.words);
-  const piece = held((facts) => facts.pieces);
+  const piece = held((facts) => facts.pieces());
   const check = (kind: Missing["kind"], values: ReadonlySet<string>, found: (value: string) => boolean) => {
     for (const value of values) if (!found(value)) missing.push({ kind, value });
   };
