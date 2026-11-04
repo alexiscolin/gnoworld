@@ -140,8 +140,9 @@
       padding-block-start: 27px;
     }
 
-    /* The kicker, or the crumbs (8g), is the row over the title: 24 px tall, its words centred in it (frame 26), so the title keeps its place. */
-    .panel[data-look="plate"] .content :is(p, nav):has(+ h1) {
+    /* The kicker, or the crumbs (8g), is the row over the title: 24 px tall, its words centred in it (frame 26), so the title keeps its place;
+       never a heading inside a dialog or an inert picture (8f). */
+    .panel[data-look="plate"] .content :is(p, nav):not(:is(dialog, [inert]) *):has(+ h1) {
       /* layout: the kicker's words centred in the crumbs' row */
       display: flex;
       /* layout: centred in the row */
@@ -150,9 +151,10 @@
       min-block-size: 24px;
     }
 
-    /* The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
+    /* The plate's own title, never a heading drawn on it in a dialog or a picture (a page's capture, 8f), which keeps its own scale.
+       The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
        step the longest name the 474 px column holds at 0.58 em a letter. */
-    .panel[data-look="plate"] h1 {
+    .panel[data-look="plate"] h1:not(:is(dialog, [inert]) *) {
       /* raw: 7 px off the crumbs, which sets the title's ink at y 183 (frame 37) */
       /* layout: the arrangement the prototype and the frames draw */
       margin-block-start: 7px;
@@ -163,7 +165,7 @@
       line-height: 0.9;
     }
 
-    .panel[data-look="plate"] h1 + p {
+    .panel[data-look="plate"] h1:not(:is(dialog, [inert]) *) + p {
       /* raw: 11 px more under the title, which sets the description's ink at y 310 (frame 26) */
       /* layout: the arrangement the prototype and the frames draw */
       margin-block-start: 11px;
@@ -175,32 +177,32 @@
       font: 400 16px/1.55 var(--family-sans);
     }
 
-    .panel[data-look="plate"][data-fit="8"] h1 {
+    .panel[data-look="plate"][data-fit="8"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: max(36px, min(10.93vb, 102px));
     }
 
-    .panel[data-look="plate"][data-fit="10"] h1 {
+    .panel[data-look="plate"][data-fit="10"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 81.7px;
     }
 
-    .panel[data-look="plate"][data-fit="12"] h1 {
+    .panel[data-look="plate"][data-fit="12"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 68px;
     }
 
-    .panel[data-look="plate"][data-fit="16"] h1 {
+    .panel[data-look="plate"][data-fit="16"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 51px;
     }
 
-    .panel[data-look="plate"][data-fit="20"] h1 {
+    .panel[data-look="plate"][data-fit="20"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 40.9px;
     }
 
-    .panel[data-look="plate"][data-fit="more"] h1 {
+    .panel[data-look="plate"][data-fit="more"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 36px;
     }

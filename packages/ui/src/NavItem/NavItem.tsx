@@ -24,14 +24,24 @@ export function NavItem({ children, current = false, lead, badge, href, onClick 
       <span className="truncate">{children}</span>
     </>
   );
+  // The whole pill is the link, its sides and its count too (review 25 of 5q): ui's `covers`.
   return (
     <div className={styles["item"]} data-nav-item="" data-current={current ? "" : undefined}>
       {href === undefined ? (
-        <button type="button" className={styles["main"]} aria-current={current ? "true" : undefined} onClick={onClick}>
+        <button
+          type="button"
+          className={[styles["main"], "covers"].join(" ")}
+          aria-current={current ? "true" : undefined}
+          onClick={onClick}
+        >
           {face}
         </button>
       ) : (
-        <Anchor href={href} className={styles["main"]} aria-current={current ? "true" : undefined}>
+        <Anchor
+          href={href}
+          className={[styles["main"], "covers"].join(" ")}
+          aria-current={current ? "true" : undefined}
+        >
           {face}
         </Anchor>
       )}

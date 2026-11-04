@@ -14,7 +14,8 @@ import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
 import { historyRoutes } from "./prices/history.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultRpc, defaultUniverse, hubWorlds } from "./prices/universes.ts";
+import { checkFor, startPreviews } from "./previews/job.ts";
+import { defaultRpc, defaultUniverse, hubRealms, hubWorlds } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 import { startWorlds } from "./worlds/job.ts";
@@ -45,6 +46,13 @@ const prices =
 // Only the default universe: the way out lets out its RPC and no other's.
 // A job meant that could not know which chain to read: the server stops rather than run without it.
 if (config.worlds !== undefined && config.universes === undefined) throw new Error("setting UNIVERSES_FILE: required");
+// The hubs' pages captured every six hours into the file PREVIEWS_FILE names (8f), each read by the moderation check before it is written:
+// no chain to read, or no check, and the server stops rather than run without them.
+if (config.previews !== undefined && config.universes === undefined)
+  throw new Error("setting UNIVERSES_FILE: required");
+if (config.previews !== undefined && config.moderation.openaiKey === undefined) {
+  throw new Error("setting OPENAI_API_KEY_FILE: required");
+}
 // The trends read a hub's rooms and its realms as one world (7t3): the hubs beside the universes, read before the job, so a bad file stops
 // the server at boot; each world's chain windows kept beside the database, counts alone, none for a database in memory.
 const hubs = config.worlds === undefined || config.universes === undefined ? undefined : hubWorlds(config.universes);
@@ -61,6 +69,17 @@ const worlds =
   config.worlds === undefined || config.universes === undefined
     ? undefined
     : startWorlds({ file: config.worlds, log, universe: defaultUniverse(config.universes), ...habits });
+const { openaiKey, thresholds } = config.moderation;
+const previews =
+  config.previews === undefined || config.universes === undefined || openaiKey === undefined
+    ? undefined
+    : startPreviews({
+        file: config.previews,
+        log,
+        universe: defaultUniverse(config.universes),
+        pages: hubRealms(config.universes),
+        check: checkFor({ openaiKey, thresholds }, { log }),
+      });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -131,6 +150,7 @@ const drain = (): void => {
   retention.stop();
   prices?.stop();
   worlds?.stop();
+  previews?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

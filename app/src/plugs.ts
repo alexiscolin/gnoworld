@@ -2,4 +2,6 @@
 // chunk it asks for later: this file is on every page's first screen).
 import "./features/expedition/plug.tsx";
 import "./features/notifications/plug.ts";
+import "./features/previews/plug.ts";
+import "./features/realms/plug.ts";
 import "./features/share/plug.ts";

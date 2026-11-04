@@ -10,6 +10,7 @@ import { pageOf, realmView, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
+import { platePreview } from "../features/previews/plate.ts";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
 import { useHours, type Hours } from "../features/world/useHours.ts";
@@ -26,6 +27,8 @@ const FromExplorer = lazy(() => import("../features/realms/FromExplorer.tsx"));
 
 // A world's kind as its crumb says it (frames 22, 93, 104); a world the data says nothing of is a hub.
 const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp" };
+// A world's page's capture (8f, frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
+const Preview = lazy(async () => ({ default: (await import("../features/previews/Preview.tsx")).Preview }));
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -119,6 +122,7 @@ export default function World() {
   const realmPath = realm === undefined ? undefined : realmView(realm, universe);
   // Who is here names a hub by its slug: its rooms' world (7h).
   const hours = useHours(world.slug);
+  const preview = platePreview(world.realms, universe);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -152,6 +156,12 @@ export default function World() {
                   </Suspense>
                 )}
                 <FromTheFile world={world} realmPath={realmPath} prefix={prefix} />
+                {/* Last on the plate, as frame 26 draws it: the world's page, captured. */}
+                {preview === undefined ? null : (
+                  <Suspense fallback={null}>
+                    <Preview path={preview} look="plate" />
+                  </Suspense>
+                )}
               </Stack>
             </Panel.Body>
           </Panel>

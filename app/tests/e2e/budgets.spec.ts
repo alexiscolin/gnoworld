@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
+import { scriptedErgo } from "./scripted.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
 // worker's precache; steps in docs/decisions.md. The first screen: 8g's plates, what waits for no read, 185,847 B on /earth when the chat's
@@ -70,6 +71,16 @@ const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 // which the journeys' site does not serve: their chunk never loads here.
 const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336 };
+// So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
+// It is weighed beyond the proposals' code, which the same page loads.
+const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
+// 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B.
+const PREVIEW_JS = 3669;
+// Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
+const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
+// And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.
+const PAGE_DRAWING = /\/assets\/RealmBlocks-[\w-]+\.js$/;
+const CAPTURE_PARTS = [PREVIEW, DRAWING, PAGE_DRAWING];
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
@@ -239,6 +250,29 @@ async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) 
   return [...scripts].find((url) => CHAT.test(url));
 }
 
+// A world's page's capture (8f): its code and the chat's drawing it asks for, both late, on a world with a realm alone (GovDAO, of the default
+// universe, whose pages the job captures); none elsewhere.
+async function lateCapture(path: string, scripts: ReadonlySet<string>): Promise<string[]> {
+  const asks = () => [...scripts].some((url) => PREVIEW.test(url));
+  await expect.poll(asks, "a world with a realm asks for its capture's code").toBe(path.includes("govdao"));
+  const preview = [...scripts].find((url) => PREVIEW.test(url));
+  if (preview === undefined) return [];
+  for (const part of [DRAWING, PAGE_DRAWING])
+    await expect
+      .poll(() => [...scripts].some((url) => part.test(url)), `the capture asks for ${part.source}`)
+      .toBe(true);
+  return [...scripts].filter((url) => CAPTURE_PARTS.some((part) => part.test(url)));
+}
+
+// What the capture brings beyond what the page already holds (`there`: its first screen and the proposals' code) stays within its cap.
+async function captureWithin(page: Page, capture: readonly string[], there: readonly string[]): Promise<void> {
+  if (capture.length === 0) return;
+  const own = await Promise.all(capture.map((url) => ownOf(page, url, there)));
+  expect(await compressed(page, [...new Set(own.flat())]), "the capture stays within its cap").toBeLessThanOrEqual(
+    PREVIEW_JS,
+  );
+}
+
 for (const path of PAGES) {
   test(`${path} stays within its budgets`, async ({ page }) => {
     const scripts = new Set<string>();
@@ -270,12 +304,17 @@ for (const path of PAGES) {
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
     const chatLate = await lateChat(page, path, scripts);
+    const capture = await lateCapture(path, scripts);
     // One look at the scripts: a plate's late chunk landing meanwhile is named late, never weighed as the first screen's.
     const seen = [...scripts];
     const plateLate = seen.filter((url) => PLATE_LATE.test(url));
-    const late = [asked[0], chatLate, ...plateLate].filter((url) => url !== undefined);
+    const late = [asked[0], ...capture, chatLate, ...plateLate].filter((url) => url !== undefined);
     const firstScreen = await without(page, seen, late);
     await plateWithin(page, plateLate, firstScreen);
+    await captureWithin(page, capture, [
+      ...firstScreen,
+      ...(asked[0] === undefined ? [] : await closureOf(page, asked[0])),
+    ]);
     const lateChunk = late.find((url) => CHAT.test(url));
     if (lateChunk !== undefined)
       expect(
@@ -303,6 +342,54 @@ for (const path of PAGES) {
     expect(holdingThree, "nothing of three on the first screen").toEqual([]);
   });
 }
+
+// A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
+// brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
+// 7,445 B: the capture's code, the realm page's reader and drawing, and the warning before a link leaves; capped at its size and 256 B.
+const LINE_PREVIEW_JS = 7701;
+test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
+  const scripts = new Set<string>();
+  page.on("response", (response) => {
+    if (response.request().resourceType() === "script") scripts.add(response.url());
+  });
+  const text = "how the hub looked last week https://onyx.testnets.gno.land/r/gov/dao";
+  const capture = {
+    path: "gno.land/r/gov/dao",
+    captured: "2026-11-05T10:00:00.000Z",
+    text: "# GovDAO\n## Proposals\n",
+  };
+  await page.route("**/previews.json", (route) =>
+    route.fulfill({ json: { version: 1, universe: "onyx", updated: capture.captured, previews: [capture] } }),
+  );
+  const verdict = { msgid: "p1", room: "#bubble/games", state: "checked" };
+  const since = { time: new Date().toISOString() };
+  await page.route("**/api/stream?**", (route) =>
+    route.fulfill({
+      headers: { "content-type": "text/event-stream", "cache-control": "no-store" },
+      body: `retry: 100\n\nevent: verdict\ndata: ${JSON.stringify(verdict)}\n\nevent: since\ndata: ${JSON.stringify(since)}\n\n`,
+    }),
+  );
+  await page.routeWebSocket(/\/ws$/, (ergo) => {
+    scriptedErgo(ergo, "guest-zzzzzz", { history: [["p1", "2026-11-05T15:32:00.000Z", text]] });
+  });
+  await page.goto("/w/bubble?room=games");
+  await hydrated(page);
+  await expect(page.locator("button[data-preview]")).toBeVisible({ timeout: 20_000 });
+  const parts = [...scripts].filter((url) => CAPTURE_PARTS.some((part) => part.test(url)));
+  expect(
+    parts.some((url) => PREVIEW.test(url)),
+    "the line asks for the capture's code",
+  ).toBe(true);
+  // What the page's other roots reach (its first screen, the chat, the lines), each with every chunk it imports: a chunk only the capture's
+  // parts import is the capture's, one the lines import too (the chat's drawing) is not.
+  const roots = await without(page, [...scripts], parts);
+  const there = [...new Set((await Promise.all(roots.map((url) => closureOf(page, url)))).flat())];
+  const own = await Promise.all(parts.map((url) => ownOf(page, url, there)));
+  expect(
+    await compressed(page, [...new Set(own.flat())]),
+    "the line's capture stays within its cap",
+  ).toBeLessThanOrEqual(LINE_PREVIEW_JS);
+});
 
 test("the cosmos's chunk stays within its cap, and the scene's holds none of it", async ({ page }) => {
   const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));

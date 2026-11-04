@@ -91,3 +91,27 @@ export function markup(element: ReactElement): HTMLElement {
   host.innerHTML = renderToStaticMarkup(element);
   return host;
 }
+
+/** Until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 10 s. */
+export async function settled(holds: () => boolean): Promise<void> {
+  const end = Date.now() + 10_000;
+  while (!holds()) {
+    if (Date.now() > end) throw new Error("waited 10 s");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
+}
+
+/** jsdom has no top layer and no showModal: a modal it opens is open, closed by close() with its event. The focus, Esc and the scrim
+ * are the journeys'. */
+export function modals(): void {
+  const proto = HTMLDialogElement.prototype;
+  proto.showModal = function open(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  proto.close = function shut(this: HTMLDialogElement) {
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  };
+}
