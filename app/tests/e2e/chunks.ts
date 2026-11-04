@@ -18,12 +18,12 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // 156 KiB since 7e, 160,000 B for the rail's portraits, 158,208 B once the shaders' spaces were stripped (Alexis, 2026-11-02 and 03);
   // 159,648 B with the three classes the Earth's stations draw with (Alexis, 2026-11-04, "Oui, 160 256" in the old measure, 159,847 in
-  // this one), 7x2's merge measured.
-  { chunk: "scene", after: ["mountUniverse"], cap: 159_648 },
+  // this one); 159,665 B with 7v2's shared golden ratio and page's bands, modules of their own (the margin given ahead).
+  { chunk: "scene", after: ["mountUniverse"], cap: 159_665 },
   // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
-  // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
-  // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead).
-  { chunk: "cosmos", after: ["scene"], cap: 17_130 },
+  // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04);
+  // 17,130 B with the Earth's view's loader (7x2), 17,165 B with 7v2's shared ratio and bands and a Plan half lit (the margin given ahead).
+  { chunk: "cosmos", after: ["scene"], cap: 17_165 },
   { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
@@ -31,14 +31,16 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "Rail", after: ["scene", "cosmos"], cap: 7026 },
   { chunk: "portraits", after: ["scene", "cosmos"], cap: 1797 },
   { chunk: "flights", after: ["scene"], cap: 18_391 },
-  { chunk: "restArrival", after: ["scene", "cosmos", "restSearch"], cap: 2033 },
+  // A system's arrival: 2,304 B, 2.25 KiB, for no column of worlds at rest (Alexis, 2026-11-04, "Oui aux deux", 7v's column patch).
+  { chunk: "restArrival", after: ["scene", "cosmos", "restSearch"], cap: 2304 },
   // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
-  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_442 },
+  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md); 13,534 B with 7v2's shared route to a world's page, the
+  // page's bands and the column's test (the margin given ahead).
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_534 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
-  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2401 },
+  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2408 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
   { chunk: "part", after: ["scene"], cap: 12_066 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the

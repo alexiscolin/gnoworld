@@ -1,7 +1,7 @@
 // The close stations' names and the caption over their group (part 7x2; frame 4's "Built and curated", "Curated" as half are other teams'): each
 // name over its station, a link to the project's own address, or to its world's page where the file names one, and the hand only then; the
 // caption over the names, where the stations group. Over the canvas, under the page's text, in the labels' layer.
-import { clearOf, type ClearBox } from "@gnoworld/core";
+import { BANDS, clearOf, worldRoute, type ClearBox } from "@gnoworld/core";
 import { OPEN } from "../openEvent.ts";
 import labelStyles from "../cosmos/labels.module.css";
 import { Placed } from "../cosmos/placed.ts";
@@ -36,15 +36,14 @@ export interface Named {
 // Pixels between a station's outline and its name's foot, and from the highest name's foot to the caption's: a name's line and air.
 const OVER = 6;
 const CAPTION_GAP = 34;
-// The header's band, which the caption keeps off; a name's and the caption's reach round their middle, kept off the page's text.
-const HEADER = 96;
+// A name's and the caption's reach round their middle, kept off the page's text; the caption keeps off the header's band (core's BANDS).
 const NAME_REACH = 50;
 const LINE = 16;
 // Half the caption's width and a margin: its centre stays this far in from the screen's sides.
 const HALF_CAPTION = 150;
 
 const hrefOf = ({ url, slug }: Named): string | undefined => {
-  const href = slug === undefined ? url : `/w/${slug}`;
+  const href = slug === undefined ? url : worldRoute(slug);
   return linkable(href) ? href : undefined;
 };
 
@@ -124,14 +123,18 @@ export class StationNames {
 
   /** Each name over its station at `spots`, and the caption over them at `caption` of its strength, its centre kept within `width`: as the
    * eye rises to the top view it gives way. */
-  place(spots: readonly Spot[], caption: number, { width, box }: { width: number; box: ClearBox | undefined }): void {
+  place(
+    spots: readonly Spot[],
+    caption: number,
+    { width, height, box }: { width: number; height: number; box: ClearBox | undefined },
+  ): void {
     const bounds = this.#bounds;
     bounds.top = Infinity;
     bounds.left = Infinity;
     bounds.right = -Infinity;
     this.#box = box;
     for (let at = 0; at < spots.length; at += 1) this.#nameAt(at, spots[at]);
-    this.#placeCaption(caption, width);
+    this.#placeCaption(caption, width, height);
   }
 
   // A name over its station, or hidden, off the page's text, the names' bounds grown by it.
@@ -157,10 +160,10 @@ export class StationNames {
   }
 
   // The caption over the names' middle, off the header and the page's text, at `caption` of its strength, written only when it changed.
-  #placeCaption(caption: number, width: number): void {
+  #placeCaption(caption: number, width: number, height: number): void {
     const { top, left, right } = this.#bounds;
     const middle = Math.min(Math.max((left + right) / 2, HALF_CAPTION), width - HALF_CAPTION);
-    const y = Math.max(top - CAPTION_GAP, HEADER);
+    const y = Math.max(top - CAPTION_GAP, BANDS.header * height);
     const hidden = !Number.isFinite(top) || caption <= 0 || !this.#clear(middle, y - 2 * LINE, HALF_CAPTION);
     if (this.#caption.hidden !== hidden) this.#caption.hidden = hidden;
     if (hidden) return;

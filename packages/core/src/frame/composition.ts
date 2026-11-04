@@ -151,6 +151,10 @@ export const atOneHeight = (
   return up < ONE_HEIGHT * height && up < LEVEL * Math.abs(one.x - other.x);
 };
 
+/** Whether two places stand one over the other on a screen, 40 degrees off the upright at most: a column (7p). */
+export const upright = (one: { x: number; y: number }, other: { x: number; y: number }): boolean =>
+  Math.abs(one.x - other.x) < LEVEL * Math.abs(one.y - other.y);
+
 /** Whether the bodies on screen, `spots`, and the Earth read as the view must, judged in `frame`: spread, apart, in no row that does not
  * recede, and deep with a close world. */
 export function composed(spots: readonly Seen[], earth: Seen, frame: Frame): boolean {

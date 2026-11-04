@@ -183,7 +183,7 @@ export class EarthView {
       this.#stations?.room(index, box === undefined ? 1 : clearOf(spot, box));
       spot.radius *= NAME_REACH;
     }
-    this.#names.place(this.#spots, caption, { width, box });
+    this.#names.place(this.#spots, caption, { width, height, box });
   }
 
   /** Keeps what `material` draws off the page's text, as its own orbits: the Earth's ring, which the cosmos's Home draws. */

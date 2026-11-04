@@ -3,6 +3,7 @@
 // written as text, ten times a second at most; each frame moves them beside their bodies as core/lod settles them, clear of each other, of
 // the page's bands and of the bodies.
 import {
+  BANDS,
   LABEL_SLOTS,
   LabelLayout,
   PLACE,
@@ -20,10 +21,8 @@ import { watchScene } from "./sceneRuns.ts";
 export type { Anchor, Chosen };
 
 const WORDS_MS = 100;
-// The bands the page keeps at 1,080 high, frames 4 and 17: the header's 9%, the ticker's 34 px, and the rail's: its footprint (core's RAIL,
+// The bands the page keeps, frames 4 and 17: the header's and the ticker's (core's BANDS), and the rail's: its footprint (core's RAIL,
 // which the rail takes its width from) and the labels' air before it, 149 px at 1,728, which a label slides left of.
-const HEADER = 0.09;
-const TICKER = 34;
 const RAIL_BAND = RAIL.footprint + PLACE.air;
 const RAIL_FROM = RAIL.from;
 // A distant star's room on screen, in pixels, whatever its distance.
@@ -80,8 +79,8 @@ export class Labels {
     const { width, height, box } = sight;
     this.#sight = sight;
     const bands = [
-      [0, 0, width, HEADER * height],
-      [0, height - TICKER, width, height],
+      [0, 0, width, BANDS.header * height],
+      [0, height - BANDS.ticker, width, height],
       ...(width >= RAIL_FROM ? [[width - RAIL_BAND, 0, width, height]] : []),
       ...(box === undefined ? [] : [[box.left, box.top, box.right, box.bottom]]),
     ];

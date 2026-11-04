@@ -1,7 +1,9 @@
 // The cosmos as a view (slice 7, 7d2, 7d5 and 7d6), for Alexis's eye on a real GPU: the site's own scene, the worlds from the recorded file
 // with the imports read for a sample of them, the view at rest first. The camera keeps the Earth at the centre: a wheel backs away, out to
 // the whole cosmos (7d5), and comes back, a drag moves the eye round it. `arrive=<system>` shows that system's arrival instead (7d3), as
-// 7g's flights will land on it, with no hero's room and no wheel.
+// 7g's flights will land on it, with no hero's room and no wheel; `plan` its Plan; `big=<count>` adds a namespace `big` of that many worlds,
+// their callers from their own hash, to weigh a system of any size (7v2; Alexis, 2026-11-04: "scalables pour récupérer énormément de
+// mondes"); `tier=low` the weak tier.
 import { HERO_ZONE, HOME } from "@gnoworld/core";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { startScene } from "../src/scene/scene.ts";
@@ -11,6 +13,8 @@ import { tuningPanel } from "./panel.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
 const ZOOM = 0.0022;
+// A realm of the synthetic namespace: no deployer, function, import or call known.
+const BLANK = { deployer: null, deployerName: null, functions: [], imports: [], calls: null, lastHeight: null };
 // Out to about 1,600 units from what the eye looks at, back along the view's axis so the disc stays in the middle: the whole of the recorded
 // cosmos, small there. Rising instead, as the wheel did, slid the disc down out of the frame past a cluster's distance.
 const FARTHEST = 45;
@@ -25,13 +29,21 @@ if (footer !== null) footer.textContent = CREDITS.map((credit) => credit.line).j
 const panel = document.querySelector("main");
 if (panel !== null) panel.hidden = true;
 
-const scene = startScene({ canvas, remembered: undefined, remember: () => undefined, onLost: () => undefined });
+const query = new URLSearchParams(location.search);
+const remembered = query.get("tier") === "low" ? "low" : undefined;
+const scene = startScene({ canvas, remembered, remember: () => undefined, onLost: () => undefined });
 const file = linked(recorded, read);
-scene.cosmos(file.worlds, file.updated);
+const big = Array.from({ length: Number(query.get("big") ?? 0) }, (_, at) => ({
+  id: `big/w${String(at)}`,
+  namespace: "big",
+  realms: [{ ...BLANK, path: `gno.land/r/big/w${String(at)}`, callers: Math.imul(at + 1, 2654435761) >>> 24 }],
+}));
+scene.cosmos([...file.worlds, ...big], file.updated);
 Reflect.set(globalThis, "__gnoworldScene", scene);
 // A system's name, looked up among the file's systems and nothing else.
-const arriving = new URLSearchParams(location.search).get("arrive");
+const arriving = query.get("arrive");
 if (arriving !== null) scene.arrive(arriving);
+if (query.has("plan")) scene.see(true);
 let away = 1;
 let aside = 0;
 let along = 0;

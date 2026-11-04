@@ -2706,7 +2706,7 @@ describe("a system's arrival (7d3)", () => {
   // The design review's second pass (F4470; the chief): a Plan's bodies were lit at a fixed angle from the eye, each facing its light alike,
   // a planetarium's tell, so one in front of its star showed lit (gnoland's boards2 about 70%, its place 13%). Each is lit from its own star
   // now, its lit side towards it, never past 2.2 radians from the eye: a fifth of its disc lit at the least.
-  it("lights a Plan's bodies from their own star, a fifth of each lit at the least", async () => {
+  it("lights a Plan's bodies from their own star, half of each lit at the least", async () => {
     const scene = made();
     await shown(scene, ONYX);
     await arrived(scene, GNOSWAP, true);
@@ -2714,9 +2714,9 @@ describe("a system's arrival (7d3)", () => {
     let turned = 0;
     for (const { at, star, sun } of list) {
       const [toStar, toEye] = [star.clone().sub(at).normalize(), at.clone().negate().normalize()];
-      expect(sun.angleTo(toEye)).toBeCloseTo(Math.min(toStar.angleTo(toEye), 2.2), 6);
+      expect(sun.angleTo(toEye)).toBeCloseTo(Math.min(toStar.angleTo(toEye), Math.PI / 2), 6);
       expect(sun.clone().cross(toEye).normalize().dot(toStar.clone().cross(toEye).normalize())).toBeCloseTo(1, 6);
-      if (toStar.angleTo(toEye) > 1.2) turned += 1;
+      if (toStar.angleTo(toEye) > Math.PI / 2) turned += 1;
     }
     expect(turned).toBeGreaterThan(0);
   });

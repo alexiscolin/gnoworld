@@ -23,9 +23,11 @@ export interface Planned {
   readonly worlds: readonly Orbiter[];
   readonly names: ReadonlyMap<string, string>;
   readonly links: ReadonlyMap<string, string>;
-  /** Each world's place on the map, still; each orbit a ring of points round the star, on the map from the star (frame/plan.ts). */
+  /** Each world's place on the map, still; each orbit its worlds share a ring of points round the star, on the map from the star, and the
+   * ring each world stands on (frame/plan.ts). */
   readonly places: readonly Point[];
   readonly rings: readonly (readonly Point[])[];
+  readonly ringOf: readonly number[];
 }
 
 export class Drawn {

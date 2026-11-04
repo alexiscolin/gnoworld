@@ -75,6 +75,7 @@ export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from ".
 export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
+export { BANDS } from "./frame/bands.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -98,6 +99,8 @@ export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
+export { realmRoute, worldRoute } from "./places/route.ts";
+export { GOLDEN } from "./space/golden.ts";
 export { NATURES } from "./planet/choice.ts";
 export { CONTINENTS_SEA, planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
 export { labOf, type Lab, type Palette } from "./planet/palette.ts";
