@@ -31,14 +31,25 @@ const page = () =>
     "",
     `Run by ${ADMIN}. Answer yes or no.`,
   ].join("\n");
-const sources = (over: Partial<Read> = {}) =>
+// The page and the state as the realm's node gave them, its functions as `vm/qfuncs` did, each at a block height, and any
+// other readings a test adds.
+interface Over {
+  page?: string;
+  state?: string;
+  functions?: FunctionList;
+  origin?: string;
+  more?: Read["texts"];
+}
+const sources = (over: Over = {}) =>
   sourcesOf({
     realm: REALM,
-    page: page(),
-    state: "(512 int)\nhttps://gno.land/r/demo/state",
-    functions: functions(),
-    origin: "https://gno.land",
-    ...over,
+    origin: over.origin ?? "https://gno.land",
+    functions: { list: over.functions === undefined ? functions() : over.functions, height: 1204 },
+    texts: [
+      { from: "node", text: over.page ?? page(), height: 1204 },
+      { from: "node", text: over.state ?? "(512 int)\nhttps://gno.land/r/demo/state", height: 1204 },
+      ...(over.more ?? []),
+    ],
   });
 const vote = (over: Partial<ProposedAction> = {}): ProposedAction => ({
   realm: REALM,
@@ -432,6 +443,119 @@ describe("groundedButton", () => {
     );
     expect(groundedButton(act({ args: { id: "99", answer: "yes" } }), sources())).toEqual(
       refused({ kind: "number", value: "99" }),
+    );
+  });
+});
+
+describe("grounded: where each source was read (Alexis, 2026-11-04: the node or the indexer, gnoscope to explain)", () => {
+  const read = (text: string, height = 1300) => [{ from: "indexer" as const, text, height }];
+  const explained = (text: string) => [{ from: "gnoscope" as const, text }];
+  const asked = (text: string) => [{ from: "question" as const, text }];
+  const figure = String.fromCodePoint(0x52, 0x32, 0x44, 0x32);
+
+  it("grounds a fact an indexer's read holds, as a node's", () => {
+    expect(grounded(digest(facts("4,321")), sources({ more: read("4,321 calls") })).ok).toBe(true);
+    expect(grounded(digest(text(`Ask ${OTHER}`)), sources({ more: read(OTHER) })).ok).toBe(true);
+  });
+
+  it.each([
+    ["a number", () => digest(facts("4,321")), "4,321 calls", { kind: "number", value: "4,321" }],
+    [
+      "a link",
+      () => digest(link("https://gno.land/r/demo/explained")),
+      "[it](https://gno.land/r/demo/explained)",
+      { kind: "link", value: "https://gno.land/r/demo/explained" },
+    ],
+    ["an account", () => digest(text(`Ask ${OTHER}`)), `${OTHER} deployed it`, { kind: "address", value: OTHER }],
+    ["a figure", () => digest(text(`Ask ${figure}`)), figure, { kind: "number", value: figure }],
+    [
+      "an argument's word",
+      () => digest(form({ function: "Delegate", args: { target: "drain", rate: "1" } })),
+      "drain",
+      { kind: "argument", value: "drain" },
+    ],
+    [
+      "an argument's account",
+      () => digest(form({ function: "Transfer", args: { to: OTHER, n4: "37" } })),
+      OTHER,
+      { kind: "address", value: OTHER },
+    ],
+    [
+      "a function",
+      () => digest(form({ function: "Withdraw", args: {} })),
+      "func Withdraw(cur realm)",
+      { kind: "function", value: "Withdraw" },
+    ],
+  ])("refuses %s that gnoscope alone gives", (...[, stated, said, missing]) => {
+    expect(grounded(stated(), sources({ more: explained(said) }))).toEqual(refused(missing));
+  });
+
+  it("grounds what gnoscope gives once a node's read agrees", () => {
+    const both = sources({ page: `${page()}\n\n4,321 calls`, more: explained("4,321 calls") });
+    expect(grounded(digest(facts("4,321")), both).ok).toBe(true);
+  });
+
+  it("grounds a form's arguments in the asker's own words: a word, a number, an account", () => {
+    const send = digest(form({ function: "Transfer", args: { to: OTHER, n4: "99" } }));
+    expect(grounded(send, sources({ more: asked(`Please send 99 to ${OTHER}`) })).ok).toBe(true);
+    const delegate = digest(form({ function: "Delegate", args: { target: "drain", rate: "1" } }));
+    expect(grounded(delegate, sources({ more: asked("delegate to drain") })).ok).toBe(true);
+    expect(
+      groundedButton(
+        { type: "action", label: "Send", action: vote({ args: { id: "99", answer: "maybe" } }) },
+        sources({ more: asked("vote maybe on 99") }),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["a fact's value", () => digest(facts("99")), "99", { kind: "number", value: "99" }],
+    ["a text's account", () => digest(text(`Ask ${OTHER}`)), OTHER, { kind: "address", value: OTHER }],
+    [
+      "a text's link",
+      () => digest(text("[x](https://gno.land/r/demo/asked)")),
+      "https://gno.land/r/demo/asked",
+      { kind: "link", value: "https://gno.land/r/demo/asked" },
+    ],
+    ["a form's why", () => digest(form({ why: "Proposal 99 is open." })), "99", { kind: "number", value: "99" }],
+    [
+      "a number both a why and an argument state",
+      () => digest(form({ args: { id: "99", answer: "yes" }, why: "Proposal 99." })),
+      "vote yes on 99",
+      { kind: "number", value: "99" },
+    ],
+  ])("refuses %s that only the asker's words hold: the asker states no chain fact", (...[, stated, words, missing]) => {
+    expect(grounded(stated(), sources({ more: asked(words) }))).toEqual(refused(missing));
+  });
+
+  it("refuses a button's label that only the asker's words hold", () => {
+    const fly = { type: "fly" as const, label: "Claim 1000 GNOT", place: "/w/bubble" };
+    expect(groundedButton(fly, sources({ more: asked("can I claim 1000?") }))).toEqual(
+      refused({ kind: "number", value: "1000" }),
+    );
+  });
+
+  it.each([
+    ["node", 0],
+    ["node", -1],
+    ["node", 1.5],
+    ["node", Number.NaN],
+    ["indexer", 0],
+    ["indexer", Number.POSITIVE_INFINITY],
+    ["indexer", 2 ** 53],
+  ] as const)("refuses a reading of the %s at height %d, which no block has", (from, height) => {
+    const functionsAt = { list: functions(), height: 1204 };
+    const texts = [{ from, text: page(), height }];
+    expect(() => sourcesOf({ realm: REALM, origin: "https://gno.land", functions: functionsAt, texts })).toThrow(
+      /height/,
+    );
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])("refuses functions read at height %d, which no block has", (height) => {
+    const good = [{ from: "indexer" as const, text: page(), height: 1204 }];
+    const listAt = { list: functions(), height };
+    expect(() => sourcesOf({ realm: REALM, origin: "https://gno.land", functions: listAt, texts: good })).toThrow(
+      /height/,
     );
   });
 });

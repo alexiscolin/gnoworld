@@ -26,7 +26,11 @@ function readOf(): Read {
       { Name: "id", Type: "int" },
     ],
   }));
-  return { realm: REALM, page, state: "(512 int)", functions, origin: "https://gno.land" };
+  const texts = [
+    { from: "node" as const, text: page, height: 1204 },
+    { from: "node" as const, text: "(512 int)", height: 1204 },
+  ];
+  return { realm: REALM, origin: "https://gno.land", functions: { list: functions, height: 1204 }, texts };
 }
 
 // Ten each of facts, links, text, chart and form blocks, every value one the page holds; parsed, so it holds to the caps.
