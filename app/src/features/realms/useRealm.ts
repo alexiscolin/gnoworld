@@ -42,7 +42,7 @@ export function useRealm({ rpc, realm, origin }: RealmSource, options: ReadOptio
     const done = (value: Realm) => {
       if (live) setRead({ key, value });
     };
-    Promise.all([readPage(rpc, { realm }, options), readHeight(rpc, options), drawing()]).then(
+    Promise.all([readPage(rpc, { realm }, options), readHeight(rpc, { ...options, chainId: null }), drawing()]).then(
       ([body, height, via]) => {
         if (!body.ok) {
           done({ state: "failed", failure: body.failure });

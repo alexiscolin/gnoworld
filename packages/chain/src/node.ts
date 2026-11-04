@@ -20,8 +20,8 @@ type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
 
 export interface NodeOptions extends ReadOptions {
   /** The universe's chain the node must be on: its status is read first, and a node naming another, or none, is read no
-   * further (D118). Null names none, as the app's reads. */
-  chainId?: string | null;
+   * further (D118). Null names none, as the app's reads; each caller states which (10h's review, V6). */
+  chainId: string | null;
 }
 
 const hexOf = (text: string): string =>
@@ -80,7 +80,7 @@ const refused = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
 // The node's status; with a chain named, a node that names another, or none, is read no further (D118). An empty name is
 // no chain's: a node that names none matches it nowhere.
 async function statusOf(rpc: string, options: NodeOptions): Promise<ChainRead<StatusAnswer>> {
-  const { chainId = null, ...read } = options;
+  const { chainId, ...read } = options;
   const status = await readChain(`${withoutSlash(rpc)}/status`, StatusAnswer, read);
   if (!status.ok || chainId === null) return status;
   const network = status.value.result.node_info?.network;
@@ -94,7 +94,7 @@ function guarded<T>(
   options: NodeOptions,
   run: (options: ReadOptions) => Promise<ChainRead<T>>,
 ): Promise<ChainRead<T>> {
-  const { chainId = null, ...read } = options;
+  const { chainId, ...read } = options;
   if (!isHttps(rpc)) return refused(rpc, read);
   if (chainId === null) return run(read);
   const source = sourceOf(rpc, read);
@@ -109,7 +109,7 @@ function guarded<T>(
  * `vm` sets no Height of its own, so a page's height is this read. */
 export async function readHeight(
   rpc: string,
-  options: NodeOptions = {},
+  options: NodeOptions,
 ): Promise<ChainRead<{ height: number; time: string }>> {
   if (!isHttps(rpc)) return refused(rpc, options);
   const status = await statusOf(rpc, options);
@@ -122,12 +122,12 @@ export async function readHeight(
 }
 
 /** A realm's page as the chain wrote it, for the data `<realm>:<path>` its caller checked. */
-export function readRender(rpc: string, data: string, options: NodeOptions = {}): Promise<ChainRead<string>> {
+export function readRender(rpc: string, data: string, options: NodeOptions): Promise<ChainRead<string>> {
   return guarded(rpc, options, (read) => query(rpc, { path: "vm/qrender", data, decode: (text) => text }, read));
 }
 
 /** The typed text of one expression, which its caller built with its own checks: the chain runs any expression it is sent. */
-export function readEvaluated(rpc: string, expression: string, options: NodeOptions = {}): Promise<ChainRead<string>> {
+export function readEvaluated(rpc: string, expression: string, options: NodeOptions): Promise<ChainRead<string>> {
   return guarded(rpc, options, (read) =>
     query(rpc, { path: "vm/qeval", data: expression, decode: (text) => text }, read),
   );
@@ -142,6 +142,6 @@ function functionListOf(text: string): Functions | null {
 }
 
 /** A realm's functions, every one in the chain's order, as `vm/qfuncs` lists them. */
-export function readFunctionList(rpc: string, realm: string, options: NodeOptions = {}): Promise<ChainRead<Functions>> {
+export function readFunctionList(rpc: string, realm: string, options: NodeOptions): Promise<ChainRead<Functions>> {
   return guarded(rpc, options, (read) => query(rpc, { path: "vm/qfuncs", data: realm, decode: functionListOf }, read));
 }

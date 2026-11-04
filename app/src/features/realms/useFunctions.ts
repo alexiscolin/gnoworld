@@ -63,7 +63,7 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
         }
         const shown: Result = { state: "read", text: text.value, height: undefined };
         settle(name, shown);
-        return readHeight(rpc, options).then((height) => {
+        return readHeight(rpc, { ...options, chainId: null }).then((height) => {
           setResults((before) =>
             before[name] === shown
               ? { ...before, [name]: { ...shown, height: height.ok ? height.value : height.failure } }
