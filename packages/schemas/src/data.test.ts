@@ -33,8 +33,18 @@ const world = { slug: "moon", name: "Moon", description: "d".repeat(60), univers
 const eco = { slug: "tokens", name: "Tokens", description: "Tokens.", universe: "onyx" };
 const genre = { slug: "game", name: "Game" };
 const event = { id: "launch", title: "Launch", start: "2026-11-01T18:00:00.000Z", link: "https://gno.land/" };
-const stop = { id: "start", title: "Start", description: "Begin here.", link: "https://gno.land/" };
-const quest = { id: "first", title: "First", description: "Say hello." };
+const stop = { id: "start", universe: "onyx", hub: "bubble", name: "Start", why: "Begin here." };
+const quest = {
+  id: "first",
+  universe: "onyx",
+  title: "First",
+  description: "Say hello.",
+  reward: "Hello",
+  steps: [
+    { id: "go", kind: "visit", title: "Go", hub: "bubble" },
+    { id: "sign", kind: "call", title: "Sign", realm: "gno.land/r/demo/x", function: "Do" },
+  ],
+};
 const news = { id: "n1", title: "News", date: "2026-10-29", link: "https://gno.land/" };
 
 type Row = Record<string, unknown>;
@@ -209,7 +219,7 @@ describe("a date", () => {
 describe("a link", () => {
   const links = (href: string) => [
     Events.safeParse([{ ...event, link: href }]).success,
-    Expedition.safeParse([{ ...stop, link: href }]).success,
+    EarthOrbit.safeParse([{ name: "gnosh.ai", url: href }]).success,
     News.safeParse([{ ...news, link: href }]).success,
     Universes.safeParse([{ ...universe, default: true, rpc: href }]).success,
   ];

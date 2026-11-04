@@ -73,7 +73,10 @@ export function Hero({
           data-first={newcomer ? "" : undefined}
           data-cosmos="none"
         >
-          <GoExplore places={{ earth: universe.earth.path, worlds: universe.worlds }} className={styles["action"]} />
+          <GoExplore
+            places={{ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id }}
+            className={styles["action"]}
+          />
           <Link to={universe.earth.path} className={styles["action"]} data-call="chat">
             Join the chat
             <Icon name="arrow" />

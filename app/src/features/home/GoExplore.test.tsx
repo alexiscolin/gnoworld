@@ -58,7 +58,12 @@ describe("Go explore's click", () => {
       await vi.dynamicImportSettled();
     });
     expect(router.state.location.pathname).toBe("/w/govdao");
-    expect(where.exploreTo).toHaveBeenCalledWith({ earth: "/earth", worlds: universe.worlds });
+    expect(where.exploreTo).toHaveBeenCalledOnce();
+    expect(where.exploreTo.mock.calls[0]?.[0]).toMatchObject({
+      earth: "/earth",
+      worlds: universe.worlds,
+      universe: universe.id,
+    });
   });
 
   it.each([{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }])(
