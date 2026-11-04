@@ -4,7 +4,7 @@
 // So every fact from it must carry its age as a block height, and no chart by date may stand on it (the calls in 24 h wait on an indexer with dates: F2974).
 import { RealmFactsAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { isRealmPath } from "./evalCall.ts";
-import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
+import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
 
 const FACTS_QUERY = "query($path: String!) { realmFacts(path: $path) { path deployer firstBlock } }";
 

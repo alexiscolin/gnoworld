@@ -1,4 +1,4 @@
-import type { FailureKind } from "../../src/lib/chain/read.ts";
+import type { FailureKind } from "@gnoworld/chain/read";
 
 // Every kind of failure a read has: a new kind is a type error here until it is listed.
 const KINDS: Record<FailureKind, true> = {

@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import type { ChainFetch } from "../../lib/chain/read.ts";
+import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmView } from "./RealmView.tsx";
 
 // 5h: a realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the

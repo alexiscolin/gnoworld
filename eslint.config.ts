@@ -7,6 +7,7 @@ import { defineConfig, globalIgnores, includeIgnoreFile } from "eslint/config";
 import importX from "eslint-plugin-import-x";
 import tseslint from "typescript-eslint";
 import app from "./lint/app.config.ts";
+import chain from "./lint/chain.config.ts";
 import core from "./lint/core.config.ts";
 import react from "./lint/react.config.ts";
 import server from "./lint/server.config.ts";
@@ -71,6 +72,7 @@ export default defineConfig(
   react,
   app,
   server,
+  chain,
   {
     // Tests read as lists of cases, so they may run long.
     files: TESTS,

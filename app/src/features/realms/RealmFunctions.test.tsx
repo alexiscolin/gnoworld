@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import { EVALS, FUNCTIONS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import { all, button, click, mount, nth, one } from "../../../tests/mount.tsx";
-import type { ChainFetch } from "../../lib/chain/read.ts";
+import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 
 // 5i, tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads

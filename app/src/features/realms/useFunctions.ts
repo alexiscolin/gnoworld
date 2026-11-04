@@ -1,8 +1,9 @@
 // What a realm's read functions need (5i): the list of names, once, from `vm/qfuncs`, and the result of each call a click
 // asks, from `vm/qeval` and the height it was read at. A read that fails is a state with its next step, never a blank.
 import { useEffect, useState } from "react";
-import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
-import { readEval, readFunctions, readHeight } from "../../lib/chain/rpc.ts";
+import type { Failure, ReadOptions } from "@gnoworld/chain/read";
+import { readHeight } from "@gnoworld/chain/node";
+import { readEval, readFunctions } from "../../lib/chain/rpc.ts";
 import type { Height } from "./useRealm.ts";
 
 type Listing = { state: "loading" } | { state: "listed"; names: string[] } | { state: "failed"; next: string };

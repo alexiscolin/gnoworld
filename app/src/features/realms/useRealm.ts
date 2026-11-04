@@ -3,8 +3,9 @@
 // fails is a state with its next step, never a blank; the height failing leaves the page standing, said so.
 import { page, type Page } from "@gnoworld/core";
 import { useEffect, useState } from "react";
-import { readHeight, readPage } from "../../lib/chain/rpc.ts";
-import type { Failure, ReadOptions } from "../../lib/chain/read.ts";
+import { readHeight } from "@gnoworld/chain/node";
+import { readPage } from "../../lib/chain/rpc.ts";
+import type { Failure, ReadOptions } from "@gnoworld/chain/read";
 import { drawing, type Drawing } from "../chat/index.ts";
 
 export interface Height {

@@ -211,6 +211,15 @@ def lint_cases(cases, where, label):
         expect(got == set() if rule is None else carries(got, rule), f"eslint {label} {name}: expected {rule or 'nothing'}, got {sorted(map(str, got))}")
 
 
+def typecheck_reaches(where, label):
+    """The gate's typecheck reaches `where` with the compiler's flags: an unchecked index planted there is its one error."""
+    plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=where)
+    out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
+    errors = [line for line in out.stdout.splitlines() if "error TS" in line]
+    expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in {label}, and only it: {errors[:3]}")
+    shutil.rmtree(where)
+
+
 try:
     if part("lint"):
         # ESLint: one run over every planted file, then each file must carry its rule.
@@ -690,11 +699,7 @@ try:
         lint_cases(server, src, "server")
         shutil.rmtree(src)
         # The gate's typecheck reaches the server, with the flags and Node's types: the planted error alone.
-        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
-        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
-        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
-        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in the server, and only it: {errors[:3]}")
-        shutil.rmtree(src)
+        typecheck_reaches(src, "the server")
         # Vitest finds the server's tests.
         plant({"found.test.ts": 'import { expect, test } from "vitest";\n\ntest("server probe found", () => {\n  expect(1).toBe(2);\n});\n'}, where=src)
         out = run(["node_modules/.bin/vitest", "run", src])
@@ -725,11 +730,7 @@ try:
         ]
         lint_cases(jarvis, src, "jarvis")
         shutil.rmtree(src)
-        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
-        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
-        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
-        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in Jarvis, and only it: {errors[:3]}")
-        shutil.rmtree(src)
+        typecheck_reaches(src, "Jarvis")
         plant({"found.test.ts": 'import { expect, test } from "vitest";\n\ntest("jarvis probe found", () => {\n  expect(1).toBe(2);\n});\n'}, where=src)
         out = run(["node_modules/.bin/vitest", "run", src])
         expect(out.returncode != 0 and "jarvis probe found" in out.stdout + out.stderr, "vitest runs Jarvis's tests")
@@ -756,11 +757,25 @@ try:
         # The one file that may reach out, as it is.
         out = run(["node_modules/.bin/eslint", "--no-cache", "--format", "json", "packages/service/src/net.ts"])
         expect(out.returncode == 0, "eslint service: net.ts calls fetch " + out.stdout[-300:])
-        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
-        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
-        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
-        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in the service package, and only it: {errors[:3]}")
+        typecheck_reaches(src, "the service package")
+
+    if part("chain"):
+        # The chain-read package (D112), held as the app's lib was: no React, design system or store, no console, no state at
+        # a module's top; type-checked by the gate's own script, with the browser's API.
+        src = "packages/chain/src/__probe__"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        lint = dict((n, c) for n, c, _ in LINT)
+        chain = [
+            ("schemas.ts", uses(name="QueryAnswer", path="@gnoworld/schemas"), None),
+            *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
+              for name in ("react", "react-dom/client", "react-router", "@gnoworld/ui", "zustand/vanilla")],
+            ("console.ts", 'export function say(): void {\n  console.log("x");\n}\n', "no-console"),
+            ("console.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  console.log("x");\n  expect(1).toBe(1);\n});\n', None),
+            ("module_map.ts", lint["module_map.ts"], MODULE),
+        ]
+        lint_cases(chain, src, "chain")
         shutil.rmtree(src)
+        typecheck_reaches(src, "the chain package")
 
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
@@ -969,6 +984,7 @@ finally:
     shutil.rmtree(APP, ignore_errors=True)
     shutil.rmtree("jarvis/src/__probe__", ignore_errors=True)
     shutil.rmtree("packages/service/src/__probe__", ignore_errors=True)
+    shutil.rmtree("packages/chain/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

@@ -12,8 +12,9 @@ import {
 } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
 import { evalCall } from "./evalCall.ts";
-import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
-import { readEval, readFunctions, readHeight, readPage } from "./rpc.ts";
+import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
+import { readHeight } from "@gnoworld/chain/node";
+import { readEval, readFunctions, readPage } from "./rpc.ts";
 
 // 5g-reads: the four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
 // which answers are RECORDED through gnomcp and which are READ from gno's source at v1.5.0; a title says "recorded" or "read".

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChainRead } from "../../lib/chain/read.ts";
+import type { ChainRead } from "@gnoworld/chain/read";
 import { mount } from "../../../tests/mount.tsx";
 import { FAILURE_KINDS } from "../../../tests/chain/failureKinds.ts";
 import { RealmFacts, type RealmFactsValue } from "./RealmFacts.tsx";

@@ -78,8 +78,8 @@ export interface Transport {
   maxBytes?: number;
   signal?: AbortSignal;
   /** Whether the request carries cookies: `omit` for a chain, `same-origin` for this site's own file. */
-  credentials: RequestCredentials;
-  cache?: RequestCache;
+  credentials: NonNullable<RequestInit["credentials"]>;
+  cache?: RequestInit["cache"];
 }
 
 export type Fetched = { bytes: Uint8Array; status: number } | { kind: FailureKind; status?: number };
@@ -88,8 +88,8 @@ interface Attempt {
   url: string;
   fetcher: ChainFetch;
   signal: AbortSignal;
-  credentials: RequestCredentials;
-  cache: RequestCache | undefined;
+  credentials: NonNullable<RequestInit["credentials"]>;
+  cache: RequestInit["cache"];
   maxBytes: number;
 }
 
