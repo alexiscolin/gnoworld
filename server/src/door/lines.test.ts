@@ -173,6 +173,22 @@ describe("the recent lines of a room", () => {
     expect(texts(recent.recent("#bubble", ASKER))).toEqual(["kept: its editor was not its author"]);
   });
 
+  it("keeps out a line taken before it came, whatever another account's edit of it says after (F5270)", () => {
+    const recent = setup();
+    recent.taken("#bubble", "m1");
+    recent.edited(said("m9", "forged", { account: BOB, edits: "m1" }));
+    recent.passed(said("m1", "deleted already"));
+    expect(recent.recent("#bubble", ASKER)).toEqual([]);
+  });
+
+  it("keeps out a line its author replaced before it came, whatever another account's edit of it says after (F5270)", () => {
+    const recent = setup();
+    recent.edited(said("m2", "the author's edit", { edits: "m1" }));
+    recent.edited(said("m9", "forged", { account: BOB, edits: "m1" }));
+    recent.passed(said("m1", "replaced already"));
+    expect(recent.recent("#bubble", ASKER)).toEqual([]);
+  });
+
   it("remembers 2,000 taken lines at most, the oldest forgotten first", () => {
     const recent = setup();
     for (let at = 0; at <= 2000; at += 1) recent.taken("#bubble", `t${String(at)}`);

@@ -31,24 +31,25 @@ const GONE = 2000;
 export function makeRecentLines({ isPublic }: { isPublic: (room: string) => boolean }): RecentLines {
   // The Map's first room is the one written longest ago: a room is set again at each line.
   const rooms = new Map<string, { lines: Kept[]; bytes: number }>();
-  // By room and id: the account that replaced the line, or null when taken, whoever wrote it.
-  const gone = new Map<string, string | null>();
-  const key = (room: string, msgid: string): string => `${room} ${msgid}`;
+  // The lines gone before they came: a room's line taken (`room id`), or replaced by its author (`room id account`), each
+  // its own mark, so no later mark of another kind or account stands for it (F5270, as pins.ts's `replaced`).
+  const gone = new Map<string, true>();
+  const key = (...parts: string[]): string => parts.join(" ");
   const drop = (room: string, msgid: string, by: string | null): void => {
-    const kept = rooms.get(room);
-    const at = kept?.lines.findIndex((line) => line.msgid === msgid) ?? -1;
-    const line = kept?.lines[at];
-    if (kept === undefined || line === undefined) remember(gone, [key(room, msgid), by], GONE);
+    const kept = rooms.get(room) ?? { lines: [], bytes: 0 };
+    const line = kept.lines.find((each) => each.msgid === msgid);
+    if (line === undefined) remember(gone, [by === null ? key(room, msgid) : key(room, msgid, by), true], GONE);
     else if (by === null || line.account === by) {
-      kept.lines.splice(at, 1);
+      kept.lines.splice(kept.lines.indexOf(line), 1);
       kept.bytes -= line.bytes;
     }
   };
   // A public room's line, not taken nor replaced by its author before it came, within a room's bytes.
-  const admits = ({ room, msgid, account, text }: Said): boolean => {
-    const by = gone.get(key(room, msgid));
-    return isPublic(room) && by !== null && by !== account && Buffer.byteLength(text) <= JARVIS_LINES.bytes;
-  };
+  const admits = ({ room, msgid, account, text }: Said): boolean =>
+    isPublic(room) &&
+    !gone.has(key(room, msgid)) &&
+    !gone.has(key(room, msgid, account)) &&
+    Buffer.byteLength(text) <= JARVIS_LINES.bytes;
   return {
     passed(said) {
       const kept = rooms.get(said.room) ?? { lines: [], bytes: 0 };
