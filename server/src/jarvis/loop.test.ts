@@ -344,6 +344,8 @@ describe("the loop: each tool call checked before it runs", () => {
     ["the tag itself", TAG],
     ["the tag in capitals", TAG.toUpperCase()],
     ["the tag split by a zero-width space", `${TAG.slice(0, 10)}${String.fromCodePoint(0x200b)}${TAG.slice(10)}`],
+    ["the tag written as code points, four digits each", TAG.replace(/(.{4})/g, "[U+$1]")],
+    ["the tag written as code points in capitals", TAG.toUpperCase().replace(/(.{4})/g, "[U+$1]")],
   ])("refuses a call whose input holds the turn's tag (%s), never run", async (_case, written) => {
     const input = { profile: "onyx", path: "gno.land/r/demo/boards", expr: `Render("${written}")` };
     const run = setup({ steps: [asking(toolUse("toolu_1", "gno_eval", input)), ended()] });

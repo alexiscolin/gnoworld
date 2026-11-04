@@ -167,13 +167,18 @@ async function resultsOf(run: Run, content: Anthropic.ContentBlock[]): Promise<A
 async function resultOf(run: Run, use: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
   const { parts, blocks, trace } = run;
   // The tag's check first, so a call that holds it is logged once, refused, and never as a call the allowlist passed.
-  if (blocks.holds(JSON.stringify(use.input ?? null))) return refused(run, use, "holds_tag");
+  if (holdsTag(blocks, JSON.stringify(use.input ?? null))) return refused(run, use, "holds_tag");
   const call = parts.tools.allowlist.check(use.name, use.input);
   if (!call.ok) return refused(run, use, call.reason);
   const ran = await ranWithin(parts, call, trace.tool(call.name));
   if (!ran.ok) return { type: "tool_result", tool_use_id: use.id, is_error: true, content: failure(ran.reason) };
   return { type: "tool_result", tool_use_id: use.id, is_error: ran.isError, content: blocks.wrap(call.name, ran.text) };
 }
+
+// holds() counts a shown code point as nothing, so the tag written as code points ([U+abab]...) is read with their
+// digits kept too. A heuristic: a tag written another way reaches a tool, and comes back replaced or withheld (D80).
+const holdsTag = (blocks: Untrusted, text: string) =>
+  blocks.holds(text) || blocks.holds(text.replace(/\[U\+([0-9A-F]{4,6})\]/giu, "$1"));
 
 // A refused call is answered as refused and never run; the allowlist logged its own refusals already.
 function refused(run: Run, use: Anthropic.ToolUseBlock, reason: Refusal): Anthropic.ToolResultBlockParam {
