@@ -82,9 +82,9 @@ const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
 const ARRIVAL_JS = 2 * 1024;
 // The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
 // program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
-// (Alexis, 2026-11-03), 3,605 B with the labels' place it shares (7p2, the size margin given ahead, 2026-11-04).
+// (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
 const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
-const DEEP_JS = 3605;
+const DEEP_JS = 3616;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
