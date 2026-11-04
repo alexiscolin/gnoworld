@@ -21,6 +21,7 @@ export {
   Universes,
 } from "./data.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
+export { Day } from "./day.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";

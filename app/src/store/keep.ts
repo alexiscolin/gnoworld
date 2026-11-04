@@ -5,6 +5,7 @@
 import { lineOf, placeBefore, type IrcMessage, type Line } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
+import { DEVICE_EMPTY, type Device, type DeviceField, type DeviceFields } from "../lib/keep/fields.ts";
 import { asSaved, SAVED_KEPT, UNREAD_KEPT, type Keep, type SavedLine } from "../lib/keep/keep.ts";
 import { lastKept, without } from "./record.ts";
 
@@ -16,6 +17,14 @@ interface Kept {
   /** Whether the device did not keep what was asked: unreadable at the start, or refusing a write. */
   readonly notKept: boolean;
 }
+
+/** What this device keeps for whoever uses it, guest or account (slice 8): it outlives a session. */
+type DeviceKept = DeviceFields & {
+  /** Whether the device was read at all: until then, and when it could not be, nothing is written to it. */
+  readonly readable: boolean;
+  /** Whether the device did not keep what was asked: unreadable, or refusing a write. */
+  readonly notKept: boolean;
+};
 
 export interface KeepSlice {
   keep: Kept;
@@ -134,6 +143,51 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
           edit === undefined ? held.saved.filter(sameLine(room, id)) : correctedBy(held.saved, room, edit),
           held,
         );
+      },
+    },
+  };
+};
+
+export interface DeviceSlice {
+  device: DeviceKept;
+  deviceActions: {
+    /** Reads every field from the page's device: at the page's start, and again when another tab changed it. */
+    load: (device: Device) => void;
+    /** Changes a field from what the device holds now (another tab's change kept), written to it when it could be read; whether the
+     * device keeps it. A change that leaves the field as it is writes nothing. */
+    change: <K extends DeviceField>(field: K, next: (held: DeviceFields[K]) => DeviceFields[K]) => boolean;
+  };
+}
+
+const FIELDS = Object.keys(DEVICE_EMPTY) as DeviceField[];
+
+export const deviceSlice: StateCreator<DeviceSlice> = (set, get) => {
+  // The page's device; none before the page starts (a pre-render has none), when nothing is written.
+  let shared: Device | undefined;
+  // The field as the device holds it now, the page's own memory when it cannot be read.
+  const fresh = <K extends DeviceField>(field: K): { value: DeviceFields[K]; readable: boolean } => {
+    const held = shared?.read(field);
+    return { value: held ?? get().device[field], readable: held !== undefined && get().device.readable };
+  };
+  return {
+    device: { ...DEVICE_EMPTY, readable: false, notKept: false },
+    deviceActions: {
+      load: (next) => {
+        shared = next;
+        const read = Object.fromEntries(FIELDS.map((field) => [field, next.read(field)]));
+        const readable = FIELDS.every((field) => read[field] !== undefined);
+        const kept = Object.fromEntries(FIELDS.map((field) => [field, read[field] ?? get().device[field]]));
+        set({ device: { ...get().device, ...kept, readable, notKept: !readable } });
+      },
+      change: (field, next) => {
+        const held = fresh(field);
+        const changed = next(held.value);
+        const same = JSON.stringify(changed) === JSON.stringify(held.value);
+        const kept = held.readable && (same || shared?.write(field, changed) === true);
+        const now = get().device;
+        if (!same || JSON.stringify(held.value) !== JSON.stringify(now[field]))
+          set({ device: { ...now, [field]: changed, notKept: now.notKept || !kept } });
+        return kept;
       },
     },
   };

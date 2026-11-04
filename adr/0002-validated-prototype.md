@@ -205,7 +205,7 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Where |
 |---|---|---|
-| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
+| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3), except the header's counter, out of the worlds the reader's own view lists (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
 | "You charted it": the uncharted worlds you were the first on your device to visit. On a first visit a scan sweeps the planet, then "Stamped" and, for the first in the universe, "First to chart · your name stays on it · Share" | 0 | Device. Only a first visit to an uncharted world reaches the server, for the shared "first to chart" (Realms, above); nothing else of the passport leaves the device |
 | Daily expedition: the same three stops for everyone, the first where something is live; a streak; a shareable route | 0 | Device; the stops from a data file the team curates |
 | Quests across worlds, each ending on a realm action. Rewards stay on the device: no NFT badges (ADR-0001 §11) | 0 | Device; the quests data file |
@@ -477,8 +477,10 @@ between worlds. None may saturate the map:
 
 **The infinite, felt.**
 - Haze closes the view before any edge.
-- No counter announces the total, as in "42 of 551". Progress shows per constellation
-  ("DeFi 3/5"), per session or as a rank.
+- No counter announces the universe's total, as in "42 of 551". Progress shows per
+  constellation ("DeFi 3/5"), per session or as a rank. The one exception is the header's
+  passport counter, as the video draws it ("3/19"): stamps out of the worlds the reader's
+  own view lists, never out of every realm (Alexis, 2026-11-04, slice 8's answer 1).
 - The rim thins instead of stopping.
 
 ### 4. Realm calls: read for free, sign inline
