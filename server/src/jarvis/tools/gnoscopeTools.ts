@@ -9,9 +9,14 @@ import { z } from "zod";
 const RULE =
   " gnoscope, a third party, explains: a figure it gives is stated only once a gnomcp read agrees. If gnoscope is down or slow, say so and answer from gnomcp's reads.";
 
+/** Whether a text is a network's name as gnoscope writes one: lower-case words and hyphens, 40 characters at most. */
+export function isNetwork(name: string): boolean {
+  return /^[a-z0-9][a-z0-9-]{0,39}$/.test(name);
+}
+
 /** The definitions of gnoscope's four reads for these networks; throws when one is no network's name, or none is given. */
 export function gnoscopeTools(networks: readonly string[]) {
-  const strange = networks.find((name) => !/^[a-z0-9][a-z0-9-]{0,39}$/.test(name));
+  const strange = networks.find((name) => !isNetwork(name));
   if (strange !== undefined)
     throw new Error(`gnoscope tools: the network ${JSON.stringify(strange)} is no network's name`);
   const [first, ...rest] = networks;
