@@ -89,7 +89,7 @@ export function Hero({
  * rail stands for them while it stands (7i), and marks them so. */
 export function Worlds({ children }: { children: ReactNode }) {
   return (
-    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none">
+    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none" data-yield="none">
       <Kicker>Worlds</Kicker>
       {children}
     </nav>

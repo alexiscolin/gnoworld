@@ -85,6 +85,17 @@ describe("the hero under the opening", () => {
     expect(box.hasAttribute("inert")).toBe(false);
   });
 
+  // F4648: on a phone the page's list of worlds stands under the hero, where the words come: it gives way with it.
+  it("gives way with every part of the page that stands where the words come, the list of worlds beside the hero", () => {
+    const [box, list] = [hero(), hero()];
+    opened("loading");
+    expect([box.dataset["yield"], list.dataset["yield"]]).toEqual(["opening", "opening"]);
+    act(() => {
+      document.body.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 40 }));
+    });
+    expect([box.dataset["yield"], list.dataset["yield"]]).toEqual(["none", "none"]);
+  });
+
   it("comes back if the words go with their page", () => {
     const box = hero();
     const { ref } = canvasRef();
