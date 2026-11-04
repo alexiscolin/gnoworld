@@ -118,6 +118,18 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report
    (Alexis, 2026-11-04).
 
+### A part's weight by its kind (Alexis, 2026-11-04)
+
+| Kind | For | What runs |
+|---|---|---|
+| Retouch | a look tried live in the workshop (ping-pong) | at the batch's end: the gate, the pictures of the screens it touches, one `reviewer` |
+| Small fix | about 20 product lines, no tier-1 or harness file | its test seen failing, the gate, the journeys that watch it, one `reviewer` |
+| Feature | product code with no tier-1 or harness file | tests first and the red pass, one combined review (the design apart only for how space looks), two lots at most |
+| Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
+
+The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
+A way to game a display's ranking or count (a ticker, a trend) is a low, kept for after the demo, never a round of its own.
+
 ## Before a push
 
 Each merge lives on its branch. Pushing a work branch wants a gate that passed on its code, and
