@@ -12,9 +12,12 @@ import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 export const HISTORY_MAX_BYTES = 4 * 1024 * 1024;
 /** The transactions a page asks: onyx-1's 6,860 in four pages. */
 export const HISTORY_PAGE = 2_000;
-/** The most requests one read makes, each a page: a million transactions. ponytail: past it the read gives up; the next step reads only
- * above the last pass's height, which needs each realm's callers kept. */
+/** The most requests one read makes, each a page, halvings and blocks alone included. */
 export const HISTORY_MAX_PAGES = 500;
+/** The most characters one read takes in all, so a broken indexer cannot run the server past its memory: 24 times onyx-1's whole chain, about
+ * 170,000 transactions. ponytail: past it the read gives up; the next step reads only above the last pass's height, keeping each realm's
+ * callers. */
+export const HISTORY_READ_BYTES = 32 * 1024 * 1024;
 const HISTORY_MS = 20_000;
 
 // A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
@@ -109,12 +112,13 @@ interface Reader {
   readonly indexer: string;
   readonly pace?: (() => Promise<void>) | undefined;
 }
-// One read under way: where it asks, the rows a page asks, and the requests it made.
+// One read under way: where it asks, the rows a page asks, the requests it made and the characters it took.
 interface Reading {
   readonly reader: Reader;
   readonly limit: number;
   readonly isStopped: () => boolean;
   asked: number;
+  taken: number;
 }
 
 // One request of the read, if its pages are not spent and the pass goes on: the JSON it answers.
@@ -134,6 +138,8 @@ async function request(reading: Reading, body: { query: string; variables: objec
     { url: reader.indexer, init },
     { ms: HISTORY_MS, maxBytes: HISTORY_MAX_BYTES },
   );
+  reading.taken += text.length;
+  if (reading.taken > HISTORY_READ_BYTES) throw new Failure("too_many");
   return jsonOf(text);
 }
 
@@ -210,6 +216,7 @@ export async function readHistories(
     limit: reader.page ?? HISTORY_PAGE,
     isStopped: hooks.isStopped ?? (() => false),
     asked: 0,
+    taken: 0,
   };
   const tallies = new Map<string, Tally>(
     paths.map((path) => [path, { calls: 0, callers: new Set(), last: null, marks: new Set(), recent: new Set() }]),

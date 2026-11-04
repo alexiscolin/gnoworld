@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { fakeChain, INDEXER, pagedCalls, type CallRow } from "../testing/fakeWorldsChain.ts";
-import { HISTORY_MAX_BYTES, HISTORY_MAX_PAGES, HISTORY_PAGE, readHistories } from "./history.ts";
+import { HISTORY_MAX_BYTES, HISTORY_MAX_PAGES, HISTORY_PAGE, HISTORY_READ_BYTES, readHistories } from "./history.ts";
 
 // The worlds job's one read of the indexer (7k3): every call of the chain, a page at a time, counted for the realms asked. onyx-1's own
 // answers to its queries are recorded in onyxIndexer.json. History holds DIRECT calls only, and a line may be a failed transaction: a
@@ -367,6 +367,27 @@ describe("readHistories", () => {
       const { chain, read } = reading(endless, { paths: [PATH], page: 2 });
       expect(await read()).toEqual({ ok: false, kind: "too_many" });
       expect(chain.asked).toHaveLength(HISTORY_MAX_PAGES);
+    });
+
+    // The security review of 7k3: 500 pages of 4 MiB, each call from another address, ran the server past its 512 MB.
+    it("gives up as too many once its answers pass the bytes one read may take, every realm without a history", async () => {
+      let height = 0;
+      const sizes: number[] = [];
+      const heavy = ({ variables }: { variables: Record<string, unknown> }) => {
+        const rows = Array.from({ length: Number(variables["limit"]) }, () => ({
+          block_height: (height += 1),
+          messages: Array.from({ length: 50 }, () => msg(PATH, CALLER_A)),
+        }));
+        const body = answer(rows);
+        sizes.push(body.length);
+        return body;
+      };
+      const { chain, read } = reading(heavy, { paths: [PATH], page: 500 });
+      expect(await read()).toEqual({ ok: false, kind: "too_many" });
+      const served = sizes.reduce((sum, size) => sum + size, 0);
+      expect(chain.asked.length).toBeLessThan(HISTORY_MAX_PAGES);
+      expect(served).toBeGreaterThan(HISTORY_READ_BYTES);
+      expect(served - (sizes.at(-1) ?? 0)).toBeLessThanOrEqual(HISTORY_READ_BYTES);
     });
 
     it.each([
