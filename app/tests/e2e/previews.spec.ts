@@ -48,6 +48,12 @@ test.describe("on a world's plate", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("GovDAO");
     await expect(dialog.getByRole("link", { name: "Open the page" })).toHaveAttribute("href", "/r/gov/dao");
+    // The page's own heading at a realm page's scale (RealmBlocks, 36 px), in the dialog and in the picture: the plate's title rule
+    // (Panel.module.css) styles the plate's own title, never a page drawn on the plate.
+    const size = (heading: ReturnType<Page["locator"]>) =>
+      heading.evaluate((element) => getComputedStyle(element).fontSize);
+    expect(await size(dialog.locator("h1"))).toBe("36px");
+    expect(await size(page.locator("[data-preview-thumb] h1"))).toBe("36px");
     expect((await new AxeBuilder({ page }).include("dialog[open]").analyze()).violations).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
