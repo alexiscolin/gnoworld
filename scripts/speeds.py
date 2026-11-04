@@ -3,8 +3,8 @@
 Reads the paths of a change on stdin, one a line (check.sh's own `$changes`), and prints `interface` or `full`; it always exits 0.
 `interface` is for a change of the interface alone: one review and no StrykerJS. Everything else runs the full control, and so does
 any doubt: every path must be on the interface list, or the answer is `full`. `speeds.py --light <root> <main's table>` prints `light`
-when no path is a security path of either table, `full` otherwise: the radical mode's light gate (Alexis, 2026-11-04), whose harness
-files check.sh judges itself.
+when every path is on the interface list of both tables and none is a security path of either, `full` otherwise: the radical mode's
+light gate (Alexis, 2026-11-04: the interface alone), whose harness files check.sh judges itself.
 
 What counts as security, and what counts as interface, is one place: the tables of <root>/docs/REVIEW.md. Tier 1's backticked paths
 are the security paths (keys, the CSP, chain reads, login, roles, the worker, deployment); tier 3's are the interface. A path under
@@ -79,12 +79,14 @@ def speed(root, paths):
 
 
 def light(root, main_table, paths):
-    """`light` when no path is a tier-1 path of the tree's table or of main's (the radical mode's light gate, check.sh): a row the change
-    drops from the tree's stays main's. `full` otherwise, or when either table holds no tier-1 row, or with nothing to read."""
-    tree, main = (([folded(p) for p in rows(root, table)["1"]]) for table in (None, main_table))
-    if not tree or not main or not paths or any(secure(root, path, tree + main) for path in paths):
+    """`light` when every path is under a tier-3 folder of both tables, the tree's and main's, and none is a tier-1 path of either (the
+    radical mode's light gate, check.sh; the interface alone, F4909's (a)): a tier-1 row the change drops stays main's, and a tier-3
+    folder it adds is none until main names it. `full` otherwise, or when either table holds no tier-1 row, or with nothing to read."""
+    tree, main = rows(root), rows(root, main_table)
+    if not tree["1"] or not main["1"]:
         return FULL
-    return LIGHT
+    interface = [folder for folder in folders(tree) if folder in folders(main)]
+    return LIGHT if within(root, paths, [folded(p) for p in tree["1"] + main["1"]], interface) else FULL
 
 
 def main(argv):

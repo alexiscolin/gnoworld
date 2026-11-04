@@ -275,16 +275,16 @@ harness_of() (
 )
 # The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice; CLAUDE.md): on while git's own hooks folder holds
 # `radical-mode` reading `on`, which Alexis alone writes (no sandboxed command writes there: the check above refuses a run where one could).
-# A change of no tier-1 path (speeds.py --light, by the tree's table and main's, so a row the change drops still counts) and no harness file
-# then runs the types, the lint, the build with the first screen's cap and jscpd, no Vitest, no journey; anything else, a doubt included,
-# the whole gate. pre-commit's secrets scan runs on every commit.
+# A change of the interface alone (speeds.py --light: tier-3 folders of the tree's table and main's, no tier-1 path of either; F4909's (a))
+# and no harness file then runs the types, the lint, the build with the first screen's cap and jscpd, no Vitest, no journey; anything else,
+# a doubt included, the whole gate. pre-commit's secrets scan runs on every commit.
 light=false
 if ! $all && ! $tests_all && common=$(git -C "$repository" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &&
 	[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ] && git -C "$repository" show origin/main:docs/REVIEW.md >"$logs/main-review.md" 2>/dev/null &&
 	[ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --light "$PWD" "$logs/main-review.md")" = light ] &&
 	harnessed=$(harness_of) && [ -z "$harnessed" ]; then
 	light=true
-	echo "check.sh: the radical mode's light gate (no tier-1 path, no harness file): the types, the lint, the build with the first screen's cap, jscpd"
+	echo "check.sh: the radical mode's light gate (the interface alone, no harness file): the types, the lint, the build with the first screen's cap, jscpd"
 fi
 # Every step's time, kept for the next audit, pass or fail (Alexis, 2026-11-04: "Oui, les trois"; it could read the runs past their budget
 # alone): a line a step in the tools' cache, which every worktree shares and none removes, `<start> <repository> <mode> <lane> <step> <s> load
@@ -512,7 +512,7 @@ lane_tests() {
 
 lane_gno() {
 	$gno || return 0
-	! $light || return 0 # the realms are tier 1: a light change holds Go's tools alone, whose tests wait as Vitest's do
+	! $light || return 0 # neither the realms nor Go's tools are the interface: a light change holds none of this lane's files
 	step gno
 	(cd gno && "$GNO" lint ./... && "$GNO" test ./...)
 	step mutate.py # removing any guard fails a test

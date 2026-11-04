@@ -2818,15 +2818,16 @@ fi
 if part gate_light; then
 gate_fixture gate_light
 # The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice): while git's own hooks folder holds `radical-mode` reading
-# `on`, a commit's or a turn's change of no tier-1 path (speeds.py --light) and no harness file (records.sh's list) runs the types, the
-# importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey, nothing else. Only Alexis writes there: no
-# sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a file of the worktree in its name, a
-# tier-1 path, a harness file, a doubt, a part's end or the full gate: the whole gate as before. pre-commit's staged copy reads the mode
-# of the repository whose packages it borrows, and its list of paths.
-cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories"
-printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n' >"$g/docs/REVIEW.md"
-printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts"
-git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+# `on`, a commit's or a turn's change of the interface alone (speeds.py --light: tier-3 folders, no tier-1 path; F4909's (a)) and no harness
+# file (records.sh's list) runs the types, the importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey,
+# nothing else. Only Alexis writes there: no sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a
+# file of the worktree in its name, a path of no tier-3 folder, a tier-1 path, a harness file, a doubt, a part's end or the full gate: the
+# whole gate as before. pre-commit's staged copy reads the mode of the repository whose packages it borrows, and its list of paths.
+cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories" "$g/app/src/features/world"
+printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 3 | Interface: `app/src/features/world/` | Either | Run it |\n' >"$g/docs/REVIEW.md"
+printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts" && printf 'x\n' >"$g/app/src/features/world/w.tsx"
+git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec, an interface file" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+w="$g/app/src/features/world/w.tsx" # the interface's file, a change of it alone light
 mode="$g/.git/hooks/radical-mode"
 light_steps="typecheck lint copies build:app playwright"
 heavy_steps="test format:check unused comments py:check_css sh:ergo py:check_docs"
@@ -2840,12 +2841,14 @@ whole() { # $1: what the run was given
 	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh said the light gate on $1: $out"
 	:
 }
-printf 'on\n' >"$mode" && echo y >>"$g/app/src/a.tsx"
+printf 'on\n' >"$mode" && echo y >>"$w"
 out=$(gate) || fail "check.sh's light gate failed a change whose every step passes: $out"
-light "a change of the app in the radical mode"
+light "a change of the interface in the radical mode"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh's light gate did not record the code it passed"
-for path in app/src/csp.ts app/tests/stories/pictures.spec.ts; do
-	reset && echo y >>"$g/$path" && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
+reset && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed a change of the app outside the interface in the radical mode: $out"
+whole "a change of the app outside the interface in the radical mode"
+for path in app/src/csp.ts app/tests/stories/pictures.spec.ts app/src/a.tsx; do
+	reset && echo y >>"$g/$path" && echo y >>"$w" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
 	whole "a change of $path in the radical mode"
 done
 reset && git -C "$g" mv app/src/csp.ts app/src/renamed.ts && out=$(gate) || fail "check.sh failed on a tier-1 file renamed: $out"
@@ -2855,10 +2858,10 @@ whole "a tier-1 file renamed away in the radical mode"
 reset && grep -v csp.ts "$g/docs/REVIEW.md" >"$g/docs/r" && mv "$g/docs/r" "$g/docs/REVIEW.md" && echo y >>"$g/app/src/csp.ts" && out=$(gate) ||
 	fail "check.sh failed on a tier-1 file whose row the change dropped: $out"
 whole "a tier-1 file whose row the same change dropped"
-reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed with no main to read: $out"
-whole "a change of the app with no main's table to read"
+reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$w" && out=$(gate) || fail "check.sh failed with no main to read: $out"
+whole "a change of the interface with no main's table to read"
 git -C "$g" update-ref refs/remotes/origin/main HEAD
-reset && echo y >>"$g/app/src/a.tsx"
+reset && echo y >>"$w"
 for state in missing off "on2" folder planted; do
 	rm -rf "${mode:?}" "$g/.githooks/radical-mode" "$g/.claude/tmp/radical-mode"
 	case $state in
@@ -2868,17 +2871,17 @@ for state in missing off "on2" folder planted; do
 	*) printf '%s\n' "$state" >"$mode" ;;
 	esac
 	out=$(gate) || fail "check.sh failed with the mode $state: $out"
-	whole "a change of the app with the mode $state"
+	whole "a change of the interface with the mode $state"
 done
 # git's own folders, a caller's to name: a common folder of another's holding the mode on is read as no mode (lot 1's security review, S5).
 fake="$t/gate_light.common" && mkdir -p "$fake/hooks" && printf 'on\n' >"$fake/hooks/radical-mode"
 for f in objects refs HEAD config; do ln -s "$g/.git/$f" "$fake/$f"; done
 for hook in commit-msg pre-commit pre-merge-commit pre-push; do ln -s "$g/.git/hooks/$hook" "$fake/hooks/$hook" 2>/dev/null || :; done
 out=$(GIT_COMMON_DIR="$fake" gate) || fail "check.sh failed with a caller's GIT_COMMON_DIR: $out"
-whole "a change of the app with a caller's GIT_COMMON_DIR holding the mode on"
+whole "a change of the interface with a caller's GIT_COMMON_DIR holding the mode on"
 rm -rf "${mode:?}" "$g/.claude/tmp/radical-mode" && printf 'on\n' >"$mode"
 mv "$g/docs/REVIEW.md" "$g/docs/gone.md" && out=$(gate) || fail "check.sh failed with no tier-1 table: $out"
-whole "a change of the app with no tier-1 table to read"
+whole "a change of the interface with no tier table to read"
 mv "$g/docs/gone.md" "$g/docs/REVIEW.md"
 for run in --tests-all --full --merge; do
 	out=$(AUDIT_ANSWER=x gate "$run") || fail "check.sh $run failed in the radical mode: $out"
@@ -2886,12 +2889,12 @@ for run in --tests-all --full --merge; do
 done
 # pre-commit's staged copy: the mode of the repository it borrows its packages from, and the paths pre-commit lists.
 c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && ln -s "$g/node_modules" "$c/node_modules"
-out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
-light "a staged copy's change of the app"
-out=$(g=$c GATE_CHANGED="$(printf 'app/src/a.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
+out=$(g=$c GATE_CHANGED=app/src/features/world/w.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
+light "a staged copy's change of the interface"
+out=$(g=$c GATE_CHANGED="$(printf 'app/src/features/world/w.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
 whole "a staged copy's change of a tier-1 file"
 rm "$c/node_modules" && cp -R "$g/node_modules" "$c/node_modules"
-out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
+out=$(g=$c GATE_CHANGED=app/src/features/world/w.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
 whole "a staged copy with no repository to read the mode of"
 rm -f "$mode"
 fi
@@ -5965,44 +5968,60 @@ done
 fi
 
 if part speeds_light; then
-# speeds.py --light <root>: whether a change may take the radical mode's light gate as far as docs/REVIEW.md's tier 1 goes (Alexis,
-# 2026-11-04, until the hardening slice): `light` when no path is a tier-1 path, read as the two speeds read them (case folded, a path it
-# cannot place or one through a link is no light); `full` on a tier-1 path anywhere in the list, a renamed one's old path included, a table
-# it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
+# speeds.py --light <root> <main's table>: whether a change may take the radical mode's light gate, the interface's alone (Alexis,
+# 2026-11-04, F4909's (a): "Léger pour l'interface seule"): `light` when every path is under a tier-3 folder that both docs/REVIEW.md's
+# tables name, the tree's and main's, and none is a tier-1 path of either, read as the two speeds read them (case folded, a path it cannot
+# place or one through a link is no light); `full` otherwise: the server, core, lib, a design-system file of no listed folder, a doc, a
+# table it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
 sp="$here"/speeds.py
-r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/login" "$r/app/src/lib" "$r/server/src"
-printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
-ln -s ../features/login "$r/app/src/lib/login"
+r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/world" "$r/app/src/features/login" "$r/server/src"
+printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`), a guard (`app/src/features/world/guard.ts`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface: `app/src/features/world/`, `app/src/features/home/`, `app/src/features/login/`, `packages/ui/src/Button/` | Either | Run it |\n' >"$r/docs/REVIEW.md"
+ln -s ../../../server/src "$r/app/src/features/world/linked"
 cp "$r/docs/REVIEW.md" "$t/main.review" # main's own table, which check.sh gives it beside the tree's (lot 1's review, R1)
 light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" "$t/main.review" 2>/dev/null || echo crashed; }
-for p in app/src/features/chat/Bubble.tsx server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/csp.test.ts; do
-	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, of no tier-1 row, is not light: $(light "$p")"
+for p in app/src/features/world/Here.tsx app/src/features/world/Here.module.css app/src/features/home/deep/Home.tsx packages/ui/src/Button/Button.tsx; do
+	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, in a tier-3 folder, is not light: $(light "$p")"
 done
-[ "$(light app/src/lib/other.ts server/src/a.ts)" = light ] || fail "speeds.py --light: two paths of no tier-1 row are not light"
-for p in app/src/csp.ts app/src/features/login/Form.tsx gno/r/x/realm deploy/web/nginx.conf App/src/CSP.ts "app/src/features/LOGIN/Form.tsx" \
-	app/src/lib/login/Form.tsx /app/src/x.ts "app/src/../src/csp.ts" '"app/src/x.ts"' "app/src/x.ts "; do
+[ "$(light app/src/features/world/Here.tsx packages/ui/src/Button/Button.tsx)" = light ] || fail "speeds.py --light: two paths of tier-3 folders are not light"
+# The rest keeps the whole gate: the server, core, the app's lib, a feature no row lists, the design system's own root, a doc, a test outside.
+for p in server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/features/chat/Bubble.tsx packages/ui/src/tokens.css \
+	docs/DEVELOPMENT.md app/tests/e2e/home.spec.ts app/src/features/worldly/x.tsx app/src/features/world app/src/csp.ts \
+	app/src/features/login/Form.tsx app/src/features/world/guard.ts app/src/features/WORLD/Guard.ts app/src/features/world/linked/a.ts \
+	gno/r/x/realm deploy/web/nginx.conf /app/src/features/world/x.ts "app/src/features/world/../../csp.ts" '"app/src/features/world/x.ts"' \
+	"app/src/features/world/x.ts "; do
 	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p is light"
-	[ "$(light app/src/lib/other.ts "$p")" = full ] || fail "speeds.py --light: $p beside a light path is light"
+	[ "$(light app/src/features/world/Here.tsx "$p")" = full ] || fail "speeds.py --light: $p beside a tier-3 path is light"
 done
 # A tier-1 file renamed away: the list holds its old path (check.sh's --no-renames), which is tier 1.
-[ "$(light app/src/csp.ts app/src/lib/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
+[ "$(light app/src/features/world/guard.ts app/src/features/world/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
 [ "$(printf '' | python3 -I "$sp" --light "$r" "$t/main.review")" = full ] || fail "speeds.py --light: an empty change is light"
-# A tier-1 path is one of either table, the tree's or main's: a row the tree drops is still main's (R1), a row it adds counts at once.
-grep -v 'csp.ts' "$t/main.review" >"$r/docs/REVIEW.md" && { [ "$(light app/src/csp.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path light"; }
-cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/lib/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
-[ "$(light app/src/lib/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
-cp "$t/main.review" "$r/docs/REVIEW.md"
-# Either table unreadable, or one it reads with no tier-1 row (a column renamed, R3), is no light; and so is a call with no main's table.
-for broken in tree main; do
-	cp "$t/main.review" "$t/main.saved"
-	if [ "$broken" = tree ]; then grep -v '^| 1 ' "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v '^| 1 ' "$t/main.saved" >"$t/main.review"; fi
-	[ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: the $broken's table with no tier-1 row is light"
-	cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+# A tier-1 path is one of either table, a tier-3 folder one of both: a tier-1 row the tree drops is still main's (R1), one it adds counts
+# at once; a tier-3 folder the tree adds is no interface until main names it, and one it drops is none at once.
+sed 's/, a guard (`app\/src\/features\/world\/guard.ts`)//' "$t/main.review" >"$r/docs/REVIEW.md"
+[ "$(light app/src/features/world/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path, in a tier-3 folder, light"
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/features/home/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
+[ "$(light app/src/features/home/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 3 | More: `server/src/`, `app/src/features/chat/` | Either | Run it |\n' >>"$r/docs/REVIEW.md"
+for p in server/src/a.ts app/src/features/chat/Bubble.tsx; do
+	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p, of a tier-3 row the tree added, is light"
 done
-[ "$(printf 'app/src/lib/other.ts\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
-mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
+sed 's/`app\/src\/features\/home\/`, //' "$t/main.review" >"$r/docs/REVIEW.md"
+[ "$(light app/src/features/home/Home.tsx)" = full ] || fail "speeds.py --light: a tier-3 folder the tree dropped is light"
+cp "$t/main.review" "$r/docs/REVIEW.md"
+# Either table unreadable, or one it reads with no tier-1 row or no tier-3 row (a column renamed, R3), is no light; and so is a call with
+# no main's table.
+for broken in tree main; do
+	for tier in 1 3; do
+		cp "$t/main.review" "$t/main.saved"
+		if [ "$broken" = tree ]; then grep -v "^| $tier " "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v "^| $tier " "$t/main.saved" >"$t/main.review"; fi
+		[ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: the $broken's table with no tier-$tier row is light"
+		cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+	done
+done
+[ "$(printf 'app/src/features/world/Here.tsx\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
+mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
 mv "$t/main.gone" "$t/main.review"
-mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no table to read is light"; }
+mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: no table to read is light"; }
 fi
 
 if part gate_speeds; then
