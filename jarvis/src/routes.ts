@@ -89,8 +89,7 @@ function replyOf(result: Result, log: Log): Reply {
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none
 // or when its lines before it draw nothing.
 function cut(text: string, log: Log): string {
-  // More code points than the bound needs more code units: a short text is kept as it is, unread.
-  if (text.length <= DOOR_CAPS.answer) return text;
+  // ponytail: every answer read whole once, its length bounded by the model's output tokens (16,000 at most, D65).
   const points = Array.from(text);
   if (points.length <= DOOR_CAPS.answer) return text;
   log("jarvis_answer_cut");

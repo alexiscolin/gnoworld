@@ -136,7 +136,7 @@ async function converse(run: Run, system: string): Promise<Result> {
   const { parts, trace } = run;
   const attempts = { ...parts, retries: parts.caps.retries, trace, signal: run.signal };
   for (;;) {
-    if (run.signal.aborted) return { kind: "gone" };
+    // callModel asks nothing once the asker left: it answers gone (D177).
     const called = await callModel(attempts, requestOf(parts, system, run.messages));
     if (!called.ok) {
       if (called.reason === "spent" || called.reason === "gone") return { kind: called.reason };
@@ -226,7 +226,7 @@ async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]
       resolve({ ok: false, reason: "timeout" });
     };
     timer = setTimeout(stop, run.parts.toolTimeoutMs ?? 30_000);
-    run.signal.addEventListener("abort", stop, { once: true });
+    run.signal.addEventListener("abort", stop);
     // A signal fired before it listened fires no more.
     if (run.signal.aborted) stop();
   });

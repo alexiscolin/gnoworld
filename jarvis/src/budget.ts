@@ -150,6 +150,8 @@ export function makeBudget(
 // written; then as they are, an admin's change counted by the next reservation's own statement.
 function capsOf(db: DatabaseSync, first: Record<Kind, number>) {
   const Caps = z.array(z.object({ kind: z.enum(["ask", "translate"]), cap: z.number() }));
+  // Both caps, seeded together: a file with one alone is refused.
+  const Both = z.object({ ask: z.number(), translate: z.number() });
   const sql = {
     seed: db.prepare("INSERT INTO budget_caps (kind, cap) VALUES (?, ?) ON CONFLICT DO NOTHING"),
     read: db.prepare("SELECT kind, cap FROM budget_caps"),
@@ -161,11 +163,8 @@ function capsOf(db: DatabaseSync, first: Record<Kind, number>) {
     sql.seed.run("translate", checked.translate);
   });
   return {
-    read: (): Record<Kind, number> => {
-      const rows = Caps.parse(sql.read.all());
-      const capOf = (kind: Kind) => rows.find((row) => row.kind === kind)?.cap ?? 0;
-      return { ask: capOf("ask"), translate: capOf("translate") };
-    },
+    read: (): Record<Kind, number> =>
+      Both.parse(Object.fromEntries(Caps.parse(sql.read.all()).map(({ kind, cap }) => [kind, cap]))),
     change: (kind: Kind, cap: number): void => {
       sql.change.run(checkedCap(cap), kind);
     },

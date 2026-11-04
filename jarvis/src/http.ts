@@ -143,23 +143,22 @@ const isJson = (type: string | undefined) => type?.split(";")[0]?.trim().toLower
 // The body's text: undefined past 256 KiB, by its declared length before a byte is read, else once its bytes pass it,
 // never waiting for its end; null for bytes that are no UTF-8.
 function bodyOf(request: IncomingMessage): Promise<string | null | undefined> {
-  if (Number(request.headers["content-length"] ?? "0") > MAX_BYTES) return Promise.resolve(undefined);
+  // No length declared reads as NaN, past no bound.
+  if (Number(request.headers["content-length"]) > MAX_BYTES) return Promise.resolve(undefined);
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    const done = (text: string | null | undefined): void => {
-      request.off("data", data).off("end", end).off("error", reject);
-      resolve(text);
-    };
-    const data = (chunk: Buffer): void => {
+    // The listeners live as long as the request, whose connection closes once a refusal is written; past the bound,
+    // its rest is counted and dropped, and the answer, given once, stays.
+    request.on("data", (chunk: Buffer) => {
       size += chunk.byteLength;
       if (size <= MAX_BYTES) chunks.push(chunk);
-      else done(undefined);
-    };
-    const end = (): void => {
-      done(decoded(Buffer.concat(chunks)));
-    };
-    request.on("data", data).on("end", end).on("error", reject);
+      else resolve(undefined);
+    });
+    request.once("end", () => {
+      resolve(decoded(Buffer.concat(chunks)));
+    });
+    request.once("error", reject);
   });
 }
 
