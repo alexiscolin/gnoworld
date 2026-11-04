@@ -53,6 +53,8 @@ describe("loadJarvisConfig", () => {
       },
       models: { main: "claude-sonnet-5-5", fast: "claude-haiku-5-5", deep: "claude-opus-5-5" },
       gnoscope: false,
+      gnoscopeServer: { url: "https://gnoscope.com/mcp", timeoutMs: 10_000, networks: ["mainnet", "onyx"] },
+      places: fileURLToPath(new URL("../../../app/data", import.meta.url)),
       skills: fileURLToPath(new URL("../../jarvis/skills", import.meta.url)),
       gnomcp: { command: "/usr/local/bin/gnomcp", config: "/etc/gnomcp/profiles.toml" },
       profiles: { read: ["testnet"], indexed: [] },
@@ -130,6 +132,29 @@ describe("loadJarvisConfig", () => {
     expect(loadJarvisConfig({ ...ENV, JARVIS_GNOSCOPE: "off" }).gnoscope).toBe(false);
   });
 
+  it("reads gnoscope's address, its time in seconds at its lowest and highest, and the networks its tools may name", () => {
+    const env = {
+      ...ENV,
+      JARVIS_GNOSCOPE_URL: "https://explorer.example:8443/v2/mcp",
+      JARVIS_GNOSCOPE_TIMEOUT_S: "1",
+      JARVIS_GNOSCOPE_NETWORKS: "onyx",
+    };
+    expect(loadJarvisConfig(env).gnoscopeServer).toEqual({
+      url: "https://explorer.example:8443/v2/mcp",
+      timeoutMs: 1_000,
+      networks: ["onyx"],
+    });
+    const slowest = { ...ENV, JARVIS_GNOSCOPE_TIMEOUT_S: "60", JARVIS_GNOSCOPE_NETWORKS: "mainnet,test-12,onyx" };
+    expect(loadJarvisConfig(slowest).gnoscopeServer).toMatchObject({
+      timeoutMs: 60_000,
+      networks: ["mainnet", "test-12", "onyx"],
+    });
+  });
+
+  it("reads the places' data folder as an absolute path", () => {
+    expect(loadJarvisConfig({ ...ENV, JARVIS_DATA_DIR: "/app/data" }).places).toBe("/app/data");
+  });
+
   it("reads the skills folder and gnomcp's command and configuration as absolute paths", () => {
     const env = {
       ...ENV,
@@ -199,6 +224,26 @@ describe("loadJarvisConfig", () => {
     ["JARVIS_GNOSCOPE", "true"],
     ["JARVIS_GNOSCOPE", "1"],
     ["JARVIS_GNOSCOPE", "yes"],
+    ["JARVIS_GNOSCOPE_URL", ""],
+    ["JARVIS_GNOSCOPE_URL", "gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "http://gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "wss://gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://user:pass@gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://user@gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://:secret@gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://gnoscope.com/mcp#tools"],
+    ["JARVIS_GNOSCOPE_URL", `https://gnoscope.com/${"m".repeat(2048)}`],
+    ["JARVIS_GNOSCOPE_TIMEOUT_S", "0"],
+    ["JARVIS_GNOSCOPE_TIMEOUT_S", "61"],
+    ["JARVIS_GNOSCOPE_TIMEOUT_S", "10s"],
+    ["JARVIS_GNOSCOPE_NETWORKS", ""],
+    ["JARVIS_GNOSCOPE_NETWORKS", "mainnet,"],
+    ["JARVIS_GNOSCOPE_NETWORKS", "Mainnet"],
+    ["JARVIS_GNOSCOPE_NETWORKS", "main net"],
+    ["JARVIS_GNOSCOPE_NETWORKS", "n".repeat(41)],
+    ["JARVIS_DATA_DIR", ""],
+    ["JARVIS_DATA_DIR", "app/data"],
+    ["JARVIS_DATA_DIR", "/app/../data"],
     ["JARVIS_BUDGET_USD", "0"],
     ["JARVIS_BUDGET_USD", "501"],
     ["JARVIS_BUDGET_USD", "4500"],
@@ -247,6 +292,10 @@ describe("loadJarvisConfig", () => {
     "JARVIS_GNOMCP_CONFIG",
     "JARVIS_SKILLS_DIR",
     "JARVIS_GNOSCOPE",
+    "JARVIS_GNOSCOPE_URL",
+    "JARVIS_GNOSCOPE_TIMEOUT_S",
+    "JARVIS_GNOSCOPE_NETWORKS",
+    "JARVIS_DATA_DIR",
     "JARVIS_BUDGET_USD",
     "JARVIS_TURNS",
     "JARVIS_RETRIES",

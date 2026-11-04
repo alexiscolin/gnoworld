@@ -1,9 +1,9 @@
 // Jarvis's loop (ADR-0002 §5, "Harness"): one question to an answer through our own small loop, not the SDK's tool
 // runner, as every call must pass our checks first. The system prompt is frozen per version and cached; the question
 // and the room's lines go in as untrusted blocks under the question's one tag (D80); each turn reserves, calls and
-// settles the model (model.ts), then each tool call passes the allowlist and the tag's check before it runs, eight a
-// turn at most, its result cut and wrapped. It stops at the answer, the turn cap, max_tokens, a refusal (D81), an
-// error, a stop it never asks for, or the day's budget (D84).
+// settles the model (model.ts), then each tool call passes the allowlist and the tag's check, eight a turn at most, runs
+// with the question's words and own cards (D103), its result cut and wrapped. It stops at the answer, with those cards,
+// the turn cap, max_tokens, a refusal (D81), an error, a stop it never asks for, or the day's budget (D84).
 import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
@@ -11,10 +11,12 @@ import type { Tracer } from "@opentelemetry/api";
 import type { Log } from "../log.ts";
 import type { Allowlist, Definition } from "./allowlist.ts";
 import type { Budget } from "./budget.ts";
+import { failure, refusal, type Refusal } from "./callWords.ts";
 import type { JarvisConfig } from "./config.ts";
 import type { Ran } from "./gnomcp.ts";
 import { callModel, type Request, type Send } from "./model.ts";
 import type { Model } from "./prices.ts";
+import { keepCards, type Asked, type Cards, type Kept } from "./tools/kept.ts";
 import { traceQuestion, type Trace } from "./tracing.ts";
 import { untrustedBlocks, type Untrusted } from "./untrusted.ts";
 
@@ -23,12 +25,13 @@ interface Question {
   readonly room: readonly string[];
 }
 type Result =
-  | { readonly kind: "answer"; readonly text: string }
+  | { readonly kind: "answer"; readonly text: string; readonly cards: Cards }
   | { readonly kind: "spent" | "turns" | "max_tokens" | "invalid" }
   | { readonly kind: "refusal"; readonly category: string | null }
   | { readonly kind: "failed"; readonly reason: "error" | "timeout" | "stop" };
 type Allowed = Extract<ReturnType<Allowlist<Definition>["check"]>, { ok: true }>;
-type Refusal = "unknown_tool" | "bad_arguments" | "holds_tag" | "too_many_calls";
+// A call run with its question's words and cards, seen through the call's own time.
+type Runs = (call: Allowed, asked: Asked) => Promise<Ran>;
 
 interface Parts {
   readonly send: Send;
@@ -38,15 +41,17 @@ interface Parts {
   readonly model: Model;
   readonly caps: JarvisConfig["caps"];
   readonly skills: { readonly index: readonly { name: string; description: string }[]; readonly digest: string };
-  readonly tools: { readonly allowlist: Allowlist<Definition>; readonly run: (call: Allowed) => Promise<Ran> };
+  readonly tools: { readonly allowlist: Allowlist<Definition>; readonly run: Runs };
   // The tag's random source, node:crypto's by default; a tool's time, 30 s by default; the wait between attempts.
   readonly random?: ((size: number) => Uint8Array) | undefined;
   readonly toolTimeoutMs?: number | undefined;
   readonly wait?: ((ms: number) => Promise<void>) | undefined;
 }
-// A question as it runs: its blocks, its trace, its conversation and its count of the model's answers.
+// A question as it runs: its words, its cards, its blocks, its trace, its conversation, its count of the model's answers.
 interface Run {
   readonly parts: Parts;
+  readonly question: string;
+  readonly kept: Kept;
   readonly blocks: Untrusted;
   readonly trace: Trace;
   readonly messages: Anthropic.MessageParam[];
@@ -90,7 +95,8 @@ async function ask(parts: Parts, prompt: Prompt, question: Question): Promise<Re
   const trace = traceQuestion(parts.tracer, { model: parts.model, version: prompt.version });
   const blocks = untrustedBlocks({ limit: parts.caps.toolResultBytes, random: parts.random ?? randomBytes });
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: opening(blocks, question) }];
-  const run: Run = { parts, blocks, trace, messages, named: prompt.named, turns: 0 };
+  const kept = keepCards();
+  const run: Run = { parts, question: question.text, kept, blocks, trace, messages, named: prompt.named, turns: 0 };
   let word = "thrown";
   try {
     const result = askable(question.text, parts.caps.questionChars) ? await converse(run, prompt.system) : invalid();
@@ -128,6 +134,7 @@ async function converse(run: Run, system: string): Promise<Result> {
     }
     run.turns += 1;
     const stop = stopOf(called.answer, run.turns, parts.caps.turns);
+    if (stop?.kind === "answer") return { ...stop, cards: run.kept.cards() };
     if (stop !== undefined) return stop;
     const results = await resultsOf(run, called.answer.content);
     run.messages.push({ role: "assistant", content: called.answer.content }, { role: "user", content: results });
@@ -178,7 +185,7 @@ async function resultOf(run: Run, use: Anthropic.ToolUseBlock): Promise<Anthropi
   if (holdsTag(blocks, JSON.stringify(use.input ?? null))) return refused(run, use, "holds_tag");
   const call = parts.tools.allowlist.check(use.name, use.input);
   if (!call.ok) return refused(run, use, call.reason);
-  const ran = await ranWithin(parts, call, trace.tool(call.name));
+  const ran = await ranWithin(run, call, trace.tool(call.name));
   if (!ran.ok) return { type: "tool_result", tool_use_id: use.id, is_error: true, content: failure(ran.reason) };
   return { type: "tool_result", tool_use_id: use.id, is_error: ran.isError, content: blocks.wrap(call.name, ran.text) };
 }
@@ -197,42 +204,25 @@ function refused(run: Run, use: Anthropic.ToolUseBlock, reason: Refusal): Anthro
   return { type: "tool_result", tool_use_id: use.id, is_error: true, content: refusal(reason) };
 }
 
-// A run within the tool's time, its span ended however it ends; one past its time goes on, ended by its own timeout.
-async function ranWithin(parts: Parts, call: Allowed, span: ReturnType<Trace["tool"]>): Promise<Ran> {
+// A run within the tool's time, its span ended however it ends; one past its time goes on, ended by its own timeout,
+// its signal aborted, so the question's cards keep nothing it hands in after.
+async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]>): Promise<Ran> {
+  const time = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<Ran>((resolve) => {
     timer = setTimeout(() => {
+      time.abort();
       resolve({ ok: false, reason: "timeout" });
-    }, parts.toolTimeoutMs ?? 30_000);
+    }, run.parts.toolTimeoutMs ?? 30_000);
   });
+  const asked: Asked = { text: run.question, cards: run.kept.within(time.signal), signal: time.signal };
   let ran: Ran = { ok: false, reason: "error" };
   try {
-    ran = await Promise.race([parts.tools.run(call), late]);
+    ran = await Promise.race([run.parts.tools.run(call, asked), late]);
     return ran;
   } finally {
     clearTimeout(timer);
     if (ran.ok) span.done(ran.isError);
     else span.failed(ran.reason);
   }
-}
-
-function refusal(reason: Refusal): string {
-  const words: Record<Refusal, string> = {
-    unknown_tool: "Refused: no tool of that name is yours.",
-    bad_arguments: "Refused: its arguments do not match the tool's schema.",
-    holds_tag: "Refused: its input holds the turn's tag.",
-    too_many_calls: "Refused: a turn takes eight calls at most.",
-  };
-  return words[reason];
-}
-
-function failure(reason: Extract<Ran, { ok: false }>["reason"]): string {
-  const words: Record<typeof reason, string> = {
-    timeout: "The tool did not answer in time.",
-    down: "The tool is not running.",
-    malformed: "The tool's answer could not be read.",
-    error: "The tool failed.",
-    refused: "The tool refused the call.",
-  };
-  return words[reason];
 }

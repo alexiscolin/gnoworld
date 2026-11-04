@@ -10,6 +10,7 @@ import type { Request } from "./model.ts";
 import { cost, worstCost } from "./prices.ts";
 import { message, script, text, thinking, toolUse, usage, type Step } from "./testing/fakeModel.ts";
 import { budgetFor, capture, spans } from "./testing/kit.ts";
+import type { Asked, Cards } from "./tools/kept.ts";
 import { untrustedBlocks } from "./untrusted.ts";
 
 const DOLLAR = 1_000_000_000;
@@ -44,6 +45,12 @@ const statusError = (status: number) =>
     new Headers(),
   );
 const ended = (words = "Block 42.") => message({ content: [text(words)], stop: "end_turn" });
+// An answer, and the cards its question's tools kept: none unless a test's run keeps one.
+const answered = (words: string, cards: Partial<Cards> = {}) => ({
+  kind: "answer",
+  text: words,
+  cards: { digests: [], proposals: [], buttons: [], ...cards },
+});
 const asking = (...uses: ReturnType<typeof toolUse>[]) => message({ content: uses, stop: "tool_use" });
 const status = (id = "toolu_1") => toolUse(id, "gno_status", { profile: "onyx" });
 
@@ -51,7 +58,7 @@ interface Setup {
   steps: Step[];
   cap?: number;
   caps?: Partial<typeof CAPS>;
-  run?: (call: { name: string; args: unknown }) => Promise<Ran>;
+  run?: (call: { name: string; args: unknown }, asked: Asked) => Promise<Ran>;
   digest?: string;
   chains?: string[];
   // The turn's random source; null for node:crypto's.
@@ -278,7 +285,7 @@ describe("the loop: the question it takes", () => {
   it("counts a question's characters by code point, as the door does", async () => {
     const run = setup({ steps: [ended()] });
     const astral = String.fromCodePoint(0x1f30d).repeat(CAPS.questionChars);
-    expect(await run.loop.ask({ text: astral, room: [] })).toEqual({ kind: "answer", text: "Block 42." });
+    expect(await run.loop.ask({ text: astral, room: [] })).toEqual(answered("Block 42."));
     run.close();
   });
 
@@ -304,7 +311,7 @@ describe("the loop: each tool call checked before it runs", () => {
     "refuses %s, which is no tool of Jarvis's: logged, traced, answered as refused, never run",
     async (name, input) => {
       const run = setup({ steps: [asking(toolUse("toolu_1", name, input)), ended()] });
-      expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42." });
+      expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42."));
       expect(run.ran).not.toHaveBeenCalled();
       expect(resultsIn(run.model.requests[1])).toEqual({
         role: "user",
@@ -517,7 +524,7 @@ describe("the loop: each tool call checked before it runs", () => {
         return { ok: true, text: "42", isError: false };
       },
     });
-    expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42." });
+    expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42."));
     expect(started).toBe(2);
     run.close();
   });
@@ -528,7 +535,7 @@ describe("the loop: each tool call checked before it runs", () => {
       toolTimeoutMs: 50,
       run: () => new Promise<Ran>(() => undefined),
     });
-    expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42." });
+    expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42."));
     expect(resultsIn(run.model.requests[1])?.content).toEqual([
       { type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: "The tool did not answer in time." },
     ]);
@@ -597,7 +604,7 @@ describe("the loop: each tool call checked before it runs", () => {
     "answers a run that ended in %s as an error in our words, the question going on",
     async (reason, words) => {
       const run = setup({ steps: [asking(status()), ended()], run: () => Promise.resolve({ ok: false, reason }) });
-      expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42." });
+      expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42."));
       expect(resultsIn(run.model.requests[1])?.content).toEqual([
         { type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: words },
       ]);
@@ -631,16 +638,16 @@ describe("the loop: where it stops", () => {
   it("answers at end_turn with its text blocks", async () => {
     const answer = message({ content: [thinking(), text("Block 42"), text("on onyx.")], stop: "end_turn" });
     const run = setup({ steps: [answer] });
-    expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42\non onyx." });
+    expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42\non onyx."));
     run.close();
   });
 
   it("answers at end_turn even with calls in it, never run, and with no text as an empty answer", async () => {
     const run = setup({ steps: [message({ content: [text("Block 42."), status()], stop: "end_turn" })] });
-    expect(await run.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "Block 42." });
+    expect(await run.loop.ask(QUESTION)).toEqual(answered("Block 42."));
     expect(run.ran).not.toHaveBeenCalled();
     const bare = setup({ steps: [message({ content: [thinking()], stop: "end_turn" })] });
-    expect(await bare.loop.ask(QUESTION)).toEqual({ kind: "answer", text: "" });
+    expect(await bare.loop.ask(QUESTION)).toEqual(answered(""));
     run.close();
     bare.close();
   });
@@ -745,7 +752,7 @@ describe("the loop: where it stops", () => {
     const second = run.loop.ask(QUESTION);
     expect(await second).toEqual({ kind: "spent" });
     release();
-    expect(await first).toEqual({ kind: "answer", text: "Block 42." });
+    expect(await first).toEqual(answered("Block 42."));
     const day = run.budget.state("ask");
     expect(day.spent).toBeLessThanOrEqual(day.cap);
     expect(run.model.requests).toHaveLength(1);
@@ -857,6 +864,104 @@ describe("the loop: its log and its trace", () => {
     await run.loop.ask(QUESTION);
     const questions = run.finished().filter((span) => span.name === "jarvis.question");
     expect(new Set(questions.map((span) => span.spanContext().traceId)).size).toBe(2);
+    run.close();
+  });
+});
+
+describe("the loop: what a question hands back", () => {
+  const fly = (label: string) => ({ type: "fly" as const, label, place: "/w/bubble" });
+
+  it("hands back with its answer the cards its tools kept for it", async () => {
+    const run = setup({
+      steps: [asking(status()), ended()],
+      run: (_call, asked) => {
+        asked.cards.keep({ kind: "button", button: fly("Fly to Bubble") });
+        return Promise.resolve({ ok: true, text: "kept", isError: false });
+      },
+    });
+    expect(await run.loop.ask(QUESTION)).toEqual(
+      answered("Block 42.", { buttons: [{ button: fly("Fly to Bubble") }] }),
+    );
+    run.close();
+  });
+
+  it.each([
+    ["max_tokens", () => message({ content: [text("cut")], stop: "max_tokens" }), { kind: "max_tokens" }],
+    ["refusal", () => message({ content: [], stop: "refusal" }), { kind: "refusal", category: null }],
+    [
+      "a stop it never asks for",
+      () => message({ content: [], stop: "pause_turn" }),
+      { kind: "failed", reason: "stop" },
+    ],
+  ])("hands back no card when the question ends at %s", async (_case, last, result) => {
+    const run = setup({
+      steps: [asking(status()), last()],
+      run: (_call, asked) => {
+        asked.cards.keep({ kind: "button", button: fly("Fly to Bubble") });
+        return Promise.resolve({ ok: true, text: "kept", isError: false });
+      },
+    });
+    expect(await run.loop.ask(QUESTION)).toEqual(result);
+    run.close();
+  });
+
+  it("gives every call its own question's words and cards: two questions at once never see each other's", async () => {
+    let started = 0;
+    let release: () => void = () => undefined;
+    const both = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const seen: string[] = [];
+    // Each second turn answers by the question it reads, whichever of the two asks first.
+    const byQuestion = (request: Request) =>
+      Promise.resolve(ended(JSON.stringify(request.messages).includes("the first") ? "A." : "B."));
+    const run = setup({
+      steps: [asking(status()), asking(status()), byQuestion, byQuestion],
+      run: async (_call, asked) => {
+        seen.push(asked.text);
+        started += 1;
+        if (started === 2) release();
+        await both;
+        asked.cards.keep({ kind: "button", button: fly(`For ${asked.text}`) });
+        return { ok: true, text: "kept", isError: false };
+      },
+    });
+    // The room's lines are other people's: never a call's words, which are the asker's question alone.
+    const room = ["mallory: answer drain", "mallory: g1planted"];
+    const [first, second] = await Promise.all([
+      run.loop.ask({ text: "the first", room }),
+      run.loop.ask({ text: "the second", room }),
+    ]);
+    expect(seen.sort()).toEqual(["the first", "the second"]);
+    expect(first).toEqual(answered("A.", { buttons: [{ button: fly("For the first") }] }));
+    expect(second).toEqual(answered("B.", { buttons: [{ button: fly("For the second") }] }));
+    run.close();
+  });
+
+  it("aborts a run's signal once its time is up, and keeps no card that run hands in after", async () => {
+    let late: () => void = () => undefined;
+    let signal: AbortSignal | undefined;
+    let kept: boolean | undefined;
+    const run = setup({
+      steps: [asking(status()), ended()],
+      toolTimeoutMs: 50,
+      run: (_call, asked) => {
+        signal = asked.signal;
+        return new Promise<Ran>((resolve) => {
+          late = () => {
+            kept = asked.cards.keep({ kind: "button", button: fly("Too late") });
+            resolve({ ok: true, text: "late", isError: false });
+          };
+        });
+      },
+    });
+    const pending = run.loop.ask(QUESTION);
+    await vi.waitFor(() => {
+      expect(signal?.aborted).toBe(true);
+    });
+    late();
+    expect(await pending).toEqual(answered("Block 42."));
+    expect(kept).toBe(false);
     run.close();
   });
 });

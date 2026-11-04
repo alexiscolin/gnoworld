@@ -1,11 +1,12 @@
-// jarvis's settings (ADR-0002 §5, §7; D44, D45, D47, D65 to D67), from its environment, checked at start as the
+// jarvis's settings (ADR-0002 §5, §7; D44, D45, D47, D65 to D67, D106), from its environment, checked at start as the
 // server's are (settings.ts): Anthropic's key only from its file, the day's budgets, the caps on a question and a
-// call, the models by task, gnoscope's switch, the skills folder, gnomcp's command and configuration, and the chain
-// profiles it may read. An error names the setting and its fault, never its value.
+// call, the models by task, gnoscope's switch and server, the places' and the skills' folders, gnomcp's command and
+// configuration, and the chain profiles it may read. An error names the setting and its fault, never its value.
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "../settings.ts";
 import { MODELS, type Model } from "./prices.ts";
+import { isNetwork } from "./tools/gnoscopeTools.ts";
 
 export interface JarvisConfig {
   anthropicKey: Secret;
@@ -23,10 +24,20 @@ export interface JarvisConfig {
   // The model that answers, the one that sorts, summarises and translates, and the one for hard realm code.
   models: { main: Model; fast: Model; deep: Model };
   gnoscope: boolean;
+  // Where gnoscope answers, a call's time, and the networks its tools may name, in gnoscope's own words.
+  gnoscopeServer: { url: string; timeoutMs: number; networks: string[] };
+  // The folder of the places' data files (app/data's).
+  places: string;
   skills: string;
   gnomcp: { command: string; config: string };
   // The chain profiles gnomcp may read for jarvis, and those of them with an indexer.
   profiles: { read: string[]; indexed: string[] };
+}
+
+// An https address with no credentials and no fragment, as a request is sent to it.
+function isHttps(text: string): boolean {
+  const url = URL.parse(text);
+  return url?.protocol === "https:" && url.username === "" && url.password === "" && !text.includes("#");
 }
 
 export function loadJarvisConfig(env: Record<string, string | undefined>): JarvisConfig {
@@ -50,6 +61,15 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       JARVIS_MODEL_FAST: z.enum(MODELS).default("claude-haiku-5-5"),
       JARVIS_MODEL_DEEP: z.enum(MODELS).default("claude-opus-5-5"),
       JARVIS_GNOSCOPE: z.enum(["on", "off"]).optional(),
+      JARVIS_GNOSCOPE_URL: z.string().max(2048).refine(isHttps).default("https://gnoscope.com/mcp"),
+      JARVIS_GNOSCOPE_TIMEOUT_S: whole(60, 10),
+      // The networks gnoscope's freshness block named on 2026-11-04 (D104).
+      JARVIS_GNOSCOPE_NETWORKS: z
+        .string()
+        .default("mainnet,onyx")
+        .transform((list) => list.split(","))
+        .pipe(z.array(z.string().refine(isNetwork))),
+      JARVIS_DATA_DIR: absolute.default(fileURLToPath(new URL("../../../app/data", import.meta.url))),
       JARVIS_SKILLS_DIR: absolute.default(fileURLToPath(new URL("../../jarvis/skills", import.meta.url))),
       JARVIS_GNOMCP_COMMAND: absolute,
       JARVIS_GNOMCP_CONFIG: absolute,
@@ -85,6 +105,12 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
     },
     models: { main: settings.JARVIS_MODEL, fast: settings.JARVIS_MODEL_FAST, deep: settings.JARVIS_MODEL_DEEP },
     gnoscope: settings.JARVIS_GNOSCOPE === "on",
+    gnoscopeServer: {
+      url: settings.JARVIS_GNOSCOPE_URL,
+      timeoutMs: settings.JARVIS_GNOSCOPE_TIMEOUT_S * 1000,
+      networks: settings.JARVIS_GNOSCOPE_NETWORKS,
+    },
+    places: settings.JARVIS_DATA_DIR,
     skills: settings.JARVIS_SKILLS_DIR,
     gnomcp: { command: settings.JARVIS_GNOMCP_COMMAND, config: settings.JARVIS_GNOMCP_CONFIG },
     profiles: { read: settings.JARVIS_PROFILES, indexed: settings.JARVIS_INDEXER_PROFILES },
