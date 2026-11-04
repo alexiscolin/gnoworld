@@ -5,3 +5,5 @@ export { RealmView } from "./RealmView.tsx";
 // after it has hydrated, in a chunk of its own.
 export { ProposalCard } from "./ProposalCard.tsx";
 export { ReadFailed } from "./ReadSource.tsx";
+// A realm page's drawing, for a page's capture (8f, features/previews), which asks for it in a chunk of its own.
+export { RealmBlocks } from "./RealmBlocks.tsx";

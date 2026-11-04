@@ -1,5 +1,5 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
-// (4c), its link's player (4g) and its bar. One that mentions the reader says so (4d), one of the reader's own says
+// (4c), its link's player (4g), its link's page preview (8f) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
 import { markdown, mentions, pollOf, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
@@ -8,6 +8,7 @@ import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { Head } from "./LineHead.tsx";
+import { LinePreview } from "./LinePreview.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { PollView } from "./PollView.tsx";
 import { Quote } from "./Replying.tsx";
@@ -186,6 +187,7 @@ export function LineView(props: LineViewProps) {
         </Body>
       </div>
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
+      <LinePreview blocks={blocks} verdict={verdict} tabbable={row.links} />
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
       <Chips to={line.id} chips={chips} react={react} />

@@ -65,6 +65,12 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+// So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief): 3,311 B.
+// It is weighed beyond the proposals' code, which the same page loads and which brings the realm page's drawing the capture shares.
+const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
+const PREVIEW_JS = 3567;
+// Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
+const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
@@ -223,6 +229,26 @@ async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) 
   return [...scripts].find((url) => CHAT.test(url));
 }
 
+// A world's page's capture (8f): its code and the chat's drawing it asks for, both late, on a world with a realm alone (GovDAO, of the default
+// universe, whose pages the job captures); none elsewhere.
+async function lateCapture(path: string, scripts: ReadonlySet<string>): Promise<string[]> {
+  const asks = () => [...scripts].some((url) => PREVIEW.test(url));
+  await expect.poll(asks, "a world with a realm asks for its capture's code").toBe(path.includes("govdao"));
+  const preview = [...scripts].find((url) => PREVIEW.test(url));
+  if (preview === undefined) return [];
+  await expect.poll(() => [...scripts].some((url) => DRAWING.test(url)), "the capture asks for its drawing").toBe(true);
+  return [preview, ...[...scripts].filter((url) => DRAWING.test(url))];
+}
+
+// What the capture brings beyond what the page already holds (`there`: its first screen and the proposals' code) stays within its cap.
+async function captureWithin(page: Page, capture: readonly string[], there: readonly string[]): Promise<void> {
+  if (capture.length === 0) return;
+  const own = await Promise.all(capture.map((url) => ownOf(page, url, there)));
+  expect(await compressed(page, [...new Set(own.flat())]), "the capture stays within its cap").toBeLessThanOrEqual(
+    PREVIEW_JS,
+  );
+}
+
 for (const path of PAGES) {
   test(`${path} stays within its budgets`, async ({ page }) => {
     const scripts = new Set<string>();
@@ -253,8 +279,13 @@ for (const path of PAGES) {
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
-    const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
+    const capture = await lateCapture(path, scripts);
+    const late = [asked[0], ...capture, await lateChat(page, path, scripts)].filter((url) => url !== undefined);
     const firstScreen = await without(page, [...scripts], late);
+    await captureWithin(page, capture, [
+      ...firstScreen,
+      ...(asked[0] === undefined ? [] : await closureOf(page, asked[0])),
+    ]);
     const lateChunk = late.find((url) => CHAT.test(url));
     if (lateChunk !== undefined)
       expect(

@@ -36,6 +36,8 @@ export interface Slots {
   discoveryWatch: ComponentType;
   /** 8c's share of a place, the "Share" on the "First to chart" pill (frame 93): its name and its page's path. */
   share: (place: { readonly name: string; readonly path: string }) => void;
+  /** 8f's capture of a page under a chat line: the realm whose home the line links to, and whether its card is a Tab stop. */
+  linePreview: ComponentType<{ readonly path: string; readonly tabbable: boolean }>;
 }
 
 const filled: Partial<Slots> = {};

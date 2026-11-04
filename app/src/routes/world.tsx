@@ -10,6 +10,7 @@ import { pageOf, realmView, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
+import { platePreview } from "../features/previews/plate.ts";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
 import { useAppStore } from "../storeContext.tsx";
@@ -18,6 +19,8 @@ import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
 const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+// A world's page's capture (8f, frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
+const Preview = lazy(async () => ({ default: (await import("../features/previews/Preview.tsx")).Preview }));
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -63,6 +66,7 @@ export default function World() {
   const chatDue = useWorldSpace(world, universe.id, ring);
   const realm = world.realms?.[0];
   const realmPath = realm === undefined ? undefined : realmView(realm, universe);
+  const preview = platePreview(world.realms, universe);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -95,6 +99,12 @@ export default function World() {
                 {realmPath === undefined ? null : (
                   <Suspense fallback={null}>
                     <Proposals path={realmPath} onRing={setRing} />
+                  </Suspense>
+                )}
+                {/* Last on the plate, as frame 26 draws it: the world's page, captured. */}
+                {preview === undefined ? null : (
+                  <Suspense fallback={null}>
+                    <Preview path={preview} look="plate" />
                   </Suspense>
                 )}
               </Stack>

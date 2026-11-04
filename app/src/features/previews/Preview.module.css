@@ -1,0 +1,80 @@
+/* A page's capture as a card (8f): on a world's plate, the page small at the start and its words beside it (frame 26); under a chat line,
+   the page as wide as the line and its words under it (frames 104, 107). The card's button covers the whole card, the page included (ui's
+   `covers`); the compositions lay it out. */
+@layer components {
+  .card {
+    position: relative;
+    border-radius: var(--radius-m);
+  }
+
+  .card[data-look="line"] {
+    max-inline-size: var(--column-l);
+  }
+
+  .thumb {
+    container-type: inline-size;
+    overflow: hidden;
+    aspect-ratio: 2 / 1;
+    border: var(--line-width) solid var(--color-line);
+    border-radius: inherit;
+    background: var(--color-surface);
+  }
+
+  .card[data-look="plate"] .thumb {
+    inline-size: var(--column-s);
+  }
+
+  .card[data-look="line"] .thumb {
+    aspect-ratio: 16 / 10;
+  }
+
+  /* The page at four times the picture's width, drawn a quarter as large: a page's own measure, seen whole across the picture. */
+  .page {
+    /* raw: four widths of the picture, its container (cqi), whatever the picture's width */
+    inline-size: 400cqi;
+    padding: var(--space-l);
+    transform: scale(0.25);
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+
+  /* The card's words: one under the other on a plate, in one run under a line. Its press covers the card (`covers`): its radius is the card's. */
+  .open {
+    /* layout: the words one under the other, each as wide as itself */
+    display: grid;
+    /* layout: the step between those words */
+    row-gap: var(--space-2xs);
+    /* layout: each word at the start */
+    justify-items: start;
+    border-radius: inherit;
+    text-align: start;
+    cursor: zoom-in;
+  }
+
+  .open:focus-visible {
+    outline: none;
+  }
+
+  .open:focus-visible::after {
+    outline: var(--focus-width) solid var(--color-primary);
+    outline-offset: var(--focus-offset);
+  }
+
+  .card[data-look="line"] .open {
+    /* layout: under a line, the words in one run */
+    grid-auto-flow: column;
+    /* layout: the run as wide as its words */
+    justify-content: start;
+    /* layout: the step between them */
+    column-gap: var(--space-2xs);
+  }
+
+  .card[data-look="line"] .title {
+    display: none;
+  }
+
+  .when {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}
