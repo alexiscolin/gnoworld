@@ -5,6 +5,7 @@ import { REALM_PREFIX } from "../chain/realm.ts";
 import type { Anchor, MapName, Ramp, Rgb } from "./anchors.ts";
 import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
 import { ramp } from "./colours.ts";
+import { ofContinents } from "./continents.ts";
 import { asciiBytes, planetSeed, worldPath } from "./look.ts";
 import {
   labOf,
@@ -22,6 +23,8 @@ import { sha256 } from "./sha256.ts";
 import { seedShare } from "./shares.ts";
 import { surfaceOf, type Surface } from "./surface.ts";
 
+export { CONTINENTS_SEA, ofContinents } from "./continents.ts";
+
 export interface Recipe {
   /** The class mixed under the world's own, and its share of the surface, 0.4 at most: the dominant keeps 60%. */
   readonly minor: Anchor;
@@ -38,10 +41,6 @@ export interface Recipe {
 /** A world of continents' bare ground, the Earth's own off its day map, cold to hot: Patagonia's cold steppe, the outback's ochre, the
  * Sahara's sand; the Gobi, the outback's west, the Sahara's east. */
 export const BARE: readonly [Ramp, Ramp] = [ramp(0x72624f, 0x927461, 0xe8d2b8), ramp(0x9f8b75, 0x96765f, 0xdfc5aa)];
-/** A world of continents has a sea of less than this (an ocean world's starts there): the program draws its land and its climate. */
-export const CONTINENTS_SEA = 0.8;
-/** Whether a world's surface makes it a world of continents, its minor its bare ground. */
-export const ofContinents = ({ sea }: Pick<Surface, "sea">): boolean => sea > 0 && sea < CONTINENTS_SEA;
 const MAX_MINOR = 0.4;
 const LIGHTNESS = [0.9, 1.1] as const;
 const CHROMA = [0.8, 1] as const;

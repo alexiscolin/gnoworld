@@ -33,13 +33,10 @@ export function namedLoad(name: string, width: number): Pick<MapLoad, "kind" | "
   return { kind: name === "clouds" ? "data" : "colour", width };
 }
 
-/** The maps a generated world reads. */
-export const mapNamesOf = ({ look, recipe }: World): string[] => [look.map, recipe.minorMap, "clouds", "ring"];
-
-/** A generated world's maps from those `held`, once all it reads are there; none till then. */
-export function mapSetOf(world: World, held: ReadonlyMap<string, Texture>): MapSet | undefined {
+/** A generated world's maps from those `held`, once all it reads (`names`, the kit's `mapNamesOf`) are there; none till then. */
+export function mapSetOf(names: readonly string[], held: ReadonlyMap<string, Texture>): MapSet | undefined {
   const [clouds, ring] = [held.get("clouds"), held.get("ring")];
-  if (clouds === undefined || ring === undefined || mapNamesOf(world).some((name) => !held.has(name))) return undefined;
+  if (clouds === undefined || ring === undefined || names.some((name) => !held.has(name))) return undefined;
   return { map: (name) => held.get(name) ?? clouds, clouds, ring };
 }
 
@@ -92,10 +89,12 @@ export class BodyMaps {
     return this.#kit;
   }
 
-  /** What `world` needs, if it is all here; what is not is asked for. */
+  /** What `world` needs, as its kit names it, if it is all here; what is not is asked for. */
   setFor(world: World): MapSet | undefined {
-    for (const name of mapNamesOf(world)) this.#fetch(name);
-    return mapSetOf(world, this.#maps);
+    const names = this.kit()?.mapNamesOf(world);
+    if (names === undefined) return undefined;
+    for (const name of names) this.#fetch(name);
+    return mapSetOf(names, this.#maps);
   }
 
   /** A map by its name, asked if it was not: until it came, none. */

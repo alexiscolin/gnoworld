@@ -2,7 +2,7 @@
 // the start of frames the scene lends, a few a frame, before it draws its own over them, so their grade is the scene's. A frame only draws
 // and reads pixels into buffers made before it; the JPEGs the page shows are made between frames. Maps are small and go with the planets.
 import { PerspectiveCamera, Scene, SphereGeometry, Vector3, Vector4, type Texture, type WebGLRenderer } from "three";
-import { mapNamesOf, mapSetOf, namedLoad } from "./cosmos/maps.ts";
+import { mapSetOf, namedLoad } from "./cosmos/maps.ts";
 import { earthPlanet } from "./earth/globe.ts";
 import { freeMap, loadMap, mapUrl } from "./planet/maps.ts";
 import type { Planet } from "./planet/planet.ts";
@@ -94,7 +94,7 @@ function worldOf(
   { maps, sphere }: { maps: ReadonlyMap<string, Texture>; sphere: SphereGeometry },
 ) {
   const world = kit.worldOf(id);
-  const set = mapSetOf(world, maps);
+  const set = mapSetOf(kit.mapNamesOf(world), maps);
   return set === undefined ? undefined : kit.createWorld(world, set, sphere);
 }
 
@@ -219,7 +219,7 @@ export async function portraitsOf(
   const kit = await import("./planet/generated.ts");
   const maps = await mapsFor(
     device,
-    new Set(ids.flatMap((id) => (id === EARTH ? EARTH_MAPS : mapNamesOf(kit.worldOf(id))))),
+    new Set(ids.flatMap((id) => (id === EARTH ? EARTH_MAPS : kit.mapNamesOf(kit.worldOf(id))))),
   );
   const sphere = new SphereGeometry(1, 64, 48);
   const planets = new Map<string, Planet>();
