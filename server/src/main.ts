@@ -18,7 +18,7 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { isTeam, loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultRpc } from "./prices/universes.ts";
+import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
@@ -40,7 +40,7 @@ const prices =
     : startPrices({
         file: config.markets,
         log,
-        ...(config.universes === undefined ? {} : { rpc: defaultRpc(config.universes) }),
+        ...(config.universes === undefined ? {} : { universe: defaultUniverse(config.universes) }),
       });
 let draining = false;
 const app = makeApp(log, () => !draining);
