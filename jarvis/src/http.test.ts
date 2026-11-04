@@ -93,7 +93,7 @@ describe("jarvis's HTTP face: what it answers", () => {
   );
 
   // fetch would resolve these before it sends them: written raw, as any client may (F5287).
-  it.each(["/%65cho", "//[", "*"])(
+  it.each(["//host/echo", "http://other.host/echo", "/x/../echo", "/./echo", "/%65cho", "//[", "*"])(
     "refuses the target %s, which is not the path /echo itself, as not_found",
     async (target) => {
       const handler = vi.fn(echo);

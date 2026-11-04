@@ -94,9 +94,10 @@ async function handle(
 }
 
 // The route and method a request asks, and how the log names them: a path or a method of the client's as one word,
-// as either could carry anything.
+// as either could carry anything. The route is the target as written up to its query, never resolved: an authority,
+// a dot segment or an escape names no route (F5287).
 function askedOf(routes: Routes, request: IncomingMessage, ready: boolean) {
-  const path = URL.parse(request.url ?? "", "http://jarvis")?.pathname ?? "";
+  const [path = ""] = (request.url ?? "").split("?");
   const route = Object.hasOwn(routes, path) ? routes[path] : undefined;
   const method = METHODS.find((known) => known === request.method);
   const asked: Asked = { route, method, ready };
