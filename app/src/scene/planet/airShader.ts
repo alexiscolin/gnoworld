@@ -1,5 +1,6 @@
 // The air: light scattered along each ray through a shell, not a painted rim, so a world lit from behind wears a thin ring of light and a
 // sunset along its terminator. Eight steps a pixel, in the world's own radii, over the whole disc: the shell's front covers it, so a close world pays for all of it.
+// A glowing world's air takes light from its own glow (`selfLight`, its level): its edge in its air's cream all round, as frame 4's Music.
 import { FARAWAY } from "./chunks.ts";
 
 export const AIR_VERTEX = /* glsl */ `
@@ -19,7 +20,7 @@ export const AIR_FRAGMENT = /* glsl */ `
 uniform vec3 sun;
 uniform vec3 rimColour;
 uniform float rimThickness;
-uniform float limbLight;
+uniform float limbLight, selfLight;
 uniform float faraway;
 varying vec3 vWorld;
 varying vec3 vCentre;
@@ -72,12 +73,14 @@ void main() {
     float along = -dot(eye, ray);
     vec3 nearest = eye + ray * along;
     float over = length(nearest) - 1.0;
-    float lit = smoothstep(-0.35, 0.25, dot(normalize(nearest), sun));
+    float warm = sign(selfLight);
+    vec3 own = rimColour * vec3(1.0, 0.86, 0.62);
+    float lit = max(smoothstep(-0.35, 0.25, dot(normalize(nearest), sun)), selfLight);
     float line = smoothstep(-0.004, 0.003, over) * exp(-max(over, 0.0) / (rimThickness * 0.3));
     float band = smoothstep(-0.003, 0.002, over) * (1.0 - smoothstep(rimThickness * 0.42, rimThickness * 0.62, over));
     float haze = smoothstep(-0.075, 0.0, over) * (1.0 - smoothstep(-0.002, 0.003, over));
-    light = mix(light, vec3(0.16, 0.22, 0.33) * dot(light, vec3(0.34)), 0.42);
-    light += (vec3(0.6, 0.78, 1.0) * line * 0.5 + vec3(0.47, 0.62, 0.82) * band * 0.5 + vec3(0.02, 0.035, 0.06) * haze) * limbLight * lit;
+    light = mix(light, mix(vec3(0.16, 0.22, 0.33), own * 0.4, warm) * dot(light, vec3(0.34)), 0.42);
+    light += (mix(vec3(0.6, 0.78, 1.0), own, warm) * line * 0.5 + mix(vec3(0.47, 0.62, 0.82), own, warm) * band * 0.5 + mix(vec3(0.02, 0.035, 0.06), own * 0.1, warm) * haze) * limbLight * lit;
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));
