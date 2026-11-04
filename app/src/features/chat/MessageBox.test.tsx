@@ -16,7 +16,7 @@ describe("the composer's box", () => {
   it("is one group holding the format bar, the field and Send", () => {
     const box = draw();
     expect(one(box, '[role="group"][aria-label="Message box"]').querySelector("textarea")).not.toBeNull();
-    expect(all(box, '[role="group"][aria-label="Format"] button')).toHaveLength(8);
+    expect(all(box, '[role="group"][aria-label="Format"] button')).toHaveLength(9);
     expect(button(box, "Send")?.getAttribute("type")).toBe("submit");
   });
 
@@ -29,6 +29,7 @@ describe("the composer's box", () => {
     expect(order).toEqual([
       "Bold",
       "Italic",
+      "Underline",
       "Strikethrough",
       "|",
       "Code",
@@ -58,6 +59,20 @@ describe("the composer's box", () => {
     const onFormat = vi.fn();
     click(button(draw({ onFormat }), "Bold"));
     expect(onFormat).toHaveBeenCalledWith("bold");
+  });
+
+  // 8k (frame 73: B, I, U, S): the underline between italic and strikethrough, its icon the design system's, a plain
+  // button as its siblings are (none of them holds a pressed state or a shortcut).
+  it("draws Underline between Italic and Strikethrough, with the design system's underline icon, and applies it", () => {
+    const onFormat = vi.fn();
+    const box = draw({ onFormat });
+    const underline = button(box, "Underline");
+    expect(underline?.getAttribute("type")).toBe("button");
+    expect(underline?.hasAttribute("aria-pressed")).toBe(false);
+    expect(underline?.hasAttribute("aria-keyshortcuts")).toBe(false);
+    expect(underline?.querySelector("svg")?.getAttribute("data-icon")).toBe("underline");
+    click(underline);
+    expect(onFormat).toHaveBeenCalledWith("underline");
   });
 
   it("names Send for what it does, a word for assistive technology, and is off while the line cannot go", () => {

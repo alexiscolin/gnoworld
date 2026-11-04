@@ -3,7 +3,7 @@
 // mark goes round whole words, the selection's spaces outside: Markdown reads a mark at a word's bounds alone.
 import { inWord } from "@gnoworld/core";
 
-export type Format = "bold" | "italic" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
+export type Format = "bold" | "italic" | "underline" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
 
 /** A draft, and its selection from `start` to `end` (the caret, when they are one). */
 export interface Edit {
@@ -12,7 +12,7 @@ export interface Edit {
   end: number;
 }
 
-const MARKS = { bold: "**", italic: "*", strike: "~~", code: "`" } as const;
+const MARKS = { bold: "**", italic: "*", underline: "++", strike: "~~", code: "`" } as const;
 const STARTS = { quote: "> ", bulleted: "- ", numbered: "1. " } as const;
 // The starts the bar puts on a line, which it takes off or turns: a number other than 1 is the writer's own text.
 const LIST = /^(?:[-*+]|1\.) /;
@@ -30,6 +30,7 @@ export function inserted({ text, start, end }: Edit, mark: string): Edit {
 export function formatted(edit: Edit, format: Format): Edit {
   if (format === "link") return linked(edit);
   if (format === "quote" || format === "bulleted" || format === "numbered") return started(edit, format);
+  if (format === "underline") return underlined(words(edit));
   return marked(words(edit), MARKS[format]);
 }
 
@@ -91,6 +92,36 @@ function marked(words: Edit, mark: string): Edit {
     text: text.slice(0, from) + mark + text.slice(from, to) + mark + text.slice(to),
     start: from + size,
     end: to + size,
+  };
+}
+
+// The text from `from` to `to`, each `+` not escaped yet escaped: an odd run of backslashes before one escapes it.
+function escaped(text: string, from: number, to: number): string {
+  let backslashes = 0;
+  for (let at = from - 1; text[at] === "\\"; at -= 1) backslashes += 1;
+  let out = "";
+  for (const char of text.slice(from, to)) {
+    out += char === "+" && backslashes % 2 === 0 ? "\\+" : char;
+    backslashes = char === "\\" ? backslashes + 1 : 0;
+  }
+  return out;
+}
+
+// The words underlined, or no more. The writer's own `+` (C++, 1+1, +33) is text far more often than a star or a tilde:
+// each one in the words and beside them is escaped, so the bar's runs are read whole and the words as written (F5380).
+function underlined(words: Edit): Edit {
+  if (inside(words, MARKS.underline) || around(words, MARKS.underline)) return marked(words, MARKS.underline);
+  const { text, start: from, end: to } = words;
+  let before = from;
+  while (text[before - 1] === "+") before -= 1;
+  let after = to;
+  while (text[after] === "+") after += 1;
+  const lead = `${text.slice(0, before)}${escaped(text, before, from)}${MARKS.underline}`;
+  const inner = escaped(text, from, to);
+  return {
+    text: `${lead}${inner}${MARKS.underline}${escaped(text, to, after)}${text.slice(after)}`,
+    start: lead.length,
+    end: lead.length + inner.length,
   };
 }
 

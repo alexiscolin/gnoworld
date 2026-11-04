@@ -1,4 +1,4 @@
-import { markdown } from "@gnoworld/core";
+import { markdown, type Inline } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { formatted, inserted, type Edit, type Format } from "./format.ts";
@@ -185,6 +185,124 @@ describe("formatted", () => {
     ["numbered", { type: "list", ordered: true, start: 1, items: [[{ type: "text", text: "hello" }]] }],
   ] as const)("starts a line Markdown reads as a %s", (format, block) => {
     expect(markdown(formatted({ text: "hello", start: 0, end: 0 }, format).text)).toStrictEqual([block]);
+  });
+});
+
+// 8k: the bar's U writes `++` round whole words, as its siblings write theirs, and takes it off again.
+describe("formatted, underline", () => {
+  it.each([
+    ["say «hi» now", "say ++«hi»++ now"],
+    ["say« hi »now", "say ++«hi»++ now"],
+    ["he|llo there", "++«hello»++ there"],
+    ["say |", "say ++|++"],
+    ["say **«hi»** now", "say **++«hi»++** now"],
+    ["see «https://a.example/x» now", "see ++«https://a.example/x»++ now"],
+  ] as const)("wraps %j in ++, still selected: %j", (before, after) => {
+    expect(apply(before, "underline")).toStrictEqual(draft(after));
+  });
+
+  it.each([
+    ["say ++«hi»++ now", "say «hi» now"],
+    ["say «++hi++» now", "say «hi» now"],
+    ["say ++|++ now", "say | now"],
+    ["++he|llo++", "«hello»"],
+  ] as const)("unwraps %j when it is already underlined: %j", (before, after) => {
+    expect(apply(before, "underline")).toStrictEqual(draft(after));
+  });
+
+  // F5380: the writer's own `+` (C++, 1+1, +33) is text far more often than a star or a tilde. The bar escapes each one
+  // in the words it underlines and beside them, so its runs are read whole and the words as written; taking the underline
+  // off leaves the escapes, which read as the same words.
+  it.each([
+    ["I like «c++» lots", "I like ++«c\\+\\+»++ lots", ["I like ", "c++", " lots"]],
+    ["I like c|++ lots", "I like ++«c»++\\+\\+ lots", ["I like ", "c", "++ lots"]],
+    ["«1»+1", "++«1»++\\+1", ["", "1", "+1"]],
+    ["a +«hi»+ b", "a \\+++«hi»++\\+ b", ["a +", "hi", "+ b"]],
+    ["«+hi+»", "++«\\+hi\\+»++", ["", "+hi+", ""]],
+    ["x «a\\+b» y", "x ++«a\\+b»++ y", ["x ", "a+b", " y"]],
+  ] as const)("escapes the `+` of %j in and beside the underline: %j", (before, after, [left, under, right]) => {
+    const once = apply(before, "underline");
+    expect(once).toStrictEqual(draft(after));
+    const read: Inline[] = left === "" ? [] : [{ type: "text", text: left }];
+    read.push({ type: "underline", children: [{ type: "text", text: under }] });
+    if (right !== "") read.push({ type: "text", text: right });
+    expect(markdown(once.text)).toStrictEqual([{ type: "paragraph", children: read }]);
+  });
+
+  it("takes an underline off and leaves its escapes, read as the same words", () => {
+    expect(apply("I like ++«c\\+\\+»++ lots", "underline")).toStrictEqual(draft("I like «c\\+\\+» lots"));
+    expect(apply("I like «c\\+\\+» lots", "underline")).toStrictEqual(draft("I like ++«c\\+\\+»++ lots"));
+  });
+
+  it("underlines a selected word holding `+` as Markdown reads it, and takes it off to the same words", () => {
+    const letters = fc.stringMatching(/^[a-z]{1,8}$/);
+    const word = fc.stringMatching(/^[a-z][a-z+]{0,7}$/);
+    fc.assert(
+      fc.property(fc.record({ a: letters, word, b: letters }), ({ a, word: selected, b }) => {
+        const edit = { text: `${a} ${selected} ${b}`, start: a.length + 1, end: a.length + 1 + selected.length };
+        const once = formatted(edit, "underline");
+        expect(markdown(once.text)).toStrictEqual([
+          {
+            type: "paragraph",
+            children: [
+              { type: "text", text: `${a} ` },
+              { type: "underline", children: [{ type: "text", text: selected }] },
+              { type: "text", text: ` ${b}` },
+            ],
+          },
+        ]);
+        const back = formatted(once, "underline");
+        expect(markdown(back.text)).toStrictEqual(markdown(edit.text));
+        expect(back.text.slice(back.start, back.end).replaceAll("\\", "")).toBe(selected);
+      }),
+      { seed: 20261017, numRuns: 200 },
+    );
+  });
+
+  it("makes, of a selected word or part of one, what Markdown reads as underline, and takes it off again", () => {
+    const words = fc.stringMatching(/^[a-z]{1,8}$/);
+    fc.assert(
+      fc.property(
+        fc.record({ a: words, word: words, b: words, from: fc.nat(), size: fc.nat() }),
+        ({ a, word, b, from, size }) => {
+          const start = a.length + 1 + (from % word.length);
+          const edit = {
+            text: `${a} ${word} ${b}`,
+            start,
+            end: start + (size % (word.length - (from % word.length) + 1)),
+          };
+          const once = formatted(edit, "underline");
+          const [paragraph] = markdown(once.text);
+          const node = paragraph?.type === "paragraph" ? paragraph.children[1] : undefined;
+          expect(node).toStrictEqual({ type: "underline", children: [{ type: "text", text: word }] });
+          expect(formatted(once, "underline")).toStrictEqual({
+            text: edit.text,
+            start: a.length + 1,
+            end: a.length + 1 + word.length,
+          });
+        },
+      ),
+      { seed: 20261017, numRuns: 200 },
+    );
+  });
+
+  it("reads a bare address the bar underlined as an underlined link", () => {
+    const { text } = apply("see «https://a.example/x» now", "underline");
+    expect(markdown(text)).toStrictEqual([
+      {
+        type: "paragraph",
+        children: [
+          { type: "text", text: "see " },
+          {
+            type: "underline",
+            children: [
+              { type: "link", href: "https://a.example/x", children: [{ type: "text", text: "https://a.example/x" }] },
+            ],
+          },
+          { type: "text", text: " now" },
+        ],
+      },
+    ]);
   });
 });
 
