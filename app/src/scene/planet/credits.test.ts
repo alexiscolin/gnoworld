@@ -2,7 +2,7 @@ import { MAPS, NEBULA_IMAGES } from "@gnoworld/core";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CREDITS } from "./credits.ts";
+import { FILED as CREDITS } from "./creditFiles.ts";
 
 // A texture with no credit breaks its licence (the plan's threat model): every file in the folder has its row, and a row's words name
 // its author and its licence.
