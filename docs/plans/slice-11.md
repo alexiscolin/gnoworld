@@ -8,7 +8,7 @@ Row 11's acceptance, word for word (amended 2026-11-03): "A rent while paused, w
 
 ## 2. Out of scope
 
-The app's half (the rent card, the slot on the plate, satellites in space, "Sponsored", "Testnet", and showing a satellite only once the chat's moderation passed it) and reports (slice 12). No deploy, no chain write: Alexis's, asked in the conversation. The `gnoworld` namespace is not registered on onyx-1 (`gno_packages @gnoworld` is empty, 2026-11-03; F062), so the deploy path is a question below. ADR-0002 §8 row 7, §9 and backlog row 11 were amended to the simple realm the same night (Alexis: "corrige tout sans rien laisser").
+The app's half (the rent card, the slot on the plate, satellites in space, "Sponsored", "Testnet", showing a satellite only once the chat's moderation passed it, and all of it behind an environment variable `SATELLITES`, off by default, Alexis 2026-11-04) and reports (slice 12). No deploy, no chain write: Alexis's, asked in the conversation. The `gnoworld` namespace is not registered on onyx-1 (`gno_packages @gnoworld` is empty, 2026-11-03; F062), so the deploy path is a question below. ADR-0002 §8 row 7, §9 and backlog row 11 were amended to the simple realm the same night (Alexis: "corrige tout sans rien laisser").
 
 ## 3. Threat model
 
