@@ -1,14 +1,17 @@
+import { readdirSync, readFileSync } from "node:fs";
 import {
+  type AnswerButton,
   ApiError,
+  JARVIS_LANGUAGES,
   JARVIS_PATHS,
   JarvisAnswer,
+  JarvisAsk,
   JarvisBudgets,
+  JarvisDigest,
+  JarvisDigestRequest,
   JarvisMadeDigest,
+  JarvisTranslate,
   JarvisTranslation,
-  type AnswerButton,
-  type JarvisAsk,
-  type JarvisDigestRequest,
-  type JarvisTranslate,
 } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serve } from "./http.ts";
@@ -17,6 +20,12 @@ import { jarvisRoutes } from "./routes.ts";
 import { budgetFor, capture } from "./testing/kit.ts";
 import type { Digested } from "./digest.ts";
 import type { Translated } from "./translate.ts";
+import { FunctionList } from "@gnoworld/schemas/functions";
+import { z } from "zod";
+import type * as zm from "zod/mini";
+import { gnomcpTools } from "./gnomcpTools.ts";
+import { MODELS } from "./prices.ts";
+import { gnoscopeTools } from "./tools/gnoscopeTools.ts";
 
 const DOLLAR = 1_000_000_000;
 const ROOM = "#bubble";
@@ -472,5 +481,254 @@ describe("POST /digest: a realm's digest", () => {
     });
     const { post } = await served({ digest });
     expect(await (await post(JARVIS_PATHS.digest, asked())).json()).toEqual({ ...made(), made: true });
+  });
+});
+
+// The evals' cases (ADR-0002 §5; row 10; 10k's report), read as data from evals/: each request one jarvis's wire takes,
+// each suite row 10 names present. The evals run apart, with a key; a change of the wire leaving a case behind fails
+// here. Each value is built inside its test (F2356).
+const folder = new URL("../../evals/cases/", import.meta.url);
+const Expect = z.strictObject({
+  status: z.array(z.string()).min(1),
+  never_tools: z.array(z.string()).optional(),
+  some_tools: z.array(z.string()).optional(),
+  contains: z.array(z.string()).optional(),
+  lacks: z.array(z.string()).optional(),
+  rubric: z.string().min(20).optional(),
+  made_at_most: z.int().min(0).optional(),
+  proposal: z.literal("none").optional(),
+  max_usd: z.number().positive().optional(),
+  max_ms: z.int().positive().optional(),
+});
+const Recorded = z.strictObject({
+  height: z.int().positive(),
+  page: z.string().max(200 * 1024),
+  functions: FunctionList,
+});
+// A realm as its case records it, or a recorded one of evals/chains/ by its name, the case's words after its page.
+const Chain = z.union([
+  Recorded,
+  z
+    .strictObject({ recorded: z.string().regex(/^[a-z0-9-]+$/), then: z.string().min(1).optional() })
+    .transform(({ recorded, then = "" }) => {
+      const file = new URL(`../../evals/chains/${recorded}.json`, import.meta.url);
+      const chain = Recorded.parse(JSON.parse(readFileSync(file, "utf8")));
+      return { ...chain, page: chain.page + then };
+    }),
+]);
+const Case = z.strictObject({
+  id: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+  about: z.string().min(10),
+  planted: z.string().min(4).optional(),
+  spent: z.literal(true).optional(),
+  repeat: z.int().min(2).max(4).optional(),
+  ask: z.unknown().optional(),
+  translate: z.unknown().optional(),
+  digest: z.unknown().optional(),
+  chain: Chain.optional(),
+  expect: Expect,
+});
+type Case = z.infer<typeof Case>;
+const Suite = z.strictObject({ suite: z.string(), cases: z.array(Case).min(1) });
+const suites = () =>
+  readdirSync(folder)
+    .filter((name) => name.endsWith(".json"))
+    .sort()
+    .map((name) => ({ name, ...Suite.parse(JSON.parse(readFileSync(new URL(name, folder), "utf8"))) }));
+const cases = () => suites().flatMap((suite) => suite.cases.map((one) => ({ ...one, suite: suite.suite })));
+const kindOf = (one: Case) => (["ask", "translate", "digest"] as const).filter((kind) => one[kind] !== undefined);
+// What each route answers (JarvisAnswer, JarvisTranslation, JarvisDigest).
+const STATUSES = {
+  ask: ["answered", "spent", "off"],
+  translate: ["translated", "original", "spent", "off"],
+  digest: ["digest", "none", "spent", "off"],
+};
+// The fewest cases a suite holds, so none is a token.
+const LEAST = {
+  injection: 6,
+  allowlist: 3,
+  refusals: 2,
+  grounding: 3,
+  "chain-facts": 4,
+  proposals: 3,
+  digest: 3,
+  translation: 20,
+  budget: 3,
+};
+// gnomcp's writes, which jarvis never offers: an ask that tempts one checks none ran.
+const WRITES = ["gno_call", "gno_run", "gno_addpkg", "gno_key_send"];
+// What /ask offers (D170) and what /digest offers (D199), by the names jarvis's own modules give.
+const offered = () =>
+  new Set([
+    ...gnomcpTools({ chains: ["onyx"], indexed: ["onyx"] }).map((tool) => tool.name),
+    ...gnoscopeTools(["onyx"]).map((tool) => tool.name),
+    "load_skill",
+    "find_place",
+    "give_button",
+    "give_digest",
+    "propose_action",
+  ]);
+
+describe("the evals' cases", () => {
+  it("hold every suite row 10, the chain facts and 10k ask for, each file named after its suite", () => {
+    const names = suites().map((suite) => suite.suite);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "injection",
+        "allowlist",
+        "grounding",
+        "proposals",
+        "budget",
+        "translation",
+        "chain-facts",
+        "digest",
+        "refusals",
+      ]),
+    );
+    for (const suite of suites()) expect(suite.name).toBe(`${suite.suite}.json`);
+  });
+
+  it("each ask one thing of jarvis's wire, in the shape its route takes", () => {
+    const ids = new Set<string>();
+    for (const one of cases()) {
+      expect(ids.has(one.id), one.id).toBe(false);
+      ids.add(one.id);
+      const kinds = kindOf(one);
+      expect(kinds, one.id).toHaveLength(1);
+      if (one.ask !== undefined) expect(JarvisAsk.safeParse(one.ask).success, one.id).toBe(true);
+      if (one.translate !== undefined) expect(JarvisTranslate.safeParse(one.translate).success, one.id).toBe(true);
+      if (one.digest !== undefined) {
+        expect(JarvisDigestRequest.safeParse(one.digest).success, one.id).toBe(true);
+        expect(one.chain, `${one.id}: a digest reads a recorded chain`).toBeDefined();
+      } else expect(one.chain, one.id).toBeUndefined();
+    }
+  });
+
+  it("expect only statuses each route answers, as its schema takes them", () => {
+    const takes = (schema: zm.ZodMiniType, status: string) =>
+      [
+        { status },
+        { status, markdown: "a", buttons: [] },
+        { status, text: "a" },
+        { status, digest: { blocks: [{ type: "text", markdown: "a" }] }, proposal: null, height: 1 },
+      ].some((value) => schema.safeParse(value).success);
+    const schemas = { ask: JarvisAnswer, translate: JarvisTranslation, digest: JarvisDigest };
+    for (const kind of ["ask", "translate", "digest"] as const)
+      for (const status of STATUSES[kind]) expect(takes(schemas[kind], status), status).toBe(true);
+    for (const one of cases())
+      for (const kind of kindOf(one))
+        for (const status of one.expect.status) expect(STATUSES[kind], `${one.id}: ${status}`).toContain(status);
+  });
+
+  it("expect tools jarvis offers to run, and tools it never offers not to", () => {
+    for (const one of cases()) {
+      for (const tool of one.expect.some_tools ?? []) expect(offered().has(tool), `${one.id}: ${tool}`).toBe(true);
+      for (const tool of one.expect.never_tools ?? []) expect(offered().has(tool), `${one.id}: ${tool}`).toBe(false);
+    }
+  });
+
+  it("hold enough cases a suite to say something", () => {
+    const counts = new Map(suites().map((suite) => [suite.suite, suite.cases.length]));
+    for (const [suite, least] of Object.entries(LEAST))
+      expect(counts.get(suite) ?? 0, suite).toBeGreaterThanOrEqual(least);
+  });
+
+  it("plant each injection where jarvis reads it, and check it changed nothing but words", () => {
+    for (const one of cases().filter((each) => each.suite === "injection")) {
+      expect(one.planted, one.id).toBeDefined();
+      const read = JSON.stringify([one.ask, one.translate, one.chain?.page]);
+      expect(read, one.id).toContain(JSON.stringify(one.planted ?? "").slice(1, -1));
+      if (one.ask !== undefined) expect(one.expect.never_tools ?? [], one.id).toEqual(expect.arrayContaining(WRITES));
+      else
+        expect((one.expect.lacks ?? []).length + (one.expect.proposal === "none" ? 1 : 0), one.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("ask for every write in the allowlist's and the refusals' cases, never once run", () => {
+    for (const one of cases().filter((each) => each.suite === "allowlist" || each.suite === "refusals"))
+      expect(one.expect.never_tools ?? [], one.id).toEqual(expect.arrayContaining(WRITES));
+  });
+
+  it("ask a grounding question no tool can answer, which must give no invented figure", () => {
+    const blind = cases().filter((one) => one.suite === "grounding" && one.expect.some_tools === undefined);
+    expect(blind.length).toBeGreaterThan(0);
+    for (const one of blind) expect(one.expect.rubric ?? "", one.id).toMatch(/invented/);
+  });
+
+  it("translate into each of jarvis's languages, and make a translation once for its readers", () => {
+    const translations = cases().filter((one) => one.translate !== undefined);
+    const languages = new Set(translations.map((one) => JarvisTranslate.parse(one.translate).language));
+    expect([...languages].sort()).toEqual([...JARVIS_LANGUAGES].sort());
+    const once = translations.filter((one) => one.repeat !== undefined);
+    expect(once.length).toBeGreaterThan(0);
+    for (const one of once) expect(one.expect.made_at_most, one.id).toBe(1);
+  });
+
+  it("stop each feature at the budget's end, as spent", () => {
+    const spent = cases().filter((one) => one.spent === true);
+    expect(new Set(spent.flatMap(kindOf))).toEqual(new Set(["ask", "translate", "digest"]));
+    for (const one of spent) expect(one.expect.status, one.id).toEqual(["spent"]);
+  });
+
+  it("propose nothing for a function the realm's vm/qfuncs lacks", () => {
+    const absent = cases().filter((one) => one.expect.proposal === "none" && one.digest !== undefined);
+    const named = (one: Case) => /\b([A-Z][A-Za-z]+)\(/.exec(one.planted ?? "")?.[1];
+    const listed = (one: Case) => new Set((one.chain?.functions ?? []).map((fn) => fn.FuncName));
+    const missing = absent.filter((one) => named(one) !== undefined && !listed(one).has(named(one) ?? ""));
+    expect(missing.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("read each chain fact through gnomcp's reads, with its height asked of the answer", () => {
+    const facts = cases().filter((one) => one.suite === "chain-facts");
+    const reads = new Set<string>(gnomcpTools({ chains: ["onyx"], indexed: ["onyx"] }).map((tool) => tool.name));
+    for (const one of facts) {
+      expect(
+        (one.expect.some_tools ?? []).some((tool) => reads.has(tool)),
+        one.id,
+      ).toBe(true);
+      expect(one.expect.rubric ?? "", one.id).toMatch(/height/);
+    }
+  });
+});
+
+describe("the evals' run", () => {
+  const evals = (path: string) => readFileSync(new URL(`../../evals/${path}`, import.meta.url), "utf8");
+  it("is graded by a model that answers none of the cases, jarvis's third model left unused", () => {
+    const config = evals("promptfooconfig.yaml");
+    const graders = [...config.matchAll(/provider: anthropic:messages:(\S+)/g)].map((match) => match[1]);
+    expect(graders).toEqual(["claude-opus-5-5"]);
+    const answering = [...config.matchAll(/JARVIS_MODEL(?:_FAST)?: (\S+)/g)].map((match) => match[1]);
+    expect(answering).toEqual(["claude-sonnet-5-5", "claude-haiku-5-5"]);
+    for (const model of [...graders, ...answering]) expect(MODELS).toContain(model);
+    // JARVIS_MODEL_DEEP (Opus by default) answers nothing yet: were it used, the grader would grade its own answers.
+    const modules = readdirSync(new URL(".", import.meta.url), { recursive: true, encoding: "utf8" });
+    const using = modules.filter((path) => path.endsWith(".ts") && !path.endsWith(".test.ts"));
+    for (const path of using)
+      expect(readFileSync(new URL(path, import.meta.url), "utf8"), path).not.toMatch(/models\.deep/);
+  });
+
+  it("calls jarvis's real entry through its provider, its tests read from cases/, each answer kept", () => {
+    const config = evals("promptfooconfig.yaml");
+    expect(config).toMatch(/^ {2}- id: file:\/\/provider\.ts$/m);
+    expect(config).toMatch(/^tests: file:\/\/tests\.ts$/m);
+    expect(config).toMatch(/^ {2}cache: true$/m);
+    expect(evals("tests.ts")).toContain(`readCases(fileURLToPath(new URL("cases", import.meta.url)))`);
+    const started = evals("jarvis.ts");
+    expect(started).toContain(`join(setup.root, "jarvis/src/main.ts")`);
+    expect(started).toContain(`"--disallow-code-generation-from-strings"`);
+    // The preload moves the universes' nodes alone; Anthropic's API is the real one.
+    expect(started).toMatch(/setup\.universes\.map\(\(one\) => \[new URL\(one\.rpc\)\.origin/);
+    for (const path of ["jarvis.ts", "provider.ts", "fakes.ts"]) expect(evals(path)).not.toMatch(/anthropic\.com/);
+  });
+
+  it("is installed apart, from its own package file, promptfoo pinned", () => {
+    const manifest = z
+      .object({ devDependencies: z.record(z.string(), z.string()) })
+      .parse(JSON.parse(evals("package.json")));
+    expect(manifest.devDependencies["promptfoo"]).toBe("0.125.1");
+    expect(readFileSync(new URL("../../pnpm-workspace.yaml", import.meta.url), "utf8")).not.toMatch(/evals/);
+    expect(evals("pnpm-workspace.yaml")).toMatch(/^packages: \[\]$/m);
+    expect(evals("pnpm-workspace.yaml")).toMatch(/^minimumReleaseAge: 1440$/m);
+    expect(evals("pnpm-workspace.yaml")).toMatch(/^trustPolicy: no-downgrade$/m);
   });
 });

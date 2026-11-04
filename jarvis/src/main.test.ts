@@ -1,29 +1,29 @@
-import { spawn, type ChildProcessByStdio } from "node:child_process";
+import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, normalize } from "node:path";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import {
+  type AnswerButton,
   ApiError,
   JARVIS_PATHS,
   JarvisAnswer,
+  type JarvisAsk,
   JarvisBudgets,
   JarvisMadeDigest,
   JarvisTranslation,
-  type AnswerButton,
-  type JarvisAsk,
 } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { makeBudget } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
-import { fakeAnthropic, held, type FakeStep } from "./testing/fakeAnthropic.ts";
+import { fakeAnthropic, type FakeStep, held } from "./testing/fakeAnthropic.ts";
 import { fakeGnomcp, type Scenario } from "./testing/fakeGnomcp.ts";
 import { fakeGnoscope } from "./testing/fakeGnoscope.ts";
 import { bodyOf, onLoopback } from "./testing/loopback.ts";
@@ -681,5 +681,292 @@ describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000
     expect(db.prepare("SELECT COUNT(*) AS holds FROM budget_holds").get()).toEqual({ holds: 0 });
     expect(db.prepare("SELECT COUNT(*) AS kept FROM translations").get()).toEqual({ kept: 1 });
     db.close();
+  });
+});
+
+// jarvis's image, of its own (Alexis, 2026-11-04, "Son propre paquet et image"; ADR-0002 §5, §7): the files its build
+// takes from the repository, read as text from deploy/jarvis/Dockerfile and .dockerignore, as main.test.ts reads the
+// server's. Docker is refused in this sandbox: deploy/test.sh builds it. Each value is built inside its test (F2356).
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
+
+// .dockerignore as Docker reads it (moby's patternmatcher): each line a pattern, `!` letting back in, the last line that
+// matches a path or one of its folders deciding; `**` any folders, `*` and `?` within one name.
+function ignoredBy(lines: readonly string[]): (path: string) => boolean {
+  const patterns = lines
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"))
+    .map((line) => {
+      const back = line.startsWith("!");
+      // As filepath.Clean does: no leading or trailing slash.
+      const glob = normalize(back ? line.slice(1) : line).replace(/^\/+|\/+$/g, "");
+      const source = glob
+        .split(/(\*\*\/|\*\*|\*|\?|\[[^\]]*\])/)
+        .map((part) => {
+          if (part === "**/") return "(?:.*/)?";
+          if (part === "**") return ".*";
+          if (part === "*") return "[^/]*";
+          if (part === "?") return "[^/]";
+          if (part.startsWith("[")) return part.replace(/^\[!/, "[^");
+          return part.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+        })
+        .join("");
+      return { back, pattern: new RegExp(`^${source}$`) };
+    });
+  return (path) => {
+    const parts = path.split("/");
+    const prefixes = parts.map((_, at) => parts.slice(0, at + 1).join("/"));
+    let ignored = false;
+    for (const { back, pattern } of patterns) if (prefixes.some((prefix) => pattern.test(prefix))) ignored = !back;
+    return ignored;
+  };
+}
+
+// Every file under a path of the repository, as paths from its root.
+function filesUnder(path: string): string[] {
+  if (!statSync(join(ROOT, path)).isDirectory()) return [path];
+  return readdirSync(join(ROOT, path), { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name).slice(ROOT.length));
+}
+
+interface Copy {
+  stage: number;
+  from: string | undefined;
+  sources: string[];
+  line: number;
+}
+// The Dockerfile's COPY lines, by their stage and their --from, a line's continuation joined.
+function copiesOf(dockerfile: string): Copy[] {
+  const lines = dockerfile.replace(/\\\n/g, " ").split("\n");
+  let stage = -1;
+  const copies: Copy[] = [];
+  for (const [line, text] of lines.entries()) {
+    if (text.startsWith("FROM ")) stage += 1;
+    const copy = /^COPY\s+(.*)$/.exec(text)?.[1];
+    if (copy === undefined) continue;
+    const words = copy.split(/\s+/);
+    const from = words.find((word) => word.startsWith("--from="))?.slice("--from=".length);
+    const paths = words.filter((word) => !word.startsWith("--"));
+    copies.push({ stage, from, sources: paths.slice(0, -1), line });
+  }
+  return copies;
+}
+
+// What the build takes from the repository: each COPY of the context, its files that .dockerignore lets through.
+function imageFiles(): string[] {
+  const ignored = ignoredBy(read(".dockerignore").split("\n"));
+  const sources = copiesOf(read("deploy/jarvis/Dockerfile"))
+    .filter((copy) => copy.from === undefined)
+    .flatMap((copy) => copy.sources);
+  return [...new Set(sources.flatMap(filesUnder))].filter((path) => !ignored(path)).sort();
+}
+
+const isTestFile = (path: string) => /\.(test|bench)\.ts$/.test(path) || /(^|\/)testing\//.test(path);
+const Manifest = z.object({ dependencies: z.record(z.string(), z.string()).default({}) });
+const ours = (path: string) =>
+  Object.keys(Manifest.parse(JSON.parse(read(path))).dependencies)
+    .filter((name) => name.startsWith("@gnoworld/"))
+    .map((name) => name.slice("@gnoworld/".length));
+// The workspaces jarvis imports, and those they import in turn.
+function workspaces(): string[] {
+  const found = new Set<string>();
+  const next = ours("jarvis/package.json");
+  for (let name = next.shift(); name !== undefined; name = next.shift()) {
+    if (found.has(name)) continue;
+    found.add(name);
+    next.push(...ours(`packages/${name}/package.json`));
+  }
+  return [...found].sort();
+}
+
+describe("the files jarvis's image takes", () => {
+  it("are its package, its skills, its places' data, the packages it imports and gnomcp's settings, nothing else", () => {
+    const allowed = new RegExp(
+      [
+        "^(package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml)$",
+        "^(jarvis|packages/(core|schemas|service|chain))/package\\.json$",
+        "^jarvis/src/.+\\.ts$",
+        "^jarvis/skills/[a-z-]+/.+$",
+        "^packages/(core|schemas|service|chain)/src/.+\\.ts$",
+        "^app/data/[a-z]+\\.json$",
+        "^deploy/jarvis/gnomcp\\.toml$",
+      ].join("|"),
+    );
+    const files = imageFiles();
+    expect(files.length).toBeGreaterThan(50);
+    expect(files.filter((path) => !allowed.test(path))).toEqual([]);
+  });
+
+  it("hold the package files the install reads and gnomcp's settings, past .dockerignore", () => {
+    const files = imageFiles();
+    for (const path of [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "jarvis/package.json",
+      ...workspaces().map((name) => `packages/${name}/package.json`),
+      "deploy/jarvis/gnomcp.toml",
+    ])
+      expect(files, path).toContain(path);
+  });
+
+  it("hold every module of each workspace jarvis imports, transitively, but its tests", () => {
+    const files = new Set(imageFiles());
+    for (const name of workspaces()) {
+      const modules = filesUnder(`packages/${name}/src`).filter((path) => path.endsWith(".ts") && !isTestFile(path));
+      expect(modules.length, name).toBeGreaterThan(0);
+      expect(
+        modules.filter((path) => !files.has(path)),
+        name,
+      ).toEqual([]);
+    }
+  });
+
+  it("hold no server code, no script, no harness, no eval and no secret", () => {
+    const outside = /^(server|scripts|lint|evals|\.claude|\.githooks|deploy\/secrets|admin)\//;
+    expect(imageFiles().filter((path) => outside.test(path))).toEqual([]);
+  });
+
+  it("hold no test, bench or test helper, so outbound.ts never moves Anthropic's traffic in an image", () => {
+    const files = imageFiles();
+    expect(files.filter(isTestFile)).toEqual([]);
+    expect(files).not.toContain("jarvis/src/testing/outbound.ts");
+    // Its control: the repository has them, so the filter is what keeps them out.
+    expect(filesUnder("jarvis/src").filter(isTestFile)).toContain("jarvis/src/testing/outbound.ts");
+  });
+
+  it("hold every module of jarvis's own and every skill, so the image runs what the tests run", () => {
+    const files = new Set(imageFiles());
+    const modules = filesUnder("jarvis/src").filter((path) => path.endsWith(".ts") && !isTestFile(path));
+    expect(modules).toContain("jarvis/src/main.ts");
+    expect(modules.filter((path) => !files.has(path))).toEqual([]);
+    expect(filesUnder("jarvis/skills").filter((path) => !files.has(path))).toEqual([]);
+    expect(filesUnder("app/data").filter((path) => !files.has(path))).toEqual([]);
+  });
+
+  it("hold every module a module of the image imports, a package's by its exports", () => {
+    const files = new Set(imageFiles());
+    const exportsOf = (name: string) =>
+      z.object({ exports: z.record(z.string(), z.string()) }).parse(JSON.parse(read(`packages/${name}/package.json`)))
+        .exports;
+    const target = (from: string, specifier: string): string | undefined => {
+      if (specifier.startsWith(".")) return normalize(join(dirname(from), specifier));
+      const own = /^@gnoworld\/([a-z]+)(\/.*)?$/.exec(specifier);
+      if (own?.[1] === undefined) return undefined;
+      const exported = exportsOf(own[1]);
+      const sub = own[2] ?? "";
+      const path = exported[`.${sub}`] ?? exported["./*"]?.replace("*", sub.slice(1));
+      return path === undefined ? `packages/${own[1]}/<none for ${sub}>` : normalize(join("packages", own[1], path));
+    };
+    const missing: string[] = [];
+    for (const path of files) {
+      if (!path.endsWith(".ts")) continue;
+      for (const [, specifier] of read(path).matchAll(/(?:from|import\()\s*"([^"]+)"/g)) {
+        const to = specifier === undefined ? undefined : target(path, specifier);
+        if (to !== undefined && !files.has(to)) missing.push(`${path} -> ${to}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("jarvis's Dockerfile", () => {
+  it("copies each workspace jarvis imports, its package.json before the install and its src after", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    expect(workspaces()).toEqual(["chain", "core", "schemas", "service"]);
+    const install = dockerfile.indexOf("RUN pnpm install --frozen-lockfile --prod --filter @gnoworld/jarvis...");
+    expect(install).toBeGreaterThan(-1);
+    for (const name of workspaces()) {
+      const copied = dockerfile.indexOf(`COPY packages/${name}/package.json packages/${name}/\n`);
+      expect(copied, `packages/${name}/package.json`).toBeGreaterThan(-1);
+      expect(copied, `packages/${name}/package.json before the install`).toBeLessThan(install);
+      expect(dockerfile.indexOf(`COPY packages/${name}/src packages/${name}/src\n`)).toBeGreaterThan(install);
+    }
+    expect(dockerfile.indexOf("COPY jarvis/package.json jarvis/\n")).toBeLessThan(install);
+  });
+
+  it("names no server file, adds nothing by ADD, copies from its own stages alone and sets no NODE_OPTIONS", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    expect(dockerfile).not.toMatch(/server\//);
+    expect(dockerfile).not.toMatch(/NODE_OPTIONS/);
+    expect(dockerfile).not.toMatch(/^ADD /m);
+    expect(dockerfile).not.toMatch(/^(ENV|ARG) /m);
+    const froms = new Set(copiesOf(dockerfile).flatMap((copy) => (copy.from === undefined ? [] : [copy.from])));
+    expect([...froms].sort()).toEqual(["build", "gnomcp"]);
+  });
+
+  it("lays its last stage out where compose and jarvis's defaults read it, /app", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    const last = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
+    expect(last).toMatch(/^WORKDIR \/app$/m);
+    expect(last).toMatch(/^COPY --from=build \/repo \/app$/m);
+    expect(copiesOf(last).filter((copy) => copy.from === undefined)).toEqual([]);
+  });
+
+  it("caps Node's heap at 70% of jarvis's memory at most, as gnomcp shares it (ADR-0002 §7)", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    const heap = Number(/"--max-old-space-size=(\d+)"/.exec(dockerfile)?.[1]);
+    const compose = readFileSync(join(ROOT, "deploy/compose.yaml"), "utf8");
+    const service = compose.slice(compose.indexOf("\n  jarvis:\n"));
+    const limit = Number(/^ {4}mem_limit: (\d+)m$/m.exec(service)?.[1]);
+    expect(heap).toBeGreaterThan(0);
+    expect(heap).toBeLessThanOrEqual(0.7 * limit);
+    expect(heap).toBeGreaterThanOrEqual(0.6 * limit);
+  });
+
+  it("runs Node 24 alone, pinned by digest, as a user of its own, with its flag and jarvis's entry", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    const froms = [...dockerfile.matchAll(/^FROM (\S+)/gm)].map((match) => match[1] ?? "");
+    expect(froms.length).toBeGreaterThanOrEqual(3);
+    for (const from of froms) expect(from).toMatch(/@sha256:[0-9a-f]{64}$/);
+    expect(froms.at(-1)).toMatch(/^gcr\.io\/distroless\/nodejs24-debian13:nonroot@/);
+    const last = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
+    expect(last).toMatch(/^USER 65533:65533$/m);
+    const cmd = /^CMD (\[.*\])$/m.exec(last)?.[1] ?? "[]";
+    const words = z.array(z.string()).parse(JSON.parse(cmd));
+    expect(words[0]).toBe("--disallow-code-generation-from-strings");
+    expect(words.at(-1)).toBe("jarvis/src/main.ts");
+    expect(words.slice(1, -1)).toEqual([expect.stringMatching(/^--max-old-space-size=\d+$/)]);
+  });
+
+  it("copies gnomcp 0.11.0 from its signed release's image, pinned by digest, and nothing else from it", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    const gnomcp =
+      "ghcr.io/gnoverse/gnomcp:0.11.0@sha256:b253d4238a236036b54cd6227c313e2609ce32dd361d71b2410d3096f6461a95";
+    expect(dockerfile).toContain(`FROM ${gnomcp} AS gnomcp\n`);
+    const fromIt = copiesOf(dockerfile).filter((copy) => copy.from === "gnomcp");
+    expect(fromIt.map((copy) => copy.sources)).toEqual([["/usr/local/bin/gnomcp"]]);
+    expect(dockerfile).toMatch(/^COPY --from=gnomcp \/usr\/local\/bin\/gnomcp \/gnomcp\/gnomcp$/m);
+  });
+
+  it("gives its file's folder to jarvis's user alone, and copies gnomcp's settings it names", () => {
+    const dockerfile = read("deploy/jarvis/Dockerfile");
+    expect(dockerfile).toMatch(/^COPY --from=build --chown=65533:65533 \/data \/data$/m);
+    expect(dockerfile).toMatch(/^COPY deploy\/jarvis\/gnomcp\.toml deploy\/jarvis\/$/m);
+    expect(read(".dockerignore").split("\n")).toContain("!deploy/jarvis/gnomcp.toml");
+  });
+});
+
+// The matcher above against Docker's own rules, so a mistake in it cannot pass the image's files.
+describe("the .dockerignore reader", () => {
+  it("lets a path back in only after a later `!`, and keeps a folder's files out with it", () => {
+    const ignored = ignoredBy(["*", "!jarvis/src", "jarvis/src/**/*.test.ts", "jarvis/src/testing"]);
+    expect(ignored("jarvis/src/main.ts")).toBe(false);
+    expect(ignored("jarvis/src/tools/cards.ts")).toBe(false);
+    expect(ignored("jarvis/src/main.test.ts")).toBe(true);
+    expect(ignored("jarvis/src/tools/cards.test.ts")).toBe(true);
+    expect(ignored("jarvis/src/testing/outbound.ts")).toBe(true);
+    expect(ignored("jarvis/skills/gno/SKILL.md")).toBe(true);
+    expect(ignored("server/src/main.ts")).toBe(true);
+    expect(ignoredBy(["*", "!app", "app/**/*.test.ts"])("app/data/hubs.json")).toBe(false);
+    expect(ignoredBy(["a?c"])("abc")).toBe(true);
+    expect(ignoredBy(["a?c"])("a/c")).toBe(false);
+    expect(ignoredBy(["jarvis/*.ts"])("jarvis/a.ts")).toBe(true);
+    expect(ignoredBy(["jarvis/*.ts"])("jarvis/src/a.ts")).toBe(false);
+    expect(ignoredBy(["jarvis/src/testing/"])("jarvis/src/testing/outbound.ts")).toBe(true);
+    expect(ignoredBy(["/deploy/secrets"])("deploy/secrets/key")).toBe(true);
+    expect(ignoredBy(["file[0-9].ts"])("file7.ts")).toBe(true);
+    expect(ignoredBy(["file[!0-9].ts"])("file7.ts")).toBe(false);
   });
 });

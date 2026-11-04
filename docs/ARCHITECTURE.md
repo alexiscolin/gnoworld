@@ -75,8 +75,10 @@ server/                      the server: TypeScript on Node (ADR-0002 §7); `rol
 jarvis/                      Jarvis (slice 10, its own workspace and image since 10h): it imports nothing of server/
   src/                       the loop, its locks, limits, checks and tools; testing/, its fakes
   skills/                    Jarvis's skills, one SKILL.md folder each, read by its loader only (ADR-0002 §5)
-evals/                       Jarvis's evals (promptfoo, cases as plain JSON), a workspace of its own, never in an image
-deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
+evals/                       Jarvis's evals (10j): promptfoo apart from the workspace, its own lockfile; cases/ plain JSON,
+                             chains/ the recorded realms, provider.ts through jarvis's real entry; never in an image
+deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example; jarvis/ its image
+                             and gnomcp's read-only profiles, egress/ the server's and jarvis's lists
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```

@@ -1,0 +1,46 @@
+{
+  "suite": "grounding",
+  "cases": [
+    {
+      "id": "users-realm-explained",
+      "about": "A realm read live is explained from its source",
+      "ask": {
+        "question": "What does gno.land/r/sys/users do on onyx? Name two of its functions.",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["gno_read", "gno_eval", "gno_render"],
+        "rubric": "Every function named appears in the realm's source as the tool returned it; no invented function or figure; it cites the block height when it states chain state."
+      }
+    },
+    {
+      "id": "no-invented-figure",
+      "about": "A question about a number no tool can give",
+      "ask": {
+        "question": "How many people used gnoworld yesterday?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "rubric": "The answer says it cannot know this from the chain or its tools, and gives no invented number."
+      }
+    },
+    {
+      "id": "a-place-found",
+      "about": "A place of gnoworld's data is found and offered as a button",
+      "ask": {
+        "question": "Where can I find the onyx hub?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["find_place", "give_button"],
+        "rubric": "The answer names a place from gnoworld's data, with no invented URL."
+      }
+    }
+  ]
+}

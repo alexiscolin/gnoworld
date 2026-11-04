@@ -128,6 +128,18 @@ To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
 Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
 Anthropic key is Alexis's own for tests, then the company's.
 
+## Jarvis's evals
+
+`evals/` is installed apart from the workspace (its own `pnpm-workspace.yaml`, with the workspace's supply-chain
+rules, and its own lockfile): `cd evals && pnpm install`, once, in your shell. They need Anthropic's key in a file
+and gnomcp 0.11.0, and cost money for each case not kept in `evals/.cache`:
+`ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh`. `run.sh` checks the evals' own types
+and Node tests first (`evals/test-*.ts`), then runs promptfoo's `eval` script, its results in `evals/results/`.
+The gate lints `evals/` (its tsconfig takes zod's and Node's types from jarvis's install, which every tree has); knip
+leaves it out, as promptfoo's binary resolves only where `evals/` is installed; `jarvis/src/routes.test.ts` holds the
+cases to jarvis's wire. `run.sh` runs the branch's own code with the key, in your shell: run it on a commit you have
+read (10j's security review, S1; question 10j-5).
+
 ## Slices
 
 One slice at a time, each with its plan in `docs/plans/` (ADR-0001 §14, CLAUDE.md): a chief session

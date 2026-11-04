@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  // Node's types and zod at jarvis's versions (the same as evals/package.json's), from jarvis's install, which every
+  // tree has: the gate typechecks and lints evals/ where its own install is absent (10j's review, V5).
+  "compilerOptions": {
+    "types": ["node"],
+    "typeRoots": ["../jarvis/node_modules/@types"],
+    "paths": { "zod": ["../jarvis/node_modules/zod/index.d.cts"] }
+  },
+  "include": ["*.ts"]
+}

@@ -1,0 +1,19 @@
+# gnoworld's evals (ADR-0002 §5, "Evals"), run by run.sh with a key: jarvis's real loop through its own entry
+# (provider.ts), the cases plain JSON in cases/ (tests.ts), graded by a model that answers none of them, every answer
+# kept so an unchanged case costs nothing. promptfoo 0.125.1, installed apart from the workspace; never in an image.
+description: gnoworld's Jarvis
+prompts:
+  - "{{about}}"
+providers:
+  - id: file://provider.ts
+    label: jarvis
+    config:
+      JARVIS_MODEL: claude-sonnet-5-5
+      JARVIS_MODEL_FAST: claude-haiku-5-5
+tests: file://tests.ts
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-opus-5-5
+evaluateOptions:
+  cache: true
+  maxConcurrency: 1

@@ -2,7 +2,8 @@
 
 The runbook (ADR-0002 §7). It holds the demo: the client behind a password, published through
 Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot)
-and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis` and Grafana come with slice 10 (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
+and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis`, off by default, comes with slice 10 (10j), and
+Grafana later (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
 later, Docker Desktop, or OrbStack.
 
@@ -14,12 +15,14 @@ later, Docker Desktop, or OrbStack.
 | `guard` (profile `demo`) | `tailscale/tailscale` v1.104.1, by digest, running `deploy/guard/guard.sh` | nothing | its rules loaded | 0.1 core, 32 MB, 16 processes | none | none |
 | `tailscale` (profile `demo`) | the same image | Funnel on 443, forwarded to `web:8080` | `127.0.0.1:9002/healthz`, inside its network | 0.5 core, 256 MB, 128 processes | the `tailscale` volume (its node key) | `ts_authkey` |
 | `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 512 MB, 1,024 processes (Go's threads count) | the `ergo` volume (accounts, history) | `ergo_oper_password` |
-| `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`), on `inside` only; the `auth` volume's socket | `127.0.0.1:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
+| `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`) on its own address of `inside` (`SERVER_ADDRESS`); the `auth` volume's socket | `SERVER_ADDRESS:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
 | `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
+| `jarvis` | built from `deploy/jarvis/Dockerfile`: its package, the packages it imports and gnomcp 0.11.0 (its release image, by digest), on distroless Node 24 | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on |
+| `egress_jarvis` (profile `demo`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
 
-All six have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
-and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and `egress` run as
-65532, the user the auth socket's volume belongs to.
+All eight have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
+and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `egress` and `egress_jarvis` run as
+65532, the user the auth socket's volume belongs to, and `jarvis` as 65533, a user of its own.
 
 - `web` sits on `inside`, an internal network with no way out and no gateway, so it reaches no
   address of the host either.
@@ -36,7 +39,21 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and
 - `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and the default universe's RPC host (`deploy/egress/acl.yaml`, one
   file the test reads too; the RPC's host is `app/data/universes.json`'s default, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
-  `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`.
+  `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
+  holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (`JARVIS_NAMES_RPC`, D120).
+- `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
+  serves its budgets and answers `off`, reads no key and starts no gnomcp. It listens on its fixed address of
+  `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
+  `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
+  smokescreen of its own on 4751 in `guard`'s network, which takes 4751 from `jarvis_out` alone and sends that network
+  nothing but its replies: Anthropic's API, each universe's node and indexer, and gnoscope
+  (`deploy/egress/jarvis-acl.yaml`). The two lists never mix. Its stop waits 35 s, its drain's 20 and 15 more.
+- The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
+  jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
+  The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
+  no jarvis: a jarvis that fails to start leaves the demo up, the door answering internal.
+- The admin API (10g) listens on 8082 at the server's address of `admin` (`ADMIN_ADDRESS`, in `ADMIN_SUBNET`), a
+  network nobody else joins: the admin console joins it (slice 12); its sites are `ADMIN_ORIGINS`.
 
 ## Before the first start (once)
 
@@ -69,6 +86,8 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server` and
    (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
    deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
    `deploy/secrets/openai_api_key`.
+   Slice 10's: Anthropic's key, one line, in `deploy/secrets/anthropic_api_key`, a key of a workspace with its own
+   spend limit (ADR-0002 §5); with Jarvis off, any line (Compose wants the file, jarvis reads it only when on).
 7. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
    unreadable to the containers: `chmod -R a+rX deploy/guard deploy/tailscale`.
 
@@ -97,9 +116,9 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 
 ## When something goes wrong: cut the public URL
 
-A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2.0
-cores and 1,248 MB in all, at and under the 2 cores and 2 GB the test holds as a ceiling: Docker
-stops a container at its cap, not the host). To cut the public URL at once:
+A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2.4
+cores and 1,952 MB in all with jarvis and its way out, at and under the 2.4 cores and 2 GB the test holds as a
+ceiling, question 10j-4: Docker stops a container at its cap, not the host). To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|
@@ -384,8 +403,9 @@ Slice 3, the stack (3e):
   not, nor does `egress` follow `guard` then: if `/ws` or `/api/` answer 502, or the checks stop
   reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
 - **The tailnet's policy stays closed.** In userspace mode, Tailscale hands a device's connection to
-  the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach the way
-  out on 4750 (to OpenAI's API alone). `"acls": []` keeps every device out (F619).
+  the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach both ways
+  out, the server's on 4750 (its four hosts, `acl.yaml`) and jarvis's on 4751 (its six, `jarvis-acl.yaml`).
+  `"acls": []` keeps every device out (F619; 10j's review, S8).
 - **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
   `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.
@@ -404,6 +424,20 @@ Slice 4, pins and what an account keeps (4d):
   above). A question Ergo does not answer keeps its pin; a re-read that throws logs `pins_unchecked` (no alert).
 - **Saved messages and "Mark unread" are on the reader's device** (ADR-0002) and nowhere on the server: nothing
   to back up, and a cleared browser loses them.
+
+- **gnomcp reads no chain in the demo** (10j, F5296, question 10j-2). jarvis starts gnomcp with its home and keys'
+  path alone, beside the six names the MCP client passes on (HOME, LOGNAME, PATH, SHELL, TERM, USER): gnomcp never sees
+  `HTTPS_PROXY`, so neither its node reads nor its indexer reads reach out, and its node reads go through gno's own
+  RPC client (tm2), which dials the node itself and would ignore the proxy anyway. In the sealed demo, switched on,
+  every gnomcp read fails, the cards' height and page among them; only jarvis's own `vm/qfuncs` read and Anthropic's
+  API pass through `egress_jarvis`. Jarvis is off by default, so nothing breaks until it is switched on.
+- **gnomcp can read Anthropic's key** (10j, question 10j-3). gnomcp is jarvis's child, so it runs as jarvis's user and
+  can read `/run/secrets/anthropic_api_key`; no capability lets jarvis start it as another, and Compose keeps a secret
+  file's owner and mode from the host. The key is a workspace's with its own spend limit: revoke it at once if gnomcp's
+  image is ever in doubt (its digest is pinned, its provenance attested by GitHub).
+- **A model call past a minute of silence** (10j). `egress_jarvis` shares `config.yaml`'s `idle_timeout: 60s` with the
+  server's way out: a request to Anthropic quiet for longer than a minute is cut, whatever `JARVIS_CALL_TIMEOUT_S`
+  says (60 s by default, up to 600 s). Raise both together, or neither.
 
 ## Secrets: rotation and revocation
 

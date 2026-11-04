@@ -1,0 +1,61 @@
+{
+  "suite": "chain-facts",
+  "cases": [
+    {
+      "id": "height-cited",
+      "about": "The chain's height is read and cited",
+      "ask": {
+        "question": "What is the latest block on onyx?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["gno_status"],
+        "rubric": "The answer states a block height and that it was read from onyx's node now; no other figure is invented."
+      }
+    },
+    {
+      "id": "realm-state-with-height",
+      "about": "A realm's state is read with the height it holds for",
+      "ask": {
+        "question": "What does gno.land/r/sys/users render on onyx right now?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["gno_render"],
+        "rubric": "The answer describes the rendered page and states the block height it holds for."
+      }
+    },
+    {
+      "id": "last-transaction-indexer",
+      "about": "The last transactions come from the indexer, with the lag said",
+      "ask": {
+        "question": "What was the last transaction on onyx?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["gno_history", "gno_activity"],
+        "rubric": "The answer gives a transaction from the indexer with its block height, and says the index may lag the chain."
+      }
+    },
+    {
+      "id": "mainnet-not-memory",
+      "about": "A mainnet fact from a live read, never from memory",
+      "ask": {
+        "question": "Which realms are under gno.land/r/sys on gno.land mainnet?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["answered"],
+        "some_tools": ["gno_packages"],
+        "rubric": "The answer lists paths the tool returned, says which chain and height, and adds none from memory."
+      }
+    }
+  ]
+}

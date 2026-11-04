@@ -94,9 +94,16 @@ services:
       context: ..
       dockerfile: deploy/server/Dockerfile
     user: "65532:65532"
-    networks: [inside]
+    networks:
+      # A fixed address, which its API binds alone (HOST): jarvis's network reaches no port of the server's (10j's V12).
+      inside:
+        ipv4_address: ${SERVER_ADDRESS:-172.30.89.11}
+      jarvis: {}
+      # The admin API's listener (10g), on an address of a network nobody else joins: a console joins it to reach it.
+      admin:
+        ipv4_address: ${ADMIN_ADDRESS:-172.30.92.10}
     environment:
-      HOST: 0.0.0.0
+      HOST: ${SERVER_ADDRESS:-172.30.89.11}
       PORT: "8080"
       DATABASE: /data/gnoworld.db
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
@@ -112,12 +119,19 @@ services:
       ERGO_DATA_MB: ${ERGO_DATA_MB:-1024}
       # The demo's way out; ops names its own proxy.
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
-      NO_PROXY: ergo,localhost,127.0.0.1
+      NO_PROXY: ergo,jarvis,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
       # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
       MARKETS_FILE: /markets/markets.json
       # The same read takes the default universe's block height from its RPC (the host the way out lets out besides CoinGecko's and OpenAI's).
       UNIVERSES_FILE: /app/app/data/universes.json
+      # The door to jarvis (10g), on the network only the two share; off unless JARVIS=on, the setting jarvis reads.
+      JARVIS: ${JARVIS:-off}
+      JARVIS_URL: http://jarvis:8081
+      # The admin API (10g, ADR-0002 §6): its sites are the console's, never a public one (ORIGINS).
+      ADMIN_HOST: ${ADMIN_ADDRESS:-172.30.92.10}
+      ADMIN_PORT: "8082"
+      ADMIN_ORIGINS: ${ADMIN_ORIGINS:-}
     secrets: [log_pepper, ergo_oper_password, openai_api_key]
     volumes:
       - server:/data
@@ -133,7 +147,68 @@ services:
           CMD,
           /nodejs/bin/node,
           -e,
-          "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+          "fetch('http://' + process.env.HOST + ':8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 1s
+
+  # Jarvis (slice 10; ADR-0002 §5, §7): its own image and user, off unless JARVIS=on (then it reads its key and starts
+  # gnomcp, its child, which init reaps). It listens on its address of the network it shares with the server alone,
+  # and goes out through a proxy of its own (egress_jarvis). /ask and /budgets ask no session: the network walls them.
+  jarvis:
+    <<: *locked
+    build:
+      context: ..
+      dockerfile: deploy/jarvis/Dockerfile
+    user: "65533:65533"
+    init: true
+    # Its drain (JARVIS_DRAIN_S), then gnomcp's close (4 s at most) and the spans' (5 s), with room (D178).
+    stop_grace_period: 35s
+    networks:
+      jarvis:
+        ipv4_address: ${JARVIS_ADDRESS:-172.30.91.10}
+      jarvis_out: {}
+    environment:
+      JARVIS: ${JARVIS:-off}
+      JARVIS_HOST: ${JARVIS_ADDRESS:-172.30.91.10}
+      JARVIS_PORT: "8081"
+      # The name the server's JARVIS_URL gives, which a request's Host must name (F5288).
+      JARVIS_HOSTNAMES: jarvis
+      JARVIS_DATABASE: /data/jarvis.db
+      # The demo's budgets, a day (D47): the file keeps them from the first start, an admin changes them (D173).
+      JARVIS_BUDGET_USD: ${JARVIS_BUDGET_USD:-3}
+      JARVIS_TRANSLATION_BUDGET_USD: ${JARVIS_TRANSLATION_BUDGET_USD:-1}
+      JARVIS_DRAIN_S: "20"
+      ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      JARVIS_GNOMCP_COMMAND: /gnomcp/gnomcp
+      JARVIS_GNOMCP_CONFIG: /app/deploy/jarvis/gnomcp.toml
+      # Named after app/data/universes.json's universes, as gnomcp.toml's profiles are.
+      JARVIS_PROFILES: onyx,gnoland
+      JARVIS_INDEXER_PROFILES: onyx,gnoland
+      JARVIS_GNOSCOPE: ${JARVIS_GNOSCOPE:-off}
+      OTEL_SERVICE_NAME: jarvis
+      # The demo's way out for jarvis alone; ops names its own proxy.
+      HTTPS_PROXY: ${JARVIS_EGRESS_PROXY:-http://guard:4751}
+      NO_PROXY: localhost,127.0.0.1
+      NODE_USE_ENV_PROXY: "1"
+    secrets: [anthropic_api_key]
+    volumes:
+      - jarvis:/data
+    cpus: 0.3
+    # Node and gnomcp together; the heap is 70% of it (deploy/jarvis/Dockerfile).
+    mem_limit: 384m
+    pids_limit: 128
+    # Its budgets, which it serves on or off, asked by the name it takes (no /health route: 10i).
+    healthcheck:
+      test:
+        [
+          CMD,
+          /nodejs/bin/node,
+          -e,
+          "require('node:http').get({ host: process.env.JARVIS_HOST, port: 8081, path: '/budgets', headers: { host: 'jarvis' } }, (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
         ]
       interval: 30s
       timeout: 3s
@@ -153,9 +228,15 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       XTABLES_LOCKFILE: /tmp/xtables.lock
+      # Its own address on jarvis's way out's network, by which guard.sh finds that network (10j's review, V2).
+      JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
     volumes:
       - ./guard:/guard:ro
-    networks: [inside, outside]
+    networks:
+      inside: {}
+      outside: {}
+      jarvis_out:
+        ipv4_address: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
     cpus: 0.1
     mem_limit: 32m
     pids_limit: 16
@@ -189,6 +270,39 @@ services:
       start_period: 10s
       start_interval: 1s
     # A guard restarted holds a new network: the way out restarts with it.
+    depends_on:
+      guard: { condition: service_healthy, restart: true }
+
+  # jarvis's way out (10j): the hosts of deploy/egress/jarvis-acl.yaml alone, on 4751 in the guard's network, whose rules
+  # take 4751 from jarvis's network alone (guard.sh): the server's list and jarvis's never mix.
+  egress_jarvis:
+    <<: *locked
+    profiles: [demo]
+    build:
+      context: ..
+      dockerfile: deploy/egress/Dockerfile
+    user: "65532:65532"
+    network_mode: service:guard
+    entrypoint:
+      [
+        "/smokescreen",
+        "--config-file",
+        "/etc/smokescreen/config.yaml",
+        "--listen-port",
+        "4751",
+        "--egress-acl-file",
+        "/etc/smokescreen/jarvis-acl.yaml",
+      ]
+    cpus: 0.1
+    mem_limit: 64m
+    pids_limit: 64
+    healthcheck:
+      test: [CMD, /probe, "127.0.0.1:4751"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
@@ -237,12 +351,42 @@ networks:
     ipam:
       config:
         - subnet: ${INSIDE_SUBNET:-172.30.89.0/24}
+  # jarvis and the server alone, jarvis's address fixed (JARVIS_HOST): as sealed as the internal network.
+  jarvis:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+    ipam:
+      config:
+        - subnet: ${JARVIS_SUBNET:-172.30.91.0/24}
+  # jarvis and the guard alone, for jarvis's way out (4751).
+  jarvis_out:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+    # Fixed, so the guard finds it by its own address in it (GUARD_JARVIS_ADDRESS), never by jarvis's name.
+    ipam:
+      config:
+        - subnet: ${JARVIS_OUT_SUBNET:-172.30.95.0/24}
+  # The admin API's listener alone: the console joins it (slice 12).
+  admin:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+    ipam:
+      config:
+        - subnet: ${ADMIN_SUBNET:-172.30.92.0/24}
   outside: {}
 
 volumes:
   tailscale: {}
   ergo: {}
   server: {}
+  # jarvis's file (D45): its budgets and its caches, which it alone mounts.
+  jarvis: {}
   # markets.json, which the server writes and the home page reads (5l, 5m).
   markets: {}
   # The auth socket's folder, which the server makes the socket in and Ergo dials.
@@ -259,3 +403,6 @@ secrets:
     file: ${LOG_PEPPER_FILE:-./secrets/log_pepper}
   openai_api_key:
     file: ${OPENAI_API_KEY_FILE:-./secrets/openai_api_key}
+  # Read by jarvis alone, and only when on; a file must be there even off (any text): Compose wants it.
+  anthropic_api_key:
+    file: ${ANTHROPIC_API_KEY_FILE:-./secrets/anthropic_api_key}
