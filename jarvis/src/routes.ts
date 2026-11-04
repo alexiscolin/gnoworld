@@ -105,10 +105,7 @@ function replyOf(result: Result, log: Log): Reply {
     return answered({ status: "answered", markdown, buttons: result.cards.buttons.map(({ button }) => button) });
   }
   if (result.kind === "spent") return answered({ status: "spent" });
-  if (result.kind === "invalid") return refusal("refused", 400);
-  // Nobody reads it: the door's request is gone.
-  if (result.kind === "gone") return refusal("not_ready", 503);
-  return refusal("internal", 502);
+  return failureOf(result.kind);
 }
 
 // The answer within the wire's code points, cut on its last line break within them, or at the bound when it has none
@@ -123,20 +120,22 @@ function cut(text: string, log: Log): string {
   return isBlank(lines) ? kept : lines;
 }
 
-// A failure on the wire, as the door reads it (D175): its reader gone is not_ready, to nobody; any other internal.
-const failed = (kind: "failed" | "gone"): Reply =>
-  kind === "gone" ? refusal("not_ready", 503) : refusal("internal", 502);
+// A result with no answer on the wire, as the door reads it (D175), for each route: a request refused is refused, its
+// reader gone is not_ready, to nobody, any other internal.
+function failureOf(kind: string): Reply {
+  if (kind === "invalid") return refusal("refused", 400);
+  return kind === "gone" ? refusal("not_ready", 503) : refusal("internal", 502);
+}
 
 function translationOf(result: Translated): Reply {
-  if (result.kind === "failed" || result.kind === "gone") return failed(result.kind);
+  if (result.kind === "failed" || result.kind === "gone") return failureOf(result.kind);
   const body: JarvisTranslation =
     result.kind === "translated" ? { status: "translated", text: result.text } : { status: result.kind };
   return { status: 200, body };
 }
 
 function digestOf(result: Digested): Reply {
-  if (result.kind === "failed" || result.kind === "gone") return failed(result.kind);
-  if (result.kind === "invalid") return refusal("refused", 400);
+  if (result.kind === "failed" || result.kind === "gone" || result.kind === "invalid") return failureOf(result.kind);
   const body: JarvisDigest =
     result.kind === "digest"
       ? { status: "digest", digest: result.digest, proposal: result.proposal, height: result.height }
