@@ -335,6 +335,19 @@ describe("Gnomcp.call: one read", () => {
     expect(fake.starts()).toHaveLength(4);
   });
 
+  it("ends a child started again while it was closing, and answers down after", async () => {
+    const { gnomcp, fake } = await start({ crash: { tool: "gno_render", starts: 1 } });
+    await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });
+    const restarting = gnomcp.call("gno_status", { profile: "onyx" });
+    await gnomcp.close();
+    await restarting;
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason: "down" });
+    const pids = fake.starts().map((seen) => seen.pid);
+    await until(() => !pids.some(running));
+    expect(pids.some(running)).toBe(false);
+    expect(fake.starts().map((seen) => existsSync(seen.cwd))).toEqual(pids.map(() => false));
+  });
+
   it("answers down when gnomcp, started again, no longer passes its checks, and logs why", async () => {
     const { gnomcp, fake, events } = await start({ crash: { tool: "gno_render", starts: 1 } });
     await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });

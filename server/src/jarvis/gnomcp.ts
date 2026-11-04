@@ -83,7 +83,9 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
       return sent(current, { name, arguments: parsed.data }, timeout);
     },
     async close() {
+      // A start under way ends first, so the child it makes is the one closed.
       closed = true;
+      await starting;
       await child.client.close();
       rmSync(child.home, { recursive: true, force: true });
     },
