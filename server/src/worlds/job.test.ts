@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { abciRefused, fakeChain, INDEXER, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
+import { abciRefused, fakeChain, INDEXER, pagedCalls, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 import { makePresence } from "./presence.ts";
 
@@ -43,16 +43,19 @@ const doc = (path: string, imports: string[] = ["gno.land/p/nt/avl/v0"]): string
     types: [],
     funcs: [{ type: "", name: "Swap", crossing: true, signature: "", doc: "", params: [], results: [] }],
   });
-const pathOf = (variables: Record<string, unknown>): string => String(variables["path"]);
-const history = (calls: number, path: string): string =>
-  JSON.stringify({
-    data: {
-      getTransactions: Array.from({ length: calls }, (_, i) => ({
+// The chain's calls, paged as onyx-1's indexer pages them (7k3): each realm's calls are transactions at heights from 100, sent by A and B
+// in turn.
+const callsOf = (counts: Record<string, number>) =>
+  pagedCalls(
+    Object.entries(counts).flatMap(([path, calls]) =>
+      Array.from({ length: calls }, (_, i) => ({
         block_height: 100 + i,
         messages: [{ value: { __typename: "MsgCall", pkg_path: path, caller: i % 2 === 0 ? A : B } }],
       })),
-    },
-  });
+    ),
+  );
+const eachCalled = (paths: readonly string[], calls: number) =>
+  callsOf(Object.fromEntries(paths.map((path) => [path, calls])));
 const named = (name: string | null): string =>
   name === null ? "(nil *gno.land/r/sys/users.UserData)" : `("${name}" string)`;
 
@@ -60,14 +63,14 @@ const chainRoutes = (paths: string[], over: Routes = {}): Routes => ({
   paths: () => paths.join("\n"),
   doc: (path) => doc(path),
   file: () => `[addpkg]\n  creator = "${A}"\n  height = 5\n`,
-  indexer: ({ variables }) => history(2, pathOf(variables)),
+  indexer: eachCalled(paths, 2),
   eval: (expression) => named(expression === evalNameOf(A) ? "alexis" : null),
   ...over,
 });
 
 interface Run {
   file: string;
-  logged: { event: string; error?: string | undefined }[];
+  logged: { event: string; error?: string | undefined; ms?: number | undefined }[];
   chain: ReturnType<typeof fakeChain>;
   outcome: Awaited<ReturnType<typeof runWorlds>>;
   /** The pause asked before each wait, in order. */
@@ -82,7 +85,10 @@ async function run(
     clock?: () => number;
     maxBytes?: number;
     delayMs?: number;
-    historyMax?: number;
+    /** The transactions a page of the indexer's read asks. */
+    historyPage?: number;
+    /** Told each wait, as it begins: a test's clock may move by it. */
+    onWait?: (ms: number) => void;
     trends?: RunOptions["trends"];
   } = {},
 ): Promise<Run> {
@@ -92,18 +98,27 @@ async function run(
   const waits: number[] = [];
   const outcome = await runWorlds({
     file,
-    log: (event, fields) => void logged.push({ event, error: fields?.error }),
+    log: (event, fields) => void logged.push({ event, error: fields?.error, ms: fields?.ms }),
     send: chain.send,
     universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
     now: extra.clock ?? (() => extra.now ?? NOW),
-    wait: (ms) => Promise.resolve(void waits.push(ms)),
+    wait: (ms) => {
+      waits.push(ms);
+      extra.onWait?.(ms);
+      return Promise.resolve();
+    },
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
-    ...(extra.historyMax === undefined ? {} : { historyMax: extra.historyMax }),
+    ...(extra.historyPage === undefined ? {} : { historyPage: extra.historyPage }),
     ...(extra.trends === undefined ? {} : { trends: extra.trends }),
   });
   return { file, logged, chain, outcome, waits };
 }
 const written = (file: string) => Worlds.parse(JSON.parse(readFileSync(file, "utf8")));
+// The variables of each request the pass made of the indexer, in order: a page's bound and size, or a block's height.
+const pagesAsked = (chain: Run["chain"]) =>
+  chain.asked
+    .filter(({ kind }) => kind === "indexer")
+    .map(({ data }) => (JSON.parse(data) as { variables: Record<string, unknown> }).variables);
 
 describe("runWorlds", () => {
   it("writes the worlds of the list, each realm with its deployer, functions, imports, calls and the deployer's name", async () => {
@@ -198,7 +213,7 @@ describe("runWorlds", () => {
     const realm = written(file).worlds[0]?.realms[0];
     expect(realm?.deployerName).toBeNull();
     expect(realm?.calls).toBe(2);
-    expect(logged).toEqual([]);
+    expect(logged).toEqual([{ event: "worlds_written", ms: 0 }]);
   });
 
   it("goes out to the RPC's host and the indexer's, and to no other", async () => {
@@ -219,6 +234,41 @@ describe("runWorlds", () => {
     expect(waits.every((ms) => ms === PAUSE_MS)).toBe(true);
     expect(PAUSE_MS).toBeGreaterThan(0);
     expect(PAUSE_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  // A clock that each answer moves by 100 ms and each wait by what it waits: the calls must start a pause apart, the waits be what is left.
+  const slowChain = (clock: { at: number }) => {
+    const starts: number[] = [];
+    const later = <T>(answer: T): T => {
+      starts.push(clock.at);
+      clock.at += 100;
+      return answer;
+    };
+    const routes = chainRoutes([POOL, ROUTER], {
+      paths: () => later([POOL, ROUTER].join("\n")),
+      doc: (path) => later(doc(path)),
+      file: () => later(`[addpkg]\n  creator = "${A}"\n`),
+      eval: () => later(named("alexis")),
+      indexer: (request) => later(eachCalled([POOL, ROUTER], 2)(request)),
+    });
+    return { routes, starts };
+  };
+
+  it("starts its calls a pause apart on its clock, not a pause after each answer: a slow answer leaves less to wait (7k3)", async () => {
+    const clock = { at: NOW };
+    const { routes, starts } = slowChain(clock);
+    const { chain, waits } = await run(routes, { clock: () => clock.at, onWait: (ms) => void (clock.at += ms) });
+    expect(chain.asked.length).toBeGreaterThan(5);
+    expect(starts.slice(1).map((start, i) => start - (starts[i] ?? 0))).toEqual(starts.slice(1).map(() => PAUSE_MS));
+    expect(waits).toEqual(starts.slice(1).map(() => PAUSE_MS - 100));
+  });
+
+  it("logs the pass's length once it wrote its files, on its clock", async () => {
+    const clock = { at: NOW };
+    const { routes } = slowChain(clock);
+    const { logged } = await run(routes, { clock: () => clock.at, onWait: (ms) => void (clock.at += ms) });
+    expect(clock.at - NOW).toBeGreaterThan(1_000);
+    expect(logged).toEqual([{ event: "worlds_written", ms: clock.at - NOW }]);
   });
 
   it("runs a pass every half hour unless told otherwise: the pause times the calls of a first pass stay far under it", () => {
@@ -392,7 +442,7 @@ describe("runWorlds", () => {
       const paths = [ROUTER, VICTIM, ...Array.from({ length: 6 }, (_, i) => `gno.land/r/evil/fat_${String(i)}`)];
       const routes = chainRoutes(paths, {
         doc: (path) => (path === VICTIM ? fat(path, "Swap") : path.includes("evil") ? fat(path, "Play") : doc(path)),
-        indexer: ({ variables }) => history(pathOf(variables) === ROUTER ? 2 : 0, pathOf(variables)),
+        indexer: callsOf({ [ROUTER]: 2 }),
       });
       const { file, logged } = await run(routes, { maxBytes: VICTIM_STRIPPED });
       expect(logged).toContainEqual({ event: "worlds_shed", error: "lists" });
@@ -455,7 +505,7 @@ describe("runWorlds", () => {
       expect(outcome).toEqual({ wrote: true });
       const realm = written(file).worlds[0]?.realms[0];
       expect(realm).toMatchObject({ deployer: A, functions: ["Swap"], calls: null, callers: null, lastHeight: null });
-      expect(logged.map(({ event }) => event)).toEqual(["worlds_indexer_failed"]);
+      expect(logged.map(({ event }) => event)).toEqual(["worlds_indexer_failed", "worlds_written"]);
     });
 
     it("stops asking the indexer for the pass once it is silent: not a request for every realm", async () => {
@@ -464,57 +514,61 @@ describe("runWorlds", () => {
       expect(chain.asked.filter(({ kind }) => kind === "indexer").length).toBeLessThanOrEqual(3);
     });
 
-    it("ends the indexer reads after three shape answers in a row and logs the indexer as failed, not once a realm", async () => {
+    it("ends the indexer read at an answer of the wrong shape, and logs the indexer as failed once, not once a realm", async () => {
       const paths = Array.from({ length: 40 }, (_, i) => `gno.land/r/ns/app${String(i)}`);
       const wrong = JSON.stringify({ errors: [{ message: "unknown field" }], data: null });
       const { chain, logged, outcome } = await run(chainRoutes(paths, { indexer: () => wrong }));
       expect(outcome).toEqual({ wrote: true });
-      expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(3);
-      expect(logged).toContainEqual({ event: "worlds_indexer_failed", error: "shape" });
+      expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(1);
+      expect(logged).toEqual([
+        { event: "worlds_indexer_failed", error: "shape" },
+        { event: "worlds_written", ms: 0 },
+      ]);
     });
 
-    it("keeps asking after a shape answer that is not followed by two more, for one realm may be the odd one", async () => {
-      const paths = Array.from({ length: 10 }, (_, i) => `gno.land/r/ns/app${String(i)}`);
-      let n = 0;
-      const { chain } = await run(
-        chainRoutes(paths, {
-          indexer: ({ variables }) => {
-            n += 1;
-            return n % 3 === 0 ? "{}" : history(1, pathOf(variables));
-          },
-        }),
-      );
-      expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(10);
-    });
-
-    it("keeps the earlier counts of a realm the indexer cannot answer now, and updates the others", async () => {
+    it("keeps every realm's earlier counts when the indexer cannot answer now: no realm is read from half the chain", async () => {
       const file = fresh();
-      await run(chainRoutes([POOL, ROUTER], { indexer: ({ variables }) => history(4, pathOf(variables)) }), { file });
-      await run(
-        chainRoutes([POOL, ROUTER], {
-          indexer: ({ variables }) =>
-            Object.values(variables).includes(POOL) ? history(7, POOL) : new TypeError("down"),
-        }),
-        { file },
-      );
+      await run(chainRoutes([POOL, ROUTER], { indexer: callsOf({ [POOL]: 7, [ROUTER]: 4 }) }), { file });
+      await run(chainRoutes([POOL, ROUTER], { indexer: () => new TypeError("down") }), { file });
       const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
       expect(calls).toEqual({ "gnoswap/pool": 7, "gnoswap/router": 4 });
     });
 
-    it("asks the indexer for at most the cap's realms a pass, the next run the next pass, and keeps the others' counts (F3518)", async () => {
+    it("reads every realm's calls each pass in one read of the chain, the same pages for twelve realms as for one (F3518)", async () => {
       const paths = Array.from({ length: 12 }, (_, i) => `gno.land/r/ev/a_r${String(i).padStart(2, "0")}`);
-      const file = fresh();
-      const asked = (chain: Run["chain"]): number => chain.asked.filter(({ kind }) => kind === "indexer").length;
-      const first = await run(chainRoutes(paths), { file, historyMax: 5, now: 0 });
-      expect(asked(first.chain)).toBe(5);
-      const second = await run(chainRoutes(paths, { indexer: ({ variables }) => history(9, pathOf(variables)) }), {
-        file,
-        historyMax: 5,
-        now: EVERY_MS,
-      });
-      expect(asked(second.chain)).toBe(5);
+      const indexer = callsOf({ [paths[3] ?? ""]: 9 });
+      const { chain, file } = await run(chainRoutes(paths, { indexer }));
+      const pages = (asked: Run["chain"]["asked"]) =>
+        asked.filter(({ kind }) => kind === "indexer").map(({ data }) => data);
+      expect(pages(chain.asked)).toEqual(pages((await run(chainRoutes([paths[3] ?? ""], { indexer }))).chain.asked));
+      expect(pages(chain.asked)).toHaveLength(4);
       const calls = written(file).worlds.flatMap((world) => world.realms.map((realm) => realm.calls));
-      expect(calls).toEqual([2, 2, 2, 2, 2, 9, 9, 9, 9, 9, null, null]);
+      expect(calls).toEqual([0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0]);
+    });
+
+    it("keeps every realm's earlier counts when a later page fails, and writes no count of half the chain", async () => {
+      const file = fresh();
+      await run(chainRoutes([POOL, ROUTER], { indexer: callsOf({ [POOL]: 7, [ROUTER]: 4 }) }), { file });
+      let n = 0;
+      const second = callsOf({ [POOL]: 9, [ROUTER]: 9 });
+      const failing: Routes["indexer"] = (request) => ((n += 1) === 2 ? new TypeError("down") : second(request));
+      const { chain, logged } = await run(chainRoutes([POOL, ROUTER], { indexer: failing }), { file, historyPage: 2 });
+      expect(pagesAsked(chain)).toEqual([{ limit: 2 }, { height: 100 }]);
+      expect(logged).toContainEqual({ event: "worlds_indexer_failed", error: "request" });
+      const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
+      expect(calls).toEqual({ "gnoswap/pool": 7, "gnoswap/router": 4 });
+    });
+
+    it("logs the calls it had to leave out once, and writes the rest", async () => {
+      const odd = pagedCalls([
+        { block_height: 1, messages: [{ value: { __typename: "MsgCall", caller: A } }] },
+        { block_height: 2, messages: [{ value: { __typename: "MsgCall", pkg_path: POOL, caller: A } }] },
+      ]);
+      const { file, logged } = await run(chainRoutes([POOL], { indexer: odd }));
+      expect(logged.filter(({ event }) => event === "worlds_history_skipped")).toEqual([
+        { event: "worlds_history_skipped", error: "shape" },
+      ]);
+      expect(written(file).worlds[0]?.realms[0]?.calls).toBe(1);
     });
 
     it("writes the file even when every read of a package failed, with empty facts", async () => {
@@ -568,7 +622,10 @@ describe("runWorlds", () => {
       const routes = (paths: string[]) =>
         chainRoutes(paths, {
           doc: (path) => (path.includes("evil") ? fat(path) : doc(path)),
-          indexer: ({ variables }) => history(pathOf(variables).includes("evil") ? 0 : 2, pathOf(variables)),
+          indexer: eachCalled(
+            paths.filter((path) => !path.includes("evil")),
+            2,
+          ),
         });
 
       it("is shed to fit and not refused: its lists go, the other worlds stay whole", async () => {
@@ -611,6 +668,21 @@ describe("runWorlds", () => {
       expect(outcome).toEqual({ wrote: true });
       expect(written(file).worlds).toHaveLength(533);
       expect(readFileSync(file).byteLength).toBeLessThan(WORLDS_MAX_BYTES / 4);
+    });
+
+    // 7k3: the per-realm reads 7c wrote made 2,231 calls of this list, the indexer's 743 at 1.2 to 1.5 s each on onyx-1 (2026-11-04).
+    it("reads the recorded chain's 743 realms in 1,492 calls: the list, two reads a package, the one deployer's name, four of the indexer", async () => {
+      const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
+        .split("\n")
+        .filter((line) => line !== "");
+      const { chain, file, logged, outcome } = await run(chainRoutes(onyx));
+      expect(outcome).toEqual({ wrote: true });
+      expect(logged).toEqual([{ event: "worlds_written", ms: 0 }]);
+      expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ calls }) => calls))).toEqual(onyx.map(() => 2));
+      const count = (kind: string) => chain.asked.filter((asked) => asked.kind === kind).length;
+      expect(onyx).toHaveLength(743);
+      expect(["vm/qpaths", "vm/qdoc", "vm/qfile", "vm/qeval", "indexer"].map(count)).toEqual([1, 743, 743, 1, 4]);
+      expect(chain.asked).toHaveLength(1_492);
     });
 
     it("writes the plan's 10,000 worlds (12,000 realms, past the chain's 10,000 per answer) under the default cap", async () => {
@@ -840,17 +912,17 @@ describe("the trends it tells", () => {
     return { told, trends };
   };
 
-  it("tells the file it wrote, and the calls of each realm this pass read, none for a realm it could not read", async () => {
+  it("tells the file it wrote, and the calls of every realm this pass read, a realm with none as none", async () => {
     const { told, trends } = keeper();
-    const odd = chainRoutes([POOL, POOL1, ROUTER], {
-      indexer: ({ variables }) => (pathOf(variables) === POOL1 ? "{}" : history(3, pathOf(variables))),
+    const { file } = await run(chainRoutes([POOL, POOL1, ROUTER], { indexer: callsOf({ [POOL]: 3, [ROUTER]: 3 }) }), {
+      trends,
     });
-    const { file } = await run(odd, { trends });
     expect(told).toHaveLength(1);
     expect(told[0]?.worlds).toEqual(written(file));
     expect(told[0]?.read).toEqual(
       new Map([
         [POOL, 3],
+        [POOL1, 0],
         [ROUTER, 3],
       ]),
     );
@@ -865,9 +937,7 @@ describe("the trends it tells", () => {
     expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ lastHeight }) => lastHeight))).toEqual([
       101, 101,
     ]);
-    const busier = chainRoutes([POOL, ROUTER], {
-      indexer: ({ variables }) => history(pathOf(variables) === POOL ? 5 : 2, pathOf(variables)),
-    });
+    const busier = chainRoutes([POOL, ROUTER], { indexer: callsOf({ [POOL]: 5, [ROUTER]: 2 }) });
     const { outcome } = await run(busier, { file, now: NOW + 5, trends });
     expect(outcome).toEqual({ wrote: true });
     expect(told[0]?.get(POOL)?.recent, "a first file has no height to count from").toBeUndefined();
@@ -881,42 +951,55 @@ describe("the trends it tells", () => {
     });
   });
 
-  // The third round of 7t3's review: the stamp's test ran on a fixed clock, so stamping every read once a pass would have passed it.
-  it("stamps each realm's read by the job's clock as its answer comes, never once a pass", async () => {
+  // The third round of 7t3's review (F4865) wanted each realm's read stamped as it came, when the reads took minutes; one read of the chain
+  // reads every realm at once (7k3), so the stamp is the clock once that read has ended, never the pass's start nor the first answer.
+  it("stamps every realm's read by the job's clock once the indexer's last page has come, never at the pass's start nor its first page", async () => {
     const clock = { at: NOW };
-    const answered = new Map<string, number>();
+    const answered: number[] = [];
     const routes = chainRoutes([POOL, ROUTER], {
-      indexer: ({ variables }) => {
+      indexer: (request) => {
         clock.at += 1000;
-        answered.set(pathOf(variables), clock.at);
-        return history(2, pathOf(variables));
+        answered.push(clock.at);
+        return eachCalled([POOL, ROUTER], 2)(request);
       },
     });
     const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    await run(routes, { clock: () => clock.at, trends: { passed: (_worlds, read) => void told.push(read) } });
-    const [pool, router] = [told[0]?.get(POOL)?.at, told[0]?.get(ROUTER)?.at];
-    expect(pool).toBe(answered.get(POOL));
-    expect(router).toBe(answered.get(ROUTER));
-    expect(pool).not.toBe(router);
+    const { chain } = await run(routes, {
+      clock: () => clock.at,
+      historyPage: 2,
+      trends: { passed: (_worlds, read) => void told.push(read) },
+    });
+    expect(pagesAsked(chain)).toEqual([
+      { limit: 2 },
+      { height: 100 },
+      { above: 100, limit: 2 },
+      { height: 101 },
+      { above: 101, limit: 2 },
+    ]);
+    expect(answered).toHaveLength(5);
+    const last = answered.at(-1);
+    expect([told[0]?.get(POOL)?.at, told[0]?.get(ROUTER)?.at]).toEqual([last, last]);
   });
 
   it("counts every call of a realm the last file read with none yet, and gives no window to one it never read", async () => {
     const file = fresh();
     const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
     const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
-    const quiet = chainRoutes([POOL, ROUTER], {
-      indexer: ({ variables }) => (pathOf(variables) === ROUTER ? "{}" : history(0, pathOf(variables))),
-    });
-    await run(quiet, { file, trends });
-    expect(
-      written(file).worlds.flatMap(({ realms }) => realms.map(({ calls, lastHeight }) => [calls, lastHeight])),
-    ).toEqual([
-      [0, null],
-      [null, null],
-    ]);
+    await run(chainRoutes([POOL], { indexer: callsOf({}) }), { file, trends });
+    expect(written(file).worlds[0]?.realms[0]).toMatchObject({ calls: 0, lastHeight: null });
     await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5, trends });
     expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: [`100:${A}`, `101:${B}`], callers: [A, B] });
     expect(told[1]?.get(ROUTER)?.recent).toBeUndefined();
+  });
+
+  it("gives no window to a realm whose counts the last file could not read", async () => {
+    const file = fresh();
+    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
+    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
+    await run(chainRoutes([POOL], { indexer: () => new TypeError("down") }), { file, trends });
+    expect(written(file).worlds[0]?.realms[0]).toMatchObject({ calls: null, lastHeight: null });
+    await run(chainRoutes([POOL]), { file, now: NOW + 5, trends });
+    expect(told[1]?.get(POOL)).toEqual({ calls: 2, callers: 2, lastHeight: 101, at: NOW + 5 });
   });
 
   it("tells no read of a pass whose indexer is silent, though it writes the file with the last counts", async () => {
@@ -978,9 +1061,9 @@ describe("startWorlds", () => {
   it("keeps the chain's window of its passes for the ticker's route, each pass against the one before (7t)", async () => {
     let reads = 0;
     const counting = chainRoutes([POOL], {
-      indexer: () => {
-        reads += 1;
-        return history(6 * reads, POOL);
+      indexer: (request) => {
+        if (request.variables["above"] === undefined && request.variables["height"] === undefined) reads += 1;
+        return callsOf({ [POOL]: 6 * reads })(request);
       },
     });
     const chain = fakeChain(counting);
@@ -998,9 +1081,9 @@ describe("startWorlds", () => {
   it("keeps each world's window in the habit files it is given, the busiest of each hour, for the next 14 days (7t3)", async () => {
     let reads = 0;
     const counting = chainRoutes([POOL], {
-      indexer: () => {
-        reads += 1;
-        return history(6 * reads, POOL);
+      indexer: (request) => {
+        if (request.variables["above"] === undefined && request.variables["height"] === undefined) reads += 1;
+        return callsOf({ [POOL]: 6 * reads })(request);
       },
     });
     const chain = fakeChain(counting);
@@ -1116,17 +1199,6 @@ describe("the behaviours the pass states", () => {
     ["a 429", () => new Response("slow down", { status: 429 })],
   ];
 
-  it("leaves a realm whose indexer answer is odd and goes on to the next, keeping its counts", async () => {
-    const { file, chain } = await run(
-      chainRoutes([POOL, ROUTER], {
-        indexer: ({ variables }) => (pathOf(variables) === POOL ? "{}" : history(2, ROUTER)),
-      }),
-    );
-    expect(chain.asked.filter(({ kind }) => kind === "indexer")).toHaveLength(2);
-    const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
-    expect(calls).toEqual({ "gnoswap/pool": null, "gnoswap/router": 2 });
-  });
-
   it.each(faults)("ends the package reads of the pass at %s, by the calls asked", async (_name, fault) => {
     const { chain, outcome } = await run(chainRoutes(THREE, { doc: fault }));
     expect(outcome).toEqual({ wrote: true });
@@ -1170,7 +1242,6 @@ describe("the behaviours the pass states", () => {
     ["the list", (asked: { kind: string }[]) => asked.length > 0],
     ["the packages", (asked: { kind: string }[]) => asked.some(({ kind }) => kind === "vm/qdoc")],
     ["the indexer", (asked: { kind: string }[]) => asked.some(({ kind }) => kind === "indexer")],
-    ["the last read", (asked: { kind: string }[]) => asked.filter(({ kind }) => kind === "indexer").length === 2],
   ])("writes nothing when it is stopped after %s", async (_name, stopped) => {
     const file = fresh();
     const chain = fakeChain(chainRoutes([POOL, ROUTER]));
@@ -1181,9 +1252,11 @@ describe("the behaviours the pass states", () => {
       send: chain.send,
       universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
       wait: () => Promise.resolve(),
+      historyPage: 2,
       isStopped: () => stopped(chain.asked),
     });
     expect(outcome).toEqual({ wrote: false, kind: "stopped" });
+    expect(pagesAsked(chain).length).toBeLessThanOrEqual(1);
     expect(existsSync(file)).toBe(false);
     expect(logged).toEqual(["worlds_failed"]);
   });
