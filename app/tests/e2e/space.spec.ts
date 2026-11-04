@@ -182,7 +182,11 @@ test.describe("the scenery on a computer", () => {
     expect(home.calls).toBeLessThanOrEqual(6);
   });
 
+  // A moving scene on the software GPU makes each screenshot cost 4 s alone and 12 to 20 s at 8 workers, and a decode beside it 2 s:
+  // three times the time, and one reading once reduced motion has stilled the scene, the page kept for the CSP's flush (F4882, Alexis:
+  // "Une lecture, temps x3").
   test("moves when motion is allowed: the picture changes with the eye", async ({ page }) => {
+    test.slow();
     await page.goto(HOME);
     await opened(page);
     await landed(page);
@@ -190,9 +194,9 @@ test.describe("the scenery on a computer", () => {
     const start = (await stats(page)).eye;
     const first = await picture(page);
     await expect.poll(async () => (await stats(page)).eye).not.toEqual(start);
-    await expect
-      .poll(async () => (await measured(page, first, await picture(page))).apart, { timeout: 20_000 })
-      .toBeGreaterThan(0.02);
+    const second = await picture(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect((await measured(page, first, second)).apart).toBeGreaterThan(0.02);
   });
 
   test("still draws its sky on a device known slow", async ({ page }) => {
