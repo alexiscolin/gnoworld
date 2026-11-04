@@ -7,7 +7,7 @@ import { useRef, type ReactNode } from "react";
 import { Avatar, Button, Cluster, NavItem, Row, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
-import { dmHref, isAccount, roomHref, roomLabel, shortAddress } from "./names.ts";
+import { dmHref, noticeDone, roomHref, roomLabel, shortAddress } from "./names.ts";
 import { badged } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
@@ -52,17 +52,8 @@ export interface DmsProps {
   notKept?: boolean | undefined;
 }
 
-const WORDS = {
-  mention: "mentioned you",
-  group: "mentioned the room",
-  reply: "replied to you",
-  dm: "wrote to you",
-} as const;
-const whoIs = (by: string) => (isAccount(by) ? shortAddress(by) : by);
-
-/** What a screen reader is told of a notice: who did what, and where. */
-export const noticeSaid = ({ kind, by, where }: Notice): string =>
-  `${whoIs(by)} ${WORDS[kind]}${kind === "dm" ? "" : ` in ${roomLabel(where)}`}`;
+// What a notice says moved to names.ts, which the bell shares (slice 8); its tests stay here.
+export { noticeSaid } from "./names.ts";
 
 // What the account was told, newest first, each a link to where.
 // The keyboard's place goes to the navigation as the list changes under it (Clear, a link followed): the button or the
@@ -98,7 +89,7 @@ function Notices({
         {list.toReversed().map((notice) => (
           <li key={notice.id}>
             <Row
-              title={`${whoIs(notice.by)} ${WORDS[notice.kind]}`}
+              title={noticeDone(notice)}
               subtitle={notice.kind === "dm" ? "Direct message" : roomLabel(notice.where)}
               href={notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full)}
             />

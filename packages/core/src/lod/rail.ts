@@ -1,4 +1,4 @@
-// The rail (ADR-0002 §1's row and §10; plan §9, question 7): the Earth first, then the trends, the most people here now and then, as
+// The rail (ADR-0002 §1's row and §10; plan §9, question 7): the Earth first, then the worlds the reader follows (slice 8), then the trends, the most people here now and then, as
 // who is here names hubs alone, the most callers; the rising worlds, against their own 14 days; the seeds, new worlds nobody here visited;
 // each world once, 25 at most. Its order holds: a world moves above one shown above it only once it is clearly ahead.
 import { mostPopular, titleOf, type LabelAsk } from "./labels.ts";
@@ -12,10 +12,12 @@ export { RAIL } from "./labels.ts";
 export const RAIL_MOST = 25;
 export const RISING_MOST = 8;
 export const SEEDS_MOST = 4;
+/** The most followed worlds the rail puts first: the rest of it stays the moment's. */
+const FOLLOWED_MOST = 10;
 /** How many times another world's people here, or its rise, a world must have to move above it. */
 export const AHEAD = 1.25;
 
-type RailSection = "earth" | "trend" | "rising" | "seed";
+type RailSection = "earth" | "followed" | "trend" | "rising" | "seed";
 
 /** A world the rail may show: a label's ask, and a new world's age in days. */
 export interface RailAsk extends LabelAsk {
@@ -111,14 +113,30 @@ function kept(ranked: readonly RailAsk[], section: RailSection, most: number): H
   return held;
 }
 
-/** The rail's worlds in their order, from `asks` in any order; `shown`, the ids it shows now, which holds their order. */
-export function chooseRail(asks: readonly RailAsk[], shown: readonly string[] = []): RailWorld[] {
-  const sections = sectionsOf(asks);
+// The followed worlds the asks hold, in the order followed, the Earth left to its own place; each once.
+function followedOf(asks: readonly RailAsk[], followed: readonly string[]): RailAsk[] {
+  const byId = new Map(asks.map((ask) => [ask.id, ask]));
+  return [...new Set(followed)].flatMap((id) => {
+    const ask = byId.get(id);
+    return ask === undefined || ask.kind === "earth" ? [] : [ask];
+  });
+}
+
+/** The rail's worlds in their order, from `asks` in any order; `shown`, the ids it shows now, which holds their order; `followed`, the
+ * worlds the reader follows, the last followed first, which come after the Earth whatever they do now. */
+export function chooseRail(
+  asks: readonly RailAsk[],
+  shown: readonly string[] = [],
+  followed: readonly string[] = [],
+): RailWorld[] {
+  const mine = kept(followedOf(asks, followed), "followed", FOLLOWED_MOST);
+  const first = new Set(mine.map(({ world }) => world.id));
+  const sections = sectionsOf(asks.filter(({ id }) => !first.has(id)));
   const position = new Map(shown.map((id, at) => [id, at]));
   const earth = kept(sections.get("earth") ?? [], "earth", 1);
   const rising = steady(kept(mostPopular(sections.get("rising") ?? []), "rising", RISING_MOST), position);
   const seeds = kept(youngest(sections.get("seed") ?? []), "seed", SEEDS_MOST);
-  const room = RAIL_MOST - earth.length - rising.length - seeds.length;
+  const room = RAIL_MOST - earth.length - mine.length - rising.length - seeds.length;
   const trends = steady(kept(mostPopular(sections.get("trend") ?? []), "trend", room), position);
-  return [...earth, ...trends, ...rising, ...seeds].map(({ world }) => world);
+  return [...earth, ...mine, ...trends, ...rising, ...seeds].map(({ world }) => world);
 }

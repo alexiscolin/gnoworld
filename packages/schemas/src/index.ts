@@ -18,6 +18,7 @@ export {
   Quests,
   RealmPath,
   Stations,
+  UNDATED_EVENT,
   Universes,
 } from "./data.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";

@@ -2,12 +2,14 @@
 import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { StoreProvider } from "../../storeContext.tsx";
 import { Actions } from "./Actions.tsx";
 
-// Slice 5j (frames 26 and 92): the main action, then Follow and Share only if they work. Share works when the browser can
-// copy the page's address; Follow needs an account's store that does not exist: it is never drawn, no dead button.
-const ADDRESS = "https://gno.world/net/onyx/w/bubble";
+// Slice 5j (frames 26 and 92), slice 8 (frames 86, 93): the main action, then Follow and Share, whose code comes a moment after the first
+// screen (PlateActs.tsx). Share opens the share sheet (features/share); the hardening slice writes their tests.
+const PLACE = { name: "Bubble", path: "/net/onyx/w/bubble" };
+const FOLLOW = "onyx:bubble";
 const PROPOSALS = "/net/onyx/r/gov/dao";
 let host: HTMLElement | undefined;
 afterEach(() => {
@@ -21,16 +23,20 @@ function draw(proposals?: string) {
   const root = createRoot(host);
   act(() => {
     root.render(
-      proposals === undefined ? <Actions address={ADDRESS} /> : <Actions address={ADDRESS} proposals={proposals} />,
+      <StoreProvider>
+        {proposals === undefined ? (
+          <Actions place={PLACE} follow={FOLLOW} />
+        ) : (
+          <Actions place={PLACE} follow={FOLLOW} proposals={proposals} />
+        )}
+      </StoreProvider>,
     );
   });
   return host;
 }
-const share = (el: HTMLElement) => [...el.querySelectorAll("button")].find((b) => /^share$/i.test(b.textContent));
 
 describe("a world's actions", () => {
   it("draws the main action: a link to the world's chat on the page, in words that say so", () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
     const main = draw().querySelector("a");
     expect(main?.getAttribute("href")).toBe("#chat");
     expect(main?.textContent).toBe("Say hi in the chat");
@@ -38,7 +44,6 @@ describe("a world's actions", () => {
   });
 
   it("moves the focus to the chat's composer when the link is clicked, and leaves the focus alone when the chat has none (F2864)", () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
     const el = draw();
     const chat = document.createElement("div");
     chat.id = "chat";
@@ -58,92 +63,16 @@ describe("a world's actions", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("never draws Follow", () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
-    expect(draw().textContent).not.toMatch(/follow/i);
+  it("draws neither Follow nor Share with the first screen: they come a moment after it", () => {
+    expect(labels(draw())).toEqual(["Say hi in the chat"]);
   });
 
-  it("copies the page's canonical address on Share, and says it did, in a status", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    const el = draw();
-    expect(el.querySelector("[role='status']")?.textContent).toBe("");
-    await act(async () => {
-      share(el)?.click();
-      await Promise.resolve();
-    });
-    expect(writeText).toHaveBeenCalledExactlyOnceWith(ADDRESS);
-    expect(el.querySelector("[role='status']")?.textContent).toBe("Copied");
-  });
-
-  it("takes the click again, and lets the words go after a moment", async () => {
-    vi.useFakeTimers();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    const el = draw();
-    for (let click = 0; click < 2; click += 1) {
-      await act(async () => {
-        share(el)?.click();
-        await Promise.resolve();
-      });
-    }
-    expect(writeText).toHaveBeenCalledTimes(2);
-    expect(el.querySelector("[role='status']")?.textContent).toBe("Copied");
-    act(() => {
-      vi.advanceTimersByTime(5_000);
-    });
-    expect(el.querySelector("[role='status']")?.textContent).toBe("");
-    vi.useRealTimers();
-  });
-
-  it("keeps the words after a second click for their whole time, not for what was left of the first's (F2870)", async () => {
-    vi.useFakeTimers();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("navigator", { clipboard: { writeText } });
-    const el = draw();
-    const click = () =>
-      act(async () => {
-        share(el)?.click();
-        await Promise.resolve();
-      });
-    await click();
-    act(() => {
-      vi.advanceTimersByTime(2_400);
-    });
-    await click();
-    act(() => {
-      vi.advanceTimersByTime(600);
-    });
-    expect(el.querySelector("[role='status']")?.textContent).toBe("Copied");
-    act(() => {
-      vi.advanceTimersByTime(2_000);
-    });
-    expect(el.querySelector("[role='status']")?.textContent).toBe("");
-    vi.useRealTimers();
-  });
-
-  it("leaves Share out where the browser cannot copy: no clipboard, or one with no writeText", () => {
-    for (const none of [{}, { clipboard: undefined }, { clipboard: {} }]) {
-      vi.stubGlobal("navigator", none);
-      const el = draw();
-      expect(share(el)).toBeUndefined();
-      expect(el.querySelectorAll("button")).toHaveLength(0);
-      host?.remove();
-    }
-  });
-
-  it("says the copy was refused, in words, and never that it was copied", async () => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
-    const el = draw();
-    await act(async () => {
-      share(el)?.click();
-      await Promise.resolve();
-    });
-    expect(el.querySelector("[role='status']")?.textContent).toBe("Could not copy the address");
-  });
-
-  it("draws no Share on the server, where nothing is known of the browser", () => {
-    const html = renderToStaticMarkup(<Actions address={ADDRESS} />);
+  it("draws neither Follow nor Share on the server, where nothing is known of the browser", () => {
+    const html = renderToStaticMarkup(
+      <StoreProvider>
+        <Actions place={PLACE} follow={FOLLOW} />
+      </StoreProvider>,
+    );
     expect(html).not.toMatch(/>Share</);
     expect(html).not.toMatch(/Follow/);
     expect(html).toContain("Say hi in the chat");
@@ -155,10 +84,6 @@ const labels = (el: HTMLElement) => [...el.querySelectorAll("a, button")].map((n
 // Slice 5k (frames 22 and 27): a world with a proposals realm draws 'Read the proposals' first, as a link to a plain path of this
 // site; one with none draws no such button. Where the realm comes from is a hubs.json schema change, parked (F2953).
 describe("a world's actions, with proposals", () => {
-  beforeEach(() => {
-    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn() } });
-  });
-
   it("draws 'Read the proposals' first, as a link with a hidden icon, to the realm's view", () => {
     const el = draw(PROPOSALS);
     const first = el.querySelector("a, button");
@@ -167,17 +92,15 @@ describe("a world's actions, with proposals", () => {
     expect(first?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
-  it("still draws Share, and never Follow", () => {
-    const text = labels(draw(PROPOSALS));
-    expect(text).toContain("Share");
-    expect(text.join(" ")).not.toMatch(/follow/i);
+  it("leaves Follow and Share to a moment after the first screen, as without proposals", () => {
+    expect(labels(draw(PROPOSALS))).toEqual(["Read the proposals", "Say hi in the chat"]);
   });
 
   // Frames 22 and 27 show the proposals first; the chat stays a click away (it is the world's core, and F2864's focus path). The
   // decision is mine, not Alexis's: it is named in the report for his review.
   it("keeps 'Say hi in the chat' after it, as a link to the chat, and makes only the proposals the solid action", () => {
     const withChat = draw(PROPOSALS);
-    expect(labels(withChat)).toEqual(["Read the proposals", "Say hi in the chat", "Share"]);
+    expect(labels(withChat)).toEqual(["Read the proposals", "Say hi in the chat"]);
     const [proposals, hi] = [...withChat.querySelectorAll("a")];
     expect(hi?.getAttribute("href")).toBe("#chat");
     expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");

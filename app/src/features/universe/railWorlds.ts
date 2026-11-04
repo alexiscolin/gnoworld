@@ -10,8 +10,9 @@ import type { Known } from "./worldsFeed.ts";
 /** The least time between two orders of the rail. */
 export const RAIL_MINUTE = 60_000;
 
-/** Where the rail's links go, the places the labels' doors lead to too. */
-export type RailPlaces = WorldPlaces;
+/** Where the rail's links go, the places the labels' doors lead to too; and the worlds the reader follows, by their ids, the last followed
+ * first, which come after the Earth (slice 8). */
+export type RailPlaces = WorldPlaces & { readonly followed?: readonly string[] | undefined };
 
 export interface RailEntry extends RailWorld {
   readonly href: string;
@@ -35,10 +36,11 @@ function asksOf(worlds: readonly CosmosWorld[], signals: LabelSignals, pages: Re
   return asks;
 }
 
-/** The rail's entries from the worlds and what is known of them; `shown`, the ids it shows now, holds their order. */
+/** The rail's entries from the worlds and what is known of them; `shown`, the ids it shows now, holds their order; the worlds followed
+ * come first. */
 export function railOf({ worlds, signals }: Known, places: RailPlaces, shown: readonly string[] = []): RailEntry[] {
   const pages = pagesOf(worlds, places);
-  return chooseRail(asksOf(worlds, signals, pages), shown).flatMap((world) => {
+  return chooseRail(asksOf(worlds, signals, pages), shown, places.followed).flatMap((world) => {
     const href = pages.get(world.id);
     return href === undefined ? [] : [{ ...world, href }];
   });
@@ -62,6 +64,8 @@ export class RailOrder {
   readonly #places: RailPlaces;
   readonly #shown = createStore<readonly RailEntry[]>(() => []);
   #latest: Known | undefined;
+  #known: Known | undefined;
+  #followed: readonly string[] = [];
   #held = false;
   #changed = Number.NEGATIVE_INFINITY;
   #timer: ReturnType<typeof setTimeout> | undefined;
@@ -77,6 +81,16 @@ export class RailOrder {
   /** The worlds and what is known of them now: shown when the rail may change. */
   read(known: Known): void {
     this.#latest = known;
+    this.#known = known;
+    this.#apply();
+  }
+
+  /** The worlds the reader follows, the last followed first: a change shows at once, as the reader made it, unless they are on the rail. */
+  follow(followed: readonly string[]): void {
+    if (followed.join() === this.#followed.join()) return;
+    this.#followed = followed;
+    this.#latest ??= this.#known;
+    this.#changed = Number.NEGATIVE_INFINITY;
     this.#apply();
   }
 
@@ -102,7 +116,7 @@ export class RailOrder {
     const { unheard } = this.#latest;
     const next = railOf(
       this.#latest,
-      this.#places,
+      { ...this.#places, followed: this.#followed },
       shown.map(({ id }) => id),
     );
     this.#latest = undefined;

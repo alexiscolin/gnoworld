@@ -94,8 +94,18 @@ export const Ecosystems = inUniverse(
   z.strictObject({ slug: Key, name: text(DATA_CAPS.name), description: text(DATA_CAPS.description), universe: Key }),
 );
 export const Genres = bySlug(z.strictObject({ slug: Key, name: text(DATA_CAPS.name) }));
+/** The start the data gives an event whose date is still to be confirmed: a sentinel at the start of 2099, never shown as a date. */
+export const UNDATED_EVENT = Date.UTC(2099, 0, 1);
+
 export const Events = byId(
-  z.strictObject({ id: text(DATA_CAPS.key), title: text(DATA_CAPS.title), start: z.iso.datetime(), link: Link }),
+  z.strictObject({
+    id: text(DATA_CAPS.key),
+    title: text(DATA_CAPS.title),
+    start: z.iso.datetime(),
+    link: Link,
+    /** The world it happens in, by its hub's slug or the Earth's ("earth"), for the calendar and the bell by world (Alexis, slice 8). */
+    world: z.optional(Key),
+  }),
 );
 // A world as the expedition and the quests name it (slice 8): a hub or a station of the file's universe by its slug, or a realm by its path,
 // never both; the build checks the slug against hubs.json and stations.json (app/src/dataFiles.ts).

@@ -1,4 +1,5 @@
 // What the scene listens to in the page; every listener goes with the signal.
+import { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "@gnoworld/core";
 import type { Eye } from "./eye.ts";
 import type { FrameLoop } from "./loop.ts";
 import { OVER_SCENE } from "./overScene.ts";
@@ -109,6 +110,19 @@ function watchCanvas(
   );
 }
 
+/** Answers a share's ask for the view (core's SNAPSHOT_EVENT) on the canvas, with the next frame's picture. */
+function watchShare(canvas: HTMLCanvasElement, loop: FrameLoop, signal: AbortSignal): void {
+  canvas.addEventListener(
+    SNAPSHOT_EVENT,
+    () => {
+      loop.picture(canvas).then((picture) => {
+        canvas.dispatchEvent(new CustomEvent(SNAPSHOT_TAKEN, { detail: picture }));
+      }, reportError);
+    },
+    { signal },
+  );
+}
+
 /** Everything the scene listens to in the page, `canvas` and its context with it. */
 export function watchScene(
   canvas: HTMLCanvasElement,
@@ -126,4 +140,5 @@ export function watchScene(
   watchQuality(scene.changed, signal);
   watchAim(scene.eye, signal);
   watchCanvas(canvas, scene, signal);
+  watchShare(canvas, scene.loop, signal);
 }

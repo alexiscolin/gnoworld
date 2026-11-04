@@ -1,0 +1,40 @@
+/* The bell's panel (frames 86, 87): a floating panel (ui's Panel) in the top layer, over the dock's column, from under the header to the
+   page's foot. */
+@layer components {
+  .place {
+    /* raw: under the header's controls, where the dock's panel starts (frame 86: 88 px) */
+    inset: calc(var(--space-2xl) + var(--space-l)) var(--space-s) var(--space-s) auto;
+    /* raw: the dock's width in frame 86 (360 px), less on a narrow screen */
+    inline-size: min(360px, calc(100% - 2 * var(--space-s)));
+    overflow: auto;
+    /* The browser's popover frame and fill go: the panel inside is the surface. */
+    border-style: none;
+    background-color: transparent;
+    /* layout: the panel inside fills the box */
+    padding: 0;
+  }
+
+  .title {
+    font: var(--font-title-s);
+  }
+
+  .list {
+    /* layout: a list with no marks */
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A line's mark: its icon, mint while unread. */
+  .mark {
+    color: var(--color-text-muted);
+  }
+
+  .mark[data-unread] {
+    color: var(--color-mine);
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

@@ -11,6 +11,10 @@ export interface Settings {
 }
 export const DEFAULT_SETTINGS: Settings = { quality: "auto", calm: false, phone3d: false };
 
+/** The worlds followed, the people followed, the reminders and the notifications marked read kept at most, each: the device's reader
+ * drops what is past it, and a feature that adds one keeps to it. */
+export const FOLLOWS_KEPT = 500;
+
 /** What the device keeps, field by field. */
 export interface DeviceFields {
   settings: Settings;
