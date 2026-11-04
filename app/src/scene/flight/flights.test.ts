@@ -4,8 +4,6 @@ import {
   flightSeconds,
   HOME,
   MIDDLE,
-  onPlane,
-  stopNear,
   systemsOf,
   toMap,
   toScene,
@@ -60,7 +58,8 @@ interface Options {
 }
 
 // The scene around the flights: three's objects for real, the renderer's draws counted, the cosmos as it reads to a flight: its systems,
-// the eye it places (where the scene's eye stands, plus the flight's way) and its bodies' projection.
+// the eye it places (where the scene's eye stands, plus the flight's way) and its bodies' projection; and its arrivals, a star's 12 units
+// from it towards the eye where it is bound, the view at rest's own part (7g2).
 function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options = {}) {
   const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
   camera.rotation.set(pitch, yaw, 0);
@@ -96,6 +95,17 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
   const shows = { value: true };
   const earth = { x: NaN, y: NaN, z: NaN };
   toScene(EARTH_PLACE, earth);
+  const arrived: (string | undefined)[] = [];
+  const arrival = {
+    bind: vi.fn((id: string | undefined) => {
+      const system = systems.find((one) => one.id === id);
+      return Promise.resolve(system === undefined ? undefined : arrivalOf(placed(), system));
+    }),
+    handOver: vi.fn(),
+    leave: vi.fn(),
+    at: false,
+    looked: earth,
+  };
   const device: FlightDevice = {
     renderer: renderer as unknown as FlightDevice["renderer"],
     stage,
@@ -120,11 +130,31 @@ function rig({ systems = systemsOf(held(30, 3)), yaw = 0, pitch = 0 }: Options =
             lit: MIDDLE,
             toScene,
             toMap,
-            onPlane,
+            arrival,
           }
         : undefined,
+    arrive: (id) => {
+      arrived.push(id);
+    },
   };
-  return { device, eye, camera, stage, said, moved, copies, freed, renderer, still, placed, systems, shows, lift };
+  return {
+    device,
+    eye,
+    camera,
+    stage,
+    said,
+    moved,
+    copies,
+    freed,
+    renderer,
+    still,
+    placed,
+    systems,
+    shows,
+    lift,
+    arrival,
+    arrived,
+  };
 }
 type Rig = ReturnType<typeof rig>;
 
@@ -162,18 +192,29 @@ const frame = (flown: Flights, scene: Rig) => {
   run(flown, scene, FRAME / 1000);
 };
 
-// Where a flight to `system` from the rig's eye stops, and the star it looks at, on the stage.
-function endOf(scene: Rig, system: StarSystem) {
-  const map = { x: NaN, y: NaN, z: NaN };
-  toMap(scene.placed(), map);
-  const stop = { x: NaN, y: NaN, z: NaN };
-  stopNear(system, map, stop);
-  const eye = { x: NaN, y: NaN, z: NaN };
-  toScene(stop, eye);
-  const star = { x: NaN, y: NaN, z: NaN };
-  toScene(system.place, star);
-  return { eye, star, distance: Math.hypot(map.x - stop.x, map.y - stop.y, map.z - stop.z) };
+// The rig's arrival at `system` from an eye `from`, on the stage: 12 units from its star towards the eye, looking at the star.
+function arrivalOf(from: Point, system: StarSystem) {
+  const look = { x: NaN, y: NaN, z: NaN };
+  toScene(system.place, look);
+  const away = Math.hypot(from.x - look.x, from.y - look.y, from.z - look.z);
+  const share = away > 0 ? 12 / away : 0;
+  const eye = {
+    x: look.x + (from.x - look.x) * share,
+    y: look.y + (from.y - look.y) * share,
+    z: look.z + (from.z - look.z) * share + (away > 0 ? 0 : 12),
+  };
+  return { eye, look };
 }
+
+// Where a flight to `system` from the rig's eye lands, its arrival's eye, and the star it looks at, on the stage.
+function endOf(scene: Rig, system: StarSystem) {
+  const from = scene.placed();
+  const { eye, look } = arrivalOf(from, system);
+  return { eye, star: look, distance: Math.hypot(from.x - eye.x, from.y - eye.y, from.z - eye.z) };
+}
+
+// A star's flight starts once its arrival is bound (7g2).
+const bound = () => Promise.resolve();
 
 // Every star in front of the eye, where it stands on screen.
 function starsOnScreen(scene: Rig) {
@@ -241,7 +282,7 @@ const editable = () =>
 const veilOn = (stage: Stage) => stage.children.some(({ name }) => name === "dissolve");
 
 describe("the jump to a star", () => {
-  it("takes the time its distance gives, out of orbit and into the next slowly, and stops where core says, looking at the star", () => {
+  it("takes the time its distance gives, out of orbit and into the next slowly, and stops where core says, looking at the star", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     const system = pick(scene);
@@ -249,6 +290,7 @@ describe("the jump to a star", () => {
     const seconds = flightSeconds(end.distance);
     const start = scene.placed();
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     expect(flown.stats().seconds).toBeCloseTo(seconds, 9);
     const places: Point[] = [start];
     let landedAt = -1;
@@ -275,12 +317,13 @@ describe("the jump to a star", () => {
     expect(flown.stats()).toMatchObject({ flying: false, along: 1 });
   });
 
-  it("tells the panel its target, its phases in order and its instruments, ten times a second at most, then that it landed", () => {
+  it("tells the panel its target, its phases in order and its instruments, ten times a second at most, then that it landed", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     const system = pick(scene);
     const seconds = flightSeconds(endOf(scene, system).distance);
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     run(flown, scene, seconds + 0.2);
     const heard = flying(scene.said);
     expect(heard.every(({ target }) => target === system.id)).toBe(true);
@@ -293,15 +336,17 @@ describe("the jump to a star", () => {
     expect(scene.said.at(-1)).toBeUndefined();
   });
 
-  it("names a star by the name its namespace or its first world gives, never by an address, and cuts a long one", () => {
+  it("names a star by the name its namespace or its first world gives, never by an address, and cuts a long one", async () => {
     const at = { x: HOME.x, y: HOME.y, z: HOME.z - 60 };
     const world = { id: `${ADDRESS}/gnoslinger`, radius: 0.5, orbit: 2, phase: 0 };
     const scene = rig({ systems: [starAt(ADDRESS, at, [world]), starAt("x".repeat(200), { ...at, x: 40 })] });
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: ADDRESS });
+    await bound();
     frame(flown, scene);
     expect(flying(scene.said)[0]?.target).toBe("gnoslinger");
     flown.fly({ kind: "star", id: "x".repeat(200) });
+    await bound();
     frame(flown, scene);
     const long = flying(scene.said).at(-1)?.target ?? "";
     expect([...new Intl.Segmenter().segment(long)].length).toBeLessThanOrEqual(24);
@@ -309,38 +354,44 @@ describe("the jump to a star", () => {
     expect(flying(scene.said).some(({ target }) => target.includes(ADDRESS))).toBe(false);
   });
 
-  it("flies to no star the cosmos does not hold, from no eye the cosmos has not placed yet, and none while it does not show", () => {
+  it("flies to no star the cosmos does not hold, from no eye the cosmos has not placed yet, and none while it does not show", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: "nowhere" });
+    await bound();
     expect(flown.stats().flying).toBe(false);
     scene.lift.value = { x: NaN, y: 0, z: 0 };
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     expect(flown.stats().flying).toBe(false);
     scene.lift.value = { x: 0, y: 0, z: 0 };
     scene.shows.value = false;
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     expect(flown.stats().flying).toBe(false);
     expect(scene.eye.travel).toEqual({ x: 0, y: 0, z: 0 });
     expect(scene.moved.count).toBe(0);
   });
 
-  it("flies to the star the eye already stands by without a step out of the finite", () => {
+  it("flies to the star the eye already stands by without a step out of the finite", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     const system = pick(scene);
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     run(flown, scene, 4);
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     run(flown, scene, 4);
     expect(Number.isFinite(scene.eye.travel.x + scene.eye.travel.y + scene.eye.travel.z)).toBe(true);
     expect(away(scene.placed(), endOf(scene, system).eye)).toBeLessThan(1e-6);
   });
 
-  it("reads a frame of no time as none, and a frame of hours as a quarter of a second at most", () => {
+  it("reads a frame of no time as none, and a frame of hours as a quarter of a second at most", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     flown.advance(Number.NaN);
     expect(flown.stats().along).toBe(0);
     expect(Number.isFinite(scene.eye.travel.x)).toBe(true);
@@ -354,7 +405,7 @@ describe("aiming at a star", () => {
   it.each([
     ["looking straight ahead", { yaw: 0, pitch: 0 }],
     ["turned as the camera turns to the Earth", { yaw: 0.6, pitch: -0.25 }],
-  ])("goes to the star nearest a click on space within 24 pixels, and to none 30 pixels off, %s", (_, turn) => {
+  ])("goes to the star nearest a click on space within 24 pixels, and to none 30 pixels off, %s", async (_, turn) => {
     const scene = rig(turn);
     const flown = flights(scene.device);
     const spots = starsOnScreen(scene);
@@ -364,10 +415,13 @@ describe("aiming at a star", () => {
     if (lone === undefined) throw new Error("no star alone on screen");
     const end = endOf(scene, lone.system);
     click(document.body, lone.x + 30, lone.y);
+    await bound();
     const empty = emptyPoint(spots);
     click(document.body, empty.x, empty.y);
+    await bound();
     expect(flown.stats().flying).toBe(false);
     click(document.body, lone.x + 16, lone.y - 16);
+    await bound();
     expect(flown.stats()).toMatchObject({ flying: true, kind: "star", target: lone.system.id });
     run(flown, scene, 4);
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
@@ -378,17 +432,21 @@ describe("aiming at a star", () => {
   it.each([
     [MIDDLE + 10, false],
     [MIDDLE - 20, true],
-  ])("flies to a star %s units from the eye: %s, the suns lighting none past their middle reach", (distance, flies) => {
-    const base = rig();
-    const where = ahead(base, [0, 0, distance]);
-    const scene = rig({ systems: [starAt("star", where)] });
-    const flown = flights(scene.device);
-    const spot = onScreen(scene, where);
-    click(document.body, spot.x, spot.y);
-    expect(flown.stats().flying).toBe(flies);
-  });
+  ])(
+    "flies to a star %s units from the eye: %s, the suns lighting none past their middle reach",
+    async (distance, flies) => {
+      const base = rig();
+      const where = ahead(base, [0, 0, distance]);
+      const scene = rig({ systems: [starAt("star", where)] });
+      const flown = flights(scene.device);
+      const spot = onScreen(scene, where);
+      click(document.body, spot.x, spot.y);
+      await bound();
+      expect(flown.stats().flying).toBe(flies);
+    },
+  );
 
-  it("takes the nearer of two stars in reach, and none behind the eye whose picture would fall there", () => {
+  it("takes the nearer of two stars in reach, and none behind the eye whose picture would fall there", async () => {
     const base = rig();
     const near = ahead(base, [1.2, 0.4, 60]);
     const nearer = ahead(base, [0.5, 0.2, 61]);
@@ -398,12 +456,14 @@ describe("aiming at a star", () => {
     const between = { x: (first.x + 2 * second.x) / 3, y: (first.y + 2 * second.y) / 3 };
     expect(Math.hypot(first.x - between.x, first.y - between.y)).toBeLessThan(24);
     click(document.body, between.x, between.y);
+    await bound();
     expect(flown.stats().target).toBe("nearer");
     flown.land();
     const lone = rig({ systems: [starAt("behind", { x: HOME.x - 1.2, y: HOME.y - 0.4, z: HOME.z + 60 })] });
     const alone = flights(lone.device);
     const mirrored = onScreen(lone, { x: HOME.x + 1.2, y: HOME.y + 0.4, z: HOME.z - 60 });
     click(document.body, mirrored.x, mirrored.y);
+    await bound();
     expect(alone.stats().flying).toBe(false);
   });
 
@@ -423,7 +483,7 @@ describe("aiming at a star", () => {
         return layer.appendChild(document.createElement("div")).parentElement;
       },
     ],
-  ])("aims at nothing through %s", (_, make) => {
+  ])("aims at nothing through %s", async (_, make) => {
     const scene = rig();
     const flown = flights(scene.device);
     const [star] = starsOnScreen(scene);
@@ -432,19 +492,22 @@ describe("aiming at a star", () => {
     if (made === null) throw new Error("nothing made");
     document.body.append(made);
     click(made.querySelector("p") ?? made, star.x, star.y);
+    await bound();
     expect(flown.stats().flying).toBe(false);
   });
 
-  it("only lands on a click mid-way: the same click starts no other flight", () => {
+  it("only lands on a click mid-way: the same click starts no other flight", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     const spots = starsOnScreen(scene);
     const [first, second] = spots;
     if (first === undefined || second === undefined) throw new Error("two stars wanted");
     flown.fly({ kind: "star", id: first.system.id });
+    await bound();
     run(flown, scene, 0.4);
     press();
     click(document.body, second.x, second.y);
+    await bound();
     expect(flown.stats().flying).toBe(false);
     expect(flown.stats().target).toBe(first.system.id);
   });
@@ -459,12 +522,13 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
       },
     ],
     ["a click", press],
-  ])("lands on %s mid-way, where the flight would have ended", (_, act) => {
+  ])("lands on %s mid-way, where the flight would have ended", async (_, act) => {
     const scene = rig();
     const flown = flights(scene.device);
     const system = pick(scene);
     const end = endOf(scene, system);
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     run(flown, scene, 0.5);
     act();
     frame(flown, scene);
@@ -473,11 +537,12 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     expect(flown.busy).toBe(false);
   });
 
-  it("flies back to the view at rest on Escape once at a star, its way undone and its look given back", () => {
+  it("flies back to the view at rest on Escape once at a star, its way undone and its look given back", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     const start = scene.placed();
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     escape();
     expect(flown.stats()).toMatchObject({ flying: true, kind: "rest", target: "Cosmos" });
@@ -487,12 +552,13 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     expect(scene.eye.look).toBeUndefined();
   });
 
-  it("lands the way back too on Escape, and does nothing on Escape at rest", () => {
+  it("lands the way back too on Escape, and does nothing on Escape at rest", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     escape();
     expect(flown.stats().flying).toBe(false);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     escape();
     run(flown, scene, 0.3);
@@ -509,10 +575,11 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     ["a text box", () => document.createElement("textarea")],
     ["a list", () => document.createElement("select")],
     ["an editable line", () => editable()],
-  ])("hears no Escape that %s holds with the focus", (_, make) => {
+  ])("hears no Escape that %s holds with the focus", async (_, make) => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     const field = document.body.appendChild(make());
     field.focus();
@@ -523,10 +590,11 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
   it.each([
     ["a dialog", () => withAttribute(document.createElement("dialog"), "open", "")],
     ["a dialog by its role", () => withAttribute(document.createElement("div"), "role", "dialog")],
-  ])("hears no Escape while %s is open, nor one the page already took", (_, make) => {
+  ])("hears no Escape while %s is open, nor one the page already took", async (_, make) => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     escape(document.body, true);
     expect(flown.stats().flying).toBe(false);
@@ -536,10 +604,11 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
   });
 
   // A chained flight that started its look from the Earth snapped the camera on its first frame (lot A's review, F3713).
-  it("starts a new flight looking where the eye looks, the camera turning less than 0.05 radians on its first frame", () => {
+  it("starts a new flight looking where the eye looks, the camera turning less than 0.05 radians on its first frame", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene, 3).id });
+    await bound();
     run(flown, scene, 0.8);
     const facing = () => {
       const [from, look] = [scene.placed(), scene.eye.look ?? scene.placed()];
@@ -547,30 +616,34 @@ describe("landing at once (DESIGN-SYSTEM.md, Motion)", () => {
     };
     const before = facing();
     flown.fly({ kind: "star", id: pick(scene, 9).id });
+    await bound();
     frame(flown, scene);
     expect(before.angleTo(facing())).toBeLessThan(0.05);
   });
 
-  it("starts a new flight from where the eye is, with no jump", () => {
+  it("starts a new flight from where the eye is, with no jump", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene, 3).id });
+    await bound();
     run(flown, scene, 0.8);
     const before = scene.placed();
     flown.fly({ kind: "star", id: pick(scene, 9).id });
+    await bound();
     frame(flown, scene);
     expect(away(before, scene.placed())).toBeLessThan(1);
   });
 });
 
 describe("under reduced motion", () => {
-  it("moves no camera: the frame drawn is copied, the eye stands at the end at once, and the copy fades in 0.2 s; no panel", () => {
+  it("moves no camera: the frame drawn is copied, the eye stands at the end at once, and the copy fades in 0.2 s; no panel", async () => {
     const scene = rig();
     scene.still.value = true;
     const flown = flights(scene.device);
     const system = pick(scene);
     const end = endOf(scene, system);
     flown.fly({ kind: "star", id: system.id });
+    await bound();
     expect(scene.copies).toHaveLength(1);
     frame(flown, scene);
     expect(away(scene.placed(), end.eye)).toBeLessThan(1e-6);
@@ -617,10 +690,11 @@ describe("the cosmos shown again with no flight bringing it", () => {
     expect(scene.eye.look).toBeUndefined();
   });
 
-  it("gives it back after a star's flight too, once the cosmos was hidden and shows again", () => {
+  it("gives it back after a star's flight too, once the cosmos was hidden and shows again", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     expect(scene.eye.look).toBeDefined();
     scene.shows.value = false;
@@ -631,10 +705,11 @@ describe("the cosmos shown again with no flight bringing it", () => {
     expect(scene.eye.look).toBeUndefined();
   });
 
-  it("leaves the eye where a flight took it while the cosmos stays shown, and lets a flight that brings the cosmos back run", () => {
+  it("leaves the eye where a flight took it while the cosmos stays shown, and lets a flight that brings the cosmos back run", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     const there = { ...scene.eye.travel };
     frame(flown, scene);
@@ -905,10 +980,11 @@ describe("a page's flight", () => {
     expect(flown.stats().waited).toBeLessThan(2);
   });
 
-  it("comes to the cosmos along the view, back to where the eye rests, its look the view's own", () => {
+  it("comes to the cosmos along the view, back to where the eye rests, its look the view's own", async () => {
     const scene = rig({ yaw: -0.4, pitch: 0.2 });
     const flown = flights(scene.device);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     const forward = new Vector3(0, 0, -1).applyQuaternion(scene.camera.quaternion);
     flown.fly({ kind: "cosmos", name: "Cosmos" });
@@ -1007,12 +1083,13 @@ describe("what a flight gives back", () => {
     await Promise.resolve();
     expect(reported).toHaveBeenCalledWith(refused);
     flown.fly({ kind: "star", id: pick(scene).id });
+    await bound();
     run(flown, scene, 4);
     expect(flown.stats().flying).toBe(false);
   });
 
   // A listener left on the window kept a disposed scene alive: none is reached once the flights are gone (lot A's review, F3712).
-  it("lets go of the window's keys, presses and clicks once disposed: none of them reads the cosmos or the look", () => {
+  it("lets go of the window's keys, presses and clicks once disposed: none of them reads the cosmos or the look", async () => {
     const scene = rig();
     const flown = flights(scene.device);
     flown.dispose();
@@ -1022,6 +1099,7 @@ describe("what a flight gives back", () => {
     escape();
     press();
     click(document.body, WIDTH / 2, HEIGHT / 2);
+    await bound();
     expect(cosmos).not.toHaveBeenCalled();
     expect(look).not.toHaveBeenCalled();
   });

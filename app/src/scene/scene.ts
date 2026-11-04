@@ -79,6 +79,8 @@ class LiveScene implements Scene {
       halved: () => this.#touch || this.#tier === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
+      go: this.moveTo,
+      rests: options.onSystem,
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
         this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
@@ -91,7 +93,7 @@ class LiveScene implements Scene {
     });
     this.ground = this.#earth;
     this.fly = this.#parts.fly;
-    ({ arrive: this.arrive, see: this.see } = this.#parts.viewsOf(this.moveTo, options.onSystem));
+    ({ arrive: this.arrive, see: this.see } = this.#parts);
     this.portraits = this.#parts.portraits;
     this.#viewport = new Viewport({
       canvas,

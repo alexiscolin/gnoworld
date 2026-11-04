@@ -147,7 +147,15 @@ export class WorldDoor {
 
 /** Both, and the flights between them (7g), as the scene sizes, moves, restores and reads them. The flights' chunk, with camera-controls,
  * is asked as the scene starts, so the first flight finds it: one asked before it came, or if it never comes, is no flight, and the page
- * changes as it did. What the flights make of the scene's device is their chunk's. */
+ * changes as it did. The flights land on a system's arrival by the scene's own way to it (7d3, 7v, 7g2). */
+/** The scene's device, with its eye's `go` and what tells the page the system the eye rests at. */
+type PartsDevice = EarthDevice &
+  FlightScene &
+  Pick<PortraitDevice, "renderer"> & {
+    readonly go: Asking["go"];
+    readonly rests: ((id: string | undefined) => void) | undefined;
+  };
+
 export class Parts {
   readonly cosmos: CosmosPart;
   readonly world: WorldDoor;
@@ -155,9 +163,11 @@ export class Parts {
   // What the next frame draws first, before the scene's own: the rail's portraits (7i).
   readonly #lent: (() => void)[] = [];
   readonly portraits: Scene["portraits"];
+  declare readonly arrive: (id: string | undefined) => void;
+  declare readonly see: (plan: boolean) => void;
 
-  constructor(device: EarthDevice & FlightScene & Pick<PortraitDevice, "renderer">, owner: Disposer, came: () => void) {
-    const { renderer, base, halved, moved } = device;
+  constructor(device: PartsDevice, owner: Disposer, came: () => void) {
+    const { renderer, base, halved, moved, go, rests } = device;
     const portrait = {
       renderer,
       base,
@@ -172,12 +182,19 @@ export class Parts {
       import("./portraits.ts").then(({ portraitsFor }) => portraitsFor(portrait, ids, { size, signal }));
     this.cosmos = new CosmosPart(device, owner, came);
     this.world = new WorldDoor(device, owner, came);
+    this.arrive = (id) => {
+      this.cosmos.arrive(id, go);
+      rests?.(id);
+    };
+    this.see = (plan) => {
+      this.cosmos.see(plan, go);
+    };
     this.flights = new Door(
       () =>
         import("./flight/flights.ts").then(
           ({ flightsOn }) =>
             () =>
-              flightsOn(device, this.cosmos),
+              flightsOn(device, this),
         ),
       owner,
       { came: () => undefined },
@@ -185,23 +202,8 @@ export class Parts {
     this.flights.open();
   }
 
-  /** The scene's ways to a system and to how what the eye looks at is seen (7d3, 7v), bound to its eye's `go` and its page's `said`. */
-  viewsOf(go: Asking["go"], said: ((id: string | undefined) => void) | undefined) {
-    return {
-      arrive: (id: string | undefined): void => {
-        this.cosmos.arrive(id, go);
-        said?.(id);
-      },
-      see: (plan: boolean): void => {
-        this.cosmos.see(plan, go);
-      },
-    };
-  }
-
-  /** Flies to `goal`, bound: the scene hands it on as its own. */
-  readonly fly = (goal: FlightGoal): void => {
-    this.flights.part?.fly(goal);
-  };
+  /** Flies to `goal`, bound: the scene hands it on as its own; true where a flight goes. */
+  readonly fly = (goal: FlightGoal): boolean | undefined => this.flights.part?.fly(goal);
 
   resize(width: number, height: number, ratio: number): void {
     this.cosmos.door.part?.resize(height, ratio);

@@ -140,7 +140,11 @@ const worlds = (systems: number, each = 3): CosmosWorld[] =>
     })),
   ).flat();
 
-function made(width = WIDTH, height = HEIGHT, eye?: { look: Point | undefined }) {
+function made(
+  width = WIDTH,
+  height = HEIGHT,
+  eye?: { look: Point | undefined; travel: { x: number; y: number; z: number } },
+) {
   const stage = new Stage();
   // The scene hands the camera the home's lens while the cosmos shows (7d9).
   const camera = new PerspectiveCamera(FIELD_OF_VIEW, width / height, 0.1, 2000);
@@ -2381,14 +2385,24 @@ describe("the whole cosmos", () => {
 
 describe("a flight's star (7g)", () => {
   it("hands a flight the fixed places' stars when the file holds no world, so the great star can be flown to", async () => {
-    const eye: { look: Point | undefined; sight?: { systems: () => readonly StarSystem[] } } = { look: undefined };
+    const eye: {
+      look: Point | undefined;
+      travel: { x: number; y: number; z: number };
+      sight?: { systems: () => readonly StarSystem[] };
+    } = {
+      look: undefined,
+      travel: { x: 0, y: 0, z: 0 },
+    };
     const scene = made(WIDTH, HEIGHT, eye);
     await shown(scene, []);
     expect(eye.sight?.systems().map(({ id }) => id)).toEqual([GNO_LAND]);
   });
 
   it("hands a flight the cosmos as it reads it once the view at rest has come: its systems, its eye and its Earth on the stage", async () => {
-    const eye: { look: Point | undefined; sight?: unknown } = { look: undefined };
+    const eye: { look: Point | undefined; travel: { x: number; y: number; z: number }; sight?: unknown } = {
+      look: undefined,
+      travel: { x: 0, y: 0, z: 0 },
+    };
     const list = worlds(30);
     const scene = made(WIDTH, HEIGHT, eye);
     expect(eye.sight).toBeUndefined();
@@ -2402,7 +2416,10 @@ describe("a flight's star (7g)", () => {
   });
 
   it("stands as bodies the worlds of the star a flight looks at, which the Earth's focus leaves as points", async () => {
-    const eye: { look: Point | undefined } = { look: undefined };
+    const eye: { look: Point | undefined; travel: { x: number; y: number; z: number } } = {
+      look: undefined,
+      travel: { x: 0, y: 0, z: 0 },
+    };
     const list = worlds(30);
     const scene = made(WIDTH, HEIGHT, eye);
     await shown(scene, list);
