@@ -197,6 +197,14 @@ const attempts = (cap: number, retries = 2) => {
   };
   return { parts, budget, clock, close, events, finished, waits };
 };
+// Each wait of the backoff, a quarter of it or less taken off at random, as the SDK does.
+const expectWaits = (waits: number[], backoffs: number[]) => {
+  expect(waits).toHaveLength(backoffs.length);
+  waits.forEach((wait, at) => {
+    expect(wait).toBeGreaterThanOrEqual(0.75 * Number(backoffs[at]));
+    expect(wait).toBeLessThanOrEqual(Number(backoffs[at]));
+  });
+};
 const DOLLAR = 1_000_000_000;
 const worstOf = (request: ModelRequest) =>
   worstCost(MODEL, { inputBytes: Buffer.byteLength(JSON.stringify(request)), maxTokens: request.max_tokens });
@@ -335,7 +343,7 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     const { send, requests } = script(bare(), bare(), bare());
     expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: false, reason: "failed" });
     expect(requests).toHaveLength(3);
-    expect(run.waits).toEqual([500, 1_000]);
+    expectWaits(run.waits, [500, 1_000]);
     run.close();
   });
 
@@ -395,7 +403,7 @@ describe("callModel: one model request, each attempt reserved and settled", () =
   it("waits half a second, then a second, between attempts when the API asks no wait", async () => {
     const run = attempts(45 * DOLLAR);
     await callModel({ ...run.parts, send: script(statusError(500), statusError(500), statusError(500)).send }, ask());
-    expect(run.waits).toEqual([500, 1_000]);
+    expectWaits(run.waits, [500, 1_000]);
     run.close();
   });
 

@@ -308,10 +308,7 @@ describe("the loop: each tool call checked before it runs", () => {
       expect(run.events()).toContainEqual({ event: "jarvis_tool_refused", tool: shown, reason: "unknown_tool" });
       expect(run.events().filter((event) => event["event"] === "jarvis_tool_refused")).toHaveLength(1);
       const question = run.finished().find((span) => span.name === "jarvis.question");
-      expect(question?.events.map((event) => event.attributes)).toContainEqual({
-        "gen_ai.tool.name": shown,
-        "jarvis.reason": "unknown_tool",
-      });
+      expect(question?.events.map((event) => event.attributes?.["jarvis.reason"])).toEqual(["unknown_tool"]);
       run.close();
     },
   );
@@ -767,7 +764,7 @@ describe("the loop: its log and its trace", () => {
       expect(span.spanContext().traceId).toBe(question?.spanContext().traceId);
       expect(span.parentSpanContext?.spanId).toBe(question?.spanContext().spanId);
     }
-    expect(question?.events.map((event) => event.attributes?.["gen_ai.tool.name"])).toEqual(["gno_call"]);
+    expect(question?.events.map((event) => event.attributes?.["jarvis.reason"])).toEqual(["unknown_tool"]);
     run.close();
   });
 
