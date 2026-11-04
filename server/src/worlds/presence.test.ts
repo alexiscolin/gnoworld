@@ -107,43 +107,27 @@ describe("makePresence", () => {
     expect(presence.history("a/known")).toEqual([{ at: T0, people: 3 }]);
   });
 
-  // 7t3: a full store is no door a flood can shut. A world entering takes the place of the stored one whose busiest hour is the smallest,
-  // the first by id among equals, when its own count is larger; never for a count no larger.
-  it("makes room in a full store for a busier world, in place of the one whose busiest hour is the smallest", () => {
-    const { presence, clock } = make();
-    const full = new Map<string, number>();
-    for (let i = 0; i < PRESENCE_WORLDS_MAX; i += 1) full.set(`ns/w${String(i).padStart(4, "0")}`, 2);
-    full.set("ns/w0007", 1);
-    full.set("ns/w0003", 1);
-    full.set("ns/w0005", 9);
-    presence.record(full);
-    clock.at = T0 + HOUR;
-    presence.record(new Map([["ns/w0005", 0]]));
-    presence.record(new Map([["a/even", 1]]));
-    expect(presence.history("a/even"), "a count no larger").toEqual([]);
-    presence.record(new Map([["a/busier", 2]]));
-    expect(presence.history("a/busier")).toEqual([{ at: T0 + HOUR, people: 2 }]);
-    expect(presence.history("ns/w0003"), "the smallest, first by id").toEqual([]);
-    expect(presence.history("ns/w0007")).toHaveLength(1);
-    presence.record(
-      new Map([
-        ["a/first", 3],
-        ["a/second", 5],
-      ]),
-    );
-    expect(presence.history("ns/w0007")).toEqual([]);
-    expect(presence.history("a/second")).toHaveLength(1);
-    expect(presence.history("ns/w0005"), "its busiest hour counts, not its last").toHaveLength(2);
-    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
-  });
-
-  // 7t3's review: the full store's tests that hold under any seat rule.
+  // 7t3's security review: a seat given to the busier by its busiest hour let one burst of 500 worlds shut every real world out for 14
+  // days. A world entering takes the seat of the one quiet longest (its last hour above none the oldest, then its busiest hour the smallest,
+  // then its id first), unless that one was active this very hour with at least its count: a flood keeps its seats only by staying busy.
   const full = (count: number, presence: ReturnType<typeof makePresence>) => {
     const ids = Array.from({ length: PRESENCE_WORLDS_MAX }, (_, at) => `ns/w${String(at).padStart(4, "0")}`);
     presence.record(new Map(ids.map((id) => [id, count])));
     expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
     return ids;
   };
+
+  it("gives a world entering a full store the seat of the one quiet longest, however busy that one once was", () => {
+    const { presence, clock } = make();
+    const ids = full(2, presence);
+    presence.record(new Map([["ns/w0007", 900]]));
+    clock.at = T0 + HOUR;
+    presence.record(new Map(ids.flatMap((id) => (id === "ns/w0007" ? [] : [[id, 2] as const]))));
+    presence.record(new Map([["a/new", 1]]));
+    expect(presence.history("a/new")).toEqual([{ at: T0 + HOUR, people: 1 }]);
+    expect(presence.history("ns/w0007"), "quiet since its burst").toEqual([]);
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+  });
 
   it("refuses a world entering when every held world was active this hour with at least its count, and takes the least busy's otherwise", () => {
     const { presence } = make();
@@ -153,6 +137,19 @@ describe("makePresence", () => {
     presence.record(new Map([["a/busier", 3]]));
     expect(presence.history("a/busier")).toHaveLength(1);
     expect(presence.history("ns/w0000"), "the least busy, first by id").toEqual([]);
+  });
+
+  it("lets a world quiet since a flood take back its seat from the flood once the flood is quiet in turn", () => {
+    const { presence, clock } = make();
+    const real = full(5, presence);
+    clock.at = T0 + HOUR;
+    const flood = real.map((id) => id.replace("ns/w", "flood/f"));
+    presence.record(new Map(flood.map((id) => [id, 20])));
+    expect(presence.history("ns/w0000"), "quiet this hour, its seat taken").toEqual([]);
+    clock.at = T0 + 2 * HOUR;
+    presence.record(new Map(real.map((id) => [id, 5])));
+    expect(real.every((id) => presence.history(id).length === 1)).toBe(true);
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
   });
 
   it("weighs a held world by its hours as the sample goes on: one active this hour keeps its seat", () => {

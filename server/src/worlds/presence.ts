@@ -8,8 +8,8 @@ import { z } from "zod";
 import { replaceFile } from "../replaceFile.ts";
 
 export const PRESENCE_DAYS = 14;
-/** At most 500 worlds: a full 14 days of hours for all of them is about 5 MB of file. Past them a world enters in place of the one whose
- * busiest hour is the smallest, when it is busier (7t3): a flood of quiet worlds shuts no busy one out. */
+/** At most 500 worlds: a full 14 days of hours for all of them is about 5 MB of file. Past them a world enters in the seat of the one quiet
+ * longest (7t3): a flood keeps its seats only by staying busy, and never takes a busy world's. */
 export const PRESENCE_WORLDS_MAX = 500;
 const HOUR = 3_600_000;
 const PEOPLE_MAX = 1_000_000;
@@ -37,24 +37,39 @@ export interface Presence {
   save: () => boolean;
 }
 
-// Each stored world's busiest hour, read only once a sample meets a full store, then kept as the sample goes on; and the one whose busiest
-// hour is the smallest, the first by id among equals.
-function peaksOf(worlds: ReadonlyMap<string, ReadonlyMap<number, number>>) {
-  let peaks: Map<string, number> | undefined;
+interface Quiet {
+  readonly id: string;
+  /** Its last hour above none, and its busiest. */
+  readonly last: number;
+  readonly peak: number;
+}
+const quietOf = (id: string, slots: ReadonlyMap<number, number>): Quiet => {
+  let [last, peak] = [Number.NEGATIVE_INFINITY, 0];
+  for (const [at, count] of slots) [last, peak] = [count > 0 ? Math.max(last, at) : last, Math.max(peak, count)];
+  return { id, last, peak };
+};
+// Whether a world was quiet longer than another: its last hour above none older, then its busiest hour smaller, then its id first.
+const quieter = (a: Quiet, b: Quiet): boolean =>
+  a.last < b.last || (a.last === b.last && (a.peak < b.peak || (a.peak === b.peak && a.id < b.id)));
+
+// How long each stored world was quiet, read only once a sample meets a full store, then kept as the sample goes on.
+function quietsOf(worlds: ReadonlyMap<string, ReadonlyMap<number, number>>) {
+  let held: Map<string, Quiet> | undefined;
   return {
-    seen(id: string, count: number): void {
-      peaks?.set(id, Math.max(peaks.get(id) ?? 0, count));
+    seen(id: string): void {
+      const slots = worlds.get(id);
+      if (held !== undefined && slots !== undefined) held.set(id, quietOf(id, slots));
     },
-    gone(id: string): void {
-      peaks?.delete(id);
-    },
-    quietest(): { id: string; peak: number } | undefined {
-      peaks ??= new Map([...worlds].map(([id, slots]) => [id, Math.max(...slots.values())]));
-      let quietest: { id: string; peak: number } | undefined;
-      for (const [id, peak] of peaks)
-        if (quietest === undefined || peak < quietest.peak || (peak === quietest.peak && id < quietest.id))
-          quietest = { id, peak };
-      return quietest;
+    // The world quiet longest, which leaves what is held for a world entering with `count` this `hour`; none when it was active this hour
+    // with at least that count.
+    leaving(count: number, hour: number): string | undefined {
+      held ??= new Map([...worlds].map(([id, slots]) => [id, quietOf(id, slots)]));
+      let quietest: Quiet | undefined;
+      for (const quiet of held.values()) if (quietest === undefined || quieter(quiet, quietest)) quietest = quiet;
+      if (quietest === undefined || (quietest.last >= hour && (worlds.get(quietest.id)?.get(hour) ?? 0) >= count))
+        return undefined;
+      held.delete(quietest.id);
+      return quietest.id;
     },
   };
 }
@@ -86,28 +101,27 @@ export function makePresence(options: { file: string; now: () => number }): Pres
   const history = (world: string): Slot[] =>
     [...(worlds.get(world) ?? [])].sort(([a], [b]) => a - b).map(([at, people]) => ({ at, people }));
 
-  // Whether a world entering with `count` finds room: under the cap, or in place of the quietest, which goes, when it is busier.
-  const roomFor = (count: number, peaks: ReturnType<typeof peaksOf>): boolean => {
+  // Whether a world entering with `count` this `hour` finds room: under the cap, or in the seat of the world quiet longest, which goes.
+  const roomFor = (count: number, hour: number, quiets: ReturnType<typeof quietsOf>): boolean => {
     if (worlds.size < PRESENCE_WORLDS_MAX) return true;
-    const quietest = peaks.quietest();
-    if (quietest === undefined || quietest.peak >= count) return false;
-    worlds.delete(quietest.id);
-    peaks.gone(quietest.id);
+    const leaving = quiets.leaving(count, hour);
+    if (leaving === undefined) return false;
+    worlds.delete(leaving);
     return true;
   };
 
   return {
     record(people) {
       const at = Math.floor(now() / HOUR) * HOUR;
-      const peaks = peaksOf(worlds);
-      // A sample's busiest worlds enter first; a world nobody was in is not kept.
-      for (const [id, count] of [...people].sort(([, a], [, b]) => b - a)) {
+      const quiets = quietsOf(worlds);
+      // A world nobody was in is not kept.
+      for (const [id, count] of people) {
         if (!WorldId.safeParse(id).success || !Count.safeParse(count).success) continue;
         const slots = worlds.get(id);
         if (slots !== undefined) slots.set(at, Math.max(slots.get(at) ?? 0, count));
-        else if (count === 0 || !roomFor(count, peaks)) continue;
+        else if (count === 0 || !roomFor(count, at, quiets)) continue;
         else worlds.set(id, new Map([[at, count]]));
-        peaks.seen(id, count);
+        quiets.seen(id);
       }
       forget();
     },
