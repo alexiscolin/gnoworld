@@ -401,7 +401,32 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   wherever it stands among the options, `eval`, env's `-S` line, `$(...)`, `<(...)`, backticks, `${...}`,
   a function's body and a command whose quotes hold a newline, takes a quoted mark for a word, and reads
   past git's global options that take their argument apart; it refuses a shell or `source` reading a pipe,
-  a file, a here-string or a process (a heredoc's lines are read), and a zsh glob qualifier; if it
+  a file, a here-string or a process (`=(…)` and stdin by any path included; a heredoc's lines are read), and a
+  zsh glob qualifier after any word. What it cannot read it refuses (7w4, reports/slice-7w4.md):
+  - a program a substitution's output names, a variable alone, a glob or a brace naming one (`/usr/bin/gi?`,
+    `""{zsh,-s}`), find's `-exec {}`; a program a variable names is otherwise read as git, rm and curl;
+  - in git: a list's words (`"$@"`), a subcommand, a `-c` value or a config key from an expansion, an expansion
+    in a commit, merge or pull but as `-m`'s or `-F`'s value (strict too when commit follows a variable behind a
+    wrapper), a brace no quote holds, a glob in a commit's, merge's, pull's or push's words, `-nm"…"`; git `am`,
+    `cherry-pick`, `rebase`, `revert`, `filter-branch`, `replay`, `update-ref`, a commit made by hash-object,
+    subtree add/merge/pull/split, stash create/store, the stash named by a command that moves a branch,
+    `pull --reb[ase]`, a config key making a pull rebase: commits no pre-commit saw;
+  - xargs or parallel feeding git or a shell, or running a program none of `FED`;
+  - a shell's `-c` line (read wherever the shell stands, and the words after it), `eval`, `trap`, `let`,
+    `sched`, `zpty`, `zstyle`, `bind`, `complete`, `compgen` and `parallel` holding an expansion (their words are
+    read as eval's); zregexparse;
+  - an alias or a hashed name (given by a variable too), zsh's `aliases`, `commands`, `functions`, `options`,
+    `histchars` and `HISTCHARS` given a value, by assignment, `${…::=…}`, `set -A`, `read -A`, `printf -v`,
+    `zparseopts` or `typeset`;
+  - zsh's ways of running a value's code: `${~x}`, `$~x`, the `(e)`, `(%)`, `(P)` and `(#)` flags, globsubst,
+    promptsubst, braceccl, extendedglob, shwordsplit, `setopt -m`, an option a variable names (to setopt or a
+    shell's `-o`), emulate, `print -P`, a `$'…'` escape by code, a value whose subscript assembles a `$(`;
+  - a NUL byte.
+  A value given is read as words, its substitutions as commands, and each line's substitutions are read too, its
+  quotes read as quotes and as characters, a command's comment skipped. A heredoc's body no shell reads (its line's
+  programs all of `READS_TEXT`) and a quote's later lines are text: kept from the qualifiers' check, a quoted
+  body's substitutions unread; the reader that finds them ends at any form it cannot settle (a continued line, a
+  `case`, a `<<` inside backticks, a mark it cannot read or never finds), what follows staying commands. If it
   crashes, the call is blocked.
   `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which served
   the staged copy a planted object under a staged file's name (F4923).
@@ -519,10 +544,18 @@ costs context in every session.
 - **The file tools write anywhere else Alexis can** (F4926): the user settings deny a list of places
   (above), not every place outside the sessions' folders. `permissions.blockWritesOutsideWorkingDirectories`
   would refuse them all, in every mode; it is Alexis's choice, for what it costs (7w2's report).
-- **The guard reads a command's text** (F4924): a variable set with `set -a` and `read`, `for` or
-  `printf -v`, a word an expansion yields (`v=GIT_DIR=x; env "$v" git commit`), a script that sets git's
-  folders itself, and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. A heredoc's
-  line that reads as a refused command is refused: a commit message goes in a file (`git commit -F`).
+- **The guard reads a command's text** (F4924, 7w4): a variable set with `set -a` and `read`, `for`, `printf -v`
+  or a substitution's output (`y=$(printf 'a[\x24(…)]'); echo $((y))`), a word an expansion yields
+  (`v=GIT_DIR=x; env "$v" git commit`; zsh's array or an unquoted `$(...)` as `-m`'s value, which the shell may
+  split into flags), a program a variable names behind a wrapper the guard does not know before a subcommand a
+  variable gives too (read for its literal flags alone), a shell reading a pipe behind such a wrapper (F5362), a
+  script that sets git's folders itself, a script or a module run from a file (`sh f`, `source f`, `enable -f`,
+  `zmodload`, `python3 -c` calling git, a copy of git under another name), a commit no hook saw put on a branch
+  by its hash (`git reset --soft <hash>`, F5369's S7-7), a subscript assembled character by character (S7-8),
+  and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. The guard is a speed bump, not the
+  wall: skipped hooks close with a record of each gated tree that no session can write (the chief's next part,
+  reports/slice-7w4.md). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
+  too: a commit message goes in a file (`git commit -F`).
 
 ## Files
 
