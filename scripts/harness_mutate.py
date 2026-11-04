@@ -1210,7 +1210,7 @@ def seven_mutants():
         ("unicodedata.normalize(\"NFC\", path).casefold()", "path.casefold()", "reads a security path in NFC"),
         ("unicodedata.normalize(\"NFC\", path).casefold()", "unicodedata.normalize(\"NFC\", path)", "reads a security path with its case folded (F164)"),
         ("or (s.endswith(\"/\") and n.startswith(s))", "", "reads a security folder's files as security"),
-        ("if not security or not interface or not paths:", "if not interface or not paths:", "doubts a table with no security path"),
+        ("bool(security and interface and paths)", "bool(interface and paths)", "doubts a table with no security path"),
         ("all(p not in (\"\", \".\", \"..\") for p in parts)", "True", "doubts a rewritten path"),
         (" and p.count(\"/\") >= 2", "", "allows no whole top folder as interface"),
         ("p.endswith(\"/\") and plain(", "plain(", "allows only an interface folder written with its slash"),

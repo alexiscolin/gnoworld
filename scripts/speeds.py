@@ -60,16 +60,22 @@ def secure(root, path, security):
     return not plain(path) or linked(root, path) or any(n == s or (s.endswith("/") and n.startswith(s)) for s in security)
 
 
+def folders(table):
+    """The tier-3 folders of a table: each written with its slash, spelled as a plain path, two levels down at least."""
+    return [p for p in table["3"] if p.endswith("/") and plain(p[:-1]) and p.count("/") >= 2]
+
+
+def within(root, paths, security, interface):
+    """Whether every path is under an interface folder and none is a security path, or one this script cannot place; never with no
+    security path, no folder or no path to compare."""
+    return bool(security and interface and paths) and all(
+        not secure(root, path, security) and any(path.startswith(i) for i in interface) for path in paths
+    )
+
+
 def speed(root, paths):
     table = rows(root)
-    security = [folded(p) for p in table["1"]]
-    interface = [p for p in table["3"] if p.endswith("/") and plain(p[:-1]) and p.count("/") >= 2]
-    if not security or not interface or not paths:
-        return FULL
-    for path in paths:
-        if secure(root, path, security) or not any(path.startswith(i) for i in interface):
-            return FULL
-    return INTERFACE
+    return INTERFACE if within(root, paths, [folded(p) for p in table["1"]], folders(table)) else FULL
 
 
 def light(root, main_table, paths):
