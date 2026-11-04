@@ -22,8 +22,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "scene", after: ["mountUniverse"], cap: 159_665 },
   // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
   // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04);
-  // 17,130 B with the Earth's view's loader (7x2), 17,153 B with 7v2's shared golden ratio and page's bands (the margin given ahead).
-  { chunk: "cosmos", after: ["scene"], cap: 17_153 },
+  // 17,130 B with the Earth's view's loader (7x2), 17,165 B with 7v2's shared ratio and bands and a Plan half lit (the margin given ahead).
+  { chunk: "cosmos", after: ["scene"], cap: 17_165 },
   { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
@@ -40,7 +40,7 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // page's bands and the column's test (the margin given ahead).
   { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_534 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
-  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2401 },
+  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2408 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
   { chunk: "part", after: ["scene"], cap: 12_066 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
