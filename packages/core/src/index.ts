@@ -16,16 +16,6 @@ export {
   topicAfter,
 } from "./chat/room.ts";
 export {
-  CELL,
-  DISC_HALF_THICKNESS,
-  driftedPlaces,
-  placeSystems,
-  starSize,
-  STATION_SEATS,
-  type SystemPlace,
-  type SystemRef,
-} from "./cosmos/cosmos.ts";
-export {
   BELT_INNER,
   EARTH_PLACE,
   EARTH_RADIUS,
