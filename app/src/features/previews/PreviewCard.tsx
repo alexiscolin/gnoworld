@@ -52,7 +52,7 @@ export function PreviewCard({ capture, look, gnoweb, via, live, tabbable = true 
       }}
     >
       <span className={styles["title"]}>Preview</span>
-      <span className="label">{`${shortPath(capture.path)} · captured`}</span>
+      <span className="label truncate">{`${shortPath(capture.path)} · captured`}</span>
       <span className="label">Open large</span>
     </button>
   );

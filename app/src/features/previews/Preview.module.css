@@ -46,6 +46,8 @@
     row-gap: var(--space-2xs);
     /* layout: each word at the start */
     justify-items: start;
+    /* layout: the words packed in the middle of the card's height, a step apart, as frame 26 sets them */
+    align-content: center;
     border-radius: inherit;
     text-align: start;
     cursor: zoom-in;
@@ -61,12 +63,14 @@
   }
 
   .card[data-look="line"] .open {
-    /* layout: under a line, the words in one run */
+    /* layout: under a line, the path then Open large, on one line: the path is cut, never wrapped */
+    grid-template-columns: minmax(0, 1fr) auto;
+    /* layout: in one run */
     grid-auto-flow: column;
-    /* layout: the run as wide as its words */
-    justify-content: start;
     /* layout: the step between them */
     column-gap: var(--space-2xs);
+    /* layout: each word as wide as its column, so the path is cut at its column's end */
+    justify-items: stretch;
   }
 
   .card[data-look="line"] .title {
