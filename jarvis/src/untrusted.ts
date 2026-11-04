@@ -26,6 +26,11 @@ export function hiddenIn(text: string): string | undefined {
   return undefined;
 }
 
+/** The hidden and control characters a text holds but tab and new line, each once. */
+export function hiddenOf(text: string): Set<string> {
+  return new Set(Array.from(text.matchAll(hidden()), ([character]) => character).filter((each) => !isLine(each)));
+}
+
 /** A text with each hidden or control character written as its code point, `[U+202E]`, tab and new line kept with `lines`. */
 export function visible(text: string, lines: boolean): string {
   return text.replace(hidden(), (character) => (lines && isLine(character) ? character : `[${pointOf(character)}]`));
