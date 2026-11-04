@@ -46,7 +46,7 @@ export const BARE: readonly [Ramp, Ramp] = [ramp(0x72624f, 0x927461, 0xe8d2b8), 
  * dim red star, purple, then rust; each no more saturated than the Earth's own greens (Lab chroma 25), its lightness theirs or under. */
 const OTHER_PLANTS: readonly (readonly [Ramp, Ramp])[] = [
   [ramp(0x131311, 0x22211d, 0x3e3b33), ramp(0x151312, 0x26221f, 0x443d36)],
-  [ramp(0x30243a, 0x5a4466, 0x7e6a82), ramp(0x2a2230, 0x4e4258, 0x786c7e)],
+  [ramp(0x2e2634, 0x56475d, 0x796c7c), ramp(0x28232c, 0x4c4452, 0x756d79)],
   [ramp(0x3e2a1e, 0x765040, 0x93745e), ramp(0x3a2a1e, 0x70503a, 0x957a62)],
 ];
 /** About one temperate world in four grows other plants (Alexis, 2026-11-03): its second hash's byte 31, the last free one. */
