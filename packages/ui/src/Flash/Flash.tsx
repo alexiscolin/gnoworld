@@ -57,14 +57,15 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
     };
   }, [timed, title, line, moves]);
   // In the top layer, over a modal dialog's scrim when raised from it (F331), shown as it comes; its
-  // region stays in the page, where it is announced.
+  // region stays in the page, where it is announced. A banner, raised by the page and never from a
+  // dialog, stays in the page: an open dialog's layer covers it (8j).
   useLayoutEffect(() => {
-    pillRef.current?.showPopover();
-  }, []);
+    if (!banner) pillRef.current?.showPopover();
+  }, [banner]);
   return (
     <div
       ref={pillRef}
-      popover="manual"
+      popover={banner ? undefined : "manual"}
       data-stays={action === undefined || banner ? undefined : ""}
       data-banner={banner ? "" : undefined}
       className={surface(styles["flash"])}

@@ -15,6 +15,21 @@
     z-index: 3;
   }
 
+  /* Full bleed, its own header is the one in view: the top centre's slot stands a step under it, and the conversation keeps
+     the slot's room free above its lines, as a realm's view does (tokens.css), so an arrival's pill covers none of them. */
+  :root:has(.screen[data-full]) {
+    --banner-under: calc(var(--flash-room) + var(--chat-head));
+  }
+
+  /* A narrow chat's header has two rows (ChatHeader.module.css): two controls' height, the header's step and its line. */
+  :root:has(.screen[data-full][data-compact]) {
+    --banner-under: calc(var(--flash-room) + var(--control-s) * 2 + var(--space-m) + var(--line-width));
+  }
+
+  .screen[data-full] [data-region="conversation"] {
+    padding-block-start: var(--banner-room);
+  }
+
   /* The dock: what the slot (320 under 1400 px, the video's 360) holds beside the scene, at the video's 24 px inset. */
   .screen:not([data-full]) {
     --chat-inset: var(--space-m);
