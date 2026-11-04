@@ -120,3 +120,9 @@ export function paletteOf(page: Element | undefined): WebPalette {
   const tone = tokenOf(style, "--color-warm");
   return { ground, kinds, tone, shadow: 0.28, farLight: 0.35 };
 }
+
+/** The window's size in its pixels, or a pixel with no page. */
+export const screenOf = (page: Document | undefined) => ({
+  width: page?.defaultView?.innerWidth ?? 1,
+  height: page?.defaultView?.innerHeight ?? 1,
+});

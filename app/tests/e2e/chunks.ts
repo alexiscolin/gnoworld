@@ -24,8 +24,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
   // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead).
   { chunk: "cosmos", after: ["scene"], cap: 17_130 },
-  // 5,889 B with the mass of particles (7u; the night's +1 KiB, the chief); its pills a chunk of their own, their size and 256 B.
-  { chunk: "web", after: ["scene", "cosmos"], cap: 5889 },
+  // 6,706 B with the mass of particles and the hero's box it shares (7u; Alexis, "Oui, 6 706"); its pills a chunk of their own.
+  { chunk: "web", after: ["scene", "cosmos"], cap: 6706 },
   { chunk: "webNames", after: ["scene", "cosmos", "web"], cap: 1219 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
@@ -38,7 +38,7 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
   // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_498 },
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_710 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2408 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },

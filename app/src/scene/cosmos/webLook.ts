@@ -1,6 +1,6 @@
 // How the whole cosmos's mass is drawn (web.ts; 7u): each particle a small opaque sphere lit from one side, so a near one hides a far
 // one, its colour its kind's from the palette, fading towards the ground with distance; it glides from where the last mass held it. The ground behind it, and the chosen clump's line of light, a thin horizontal band.
-import { AdditiveBlending, Color, ShaderMaterial } from "three";
+import { AdditiveBlending, Color, Mesh, PlaneGeometry, ShaderMaterial } from "three";
 
 const POINT_VERTEX = /* glsl */ `
 attribute vec3 aSize;
@@ -47,6 +47,7 @@ void main() {
   gl_FragColor = vec4(mix(uGround, shaded, vDepth) * uShare + uGround * (1.0 - uShare), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  #include <dithering_fragment>
 }`;
 
 const GROUND_VERTEX = /* glsl */ `
@@ -85,6 +86,7 @@ void main() {
   gl_FragColor = vec4(uTone * uLight * (line * fall + glow), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  #include <dithering_fragment>
 }`;
 
 type Uniforms = Record<string, { value: number | Color | Color[] | { x: number; y: number } }>;
@@ -111,12 +113,19 @@ export const massUniforms = () => ({
   ...{ uShadow: { value: 0 }, uFarLight: { value: 1 } },
 });
 
-/** The particles' material: opaque, depth-tested. */
+/** The particles' material: depth-tested and written, its light whole but where the page's text's box fades it (offTheBox.ts). */
 export const massLook = (uniforms: Uniforms) =>
-  new ShaderMaterial({ uniforms, vertexShader: POINT_VERTEX, fragmentShader: POINT_FRAGMENT });
+  new ShaderMaterial({ uniforms, vertexShader: POINT_VERTEX, fragmentShader: POINT_FRAGMENT, transparent: true });
 
-/** The ground's: opaque and first, so the mass draws over it and the sky adds its light after. */
-export const groundLook = (uniforms: Uniforms) =>
+/** The ground: opaque and drawn first, under the sky's picture (-2), so the mass draws over it and the sky adds its light after. */
+export function groundOf(uniforms: Uniforms): Mesh<PlaneGeometry, ShaderMaterial> {
+  const ground = new Mesh(new PlaneGeometry(2, 2), groundLook(uniforms));
+  ground.frustumCulled = false;
+  ground.renderOrder = -3;
+  return ground;
+}
+
+const groundLook = (uniforms: Uniforms) =>
   new ShaderMaterial({
     uniforms,
     vertexShader: GROUND_VERTEX,

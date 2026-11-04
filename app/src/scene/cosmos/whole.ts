@@ -1,7 +1,7 @@
 // The whole cosmos's place in the cosmos (ADR-0002 §10; Alexis, 2026-11-02): its chunk asked once the eye may be leaving for it, its share
 // of the view from how far the eye is from what it looks at, the same at one distance for all that gives it up, and its look and its set
 // handed on once it came.
-import { MOOD_SCALE, wholeShare, type Point } from "@gnoworld/core";
+import { MOOD_SCALE, wholeShare, type ClearBox, type Point } from "@gnoworld/core";
 import type { Disposer } from "../disposer.ts";
 import { Door } from "../door.ts";
 import type { EarthDevice } from "../earth/device.ts";
@@ -29,7 +29,12 @@ export class Whole {
   most = 1;
 
   /** `came` is told when its part came, which then needs a look. */
-  constructor(device: EarthDevice, owner: Disposer, came: () => void) {
+  /** `box`, the page's text's, which the mass keeps clear as the disc does. */
+  constructor(
+    device: EarthDevice,
+    owner: Disposer,
+    { came, box }: { came: () => void; box: () => ClearBox | undefined },
+  ) {
     this.#device = device;
     this.#came = came;
     this.#door = new Door(
@@ -37,7 +42,7 @@ export class Whole {
         import("./web.ts").then(
           ({ Web: Loaded }) =>
             () =>
-              new Loaded(device.camera, typeof document === "undefined" ? undefined : document),
+              new Loaded({ camera: device.camera, page: typeof document === "undefined" ? undefined : document, box }),
         ),
       owner,
       { came: this.#webCame },

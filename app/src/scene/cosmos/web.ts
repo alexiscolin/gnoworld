@@ -8,26 +8,19 @@ import {
   MASS,
   massOf,
   smoothstep,
+  type ClearBox,
   type Mass,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
-import {
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  Group,
-  Mesh,
-  PlaneGeometry,
-  Points,
-  Vector3,
-  type Camera,
-} from "three";
+import { BufferAttribute, BufferGeometry, Color, Group, Points, Vector3, type Camera } from "three";
 import { universeOf, type Universe } from "../live.ts";
+import { offTheBox } from "../offTheBox.ts";
+import { TextBox } from "../station/textBox.ts";
 import type { CosmosWorld } from "./cosmosWorld.ts";
-import { glideFrom, livelyOf, namespacesOf, paletteOf, type WebPalette } from "./webHeld.ts";
+import { glideFrom, livelyOf, namespacesOf, paletteOf, screenOf, type WebPalette } from "./webHeld.ts";
 import { WebLine } from "./webLine.ts";
-import { groundLook, massLook, massUniforms } from "./webLook.ts";
+import { groundOf, massLook, massUniforms } from "./webLook.ts";
 import type { WebNames } from "./webNames.ts";
 import { WebRings } from "./webRings.ts";
 
@@ -47,12 +40,6 @@ export interface WebView {
 
 const GLIDE_SECONDS = 1.6;
 
-// The window's size in its pixels, or a pixel with no page.
-const screenOf = (page: Document | undefined) => ({
-  width: page?.defaultView?.innerWidth ?? 1,
-  height: page?.defaultView?.innerHeight ?? 1,
-});
-
 export class Web {
   readonly group = new Group();
   readonly #mass = new Group();
@@ -63,7 +50,7 @@ export class Web {
   readonly #tone = { value: new Color() };
   readonly #look = massLook(this.#uniforms);
   readonly #line = new WebLine(this.#tone);
-  readonly #groundMesh = new Mesh(new PlaneGeometry(2, 2), groundLook({ uGround: this.#ground, uShare: this.#share }));
+  readonly #groundMesh = groundOf({ uGround: this.#ground, uShare: this.#share });
   readonly #rings = new WebRings();
   #names: WebNames | undefined;
   #named = false;
@@ -77,19 +64,25 @@ export class Web {
   #chosen = -1;
   #camera: Camera | undefined;
   #count = 0;
+  #box: () => ClearBox | undefined;
   readonly #at = new Vector3();
 
   /** Seen through `camera`, on `page`, whose tokens paint it and which holds its names; with none, a grey mass and no names. */
-  constructor(camera?: Camera, page?: Document) {
+  constructor({
+    camera,
+    page,
+    box,
+  }: { camera?: Camera | undefined; page?: Document | undefined; box?: () => ClearBox | undefined } = {}) {
+    // The hero's box and, on a phone, the list of worlds under it, as the Earth's view keeps them (7x2's TextBox).
+    const text = new TextBox();
+    this.#box = page === undefined ? () => box?.() : () => text.of(box?.());
+    for (const look of [this.#look, this.#line.mesh.material, this.#rings.look]) offTheBox(look, this.#box);
     this.#page = page;
     this.#camera = camera;
     this.group.name = "web";
     this.group.rotation.x = DISC_TILT;
     this.group.visible = false;
     this.#mass.position.set(EARTH_PLACE.x, EARTH_PLACE.y, EARTH_PLACE.z);
-    // Under the sky's picture (-2), which adds its light over the ground.
-    this.#groundMesh.frustumCulled = false;
-    this.#groundMesh.renderOrder = -3;
     this.#mass.add(this.#rings.group);
     this.group.add(this.#groundMesh, this.#mass, this.#line.mesh);
     this.paint(paletteOf(page?.documentElement));
@@ -166,7 +159,7 @@ export class Web {
       const ndc = project(clump.landmark);
       this.#line.stand(ndc.x, ndc.y, screen);
     }
-    this.#names?.place(project, screen);
+    this.#names?.place(project, { ...screen, box: this.#box() });
   }
 
   resize(ratio: number): void {

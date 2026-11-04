@@ -18,11 +18,12 @@ const LEAN = 0.42;
 
 export class WebRings {
   readonly group = new Group();
-  readonly #look: LineBasicMaterial;
+  /** Its material, which the page's text's box keeps clear (offTheBox.ts). */
+  readonly look: LineBasicMaterial;
   readonly #geometry = new BufferGeometry();
 
   constructor() {
-    this.#look = new LineBasicMaterial({
+    this.look = new LineBasicMaterial({
       transparent: true,
       opacity: LIGHT,
       blending: AdditiveBlending,
@@ -38,7 +39,7 @@ export class WebRings {
         }
     });
     this.#geometry.setAttribute("position", new BufferAttribute(corners, 3));
-    const lines = new LineSegments(this.#geometry, this.#look);
+    const lines = new LineSegments(this.#geometry, this.look);
     lines.frustumCulled = false;
     this.group.add(lines);
     this.group.rotation.set(LEAN, 0, LEAN / 2);
@@ -47,7 +48,7 @@ export class WebRings {
 
   /** Its tone, the palette's. */
   paint(tone: Color): void {
-    this.#look.color.copy(tone);
+    this.look.color.copy(tone);
   }
 
   /** Round `clump`, or none. */
@@ -60,6 +61,6 @@ export class WebRings {
 
   dispose(): void {
     this.#geometry.dispose();
-    this.#look.dispose();
+    this.look.dispose();
   }
 }

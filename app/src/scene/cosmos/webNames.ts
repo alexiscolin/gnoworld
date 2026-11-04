@@ -1,7 +1,7 @@
 // The whole cosmos's names (web.ts; 7u): the cosmos's own pills (labels.module.css, the video's) over the biggest clumps, each its
 // namespace and its worlds; on a phone the four biggest alone (the chief, 2026-11-04), so none crowds or runs off its edge. A pill that
-// would cover another stays hidden, the biggest first. Over the canvas, taking no pointer.
-import type { Clump, Point } from "@gnoworld/core";
+// would cover another, or the page's text, stays hidden, the biggest first. Over the canvas, taking no pointer.
+import type { ClearBox, Clump, Point } from "@gnoworld/core";
 import type { Vector3 } from "three";
 import styles from "./labels.module.css";
 
@@ -14,6 +14,15 @@ const GAP = 6;
 const shortOf = (name: string) => (name.startsWith("g1") ? `${name.slice(0, 6)}…${name.slice(-4)}` : name);
 const overlaps = (a: DOMRect, b: DOMRect) =>
   a.left < b.right + GAP && a.right > b.left - GAP && a.top < b.bottom + GAP && a.bottom > b.top - GAP;
+
+/** The window in its pixels, and the page's text's box, which no pill stands in. */
+interface Screen {
+  readonly width: number;
+  readonly height: number;
+  readonly box: ClearBox | undefined;
+}
+const over = (rect: DOMRect, box: ClearBox | undefined) =>
+  box !== undefined && rect.left < box.right && rect.right > box.left && rect.top < box.bottom && rect.bottom > box.top;
 
 export class WebNames {
   readonly #document: Document;
@@ -51,8 +60,8 @@ export class WebNames {
     this.#layer.hidden = !shown;
   }
 
-  /** Each pill over its clump through `project` (to the view's -1 to 1), the biggest first, one that would cover another hidden. */
-  place(project: (at: Point) => Vector3, { width, height }: { readonly width: number; readonly height: number }): void {
+  /** Each pill over its clump through `project` (to the view's -1 to 1), the biggest first, one that would cover another or the box hidden. */
+  place(project: (at: Point) => Vector3, { width, height, box: clear }: Screen): void {
     const taken: DOMRect[] = [];
     const most = width < PHONE_PX ? PHONE_MOST : MOST;
     this.#pills.forEach(({ box, clump }, rank) => {
@@ -62,7 +71,7 @@ export class WebNames {
       box.style.transform = `translate(${String(Math.round(x))}px, ${String(Math.round(y))}px) translate(-50%, -100%)`;
       const rect = box.getBoundingClientRect();
       const inside = rect.left >= 0 && rect.right <= width && at.z < 1;
-      const shown = rank < most && inside && !taken.some((other) => overlaps(rect, other));
+      const shown = rank < most && inside && !taken.some((other) => overlaps(rect, other)) && !over(rect, clear);
       // The pill's own display outweighs the hidden attribute: it goes by its style.
       box.style.display = shown ? "" : "none";
       if (shown) taken.push(rect);
