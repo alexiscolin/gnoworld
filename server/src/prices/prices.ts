@@ -7,9 +7,7 @@
 import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
-import { readCapped, send as netSend } from "../net.ts";
-
-type Send = (url: string, init: RequestInit, ms: number) => Promise<Response>;
+import { readCapped, send as netSend, type Send } from "../net.ts";
 
 interface Options {
   file: string;
