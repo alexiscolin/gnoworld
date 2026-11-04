@@ -162,41 +162,10 @@
   }
 }
 
-/* The particles study's labels (particles.ts): a dark box in mono type, its short id beside, the chosen's in gold; a card on hover. */
+/* The particles study (particlesLabels.ts): the chosen clump's pill, the cosmos's own, ringed in gold; and the card a hover opens. */
 @layer components {
-  .study-labels {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-  }
-
-  .study-label {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-    display: flex;
-    gap: var(--space-2xs);
-    align-items: baseline;
-    padding: var(--space-3xs) var(--space-2xs);
-    background: var(--color-scrim);
-    color: var(--color-text);
-    font: var(--font-data);
-    white-space: nowrap;
-    pointer-events: auto;
-  }
-
-  .study-label[hidden] {
-    display: none;
-  }
-
-  .study-label small {
-    color: var(--color-text-muted);
-    font: var(--font-hint);
-  }
-
-  .study-label.chosen {
-    border: var(--line-width) solid var(--color-warm-line);
-    color: var(--color-warm);
+  .study-chosen {
+    box-shadow: inset 0 0 0 var(--line-width) var(--color-warm-line);
   }
 
   .study-card {

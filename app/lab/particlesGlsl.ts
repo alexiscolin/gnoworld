@@ -1,55 +1,53 @@
-// The particles study's shaders (particlesLook.ts): a world's soft particle, blurred nearer than the focus as a lens does, and the chosen
-// cluster's line of light, a thin horizontal band through its brightest world, with a glow where they cross.
+// The particles study's shaders (particlesLook.ts): each particle a small solid sphere, lit from one side and opaque, so the mass reads as
+// matter in volume and a near one hides a far one; dust dimmer; light falling with distance. And the chosen cluster's line of light, a thin
+// horizontal band through its brightest world, with a glow where they cross.
 
 export const POINT_VERTEX = /* glsl */ `
 attribute vec3 aSize;
-attribute vec3 aTint;
 attribute float aCluster;
 uniform float uFocal;
-uniform float uFocus;
-uniform float uAperture;
-uniform float uBlurMost;
-uniform float uGlow;
 uniform float uLeast;
-uniform float uBokeh;
-uniform float uLight;
 uniform float uRatio;
 uniform float uChosen;
-uniform float uGoldLift;
+uniform float uNear;
+uniform float uFarAt;
+uniform float uFar;
+uniform float uLight;
+uniform float uDustLight;
 uniform float uDim;
+uniform float uGoldLift;
 uniform float uWarm;
 uniform vec3 uGold;
 uniform vec3 uPeach;
 uniform vec3 uRose;
-varying vec3 vLight;
-varying float vBlur;
+uniform vec3 uEarth;
+varying vec3 vColour;
 void main() {
   vec4 seen = modelViewMatrix * vec4(position, 1.0);
-  float distance = max(-seen.z, aSize.x * uGlow);
-  float sharp = aSize.x * uGlow * uFocal / distance;
-  float core = max(sharp, uLeast);
-  float blur = min(uBlurMost, uAperture * uFocal * max(0.0, 1.0 / distance - 1.0 / uFocus));
-  float size = length(vec2(core, blur));
+  float distance = max(-seen.z, 0.01);
+  float size = max(aSize.x * uFocal / distance, uLeast);
   float chosen = 1.0 - step(0.5, abs(aCluster - uChosen));
-  float light = (sharp / core) * (sharp / core) * pow(core / size, uBokeh);
-  vec3 tint = mix(aTint, mix(uPeach, uRose, aSize.z), uWarm * step(0.0, aSize.z));
-  vLight = mix(tint * uDim, uGold * uGoldLift, chosen) * light * uLight * aSize.y;
-  vBlur = blur / size;
+  float dust = step(2.5, aSize.y) * (1.0 - step(3.5, aSize.y));
+  float earth = step(3.5, aSize.y);
+  vec3 tint = mix(vec3(0.86, 0.7, 0.64), mix(uPeach, uRose, aSize.z), uWarm);
+  vec3 colour = mix(tint * uDim, uGold * uGoldLift, chosen * (1.0 - dust * 0.4));
+  colour = mix(colour, uEarth, earth);
+  float depth = mix(1.0, uFar, smoothstep(uNear, uFarAt, distance));
+  vColour = colour * uLight * depth * mix(1.0, uDustLight, dust) * min(1.0, aSize.x * uFocal / distance / uLeast);
   gl_Position = projectionMatrix * seen;
   gl_PointSize = 2.0 * size * uRatio;
 }`;
 
-// A sharp particle is a soft round, most of its light at its heart; a blurred one a flat disc with a soft rim, as a lens's.
+// A sphere's disc: lit from the upper left, a little light on its shadowed side from the mass around it.
 export const POINT_FRAGMENT = /* glsl */ `
-varying vec3 vLight;
-varying float vBlur;
+varying vec3 vColour;
 void main() {
   vec2 at = gl_PointCoord * 2.0 - 1.0;
   float reach = dot(at, at);
   if (reach >= 1.0) discard;
-  float soft = exp(-3.0 * reach) * (1.0 - reach);
-  float disc = 0.55 * (1.0 - smoothstep(0.62, 1.0, sqrt(reach))) * (0.8 + 0.2 * reach);
-  gl_FragColor = vec4(vLight * mix(soft, disc, smoothstep(0.3, 0.9, vBlur)), 1.0);
+  vec3 normal = vec3(at.x, -at.y, sqrt(1.0 - reach));
+  float lit = max(dot(normal, normalize(vec3(-0.45, 0.55, 0.7))), 0.0);
+  gl_FragColor = vec4(vColour * (0.28 + 0.9 * lit + 0.25 * pow(lit, 12.0)), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

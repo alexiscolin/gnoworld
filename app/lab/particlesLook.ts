@@ -22,6 +22,7 @@ import { values } from "./particlesValues.ts";
 const GOLD = new Color(1, 0.66, 0.22);
 const PEACH = new Color(0.95, 0.6, 0.47);
 const ROSE = new Color(0.82, 0.45, 0.5);
+const EARTH = new Color(0.4, 0.6, 1.2);
 const RING_SHARES = [1, 1.6, 2.3] as const;
 const RING_TILT = 0.42;
 const RING_SIDES = 160;
@@ -58,7 +59,9 @@ export interface Frame {
   readonly width: number;
   readonly height: number;
   readonly focal: number;
-  readonly focus: number;
+  /** From where the mass's light falls with distance, and where it is down to `values.far`. */
+  readonly near: number;
+  readonly far: number;
   readonly chosen: number;
   readonly target: Cluster | undefined;
 }
@@ -82,23 +85,20 @@ export class Look {
   readonly #rings = ringsOf(this.#ringLook);
   readonly #points: ShaderMaterial;
   #cloud: Points<BufferGeometry, ShaderMaterial> | undefined;
+  #sizes: ArrayLike<number> = [];
 
   constructor(ratio: number) {
     const one = (value: number) => ({ value });
     this.#uniforms = {
-      ...{ uFocal: one(1), uFocus: one(100), uAperture: one(1), uBlurMost: one(1), uGlow: one(1), uLeast: one(1) },
-      ...{
-        uBokeh: one(1),
-        uLight: one(1),
-        uRatio: one(ratio),
-        uChosen: one(0),
-        uGoldLift: one(1),
-        uDim: one(1),
-        uWarm: one(1),
-      },
-      ...{ uGold: { value: GOLD }, uPeach: { value: PEACH }, uRose: { value: ROSE } },
+      ...{ uFocal: one(1), uLeast: one(1), uRatio: one(ratio), uChosen: one(0), uNear: one(1), uFarAt: one(2) },
+      ...{ uFar: one(1), uLight: one(1), uDustLight: one(1), uDim: one(1), uGoldLift: one(1), uWarm: one(1) },
+      ...{ uGold: { value: GOLD }, uPeach: { value: PEACH }, uRose: { value: ROSE }, uEarth: { value: EARTH } },
     };
-    this.#points = added(POINT_VERTEX, POINT_FRAGMENT, this.#uniforms);
+    this.#points = new ShaderMaterial({
+      uniforms: this.#uniforms,
+      vertexShader: POINT_VERTEX,
+      fragmentShader: POINT_FRAGMENT,
+    });
     const line = new Mesh(new PlaneGeometry(2, 2), added(LINE_VERTEX, LINE_FRAGMENT, this.#line));
     line.material.depthTest = false;
     line.frustumCulled = false;
@@ -113,27 +113,37 @@ export class Look {
       this.#cloud.geometry.dispose();
     }
     const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new BufferAttribute(laid.positions, 3));
-    geometry.setAttribute("aSize", new BufferAttribute(laid.sizes, 3));
-    geometry.setAttribute("aTint", new BufferAttribute(laid.tints, 3));
+    this.#sizes = laid.sizes;
+    geometry.setAttribute("position", new BufferAttribute(new Float32Array(laid.positions), 3));
+    geometry.setAttribute("aSize", new BufferAttribute(new Float32Array(laid.sizes), 3));
     geometry.setAttribute("aCluster", new BufferAttribute(laid.owners, 1));
     this.#cloud = new Points(geometry, this.#points);
     this.#cloud.frustumCulled = false;
     this.group.add(this.#cloud);
   }
 
+  /** The places on the way to the stood ones, and the new particles `grow` grown to `share` of their size. */
+  move(positions: Float32Array, grow: ReadonlySet<number>, share: number): void {
+    const geometry = this.#cloud?.geometry;
+    const [at, size] = [geometry?.getAttribute("position"), geometry?.getAttribute("aSize")];
+    if (!(at instanceof BufferAttribute) || !(size instanceof BufferAttribute)) return;
+    at.copyArray(positions);
+    at.needsUpdate = true;
+    for (const index of grow) size.setX(index, (this.#sizes[index * 3] ?? 0) * share);
+    size.needsUpdate = grow.size > 0;
+  }
+
   /** A frame's uniforms, the rings and the line on the chosen cluster. */
-  frame({ camera, width, height, focal, focus, chosen, target }: Frame): void {
+  frame({ camera, width, height, focal, near, far, chosen, target }: Frame): void {
     const set = this.#uniforms;
     set.uFocal.value = focal;
-    set.uFocus.value = focus;
+    set.uNear.value = near;
+    set.uFarAt.value = far;
     set.uChosen.value = chosen;
-    set.uAperture.value = values.aperture;
-    set.uBlurMost.value = values.blurMost;
-    set.uGlow.value = values.glow;
     set.uLeast.value = values.least;
-    set.uBokeh.value = values.bokeh;
+    set.uFar.value = values.far;
     set.uLight.value = values.light;
+    set.uDustLight.value = values.dustLight;
     set.uGoldLift.value = values.goldLift;
     set.uDim.value = values.dim;
     set.uWarm.value = values.warm;
