@@ -40,35 +40,58 @@ describe("the workshop's lean", () => {
     const [{ Eye: Made }, tuning] = await Promise.all([import("./eye.ts"), import("./tuning.ts")]);
     return { Made, ...tuning };
   };
-  const leaned = (eye: Eye) => {
+  // Leant whole to the right and down, then held still: a still frame moves neither the drift nor the ease.
+  const leant = (eye: Eye) => {
     eye.aim(1, -1);
     eye.advance(1e9, false);
-    return { x: eye.worlds.x - HOME.x, y: eye.worlds.y - HOME.y };
+    eye.advance(0, true);
+    return { at: { ...eye.at }, worlds: { ...eye.worlds } };
+  };
+  const still = (eye: Eye) => {
+    eye.advance(0, true);
+    return { at: { ...eye.at }, worlds: { ...eye.worlds } };
   };
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("leans as far as the panel's value in the lab, and LEAN once it is cleared", async () => {
+  it("leans the eye and the worlds as far as the panel's value in the lab, from the next frame, and as LEAN once cleared", async () => {
     vi.stubEnv("GNOWORLD_TUNING", "1");
     const { Made, setTuned, tunedDefaults } = await withRegistry();
     const eye = new Made();
-    expect(leaned(eye).x).toBeCloseTo(LEAN, 9);
+    const before = leant(eye);
+    expect(before.worlds.x - HOME.x).toBeCloseTo(LEAN, 9);
     expect(tunedDefaults().get("eye.lean")).toBe(LEAN);
     setTuned("eye.lean", 2 * LEAN);
-    expect(leaned(eye).x).toBeCloseTo(2 * LEAN, 9);
-    expect(leaned(eye).y).toBeCloseTo(-2 * LEAN, 9);
-    expect(eye.at.x - eye.worlds.x).toBeCloseTo(eye.at.x - HOME.x - 2 * LEAN, 9);
+    const after = still(eye);
+    for (const [now, then] of [
+      [after.at, before.at],
+      [after.worlds, before.worlds],
+    ] as const) {
+      expect(now.x - then.x).toBeCloseTo(LEAN, 9);
+      expect(now.y - then.y).toBeCloseTo(-LEAN, 9);
+      expect(now.z).toBe(then.z);
+    }
     setTuned("eye.lean", undefined);
-    expect(leaned(eye).x).toBeCloseTo(LEAN, 9);
+    expect(still(eye)).toEqual(before);
+  });
+
+  it("leans nothing at the panel's 0, the drift alone moving the eye", async () => {
+    vi.stubEnv("GNOWORLD_TUNING", "1");
+    const { Made, setTuned } = await withRegistry();
+    const eye = new Made();
+    setTuned("eye.lean", 0);
+    const { at, worlds } = leant(eye);
+    expect(worlds).toEqual(HOME);
+    expect(Number.isFinite(at.x) && Number.isFinite(at.y)).toBe(true);
   });
 
   it("leans as far as LEAN outside the lab, whatever the registry holds", async () => {
     const { Made, setTuned, tunedDefaults } = await withRegistry();
     const eye = new Made();
     setTuned("eye.lean", 2 * LEAN);
-    expect(leaned(eye).x).toBeCloseTo(LEAN, 9);
+    expect(leant(eye).worlds.x - HOME.x).toBeCloseTo(LEAN, 9);
     expect(tunedDefaults().has("eye.lean")).toBe(false);
   });
 });
