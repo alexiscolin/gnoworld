@@ -8,11 +8,14 @@
 # worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, keeps its
 # branch, and prunes the records of the worktrees gone.
 set -eu
+# A bare <dir> is a folder of the root (below), so `remove` names no tree.
 case $#:${1-} in
-3:*) action=add dir=$1 branch=$2 base=$3 ;;
 2:remove) action=remove dir=$2 branch= base= ;;
-*) printf 'usage: sh scripts/worktree.sh <dir> <branch> <base>\n   or: sh scripts/worktree.sh remove <dir>\n' >&2; exit 2 ;;
+3:remove) action= ;;
+3:*) action=add dir=$1 branch=$2 base=$3 ;;
+*) action= ;;
 esac
+[ -n "$action" ] || { printf 'usage: sh scripts/worktree.sh <dir> <branch> <base>\n   or: sh scripts/worktree.sh remove <dir>\n' >&2; exit 2; }
 # An argument that starts with - is an option for git, never a name (a base `--output=<file>` made git diff truncate a file), and
 # every check is made before the tree is: what the script cannot undo is not begun (CR6).
 for arg in "$dir" "$branch" "$base"; do
@@ -25,6 +28,7 @@ done
 # trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as the folder is refused,
 # as git makes the branch before failing on one, and removes the tree a link leads to, wherever it is.
 root=/private/tmp/claude-$(id -u)/gnoworld-wt
+case $dir in */*) ;; *) dir=$root/$dir ;; esac # a bare name is a folder of the root
 name=$(basename "$dir")
 parent=$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P) || parent=
 case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac

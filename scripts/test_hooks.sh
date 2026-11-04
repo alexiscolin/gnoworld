@@ -5074,7 +5074,8 @@ done
 # (bash 3.2, macOS's sh: U and e-acute; dash, Linux's, reads bytes). The locale is set here, whatever the caller's.
 mkdir -p "$ws/elsewhere" "$wsr/claude-$(($(id -u) + 1))/gnoworld-wt" && ln -s "$ws/elsewhere" "$wr/away"
 n=0
-for d in "$ws/elsewhere/a" "$wsr/claude-$(($(id -u) + 1))/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
+for d in "$ws/elsewhere/a" "$wsr/claude-$(($(id -u) + 1))/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
+	"$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
 	n=$((n + 1))
 	out=$(LC_ALL=en_US.UTF-8 && export LC_ALL && wt "$d" "fence$n" HEAD 2>&1) && fail "worktree.sh made a tree at $d, which is not <root>/<name>: $out"
 	printf '%s\n' "$out" | grep -qF "is not $wr/<name>" || fail "worktree.sh refused $d for another reason than its root: $out"
@@ -5146,9 +5147,9 @@ code=0 && out=$(wt remove -x 2>&1) || code=$?
 [ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not refuse, as a call, a folder to remove that starts with a dash ($code): $out"
 [ -f "$wr/plain/p" ] && [ -d "$wr/foreign" ] && [ -d "$ws/far" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wsr/far" ||
 	fail "worktree.sh's refused remove touched a tree"
-# Three words starting with remove are a tree named remove, in the folder it runs in: refused as out of the root.
-out=$(wt remove "$wr/rm3" HEAD 2>&1) && fail "worktree.sh took remove and two words for a call: $out"
-printf '%s\n' "$out" | grep -qF "remove is not $wr/<name>" || fail "worktree.sh did not refuse a tree named remove for its root: $out"
+# Three words starting with remove are no call: remove names no tree, as a bare name would make it one.
+code=0 && out=$(wt remove "$wr/rm3" HEAD 2>&1) || code=$?
+[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" && [ ! -e "$wr/remove" ] || fail "worktree.sh took remove and two words for a call ($code): $out"
 # A worktree's commondir, which Claude Code protects only for the trees that stood when the session started, leads git at no
 # other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run (reviewer, F5097).
 wt "$wr/redirected" redirected HEAD >/dev/null 2>&1 || fail "the redirected worktree of this case could not be made"
@@ -5179,6 +5180,17 @@ git -C "$ws/src" add .claude/nested 2>/dev/null
 out=$(wt "$wr/nested" nested HEAD 2>&1) || :
 [ ! -e "$ws/pwned" ] || fail "worktree.sh ran git in a nested repository of this tree: its fsmonitor ran (F5097): $out"
 git -C "$ws/src" rm -q -f --cached .claude/nested
+# A bare name is a folder of the root: no caller writes its user's number.
+wt bare bare HEAD >"$ws/out" 2>&1 && [ -d "$wr/bare" ] || fail "worktree.sh made no tree of a bare name in its root: $(cat "$ws/out")"
+wt remove bare >"$ws/out" 2>&1 && [ ! -e "$wr/bare" ] || fail "worktree.sh removed no tree of a bare name: $(cat "$ws/out")"
+# A folder name holding a newline would split into paths of their own as node_modules are borrowed, outside the sandbox: a
+# folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099). It is refused, and makes nothing.
+mkdir -p "$ws/src/a
+../b/scripts/planted/node_modules" "$ws/src/a" "$wr/b"
+out=$(wt "$wr/nl" nl HEAD 2>&1) && fail "worktree.sh borrowed the packages of a tree holding a name with a newline: $out"
+[ ! -e "$wr/b/scripts" ] && [ ! -e "$wr/nl" ] || fail "worktree.sh made a folder through a name with a newline: $out"
+rm -r "$ws/src/a
+.." "$ws/src/a"
 # A prune that fails fails the call, which then says nothing of a removal.
 mkdir "$ws/badgit" && printf '#!/bin/sh\n[ "$1 $2" != "worktree prune" ] || exit 1\nexec "%s" "$@"\n' "$(command -v git)" >"$ws/badgit/git" && chmod +x "$ws/badgit/git"
 wt "$wr/unpruned" unpruned HEAD >/dev/null 2>&1 || fail "the unpruned worktree of this case could not be made"
