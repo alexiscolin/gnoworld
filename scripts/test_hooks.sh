@@ -3442,16 +3442,28 @@ PY
 	exits 2 "$base" "$sl/out.json"
 	cp "$t/stryker.good" "$sl/stryker.config.json"
 done
-# On the repository's own config, git's reading of the patterns and StrykerJS's matcher (minimatch, hidden files left out) pick one set.
+# On the repository's own config, git's reading of the patterns and StrykerJS's matcher (minimatch, hidden files left out) pick one set, of
+# the repository's files: git's list, or the copy's own files in pre-commit's staged copy, which has no .git; git reads its patterns in a
+# repository of those paths, empty.
 nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
-(cd "$here/.." && git ls-files) >"$t/tracked"
-python3 -I - "$here" "$here/.." <"$t/tracked" >"$t/by_git" <<'PY' || fail "stryker_lines.py's pathspecs could not be read on the repository's config"
+if git -C "$here/.." rev-parse --git-dir >/dev/null 2>&1; then
+	(cd "$here/.." && git ls-files) >"$t/tracked"
+else
+	(cd "$here/.." && find . -path ./node_modules -prune -o -type f -print | sed 's|^\./||' | LC_ALL=C sort) >"$t/tracked"
+fi
+python3 -I - "$here" "$here/.." "$t/stryker_lines.mirror" "$t/tracked" >"$t/by_git" <<'PY' || fail "stryker_lines.py's pathspecs could not be read on the repository's config"
 import json, os, subprocess, sys
 sys.path.insert(0, sys.argv[1])
 from stryker_lines import pathspecs
-os.chdir(sys.argv[2])
-specs = pathspecs(json.load(open("stryker.config.json"))["mutate"])
-files = subprocess.run(["git", "ls-files", "--", *specs], capture_output=True, text=True, check=True).stdout.splitlines()
+specs = pathspecs(json.load(open(os.path.join(sys.argv[2], "stryker.config.json")))["mutate"])
+mirror = sys.argv[3]
+os.makedirs(mirror)
+for path in open(sys.argv[4]).read().splitlines():
+    os.makedirs(os.path.join(mirror, os.path.dirname(path)), exist_ok=True)
+    open(os.path.join(mirror, path), "w").close()
+for args in (["init", "-q"], ["add", "-A"]):
+    subprocess.run(["git", *args], cwd=mirror, check=True)
+files = subprocess.run(["git", "ls-files", "--", *specs], cwd=mirror, capture_output=True, text=True, check=True).stdout.splitlines()
 print("\n".join(sorted(f for f in files if not any(p.startswith(".") for p in f.split("/")))))
 PY
 (cd "$here/.." && PATH="$nodebin:$PATH" node --input-type=module -e 'import { readFileSync } from "node:fs";
@@ -6651,7 +6663,8 @@ shop() { # $1: the run's name; in the background, its pid in $shop
 	shop=$!
 }
 serving() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null; } # the pid that listens on port $1
-until_() { n=0; until eval "$1"; do n=$((n + 1)); [ "$n" -lt 150 ] || return 1; sleep 0.2; done; }
+# Two minutes at most, as the script gives each server one to listen: at a load of 60 the lab's Python server took past 30 s (F4918).
+until_() { n=0; until eval "$1"; do n=$((n + 1)); [ "$n" -lt 600 ] || return 1; sleep 0.2; done; }
 up() { until_ 'grep -q "^up workshop-lab " "$w/log.preview" 2>/dev/null && [ -n "$(serving "$lab_port")" ]'; } # both servers up
 ended() { gone=$1 && until_ '! kill -0 "$gone" 2>/dev/null' && until_ '[ -z "$(serving "$app_port")$(serving "$lab_port")" ]'; } # $1, the run, and its servers gone
 order() { # down before up, for each name
