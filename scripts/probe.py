@@ -807,6 +807,8 @@ try:
         tested = 'import {{ {name} }} from "{path}";\nimport {{ expect, test }} from "vitest";\n\ntest("x", () => {{\n  expect({name}).toBeDefined();\n}});\n'.format
         lint_cases([*apart("server", "../../../server/src/config.ts", ["@gnoworld/server", "@gnoworld/server/src/config.ts"]),
                     ("server_test.test.ts", tested(name="wallet", path="../../../server/src/testing/signer.ts"), zone),
+                    # A package whose name only starts like a banned one is another package.
+                    ("serverless.ts", uses(name="x", path="@gnoworld/serverless"), None),
                     ("testing/server_helper.ts", uses(name="wallet", path="../../../../server/src/testing/signer.ts"), zone)],
                    "jarvis/src/__probe__", "walls jarvis")
         shutil.rmtree("jarvis/src/__probe__")

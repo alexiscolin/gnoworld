@@ -1,7 +1,9 @@
 // The services' folders (docs/ARCHITECTURE.md, "Which way dependencies point"): the server, Jarvis and what they share
-// (packages/service) import core, schemas, Node and their own dependencies, never the browser's code; fetch only in
-// packages/service's net.ts, whose helper sets the timeout; console nowhere, the logger writes. The network's real
-// boundary is the egress proxy (slice 3e), not this list. A part of the lint config, which eslint.config.ts composes.
+// (packages/service) import core, schemas, Node and their own dependencies, never the browser's code nor each other
+// (decision-isolation.md, D110): a wall holds tests too. fetch only in packages/service's net.ts, whose helper sets the
+// timeout; console nowhere, the logger writes. The network's real boundary is the egress proxy (slice 3e), not this list.
+// A part of the lint config, which eslint.config.ts composes.
+import type { Linter } from "eslint";
 import { defineConfig } from "eslint/config";
 import { TESTS } from "./shared.config.ts";
 
@@ -9,17 +11,25 @@ const SERVER =
   "The server imports core, schemas, the service and chain packages, Node and its framework, never Jarvis (docs/ARCHITECTURE.md).";
 const JARVIS =
   "Jarvis imports core, schemas, the service and chain packages, Node and its dependencies, never the server (docs/ARCHITECTURE.md).";
+const SERVICE =
+  "The service package imports core, schemas, Node and its dependencies, never the server, Jarvis, the app or the chain package (D111).";
 const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "packages/service/**/*.ts"];
+// By name, so the ban holds wherever node_modules sits (F385): the browser's code, and the workspaces a folder never imports.
+const banned = (workspaces: string, message: string): Linter.RuleEntry => [
+  "error",
+  {
+    patterns: [
+      { regex: "^(react|react-dom|three|@gnoworld/ui)(/|$)", message },
+      { regex: `^@gnoworld/(${workspaces})(/|$)`, message },
+    ],
+  },
+];
 
 export default defineConfig(
   {
     files: SERVICES,
     rules: {
-      // By name, so the ban holds wherever node_modules sits (F385); a path out of the folder by the zone.
-      "no-restricted-imports": [
-        "error",
-        { patterns: [{ regex: "^(react|react-dom|three|@gnoworld/ui)(/|$)", message: SERVER }] },
-      ],
+      // A path out of the folder by the zone; a name by each folder's own list, below.
       "import-x/no-restricted-paths": [
         "error",
         {
@@ -50,11 +60,23 @@ export default defineConfig(
               ],
               message: JARVIS,
             },
+            {
+              target: "./packages/service",
+              from: "./",
+              except: ["./packages/service", "./packages/core", "./packages/schemas", "./node_modules"],
+              message: SERVICE,
+            },
           ],
         },
       ],
       "no-console": "error",
     },
+  },
+  { files: ["server/**/*.ts"], rules: { "no-restricted-imports": banned("jarvis", SERVER) } },
+  { files: ["jarvis/**/*.ts"], rules: { "no-restricted-imports": banned("server", JARVIS) } },
+  {
+    files: ["packages/service/**/*.ts"],
+    rules: { "no-restricted-imports": banned("server|jarvis|app|chain", SERVICE) },
   },
   {
     // A test calls the server it started.

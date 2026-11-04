@@ -48,11 +48,11 @@ CHAIN = "lint/chain.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain", "app/tsconfig.json": "react_tsc",
-    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,bench_files", "lint/core.config.ts": "lint",
-    "lint/chain.config.ts": "chain",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,bench_files", "lint/core.config.ts": "lint",
+    "lint/chain.config.ts": "chain,walls",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
-    "lint/server.config.ts": "server,jarvis,service", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
+    "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc,jarvis,service,chain", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
@@ -227,6 +227,19 @@ def mutants():
         yield from each(SERVER, f'"{name}"', '"./nowhere"', "probe", f"eslint the server imports from {name}")
     yield from each(SERVER, '"packages/service/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
     yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")
+    # The walls (decision-isolation.md, D110 to D112): each folder's bans by name, the service package's zone; the zones'
+    # exceptions are the names loop's above.
+    yield from each(SERVER, 'banned("jarvis", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
+    yield from each(SERVER, 'banned("server", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
+    listed = 'banned("server|jarvis|app|chain", SERVICE)'
+    for name in ("server|", "jarvis|", "app|", "|chain"):
+        yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
+    yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
+    yield from each(CHAIN, 'target: "./packages/chain"', 'target: "./nowhere"', "probe", "eslint the chain package reaches no path out of its folder")
+    for name in ('"./packages/core"', '"./packages/schemas"', '"./packages/chain"'):
+        yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
+    for name in ("server|", "jarvis|", "app|", "|service"):
+        yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
     # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
     for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
         yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")
