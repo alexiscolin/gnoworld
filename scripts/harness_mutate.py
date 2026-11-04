@@ -129,7 +129,7 @@ def journeys_mutants():
         ("\t\trun build:app\n", "\t\t:\n", "builds the app at a commit"),
         ("\t\treturn 0\n\tfi\n\t# Three free ports", "\tfi\n\t# Three free ports", "stops after the build at a commit"),
         ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
-        ("\t\tapp/tests/*.ts) ts=true ;;", "\t\tapp/tests/*.ts) ts=true app=true ;;", "builds the app for a change of a journey"),
+        ("\t\tapp/tests/*) ts=true ;;", "\t\tapp/tests/*) ts=true app=true ;;", "builds the app for a change of a journey"),
         ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', '{ $full || [ -n "$tested" ]; } || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
@@ -993,26 +993,22 @@ def mutants():
     yield from each("scripts/check.sh", "playwright.stories.config.ts --reporter=dot\n", "playwright.stories.config.ts --reporter=dot || true\n", "hooks", "check.sh lets the stories fail it")
     # The lanes and the scope of a fast run (Alexis, 2026-10-25: a check's cost follows the change).
     for find, replace, label in (
-        ("\t\t*) all=true ;;", "\t\t*) ;;", "a path of no known area runs everything"),
-        ("$all && ts=true app=true gno=true related=false", ":", "no change runs everything"),
-        ("server/src/*) ts=true related=false ;;", "server/src/*) ts=true ;;", "a server change runs every test"),
+        ("\t\t\tall=true\n\t\t\tcase $path in\n", "\t\t\t:\n\t\t\tcase $path in\n", "a path of no known area runs everything"),
+        ("$all && ts=true app=true gno=true\n", ":\n", "no change runs everything"),
         ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
         ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
         ("\t\tgno/*) gno=true ;;", "\t\tgno/*) gno=true; break ;;", "two areas at once run both"),
         ("elif ! $full; then", "elif true; then", "--full is never scoped"),
         ("':!node_modules'", "':!nothing'", "a linked node_modules is no change"),
-        ("packages/ui/src/*) ts=true app=true related=false ;;", "packages/ui/src/*) ts=true app=true ;;", "a change outside Vitest's graph runs every test"),
         ('if ! $full && [ -z "$tested" ]; then', 'if ! $full && true; then', "a repository reads its change from git, never GATE_CHANGED"),
-        ("changed=${GATE_CHANGED:-} related=false", "changed=${GATE_CHANGED:-}", "outside a repository, every test"),
-        ("case $path in docs/* | adr/* | *.md) continue", "case $path in docs/nothing) continue", "prose in pre-commit's list is no change"),
+        (";; docs/* | adr/* | *.md) continue", ";; docs/nothing) continue", "prose in pre-commit's list is no change"),
         ("\t$code || all=true", "\t:", "prose alone runs everything"),
         ("if ! $full && [ -z \"$tested\" ]; then", "if [ -z \"$tested\" ]; then", "--full in a copy is never scoped"),
         ("$all || $app || budget=30", ":", "a scoped run has the lower budget"),
         ("$all || $app || budget=30", "$all || budget=30", "a run that builds the app has the budget of everything"),
         ('[ "${GATE_BUDGET:-$budget}" -lt "$budget" ] 2>/dev/null &&', '[ -n "${GATE_BUDGET:-}" ] &&', "GATE_BUDGET never raises the budget"),
         ('[ "$took" -gt "$budget" ]', '[ "$took" -gt 99999 ]', "the fast gate fails past its budget"),
-        ("$related && tests_scope=", ": && tests_scope=", "a scoped run runs the related tests"),
         ('|| failed="$failed $l"', "|| :", "a failed lane fails the gate"),
         ('\t\tcat "$logs/$l.log" >&2\n', "\n", "a failed lane's output is shown"),
         ('\t[ -z "$failed" ]\n}', "\t:\n}", "finish fails when a lane did"),
@@ -1020,12 +1016,12 @@ def mutants():
         ("\t$ts || return 0\n\tstep ergo", "\tstep ergo", "tests only for a TypeScript change"),
         ("\t$gno || return 0", "\t:", "gno only for a gno change"),
         ("\t$app || return 0", "\t:", "the journeys only for an app change"),
-        ("\t$all || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only for everything"),
+        ("\t$hooks || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only when what they test changed"),
         ('harness --quiet "$base" && return 0', 'true && return 0', "--full mutates a changed harness"),
         ("\tphase $($product && echo stories) history\n", "\t:\n", "--full fails when the stories or the history lane did"),
         ("*) product=true ;; esac", "*) ;; esac", "--merge judges the product for any path it cannot place"),
         ("\t\tSTORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts", "\t\tnode app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts", "the stories' walk takes a free port of its own"),
-        ("\t\tproduct=false\n", "", "--merge skips the product's lanes with no product code"),
+        ("\t! $merge || product=false\n", "", "--merge skips the product's lanes with no product code"),
         ('changes=$(git -c core.quotePath=false diff --no-renames --name-only', 'changes=$(git -c core.quotePath=false diff --name-only', "--merge reads product code renamed away as a change of the product"),
         ('-- && git -c core.quotePath=false ls-files --others --exclude-standard)', '--)', "--merge reads an untracked product file as a change of the product"),
         ("'' | docs/* | adr/*", "'' | docs* | adr/*", "--merge reads a folder named like docs as product"),
@@ -1063,7 +1059,7 @@ def mutants():
         ("\t\tpython3 -I scripts/probe.py\n", "\t\tpython3 -I scripts/probe.py || :\n", "--full fails when the probe does (G2)"),
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
         ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
-        ("ts=true app=true tokens=true related=false ;;", "ts=true app=true related=false ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
+        ("ts=true app=true tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
         ("\t$tokens || return 0\n\tstep pictures", "\tstep pictures", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures ||", "finish ts types tests gno docs ||", "a failed tokens comparison fails the gate (F1190)"),
@@ -1255,7 +1251,7 @@ def merge_lock_mutants():
 def nginx_mutants():
     """The merge check proves nginx accepts the image's config and serves each page its own policy (slice-5 harness-c)."""
     c = "scripts/check.sh"
-    yield from each(c, "\t\tif $merge; then\n\t\t\tstep nginx", "\t\tif false; then\n\t\t\tstep nginx", "hooks", "check.sh --merge checks nginx")
+    yield from each(c, "\t\tif $merge && $nginx; then", "\t\tif false; then", "hooks", "check.sh --merge checks nginx")
     n = "scripts/check_nginx.py"
     yield from swaps(n, "check_nginx.py", (
         ("    if actual != want:", "    if False:", "refuses a binary whose checksum is not the pinned one"),
@@ -1294,8 +1290,8 @@ def bench_load_mutants():
         ("if polls > 1 else", "if True else", "says it waited only when it did"),
         ("        if waited >= ceiling:", "        if False:", "gives up past its ceiling"),
         ("        time.sleep(min(step,", "        time.sleep(0 * min(step,", "waits between two reads of the load"),
-        ("CEILING, STEP = 600.0, 10.0", "CEILING, STEP = 1.0, 10.0", "waits up to 600 s by default"),
-        ("CEILING, STEP = 600.0, 10.0", "CEILING, STEP = 600.0, 0.0", "reads the load every 10 s by default"),
+        ("CEILING, STEP = 60.0, 10.0", "CEILING, STEP = 1.0, 10.0", "waits up to 60 s by default"),
+        ("CEILING, STEP = 60.0, 10.0", "CEILING, STEP = 60.0, 0.0", "reads the load every 10 s by default"),
     ))
 
 

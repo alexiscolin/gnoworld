@@ -87,6 +87,10 @@ each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-
 ## The gate and the harness
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
+A commit's gate runs the unit tests related to its change (HARNESS.md, "The related tests"); before a part's report,
+`./scripts/check.sh --tests-all` runs every test of the commit's projects (node, ui, compiled); the slow ones (the real Ergo,
+the soak) and core's in Chromium run at the merge check and in `--full`. Design still being tried lives in the workshop
+(this file's "The workshop") and lands later, in one tested batch (REVIEW.md, "Keep it cheap").
 `--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
@@ -116,24 +120,20 @@ batch then lands once, in a part of its own: test first, through the gate and on
 one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the fast lane instead: its test seen failing,
 the gate, the journeys that watch it, one `reviewer`.
 
-**Start it** in your own terminal, from a worktree or the main checkout (the sandbox reaches neither Tailscale's socket nor a server
-it could stop):
-
-```sh
-cd app
-export PATH="$HOME/.nvm/versions/node/v24.22.0/bin:$PATH"
-host=$(tailscale status --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
-LAB_HOSTS="$host,$(tailscale ip -4 | head -n 1)" node_modules/.bin/vite --config lab.config.ts &
-~/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh up workshop 5199
-```
+**Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
+Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in: the lab's dev server with
+`LAB_HOSTS` set to this machine's tailnet name and address, then, when the `tailnet-preview` skill's script is installed, the
+server on the tailnet; without it, the local address. It stops only a server it started itself (its pid in `.claude/tmp/`): a port
+5199 held by anything else is said, never taken. Ctrl+C stops the server and takes it off the tailnet; a second `pnpm workshop`
+in the same checkout replaces the first, and a run killed hard stays on the tailnet until the next one, or
+`tailnet-preview.sh down workshop`.
 
 The dev server listens on 127.0.0.1:5199 alone and answers only the names `LAB_HOSTS` lists, exactly. By path it serves the app,
 the packages and their store, never the repository's root, whose `deploy/` holds secrets (`lab.config.ts`). The
 `tailnet-preview` skill's script prints two links. On the MacBook or the phone, open the https one with `/realism.html` after it:
 `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for the site's own scene
 (`&arrive=<system>` for a system's view). The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS.
-It is not a secure context, so Copy cannot reach the clipboard there; select the list instead. Stop the workshop with
-`tailnet-preview.sh down workshop`, then end the dev server.
+It is not a secure context, so Copy cannot reach the clipboard there; select the list instead.
 
 **The panel:** T shows and hides it, on either page, and so does its Tuning button in the corner, for a phone.
 - **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home

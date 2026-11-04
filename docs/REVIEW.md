@@ -68,16 +68,19 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
 3. **One combined review.** The `reviewer` agent reads the branch once: the tests' green pass on the
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
-   size each input reaches, and simplification. A tier-1 file or the harness adds the
-   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`, a changed screen (`app/src/`,
-   `packages/ui/src/`) the `design-reviewer`, which compares it with the video's frames in the branch loop
-   (`docs/design/video-screens.md`; frames missing fail the step). Each finding names its
+   size each input reaches, and simplification. Where StrykerJS runs on the files it reads its
+   survivors and writes no mutant by hand. A tier-1 file or the harness adds the `security-reviewer`
+   (Opus, the threat model), a realm the `gno-auditor`. A changed screen is the `reviewer`'s too, read
+   with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
+   runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
+   `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
+   missing fail the step). At most two review lots a part (7d6 had eight). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).
-4. **Verified, then reproduced, before it is fixed.** On tier-1 files the `finding-verifier`
-   (Opus) first tries to refute each finding, then to reproduce it, and its severity stands. Then:
-   a command, or a test seen failing. One nobody could reproduce stays `claimed`; a false positive
+4. **Reproduced before it is fixed:** a command, or a test seen failing, by the session (no agent
+   verifies the reviewers' findings: the `finding-verifier` gave 5 ledger rows in November, none high,
+   Alexis 2026-11-04). One nobody could reproduce stays `claimed`; a false positive
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,
@@ -88,12 +91,14 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    lens, on the diff since the first; after three rounds the review stops and Claude and Alexis
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
-   status and evidence, and a review reads it first: no rejected claim raised again without new
-   evidence, and a fixed one that comes back filed as a regression. What Alexis caught and missed
+   status and evidence. An agent greps it for its diff's paths and the ids it is given and reads those
+   rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
+   evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
+   second run is no ledger row: `.claude/tmp/unsteady.log` keeps it. What Alexis caught and missed
    goes into the review log, with each branch's rounds, tokens and hours (measured against slice
    4's). At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the
-   log and the ledger, and proposes the rules and memories a repeated miss calls for; Alexis
-   accepts each.
+   log and the ledger, and proposes the rules and memories a repeated miss calls for, and the
+   rules, tests and checks to remove, each with what it costs and what it caught; Alexis accepts each.
 7. **Measure the harness by its findings.** Each `/pre-merge` writes to the review log how many
    verified findings it found in the harness itself (`scripts/`, `.githooks/`, `.claude/`). If
    that number does not fall over three merges, the harness is simplified, not extended: a guard
@@ -103,6 +108,15 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    most at once; the chief session plans, integrates and runs the full gate. Agents are fresh,
    briefed from files, four at most at once, each asked for a short report: its findings, one row
    each with its evidence. A workspace is reviewed whole once per slice, at its true last merge.
+   A commit's gate runs the unit tests related to its change, the whole suite at a part's end
+   (`check.sh --tests-all`) and at every merge (`docs/HARNESS.md`, "The gate"). A fix of about 20
+   product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
+   failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
+   design pass unless it moves an approved picture. Design still being tried goes to the workshop
+   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A part may raise one
+   chunk's size cap by up to 256 B without asking, never the first screen's: the new cap, its size
+   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report
+   (Alexis, 2026-11-04).
 
 ## Before a push
 
