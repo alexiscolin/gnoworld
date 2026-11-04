@@ -55,7 +55,7 @@ export function jarvisClient({
         ? { method: "GET", headers: { accept: "application/json" } }
         : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
     try {
-      const response = await send(`${url}${path}`, signal === undefined ? init : { ...init, signal }, ms);
+      const response = await send(`${url}${path}`, { ...init, signal: signal ?? null }, ms);
       if (response.ok) return parsed(schema, await readJson(response, MAX_BYTES));
       await response.body?.cancel();
       return { ok: false, error: "failed" };

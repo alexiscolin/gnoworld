@@ -80,17 +80,17 @@ export function adminRoutes(options: Options): Hono<Guarded> {
   const { isTeam, session, origins, signed, quota, jarvis, log, now } = options;
   const calls = limiter({ max: 30, windowMs: 60_000, keys: 10_000 });
   const Stored = z.object({ by: z.string(), change: z.unknown() });
-  const refuse = (c: Context, cause: keyof typeof refusals, account?: string): Response => {
+  const refuse = (c: Context, cause: keyof typeof refusals, more: Parameters<Log>[1] = {}): Response => {
     const [error, status] = refusals[cause];
-    log("admin_refused", { route: c.req.path, status, error: cause, ...(account === undefined ? {} : { account }) });
+    log("admin_refused", { route: c.req.path, status, error: cause, ...more });
     return c.json({ error } satisfies ApiError, status);
   };
   // The team member who calls, checked before any work: a session, the team, the rate.
   const caller = (c: Context): Address | Response => {
     const who = session(getCookie(c, "__Host-session"));
     if (who === undefined) return refuse(c, "session");
-    if (!isTeam(who)) return refuse(c, "team", who);
-    return calls.take(who, now()) ? who : refuse(c, "limit", who);
+    if (!isTeam(who)) return refuse(c, "team", { account: who });
+    return calls.take(who, now()) ? who : refuse(c, "limit", { account: who });
   };
   const values = async (): Promise<JarvisSettings> => {
     const budgets = jarvis === undefined ? undefined : await jarvis.budgets();
@@ -115,27 +115,27 @@ export function adminRoutes(options: Options): Hono<Guarded> {
     const who = caller(c);
     if (who instanceof Response) return who;
     const body = JarvisChangeRequest.safeParse(await json(c));
-    if (!body.success) return refuse(c, "body", who);
+    if (!body.success) return refuse(c, "body", { account: who });
     const { chainId, change } = body.data;
     const head = ["Change gnoworld's settings (admin, version 1)", "", wordsOf(change), "", `Account: ${who}`];
     const made = signed.issue(chainId, c.get("host"), { head, action: JSON.stringify({ by: who, change }) });
-    return typeof made === "string" ? refuse(c, made, who) : c.json(made);
+    return typeof made === "string" ? refuse(c, made, { account: who }) : c.json(made);
   });
 
   app.post("/change", async (c) => {
     const who = caller(c);
     if (who instanceof Response) return who;
     const body = VerifyRequest.safeParse(await json(c));
-    if (!body.success) return refuse(c, "body", who);
-    if (body.data.address !== who) return refuse(c, "signer", who);
+    if (!body.success) return refuse(c, "body", { account: who });
+    if (body.data.address !== who) return refuse(c, "signer", { account: who });
     const proved = await signed.proveAction(body.data, c.get("host"));
-    if (typeof proved === "string") return refuse(c, proved, who);
+    if (typeof proved === "string") return refuse(c, proved, { account: who });
     const { by, change } = Stored.parse(JSON.parse(proved.action));
     // Asked by this account: another team member's challenge is not this one's to sign.
-    if (by !== who) return refuse(c, "by", who);
+    if (by !== who) return refuse(c, "by", { account: who });
     const parsed = JarvisChange.parse(change);
     const result = await apply(parsed);
-    if (result !== "changed") return refuse(c, result, who);
+    if (result !== "changed") return refuse(c, result, { account: who });
     log("admin_change", { route: c.req.path, status: 200, account: who, ...logged(parsed) });
     return c.json(await values());
   });

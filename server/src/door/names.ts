@@ -22,7 +22,8 @@ const MAX_BYTES = 64 * 1024;
 function answerOf(json: unknown): boolean | undefined {
   const { Error: refused = null, Data: data = null } =
     QueryAnswer.safeParse(json).data?.result?.response.ResponseBase ?? {};
-  const said = refused === null && data !== null ? Buffer.from(data, "base64").toString("utf8").trimEnd() : "";
+  if (refused !== null || data === null) return undefined;
+  const said = Buffer.from(data, "base64").toString("utf8").trimEnd();
   if (said === "(false bool)") return true;
   return said === "(true bool)" ? false : undefined;
 }
@@ -33,13 +34,15 @@ function answerOf(json: unknown): boolean | undefined {
 async function readName(rpc: string, account: Address, send: Send): Promise<boolean | undefined> {
   const expression = `gno.land/r/sys/users.ResolveAddress("${account}").IsDeleted()`;
   const url = `${rpc}/abci_query?path=%22vm/qeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
+  let json: unknown;
   try {
     const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
-    return answerOf(response.ok ? await readJson(response, MAX_BYTES) : undefined);
+    json = response.ok ? await readJson(response, MAX_BYTES) : undefined;
   } catch {
     // A timeout or a refused connection: the read failed, and the quota is the lower one.
     return undefined;
   }
+  return answerOf(json);
 }
 
 // How long an answer is kept: a name an hour, none ten minutes, so a name just taken counts soon, a failure a minute.
