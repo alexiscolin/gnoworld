@@ -51,14 +51,17 @@ const world = (id: string, paths: string[], over: Partial<World> = {}): World =>
   ...over,
 });
 const file = (time: number, worlds: World[]): Worlds => ({ version: 1, universe: "onyx", updated: at(time), worlds });
-// What a pass read of each realm: its transactions above the last pass's height, and who sent them; a realm given none was read with no
-// height to count from.
-const reads = (entries: Record<string, [number, string[]] | null>) =>
+// What a pass read of each realm: its transactions above the last pass's height, as their marks or a count of marks of its own, and who sent
+// them; a realm given none was read with no height to count from.
+const reads = (entries: Record<string, [number | string[], string[]] | null>) =>
   new Map(
-    Object.entries(entries).map(([path, recent]) => [
-      path,
-      recent === null ? {} : { recent: { transactions: recent[0], callers: recent[1] } },
-    ]),
+    Object.entries(entries).map(([path, recent]) => {
+      if (recent === null) return [path, {}] as const;
+      const [given, callers] = recent;
+      const marks =
+        typeof given === "number" ? Array.from({ length: given }, (_, at) => `${path}#${String(at)}`) : given;
+      return [path, { recent: { transactions: marks, callers } }] as const;
+    }),
   );
 
 const POOL = "gno.land/r/gnoswap/pool";
@@ -120,6 +123,27 @@ describe("the chain's window", () => {
       addresses: { now: 1 },
     });
     expect(windowOf(trends.chain(), "alexis/blog")).toMatchObject({ transactions: { now: 0 }, addresses: { now: 0 } });
+  });
+
+  // 7t3's security review: one transaction calling K realms of a world counted K times. Its mark is the same in each realm's window.
+  it("counts a transaction that calls several realms of a world once", () => {
+    const { trends, pass } = keeper();
+    pass(T1, WORLDS, reads({ [POOL]: null, [POOL1]: null }));
+    pass(
+      T2,
+      WORLDS,
+      reads({
+        [POOL]: [
+          [`5:${A}`, `6:${B}`],
+          [A, B],
+        ],
+        [POOL1]: [
+          [`5:${A}`, `6:${B}`],
+          [A, B],
+        ],
+      }),
+    );
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({ transactions: { now: 2 }, addresses: { now: 2 } });
   });
 
   it("has no window on a first pass, for there is nothing to compare with", () => {

@@ -50,27 +50,26 @@ function placed(world: World): Place | undefined {
 // its realms; none for a world with no such realm.
 function windowOf(
   world: World,
-  before: PassReads,
+  before: ReadonlySet<string>,
   now: PassReads,
 ): { transactions: number; addresses: number } | undefined {
-  let transactions = 0;
   let known = false;
-  const addresses = new Set<string>();
+  const [transactions, addresses] = [new Set<string>(), new Set<string>()];
   for (const { path } of world.realms) {
     const recent = now.get(path)?.recent;
     if (recent === undefined || !before.has(path)) continue;
     known = true;
-    transactions += recent.transactions;
+    for (const mark of recent.transactions) transactions.add(mark);
     for (const caller of recent.callers) addresses.add(caller);
   }
-  return known ? { transactions, addresses: addresses.size } : undefined;
+  return known ? { transactions: transactions.size, addresses: addresses.size } : undefined;
 }
 
 // Each world's window since the pass before, kept in its habits, beside its usual; none on a first pass or past the window. ponytail: a
 // usual reads a world's 14 days of hours (336 at most) for each world the pass read, once a pass.
 function windowsOf(
   { worlds, read }: { worlds: Worlds; read: PassReads },
-  last: { at: string; read: PassReads } | undefined,
+  last: { at: string; read: ReadonlySet<string> } | undefined,
   habits: Habits | undefined,
 ): ChainWorld[] {
   if (last === undefined) return [];
@@ -124,12 +123,12 @@ function newest(worlds: Worlds): NewTrend[] {
   return [{ kind: "new", world: first.world.id, ...first.place, at: new Date(first.seen).toISOString() }];
 }
 
-/** The chain's part of the trends, each pass against the pass before it, its windows kept in `habits` when given. ponytail: it keeps the last
- * pass's reads, one entry a realm read, at most the job's HISTORY_MAX_CALLS; past that cap each pass reads a run of realms that moves on, so a
- * world is known by the realms both passes read, and unknown once the runs no longer meet (from twice the cap). */
+/** The chain's part of the trends, each pass against the pass before it, its windows kept in `habits` when given. ponytail: it keeps the paths
+ * the last pass read, at most the job's HISTORY_MAX_CALLS; past that cap each pass reads a run of realms that moves on, so a world is known by
+ * the realms both passes read, and unknown once the runs no longer meet (from twice the cap). */
 export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendKeeper {
   const { habits, log = () => undefined } = options;
-  let last: { at: string; read: PassReads } | undefined;
+  let last: { at: string; read: ReadonlySet<string> } | undefined;
   let kept: ChainRead = { worlds: [], newest: [] };
   const save = (): void => {
     if (habits !== undefined && ![habits.transactions.save(), habits.addresses.save()].every(Boolean))
@@ -140,7 +139,7 @@ export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendK
       const windows = windowsOf({ worlds, read }, last, habits);
       save();
       kept = { worlds: windows, newest: newest(worlds) };
-      last = { at: worlds.updated, read };
+      last = { at: worlds.updated, read: new Set(read.keys()) };
     },
     chain: () => kept,
     save,

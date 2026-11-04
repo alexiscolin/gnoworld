@@ -104,21 +104,30 @@ describe("readHistory", () => {
       ];
       expect(await since(rows, 100)).toEqual({
         ok: true,
-        history: { calls: 8, callers: 2, lastHeight: 104, recent: { transactions: 3, callers: [CALLER_A, CALLER_B] } },
+        history: {
+          calls: 8,
+          callers: 2,
+          lastHeight: 104,
+          recent: {
+            transactions: [`101:${CALLER_A}`, `102:${CALLER_B}`, `104:${CALLER_B}`],
+            callers: [CALLER_A, CALLER_B],
+          },
+        },
       });
     });
 
     it("counts nothing at the height itself, the last pass's, and every call above a height of none", async () => {
       const rows = [call(100, CALLER_A), call(101, CALLER_B)];
-      expect(await since(rows, 101)).toMatchObject({ history: { recent: { transactions: 0, callers: [] } } });
+      expect(await since(rows, 101)).toMatchObject({ history: { recent: { transactions: [], callers: [] } } });
       expect(await since(rows, 0)).toMatchObject({
-        history: { recent: { transactions: 2, callers: [CALLER_A, CALLER_B] } },
+        history: { recent: { transactions: [`100:${CALLER_A}`, `101:${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
       });
     });
 
     it("gives the same senders for the same rows in any order", async () => {
       const rows = [call(101, CALLER_B), call(102, CALLER_A), call(103, CALLER_B)];
-      const expected = { history: { recent: { transactions: 3, callers: [CALLER_A, CALLER_B] } } };
+      const transactions = [`101:${CALLER_B}`, `102:${CALLER_A}`, `103:${CALLER_B}`];
+      const expected = { history: { recent: { transactions, callers: [CALLER_A, CALLER_B] } } };
       expect(await since(rows, 100)).toMatchObject(expected);
       expect(await since(rows.toReversed(), 100)).toMatchObject(expected);
     });
@@ -129,7 +138,19 @@ describe("readHistory", () => {
         call(102, CALLER_A),
       ];
       expect(await since(rows, 100)).toMatchObject({
-        history: { calls: 2, callers: 1, recent: { transactions: 2, callers: [CALLER_A] } },
+        history: { calls: 2, callers: 1, recent: { transactions: ["101:", `102:${CALLER_A}`], callers: [CALLER_A] } },
+      });
+    });
+
+    // The security review of 7t3: one transaction calling K realms of a world counted K times, past the floor. Its mark is its height and its
+    // senders, so the world counts it once, whichever realms it called.
+    it("marks a transaction by its height and its senders, whatever calls it bundles, so a world's realms count it once", async () => {
+      const both = {
+        block_height: 101,
+        messages: [CALLER_B, CALLER_A, CALLER_B].map((caller) => burst(101, caller, 1).messages[0]),
+      };
+      expect(await since([both], 100)).toMatchObject({
+        history: { recent: { transactions: [`101:${CALLER_A},${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
       });
     });
 

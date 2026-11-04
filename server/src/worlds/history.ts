@@ -18,10 +18,11 @@ export const HISTORY_MAX_CALLS = 10_000;
 const QUERY =
   "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }";
 
-/** What a realm drew above a height (7t3's window): its transactions with a call to it, one however many calls it bundles, and the
- * different addresses that sent them, sorted. */
+/** What a realm drew above a height (7t3's window): a mark for each transaction with a call to it, its height and its senders, so a
+ * transaction is one however many calls it bundles, to one realm or several of a world; and the different addresses that sent them. Both
+ * sorted. Two transactions of one block from the same senders are one mark: an undercount, never more. */
 export interface Recent {
-  readonly transactions: number;
+  readonly transactions: readonly string[];
   readonly callers: readonly string[];
 }
 
@@ -67,16 +68,11 @@ export function realmsOfPass(paths: readonly string[], pass: number, max = HISTO
   return Array.from({ length: max }, (_, i) => paths[(start + i) % paths.length] ?? "");
 }
 
-// The transactions above `since` and the different addresses that sent them.
-function recentOf(
-  rows: readonly { height: number; callers: readonly (string | undefined)[] }[],
-  since: number,
-): Recent {
+// The transactions above `since`, each marked by its height and its senders, and the different addresses that sent them.
+function recentOf(rows: readonly { height: number; callers: readonly string[] }[], since: number): Recent {
   const above = rows.filter(({ height }) => height > since);
-  const callers = new Set(
-    above.flatMap((row) => row.callers.flatMap((caller) => (caller === undefined ? [] : [caller]))),
-  );
-  return { transactions: above.length, callers: [...callers].sort() };
+  const marks = new Set(above.map(({ height, callers }) => `${String(height)}:${callers.join(",")}`));
+  return { transactions: [...marks].sort(), callers: [...new Set(above.flatMap(({ callers }) => callers))].sort() };
 }
 
 /** A realm's history, and with `since` its window above that height (the last file's for the realm). */
@@ -101,21 +97,21 @@ export async function readHistory(
     const answer = Answer.safeParse(jsonOf(text));
     if (!answer.success) throw new Failure("shape");
     // A transaction may bundle calls to several realms: only the messages aimed at this path count, and a transaction with none is left out.
+    // Each row keeps its calls and the different addresses that sent them, sorted; a call that names none adds no address.
     const rows = answer.data.data.getTransactions.flatMap((row) => {
-      const callers = row.messages.flatMap(({ value }) => {
+      const aimed = row.messages.flatMap(({ value }) => {
         if (value.__typename !== "MsgCall") return [];
         if (value.pkg_path === undefined) throw new Failure("shape");
         return value.pkg_path === path ? [value.caller] : [];
       });
-      return callers.length === 0 ? [] : [{ height: row.block_height, callers }];
+      const callers = [...new Set(aimed.flatMap((caller) => (caller === undefined ? [] : [caller])))].sort();
+      return aimed.length === 0 ? [] : [{ height: row.block_height, calls: aimed.length, callers }];
     });
-    const calls = rows.flatMap((row) => row.callers);
-    const callers = new Set(calls.flatMap((caller) => (caller === undefined ? [] : [caller])));
     return {
       ok: true,
       history: {
-        calls: calls.length,
-        callers: callers.size,
+        calls: rows.reduce((sum, { calls }) => sum + calls, 0),
+        callers: new Set(rows.flatMap(({ callers }) => callers)).size,
         lastHeight: rows.length === 0 ? null : rows.reduce((last, { height }) => Math.max(last, height), 0),
         ...(since === undefined ? {} : { recent: recentOf(rows, since) }),
       },
