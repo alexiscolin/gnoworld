@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // mount.tsx also sets the act environment and the popover stand-in for the whole file.
-import { settled } from "../../../tests/mount.tsx";
+import { modals, settled } from "../../../tests/mount.tsx";
 import type { LineViewProps } from "./LineView.tsx";
 
 // A page's preview under a line (8f, frames 104 and 107): a line whose link points at a realm's home on the default universe's gnoweb
@@ -18,6 +18,7 @@ let asked: string[] = [];
 
 // Each test a page of its own: the captures' file is read once a page, so each loads the modules afresh.
 beforeEach(() => {
+  modals();
   asked = [];
   vi.resetModules();
   vi.stubGlobal(
@@ -177,5 +178,30 @@ describe("a page's preview under a line", () => {
     expect(cards(host)[0]?.getAttribute("tabindex")).toBe("-1");
     draw([props(GOVDAO, { stop: true })]);
     expect(cards(host)[0]?.getAttribute("tabindex")).not.toBe("-1");
+  });
+
+  // F896's class (8f's review, finding 2): a hide or an edit takes the card away while it, or its open capture, holds the focus.
+  it.each([
+    ["the card held the focus", false],
+    ["its open capture held the focus", true],
+  ])("gives the focus back to its line when the check hides it and %s", async (_, opened) => {
+    const { host, draw } = await drawn([props(GOVDAO, { stop: true })]);
+    await settled(() => cards(host).length === 1);
+    const card = cards(host)[0];
+    if (!(card instanceof HTMLElement)) throw new Error("no card");
+    act(() => {
+      card.focus();
+      if (opened) card.click();
+    });
+    if (opened) {
+      const heading = host.querySelector<HTMLElement>("dialog[open] h2, dialog[open] [tabindex='-1']");
+      act(() => {
+        heading?.focus();
+      });
+    }
+    expect(host.contains(document.activeElement)).toBe(true);
+    draw([props(GOVDAO, { stop: true, verdict: "hidden" })]);
+    expect(cards(host)).toEqual([]);
+    expect(document.activeElement).toBe(host.querySelector("li"));
   });
 });

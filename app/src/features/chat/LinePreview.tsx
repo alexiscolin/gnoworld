@@ -6,6 +6,7 @@ import type { StreamEvent } from "@gnoworld/schemas";
 import { createElement } from "react";
 import { site } from "../../places.ts";
 import { slot } from "../../slots.tsx";
+import { useFocusKept } from "./focusKept.ts";
 import { previewIn } from "./pageLinks.ts";
 
 export interface LinePreviewProps {
@@ -18,7 +19,8 @@ export interface LinePreviewProps {
 export function LinePreview({ blocks, verdict, tabbable }: LinePreviewProps) {
   const path = previewIn(blocks, site.universeAt("/").gnoweb ?? "");
   const drawn = slot("linePreview");
-  return path === undefined || verdict !== "checked" || drawn === undefined
-    ? null
-    : createElement(drawn, { key: path, path, tabbable });
+  const shown = path !== undefined && verdict === "checked" && drawn !== undefined;
+  // A hide or an edit takes the card away, its open capture with it: the focus they held goes back to the line (F896's class).
+  const kept = useFocusKept(!shown);
+  return shown ? <div {...kept}>{createElement(drawn, { key: path, path, tabbable })}</div> : null;
 }
