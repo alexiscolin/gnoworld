@@ -12,7 +12,7 @@ import { beatAt } from "../../../packages/core/src/space/beat.ts";
 import { FIELD_OF_VIEW, postcardOf, restView } from "../../../packages/core/src/frame/rest.ts";
 import { toScene } from "../../../packages/core/src/frame/disc.ts";
 import { heldOf } from "../../src/scene/cosmos/cosmosWorld.ts";
-import { CREDITS } from "../../src/scene/planet/credits.ts";
+import { FILED as CREDITS } from "../../src/scene/planet/creditFiles.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box, brightness, brightShare, colours, near } from "./geometry.ts";
 import { held, hideThePage, landed, opened, running, stats, type CosmosStats } from "./sceneStage.ts";

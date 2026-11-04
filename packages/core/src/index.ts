@@ -16,16 +16,6 @@ export {
   topicAfter,
 } from "./chat/room.ts";
 export {
-  CELL,
-  DISC_HALF_THICKNESS,
-  driftedPlaces,
-  placeSystems,
-  starSize,
-  STATION_SEATS,
-  type SystemPlace,
-  type SystemRef,
-} from "./cosmos/cosmos.ts";
-export {
   BELT_INNER,
   EARTH_PLACE,
   EARTH_RADIUS,
@@ -74,6 +64,11 @@ export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
 export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
+export { PART_KINDS, type Finish, type Part, type PartKind } from "./station/parts.ts";
+export { stationOf, type Station } from "./station/station.ts";
+export { earthCamera, earthEye, sceneryOf, type Scenery } from "./station/scenery.ts";
+export { stationsRound, type Placed as PlacedStation } from "./station/round.ts";
+export { alikeStations, lookOf as stationLookOf } from "./station/variety.ts";
 export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
 export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
 export { LENT, type Lent } from "./frame/lent.ts";

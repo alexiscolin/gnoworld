@@ -161,3 +161,29 @@
     }
   }
 }
+
+@layer components {
+  .sheet-name {
+    position: fixed;
+    transform: translate(-50%, 0);
+    font: var(--font-data);
+    color: var(--color-text-muted);
+    pointer-events: none;
+    /* raw: over the scene's labels' layer (0), as the site's header is */
+    z-index: 1;
+  }
+
+  .station-name {
+    position: fixed;
+    transform: translate(-50%, -100%);
+    padding: var(--space-3xs) var(--space-2xs);
+    border-radius: var(--radius-pill);
+    background: var(--color-scrim);
+    color: var(--color-text);
+    font: var(--font-ui);
+    pointer-events: none;
+    /* raw: over the scene's labels' layer (0), as the site's header is */
+    z-index: 1;
+    white-space: nowrap;
+  }
+}

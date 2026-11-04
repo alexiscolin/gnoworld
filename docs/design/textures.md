@@ -24,6 +24,18 @@ fictional terrain, and the site lists Ceres and Eris as fictional.
 
 The shaders warp, recolour and mix them by each world's seed.
 
+The Earth's view's scenery (part 7x, read on 2026-11-04 from the same page, under the same terms): the real planets drawn as their maps
+came, no warp and no colour, small for they stand far, and loaded only once the cosmos is asked; a credit row of their own. Encoded by
+Chromium's WebP encoder from the files named, scaled down by halves with high-quality smoothing.
+
+| File | Source | Size | Changes |
+|---|---|---|---|
+| `far-mars.webp` | `mars.webp` above | 1024 by 512 | Scaled, re-encoded as WebP at 0.8, 54 KB |
+| `far-venus.webp` | `venus.webp` above | 1024 by 512 | Scaled, re-encoded as WebP at 0.8, 76 KB |
+| `far-jupiter.webp` | `jupiter.webp` above | 1024 by 512 | Scaled, re-encoded as WebP at 0.8, 34 KB |
+| `far-neptune.webp` | `neptune.webp` above | 1024 by 512 | Scaled, re-encoded as WebP at 0.85, 7 KB |
+| `saturn.webp` | `8k_saturn.jpg` (a 4096 by 2048 file, whatever its name) | 1024 by 512 | Scaled, re-encoded as WebP at 0.8, 8 KB |
+
 The Earth's two are drawn as they came on the Earth, with a row of their own in the credits. Temperate and ocean worlds warp and recolour
 the day map, and every generated world's lights read the night map warped by its seed, which that row says. Read on the same day, from the same page. A Low or touch
 device decodes them at half each side, from the same files (`decodeOptions`, `earth/maps.ts`).
