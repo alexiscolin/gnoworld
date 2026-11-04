@@ -170,17 +170,7 @@ export const Quests = byId(
   }),
 );
 
-const rule = (low: number, high: number) => z.int().check(z.gte(low), z.lte(high));
-
-/** The rules of the Earth's bubbles (ADR-0001 §7), one object; each bound keeps a rule from drowning the globe. */
-export const BubbleRules = z.strictObject({
-  maxOnScreen: rule(1, 12),
-  showSeconds: rule(1, 15),
-  speakerDelaySeconds: rule(1, 120),
-  maxChars: rule(20, 160),
-  readLast: rule(1, 2000),
-  maxAgeSeconds: rule(30, 86_400),
-});
+export { BubbleRules } from "./bubbleRules.ts";
 
 const degrees = (limit: number) => z.number().check(z.gte(-limit), z.lte(limit));
 
