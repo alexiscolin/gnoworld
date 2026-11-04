@@ -445,7 +445,7 @@ describe("readChain, each failure's next step", () => {
 
   it.each(cases)("is exact on %s", async (_name, run, expected) => {
     const result = await run();
-    expect(result.ok ? null : result.failure).toEqual(expected);
+    expect(result.ok ? null : result.failure).toStrictEqual(expected);
   });
 });
 
