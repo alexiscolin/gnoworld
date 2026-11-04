@@ -15,10 +15,12 @@ const translation = (): JarvisTranslation => ({ status: "translated", text: "Le 
 
 interface Options {
   on?: boolean;
-  perMinute?: number;
+  // null builds the route with its own default rate.
+  perMinute?: number | null;
   answer?: () => Promise<Translated>;
 }
 const setup = ({ on = true, perMinute = 30, answer }: Options = {}) => {
+  const rate = perMinute === null ? {} : { perMinute };
   const clock = { now: DOOR.t0 };
   const work: string[] = [];
   const sent: { request: JarvisTranslate; signal: AbortSignal }[] = [];
@@ -43,7 +45,7 @@ const setup = ({ on = true, perMinute = 30, answer }: Options = {}) => {
           },
         },
         on,
-        perMinute,
+        ...rate,
         log,
         now: () => clock.now,
       }),
@@ -188,5 +190,26 @@ describe("a line's translation through the door", () => {
         account: createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex"),
       },
     ]);
+  });
+
+  it("logs each refusal of a request read with its account, and its room once named", async () => {
+    const { translate, events } = setup();
+    await translate({ body: "no body" });
+    await translate({ body: { room: "#bubble/crew", msgid: "m1", language: "fr" } });
+    await translate({ body: { room: "#bubble", msgid: "m9", language: "fr" } });
+    const account = createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex");
+    const route = "/api/jarvis/translate";
+    expect(events().map((line) => JSON.parse(line) as unknown)).toEqual([
+      { event: "jarvis_refused", route, status: 400, error: "body", account },
+      { event: "jarvis_refused", route, status: 403, error: "room", room: "#bubble/crew", account },
+      { event: "jarvis_refused", route, status: 404, error: "line", room: "#bubble", account },
+    ]);
+  });
+
+  it("takes 30 translations a minute an account by default", async () => {
+    const { translate } = setup({ perMinute: null });
+    const statuses: number[] = [];
+    for (let at = 0; at < 31; at += 1) statuses.push((await translate()).status);
+    expect([statuses.slice(0, 30).every((status) => status === 200), statuses[30]]).toEqual([true, 429]);
   });
 });

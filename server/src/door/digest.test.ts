@@ -20,10 +20,12 @@ const made = (): JarvisDigest => ({
 
 interface Options {
   on?: boolean;
-  perMinute?: number;
+  // null builds the route with its own default rate.
+  perMinute?: number | null;
   answer?: () => Promise<Digested>;
 }
 const setup = ({ on = true, perMinute = 10, answer }: Options = {}) => {
+  const rate = perMinute === null ? {} : { perMinute };
   const clock = { now: DOOR.t0 };
   const sent: { request: JarvisDigestRequest; signal: AbortSignal }[] = [];
   const door = doorApp(
@@ -38,7 +40,7 @@ const setup = ({ on = true, perMinute = 10, answer }: Options = {}) => {
           },
         },
         on,
-        perMinute,
+        ...rate,
         log,
         now: () => clock.now,
       }),
@@ -147,5 +149,21 @@ describe("a realm's digest through the door", () => {
         account: createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex"),
       },
     ]);
+  });
+
+  it("logs a body's refusal with its account", async () => {
+    const { digest, events } = setup();
+    await digest({ body: "no body" });
+    const account = createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex");
+    expect(events().map((line) => JSON.parse(line) as unknown)).toEqual([
+      { event: "jarvis_refused", route: "/api/jarvis/digest", status: 400, error: "body", account },
+    ]);
+  });
+
+  it("takes 10 digests a minute an account by default", async () => {
+    const { digest } = setup({ perMinute: null });
+    const statuses: number[] = [];
+    for (let at = 0; at < 11; at += 1) statuses.push((await digest()).status);
+    expect([statuses.slice(0, 10).every((status) => status === 200), statuses[10]]).toEqual([true, 429]);
   });
 });

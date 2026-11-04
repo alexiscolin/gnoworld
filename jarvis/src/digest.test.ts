@@ -12,6 +12,8 @@ import { budgetFor, capture, spans } from "./testing/kit.ts";
 import { placesData } from "./testing/placesData.ts";
 import { REALM_TYPE } from "./testing/realm.ts";
 import { cardTools } from "./tools/cards.ts";
+import { keepCards } from "./tools/kept.ts";
+import { realmCards } from "./tools/realmCards.ts";
 import { loadPlaces } from "./tools/places.ts";
 
 // 10k, ADR-0002 §4 ("What a realm shows: a digest"): a realm's page and functions read on its universe's own node with
@@ -46,30 +48,34 @@ interface Chain {
   height: number;
   network?: string;
   down?: boolean;
-  // The realms the node holds, the poll alone by default.
+  // The realms the node holds, the poll alone by default; a realm whose page or functions it refuses.
   realms?: string[];
+  noPage?: boolean;
+  noFunctions?: boolean;
 }
 // A universe's node (placesData: `https://rpc.<id>.example:443`, chain `<id>-1`): its status, a realm's page for
 // `<realm>:` and its functions, as the chain package reads them; a realm it has none of refused as gno refuses it.
 const nodeOf = (chain: Chain): ChainFetch =>
-  vi.fn<ChainFetch>((url) => {
-    if (chain.down === true) return Promise.reject(new TypeError("fetch failed"));
-    const id = /^https:\/\/rpc\.([a-z]+)\.example:443\//.exec(url)?.[1] ?? "";
-    if (url.endsWith("/status"))
-      return Promise.resolve(
-        Response.json(statusEnvelope(chain.height, "2026-11-04T03:34:18Z", chain.network ?? `${id}-1`)),
-      );
-    const data = fromHex(url);
-    const refused = queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } });
-    const held = chain.realms ?? [REALM];
-    if (url.includes("qrender"))
-      return Promise.resolve(
-        Response.json(held.some((realm) => data === `${realm}:`) ? queryEnvelope({ data: chain.page }) : refused),
-      );
-    return Promise.resolve(
-      Response.json(held.includes(data) ? queryEnvelope({ data: JSON.stringify(chain.functions) }) : refused),
-    );
-  });
+  vi.fn<ChainFetch>((url) =>
+    chain.down === true
+      ? Promise.reject(new TypeError("fetch failed"))
+      : Promise.resolve(Response.json(answerOf(chain, url))),
+  );
+function answerOf(chain: Chain, url: string): unknown {
+  const id = /^https:\/\/rpc\.([a-z]+)\.example:443\//.exec(url)?.[1] ?? "";
+  if (url.endsWith("/status")) return statusEnvelope(chain.height, "2026-11-04T03:34:18Z", chain.network ?? `${id}-1`);
+  return url.includes("qrender") ? pageOf(chain, fromHex(url)) : functionsOf(chain, fromHex(url));
+}
+const REFUSED = () => queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } });
+function pageOf(chain: Chain, data: string): unknown {
+  if (chain.noPage === true) return queryEnvelope({ data: null, error: { "@type": "/vm.NoRenderDeclError" } });
+  const held = (chain.realms ?? [REALM]).some((realm) => data === `${realm}:`);
+  return held ? queryEnvelope({ data: chain.page }) : REFUSED();
+}
+function functionsOf(chain: Chain, data: string): unknown {
+  const listed = chain.noFunctions !== true && (chain.realms ?? [REALM]).includes(data);
+  return listed ? queryEnvelope({ data: JSON.stringify(chain.functions) }) : REFUSED();
+}
 const asked = (url: string) =>
   url.endsWith("/status") ? "status" : `${url.includes("qrender") ? "render" : "funcs"} ${fromHex(url)}`;
 
@@ -442,5 +448,99 @@ describe("a digest's making, again and paid (red pass, R3, R4, R10, R13)", () =>
     const { ask, node } = setup({ chains: ["onyx"] });
     expect(await ask(REALM, "gnoland")).toEqual({ kind: "invalid" });
     expect(node).not.toHaveBeenCalled();
+  });
+});
+
+describe("a digest's reads and what it keeps (StrykerJS, the review's V4, V5)", () => {
+  it("serves a digest reused at a new height at that height for its next 10 minutes", async () => {
+    const { ask, kit, state } = setup({ steps: [give(digest()), done()] });
+    await ask();
+    kit.clock.now += 10 * 60_000;
+    state.height = 1300;
+    await ask();
+    kit.clock.now += 60_000;
+    expect(await ask()).toEqual({ kind: "digest", digest: digest(), proposal: null, height: 1300 });
+  });
+
+  it("counts a row's bytes as its universe, realm, reads' hash and card in UTF-8", async () => {
+    const { ask, kit } = setup({ steps: [give(digest()), done(), give(digest("4,321")), done()] });
+    await ask();
+    await ask(REALM, "gnoland");
+    const rows = kit.db.prepare("SELECT universe, realm, source, card, bytes FROM digests ORDER BY made").all();
+    expect(rows.map((row) => row["bytes"])).toEqual(
+      rows.map(({ universe, realm, source, card }) =>
+        Buffer.byteLength(String(universe) + String(realm) + String(source) + (card === null ? "" : String(card))),
+      ),
+    );
+    expect(rows.map((row) => row["card"] === null)).toEqual([false, true]);
+  });
+
+  it("counts a digest made again in place of its row, so two rows that fit still fit", async () => {
+    const steps = [
+      give(digest()),
+      done(),
+      give(digest(), { profile: "gnoland" }),
+      done(),
+      give(digest("1,300")),
+      done(),
+    ];
+    const first = setup({ steps });
+    await first.ask();
+    await first.ask(REALM, "gnoland");
+    const total = first.kit.db.prepare("SELECT SUM(bytes) AS bytes FROM digests").get();
+    const digests = makeDigests({ ...first.parts, keepBytes: Number(total?.["bytes"]) });
+    first.kit.clock.now += 10 * 60_000;
+    first.state.page = pollPage().replace("1,204", "1,300");
+    expect(await digests.digest({ universe: "onyx", realm: REALM }, first.signal())).toMatchObject({ kind: "digest" });
+    expect(first.kit.db.prepare("SELECT universe FROM digests ORDER BY universe").all()).toEqual([
+      { universe: "gnoland" },
+      { universe: "onyx" },
+    ]);
+  });
+
+  it("makes two realms asked at once each its own digest", async () => {
+    const boards = "gno.land/r/demo/boards";
+    const steps = [give(digest()), give(digest("37"), { realm: boards }), done(), done()];
+    const { ask } = setup({ steps, chain: { realms: [REALM, boards] } });
+    const [poll, board] = await Promise.all([ask(), ask(boards)]);
+    expect([poll, board]).toEqual([
+      { kind: "digest", digest: digest(), proposal: null, height: 1204 },
+      { kind: "digest", digest: digest("37"), proposal: null, height: 1204 },
+    ]);
+  });
+
+  it.each([
+    ["a page its node refuses", { noPage: true }],
+    ["functions its node refuses", { noFunctions: true }],
+  ])("answers none for %s, asking the model nothing", async (_, chain) => {
+    const { ask, model } = setup({ chain });
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("sends a page of 60 KiB whole in its block, with no room block", async () => {
+    const long = `${"Filler line of the poll.\n".repeat(2_400)}9,999 members in all.`;
+    const { ask, model } = setup({ steps: [give(digest("9,999")), done()], chain: { page: long } });
+    expect(await ask()).toMatchObject({ kind: "digest" });
+    const first = sent(model.requests[0]);
+    expect(first).toContain("9,999 members in all.");
+    expect(first).not.toContain("cut_at_byte");
+    expect(first).not.toContain(`source=\\"room\\"`);
+  });
+
+  it("refuses a digest of another realm naming the one read, and runs no other tool", async () => {
+    const places = loadPlaces(folderOf());
+    const cards = cardTools({ chains: ["onyx"], places, read: () => Promise.reject(new Error("no gnomcp")) });
+    const read = { realm: REALM, origin: "https://onyx.example", texts: [] };
+    const tools = realmCards(cards.definitions, { at: { profile: "onyx", height: 1204 }, read });
+    const kept = keepCards();
+    const asked = { text: "", cards: kept, signal: new AbortController().signal };
+    const other = { profile: "onyx", realm: "gno.land/r/demo/boards", digest: digest() };
+    expect(await tools.run({ name: "give_digest", args: other }, asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: `Refused, nothing kept: only ${REALM} on onyx was read: give its digest.`,
+    });
+    expect(await tools.run({ name: "give_button", args: {} }, asked)).toEqual({ ok: false, reason: "refused" });
   });
 });

@@ -1,9 +1,9 @@
-import { APIConnectionError } from "@anthropic-ai/sdk";
+import { APIConnectionError, APIConnectionTimeoutError } from "@anthropic-ai/sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Request } from "./model.ts";
 import { DOLLAR } from "./prices.ts";
-import { message, script, text, usage, type Step } from "./testing/fakeModel.ts";
+import { message, script, text, thinking, usage, type Step } from "./testing/fakeModel.ts";
 import { budgetFor, capture, spans } from "./testing/kit.ts";
 import { makeTranslator } from "./translate.ts";
 
@@ -30,12 +30,13 @@ const setup = ({ steps = [], cap = 5 * DOLLAR, keepBytes }: Setup = {}) => {
   closing.push(kit.close);
   const model = script(...steps);
   const { log, events } = capture();
+  const traced = spans();
   const parts = {
     db: kit.db,
     send: model.send,
     budget: kit.budget,
     log,
-    tracer: spans().tracer,
+    tracer: traced.tracer,
     model: "claude-haiku-5-5" as const,
     retries: 2,
     now: () => kit.clock.now,
@@ -45,7 +46,7 @@ const setup = ({ steps = [], cap = 5 * DOLLAR, keepBytes }: Setup = {}) => {
   };
   const translator = makeTranslator(parts);
   const signal = () => new AbortController().signal;
-  return { translator, model, events, kit, parts, signal };
+  return { translator, model, events, kit, parts, signal, finished: traced.finished };
 };
 const userText = (request: Request | undefined): string =>
   JSON.stringify(request?.messages.map(({ content }) => content) ?? []);
@@ -143,7 +144,7 @@ describe("a translation that adds what its original lacks", () => {
       message({ content: [text("Le vote")], stop: "max_tokens", model: "claude-haiku-5-5" }),
     ],
     ["an answer that draws nothing", said(" \n ")],
-    ["an answer past the wire's bound", said(`${"a".repeat(16_000)}b`)],
+    ["an answer past the wire's bound", said(`${"ab ".repeat(5_333)}ab`)],
   ])("shows the original for %s", async (_, step) => {
     const { translator, signal } = setup({ steps: [step] });
     expect(await translator.translate({ text: ORIGINAL, language: "fr" }, signal())).toEqual({ kind: "original" });
@@ -293,3 +294,88 @@ describe("a translation's making, again and paid (red pass, R3, R4, R5, R10)", (
     expect(kept).toEqual(words.slice(1).map((each) => ({ text: each, bytes: row(each) })));
   });
 });
+
+describe("a translation's request and what it keeps (StrykerJS, the review's V5)", () => {
+  it("asks the fast model with the same system prompt for every line, cached, at low effort, in one user turn", async () => {
+    const { translator, model, signal } = setup({ steps: [said(FRENCH)] });
+    await translator.translate({ text: ORIGINAL, language: "fr" }, signal());
+    const [request] = model.requests;
+    expect(request?.system).toEqual([
+      {
+        type: "text",
+        text: expect.stringContaining("You translate one chat message") as unknown,
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+    expect(request?.messages.map(({ role }) => role)).toEqual(["user"]);
+    expect([request?.max_tokens, request?.output_config, request?.tools]).toEqual([8192, { effort: "low" }, undefined]);
+  });
+
+  it("traces the translation as one question, with its model, its prompt's version and how it ended", async () => {
+    const { translator, signal, finished } = setup({ steps: [said(FRENCH)] });
+    await translator.translate({ text: ORIGINAL, language: "fr" }, signal());
+    const question = finished().find(({ name }) => name === "jarvis.question");
+    expect(question?.attributes).toMatchObject({
+      "gen_ai.request.model": "claude-haiku-5-5",
+      "jarvis.result": "translated",
+      "jarvis.turns": 1,
+    });
+    expect(question?.attributes["jarvis.prompt_version"]).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("drops a translation that holds the turn's tag", async () => {
+    const { translator, signal } = setup({ steps: [said(`Le vote. ${"cd".repeat(16)}`)] });
+    expect(await translator.translate({ text: "The vote.", language: "fr" }, signal())).toEqual({ kind: "original" });
+  });
+
+  it("answers failed, never its reason, for a model that times out", async () => {
+    const late = new APIConnectionTimeoutError();
+    const { translator, signal } = setup({ steps: [late, late, late] });
+    expect(await translator.translate({ text: ORIGINAL, language: "fr" }, signal())).toEqual({ kind: "failed" });
+  });
+
+  it("takes a translation of 16,000 code points, the most the wire carries", async () => {
+    // Short words: a long run of letters reads as an account.
+    const longest = () => `${"ab ".repeat(5_333)}a`;
+    const { translator, signal } = setup({ steps: [said(longest())] });
+    expect(await translator.translate({ text: "Hello.", language: "fr" }, signal())).toEqual({
+      kind: "translated",
+      text: longest(),
+    });
+  });
+
+  it("joins an answer's text blocks as written, its thinking left out", async () => {
+    const answer = message({
+      content: [thinking(), text("Le vote "), text("se termine.")],
+      stop: "end_turn",
+      model: "claude-haiku-5-5",
+    });
+    const { translator, signal } = setup({ steps: [answer] });
+    expect(await translator.translate({ text: "The vote ends.", language: "fr" }, signal())).toEqual({
+      kind: "translated",
+      text: "Le vote se termine.",
+    });
+  });
+
+  it("keeps an original as its key's bytes alone, with no text", async () => {
+    const { translator, kit, signal } = setup({ steps: [said("Le vote 9.")] });
+    await translator.translate({ text: "The vote.", language: "fr" }, signal());
+    expect(kit.db.prepare("SELECT text, bytes FROM translations").all()).toEqual([{ text: null, bytes: 64 + 2 }]);
+  });
+
+  it("answers two translators on one file that make the same line at once, the file keeping one row", async () => {
+    const first = setup({ steps: [said(FRENCH)] });
+    const second = makeTranslator({ ...first.parts, send: script(said(FRENCH)).send });
+    const asked = { text: ORIGINAL, language: "fr" } as const;
+    const both = await Promise.all([
+      first.translator.translate(asked, first.signal()),
+      second.translate(asked, first.signal()),
+    ]);
+    expect(both).toEqual([translatedOf(FRENCH), translatedOf(FRENCH)]);
+    expect(first.kit.db.prepare("SELECT COUNT(*) AS rows FROM translations").get()).toEqual({ rows: 1 });
+  });
+});
+
+function translatedOf(words: string) {
+  return { kind: "translated", text: words };
+}
