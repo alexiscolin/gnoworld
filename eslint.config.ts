@@ -65,7 +65,7 @@ export default defineConfig(
   // No state at a module's top in a workspace's source; core's and ui's own lists, below, hold it too, and the
   // tests' lists replace it.
   {
-    files: ["server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
+    files: ["server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
     rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE] },
   },
   react,

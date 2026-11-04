@@ -703,6 +703,43 @@ try:
         expect(out.returncode != 0 and "server probe found" in out.stdout + out.stderr, "vitest runs the server's tests")
         shutil.rmtree(src)
 
+    if part("jarvis"):
+        # Jarvis's own workspace (D110): linted as the server is (no browser package, no console, fetch in a test alone, no
+        # state at a module's top), type-checked with Node's types by the gate's own script, its tests found, knip reading it.
+        src = "jarvis/src/__probe__"
+        uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
+        lint = dict((n, c) for n, c, _ in LINT)
+        jarvis = [
+            ("node.ts", uses(name="readFileSync", path="node:fs"), None),
+            ("workspace.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
+            ("sdk.ts", uses(name="Anthropic", path="@anthropic-ai/sdk"), None),
+            ("sibling.ts", uses(name="used", path="./node.ts"), None),
+            ("server_shared.ts", uses(name="logger", path="../../../server/src/log.ts"), None),
+            *[(f"{name.replace('/', '_').replace('@', '')}.ts", uses(name="x", path=name), "no-restricted-imports")
+              for name in ("react", "three", "@gnoworld/ui")],
+            ("app_path.ts", uses(name="Layout", path="../../../app/src/root.tsx"), "import-x/no-restricted-paths"),
+            ("fetch.ts", "export function load(): unknown {\n  return fetch(\"http://x\");\n}\n", "no-restricted-globals: Unexpected use of 'fetch'."),
+            ("calls.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect(typeof fetch).toBe("function");\n});\n', None),
+            ("console.ts", 'export function say(): void {\n  console.log("x");\n}\n', "no-console"),
+            ("module_map.ts", lint["module_map.ts"], MODULE),
+        ]
+        lint_cases(jarvis, src, "jarvis")
+        shutil.rmtree(src)
+        plant({"unchecked.ts": "export function first(a: number[]): string {\n  return a[0].toFixed();\n}\n"}, where=src)
+        out = run(["sh", "-c", f'PATH="$PWD/node_modules/.bin:$PATH" {SCRIPTS["typecheck"]}'])
+        errors = [line for line in out.stdout.splitlines() if "error TS" in line]
+        expect(len(errors) == 1 and "__probe__/unchecked.ts" in errors[0] and "possibly 'undefined'" in errors[0], f"tsc refuses an unchecked index in Jarvis, and only it: {errors[:3]}")
+        shutil.rmtree(src)
+        plant({"found.test.ts": 'import { expect, test } from "vitest";\n\ntest("jarvis probe found", () => {\n  expect(1).toBe(2);\n});\n'}, where=src)
+        out = run(["node_modules/.bin/vitest", "run", src])
+        expect(out.returncode != 0 and "jarvis probe found" in out.stdout + out.stderr, "vitest runs Jarvis's tests")
+        shutil.rmtree(src)
+        plant({"unused.ts": "export function lonely(): number {\n  return 1;\n}\n"}, where=src)
+        out = run(["node_modules/.bin/knip", "--no-progress"])
+        expect(out.returncode != 0 and f"{src}/unused.ts" in out.stdout, "knip reports an unused file in Jarvis")
+        shutil.rmtree(src)
+
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
         plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)
@@ -908,6 +945,7 @@ finally:
     shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(FIELD, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
+    shutil.rmtree("jarvis/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

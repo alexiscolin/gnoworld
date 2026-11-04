@@ -1,7 +1,7 @@
 // Jarvis's locks on one tool call (docs/plans/slice-10.md §4): the allowlist's check of its arguments, then the
 // untrusted block of its result, a 64 KiB page cut to the 16 KiB a result holds. Measured by scripts/bench.py.
 import { bench, describe } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "../../server/src/log.ts";
 import { allowlist } from "./allowlist.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 import { untrustedBlocks } from "./untrusted.ts";

@@ -5810,6 +5810,11 @@ printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py d
 # Helpers that only tests use are no product code (G8).
 git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
+# Jarvis's workspace since 10h (D110): its code is product, its test helpers are not.
+git -C "$bs" checkout -q -f -b jarvis "$base" && mkdir -p "$bs/jarvis/src/testing" && lines 700 >"$bs/jarvis/src/testing/kit.ts" && commit "jarvis's test helper"
+out=$(size "$base") || fail "batch_size.py counted jarvis/src/testing, a test helper's folder, as product code: $out"
+lines 610 >"$bs/jarvis/src/loop.ts" && commit "jarvis's code"
+out=$(size "$base") && fail "batch_size.py passed 610 lines of jarvis/src, which is product code: $out"
 fi
 
 if part gate_full; then

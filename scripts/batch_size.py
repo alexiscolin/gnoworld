@@ -3,8 +3,8 @@ when it touches a tier-1 file, 600 otherwise; Alexis, 2026-10-22). Slice 4's mer
 lines unseen.
 
 A merge's own code: the lines it adds since the newest commit /pre-merge reviewed (docs/review-passes.txt, the
-previous merge's tip), or since base when none is between. Product code: app/src, packages/*/src, server/src and gno;
-tests, stories, journeys and the server's test helpers are not. Past 600 lines it fails, unless a commit of the
+previous merge's tip), or since base when none is between. Product code: app/src, packages/*/src, server/src, jarvis/src
+and gno; tests, stories, journeys and the server's and Jarvis's test helpers are not. Past 600 lines it fails, unless a commit of the
 merge says why on a line `Batch-size: <lines> - <why>` giving the count, a tenth more at most, which Alexis reads
 (a far larger number would waive the lines added after it); past 400 it
 says the tier-1 limit, for the review card. A renamed file counts its added lines at its new path.
@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this
 from repo_files import git, last_reviewed
 
 LIMIT, TIER_ONE = 600, 400
-PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|gno)/")
-NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/")  # the server's test helpers
+PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|jarvis/src|gno)/")
+NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/|^jarvis/src/testing/")  # the services' test helpers
 
 base = sys.argv[1]
 own = last_reviewed(base)

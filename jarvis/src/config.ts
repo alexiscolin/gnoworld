@@ -4,7 +4,7 @@
 // configuration, and the chain profiles it may read. An error names the setting and its fault, never its value.
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "../settings.ts";
+import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "../../server/src/settings.ts";
 import { MODELS, type Model } from "./prices.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 
@@ -69,8 +69,8 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
         .default("mainnet,onyx")
         .transform((list) => list.split(","))
         .pipe(z.array(z.string().refine(isNetwork))),
-      JARVIS_DATA_DIR: absolute.default(fileURLToPath(new URL("../../../app/data", import.meta.url))),
-      JARVIS_SKILLS_DIR: absolute.default(fileURLToPath(new URL("../../jarvis/skills", import.meta.url))),
+      JARVIS_DATA_DIR: absolute.default(fileURLToPath(new URL("../../app/data", import.meta.url))),
+      JARVIS_SKILLS_DIR: absolute.default(fileURLToPath(new URL("../skills", import.meta.url))),
       JARVIS_GNOMCP_COMMAND: absolute,
       JARVIS_GNOMCP_CONFIG: absolute,
       JARVIS_PROFILES: z

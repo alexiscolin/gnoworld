@@ -10,8 +10,8 @@ import Anthropic, {
   type ClientOptions,
 } from "@anthropic-ai/sdk";
 import { z } from "zod";
-import type { Log } from "../log.ts";
-import type { Secret } from "../settings.ts";
+import type { Log } from "../../server/src/log.ts";
+import type { Secret } from "../../server/src/settings.ts";
 import type { Budget } from "./budget.ts";
 import { cost, worstCost, type Model } from "./prices.ts";
 import type { Trace } from "./tracing.ts";

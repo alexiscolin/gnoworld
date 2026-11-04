@@ -11,7 +11,7 @@
     "build:app": "cd app && node node_modules/@react-router/dev/bin.cjs build",
     "format": "prettier --write .",
     "format:check": "prettier --check --log-level warn .",
-    "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json && tsc -p packages/ui/tsconfig.json && tsc -p server/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p app/tsconfig.json && tsc -p packages/ui/tsconfig.json && tsc -p server/tsconfig.json && tsc -p jarvis/tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "test": "vitest run --project node --project ui --project compiled",
     "test:compiled": "vitest run --project compiled",

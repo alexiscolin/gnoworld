@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { logger } from "../log.ts";
+import { logger } from "../../server/src/log.ts";
 import { allowlist } from "./allowlist.ts";
 import { loadSkills } from "./skills.ts";
 
@@ -208,7 +208,7 @@ describe("loadSkills: the gno skill's references Jarvis is never offered", () =>
   });
 
   it("ships skills of ours that name none of them, so the model is sent to none", () => {
-    const skills = loadSkills(fileURLToPath(new URL("../../jarvis/skills", import.meta.url)));
+    const skills = loadSkills(fileURLToPath(new URL("../skills", import.meta.url)));
     for (const { name } of skills.index.filter((entry) => entry.name !== "gno")) {
       const text = skills.read({ skill: name });
       for (const reference of WRITING) expect(text).not.toContain(reference);
@@ -539,7 +539,7 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
 });
 
 describe("loadSkills: the skills folder this repository ships", () => {
-  const SHIPPED = fileURLToPath(new URL("../../jarvis/skills", import.meta.url));
+  const SHIPPED = fileURLToPath(new URL("../skills", import.meta.url));
 
   it("loads ours and gnomcp's gno skill, and offers nine of its fourteen references, the reading ones", () => {
     const skills = loadSkills(SHIPPED);

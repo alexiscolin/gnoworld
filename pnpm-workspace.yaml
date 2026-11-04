@@ -1,6 +1,7 @@
 packages:
   - app
   - server
+  - jarvis
   - packages/*
 
 # Supply chain, made explicit: no package younger than a day, no dependency build script

@@ -8,7 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import { isBlank } from "@gnoworld/core";
 import type { Tracer } from "@opentelemetry/api";
-import type { Log } from "../log.ts";
+import type { Log } from "../../server/src/log.ts";
 import type { Allowlist, Definition } from "./allowlist.ts";
 import type { Budget } from "./budget.ts";
 import { failure, refusal, type Refusal } from "./callWords.ts";

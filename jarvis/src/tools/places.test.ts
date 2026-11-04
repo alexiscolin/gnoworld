@@ -19,7 +19,7 @@ const answer = async (folder: string, query: string) => {
 
 describe("loadPlaces: the places' data, read once at start", () => {
   it("reads the app's own data files, the ones the site is built from", async () => {
-    const shipped = fileURLToPath(new URL("../../../../app/data", import.meta.url));
+    const shipped = fileURLToPath(new URL("../../../app/data", import.meta.url));
     const { json } = await answer(shipped, "bubble");
     expect(json).toEqual({
       places: [{ kind: "world", name: "Bubble", universe: "onyx", path: "/w/bubble", canonical: "/net/onyx/w/bubble" }],

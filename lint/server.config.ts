@@ -6,10 +6,12 @@ import { defineConfig } from "eslint/config";
 import { TESTS } from "./shared.config.ts";
 
 const SERVER = "The server imports core, schemas, Node and its framework (docs/ARCHITECTURE.md).";
+const JARVIS =
+  "Jarvis imports core, schemas, Node, its dependencies and the server's shared files (docs/ARCHITECTURE.md).";
 
 export default defineConfig(
   {
-    files: ["server/**/*.ts"],
+    files: ["server/**/*.ts", "jarvis/**/*.ts"],
     rules: {
       // By name, so the ban holds wherever node_modules sits (F385); a path out of the folder by the zone.
       "no-restricted-imports": [
@@ -26,6 +28,12 @@ export default defineConfig(
               except: ["./server", "./packages/core", "./packages/schemas", "./node_modules"],
               message: SERVER,
             },
+            {
+              target: "./jarvis",
+              from: "./",
+              except: ["./jarvis", "./server", "./packages/core", "./packages/schemas", "./node_modules"],
+              message: JARVIS,
+            },
           ],
         },
       ],
@@ -34,7 +42,7 @@ export default defineConfig(
   },
   {
     // A test calls the server it started.
-    files: ["server/**/*.ts"],
+    files: ["server/**/*.ts", "jarvis/**/*.ts"],
     ignores: ["server/src/net.ts", ...TESTS],
     rules: {
       "no-restricted-globals": [

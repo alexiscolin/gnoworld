@@ -54,8 +54,8 @@ describe("loadJarvisConfig", () => {
       models: { main: "claude-sonnet-5-5", fast: "claude-haiku-5-5", deep: "claude-opus-5-5" },
       gnoscope: false,
       gnoscopeServer: { url: "https://gnoscope.com/mcp", timeoutMs: 10_000, networks: ["mainnet", "onyx"] },
-      places: fileURLToPath(new URL("../../../app/data", import.meta.url)),
-      skills: fileURLToPath(new URL("../../jarvis/skills", import.meta.url)),
+      places: fileURLToPath(new URL("../../app/data", import.meta.url)),
+      skills: fileURLToPath(new URL("../skills", import.meta.url)),
       gnomcp: { command: "/usr/local/bin/gnomcp", config: "/etc/gnomcp/profiles.toml" },
       profiles: { read: ["testnet"], indexed: [] },
     });

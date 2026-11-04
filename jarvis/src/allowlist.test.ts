@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { logger } from "../log.ts";
+import { logger } from "../../server/src/log.ts";
 import { allowlist, isName } from "./allowlist.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 
