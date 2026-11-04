@@ -329,6 +329,14 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
     await started.close();
   });
 
+  it("sends nothing once closed, gnoscope still up", async () => {
+    const server = await serve();
+    const started = await start(server.url).gnoscope;
+    await started.close();
+    expect(await started.call("get_realm_state", state())).toEqual({ ok: false, reason: "down" });
+    expect(server.calls()).toEqual([]);
+  });
+
   it("answers as down once it went away, and once it is closed", async () => {
     const server = await serve();
     const started = await start(server.url).gnoscope;
