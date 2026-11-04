@@ -1,12 +1,12 @@
 // A namespace's worlds around its star (ADR-0002 §3, §10). Places come from the set alone, so the same file is the same picture. Each world
 // holds a slot of a sunflower's lattice: its hash picks the slot, so an arrival moves only a world it meets, and the lattice keeps any
 // number of worlds apart in the room a cell leaves. A system turns as one, so none ever crosses another. The disc lies tilted on the stage.
-import { cellHash, nextState, textHash, unitOf, type Point } from "../space/cell.ts";
+import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { lerp } from "../space/smooth.ts";
 import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos.ts";
+import { GNO_LAND, starDraws, starWarmth } from "./warmth.ts";
 
-/** gno.land's star, at the centre: a slug holds no dot, so no namespace is it. */
-export const GNO_LAND = "gno.land";
+export { GNO_LAND };
 /** How far a system reaches from its star: two systems stand a cell apart at the least. */
 export const ROOM = CELL / 2;
 /** Where a far belt's room starts: no world goes past it, a postcard's widened ones included (7d3). */
@@ -41,7 +41,6 @@ const SPIN_SPAN = 0.1;
 // A plane leans 15 to 45 degrees off the disc's: none lies in it, and none stands face on to the rest's 15-degree slant (7d6).
 const TILT_LEAST = Math.PI / 12;
 const TILT_SPAN = Math.PI / 6;
-const SALT = 2;
 
 export { WORLD_MOST };
 
@@ -163,13 +162,12 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
 
 function systemOf(id: string, place: SystemPlace, worlds: readonly WorldHeld[]): StarSystem {
   const star = starSize(worlds.length);
-  const seed = textHash(`star ${id}`);
-  const unit = (step: number) => unitOf(nextState(cellHash(SALT, { x: seed, y: step, z: 0 })));
+  const unit = starDraws(id);
   return {
     id,
     place,
     star,
-    warmth: unit(0),
+    warmth: starWarmth(id),
     spin: (SPIN_LEAST + SPIN_SPAN * unit(1)) * (unit(2) < 0.5 ? -1 : 1),
     tilt: TILT_LEAST + TILT_SPAN * unit(5),
     node: 2 * Math.PI * unit(6),
@@ -182,7 +180,7 @@ const greatStar = (): StarSystem => ({
   id: GNO_LAND,
   place: { x: 0, y: 0, z: 0 },
   star: starSize(STAR_MOST),
-  warmth: 0.45,
+  warmth: starWarmth(GNO_LAND),
   spin: SPIN_LEAST,
   tilt: 0,
   node: 0,
