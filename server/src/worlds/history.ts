@@ -36,6 +36,9 @@ export interface History {
   readonly recent?: Recent;
 }
 
+/** A realm's history as the job read it, stamped by its clock as it came (7t3: a world's window runs from read to read). */
+export type StampedHistory = History & { readonly at: number };
+
 export type HistoryRead = { ok: true; history: History } | { ok: false; kind: Kind };
 
 const Answer = z.object({

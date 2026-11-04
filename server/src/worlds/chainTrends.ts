@@ -21,8 +21,9 @@ export interface ChainRead {
   readonly worlds: readonly ChainWorld[];
   readonly newest: readonly NewTrend[];
 }
-/** What a pass read of each realm, by its path: its window above the last pass's height, none when it had no height to count from. */
-type PassReads = ReadonlyMap<string, { readonly recent?: Recent }>;
+/** What a pass read of each realm, by its path: its window above the last pass's height, none when it had no height to count from; and when
+ * the job read it. */
+type PassReads = ReadonlyMap<string, { readonly recent?: Recent; readonly at: number }>;
 type World = Worlds["worlds"][number];
 /** The chain's habits: each world's busiest window of each hour over 14 days, in presence.ts's store. */
 interface Habits {
@@ -47,29 +48,29 @@ function placed(world: World): Place | undefined {
 }
 
 // A world's window over the realms both passes read: its transactions, and the different addresses that sent them, each counted once across
-// its realms; none for a world with no such realm.
+// its realms, from its realms' first read in the last pass to their last in this one; none for a world with no such realm.
 function windowOf(
   world: World,
-  before: ReadonlySet<string>,
+  before: ReadonlyMap<string, number>,
   now: PassReads,
-): { transactions: number; addresses: number } | undefined {
-  let known = false;
+): { transactions: number; addresses: number; from: number; to: number } | undefined {
+  let [from, to] = [Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
   const [transactions, addresses] = [new Set<string>(), new Set<string>()];
   for (const { path } of world.realms) {
-    const recent = now.get(path)?.recent;
-    if (recent === undefined || !before.has(path)) continue;
-    known = true;
-    for (const mark of recent.transactions) transactions.add(mark);
-    for (const caller of recent.callers) addresses.add(caller);
+    const [read, was] = [now.get(path), before.get(path)];
+    if (read?.recent === undefined || was === undefined) continue;
+    [from, to] = [Math.min(from, was), Math.max(to, read.at)];
+    for (const mark of read.recent.transactions) transactions.add(mark);
+    for (const caller of read.recent.callers) addresses.add(caller);
   }
-  return known ? { transactions: transactions.size, addresses: addresses.size } : undefined;
+  return to > from ? { transactions: transactions.size, addresses: addresses.size, from, to } : undefined;
 }
 
 // Each world's window since the pass before, kept in its habits, beside its usual; none on a first pass or past the window. ponytail: a
 // usual reads a world's 14 days of hours (336 at most) for each world the pass read, once a pass.
 function windowsOf(
   { worlds, read }: { worlds: Worlds; read: PassReads },
-  last: { at: string; read: ReadonlySet<string> } | undefined,
+  last: { at: string; read: ReadonlyMap<string, number> } | undefined,
   habits: Habits | undefined,
 ): ChainWorld[] {
   if (last === undefined) return [];
@@ -92,24 +93,25 @@ function windowsOf(
       ),
     );
   };
-  // Each count at its pace an hour, as a habit keeps it: a window twice as long as usual is no rise.
-  const pace = (count: number): number => Math.round((count * HOUR) / span);
+  // Each count at its pace an hour over its world's own reads, as a habit keeps it: a window longer than usual is no rise.
+  const pace = (count: number, { from, to }: { from: number; to: number }): number =>
+    Math.round((count * HOUR) / (to - from));
   if (habits !== undefined) {
-    keep(habits.transactions, ({ transactions }) => pace(transactions));
-    keep(habits.addresses, ({ addresses }) => pace(addresses));
+    keep(habits.transactions, (window) => pace(window.transactions, window));
+    keep(habits.addresses, (window) => pace(window.addresses, window));
   }
-  const signal = (count: number, kept: Hours | undefined, id: string): ChainSignal => ({
-    now: pace(count),
-    usual: kept === undefined ? null : usualOf(kept.history(id), at),
+  const signal = (count: number, window: (typeof counted)[number], kept: Hours | undefined): ChainSignal => ({
+    now: pace(count, window),
+    usual: kept === undefined ? null : usualOf(kept.history(window.world.id), at),
     count,
   });
-  return counted.map(({ world, transactions, addresses }) => ({
-    world: world.id,
-    place: placed(world),
-    transactions: signal(transactions, habits?.transactions, world.id),
-    addresses: signal(addresses, habits?.addresses, world.id),
-    since: last.at,
-    at: worlds.updated,
+  return counted.map((window) => ({
+    world: window.world.id,
+    place: placed(window.world),
+    transactions: signal(window.transactions, window, habits?.transactions),
+    addresses: signal(window.addresses, window, habits?.addresses),
+    since: new Date(window.from).toISOString(),
+    at: new Date(window.to).toISOString(),
   }));
 }
 
@@ -133,7 +135,7 @@ function newest(worlds: Worlds): NewTrend[] {
  * the realms both passes read, and unknown once the runs no longer meet (from twice the cap). */
 export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendKeeper {
   const { habits, log = () => undefined } = options;
-  let last: { at: string; read: ReadonlySet<string> } | undefined;
+  let last: { at: string; read: ReadonlyMap<string, number> } | undefined;
   let kept: ChainRead = { worlds: [], newest: [] };
   // ponytail: each habit writes its whole file at once, about 44 ms for a full one (5.7 MB, 7t3's review), twice a pass.
   const save = (): void => {
@@ -145,7 +147,7 @@ export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendK
       const windows = windowsOf({ worlds, read }, last, habits);
       save();
       kept = { worlds: windows, newest: newest(worlds) };
-      last = { at: worlds.updated, read: new Set(read.keys()) };
+      last = { at: worlds.updated, read: new Map([...read].map(([path, { at }]) => [path, at])) };
     },
     chain: () => kept,
     save,

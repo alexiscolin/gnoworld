@@ -63,6 +63,9 @@ const reads = (entries: Record<string, [number | string[], string[]] | null>) =>
       return [path, { recent: { transactions: marks, callers } }] as const;
     }),
   );
+// A pass's reads, each realm read at `at`: the job stamps each read as it comes.
+const stamped = (read: ReturnType<typeof reads>, at: number) =>
+  new Map([...read].map(([path, value]) => [path, { ...value, at }] as const));
 
 const POOL = "gno.land/r/gnoswap/pool";
 const POOL1 = "gno.land/r/gnoswap/pool/v1";
@@ -97,9 +100,11 @@ function keeper(files: { transactions: string; addresses: string } = { transacti
     ...(habits === undefined ? {} : { habits }),
     log: (event, fields) => logged.push([event, fields]),
   });
-  const pass = (time: number, worlds: World[], read: ReturnType<typeof reads>) => {
-    clock.at = time;
-    trends.passed(file(time, worlds), read);
+  // A pass whose file is stamped `time`, each realm read as it ends, or the file at `time.file` and each realm read at `time.read`.
+  const pass = (time: number | { file: number; read: number }, worlds: World[], read: ReturnType<typeof reads>) => {
+    const [stamp, readAt] = typeof time === "number" ? [time, time] : [time.file, time.read];
+    clock.at = stamp;
+    trends.passed(file(stamp, worlds), stamped(read, readAt));
   };
   return { trends, pass, logged, habits };
 }
@@ -164,6 +169,25 @@ describe("the chain's window", () => {
       addresses: { now: 4, usual: 4, count: 8 },
     });
     expect(await trendingOf({ chain: trends.chain().worlds, now: T1 + HOUR + MINUTE })).toBeUndefined();
+  });
+
+  // The second round of 7t3's review (high, reproduced): a pass's stamp falls once its gather ends, but a realm's window runs from its read
+  // in the last pass to its read in this one: after a slow gather, a realm read early had a window longer than the stamps', and a steady
+  // world trended. A world is paced by its realms' own reads, and the ticker's minutes are theirs.
+  it("paces a world by its realms' own reads, so a realm read early after a slow gather is no rise", async () => {
+    const files = { transactions: habitOf(48, 60), addresses: habitOf(48, 12) };
+    const later = T1 + 33 * MINUTE;
+    const { trends, pass } = keeper(files, T1);
+    pass({ file: T1, read: T1 - 20 * MINUTE }, WORLDS, reads({ [POOL]: null }));
+    const senders = Array.from({ length: 10 }, (_, at) => `g1sender${String(at)}`);
+    pass({ file: later, read: later - MINUTE }, WORLDS, reads({ [POOL]: [52, senders] }));
+    expect(windowOf(trends.chain(), "gnoswap/pool")).toMatchObject({
+      transactions: { now: 60, usual: 60, count: 52 },
+      addresses: { now: 12, usual: 12, count: 10 },
+      since: at(T1 - 20 * MINUTE),
+      at: at(later - MINUTE),
+    });
+    expect(await trendingOf({ chain: trends.chain().worlds, now: later })).toBeUndefined();
   });
 
   it("has no window on a first pass, for there is nothing to compare with", () => {
@@ -311,8 +335,8 @@ describe("the chain's window", () => {
         },
       });
     const trends = makeTrends();
-    trends.passed(counted(T1), reads({ [POOL]: null }));
-    trends.passed(counted(T2), reads({ [POOL]: [7, [A, B]] }));
+    trends.passed(counted(T1), stamped(reads({ [POOL]: null }), T1));
+    trends.passed(counted(T2), stamped(reads({ [POOL]: [7, [A, B]] }), T2));
     const after = count;
     for (let ask = 0; ask < 100; ask += 1) trends.chain();
     expect(count).toBe(after);
@@ -330,7 +354,7 @@ describe("the new world", () => {
       world("gnoswap/router", [ROUTER], { seen: at(T2 - 2 * NEW_MS) }),
     ];
     const trends = makeTrends();
-    trends.passed(file(T2, worlds), reads({}));
+    trends.passed(file(T2, worlds), stamped(reads({}), T2));
     expect(newestOf(trends.chain())).toEqual({
       kind: "new",
       world: "gnoswap/pool",
@@ -348,7 +372,7 @@ describe("the new world", () => {
       world("gnoswap/pool", [POOL]),
       world("gnoswap/router", [ROUTER], { seen: at(T2 - NEW_MS - 1) }),
     ];
-    trends.passed(file(T2, worlds), reads({}));
+    trends.passed(file(T2, worlds), stamped(reads({}), T2));
     expect(newestOf(trends.chain())).toBeUndefined();
   });
 
@@ -360,10 +384,13 @@ describe("the new world", () => {
       world("gnoswap/router", [ROUTER], { seen, realms: [realm(ROUTER, null)] }),
     ];
     const trends = makeTrends();
-    trends.passed(file(T2, worlds), reads({}));
+    trends.passed(file(T2, worlds), stamped(reads({}), T2));
     expect(newestOf(trends.chain())).toMatchObject({ world: "gnoswap/pool" });
     const even = makeTrends();
-    even.passed(file(T2, [world("gnoswap/router", [ROUTER], { seen }), worlds[0] ?? world("x", [])]), reads({}));
+    even.passed(
+      file(T2, [world("gnoswap/router", [ROUTER], { seen }), worlds[0] ?? world("x", [])]),
+      stamped(reads({}), T2),
+    );
     expect(newestOf(even.chain())).toMatchObject({ world: "alexis/blog" });
   });
 
@@ -374,14 +401,14 @@ describe("the new world", () => {
       world("gnoswap/router", [ROUTER], { seen: at(T2 - HOUR) }),
     ];
     const trends = makeTrends();
-    trends.passed(file(T2, worlds), reads({}));
+    trends.passed(file(T2, worlds), stamped(reads({}), T2));
     expect(newestOf(trends.chain())).toMatchObject({ world: "gnoswap/router", title: "router" });
   });
 
   it("keeps a world first seen exactly a day before the pass, and one first seen by the pass itself", () => {
     const keptAt = (seen: number) => {
       const trends = makeTrends();
-      trends.passed(file(T2, [world("alexis/blog", [BLOG], { seen: at(seen) })]), reads({}));
+      trends.passed(file(T2, [world("alexis/blog", [BLOG], { seen: at(seen) })]), stamped(reads({}), T2));
       return newestOf(trends.chain())?.at;
     };
     expect(keptAt(T2 - NEW_MS)).toBe(at(T2 - NEW_MS));
@@ -390,7 +417,7 @@ describe("the new world", () => {
 
   it("is never a world first seen after the pass that wrote the file", () => {
     const trends = makeTrends();
-    trends.passed(file(T2, [world("alexis/blog", [BLOG], { seen: at(T2 + MINUTE) })]), reads({}));
+    trends.passed(file(T2, [world("alexis/blog", [BLOG], { seen: at(T2 + MINUTE) })]), stamped(reads({}), T2));
     expect(newestOf(trends.chain())).toBeUndefined();
   });
 });

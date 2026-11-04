@@ -4,7 +4,7 @@ import { natureOf } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { Comparison } from "./compare.ts";
 import { groupWorlds, type Group } from "./group.ts";
-import type { History } from "./history.ts";
+import type { History, StampedHistory } from "./history.ts";
 import type { PackageFacts } from "./packages.ts";
 
 type RealmRow = Worlds["worlds"][number]["realms"][number];
@@ -21,7 +21,7 @@ export interface Gathered {
   readonly fresh: ReadonlySet<string>;
   readonly earlierNames: ReadonlyMap<string, string>;
   readonly names: ReadonlyMap<string, string | null>;
-  readonly histories: ReadonlyMap<string, History>;
+  readonly histories: ReadonlyMap<string, StampedHistory>;
 }
 
 // The facts of the realms the last file already read: a realm with no deployer, function and import was not read, and nor, while its

@@ -871,6 +871,7 @@ describe("the trends it tells", () => {
     expect(told[0]?.get(POOL)?.recent, "a first file has no height to count from").toBeUndefined();
     expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: [`102:${A}`, `103:${B}`, `104:${A}`], callers: [A, B] });
     expect(told[1]?.get(ROUTER)?.recent).toEqual({ transactions: [], callers: [] });
+    expect(told[1]?.get(POOL)?.at, "each read stamped as it comes, by the job's clock").toBe(NOW + 5);
     expect(readFileSync(file, "utf8")).not.toContain("recent");
     expect(written(file).worlds.find(({ id }) => id === "gnoswap/pool")?.realms[0]).toMatchObject({
       calls: 5,

@@ -14,7 +14,7 @@ import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths } from "./group.ts";
-import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type History } from "./history.ts";
+import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type StampedHistory } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
@@ -43,7 +43,7 @@ export interface RunOptions {
   historyMax?: number;
   isStopped?: () => boolean;
   /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
-  trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, History>) => void };
+  trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
 }
 
 export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
@@ -103,16 +103,16 @@ const aboutRealm = (kind: Kind): boolean => kind === "shape" || kind === "too_la
 async function readHistories(
   reader: { send: Send; indexer: string; pace: () => Promise<void> },
   paths: readonly string[],
-  hooks: { log: Log; isStopped: () => boolean; sinceOf: (path: string) => number | undefined },
-): Promise<Map<string, History>> {
-  const histories = new Map<string, History>();
+  hooks: { log: Log; isStopped: () => boolean; now: () => number; sinceOf: (path: string) => number | undefined },
+): Promise<Map<string, StampedHistory>> {
+  const histories = new Map<string, StampedHistory>();
   let skipped: Kind | undefined;
   let strikes = 0;
   for (const path of paths) {
     if (hooks.isStopped()) throw new Failure("stopped");
     const read = await readHistory(reader, path, hooks.sinceOf(path));
     if (read.ok) {
-      histories.set(path, read.history);
+      histories.set(path, { ...read.history, at: hooks.now() });
       strikes = 0;
       continue;
     }
