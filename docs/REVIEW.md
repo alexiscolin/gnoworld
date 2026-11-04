@@ -126,6 +126,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
 | Small fix | about 20 product lines, no tier-1 or harness file | its test seen failing, the gate, the journeys that watch it, one `reviewer` |
 | Feature | product code with no tier-1 or harness file | tests first and the red pass, one combined review (the design apart only for how space looks), two lots at most |
 | Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
+| Radical (until the hardening slice) | a part that touches no tier-1 file and no harness file | no test written and no agent review while it builds; the types, the lint, the build, the secrets' scan, the copies' check and the first screen's cap hold; the hardening slice writes its tests and reviews it before `main` |
 
 The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
 A way to game a display's ranking or count (a ticker, a trend) is a low, kept for after the demo, never a round of its own.
