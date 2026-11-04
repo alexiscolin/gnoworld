@@ -19,7 +19,7 @@ import re
 import shlex
 import sys
 
-SHELLS = {"sh", "bash", "zsh", "dash"}
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "fish"}
 WRAPPERS = {"env", "nohup", "time", "timeout", "nice", "stdbuf", "command", "builtin", "noglob", "exec", "xargs", "sudo", "doas"}
 KEYWORDS = {"!", "{", "}", "if", "then", "else", "elif", "do", "while", "until"}  # words that open a command, not name it
 # A function's body is commands too: `(` opens one form, and `{` the other where it opens a command, after `f()` or `function f`
@@ -103,8 +103,9 @@ SHIELDED = {c: chr(0xE000 + ord(c)) for c in QUOTED + " \t'\"\\"}  # in a $(...)
 unshield = lambda word: word.translate({ord(v): k for k, v in SHIELDED.items()})
 
 
-def closing(text, at):
-    """Where the `)` is that closes the `(` at `at`, past nested ones, quotes and escapes; None when the text holds none."""
+def closing(text, at, ends="()"):
+    """Where the mark is that closes the one at `at` (a `(` by default, or ends[0]), past nested ones, quotes and escapes; None when the
+    text holds none."""
     depth, quote, k = 0, "", at
     while k < len(text):
         c = text[k]
@@ -115,8 +116,8 @@ def closing(text, at):
             quote = "" if c == quote else quote
         elif c in "'\"":
             quote = c
-        elif c in "()":
-            depth += 1 if c == "(" else -1
+        elif c in ends:
+            depth += 1 if c == ends[0] else -1
             if depth == 0:
                 return k
         k += 1
@@ -124,16 +125,24 @@ def closing(text, at):
 
 
 def scan(text):
-    """The text with every quoted or escaped mark and newline, and the whole of each $(...), <(...) and >(...), swapped for characters
-    of their own, so that only the shell's own separators split it (lot 1's R1: a quoted '{' split `git commit -m '{' -n`; lot 2's
-    S2-6: `-F <(echo x) -n` split it too); and the commands of those substitutions, each to be read in its turn. $'...' is a quote
-    whose backslash escapes (S2-11)."""
+    """The text with every quoted or escaped mark and newline, and the whole of each $(...), <(...), >(...), `...` and ${...}, swapped for
+    characters of their own, so that only the shell's own separators split it (lot 1's R1: a quoted '{' split `git commit -m '{' -n`;
+    lot 2's S2-6 and lot 3's S3-4: a substitution's or an expansion's separators split it too); the commands those substitutions and
+    expansions hold, each to be read in its turn; and whether a quote is still open at the end. $'...' is a quote whose backslash
+    escapes (S2-11). One character for one, so an offset in the text is the same in what it gives."""
     out, spans, quote, i = [], [], "", 0
     while i < len(text):
         c, after = text[i], text[i + 1:i + 2]
-        end = closing(text, i + 1) if after == "(" and quote != "'" and quote != "$'" and (c == "$" or (c in "<>" and not quote)) else None
-        if end is not None:
-            spans.append(text[i + 2:end])
+        end = None
+        if quote not in ("'", "$'"):
+            if after == "(" and (c == "$" or (c in "<>" and not quote)):
+                end = closing(text, i + 1)
+            elif c == "$" and after == "{":
+                end = closing(text, i + 1, "{}")
+            elif c == "`":
+                end = next((k for k in range(i + 1, len(text)) if text[k] == "`" and text[k - 1] != "\\"), None)
+        if end is not None:  # the whole span one word, its opening and closing marks swapped too but a backtick's
+            spans.append(text[i + 1:end] if c == "`" else text[i + 2:end])
             out.append(c + "".join(SHIELDED.get(x, x) for x in text[i + 1:end + 1]))
             i = end + 1
         elif c == "\\" and quote != "'" and after:
@@ -149,32 +158,23 @@ def scan(text):
                 c = SHIELDED[c]
             out.append(c)
             i += 1
-    return "".join(out), spans
+    return "".join(out), spans, bool(quote)
 
 
-HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][\w.-]*)\1")
-
-
-def without_bodies(text):
-    """The text without its heredocs' bodies, whose lines are read one by one, never as quotes held open over the next lines."""
-    out, end = [], None
-    for line in text.split("\n"):
-        if end is not None:
-            end = None if line.strip() == end else end
-            continue
-        out.append(line)
-        found = HEREDOC.search(line)
-        end = found.group(2) if found else None
-    return "\n".join(out)
+# A ( set against the word before it opens zsh's glob qualifiers, which run code (`*(e:cmd:)`, `*(+f)`: lot 3's S3-6), and bash's
+# extended globs; a function's `f()` is none.
+GLOB_QUALIFIER = re.compile(r"(?<=[\w*?\]}])\((?!\))")
 
 
 def simple_commands(text):
     """Each simple command's words, split at the shell's separators outside quotes and substitutions: line by line (a heredoc's body
-    too, which may be fed to a shell), and each command whose quotes hold a newline once more, whole (lot 2's S2-7:
-    `git commit -m "a⏎b" --no-verify` was two lines, its flag unread)."""
+    too, which may be fed to a shell), and each command whose quotes hold a newline once more, whole (lot 2's S2-7; lot 3's S3-3: no
+    heredoc is taken out of that second reading, as a `<<` in quotes misled it, and git is read at any word of either)."""
     lines = [scan(line)[0] for line in text.split("\n")]
-    lines += [line for line in scan(without_bodies(text))[0].split("\n") if SHIELDED["\n"] in line]
+    lines += [line for line in scan(text)[0].split("\n") if SHIELDED["\n"] in line]
     for line in lines:
+        if GLOB_QUALIFIER.search(line):
+            refuse("a glob qualifier or an extended glob, which runs code in zsh: write the files out")
         lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
         lexer.commenters = ""  # a `#` inside a word is the word's (lot 2's S2-5); a comment read as words fails closed
@@ -193,11 +193,57 @@ def simple_commands(text):
         yield words
 
 
+def shell_line(words):
+    """The command line a shell is given with -c, among its leading options wherever it stands (`sh -x -c`, `bash -o posix -c`,
+    `bash -c --`: lot 3's S3-5); None when it is given none."""
+    given, i = False, 1
+    while i < len(words):
+        w = words[i]
+        if w in ("-o", "+o", "-O", "+O", "--rcfile", "--init-file"):
+            i += 2
+        elif re.fullmatch(r"[-+][a-zA-Z]+", w):
+            given |= w.startswith("-") and "c" in w
+            i += 1
+        elif w.startswith("--"):
+            i += 1
+        else:
+            break
+    return (words[i] if i < len(words) else "") if given else None
+
+
+def reads_unseen(words):
+    """Whether a shell, or source or `.`, runs commands the guard cannot read: from a pipe, a redirected file, a here-string or a
+    process (lot 3's S3-5); a heredoc's lines are read, and a script named as a file is the harness's limit."""
+    program, args = os.path.basename(words[0]), words[1:]
+    if program in ("source", "."):  # the split gives `<(...)` as `<` and the process
+        return not args or args[0] in ("<", ">") or args[0].startswith(("/dev/stdin", "/dev/fd"))
+    k, heredoc, stdin = 0, False, False
+    while k < len(args):  # the split gives `<<` as two `<`, `<<<` as three
+        w = args[k]
+        if w == "<" and args[k + 1:k + 3] == ["<", "<"]:
+            return True  # a here-string
+        if w == "<" and args[k + 1:k + 2] == ["<"]:
+            heredoc, k = True, k + 3
+        elif w == "<" or w.startswith(("<(", "/dev/stdin", "/dev/fd")):
+            return True  # a file redirected in, a process, stdin named
+        elif w in (">", ">>", ">|", "&>", "&>>", "<>", ">&", "<&", "-o", "+o", "-O", "+O", "--rcfile", "--init-file"):
+            k += 2  # a redirection and its target, an option and its argument
+        elif re.fullmatch(r"-[a-zA-Z]*s[a-zA-Z]*", w):
+            stdin, k = True, k + 1  # -s: the commands come on stdin, the words after are their arguments
+        elif w.startswith(("-", "+")) or re.fullmatch(r"\d+", w):
+            k += 1
+        elif not stdin:
+            return False  # a script named as a file
+        else:
+            k += 1
+    return not heredoc
+
+
 def commands(text):
-    """The words of each simple command in a shell line, looking inside `sh -c`, `eval`, env -S, `$(...)`, `<(...)`, `>(...)` and
-    backticks."""
+    """The words of each simple command in a shell line, looking inside a shell's -c, `eval`, env -S, `$(...)`, `<(...)`, `>(...)`,
+    backticks and ${...}."""
     text = text.replace("\\\n", "")  # a continued line is one line to the shell
-    for inner in re.findall(r"`([^`]*)`", text) + scan(text)[1] + [s for line in text.split("\n") for s in scan(line)[1]]:
+    for inner in scan(text)[1]:
         yield from commands(inner)
     for raw in simple_commands(text):
         # A config file included (include.path, includeIf) sets what it likes, hooksPath and core.worktree too (7w2's review, S10).
@@ -209,11 +255,14 @@ def commands(text):
         # git's folders given a value before the program, through env, or by export and its kin; unset and env -u remove them.
         if any(git_place(w) for w in given) or (words and words[0] in SETTERS and any(git_place(w) for w in words[1:])):
             refuse("git pointed at folders of the command's own (GIT_DIR, GIT_COMMON_DIR, GIT_WORK_TREE): their hooks run, or none")
-        if len(words) >= 3 and os.path.basename(words[0]) in SHELLS and re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", words[1]):
-            yield from commands(words[2])
+        line = shell_line(words) if words and os.path.basename(words[0]) in SHELLS else None
+        if line is not None:
+            yield from commands(line)
         elif words and words[0] == "eval":
             yield from commands(" ".join(words[1:]))
         elif words:
+            if (os.path.basename(words[0]) in SHELLS or words[0] in ("source", ".")) and reads_unseen(words):
+                refuse("a shell or source reading commands from a pipe, a file, a here-string or a process: write them out, or in a heredoc")
             yield words
 
 
@@ -238,13 +287,14 @@ def check_git(words):
         refuse("git commit -n is --no-verify")
     if sub in ("commit-tree", "fast-import"):
         refuse(f"git {sub} makes commits no hook sees")
-    if sub in ("send-pack", "http-push", "receive-pack"):
+    if sub in ("send-pack", "http-push", "receive-pack") or sub.startswith("remote-"):  # a remote helper pushes what its stdin asks
         refuse(f"git {sub} pushes with no pre-push hook")
     if any(w.lower().startswith("alias.") or w.lower().startswith("--config-env=alias.") for w in words[1:]):
         refuse("a git alias can carry any flag past these checks: write the command out")
-    if sub == "push" and (any("f" in flag for flag in short) or any(w.startswith(("--force", "+")) or w == "--mirror" for w in words[2:])):
+    pushing = sub == "push" or sub == "subtree" and "push" in words[at + 1:]  # `git subtree push` pushes too (lot 3's S3-2)
+    if pushing and (any("f" in flag for flag in short) or any(w.startswith(("--force", "+")) or w == "--mirror" for w in words[2:])):
         refuse("a forced push rewrites what others have; Alexis forces, if ever")
-    return sub == "push"
+    return pushing
 
 
 def writes_gno(words, text):
@@ -318,17 +368,22 @@ elif tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
 elif tool == "Bash":
     text = str(given.get("command", ""))
     for words in commands(text):
-        program = os.path.basename(words[0])
-        if program == "git":
-            push |= check_git(words)
-        if program == "gnokey":
-            refuse("gnokey: writes and keys go through gnomcp (gno_call, gno_addpkg, sessions)")
-        if deletes_unguarded(words):
-            refuse("a recursive delete of a path a variable may leave empty, reaching / or this folder: write ${name:?}")
-        if program in ("curl", "wget") and any(CHAIN_URL.match(w) for w in words):
-            refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
-        if writes_gno(words, text) and not ready_for_gno(event.get("transcript_path", "")):
-            refuse(UNREAD)
+        # Every word may be the program a wrapper runs (7w2's third lot, S3-1, S3-2): each check reads the command from each word on,
+        # that word's name as a program's (=git, $'git' and a path give it), git-core's dashed programs as git and their name. So the
+        # guard fails closed: `echo git commit -n`, `echo gnokey` and `grep gnokey` are refused, `echo git push` asks.
+        for at, word in enumerate(words):
+            name = os.path.basename(word).lstrip("=$")
+            tail = [name] + words[at + 1:]
+            if name == "git" or name.startswith("git-"):
+                push |= check_git(["git"] + ([name[len("git-"):]] if name != "git" else []) + words[at + 1:])
+            if name == "gnokey":
+                refuse("gnokey: writes and keys go through gnomcp (gno_call, gno_addpkg, sessions); to search for the word, use the Grep tool")
+            if deletes_unguarded(tail):
+                refuse("a recursive delete of a path a variable may leave empty, reaching / or this folder: write ${name:?}")
+            if name in ("curl", "wget") and any(CHAIN_URL.match(w) for w in tail):
+                refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
+            if writes_gno(tail, text) and not ready_for_gno(event.get("transcript_path", "")):
+                refuse(UNREAD)
 if push:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
                                              "permissionDecisionReason": "a push leaves this machine: Alexis decides"}}))

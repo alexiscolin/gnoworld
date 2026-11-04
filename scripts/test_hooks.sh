@@ -3608,7 +3608,7 @@ sh_ "cd gno && gnokey list" 2
 sh_ "/usr/local/bin/gnokey list" 2
 sh_ '"$GNO_TOOLCHAIN/gnokey" list' 2
 sh_ "sh -c 'gnokey list'" 2
-sh_ "grep -rn gnokey docs" 0
+sh_ "grep -rn gnokey docs" 2 # 7w2's third lot: gnokey is refused at any word, failing closed; the Grep tool reads it
 sh_ "git commit -m 'docs: never call gnokey'" 0
 sh_ "curl -s https://rpc.gno.land:443/status" 2
 sh_ "curl -s HTTPS://GNO.LAND/r/gnoland/home" 2
@@ -3787,6 +3787,70 @@ git status" "git log --format='%h #1'" 'echo "$(git rev-parse HEAD)"' 'echo x # 
 body'" "echo '\$((1+2))' && git status"; do
 	sh_ "$cmd" 0
 done
+# 7w2's third lot: git is read wherever it stands, not only first (S3-1: a wrapper the guard does not know ran it; S3-2: git-core's
+# dashed programs, `git-push`), so the guard fails closed: `echo git commit -n` is refused and `echo git push` asks. Each form the
+# lot found, then one of each class it did not list, so the next form of a class fails a case.
+for cmd in 'exec -a x git push --force origin main' 'repeat 1 { git push --force origin main; }' 'nocorrect git commit -n -m y' \
+	'stdbuf -o L git commit -n -m y' 'echo | xargs -E eof git commit -n -m y' 'xargs -J % git commit -n -m y' 'arch -arm64 git commit -n -m y' \
+	'script -q /dev/null git commit -n -m y' 'coproc git commit -n -m y' '{ true; } always { git commit -n -m y; }' \
+	'if [[ -n x ]] { git commit -n -m y; }' '/opt/homebrew/opt/git/libexec/git-core/git-push --force origin main' \
+	'/opt/homebrew/opt/git/libexec/git-core/git-commit -n -m y' '/opt/homebrew/opt/git/libexec/git-core/git-commit-tree HEAD^{tree} -m y' \
+	'git remote-https origin https://github.com/a/b' 'git subtree push --force --prefix=app origin main' \
+	'some-new-wrapper --flag git commit -n -m y' 'nice -n 5 caffeinate git push --force origin main' 'git-merge --no-verify x' \
+	'/usr/libexec/git-core/git-am --no-verify' 'git remote-ext x y' 'echo git commit -n -m y'; do
+	sh_ "$cmd" 2
+done
+sh_ 'git remote -v' 0
+sh_ 'ls /opt/homebrew/opt/git/libexec/git-core' 0
+# A heredoc's mark in quotes is no heredoc, and a here-string is none (S3-3); backticks and ${...} hold their separators (S3-4); the
+# shells the guard did not read, -c anywhere among a shell's options, a shell or source reading a pipe, a here-string or a process
+# (S3-5); zsh's glob qualifiers, which run code (S3-6). Each form, then one of each class unlisted.
+for cmd in 'git commit -m "<<E
+b" --no-verify' "echo '<<E'; git commit -m \"a
+b\" --no-verify" ': <<E; git commit -m "a
+b" --no-verify
+E' 'git commit -m `true;` -n' 'git commit -m `echo x|cat` --no-verify' 'git commit -m ${x:-a;b} -n' 'git commit -m `true
+` -n' 'git push ${x:-o;} --force' 'git commit -m ${x:-$(true)} -n' "sh -x -c 'git commit -n -m y'" \
+	"bash -o posix -c 'git commit -n -m y'" "bash -c -- 'git commit -n -m y'" "ksh -c 'git commit -n -m y'" "tcsh -c 'git commit -n -m y'" \
+	"fish -c 'git commit -n -m y'" "csh -c 'git commit -n -m y'" "sh <<EOF
+git commit -m \"a
+b\" --no-verify
+EOF" "cat <<EOF
+it's
+EOF
+git commit -m \"<<E
+b\" --no-verify" "echo 'git commit -n -m y' | sh" "sh <<< 'git commit -n -m y'" "source <(echo 'git commit -n -m y')" \
+	'printf x | zsh' '. <(echo x)' 'bash < /tmp/f.sh' "print -l *(e:'git commit -n -m y':)" "ls **/*(.e{'true'})" 'echo *(+myfunc)'; do
+	sh_ "$cmd" 2
+done
+# gnokey, a recursive delete of an unguarded path, curl or wget to the chain and a .gno written are read at any word too, failing
+# closed as git is (the chief, 2026-11-04): each behind a wrapper the guard knows, one it does not, and a spelling of its name.
+for cmd in 'caffeinate gnokey list' 'some-new-wrapper gnokey list' 'exec -a x gnokey list' '=gnokey list' "\$'gnokey' list" 'echo gnokey' \
+	'caffeinate rm -r "$d"' 'some-new-wrapper find "$d" -delete' 'exec -a x rm -rf $dir/*' '=rm -r "$d"' \
+	'caffeinate curl -s https://rpc.gno.land:443/status' 'some-new-wrapper wget https://gno.land/r/x' '=curl https://rpc.gno.land:443/status' \
+	'caffeinate cp /tmp/x.gno gno/r/x/x.gno' "some-new-wrapper sed -i '' s/a/b/ gno/r/x/x.gno" 'exec -a x tee gno/r/x/x.gno'; do
+	sh_ "$cmd" 2
+done
+for cmd in 'some-new-wrapper rm -r "${d:?}"' 'echo rm -f x' 'some-new-wrapper curl https://github.com' 'echo curl'; do
+	sh_ "$cmd" 0
+done
+sh_ 'caffeinate cp /tmp/x.gno gno/r/x/x.gno' 0 "$t/skilled.jsonl"
+# Every program now read at any word, these hold the split into commands to its job through what a command's start alone decides,
+# a shell's -c: after a keyword, in a function's body, past a process left open, past env's -u; and sh -s, and a substitution left
+# open on a heredoc's line.
+for cmd in "if true; then sh -c 'gnokey list'; fi" "function f { sh -c 'gnokey list'; }; f" "cat <(sh -c 'gnokey list'" \
+	"tee >(sh -c 'gnokey list'" "env -uSHELL sh -c 'gnokey list'" "sudo sh -c 'gnokey list'" 'echo x | sh -s arg' "sh <<EOF
+it's
+rm -r \$(
+pwd)/x
+EOF"; do
+	sh_ "$cmd" 2
+done
+for cmd in 'sh scripts/check.sh' "sh -c 'git status'" 'bash -lc "git log -n 1"' 'sh <<EOF
+git status
+EOF' '(git status)' '( exit 0 )' 'echo ${HOME:-x}/a && git status' 'source scripts/env.sh'; do
+	sh_ "$cmd" 0
+done
 sh_ 'f() { git status; }; f' 0
 sh_ 'git status >>/tmp/log 2>&1 && ls &>/dev/null' 0
 sh_ 'echo x >|/tmp/f && git status' 0
@@ -3822,6 +3886,12 @@ asks "git --namespace x push origin slice-1a"
 asks "git --config-env user.name=HOME push origin slice-1a"
 asks "git --attr-source HEAD push origin slice-1a"
 asks "git --shallow-file /tmp/f push origin slice-1a"
+# Wherever git stands, a push asks (7w2's third lot, S3-1, S3-2): each form the lot found, then a wrapper nobody listed, and a mention.
+for cmd in "find . -maxdepth 0 -exec git push origin main ';'" 'caffeinate git push origin main' '- git push origin main' \
+	'=git push origin main' "\$'git' push origin main" 'git subtree push --prefix=app origin main' 'git-push origin main' \
+	'some-new-wrapper git push origin main' 'echo git push'; do
+	asks "$cmd"
+done
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
 fi
 

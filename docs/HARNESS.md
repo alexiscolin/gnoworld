@@ -336,9 +336,14 @@ with `/cd`:
   `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
   run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used. It reads through wrappers, `sh -c`, `eval`, env's `-S` line, `$(...)`, `<(...)`,
+  and gnomcp was used. Every check reads the command from every word on, so a wrapper it does not know
+  runs nothing past it (git-core's dashed programs read as git): it fails closed, refusing a bare `gnokey`
+  word (the Grep tool searches for one) and asking before `echo git push`. It reads a shell's `-c`
+  wherever it stands among the options, `eval`, env's `-S` line, `$(...)`, `<(...)`, backticks, `${...}`,
   a function's body and a command whose quotes hold a newline, takes a quoted mark for a word, and reads
-  past git's global options that take their argument apart; if it crashes, the call is blocked.
+  past git's global options that take their argument apart; it refuses a shell or `source` reading a pipe,
+  a file, a here-string or a process (a heredoc's lines are read), and a zsh glob qualifier; if it
+  crashes, the call is blocked.
   `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which served
   the staged copy a planted object under a staged file's name (F4923).
 - **Alexis's user settings** (`~/.claude/settings.json`, every project; 7w2's `apply-7w2-user.sh`): the
