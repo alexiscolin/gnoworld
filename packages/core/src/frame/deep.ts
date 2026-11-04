@@ -79,7 +79,6 @@ const spotsAt = ({ looks: [look], lent }: Judge, cards: Judge["cards"], seconds:
 
 // What stands before the depth, into `judge`: each postcard's ball at its worlds' own size at the least, with its bodies as drawn and its
 // star, the close world, held still as the scene holds it, and the stars that glow.
-const SECOND_SUN = 0.75;
 function standing(judge: Judge, systems: readonly StarSystem[], view: RestView): void {
   const { drawnOf, postcardOf } = judge.lent;
   const stand = (balled: (look: Look) => Seen, card: Pick<Card, "system" | "worlds">) => {
@@ -104,12 +103,12 @@ function standing(judge: Judge, systems: readonly StarSystem[], view: RestView):
   glowing(judge, systems, view);
 }
 
-// The postcards' stars and every other that glows, its halo three quarters whole or more, as the arrival's second sun (7d3), into `judge`.
+// The postcards' stars and every other that glows, as the arrival's second sun (7d3), into `judge`.
 function glowing({ looks: [first], stars, lent }: Judge, systems: readonly StarSystem[], view: RestView): void {
   systems.forEach((system, index) => {
     const star = first?.seen(system.place);
     if (star === undefined || index === 0) return;
-    if (view.postcards.includes(index) || (star.depth > 0 && lent.haloAt(star.away) >= SECOND_SUN)) stars.push(star);
+    if (view.postcards.includes(index) || (star.depth > 0 && lent.glowsAt(star.away))) stars.push(star);
   });
 }
 

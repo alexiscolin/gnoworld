@@ -2,7 +2,7 @@
 // imports nothing that lives only with the search and the bundler splits nothing out of it (a split chunk cost the search 420 B of lost
 // compression, and the cosmos 28 B to name it).
 import { atOneHeight, composed, evenRow } from "./composition.ts";
-import { haloAt } from "./halo.ts";
+import { glowsAt } from "./halo.ts";
 import { drawnOf, postcardOf } from "./postcard.ts";
 import { instantsOf } from "./restCards.ts";
 import { rowOnTheWayDown } from "./restDive.ts";
@@ -16,7 +16,7 @@ export const LENT = {
   drawnOf,
   evenRow,
   focalOf,
-  haloAt,
+  glowsAt,
   instantsOf,
   looksFrom,
   placeOf,

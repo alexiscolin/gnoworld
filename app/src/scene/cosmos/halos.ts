@@ -2,17 +2,22 @@
 // (7d3), every other sun half its size on screen at most; seven halos at most, the ones the view needs and then the nearest whose heart
 // shows, each dimming and shrinking from 40 to 120 units into a point of a few pixels; no halo wider than the great star's at the approved
 // arrival, 36 units off (305 pixels).
-import { distanceOf as away, haloAt, type Drawn, type Point, type StarSystem } from "@gnoworld/core";
+import {
+  distanceOf as away,
+  haloAt,
+  mainSizeOf,
+  OTHER_SUN,
+  POINT_PIXELS,
+  sunReach,
+  type Drawn,
+  type Point,
+  type StarSystem,
+  type SunSight,
+} from "@gnoworld/core";
 
 const HALOS = 7;
-const POINT_PIXELS = 10;
-const HALO_PIXELS = 320;
-const OTHER_SUN = 0.5;
 // At a system's arrival its own star is the one light: the others a quarter of its size at most (7d3's design review).
 const ARRIVAL_SUN = 0.25;
-// A star's reach, from its size.
-const REACH = 7.5;
-const LEAST_REACH = 2;
 
 /** What the halos are chosen from: a look's stars, the eye on the map, the lens, and what the view says, its main light among them. */
 export interface HaloSight {
@@ -28,14 +33,6 @@ export interface HaloSight {
   readonly chart?: boolean;
 }
 
-// Under the ceiling, a sun's own size eased so it nears it and never reaches it: two suns at different distances never draw one size, the
-// nearer the larger (the chief, 2026-11-03, after Alexis's not-a-planetarium rule).
-const under = (size: number, most: number): number => size / (1 + (size / most) ** 4) ** 0.25;
-const reachOf = ({ star }: StarSystem): number => REACH * Math.sqrt(star) + LEAST_REACH;
-// The main light's size on screen, as its reach over its distance, the widest halo kept.
-const mainSize = (main: StarSystem | undefined, eye: Point, focal: number): number =>
-  main === undefined ? Infinity : Math.min(reachOf(main) / Math.max(away(main.place, eye), 1e-9), HALO_PIXELS / focal);
-
 export class Halos {
   // Each drawn star's halo and distance to the eye, and the stars in view by distance: written on a look, kept from one to the next.
   readonly #halos: number[] = [];
@@ -46,6 +43,7 @@ export class Halos {
   #lit = true;
   #chart = false;
   #focal = 1;
+  readonly #sight: SunSight = { distance: 0, focal: 1, halo: 0 };
 
   /** Chooses which of `sight`'s drawn stars keep a halo. */
   choose(sight: HaloSight): void {
@@ -76,20 +74,17 @@ export class Halos {
     this.#main = main;
     this.#chart = chart;
     this.#lit = systems[main] !== undefined;
-    this.#mainSize = mainSize(systems[main], eye, focal);
+    this.#mainSize = mainSizeOf(systems[main], eye, focal);
   }
 
   /** Drawn star `at`'s quad reach, in world units, and its halo, for `system`, of index `index` among the systems. */
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
-    const dot = (POINT_PIXELS * distance) / this.#focal;
-    if (!this.#lit || (this.#chart && index !== this.#main)) return { reach: dot, halo: 0 };
-    const ceiling = (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize * distance;
-    const full =
-      index === this.#main
-        ? Math.min(reachOf(system), (HALO_PIXELS * distance) / this.#focal)
-        : under(reachOf(system), ceiling);
-    const point = Math.min(full, dot);
-    return { reach: point + (full - point) * halo, halo };
+    if (!this.#lit || (this.#chart && index !== this.#main))
+      return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
+    const sight = this.#sight;
+    [sight.distance, sight.focal, sight.halo] = [distance, this.#focal, halo];
+    sight.most = index === this.#main ? undefined : (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize;
+    return { reach: sunReach(system, sight), halo };
   }
 }
