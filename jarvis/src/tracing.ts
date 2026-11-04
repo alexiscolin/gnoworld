@@ -11,14 +11,15 @@ import { parseSettings } from "@gnoworld/service/settings";
 import { isName } from "./allowlist.ts";
 
 /** jarvis's tracer, its spans exported to JARVIS_TRACES_URL when set; throws naming the setting when it is no URL.
- * shutdown() tells whether the last spans left: a collector out of reach costs spans, never jarvis's stop. */
-export function startTracing(env: Record<string, string | undefined>) {
+ * shutdown() tells whether the last spans left: a collector out of reach costs spans, never jarvis's stop. An export
+ * waits 5 s at most, its retries included (F5112: a test hands a shorter one). */
+export function startTracing(env: Record<string, string | undefined>, { exportTimeoutMs = 5_000 } = {}) {
   const Env = z.object({ JARVIS_TRACES_URL: z.url({ protocol: /^https?$/ }).optional() });
   const { JARVIS_TRACES_URL: url } = parseSettings(Env, env);
   const exporting =
     url === undefined
       ? []
-      : [new BatchSpanProcessor({ exporter: new OTLPTraceExporter({ url, timeoutMillis: 5_000 }) })];
+      : [new BatchSpanProcessor({ exporter: new OTLPTraceExporter({ url, timeoutMillis: exportTimeoutMs }) })];
   const provider = new TracerProvider({ spanProcessors: exporting });
   const shutdown = (): Promise<boolean> =>
     provider.shutdown().then(
