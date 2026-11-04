@@ -789,6 +789,32 @@ describe("GET /api/trends", () => {
     expect(await kinds({ chain: [chainOf("gnoswap/pool", [6, 3], [4, 2])] })).toEqual(["trending", "rising"]);
   });
 
+  // 7t3's review (medium): every ask scored every world again, up to 10,000 windows, and one address's burst of asks held the event loop.
+  it("scores once for one chain read and one answer of who is here, however often asked, and again when either changes or a window ages", async () => {
+    let reads = 0;
+    const worlds = [chainOf("gnoswap/pool", [6, 3], [4, 2])];
+    const read: ChainRead = {
+      newest: [],
+      get worlds() {
+        reads += 1;
+        return worlds;
+      },
+    };
+    const rooms = { now: [chatOf("earth", [3, 3])] };
+    const clock = { at: T2 + MINUTE };
+    const routes = trendsRoutes({ chain: () => read, chat: () => rooms.now, now: () => clock.at });
+    const items = async () => Trends.parse(await (await routes.request("/")).json()).items;
+    expect(await items()).toMatchObject([{ kind: "trending", world: "gnoswap/pool" }]);
+    const once = reads;
+    for (let ask = 0; ask < 50; ask += 1) await items();
+    expect(reads).toBe(once);
+    rooms.now = [chatOf("earth", [3, 3])];
+    await items();
+    expect(reads, "a new answer of who is here").toBe(once + 1);
+    clock.at = T2 + WINDOW_MOST_MS + 1;
+    expect(await items(), "the window aged").toEqual([]);
+  });
+
   it("answers no trend, and never fails, with no worlds job and no count of who is here", async () => {
     const routes = trendsRoutes({ chain: () => ({ worlds: [], newest: [] }), now: () => T2 });
     const response = await routes.request("/");

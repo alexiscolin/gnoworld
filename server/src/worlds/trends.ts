@@ -31,14 +31,22 @@ export function trendsRoutes(options: {
   now: () => number;
 }): Hono {
   const routes = new Hono();
+  const [noRooms, hubs]: [readonly ChatWorld[], ReadonlyMap<string, string>] = [[], options.hubs ?? new Map()];
+  // The score once for each chain read and each answer of who is here, until its first window ages: an ask scores nothing (7t3's review).
+  let scored:
+    { read: ChainRead; chat: readonly ChatWorld[]; until: number; trending: ReturnType<typeof trendingOf> } | undefined;
+  const trendingAt = (read: ChainRead, chat: readonly ChatWorld[], at: number): ReturnType<typeof trendingOf> => {
+    if (scored?.read === read && scored.chat === chat && at <= scored.until) return scored.trending;
+    const chain = read.worlds.filter((world) => at - Date.parse(world.at) <= WINDOW_MOST_MS);
+    const until = chain.reduce((first, world) => Math.min(first, Date.parse(world.at) + WINDOW_MOST_MS), Infinity);
+    scored = { read, chat, until, trending: trendingOf({ chain, chat, hubs }, at) };
+    return scored.trending;
+  };
   routes.get("/", (c) => {
     const at = options.now();
-    const { worlds, newest: fresh } = options.chain();
-    const chain = worlds.filter((world) => at - Date.parse(world.at) <= WINDOW_MOST_MS);
-    const trending = trendingOf(
-      { chain, chat: options.chat?.() ?? [], hubs: options.hubs ?? new Map<string, string>() },
-      at,
-    );
+    const read = options.chain();
+    const trending = trendingAt(read, options.chat?.() ?? noRooms, at);
+    const fresh = read.newest;
     // A world Trending by its people says its rise this hour itself: a Rising item beside it would say a second (the chief, 2026-11-04).
     const byPeople = trending?.item.kind === "trending" && trending.item.by === "here";
     const rising = options.presence === undefined || byPeople ? [] : risingOf(options.presence(), at, trending?.rooms);

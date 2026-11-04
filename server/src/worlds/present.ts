@@ -115,6 +115,8 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
   // A world's messages an hour now: its open rooms' pace.
   const perHourIn = (names: readonly string[], at: number): number =>
     [...rates(names, at).values()].reduce((sum, rate) => sum + rate, 0) * 60;
+  // ponytail: each history writes its whole file at once, about 44 ms for a store of 500 worlds full of 14 days (5.7 MB, 7t3's review):
+  // two every five minutes here, beside the chain's two a pass.
   const record = (): void => {
     const at = now();
     const counted = worlds().flatMap(([world, names]): [string, number, number][] => {
