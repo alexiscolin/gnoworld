@@ -2,9 +2,10 @@
 // text (4d), and a node added to those before it; and a walk of a message's tree, each inline node in order.
 import type { Block, Inline } from "./types.ts";
 
-/** The node a mark of `mark`, `size` long, makes of what it holds: three stars make two. */
+/** The node a mark of `mark`, `size` long, makes of what it holds: three stars make two; `~~` strikes, `++` underlines. */
 export function wrap(mark: string, size: number, children: Inline[]): Inline {
   if (mark === "~") return { type: "strike", children };
+  if (mark === "+") return { type: "underline", children };
   if (size === 1) return { type: "em", children };
   if (size === 2) return { type: "strong", children };
   return { type: "em", children: [{ type: "strong", children }] };

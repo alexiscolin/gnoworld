@@ -1,9 +1,10 @@
 // A line's marks (slice 4's 4c), read left to right once: escapes, code, bare https addresses, links
-// `[label](https://…)`, mentions `@g1…` (4d), and runs of one, two or three `*` or `_`, or two `~`, at word bounds.
+// `[label](https://…)`, mentions `@g1…` (4d), and runs of one, two or three `*` or `_`, or two `~` or `+` (8k's
+// underline, the chat's alone), at word bounds.
 // A mark or label open is a frame on a stack, holding what it would wrap; one never closed gives its run back as
 // text. Marks and labels nest 8 deep at most, past which a mark is text: a hostile line costs no deeper stack and
 // linear time.
-import { Addresses } from "./address.ts";
+import { Addresses, type Underline } from "./address.ts";
 import { mentionAt } from "./mentions.ts";
 import { append, invisible, labelOf, wrap } from "./nodes.ts";
 import { after, before, closes, opens, Runs, runOf } from "./scan.ts";
@@ -30,9 +31,12 @@ interface Frame {
 }
 
 // Where the reader stops to look: an escape, a mark, a label's bracket (a page's image, `![`, too), an address or a
-// mention's `@g1` (any other `@` stays in the text it is in).
-const MARKS = /[\\`*_~[\]]|https:\/\/|@g1/g;
+// mention's `@g1` (any other `@` stays in the text it is in). A page's reader never stops at `+`: gnoweb has no
+// underline, so a page shows `++` as written.
+const MARKS = /[\\`*_~+[\]]|https:\/\/|@g1/g;
 const IMAGES = /[\\`*_~[\]]|!\[|https:\/\/|@g1/g;
+// The marks of two characters alone: `~~` and `++`.
+const PAIRED = /^[~+]$/;
 
 /** What a page's lines add to the chat's: its images, read as links to them, and the origin its path links resolve against
  * (an https origin, already checked: address.ts's `originOf`). */
@@ -139,7 +143,7 @@ class Reader {
   // An https address at a word's start, outside a label: a link to itself; else the letter.
   #bare(): void {
     const at = this.#at;
-    const end = this.#inLabel() ? -1 : this.#addresses.bare(at);
+    const end = this.#inLabel() ? -1 : this.#addresses.bare(at, this.#underline());
     if (end === -1) {
       this.#add("h");
       this.#at = at + 1;
@@ -163,6 +167,14 @@ class Reader {
     return this.#frames.some((frame) => frame.mark === "[");
   }
 
+  // Where the reader is as to an underline (address.ts): just after the run that opened one, which holds nothing yet; in
+  // one; or in none.
+  #underline(): Underline {
+    const top = this.#frames.at(-1);
+    if (top?.mark === "+" && top.children.length === 0) return "opened";
+    return this.#frames.some((frame) => frame.mark === "+") ? "open" : undefined;
+  }
+
   // A run of `*`, `_` or `~`: it closes what it can, else opens, else is text.
   #mark(mark: string): void {
     const at = this.#at;
@@ -170,7 +182,7 @@ class Reader {
     const behind = before(this.#source, at);
     const ahead = after(this.#source, at + size);
     this.#at = at + size;
-    if (mark === "~" ? size !== 2 : size > 3) {
+    if (PAIRED.test(mark) ? size !== 2 : size > 3) {
       this.#add(mark.repeat(size));
       return;
     }

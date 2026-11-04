@@ -194,6 +194,21 @@ describe("page: the blocks a realm's Markdown reads into", () => {
   });
 });
 
+// 8k: the chat's underline is the chat's alone. gnoweb reads no `++` (goldmark with GFM's extensions), so a page shows it
+// as written, and a bare address keeps GFM's bounds: a `+` neither starts one nor is left out of its end.
+describe("page: no underline, as gnoweb", () => {
+  test("keeps `++` as text, in a heading and a list too", () => {
+    reads("++x++ and ++y z++", paragraph(text("++x++ and ++y z++")));
+    reads("## ++x++", heading(2, text("++x++")));
+    reads("- ++x++", { type: "list", ordered: false, items: [[text("++x++")]] });
+  });
+
+  test("links a bare address with its `+` at the end, and none after a `+`", () => {
+    reads("see https://a.test/c++", paragraph(text("see "), link("https://a.test/c++")));
+    reads("a+https://a.test/x", paragraph(text("a+https://a.test/x")));
+  });
+});
+
 describe("page: links and images", () => {
   test.each([
     "[click](javascript:alert(1))",
@@ -822,6 +837,7 @@ describe("page: the allowlist, for any input", () => {
     "**",
     "_",
     "~~",
+    "++",
     "`",
     "[",
     "](",

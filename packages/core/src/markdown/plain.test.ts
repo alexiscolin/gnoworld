@@ -32,6 +32,11 @@ describe("plain: a message's words in one line", () => {
     expect(plain(source)).toBe(words);
   });
 
+  // 8k: an underline is a mark like the others: its words alone, as a reply quotes the line.
+  test("reads an underline as its words, a link inside it by its words", () => {
+    expect(plain("say ++hi++ to ++[the docs](https://gno.land/docs)++")).toBe("say hi to the docs");
+  });
+
   // R5: markup and a link of another scheme are no element in the room; their words stay as written.
   test.each([
     ["markup", "<img src=x onerror=alert(1)> <script>alert(1)</script>"],

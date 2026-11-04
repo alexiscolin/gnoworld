@@ -6,6 +6,8 @@ import { before } from "./scan.ts";
 
 // A bare address's closing punctuation, left out of it; a `)` too when the address does not open it.
 const TRAIL = /[.,:;!?*_~']/;
+// Inside an underline, its `+` closes an address too: elsewhere a `+` is the address's own, as GFM reads it (8k).
+const closing = (char: string, underline: Underline) => TRAIL.test(char) || (underline !== undefined && char === "+");
 // What may come before a bare address: a line's start, a space, a mark's opening or a `(` (GFM's rule).
 const WORD_START = /[\s*_~(]/u;
 // What ends a bare address; any other character no address may hold makes it none.
@@ -49,6 +51,10 @@ function parens(source: string): Int32Array {
 }
 
 const count = (source: string, char: string): number => source.split(char).length - 1;
+
+/** Where the line's reader is as to an underline (8k): just after the run that opened one (`opened`), whose `+` may come
+ * before an address as a word's start does; in one (`open`), whose `+` ends an address; or in none. */
+export type Underline = "opened" | "open" | undefined;
 
 /** An https origin as a page's links may resolve against: `https://host[:port]` and at most a closing `/`, nothing else
  * (no user, path, query or look-alike letter); the origin without the `/`, or none. */
@@ -95,17 +101,18 @@ export class Addresses {
 
   /**
    * Where a bare address at `at` ends: a word's start, its host, then a path to a space, `<` or the line's end,
-   * less its closing punctuation and a `)` it does not open; -1 if it is none.
+   * less its closing punctuation and a `)` it does not open; -1 if it is none. `underline` is where the reader is.
    */
-  bare(at: number): number {
+  bare(at: number, underline?: Underline): number {
     const previous = before(this.#source, at);
-    if (previous !== undefined && !WORD_START.test(previous)) return -1;
+    const opener = underline === "opened" && previous === "+";
+    if (previous !== undefined && !WORD_START.test(previous) && !opener) return -1;
     const path = authority(this.#source, at);
     if (path === -1) return -1;
     const stop = this.#stop(path);
     if (stop < this.#source.length && !ENDS.test(this.#source.charAt(stop))) return -1;
-    if (!PATH.test(this.#source.charAt(path)) && !trailing(this.#source, path, stop)) return -1;
-    return this.#trimmed(at, stop);
+    if (!PATH.test(this.#source.charAt(path)) && !this.#trailing(path, stop, underline)) return -1;
+    return this.#trimmed(at, stop, underline);
   }
 
   #stop(at: number): number {
@@ -113,27 +120,27 @@ export class Addresses {
     return this.#stops[at] ?? this.#source.length;
   }
 
+  // Whether the line from `from` to `to` is closing punctuation alone, a `)` among it: it stops at the first that is not.
+  #trailing(from: number, to: number, underline: Underline): boolean {
+    for (let at = from; at < to; at += 1) {
+      const char = this.#source.charAt(at);
+      if (char !== ")" && !closing(char, underline)) return false;
+    }
+    return true;
+  }
+
   // The address less its closing punctuation, and less each `)` it has not opened.
-  #trimmed(at: number, stop: number): number {
+  #trimmed(at: number, stop: number, underline: Underline): number {
     const address = this.#source.slice(at, stop);
     let unopened = count(address, ")") - count(address, "(");
     let end = stop;
     // The host's first character, a letter or a digit, ends the trimming at the latest.
     while (end > at) {
       const last = this.#source.charAt(end - 1);
-      if (last === ")" ? unopened <= 0 : !TRAIL.test(last)) break;
+      if (last === ")" ? unopened <= 0 : !closing(last, underline)) break;
       if (last === ")") unopened -= 1;
       end -= 1;
     }
     return end;
   }
-}
-
-// Whether the line from `from` to `to` is closing punctuation alone, a `)` among it.
-function trailing(source: string, from: number, to: number): boolean {
-  for (let at = from; at < to; at += 1) {
-    const char = source.charAt(at);
-    if (char !== ")" && !TRAIL.test(char)) return false;
-  }
-  return true;
 }

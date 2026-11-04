@@ -13,6 +13,7 @@ const TAGS = new Set([
   "strong",
   "em",
   "s",
+  "u",
   "code",
   "pre",
   "a",
@@ -35,6 +36,19 @@ const opening = (markup: string) =>
 describe("Message", () => {
   it("shows a one-paragraph message on its line, its marks as elements", () => {
     expect(html("a **b** *c* ~~d~~ `e`")).toBe("<span>a <strong>b</strong> <em>c</em> <s>d</s> <code>e</code></span>");
+  });
+
+  // 8k: `++` draws <u>, a link inside it still the anchor it always is, and a page's underline nothing (it reads none).
+  it("shows an underline as <u>, beside and around the other marks, a link and code inside it", () => {
+    expect(html("a ++b++ c")).toBe("<span>a <u>b</u> c</span>");
+    expect(html("**++b++** ++*i*++")).toBe("<span><strong><u>b</u></strong> <u><em>i</em></u></span>");
+    expect(html("++`c`++")).toBe("<span><u><code>c</code></u></span>");
+    expect(html("++[docs](https://gno.land/docs)++")).toBe(
+      '<span><u><a href="https://gno.land/docs" title="https://gno.land/docs" dir="ltr" target="_blank" rel="noopener noreferrer">docs</a></u></span>',
+    );
+    expect(html("> ++q++\n- ++l++")).toBe(
+      "<div><blockquote><p><u>q</u></p></blockquote><ul><li><u>l</u></li></ul></div>",
+    );
   });
 
   it("links an https address in a new tab, with no opener or referrer, its whole address in its title", () => {
@@ -194,6 +208,7 @@ describe("Message", () => {
       "**",
       "*",
       "~~",
+      "++",
       "`",
       "```\n",
       "\n",

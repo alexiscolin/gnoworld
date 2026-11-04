@@ -145,7 +145,7 @@ Phases are ADR-0001's:
 |---|---|---|
 | Rooms, shared rooms, and a room switcher that scales to hundreds: groups set by the world's moderators, pinned, joined, "active now", then the rest; search, unread counts, the keyboard, a windowed list | 0 | Ergo channels; groups in the hubs data file, then `r/gnoworld/hubs` |
 | Replies, reactions, mentions, threads built from reply chains | 0 | `+draft/reply`, `+draft/react` (message-tags) |
-| Rich composer with a format bar: bold, italic, strikethrough, code, quote and lists show as such; Markdown on the wire. No underline: Markdown has none | 0 | `draft/multiline` |
+| Rich composer with a format bar: bold, italic, underline, strikethrough, code, quote and lists show as such; Markdown on the wire. Underline, which Markdown lacks, as the video (Alexis, 2026-11-04, `docs/decisions.md`): `++word++` on the wire (markdown-it-ins's; part 8k's choice, since `__` is bold in CommonMark and gnoweb), the chat's alone, a realm's page reading none as gnoweb does | 0 | `draft/multiline` |
 | Slash commands with autocomplete; `#room` and `@name` completion; Alt+Up and Alt+Down between rooms | 0 | — |
 | Message menu: copy, room link, save, report, delete your own | 0. Delete needs `allow-individual-delete` on (it is off by default); report goes to moderation (§6) | `draft/message-redaction` |
 | Moderation: a bot checks each public message; a hidden message says why and can be contested | 0 | The moderation bot (§6) |

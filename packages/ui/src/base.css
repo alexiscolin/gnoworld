@@ -30,6 +30,14 @@
     color: inherit;
   }
 
+  /* An underlined word (the composer's U, 8k): its line in the muted grey, a step under the words, never read as a link's,
+     which is the words' own colour at the font's place (prototype index.html:220). */
+  u {
+    text-decoration-color: var(--color-text-muted);
+    /* raw: the prototype's step under the words, `.body u` */
+    text-underline-offset: 2px;
+  }
+
   /* Code and a mention sit on a fill; a mention of the reader in amber, "about me" (slice 4's 4d). */
   code,
   [data-mention] {
