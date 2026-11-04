@@ -66,6 +66,8 @@ export function paletteNamed(name: string | null, page: Element): WebPalette {
   return {
     ground: colourOf(style, preset.ground),
     kinds,
+    touches: kinds,
+    touch: 0,
     tone: colourOf(style, preset.tone),
     shadow: preset.shadow,
     farLight: preset.farLight,

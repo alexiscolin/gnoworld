@@ -7,6 +7,7 @@ attribute vec3 aSize;
 attribute vec3 aFrom;
 attribute float aClump;
 uniform vec3 uKind[6];
+uniform vec3 uTouch[6];
 uniform float uHalfHeight;
 uniform float uRatio;
 uniform float uGlide;
@@ -16,6 +17,7 @@ uniform float uNear;
 uniform float uFar;
 uniform float uFarLight;
 varying vec3 vColour;
+varying vec3 vTouch;
 varying float vDepth;
 void main() {
   vec3 at = mix(aFrom, position, uGlide);
@@ -24,18 +26,23 @@ void main() {
   float size = aSize.x * projectionMatrix[1][1] * uHalfHeight / distance;
   vec3 kind = uKind[int(aSize.y + 0.5)];
   float chosen = 1.0 - step(0.5, abs(aClump - uChosen));
-  vColour = kind * (0.8 + 0.4 * aSize.z) * mix(1.0, uLift, chosen);
+  float lift = (0.8 + 0.4 * aSize.z) * mix(1.0, uLift, chosen);
+  vColour = kind * lift;
+  vTouch = uTouch[int(aSize.y + 0.5)] * lift;
   vDepth = mix(1.0, uFarLight, smoothstep(uNear, uFar, distance)) * min(1.0, size / 0.8);
   gl_Position = projectionMatrix * seen;
   gl_PointSize = 2.0 * max(size, 0.8) * uRatio;
 }`;
 
-// A sphere's disc, lit from the upper left, `uShadow` of the light on its far side from the mass around it; its far ones the ground's.
+// A sphere's disc, lit from the upper left, `uShadow` of the light on its far side from the mass around it, its kind's touch at its rim;
+// its far ones the ground's.
 const POINT_FRAGMENT = /* glsl */ `
 uniform vec3 uGround;
 uniform float uShadow;
 uniform float uShare;
+uniform float uTouchShare;
 varying vec3 vColour;
+varying vec3 vTouch;
 varying float vDepth;
 void main() {
   vec2 at = gl_PointCoord * 2.0 - 1.0;
@@ -43,7 +50,8 @@ void main() {
   if (reach >= 1.0) discard;
   vec3 normal = vec3(at.x, -at.y, sqrt(1.0 - reach));
   float lit = max(dot(normal, vec3(-0.45, 0.55, 0.7)), 0.0);
-  vec3 shaded = vColour * (uShadow + (1.18 - uShadow) * lit + 0.25 * pow(lit, 12.0));
+  vec3 colour = mix(vColour, vTouch, uTouchShare * pow(1.0 - normal.z, 1.2));
+  vec3 shaded = colour * (uShadow + (1.18 - uShadow) * lit + 0.25 * pow(lit, 12.0));
   gl_FragColor = vec4(mix(uGround, shaded, vDepth) * uShare + uGround * (1.0 - uShare), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -109,7 +117,7 @@ export const massUniforms = () => ({
     uFar: { value: 2 },
     uGround: { value: new Color() },
   },
-  ...{ uKind: { value: [] as Color[] } },
+  ...{ uKind: { value: [] as Color[] }, uTouch: { value: [] as Color[] }, uTouchShare: { value: 0 } },
   ...{ uShadow: { value: 0 }, uFarLight: { value: 1 } },
 });
 

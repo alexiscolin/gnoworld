@@ -24,8 +24,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
   // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead).
   { chunk: "cosmos", after: ["scene"], cap: 17_130 },
-  // 6,706 B with the mass of particles and the hero's box it shares (7u; Alexis, "Oui, 6 706"); its pills a chunk of their own.
-  { chunk: "web", after: ["scene", "cosmos"], cap: 6706 },
+  // 6,834 B with the mass, the hero's box it shares (7u; Alexis, "Oui, 6 706") and its rims' touch; its pills a chunk apart.
+  { chunk: "web", after: ["scene", "cosmos"], cap: 6834 },
   { chunk: "webNames", after: ["scene", "cosmos", "web"], cap: 1219 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },

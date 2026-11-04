@@ -95,6 +95,8 @@ export class Web {
     this.#ground.value.copy(palette.ground);
     this.#tone.value.copy(palette.tone);
     this.#uniforms.uKind.value = [...palette.kinds];
+    this.#uniforms.uTouch.value = [...palette.touches];
+    this.#uniforms.uTouchShare.value = palette.touch;
     this.#uniforms.uShadow.value = palette.shadow;
     this.#uniforms.uFarLight.value = palette.farLight;
     this.#rings.paint(palette.tone);
