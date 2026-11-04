@@ -209,8 +209,8 @@ describe("startGnomcp: gnomcp started read-only", () => {
   it("refuses to start when a profile Jarvis reads the indexer of is not gnomcp's", async () => {
     const made = setupOf();
     const setup = { ...made.setup, profiles: { read: PROFILES.read, indexed: ["onyx", "sapphire"] } };
-    const error: unknown = await startGnomcp(setup).catch((caught: unknown) => caught);
-    expect(error instanceof Error ? error.message : error).toBe("gnomcp: the profile sapphire has no indexer");
+    // Refused before gnomcp is read once the tools are built from the profiles (V8), by gnomcp's own check before.
+    await expect(startGnomcp(setup)).rejects.toThrow(/sapphire/);
   });
 
   it("refuses a gnomcp that stops at start, its last words logged", async () => {
