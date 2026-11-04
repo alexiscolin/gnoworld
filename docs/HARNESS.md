@@ -315,20 +315,56 @@ run is no row: `unsteady.log` keeps it.
 
 ## The boundary: what Claude may do
 
-`.claude/settings.json`, read only when Claude Code starts in this folder or moves into it
-with `/cd`:
+`.claude/settings.json`, read when Claude Code starts in this folder or moves into it with `/cd`, and read again
+whenever the file changes: Claude Code reloads a changed settings file in the running session, hooks and permissions
+included (its settings page, "When edits take effect"). A worktree session reads its own checkout's file, and the main
+checkout's local settings (`settings.local.json` in its `.claude/`) when there are some:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** only `git push` and every gnomcp write (`gno_addpkg`, `gno_call`,
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
 - **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
-  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
+  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads,
+  `scripts/worktree.sh` and `scripts/borrow_node_modules.sh`, which Alexis's terminal runs), an edit of the
+  instructions every session reads (`CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`: Alexis's from 7z on),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
   each such file at `merge.sh`. In his shell the hooks run nothing of the repository but the
   records the sandboxed gate wrote (F076).
-- **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks`, `.git/config` or `.git/worktrees` (so a stale worktree is pruned
-  by Alexis: `git worktree prune`); they reach only the npm and Go registries and github.com.
+- **The sandbox** around shell commands: they write only in the project, the per-user temp folder (`$TMPDIR`, where the
+  worktrees live) and the caches, and in git's shared folder never `.git/hooks`, `.git/config` or a worktree's `commondir`
+  under `.git/worktrees` (so a stale worktree is pruned by Alexis: `git worktree prune`); they reach only the npm and Go
+  registries and github.com.
+- **Every worktree's closed files, to every session** (7z, F4890 to F4892). A relative rule guards the session's own tree alone,
+  and every worktree lives in the temp folder every command may write, so each closed path has twins: each relative `denyWrite`
+  entry again under `/private/tmp/claude-501/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there by both spellings
+  of the temp folder (`//private/tmp/…` and `//tmp/…`, a link the file tools may not follow) and in the main checkout
+  (`~/Server/gnoworld/…`), which the file tools reach from every worktree; and a linked worktree's `.git`, the file that names
+  git's folder (F150's class). `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
+  real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the rules as Claude Code
+  does and, in its sandbox, writes into a sibling to see each write refused. A session carries the twins once its own
+  checkout's `settings.json` does: a branch cut after 7z's merge at once, the chief's session (started in the main checkout,
+  which reads `main`'s) after slice 7 reaches `main`, or sooner if Alexis copies the twins into the main checkout's
+  local settings, which every session of the repository reads.
+- **The instructions at a tree's root and above it** (7z, S4): Claude Code reads `CLAUDE.md` and `CLAUDE.local.md` in every
+  folder above the one it starts in (its memory page), and `.claude`'s own `CLAUDE.md` and `.claude/rules/` there by its source.
+  Closed: to commands in `/private/tmp/claude-501/` and `gnoworld-wt/`, the folders above every worktree a command may write; to
+  the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`. Not closed: those below a tree's root,
+  the memory and the imports (Known limits).
+- **What a session holding the twins no longer writes in another worktree** (7z): everything closed in its own tree,
+  in every worktree under `gnoworld-wt/`. By command: `CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`, `scripts/`,
+  `.githooks/`, `.github/`, the settings, agents, commands, workflows, skills, rules and hooks in `.claude/`, every
+  `package.json`, the lockfile and pnpm's files, the tools' configs (`eslint.config.ts`, `vitest.config.ts`,
+  `stryker.config.json`, `knip.json`, `.jscpd.json`, the `tsconfig`s, Prettier's two), `.gitignore`, `.node-version`, `.npmrc`,
+  `.mcp.json` and the worktree's `.git`. By file tool: the Edit list above (the harness files run outside the sandbox and the
+  instructions) and the secrets' reads, in the main checkout too. So `scripts/worktree.sh` (`git worktree add` writes all of
+  them in the new tree), and any merge or checkout that writes one of them, leave such a session for Alexis's terminal or one
+  of his scripts. What stays: the tree's `docs/` and `adr/` (the ledger, the decisions, the review log), the code,
+  `.claude/tmp/`, the shared folder in the main checkout's `.claude/tmp/`, and git's shared folder (refs, objects, each
+  worktree's index and HEAD).
+- **Alexis's scripts run nothing of a checkout** (7z, R1, S1): a script that writes a closed file for him reads the files it
+  changes and nothing else of the tree, and calls the system's own programs by path (S2-2); the format of what it wrote is the session's gate's to check, in its sandbox, at the
+  commit. Prettier run from a worktree loads a config a session can plant beside the file (a `prettier.config.mjs` in `.claude/`, run
+  with Alexis's rights, reproduced).
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
@@ -370,6 +406,35 @@ costs context in every session.
 - **Claude's sandbox shares Alexis's `.git`** (one repository, Alexis 2026-10-18): it writes
   refs, objects and the index, so it could move or shadow `main` or plant a nested repository
   (F152, F153, F163). The boundary is `main` protected with the CI required.
+- **A glob holds no folder at its `*`, so a command still rewrites a sibling** (F4893, high). The sandbox refuses a rename of a
+  rule's fixed part and of a literal rule's folders, not of the folder a `*` stands for: a command can move a whole worktree out
+  of `gnoworld-wt/`, write its closed files there and move it back (probed on `packages/core`, whose `package.json` only a glob
+  holds; the section `siblings` prints it as a known gap), or plant a whole folder there for herdr's `open.sh`, which opens a
+  session in any folder of the part's name. What closes it is the worktrees out of the temp folder, each session writing only
+  its own, their making and merging out of the sandbox, or a literal rule per worktree written at its making: Alexis's decision.
+- **The file tools still edit another worktree's files that only the sandbox closes** (F4895): `scripts/check.sh`,
+  `scripts/test_hooks.sh`, the tools' configs. The Edit list holds what runs outside the sandbox and the instructions, and no
+  rule tells a session's own tree from another's: one closing a sibling's would close its own. A worktree outside `gnoworld-wt/`
+  has no twin at all (F4897), and every session shares the rest of the temp folder (another session's scratchpad, its test trees,
+  an agent's report before the chief records its message: S5).
+- **Alexis's scripts wait in the main checkout's `.claude/tmp/`, open to every session's file tools** (R2): one can be rewritten
+  before he runs it, or between his check and his run. He copies it into a `mktemp -d` folder, checks the copy against the
+  `shasum -a 256` the chief's message gives, never a file's, and runs the copy (S2-5).
+- **What Alexis runs from a checkout is any session's to rewrite** (7z's round 2, S2-1; F204's class): `deploy/test.sh` and
+  `deploy/`'s compose files are open, in the integration worktree too, so an uncommitted line any session adds there runs with
+  his rights and Docker's socket. Safe only from a tree no session writes: `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha
+  from the chief's message.
+- **In bypass mode the file tools write the programs that run outside the sandbox** (S2-2, claimed, the writes not run):
+  `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then `~/.opencode/bin` and
+  `/opt/homebrew/bin` (the hooks' `python3`); herdr's `open.sh`, the hooks and Alexis's scripts call programs by name; no deny
+  names those folders, nor `~/.claude/skills/` (the two excluded scripts) or `~/Library/LaunchAgents/`. Closing them is Alexis's
+  user settings' to do; `apply-7z.sh` calls only `/usr/bin` and `/bin`.
+- **Instructions below a tree's root and Claude Code's memory stay open** (S2-3, S2-4): a `CLAUDE.md` in any folder of a tree,
+  which Claude Code attaches when it reads a file there (its memory page: subdirectories load on demand), its `.claude/rules/` and
+  skills; the auto memory every worktree session loads (`~/.claude/projects/…/memory/`); `~/.claude/RTK.md`, which
+  `~/.claude/CLAUDE.md` imports. Closing the nested ones needs StrykerJS to leave `CLAUDE.md` out of its copies.
+- **Two commands leave the sandbox** by Alexis's user settings (`sandbox.excludedCommands`): his captures' `fetch.sh` and
+  herdr's `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
   harness is refused at its commit, its files written already: undo it at once
   (`git merge --abort`). A cherry-pick, a rebase or a checkout of Claude's branch runs no such
