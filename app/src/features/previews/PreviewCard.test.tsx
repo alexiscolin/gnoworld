@@ -55,8 +55,8 @@ describe("PreviewCard", () => {
     expect(words).toContain("Open large");
   });
 
-  it("cuts a long path's middle under a line, as frame 104 does", () => {
-    const box = card({ look: "line", capture: { ...CAPTURE, path: "gno.land/r/sample/bubble" } });
+  it("cuts a long path's middle, as frame 104's plate does", () => {
+    const box = card({ capture: { ...CAPTURE, path: "gno.land/r/sample/bubble" } });
     expect(opener(box).textContent).toContain("gno.land/r/…/bubble · captured");
   });
 
