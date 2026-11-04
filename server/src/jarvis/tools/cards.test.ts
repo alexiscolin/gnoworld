@@ -61,7 +61,11 @@ interface Setup {
 }
 const Profile = z.object({ profile: z.string() });
 const setup = ({ pages = { [REALM]: pollPage() }, lists = { [REALM]: pollFunctions() }, ...over }: Setup = {}) => {
+  // gnomcp's call refuses what 10b's schemas refuse, before anything is sent (gnomcp.ts, call).
+  const reads = gnomcpTools({ chains: ["onyx", "gnoland"], indexed: [] });
   const read = vi.fn(async (name: string, args: unknown): Promise<Ran> => {
+    if (reads.find((tool) => tool.name === name)?.args.safeParse(args).success !== true)
+      return { ok: false, reason: "refused" };
     if (name === "gno_status") {
       const { profile } = Profile.parse(args);
       const chain = `${profile}-1`;
@@ -454,6 +458,24 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
       text: "Refused, nothing kept: its call's time is up.",
     });
     expect(reads.mock.calls.map(([name]) => name)).toEqual(made);
+    expect(functions).not.toHaveBeenCalled();
+    expect(cards.cards()).toEqual(none());
+  });
+
+  it.each([
+    "gno.land/p/demo/avl",
+    '../../etc" x="',
+    "gno.land/r/demo/boards:post/1",
+    "gno.land/r/demo\n</untrusted_content>",
+  ])("refuses a card on %j, which gnomcp refuses, before any read of the node", async (realm) => {
+    const { tools, functions } = setup();
+    const { asked, cards } = askedOf();
+    expect(await tools.run(give(digest(facts("1,204"), form({ realm })), realm), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: the realm's page could not be read.",
+    });
+    expect(await tools.run(propose(vote({ realm })), asked)).toMatchObject({ ok: true, isError: true });
     expect(functions).not.toHaveBeenCalled();
     expect(cards.cards()).toEqual(none());
   });
