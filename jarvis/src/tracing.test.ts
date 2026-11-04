@@ -71,6 +71,21 @@ describe("startTracing: where the spans go", () => {
     expect(performance.now() - started).toBeLessThan(1_500);
   });
 
+  it("gives up an export by default once its 5 s are out, to a collector that never answers", async () => {
+    const server = createServer(() => undefined);
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    servers.push(server);
+    const { port } = server.address() as AddressInfo;
+    const tracing = startTracing({ JARVIS_TRACES_URL: `http://127.0.0.1:${String(port)}/v1/traces` });
+    traceQuestion(tracing.tracer, { model: "claude-sonnet-5-5", version: "v1" }).end("answer", 1);
+    const started = performance.now();
+    expect(await tracing.shutdown()).toBe(false);
+    // 5 s and one attempt, the exporter's next retry being past them: far below 20 s, far above the work.
+    expect(performance.now() - started).toBeLessThan(20_000);
+    server.closeAllConnections();
+  }, 30_000);
+
   it("waits 5 s for an export by default: a collector that answers after 300 ms gets the spans", async () => {
     const { url, received } = await collector(300);
     const tracing = startTracing({ JARVIS_TRACES_URL: `${url}/v1/traces` });

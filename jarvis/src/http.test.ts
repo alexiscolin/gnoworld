@@ -52,23 +52,38 @@ const unended = (
     headers: { "content-type": "application/json", ...headers },
   });
   sent.on("error", () => undefined);
-  const status = new Promise<number | undefined>((resolve) => {
+  const answer = new Promise<{ status: number | undefined; connection: string | undefined }>((resolve) => {
     sent.on("response", (response) => {
       response.resume();
-      resolve(response.statusCode);
+      resolve({ status: response.statusCode, connection: response.headers.connection });
     });
   });
   write(sent);
-  return { sent, status };
+  return { sent, status: answer.then(({ status }) => status), connection: answer.then(({ connection }) => connection) };
 };
 
 describe("jarvis's HTTP face: what it answers", () => {
-  it("answers a route's handler with its status and its body as JSON", async () => {
-    const { url } = await served({ "/echo": { POST: echo } });
+  it("answers a route's handler with its status and its body as JSON, its connection kept, and logs nothing", async () => {
+    const { url, events } = await served({ "/echo": { POST: echo } });
     const response = await post(`${url}/echo`, JSON.stringify({ question: "hi" }));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/json; charset=utf-8");
+    expect(response.headers.get("connection")).toBe("keep-alive");
     expect(await response.json()).toEqual({ echoed: { question: "hi" } });
+    expect(events()).toEqual([]);
+  });
+
+  it("refuses a body that is no UTF-8 as refused, never handing it on", async () => {
+    const handler = vi.fn(echo);
+    const { url } = await served({ "/echo": { POST: handler } });
+    const bytes = new Uint8Array([0x22, 0xff, 0xfe, 0x22]);
+    const response = await fetch(`${url}/echo`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: bytes,
+    });
+    expect(await refusal(response)).toEqual({ status: 400, body: { error: "refused" } });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("hands a GET's handler no body", async () => {
@@ -221,13 +236,15 @@ describe("jarvis's HTTP face: what it answers", () => {
     expect(response.status).toBe(415);
   });
 
-  it.each(["application/json; charset=utf-8", "Application/JSON", "application/json;charset=UTF-8"])(
-    "takes JSON written %s",
-    async (type) => {
-      const { url } = await served({ "/echo": { POST: echo } });
-      expect((await post(`${url}/echo`, "[1]", type)).status).toBe(200);
-    },
-  );
+  it.each([
+    "application/json; charset=utf-8",
+    "Application/JSON",
+    "application/json;charset=UTF-8",
+    "application/json ; q=1",
+  ])("takes JSON written %s", async (type) => {
+    const { url } = await served({ "/echo": { POST: echo } });
+    expect((await post(`${url}/echo`, "[1]", type)).status).toBe(200);
+  });
 
   it.each([
     ["no JSON", "{question:"],
@@ -289,7 +306,7 @@ describe("jarvis's HTTP face: what it answers", () => {
   it("refuses a body that declares 10 GB as too_large at once, a few bytes sent", async () => {
     const handler = vi.fn(echo);
     const { url } = await served({ "/echo": { POST: handler } });
-    const { sent, status } = unended(
+    const { sent, status, connection } = unended(
       `${url}/echo`,
       { headers: { "content-length": String(10 * 1024 ** 3) } },
       (request) => {
@@ -297,6 +314,8 @@ describe("jarvis's HTTP face: what it answers", () => {
       },
     );
     expect(await status).toBe(413);
+    // The rest is never read: its connection closes once the refusal is written.
+    expect(await connection).toBe("close");
     sent.destroy();
     expect(handler).not.toHaveBeenCalled();
   });
@@ -381,6 +400,34 @@ describe("jarvis's HTTP face: a request that ends", () => {
     await answer;
     await once(seen ?? new EventTarget(), "abort");
     expect(seen?.aborted).toBe(true);
+  });
+
+  it("logs nothing of a handler that fails once its client left: no fault of jarvis's", async () => {
+    const started = Promise.withResolvers<undefined>();
+    const { url, jarvis, events } = await served({
+      "/slow": {
+        POST: (_body, signal) => {
+          started.resolve(undefined);
+          return new Promise((_resolve, reject) => {
+            signal.addEventListener("abort", () => {
+              reject(new Error("the client left"));
+            });
+          });
+        },
+      },
+    });
+    const leave = new AbortController();
+    const answer = fetch(`${url}/slow`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+      signal: leave.signal,
+    }).catch((error: unknown) => error);
+    await started.promise;
+    leave.abort();
+    await answer;
+    await jarvis.idle();
+    expect(events()).toEqual([]);
   });
 
   it("keeps its handler's signal unaborted once it answered", async () => {

@@ -77,12 +77,15 @@ describe("POST /ask: a question to the loop", () => {
     expect(JarvisAnswer.parse(await response.json())).toEqual({ status: "off" });
   });
 
-  it("refuses a question its schema refuses, off as on, before any work", async () => {
+  it("refuses a question its schema refuses, off as on, before any work, logging the refusal by its route", async () => {
     for (const ask of [undefined, asking({ kind: "spent" })]) {
-      const { post } = await served({ ask });
+      const { post, events } = await served({ ask });
       const response = await post(JARVIS_PATHS.ask, { ...question(), account: "g1..." });
       expect([response.status, ApiError.parse(await response.json())]).toEqual([400, { error: "refused" }]);
       expect(ask?.mock.calls ?? []).toEqual([]);
+      expect(events()).toEqual([
+        { event: "jarvis_refused", route: JARVIS_PATHS.ask, method: "POST", status: 400, error: "refused" },
+      ]);
     }
   });
 
@@ -314,7 +317,9 @@ describe("GET and POST /budgets: the day's budgets, changed at once", () => {
     const response = await post(JARVIS_PATHS.budgets, body);
     expect([response.status, ApiError.parse(await response.json())]).toEqual([400, { error: "refused" }]);
     expect(budget.caps()).toEqual({ ask: 45 * DOLLAR, translate: 5 * DOLLAR });
-    expect(events().filter(({ event }) => event === "jarvis_budget_changed")).toEqual([]);
+    expect(events()).toEqual([
+      { event: "jarvis_refused", route: JARVIS_PATHS.budgets, method: "POST", status: 400, error: "refused" },
+    ]);
   });
 
   it("takes 1 and 500 dollars, the bounds", async () => {

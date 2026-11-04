@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { getEventListeners } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 import { APIConnectionTimeoutError, APIError, APIUserAbortError } from "@anthropic-ai/sdk";
 import fc from "fast-check";
@@ -915,6 +916,42 @@ describe("the loop: a question whose asker left", () => {
     });
     expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
     expect(run.model.requests).toHaveLength(1);
+    run.close();
+  });
+
+  // The SDK never resolves a request after its signal fired (the verifier, 4,000 runs): this pins a guard for a send
+  // that does, as a fake can (the reviewer's V5).
+  it("stops a run at once when the asker left as the model's answer came, never waiting the tool's time", async () => {
+    const left = new AbortController();
+    const signals: AbortSignal[] = [];
+    const run = setup({
+      steps: [
+        () => {
+          left.abort();
+          return Promise.resolve(asking(status()));
+        },
+        ended(),
+      ],
+      run: (_call, asked) => {
+        signals.push(asked.signal);
+        return new Promise((resolve) => {
+          asked.signal.addEventListener("abort", () => {
+            resolve({ ok: false, reason: "down" });
+          });
+        });
+      },
+    });
+    expect(await run.loop.ask(QUESTION, left.signal)).toEqual({ kind: "gone" });
+    expect(signals.map((signal) => signal.aborted)).toEqual([true]);
+    run.close();
+  });
+
+  it("leaves no listener on the question's signal once it ended, whatever its calls", async () => {
+    const left = new AbortController();
+    const eight = () => asking(...Array.from({ length: 8 }, (_, at) => status(`toolu_${String(at)}`)));
+    const run = setup({ steps: [eight(), eight(), ended()] });
+    expect(await run.loop.ask(QUESTION, left.signal)).toMatchObject({ kind: "answer" });
+    expect(getEventListeners(left.signal, "abort")).toEqual([]);
     run.close();
   });
 
