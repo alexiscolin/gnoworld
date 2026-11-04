@@ -1,0 +1,39 @@
+/* The settings: sections under their titles, a choice a row with its words and a muted line under them. */
+@layer components {
+  .choices {
+    /* layout: the choices in a column */
+    display: grid;
+    /* layout: a small step between them */
+    gap: var(--space-2xs);
+    /* layout: a fieldset's own margin, padding and frame taken off: its legend titles it */
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .choice {
+    /* layout: the box and its words on a row */
+    display: flex;
+    /* layout: the box on the words' first line */
+    align-items: baseline;
+    /* layout: a step between the box and the words */
+    gap: var(--space-2xs);
+    font: var(--font-body);
+    cursor: pointer;
+  }
+
+  .help {
+    /* layout: the help on its own line under the choice's words */
+    display: block;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .soon {
+    font: var(--font-body);
+  }
+
+  .file input {
+    font: var(--font-meta);
+  }
+}

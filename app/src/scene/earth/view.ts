@@ -4,7 +4,7 @@
 import { subSolarPoint } from "@gnoworld/core";
 import { Euler, Quaternion, Vector3 } from "three";
 import { SPIN } from "../planet/surfaceShader.ts";
-import { MOTION } from "../watch.ts";
+import { motionOf } from "../watch.ts";
 import type { Circle, EarthDevice, EarthState } from "./device.ts";
 import { buildGlobe, type Globe } from "./globe.ts";
 import { EARTH } from "./look.ts";
@@ -31,7 +31,7 @@ const MOON_SWEEP = 1.5;
 
 export class EarthView implements Ground {
   readonly #device: EarthDevice;
-  readonly #motion = matchMedia(MOTION);
+  readonly #motion = motionOf();
   readonly #rest = new Vector3();
   readonly #marks = new GroundMarks();
   readonly #eye = new EyeTurn(EARTH.lean);

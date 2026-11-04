@@ -176,3 +176,4 @@ export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
 export * from "./space/index.ts";
+export * from "./discovery/index.ts";

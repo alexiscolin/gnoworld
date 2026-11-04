@@ -1,5 +1,6 @@
 // The circle a page keeps for the Earth or a world, read on the page, and what a world's page asks of the scene in it: the worlds' file, read
 // once a visit, and this reader's visits, which the device keeps.
+import { markFirst, stampKey, utcDay } from "@gnoworld/core";
 import { readWorlds } from "../../lib/chain/realms.ts";
 import { readFlag, writeFlag } from "../../lib/flags.ts";
 import type { Circle, EarthState } from "../../scene/earth/device.ts";
@@ -48,8 +49,13 @@ export function worldAsk(circle: Circle, id: string, page: WorldPage): WorldAsk 
     page,
     file: () => readWorlds(import.meta.env.BASE_URL),
     visited: visitedIn(page.universe)(id),
-    remember: () => {
+    remember: (fresh) => {
       writeFlag(visitKey(page.universe, id), "1");
+      // An uncharted world woken by this visit is one this device charted (slice 8): the passport keeps it, and its pill says it.
+      if (fresh)
+        page.store
+          .getState()
+          .deviceActions.change("charted", (held) => markFirst(held, stampKey(page.universe, id), utcDay(new Date())));
     },
   };
 }
