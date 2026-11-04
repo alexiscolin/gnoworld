@@ -16,6 +16,7 @@ export interface DoorsPage {
 
 const LABEL = "[data-labels] [data-world]";
 const OPEN = styles["open"] ?? "open";
+const DOOR = styles["door"] ?? "door";
 // The Earth's label names its place already, "Start here" to a newcomer: it enters at once, and never opens to Enter.
 const direct = (label: HTMLElement) => label.dataset["world"] === EARTH;
 
@@ -62,6 +63,7 @@ export function labelDoors(page: DoorsPage, known: () => Known | undefined, sign
   signal.addEventListener("abort", () => {
     watching.disconnect();
     close();
+    for (const label of document.querySelectorAll(LABEL)) label.classList.remove(DOOR);
   });
   const openOne = (label: HTMLElement) => {
     if (opened.has(label)) return;
@@ -75,25 +77,29 @@ export function labelDoors(page: DoorsPage, known: () => Known | undefined, sign
     const shift = Math.min(label.getBoundingClientRect().width - before.width, before.left);
     if (shift > 0) label.style.setProperty("--_open", `${String(-shift)}px`);
   };
-  hearPointer({ openOne, close, hrefOf, open: page.open }, signal);
+  // A label shows the pointer's hand only where it leads somewhere: a hand-made project's has no page here (F4649).
+  const marked = (label: HTMLElement) => label.classList.toggle(DOOR, hrefOf(label) !== undefined);
+  hearPointer({ openOne, close, hrefOf, marked, open: page.open }, signal);
   hearFocus({ openOne, close, worldAt }, signal);
 }
 
 interface Doors {
   readonly openOne: (label: HTMLElement) => void;
+  readonly marked: (label: HTMLElement) => void;
   readonly close: (label?: HTMLElement) => void;
   readonly hrefOf: (label: HTMLElement) => string | undefined;
   readonly open: (href: string) => void;
 }
 
 // The pointer and the finger: hover opens, a click enters; a first tap opens, a second enters, a tap elsewhere closes.
-function hearPointer({ openOne, close, hrefOf, open }: Doors, signal: AbortSignal): void {
+function hearPointer({ openOne, close, hrefOf, marked, open }: Doors, signal: AbortSignal): void {
   const listening = { signal };
   let finger = false;
   document.addEventListener(
     "pointerover",
     ({ target, pointerType }) => {
       const label = labelAt(target);
+      if (label !== undefined) marked(label);
       if (label !== undefined && pointerType !== "touch") openOne(label);
     },
     listening,

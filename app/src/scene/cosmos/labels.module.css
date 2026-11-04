@@ -1,6 +1,6 @@
 /* The cosmos's labels (frame 4): a dark glass pill beside each body, its name in the text's white, its people in amber figures, its heat in
    a pill of its own; an uncharted signal in violet within a dashed edge; a thin stem from the pill to the body. Over the canvas, under the
-   page; a shown one is a door to its world (ADR-0003, 2e), a hidden one takes no pointer. The script moves each from the window's corner. */
+   page; a shown one takes the pointer, a door to its world where it has a page (ADR-0003, 2e), a hidden one none. The script moves each. */
 @layer components {
   /* The layer is the window's corner: each label is moved from it. */
   .layer {
@@ -39,7 +39,6 @@
     /* raw: f0004's pills, the night at 80% over the warm space behind them: no blur, which is not Baseline yet (F262) */
     background: color-mix(in oklab, var(--color-surface) 80%, transparent);
     box-shadow: inset 0 0 0 var(--line-width) var(--color-line);
-    cursor: pointer;
     transition: opacity var(--motion-base) var(--ease-standard);
   }
 

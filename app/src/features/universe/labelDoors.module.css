@@ -11,6 +11,11 @@
     translate: var(--_open) 0;
   }
 
+  /* A label that leads somewhere, as the pointer finds it: the pointer's hand (F4649). */
+  .door {
+    cursor: pointer;
+  }
+
   .open::before {
     order: 1;
     /* raw: the muted dot before Enter, 8 px in (mock-up 3) */

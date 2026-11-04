@@ -490,14 +490,22 @@ test.describe("a reader who came back, and the labels", () => {
     await arrive(page);
     await running(page);
     await landed(page);
+    // F4649: no label shows the pointer's hand before the pointer finds it a door; a hand-made project's never does.
+    const cursors = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll("[data-labels] [data-world]")].map((label) => getComputedStyle(label).cursor),
+      );
+    expect(new Set(await cursors())).toEqual(new Set(["auto"]));
     // A label sways with the eye, and one the layout hides takes no pointer: each try lays the pointer on a label it reaches now.
+    let world = await shownWorld(page);
     await expect
       .poll(async () => {
-        const world = await shownWorld(page);
+        world = await shownWorld(page);
         await world.hover({ force: true });
         return opened(world);
       }, SLOW)
       .toContain("Enter →");
+    expect(await world.evaluate((label) => getComputedStyle(label).cursor)).toBe("pointer");
     const before = page.url();
     await (await shownWorld(page)).click({ force: true });
     await expect.poll(() => page.url(), SLOW).not.toBe(before);

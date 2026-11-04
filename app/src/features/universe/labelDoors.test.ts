@@ -43,8 +43,9 @@ const labelOf = (id: string) => {
   return found;
 };
 const words = (id: string) => labelOf(id).querySelector("span") ?? labelOf(id);
-// The doors' open class, their stylesheet's.
+// The doors' open class, their stylesheet's, and the one of a label that leads somewhere.
 const OPEN = styles["open"] ?? "open";
+const DOOR = styles["door"] ?? "door";
 const opened = () =>
   [...document.querySelectorAll<HTMLElement>("[data-labels] [data-world]")]
     .filter((one) => one.classList.contains(OPEN))
@@ -74,6 +75,19 @@ afterEach(() => {
 });
 
 describe("a label under the pointer", () => {
+  // F4649: a label with no page, a hand-made project's (7v's ~earth/gnosh.ai), looked like a door and opened nothing: only a door shows the
+  // pointer's hand, and none stays once the doors are gone.
+  it("marks a label that leads somewhere as a door under the pointer, and none with no page", () => {
+    layer({ world: "gov/dao" }, { world: "~earth/gnosh.ai" });
+    labelDoors({ places: PLACES, open }, () => KNOWN, leaving.signal);
+    pointer("pointerover", words("gov/dao"));
+    pointer("pointerover", words("~earth/gnosh.ai"));
+    expect(labelOf("gov/dao").classList.contains(DOOR)).toBe(true);
+    expect(labelOf("~earth/gnosh.ai").classList.contains(DOOR)).toBe(false);
+    leaving.abort();
+    expect(labelOf("gov/dao").classList.contains(DOOR)).toBe(false);
+  });
+
   it("opens to Enter while the pointer is on it, and closes as it leaves", () => {
     layer({ world: "gov/dao" }, { world: "games/go" });
     labelDoors({ places: PLACES, open }, () => KNOWN, leaving.signal);
