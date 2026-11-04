@@ -137,6 +137,49 @@ describe("makePresence", () => {
     expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
   });
 
+  // 7t3's review: the full store's tests that hold under any seat rule.
+  const full = (count: number, presence: ReturnType<typeof makePresence>) => {
+    const ids = Array.from({ length: PRESENCE_WORLDS_MAX }, (_, at) => `ns/w${String(at).padStart(4, "0")}`);
+    presence.record(new Map(ids.map((id) => [id, count])));
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+    return ids;
+  };
+
+  it("refuses a world entering when every held world was active this hour with at least its count, and takes the least busy's otherwise", () => {
+    const { presence } = make();
+    full(2, presence);
+    presence.record(new Map([["a/even", 2]]));
+    expect(presence.history("a/even"), "no count above this hour's").toEqual([]);
+    presence.record(new Map([["a/busier", 3]]));
+    expect(presence.history("a/busier")).toHaveLength(1);
+    expect(presence.history("ns/w0000"), "the least busy, first by id").toEqual([]);
+  });
+
+  it("weighs a held world by its hours as the sample goes on: one active this hour keeps its seat", () => {
+    const { presence, clock } = make();
+    full(2, presence);
+    clock.at = T0 + HOUR;
+    presence.record(
+      new Map([
+        ["a/small", 3],
+        ["ns/w0001", 4],
+        ["a/large", 6],
+        ["a/third", 3],
+      ]),
+    );
+    expect(presence.history("ns/w0001"), "active this hour, as held").toHaveLength(2);
+    expect(["a/small", "a/large", "a/third"].map((id) => presence.history(id).length)).toEqual([1, 1, 1]);
+  });
+
+  it("breaks a tie between worlds equally quiet by id, in whatever order they came", () => {
+    const { presence } = make();
+    const ids = Array.from({ length: PRESENCE_WORLDS_MAX }, (_, at) => `ns/w${String(at).padStart(4, "0")}`).reverse();
+    presence.record(new Map(ids.map((id) => [id, 2])));
+    presence.record(new Map([["a/busier", 3]]));
+    expect(presence.history("ns/w0000")).toEqual([]);
+    expect(presence.history("ns/w0499")).toHaveLength(1);
+  });
+
   it.each([
     ["a count that is negative", -1],
     ["a count that is a fraction", 1.5],
