@@ -536,7 +536,7 @@ if $full; then
 	product=true nginx=false migrations=false
 	! $merge || product=false
 	while IFS= read -r path; do
-		case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
+		case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) product=true ;; '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
 		case $path in deploy/web/* | app/* | packages/* | pnpm-lock.yaml | scripts/check_nginx.py | scripts/nginx.sha256) nginx=true ;; esac
 		case $path in server/src/* | scripts/check_migrations.py) migrations=true ;; esac
 	done <<EOF

@@ -39,6 +39,8 @@ READ = re.compile(r"""new URL\(\s*(?:"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`|([\w.$]+)
 GLOB = re.compile(r"""import\.meta\.glob\b(?:<[^>()]*>)?\(\s*(\[[^\]]*\]|"[^"\n]*"|'[^'\n]*')""")
 QUOTED = re.compile(r"""["'`]([^"'`\n]*)["'`]""")
 QUERY = re.compile(r"""\b(?:from|import)\s*\(?\s*["']([^"'?\n]+)\?(?:raw|url|inline|worker|sharedworker)\b""")
+# A project's setup files run before each of its tests, which import none of them: a change of one asks for every test (F4828).
+SETUP = re.compile(r"""\b(?:setupFiles|globalSetup)\s*:\s*(\[[^\]]*\]|"[^"\n]*"|'[^'\n]*')""")
 # Every way to name a place on disk relative to a file or to the process: each must sit in a READ or a GLOB.
 ANCHOR = re.compile(
     r"import\.meta\.(?:url|dirname|filename|resolve|glob)\b|\b__(?:dirname|filename)\b|process\.cwd\b|require\.resolve\b|\bcreateRequire\b"
@@ -171,10 +173,17 @@ def main():
         )
     if sys.argv[1:] == ["--check"]:
         return
+    try:
+        with open("vitest.config.ts", encoding="utf-8") as f:
+            setups = {p for m in SETUP.finditer(f.read()) for p in QUOTED.findall(m.group(1))}
+    except OSError:
+        setups = set()
     out = set()
     for path in sys.stdin.read().split("\n"):
         if not path or prose(path):
             continue
+        if path in setups:
+            out.update(p for p, plain in sources() if TEST.search(p))
         out.add(path)  # Vitest follows its importers, a JSON or a stylesheet of app/data or app/lab too (F4810)
         if path.startswith(SERVER) and CODE.search(path) and not TEST.search(path):
             out.add(MAIN)
