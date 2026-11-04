@@ -43,8 +43,8 @@ const SCENE_JS = 160_109;
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
 // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04);
-// 17,587 B with the Earth's view's loader and the glide between its two views (7x2, the margin given ahead).
-const COSMOS_JS = 17_587;
+// 17,622 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, the margin given ahead).
+const COSMOS_JS = 17_622;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
@@ -86,6 +86,10 @@ const ARRIVAL_JS = 2070;
 // Earth's view (7x2), leaving the laying at 1,392 B: 1.5 KiB.
 const LAID_NAMED = /\.\/(restRocks-[\w-]+\.js)/;
 const LAID_JS = 1.5 * 1024;
+// The Earth's view (7x2): its stations, scenery, belt, names and caption, a chunk the cosmos's names once it shows, with what it alone
+// brings: 13,053 B and the 256 B margin, never more (the chief, 2026-11-04: a new cap is a new limit, his call).
+const EARTH_VIEW_NAMED = /\.\/(earthView-[\w-]+\.js)/;
+const EARTH_VIEW_JS = 13_309;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_JS = 1325;
@@ -320,6 +324,14 @@ test("a system's view's rocks' laying chunk stays within its cap, apart from the
   page,
 }) => {
   await restLateWithin(page, { named: LAID_NAMED, cap: LAID_JS });
+});
+
+test("the Earth's view's chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
+  const scene = await homeScene(page);
+  const cosmos = await namedIn(page, scene, COSMOS_NAMED);
+  const there = (await Promise.all([scene, cosmos].map((url) => closureOf(page, url)))).flat();
+  const view = await namedIn(page, cosmos, EARTH_VIEW_NAMED);
+  expect(await compressed(page, await ownOf(page, view, there))).toBeLessThanOrEqual(EARTH_VIEW_JS);
 });
 
 test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({
