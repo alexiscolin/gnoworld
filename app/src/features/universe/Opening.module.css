@@ -29,15 +29,17 @@
   }
 
   /* F4643: a soft dark veil behind the words, the dive showing through it: each word keeps 4.5:1 over the brightest the dive shows, a sun's
-     white, and the dive itself is never dimmed. Its edge stands 64 px past the words, more than twice its blur, so it is whole behind them. */
+     white, and the dive itself is never dimmed. Its edge stands 96 px past the words, more than twice its blur, so it is whole behind them. */
   .opening::before {
     position: absolute;
-    inset: calc(-1 * var(--space-2xl)) calc(-1 * var(--space-l));
-    border-radius: var(--radius-l);
+    /* raw: 96 px past the words, the column's own 32 px of side included */
+    inset: -96px -64px;
+    /* raw: a long soft ellipse, no card's corner */
+    border-radius: 50%;
     /* raw: the night at 72%, under which the line's grey keeps 5.4:1 over white */
     background: color-mix(in oklab, var(--color-ink) 72%, transparent);
     /* raw: the veil's soft edge */
-    filter: blur(24px);
+    filter: blur(40px);
     content: "";
   }
 
