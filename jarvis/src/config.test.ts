@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadJarvisConfig, loadServed } from "./config.ts";
+import { z } from "zod";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-jarvis-config-"));
 afterAll(() => {
@@ -465,4 +466,428 @@ it("lists nothing of the server's in its package, and compiles its own folder al
   const tsconfig = readFileSync(new URL("../tsconfig.json", import.meta.url), "utf8");
   expect(tsconfig).toMatch(/"include": \["src"\]/);
   expect(tsconfig).not.toMatch(/\.\.\/server|"references"|"paths"/);
+});
+
+// jarvis in the stack (ADR-0002 §5, §7; 10i's report, "What 10j's deploy needs"): deploy/compose.yaml, the two ways
+// out's lists and the guard's rules, read as text. Docker is refused in this sandbox: deploy/test.sh starts the stack
+// and proves each of these by a request (test-jarvis.sh). Each value is built inside its test (F2356).
+const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+
+// A key's block of a YAML mapping at an indentation, up to the next key at that indentation or less; empty if none.
+function block(text: string, indent: number, key: string): string {
+  const pad = " ".repeat(indent);
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => line === `${pad}${key}:` || line.startsWith(`${pad}${key}: `));
+  if (start === -1) return "";
+  const end = lines.findIndex(
+    (line, at) => at > start && line.trim() !== "" && !line.trimStart().startsWith("#") && line.search(/\S/) <= indent,
+  );
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+// The keys of a mapping's block, one indentation in.
+const keysOf = (text: string, indent: number) =>
+  [...text.matchAll(new RegExp(`^ {${String(indent)}}([A-Za-z_][A-Za-z0-9_-]*):`, "gm"))].map(
+    (match) => match[1] ?? "",
+  );
+const compose = () => read("deploy/compose.yaml");
+const services = () => block(compose(), 0, "services");
+const names = () => keysOf(services(), 2);
+const service = (name: string) => block(services(), 2, name);
+const networks = () => block(compose(), 0, "networks");
+const environment = (name: string) => block(service(name), 4, "environment");
+// A setting of a service's environment, as written.
+const setting = (name: string, key: string) =>
+  new RegExp(`^ {6}${key}: (.*)$`, "m").exec(environment(name))?.[1]?.trim();
+// A service's networks, in its list (`[a, b]`) or its map (`a: {}`).
+function networksOf(name: string): string[] {
+  const listed = block(service(name), 4, "networks");
+  const inline = /^ {4}networks: \[([^\]]*)\]$/m.exec(listed)?.[1];
+  return (inline === undefined ? keysOf(listed, 6) : inline.split(",").map((one) => one.trim())).sort();
+}
+const on = (network: string) =>
+  names()
+    .filter((name) => networksOf(name).includes(network))
+    .sort();
+// The hosts a way out lets out: its default rule's allowed domains, its one list.
+function allowedBy(acl: string): string[] {
+  const allowed = block(block(acl, 0, "default"), 2, "allowed_domains");
+  return [...allowed.matchAll(/^ {4}- "?([^"\s#]+)"?\s*$/gm)].map((match) => match[1] ?? "").sort();
+}
+const Universes = z.array(
+  z.object({ id: z.string(), chainId: z.string(), rpc: z.url(), indexer: z.url(), gnoweb: z.url() }),
+);
+const universes = () => Universes.parse(JSON.parse(read("app/data/universes.json")));
+// A fixed address setting and a subnet setting, by their default.
+const defaultOf = (written: string | undefined, name: string) =>
+  new RegExp(`^\\$\\{${name}:-([0-9./]+)\\}$`).exec(written ?? "")?.[1];
+const subnetOf = (network: string) => /- subnet: (\$\{[A-Z_]+:-[0-9./]+\})$/m.exec(block(networks(), 2, network))?.[1];
+const inSubnet = (address: string, subnet: string) => {
+  const [base = "", bits = "32"] = subnet.split("/");
+  const toNumber = (ip: string) => ip.split(".").reduce((sum, part) => sum * 256 + Number(part), 0);
+  const mask = Number(bits) === 0 ? 0 : 2 ** 32 - 2 ** (32 - Number(bits));
+  return (toNumber(address) & mask) >>> 0 === (toNumber(base) & mask) >>> 0;
+};
+const isPrivate = (subnet: string) => inSubnet(subnet.split("/")[0] ?? "", "172.16.0.0/12");
+
+describe("the jarvis service", () => {
+  it("is built from its own image, as a user of its own, locked as every service, with init to reap gnomcp", () => {
+    const jarvis = service("jarvis");
+    expect(jarvis).toMatch(/^ {4}<<: \*locked$/m);
+    expect(jarvis).toMatch(/^ {6}dockerfile: deploy\/jarvis\/Dockerfile$/m);
+    expect(jarvis).toMatch(/^ {4}user: "65533:65533"$/m);
+    expect(jarvis).toMatch(/^ {4}init: true$/m);
+    for (const cap of ["cpus", "mem_limit", "pids_limit"])
+      expect(jarvis).toMatch(new RegExp(`^ {4}${cap}: \\S+$`, "m"));
+  });
+
+  it("overrides nothing the lock or the image sets: its root, its command, its privileges", () => {
+    const keys = keysOf(service("jarvis"), 4);
+    expect(keys).toEqual([
+      "build",
+      "user",
+      "init",
+      "stop_grace_period",
+      "networks",
+      "environment",
+      "secrets",
+      "volumes",
+      "cpus",
+      "mem_limit",
+      "pids_limit",
+      "healthcheck",
+    ]);
+    expect(service("jarvis")).toMatch(/^ {4}<<: \*locked$/m);
+  });
+
+  it("is off unless JARVIS says on, the same setting the server's door reads", () => {
+    expect(setting("jarvis", "JARVIS")).toBe("${JARVIS:-off}");
+    expect(setting("server", "JARVIS")).toBe("${JARVIS:-off}");
+  });
+
+  it("is given only the settings it reads, none naming another key or moving its way out", () => {
+    expect(keysOf(environment("jarvis"), 6).sort()).toEqual(
+      [
+        "JARVIS",
+        "JARVIS_HOST",
+        "JARVIS_PORT",
+        "JARVIS_HOSTNAMES",
+        "JARVIS_DATABASE",
+        "JARVIS_BUDGET_USD",
+        "JARVIS_TRANSLATION_BUDGET_USD",
+        "JARVIS_DRAIN_S",
+        "ANTHROPIC_API_KEY_FILE",
+        "JARVIS_GNOMCP_COMMAND",
+        "JARVIS_GNOMCP_CONFIG",
+        "JARVIS_PROFILES",
+        "JARVIS_INDEXER_PROFILES",
+        "JARVIS_GNOSCOPE",
+        "OTEL_SERVICE_NAME",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "NODE_USE_ENV_PROXY",
+      ].sort(),
+    );
+    expect(setting("jarvis", "NO_PROXY")).toBe("localhost,127.0.0.1");
+    expect(setting("jarvis", "JARVIS_BUDGET_USD")).toBe("${JARVIS_BUDGET_USD:-3}");
+    expect(setting("jarvis", "JARVIS_TRANSLATION_BUDGET_USD")).toBe("${JARVIS_TRANSLATION_BUDGET_USD:-1}");
+  });
+
+  it("listens on its address on the network it shares with the server alone, for the name the server asks", () => {
+    const address = defaultOf(setting("jarvis", "JARVIS_HOST"), "JARVIS_ADDRESS") ?? "";
+    expect(address).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
+    expect(block(service("jarvis"), 4, "networks")).toContain(`ipv4_address: \${JARVIS_ADDRESS:-${address}}`);
+    expect(setting("jarvis", "JARVIS_PORT")).toBe('"8081"');
+    expect(setting("jarvis", "JARVIS_HOSTNAMES")).toBe("jarvis");
+    expect(setting("server", "JARVIS_URL")).toBe("http://jarvis:8081");
+    // The server's way out would carry its questions to the proxy: jarvis is named among the hosts it reaches itself.
+    expect(setting("server", "NO_PROXY")?.split(",")).toContain("jarvis");
+    expect(inSubnet(address, defaultOf(subnetOf("jarvis"), "JARVIS_SUBNET") ?? "")).toBe(true);
+  });
+
+  it("keeps its file on a volume only it mounts", () => {
+    expect(setting("jarvis", "JARVIS_DATABASE")).toBe("/data/jarvis.db");
+    expect(block(service("jarvis"), 4, "volumes").split("\n").slice(1)).toEqual(["      - jarvis:/data"]);
+    const mounting = names().filter((name) => /^ {6}- jarvis:/m.test(block(service(name), 4, "volumes")));
+    expect(mounting).toEqual(["jarvis"]);
+    expect(block(compose(), 0, "volumes")).toMatch(/^ {2}jarvis: \{\}$/m);
+  });
+
+  it("holds Anthropic's key alone, as a secret file it reads only when on, and no other service holds it", () => {
+    expect(setting("jarvis", "ANTHROPIC_API_KEY_FILE")).toBe("/run/secrets/anthropic_api_key");
+    expect(service("jarvis")).toMatch(/^ {4}secrets: \[anthropic_api_key\]$/m);
+    expect(names().filter((name) => /anthropic/i.test(service(name)))).toEqual(["jarvis"]);
+    expect(block(compose(), 0, "secrets")).toMatch(
+      /^ {2}anthropic_api_key:\n {4}file: \$\{ANTHROPIC_API_KEY_FILE:-\.\/secrets\/anthropic_api_key\}$/m,
+    );
+  });
+
+  it("waits past its drain by 15 s at least before it is killed, and is never given NODE_OPTIONS", () => {
+    const drain = Number(/^"(\d+)"$/.exec(setting("jarvis", "JARVIS_DRAIN_S") ?? "")?.[1]);
+    const grace = Number(/^ {4}stop_grace_period: (\d+)s$/m.exec(service("jarvis"))?.[1]);
+    expect(drain).toBeGreaterThan(0);
+    expect(grace - drain).toBeGreaterThanOrEqual(15);
+    expect(grace - drain).toBeLessThanOrEqual(20);
+    expect(compose()).not.toMatch(/NODE_OPTIONS/);
+  });
+
+  it("starts gnomcp from the image with its read-only settings, on the profiles named after the data's universes", () => {
+    expect(setting("jarvis", "JARVIS_GNOMCP_COMMAND")).toBe("/gnomcp/gnomcp");
+    expect(setting("jarvis", "JARVIS_GNOMCP_CONFIG")).toBe("/app/deploy/jarvis/gnomcp.toml");
+    const ids = universes().map((universe) => universe.id);
+    expect(setting("jarvis", "JARVIS_PROFILES")?.split(",").sort()).toEqual([...ids].sort());
+    expect(setting("jarvis", "JARVIS_INDEXER_PROFILES")?.split(",").sort()).toEqual([...ids].sort());
+    expect(setting("jarvis", "JARVIS_GNOSCOPE")).toBe("${JARVIS_GNOSCOPE:-off}");
+  });
+
+  it("asks a health check jarvis answers on or off, by the name it takes", () => {
+    const test = block(block(service("jarvis"), 4, "healthcheck"), 6, "test");
+    expect(test).toContain("path: '/budgets'");
+    expect(test).toContain("headers: { host: 'jarvis' }");
+    expect(test).toContain("host: process.env.JARVIS_HOST");
+  });
+
+  it("leaves the server's names on the node the server's way out lets out", () => {
+    expect(setting("server", "JARVIS_NAMES_RPC")).toBeUndefined();
+    expect(allowedBy(read("deploy/egress/acl.yaml"))).toContain("rpc.gno.land");
+  });
+});
+
+describe("the demo's ceiling", () => {
+  it("holds every service's caps, jarvis's and its way out's with them, under 2.4 cores and 2 GB (question 10j-4)", () => {
+    const units = new Map([
+      ["", 1],
+      ["k", 2 ** 10],
+      ["m", 2 ** 20],
+      ["g", 2 ** 30],
+    ]);
+    const size = (written: string) => {
+      const [, number = "0", unit = ""] = /^(\d+)([kmg]?)$/.exec(written) ?? [];
+      return Number(number) * (units.get(unit) ?? Number.NaN);
+    };
+    const capOf = (name: string, key: string) => new RegExp(`^ {4}${key}: (\\S+)$`, "m").exec(service(name))?.[1];
+    expect(names()).toEqual(expect.arrayContaining(["jarvis", "egress_jarvis"]));
+    for (const name of names()) expect(capOf(name, "cpus"), name).toBeDefined();
+    const cores = names().reduce((sum, name) => sum + Number(capOf(name, "cpus")), 0);
+    const bytes = names().reduce((sum, name) => sum + size(capOf(name, "mem_limit") ?? "0"), 0);
+    expect(cores).toBeLessThanOrEqual(2.4 + 1e-9);
+    expect(bytes).toBeLessThanOrEqual(2 ** 31);
+    expect(read("deploy/test.sh")).toContain("sys.exit(float(c) > 2.4 or int(m) > 2**31)");
+    // And the running demo's, which counts the containers it finds.
+    expect(read("deploy/test.sh")).toContain(
+      "for id in $ts $guard $web $ergo $server $egress $jarvis $egress_jarvis; do",
+    );
+    expect(read("deploy/test.sh")).toContain(`[ "$cpus" -le 2400000000 ]`);
+  });
+});
+
+describe("gnomcp's settings in the image", () => {
+  const toml = () => read("deploy/jarvis/gnomcp.toml");
+  const profile = (name: string) => toml().split(`[${name}]\n`)[1]?.split(/^\[/m)[0] ?? "";
+  const field = (name: string, key: string) => new RegExp(`^${key} = "([^"]*)"$`, "m").exec(profile(name))?.[1];
+  const keys = (name: string) => keysOfToml(profile(name));
+  const keysOfToml = (text: string) => [...text.matchAll(/^([a-z-]+) = /gm)].map((match) => match[1] ?? "").sort();
+
+  it("name each of jarvis's universes on its own chain, node, page and indexer, and nothing that writes", () => {
+    const profiles = [...toml().matchAll(/^\[([a-z0-9_-]+)\]$/gm)].map((match) => match[1] ?? "").sort();
+    expect(profiles).toEqual([...universes().map((one) => one.id), "local", "sapphire", "testnet"].sort());
+    for (const universe of universes()) {
+      expect(keys(universe.id)).toEqual(["chain-id", "gnoweb-url", "rpc-url", "tx-indexer-url"]);
+      expect(field(universe.id, "chain-id")).toBe(universe.chainId);
+      expect(field(universe.id, "rpc-url")).toBe(universe.rpc);
+      expect(field(universe.id, "gnoweb-url")).toBe(universe.gnoweb);
+      expect(field(universe.id, "tx-indexer-url")).toBe(universe.indexer);
+    }
+  });
+
+  it("redefine gnomcp's built-ins on the mainnet's chain, which gnomcp 0.11.0 never writes to", () => {
+    // gnomcp 0.11.0 writes to dev and testnet chains alone (internal/profiles/validate.go, testnetChainNames).
+    const mainnet = universes().find((one) => one.chainId === "gnoland-1");
+    for (const builtin of ["local", "sapphire", "testnet"]) {
+      expect(keys(builtin)).toEqual(["chain-id", "rpc-url"]);
+      expect(field(builtin, "chain-id")).toBe("gnoland-1");
+      expect(field(builtin, "rpc-url")).toBe(mainnet?.rpc);
+    }
+  });
+});
+
+describe("the networks", () => {
+  it("are every one internal, with no gateway, but the guard's own way out", () => {
+    for (const name of keysOf(networks(), 2).filter((one) => one !== "outside")) {
+      const network = block(networks(), 2, name);
+      expect(network, name).toMatch(/^ {4}internal: true$/m);
+      expect(network, name).toMatch(/^ {6}com\.docker\.network\.bridge\.gateway_mode_ipv4: isolated$/m);
+      expect(network, name).toMatch(/^ {6}com\.docker\.network\.bridge\.gateway_mode_ipv6: isolated$/m);
+    }
+    expect(keysOf(networks(), 2)).toEqual(
+      expect.arrayContaining(["inside", "jarvis", "jarvis_out", "admin", "outside"]),
+    );
+    expect(on("outside")).toEqual(["guard"]);
+  });
+
+  it("put jarvis on its two alone, and the server on the internal one, jarvis's and the admin API's", () => {
+    expect(networksOf("jarvis")).toEqual(["jarvis", "jarvis_out"]);
+    expect(networksOf("server")).toEqual(["admin", "inside", "jarvis"]);
+    expect(on("jarvis")).toEqual(["jarvis", "server"]);
+    expect(on("jarvis_out")).toEqual(["guard", "jarvis"]);
+    expect(on("admin")).toEqual(["server"]);
+    expect(names().filter((name) => service(name).includes("network_mode: service:jarvis"))).toEqual([]);
+  });
+
+  it("open the admin API on the server's address of its own network, never on the others", () => {
+    const address = defaultOf(setting("server", "ADMIN_HOST"), "ADMIN_ADDRESS") ?? "";
+    expect(block(service("server"), 4, "networks")).toContain(`ipv4_address: \${ADMIN_ADDRESS:-${address}}`);
+    expect(setting("server", "ADMIN_PORT")).toBe('"8082"');
+    expect(inSubnet(address, defaultOf(subnetOf("admin"), "ADMIN_SUBNET") ?? "")).toBe(true);
+  });
+
+  it("have private, disjoint subnets by default, so the guard's refusal of private addresses covers them", () => {
+    const subnets = [
+      defaultOf(subnetOf("inside"), "INSIDE_SUBNET"),
+      defaultOf(subnetOf("jarvis"), "JARVIS_SUBNET"),
+      defaultOf(subnetOf("admin"), "ADMIN_SUBNET"),
+    ].map((one) => one ?? "");
+    for (const subnet of subnets) expect(isPrivate(subnet), subnet).toBe(true);
+    for (const [at, subnet] of subnets.entries())
+      for (const other of subnets.slice(at + 1)) expect(inSubnet(other.split("/")[0] ?? "", subnet)).toBe(false);
+  });
+});
+
+describe("jarvis's way out", () => {
+  it("is a proxy of its own, locked as the server's, in the guard's network, on its own port and list", () => {
+    const egress = service("egress_jarvis");
+    expect(egress).toMatch(/^ {4}<<: \*locked$/m);
+    expect(egress).toMatch(/^ {4}profiles: \[demo\]$/m);
+    expect(egress).toMatch(/^ {4}user: "65532:65532"$/m);
+    expect(egress).toMatch(/^ {4}network_mode: service:guard$/m);
+    expect(egress).toMatch(/^ {6}guard: \{ condition: service_healthy, restart: true \}$/m);
+    expect(egress).toMatch(/^ {6}test: \[CMD, \/probe, "127\.0\.0\.1:4751"\]$/m);
+    for (const cap of ["cpus", "mem_limit", "pids_limit"])
+      expect(egress).toMatch(new RegExp(`^ {4}${cap}: \\S+$`, "m"));
+    // smokescreen v0.1.0 applies its flags after its config file (cmd/smokescreen.go:195-292): the port and list win.
+    // A flow list of quoted words, on one line or as Prettier lays it out.
+    const entry = block(egress, 4, "entrypoint")
+      .replace(/^ {4}entrypoint:/, "")
+      .replace(/,(\s*)\]/, "$1]");
+    expect(z.array(z.string()).parse(JSON.parse(entry))).toEqual([
+      "/smokescreen",
+      "--config-file",
+      "/etc/smokescreen/config.yaml",
+      "--listen-port",
+      "4751",
+      "--egress-acl-file",
+      "/etc/smokescreen/jarvis-acl.yaml",
+    ]);
+    expect(setting("jarvis", "HTTPS_PROXY")).toBe("${JARVIS_EGRESS_PROXY:-http://guard:4751}");
+    expect(setting("jarvis", "NODE_USE_ENV_PROXY")).toBe('"1"');
+    expect(read("deploy/egress/Dockerfile")).toMatch(
+      /^COPY deploy\/egress\/config\.yaml deploy\/egress\/acl\.yaml deploy\/egress\/jarvis-acl\.yaml \/out\/etc\/$/m,
+    );
+    expect(read(".dockerignore").split("\n")).toContain("!deploy/egress/jarvis-acl.yaml");
+  });
+
+  it("lets out Anthropic's API, each universe's node and indexer, and gnoscope, by full name, and nothing else", () => {
+    const hostOf = (url: string) => new URL(url).hostname;
+    const wanted = [
+      "api.anthropic.com",
+      "gnoscope.com",
+      ...universes().flatMap((universe) => [hostOf(universe.rpc), hostOf(universe.indexer)]),
+    ].sort();
+    expect(allowedBy(read("deploy/egress/jarvis-acl.yaml"))).toEqual(wanted);
+  });
+
+  it.each(["deploy/egress/acl.yaml", "deploy/egress/jarvis-acl.yaml"])(
+    "%s enforces its one list: no service rule, no other list, no wildcard",
+    (path) => {
+      const acl = read(path);
+      expect(keysOf(acl, 0)).toEqual(["version", "services", "default"]);
+      expect(acl).toMatch(/^services: \[\]$/m);
+      expect(keysOf(block(acl, 0, "default"), 2)).toEqual(["project", "action", "allowed_domains"]);
+      expect(block(acl, 0, "default")).toMatch(/^ {2}action: enforce$/m);
+      expect([...acl.matchAll(/^\s+- /gm)].length).toBe(allowedBy(acl).length);
+      expect(acl).not.toMatch(/\*/);
+    },
+  );
+
+  it("shares no host with the server's list but a node both read", () => {
+    const server = new Set(allowedBy(read("deploy/egress/acl.yaml")));
+    const shared = allowedBy(read("deploy/egress/jarvis-acl.yaml")).filter((host) => server.has(host));
+    const nodes = universes().map((universe) => new URL(universe.rpc).hostname);
+    expect(shared.filter((host) => !nodes.includes(host))).toEqual([]);
+    expect(server.has("api.anthropic.com")).toBe(false);
+    expect(server.has("gnoscope.com")).toBe(false);
+  });
+});
+
+describe("the guard's rules", () => {
+  const rules = () => read("deploy/guard/guard.sh");
+  const at = (line: string) => rules().indexOf(line);
+  it("let jarvis's proxy be reached from jarvis's network alone, and the server's from the internal one alone", () => {
+    expect(rules()).toMatch(/^jarvis_out=\$\(ip route get "\$jarvis"/m);
+    const accept = at(`echo "-A INPUT -i $jarvis_out -p tcp --dport 4751 -j ACCEPT"`);
+    const reject = at(`echo '-A INPUT -p tcp --dport 4751 -j REJECT'`);
+    const closed = at(`echo "-A INPUT -i $jarvis_out -j REJECT"`);
+    expect(accept).toBeGreaterThan(-1);
+    expect(reject).toBeGreaterThan(accept);
+    expect(closed).toBeGreaterThan(accept);
+    expect(at(`echo "-A INPUT -i $inside -p tcp --dport 4750 -j ACCEPT"`)).toBeGreaterThan(-1);
+    expect(at(`echo '-A INPUT -p tcp --dport 4750 -j REJECT'`)).toBeGreaterThan(-1);
+  });
+
+  it("send jarvis's network nothing but its proxy's replies", () => {
+    const outputs = [...rules().matchAll(/-A OUTPUT -o \$jarvis_out [^"']*/g)].map((match) => match[0]);
+    expect(outputs).toEqual([
+      "-A OUTPUT -o $jarvis_out -p tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT",
+    ]);
+  });
+
+  it("wait for jarvis, whose address names its network", () => {
+    expect(block(service("guard"), 4, "depends_on")).toMatch(/^ {6}jarvis: \{ condition: service_healthy \}$/m);
+  });
+});
+
+// What only Docker proves, read as text so a check or a fault planted for it is not lost (deploy/test.sh, F2763).
+describe("deploy/test.sh", () => {
+  const script = () => read("deploy/test.sh");
+  const jarvis = () => read("deploy/test-jarvis.sh");
+  it("starts jarvis and its way out with a made-up key, and runs jarvis's proofs", () => {
+    expect(script()).toContain(`export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key"`);
+    expect(script()).toMatch(/for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key; do/);
+    expect(script()).toMatch(/up -d --build --wait web guard ergo server egress jarvis egress_jarvis/);
+    expect(script()).toContain(`. "$here/test-jarvis.sh"`);
+    expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
+    expect(script()).toMatch(/hardened "\$jarvis" jarvis$/m);
+  });
+
+  it("proves jarvis's networks, its way out, its file, its key and its image on the running stack", () => {
+    for (const check of [
+      "jarvis sits on its two networks only",
+      "jarvis's network holds jarvis and the server alone",
+      "the admin API's network holds the server alone",
+      "the server reads jarvis's budgets by its name, not through its way out",
+      "jarvis, off by default, answers a question off",
+      "nothing on the internal network reaches jarvis",
+      "jarvis's way out lets six hosts out",
+      "jarvis reaches Anthropic's API through its way out",
+      "jarvis cannot use the server's way out",
+      "the guard's rules refuse 4751 but from jarvis's network",
+      "no other service mounts it",
+      "the server holds no Anthropic key",
+      "jarvis waits 35 s for its drain",
+      "the image holds no test, bench or test helper",
+    ])
+      expect(jarvis(), check).toContain(check);
+  });
+
+  it("plants each of jarvis's faults in `--mutants`, each killed by its own check", () => {
+    const faults: [string, string][] = [
+      ["a host added to jarvis's way out", "jarvis's way out lets six hosts out"],
+      ["jarvis's way out open to the internal network", "the guard's rules refuse 4751 but from jarvis's network"],
+      ["the guard drops jarvis's replies", "jarvis reaches Anthropic's API through its way out"],
+      ["jarvis on the internal network", "jarvis sits on its two networks only"],
+      ["jarvis's root writable", "jarvis: read-only root"],
+      ["jarvis's key given to the server", "the server holds no Anthropic key"],
+      ["jarvis killed before its drain ends", "jarvis waits 35 s for its drain"],
+    ];
+    for (const [fault, by] of faults) expect(script()).toContain(`mutant "${fault}" "${by}"`);
+  });
 });

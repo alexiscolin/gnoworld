@@ -2,6 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { z } from "zod";
+import { doorSettings } from "../door/settings.ts";
 import { defaultUniverse } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
@@ -89,20 +91,31 @@ const OTHER_HOSTS = data.filter((universe) => universe.default !== true).map((un
 /** The hosts the list allows, as test.sh reads them: each `- name` line, quotes dropped. */
 const allowed = [...acl.matchAll(/^\s+-\s*"?([^"\s#]+)"?\s*$/gm)].map((match) => match[1]);
 
+// The node the door reads a mainnet name on (JARVIS_NAMES_RPC, D120), by the door's own default, never a copy of it.
+const namesHost = () => new URL(z.object(doorSettings()).parse({}).JARVIS_NAMES_RPC).hostname;
+
 describe("the way out's list", () => {
-  it("names CoinGecko's API, OpenAI's and the default universe's RPC host, each by its full name, and nothing else", () => {
+  it("names CoinGecko's API, OpenAI's, the default universe's RPC host and the names' node, by full name, and nothing else", () => {
     expect(DEFAULT_HOST).not.toBe("");
-    expect([...allowed].sort()).toEqual(["api.coingecko.com", "api.openai.com", DEFAULT_HOST].sort());
+    expect([...allowed].sort()).toEqual(["api.coingecko.com", "api.openai.com", DEFAULT_HOST, namesHost()].sort());
   });
 
   it("names the host the data's default universe has now, not a copy that drifts from it", () => {
     expect(allowed).toContain(DEFAULT_HOST);
     expect(DEFAULT_HOST).toBe("rpc.onyx.testnets.gno.land");
+    expect(namesHost()).toBe("rpc.gno.land");
   });
 
-  it("lets no other universe's RPC out, nor a domain by a wildcard", () => {
+  it("lets no other universe's RPC out but the names' node, no indexer and no gnoweb, nor a domain by a wildcard", () => {
     expect(OTHER_HOSTS.length).toBeGreaterThan(0);
-    for (const host of OTHER_HOSTS) expect(allowed).not.toContain(host);
+    for (const host of OTHER_HOSTS.filter((other) => other !== namesHost())) expect(allowed).not.toContain(host);
+    const pages = z
+      .array(z.object({ indexer: z.url(), gnoweb: z.url() }))
+      .parse(JSON.parse(read("app/data/universes.json")));
+    for (const { indexer, gnoweb } of pages) {
+      expect(allowed).not.toContain(hostOf(indexer));
+      expect(allowed).not.toContain(hostOf(gnoweb));
+    }
     expect(acl).not.toMatch(/\*/);
   });
 });
@@ -115,15 +128,17 @@ describe("the server's data", () => {
 });
 
 describe("deploy/test.sh", () => {
-  it("expects the list's hosts from the data, three of them, and no other host reached through the way out", () => {
-    expect(script).toMatch(/the way out lets three hosts out/);
-    expect(script).not.toMatch(/the way out lets two hosts out/);
+  it("expects the list's hosts from the data and the door, four of them, and no other host reached through the way out", () => {
+    expect(script).toMatch(/the way out lets four hosts out/);
+    expect(script).not.toMatch(/the way out lets (two|three) hosts out/);
     expect(script).toContain("app/data/universes.json");
   });
 
-  it("proves the server reaches the default RPC through the way out, and a universe's other RPC stays refused", () => {
+  it("proves the server reaches the default RPC and the names' node through the way out, and an indexer stays refused", () => {
     expect(script).toMatch(/the server reaches the default universe's RPC through the way out/);
-    expect(script).toMatch(/"https:\/\/\$other_rpc\/"/);
+    expect(script).toMatch(/the server reaches the names' node through the way out/);
+    expect(script).toMatch(/"https:\/\/\$other_indexer\/"/);
+    expect(script).not.toMatch(/"https:\/\/\$other_rpc\/"/);
   });
 
   it("refuses a look-alike of the default RPC's host and its sibling gnoweb host, as CoinGecko's have, and sees the timer write a block", () => {
@@ -136,7 +151,10 @@ describe("deploy/test.sh", () => {
     expect(script).toMatch(
       /mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC"/,
     );
-    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets three hosts out"/);
-    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets three hosts out"/);
+    expect(script).toMatch(/mutant "another chain's node let out" "the way out lets four hosts out"/);
+    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets four hosts out"/);
+    expect(script).toMatch(
+      /mutant "the names' node dropped from the way out" "the server does not reach the names' node"/,
+    );
   });
 });

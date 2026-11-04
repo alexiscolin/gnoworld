@@ -565,11 +565,12 @@ describe("the prices timer: when it runs", () => {
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("the egress proxy's list", () => {
-  // The block height (decision of 2026-10-31) adds one host, the default universe's RPC; universes.test.ts ties it to the data.
-  it("lets out CoinGecko's API, OpenAI's and the default universe's RPC, and no other host", () => {
+  // The block height (decision of 2026-10-31) adds the default universe's RPC, the door's names (D120) the mainnet's node;
+  // universes.test.ts ties both to their sources.
+  it("lets out CoinGecko's API, OpenAI's, the default universe's RPC and the names' node, and no other host", () => {
     const acl = read("../../../deploy/egress/acl.yaml");
     const hosts = [...acl.matchAll(/^\s+-\s+(\S+)\s*$/gm)].map((match) => match[1]);
-    expect(hosts).toEqual(["api.coingecko.com", "api.openai.com", "rpc.onyx.testnets.gno.land"]);
+    expect(hosts).toEqual(["api.coingecko.com", "api.openai.com", "rpc.onyx.testnets.gno.land", "rpc.gno.land"]);
   });
 
   it("names CoinGecko by the API's own name, never a wildcard or its parent domain", () => {
@@ -611,8 +612,8 @@ describe("the stack", () => {
 describe("deploy/test.sh", () => {
   const script = read("../../../deploy/test.sh");
 
-  it("expects the way out's list to be exactly CoinGecko's API, OpenAI's and the default universe's RPC", () => {
-    expect(script).toMatch(/printf '%s\\n' api\.coingecko\.com api\.openai\.com "\$rpc_host"/);
+  it("expects the way out's list to be exactly CoinGecko's API, OpenAI's, the default universe's RPC and the names' node", () => {
+    expect(script).toMatch(/printf '%s\\n' api\.coingecko\.com api\.openai\.com "\$rpc_host" "\$names_host"/);
   });
 
   it("checks the server may write in the folder of markets.json, on its read-only root", () => {
@@ -621,7 +622,7 @@ describe("deploy/test.sh", () => {
 
   it("names its mutants by checks that exist: the renamed one cannot be orphaned (F695)", () => {
     expect(script).not.toContain("lets one host out");
-    for (const wanted of ["the way out lets three hosts out", "the server does not reach CoinGecko"]) {
+    for (const wanted of ["the way out lets four hosts out", "the server does not reach CoinGecko"]) {
       // Once in a mutant that must be killed by the check, once in the check itself.
       expect(script.split(wanted).length - 1, wanted).toBeGreaterThanOrEqual(2);
     }

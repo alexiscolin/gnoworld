@@ -43,5 +43,15 @@ packages/chain/src/testing
 deploy/probe/*_test.go
 !deploy/egress/config.yaml
 !deploy/egress/acl.yaml
+!deploy/egress/jarvis-acl.yaml
+# jarvis's image (deploy/jarvis/Dockerfile): its workspace, its skills and gnomcp's settings, without its tests, its
+# benches and its test helpers (testing/outbound.ts would move Anthropic's traffic); the places' data comes with !app.
+!jarvis/package.json
+!jarvis/src
+jarvis/src/**/*.test.ts
+jarvis/src/**/*.bench.ts
+jarvis/src/testing
+!jarvis/skills
+!deploy/jarvis/gnomcp.toml
 # Named as well, should the list above ever open: the demo's secrets never reach a build.
 deploy/secrets
