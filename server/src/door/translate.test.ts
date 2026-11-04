@@ -222,7 +222,22 @@ describe("an account's translations a day (the review's V1, D194)", () => {
     expect([statuses.slice(0, 200).every((status) => status === 200), statuses[200]]).toEqual([true, 429]);
     expect(work.filter((step) => step === "jarvis")).toHaveLength(200);
     expect((await translate({ token: DOOR.benToken })).status).toBe(200);
-    clock.now += 24 * 60 * 60_000;
+    clock.now += 23 * 60 * 60_000;
+    expect((await translate()).status).toBe(429);
+    clock.now += 60 * 60_000;
     expect((await translate()).status).toBe(200);
+  });
+
+  it("logs the day's refusal with its account", async () => {
+    const { translate, events } = setup({ perMinute: 1_000 });
+    for (let at = 0; at < 201; at += 1) await translate();
+    const account = createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex");
+    expect(JSON.parse(events().at(-1) ?? "") as unknown).toEqual({
+      event: "jarvis_refused",
+      route: "/api/jarvis/translate",
+      status: 429,
+      error: "quota",
+      account,
+    });
   });
 });

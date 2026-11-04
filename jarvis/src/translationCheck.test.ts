@@ -99,4 +99,9 @@ describe("keeps", () => {
     const joined = `Bravo ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`;
     expect(keeps(joined, `Well done ${char(0x1f469, 0x200d, 0x1f4bb)} 1,204 votes.`)).toBe(true);
   });
+
+  it("keeps a translation that breaks a line its original wrote on one, and drops one trading a hidden character for another", () => {
+    expect(keeps("The poll closes today.", "Le sondage\nferme aujourd'hui.")).toBe(true);
+    expect(keeps(`Bravo${char(0x200d)} 1,204.`, `Bravo${char(0x202e)} 1,204.`)).toBe(false);
+  });
 });

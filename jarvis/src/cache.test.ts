@@ -35,7 +35,7 @@ const file = () => {
 describe("a cache's bound in bytes", () => {
   it.each([0, -1, 1.5, Number.NaN])("is a count of bytes from 1, not %s", (bound) => {
     const { db } = file();
-    expect(() => boundOf(db, "translations", bound)).toThrow(RangeError);
+    expect(() => boundOf(db, "translations", bound)).toThrow(new RangeError("a cache's bound is a count of bytes"));
   });
 
   it("takes a bound of one byte, the row just written always kept", () => {

@@ -216,9 +216,14 @@ describe("a realm's digest through the door", () => {
     expect((await digest()).status).toBe(200);
     expect(await answerOf(await digest())).toEqual([429, { error: "full" }]);
     expect(sent).toHaveLength(1);
-    expect(events().at(-1)).toMatch(
-      /"event":"jarvis_refused","route":"\/api\/jarvis\/digest","status":429,"error":"quota"/,
-    );
+    const account = createHmac("sha256", DOOR.pepper).update(DOOR.anna).digest("hex");
+    expect(JSON.parse(events().at(-1) ?? "") as unknown).toEqual({
+      event: "jarvis_refused",
+      route: "/api/jarvis/digest",
+      status: 429,
+      error: "quota",
+      account,
+    });
     expect((await digest({ token: DOOR.benToken })).status).toBe(200);
   });
 });

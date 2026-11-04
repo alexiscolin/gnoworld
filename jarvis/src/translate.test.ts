@@ -423,4 +423,20 @@ describe("a long line's block (the verifier's M7)", () => {
     expect(sent).toContain(line);
     expect(sent).not.toContain("cut_at_byte");
   });
+
+  it("counts a remade row in place of the one it replaced, so the rows that fit still fit", async () => {
+    const steps = [said("Un."), said("Deux."), said("Un.")];
+    const row = (words: string) => 64 + 2 + Buffer.byteLength(words);
+    const { translator, kit, signal } = setup({ steps, keepBytes: row("Un.") + row("Deux.") });
+    await translator.translate({ text: "One.", language: "fr" }, signal());
+    kit.clock.now += 1;
+    await translator.translate({ text: "Two.", language: "fr" }, signal());
+    kit.db.prepare("UPDATE translations SET text = ? WHERE text = 'Un.'").run(`${"ab ".repeat(5_333)}ab`);
+    kit.clock.now += 1;
+    await translator.translate({ text: "One.", language: "fr" }, signal());
+    expect(kit.db.prepare("SELECT text FROM translations ORDER BY text").all()).toEqual([
+      { text: "Deux." },
+      { text: "Un." },
+    ]);
+  });
 });
