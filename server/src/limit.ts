@@ -1,5 +1,7 @@
 // A fixed window per key, in memory (ADR-0002 §7: one process, nothing to share): at most `max` calls
 // per `windowMs`, and at most `keys` keys held.
+import { remember } from "./remember.ts";
+
 export interface Limiter {
   take: (key: string, now: number) => boolean;
   // Whether a key's window already holds `max` calls; asking counts nothing.
@@ -14,13 +16,10 @@ export function limiter({ max, windowMs, keys }: { max: number; windowMs: number
     take(key, now) {
       let window = windows.get(key);
       if (window === undefined || now - window.start >= windowMs) {
-        windows.delete(key);
+        window = { start: now, count: 0 };
         // ponytail: past the cap, the key whose window started first goes and starts over if it comes
         // back; the cap is set far above the visitors one window sees.
-        const first = windows.keys().next();
-        if (windows.size >= keys && first.done !== true) windows.delete(first.value);
-        window = { start: now, count: 0 };
-        windows.set(key, window);
+        remember(windows, [key, window], keys);
       }
       window.count += 1;
       return window.count <= max;
