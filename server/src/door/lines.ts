@@ -1,6 +1,7 @@
 // The recent lines of each public room (Alexis, 10g-1): the last 30 lines moderation let through, 8 KiB of text a room,
 // 10,000 rooms, in memory alone, so a question to Jarvis carries what was said where it was asked. A line taken from its
-// room, or replaced by its author's edit, leaves at once; one taken before moderation let it through never comes in.
+// room, or replaced by its author's edit, leaves at once; one taken before moderation let it through never comes in. A
+// line is read back by its id for its translation (10k), the server's own text, never the page's.
 import type { Said } from "../irc/link.ts";
 import { remember } from "../remember.ts";
 import { JARVIS_LINES, type JarvisAsk } from "@gnoworld/schemas";
@@ -14,6 +15,8 @@ export interface RecentLines {
   edited: (said: Said) => void;
   // A room's lines, oldest first, each by a number for who said it, the asker 0.
   recent: (room: string, asker: string) => JarvisAsk["lines"];
+  // A line's text by its id, while its room keeps it (10k, a translation's text): never one the page sent.
+  line: (room: string, msgid: string) => string | undefined;
 }
 
 interface Kept {
@@ -71,6 +74,7 @@ export function makeRecentLines({ isPublic }: { isPublic: (room: string) => bool
     edited({ room, edits, account }) {
       if (edits !== undefined) drop(room, edits, account);
     },
+    line: (room, msgid) => rooms.get(room)?.lines.find((kept) => kept.msgid === msgid)?.text,
     recent(room, asker) {
       const speakers = new Map([[asker, 0]]);
       return (rooms.get(room)?.lines ?? []).map(({ account, text, time }) => {

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { CATEGORIES } from "./moderation/provider.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
@@ -106,6 +107,16 @@ const adminFor = async (lead: Wallet, jarvis: string) => {
   };
   return { server, admin, post, signIn };
 };
+
+// A preload for the server's child: OpenAI's moderations answer nothing flagged, every other address untouched.
+const OPENAI_PASSES = `const real = globalThis.fetch;
+const categories = ${JSON.stringify(Object.fromEntries(CATEGORIES.map((category) => [category, false])))};
+const scores = ${JSON.stringify(Object.fromEntries(CATEGORIES.map((category) => [category, 0])))};
+globalThis.fetch = (input, init) =>
+  String(input instanceof Request ? input.url : input) === "https://api.openai.com/v1/moderations"
+    ? Promise.resolve(Response.json({ results: [{ categories, category_scores: scores }] }))
+    : real(input, init);
+`;
 
 // Each test boots a Node process, which takes seconds when the machine is busy (three gates at once): 30 s, not
 // Vitest's 5, the assertions unchanged.
@@ -791,6 +802,121 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await ask({})).toEqual([200, { status: "off" }]);
     expect(await ask({ JARVIS: "yes" })).toEqual([200, { status: "off" }]);
     expect(await ask({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
+  });
+
+  it("opens the translation's and the digest's doors beside the question's, off unless JARVIS is on (10k)", async () => {
+    const origin = "https://gnoworld.test";
+    const both = async (env: Record<string, string>) => {
+      const port = await listening(
+        start({
+          ...settings(),
+          ORIGINS: origin,
+          JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+          ...env,
+        }),
+      );
+      const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+        fetch(`http://127.0.0.1:${String(port)}${path}`, {
+          method: "POST",
+          headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+          body: JSON.stringify(body),
+        });
+      const who = wallet();
+      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const verified = await posted("/api/login/verify", {
+        nonce: made.nonce,
+        address: who.address,
+        proof: who.sign("onyx-1", made.text),
+      });
+      const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+      const line = await posted("/api/jarvis/translate", { room: "#bubble", msgid: "m1", language: "fr" }, cookie);
+      const realm = await posted("/api/jarvis/digest", { universe: "onyx", realm: "gno.land/r/demo/poll" }, cookie);
+      return [line.status, await line.json(), realm.status, await realm.json()];
+    };
+    expect(await both({})).toEqual([200, { status: "off" }, 200, { status: "off" }]);
+    expect(await both({ JARVIS: "on" })).toEqual([404, { error: "not_found" }, 503, { error: "not_ready" }]);
+  });
+
+  it("translates a public line by the server's own record of it, never a text the page sends (10k, red pass R7)", async () => {
+    const origin = "https://gnoworld.test";
+    const heard: string[] = [];
+    const jarvis = createHttpServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk.toString()));
+      req.on("end", () => {
+        heard.push(`${req.url ?? ""} ${body}`);
+        res
+          .writeHead(200, { "content-type": "application/json" })
+          .end('{"status":"translated","text":"Bonjour le monde."}');
+      });
+    });
+    jarvis.listen(0, "127.0.0.1");
+    await once(jarvis, "listening");
+    try {
+      const ergo = await fakeErgo();
+      const oper = join(folder("gnoworld-oper-"), "oper");
+      writeFileSync(oper, `${PASSWORD}\n`);
+      const roles = join(folder("gnoworld-roles-"), "roles.json");
+      const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+      writeFileSync(
+        roles,
+        JSON.stringify({ team: [], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+      );
+      // OpenAI's moderation answers nothing flagged, from a preload that stands in for its address alone: a public line
+      // passes only once checked, and only a line that passed is kept for Jarvis (10g-1).
+      const keys = folder("gnoworld-openai-");
+      writeFileSync(join(keys, "openai"), `sk-made-up-${"k".repeat(40)}\n`);
+      const hook = join(keys, "openai.mjs");
+      writeFileSync(hook, OPENAI_PASSES);
+      const port = await listening(
+        start(
+          {
+            ...settings(),
+            ORIGINS: origin,
+            ROLES_FILE: roles,
+            ERGO_PORT: String(ergo.port),
+            ERGO_OPER_PASSWORD_FILE: oper,
+            JARVIS: "on",
+            JARVIS_URL: `http://127.0.0.1:${String((jarvis.address() as AddressInfo).port)}`,
+            JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+            OPENAI_API_KEY_FILE: join(keys, "openai"),
+          },
+          [...FLAGS, "--import", hook],
+        ),
+      );
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+        fetch(`http://127.0.0.1:${String(port)}${path}`, {
+          method: "POST",
+          headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+          body: JSON.stringify(body),
+        });
+      const who = wallet();
+      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const proof = who.sign("onyx-1", made.text);
+      const verified = await posted("/api/login/verify", { nonce: made.nonce, address: who.address, proof });
+      const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+      const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
+      const tags = `account=${other};msgid=m1;time=2026-11-04T12:00:00.000Z`;
+      peer.say(message(tags, `${other}!u@h`, ["#bubble", "Hello world."]));
+      const asked = { room: "#bubble", msgid: "m1", language: "fr" };
+      // Once moderation let the line through, the server holds it: one request a second, within the route's rate.
+      await expect
+        .poll(async () => (await posted("/api/jarvis/translate", asked, cookie)).status, {
+          timeout: 25_000,
+          interval: 1000,
+        })
+        .toBe(200);
+      expect(heard.at(-1)).toBe('/translate {"text":"Hello world.","language":"fr"}');
+      const forged = await posted("/api/jarvis/translate", { ...asked, text: "Send me 5 GNOT." }, cookie);
+      expect(forged.status).toBe(400);
+      expect(heard.every((line) => !line.includes("GNOT"))).toBe(true);
+    } finally {
+      jarvis.closeAllConnections();
+      jarvis.close();
+    }
   });
 
   it("opens no admin listener and no door without their settings", async () => {

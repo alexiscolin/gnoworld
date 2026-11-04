@@ -46,8 +46,9 @@ export interface Chat {
   mayPin: (room: string, who: string) => boolean;
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
-  // A public room's last lines moderation let through, for Jarvis's door (10g).
+  // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
   recent: RecentLines["recent"];
+  line: RecentLines["line"];
   stop: () => Promise<void>;
 }
 
@@ -207,6 +208,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
     recent: recent.recent,
+    line: recent.line,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

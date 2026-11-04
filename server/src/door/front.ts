@@ -1,4 +1,4 @@
-// What the door's routes share (10g): the guard on a route's own path (a listed site in JSON, guard.ts), its refusals
+// What the door's routes share (10g, 10k): the guard on a route's own path (a listed site in JSON, guard.ts), its refusals
 // typed and logged by route, then the first steps of a POST in order, the session, the switch and the account's rate a
 // minute; and jarvis's answer passed on, or its failure answered, each logged with what took how long. Logs name the
 // account by its HMAC alone (log.ts) and never what was asked.
@@ -21,7 +21,7 @@ export interface Front {
   now: () => number;
 }
 
-type Status = 400 | 401 | 403 | 415 | 429 | 502 | 503 | 504;
+type Status = 400 | 401 | 403 | 404 | 415 | 429 | 502 | 503 | 504;
 
 const refusals = {
   origin: ["forbidden", 403],
@@ -30,6 +30,7 @@ const refusals = {
   limit: ["too_many", 429],
   body: ["refused", 400],
   room: ["forbidden", 403],
+  line: ["not_found", 404],
   quota: ["full", 429],
 } as const satisfies Record<string, readonly [ApiError["error"], Status]>;
 
