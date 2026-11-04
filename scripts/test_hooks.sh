@@ -3119,15 +3119,16 @@ fi
 if part gate_light; then
 gate_fixture gate_light
 # The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice): while git's own hooks folder holds `radical-mode` reading
-# `on`, a commit's or a turn's change of no tier-1 path (speeds.py --light) and no harness file (records.sh's list) runs the types, the
-# importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey, nothing else. Only Alexis writes there: no
-# sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a file of the worktree in its name, a
-# tier-1 path, a harness file, a doubt, a part's end or the full gate: the whole gate as before. pre-commit's staged copy reads the mode
-# of the repository whose packages it borrows, and its list of paths.
-cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories"
-printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n' >"$g/docs/REVIEW.md"
-printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts"
-git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+# `on`, a commit's or a turn's change of the interface alone (speeds.py --light: tier-3 folders, no tier-1 path; F4909's (a)) and no harness
+# file (records.sh's list) runs the types, the importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey,
+# nothing else. Only Alexis writes there: no sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a
+# file of the worktree in its name, a path of no tier-3 folder, a tier-1 path, a harness file, a doubt, a part's end or the full gate: the
+# whole gate as before. pre-commit's staged copy reads the mode of the repository whose packages it borrows, and its list of paths.
+cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories" "$g/app/src/features/world"
+printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 3 | Interface: `app/src/features/world/` | Either | Run it |\n' >"$g/docs/REVIEW.md"
+printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts" && printf 'x\n' >"$g/app/src/features/world/w.tsx"
+git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec, an interface file" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+w="$g/app/src/features/world/w.tsx" # the interface's file, a change of it alone light
 mode="$g/.git/hooks/radical-mode"
 light_steps="typecheck lint copies build:app playwright"
 heavy_steps="test format:check unused comments py:check_css sh:ergo py:check_docs"
@@ -3141,12 +3142,14 @@ whole() { # $1: what the run was given
 	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh said the light gate on $1: $out"
 	:
 }
-printf 'on\n' >"$mode" && echo y >>"$g/app/src/a.tsx"
+printf 'on\n' >"$mode" && echo y >>"$w"
 out=$(gate) || fail "check.sh's light gate failed a change whose every step passes: $out"
-light "a change of the app in the radical mode"
+light "a change of the interface in the radical mode"
 grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh's light gate did not record the code it passed"
-for path in app/src/csp.ts app/tests/stories/pictures.spec.ts; do
-	reset && echo y >>"$g/$path" && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
+reset && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed a change of the app outside the interface in the radical mode: $out"
+whole "a change of the app outside the interface in the radical mode"
+for path in app/src/csp.ts app/tests/stories/pictures.spec.ts app/src/a.tsx; do
+	reset && echo y >>"$g/$path" && echo y >>"$w" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
 	whole "a change of $path in the radical mode"
 done
 reset && git -C "$g" mv app/src/csp.ts app/src/renamed.ts && out=$(gate) || fail "check.sh failed on a tier-1 file renamed: $out"
@@ -3156,10 +3159,10 @@ whole "a tier-1 file renamed away in the radical mode"
 reset && grep -v csp.ts "$g/docs/REVIEW.md" >"$g/docs/r" && mv "$g/docs/r" "$g/docs/REVIEW.md" && echo y >>"$g/app/src/csp.ts" && out=$(gate) ||
 	fail "check.sh failed on a tier-1 file whose row the change dropped: $out"
 whole "a tier-1 file whose row the same change dropped"
-reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed with no main to read: $out"
-whole "a change of the app with no main's table to read"
+reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$w" && out=$(gate) || fail "check.sh failed with no main to read: $out"
+whole "a change of the interface with no main's table to read"
 git -C "$g" update-ref refs/remotes/origin/main HEAD
-reset && echo y >>"$g/app/src/a.tsx"
+reset && echo y >>"$w"
 for state in missing off "on2" folder planted; do
 	rm -rf "${mode:?}" "$g/.githooks/radical-mode" "$g/.claude/tmp/radical-mode"
 	case $state in
@@ -3169,17 +3172,17 @@ for state in missing off "on2" folder planted; do
 	*) printf '%s\n' "$state" >"$mode" ;;
 	esac
 	out=$(gate) || fail "check.sh failed with the mode $state: $out"
-	whole "a change of the app with the mode $state"
+	whole "a change of the interface with the mode $state"
 done
 # git's own folders, a caller's to name: a common folder of another's holding the mode on is read as no mode (lot 1's security review, S5).
 fake="$t/gate_light.common" && mkdir -p "$fake/hooks" && printf 'on\n' >"$fake/hooks/radical-mode"
 for f in objects refs HEAD config; do ln -s "$g/.git/$f" "$fake/$f"; done
 for hook in commit-msg pre-commit pre-merge-commit pre-push; do ln -s "$g/.git/hooks/$hook" "$fake/hooks/$hook" 2>/dev/null || :; done
 out=$(GIT_COMMON_DIR="$fake" gate) || fail "check.sh failed with a caller's GIT_COMMON_DIR: $out"
-whole "a change of the app with a caller's GIT_COMMON_DIR holding the mode on"
+whole "a change of the interface with a caller's GIT_COMMON_DIR holding the mode on"
 rm -rf "${mode:?}" "$g/.claude/tmp/radical-mode" && printf 'on\n' >"$mode"
 mv "$g/docs/REVIEW.md" "$g/docs/gone.md" && out=$(gate) || fail "check.sh failed with no tier-1 table: $out"
-whole "a change of the app with no tier-1 table to read"
+whole "a change of the interface with no tier table to read"
 mv "$g/docs/gone.md" "$g/docs/REVIEW.md"
 for run in --tests-all --full --merge; do
 	out=$(AUDIT_ANSWER=x gate "$run") || fail "check.sh $run failed in the radical mode: $out"
@@ -3187,12 +3190,12 @@ for run in --tests-all --full --merge; do
 done
 # pre-commit's staged copy: the mode of the repository it borrows its packages from, and the paths pre-commit lists.
 c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && ln -s "$g/node_modules" "$c/node_modules"
-out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
-light "a staged copy's change of the app"
-out=$(g=$c GATE_CHANGED="$(printf 'app/src/a.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
+out=$(g=$c GATE_CHANGED=app/src/features/world/w.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
+light "a staged copy's change of the interface"
+out=$(g=$c GATE_CHANGED="$(printf 'app/src/features/world/w.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
 whole "a staged copy's change of a tier-1 file"
 rm "$c/node_modules" && cp -R "$g/node_modules" "$c/node_modules"
-out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
+out=$(g=$c GATE_CHANGED=app/src/features/world/w.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
 whole "a staged copy with no repository to read the mode of"
 rm -f "$mode"
 fi
@@ -3234,9 +3237,11 @@ grep -q "^coverage --maxWorkers=$half --reporter=default --reporter=json --outpu
 # StrykerJS's incremental file is one cache every tree shares, in the tools' cache: a worktree's own, copied from the main
 # tree's (63 of 142 files, a week old), made each branch mutate again what others had judged (Alexis, 2026-10-29). Each run
 # works on its own copy, taken only if the cache reads as JSON, and puts it back whole only if it reads as JSON in turn: a
-# run cut short, or two at once, never leaves the cache half written for every tree to fail on.
-grep -qE "^mutate --concurrency $half --incrementalFile /[^ ]*/stryker-incremental\.json$" "$log" && ! grep -q "incrementalFile $g.home" "$log" ||
-	fail "check.sh --full let StrykerJS take the whole machine (F777), or work on the shared cache itself: $(grep '^mutate' "$log")"
+# run cut short, or two at once, never leaves the cache half written for every tree to fail on. StrykerJS runs alone, after every other
+# lane, so it takes every core (Alexis, 2026-11-04: "16 cœurs"; section gate_stryker_lines).
+cores=$(node -p "require('os').availableParallelism()")
+grep -qE "^mutate --concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" "$log" && ! grep -q "incrementalFile $g.home" "$log" ||
+	fail "check.sh --full did not give StrykerJS every core, or let it work on the shared cache itself: $(grep '^mutate' "$log")"
 cache="$g.home/.cache/gnoworld-tools/stryker-incremental.json"
 mkdir -p "${cache%/*}" && printf '{"files":{"a":1}}' >"$cache"
 STRYKER_WRITES='{"files":{"b":2}}' gate --full >/dev/null || fail "check.sh --full failed with a cache StrykerJS reads and writes"
@@ -3629,6 +3634,149 @@ AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folde
 rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
 AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
 [ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+if part gate_stryker_lines; then
+full_fixture gate_stryker_lines
+# StrykerJS runs alone, once every other lane of the gate has ended, on every core (Alexis, 2026-11-04: "16 cœurs"): it took half the
+# machine while the coverage and the harness lanes ran beside it, whose load outlasted Ergo's 9 s auth script (F777); nothing runs beside it
+# now. A merge check mutates the code the branch changed since its base alone ("Lignes de la tranche"): scripts/stryker_lines.py writes
+# that config in the run's own folder and StrykerJS is given it; no line to mutate, no StrykerJS; a stryker_lines.py that fails, the
+# whole control. --full mutates the whole, with no such config. Either way the shared cache gets the run's file back.
+cores=$(node -p "require('os').availableParallelism()")
+base=$(git -C "$g" rev-parse HEAD)
+mkdir -p "$g/.claude" && echo '{}' >"$g/.claude/x.json" && echo 'y' >>"$g/app/src/a.tsx" && git -C "$g" add -A && git -C "$g" commit -qm "product and harness"
+mutate() { sed -n 's/^mutate //p' "$log"; }
+cache="$g.home/.cache/gnoworld-tools/stryker-incremental.json"
+out=$(AUDIT_ANSWER=x SLOW_STEP=py:harness_mutate STRYKER_WRITES='{"files":{"lines":1}}' gate --merge) || fail "check.sh --merge failed a run whose every step passes: $out"
+config=$(sed -n "s|^py:stryker_lines $base ||p" "$log")
+case $config in /*/stryker.json) ;; *) fail "check.sh --merge did not ask stryker_lines.py for its base's lines, into a file of its own: $(grep '^py:stryker_lines' "$log")" ;; esac
+[ "$(mutate)" = "$config --concurrency $cores --incrementalFile ${config%/*}/stryker-incremental.json" ] ||
+	fail "check.sh --merge did not give StrykerJS the lines' config and every core, from its own copy of the cache: $(mutate)"
+[ "$(cat "$cache")" = '{"files":{"lines":1}}' ] || fail "check.sh --merge did not put the lines' run's file back in the shared cache: $(cat "$cache" 2>&1)"
+before "done py:harness_mutate" mutate && before "done py:patch_coverage" mutate || fail "check.sh --merge ran StrykerJS beside another lane"
+printf '%s\n' "$out" | grep -qE '^lane stryker [0-9.]+ s: stryker [0-9.]+$' || fail "check.sh --merge did not print StrykerJS's lane apart: $out"
+out=$(AUDIT_ANSWER=x STRYKER_LINES_EXIT=3 gate --merge) || fail "check.sh --merge failed with no line to mutate: $out"
+ran mutate && fail "check.sh --merge ran StrykerJS with no line to mutate: $(mutate)"
+printf '%s\n' "$out" | grep -q "no line StrykerJS mutates changed since $base" || fail "check.sh --merge did not say why StrykerJS did not run: $out"
+for code in 1 2; do
+	out=$(AUDIT_ANSWER=x STRYKER_LINES_EXIT=$code gate --merge) || fail "check.sh --merge failed when stryker_lines.py exited $code: $out"
+	mutate | grep -qE "^--concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" || fail "check.sh --merge did not mutate the whole control when stryker_lines.py exited $code: $(mutate)"
+	printf '%s\n' "$out" | grep -q "stryker_lines.py failed: StrykerJS mutates the whole control" || fail "check.sh --merge did not say stryker_lines.py failed: $out"
+done
+out=$(AUDIT_ANSWER=x FAIL=mutate gate --merge) && fail "check.sh --merge passed with StrykerJS failing: $out"
+printf '%s\n' "$out" | tail -1 | grep -qx "check.sh: FAILED at stryker:stryker" || fail "check.sh --merge did not name StrykerJS's lane last: $(printf '%s\n' "$out" | tail -1)"
+out=$(AUDIT_ANSWER=x SLOW_STEP=py:harness_mutate gate --full) || fail "check.sh --full failed a run whose every step passes: $out"
+ran py:stryker_lines && fail "check.sh --full narrowed StrykerJS to the branch's lines"
+mutate | grep -qE "^--concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" || fail "check.sh --full did not mutate the whole on every core: $(mutate)"
+before "done py:harness_mutate" mutate || fail "check.sh --full ran StrykerJS beside the harness lane"
+# A patch's coverage under its floor fails --full there, before StrykerJS's half hour; a merge check goes on, and says both.
+out=$(AUDIT_ANSWER=x FAIL=py:patch_coverage gate --full) && fail "check.sh --full passed under the patch's floor: $out"
+ran mutate && fail "check.sh --full ran StrykerJS after the patch's coverage failed"
+out=$(AUDIT_ANSWER=x FAIL=py:patch_coverage gate --merge) && fail "check.sh --merge passed under the patch's floor: $out"
+ran mutate || fail "check.sh --merge stopped before StrykerJS on the patch's coverage"
+printf '%s\n' "$out" | grep -q "every failure above, in the order they came: mutation:patch_coverage" || fail "check.sh --merge did not name the patch's coverage among its failures: $out"
+fi
+
+if part stryker_lines; then
+# stryker_lines.py: the merge check's StrykerJS config, its `mutate` the code the branch changed since its base: each changed line widened
+# to the top-level statements it lies in (StrykerJS 10.0.0 mutates a node only inside one range: an `if (a &&\n b)` whose one line changed
+# keeps its mutants), as `path:from-to`, in the files the config's own `mutate` selects (braces and negations read as git's glob pathspecs,
+# a hidden part left out as minimatch leaves it), a new file whole, committed or not; a deletion or a comment touches no statement. Every
+# other key is kept. No line: exit 3, nothing written; a config it cannot read or an odd pattern: exit 2; any other failure is no 0 nor 3.
+sl="$t/stryker_lines" && mkdir -p "$sl/scripts" "$sl/app/src/.cache" "$sl/server/src/testing" "$sl/docs"
+cp "$here/stryker_lines.py" "$here/repo_files.py" "$sl/scripts/" && ln -s "$(cd "$here/../node_modules" && pwd -P)" "$sl/node_modules"
+cat >"$sl/stryker.config.json" <<'JSON'
+{
+  "testRunner": "vitest",
+  "mutate": ["app/src/**/*.{ts,tsx}", "!app/src/**/*.test.{ts,tsx}", "server/src/**/*.ts", "!server/src/testing/**"],
+  "incremental": true
+}
+JSON
+printf 'node_modules\n' >"$sl/.gitignore"
+for n in one two three four five; do printf 'export const %s = 1;\n' "$n"; done >"$sl/app/src/a.ts"
+printf 'export function f(a: boolean, b: boolean): number {\n  if (\n    a &&\n    b\n  ) {\n    return 1;\n  }\n  return 0;\n}\nexport const apart = 0;\n' >"$sl/app/src/m.ts"
+printf '// a note\nexport const c = 1;\n' >"$sl/app/src/c.ts"
+printf 'export const x = 1;\nexport const y = 2;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
+for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts app/src/gone.ts app/src/r.ts; do printf 'export const v = 1;\n' >"$sl/$f"; done
+git -C "$sl" init -q && git -C "$sl" add -A && git -C "$sl" commit -qm base && base=$(git -C "$sl" rev-parse HEAD)
+lines() { (cd "$sl" && PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin:$PATH" python3 -I scripts/stryker_lines.py "$@"); }
+exits() { # $1: the exit it must give; then stryker_lines.py's arguments. It writes nothing but on 0
+	want=$1 && shift && rm -f "$sl/out.json"
+	code=0 && out=$(lines "$@" 2>&1) || code=$?
+	[ "$code" = "$want" ] && [ ! -e "$sl/out.json" ] || fail "stryker_lines.py $* exited $code, not $want, or wrote its config: $out"
+}
+exits 3 "$base" "$sl/out.json"
+for n in one two three four five six; do case $n in two) echo 'export const two = 22;' ;; three) echo 'export const three = 33;' ;; *) printf 'export const %s = 1;\n' "$n" ;; esac; done >"$sl/app/src/a.ts"
+sed 's/^    b$/    !b/' "$sl/app/src/m.ts" >"$sl/m" && mv "$sl/m" "$sl/app/src/m.ts"
+printf '// another note\nexport const c = 1;\n' >"$sl/app/src/c.ts" && printf 'export const x = 1;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
+for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts; do printf 'export const w = 2;\n' >"$sl/$f"; done
+printf 'export const added = 1;\nexport const more = 2;\n' >"$sl/app/src/added.ts" && git -C "$sl" rm -q app/src/gone.ts && git -C "$sl" mv app/src/r.ts app/src/r2.ts
+git -C "$sl" add -A && git -C "$sl" commit -qm change && printf 'export const n = 1;\nexport const m = 2;\n' >"$sl/app/src/n.tsx"
+out=$(lines "$base" "$sl/out.json") || fail "stryker_lines.py failed on a change: $out"
+printf '%s\n' "$out" | grep -qx "stryker_lines: 18 lines in 6 files changed since $base" || fail "stryker_lines.py did not say what it kept: $out"
+python3 -I - "$sl/out.json" "$sl/stryker.config.json" <<'PY' || fail "stryker_lines.py's config is not the changed statements alone, the rest kept: $(cat "$sl/out.json")"
+import json, sys
+out, config = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+want = ["app/src/a.ts:2-3", "app/src/a.ts:6-6", "app/src/added.ts:1-2", "app/src/m.ts:1-9", "app/src/n.tsx:1-2", "app/src/r2.ts:1-1", "server/src/s.ts:1-1"]
+assert out["mutate"] == want, out["mutate"]
+assert {k: v for k, v in out.items() if k != "mutate"} == {k: v for k, v in config.items() if k != "mutate"}, out
+PY
+# What it cannot read is no green check: an unknown base, an output it cannot write, a config absent, not JSON, or whose mutate is no list.
+exits 1 0000000000000000000000000000000000000000 "$sl/out.json"
+code=0 && lines "$base" "$sl/nowhere/out.json" >/dev/null 2>&1 || code=$?
+[ "$code" != 0 ] && [ "$code" != 3 ] && [ ! -e "$sl/nowhere" ] || fail "stryker_lines.py exited $code with an output it cannot write"
+cp "$sl/stryker.config.json" "$t/stryker.good"
+for bad in none 'not json' '{"mutate": "app/src/**/*.ts"}' '{"mutate": []}' '[]'; do
+	if [ "$bad" = none ]; then rm "$sl/stryker.config.json"; else printf '%s' "$bad" >"$sl/stryker.config.json"; fi
+	exits 2 "$base" "$sl/out.json"
+	cp "$t/stryker.good" "$sl/stryker.config.json"
+done
+# A pattern git's pathspecs do not read as minimatch does refuses, alone or beside good ones: an extglob, a character class, a `?`.
+for odd in 'app/src/**/+(a|b).ts' 'app/src/[ab].ts' 'app/src/?.ts'; do
+	python3 -I - "$sl/stryker.config.json" "$odd" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+c["mutate"].append(sys.argv[2])
+json.dump(c, open(sys.argv[1], "w"))
+PY
+	exits 2 "$base" "$sl/out.json"
+	cp "$t/stryker.good" "$sl/stryker.config.json"
+done
+# On the repository's own config, git's reading of the patterns and StrykerJS's matcher (minimatch, hidden files left out) pick one set, of
+# the repository's files: git's list, or the copy's own files in pre-commit's staged copy, which has no .git; git reads its patterns in a
+# repository of those paths, empty.
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+if git -C "$here/.." rev-parse --git-dir >/dev/null 2>&1; then
+	(cd "$here/.." && git ls-files) >"$t/tracked"
+else
+	(cd "$here/.." && find . -path ./node_modules -prune -o -type f -print | sed 's|^\./||' | LC_ALL=C sort) >"$t/tracked"
+fi
+python3 -I - "$here" "$here/.." "$t/stryker_lines.mirror" "$t/tracked" >"$t/by_git" <<'PY' || fail "stryker_lines.py's pathspecs could not be read on the repository's config"
+import json, os, subprocess, sys
+sys.path.insert(0, sys.argv[1])
+from stryker_lines import pathspecs
+specs = pathspecs(json.load(open(os.path.join(sys.argv[2], "stryker.config.json")))["mutate"])
+mirror = sys.argv[3]
+os.makedirs(mirror)
+for path in open(sys.argv[4]).read().splitlines():
+    os.makedirs(os.path.join(mirror, os.path.dirname(path)), exist_ok=True)
+    open(os.path.join(mirror, path), "w").close()
+for args in (["init", "-q"], ["add", "-A"]):
+    subprocess.run(["git", *args], cwd=mirror, check=True)
+files = subprocess.run(["git", "ls-files", "--", *specs], cwd=mirror, capture_output=True, text=True, check=True).stdout.splitlines()
+print("\n".join(sorted(f for f in files if not any(p.startswith(".") for p in f.split("/")))))
+PY
+(cd "$here/.." && PATH="$nodebin:$PATH" node --input-type=module -e 'import { readFileSync } from "node:fs";
+import { FileMatcher } from "./node_modules/@stryker-mutator/core/dist/src/config/file-matcher.js";
+const files = readFileSync(0, "utf8").split("\n").filter(Boolean);
+const chosen = new Map(files.map((f) => [f, false]));
+for (const p of JSON.parse(readFileSync("stryker.config.json", "utf8")).mutate) {
+  const no = p.startsWith("!"), m = new FileMatcher(no ? p.slice(1) : p, false);
+  for (const f of files) if (m.matches(f)) chosen.set(f, !no);
+}
+console.log([...chosen].filter(([, on]) => on).map(([f]) => f).sort().join("\n"));' <"$t/tracked") >"$t/by_stryker" || fail "StrykerJS's matcher could not be read"
+[ -s "$t/by_git" ] && cmp -s "$t/by_git" "$t/by_stryker" || fail "stryker_lines.py's pathspecs and StrykerJS's matcher pick other files: $(diff "$t/by_git" "$t/by_stryker" | head -5)"
 fi
 
 if part lint_scope; then
@@ -6133,44 +6281,60 @@ done
 fi
 
 if part speeds_light; then
-# speeds.py --light <root>: whether a change may take the radical mode's light gate as far as docs/REVIEW.md's tier 1 goes (Alexis,
-# 2026-11-04, until the hardening slice): `light` when no path is a tier-1 path, read as the two speeds read them (case folded, a path it
-# cannot place or one through a link is no light); `full` on a tier-1 path anywhere in the list, a renamed one's old path included, a table
-# it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
+# speeds.py --light <root> <main's table>: whether a change may take the radical mode's light gate, the interface's alone (Alexis,
+# 2026-11-04, F4909's (a): "Léger pour l'interface seule"): `light` when every path is under a tier-3 folder that both docs/REVIEW.md's
+# tables name, the tree's and main's, and none is a tier-1 path of either, read as the two speeds read them (case folded, a path it cannot
+# place or one through a link is no light); `full` otherwise: the server, core, lib, a design-system file of no listed folder, a doc, a
+# table it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
 sp="$here"/speeds.py
-r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/login" "$r/app/src/lib" "$r/server/src"
-printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
-ln -s ../features/login "$r/app/src/lib/login"
+r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/world" "$r/app/src/features/login" "$r/server/src"
+printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`), a guard (`app/src/features/world/guard.ts`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface: `app/src/features/world/`, `app/src/features/home/`, `app/src/features/login/`, `packages/ui/src/Button/` | Either | Run it |\n' >"$r/docs/REVIEW.md"
+ln -s ../../../server/src "$r/app/src/features/world/linked"
 cp "$r/docs/REVIEW.md" "$t/main.review" # main's own table, which check.sh gives it beside the tree's (lot 1's review, R1)
 light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" "$t/main.review" 2>/dev/null || echo crashed; }
-for p in app/src/features/chat/Bubble.tsx server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/csp.test.ts; do
-	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, of no tier-1 row, is not light: $(light "$p")"
+for p in app/src/features/world/Here.tsx app/src/features/world/Here.module.css app/src/features/home/deep/Home.tsx packages/ui/src/Button/Button.tsx; do
+	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, in a tier-3 folder, is not light: $(light "$p")"
 done
-[ "$(light app/src/lib/other.ts server/src/a.ts)" = light ] || fail "speeds.py --light: two paths of no tier-1 row are not light"
-for p in app/src/csp.ts app/src/features/login/Form.tsx gno/r/x/realm deploy/web/nginx.conf App/src/CSP.ts "app/src/features/LOGIN/Form.tsx" \
-	app/src/lib/login/Form.tsx /app/src/x.ts "app/src/../src/csp.ts" '"app/src/x.ts"' "app/src/x.ts "; do
+[ "$(light app/src/features/world/Here.tsx packages/ui/src/Button/Button.tsx)" = light ] || fail "speeds.py --light: two paths of tier-3 folders are not light"
+# The rest keeps the whole gate: the server, core, the app's lib, a feature no row lists, the design system's own root, a doc, a test outside.
+for p in server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/features/chat/Bubble.tsx packages/ui/src/tokens.css \
+	docs/DEVELOPMENT.md app/tests/e2e/home.spec.ts app/src/features/worldly/x.tsx app/src/features/world app/src/csp.ts \
+	app/src/features/login/Form.tsx app/src/features/world/guard.ts app/src/features/WORLD/Guard.ts app/src/features/world/linked/a.ts \
+	gno/r/x/realm deploy/web/nginx.conf /app/src/features/world/x.ts "app/src/features/world/../../csp.ts" '"app/src/features/world/x.ts"' \
+	"app/src/features/world/x.ts "; do
 	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p is light"
-	[ "$(light app/src/lib/other.ts "$p")" = full ] || fail "speeds.py --light: $p beside a light path is light"
+	[ "$(light app/src/features/world/Here.tsx "$p")" = full ] || fail "speeds.py --light: $p beside a tier-3 path is light"
 done
 # A tier-1 file renamed away: the list holds its old path (check.sh's --no-renames), which is tier 1.
-[ "$(light app/src/csp.ts app/src/lib/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
+[ "$(light app/src/features/world/guard.ts app/src/features/world/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
 [ "$(printf '' | python3 -I "$sp" --light "$r" "$t/main.review")" = full ] || fail "speeds.py --light: an empty change is light"
-# A tier-1 path is one of either table, the tree's or main's: a row the tree drops is still main's (R1), a row it adds counts at once.
-grep -v 'csp.ts' "$t/main.review" >"$r/docs/REVIEW.md" && { [ "$(light app/src/csp.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path light"; }
-cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/lib/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
-[ "$(light app/src/lib/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
-cp "$t/main.review" "$r/docs/REVIEW.md"
-# Either table unreadable, or one it reads with no tier-1 row (a column renamed, R3), is no light; and so is a call with no main's table.
-for broken in tree main; do
-	cp "$t/main.review" "$t/main.saved"
-	if [ "$broken" = tree ]; then grep -v '^| 1 ' "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v '^| 1 ' "$t/main.saved" >"$t/main.review"; fi
-	[ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: the $broken's table with no tier-1 row is light"
-	cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+# A tier-1 path is one of either table, a tier-3 folder one of both: a tier-1 row the tree drops is still main's (R1), one it adds counts
+# at once; a tier-3 folder the tree adds is no interface until main names it, and one it drops is none at once.
+sed 's/, a guard (`app\/src\/features\/world\/guard.ts`)//' "$t/main.review" >"$r/docs/REVIEW.md"
+[ "$(light app/src/features/world/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path, in a tier-3 folder, light"
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/features/home/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
+[ "$(light app/src/features/home/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 3 | More: `server/src/`, `app/src/features/chat/` | Either | Run it |\n' >>"$r/docs/REVIEW.md"
+for p in server/src/a.ts app/src/features/chat/Bubble.tsx; do
+	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p, of a tier-3 row the tree added, is light"
 done
-[ "$(printf 'app/src/lib/other.ts\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
-mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
+sed 's/`app\/src\/features\/home\/`, //' "$t/main.review" >"$r/docs/REVIEW.md"
+[ "$(light app/src/features/home/Home.tsx)" = full ] || fail "speeds.py --light: a tier-3 folder the tree dropped is light"
+cp "$t/main.review" "$r/docs/REVIEW.md"
+# Either table unreadable, or one it reads with no tier-1 row or no tier-3 row (a column renamed, R3), is no light; and so is a call with
+# no main's table.
+for broken in tree main; do
+	for tier in 1 3; do
+		cp "$t/main.review" "$t/main.saved"
+		if [ "$broken" = tree ]; then grep -v "^| $tier " "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v "^| $tier " "$t/main.saved" >"$t/main.review"; fi
+		[ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: the $broken's table with no tier-$tier row is light"
+		cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+	done
+done
+[ "$(printf 'app/src/features/world/Here.tsx\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
+mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
 mv "$t/main.gone" "$t/main.review"
-mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no table to read is light"; }
+mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/features/world/Here.tsx)" = full ] || fail "speeds.py --light: no table to read is light"; }
 fi
 
 if part gate_speeds; then
@@ -6766,6 +6930,143 @@ printf '%s\n' "$out" | grep -q "failed=1" && printf '%s\n' "$out" | grep -q "sur
 : >"$dm/env.log"
 out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deploy/test.sh's first run under --mutants failed under a stub that passes: $out"
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
+fi
+
+if part workshop; then
+# pnpm workshop (scripts/workshop.sh) serves the app's screens and the lab's pages, each on its dev server at 127.0.0.1, both put on the
+# tailnet through the tailnet-preview skill's script under a name each (workshop-app, workshop-lab), each link said beside its name
+# (Alexis, 2026-11-04: "il me faudra une adresse tailscale aussi pour regarder à distance"). One function starts each: a port held by
+# another process is said and never taken, its pid and port go to .claude/tmp/workshop.pid, the last run of this checkout is stopped first
+# (killed hard too), what it left on the tailnet taken down; its end, Ctrl+C, a closed terminal or either server stopping, takes both off
+# the tailnet and stops them. The script itself stays in the checkout's folder. Here the servers are Python's.
+w="$t/workshop" && want="v$(cat "$here/../.node-version")"
+mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skills/tailnet-preview/scripts" "$w/bin" "$w/nvm/versions/node/$want/bin"
+cp "$here/workshop.sh" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
+root=$(cd "$w/root" && pwd -P)
+printf '#!/bin/sh\necho %s\n' "$want" >"$w/nvm/versions/node/$want/bin/node"
+cat >"$w/server" <<'SH'
+#!/bin/sh
+echo "$(basename "$0") $* hosts=${WORKSHOP_HOSTS-unset} cwd=$(pwd -P)" >>"$W_LOG"
+[ "${DIE:-}" != "$(basename "$0")" ] || exit 1
+port= prev=
+for a in "$@"; do [ "$prev" != --port ] || port=$a; prev=$a; done
+exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$port"
+SH
+cp "$w/server" "$w/root/app/node_modules/.bin/react-router" && cp "$w/server" "$w/root/app/node_modules/.bin/vite"
+printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exit 1 ;; esac\n' "'{\"BackendState\": \"Running\", \"Self\": {\"DNSName\": \"box.tail.ts.net.\"}}'" >"$w/bin/tailscale"
+preview="$w/home/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
+printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
+chmod +x "$w/nvm/versions/node/$want/bin/node" "$w/root/app/node_modules/.bin/react-router" "$w/root/app/node_modules/.bin/vite" "$w/bin/tailscale" "$preview"
+eval "$(sed -n '/^free_ports() {/,/^}/p' "$here/check.sh")"
+port=$(free_ports 2) && app_port=$port && lab_port=$((port + 1))
+shop() { # $1: the run's name; in the background, its pid in $shop
+	(cd "$t" && W_LOG="$w/log" HOME="$w/home" NVM_DIR="$w/nvm" PATH="$w/bin:$PATH" WORKSHOP_APP_PORT=$app_port WORKSHOP_LAB_PORT=$lab_port exec "${under:-sh}" "$root/scripts/workshop.sh") >"$w/$1.out" 2>&1 &
+	shop=$!
+}
+serving() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null; } # the pid that listens on port $1
+# Two minutes at most, as the script gives each server one to listen: at a load of 60 the lab's Python server took past 30 s (F4918).
+until_() { n=0; until eval "$1"; do n=$((n + 1)); [ "$n" -lt 600 ] || return 1; sleep 0.2; done; }
+up() { until_ 'grep -q "^up workshop-lab " "$w/log.preview" 2>/dev/null && [ -n "$(serving "$lab_port")" ]'; } # both servers up
+ended() { gone=$1 && until_ '! kill -0 "$gone" 2>/dev/null' && until_ '[ -z "$(serving "$app_port")$(serving "$lab_port")" ]'; } # $1, the run, and its servers gone
+order() { # down before up, for each name
+	for name in workshop-app workshop-lab; do
+		[ "$(grep -n "^down $name\$" "$w/log.preview" | head -1 | cut -d: -f1)" -lt "$(grep -n "^up $name " "$w/log.preview" | head -1 | cut -d: -f1)" ] ||
+			fail "workshop.sh did not take down what a run cut short left under $name before putting it up: $(cat "$w/log.preview")"
+	done
+}
+listen_on() { python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$1" >/dev/null 2>&1 & }
+# The defaults, which every case below replaces: two ports, the lab's its config's preview's.
+grep -q 'WORKSHOP_APP_PORT:-5198' "$here/workshop.sh" && grep -q 'WORKSHOP_LAB_PORT:-5199' "$here/workshop.sh" && grep -q 'port: 5199,' "$here/../app/lab.config.ts" ||
+	fail "workshop.sh's default ports are not 5198 for the app and 5199 for the lab, as lab.config.ts's preview"
+shop one && first=$shop
+up || fail "workshop.sh did not put both servers on the tailnet: $(cat "$w/one.out")"
+# The configs hold each server to 127.0.0.1 and its port (app/vite.config.ts's workshopServer); the script gives it its port and its names.
+grep -qxF "react-router dev --port $app_port hosts=box.tail.ts.net,100.64.0.1 cwd=$root/app" "$w/log" ||
+	fail "workshop.sh did not start the app's dev server on its port, the tailnet's names its hosts, from the app: $(cat "$w/log")"
+grep -qxF "vite --config lab.config.ts --port $lab_port hosts=box.tail.ts.net,100.64.0.1 cwd=$root/app" "$w/log" ||
+	fail "workshop.sh did not start the lab's dev server alike: $(cat "$w/log")"
+order
+grep -q "^workshop-app: .*https://box.tail.ts.net:$((app_port + 1000)) " "$w/one.out" && grep -q "^workshop-lab: .*https://box.tail.ts.net:$((lab_port + 1000)) " "$w/one.out" ||
+	fail "workshop.sh did not say each tailnet link beside the name it opens: $(cat "$w/one.out")"
+grep -q "workshop-app is the app's screens" "$w/one.out" && grep -q "workshop-lab is the lab.*realism.html" "$w/one.out" || fail "workshop.sh did not say what each name opens: $(cat "$w/one.out")"
+[ "$(lsof -a -p "$first" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$root" ] || fail "workshop.sh left its checkout's folder"
+app_pid=$(serving "$app_port") && lab_pid=$(serving "$lab_port") || fail "workshop.sh's servers do not listen on their ports"
+[ "$(cat "$root/.claude/tmp/workshop.pid")" = "$(printf '%s %s %s\n%s %s %s' "$first" "$app_pid" "$app_port" "$first" "$lab_pid" "$lab_port")" ] ||
+	fail "workshop.sh did not write its pid, each server's and its port: $(cat "$root/.claude/tmp/workshop.pid")"
+# A second run of the checkout stops the first, its servers and its tailnet names, and serves in its place.
+: >"$w/log.preview" && shop two && second=$shop
+up || fail "a second workshop.sh did not serve in place of the first: $(cat "$w/two.out")"
+kill -0 "$first" 2>/dev/null && fail "a second workshop.sh left the first running"
+! kill -0 "$app_pid" 2>/dev/null && ! kill -0 "$lab_pid" 2>/dev/null || fail "a second workshop.sh left the first's servers running"
+head -n 1 "$root/.claude/tmp/workshop.pid" | grep -q "^$second " || fail "the second workshop.sh did not write its own pids: $(cat "$root/.claude/tmp/workshop.pid")"
+# Either server that stops ends the run, saying so: the other stopped, both off the tailnet, its pid file gone.
+for which in app lab; do
+	[ "$which" = app ] || { : >"$w/log.preview" && shop again && second=$shop && up || fail "workshop.sh did not start again: $(cat "$w/again.out")"; }
+	: >"$w/log.preview" && eval "kill \"\$(serving \"\$${which}_port\")\""
+	ended "$second" || fail "workshop.sh lived on, or left a server, after its $which's server stopped"
+	wait "$second" && fail "workshop.sh exited 0 after its $which's server stopped"
+	grep -q "the $which's dev server stopped" "$w/$([ "$which" = app ] && echo two || echo again).out" || fail "workshop.sh did not say its $which's server stopped"
+	grep -qx "down workshop-app" "$w/log.preview" && grep -qx "down workshop-lab" "$w/log.preview" || fail "workshop.sh did not take both off the tailnet at its end: $(cat "$w/log.preview")"
+	[ ! -e "$root/.claude/tmp/workshop.pid" ] || fail "workshop.sh left its pid file at its end"
+done
+# A server that dies before it listens (a config it cannot load) ends the run, saying which, and puts nothing on the tailnet for it.
+: >"$w/log.preview" && export DIE=vite && shop dies && dies=$shop
+ended "$dies" || fail "workshop.sh lived on after its lab's server died before it listened"
+unset DIE
+grep -q "the lab's dev server stopped before it listened" "$w/dies.out" || fail "workshop.sh did not say its lab's server died before it listened: $(cat "$w/dies.out")"
+grep -q "^up workshop-lab" "$w/log.preview" && fail "workshop.sh put a server that never listened on the tailnet"
+# Ctrl+C (TERM here) and a closed terminal (HUP) end it alike; HUP under dash, which macOS can make its sh (/private/var/select/sh): bash
+# runs the EXIT trap on HUP by itself, dash only through the script's own trap.
+for signal in TERM HUP; do
+	under=$([ "$signal" = TERM ] && echo sh || echo /bin/dash)
+	: >"$w/log.preview" && shop "$signal" && run=$shop && up || fail "workshop.sh did not start again under $under: $(cat "$w/$signal.out")"
+	unset under
+	: >"$w/log.preview" && kill -s "$signal" "$run"
+	ended "$run" || fail "workshop.sh lived through $signal, or left a server running"
+	[ "$(grep -c '^down ' "$w/log.preview")" = 2 ] || fail "workshop.sh did not take both off the tailnet after $signal: $(cat "$w/log.preview")"
+done
+# A run killed hard leaves its servers and its tailnet names: the next run stops those servers, from this checkout's app, and takes the
+# names down before it puts them up again.
+: >"$w/log.preview" && shop hard && hard=$shop && up || fail "workshop.sh did not start again: $(cat "$w/hard.out")"
+old_app=$(serving "$app_port") && kill -9 "$hard" && : >"$w/log.preview" && shop after && after=$shop
+up || fail "workshop.sh did not serve after a run killed hard: $(cat "$w/after.out")"
+kill -0 "$old_app" 2>/dev/null && fail "workshop.sh left the servers of a run killed hard"
+order
+kill "$after" && ended "$after" || fail "workshop.sh lived through TERM"
+# A pid file the run left, or one naming a process of another folder: nothing of it is stopped but this checkout's own servers.
+listen_on "$app_port" && other=$! && until_ '[ -n "$(serving "$app_port")" ]' || fail "the test's own server did not listen"
+printf '%s %s %s\n' "$other" "$other" "$app_port" >"$root/.claude/tmp/workshop.pid"
+shop named && named=$shop && until_ '! kill -0 "$named" 2>/dev/null' || fail "workshop.sh waited on a port another process holds"
+kill -0 "$other" 2>/dev/null || fail "workshop.sh stopped a process of another folder its pid file named"
+grep -q "port $app_port is held by another process" "$w/named.out" || fail "workshop.sh did not say its app's port is held: $(cat "$w/named.out")"
+until_ '[ -z "$(serving "$lab_port")" ]' || fail "workshop.sh started its lab's server though the app's port was held"
+kill "$other"
+printf '999999 999998 %s\n' "$app_port" >"$root/.claude/tmp/workshop.pid" && : >"$w/log.preview" && shop stale && stale=$shop
+up || fail "workshop.sh did not serve past a pid file of gone processes: $(cat "$w/stale.out")"
+# A later run's pid file, written while this one ends, stays.
+printf '1 2 %s\n' "$app_port" >"$root/.claude/tmp/workshop.pid" && kill "$stale" && ended "$stale" || fail "workshop.sh lived through TERM"
+[ "$(cat "$root/.claude/tmp/workshop.pid" 2>/dev/null)" = "1 2 $app_port" ] || fail "workshop.sh removed a later run's pid file at its end"
+# The lab's port held by another process: said, that process left as it is, no server of the run left behind.
+listen_on "$lab_port" && other=$! && until_ '[ -n "$(serving "$lab_port")" ]' || fail "the test's own server did not listen"
+shop four && four=$shop && until_ '! kill -0 "$four" 2>/dev/null' || fail "workshop.sh waited on a port another process holds"
+wait "$four" && fail "workshop.sh exited 0 on a port another process holds"
+grep -q "port $lab_port is held by another process" "$w/four.out" || fail "workshop.sh did not say its lab's port is held: $(cat "$w/four.out")"
+kill -0 "$other" 2>/dev/null || fail "workshop.sh stopped a process it did not start"
+until_ '[ -z "$(serving "$app_port")" ]' || fail "workshop.sh left its app's server running when the lab's port was held"
+kill "$other"
+# The tailnet refusing one name half way (F4759): the run goes on, that server here alone, and both names come down at its end.
+: >"$w/log.preview" && export FAIL_UP=workshop-lab && shop refused && refused=$shop
+until_ 'grep -q "the tailnet refused the lab" "$w/refused.out" && [ -n "$(serving "$lab_port")" ]' || fail "workshop.sh did not say the tailnet refused its lab: $(cat "$w/refused.out")"
+unset FAIL_UP
+kill "$refused" && ended "$refused" || fail "workshop.sh lived through TERM"
+[ "$(grep -c '^down workshop-lab$' "$w/log.preview")" = 2 ] || fail "workshop.sh left on the tailnet a name whose up failed half way: $(cat "$w/log.preview")"
+# With no Tailscale here, it serves on this machine alone and says the local addresses, no tailnet name asked.
+: >"$w/log.preview" && printf '#!/bin/sh\nexit 1\n' >"$w/bin/tailscale" && shop five && five=$shop
+until_ 'grep -q "127.0.0.1:$lab_port" "$w/five.out"' || fail "workshop.sh with no tailnet did not say its local addresses: $(cat "$w/five.out")"
+grep -q "127.0.0.1:$app_port" "$w/five.out" || fail "workshop.sh with no tailnet did not say the app's local address: $(cat "$w/five.out")"
+[ ! -s "$w/log.preview" ] || fail "workshop.sh asked the tailnet with no Tailscale running: $(cat "$w/log.preview")"
+grep -q "hosts= cwd=" "$w/log" || fail "workshop.sh gave the servers hosts with no tailnet: $(cat "$w/log")"
+kill "$five" && ended "$five" || fail "workshop.sh lived through TERM"
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"

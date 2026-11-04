@@ -117,10 +117,11 @@ fast gate                                              full gate (--full, --merg
   types  tsc ─▶ ESLint                                   ─▶ stories   core in Chromium ─▶ the stories' journeys
   tests  Ergo's build ─▶ Vitest                             history   the batch's size ─▶ prove_fix
   gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ regressions ─▶ migrations ─▶ gitleaks ─▶ audit
-  docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage ─▶ StrykerJS
+  docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage
      (the five lanes at once)                               harness   harness_mutate, in 4 worktrees
+                                                         ─▶ StrykerJS, alone, on every core
                                                          (the benches in --full alone; nginx in --merge alone)
-                                                         (two lanes at once, then two)
+                                                         (two lanes at once, then two, then one)
 ```
 
 A failure in the stories or history lane stops the gate before the coverage and harness lanes,
@@ -138,12 +139,14 @@ gate fails, run the failing lane alone before running the whole gate again.
 | anything else (a config, the lockfile, the harness, `deploy/`), no change at all, or a list pre-commit could not give | everything, every test; `test_hooks.sh` only when the change holds what it tests: the harness, a package file, the lockfile (its cases run the real Prettier and Vitest), a config its cases read (`vitest.config.ts`, `app/vitest.compiled.config.ts`, `lint/shared.config.ts`, `.prettierrc.json`, `.gitignore`, `.node-version`, `pnpm-workspace.yaml`, `deploy/test.sh`, `deploy/web/nginx.conf`), a line it cannot place, or nothing at all (the harness audit, 2026-11-04: 99 to 228 s on each of 17 config commits a slice) | 120 s |
 
 **The radical mode's light gate** (Alexis, 2026-11-04, until the hardening slice; `docs/decisions.md`): while git's own hooks folder
-holds `radical-mode` reading `on`, a fast run whose change holds no tier-1 path (`scripts/speeds.py --light`: docs/REVIEW.md's table, the
-tree's and `origin/main`'s, so a row the change drops still counts) and
+holds `radical-mode` reading `on`, a fast run whose change is the interface's alone (`scripts/speeds.py --light`: every path under a
+tier-3 folder that docs/REVIEW.md's table names both in the tree and on `origin/main`, and none a tier-1 path of either, so a tier-1 row
+the change drops still counts and a tier-3 folder it adds does not yet; the interface alone, F4909's (a)) and
 no harness file (records.sh's list, read by git through an index of the run's own) runs the types, the importers' lint, the build with the
 first screen's cap and jscpd, and says so; no Vitest, no journey, no Prettier, knip, CSS or comments check, no docs lane. pre-commit's
-secrets scan runs on every commit as before. A tier-1 path or a harness file, the file absent or reading anything else, a table it
-cannot read, `--tests-all`, `--merge` and `--full` run the whole gate. Only Alexis switches it, from any checkout: on with
+secrets scan runs on every commit as before. A path of no tier-3 folder (the server, core, lib, the design system's own root, a doc, a
+test outside the folders), a tier-1 path or a harness file, the file absent or reading anything else, a table it cannot read,
+`--tests-all`, `--merge` and `--full` run the whole gate. Only Alexis switches it, from any checkout: on with
 `printf 'on\n' >"$(git rev-parse --git-common-dir)/hooks/radical-mode"`, off with `rm -f "$(git rev-parse --git-common-dir)/hooks/radical-mode"`.
 No sandboxed command writes there, and check.sh refuses to run where one could; pre-commit's staged copy reads the mode of the
 repository whose packages it borrows, and the paths pre-commit lists from the commit's own index. A tree a light gate recorded stays
@@ -254,8 +257,8 @@ UTF-8), and a script that fails or prints anything but the word `interface`, run
 always whole.
 
 **A failing merge check goes on** (the dream of 2026-11-01, 5): a failed lane, or a bench refused for the load, no longer stops the
-coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, which fails
-the mutation lane only after StrykerJS has run beside it (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
+coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, whose lane
+fails before StrykerJS's own phase runs (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
@@ -277,7 +280,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test |
 | `scripts/batch_size.py` | a merge's own product code past 600 lines (400 with a tier-1 file) with no `Batch-size:` line |
 | `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs, unless it says why (`No-test: <why>`) or a later commit of the range does (`No-test: <short sha> - <why>`) |
-| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole |
+| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole. It runs alone, once every other lane has ended, on every core (Alexis, 2026-11-04; F777's case at 16 workers passed). A merge check gives it the code the branch changed since its base (`scripts/stryker_lines.py`: each changed line widened to its top-level statements, as StrykerJS mutates a node only inside one range; `path:from-to`), so a survivor in code the branch did not touch goes unseen, as those of the files it did not change do; no such line, no StrykerJS; a `stryker_lines.py` that fails, the whole control. `--full` mutates the whole |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` (when `server/src/` or the check changed since the base) | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
@@ -486,12 +489,12 @@ costs context in every session.
 | `scripts/check.sh` | the gate |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
-| `scripts/lint_scope.py` | the files a commit's lint reads, from the type check's graph |
+| `scripts/lint_scope.py`, `scripts/stryker_lines.py` | the files a commit's lint reads, from the type check's graph; the code a merge check's StrykerJS mutates |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
-| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of no tier-1 path may take the radical mode's light gate |
+| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of the interface alone, tier-3 folders of main's table and the tree's and no tier-1 path of either, may take the radical mode's light gate |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
@@ -500,7 +503,7 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
-| `scripts/workshop.sh` | `pnpm workshop`: the lab's dev server on the tailnet (DEVELOPMENT.md, "The workshop") |
+| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

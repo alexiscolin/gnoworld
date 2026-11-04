@@ -107,6 +107,7 @@ const LabConfig = z.object({
   optimizeDeps: z.object({ entries: z.array(z.string()) }),
   server: z.object({
     host: z.literal("127.0.0.1"),
+    strictPort: z.literal(true),
     allowedHosts: z.array(z.string()),
     fs: z.object({ allow: z.array(z.string()) }),
   }),
@@ -143,11 +144,41 @@ it("serves the app, the packages and their store alone, never deploy/, and scans
   expect(optimizeDeps.entries).toEqual(["realism.html"]);
 });
 
-it("serves the lab on this machine alone, to the exact hosts LAB_HOSTS names", async () => {
+it("serves the lab on this machine alone, to the exact hosts WORKSHOP_HOSTS names", async () => {
   expect((await labConfig()).server.allowedHosts).toEqual([]);
-  vi.stubEnv("LAB_HOSTS", "box.tail.ts.net,100.64.0.1");
+  vi.stubEnv("WORKSHOP_HOSTS", "box.tail.ts.net,100.64.0.1");
   vi.resetModules();
   const { server, preview } = await labConfig();
   expect(server.allowedHosts).toEqual(["box.tail.ts.net", "100.64.0.1"]);
   expect(preview.allowedHosts).toEqual(["box.tail.ts.net", "100.64.0.1"]);
+});
+
+// The app's screens on the workshop's other dev server (scripts/workshop.sh, Alexis, 2026-11-04: the ping-pong): the same guards as the lab's,
+// which `react-router dev` alone left open, /@fs/ serving the repository's root and deploy/ with it.
+const AppConfig = z.object({
+  server: z.object({
+    host: z.literal("127.0.0.1"),
+    strictPort: z.literal(true),
+    allowedHosts: z.array(z.string()),
+    fs: z.object({ allow: z.array(z.string()) }),
+  }),
+});
+const APP_CONFIG = new URL("../../vite.config.ts", import.meta.url).href;
+const appConfig = async () => {
+  const read: unknown = await import(/* @vite-ignore */ APP_CONFIG);
+  return AppConfig.parse(z.object({ default: z.unknown() }).parse(read).default);
+};
+
+it("serves the app's screens as the lab's: this machine alone, the hosts WORKSHOP_HOSTS names, the lab's folders by path", async () => {
+  const lab = await labConfig();
+  const { server } = await appConfig();
+  expect(server.allowedHosts).toEqual([]);
+  expect(server.fs.allow).toEqual(lab.server.fs.allow);
+  vi.stubEnv("WORKSHOP_HOSTS", "box.tail.ts.net,100.64.0.1");
+  vi.resetModules();
+  expect((await appConfig()).server.allowedHosts).toEqual(["box.tail.ts.net", "100.64.0.1"]);
+  // A tailnet with no address yet gives `name,`: no empty name is allowed.
+  vi.stubEnv("WORKSHOP_HOSTS", "box.tail.ts.net,");
+  vi.resetModules();
+  expect((await appConfig()).server.allowedHosts).toEqual(["box.tail.ts.net"]);
 });

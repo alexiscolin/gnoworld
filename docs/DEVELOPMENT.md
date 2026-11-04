@@ -114,28 +114,35 @@ Anthropic key is Alexis's own for tests, then the company's.
 
 ## The workshop
 
-Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the lab's pages on Vite's dev server, with hot reload,
-and their tuning panel on the real renderer, opened from the MacBook or a phone over Tailscale. No gate runs per tweak. An accepted
-batch then lands once, in a part of its own: test first, through the gate and one review, with pictures where it moves an approved
-one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the fast lane instead: its test seen failing,
-the gate, the journeys that watch it, one `reviewer`.
+Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens and the lab's pages on Vite's dev
+servers, with hot reload, and the lab's tuning panel on the real renderer, opened from the MacBook or a phone over Tailscale. No
+gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
+pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
+fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
 
 **Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
-Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in: the lab's dev server with
-`LAB_HOSTS` set to this machine's tailnet name and address, then, when the `tailnet-preview` skill's script is installed, the
-server on the tailnet; without it, the local address. It stops only a server it started itself (its pid in `.claude/tmp/`): a port
-5199 held by anything else is said, never taken. Ctrl+C stops the server and takes it off the tailnet; a second `pnpm workshop`
-in the same checkout replaces the first, and a run killed hard stays on the tailnet until the next one, or
-`tailnet-preview.sh down workshop`.
+Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
+each started by its one function `serve`: the app's (`react-router dev`) on 127.0.0.1:5198 and the lab's (`vite --config
+lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when the `tailnet-preview`
+skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`; without it, the local
+addresses. It stops only servers it started itself (their pids and ports in `.claude/tmp/workshop.pid`): a port held by anything
+else is said, never taken. Ctrl+C stops both and takes them off the tailnet, and so does either server that stops; a second
+`pnpm workshop` in the same checkout replaces the first, and a run killed hard stays on the tailnet until the next one, or
+`tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
-The dev server listens on 127.0.0.1:5199 alone and answers only the names `LAB_HOSTS` lists, exactly. By path it serves the app,
-the packages and their store, never the repository's root, whose `deploy/` holds secrets (`lab.config.ts`). The
-`tailnet-preview` skill's script prints two links. On the MacBook or the phone, open the https one with `/realism.html` after it:
-`https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for the site's own scene
-(`&arrive=<system>` for a system's view). The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS.
-It is not a secure context, so Copy cannot reach the clipboard there; select the list instead.
+Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
+the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
+which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
+which. On the MacBook or the phone, open the https ones:
+- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route.
+  No server runs behind it: what a page reads from the relay shows as it does when the relay is away.
+- **`workshop-lab`, the lab:** `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for
+  the site's own scene (`&arrive=<system>` for a system's view).
 
-**The panel:** T shows and hides it, on either page, and so does its Tuning button in the corner, for a phone.
+The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
+cannot reach the clipboard there; select the list instead.
+
+**The panel:** T shows and hides it, on either page of the lab, and so does its Tuning button in the corner, for a phone.
 - **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home
   (`LEAN`) and, at a system's view, its share of that lean (`ARRIVAL_LEAN = LEAN / 2.2`), both in
   `packages/core/src/space/drift.ts`. A Plan keeps its own share.
