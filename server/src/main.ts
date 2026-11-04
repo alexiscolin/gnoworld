@@ -97,7 +97,7 @@ if (door !== undefined)
       origins: config.origins,
       mayRead: chat.mayRead,
       recent: chat.recent,
-      named: makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now }),
+      named: makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log }),
       quota: door.quota,
       jarvis: door.jarvis,
       on: door.settings.on,

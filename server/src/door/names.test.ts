@@ -66,11 +66,13 @@ const setup = (
 ) => {
   const calls: Call[] = [];
   const asked: string[] = [];
+  const lines: unknown[][] = [];
   const clock = { now: T0 };
   const named = makeNames({
     rpc: RPC,
     chainId: MAINNET,
     now: () => clock.now,
+    log: (...line) => lines.push(line),
     send: (url, init, ms) => {
       asked.push(url);
       if (url === `${RPC}/status`) return status?.() ?? Promise.resolve(statusOf(network));
@@ -80,7 +82,7 @@ const setup = (
     },
     ...(max === undefined ? {} : { max }),
   });
-  return { calls, asked, clock, named };
+  return { calls, asked, lines, clock, named };
 };
 
 describe("a mainnet name", () => {
@@ -137,6 +139,41 @@ describe("a mainnet name", () => {
     clock.now += 1;
     expect(await named(Address.parse(addressAt(1)))).toBe(true);
     expect(statuses()).toBe(2);
+  });
+
+  it("logs a failed read's kind once a minute, never the account (10h's review, V9)", async () => {
+    const { lines, clock, named } = setup([], { network: "test5" });
+    await named(ANNA);
+    await named(BEN);
+    expect(lines).toEqual([["name_failed", { error: "other_chain" }]]);
+    clock.now += MINUTE - 1;
+    await named(Address.parse(addressAt(1)));
+    expect(lines).toHaveLength(1);
+    clock.now += 1;
+    await named(Address.parse(addressAt(2)));
+    expect(lines).toEqual([
+      ["name_failed", { error: "other_chain" }],
+      ["name_failed", { error: "other_chain" }],
+    ]);
+  });
+
+  it.each([
+    ["a node that does not answer", { status: () => Promise.resolve(new Response("", { status: 503 })) }, [], "down"],
+    ["an answer of another value", {}, [() => evaluated("(1 int)")], "wrong_shape"],
+    ["an answer past 64 KiB", {}, [() => sized(64 * 1024 + 1)], "too_big"],
+  ])("logs %s as its kind", async (...[, over, answers, error]) => {
+    const { lines, named } = setup(answers, over);
+    expect(await named(ANNA)).toBe(false);
+    expect(lines).toEqual([["name_failed", { error }]]);
+  });
+
+  it("logs no read that gives a name, or none, only the one that fails", async () => {
+    const { lines, named } = setup([NAMED, NONE, () => evaluated("(1 int)")]);
+    await named(ANNA);
+    await named(BEN);
+    expect(lines).toEqual([]);
+    await named(Address.parse(addressAt(1)));
+    expect(lines).toEqual([["name_failed", { error: "wrong_shape" }]]);
   });
 
   it("is none when the record is missing", async () => {
