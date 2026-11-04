@@ -432,7 +432,7 @@ Components use container queries, so they fit wherever they are placed.
   utilities;`.
   - **Base** styles the elements globally first (type, links, focus, `hr`, rich text: code,
     quote, mention, underline), so components write little. An underline's line is the muted
-    grey, a step under the words; a link's is the words' own colour: the two never read alike.
+    grey, a step under the words; a link's is the words' own colour, at the font's place.
     `::selection` waits for Baseline.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking

@@ -30,8 +30,8 @@
     color: inherit;
   }
 
-  /* An underlined word (the composer's U, 8k): its line in the muted grey, a step under the words, never read as a link's,
-     which is the words' own colour at the font's place (prototype index.html:220). */
+  /* An underlined word (the composer's U, 8k): its line in the muted grey, a step under the words (prototype
+     index.html:220, `.body u`); a link's line is the words' own colour, at the font's place. */
   u {
     text-decoration-color: var(--color-text-muted);
     /* raw: the prototype's step under the words, `.body u` */
