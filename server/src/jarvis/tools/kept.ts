@@ -4,7 +4,7 @@
 import type { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";
 
 /** The chain profile and the block height a card's chain sources were read at. */
-interface ReadAt {
+export interface ReadAt {
   readonly profile: string;
   readonly height: number;
 }

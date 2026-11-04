@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
 
 /** A universe's chain: its id, the chain's id, its node and its gnoweb's origin. */
-interface Universe {
+export interface Universe {
   readonly id: string;
   readonly name: string;
   readonly chainId: string;
@@ -26,7 +26,7 @@ interface Shown {
   readonly canonical: string;
 }
 
-interface Places {
+export interface Places {
   readonly places: readonly Place[];
   readonly universes: ReadonlyMap<string, Universe>;
   // Each place as find_place shows it, and the words a query looks for in it, in lower case.
