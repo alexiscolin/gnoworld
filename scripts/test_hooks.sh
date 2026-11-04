@@ -5122,6 +5122,17 @@ for change in "echo m >>packages/core/a.ts" "echo s >staged.txt && git add stage
 	[ -d "$wr/unclean" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/unclean" || fail "worktree.sh's refused remove touched the tree ($change)"
 	git -C "$wr/unclean" reset -q --hard && git -C "$wr/unclean" clean -qfd
 done
+# Its clean check enters no nested repository: git's own ran git status in one its index staged at that moment, which the tree's
+# session can flip between git's two reads, so that its fsmonitor ran outside the sandbox (security-reviewer, third review). Here
+# the nested repository's own clean filter, which git status runs to read a file changed at its size, and no setting of the script
+# turns off.
+wt "$wr/subm" subm HEAD >/dev/null 2>&1 || fail "the subm worktree of this case could not be made"
+git init -q "$wr/subm/x" && echo x >"$wr/subm/x/x" && echo 'x filter=planted' >"$wr/subm/x/.gitattributes"
+git -C "$wr/subm/x" add x .gitattributes && git -C "$wr/subm/x" commit -qm x
+git -C "$wr/subm/x" config filter.planted.clean "sh -c 'touch \"$ws/pwned-subm\"; cat'" && echo y >"$wr/subm/x/x"
+git -C "$wr/subm" add x 2>/dev/null
+out=$(wt remove subm 2>&1) || :
+[ ! -e "$ws/pwned-subm" ] || fail "worktree.sh's remove ran git in a nested repository of the tree: its clean filter ran: $out"
 # The tree it runs in is refused, and kept: its removal would leave the run in no folder. Whatever the spelling of either: the
 # folder through a .., the run entered through a link.
 wt "$wr/inside" inside HEAD >/dev/null 2>&1 && ln -s "$wr/inside" "$ws/toinside" || fail "the inside worktree of this case could not be made"
@@ -5175,6 +5186,14 @@ out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
 rm "$ws/src/.git/commondir"
 [ ! -e "$ws/pwned" ] || fail "worktree.sh, run from the main checkout, took its config from a commondir planted there: its fsmonitor ran (F5097): $out"
 [ -d "$wr/frommain" ] || fail "worktree.sh, run from the main checkout beside a planted commondir, made no tree: $out"
+# Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write (F5095): a
+# post-checkout hook ran when the tree was made, an fsmonitor when the base was compared (security-reviewer, third review).
+printf '#!/bin/sh\ntouch "%s"\n' "$ws/hookran" >"$ws/src/.git/hooks/post-checkout" && chmod +x "$ws/src/.git/hooks/post-checkout"
+git -C "$ws/src" config core.fsmonitor "$ws/fsmonitor"
+out=$(wt hooked hooked HEAD 2>&1) || :
+rm "$ws/src/.git/hooks/post-checkout" && git -C "$ws/src" config --unset core.fsmonitor
+[ ! -e "$ws/hookran" ] && [ ! -e "$ws/pwned" ] || fail "worktree.sh ran a hook or an fsmonitor of the common folder: $out"
+[ -d "$wr/hooked" ] || fail "worktree.sh made no tree beside a planted hook and fsmonitor: $out"
 # A nested repository staged in this tree, under a harness path the base check reads, is never entered when worktree.sh compares
 # a base outside the sandbox: git would run its fsmonitor there (security-reviewer, F5097).
 git init -q "$ws/src/.claude/nested" && echo n >"$ws/src/.claude/nested/n" && git -C "$ws/src/.claude/nested" add n
@@ -5187,14 +5206,16 @@ git -C "$ws/src" rm -q -f --cached .claude/nested && rm -r "$ws/src/.claude/nest
 # A bare name is a folder of the root: no caller writes its user's number.
 wt bare bare HEAD >"$ws/out" 2>&1 && [ -d "$wr/bare" ] || fail "worktree.sh made no tree of a bare name in its root: $(cat "$ws/out")"
 wt remove bare >"$ws/out" 2>&1 && [ ! -e "$wr/bare" ] || fail "worktree.sh removed no tree of a bare name: $(cat "$ws/out")"
-# A folder name holding a newline would split into paths of their own as node_modules are borrowed, outside the sandbox: a
-# folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099), under the top or under a folder the
-# borrowing leaves out only at the top (app/.claude, the reviewer's second review). It is refused, and makes nothing.
-for at in . app/.claude; do
+# A folder name holding a newline is a name like another as node_modules are borrowed, outside the sandbox: read line by line it
+# split, and a folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099), under the top or under a
+# folder the borrowing leaves out only at the top (app/.claude, the reviewer's second review). The tree is made, nothing outside.
+n=0
+for at in . app/.claude app/.git app/.stryker-tmp; do
+	n=$((n + 1))
 	mkdir -p "$ws/src/$at/a
 ../b/scripts/planted/node_modules" "$ws/src/$at/a" "$wr/b"
-	out=$(wt "$wr/nl" nl HEAD 2>&1) && fail "worktree.sh borrowed the packages of a tree holding a name with a newline under $at: $out"
-	[ ! -e "$wr/b/scripts" ] && [ ! -e "$wr/nl" ] || fail "worktree.sh made a folder through a name with a newline under $at: $out"
+	out=$(wt "nl-$n" "nl-$n" HEAD 2>&1) || fail "worktree.sh refused a tree holding a name with a newline under $at: $out"
+	[ ! -e "$wr/b/scripts" ] || fail "worktree.sh made a folder through a name with a newline under $at: $out"
 	rm -r "$ws/src/$at/a
 .." "$ws/src/$at/a"
 done

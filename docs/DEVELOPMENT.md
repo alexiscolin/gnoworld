@@ -39,9 +39,10 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 Each branch works in a worktree of its own, made from the root of a checkout whose packages are
 installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
 `sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
-`~/Server/gnoworld-wt` (made once, in your shell), where no session writes but its own folder
-(Alexis, 2026-11-04), which it may also be given in full. Whatever the spelling (a `..`, a link, another path) it refuses any other
-folder, as it may run outside the sandbox and must touch no other (F5058), and a base whose harness,
+`~/Server/gnoworld-wt` (made once, in your shell), where no session's shell writes but its own
+folder (Alexis, 2026-11-04; its file tools still can, F5095), which it may also be given in full.
+Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
+outside the sandbox and must touch no other (F5058), and a base whose harness,
 `CLAUDE.md` or package files are not its tree's (F5098). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
 relative links and a `.bin` of its own, through no link it did not make; the gate's StrykerJS reads

@@ -35,7 +35,7 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
   `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127), in
-  `~/Server/gnoworld-wt/`, where no session writes but its own folder, the one root where the script makes or removes a folder
+  `~/Server/gnoworld-wt/`, where no session's shell writes but its own folder (its file tools still can, F5095), the one root where the script makes or removes a folder
   (`worktree.sh remove`); it writes no other session's worktree, by any tool (F5058). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check

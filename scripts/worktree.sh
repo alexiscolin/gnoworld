@@ -22,7 +22,7 @@ for arg in "$dir" "$branch" "$base"; do
 	case $arg in -*) echo "worktree.sh: $arg starts with -, which git would read as an option" >&2; exit 2 ;; esac
 done
 # It may run outside the sandbox (F5058): it makes and removes the folders of one root alone, in this user's home, where no
-# session writes but its own folder (Alexis, 2026-11-04), and which no argument moves. The folder's parent is resolved, so a
+# session's shell writes but its own folder (Alexis, 2026-11-04; the file tools still can, F5095), and which no argument moves. The folder's parent is resolved, so a
 # `..`, a link on the way or another path is refused, and compared with the root as written, never resolved; the name's letters
 # are spelled out, as sh's [a-z] takes a capital or an accented letter in a UTF-8 locale (bash 3.2). The folder is then named by
 # that resolved path, so no trailing slash or `..` hides a link from the checks below, nor the tree this runs in: a link named as
@@ -47,12 +47,20 @@ else
 	GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)
 fi
 export GIT_COMMON_DIR
+# Nor a hook or an fsmonitor of that folder, whose .git/hooks and config the file tools can still write (F5095): a post-checkout
+# hook ran as the tree was made, an fsmonitor as the base was compared (security-reviewer, third review).
+GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null GIT_CONFIG_KEY_1=core.fsmonitor GIT_CONFIG_VALUE_1=false
+export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 if [ "$action" = remove ]; then
-	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder. git removes only a clean
-	# worktree of this repository (no --force), its ignored files and its own record with it, never what a link in it leads to. No
-	# other record is pruned: a session can point another tree's at nothing (reviewer, second review); Alexis prunes by hand.
+	# Never the tree this runs in, however it was entered: its removal would leave the run in no folder. Only a clean tree, by a
+	# check that enters no nested repository: git's own ran git status in one its index staged at that moment, which the tree's
+	# session can flip between git's two reads (security-reviewer, third review). Then git removes a worktree of this repository,
+	# its ignored files and its own record with it, never what a link in it leads to; a change made since is the tree's own loss.
+	# No other record is pruned: a session can point another tree's at nothing (reviewer, second review); Alexis prunes by hand.
 	case $src/ in "$dir"/*) echo "worktree.sh: $dir is the tree this runs in; remove it from another" >&2; exit 1 ;; esac
-	git worktree remove "$dir"
+	changes=$(git -C "$dir" status --porcelain --ignore-submodules=all)
+	[ -z "$changes" ] || { echo "worktree.sh: $dir holds a change, a staged or an untracked file; commit or delete it first: $(echo "$changes" | tr '\n' ' ')" >&2; exit 1; }
+	git worktree remove --force "$dir"
 	echo "worktree.sh: $dir removed, its branch kept"
 	exit 0
 fi
