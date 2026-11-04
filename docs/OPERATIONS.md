@@ -81,8 +81,8 @@ tailnet; keep it so.
 | What | Command, from the repository's root |
 |---|---|
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
-| Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh` |
-| Test that each check catches its fault | `sh deploy/test.sh --mutants` |
+| Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh`, from the commit you reviewed (below) |
+| Test that each check catches its fault | `sh deploy/test.sh --mutants`, from the commit you reviewed (below) |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
 | Its logs | `docker compose -f deploy/compose.yaml --profile demo logs -f` |
 | Stop | `docker compose -f deploy/compose.yaml --profile demo down` |
@@ -94,6 +94,33 @@ that changes `deploy/`. App code alone needs neither: the gate's journeys test i
 
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.
+
+### Run test.sh from the commit you reviewed
+
+`deploy/test.sh` runs with Docker's socket, which is root on the host, and every session can write a
+worktree's `deploy/` (F204) and the shared `.git`'s objects: git does not check an object against its
+name as it reads it, so even `git archive <sha>` writes a planted object's text (F152's class,
+F4921). So run it neither from a worktree nor from a bare archive, but from a copy of the commit you
+reviewed whose commit and files hash to that commit's name. Paste this in your own Terminal, `sha`
+set to that commit (read it once, right after you reviewed it: a session can move a branch), and
+add `--mutants` to the last line when the branch changes `deploy/`:
+
+```sh
+repo=~/Server/gnoworld sha=$(/usr/bin/git -C ~/Server/gnoworld rev-parse --verify '<the commit you reviewed>^{commit}')
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 # no git config of the home folder in what follows
+d=$(mktemp -d) && /usr/bin/git -C "$repo" archive "$sha" | /usr/bin/tar -x -C "$d" &&
+	[ "$(/usr/bin/git -C "$repo" cat-file commit "$sha" | /usr/bin/git hash-object -t commit --stdin)" = "$sha" ] &&
+	(cd "$d" && /usr/bin/git init -q && /usr/bin/git add -A -f && [ "$(/usr/bin/git write-tree)" = "$(/usr/bin/git -C "$repo" rev-parse "$sha^{tree}")" ]) &&
+	echo "test.sh runs from $sha, checked, in $d" && (cd "$d" && sh deploy/test.sh)
+```
+
+It calls the system's git and tar by path, and the copy holds a repository of its own, for
+test.sh's checks of what git ignores. A line that prints nothing and runs no test.sh means the copy
+is not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh; remove
+the copy after (`rm -r "$d"`). It needs Alexis's user settings of 2026-11-04 (7w2's
+`apply-7w2-user.sh`), which keep the sessions' file tools out of the programs it calls (git, tar,
+docker, sh's startup files); without them, anything on `PATH` outside `/usr/bin` and `/bin` is
+theirs to rewrite.
 
 ## When something goes wrong: cut the public URL
 
@@ -416,7 +443,8 @@ Slice 3, the stack (3e):
   out on 4750 (to OpenAI's API alone). `"acls": []` keeps every device out (F619).
 - **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
-  `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.
+  `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` from the commit you reviewed (in "Run, test, stop") before
+  `up -d --build`.
 - **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
   to start the stack (Compose names the overlap); set both in `deploy/.env`.
 
