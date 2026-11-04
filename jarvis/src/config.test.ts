@@ -63,16 +63,16 @@ describe("loadJarvisConfig", () => {
 
   it("reads the day's budgets in whole dollars, the demo's $3 and $1 among them, as nano-dollars", () => {
     const demo = { ...ENV, JARVIS_BUDGET_USD: "3", JARVIS_TRANSLATION_BUDGET_USD: "1" };
-    expect(loadJarvisConfig(demo).budgets).toEqual({ ask: 3 * DOLLAR, translate: 1 * DOLLAR });
+    expect(loadServed(demo).budgets).toEqual({ ask: 3 * DOLLAR, translate: 1 * DOLLAR });
     const most = { ...ENV, JARVIS_BUDGET_USD: "500", JARVIS_TRANSLATION_BUDGET_USD: "500" };
-    expect(loadJarvisConfig(most).budgets).toEqual({ ask: 500 * DOLLAR, translate: 500 * DOLLAR });
+    expect(loadServed(most).budgets).toEqual({ ask: 500 * DOLLAR, translate: 500 * DOLLAR });
     const least = { ...ENV, JARVIS_BUDGET_USD: "1", JARVIS_TRANSLATION_BUDGET_USD: "1" };
-    expect(loadJarvisConfig(least).budgets).toEqual({ ask: DOLLAR, translate: DOLLAR });
+    expect(loadServed(least).budgets).toEqual({ ask: DOLLAR, translate: DOLLAR });
   });
 
   it("takes a database's path of 1024 characters, the longest", () => {
     const longest = `/${"d".repeat(1023)}`;
-    expect(loadJarvisConfig({ ...ENV, JARVIS_DATABASE: longest }).database).toBe(longest);
+    expect(loadServed({ ...ENV, JARVIS_DATABASE: longest }).database).toBe(longest);
   });
 
   it("reads each cap at its lowest and its highest", () => {
@@ -403,13 +403,6 @@ describe("loadServed", () => {
     for (const on of ["on", undefined]) {
       expect(() => loadServed({ ...SERVED, JARVIS: on, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
     }
-  });
-
-  it("reads the same file and budgets as loadJarvisConfig, from the same settings", () => {
-    const env = { ...ENV, JARVIS: "on", JARVIS_BUDGET_USD: "7", JARVIS_TRANSLATION_BUDGET_USD: "2" };
-    const served = loadServed(env);
-    const config = loadJarvisConfig(env);
-    expect([served.database, served.budgets]).toEqual([config.database, config.budgets]);
   });
 });
 
