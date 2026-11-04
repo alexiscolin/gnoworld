@@ -22,7 +22,7 @@ export interface CosmosStats {
   nebulae: number;
   worlds: number;
   eye: { x: number; y: number; z: number };
-  web?: { points: number; lines: number; gold: number; share: number };
+  web?: { points: number; particles: number; clumps: number; chosen?: string; share: number };
   sky: { share: number; eye: { x: number; y: number; z: number } };
   /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
   dive: { along: number; veil: number };

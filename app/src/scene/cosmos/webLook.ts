@@ -1,79 +1,139 @@
-// How the whole cosmos's points and lines are drawn (web.ts): added light, behind every body, each world where its orbit holds it in its
-// system's plane, as the ladder's points have it (`ORBITING`).
-import { AdditiveBlending, ShaderMaterial } from "three";
-import { ORBITING } from "./dots.ts";
-
-const POINT_LIGHT = 1.1;
-const LINE_LIGHT = 0.16;
+// How the whole cosmos's mass is drawn (web.ts; 7u): each particle a small opaque sphere lit from one side, so a near one hides a far
+// one, its colour its kind's from the palette, fading towards the ground with distance; it glides from where the last mass held it. The ground behind it, and the chosen clump's line of light, a thin horizontal band.
+import { AdditiveBlending, Color, ShaderMaterial } from "three";
 
 const POINT_VERTEX = /* glsl */ `
-attribute vec3 aCircle;
-attribute vec2 aPlane;
-attribute vec3 aTint;
-attribute vec2 aSoft;
-uniform float uSeconds;
+attribute vec3 aSize;
+attribute vec3 aFrom;
+attribute float aClump;
+uniform vec3 uKind[6];
+uniform float uHalfHeight;
 uniform float uRatio;
-uniform float uShare;
-uniform float uCalm;
-varying vec3 vLight;
-${ORBITING}
+uniform float uGlide;
+uniform float uChosen;
+uniform float uLift;
+uniform float uNear;
+uniform float uFar;
+uniform float uFarLight;
+varying vec3 vColour;
+varying float vDepth;
 void main() {
-  vLight = aTint * aSoft.y * uShare * uCalm * ${POINT_LIGHT.toFixed(2)};
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position + orbiting(aCircle, aPlane, uSeconds) * aCircle.x, 1.0);
-  gl_Position.z = gl_Position.w * 0.99998;
-  gl_PointSize = 2.0 * aSoft.x * uRatio;
+  vec3 at = mix(aFrom, position, uGlide);
+  vec4 seen = modelViewMatrix * vec4(at, 1.0);
+  float distance = max(-seen.z, 0.01);
+  float size = aSize.x * projectionMatrix[1][1] * uHalfHeight / distance;
+  vec3 kind = uKind[int(aSize.y + 0.5)];
+  float chosen = 1.0 - step(0.5, abs(aClump - uChosen));
+  vColour = kind * (0.8 + 0.4 * aSize.z) * mix(1.0, uLift, chosen);
+  vDepth = mix(1.0, uFarLight, smoothstep(uNear, uFar, distance)) * min(1.0, size / 0.8);
+  gl_Position = projectionMatrix * seen;
+  gl_PointSize = 2.0 * max(size, 0.8) * uRatio;
 }`;
 
-// A soft round with no edge, most of its light at its heart.
+// A sphere's disc, lit from the upper left, `uShadow` of the light on its far side from the mass around it; its far ones the ground's.
 const POINT_FRAGMENT = /* glsl */ `
-varying vec3 vLight;
+uniform vec3 uGround;
+uniform float uShadow;
+uniform float uShare;
+varying vec3 vColour;
+varying float vDepth;
 void main() {
   vec2 at = gl_PointCoord * 2.0 - 1.0;
   float reach = dot(at, at);
   if (reach >= 1.0) discard;
-  gl_FragColor = vec4(vLight * exp(-3.0 * reach) * (1.0 - reach), 1.0);
+  vec3 normal = vec3(at.x, -at.y, sqrt(1.0 - reach));
+  float lit = max(dot(normal, vec3(-0.45, 0.55, 0.7)), 0.0);
+  vec3 shaded = vColour * (uShadow + (1.18 - uShadow) * lit + 0.25 * pow(lit, 12.0));
+  gl_FragColor = vec4(mix(uGround, shaded, vDepth) * uShare + uGround * (1.0 - uShare), 1.0);
   #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+const GROUND_VERTEX = /* glsl */ `
+void main() {
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}`;
+
+// The view's ground under the mass, as much of it as the whole cosmos's share: the sky's light is added over it.
+const GROUND_FRAGMENT = /* glsl */ `
+uniform vec3 uGround;
+uniform float uShare;
+void main() {
+  gl_FragColor = vec4(uGround * uShare, 1.0);
   #include <colorspace_fragment>
 }`;
 
 const LINE_VERTEX = /* glsl */ `
-attribute vec3 aCircle;
-attribute vec2 aPlane;
-attribute vec3 aTint;
-attribute vec2 aSoft;
-uniform float uSeconds;
-uniform float uShare;
-uniform float uCalm;
-varying vec3 vLight;
-${ORBITING}
+uniform vec2 uAt;
+uniform float uHalf;
+varying vec2 vAt;
 void main() {
-  vLight = aTint * aSoft.y * uShare * uCalm * ${LINE_LIGHT.toFixed(2)};
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position + orbiting(aCircle, aPlane, uSeconds) * aCircle.x, 1.0);
-  gl_Position.z = gl_Position.w * 0.99998;
+  vAt = vec2(position.x - uAt.x, position.y);
+  gl_Position = vec4(position.x, uAt.y + position.y * uHalf, 0.0, 1.0);
 }`;
 
 const LINE_FRAGMENT = /* glsl */ `
-varying vec3 vLight;
+uniform vec3 uTone;
+uniform float uLight;
+uniform vec2 uPixels;
+varying vec2 vAt;
 void main() {
-  gl_FragColor = vec4(vLight, 1.0);
+  vec2 px = vAt * uPixels;
+  float line = exp(-px.y * px.y / 1.5) + 0.18 * exp(-abs(px.y) / 5.0);
+  float fall = 0.3 * exp(-abs(px.x) / (0.6 * uPixels.x)) + 0.7 * exp(-abs(px.x) / (0.12 * uPixels.x));
+  float glow = 1.4 * exp(-dot(px, px) / 300.0) + 0.6 * exp(-length(px) / 9.0);
+  gl_FragColor = vec4(uTone * uLight * (line * fall + glow), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
 
-const added = (vertexShader: string, fragmentShader: string, uniforms: Record<string, { value: number }>) =>
+type Uniforms = Record<string, { value: number | Color | Color[] | { x: number; y: number } }>;
+
+// How much brighter the chosen clump stands.
+const LIFT = 1.7;
+
+/** The particles' uniforms: each frame, look and palette writes its own. */
+export const massUniforms = () => ({
+  ...{
+    uHalfHeight: { value: 1 },
+    uRatio: { value: 1 },
+    uShare: { value: 0 },
+    uGlide: { value: 1 },
+    uChosen: { value: -1 },
+  },
+  ...{
+    uLift: { value: LIFT },
+    uNear: { value: 1 },
+    uFar: { value: 2 },
+    uGround: { value: new Color() },
+  },
+  ...{ uKind: { value: [] as Color[] } },
+  ...{ uShadow: { value: 0 }, uFarLight: { value: 1 } },
+});
+
+/** The particles' material: opaque, depth-tested. */
+export const massLook = (uniforms: Uniforms) =>
+  new ShaderMaterial({ uniforms, vertexShader: POINT_VERTEX, fragmentShader: POINT_FRAGMENT });
+
+/** The ground's: opaque and first, so the mass draws over it and the sky adds its light after. */
+export const groundLook = (uniforms: Uniforms) =>
   new ShaderMaterial({
-    blending: AdditiveBlending,
-    depthWrite: false,
-    transparent: true,
     uniforms,
-    vertexShader,
-    fragmentShader,
+    vertexShader: GROUND_VERTEX,
+    fragmentShader: GROUND_FRAGMENT,
+    depthTest: false,
+    depthWrite: false,
+    transparent: false,
   });
 
-type Uniforms = Record<string, { value: number }>;
-
-/** The points' material: a soft round each, its size and light from the look, all of it by the share. */
-export const pointLook = (uniforms: Uniforms) => added(POINT_VERTEX, POINT_FRAGMENT, uniforms);
-
-/** The lines' material: a thin line each, read through an index from the points' own buffers: its ends' light and colour. */
-export const lineLook = (uniforms: Uniforms) => added(LINE_VERTEX, LINE_FRAGMENT, uniforms);
+/** The line of light's: added light over the frame, no depth. */
+export const lineLook = (uniforms: Uniforms) =>
+  new ShaderMaterial({
+    uniforms,
+    vertexShader: LINE_VERTEX,
+    fragmentShader: LINE_FRAGMENT,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+  });

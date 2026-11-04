@@ -1,82 +1,122 @@
-// The whole cosmos's worlds as it draws them (web.ts): each world of the file once, where its system holds it, sized by its use, coloured by
-// the mood where its star stands, its calls as the file read them, its light calmed by its star's crowd; and its lines as pairs of them.
-import { pointTint, toScene, worldSize, type StarSystem } from "@gnoworld/core";
-import { callsOf, lastOf } from "../live.ts";
+// The whole cosmos's matter and colours (web.ts; 7u): the file's worlds gathered by namespace as core's mass reads them, a world new for
+// the week marked; how live each world is now; and the palette, the design system's own tokens read on the page (Alexis, 2026-11-04,
+// "Palette du design system"), one colour a kind, low-key: mixed a third towards their grey, so none reads saturated.
+import { auroraOf, MASS_KIND, type Mass, type MassNamespace } from "@gnoworld/core";
+import { Color } from "three";
+import { callsOf, heightAt, lastOf, type Universe } from "../live.ts";
 import { usageOf, type CosmosWorld } from "./cosmosWorld.ts";
 
-// A crowd of one star's worlds stands in a few pixels from afar, and would burn to white: past this many, each adds less.
-const SYSTEM_CALM = 8;
+const WEEK_MS = 7 * 86_400_000;
+const GREY = 1 / 3;
+// Each kind's token and its light: worlds the brightest, their realms and packages under them, dust far under, the Earth its own.
+const KINDS: readonly (readonly [kind: number, token: string, light: number])[] = [
+  [MASS_KIND.world, "--color-primary", 0.7],
+  [MASS_KIND.realm, "--color-warm", 0.6],
+  [MASS_KIND.package, "--color-mine", 0.5],
+  [MASS_KIND.dust, "--color-primary", 0.28],
+  [MASS_KIND.earth, "--world", 1],
+  [MASS_KIND.fresh, "--color-new", 0.75],
+];
 
-/** A world drawn: its system, its orbit, phase and size there, its colour with no activity, the file's word on it, how live it was at the
- * last look, and how much of its light its star's crowd leaves it. */
-export interface Held {
-  readonly system: StarSystem;
-  readonly orbit: number;
-  readonly phase: number;
-  readonly radius: number;
-  readonly tint: readonly [number, number, number];
-  readonly called: { readonly calls: number | null; readonly lastHeight: number | null };
-  live: number;
-  calm: number;
-}
-
-/** How much of each one's light a crowd of `count` leaves, `whole` of them showing all of theirs: as the square root of how many more. */
-export const calmFor = (count: number, whole: number): number => Math.min(1, Math.sqrt(whole / Math.max(count, 1)));
-
-// A system's worlds' colour, from the mood where its star stands on the stage.
-function tintAt(system: StarSystem): readonly [number, number, number] {
-  const stage = { x: 0, y: 0, z: 0 };
-  const tint = { red: 0, green: 0, blue: 0 };
-  toScene(system.place, stage);
-  pointTint(stage, tint);
-  return [tint.red, tint.green, tint.blue];
-}
-
-/** The worlds drawn, each once, and for each of the file's worlds its index among them, or -1 where it has no place. */
-export function heldOf(
-  systems: readonly StarSystem[],
-  worlds: readonly CosmosWorld[],
-): { held: Held[]; at: Int32Array } {
-  const tints = new Map<string, readonly [number, number, number]>();
-  const places = new Map(
-    systems.flatMap((system) => system.worlds.map((world) => [world.id, { system, world }] as const)),
-  );
-  const at = new Int32Array(worlds.length).fill(-1);
-  const seen = new Map<string, number>();
-  const held: Held[] = [];
-  worlds.forEach((world, from) => {
-    const place = places.get(world.id);
-    at[from] = seen.get(world.id) ?? -1;
-    if (place === undefined || at[from] >= 0) return;
-    at[from] = held.length;
-    seen.set(world.id, held.length);
-    const tint = tints.get(place.system.id) ?? tintAt(place.system);
-    tints.set(place.system.id, tint);
-    const { orbit, phase } = place.world;
-    const called = { calls: callsOf(world), lastHeight: lastOf(world) };
-    held.push({
-      system: place.system,
-      orbit,
-      phase,
-      radius: worldSize(usageOf(world)),
-      tint,
-      called,
-      live: 0,
-      calm: 1,
+/** The file's worlds by namespace, each world new if the file first saw it within a week of its writing. */
+export function namespacesOf(worlds: readonly CosmosWorld[], written: string | undefined): MassNamespace[] {
+  const at = written === undefined ? Number.NaN : Date.parse(written);
+  const held = new Map<string, Map<string, MassNamespace["worlds"][number]>>();
+  for (const world of worlds) {
+    const seen = world.seen === undefined || world.seen === null ? Number.NaN : Date.parse(world.seen);
+    const one = held.get(world.namespace) ?? new Map<string, MassNamespace["worlds"][number]>();
+    one.set(world.id, {
+      id: world.id,
+      realms: world.realms.map(({ path }, index) => path ?? `${world.id}#${String(index)}`),
+      use: usageOf(world),
+      fresh: at - seen < WEEK_MS,
     });
-  });
-  const crowds = new Map<string, number>();
-  for (const { system } of held) crowds.set(system.id, (crowds.get(system.id) ?? 0) + 1);
-  for (const each of held) each.calm = calmFor(crowds.get(each.system.id) ?? 1, SYSTEM_CALM);
-  return { held, at };
+    held.set(world.namespace, one);
+  }
+  return [...held].map(([id, one]) => ({ id, worlds: [...one.values()], packages: [] }));
 }
 
-/** The lines' ends among the worlds drawn: a pair whose one world has no place goes whole, so no later pair slides onto another world. */
-export function endsOf(links: readonly number[], at: Int32Array): number[] {
-  const ends: number[] = [];
-  for (let pair = 0; pair < links.length; pair += 2) {
-    const [from = -1, to = -1] = [at[links[pair] ?? -1], at[links[pair + 1] ?? -1]];
-    if (from >= 0 && to >= 0) ends.push(from, to);
+/** Where each particle of `laid` glides from: where `last` held its key, or where it stands for one new. */
+export function glideFrom(laid: Mass, last: Mass | undefined): Float32Array {
+  const from = new Float32Array(laid.positions);
+  if (last === undefined) return from;
+  const was = new Map(last.keys.map((key, at) => [key, at]));
+  laid.keys.forEach((key, at) => {
+    const before = was.get(key);
+    if (before !== undefined) from.set(last.positions.subarray(before * 3, before * 3 + 3), at * 3);
+  });
+  return from;
+}
+
+/** How live each of the file's worlds is at `now`, by its id. */
+function liveOf(worlds: readonly CosmosWorld[], universe: Universe, now: number): Map<string, number> {
+  const height = heightAt(universe, now);
+  return new Map(
+    worlds.map((world) => [
+      world.id,
+      auroraOf({ calls: callsOf(world), lastHeight: lastOf(world) }, height, universe.calls),
+    ]),
+  );
+}
+
+/** The mass's look as one value: the ground, each kind's colour, the chosen clump's tone, the light on a sphere's far side, and how much of its light a far particle keeps before the ground. */
+export interface WebPalette {
+  readonly ground: Color;
+  readonly kinds: readonly Color[];
+  readonly tone: Color;
+  readonly shadow: number;
+  readonly farLight: number;
+}
+
+// With no page to read the tokens from: every kind a mid grey, on black.
+const greyPalette = (): WebPalette => {
+  const grey = () => new Color(0.5, 0.5, 0.5);
+  const tone = grey();
+  return {
+    ground: new Color(),
+    kinds: Array.from({ length: 6 }, grey),
+    tone,
+    shadow: 0.3,
+    farLight: 0.35,
+  };
+};
+
+const tokenOf = (style: CSSStyleDeclaration, token: string) => {
+  const colour = new Color();
+  const value = style.getPropertyValue(token).trim();
+  if (value !== "") colour.setStyle(value);
+  return colour;
+};
+
+/** The clump holding the most live worlds at `now`, or else the first, the most used; none with no clump. */
+export function livelyOf(
+  clumps: readonly { readonly id: string }[],
+  worlds: readonly CosmosWorld[],
+  { universe, now }: { readonly universe: Universe; readonly now: number },
+): number {
+  const live = liveOf(worlds, universe, now);
+  const byClump = new Map<string, number>();
+  for (const world of worlds)
+    byClump.set(world.namespace, (byClump.get(world.namespace) ?? 0) + (live.get(world.id) ?? 0));
+  let best = clumps.length > 0 ? 0 : -1;
+  clumps.forEach(({ id }, at) => {
+    if ((byClump.get(id) ?? 0) > (byClump.get(clumps[best]?.id ?? "") ?? 0)) best = at;
+  });
+  return best;
+}
+
+/** The design system's palette (Alexis, 2026-11-04), from the page's tokens, low-key: worlds cream, realms amber, packages mint, a new
+ * world coral, dust a dim cream, the Earth `--world`; on the space's own ground, the chosen clump in amber. */
+export function paletteOf(page: Element | undefined): WebPalette {
+  if (page === undefined) return greyPalette();
+  const style = getComputedStyle(page);
+  const kinds = Array.from({ length: KINDS.length }, () => new Color());
+  for (const [kind, token, light] of KINDS) {
+    const colour = tokenOf(style, token);
+    const grey = 0.2126 * colour.r + 0.7152 * colour.g + 0.0722 * colour.b;
+    kinds[kind]?.copy(colour.lerp(new Color(grey, grey, grey), GREY).multiplyScalar(light));
   }
-  return ends;
+  const ground = tokenOf(style, "--color-space");
+  const tone = tokenOf(style, "--color-warm");
+  return { ground, kinds, tone, shadow: 0.28, farLight: 0.35 };
 }

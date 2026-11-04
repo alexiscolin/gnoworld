@@ -65,30 +65,18 @@ function poles({ view }: Probed): [number, number, number][] {
   });
 }
 
-/** What a frame costs, in milliseconds: `draw` run `count` times, the GPU waited for by a read of one pixel before and after. */
-export function frameCost(renderer: WebGLRenderer, draw: () => void, count: number): number {
-  const gl = renderer.getContext();
-  const pixel = new Uint8Array(4);
-  draw();
-  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-  const start = performance.now();
-  for (let at = 0; at < count; at += 1) draw();
-  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-  return (performance.now() - start) / count;
-}
-
-// What a frame of the view costs.
+// What a frame of the view costs, in milliseconds: drawn `count` times, the GPU waited for by a read of one pixel.
 function cost({ renderer, view, draw }: Probed, count: number): number {
   const shown = view();
-  return shown === undefined
-    ? 0
-    : frameCost(
-        renderer,
-        () => {
-          draw(shown);
-        },
-        count,
-      );
+  if (shown === undefined) return 0;
+  const gl = renderer.getContext();
+  const pixel = new Uint8Array(4);
+  draw(shown);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  const start = performance.now();
+  for (let at = 0; at < count; at += 1) draw(shown);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  return (performance.now() - start) / count;
 }
 
 // The uniforms the first world's surface program keeps once compiled: its compiler leaves out what no pixel reads.

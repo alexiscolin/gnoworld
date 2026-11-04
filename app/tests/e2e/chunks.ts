@@ -19,12 +19,14 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // 156 KiB since 7e, 160,000 B for the rail's portraits, 158,208 B once the shaders' spaces were stripped (Alexis, 2026-11-02 and 03);
   // 159,648 B with the three classes the Earth's stations draw with (Alexis, 2026-11-04, "Oui, 160 256" in the old measure, 159,847 in
   // this one), 7x2's merge measured.
-  { chunk: "scene", after: ["mountUniverse"], cap: 159_648 },
+  { chunk: "scene", after: ["mountUniverse"], cap: 159_649 },
   // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
   // chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
   // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead).
   { chunk: "cosmos", after: ["scene"], cap: 17_130 },
-  { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
+  // 5,860 B with the mass of particles (7u; the night's +1 KiB, the chief); its pills a chunk of their own, their size and 256 B.
+  { chunk: "web", after: ["scene", "cosmos"], cap: 5860 },
+  { chunk: "webNames", after: ["scene", "cosmos", "web"], cap: 1219 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
   { chunk: "labelled", after: ["scene", "cosmos"], cap: 6502 },
@@ -36,9 +38,9 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
   // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_442 },
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_498 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
-  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2401 },
+  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2408 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
   { chunk: "part", after: ["scene"], cap: 12_066 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the

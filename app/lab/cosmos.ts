@@ -4,9 +4,11 @@
 // 7g's flights will land on it, with no hero's room and no wheel.
 import { HERO_ZONE, HOME } from "@gnoworld/core";
 import { CREDITS } from "../src/scene/planet/credits.ts";
+import { Web } from "../src/scene/cosmos/web.ts";
 import { startScene } from "../src/scene/scene.ts";
 import read from "./imports.json" with { type: "json" };
 import { linked } from "./linked.ts";
+import { paletteNamed } from "./palettes.ts";
 import { tuningPanel } from "./panel.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
@@ -29,6 +31,14 @@ const scene = startScene({ canvas, remembered: undefined, remember: () => undefi
 const file = linked(recorded, read);
 scene.cosmos(file.worlds, file.updated);
 Reflect.set(globalThis, "__gnoworldScene", scene);
+// The whole cosmos's palette (palettes.ts), painted on its mass once its chunk has come.
+const palette = new URLSearchParams(location.search).get("palette");
+const painting = setInterval(() => {
+  const web: unknown = Reflect.get(globalThis, "__gnoworldWeb");
+  if (!(web instanceof Web)) return;
+  clearInterval(painting);
+  web.paint(paletteNamed(palette, document.documentElement));
+}, 100);
 // A system's name, looked up among the file's systems and nothing else.
 const arriving = new URLSearchParams(location.search).get("arrive");
 if (arriving !== null) scene.arrive(arriving);

@@ -82,30 +82,6 @@ function slider(name: string, { value, ...span }: Span & { readonly value: numbe
   return { row, back, now: () => (touched ? input.valueAsNumber : value) };
 }
 
-/** A study's value, held by the lab page that tries it before any product code reads it: `set` takes each move, `where` names its page. */
-export interface Studied extends Span {
-  readonly name: string;
-  readonly label: string;
-  readonly value: number;
-  readonly where: string;
-  readonly set: (value: number) => void;
-}
-
-export function studyControl({ name, label, value, where, set, ...span }: Studied, drawn: () => void): Control {
-  const { row, now, back } = slider(label, { ...span, value }, (moved) => {
-    set(moved);
-    drawn();
-  });
-  return {
-    row,
-    line: () => (now() === value ? undefined : `${name}: ${String(now())} (was ${String(value)}) · ${where}`),
-    reset: () => {
-      back();
-      set(value);
-    },
-  };
-}
-
 export function sceneControl(name: Tunable, own: number, drawn: () => void): Control {
   const { label, where, ...span } = SCENE[name];
   const { row, now, back } = slider(label, { ...span, value: own }, (value) => {

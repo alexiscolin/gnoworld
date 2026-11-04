@@ -1,23 +1,35 @@
-// The whole cosmos on the stage (ADR-0002 §10; Alexis, 2026-11-02), a chunk of its own: past a cluster's distance a soft point for each
-// world of the file and a thin line for each import between two, one draw each, gold for a world called in the last run and nothing else. A
-// look writes sizes and lights; a frame brings the disc to the eye and moves the clock and the share, as the ladder's points do.
+// The whole cosmos on the stage (ADR-0002 §10; 7u, Alexis, 2026-11-04 night), a chunk of its own: past a cluster's distance one mass round
+// the Earth, every world and realm a small solid sphere, each namespace a clump with its dust (core's mass), one draw; the liveliest clump
+// lit, with three rings and a line of light; the biggest clumps' names in the cosmos's pills. A new set glides from the last one's places.
 import {
-  auroraOf,
   CENTRE,
   DISC_TILT,
-  distanceOf,
-  linksOf,
-  orbitTime,
-  softPoint,
+  EARTH_PLACE,
+  MASS,
+  massOf,
+  smoothstep,
+  type Mass,
   type Point,
   type StarSystem,
 } from "@gnoworld/core";
-import { BufferGeometry, Group, LineSegments, Points } from "three";
-import { heightAt, universeOf, type Universe } from "../live.ts";
-import { cloudOf, type Cloud } from "./cloud.ts";
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  Group,
+  Mesh,
+  PlaneGeometry,
+  Points,
+  Vector3,
+  type Camera,
+} from "three";
+import { universeOf, type Universe } from "../live.ts";
 import type { CosmosWorld } from "./cosmosWorld.ts";
-import { calmFor, endsOf, heldOf, type Held } from "./webHeld.ts";
-import { lineLook, pointLook } from "./webLook.ts";
+import { glideFrom, livelyOf, namespacesOf, paletteOf, type WebPalette } from "./webHeld.ts";
+import { WebLine } from "./webLine.ts";
+import { groundLook, massLook, massUniforms } from "./webLook.ts";
+import type { WebNames } from "./webNames.ts";
+import { WebRings } from "./webRings.ts";
 
 /** A set to stand: its systems as the cosmos placed them, its worlds as the file holds them, and the file's time. */
 export interface WebSet {
@@ -33,153 +45,186 @@ export interface WebView {
   readonly focus: number;
 }
 
-// A live world's colour, the post's gold, in linear light, and how much brighter and larger it stands.
-const GOLD = [1, 0.62, 0.18] as const;
-const GOLD_LIFT = 1.5;
-const GOLD_GROW = 0.5;
-// How many points and lines a view holds whole: past that, each adds less, as the square root of how many more, so a crowd keeps its dark.
-const POINTS_CALM = 2_000;
-const LINES_CALM = 200;
-type PointCloud = Cloud<"position" | "aCircle" | "aPlane" | "aTint" | "aSoft">;
+const GLIDE_SECONDS = 1.6;
+
+// The window's size in its pixels, or a pixel with no page.
+const screenOf = (page: Document | undefined) => ({
+  width: page?.defaultView?.innerWidth ?? 1,
+  height: page?.defaultView?.innerHeight ?? 1,
+});
 
 export class Web {
   readonly group = new Group();
-  readonly #seconds = { value: 0 };
-  readonly #ratio = { value: 1 };
-  readonly #share = { value: 0 };
-  readonly #pointCalm = { value: 1 };
-  readonly #lineCalm = { value: 1 };
-  readonly #pointLook = pointLook({
-    uSeconds: this.#seconds,
-    uRatio: this.#ratio,
-    uShare: this.#share,
-    uCalm: this.#pointCalm,
-  });
-  readonly #lineLook = lineLook({ uSeconds: this.#seconds, uShare: this.#share, uCalm: this.#lineCalm });
-  readonly #soft = { size: 0, light: 0 };
-  #held: Held[] = [];
+  readonly #mass = new Group();
+  readonly #uniforms = massUniforms();
+  readonly #ratio = this.#uniforms.uRatio;
+  readonly #share = this.#uniforms.uShare;
+  readonly #ground = this.#uniforms.uGround;
+  readonly #tone = { value: new Color() };
+  readonly #look = massLook(this.#uniforms);
+  readonly #line = new WebLine(this.#tone);
+  readonly #groundMesh = new Mesh(new PlaneGeometry(2, 2), groundLook({ uGround: this.#ground, uShare: this.#share }));
+  readonly #rings = new WebRings();
+  #names: WebNames | undefined;
+  #named = false;
+  #gone = false;
+  readonly #page: Document | undefined;
+  #laid: Mass | undefined;
+  #points: Points | undefined;
   #universe: Universe = { calls: 0, newest: null, written: undefined };
-  #ends: number[] = [];
-  #points: PointCloud | undefined;
-  #lines: BufferGeometry | undefined;
+  #worlds: readonly CosmosWorld[] = [];
+  #glideFrom = Number.NaN;
+  #chosen = -1;
+  #camera: Camera | undefined;
+  #count = 0;
+  readonly #at = new Vector3();
 
-  constructor() {
+  /** Seen through `camera`, on `page`, whose tokens paint it and which holds its names; with none, a grey mass and no names. */
+  constructor(camera?: Camera, page?: Document) {
+    this.#page = page;
+    this.#camera = camera;
     this.group.name = "web";
     this.group.rotation.x = DISC_TILT;
     this.group.visible = false;
+    this.#mass.position.set(EARTH_PLACE.x, EARTH_PLACE.y, EARTH_PLACE.z);
+    // Under the sky's picture (-2), which adds its light over the ground.
+    this.#groundMesh.frustumCulled = false;
+    this.#groundMesh.renderOrder = -3;
+    this.#mass.add(this.#rings.group);
+    this.group.add(this.#groundMesh, this.#mass, this.#line.mesh);
+    this.paint(paletteOf(page?.documentElement));
+    // The workshop's palettes, in the lab alone (tuning.ts's switch): the lab paints the mass it finds here.
+    if (import.meta.env.GNOWORLD_TUNING === "1") Reflect.set(globalThis, "__gnoworldWeb", this);
   }
 
-  /** Stands a set at `now`: every world a point where its system holds it, every link of the file a line, a world called lately gold. */
-  stand({ systems, worlds, written }: WebSet, now: number): void {
-    this.#free();
+  /** Paints the mass with `palette`: its ground, kinds, chosen tone and light. */
+  paint(palette: WebPalette): void {
+    this.#ground.value.copy(palette.ground);
+    this.#tone.value.copy(palette.tone);
+    this.#uniforms.uKind.value = [...palette.kinds];
+    this.#uniforms.uShadow.value = palette.shadow;
+    this.#uniforms.uFarLight.value = palette.farLight;
+    this.#rings.paint(palette.tone);
+  }
+
+  /** Stands a set at `now`: one mass of its worlds, gliding from where the last one held each particle, a new one growing from nothing. */
+  stand({ worlds, written }: WebSet, now: number): void {
+    const last = this.#laid;
+    this.#worlds = worlds;
     this.#universe = universeOf(written === undefined ? { worlds } : { worlds, updated: written });
-    const { held, at } = heldOf(systems, worlds);
-    this.#held = held;
-    this.#ends = endsOf(linksOf(worlds), at);
-    this.#pointCalm.value = calmFor(this.#held.length, POINTS_CALM);
-    this.#lineCalm.value = calmFor(this.#ends.length / 2, LINES_CALM);
-    this.#build();
-    this.#age(now);
+    const laid = massOf(namespacesOf(worlds, written));
+    this.#laid = laid;
+    this.#count = laid.clumps.reduce((sum, clump) => sum + clump.worlds, 0);
+    this.#build(laid, last);
+    this.#names?.stand(laid.clumps);
+    this.#name();
+    this.#choose(now);
   }
 
-  // How live each world is at `now`: the chain's height read once, each world's calls as the stand read them.
-  #age(now: number): void {
-    const height = heightAt(this.#universe, now);
-    for (const held of this.#held) held.live = auroraOf(held.called, height, this.#universe.calls);
-  }
-
-  // The points hold every world's place, written once; the lines read the same buffers through an index, so a look writes nothing of theirs.
-  #build(): void {
-    const points = cloudOf(this.#held.length, { position: 3, aCircle: 3, aPlane: 2, aTint: 3, aSoft: 2 });
-    this.#held.forEach(({ system, orbit, phase }, index) => {
-      const { x, y, z } = system.place;
-      points.attributes.position.setXYZ(index, x, y, z);
-      points.attributes.aCircle.setXYZ(index, orbit, phase, system.spin);
-      points.attributes.aPlane.setXY(index, system.node, system.tilt);
-    });
-    points.geometry.setDrawRange(0, this.#held.length);
-    const lines = new BufferGeometry();
-    for (const [name, attribute] of Object.entries(points.attributes)) lines.setAttribute(name, attribute);
-    lines.setIndex(this.#ends);
-    lines.setDrawRange(0, this.#ends.length);
+  #build(laid: Mass, last: Mass | undefined): void {
+    this.#points?.geometry.dispose();
+    this.#points?.removeFromParent();
+    const [from, sizes] = [glideFrom(laid, last), new Float32Array(laid.sizes)];
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new BufferAttribute(laid.positions, 3));
+    geometry.setAttribute("aFrom", new BufferAttribute(from, 3));
+    geometry.setAttribute("aSize", new BufferAttribute(sizes, 3));
+    geometry.setAttribute("aClump", new BufferAttribute(laid.owners, 1));
+    const points = new Points(geometry, this.#look);
+    points.frustumCulled = false;
     this.#points = points;
-    this.#lines = lines;
-    this.#add(new Points(points.geometry, this.#pointLook));
-    this.#add(new LineSegments(lines, this.#lineLook));
+    this.#mass.add(points);
+    const still = this.#page?.defaultView?.matchMedia("(prefers-reduced-motion: reduce)").matches ?? true;
+    this.#glideFrom = last === undefined || still ? Number.NaN : Number.POSITIVE_INFINITY;
+    this.#uniforms.uGlide.value = Number.isNaN(this.#glideFrom) ? 1 : 0;
   }
 
-  #add(drawn: Points | LineSegments): void {
-    drawn.frustumCulled = false;
-    this.group.add(drawn);
+  // The clump that holds the most live worlds now, or else the most used: lit, ringed and crossed by the line of light.
+  #choose(now: number): void {
+    const clumps = this.#laid?.clumps ?? [];
+    const best = livelyOf(clumps, this.#worlds, { universe: this.#universe, now });
+    this.#chosen = best;
+    this.#uniforms.uChosen.value = best;
+    this.#rings.stand(clumps[best]);
   }
 
-  /** A look at `now`: each point's size and light from where the eye stands, and its gold from how lately its world was called. It
-   * uploads those and nothing else. */
-  look({ eye, focal, focus }: WebView, now: number): void {
-    const points = this.#points;
-    if (points === undefined) return;
-    this.#age(now);
-    const { aSoft, aTint } = points.attributes;
-    this.#held.forEach((held, index) => {
-      const gold = Math.min(1, held.live);
-      softPoint(held.radius, { distance: distanceOf(held.system.place, eye), focus, focal }, this.#soft);
-      aSoft.setXY(
-        index,
-        this.#soft.size * (1 + GOLD_GROW * gold),
-        this.#soft.light * held.calm * (1 + GOLD_LIFT * gold),
-      );
-      // No array made a world: a look at 20,000 worlds runs on the dive's frames (the review of 7d7).
-      const { tint } = held;
-      aTint.setXYZ(
-        index,
-        tint[0] + (GOLD[0] - tint[0]) * gold,
-        tint[1] + (GOLD[1] - tint[1]) * gold,
-        tint[2] + (GOLD[2] - tint[2]) * gold,
-      );
-    });
-    aSoft.needsUpdate = true;
-    aTint.needsUpdate = true;
+  /** A look at `now`: the chosen clump again, as its worlds' runs end; the depth its light falls over, the line and the names, where the
+   * camera sees them now. */
+  look(_view: WebView, now: number): void {
+    this.#choose(now);
+    const camera = this.#camera;
+    const clump = this.#laid?.clumps[this.#chosen];
+    if (camera === undefined) return;
+    this.group.updateMatrixWorld();
+    const screen = screenOf(this.#page);
+    const from = this.#mass.getWorldPosition(this.#at).distanceTo(camera.position);
+    this.#uniforms.uHalfHeight.value = screen.height / 2;
+    this.#uniforms.uNear.value = Math.max(1, from - MASS.reach);
+    this.#uniforms.uFar.value = from + MASS.reach;
+    const project = (at: Point) => new Vector3(at.x, at.y, at.z).applyMatrix4(this.#mass.matrixWorld).project(camera);
+    if (clump !== undefined) {
+      const ndc = project(clump.landmark);
+      this.#line.stand(ndc.x, ndc.y, screen);
+    }
+    this.#names?.place(project, screen);
   }
 
   resize(ratio: number): void {
     this.#ratio.value = ratio;
   }
 
-  /** A frame: the disc brought to `eye` on the stage, the clock every world turns by, and how much of the view is the whole cosmos's. */
+  /** A frame: the disc brought to `eye` on the stage, the glide on, how much of the view is the whole cosmos's, the line and the names. */
   advance(eye: Point, seconds: number, share: number): void {
     this.group.position.set(CENTRE.x - eye.x, CENTRE.y - eye.y, CENTRE.z - eye.z);
-    this.#seconds.value = orbitTime(seconds);
+    if (this.#glideFrom === Number.POSITIVE_INFINITY) this.#glideFrom = seconds;
+    if (!Number.isNaN(this.#glideFrom))
+      this.#uniforms.uGlide.value = smoothstep(0, GLIDE_SECONDS, seconds - this.#glideFrom);
     this.#share.value = share;
-    this.group.visible = share > 0 && this.#held.length > 0;
+    this.group.visible = share > 0 && this.#count > 0;
+    this.#line.light(this.#chosen >= 0 && this.#camera !== undefined ? share : 0);
+    this.#names?.show(share > 0.5 && this.#camera !== undefined);
+  }
+
+  // The pills come in a late chunk of their own, asked once a mass stands on a page (the chief, 2026-11-05).
+  #name(): void {
+    const page = this.#page;
+    if (this.#named || page === undefined) return;
+    this.#named = true;
+    import("./webNames.ts")
+      .then(({ WebNames: Loaded }) => {
+        if (this.#gone) return;
+        this.#names = new Loaded(page);
+        if (this.#laid !== undefined) this.#names.stand(this.#laid.clumps);
+      })
+      .catch(reportError);
   }
 
   /** How many worlds it draws. */
   get count(): number {
-    return this.#held.length;
+    return this.#count;
   }
 
   /** What stands, for the journeys. */
   stats() {
+    const laid = this.#laid;
     return {
-      points: this.#held.length,
-      lines: this.#ends.length / 2,
-      gold: this.#held.filter(({ live }) => live > 0).length,
+      points: this.count,
+      particles: laid?.keys.length ?? 0,
+      clumps: laid?.clumps.length ?? 0,
+      chosen: laid?.clumps[this.#chosen]?.id,
       share: this.#share.value,
     };
   }
 
-  #free(): void {
-    for (const child of [...this.group.children]) child.removeFromParent();
-    this.#points?.geometry.dispose();
-    this.#lines?.dispose();
-    this.#points = undefined;
-    this.#lines = undefined;
-  }
-
   dispose(): void {
-    this.#free();
-    this.#pointLook.dispose();
-    this.#lineLook.dispose();
+    this.#points?.geometry.dispose();
+    this.#look.dispose();
+    this.#line.dispose();
+    this.#groundMesh.geometry.dispose();
+    this.#groundMesh.material.dispose();
+    this.#rings.dispose();
+    this.#gone = true;
+    this.#names?.dispose();
     this.group.removeFromParent();
   }
 }

@@ -2,9 +2,8 @@
 import "@gnoworld/ui/styles.css";
 import "./lab.css";
 
-const view = new URLSearchParams(location.search).get("view");
 const start =
-  view === "cosmos" ? import("./cosmos.ts") : view === "particles" ? import("./particles.ts") : import("./realism.ts");
+  new URLSearchParams(location.search).get("view") === "cosmos" ? import("./cosmos.ts") : import("./realism.ts");
 start.catch((error: unknown) => {
   throw error;
 });

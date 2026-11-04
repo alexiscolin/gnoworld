@@ -162,39 +162,6 @@
   }
 }
 
-/* The particles study (particlesLabels.ts): the chosen clump's pill, the cosmos's own, ringed in gold; and the card a hover opens. */
-@layer components {
-  .study-chosen {
-    box-shadow: inset 0 0 0 var(--line-width) var(--color-warm-line);
-  }
-
-  .study-card {
-    position: fixed;
-    inline-size: var(--popover-w);
-    padding: var(--space-xs) var(--space-s);
-    border: var(--line-width) solid var(--color-line-strong);
-    background: var(--color-scrim);
-    color: var(--color-text);
-    font: var(--font-data);
-    pointer-events: none;
-  }
-
-  .study-card[hidden] {
-    display: none;
-  }
-
-  .study-card h3 {
-    margin: 0;
-    font: var(--font-data);
-  }
-
-  .study-card dt {
-    color: var(--color-text-muted);
-    font: var(--font-hint);
-    text-transform: uppercase;
-  }
-}
-
 @layer components {
   .sheet-name {
     position: fixed;

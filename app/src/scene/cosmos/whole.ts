@@ -37,7 +37,7 @@ export class Whole {
         import("./web.ts").then(
           ({ Web: Loaded }) =>
             () =>
-              new Loaded(),
+              new Loaded(device.camera, typeof document === "undefined" ? undefined : document),
         ),
       owner,
       { came: this.#webCame },
