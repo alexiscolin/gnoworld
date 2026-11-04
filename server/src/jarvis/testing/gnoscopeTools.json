@@ -1,0 +1,240 @@
+{
+  "read": "2026-11-04, tools/list of https://gnoscope.com/mcp, serverInfo gnoscope 82d3907",
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Decode a transaction"
+      },
+      "description": "One transaction, decoded: its messages with arguments, the events it emitted, gas wanted against gas used, what it cost, the storage it locked or released, and the block and time it landed in. A node serves the raw Amino encoding of the same thing, and a public RPC usually runs with no transaction index at all, so it cannot find a transaction by hash.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "hash": {
+            "description": "Transaction hash as the explorer and the indexer print it.",
+            "type": "string"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          }
+        },
+        "required": ["hash"],
+        "type": "object"
+      },
+      "name": "explain_tx",
+      "title": "Decode a transaction"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "List packages, faceted and ranked"
+      },
+      "description": "Browse what is deployed: filter by kind (realm or pure package) and by namespace, and rank by what the chain has done with each one, calls received, unique users, gas burned, storage held, importers, or symbols declared. The chain has no such listing at all: it can tell you a path exists if you already know the path.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "realm is gno.land/r/, pure is gno.land/p/. Default all.",
+            "enum": ["all", "realm", "pure"],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Rows to return, default 50, capped at 200.",
+            "type": "integer"
+          },
+          "namespace": {
+            "description": "The element after r/ or p/, e.g. \"gnoland\" for gno.land/r/gnoland/home.",
+            "type": "string"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          },
+          "offset": {
+            "description": "Rows to skip, for paging.",
+            "type": "integer"
+          },
+          "sort": {
+            "description": "Ranking. Default newest. Use symbols to find libraries worth reading: a pure package burns no gas and receives no calls, so every other ranking puts all of p/ at zero.",
+            "enum": [
+              "newest",
+              "oldest",
+              "name",
+              "calls",
+              "users",
+              "gas",
+              "storage",
+              "importers",
+              "imports",
+              "symbols",
+              "last_call"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "find_realms",
+      "title": "List packages, faceted and ranked"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Everything on chain about one address"
+      },
+      "description": "An account's history and holdings in one call: balance, the realms it deployed, the calls it made, transfers in and out, GRC20 positions, and the name behind it when there is one. A node can only answer the current balance, and only for an address you already know about. Works for a realm's derived address as well as a user's.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "description": "A bech32 gno address, g1...",
+            "type": "string"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          }
+        },
+        "required": ["address"],
+        "type": "object"
+      },
+      "name": "get_address",
+      "title": "Everything on chain about one address"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Read a package: source, metadata and symbols"
+      },
+      "description": "Everything about one deployed package or realm in a single call: every source file, who deployed it and in which transaction and block, its imports and importers, its exported functions and full symbol table, and the addresses the chain derives for it. Reading this from a node means one vm/qfile per file with no file list to start from.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Package path, with or without the gno.land/ prefix, e.g. gno.land/r/gnoland/home.",
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "type": "object"
+      },
+      "name": "get_package",
+      "title": "Read a package: source, metadata and symbols"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Read a realm's live state, decoded"
+      },
+      "description": "What a realm currently holds, as a named tree of decoded values with its object graph resolved. A node answers this as raw Amino JSON with unresolved object references, which is unreadable without following each one by hand. Read live from a node, so unlike every other tool here it is the chain's tip rather than the index. Large realms come back partial and say so; ask again with full=true for a wider read.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "full": {
+            "description": "Spend a longer, wider read. Use only after a partial answer: this runs against a public node nobody is funding.",
+            "type": "boolean"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Realm path, with or without the gno.land/ prefix, e.g. gno.land/r/gnoland/home.",
+            "type": "string"
+          }
+        },
+        "required": ["path"],
+        "type": "object"
+      },
+      "name": "get_realm_state",
+      "title": "Read a realm's live state, decoded"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Search every source file on chain"
+      },
+      "description": "Full-text search across every .gno file and README the chain stores. This is the one thing no gno.land node can answer: source is on chain, but there is no query that reads it, so the alternative is cloning tx-exports and grepping. Supports phrase search (\"func Render\"), prefix (Iterate*) and boolean operators. Returns a ranked list of files with a highlighted snippet, not whole files: follow a hit with get_package.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "Narrow to realms (gno.land/r/) or pure packages (gno.land/p/). Omit for both.",
+            "enum": ["realm", "package"],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Hits to return, default 25, capped at 100.",
+            "type": "integer"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          },
+          "query": {
+            "description": "FTS5 query. A bare word, a \"quoted phrase\", a prefix*, or AND/OR/NOT between them.",
+            "type": "string"
+          }
+        },
+        "required": ["query"],
+        "type": "object"
+      },
+      "name": "search_code",
+      "title": "Search every source file on chain"
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true,
+        "title": "Find a declaration by name"
+      },
+      "description": "Search the symbol index: which package declares a given function, type, method or constant, with its signature, doc comment and the file and line it is declared on. Answers \"has anyone already written this\" and \"where does this name come from\", neither of which a node can answer. Use search_code instead to find uses rather than declarations.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Results to return, default 25, capped at 100.",
+            "type": "integer"
+          },
+          "network": {
+            "description": "Chain to query, e.g. \"mainnet\". Omit to search every chain this explorer indexes; each result then carries the network it came from.",
+            "type": "string"
+          },
+          "query": {
+            "description": "A symbol name or prefix, e.g. IterateByOffset, Render, Banker.",
+            "type": "string"
+          }
+        },
+        "required": ["query"],
+        "type": "object"
+      },
+      "name": "search_symbols",
+      "title": "Find a declaration by name"
+    }
+  ]
+}
