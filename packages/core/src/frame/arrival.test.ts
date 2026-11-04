@@ -181,6 +181,7 @@ const WHOLE_SEARCHES = 20_000;
 describe("a system's arrival: the same address, the same postcard", () => {
   it(
     "gives a system the same arrival each time it is asked, in the same set, in any order",
+    { tags: ["timing"], timeout: WHOLE_SEARCHES },
     () => {
       for (const { system, systems } of allCases()) {
         const arrival = arrivalOf(system, systems);
@@ -188,7 +189,6 @@ describe("a system's arrival: the same address, the same postcard", () => {
         expect(arrivalOf(system, [...systems].reverse())).toEqual(arrival);
       }
     },
-    WHOLE_SEARCHES,
   );
 
   it(
@@ -348,33 +348,37 @@ describe("a system's arrival: a good angle", () => {
 
   // A mouse at the window's edge leans the eye (half the home's at an arrival): most views hold through it, the others at rest and through
   // the sway, rather than lose a world.
-  it("holds seven views in ten or more through a mouse's lean: the others whole and off the star's heart, the near one on the screen", () => {
-    const cases = allCases().filter(({ system, systems }) => arrivalOf(system, systems).postcard.worlds.length > 0);
-    const holding = cases.filter(({ system, systems }) => {
-      const arrival = arrivalOf(system, systems);
-      return REST_SCREENS.every((screen) =>
-        movesOf(arrival, true).every((moved) => {
-          const see = cameraOf(arrival, screen, moved);
-          const star = see(system.place);
-          const [near, ...others] = nearestFirst(see, arrival);
-          const heart = (seen: Seen) => Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius >= STAR_HEART;
-          const shows = near !== undefined && near.right > 0 && near.left < screen.width && near.top < screen.height;
-          return (
-            shows &&
-            others.every(
-              (seen) =>
-                heart(seen) &&
-                seen.left >= 0 &&
-                seen.right <= screen.width &&
-                seen.top >= 0.09 * screen.height &&
-                seen.bottom <= screen.height,
-            )
-          );
-        }),
-      );
-    });
-    expect(holding.length).toBeGreaterThanOrEqual(0.7 * cases.length);
-  });
+  it(
+    "holds seven views in ten or more through a mouse's lean: the others whole and off the star's heart, the near one on the screen",
+    { tags: ["timing"] },
+    () => {
+      const cases = allCases().filter(({ system, systems }) => arrivalOf(system, systems).postcard.worlds.length > 0);
+      const holding = cases.filter(({ system, systems }) => {
+        const arrival = arrivalOf(system, systems);
+        return REST_SCREENS.every((screen) =>
+          movesOf(arrival, true).every((moved) => {
+            const see = cameraOf(arrival, screen, moved);
+            const star = see(system.place);
+            const [near, ...others] = nearestFirst(see, arrival);
+            const heart = (seen: Seen) => Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius >= STAR_HEART;
+            const shows = near !== undefined && near.right > 0 && near.left < screen.width && near.top < screen.height;
+            return (
+              shows &&
+              others.every(
+                (seen) =>
+                  heart(seen) &&
+                  seen.left >= 0 &&
+                  seen.right <= screen.width &&
+                  seen.top >= 0.09 * screen.height &&
+                  seen.bottom <= screen.height,
+              )
+            );
+          }),
+        );
+      });
+      expect(holding.length).toBeGreaterThanOrEqual(0.7 * cases.length);
+    },
+  );
 
   it.each(ROWS)(
     "on %s, sees %s from above its plane at a slant: never face on, never edge on, never from under it",

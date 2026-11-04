@@ -208,18 +208,22 @@ describe("the draw bound", () => {
     expect(large?.stars).toBeGreaterThanOrEqual((small?.stars ?? 0) * 0.75);
   });
 
-  it("holds its counts past the cap: 100,000 systems draw what 10,000 do, not ten times it", () => {
-    const huge = universe(100_000, 1);
-    const eye = { x: 200, y: 60, z: 200 };
-    const large = counts(look(new Ladder(universe(10_000, 1)), eye));
-    const most = counts(look(new Ladder(huge), eye));
-    expect(large.stars).toBeGreaterThan(100);
-    expect(most.stars).toBeLessThanOrEqual(large.stars * 1.3);
-    expect(most.bodies).toBeLessThanOrEqual(BOUNDS.bodies);
-    expect(most.glows).toBeLessThanOrEqual(BOUNDS.glows);
-  });
+  it(
+    "holds its counts past the cap: 100,000 systems draw what 10,000 do, not ten times it",
+    { tags: ["timing"] },
+    () => {
+      const huge = universe(100_000, 1);
+      const eye = { x: 200, y: 60, z: 200 };
+      const large = counts(look(new Ladder(universe(10_000, 1)), eye));
+      const most = counts(look(new Ladder(huge), eye));
+      expect(large.stars).toBeGreaterThan(100);
+      expect(most.stars).toBeLessThanOrEqual(large.stars * 1.3);
+      expect(most.bodies).toBeLessThanOrEqual(BOUNDS.bodies);
+      expect(most.glows).toBeLessThanOrEqual(BOUNDS.glows);
+    },
+  );
 
-  it("asks a look about what is around the eye, never the whole universe", () => {
+  it("asks a look about what is around the eye, never the whole universe", { tags: ["timing"] }, () => {
     const eye = { x: 100, y: 60, z: 100 };
     const [large, huge] = [new Ladder(universe(10_000, 1)), new Ladder(universe(100_000, 1))];
     look(large, eye);

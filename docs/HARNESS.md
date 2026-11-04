@@ -76,7 +76,13 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
    is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a
    dev or watch mode, each logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox
-   cannot write.
+   cannot write. Its one exception is the ping-pong (`pingpong`; Alexis, 2026-11-04): while
+   Alexis's own `pnpm workshop` serves this checkout, the turn ends with no gate (docs/DEVELOPMENT.md,
+   "The workshop"). Its sign is one no sandboxed command plants: a shell running this checkout's
+   `scripts/workshop.sh` from its folder, its parent alive, that macOS's `sandbox_check` finds in no
+   sandbox, read with `/bin/ps`, `/usr/sbin/lsof` and `/usr/bin/python3 -I`; no file of the tree.
+   A workshop left running keeps every turn of that checkout gate-free; pre-commit still gates each
+   commit.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
@@ -167,6 +173,17 @@ in a run of the related tests and, as `related.py --check`, in a run of every on
 copy of pre-commit gets the related tests too, from its list (the command, given the paths, needs no git). The whole suite runs when
 the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test of
 its projects, before its report; the slow project and core's in Chromium wait for the merge check) and in the merge check and `--full`.
+
+**The timing tests** (Alexis, 2026-11-04, "Oui, les deux"): a test whose bound is wall-clock time, outright ("in 100 ms or less",
+a cost that grows with its input and not its square) or through its timeout under a heavy case, carries Vitest's tag `timing`
+(`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast gate leaves those, related, `--tests-all` and a failed file's
+second run alike (`--tags-filter=!timing`); the merge check and `--full` run them in the coverage, as every test. Other gates' load
+failed them for nothing: rest.test.ts's search cost 202 times in the worktrees' unsteady logs, main.test.ts's 3k 139, LineView's
+country 93. It holds 16 tests: rest.test.ts's two search costs, main.test.ts's 3k, LineView's country, Here's two, arrival's
+seven views and same arrival, cosmos.test.ts's close world, space.test.ts's shells, useSpace's three, ladder's two past the cap
+and search.test.ts's square. A guard against overload stays in every commit's related tests though it flakes at a load (the
+markdown scanner's linear-in-bytes cases, tier 1; the guards' property tests), the chief's call. Run them alone:
+`pnpm exec vitest run --tags-filter=timing`.
 
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
 journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
@@ -262,7 +279,10 @@ fails before StrykerJS's own phase runs (a coverage run that failed leaves no re
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
-budget with the budget spec alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip).
+budget with the budget spec's tests tagged `@gate` alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip), and the late chunks'
+caps from the built files with no page (`app/tests/e2e/chunks.ts`, Node's gzip, the browser's bytes; Alexis, 2026-11-04): the late
+chunks' journeys, which draw the scene on a software GPU to see which chunk a page asks, timed out at a load of 60 and run at the merge
+check and in `--full`, each checking that the chunk the page asked is the file weighed.
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
