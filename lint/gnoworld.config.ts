@@ -1,25 +1,11 @@
 // Our own lint rules, as no rule of ESLint's reads a string's words across literals, templates and sums: no module outside
 // packages/chain holds a chain read's words (gnoworld/chain-read, D113, D124), none of the product imports a test helper
 // (test-helpers) or the one expression sender but its two builders (chain-eval), and an import at run time names its module
-// (named-import, D123). A part of the lint config, which eslint.config.ts composes.
+// (named-import, D123). A part of the lint config, which eslint.config.ts composes; the read's words are words.config.ts's.
 import type { Rule } from "eslint";
 import { defineConfig } from "eslint/config";
 import { BENCHES, TESTS } from "./shared.config.ts";
-
-// A node's RPC routes (tm2/pkg/bft/rpc/core/routes.go, read at c4c72fdd), as a URL's path or a JSON-RPC call's method.
-const ROUTES =
-  "status|block|block_results|blockchain|commit|validators|genesis|net_info|health|tx|tx_search|broadcast_tx_(?:async|sync|commit)|unconfirmed_txs|num_unconfirmed_txs|consensus_state|dump_consensus_state|consensus_params|abci_query|abci_info";
-// A read's words (D113, D124): what a request to a chain's node or the indexer says, which the chain package alone may
-// write. A node's bare address is configuration, which reaches nothing alone; a route of our own ("/status") names no address.
-const WORDS: readonly (readonly [string, RegExp])[] = [
-  ["an ABCI query", /abci_(?:query|info)/],
-  ["an ABCI path", /(?<![A-Za-z])vm(?:\/|%2[Ff])q|\b(?:auth\/accounts|bank\/balances)\//],
-  ["a node's RPC route after its address", new RegExp(`(?:\\$\\{\\}|://[^/?#\\s]+)/(?:${ROUTES})(?![\\w-])`)],
-  ["a node's RPC method", new RegExp(`"method"\\s*:\\s*"(?:${ROUTES})"`)],
-  ["a node's RPC port", /:26657(?!\d)/],
-  ["an indexer's GraphQL operation", /^\s*(?:(?:query|subscription|mutation)\b[^{]*\{|\{\s*[A-Za-z_]\w*\s*[({])/],
-  ["the chain package's fake node", /^@gnoworld\/chain\/testing(?:\/|$)/],
-];
+import { ROUTES, WORDS } from "./words.config.ts";
 
 interface Part {
   type: string;

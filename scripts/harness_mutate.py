@@ -46,12 +46,13 @@ APP = "lint/app.config.ts"
 SERVER = "lint/server.config.ts"
 CHAIN = "lint/chain.config.ts"
 RULES = "lint/gnoworld.config.ts"
+WORDS = "lint/words.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
     "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
     "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
-    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls",
+    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls", "lint/words.config.ts": "chain_reads",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
@@ -246,9 +247,9 @@ def mutants():
         yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
     for name in ("server|", "jarvis|", "app|", "|service"):
         yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
-    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package,
-    # each word and each way a string is read; a test helper or the expression sender imported by product code; an import at
-    # run time of a computed name; the files each reaches or leaves free.
+    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package
+    # (lint/words.config.ts), each word and each way a string is read; a test helper or the expression sender imported by
+    # product code; an import at run time of a computed name; the files each reaches or leaves free.
     for find, replace, label in (
         (r"/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
         (r"/(?<![A-Za-z])vm(?:\/|%2[Ff])q|\b(?:auth\/accounts|bank\/balances)\//", "/(?!)/", "an ABCI path"),
@@ -265,6 +266,9 @@ def mutants():
         ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
         (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
         (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
+    ):
+        yield from each(WORDS, find, replace, "probe", f"eslint our rules refuse {label}")
+    for find, replace, label in (
         ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
         ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
         ('.join("${}")', '.join("")', "a template's interpolation"),
