@@ -6,26 +6,15 @@
 import { Addresses } from "./address.ts";
 import { mentionAt } from "./mentions.ts";
 import { append, invisible, labelOf, wrap } from "./nodes.ts";
-import { after, before, Runs, runOf } from "./scan.ts";
+import { after, before, closes, opens, Runs, runOf } from "./scan.ts";
 import type { Inline } from "./types.ts";
 
 /** The marks and labels a line nests, one in another, at most. */
 export const MAX_INLINE_DEPTH = 8;
 
-const SPACE = /\s/u;
-const PUNCTUATION = /[\p{P}\p{S}]/u;
 // What a backslash makes text: ASCII punctuation.
 const ESCAPABLE = /[!-/:-@[-`{-~]/;
 
-// A mark opens before a word (no space after it; a space, punctuation or the line's start before it) and closes
-// after one, the other way round: none inside a word, as snake_case and 2*3*4 write.
-const bound = (char: string | undefined) => char === undefined || SPACE.test(char) || PUNCTUATION.test(char);
-/** Whether a character is part of a word, as the reader bounds marks: no space, punctuation or symbol. */
-export const inWord = (char: string | undefined): boolean => !bound(char);
-const opens = (behind: string | undefined, ahead: string | undefined) =>
-  ahead !== undefined && !SPACE.test(ahead) && bound(behind);
-const closes = (behind: string | undefined, ahead: string | undefined) =>
-  behind !== undefined && !SPACE.test(behind) && bound(ahead);
 // The nodes a run of `size` makes: three stars make two.
 const weight = (size: number) => (size === 3 ? 2 : 1);
 
