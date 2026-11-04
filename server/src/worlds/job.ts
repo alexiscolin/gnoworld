@@ -10,17 +10,17 @@ import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";
 import { repeat } from "../repeat.ts";
-import { replaceFiles } from "../replaceFile.ts";
-import { knownFacts, namesOf, worldsOf, type Gathered } from "./assemble.ts";
+import { besideOf, replaceFiles } from "../replaceFile.ts";
+import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths } from "./group.ts";
-import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type History } from "./history.ts";
+import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type StampedHistory } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
 import { Failure, kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
-import { makeTrends, type ChainTrend, type TrendKeeper } from "./trends.ts";
+import { habitsAt, makeTrends, type ChainRead } from "./chainTrends.ts";
 
 interface Universe {
   readonly id: string;
@@ -42,8 +42,8 @@ export interface RunOptions {
   /** The most realms asked of the indexer in one pass. */
   historyMax?: number;
   isStopped?: () => boolean;
-  /** Told each pass that wrote its files: the file, and the calls this pass read (7t's trends). */
-  trends?: Pick<TrendKeeper, "passed">;
+  /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
+  trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
 }
 
 export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
@@ -52,9 +52,6 @@ export const EVERY_MS = 30 * 60_000;
 export const PAUSE_MS = 250;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-// The worlds' count beside their file, named after it (worlds.json, worlds-count.json: the name nginx serves), so the two never share a path.
-const countFileOf = (file: string): string => `${file.replace(/\.json$/, "")}-count.json`;
 
 // The options with their defaults, so the pass reads them as plain values.
 interface Settings {
@@ -68,7 +65,7 @@ interface Settings {
   readonly maxBytes: number;
   readonly historyMax: number;
   readonly isStopped: () => boolean;
-  readonly trends?: Pick<TrendKeeper, "passed">;
+  readonly trends?: RunOptions["trends"];
 }
 
 function settingsOf(options: RunOptions): Settings {
@@ -106,16 +103,16 @@ const aboutRealm = (kind: Kind): boolean => kind === "shape" || kind === "too_la
 async function readHistories(
   reader: { send: Send; indexer: string; pace: () => Promise<void> },
   paths: readonly string[],
-  hooks: { log: Log; isStopped: () => boolean },
-): Promise<Map<string, History>> {
-  const histories = new Map<string, History>();
+  hooks: { log: Log; isStopped: () => boolean; now: () => number; sinceOf: (path: string) => number | undefined },
+): Promise<Map<string, StampedHistory>> {
+  const histories = new Map<string, StampedHistory>();
   let skipped: Kind | undefined;
   let strikes = 0;
   for (const path of paths) {
     if (hooks.isStopped()) throw new Failure("stopped");
-    const read = await readHistory(reader, path);
+    const read = await readHistory(reader, path, hooks.sinceOf(path));
     if (read.ok) {
-      histories.set(path, read.history);
+      histories.set(path, { ...read.history, at: hooks.now() });
       strikes = 0;
       continue;
     }
@@ -157,7 +154,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   const names = await readNames({ send, rpc: universe.rpc, pace }, unnamed);
   const reader = { send, indexer: universe.indexer, pace };
   const asked = realmsOfPass(paths, Math.floor(settings.now() / EVERY_MS), settings.historyMax);
-  const histories = await readHistories(reader, asked, settings);
+  const histories = await readHistories(reader, asked, { ...settings, sinceOf: sinceOf(lastRealms) });
   const news = compareLists([...lastRealms.keys()], list.paths);
   return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };
 }
@@ -181,11 +178,12 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     if (worlds.dropped > 0) settings.log("worlds_shed", { error: "worlds" });
     const file = Worlds.safeParse({ ...head, worlds: worlds.worlds });
     if (!file.success) return fail("shape");
-    // The count of the file as written, as the scene counts it: the hero and the cosmos never say two numbers.
+    // The count of the file as written, as the scene counts it: the hero and the cosmos never say two numbers; beside it, worlds-count.json,
+    // the name nginx serves.
     const count: WorldsCount = { ...head, count: worldsDrawn(file.data.worlds) };
     const written = replaceFiles([
       { file: settings.file, text: `${JSON.stringify(file.data)}\n` },
-      { file: countFileOf(settings.file), text: `${JSON.stringify(count)}\n` },
+      { file: besideOf(settings.file, "count"), text: `${JSON.stringify(count)}\n` },
     ]);
     if (!written) return fail("write");
     settings.trends?.passed(file.data, read.histories);
@@ -197,8 +195,8 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
 
 export interface WorldsJob {
   stop: () => void;
-  /** The chain's trends of its passes, each against the one before (7t). */
-  trends: () => readonly ChainTrend[];
+  /** The chain's part of the trends, each pass against the one before (7t). */
+  trends: () => ChainRead;
 }
 
 // The universe's addresses, or a refusal at start: https on a public name, no user, and an id that is a plain slug.
@@ -208,11 +206,15 @@ function checked(universe: Universe): void {
   if (publicUrl(universe.indexer) === null) throw new RangeError("worlds: the indexer is no public https address");
 }
 
-/** Runs a pass at start and after each pass ends, one at a time, `everyMs` apart; `stop` ends it, and a pass under way writes nothing. */
-export function startWorlds(options: RunOptions & { everyMs?: number }): WorldsJob {
+/** Runs a pass at start and after each pass ends, one at a time, `everyMs` apart; `stop` ends it, and a pass under way writes nothing. Each
+ * world's window is kept in `habits`' files (7t3), counts alone; without them the chain's signals have no habit. */
+export function startWorlds(
+  options: RunOptions & { everyMs?: number; habits?: { transactions: string; addresses: string } },
+): WorldsJob {
   checked(options.universe);
   const everyMs = options.everyMs ?? EVERY_MS;
-  const trends = makeTrends();
+  const habits = options.habits === undefined ? {} : { habits: habitsAt(options.habits, options.now ?? Date.now) };
+  const trends = makeTrends({ ...habits, log: options.log });
   const job = repeat({
     pass: (isStopped) => runWorlds({ ...options, isStopped, trends }),
     failed: () => {
@@ -220,5 +222,11 @@ export function startWorlds(options: RunOptions & { everyMs?: number }): WorldsJ
     },
     waitMs: () => everyMs,
   });
-  return { stop: job.stop, trends: trends.chain };
+  return {
+    stop() {
+      job.stop();
+      trends.save();
+    },
+    trends: trends.chain,
+  };
 }

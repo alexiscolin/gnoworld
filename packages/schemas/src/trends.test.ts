@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { Trends, TRENDS_MAX_BYTES, TRENDS_MOST } from "./trends.ts";
 
-// GET /api/trends (7t): the home's ticker's trends, computed on the server from the worlds job's passes and who is here, so a phone reads a
-// few items and never the worlds' file. Every field came from a chain, an indexer or a room count: each is bounded, each kind once.
+// GET /api/trends (7t, 7t3): the home's ticker's trends, computed on the server, so a phone reads a few items. Every field came from a chain,
+// an indexer or a room count: each is bounded, each kind once. Trending is said by its strongest signal: its chain's (transactions, or the
+// addresses that sent them) or its rooms' (people here, or messages an hour).
 const trending = () => ({
   kind: "trending",
+  by: "transactions",
   world: "gnoswap/pool",
   realm: "gno.land/r/gnoswap/pool",
   title: "pool",
-  calls: 42,
+  count: 42,
+  rise: 0.5,
   since: "2026-11-04T09:00:00.000Z",
+  at: "2026-11-04T09:31:00.000Z",
+});
+const byChat = () => ({
+  kind: "trending",
+  by: "here",
+  world: "bubble",
+  count: 12,
+  rise: 2,
   at: "2026-11-04T09:31:00.000Z",
 });
 const rising = () => ({ kind: "rising", world: "bubble", rise: 0.45, at: "2026-11-04T09:31:00.000Z" });
@@ -25,6 +36,14 @@ describe("Trends", () => {
   it("reads each kind of trend, in the order given", () => {
     const answer = { items: [trending(), rising(), fresh()] };
     expect(Trends.parse(answer)).toEqual(answer);
+  });
+
+  it("reads a world Trending by each of its four signals: transactions or addresses with its realm and window, people or messages by its hub", () => {
+    for (const by of ["transactions", "addresses"])
+      expect(Trends.safeParse({ items: [{ ...trending(), by }] }).success).toBe(true);
+    for (const by of ["here", "messages"])
+      expect(Trends.safeParse({ items: [{ ...byChat(), by }] }).success).toBe(true);
+    expect(Trends.safeParse({ items: [{ ...byChat(), by: "messages", count: 240.5 }] }).success, "a pace").toBe(true);
   });
 
   it("reads an answer with no trend: the server says so rather than fail", () => {
@@ -59,8 +78,9 @@ describe("Trends", () => {
     const realm = `gno.land/r/${"a".repeat(128)}/${"b".repeat(116)}`;
     expect(realm).toHaveLength(256);
     for (const items of [
-      [{ ...trending(), calls: 1 }],
-      [{ ...trending(), calls: 1e12 }],
+      [{ ...trending(), count: 1 }],
+      [{ ...trending(), count: 1e12, rise: 1e12 }],
+      [{ ...byChat(), by: "messages", count: 10_000_000, rise: 10_000_000 }],
       [{ ...rising(), rise: 1_000_000 }],
       [{ ...fresh(), world: "w".repeat(256), realm }],
       [{ ...fresh(), title: "t".repeat(128) }],
@@ -74,9 +94,23 @@ describe("Trends", () => {
     ["a kind it does not know", () => ({ items: [{ ...rising(), kind: "hot" }] })],
     ["one kind twice", () => ({ items: [trending(), { ...trending(), world: "gnoswap/router" }] })],
     ["more items than kinds", () => ({ items: [trending(), rising(), fresh(), rising()] })],
-    ["a busiest world with no call", () => ({ items: [{ ...trending(), calls: 0 }] })],
-    ["a count of calls that is no whole number", () => ({ items: [{ ...trending(), calls: 1.5 }] })],
-    ["a count past any chain's", () => ({ items: [{ ...trending(), calls: 1e13 }] })],
+    ["one kind twice, by the chain and by the chat", () => ({ items: [trending(), byChat()] })],
+    [
+      "the busiest world's words of 7t, calls and no signal",
+      () => ({ items: [{ ...fresh(), kind: "trending", calls: 42, since: "2026-11-04T07:00:00.000Z" }] }),
+    ],
+    ["a signal it does not know", () => ({ items: [{ ...trending(), by: "votes" }] })],
+    ["a chain's signal with no realm", () => ({ items: [{ ...byChat(), by: "transactions" }] })],
+    ["a chat's signal with a realm and a window", () => ({ items: [{ ...trending(), by: "here" }] })],
+    ["a world by its chat no hub's slug names", () => ({ items: [{ ...byChat(), world: "gnoswap/pool" }] })],
+    ["a Trending world with no rise", () => ({ items: [{ ...trending(), rise: 0 }] })],
+    ["a Trending rise past any chain's count", () => ({ items: [{ ...trending(), rise: 1e12 + 1 }] })],
+    ["a Trending world by a fall", () => ({ items: [{ ...byChat(), rise: -1 }] })],
+    ["a busiest world with no transaction", () => ({ items: [{ ...trending(), count: 0 }] })],
+    ["a count of transactions that is no whole number", () => ({ items: [{ ...trending(), count: 1.5 }] })],
+    ["a count past any chain's", () => ({ items: [{ ...trending(), count: 1e13 }] })],
+    ["a chat with nobody", () => ({ items: [{ ...byChat(), count: 0 }] })],
+    ["a pace past any room's", () => ({ items: [{ ...byChat(), by: "messages", count: 10_000_001 }] })],
     ["a busiest world with no start to its window", () => ({ items: [{ ...trending(), since: undefined }] })],
     ["a time with no offset", () => ({ items: [{ ...trending(), at: "2026-11-04 09:31" }] })],
     ["a realm that is no realm's path", () => ({ items: [{ ...trending(), realm: "gno.land/p/nt/avl" }] })],

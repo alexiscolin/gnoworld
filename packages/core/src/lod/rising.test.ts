@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { RISE, riseOf, type PresenceSlot } from "./rising.ts";
+import { middleOf, RISE, riseFrom, riseOf, usualOf, type PresenceSlot } from "./rising.ts";
 
 // A world rises against its own last 14 days (plan §9, question 6; ADR-0002 §10): its people now beside its usual hour, so a small world can
 // stand out where a busy one would drown it. The history is 7c's: the busiest sample of each hour, kept 14 days.
@@ -100,5 +100,30 @@ describe("a world against its own 14 days", () => {
         expect(rise ?? 0).toBeGreaterThan(0);
       }),
     );
+  });
+});
+
+// 7t3's score reads each signal against its usual hour through these: the middle, the usual hour, the rise (the review of 7t3, its 5).
+describe("the usual hour and its rise", () => {
+  it("is the middle of the hours before the one `now` falls in: an hour of now's counts for nothing, past 24 or short of them", () => {
+    expect(usualOf(history(RISE.hours, 4), NOW)).toBe(4);
+    const thisHour = { at: hourOf(NOW), people: 4 };
+    expect(usualOf([...history(RISE.hours - 1, 4), thisHour], NOW), "23 hours and this one").toBeNull();
+    expect(usualOf([...history(RISE.hours, 2), thisHour, { at: hourOf(NOW) + 1, people: 9 }], NOW)).toBe(2);
+  });
+
+  it("takes the middle of some counts, the upper of the two for an even number, and none of none, whatever their order", () => {
+    expect(middleOf([])).toBeUndefined();
+    expect(middleOf([5, 1, 3])).toBe(3);
+    expect(middleOf([4, 1, 3, 2])).toBe(3);
+    const counts = [9, 2, 7];
+    expect(middleOf(counts)).toBe(7);
+    expect(counts, "left as given").toEqual([9, 2, 7]);
+  });
+
+  it("gives a rise as a share of the usual, of one for a usual of none, and a fall below none", () => {
+    expect(riseFrom(6, 3)).toBe(1);
+    expect(riseFrom(3, 0)).toBe(3);
+    expect(riseFrom(2, 4)).toBe(-0.5);
   });
 });

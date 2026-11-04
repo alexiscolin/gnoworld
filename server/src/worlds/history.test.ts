@@ -77,6 +77,109 @@ describe("readHistory", () => {
     });
   });
 
+  // 7t3's window: what the realm drew between the job's last two passes, counted from the last file's height. A transaction is one however
+  // many calls it bundles, so one address's burst counts once; its senders are given, for a world's realms count each address once.
+  describe("above the height it is given", () => {
+    const CALLER_C = "g1ut6usp7lsurwsk9n3cyeu3ckn8ftw7mtufzhcz";
+    const since = (rows: unknown[], height: number) => {
+      const chain = fakeChain({ indexer: () => answer(rows) });
+      return readHistory({ send: chain.send, indexer: INDEXER }, PATH, height);
+    };
+    const burst = (height: number, caller: string, calls: number) => ({
+      block_height: height,
+      messages: Array.from({ length: calls }, () => ({ value: { __typename: "MsgCall", pkg_path: PATH, caller } })),
+    });
+
+    it("counts the transactions with a call to the realm, a transaction of five calls once, and the different addresses that sent them", async () => {
+      const rows = [
+        call(100, CALLER_A),
+        burst(101, CALLER_A, 5),
+        call(102, CALLER_B),
+        deploy(103, CALLER_C),
+        call(104, CALLER_B),
+        {
+          block_height: 105,
+          messages: [{ value: { __typename: "MsgCall", pkg_path: "gno.land/r/b/other", caller: CALLER_C } }],
+        },
+      ];
+      expect(await since(rows, 100)).toEqual({
+        ok: true,
+        history: {
+          calls: 8,
+          callers: 2,
+          lastHeight: 104,
+          recent: {
+            transactions: [`101:${CALLER_A}`, `102:${CALLER_B}`, `104:${CALLER_B}`],
+            callers: [CALLER_A, CALLER_B],
+          },
+        },
+      });
+    });
+
+    it("counts nothing at the height itself, the last pass's, and every call above a height of none", async () => {
+      const rows = [call(100, CALLER_A), call(101, CALLER_B)];
+      expect(await since(rows, 101)).toMatchObject({ history: { recent: { transactions: [], callers: [] } } });
+      expect(await since(rows, 0)).toMatchObject({
+        history: { recent: { transactions: [`100:${CALLER_A}`, `101:${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
+      });
+    });
+
+    it("gives the same senders for the same rows in any order", async () => {
+      const rows = [call(101, CALLER_B), call(102, CALLER_A), call(103, CALLER_B)];
+      const transactions = [`101:${CALLER_B}`, `102:${CALLER_A}`, `103:${CALLER_B}`];
+      const expected = { history: { recent: { transactions, callers: [CALLER_A, CALLER_B] } } };
+      expect(await since(rows, 100)).toMatchObject(expected);
+      expect(await since(rows.toReversed(), 100)).toMatchObject(expected);
+    });
+
+    it("counts a call that names no caller as its transaction, with no address", async () => {
+      const rows = [
+        { block_height: 101, messages: [{ value: { __typename: "MsgCall", pkg_path: PATH } }] },
+        call(102, CALLER_A),
+      ];
+      expect(await since(rows, 100)).toMatchObject({
+        history: { calls: 2, callers: 1, recent: { transactions: ["101:", `102:${CALLER_A}`], callers: [CALLER_A] } },
+      });
+    });
+
+    // The security review of 7t3: one transaction calling K realms of a world counted K times, past the floor. Its mark is its height and its
+    // senders, so the world counts it once, whichever realms it called.
+    it("marks a transaction by its height and its senders, whatever calls it bundles, so a world's realms count it once", async () => {
+      const both = {
+        block_height: 101,
+        messages: [CALLER_B, CALLER_A, CALLER_B].map((caller) => burst(101, caller, 1).messages[0]),
+      };
+      expect(await since([both], 100)).toMatchObject({
+        history: { recent: { transactions: [`101:${CALLER_A},${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
+      });
+    });
+
+    // The second round of 7t3's review: one transaction signed by two, each calling a realm of one world, gave each realm the mark of its
+    // own caller: two marks, two transactions. A mark carries the senders of all the transaction's calls, so each realm gives the same.
+    it("marks a transaction by the senders of all its calls, so a realm called by one of its signers gives the mark another realm does", async () => {
+      const other = "gno.land/r/samcrew/launchpad/market/v2";
+      const both = {
+        block_height: 101,
+        messages: [
+          { value: { __typename: "MsgCall", pkg_path: PATH, caller: CALLER_A } },
+          { value: { __typename: "MsgCall", pkg_path: other, caller: CALLER_B } },
+        ],
+      };
+      expect(await since([both], 100)).toMatchObject({
+        history: {
+          calls: 1,
+          callers: 1,
+          recent: { transactions: [`101:${CALLER_A},${CALLER_B}`], callers: [CALLER_A] },
+        },
+      });
+    });
+
+    it("gives no window when it is given no height: a realm the last file never read", async () => {
+      const read = await ask(() => answer([call(101, CALLER_A)])).read();
+      expect(read.ok && "recent" in read.history).toBe(false);
+    });
+  });
+
   it("refuses a call message that names no path, for it cannot be tied to the realm asked", async () => {
     const rows = [{ block_height: 9, messages: [{ value: { __typename: "MsgCall", caller: CALLER_A } }] }];
     expect(await ask(() => answer(rows)).read()).toEqual({ ok: false, kind: "shape" });

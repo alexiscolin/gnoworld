@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Presence, PRESENCE_ANSWER_MAX } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makePresence } from "./presence.ts";
@@ -215,6 +215,86 @@ describe("who is here", () => {
     const listed = await setup({ rooms: many, hidden: new Set() }).worlds();
     expect(listed).toHaveLength(PRESENCE_ANSWER_MAX);
     expect(listed.at(-1)?.world).toBe(`w${String(PRESENCE_ANSWER_MAX - 1).padStart(4, "0")}`);
+  });
+});
+
+// 7t3's score reads each world's people here and messages an hour against its own 14 days: the messages' history is kept as the people's is,
+// the busiest sample of each hour, in a file beside it; a world whose rooms went unread gives no signal, never a zero.
+describe("the chat's signals for the trends", () => {
+  const messagesOf = (file: string) => join(dirname(file), "presence-messages.json");
+  const pastOf = (file: string, world: string, count: number) => {
+    const clock = { at: T0 - 48 * HOUR };
+    const past = makePresence({ file, now: () => clock.at });
+    for (let hour = 0; hour < 48; hour += 1, clock.at += HOUR) past.record(new Map([[world, count]]));
+    expect(past.save()).toBe(true);
+  };
+
+  it("hands each world's people here and messages an hour, each beside its usual hour of the last 14 days", () => {
+    const file = fileOf();
+    pastOf(file, "bubble", 4);
+    pastOf(messagesOf(file), "bubble", 100);
+    const { present } = setup({ file, rates: { "#bubble": 5 } });
+    present.seen("#bubble", ["gnoworld", "a", "b", "c", "d", "e", "f"]);
+    present.seen("#earth", ["gnoworld", "a"]);
+    expect(present.chat()).toEqual([
+      { world: "bubble", here: { now: 6, usual: 4 }, messages: { now: 300, usual: 100 } },
+      { world: "earth", here: { now: 1, usual: null }, messages: { now: 0, usual: null } },
+    ]);
+  });
+
+  it("gives no signal of a world whose rooms went unread: unknown, never zero", () => {
+    const { present } = setup({ rates: { "#earth": 2 } });
+    present.seen("#bubble", ["gnoworld", "a"]);
+    expect(present.chat().map(({ world }) => world)).toEqual(["bubble"]);
+  });
+
+  it(`records each world's messages an hour every ${String(PRESENT_MS / MINUTE)} minutes beside its people, the busiest of each hour, none for a room unread`, () => {
+    const { present, file } = setup({ rates: { "#earth": 1.5, "#earth/kyoto": 0.5, "#bubble": 3 } });
+    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+    present.seen("#earth", ["gnoworld", "ada"]);
+    vi.advanceTimersByTime(MINUTE);
+    const read = makePresence({ file: messagesOf(file), now: () => T0 + PRESENT_MS });
+    expect(read.history("earth")).toEqual([{ at: T0, people: 120 }]);
+    expect(read.history("bubble")).toEqual([]);
+  });
+
+  it("counts no room a guest cannot see, in the signals as in the messages' history", () => {
+    const { present, file } = setup({ rates: { "#earth": 2, "#earth/desk": 5, "#govdao/desk": 5 } });
+    present.seen("#earth", ["gnoworld", "ada"]);
+    present.seen("#earth/desk", ["gnoworld", ...Array.from({ length: 20 }, (_, at) => `p${String(at)}`)]);
+    present.seen("#govdao/desk", ["gnoworld", ...Array.from({ length: 20 }, (_, at) => `q${String(at)}`)]);
+    expect(present.chat()).toEqual([
+      { world: "earth", here: { now: 1, usual: null }, messages: { now: 120, usual: null } },
+    ]);
+    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+    present.seen("#earth", ["gnoworld", "ada"]);
+    vi.advanceTimersByTime(MINUTE);
+    const read = makePresence({ file: messagesOf(file), now: () => T0 + PRESENT_MS });
+    expect(read.history("earth")).toEqual([{ at: T0, people: 120 }]);
+    expect(read.history("govdao")).toEqual([]);
+  });
+
+  it("says when its folder refuses the messages' history, and still records the people's", () => {
+    const file = fileOf();
+    mkdirSync(messagesOf(file));
+    const { present, logged } = setup({ file });
+    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+    present.seen("#bubble", ["gnoworld", "a"]);
+    vi.advanceTimersByTime(MINUTE);
+    expect(logged).toContainEqual(["alert", { error: "presence_write" }]);
+    expect(makePresence({ file, now: () => T0 + PRESENT_MS }).history("bubble")).toEqual([{ at: T0, people: 1 }]);
+  });
+
+  it("builds the signals with the answer, once a minute or a second after a change, however often they are asked", () => {
+    const { present, listed } = setup();
+    present.seen("#earth", ["gnoworld", "ada"]);
+    present.chat();
+    const built = listed.mock.calls.length;
+    for (let ask = 0; ask < 50; ask += 1) {
+      present.chat();
+      present.current();
+    }
+    expect(listed.mock.calls.length).toBe(built);
   });
 });
 

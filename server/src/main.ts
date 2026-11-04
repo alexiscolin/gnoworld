@@ -13,7 +13,7 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultRpc, defaultUniverse } from "./prices/universes.ts";
+import { defaultRpc, defaultUniverse, hubWorlds } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 import { startWorlds } from "./worlds/job.ts";
@@ -44,10 +44,22 @@ const prices =
 // Only the default universe: the way out lets out its RPC and no other's.
 // A job meant that could not know which chain to read: the server stops rather than run without it.
 if (config.worlds !== undefined && config.universes === undefined) throw new Error("setting UNIVERSES_FILE: required");
+// The trends read a hub's rooms and its realms as one world (7t3): the hubs beside the universes, read before the job, so a bad file stops
+// the server at boot; each world's chain windows kept beside the database, counts alone, none for a database in memory.
+const hubs = config.worlds === undefined || config.universes === undefined ? undefined : hubWorlds(config.universes);
+const habits =
+  config.database === ":memory:"
+    ? {}
+    : {
+        habits: {
+          transactions: join(dirname(config.database), "trends-transactions.json"),
+          addresses: join(dirname(config.database), "trends-addresses.json"),
+        },
+      };
 const worlds =
   config.worlds === undefined || config.universes === undefined
     ? undefined
-    : startWorlds({ file: config.worlds, log, universe: defaultUniverse(config.universes) });
+    : startWorlds({ file: config.worlds, log, universe: defaultUniverse(config.universes), ...habits });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -76,7 +88,13 @@ if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
 // The home's ticker's trends (7t): the worlds job's last passes and who is here, a few items; none without either, never a 404.
 app.route(
   "/api/trends",
-  trendsRoutes({ chain: worlds?.trends ?? (() => []), presence: chat.presenceNow, now: Date.now }),
+  trendsRoutes({
+    chain: worlds?.trends ?? (() => ({ worlds: [], newest: [] })),
+    presence: chat.presenceNow,
+    chat: chat.presenceChat,
+    hubs,
+    now: Date.now,
+  }),
 );
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);

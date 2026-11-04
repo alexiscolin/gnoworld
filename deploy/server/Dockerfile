@@ -15,6 +15,8 @@ COPY server/src server/src
 COPY server/roles.json server/
 # The universes the app is built from: the default one's RPC is where the prices timer reads the block height (UNIVERSES_FILE).
 COPY app/data/universes.json app/data/
+# The hubs beside them: the trends read a hub's rooms and its realms as one world (7t3).
+COPY app/data/hubs.json app/data/
 RUN mkdir -p /data /markets /run/gnoworld && chown 65532:65532 /data /markets /run/gnoworld
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:78f07ef1b5ea71ad7c055df15d0dd8997f2d288f9158623c4d4ae3d765b7d50d

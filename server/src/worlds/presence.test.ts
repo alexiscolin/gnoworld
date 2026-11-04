@@ -107,6 +107,96 @@ describe("makePresence", () => {
     expect(presence.history("a/known")).toEqual([{ at: T0, people: 3 }]);
   });
 
+  // 7t3's security review: a seat given to the busier by its busiest hour let one burst of 500 worlds shut every real world out for 14
+  // days. A world entering takes the seat of the one quiet longest (its last hour above none the oldest, then its busiest hour the smallest,
+  // then its id first), unless that one was active this very hour with at least its count: a flood keeps its seats only by staying busy.
+  const full = (count: number, presence: ReturnType<typeof makePresence>) => {
+    const ids = Array.from({ length: PRESENCE_WORLDS_MAX }, (_, at) => `ns/w${String(at).padStart(4, "0")}`);
+    presence.record(new Map(ids.map((id) => [id, count])));
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+    return ids;
+  };
+
+  it("gives a world entering a full store the seat of the one quiet longest, however busy that one once was", () => {
+    const { presence, clock } = make();
+    const ids = full(2, presence);
+    presence.record(new Map([["ns/w0007", 900]]));
+    clock.at = T0 + HOUR;
+    presence.record(new Map(ids.flatMap((id) => (id === "ns/w0007" ? [] : [[id, 2] as const]))));
+    presence.record(new Map([["a/new", 1]]));
+    expect(presence.history("a/new")).toEqual([{ at: T0 + HOUR, people: 1 }]);
+    expect(presence.history("ns/w0007"), "quiet since its burst").toEqual([]);
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+  });
+
+  it("refuses a world entering when every held world was active this hour with at least its count, and takes the least busy's otherwise", () => {
+    const { presence } = make();
+    full(2, presence);
+    presence.record(new Map([["a/even", 2]]));
+    expect(presence.history("a/even"), "no count above this hour's").toEqual([]);
+    presence.record(new Map([["a/busier", 3]]));
+    expect(presence.history("a/busier")).toHaveLength(1);
+    expect(presence.history("ns/w0000"), "the least busy, first by id").toEqual([]);
+  });
+
+  // The second round of 7t3's review: a held world not yet counted this hour looked quiet to a newcomer listed before it in the same sample,
+  // which took its seat and its 14 days; chain worlds come by id, so a flood under ids that sort first wiped every real world's history.
+  it("counts the sample's held worlds before any newcomer, so one listed after a newcomer keeps its seat and its history", () => {
+    const { presence, clock } = make();
+    full(2, presence);
+    clock.at = T0 + HOUR;
+    presence.record(
+      new Map([
+        ["a/new", 3],
+        ["ns/w0000", 9],
+      ]),
+    );
+    expect(presence.history("ns/w0000")).toEqual([
+      { at: T0, people: 2 },
+      { at: T0 + HOUR, people: 9 },
+    ]);
+    expect(presence.history("a/new")).toHaveLength(1);
+    expect(presence.history("ns/w0001"), "the quietest held world").toEqual([]);
+  });
+
+  it("lets a world quiet since a flood take back its seat from the flood once the flood is quiet in turn", () => {
+    const { presence, clock } = make();
+    const real = full(5, presence);
+    clock.at = T0 + HOUR;
+    const flood = real.map((id) => id.replace("ns/w", "flood/f"));
+    presence.record(new Map(flood.map((id) => [id, 20])));
+    expect(presence.history("ns/w0000"), "quiet this hour, its seat taken").toEqual([]);
+    clock.at = T0 + 2 * HOUR;
+    presence.record(new Map(real.map((id) => [id, 5])));
+    expect(real.every((id) => presence.history(id).length === 1)).toBe(true);
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+  });
+
+  it("weighs a held world by its hours as the sample goes on: one active this hour keeps its seat", () => {
+    const { presence, clock } = make();
+    full(2, presence);
+    clock.at = T0 + HOUR;
+    presence.record(
+      new Map([
+        ["a/small", 3],
+        ["ns/w0001", 4],
+        ["a/large", 6],
+        ["a/third", 3],
+      ]),
+    );
+    expect(presence.history("ns/w0001"), "active this hour, as held").toHaveLength(2);
+    expect(["a/small", "a/large", "a/third"].map((id) => presence.history(id).length)).toEqual([1, 1, 1]);
+  });
+
+  it("breaks a tie between worlds equally quiet by id, in whatever order they came", () => {
+    const { presence } = make();
+    const ids = Array.from({ length: PRESENCE_WORLDS_MAX }, (_, at) => `ns/w${String(at).padStart(4, "0")}`).reverse();
+    presence.record(new Map(ids.map((id) => [id, 2])));
+    presence.record(new Map([["a/busier", 3]]));
+    expect(presence.history("ns/w0000")).toEqual([]);
+    expect(presence.history("ns/w0499")).toHaveLength(1);
+  });
+
   it.each([
     ["a count that is negative", -1],
     ["a count that is a fraction", 1.5],

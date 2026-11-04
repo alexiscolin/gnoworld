@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc, defaultUniverse } from "./universes.ts";
+import { defaultRpc, defaultUniverse, hubWorlds } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -88,6 +88,61 @@ describe("defaultUniverse", () => {
   });
 });
 
+// 7t3: the trends read a hub's rooms and its realms as one world, so the server knows each hub's world from the data the app is built from,
+// hubs.json beside the universes' file, through the data's own schema; a bad file stops the server at boot, naming the file alone.
+describe("hubWorlds", () => {
+  const HUB = {
+    name: "Bubble",
+    description: "Bubble, a world of gno.land: its token, its governance and its games, played on chain.",
+  };
+  const pair = (hubs: string, universes = JSON.stringify([OTHER, ONYX])): string => {
+    n += 1;
+    const folder = join(dir, `pair${String(n)}`);
+    mkdirSync(folder);
+    writeFileSync(join(folder, "hubs.json"), hubs);
+    const file = join(folder, "universes.json");
+    writeFileSync(file, universes);
+    return file;
+  };
+
+  it("names each hub of the default universe that lists realms by its slug with its first realm's world; one with none joins no chain world", () => {
+    const hubs = [
+      { ...HUB, slug: "bubble", universe: "onyx" },
+      { ...HUB, slug: "govdao", universe: "onyx", realms: ["gno.land/r/gov/dao", "gno.land/r/gov/dao/v3/impl"] },
+      { ...HUB, slug: "elsewhere", universe: "other", realms: ["gno.land/r/else/where"] },
+    ];
+    expect(hubWorlds(pair(JSON.stringify(hubs)))).toEqual(new Map([["govdao", "gov/dao"]]));
+  });
+
+  it("reads the data the app ships: GovDAO with its realm's world, and Bubble, which has no realm, joined to none", () => {
+    expect(hubWorlds(DATA)).toEqual(new Map([["govdao", "gov/dao"]]));
+  });
+
+  it.each([
+    ["a file that is no JSON", "{nope"],
+    ["a hub with a field it does not know", JSON.stringify([{ ...HUB, slug: "bubble", universe: "onyx", extra: "x" }])],
+    [
+      "a hub whose realm is no realm path",
+      JSON.stringify([{ ...HUB, slug: "bubble", universe: "onyx", realms: ["evil"] }]),
+    ],
+    ["no list", "{}"],
+  ])("refuses %s, naming the file and none of its content", (_, content) => {
+    const file = pair(content);
+    const hubs = join(file, "..", "hubs.json");
+    expect(() => hubWorlds(file)).toThrow(hubs);
+    try {
+      hubWorlds(file);
+    } catch (error) {
+      expect(String(error)).not.toMatch(/nope|extra|evil/);
+    }
+  });
+
+  it("refuses a folder with no hubs.json beside the universes, naming it", () => {
+    const file = planted(JSON.stringify([ONYX]));
+    expect(() => hubWorlds(file)).toThrow("hubs.json");
+  });
+});
+
 // The egress proxy's list gains the default universe's RPC host from the data, and nothing else (decision of 2026-10-31). Docker is
 // refused in this sandbox, so these read the files as text; deploy/test.sh and its `--mutants` rows are the run against the stack.
 const read = (path: string) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
@@ -132,6 +187,7 @@ describe("the way out's list", () => {
 describe("the server's data", () => {
   it("is the file the image copies, and the one the compose file names", () => {
     expect(dockerfile).toMatch(/^COPY app\/data\/universes\.json app\/data\/$/m);
+    expect(dockerfile, "the hubs beside it, for the trends (7t3)").toMatch(/^COPY app\/data\/hubs\.json app\/data\/$/m);
     expect(compose).toMatch(/^\s+UNIVERSES_FILE: \/app\/app\/data\/universes\.json$/m);
   });
 });

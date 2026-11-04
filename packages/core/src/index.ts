@@ -57,7 +57,7 @@ export {
 export { chooseLabels, labelName, known, LABELS_MOST, type Label, type LabelAsk, type Signals } from "./lod/labels.ts";
 export { LABEL_SLOTS, LabelLayout, PLACE, settle } from "./lod/settle.ts";
 export { callersIn, chooseRail, RAIL, type RailAsk, type RailWorld } from "./lod/rail.ts";
-export { riseOf, type PresenceSlot } from "./lod/rising.ts";
+export { middleOf, riseFrom, riseOf, usualOf, type PresenceSlot } from "./lod/rising.ts";
 export { clearOf, leanFor, type ClearBox, type ScreenSpot } from "./frame/screen.ts";
 export {
   CENTRE,
@@ -110,7 +110,7 @@ export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseC
 export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
-export { worldIdOf } from "./cosmos/worldId.ts";
+export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";

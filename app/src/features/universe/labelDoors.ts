@@ -2,10 +2,11 @@
 // keyboard is on that world's link in the rail or the list, for the labels take no focus; a click, or a second tap, goes to its page through
 // the page's router. The Earth's label is a call already, "Start here" to a newcomer: one click or one tap enters. The labels are the scene's
 // (scene/cosmos/labels.ts): only the world each one names is read.
+import { EARTH } from "@gnoworld/core";
 import type { CosmosWorld } from "../../scene/cosmos/cosmosWorld.ts";
 import { followed } from "../../lib/followed.ts";
 import styles from "./labelDoors.module.css";
-import { EARTH, pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
+import { pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
 import type { Known } from "./worldsFeed.ts";
 
 /** What the doors need of the page: the places its labels lead to, and its router. */

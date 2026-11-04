@@ -13,14 +13,25 @@ import { readTrends, trendItems, TRENDS_URL, useTrends } from "./trends.ts";
 // never the worlds' file. A trend names its world as the page does, a hub by its name and page, another world by the chain's title and its
 // first realm's view, and says when its data was read; a trend the page cannot place is left out, and nothing comes when the server is silent.
 const NOW = new Date("2026-11-04T09:40:00.000Z");
+// Trending (7t3) is said by its strongest signal: the chain's transactions or addresses in the job's window, or a hub's people or messages.
 const BUSIEST = {
   kind: "trending",
+  by: "transactions",
   world: "gnoswap/pool",
   realm: "gno.land/r/gnoswap/pool",
   title: "pool",
-  calls: 45,
+  count: 45,
+  rise: 1.2,
   since: "2026-11-04T09:00:00.000Z",
   at: "2026-11-04T09:31:00.000Z",
+} as const;
+const BY_CHAT = {
+  kind: "trending",
+  by: "here",
+  world: "bubble",
+  count: 12,
+  rise: 0.6,
+  at: "2026-11-04T09:39:00.000Z",
 } as const;
 const RISING = { kind: "rising", world: "bubble", rise: 0.456, at: "2026-11-04T09:39:00.000Z" } as const;
 const NEWEST = {
@@ -41,20 +52,55 @@ const hubOf = (slug: string) => {
 };
 
 describe("trendItems", () => {
-  it("says the busiest world's calls since the last read, linked to its first realm's view, its source and times beside", () => {
+  it("says a world Trending by its transactions as calls in the window, linked to its first realm's view, its source and times beside", () => {
     expect(trendItems([BUSIEST], places(), NOW)).toEqual<TickerItem[]>([
       {
         id: "trend-trending",
         kind: "trending",
         text: "pool · 45 calls in 31 min",
         link: "/r/gnoswap/pool",
-        source: "Calls to its realms, as the chain's indexer counts them, from 09:00 UTC to 09:31 UTC",
+        source:
+          "Transactions to its realms, as the chain's indexer counts them, from 09:00 UTC to 09:31 UTC, against its usual of the last 14 days",
       },
     ]);
   });
 
   it("says one call in the singular", () => {
-    expect(trendItems([{ ...BUSIEST, calls: 1 }], places(), NOW)[0]?.text).toBe("pool · 1 call in 31 min");
+    expect(trendItems([{ ...BUSIEST, count: 1 }], places(), NOW)[0]?.text).toBe("pool · 1 call in 31 min");
+  });
+
+  it("says a world Trending by the addresses that called it as callers in the window", () => {
+    expect(trendItems([{ ...BUSIEST, by: "addresses", count: 12 }], places(), NOW)[0]).toMatchObject({
+      text: "pool · 12 callers in 31 min",
+      source:
+        "Different addresses calling its realms, as the chain's indexer counts them, from 09:00 UTC to 09:31 UTC, against its usual of the last 14 days",
+    });
+  });
+
+  it("names a hub Trending by its rooms by the page's own name, links its page, and says its people or messages and their rise", () => {
+    const bubble = hubOf("bubble");
+    expect(trendItems([BY_CHAT], places(), NOW)).toEqual<TickerItem[]>([
+      {
+        id: "trend-trending",
+        kind: "trending",
+        text: `${bubble.name} · 12 here, +60% this hour`,
+        link: bubble.path,
+        source: "People in its rooms against its usual hour of the last 14 days, at 09:39 UTC",
+      },
+    ]);
+    expect(trendItems([{ ...BY_CHAT, by: "messages", count: 240.4 }], places(), NOW)[0]).toMatchObject({
+      text: `${bubble.name} · 240 messages an hour, +60%`,
+      source:
+        "Messages in its rooms, the last five minutes at an hour's pace, against its usual hour of the last 14 days, at 09:39 UTC",
+    });
+  });
+
+  it("names the Earth Trending by its rooms, and leaves out a hub the page does not list", () => {
+    expect(trendItems([{ ...BY_CHAT, world: "earth" }], places(), NOW)[0]).toMatchObject({
+      text: "Earth · 12 here, +60% this hour",
+      link: places().earth,
+    });
+    expect(trendItems([{ ...BY_CHAT, world: "nowhere" }], places(), NOW)).toEqual([]);
   });
 
   it("says a window of seconds as a minute, never none", () => {
@@ -145,7 +191,7 @@ describe("readTrends", () => {
   it("gives nothing for a server that fails, is not there, or answers what its schema refuses", async () => {
     expect(await readTrends({ fetch: answer("down", { status: 502 }) })).toBeUndefined();
     expect(await readTrends({ fetch: vi.fn(() => Promise.reject(new TypeError("down"))) })).toBeUndefined();
-    expect(await readTrends({ fetch: answer(JSON.stringify({ items: [{ ...BUSIEST, calls: -1 }] })) })).toBeUndefined();
+    expect(await readTrends({ fetch: answer(JSON.stringify({ items: [{ ...BUSIEST, count: -1 }] })) })).toBeUndefined();
     expect(await readTrends({ fetch: answer("<html>") })).toBeUndefined();
   });
 
