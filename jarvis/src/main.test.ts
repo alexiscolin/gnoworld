@@ -260,6 +260,16 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
     expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
   });
 
+  // An operator who lowers a budget's setting and starts jarvis again learns the file keeps its own (F5289, S3).
+  it("says at its start each cap its file keeps over its setting, and nothing of one they agree on", async () => {
+    const { env, dir } = await setup();
+    spentDay(join(dir, "jarvis.db"));
+    const jarvis = start({ ...env, JARVIS: "off", JARVIS_BUDGET_USD: "3", JARVIS_TRANSLATION_BUDGET_USD: "1" });
+    await listening(jarvis);
+    const kept = lines(jarvis).filter(({ event }) => event === "jarvis_budget_kept");
+    expect(kept.map(({ setting, value }) => [setting, value])).toEqual([["ask", 1]]);
+  });
+
   it("refuses to start without --disallow-code-generation-from-strings", async () => {
     const { env } = await setup();
     const jarvis = start(env, ["--import", OUTBOUND]);

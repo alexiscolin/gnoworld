@@ -14,6 +14,7 @@ import { serve } from "./http.ts";
 import { makeLoop } from "./loop.ts";
 import { jarvisMigrations } from "./migrations.ts";
 import { connectAnthropic } from "./model.ts";
+import { DOLLAR } from "./prices.ts";
 import { jarvisRoutes } from "./routes.ts";
 import { loadSkills } from "./skills.ts";
 import { toolbox } from "./toolbox.ts";
@@ -32,6 +33,12 @@ const served = loadServed(process.env);
 const log = logger(randomBytes(32).toString("hex"), (line) => process.stdout.write(line));
 const db = openDatabase(served.database, jarvisMigrations);
 const budget = makeBudget(db, { caps: served.budgets, holdMs: HOLD_MS, now: Date.now });
+// The file's caps are the first start's or an admin's: one its setting no longer names is said, so an operator who
+// lowered the setting knows it is not the cap (F5289).
+for (const kind of ["ask", "translate"] as const) {
+  const kept = budget.caps()[kind];
+  if (kept !== served.budgets[kind]) log("jarvis_budget_kept", { setting: kind, value: kept / DOLLAR });
+}
 // A start refused closes the file too, so nothing is left behind it (F5289).
 const running = served.on
   ? await startModel(log, budget).catch((error: unknown) => {
