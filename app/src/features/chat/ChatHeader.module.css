@@ -69,6 +69,10 @@
     .trigger {
       max-inline-size: 100%;
       overflow: hidden;
+      /* raw: room for the ink a glyph draws past its 22 px line (a #'s bars, a g's tail), which the clip cut (F4883) */
+      padding: 2px;
+      /* layout: the padding taken back, so the name stands where it did */
+      margin: -2px;
     }
   }
 }
