@@ -17,10 +17,11 @@ const GNO_LAND = "https://gno.land";
 const HOLDING = new Set(["Tab", "Shift", "Control", "Alt", "Meta"]);
 
 // The hero gives way while the words show, and comes back as they leave or go: mock-up 1's "the hero, the labels and the buttons come as
-// the camera lands". It stays the page's reading, its heading a reader's, and shows again as the keyboard reaches it (Hero.module.css).
+// the camera lands"; so does what stands with it where the words come, a phone's list of worlds (F4648). It stays the page's reading, its
+// heading a reader's, and shows again as the keyboard reaches it (Hero.module.css).
 function yieldHero(yielding: boolean): void {
-  const hero = document.querySelector<HTMLElement>("[data-yield]");
-  if (hero !== null) hero.dataset["yield"] = yielding ? "opening" : "none";
+  for (const part of document.querySelectorAll<HTMLElement>("[data-yield]"))
+    part.dataset["yield"] = yielding ? "opening" : "none";
 }
 
 interface Ends {

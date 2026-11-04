@@ -30,12 +30,13 @@ describe("the hero's big number, on a planted site", () => {
     expect(headingOf(html)).toBe("Worlds in Mainland");
   });
 
-  // 7n: the number comes after the page, and the actions beside the line must not slide when it does (frames 2 to 8 never move).
+  // 7n: the number comes after the page, and the actions beside the line must not slide when it does (frames 2 to 8 never move). F4641:
+  // read with no script, by a search engine or a link's preview, the heading is a sentence, "Worlds in", never " worlds in".
   test("keeps its figure's room in the line while the number comes: an empty figure, then the words", async () => {
     const html = await heroWith("main", undefined, true);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
     expect(html).toMatch(/data-hero="figure"[^>]*><\/span>/);
-    expect(headingOf(html)).toBe(" worlds in Mainland");
+    expect(headingOf(html)).toBe("Worlds in Mainland");
   });
 
   test("sets the number in the line's figure once it has come", async () => {
@@ -50,7 +51,7 @@ describe("the hero's big number, on a planted site", () => {
       /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*>534<\/span> worlds<\/strong> in Mainland<\/h1>/,
     );
     expect(await heroWith("main", undefined, true)).toMatch(
-      /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*><\/span> worlds<\/strong> in Mainland<\/h1>/,
+      /<h1[^>]*><strong [^>]*><span [^>]*data-hero="figure"[^>]*><\/span><span [^>]*>Worlds<\/span><\/strong> in Mainland<\/h1>/,
     );
     expect(await heroWith("main", undefined)).not.toContain("<strong");
   });
@@ -96,7 +97,7 @@ describe("the hero's line", () => {
   });
 
   test("says it while the number comes, and once none came", async () => {
-    expect(lineOf(await heroWith("main", undefined, true))).toBe(" worlds in Mainland. Each one is a place to talk.");
+    expect(lineOf(await heroWith("main", undefined, true))).toBe("Worlds in Mainland. Each one is a place to talk.");
     expect(lineOf(await heroWith("main", undefined))).toBe("Worlds in Mainland. Each one is a place to talk.");
   });
 

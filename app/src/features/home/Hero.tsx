@@ -11,6 +11,23 @@ import { Live } from "./Live.tsx";
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
 const TALK = ". Each one is a place to talk.";
 
+// The line's count, its figure and its word: the figure's room kept while the number comes (7n). While it comes, a page read with no script
+// says "Worlds in", a sentence (F4641); the stylesheet draws the count's word.
+function Count({ worlds }: { worlds: number | undefined }) {
+  return (
+    <strong className={styles["count"]}>
+      <span className={styles["figure"]} data-hero="figure">
+        {worlds}
+      </span>
+      {worlds === undefined ? (
+        <span className={styles["coming"]}>Worlds</span>
+      ) : (
+        ` ${worlds === 1 ? "world" : "worlds"}`
+      )}
+    </strong>
+  );
+}
+
 /** `coming`: no number yet, but one is on its way (the worlds' count is being read). `newcomer`: the reader has entered no place yet, so the
  * Earth's label says "Start here", the one filled call (ADR-0003 §3). */
 export function Hero({
@@ -41,12 +58,7 @@ export function Hero({
               `Worlds in ${universe.name}`
             ) : (
               <>
-                <strong className={styles["count"]}>
-                  <span className={styles["figure"]} data-hero="figure">
-                    {worlds}
-                  </span>
-                  {` ${worlds === 1 ? "world" : "worlds"}`}
-                </strong>
+                <Count worlds={worlds} />
                 {` in ${universe.name}`}
               </>
             )}
@@ -77,7 +89,7 @@ export function Hero({
  * rail stands for them while it stands (7i), and marks them so. */
 export function Worlds({ children }: { children: ReactNode }) {
   return (
-    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none">
+    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none" data-yield="none">
       <Kicker>Worlds</Kicker>
       {children}
     </nav>

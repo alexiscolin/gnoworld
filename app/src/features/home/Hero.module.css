@@ -17,12 +17,13 @@
   }
 
   /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
-     page's reading, and shows again as the keyboard reaches it. */
-  .hero[data-yield="opening"]:not(:focus-within) {
+     page's reading, and shows again as the keyboard reaches it: a link the keyboard is on, never the heading View in space hands the focus
+     to, by a tap or a key (F4644, F4651). */
+  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) {
     opacity: 0;
   }
 
-  .hero[data-yield="opening"]:not(:focus-within) > * {
+  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) > * {
     pointer-events: none;
   }
 
@@ -118,6 +119,8 @@
   .worlds {
     /* layout: the list stands off the hero above it when the page holds them in a column */
     margin-block-start: var(--space-s);
+    /* raw: the list gives way and comes back with the hero, in the opening's 600 ms */
+    transition: opacity 600ms var(--ease-standard);
     /* The ticker is fixed over the foot of the page, and "View in space" over a phone's: the last link scrolls above them. */
     padding-block-end: calc(var(--space-xl) + var(--control-m) + var(--space-s));
   }
@@ -158,22 +161,42 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* While the number comes, three hidden digits keep its room (7n): a count of 100 to 999 fills it, whatever face draws the line. `3ch`
-     and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits: the actions slid. */
+  /* While the number comes, three hidden digits and the space after them keep its room (7n): a count of 100 to 999 fills it, whatever face
+     draws the line. `3ch` and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits. */
   .figure:empty::before {
     visibility: hidden;
-    content: "000";
+    content: "000 ";
+  }
+
+  /* The word after the room, "Worlds" in the page (F4641), drawn as the count's "worlds", so the line holds its width when the number comes. */
+  .coming {
+    text-transform: lowercase;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hero {
+    .hero,
+    .worlds {
       transition: none;
+    }
+  }
+
+  /* Where the list stands in the page under the hero, a phone or a short screen, the opening's words come over it: it gives way with the
+     hero (F4648). Fixed at the top from 900 by 800 px, it stands clear of them, as mock-up 1 draws it. */
+  @media (max-width: 899px), (max-height: 799px) {
+    .worlds[data-yield="opening"]:not(:has(:focus-visible)) {
+      opacity: 0;
+      pointer-events: none;
     }
   }
 
   @media (max-width: 899px) {
     .row {
       /* layout: the actions go under the line when the phone is too narrow for both */
+      flex-wrap: wrap;
+    }
+
+    .actions {
+      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px (F4642) */
       flex-wrap: wrap;
     }
 

@@ -494,10 +494,10 @@ describe("react-router build", () => {
         const pages: [string[], string, string][] = [
           // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
           // the line's figure's room for it.
-          [[], " worlds in Onyx", "/net/onyx/"],
+          [[], "Worlds in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
           [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "onyx"], " worlds in Onyx", "/net/onyx/"],
+          [["net", "onyx"], "Worlds in Onyx", "/net/onyx/"],
           [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
           [["net", "gnoland"], "\\d+ worlds? in gno\\.land", "/net/gnoland/"],
           [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],

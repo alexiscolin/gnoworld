@@ -46,6 +46,40 @@ describe("the labels' way in", () => {
   });
 });
 
+// ADR-0003 §2, 2b: the Earth's label says "Start here" to a newcomer, as the page's signals say the reader is one, and to nobody else.
+describe("the Earth's label for a newcomer", () => {
+  // F4524: the device is read at each look, as the reader's visits are, never held from an older reading.
+  const signals = (newcomer?: boolean) => ({
+    present: new Map([["earth", { here: 184, perHour: 130, rise: 0.21 }]]),
+    names: new Map<string, string>(),
+    visited: () => false,
+    now: 0,
+    ...(newcomer === undefined ? {} : { newcomer: () => newcomer }),
+  });
+  const earthWords = (newcomer?: boolean) => {
+    const part = new CosmosLabels(document, {
+      projector,
+      earth: () => new Vector3(0, 0, -20),
+      earthRadius: EARTH_RADIUS,
+    });
+    part.list([], signals(newcomer));
+    part.look([], new Drawn(), []);
+    part.tick({ x: 0, y: 0, z: 0 }, true);
+    const words = shown()[0]?.textContent;
+    part.dispose();
+    return words;
+  };
+
+  it("says Start here in place of the heat to a newcomer, beside the Earth's people", () => {
+    expect(earthWords(true)).toBe("Earth184 hereStart here →");
+  });
+
+  it("keeps the Earth's heat for a reader who came back, or of whom nothing is said", () => {
+    expect(earthWords(false)).toBe("Earth184 here▲ 21% · 130/h");
+    expect(earthWords()).toBe("Earth184 here▲ 21% · 130/h");
+  });
+});
+
 // The home's rocks (7p) come through the labels' chunk, the one a look and a frame reach that costs the cosmos's and the scene's nothing:
 // drawn among the bodies once their chunk came, moved with the eye on each frame.
 describe("the home's rocks through the labels' way in", () => {

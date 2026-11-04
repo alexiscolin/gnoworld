@@ -27,7 +27,7 @@ test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267: the kicker says gno.world, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
   expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-  expect(headingOf(html)).toBe(" worlds in Onyx");
+  expect(headingOf(html)).toBe("Worlds in Onyx");
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");
   expect(html).toContain('<a href="/w/govdao"');
@@ -49,7 +49,7 @@ test("keeps the line's figure while its number comes, and names the worlds witho
   useWorldsCount.mockReturnValue(undefined);
   const coming = await render({ path: "/", Component: Home, loader }, "/");
   expect(coming).toMatch(/data-hero="figure"[^>]*><\/span>/);
-  expect(headingOf(coming)).toBe(" worlds in Onyx");
+  expect(headingOf(coming)).toBe("Worlds in Onyx");
   useWorldsCount.mockReturnValue(null);
   const none = await render({ path: "/", Component: Home, loader }, "/");
   expect(none).not.toContain('data-hero="figure"');

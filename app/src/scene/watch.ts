@@ -1,5 +1,7 @@
 // What the scene listens to in the page; every listener goes with the signal.
+import type { Eye } from "./eye.ts";
 import type { FrameLoop } from "./loop.ts";
+import { OVER_SCENE } from "./overScene.ts";
 
 export const MOTION = "(prefers-reduced-motion: reduce)";
 const INPUTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
@@ -22,12 +24,15 @@ function watchPage(loop: FrameLoop, signal: AbortSignal): void {
   for (const name of INPUTS) window.addEventListener(name, input, { signal, passive: true });
 }
 
-/** Gives `aim` a mouse's place, -1 to 1 across the window, y up. A finger is no aim. */
-function watchAim(aim: (x: number, y: number) => void, signal: AbortSignal): void {
+/** Gives the eye a mouse's place to aim at, -1 to 1 across the window, y up. A finger is no aim. A mouse on what the scene places over
+ * itself holds the lean where it is: a label is a door to its world (ADR-0003, 2e), which would slide from under the pointer (F4646). */
+function watchAim(eye: Pick<Eye, "aim" | "hold">, signal: AbortSignal): void {
   window.addEventListener(
     "pointermove",
-    ({ pointerType, clientX, clientY }) => {
-      if (pointerType === "mouse") aim((clientX / innerWidth) * 2 - 1, 1 - (clientY / innerHeight) * 2);
+    ({ pointerType, clientX, clientY, target }) => {
+      if (pointerType !== "mouse") return;
+      if (target instanceof Element && target.closest(OVER_SCENE) !== null) eye.hold();
+      else eye.aim((clientX / innerWidth) * 2 - 1, 1 - (clientY / innerHeight) * 2);
     },
     { signal, passive: true },
   );
@@ -80,7 +85,7 @@ export function watchScene(
   canvas: HTMLCanvasElement,
   scene: {
     readonly loop: FrameLoop;
-    readonly aim: (x: number, y: number) => void;
+    readonly eye: Pick<Eye, "aim" | "hold">;
     readonly changed: () => void;
     readonly resized: () => void;
     readonly lost: (now: boolean) => void;
@@ -89,6 +94,6 @@ export function watchScene(
 ): void {
   watchPage(scene.loop, signal);
   watchScreen(scene.changed, signal);
-  watchAim(scene.aim, signal);
+  watchAim(scene.eye, signal);
   watchCanvas(canvas, scene, signal);
 }

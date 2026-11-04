@@ -414,6 +414,15 @@ describe("aiming at a star", () => {
     ["a text box", () => document.createElement("textarea")],
     ["an editable line", () => editable()],
     ["a panel's words", () => document.createElement("section").appendChild(document.createElement("p")).parentElement],
+    // F4522: a label of the cosmos is a door to its world (ADR-0003, 2e): its click or tap goes there, never to a star beside it.
+    [
+      "a label of the cosmos",
+      () => {
+        const layer = document.createElement("div");
+        layer.dataset["labels"] = "";
+        return layer.appendChild(document.createElement("div")).parentElement;
+      },
+    ],
   ])("aims at nothing through %s", (_, make) => {
     const scene = rig();
     const flown = flights(scene.device);
