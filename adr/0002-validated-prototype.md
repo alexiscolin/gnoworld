@@ -962,8 +962,8 @@ by few hands, so they get the safest path.
 - **Phase 1:** the signals at scale, Langfuse Cloud, voice, room games, and satellites on
   mainnet once approved.
 
-**Containers.** One image for the server's code, run as two containers, each with only its
-own secrets and its own way out:
+**Containers.** Two images, the server's and Jarvis's own (Alexis, 2026-11-04; 10j), each
+container with only its own secrets and its own way out (in the demo, a proxy each, `deploy/egress/`):
 
 | Container | Roles | Secrets | Reaches |
 |---|---|---|---|
