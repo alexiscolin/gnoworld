@@ -23,12 +23,15 @@ export interface Scenario {
   profiles?: Profile[];
   // A tool's result by its name; any other call is answered with its name and arguments.
   answers?: Record<string, unknown>;
-  // Tools, or protocol methods such as `initialize`, it never answers.
+  // Tools, or protocol methods such as `initialize`, it never answers; tools it answers with a JSON-RPC error.
   slow?: string[];
+  failing?: string[];
   // A tool whose call ends the process, in its first `starts` starts.
   crash?: { tool: string; starts: number };
   stderr?: string[];
-  // Words written with no line end before each audit line, which then ends theirs.
+  // Each stderr line written in two halves, 50 ms apart, before any request is read; words written with no line end
+  // before each audit line, which then ends theirs.
+  stderrSplit?: boolean;
   stderrBefore?: string;
   exitAtStart?: boolean;
 }
@@ -77,12 +80,19 @@ const ignored = ["PATH", "LOGNAME", "SHELL", "TERM", "USER", "__CF_USER_TEXT_ENC
 for (const [key, value] of Object.entries(process.env)) if (!ignored.includes(key)) env[key] = value;
 const seen = { argv: process.argv.slice(2), cwd: process.cwd(), env, listed: readdirSync(process.cwd()), pid: process.pid };
 appendFileSync(join(here, "starts.jsonl"), JSON.stringify(seen) + "\\n");
-for (const line of scenario.stderr ?? []) process.stderr.write(line + "\\n");
+for (const line of scenario.stderr ?? []) {
+  if (!scenario.stderrSplit) process.stderr.write(line + "\\n");
+  else {
+    process.stderr.write(line.slice(0, line.length / 2));
+    setTimeout(() => process.stderr.write(line.slice(line.length / 2) + "\\n"), 50);
+  }
+}
 if (scenario.exitAtStart) process.exit(3);
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
 const call = (id, name, args) => {
   if (scenario.crash && scenario.crash.tool === name && started < scenario.crash.starts) process.exit(1);
   if ((scenario.slow ?? []).includes(name)) return;
+  if ((scenario.failing ?? []).includes(name)) return send({ id, error: { code: -32603, message: "a made-up failure" } });
   const listed = { content: [{ type: "text", text: "profiles" }], structuredContent: { profiles: scenario.profiles } };
   const echoed = { content: [{ type: "text", text: name + " " + JSON.stringify(args) }] };
   const result = scenario.answers?.[name] ?? (name === "gno_profile_list" ? listed : echoed);
@@ -90,7 +100,7 @@ const call = (id, name, args) => {
   process.stderr.write((scenario.stderrBefore ?? "") + JSON.stringify(audit) + "\\n");
   send({ id, result });
 };
-createInterface({ input: process.stdin }).on("line", (line) => {
+const serve = () => createInterface({ input: process.stdin }).on("line", (line) => {
   const request = JSON.parse(line);
   appendFileSync(join(here, "requests.jsonl"), JSON.stringify({ start: started + 1, method: request.method, params: request.params }) + "\\n");
   if (request.id === undefined || (scenario.slow ?? []).includes(request.method)) return;
@@ -102,6 +112,8 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   if (request.method === "tools/call") return call(request.id, request.params.name, request.params.arguments);
   send({ id: request.id, error: { code: -32601, message: "no such method" } });
 });
+if (scenario.stderrSplit) setTimeout(serve, 100);
+else serve();
 `;
 
 const Seen = z.object({

@@ -2,6 +2,7 @@ import { once } from "node:events";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { message, text, toolUse, usage } from "./testing/fakeModel.ts";
 import { spans } from "./testing/kit.ts";
 import { startTracing, traceQuestion } from "./tracing.ts";
@@ -47,6 +48,13 @@ describe("startTracing: where the spans go", () => {
     expect(await tracing.shutdown()).toBe(true);
     expect(received.map(({ method, path }) => [method, path])).toEqual([["POST", "/v1/traces"]]);
     expect(received[0]?.body).toContain("jarvis.question");
+    const Body = z.object({
+      resourceSpans: z.array(z.object({ scopeSpans: z.array(z.object({ scope: z.object({ name: z.string() }) })) })),
+    });
+    const scopes = Body.parse(JSON.parse(received[0]?.body ?? "{}")).resourceSpans.flatMap((resource) =>
+      resource.scopeSpans.map((spans) => spans.scope.name),
+    );
+    expect(scopes).toEqual(["jarvis"]);
   });
 
   it("loses the spans, never the question, when the collector cannot be reached", async () => {
@@ -59,19 +67,23 @@ describe("startTracing: where the spans go", () => {
     expect(performance.now() - started).toBeLessThan(8_000);
   }, 15_000);
 
-  it.each(["ftp://collector.example/v1/traces", "collector:4318", "file:///tmp/traces", "javascript:alert(1)"])(
-    "refuses %j as a collector, naming the setting and never its value",
-    (value) => {
-      let message = "";
-      try {
-        startTracing({ JARVIS_TRACES_URL: value });
-      } catch (error) {
-        message = error instanceof Error ? error.message : String(error);
-      }
-      expect(message).toMatch(/^setting JARVIS_TRACES_URL: /);
-      expect(message).not.toContain(value);
-    },
-  );
+  it.each([
+    "shttp://collector.example/v1/traces",
+    "https2://collector.example/v1/traces",
+    "ftp://collector.example/v1/traces",
+    "collector:4318",
+    "file:///tmp/traces",
+    "javascript:alert(1)",
+  ])("refuses %j as a collector, naming the setting and never its value", (value) => {
+    let message = "";
+    try {
+      startTracing({ JARVIS_TRACES_URL: value });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/^setting JARVIS_TRACES_URL: /);
+    expect(message).not.toContain(value);
+  });
 });
 
 describe("traceQuestion: one trace per question", () => {
@@ -124,6 +136,13 @@ describe("traceQuestion: one trace per question", () => {
       "jarvis.cost_nano_usd": 7_777,
     });
     expect(request?.status.code).toBe(1);
+  });
+
+  it("says none as the finish reason of an answer that gave no stop reason", () => {
+    const { trace, finished } = start();
+    trace.request(1).answered(message({ content: [], stop: null }), 1);
+    trace.end("failed_stop", 1);
+    expect(finished()[0]?.attributes["gen_ai.response.finish_reasons"]).toEqual(["none"]);
   });
 
   it("leaves a request's cost out when the budget charged nothing it could say", () => {

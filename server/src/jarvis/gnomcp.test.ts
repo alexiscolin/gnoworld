@@ -172,6 +172,12 @@ describe("startGnomcp: gnomcp started read-only", () => {
     expect(message).toBe("gnomcp: its profile list is not gnomcp 0.11.0's");
   });
 
+  it("shows a profile's hidden characters in its refusal, lines and tabs included", async () => {
+    const odd = { name: "on\nyx", chain_id: "pearl-1", kind: "test\tnet", tx_indexer_url: "" };
+    const { message } = await refusal({ profiles: [...readOnlyProfiles(), odd] });
+    expect(message).toBe("gnomcp: the profile on[U+000A]yx is test[U+0009]net, not read-only");
+  });
+
   it("refuses a kind written otherwise than gnomcp's own word, read-only", async () => {
     const profiles = readOnlyProfiles().map((profile) => ({ ...profile, kind: "READ-ONLY" }));
     expect((await refusal({ profiles })).message).toBe("gnomcp: the profile betanet is READ-ONLY, not read-only");
@@ -184,6 +190,7 @@ describe("startGnomcp: gnomcp started read-only", () => {
       const started = performance.now();
       const error: unknown = await startGnomcp(made.setup).catch((caught: unknown) => caught);
       expect(error instanceof Error ? error.message : error).toBe("gnomcp: it did not answer at start");
+      expect(error instanceof Error ? error.cause : undefined).toBeInstanceOf(Error);
       expect(performance.now() - started).toBeLessThan(5_000);
       const [seen] = made.fake.starts();
       expect(existsSync(seen?.cwd ?? "")).toBe(false);
@@ -257,6 +264,14 @@ describe("Gnomcp.call: one read", () => {
       text: "outline\n-- a.gno --",
       isError: false,
     });
+  });
+
+  it("answers a JSON-RPC error of a child still running as an error, the child kept", async () => {
+    const { gnomcp, fake } = await start({ failing: ["gno_eval"] });
+    const args = { profile: "onyx", path: "gno.land/r/demo/boards", expr: 'Render("")' };
+    expect(await gnomcp.call("gno_eval", args)).toEqual({ ok: false, reason: "error" });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toMatchObject({ ok: true });
+    expect(fake.starts()).toHaveLength(1);
   });
 
   it("gives gnomcp's own error result as an error, its text kept for the block", async () => {
@@ -355,6 +370,16 @@ describe("Gnomcp.call: one read", () => {
     expect(fake.starts().map((seen) => existsSync(seen.cwd))).toEqual(pids.map(() => false));
   });
 
+  it("answers down, and never throws, each time gnomcp started again fails its checks", async () => {
+    const { gnomcp, fake } = await start({ crash: { tool: "gno_render", starts: 1 } });
+    await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });
+    const writable = { name: "testnet", chain_id: "pearl-1", kind: "testnet", tx_indexer_url: "" };
+    fake.change({ profiles: [...readOnlyProfiles(), writable] });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason: "down" });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason: "down" });
+    expect(fake.starts()).toHaveLength(3);
+  });
+
   it("answers down when gnomcp, started again, no longer passes its checks, and logs why", async () => {
     const { gnomcp, fake, events } = await start({ crash: { tool: "gno_render", starts: 1 } });
     await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });
@@ -398,7 +423,17 @@ describe("startGnomcp: gnomcp's stderr in jarvis's log", () => {
     const { events, raw } = await start({ stderr: [line, "[1, 2]"] });
     await until(() => events().filter((event) => event["event"] === "jarvis_gnomcp_audit").length >= 3);
     expect(raw()).not.toContain("an-argument-0123456789");
+    const malformed = { event: "jarvis_gnomcp_audit", tool: "<malformed>", reason: "<malformed>" };
+    expect(events().filter((event) => event["tool"] === "<malformed>")).toEqual([malformed, malformed]);
     expect(events().filter((event) => event["event"] === "jarvis_gnomcp_stderr")).toEqual([]);
+  });
+
+  it("joins a line gnomcp writes in two parts, and shows its tabs", async () => {
+    const { events } = await start({ stderr: ["a line\tin two parts"], stderrSplit: true });
+    await until(() => events().some((event) => event["event"] === "jarvis_gnomcp_stderr"));
+    expect(events().filter((event) => event["event"] === "jarvis_gnomcp_stderr")).toEqual([
+      { event: "jarvis_gnomcp_stderr", error: "a line[U+0009]in two parts" },
+    ]);
   });
 
   it("logs no word of an audit line written into an unended line of words, only those words", async () => {

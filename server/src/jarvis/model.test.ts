@@ -1,5 +1,11 @@
 import { inspect } from "node:util";
-import { APIConnectionError, APIConnectionTimeoutError, APIError, type ClientOptions } from "@anthropic-ai/sdk";
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  APIUserAbortError,
+  type ClientOptions,
+} from "@anthropic-ai/sdk";
 import { trace as otel } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor, TracerProvider } from "@opentelemetry/sdk-trace";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -200,7 +206,11 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     const run = attempts(45 * DOLLAR);
     let reserved = -1;
     let worst = -1;
-    const answer = message({ content: [text("Block 42.")], stop: "end_turn", usage: usage({ input_tokens: 900 }) });
+    const answer = message({
+      content: [text("Block 42.")],
+      stop: "end_turn",
+      usage: usage({ input_tokens: 40, output_tokens: 8 }),
+    });
     const { send, requests } = script((request) => {
       reserved = run.budget.state("ask").reserved;
       worst = worstOf(request);
@@ -211,6 +221,7 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     expect(reserved).toBe(worst);
     expect(requests[0]).toMatchObject({ inference_geo: "global", service_tier: "standard_only" });
     expect(run.budget.state("ask")).toEqual({ spent: cost(MODEL, answer.usage), reserved: 0, cap: 45 * DOLLAR });
+    expect(run.events().filter((event) => event["event"] === "jarvis_budget_settle")).toEqual([]);
     run.close();
   });
 
@@ -302,6 +313,31 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     run.close();
   });
 
+  it.each([
+    [
+      "an error of no status that asks a retry",
+      () => new APIError(undefined, undefined, "made-up", new Headers({ "x-should-retry": "true" })),
+    ],
+    ["an abort", () => new APIUserAbortError()],
+  ])("never retries %s", async (_case, error) => {
+    const run = attempts(45 * DOLLAR);
+    const { send, requests } = script(error());
+    expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: false, reason: "failed" });
+    expect(requests).toHaveLength(1);
+    run.close();
+  });
+
+  it("retries a 500 that came with no headers, at its own pace", async () => {
+    const run = attempts(45 * DOLLAR);
+    const bare = () =>
+      APIError.generate(500, { type: "error", error: { type: "api_error", message: "made-up" } }, "made-up", undefined);
+    const { send, requests } = script(bare(), bare(), bare());
+    expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: false, reason: "failed" });
+    expect(requests).toHaveLength(3);
+    expect(run.waits).toEqual([500, 1_000]);
+    run.close();
+  });
+
   it("obeys the API's x-should-retry, either way", async () => {
     const run = attempts(45 * DOLLAR);
     const answer = message({ content: [text("Block 42.")], stop: "end_turn" });
@@ -338,8 +374,20 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     const { send, requests } = script(bug, message({ content: [], stop: "end_turn" }));
     await expect(callModel({ ...run.parts, send }, ask())).rejects.toBe(bug);
     expect(requests).toHaveLength(1);
+    expect(run.finished()[0]?.attributes["error.type"]).toBe("TypeError");
     const worst = worstOf(requests[0] ?? ask());
     expect(run.budget.state("ask")).toEqual({ spent: worst, reserved: 0, cap: 45 * DOLLAR });
+    run.close();
+  });
+
+  it("lets a value thrown by send that is no Error rise, its span marked unknown", async () => {
+    const run = attempts(45 * DOLLAR);
+    const thrown: unknown = "not an error";
+    const { send } = script(() => {
+      throw thrown;
+    });
+    await expect(callModel({ ...run.parts, send }, ask())).rejects.toBe(thrown);
+    expect(run.finished()[0]?.attributes["error.type"]).toBe("unknown");
     run.close();
   });
 
