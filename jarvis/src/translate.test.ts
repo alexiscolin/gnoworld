@@ -413,3 +413,14 @@ describe("a cached translation the wire now refuses (the review's V2)", () => {
     expect(model.requests).toHaveLength(2);
   });
 });
+
+describe("a long line's block (the verifier's M7)", () => {
+  it("sends a line of 8,192 three-byte code points whole, never cut", async () => {
+    const line = String.fromCodePoint(0x4e00).repeat(8_192);
+    const { translator, model, signal } = setup({ steps: [said("One line.")] });
+    await translator.translate({ text: line, language: "en" }, signal());
+    const sent = userText(model.requests[0]);
+    expect(sent).toContain(line);
+    expect(sent).not.toContain("cut_at_byte");
+  });
+});
