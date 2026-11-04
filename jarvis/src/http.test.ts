@@ -39,14 +39,14 @@ const refusal = async (response: Response) => ({
 // answer's status once it arrives, and the request to destroy.
 const unended = (
   url: string,
-  headers: Record<string, string>,
+  { headers, path }: { headers: Record<string, string>; path?: string },
   write: (sent: ReturnType<typeof httpRequest>) => void,
 ) => {
   const target = new URL(url);
   const sent = httpRequest({
     host: target.hostname,
     port: target.port,
-    path: target.pathname,
+    path: path ?? target.pathname,
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
   });
@@ -88,6 +88,22 @@ describe("jarvis's HTTP face: what it answers", () => {
       const handler = vi.fn(echo);
       const { url } = await served({ "/echo": { POST: handler } });
       expect(await refusal(await post(`${url}${path}`, "{}"))).toEqual({ status: 404, body: { error: "not_found" } });
+      expect(handler).not.toHaveBeenCalled();
+    },
+  );
+
+  // fetch would resolve these before it sends them: written raw, as any client may (F5287).
+  it.each(["/%65cho", "//[", "*"])(
+    "refuses the target %s, which is not the path /echo itself, as not_found",
+    async (target) => {
+      const handler = vi.fn(echo);
+      const { url } = await served({ "/echo": { POST: handler } });
+      const write = (request: ReturnType<typeof httpRequest>) => {
+        request.end("{}");
+      };
+      const { sent, status } = unended(url, { headers: { "content-length": "2" }, path: target }, write);
+      expect(await status).toBe(404);
+      sent.destroy();
       expect(handler).not.toHaveBeenCalled();
     },
   );
@@ -193,7 +209,7 @@ describe("jarvis's HTTP face: what it answers", () => {
   it("refuses a body as too_large once it passes 256 KiB, its stream never ended, never waiting for its end", async () => {
     const handler = vi.fn(echo);
     const { url } = await served({ "/echo": { POST: handler } });
-    const { sent, status } = unended(`${url}/echo`, { "transfer-encoding": "chunked" }, (request) => {
+    const { sent, status } = unended(`${url}/echo`, { headers: { "transfer-encoding": "chunked" } }, (request) => {
       request.write("x".repeat(300 * 1024));
     });
     expect(await status).toBe(413);
@@ -204,9 +220,13 @@ describe("jarvis's HTTP face: what it answers", () => {
   it("refuses a body that declares 10 GB as too_large at once, a few bytes sent", async () => {
     const handler = vi.fn(echo);
     const { url } = await served({ "/echo": { POST: handler } });
-    const { sent, status } = unended(`${url}/echo`, { "content-length": String(10 * 1024 ** 3) }, (request) => {
-      request.write("{}");
-    });
+    const { sent, status } = unended(
+      `${url}/echo`,
+      { headers: { "content-length": String(10 * 1024 ** 3) } },
+      (request) => {
+        request.write("{}");
+      },
+    );
     expect(await status).toBe(413);
     sent.destroy();
     expect(handler).not.toHaveBeenCalled();
@@ -216,7 +236,7 @@ describe("jarvis's HTTP face: what it answers", () => {
     const handler = vi.fn(echo);
     const { url, jarvis } = await served({ "/echo": { POST: handler } });
     const arrived = once(jarvis.server, "request");
-    const { sent } = unended(`${url}/echo`, { "content-length": "100" }, (request) => {
+    const { sent } = unended(`${url}/echo`, { headers: { "content-length": "100" } }, (request) => {
       request.write("x".repeat(10));
     });
     await arrived;
