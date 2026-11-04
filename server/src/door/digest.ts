@@ -25,10 +25,12 @@ export function digestRoutes(options: Options): Hono<Guarded> {
     const body = JarvisDigestRequest.safeParse(await json(c));
     if (!body.success) return refuse(c, "body", { account: who });
     // Taken before jarvis is asked, in the one statement that refuses it: a page that leaves, or asks many at once, pays.
-    if (!quota.take(who, await named(who))) return refuse(c, "quota", { account: who });
+    // Given back to the day it was taken, whenever jarvis answers (U1).
     const started = now();
+    if (!quota.take(who, await named(who), started)) return refuse(c, "quota", { account: who });
     const called = await jarvis.digest(body.data, c.req.raw.signal);
-    if (called.ok ? !("made" in called.answer && called.answer.made) : called.error === "refused") quota.giveBack(who);
+    const nothing = called.ok ? !("made" in called.answer && called.answer.made) : called.error === "refused";
+    if (nothing) quota.giveBack(who, started);
     return relay(c, called.ok ? { ok: true, answer: shown(called.answer) } : called, { started, account: who });
   });
   return app;

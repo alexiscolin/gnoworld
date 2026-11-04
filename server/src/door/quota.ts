@@ -21,10 +21,12 @@ export interface QuotaValues {
 }
 
 export interface Quota {
-  // Counts a question of the account's quota, by its kind; false, counting nothing, once that quota is reached.
-  take: (account: Address, named: boolean) => boolean;
-  // A question of today given back: a digest jarvis made nothing for costs none (10k-1).
-  giveBack: (account: Address) => void;
+  // Counts a question of the account's quota, by its kind, on the day of `at` (now by default); false, counting nothing,
+  // once that quota is reached.
+  take: (account: Address, named: boolean, at?: number) => boolean;
+  // A question given back to the day of `at`, the time it was taken (now by default): a digest jarvis made nothing for
+  // costs none (10k-1).
+  giveBack: (account: Address, at?: number) => void;
   values: () => QuotaValues;
   // A quota, or an account's own taken off or given back; full past the allowlist's cap.
   change: (change: Exclude<JarvisChange, { setting: "budget" }>) => "changed" | "full";
@@ -74,13 +76,13 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
       for (const address of first.unlimited) sql.allow.run({ address, at: now(), cap: DOOR_CAPS.unlimited });
   });
   return {
-    take(account, named) {
-      const day = dayOf(now());
+    take(account, named, at = now()) {
+      const day = dayOf(at);
       sql.purge.run(day);
       return sql.take.get({ account, day, kind: named ? "quota" : "quota_unnamed" }) !== undefined;
     },
-    giveBack(account) {
-      sql.giveBack.run(account, dayOf(now()));
+    giveBack(account, at = now()) {
+      sql.giveBack.run(account, dayOf(at));
     },
     values() {
       const rows = Rows.parse(sql.settings.all());

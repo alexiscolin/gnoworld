@@ -264,4 +264,16 @@ describe("a realm's digest through the door", () => {
     expect(JSON.stringify(bodies)).not.toContain("made");
     expect(bodies[1]).toEqual({ status: "none" });
   });
+
+  it("gives a question back to the day it was taken from, though jarvis answered after midnight (the third round's U1)", async () => {
+    const { digest, clock, counted } = setup({
+      answer: () => {
+        clock.now = Date.parse("2026-11-05T00:00:01.000Z");
+        return Promise.resolve({ ok: true, answer: made() });
+      },
+    });
+    clock.now = Date.parse("2026-11-04T23:59:59.000Z");
+    await digest();
+    expect(counted()).toEqual([{ account: DOOR.anna, count: 0 }]);
+  });
 });
