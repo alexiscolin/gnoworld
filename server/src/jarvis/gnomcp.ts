@@ -38,6 +38,8 @@ interface Child {
   readonly client: Client;
   readonly home: string;
   alive: boolean;
+  // Dropped by the transport for a message past its buffer: the message failed, not the child.
+  oversized: boolean;
 }
 
 /** gnomcp started and checked; throws, the child ended and its folder removed, when a check fails. */
@@ -48,14 +50,16 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   let child = await spawn(setup);
   let closed = false;
   let starting: Promise<Child | undefined> | undefined;
-  const restart = async (): Promise<Child | undefined> => {
-    const at = setup.now?.() ?? Date.now();
+  // At most 3 starts in 10 minutes, but for a child dropped for its message's size, which spends none of them.
+  const counted = (at: number) => {
     while (at - (starts[0] ?? at) > 10 * 60_000) starts.shift();
-    if (starts.length >= 3) {
+    return starts.length < 3 && starts.push(at) > 0;
+  };
+  const restart = async (): Promise<Child | undefined> => {
+    if (!child.oversized && !counted(setup.now?.() ?? Date.now())) {
       setup.log("jarvis_gnomcp_down", { reason: "restarts" });
       return undefined;
     }
-    starts.push(at);
     rmSync(child.home, { recursive: true, force: true });
     try {
       child = await spawn(setup);
@@ -119,9 +123,15 @@ async function spawn(setup: Setup): Promise<Child> {
   });
   logLines(transport.stderr, setup.log);
   const client = new Client({ name: "jarvis", version: "1.0.0" });
-  const child: Child = { client, home, alive: true };
+  const child: Child = { client, home, alive: true, oversized: false };
   client.onclose = () => {
     child.alive = false;
+  };
+  // MCP's ReadBuffer says so only in its error's words (@modelcontextprotocol/client 2.4.0, pinned, and tested here).
+  client.onerror = (error) => {
+    if (!error.message.startsWith("ReadBuffer exceeded maximum size")) return;
+    child.oversized = true;
+    setup.log("jarvis_gnomcp_down", { reason: "oversized" });
   };
   try {
     await atStart(client.connect(transport, { timeout }));

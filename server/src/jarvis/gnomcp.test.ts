@@ -313,6 +313,18 @@ describe("Gnomcp.call: one read", () => {
     expect(fake.starts()).toHaveLength(2);
   });
 
+  it("spends none of the restarts' window on a child dropped for a message past 1 MiB, its own error text", async () => {
+    const clock = { now: Date.parse("2026-11-04T12:00:00.000Z") };
+    const answers = { gno_render: { content: [{ type: "text", text: "z".repeat(1_100_000) }], isError: true } };
+    const { gnomcp, fake, events } = await start({ answers }, { now: () => clock.now });
+    const render = () => gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });
+    for (let drop = 0; drop < 4; drop += 1) expect(await render()).toEqual({ ok: false, reason: "down" });
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toMatchObject({ ok: true });
+    expect(fake.starts()).toHaveLength(5);
+    expect(events()).not.toContainEqual({ event: "jarvis_gnomcp_down", reason: "restarts" });
+    expect(events().filter((event) => event["reason"] === "oversized")).toHaveLength(4);
+  });
+
   it("gives up a call at its timeout, the child still answering the next one", async () => {
     const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 200 });
     const started = performance.now();
