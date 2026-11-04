@@ -200,6 +200,13 @@ describe("the recent lines of a room", () => {
     expect(recent.recent("#bubble", ASKER)).toEqual([]);
   });
 
+  it("keeps each room's marks to its own lines, whatever their names run into", () => {
+    const recent = setup();
+    recent.taken("#bubble", "m1");
+    recent.passed(said("1", "another room's line", { room: "#bubblem" }));
+    expect(texts(recent.recent("#bubblem", ASKER))).toEqual(["another room's line"]);
+  });
+
   it("remembers 2,000 taken lines at most, the oldest forgotten first", () => {
     const recent = setup();
     for (let at = 0; at <= 2000; at += 1) recent.taken("#bubble", `t${String(at)}`);

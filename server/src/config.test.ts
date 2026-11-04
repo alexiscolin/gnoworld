@@ -521,7 +521,9 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
   });
 
   it("holds 1,000 accounts with no quota at most", () => {
-    const many = Array.from({ length: 1001 }, () => ANNA).join(",");
+    const many = Array.from({ length: 1001 }, (_, at) => toAddress(Buffer.from(String(at).padStart(20, "0")))).join(
+      ",",
+    );
     expect(failure({ ...ENV, JARVIS_URL: "http://jarvis:8090", JARVIS_UNLIMITED: many })).toMatch(
       /setting JARVIS_UNLIMITED: /,
     );

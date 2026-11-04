@@ -426,6 +426,29 @@ describe("the admin API, a change", () => {
     expect(await answerOf(await change(prove(made)))).toEqual([409, { error: "full" }]);
   });
 
+  it("names the team member by its HMAC in each refusal of its own calls", async () => {
+    const { call, change, challenge, prove, events, lead, second } = setup({ nonceCap: 1 });
+    const made = await challenge({ setting: "quota", questions: 21 });
+    await call("POST", "/challenge", { body: { chainId: CHAIN, change: { setting: "quota", questions: 22 } } });
+    await call("POST", "/challenge", { body: { chainId: "another-1", change: { setting: "quota", questions: 22 } } });
+    await call("POST", "/challenge", { body: { nope: true } });
+    await change({ nonce: made.nonce });
+    await change(prove(made, { by: second }));
+    // Six calls so far: 24 more reach the minute's 30, the 25th is refused.
+    for (let at = 0; at < 25; at += 1) await call("GET", "", {});
+    const account = `"account":"${hmac(lead.address)}"`;
+    const refused = events().filter((line) => line.includes('"admin_refused"'));
+    expect(refused.map((line) => /"error":"(\w+)"/.exec(line)?.[1])).toEqual([
+      "full",
+      "chain",
+      "body",
+      "body",
+      "signer",
+      "limit",
+    ]);
+    expect(refused.every((line) => line.includes(account))).toBe(true);
+  });
+
   it("makes each change it says in words, and nothing else", async () => {
     const { challenge, prove, change, outsider } = setup();
     const ends: [unknown, string, Partial<JarvisSettings>][] = [

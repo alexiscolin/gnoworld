@@ -144,6 +144,8 @@ describe("readJson", () => {
     });
     expect(await readJson(new Response(body, { status: 500 }), 100)).toBeUndefined();
     expect(seen.cancelled).toBe(true);
+    expect(await readJson(new Response('{"error":"internal"}', { status: 500 }), 100)).toBeUndefined();
+    expect(await readJson(new Response(null, { status: 503 }), 100)).toBeUndefined();
   });
 
   it("reads a body's JSON up to its cap, and none past it or for text that is no JSON", async () => {

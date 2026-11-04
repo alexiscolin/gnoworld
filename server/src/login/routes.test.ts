@@ -688,6 +688,18 @@ describe("the login from the settings", () => {
     expect(at).toBeLessThanOrEqual(Date.now() + MINUTE);
   });
 
+  it("gives the public site's session of 90 days by default, and the console's of an hour when asked (10g-7)", async () => {
+    const maxAge = async (options: { log: ReturnType<typeof logger>; console?: boolean }) => {
+      const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+      opened.push(db);
+      const app = makeApp(options.log, () => true);
+      app.route("/api/login", loginFrom(db, SETTINGS, options));
+      return /Max-Age=(\d+)/.exec((await login(app)).headers.get("set-cookie") ?? "")?.[1];
+    };
+    const log = logger(PEPPER, () => true);
+    expect([await maxAge({ log }), await maxAge({ log, console: true })]).toEqual([String(90 * 24 * 60 * 60), "3600"]);
+  });
+
   it("keeps the system's time by default", async () => {
     const before = Date.now();
     const { expiresAt } = await challenge(mount());

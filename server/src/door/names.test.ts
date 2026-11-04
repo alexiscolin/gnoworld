@@ -99,6 +99,10 @@ describe("a mainnet name", () => {
       ["no data", () => queried(null)],
       ["data that is not base64 of text", () => queried(Buffer.from([0xff, 0xfe]).toString("base64"))],
       ["another value", () => evaluated("(1 int)")],
+      [
+        "the node's error, with no result",
+        () => new Response(JSON.stringify({ jsonrpc: "2.0", id: "", error: { code: -32603 } })),
+      ],
       ["a value that only begins as a name's", () => evaluated("(false bool)\n(true bool)")],
       ["a name's answer past 64 KiB", () => sized(64 * 1024 + 1)],
       ["a timeout", () => Promise.reject(new DOMException("timed out", "TimeoutError"))],
@@ -132,6 +136,14 @@ describe("a mainnet name", () => {
     expect(await named(BEN)).toBe(false);
     clock.now += 1;
     expect(await named(BEN)).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("is read again a minute after an answer of another value, as after any failed read", async () => {
+    const { calls, clock, named } = setup([() => evaluated("(1 int)"), NAMED]);
+    await named(ANNA);
+    clock.now += MINUTE;
+    expect(await named(ANNA)).toBe(true);
     expect(calls).toHaveLength(2);
   });
 
