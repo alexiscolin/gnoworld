@@ -2,7 +2,10 @@
 // whatever the caller asks, and what comes back is read up to a size. Where it may go is the egress
 // proxy's to decide (slice 3e).
 export function send(url: string, init: RequestInit, ms: number): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(ms), redirect: "error" });
+  // The caller's own signal stops it too: the first of the two to fire, so its timeout always holds.
+  const timeout = AbortSignal.timeout(ms);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+  return fetch(url, { ...init, signal, redirect: "error" });
 }
 
 /** The body's text, at most `max` bytes of it; undefined for a longer one, whose stream is cut off. */
@@ -26,4 +29,15 @@ export async function readCapped(response: Response, max: number): Promise<strin
     chunks.push(part.value);
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/** The body's JSON, at most `max` bytes of it; undefined for a longer one, or for text that is no JSON. */
+export async function readJson(response: Response, max: number): Promise<unknown> {
+  const text = await readCapped(response, max);
+  try {
+    return text === undefined ? undefined : JSON.parse(text);
+  } catch {
+    // Text that is no JSON is an answer of no shape, as one too long is.
+    return undefined;
+  }
 }
