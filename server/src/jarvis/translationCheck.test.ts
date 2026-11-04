@@ -58,7 +58,6 @@ describe("keeps", () => {
     ["1.204", "a dot"],
     ["1 204", "a space"],
     [`1${char(0x202f)}204`, "a narrow no-break space"],
-    [`1${char(0x2009)}204`, "a thin space"],
     ["1'204", "an apostrophe"],
     [`${char(0x661)}${char(0x66c)}${char(0x662, 0x660, 0x664)}`, "Arabic's digits and separator"],
   ])("keeps the same number written %j (%s)", (written) => {

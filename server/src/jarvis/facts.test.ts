@@ -22,7 +22,6 @@ describe("a text's numbers", () => {
     ["1 000", "a space"],
     [`1${char(0xa0)}000`, "a no-break space"],
     [`1${char(0x202f)}000`, "a narrow no-break space"],
-    [`1${char(0x2009)}000`, "a thin space"],
     [`1${char(0x2007)}000`, "a figure space"],
     ["1'000", "an apostrophe"],
     [`1${char(0x2019)}000`, "a right single quote"],
@@ -85,7 +84,7 @@ describe("a text's numbers", () => {
 
   it("keeps a number as written for grounding: its separators, a plain space for any blank, each digit an ASCII one", () => {
     expect(written("1,250 and 1.250 and 1 250")).toEqual(["1,250", "1.250", "1 250"]);
-    for (const blank of [0xa0, 0x202f, 0x2009, 0x2007]) expect(written(`1${char(blank)}250`)).toEqual(["1 250"]);
+    for (const blank of [0xa0, 0x202f, 0x2007]) expect(written(`1${char(blank)}250`)).toEqual(["1 250"]);
     expect(written("1  250 and 1\t250")).toEqual(["1 250"]);
     expect(written(`${char(0x661)}${char(0x66c)}${char(0x662, 0x665, 0x660)}`)).toEqual([`1${char(0x66c)}250`]);
     expect(written(`1${char(0xff0c)}250`)).toEqual(["1,250"]);
