@@ -214,6 +214,24 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
     await started.close();
   });
 
+  it("never checks a result against an output schema gnoscope lists: a planted pattern cannot hold the process", async () => {
+    // A pattern that takes exponential time on "aaa...ab", which the MCP client would check synchronously (S1).
+    const outputSchema = { type: "object", properties: { x: { type: "string", pattern: "^(a|a)*$" } } };
+    const tools = recordedTools().map((tool) =>
+      Field.parse(tool).name === "get_realm_state" ? { ...tool, outputSchema } : tool,
+    );
+    const answer = () => ({
+      content: [{ type: "text", text: "state" }],
+      structuredContent: { x: `${"a".repeat(27)}b` },
+    });
+    const server = await serve({ tools, answer });
+    const started = await start(server.url, { timeoutMs: 1_000 }).gnoscope;
+    const begun = performance.now();
+    expect(await started.call("get_realm_state", state())).toEqual({ ok: true, isError: false, text: "state" });
+    expect(performance.now() - begun).toBeLessThan(1_000);
+    await started.close();
+  });
+
   it("gives gnoscope's own error as an error, its text kept", async () => {
     const server = await serve({
       answer: () => ({ content: [{ type: "text", text: "no such realm" }], isError: true }),

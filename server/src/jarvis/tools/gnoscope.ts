@@ -83,7 +83,11 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
       if (closed) return { ok: false, reason: "down" };
       try {
-        return read(await client.callTool({ name, arguments: parsed.data }, { timeout: setup.timeoutMs }));
+        // Our own definition, with no output schema: the client checks none of gnoscope's against a result (S1).
+        const toolDefinition = { name, inputSchema: { type: "object" as const } };
+        return read(
+          await client.callTool({ name, arguments: parsed.data }, { timeout: setup.timeoutMs, toolDefinition }),
+        );
       } catch (error) {
         return { ok: false, reason: failureOf(error) };
       }
