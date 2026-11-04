@@ -7,7 +7,7 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisBudgets,
-  JarvisDigest,
+  JarvisMadeDigest,
   JarvisTranslation,
   type JarvisAsk,
   type JarvisBudget,
@@ -28,7 +28,7 @@ type Budgeted = { ok: true; budgets: JarvisBudgets } | { ok: false; error: Failu
 export interface Jarvis {
   ask: (request: JarvisAsk, signal: AbortSignal) => Promise<Answered<JarvisAnswer>>;
   translate: (request: JarvisTranslate, signal: AbortSignal) => Promise<Answered<JarvisTranslation>>;
-  digest: (request: JarvisDigestRequest, signal: AbortSignal) => Promise<Answered<JarvisDigest>>;
+  digest: (request: JarvisDigestRequest, signal: AbortSignal) => Promise<Answered<JarvisMadeDigest>>;
   budgets: () => Promise<Budgeted>;
   setBudget: (change: JarvisBudget) => Promise<Budgeted>;
 }
@@ -92,7 +92,7 @@ export function jarvisClient({
   return {
     ask: (body, signal) => posted(JarvisAnswer, JARVIS_PATHS.ask, { body, signal }),
     translate: (body, signal) => posted(JarvisTranslation, JARVIS_PATHS.translate, { body, signal }),
-    digest: (body, signal) => posted(JarvisDigest, JARVIS_PATHS.digest, { body, signal }),
+    digest: (body, signal) => posted(JarvisMadeDigest, JARVIS_PATHS.digest, { body, signal }),
     budgets: async () => budgets(await call(JarvisBudgets, JARVIS_PATHS.budgets, { ms: BUDGETS_MS })),
     setBudget: async (change) =>
       budgets(await call(JarvisBudgets, JARVIS_PATHS.budgets, { body: change, ms: BUDGETS_MS })),

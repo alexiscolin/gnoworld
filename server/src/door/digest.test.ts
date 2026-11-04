@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { JarvisDigest, JarvisDigestRequest } from "@gnoworld/schemas";
+import type { JarvisDigestRequest, JarvisMadeDigest } from "@gnoworld/schemas";
 import { openDatabase } from "@gnoworld/service/db";
 import { afterEach, describe, expect, it } from "vitest";
 import { BODY_LIMIT } from "../app.ts";
@@ -18,7 +18,7 @@ afterEach(() => {
   for (const db of opened.splice(0)) db.close();
 });
 const REQUEST = (): JarvisDigestRequest => ({ universe: "onyx", realm: "gno.land/r/demo/poll" });
-const made = (): Extract<JarvisDigest, { status: "digest" }> => ({
+const made = (): Extract<JarvisMadeDigest, { status: "digest" }> => ({
   status: "digest",
   digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
   proposal: null,
@@ -68,7 +68,8 @@ const setup = ({ on = true, perMinute = 10, answer, quota: questions = 20 }: Opt
 describe("a realm's digest through the door", () => {
   it("asks jarvis for the realm of its universe, its answer passed on", async () => {
     const { digest, sent } = setup();
-    expect(await answerOf(await digest())).toEqual([200, made()]);
+    const { digest: blocks, proposal, height } = made();
+    expect(await answerOf(await digest())).toEqual([200, { status: "digest", digest: blocks, proposal, height }]);
     expect(sent.map(({ request }) => request)).toEqual([REQUEST()]);
   });
 
@@ -126,11 +127,7 @@ describe("a realm's digest through the door", () => {
   });
 
   it.each([
-    [
-      "none",
-      () => ({ ok: true, answer: { status: "none", made: false } }) as const,
-      [200, { status: "none", made: false }],
-    ],
+    ["none", () => ({ ok: true, answer: { status: "none", made: false } }) as const, [200, { status: "none" }]],
     ["spent", () => ({ ok: true, answer: { status: "spent" } }) as const, [200, { status: "spent" }]],
     ["jarvis's failure", () => ({ ok: false, error: "failed" }) as const, [502, { error: "internal" }]],
     ["an answer of the wrong shape", () => ({ ok: false, error: "shape" }) as const, [502, { error: "internal" }]],
@@ -255,5 +252,16 @@ describe("a realm's digest through the door", () => {
     });
     for (let at = 0; at < 3; at += 1) await digest();
     expect(counted()).toEqual([{ account: DOOR.anna, count: 0 }]);
+  });
+
+  it("never tells the page whether jarvis made its digest (the second round's T3)", async () => {
+    const answers: Digested[] = [
+      { ok: true, answer: { ...made(), made: true } },
+      { ok: true, answer: { status: "none", made: true } },
+    ];
+    const { digest } = setup({ answer: () => Promise.resolve(answers.shift() ?? { ok: false, error: "down" }) });
+    const bodies = [await (await digest()).json(), await (await digest()).json()];
+    expect(JSON.stringify(bodies)).not.toContain("made");
+    expect(bodies[1]).toEqual({ status: "none" });
   });
 });

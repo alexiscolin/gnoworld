@@ -14,6 +14,7 @@ import {
   JarvisChangeRequest,
   JarvisDigest,
   JarvisDigestRequest,
+  JarvisMadeDigest,
   JARVIS_LANGUAGES,
   JarvisQuestion,
   JarvisSettings,
@@ -528,8 +529,8 @@ describe("the digest's contract (10k)", () => {
     expect(asked({ page: "# forged" })).toBe(false);
   });
 
-  it("answers a digest with the height it was read at, at most one proposal and whether jarvis made it, none, spent or off", () => {
-    const answer = (value: unknown) => JarvisDigest.safeParse(value).success;
+  it("answers the door a digest with the height it was read at, at most one proposal and whether jarvis made it, none, spent or off", () => {
+    const answer = (value: unknown) => JarvisMadeDigest.safeParse(value).success;
     const digest = { blocks: [blocks().facts] };
     const made = (over: Record<string, unknown>) => ({
       status: "digest",
@@ -552,5 +553,14 @@ describe("the digest's contract (10k)", () => {
     expect(answer({ status: "none" })).toBe(false);
     expect([answer({ status: "spent" }), answer({ status: "off" })]).toEqual([true, true]);
     expect(answer({ status: "none", made: true, digest })).toBe(false);
+  });
+
+  it("answers the page a digest, none, spent or off, never whether jarvis made it (the second round's T3)", () => {
+    const answer = (value: unknown) => JarvisDigest.safeParse(value).success;
+    const digest = { blocks: [blocks().facts] };
+    expect(answer({ status: "digest", digest, proposal: null, height: 1204 })).toBe(true);
+    expect(answer({ status: "digest", digest, proposal: null, height: 1204, made: true })).toBe(false);
+    expect([answer({ status: "none" }), answer({ status: "none", made: false })]).toEqual([true, false]);
+    expect([answer({ status: "spent" }), answer({ status: "off" })]).toEqual([true, true]);
   });
 });

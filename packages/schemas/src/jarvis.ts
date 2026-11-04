@@ -206,19 +206,33 @@ export type JarvisTranslation = z.infer<typeof JarvisTranslation>;
 export const JarvisDigestRequest = z.strictObject({ universe: Slug, realm: RealmPath });
 export type JarvisDigestRequest = z.infer<typeof JarvisDigestRequest>;
 
-/** A realm's digest with the block height its page and functions were read at and the one action it proposes, if any;
- * none when no digest its reads hold could be made, then the whole page shows (ADR-0002 §4); spent; or off. `made`
- * says the model made it for this request, which takes a question of the asker's quota (10k-1). */
-export const JarvisDigest = z.discriminatedUnion("status", [
-  z.strictObject({
-    status: z.literal("digest"),
-    digest: Digest,
-    proposal: z.nullable(ProposedAction),
-    height: z.int().check(z.gte(1)),
-    made: z.boolean(),
-  }),
-  z.strictObject({ status: z.literal("none"), made: z.boolean() }),
+// A digest's fields on both wires: the digest, its one proposal or none, and the height its reads were made at.
+const digested = {
+  status: z.literal("digest"),
+  digest: Digest,
+  proposal: z.nullable(ProposedAction),
+  height: z.int().check(z.gte(1)),
+};
+const spentOrOff = [
   z.strictObject({ status: z.literal("spent") }),
   z.strictObject({ status: z.literal("off") }),
+] as const;
+
+/** A realm's digest as a page reads it, with the block height its page and functions were read at and the one action
+ * it proposes, if any; none when no digest its reads hold could be made, then the whole page shows (ADR-0002 §4);
+ * spent; or off. */
+export const JarvisDigest = z.discriminatedUnion("status", [
+  z.strictObject(digested),
+  z.strictObject({ status: z.literal("none") }),
+  ...spentOrOff,
 ]);
 export type JarvisDigest = z.infer<typeof JarvisDigest>;
+
+/** A digest as jarvis answers the door: `made` says the model made it, or its none, for this request, so the door
+ * keeps the asker's question; the door hands the page JarvisDigest, without it (10k-1, the second round's T3). */
+export const JarvisMadeDigest = z.discriminatedUnion("status", [
+  z.strictObject({ ...digested, made: z.boolean() }),
+  z.strictObject({ status: z.literal("none"), made: z.boolean() }),
+  ...spentOrOff,
+]);
+export type JarvisMadeDigest = z.infer<typeof JarvisMadeDigest>;

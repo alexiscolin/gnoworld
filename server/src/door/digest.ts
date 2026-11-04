@@ -6,7 +6,7 @@
 import type { Hono } from "hono";
 import type { Jarvis } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
-import { JarvisDigestRequest } from "@gnoworld/schemas";
+import { JarvisDigestRequest, type JarvisDigest, type JarvisMadeDigest } from "@gnoworld/schemas";
 import { json, type Guarded } from "../guard.ts";
 import { frontOf, type Front } from "./front.ts";
 
@@ -29,7 +29,16 @@ export function digestRoutes(options: Options): Hono<Guarded> {
     const started = now();
     const called = await jarvis.digest(body.data, c.req.raw.signal);
     if (called.ok ? !("made" in called.answer && called.answer.made) : called.error === "refused") quota.giveBack(who);
-    return relay(c, called, { started, account: who });
+    return relay(c, called.ok ? { ok: true, answer: shown(called.answer) } : called, { started, account: who });
   });
   return app;
+}
+
+// The page never learns whether the model made its digest, which tells that someone read the realm lately: `made` is the
+// door's, for the quota (the second round's T3).
+function shown(answer: JarvisMadeDigest): JarvisDigest {
+  if (answer.status === "digest") {
+    return { status: "digest", digest: answer.digest, proposal: answer.proposal, height: answer.height };
+  }
+  return answer.status === "none" ? { status: "none" } : answer;
 }

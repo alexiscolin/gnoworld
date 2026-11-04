@@ -12,7 +12,7 @@ import {
   JarvisTranslate,
   type JarvisAnswer,
   type JarvisBudgets,
-  type JarvisDigest,
+  type JarvisMadeDigest,
   type JarvisTranslation,
 } from "@gnoworld/schemas";
 import { isBlank } from "@gnoworld/core";
@@ -73,7 +73,7 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
       async POST(body, signal) {
         const asked = JarvisDigestRequest.safeParse(body);
         if (!asked.success) return refused(JARVIS_PATHS.digest);
-        if (digest === undefined) return { status: 200, body: { status: "off" } satisfies JarvisDigest };
+        if (digest === undefined) return { status: 200, body: { status: "off" } satisfies JarvisMadeDigest };
         let made = false;
         const result = await digest(asked.data, signal, () => {
           made = true;
@@ -142,7 +142,7 @@ function translationOf(result: Translated): Reply {
 // A digest on the wire, with whether the model made it for this request, which the door charges to its asker (10k-1).
 function digestOf(result: Digested, made: boolean): Reply {
   if (result.kind === "failed" || result.kind === "gone" || result.kind === "invalid") return failureOf(result.kind);
-  const body: JarvisDigest =
+  const body: JarvisMadeDigest =
     result.kind === "digest"
       ? { status: "digest", digest: result.digest, proposal: result.proposal, height: result.height, made }
       : result.kind === "none"

@@ -13,7 +13,7 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisBudgets,
-  JarvisDigest,
+  JarvisMadeDigest,
   JarvisTranslation,
   type AnswerButton,
   type JarvisAsk,
@@ -615,7 +615,9 @@ describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000
     expect(JarvisTranslation.parse(await (await post(url, JARVIS_PATHS.translate, LINE)).json())).toEqual({
       status: "off",
     });
-    expect(JarvisDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({ status: "off" });
+    expect(JarvisMadeDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({
+      status: "off",
+    });
     expect([model.seen, node.received]).toEqual([[], []]);
   });
 
@@ -646,7 +648,7 @@ describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000
     const { env, model, node } = await setup(steps);
     const url = await listening(start(env));
     for (const made of [true, false])
-      expect(JarvisDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({
+      expect(JarvisMadeDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({
         status: "digest",
         digest,
         proposal: null,

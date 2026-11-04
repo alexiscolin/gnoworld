@@ -35,6 +35,7 @@ export {
   JarvisDigest,
   JarvisDigestRequest,
   JARVIS_LANGUAGES,
+  JarvisMadeDigest,
   JarvisQuestion,
   JarvisSettings,
   JarvisTranslate,

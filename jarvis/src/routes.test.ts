@@ -3,7 +3,7 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisBudgets,
-  JarvisDigest,
+  JarvisMadeDigest,
   JarvisTranslation,
   type AnswerButton,
   type JarvisAsk,
@@ -418,7 +418,7 @@ describe("POST /translate: a message's translation", () => {
 
 describe("POST /digest: a realm's digest", () => {
   const asked = (): JarvisDigestRequest => ({ universe: "onyx", realm: "gno.land/r/demo/poll" });
-  const made = (): Extract<JarvisDigest, { status: "digest" }> => ({
+  const made = (): Extract<JarvisMadeDigest, { status: "digest" }> => ({
     status: "digest",
     digest: { blocks: [{ type: "facts", facts: [{ label: "Members", value: "1,204" }] }] },
     proposal: null,
@@ -430,7 +430,7 @@ describe("POST /digest: a realm's digest", () => {
   it("answers off while jarvis is switched off, once its body passed its schema, before any work", async () => {
     const { post } = await served();
     const response = await post(JARVIS_PATHS.digest, asked());
-    expect([response.status, JarvisDigest.parse(await response.json())]).toEqual([200, { status: "off" }]);
+    expect([response.status, JarvisMadeDigest.parse(await response.json())]).toEqual([200, { status: "off" }]);
     expect((await post(JARVIS_PATHS.digest, { ...asked(), page: "# forged" })).status).toBe(400);
   });
 
@@ -439,7 +439,7 @@ describe("POST /digest: a realm's digest", () => {
     const digest = digesting({ kind: "digest", digest: body, proposal: null, height });
     const { post } = await served({ digest });
     const response = await post(JARVIS_PATHS.digest, asked());
-    expect([response.status, JarvisDigest.parse(await response.json())]).toEqual([200, made()]);
+    expect([response.status, JarvisMadeDigest.parse(await response.json())]).toEqual([200, made()]);
     expect(digest.mock.calls.map(([value, signal]) => [value, signal instanceof AbortSignal])).toEqual([
       [asked(), true],
     ]);
