@@ -4,7 +4,7 @@ import { TUNABLES } from "../../src/scene/tuning.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
 import { askLab, circles, heldQuiet, lit, open, PAGE, picture, SOFTWARE, stats } from "./lab.ts";
-import { landed, running, stats as sceneStats } from "./sceneStage.ts";
+import { earthStanding, landed, running, stats as sceneStats } from "./sceneStage.ts";
 import { BUILD } from "./sites.ts";
 
 // The workshop's tuning panel (docs/DEVELOPMENT.md, "The workshop"): T shows it on either lab page, its controls change what the real
@@ -199,7 +199,7 @@ test.describe("the workshop's tuning panel", () => {
   }) => {
     test.setTimeout(180_000);
     await onTheCosmos(page, "");
-    await expect.poll(async () => (await sceneStats(page)).cosmos?.bodies ?? 0, { timeout: 90_000 }).toBeGreaterThan(2);
+    await earthStanding(page);
     const whole: [number, number, number, number] = [0, 0, 1728, 1080];
     const [before = 0] = await brightness(page, await picture(page), [whole]);
     const { eye } = await sceneStats(page);
