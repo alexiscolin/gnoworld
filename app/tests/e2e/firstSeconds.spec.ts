@@ -159,11 +159,11 @@ test.describe("a newcomer", () => {
     await expect(opening(page)).toBeVisible();
     // F4529, mock-up 1: while the words stand, the hero has given way, still the page's reading; read with the words' own state, for the
     // dive may land soon on a loaded machine.
-    const hero = page.locator("[data-yield]");
+    const hero = page.locator("[data-hero='number']").locator("..");
     expect(
       await page.evaluate(() => {
         const words = document.querySelector("[data-opening]");
-        const box = document.querySelector("[data-yield]");
+        const box = document.querySelector("[data-hero='number']")?.parentElement;
         return {
           left: words?.hasAttribute("data-left"),
           yielded: box?.getAttribute("data-yield"),
@@ -277,7 +277,7 @@ test.describe("a newcomer", () => {
     await page.getByRole("button", { name: "View in space" }).click();
     await expect(opening(page)).toBeVisible(SLOW);
     await expect.poll(() => page.evaluate(() => document.activeElement?.tagName), SLOW).toBe("H1");
-    const hero = page.locator("[data-yield]");
+    const hero = page.locator("[data-hero='number']").locator("..");
     await expect(hero).toHaveAttribute("data-yield", "opening");
     await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("0");
     await page.keyboard.press("Tab");
