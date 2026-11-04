@@ -75,6 +75,18 @@ describe("a cache's bound in bytes", () => {
   });
 });
 
+describe("a cache's rows past their life (the security review's S4)", () => {
+  it("drops the rows made at a time or before, their bytes counted out of the bound", () => {
+    const { db, write, kept } = file();
+    const bound = boundOf(db, "translations", 20);
+    bound({ rowid: write("a", 10), bytes: 10, replaced: 0 });
+    bound({ rowid: write("b", 10), bytes: 10, replaced: 0 });
+    bound.expire(1);
+    bound({ rowid: write("c", 10), bytes: 10, replaced: 0 });
+    expect(kept()).toEqual(["b", "c"]);
+  });
+});
+
 describe("one making for readers at once", () => {
   const deferred = <T>() => Promise.withResolvers<T>();
 

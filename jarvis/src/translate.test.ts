@@ -379,3 +379,25 @@ describe("a translation's request and what it keeps (StrykerJS, the review's V5)
 function translatedOf(words: string) {
   return { kind: "translated", text: words };
 }
+
+describe("a translation's life in jarvis's file (the security review's S4)", () => {
+  it("serves a translation for a day after it was made, then makes it again", async () => {
+    const { translator, model, kit, signal } = setup({ steps: [said(FRENCH), said(FRENCH)] });
+    const asked = { text: ORIGINAL, language: "fr" } as const;
+    await translator.translate(asked, signal());
+    kit.clock.now += 24 * 60 * 60_000 - 1;
+    await translator.translate(asked, signal());
+    expect(model.requests).toHaveLength(1);
+    kit.clock.now += 1;
+    expect(await translator.translate(asked, signal())).toEqual({ kind: "translated", text: FRENCH });
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it("deletes the translations a day old at its next write, a deleted line's among them", async () => {
+    const { translator, kit, signal } = setup({ steps: [said("Un."), said("Deux.")] });
+    await translator.translate({ text: "One.", language: "fr" }, signal());
+    kit.clock.now += 24 * 60 * 60_000;
+    await translator.translate({ text: "Two.", language: "fr" }, signal());
+    expect(kit.db.prepare("SELECT text FROM translations").all()).toEqual([{ text: "Deux." }]);
+  });
+});

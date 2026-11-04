@@ -2,7 +2,8 @@
 // by the fast model on the translations' own budget with the same hard stop, kept in jarvis's file by the SHA-256 of
 // the text and the language so it serves every reader; readers asking at once share one call. The line reaches the
 // model inside an untrusted block; a translation that adds a link, an account, `@room` or a number, or that the wire
-// could not carry, is dropped and kept so: the original shows. A failure, a stop or a reader gone keeps nothing.
+// could not carry, is dropped and kept so: the original shows. A failure, a stop or a reader gone keeps nothing. A
+// translation lives a day: the door's record of a room holds no older line (D191).
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -69,6 +70,8 @@ const SYSTEM = [
 const OUTPUT_TOKENS = 8192;
 // A line of 8,192 code points takes 32 KiB at most: its block never cuts it.
 const BLOCK_BYTES = 32 * 1024;
+// How long a translation is kept: the door asks only for lines its record holds, a room's last 30 (D194).
+const LIFE_MS = 24 * 60 * 60_000;
 // The prompt's version, as a question's trace carries its own.
 const VERSION = createHash("sha256").update(SYSTEM).digest("hex");
 
@@ -78,7 +81,7 @@ const translated = (text: string): Translated => ({ kind: "translated", text });
 export function makeTranslator(parts: Parts) {
   const Row = z.object({ text: z.string().nullable() });
   const sql = {
-    find: parts.db.prepare("SELECT text FROM translations WHERE hash = ? AND language = ?"),
+    find: parts.db.prepare("SELECT text FROM translations WHERE hash = ? AND language = ? AND made > ?"),
     keep: parts.db.prepare(
       "INSERT INTO translations (hash, language, made, text, bytes) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING RETURNING rowid",
     ),
@@ -87,6 +90,7 @@ export function makeTranslator(parts: Parts) {
   const shared = together<Translated>();
   const keep = (hash: string, language: string, text: string | null): void => {
     const bytes = Buffer.byteLength(hash + language + (text ?? ""));
+    bound.expire(parts.now() - LIFE_MS);
     const row = z
       .object({ rowid: z.number() })
       .optional()
@@ -103,7 +107,7 @@ export function makeTranslator(parts: Parts) {
     /** The line's translation, from the file or made once; the original when one would add what the line lacks. */
     translate: async (asked: JarvisTranslate, signal: AbortSignal): Promise<Translated> => {
       const hash = createHash("sha256").update(asked.text).digest("hex");
-      const row = sql.find.get(hash, asked.language);
+      const row = sql.find.get(hash, asked.language, parts.now() - LIFE_MS);
       if (row !== undefined) {
         const { text } = Row.parse(row);
         return text === null ? { kind: "original" } : translated(text);

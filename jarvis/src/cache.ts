@@ -38,19 +38,21 @@ interface Written {
   readonly replaced: number;
 }
 
-/** The bound of a cache's table: after each write, its oldest rows made are dropped until its bytes fit `maxBytes`. */
+/** The bound of a cache's table: after each write, its oldest rows made are dropped until its bytes fit `maxBytes`;
+ * `expire` drops the rows made at a time or before. */
 export function boundOf(db: DatabaseSync, table: "translations" | "digests", maxBytes: number) {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new RangeError("a cache's bound is a count of bytes");
   const Bytes = z.object({ bytes: z.number() });
   const sql = {
     sum: db.prepare(`SELECT COALESCE(SUM(bytes), 0) AS bytes FROM ${table}`),
+    expired: db.prepare(`DELETE FROM ${table} WHERE made <= ? RETURNING bytes`),
     oldest: db.prepare(
       `DELETE FROM ${table} WHERE rowid = (SELECT rowid FROM ${table} WHERE rowid <> ? ORDER BY made, rowid LIMIT 1) RETURNING bytes`,
     ),
   };
   // The table's bytes, read once, then kept by each write and drop: jarvis alone writes its file (D45).
   let total = Bytes.parse(sql.sum.get()).bytes;
-  return (written: Written): void => {
+  const wrote = (written: Written): void => {
     total += written.bytes - written.replaced;
     // ponytail: one indexed delete a row dropped, as many as one write's bytes push out.
     while (total > maxBytes) {
@@ -59,6 +61,10 @@ export function boundOf(db: DatabaseSync, table: "translations" | "digests", max
       total -= Bytes.parse(dropped).bytes;
     }
   };
+  const expire = (before: number): void => {
+    for (const row of sql.expired.all(before)) total -= Bytes.parse(row).bytes;
+  };
+  return Object.assign(wrote, { expire });
 }
 
 interface Making<T> {
