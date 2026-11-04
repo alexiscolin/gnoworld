@@ -2,6 +2,7 @@
 paths:
   - "app/**"
   - "admin/**"
+  - "jarvis/**"
   - "packages/**"
   - "server/**"
 ---

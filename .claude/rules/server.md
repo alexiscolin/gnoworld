@@ -1,6 +1,8 @@
 ---
 paths:
   - "server/**"
+  - "jarvis/**"
+  - "packages/service/**"
 ---
 
 # The server (Node)
