@@ -182,3 +182,56 @@ it("serves the app's screens as the lab's: this machine alone, the hosts WORKSHO
   vi.resetModules();
   expect((await appConfig()).server.allowedHosts).toEqual(["box.tail.ts.net"]);
 });
+
+// The workshop's backend behind the app's dev server alone (Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"): its server's /api
+// and Ergo's /ws on this machine, as nginx's are, the visitor's address the proxy's own and never the browser's. Vite's proxy is a dev
+// server's: no build reads it. The lab's server proxies nothing.
+const Proxied = z.object({
+  server: z.object({
+    proxy: z.optional(
+      z.record(
+        z.string(),
+        z.strictObject({
+          target: z.string(),
+          ws: z.optional(z.boolean()),
+          headers: z.record(z.string(), z.string()),
+        }),
+      ),
+    ),
+  }),
+});
+const proxyOf = async (config: string) => {
+  const read: unknown = await import(/* @vite-ignore */ config);
+  return Proxied.parse(z.object({ default: z.unknown() }).parse(read).default).server.proxy;
+};
+
+it("proxies the workshop's /api and /ws to its backend on this machine, from the app's dev server alone", async () => {
+  expect(await proxyOf(APP_CONFIG)).toBeUndefined();
+  vi.stubEnv("WORKSHOP_API_PORT", "5195");
+  vi.stubEnv("WORKSHOP_WS_PORT", "5197");
+  vi.resetModules();
+  expect(await proxyOf(APP_CONFIG)).toEqual({
+    "^/api/": { target: "http://127.0.0.1:5195", headers: { "x-real-ip": "127.0.0.1" } },
+    "^/ws$": {
+      target: "ws://127.0.0.1:5197",
+      ws: true,
+      headers: { "x-forwarded-for": "127.0.0.1", "x-real-ip": "127.0.0.1" },
+    },
+  });
+  expect(await proxyOf(LAB_CONFIG)).toBeUndefined();
+  // Both ports, each a whole number from 1 to 65535 written plainly, or no proxy at all.
+  for (const [api, ws] of [
+    ["5195", ""],
+    ["", "5197"],
+    ["0", "5197"],
+    ["5195", "65536"],
+    ["5195", "5197x"],
+    ["51.5", "5197"],
+    [" 5195", "5197"],
+  ] as const) {
+    vi.stubEnv("WORKSHOP_API_PORT", api);
+    vi.stubEnv("WORKSHOP_WS_PORT", ws);
+    vi.resetModules();
+    expect(await proxyOf(APP_CONFIG), `${api}, ${ws}`).toBeUndefined();
+  }
+});

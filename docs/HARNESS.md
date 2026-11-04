@@ -176,15 +176,15 @@ copy of pre-commit gets the related tests too, from its list (the command, given
 the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test of
 its projects, before its report; the slow project and core's in Chromium wait for the merge check) and in the merge check and `--full`.
 
-**The timing tests** (Alexis, 2026-11-04, "Oui, les deux"): a test whose bound is wall-clock time, outright ("in 100 ms or less",
-a cost that grows with its input and not its square) or through its timeout under a heavy case, carries Vitest's tag `timing`
-(`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast gate leaves those, related, `--tests-all` and a failed file's
-second run alike (`--tags-filter=!timing`); the merge check and `--full` run them in the coverage, as every test. Other gates' load
-failed them for nothing: rest.test.ts's search cost 202 times in the worktrees' unsteady logs, main.test.ts's 3k 139, LineView's
-country 93. It holds 16 tests: rest.test.ts's two search costs, main.test.ts's 3k, LineView's country, Here's two, arrival's
-seven views and same arrival, cosmos.test.ts's close world, space.test.ts's shells, useSpace's three, ladder's two past the cap
-and search.test.ts's square. A guard against overload stays in every commit's related tests though it flakes at a load (the
-markdown scanner's linear-in-bytes cases, tier 1; the guards' property tests), the chief's call. Run them alone:
+**The timing tests** (Alexis, 2026-11-04, "Oui, les deux"): a test that reads a clock ("in 100 ms or less", a cost that grows
+with its input and not its square) carries Vitest's tag `timing` (`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast
+gate leaves those, related, `--tests-all` and a failed file's second run alike (`--tags-filter=!timing`); the merge check and
+`--full` run them in the coverage, as every test. Three carry it: rest.test.ts's two search costs (202 times in the worktrees'
+unsteady logs) and search.test.ts's square. A behaviour test that failed only on its timeout under load is no clock's: it keeps
+its place in every commit's related tests, with a timeout that holds at a load of 80, a minute (main.test.ts's 3k, LineView's
+country, Here's two counts, whose waits get 30 s, arrival's seven views and same arrival, cosmos.test.ts's close world,
+space.test.ts's shells, useSpace's three, ladder's two past the cap; the chief's reading of the decision, lot 2's R2). So do the
+guards against overload (the markdown scanner's linear-in-bytes cases, tier 1; the guards' property tests). Run the tagged alone:
 `pnpm exec vitest run --tags-filter=timing`.
 
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
@@ -552,7 +552,7 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
-| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet (DEVELOPMENT.md, "The workshop") |
+| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

@@ -148,7 +148,7 @@ describe("the end of the first screen", () => {
     expect(done).toBe(true);
   });
 
-  it("waits for the door though the page has loaded: the two are the first screen", { tags: ["timing"] }, async () => {
+  it("waits for the door though the page has loaded: the two are the first screen", { timeout: 60_000 }, async () => {
     readyState("complete");
     const arrive = heldDoor();
     const Earth = await pageThatWaits();
@@ -196,7 +196,7 @@ describe("the end of the first screen", () => {
 
   it(
     "goes on 2.5 s after it is on screen when the door never answers: a held chunk leaves no page without its chat (F4306)",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     async () => {
       readyState("complete");
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -319,7 +319,7 @@ describe("useSpace", () => {
     expect(universe.mount).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves the page as it is when the chunk does not come", { tags: ["timing"] }, async () => {
+  it("leaves the page as it is when the chunk does not come", { timeout: 60_000 }, async () => {
     vi.doMock("./mountUniverse.tsx", () => {
       throw new TypeError("Failed to fetch dynamically imported module");
     });

@@ -72,7 +72,7 @@ describe("who is here, from the chat's store", () => {
 
   it(
     "keeps its place, empty, until someone is counted, and draws the fact in it: the plate under it never moves (7e)",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     async () => {
       const place = host?.firstElementChild;
       expect(place, "a place before the chat has connected").toBeInstanceOf(HTMLElement);
@@ -82,9 +82,12 @@ describe("who is here, from the chat's store", () => {
         held().connected(ME);
         held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
       });
-      await vi.waitFor(() => {
-        expect(labels()).toContain("right now");
-      });
+      await vi.waitFor(
+        () => {
+          expect(labels()).toContain("right now");
+        },
+        { timeout: 30_000 },
+      );
       expect(host?.firstElementChild, "the fact in the same place").toBe(place);
       expect(place?.querySelector(".label")?.textContent).toBe("right now");
     },
@@ -103,7 +106,7 @@ describe("who is here, from the chat's store", () => {
 
   it(
     "counts the distinct people of the rooms followed, once the chat has connected, and writes no rate",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     async () => {
       act(() => {
         held().follow(["#bubble", "#bubble/games"]);
@@ -112,9 +115,12 @@ describe("who is here, from the chat's store", () => {
         held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
         held().heard(read(`:${ME}!u@h JOIN #bubble/games`));
       });
-      await vi.waitFor(() => {
-        expect(labels()).toContain("right now");
-      });
+      await vi.waitFor(
+        () => {
+          expect(labels()).toContain("right now");
+        },
+        { timeout: 30_000 },
+      );
       expect(host?.querySelector("[data-value]")?.getAttribute("data-value")).toBe("2");
       expect(labels()).not.toContain("messages now");
     },

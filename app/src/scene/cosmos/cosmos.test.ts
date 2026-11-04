@@ -1200,7 +1200,7 @@ describe("the close world off the rest (7d9)", () => {
 
   it(
     "keeps it where it holds, at its true size, a body then a point, as the eye steps back, in, aside, up and down, the clock run on",
-    { tags: ["timing"] },
+    { timeout: 60_000 },
     async () => {
       const scene = await restAt(ONYX);
       const { system, world } = onyxClose();

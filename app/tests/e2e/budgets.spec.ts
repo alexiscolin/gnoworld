@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { closureOf as filesOf, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
+import { closureOf as filesOf, DYNAMIC_IMPORT, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
+import type { Request } from "@playwright/test";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 import { BUILD } from "./sites.ts";
 
@@ -54,6 +56,73 @@ test(
   },
 );
 
+// A page of its own, planted where the site is served: what its entry imports, statically, as it runs and after a fetch, is its first
+// screen; what a timer, a frame or an idle callback asks is not, whatever the load, though the page asks it once its clock runs again.
+test(
+  "the first screen counts what a page imports as it runs, never what its timers ask",
+  { tag: "@gate" },
+  async ({ page }) => {
+    const files: Record<string, string> = {
+      "index.html":
+        '<!doctype html><link rel="modulepreload" href="/__first/static.js"><script type="module" src="/__first/entry.js"></script>',
+      "entry.js": [
+        'import "./static.js";',
+        'void import("./early.js");',
+        'void fetch("/__first/data.json").then(() => import("./fetched.js"));',
+        'setTimeout(() => import("./timer.js"), 0);',
+        'requestAnimationFrame(() => import("./frame.js"));',
+        'requestIdleCallback(() => import("./idle.js"));',
+        'const every = setInterval(() => { clearInterval(every); void import("./interval.js"); }, 0);',
+        'clearTimeout(setTimeout(() => import("./cleared.js"), 0));',
+        'cancelAnimationFrame(requestAnimationFrame(() => import("./cleared.js")));',
+        'cancelIdleCallback(requestIdleCallback(() => import("./cleared.js")));',
+        "document.__reactContainer$planted = true;",
+      ].join("\n"),
+      "static.js": "export const at = 1;",
+      "early.js": 'import "./part.js";',
+      "part.js": "export const at = 2;",
+      "data.json": "{}",
+      "fetched.js": "export const at = 3;",
+      "timer.js": "export const at = 4;",
+      "frame.js": "export const at = 5;",
+      "idle.js": "export const at = 6;",
+      "interval.js": "export const at = 7;",
+      "cleared.js": "export const at = 8;",
+    };
+    const name = (url: string) => new URL(url).pathname.split("/").pop() ?? "";
+    await page.route("**/__first/*", (route) => {
+      const file = name(route.request().url());
+      const type = file.endsWith(".html")
+        ? "text/html"
+        : file.endsWith(".json")
+          ? "application/json"
+          : "text/javascript";
+      return route.fulfill({ body: files[file] ?? "", contentType: type, status: file in files ? 200 : 404 });
+    });
+    const seen = watch(page);
+    const early = (await firstScreenOf(page, "/__first/index.html", seen)).map(name).sort();
+    expect(early).toEqual(["early.js", "entry.js", "fetched.js", "part.js", "static.js"]);
+    const later = ["frame.js", "idle.js", "interval.js", "timer.js"];
+    await expect
+      .poll(() =>
+        [...seen.scripts]
+          .map(name)
+          .filter((file) => later.includes(file))
+          .sort(),
+      )
+      .toEqual(later);
+    // A held call cleared before it ran never runs once the rest goes (R5).
+    expect([...seen.scripts].map(name)).not.toContain("cleared.js");
+    // The guard of every page's run names them: asked, and under no cap.
+    expect(
+      uncounted(
+        seen.scripts,
+        early.map((file) => new URL(`/__first/${file}`, page.url()).href),
+      ),
+    ).toEqual(later);
+  },
+);
+
 // A world's chat comes after hydration (Chat.tsx's boundary), its lines' view only once a room holds a line
 // (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
 const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
@@ -62,12 +131,15 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // for Alexis: 7f2's report for the Earth, 7e's for a world.
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
-const LATE_CHAT_JS = 21_091;
+// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with
+// what it asks once open: 21,212 B with RoomsDrawer's 762 B and 7y's merge (the chief, 2026-11-04, the margin given ahead).
+const LATE_CHAT_JS = 21_212;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
-// screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
+// screen, and the scripts only it needs with it. The first screen counts the scripts the others need, its own cap the rest: first its
+// measured 21,265 B and the 256 B margin given ahead (the chief, 2026-11-04).
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+const PROPOSALS_JS = 21_521;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
@@ -146,6 +218,113 @@ const without = (page: Page, urls: readonly string[], skip: readonly string[]) =
     [[...urls], skip, STATIC_IMPORT.source] as const,
   );
 
+// What a page asks, as the test sees it: each script, every answer but a stream's, the scripts in flight and every request in flight but
+// a stream's or a socket's, and how many it asked.
+function watch(page: Page) {
+  const seen = {
+    scripts: new Set<string>(),
+    all: new Set<string>(),
+    pending: new Set<unknown>(),
+    inflight: new Set<unknown>(),
+    requests: 0,
+  };
+  page.on("request", (request) => {
+    const kind = request.resourceType();
+    if (kind === "eventsource" || kind === "websocket") return;
+    seen.requests += 1;
+    seen.inflight.add(request);
+    if (kind === "script") seen.pending.add(request);
+  });
+  const ended = (request: Request) => {
+    seen.inflight.delete(request);
+    seen.pending.delete(request);
+  };
+  page.on("requestfinished", ended);
+  page.on("requestfailed", ended);
+  page.on("response", (response) => {
+    // A world page's verdicts stream (an EventSource) has no end to count: what the page downloads to run is.
+    if (response.request().resourceType() === "eventsource") return;
+    seen.all.add(response.url());
+    if (response.request().resourceType() === "script") seen.scripts.add(response.url());
+  });
+  return seen;
+}
+type Seen = ReturnType<typeof watch>;
+
+// The page's timers, frames and idle callbacks, held from before its first script until the test lets them go: each then runs as asked,
+// its delay counted from then, and one cleared meanwhile never runs. The browser's own idle callback stays the test's, which runs only
+// when the page has no task left. An init script, it holds each document a page loads.
+function holdTimers() {
+  const idle = window.requestIdleCallback.bind(window);
+  Reflect.set(
+    window,
+    "__idle",
+    () =>
+      new Promise<void>((done) =>
+        idle(() => {
+          done();
+        }),
+      ),
+  );
+  const pairs = [
+    ["setTimeout", "clearTimeout"],
+    ["setInterval", "clearInterval"],
+    ["requestAnimationFrame", "cancelAnimationFrame"],
+    ["requestIdleCallback", "cancelIdleCallback"],
+  ] as const;
+  const waiting: (() => void)[] = [];
+  const held = new Map<number, number | undefined>(); // a held call's id, and the real one once let go
+  let holding = true;
+  let last = 0;
+  for (const [set, clear] of pairs) {
+    const setReal = (window[set] as unknown as (...args: unknown[]) => number).bind(window);
+    const clearReal = window[clear].bind(window);
+    Reflect.set(window, set, (...args: unknown[]) => {
+      if (!holding) return setReal(...args);
+      last -= 1;
+      const id = last;
+      held.set(id, undefined);
+      waiting.push(() => {
+        if (held.has(id)) held.set(id, setReal(...args));
+      });
+      return id;
+    });
+    Reflect.set(window, clear, (id: number) => {
+      if (!held.has(id)) {
+        clearReal(id);
+        return;
+      }
+      const real = held.get(id);
+      held.delete(id);
+      if (real !== undefined) clearReal(real);
+    });
+  }
+  Reflect.set(window, "__letTimersGo", () => {
+    holding = false;
+    for (const go of waiting.splice(0)) go();
+  });
+}
+
+// The first screen: what a page asks before any of its timers, frames or idle callbacks runs (the chief, 2026-11-04: a timer's chunk was
+// counted at a load of 50 to 80, not quiet), held until nothing is in flight and an idle period brings no request, twice, which no load
+// moves. What it imports as it runs or mounts counts.
+async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
+  await page.addInitScript(holdTimers);
+  await page.goto(path);
+  await hydrated(page);
+  for (let still = 0; still < 2;) {
+    await expect.poll(() => seen.inflight.size, { timeout: 60_000 }).toBe(0);
+    const before = seen.requests;
+    await page.evaluate(() => (Reflect.get(window, "__idle") as () => Promise<void>)());
+    still = seen.inflight.size === 0 && seen.requests === before ? still + 1 : 0;
+  }
+  const asked = [...seen.scripts];
+  await page.evaluate(() => {
+    (Reflect.get(window, "__letTimersGo") as () => void)();
+  });
+  return asked;
+}
+
 // The built files the pages are served from (serve.mjs), which chunks.ts weighs with no page (item 7: a page drawing the scene on a
 // software GPU timed these journeys out at a load of 60).
 const ASSETS = fileURLToPath(new URL("client/assets/", BUILD));
@@ -157,6 +336,30 @@ const closureOf = (url: string) => filesOf(ASSETS, fileOfUrl(url)).map((file) =>
 // What a late chunk brings: it and every chunk it imports statically that was not there already. A chunk weighed alone would let a split
 // carry its code out of every cap (7e's review, B2-1).
 const ownOf = (late: string, there: readonly string[]) => closureOf(late).filter((each) => !there.includes(each));
+
+// The scripts a page asked that none of its caps' files holds, by name.
+const uncounted = (asked: Iterable<string>, ...caps: readonly (readonly string[])[]) => {
+  const counted = new Set(caps.flat());
+  return [...asked]
+    .filter((url) => !counted.has(url))
+    .map(fileOfUrl)
+    .sort();
+};
+
+// What a late chunk brings once it runs: its own, and each chunk its files name in a dynamic import that the page asked, with that one's
+// own, at any depth (the chief, 2026-11-04: the chat's RoomsDrawer, asked once its box is narrow, fell between two cuts).
+function openedOf(late: string, there: readonly string[], asked: ReadonlySet<string>): string[] {
+  const own = ownOf(late, there);
+  // The loop reaches the files pushed as it goes: an array's iterator reads its length at each step.
+  for (const file of own) {
+    const text = readFileSync(join(ASSETS, fileOfUrl(file)), "utf8");
+    for (const [, name = ""] of text.matchAll(new RegExp(DYNAMIC_IMPORT.source, "g"))) {
+      const url = new URL(name, late).href;
+      if (asked.has(url) && !own.includes(url) && !there.includes(url)) own.push(...ownOf(url, [...there, ...own]));
+    }
+  }
+  return own;
+}
 
 // A late chunk the page asked: the very built file chunks.ts weighs by its name, within its cap there.
 function weighed(url: string, chunk: string) {
@@ -201,28 +404,15 @@ async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) 
 
 for (const path of PAGES) {
   test(`${path} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
-    const scripts = new Set<string>();
-    const all = new Set<string>();
-    const pending = new Set<unknown>();
-    page.on("request", (request) => {
-      if (request.resourceType() === "script") pending.add(request);
-    });
-    page.on("requestfinished", (request) => pending.delete(request));
-    page.on("requestfailed", (request) => pending.delete(request));
-    page.on("response", (response) => {
-      // A world page's verdicts stream (an EventSource) has no end to count: what the page downloads to run is.
-      if (response.request().resourceType() === "eventsource") return;
-      all.add(response.url());
-      if (response.request().resourceType() === "script") scripts.add(response.url());
-    });
+    const seen = watch(page);
+    const { scripts, all, pending } = seen;
     const world = isWorld(path);
     // The chat's socket answers nothing: no line comes, so nothing asks the lines' view but a fault.
     if (world || holdsDoor(path)) await page.routeWebSocket(/\/ws$/, () => undefined);
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;
     // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
     const stream = world ? page.waitForResponse((response) => response.url().includes("/api/stream")) : undefined;
-    await page.goto(path);
-    await hydrated(page);
+    const early = await firstScreenOf(page, path, seen);
     await stream;
     await chat;
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
@@ -230,13 +420,22 @@ for (const path of PAGES) {
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
     const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
-    const firstScreen = await without(page, [...scripts], late);
+    const firstScreen = await without(page, early, late);
     const lateChunk = late.find((url) => CHAT.test(url));
+    const chatOpened = lateChunk === undefined ? [] : openedOf(lateChunk, firstScreen, scripts);
     if (lateChunk !== undefined)
-      expect(
-        await compressed(page, ownOf(lateChunk, firstScreen)),
-        "the late chat stays within its cap",
-      ).toBeLessThanOrEqual(LATE_CHAT_JS);
+      expect(await compressed(page, chatOpened), "the late chat stays within its cap").toBeLessThanOrEqual(
+        LATE_CHAT_JS,
+      );
+    const proposals = asked[0] === undefined ? [] : openedOf(asked[0], [...firstScreen, ...chatOpened], scripts);
+    if (asked[0] !== undefined)
+      expect(await compressed(page, proposals), "the proposals stay within their cap").toBeLessThanOrEqual(
+        PROPOSALS_JS,
+      );
+    // Every script the page asked is under one of its caps: a chunk between two cuts fails here (the chief, 2026-11-04).
+    expect(uncounted(scripts, firstScreen, chatOpened, proposals), "every chunk the page asks is under a cap").toEqual(
+      [],
+    );
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),

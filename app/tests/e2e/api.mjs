@@ -43,11 +43,11 @@ const LISTENING = /"event":"listening".*"port":(\d+)/;
 const LINKED = /"event":"irc_ready"/;
 
 /**
- * Starts Ergo, then the server linked to it, allowing a POST and a WebSocket from `origins`; resolves to the
- * server's port and Ergo's WebSocket port once the server listens and its bot has opened the rooms. Both stop, and
- * their folders go, when the process ends.
+ * Starts Ergo, then the server linked to it, allowing a POST and a WebSocket from `origins`, on free ports or the given ones
+ * (the workshop's); resolves to the server's port and Ergo's WebSocket port once the server listens and its bot has opened
+ * the rooms. Both stop, and their folders go, when the process ends.
  */
-export async function startBackend(origins) {
+export async function startBackend(origins, { apiPort = 0, ergoPorts } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "gnoworld-e2e-"));
   writeFileSync(join(dir, "pepper"), "a-pepper-of-forty-characters-0123456789");
   // The server takes the operator's password from a file, 32 characters at least (config.ts).
@@ -56,18 +56,20 @@ export async function startBackend(origins) {
   // The ticket logins reach the server's auth handler through a port (authPort.mjs), on which Ergo's script dials.
   const authPort = await freePort();
   const worlds = writeRoles(join(dir, "roles.json"));
-  const ergo = await startErgo({ origins, operPassword, authScript: { forward: authPort } }).catch((error) => {
-    rmSync(dir, { recursive: true, force: true });
-    throw new Error("serve.mjs: Ergo did not start; sh scripts/ergo.sh builds the binary the journeys need", {
-      cause: error,
-    });
-  });
+  const ergo = await startErgo({ origins, operPassword, authScript: { forward: authPort }, ports: ergoPorts }).catch(
+    (error) => {
+      rmSync(dir, { recursive: true, force: true });
+      throw new Error("serve.mjs: Ergo did not start; sh scripts/ergo.sh builds the binary the journeys need", {
+        cause: error,
+      });
+    },
+  );
   const child = spawn(process.execPath, ["--disallow-code-generation-from-strings", "--import", AUTH_PORT, ENTRY], {
     env: {
       PATH: process.env.PATH ?? "",
       DATABASE: join(dir, "server.db"),
       LOG_PEPPER_FILE: join(dir, "pepper"),
-      PORT: "0",
+      PORT: String(apiPort),
       ORIGINS: origins.join(","),
       TRUSTED_PROXY: "127.0.0.1",
       AUTH_SOCKET: join(dir, "auth.sock"),
