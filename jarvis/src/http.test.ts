@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { request as httpRequest } from "node:http";
+import { connect } from "node:net";
 import { ApiError } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serve, type Handler, type Routes } from "./http.ts";
@@ -13,7 +14,7 @@ afterEach(async () => {
 // A table of routes whose handlers the test gives, served on a port of its own; its address and its log.
 const served = async (routes: Routes, ready = () => true) => {
   const { log, events, raw } = capture();
-  const jarvis = await serve(routes, { host: "127.0.0.1", port: 0, log, ready });
+  const jarvis = await serve(routes, { host: "127.0.0.1", port: 0, names: ["127.0.0.1"], log, ready });
   const address = jarvis.server.address();
   if (address === null || typeof address === "string") throw new Error("no port");
   const url = `http://127.0.0.1:${String(address.port)}`;
@@ -107,6 +108,74 @@ describe("jarvis's HTTP face: what it answers", () => {
       expect(handler).not.toHaveBeenCalled();
     },
   );
+
+  // A page of another site a browser was steered to (DNS rebinding) names its own host: refused (F5288).
+  it.each([
+    "evil.example:8081",
+    "evil.example",
+    "127.0.0.1.evil.example",
+    "127.0.0.1@evil.example",
+    "localhost",
+    ":8081",
+  ])("refuses a request whose Host is %j, no name jarvis answers to, as not_found", async (host) => {
+    const handler = vi.fn(echo);
+    const { url, events } = await served({ "/echo": { POST: handler } });
+    const write = (request: ReturnType<typeof httpRequest>) => {
+      request.end("{}");
+    };
+    const { sent, status } = unended(`${url}/echo`, { headers: { host, "content-length": "2" } }, write);
+    expect(await status).toBe(404);
+    sent.destroy();
+    expect(handler).not.toHaveBeenCalled();
+    expect(events()).toContainEqual({
+      event: "jarvis_refused",
+      route: "<unknown>",
+      method: "POST",
+      status: 404,
+      error: "not_found",
+    });
+  });
+
+  it("refuses a request that names no Host at all", async () => {
+    const { url } = await served({ "/echo": { GET: echo } });
+    const socket = connect(Number(new URL(url).port), "127.0.0.1");
+    socket.on("error", () => undefined);
+    await once(socket, "connect");
+    let said = "";
+    socket.on("data", (chunk: Buffer) => (said += chunk.toString()));
+    const closed = new Promise((resolve) => socket.on("close", resolve));
+    socket.write("GET /echo HTTP/1.0\r\n\r\n");
+    await closed;
+    expect(said).toMatch(/^HTTP\/1\.1 404 /);
+  });
+
+  it("answers its names whatever their case and port", async () => {
+    const { log } = capture();
+    const jarvis = await serve(
+      { "/echo": { POST: echo } },
+      { host: "127.0.0.1", port: 0, names: ["jarvis"], log, ready: () => true },
+    );
+    opened.push({
+      close: () =>
+        new Promise((resolve) => {
+          jarvis.server.closeAllConnections();
+          jarvis.server.close(() => {
+            resolve();
+          });
+        }),
+    });
+    const address = jarvis.server.address();
+    if (address === null || typeof address === "string") throw new Error("no port");
+    const write = (request: ReturnType<typeof httpRequest>) => {
+      request.end("{}");
+    };
+    const at = `http://127.0.0.1:${String(address.port)}/echo`;
+    for (const host of ["jarvis", "JARVIS:8081", "Jarvis:1"]) {
+      const { sent, status } = unended(at, { headers: { host, "content-length": "2" } }, write);
+      expect(await status).toBe(200);
+      sent.destroy();
+    }
+  });
 
   it.each(["GET", "PUT", "DELETE", "PATCH", "OPTIONS"])(
     "refuses %s on a route that takes POST alone, as unsupported, naming what it takes",

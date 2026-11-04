@@ -37,7 +37,9 @@ export interface JarvisConfig {
 /** What jarvis reads on or off: off, it reads nothing more (D171). */
 export interface Served {
   on: boolean;
-  listen: { host: string; port: number };
+  // Where it listens, and the names a request's Host may give it, so a page another site's DNS steers to jarvis is
+  // refused (F5288).
+  listen: { host: string; port: number; names: string[] };
   database: string;
   budgets: JarvisConfig["budgets"];
   // How long a stop waits for the questions in flight before it cuts them (D178).
@@ -52,6 +54,11 @@ const servedShape = () => ({
   JARVIS: z.string().optional(),
   JARVIS_HOST: host(),
   JARVIS_PORT: port().default(8081),
+  JARVIS_HOSTNAMES: z
+    .string()
+    .default("127.0.0.1,localhost")
+    .transform((list) => list.split(","))
+    .pipe(z.array(z.string().regex(/^(?:[a-z0-9][a-z0-9.-]{0,252}|\[[0-9a-f:.]{2,45}\])$/))),
   // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
   JARVIS_DATABASE: databasePath.pipe(absolute),
   JARVIS_BUDGET_USD: whole(500, 45),
@@ -68,7 +75,7 @@ export function loadServed(env: Record<string, string | undefined>): Served {
   const settings = parseSettings(z.object(servedShape()), env);
   return {
     on: settings.JARVIS === "on",
-    listen: { host: settings.JARVIS_HOST, port: settings.JARVIS_PORT },
+    listen: { host: settings.JARVIS_HOST, port: settings.JARVIS_PORT, names: settings.JARVIS_HOSTNAMES },
     database: settings.JARVIS_DATABASE,
     budgets: budgetsOf(settings),
     drainMs: settings.JARVIS_DRAIN_S * 1000,

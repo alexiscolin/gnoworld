@@ -23,6 +23,8 @@ export type Routes = Readonly<Record<string, Readonly<Partial<Record<Method, Han
 interface Options {
   readonly host: string;
   readonly port: number;
+  // The names a request's Host may give, in lower case, without a port; any other is refused (F5288).
+  readonly names: readonly string[];
   readonly log: Log;
   // False once jarvis stops: every request is then not ready, its connection closed.
   readonly ready: () => boolean;
@@ -73,12 +75,12 @@ async function handle(
   request: IncomingMessage,
   response: ServerResponse,
 ) {
-  const { routes, options } = served;
+  const { options } = served;
   const left = new AbortController();
   response.on("close", () => {
     if (!response.writableFinished) left.abort();
   });
-  const { asked, named } = askedOf(routes, request, options.ready());
+  const { asked, named } = askedOf(served, request);
   let reply: Made;
   try {
     reply = await replyOf(asked, request, left.signal);
@@ -96,11 +98,14 @@ async function handle(
 // The route and method a request asks, and how the log names them: a path or a method of the client's as one word,
 // as either could carry anything. The route is the target as written up to its query, never resolved: an authority,
 // a dot segment or an escape names no route (F5287).
-function askedOf(routes: Routes, request: IncomingMessage, ready: boolean) {
+function askedOf({ routes, options }: { routes: Routes; options: Options }, request: IncomingMessage) {
   const [path = ""] = (request.url ?? "").split("?");
-  const route = Object.hasOwn(routes, path) ? routes[path] : undefined;
+  // A request whose Host is no name of jarvis's reaches no route (F5288).
+  const name = /^([a-z0-9.-]+|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i.exec(request.headers.host ?? "")?.[1]?.toLowerCase();
+  const ours = options.names.some((known) => known === name);
+  const route = ours && Object.hasOwn(routes, path) ? routes[path] : undefined;
   const method = METHODS.find((known) => known === request.method);
-  const asked: Asked = { route, method, ready };
+  const asked: Asked = { route, method, ready: options.ready() };
   return { asked, named: { route: route === undefined ? "<unknown>" : path, method: method ?? "<other>" } };
 }
 

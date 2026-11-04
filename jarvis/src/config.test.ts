@@ -327,7 +327,7 @@ describe("loadServed", () => {
   it("reads jarvis off, its defaults, and nothing of the key, gnomcp or the profiles", () => {
     expect(loadServed(SERVED)).toEqual({
       on: false,
-      listen: { host: "127.0.0.1", port: 8081 },
+      listen: { host: "127.0.0.1", port: 8081, names: ["127.0.0.1", "localhost"] },
       database: SERVED.JARVIS_DATABASE,
       budgets: { ask: 45 * DOLLAR, translate: 5 * DOLLAR },
       drainMs: 20_000,
@@ -370,7 +370,20 @@ describe("loadServed", () => {
     });
   });
 
+  it("reads the names a request's Host may give it, each a name or an address with no port (F5288)", () => {
+    expect(loadServed({ ...SERVED, JARVIS_HOSTNAMES: "jarvis" }).listen.names).toEqual(["jarvis"]);
+    const names = "jarvis.gnoworld.internal,10.0.0.7,[fd00::7]";
+    expect(loadServed({ ...SERVED, JARVIS_HOSTNAMES: names }).listen.names).toEqual(names.split(","));
+  });
+
   it.each([
+    ["JARVIS_HOSTNAMES", ""],
+    ["JARVIS_HOSTNAMES", "jarvis,"],
+    ["JARVIS_HOSTNAMES", "Jarvis"],
+    ["JARVIS_HOSTNAMES", "jar vis"],
+    ["JARVIS_HOSTNAMES", "jarvis:8081"],
+    ["JARVIS_HOSTNAMES", "j".repeat(254)],
+    ["JARVIS_HOSTNAMES", "a@b"],
     ["JARVIS_DATABASE", undefined],
     ["JARVIS_DATABASE", ":memory:"],
     ["JARVIS_DATABASE", "jarvis.db"],

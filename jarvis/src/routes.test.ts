@@ -31,6 +31,7 @@ const served = async ({ ask }: { ask?: Ask | undefined } = {}) => {
   const jarvis = await serve(jarvisRoutes({ ask, budget: budget.budget, log }), {
     host: "127.0.0.1",
     port: 0,
+    names: ["127.0.0.1"],
     log,
     ready: () => true,
   });

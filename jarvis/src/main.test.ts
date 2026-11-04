@@ -554,9 +554,10 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     socket.on("error", () => undefined);
     await once(socket, "connect");
     socket.write(
-      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: jarvis\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"question`,
+      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"question`,
     );
-    const closed = once(socket, "close");
+    // events.once rejects on the reset a cut connection may give first.
+    const closed = new Promise((resolve) => socket.on("close", resolve));
     jarvis.child.kill("SIGTERM");
     expect(await exited(jarvis)).toBe(0);
     await closed;
