@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -61,15 +61,21 @@ const running = (pid: number) => {
     return false;
   }
 };
-// What a child writes arrives in its own time: wait for it, a little at a time.
+// What a child writes arrives in its own time: wait for it, a little at a time, 20 s at least, far from the few
+// milliseconds it takes on a quiet machine (F5138).
 const until = async (seen: () => boolean): Promise<void> => {
   for (let tries = 0; !seen(); tries += 1) {
-    if (tries > 500) throw new Error("waited 5 s for the child");
+    if (tries > 2_000) throw new Error("waited 20 s for the child");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 };
+// gnomcp's folders in the system's temporary folder: jarvis makes one at each start and removes it.
+const homes = () => readdirSync(realpathSync(tmpdir())).filter((name) => name.startsWith("jarvis-gnomcp-"));
+// Each test boots a Node process, some up to five, which takes seconds each at a load of 190 on 14 cores: a minute, not
+// Vitest's 5 s, as main.test.ts gives the server's (F5138).
+const BOOTS = { timeout: 60_000 };
 
-describe("startGnomcp: gnomcp started read-only", () => {
+describe("startGnomcp: gnomcp started read-only", BOOTS, () => {
   it("runs it in an empty folder of its own, its home, keys and sessions there, with its configuration and its audit on stderr", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY_FILE", "/run/secrets/anthropic");
     vi.stubEnv("GNOMCP_SESSION_PASSPHRASE", "a-passphrase-of-the-test");
@@ -186,15 +192,21 @@ describe("startGnomcp: gnomcp started read-only", () => {
     "refuses a gnomcp that never answers %s at start, its process ended and its folder removed",
     async (silent) => {
       const made = setupOf({ slow: [silent] }, { startTimeoutMs: 1_000 });
+      const before = homes();
       const started = performance.now();
       const error: unknown = await startGnomcp(made.setup).catch((caught: unknown) => caught);
       expect(error instanceof Error ? error.message : error).toBe("gnomcp: it did not answer at start");
       expect(error instanceof Error ? error.cause : undefined).toBeInstanceOf(Error);
-      expect(performance.now() - started).toBeLessThan(5_000);
-      const [seen] = made.fake.starts();
-      expect(existsSync(seen?.cwd ?? "")).toBe(false);
-      await until(() => !running(seen?.pid ?? 0));
-      expect(running(seen?.pid ?? 0)).toBe(false);
+      // The start's 1 s and the transport's close, 4 s at most, far below gnomcp's own 30 s.
+      expect(performance.now() - started).toBeLessThan(20_000);
+      // Under load the start may end at initialize, its child ended before it wrote its start (F5138): its folder,
+      // made before the child, is gone all the same.
+      expect(homes()).toEqual(before);
+      const seen = made.fake.starts();
+      expect(seen.map(({ cwd }) => existsSync(cwd))).toEqual(seen.map(() => false));
+      const pids = seen.map(({ pid }) => pid);
+      await until(() => !pids.some(running));
+      expect(pids.some(running)).toBe(false);
     },
   );
 
@@ -230,7 +242,7 @@ describe("startGnomcp: gnomcp started read-only", () => {
   });
 });
 
-describe("Gnomcp.call: one read", () => {
+describe("Gnomcp.call: one read", BOOTS, () => {
   it("gives a read's text once its result passed the schema", async () => {
     const { gnomcp, fake } = await start();
     expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({
@@ -333,10 +345,11 @@ describe("Gnomcp.call: one read", () => {
   });
 
   it("gives up a call at its timeout, the child still answering the next one", async () => {
-    const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 200 });
+    // 2 s for a call, far from a quiet round trip with the child, and the bound far below gnomcp's own 30 s (F5138).
+    const { gnomcp, fake } = await start({ slow: ["gno_status"] }, { callTimeoutMs: 2_000 });
     const started = performance.now();
     expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason: "timeout" });
-    expect(performance.now() - started).toBeLessThan(3_000);
+    expect(performance.now() - started).toBeLessThan(20_000);
     expect(await gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" })).toMatchObject({ ok: true });
     expect(fake.starts()).toHaveLength(1);
   });
@@ -432,7 +445,7 @@ describe("Gnomcp.call: one read", () => {
   });
 });
 
-describe("startGnomcp: gnomcp's stderr in jarvis's log", () => {
+describe("startGnomcp: gnomcp's stderr in jarvis's log", BOOTS, () => {
   it("logs each audit line by its tool, its result and its time, never its arguments", async () => {
     const { gnomcp, events, raw } = await start();
     await gnomcp.call("gno_eval", { profile: "onyx", path: "gno.land/r/demo/boards", expr: "an-argument-0123456789" });
