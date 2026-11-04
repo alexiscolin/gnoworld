@@ -643,6 +643,18 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(performance.now() - started).toBeLessThan(2000);
   });
 
+  it("opens no admin listener and no door without their settings", async () => {
+    const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });
+    const port = await listening(server);
+    const asked = await fetch(`http://127.0.0.1:${String(port)}/api/jarvis/ask`, {
+      method: "POST",
+      headers: { origin: "https://gnoworld.test", "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(asked.status).toBe(404);
+    expect(server.out.stdout).not.toContain("admin_listening");
+  });
+
   it("stops when a rejection escapes, rather than serving on", async () => {
     const hook = join(folder("gnoworld-reject-"), "reject.mjs");
     writeFileSync(hook, 'setTimeout(() => {\n  Promise.reject(new Error("escaped"));\n}, 500);\n');

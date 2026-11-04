@@ -42,7 +42,7 @@ export const port = () =>
     .pipe(z.number().max(65_535));
 
 // A list of entries parted by commas, none when empty, each checked by `item`.
-export const list = <T extends z.ZodType<unknown, string>>(item: T) =>
+export const list = <T extends z.core.$ZodType<unknown, string>>(item: T) =>
   z
     .string()
     .default("")

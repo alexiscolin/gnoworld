@@ -6,6 +6,10 @@ import { loadConfig } from "./config.ts";
 import { openDatabase } from "./db.ts";
 import { logger } from "./log.ts";
 import { startChat } from "./chat.ts";
+import { askRoutes } from "./door/ask.ts";
+import { jarvisClient } from "./door/jarvis.ts";
+import { makeNames } from "./door/names.ts";
+import { makeQuota } from "./door/quota.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
 import { makeLogin } from "./login/login.ts";
 import { migrations } from "./migrations.ts";
@@ -74,6 +78,32 @@ app.route(
     now: Date.now,
   }),
 );
+// Jarvis's door (10g): a question from a room, held to its account's quota, to jarvis on the network only the two share;
+// none without JARVIS_URL. Its quotas, allowlist and jarvis's budgets change on the admin API alone.
+const door =
+  config.jarvis === undefined
+    ? undefined
+    : {
+        settings: config.jarvis,
+        quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
+        jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs }),
+      };
+if (door !== undefined)
+  app.route(
+    "/api/jarvis",
+    askRoutes({
+      session,
+      origins: config.origins,
+      mayRead: chat.mayRead,
+      recent: chat.recent,
+      named: makeNames({ rpc: door.settings.namesRpc, now: Date.now }),
+      quota: door.quota,
+      jarvis: door.jarvis,
+      questionChars: door.settings.questionChars,
+      log,
+      now: Date.now,
+    }),
+  );
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
 const auth = authServer(db, { log, ...(config.ergo === undefined ? {} : { bot: config.ergo.password }) });
 if (config.authSocket !== undefined) await listenAt(auth, config.authSocket);
