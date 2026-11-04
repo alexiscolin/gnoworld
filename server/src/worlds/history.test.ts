@@ -154,6 +154,26 @@ describe("readHistory", () => {
       });
     });
 
+    // The second round of 7t3's review: one transaction signed by two, each calling a realm of one world, gave each realm the mark of its
+    // own caller: two marks, two transactions. A mark carries the senders of all the transaction's calls, so each realm gives the same.
+    it("marks a transaction by the senders of all its calls, so a realm called by one of its signers gives the mark another realm does", async () => {
+      const other = "gno.land/r/samcrew/launchpad/market/v2";
+      const both = {
+        block_height: 101,
+        messages: [
+          { value: { __typename: "MsgCall", pkg_path: PATH, caller: CALLER_A } },
+          { value: { __typename: "MsgCall", pkg_path: other, caller: CALLER_B } },
+        ],
+      };
+      expect(await since([both], 100)).toMatchObject({
+        history: {
+          calls: 1,
+          callers: 1,
+          recent: { transactions: [`101:${CALLER_A},${CALLER_B}`], callers: [CALLER_A] },
+        },
+      });
+    });
+
     it("gives no window when it is given no height: a realm the last file never read", async () => {
       const read = await ask(() => answer([call(101, CALLER_A)])).read();
       expect(read.ok && "recent" in read.history).toBe(false);

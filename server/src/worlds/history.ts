@@ -68,10 +68,13 @@ export function realmsOfPass(paths: readonly string[], pass: number, max = HISTO
   return Array.from({ length: max }, (_, i) => paths[(start + i) % paths.length] ?? "");
 }
 
-// The transactions above `since`, each marked by its height and its senders, and the different addresses that sent them.
-function recentOf(rows: readonly { height: number; callers: readonly string[] }[], since: number): Recent {
+// The transactions above `since`, each marked by its height and the senders of all its calls, and the different addresses that called it.
+function recentOf(
+  rows: readonly { height: number; callers: readonly string[]; senders: readonly string[] }[],
+  since: number,
+): Recent {
   const above = rows.filter(({ height }) => height > since);
-  const marks = new Set(above.map(({ height, callers }) => `${String(height)}:${callers.join(",")}`));
+  const marks = new Set(above.map(({ height, senders }) => `${String(height)}:${senders.join(",")}`));
   return { transactions: [...marks].sort(), callers: [...new Set(above.flatMap(({ callers }) => callers))].sort() };
 }
 
@@ -97,15 +100,20 @@ export async function readHistory(
     const answer = Answer.safeParse(jsonOf(text));
     if (!answer.success) throw new Failure("shape");
     // A transaction may bundle calls to several realms: only the messages aimed at this path count, and a transaction with none is left out.
-    // Each row keeps its calls and the different addresses that sent them, sorted; a call that names none adds no address.
+    // Each row keeps its calls, the different addresses that sent them and the senders of all its calls (its mark's), each sorted; a call
+    // that names none adds no address.
+    const known = (calls: readonly { caller?: string | undefined }[]): string[] =>
+      [...new Set(calls.flatMap(({ caller }) => (caller === undefined ? [] : [caller])))].sort();
     const rows = answer.data.data.getTransactions.flatMap((row) => {
-      const aimed = row.messages.flatMap(({ value }) => {
+      const calls = row.messages.flatMap(({ value }) => {
         if (value.__typename !== "MsgCall") return [];
         if (value.pkg_path === undefined) throw new Failure("shape");
-        return value.pkg_path === path ? [value.caller] : [];
+        return [{ path: value.pkg_path, caller: value.caller }];
       });
-      const callers = [...new Set(aimed.flatMap((caller) => (caller === undefined ? [] : [caller])))].sort();
-      return aimed.length === 0 ? [] : [{ height: row.block_height, calls: aimed.length, callers }];
+      const aimed = calls.filter((call) => call.path === path);
+      return aimed.length === 0
+        ? []
+        : [{ height: row.block_height, calls: aimed.length, callers: known(aimed), senders: known(calls) }];
     });
     return {
       ok: true,
