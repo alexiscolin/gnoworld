@@ -230,6 +230,63 @@ describe("a node read given its universe's chain", () => {
   });
 });
 
+// A caller's memory of its nodes' checks (10h's review, V7): a node seen on its chain is asked its status once a minute.
+describe("a node read given its caller's memory of the nodes it saw on their chain", () => {
+  const T0 = Date.parse("2026-11-04T12:00:00.000Z");
+  const at = (ms: number) => () => new Date(T0 + ms);
+
+  it("asks a node seen on its chain no status for a minute, then asks it again", async () => {
+    const node = fakeNode({ network: "onyx-1" });
+    const seen = new Map<string, number>();
+    const read = (ms: number) =>
+      readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: node.fetch, chainId: "onyx-1", seen, now: at(ms) });
+    expect(kindOf(await read(0))).toBe("ok");
+    expect(kindOf(await read(59_999))).toBe("ok");
+    expect(paths(node.asked)).toEqual(["status", "vm%2Fqfuncs", "vm%2Fqfuncs"]);
+    expect(kindOf(await read(60_000))).toBe("ok");
+    expect(paths(node.asked)).toEqual(["status", "vm%2Fqfuncs", "vm%2Fqfuncs", "status", "vm%2Fqfuncs"]);
+  });
+
+  it.each([
+    ["another chain's", { network: "test5" }],
+    ["one whose status failed", { network: "onyx-1", status: 503 }],
+  ])("remembers no node found to be %s, but the one found on its chain next", async (_case, answers) => {
+    const node = fakeNode(answers);
+    const seen = new Map<string, number>();
+    const options = { fetch: node.fetch, chainId: "onyx-1", seen, now: at(0) };
+    expect(kindOf(await readRender(RPC, "x:", options))).not.toBe("ok");
+    expect(kindOf(await readRender(RPC, "x:", options))).not.toBe("ok");
+    expect(paths(node.asked)).toEqual(["status", "status"]);
+    expect(seen.size).toBe(0);
+    const good = fakeNode({ network: "onyx-1" });
+    expect(kindOf(await readRender(RPC, "x:", { ...options, fetch: good.fetch }))).toBe("ok");
+    expect(seen.size).toBe(1);
+  });
+
+  it("remembers a node for the chain it was seen on, at its address with or without its last slash", async () => {
+    const node = fakeNode({ network: "onyx-1" });
+    const seen = new Map<string, number>();
+    await readRender(RPC, "x:", { fetch: node.fetch, chainId: "onyx-1", seen, now: at(0) });
+    await readRender(`${RPC}/`, "x:", { fetch: node.fetch, chainId: "onyx-1", seen, now: at(1) });
+    expect(paths(node.asked)).toEqual(["status", "vm%2Fqrender", "vm%2Fqrender"]);
+    const other = { fetch: node.fetch, chainId: "test5", seen, now: at(2) };
+    expect(kindOf(await readRender(RPC, "x:", other))).toBe("other-chain");
+    await readRender("https://rpc.other.example", "x:", { fetch: node.fetch, chainId: "onyx-1", seen, now: at(3) });
+    expect(paths(node.asked).slice(3)).toEqual(["status", "status", "vm%2Fqrender"]);
+    expect(seen.size).toBe(2);
+  });
+
+  it("neither reads nor fills the memory for a read whose chain is null, as one naming it does", async () => {
+    const node = fakeNode({ network: "onyx-1" });
+    const seen = new Map<string, number>();
+    await readRender(RPC, "x:", { fetch: node.fetch, chainId: null, seen, now: at(0) });
+    expect(paths(node.asked)).toEqual(["vm%2Fqrender"]);
+    expect(seen.size).toBe(0);
+    await readRender(RPC, "x:", { fetch: node.fetch, chainId: "onyx-1", seen, now: at(0) });
+    expect(seen.size).toBe(1);
+  });
+});
+
 // The answer inside a node's envelope, read by the package's own reads (the app's rpc.test.ts reads it through its wrappers,
 // which StrykerJS does not see: its sandbox links the workspaces' packages to the tree).
 describe("a node's answer inside its envelope", () => {

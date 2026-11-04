@@ -22,7 +22,13 @@ export interface NodeOptions extends ReadOptions {
   /** The universe's chain the node must be on: its status is read first, and a node naming another, or none, is read no
    * further (D118). Null names none, as the app's reads; each caller states which (10h's review, V6). */
   chainId: string | null;
+  /** The caller's memory of the nodes it saw on their chain, each until when (ms): a node is asked its status again only a
+   * minute after it was seen (V7). An entry a node and chain the caller reads. */
+  seen?: Map<string, number>;
 }
+
+/** How long a node seen on its chain is taken to stay on it. */
+const SEEN_MS = 60_000;
 
 const hexOf = (text: string): string =>
   Array.from(new TextEncoder().encode(text), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -87,21 +93,25 @@ async function statusOf(rpc: string, options: NodeOptions): Promise<ChainRead<St
   return chainId !== "" && network === chainId ? status : failedRead("other-chain", status.source);
 }
 
-// A read of an https RPC, or a refusal without a request; with a chain named, its node's status first, the two requests
-// under the read's one time limit and its caller's signal (10h's review, V1).
+// A read of an https RPC, or a refusal without a request; with a chain named, its node's status first unless its caller
+// saw it on that chain within a minute, the two requests under the read's one time limit and its caller's signal (V1).
 function guarded<T>(
   rpc: string,
   options: NodeOptions,
   run: (options: ReadOptions) => Promise<ChainRead<T>>,
 ): Promise<ChainRead<T>> {
-  const { chainId, ...read } = options;
+  const { chainId, seen, ...read } = options;
   if (!isHttps(rpc)) return refused(rpc, read);
   if (chainId === null) return run(read);
   const source = sourceOf(rpc, read);
+  const [at, node] = [Date.parse(source.at), `${chainId} ${withoutSlash(rpc)}`];
+  if ((seen?.get(node) ?? at) > at) return run(read);
   const ends = { timeout: failedRead<T>("timeout", source), left: failedRead<T>("down", source) };
   return withinTime(read, ends, async (signal) => {
     const status = await statusOf(rpc, { ...read, chainId, signal });
-    return status.ok ? run({ ...read, signal }) : status;
+    if (!status.ok) return status;
+    seen?.set(node, at + SEEN_MS);
+    return run({ ...read, signal });
   });
 }
 

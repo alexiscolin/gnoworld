@@ -356,6 +356,26 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
     ]);
   });
 
+  it("asks a universe's node its status once for two cards' forms in a minute, the other's node its own (V7)", async () => {
+    const realm = "gno.land/r/demo/tower";
+    const pages = { [REALM]: pollPage(), [realm]: "# Tower\n\n12 floors." };
+    const { tools, node } = setup({ pages, lists: { [REALM]: pollFunctions(), [realm]: pollFunctions() } });
+    await tools.run(give(digest(form())), askedOf().asked);
+    await tools.run(give(digest(form())), askedOf().asked);
+    const tower = form({ realm, args: { id: "12", answer: "floors" }, why: "It has 12 floors." });
+    await tools.run(
+      { name: "give_digest", args: { profile: "gnoland", realm, digest: digest(tower) } },
+      askedOf().asked,
+    );
+    expect(nodeAsked(node)).toEqual([
+      ["https://rpc.onyx.example:443", "status"],
+      ["https://rpc.onyx.example:443", REALM],
+      ["https://rpc.onyx.example:443", REALM],
+      ["https://rpc.gnoland.example:443", "status"],
+      ["https://rpc.gnoland.example:443", realm],
+    ]);
+  });
+
   it("refuses a form when the universe's node is another chain, asking it nothing more than its status", async () => {
     const { tools, node } = setup({ node: nodeOf({ [REALM]: pollFunctions() }, "test5") });
     const { asked, cards } = askedOf();

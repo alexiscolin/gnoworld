@@ -21,6 +21,9 @@ interface Setup {
   readonly fetch?: ChainFetch;
 }
 
+// The cards' setup and their memory of the universes' nodes seen on their chain, an entry a universe (10h's review, V7).
+type Ready = Setup & { readonly seen: Map<string, number> };
+
 // A page is read only as far as 64 KiB, cut on its last line's end so no number is read cut (D102).
 const PAGE_BYTES = 64 * 1024;
 const refused = (why: string): Ran => ({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
@@ -83,14 +86,14 @@ const LATE = { ok: false, why: "its call's time is up." } as const;
 const over = (signal: AbortSignal): boolean => signal.aborted;
 
 // A realm's functions on its universe's own node, checked to be its chain (D118), the call's signal ending the read.
-function functionsOn(setup: Setup, universe: Universe, at: Realm) {
-  const node = { chainId: universe.chainId, signal: at.signal };
+function functionsOn(setup: Ready, universe: Universe, at: Realm) {
+  const node = { chainId: universe.chainId, signal: at.signal, seen: setup.seen };
   return readFunctionList(universe.rpc, at.realm, setup.fetch === undefined ? node : { ...node, fetch: setup.fetch });
 }
 
 // A realm's reads, that call: its height, its page, and its functions when a form needs them; none more once the call's
 // time is up.
-async function readRealm(setup: Setup, at: Realm): Promise<Sourced> {
+async function readRealm(setup: Ready, at: Realm): Promise<Sourced> {
   const universe = setup.places.universes.get(at.profile);
   if (universe === undefined) return { ok: false, why: "its chain is no universe's." };
   const height = heightOf(await setup.read("gno_status", { profile: at.profile }), universe);
@@ -126,7 +129,7 @@ function whyOf(
 type Definitions = ReturnType<typeof definitionsOf>;
 type Args<At extends 0 | 1 | 2> = z.output<Definitions[At]["args"]>;
 
-async function digestCard(setup: Setup, args: Args<0>, asked: Asked): Promise<Ran> {
+async function digestCard(setup: Ready, args: Args<0>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("digest")) return refused(`an answer holds ${String(CARDS.digests)} digests at most.`);
   const forms = args.digest.blocks.some((block) => block.type === "form");
   const sourced = await readRealm(setup, { profile: args.profile, realm: args.realm, forms, signal: asked.signal });
@@ -138,7 +141,7 @@ async function digestCard(setup: Setup, args: Args<0>, asked: Asked): Promise<Ra
   return kept(`the digest of ${args.realm}, read at block ${String(sourced.at.height)}, shows with the answer.`);
 }
 
-async function proposalCard(setup: Setup, args: Args<1>, asked: Asked): Promise<Ran> {
+async function proposalCard(setup: Ready, args: Args<1>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("proposal")) return refused(`an answer holds ${String(CARDS.proposals)} proposal at most.`);
   const sourced = await readRealm(setup, {
     profile: args.profile,
@@ -169,7 +172,7 @@ function flyCard(setup: Setup, button: Extract<AnswerButton, { type: "fly" }>, a
   return Promise.resolve(kept(`the button to ${button.place}.`));
 }
 
-async function buttonCard(setup: Setup, args: Args<2>, asked: Asked): Promise<Ran> {
+async function buttonCard(setup: Ready, args: Args<2>, asked: Asked): Promise<Ran> {
   if (asked.cards.full("button")) return refused(`an answer holds ${String(CARDS.buttons)} buttons at most.`);
   const { button, profile } = args;
   if (button.type === "fly") return flyCard(setup, button, asked);
@@ -190,6 +193,7 @@ export function cardTools(setup: Setup) {
     throw new Error(`cards: the chain profile ${JSON.stringify(strange)} is no universe of the data`);
   const definitions = definitionsOf(setup.chains);
   const [digest, proposal, button] = definitions;
+  const ready: Ready = { ...setup, seen: new Map() };
   return {
     definitions,
     /** A card's call, its arguments parsed again by its own schema; refused when they fail it or it is no card's. */
@@ -197,15 +201,15 @@ export function cardTools(setup: Setup) {
       const no = Promise.resolve<Ran>({ ok: false, reason: "refused" });
       if (call.name === digest.name) {
         const args = digest.args.safeParse(call.args);
-        return args.success ? digestCard(setup, args.data, asked) : no;
+        return args.success ? digestCard(ready, args.data, asked) : no;
       }
       if (call.name === proposal.name) {
         const args = proposal.args.safeParse(call.args);
-        return args.success ? proposalCard(setup, args.data, asked) : no;
+        return args.success ? proposalCard(ready, args.data, asked) : no;
       }
       if (call.name !== button.name) return no;
       const args = button.args.safeParse(call.args);
-      return args.success ? buttonCard(setup, args.data, asked) : no;
+      return args.success ? buttonCard(ready, args.data, asked) : no;
     },
   };
 }

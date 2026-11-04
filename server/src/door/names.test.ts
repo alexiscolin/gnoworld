@@ -127,6 +127,18 @@ describe("a mainnet name", () => {
     expect(await named(ANNA)).toBe(true);
   });
 
+  it("asks the node's status once a minute, however many accounts it reads (10h's review, V7)", async () => {
+    const { asked, clock, named } = setup([NAMED, NONE, NAMED]);
+    const statuses = () => asked.filter((url) => url === `${RPC}/status`).length;
+    expect(await named(ANNA)).toBe(true);
+    clock.now += MINUTE - 1;
+    expect(await named(BEN)).toBe(false);
+    expect(statuses()).toBe(1);
+    clock.now += 1;
+    expect(await named(Address.parse(addressAt(1)))).toBe(true);
+    expect(statuses()).toBe(2);
+  });
+
   it("is none when the record is missing", async () => {
     const { named } = setup([NONE]);
     expect(await named(BEN)).toBe(false);

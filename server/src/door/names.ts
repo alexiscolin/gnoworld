@@ -16,6 +16,15 @@ interface Options {
   max?: number;
 }
 
+// The mainnet's node, and when it was last seen on its chain: its status is read once a minute (10h's review, V7).
+interface Node {
+  rpc: string;
+  chainId: string;
+  send: Send;
+  now: () => number;
+  seen: Map<string, number>;
+}
+
 const MINUTE = 60_000;
 const TIMEOUT_MS = 3000;
 // A good answer is under 1 KiB.
@@ -24,13 +33,12 @@ const MAX_BYTES = 64 * 1024;
 /** Whether an account has a name on the mainnet: its record in r/sys/users, missing or deleted, by that realm's own nil
  * check (users.gno, store.gno, read on gnoland-1), through the RPC's vm/qeval; undefined when the read fails, the node
  * being another chain's included. The expression is a fixed one over a parsed address (D114). */
-async function readName(
-  node: { rpc: string; chainId: string; send: Send },
-  account: Address,
-): Promise<boolean | undefined> {
+async function readName(node: Node, account: Address): Promise<boolean | undefined> {
   const expression = `gno.land/r/sys/users.ResolveAddress("${account}").IsDeleted()`;
   const read = await readEvaluated(node.rpc, expression, {
     chainId: node.chainId,
+    seen: node.seen,
+    now: () => new Date(node.now()),
     timeoutMs: TIMEOUT_MS,
     maxBytes: MAX_BYTES,
     fetch: (url, init) => node.send(url, init ?? {}, TIMEOUT_MS),
@@ -56,11 +64,12 @@ export function makeNames({
 }: Options): (account: Address) => Promise<boolean> {
   // The Map's first account is the one read longest ago: an account is set again at each read.
   const known = new Map<string, { named: boolean; until: number }>();
+  const node: Node = { rpc, chainId, send, now, seen: new Map() };
   return async (account) => {
     const at = now();
     const kept = known.get(account);
     if (kept !== undefined && kept.until > at) return kept.named;
-    const named = await readName({ rpc, chainId, send }, account);
+    const named = await readName(node, account);
     remember(known, [account, { named: named === true, until: now() + keptFor(named) }], max);
     return named === true;
   };
