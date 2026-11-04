@@ -53,7 +53,7 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   // At most 3 starts in 10 minutes, but for a child dropped for its message's size, which spends none of them.
   const counted = (at: number) => {
     while (at - (starts[0] ?? at) > 10 * 60_000) starts.shift();
-    return starts.length < 3 && starts.push(at) > 0;
+    return starts.length < 3 && starts.push(at) !== 0;
   };
   const restart = async (): Promise<Child | undefined> => {
     if (!child.oversized && !counted(setup.now?.() ?? Date.now())) {
