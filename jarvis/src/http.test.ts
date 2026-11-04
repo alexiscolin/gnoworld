@@ -164,11 +164,11 @@ describe("jarvis's HTTP face: what it answers", () => {
     expect(said).toMatch(/^HTTP\/1\.1 404 /);
   });
 
-  it("answers its names whatever their case and port", async () => {
+  it("answers each of its names whatever their case and port, an address in brackets among them", async () => {
     const { log } = capture();
     const jarvis = await serve(
       { "/echo": { POST: echo } },
-      { host: "127.0.0.1", port: 0, names: ["jarvis"], log, ready: () => true },
+      { host: "127.0.0.1", port: 0, names: ["jarvis", "[fd00::7]"], log, ready: () => true },
     );
     opened.push({
       close: () =>
@@ -185,9 +185,15 @@ describe("jarvis's HTTP face: what it answers", () => {
       request.end("{}");
     };
     const at = `http://127.0.0.1:${String(address.port)}/echo`;
-    for (const host of ["jarvis", "JARVIS:8081", "Jarvis:1"]) {
+    for (const host of ["jarvis", "JARVIS:8081", "Jarvis:1", "[fd00::7]", "[FD00::7]:8081"]) {
       const { sent, status } = unended(at, { headers: { host, "content-length": "2" } }, write);
       expect(await status).toBe(200);
+      sent.destroy();
+    }
+    // A name inside a Host that is no name, before or after: never ours.
+    for (const host of ["evil.example/jarvis", "jarvis/evil.example", "jarvis:", "[fd00::7", "[zz]", "[]"]) {
+      const { sent, status } = unended(at, { headers: { host, "content-length": "2" } }, write);
+      expect(await status).toBe(404);
       sent.destroy();
     }
   });

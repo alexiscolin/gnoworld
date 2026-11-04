@@ -25,7 +25,8 @@ describe("serverOptions", () => {
 });
 
 describe("stop", () => {
-  it("closes the server, then cuts a client stalled in its headers once its time is up", async () => {
+  it("closes the server, then cuts a request still in flight once its time is up", async () => {
+    // A request never answered, its body still coming: close() alone would wait for it.
     const server = createServer(serverOptions({ headers: 60_000, request: 60_000, keepAlive: 60_000, check: 1_000 }));
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
@@ -35,7 +36,9 @@ describe("stop", () => {
     client.on("error", () => undefined);
     await once(client, "connect");
     const closed = new Promise((resolve) => client.on("close", resolve));
-    client.write("GET / HTTP/1.1\r\nHost: localhost\r\n");
+    const arrived = once(server, "request");
+    client.write("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\n\r\nab");
+    await arrived;
     const stopped = new Promise<void>((resolve) => {
       stop(server, resolve, 100);
     });
