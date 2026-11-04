@@ -1200,7 +1200,9 @@ def seven_mutants():
         (" --outputFile.json=$logs/coverage.json\"", "\"", "reads the coverage's own report for its retry"),
         ("\"$waited\" \"${held_by:--}\"", "0 \"${held_by:--}\"", "--merge records how long it waited"),        ("\t\t\theld_by=$(cat \"$merge_lock/worktree\" 2>/dev/null || echo \"another worktree\")\n", "\t\t\theld_by=\n", "--merge records whose lock it waited for"),
         ("\" >>\"${merge_lock%/*}/merge-waits.log\" 2>/dev/null", "\" >/dev/null 2>&1", "--merge records its wait"),
-        ("\t\tnode app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts\n", "\t\t:\n", "a commit's gate reads the first screen's budget"),
+        ("\t\tnode app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate\n", "\t\t:\n", "a commit's gate reads the first screen's budget"),
+        (" app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate\n", " app/tests/e2e/budgets.spec.ts --grep @gate\n", "a commit's gate weighs the late chunks from the build (item 7)"),
+        (" app/tests/e2e/chunks.spec.ts --grep @gate\n", " app/tests/e2e/chunks.spec.ts\n", "a commit's gate walks the @gate tests alone, no late chunk's journey (item 7)"),
     ))
     s = "scripts/speeds.py"
     yield from swaps(s, "speeds.py", (

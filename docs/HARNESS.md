@@ -262,7 +262,10 @@ fails before StrykerJS's own phase runs (a coverage run that failed leaves no re
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
-budget with the budget spec alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip).
+budget with the budget spec's tests tagged `@gate` alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip), and the late chunks'
+caps from the built files with no page (`app/tests/e2e/chunks.ts`, Node's gzip, the browser's bytes; Alexis, 2026-11-04): the late
+chunks' journeys, which draw the scene on a software GPU to see which chunk a page asks, timed out at a load of 60 and run at the merge
+check and in `--full`, each checking that the chunk the page asked is the file weighed.
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,

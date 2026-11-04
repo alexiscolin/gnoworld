@@ -6229,6 +6229,10 @@ printf 'x\n' >"$g/app/src/b.tsx"
 out=$(gate) || fail "check.sh failed on a new app file: $out"
 [ "$(grep -c '^playwright ' "$log")" = 1 ] || fail "check.sh did not run one Playwright command on a build: $(grep '^playwright' "$log")"
 grep '^playwright ' "$log" | grep -q "app/tests/e2e/budgets.spec.ts" || fail "check.sh's fast gate did not run the budget spec after its build: $(grep '^playwright' "$log")"
+# Its tests tagged @gate alone: the first screens and the measure's own case, and the late chunks weighed from the built files with no page
+# (chunks.spec.ts; Alexis, 2026-11-04, "Oui, les deux": their journeys, a scene on a software GPU, timed out at a load of 60).
+grep '^playwright ' "$log" | grep -qF " app/tests/e2e/chunks.spec.ts" || fail "check.sh's fast gate did not weigh the late chunks from the build: $(grep '^playwright' "$log")"
+grep '^playwright ' "$log" | grep -qE -- " --grep @gate( |$)" || fail "check.sh's fast gate walked the late chunks' journeys, not the @gate tests alone: $(grep '^playwright' "$log")"
 before build:app playwright || fail "check.sh ran the budget spec before the build it measures"
 # The budget spec gets a free port of its own (not the config's fixed 4173, another gate's), and a free_ports that fails stops it before it starts.
 port=$(sed -n 's/^playwright port=\([0-9]*\) .*/\1/p' "$log")
