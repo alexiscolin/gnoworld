@@ -98,8 +98,8 @@ async function sent(child: Child, params: Parameters<Client["callTool"]>[0], tim
   } catch (error) {
     if (error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout)
       return { ok: false, reason: "timeout" };
-    const ended = !child.alive || (error instanceof SdkError && error.code === SdkErrorCode.ConnectionClosed);
-    return { ok: false, reason: ended ? "down" : "error" };
+    // The client calls onclose before it fails the requests a closed connection leaves (its Protocol's _onclose).
+    return { ok: false, reason: child.alive ? "error" : "down" };
   }
 }
 
@@ -145,13 +145,9 @@ async function atStart<T>(request: Promise<T>): Promise<T> {
 }
 
 async function checked(client: Client, setup: Setup, timeout: number): Promise<void> {
-  const Tool = z.object({
-    name: z.string(),
-    inputSchema: z.object({ properties: z.record(z.string(), z.unknown()).optional() }),
-  });
-  const listing = z.object({ tools: z.array(Tool) }).safeParse(await atStart(client.listTools(undefined, { timeout })));
-  if (!listing.success) throw new Error("gnomcp: its tool list is not gnomcp 0.11.0's");
-  const fields = new Map(listing.data.tools.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]));
+  // The client parsed the list by MCP's own schema: each tool a name and an input schema of properties.
+  const { tools } = await atStart(client.listTools(undefined, { timeout }));
+  const fields = new Map(tools.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]));
   for (const { name, args } of setup.tools) {
     const theirs = fields.get(name);
     if (theirs === undefined) throw new Error(`gnomcp: no tool ${name}`);
@@ -195,7 +191,7 @@ function read(result: unknown): Ran {
 
 // A stream's lines into the log, each kept to 64 KiB, so a line with no end holds no more.
 function logLines(stream: Stream | null, log: Log): void {
-  const decoder = new StringDecoder("utf8");
+  const decoder = new StringDecoder();
   let kept = "";
   stream?.on("data", (chunk: Buffer) => {
     const parts = (kept + decoder.write(chunk)).split("\n");

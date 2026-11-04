@@ -9,6 +9,7 @@ import Anthropic, {
   APIConnectionTimeoutError,
   type ClientOptions,
 } from "@anthropic-ai/sdk";
+import { z } from "zod";
 import type { Log } from "../log.ts";
 import type { Secret } from "../settings.ts";
 import type { Budget } from "./budget.ts";
@@ -115,15 +116,12 @@ function delayOf(error: AnthropicError, attempt: number): number | undefined {
 }
 
 // The status and headers of an error the API answered with: `instanceof APIError` would type its generics as any.
-function answeredOf(error: AnthropicError): { status: number; headers: Headers | undefined } | undefined {
-  if (!("status" in error) || typeof error.status !== "number") return undefined;
-  return {
-    status: error.status,
-    headers: "headers" in error && error.headers instanceof Headers ? error.headers : undefined,
-  };
+function answeredOf(error: AnthropicError): { status: number; headers?: Headers | undefined } | undefined {
+  const parsed = z.object({ status: z.number(), headers: z.instanceof(Headers).optional() }).safeParse(error);
+  return parsed.success ? parsed.data : undefined;
 }
 
-function retried({ status, headers }: { status: number; headers: Headers | undefined }): boolean {
+function retried({ status, headers }: { status: number; headers?: Headers | undefined }): boolean {
   const told = headers?.get("x-should-retry");
   if (told === "true" || told === "false") return told === "true";
   return status === 408 || status === 409 || status === 429 || status >= 500;
@@ -131,7 +129,7 @@ function retried({ status, headers }: { status: number; headers: Headers | undef
 
 // retry-after-ms, else retry-after in seconds; a date, zero or no number asks nothing.
 function askedWait(headers: Headers | undefined): number | undefined {
-  const millis = Number.parseFloat(headers?.get("retry-after-ms") ?? "");
-  const asked = Number.isNaN(millis) ? Number.parseFloat(headers?.get("retry-after") ?? "") * 1000 : millis;
+  const millis = Number.parseFloat(String(headers?.get("retry-after-ms")));
+  const asked = Number.isNaN(millis) ? Number.parseFloat(String(headers?.get("retry-after"))) * 1000 : millis;
   return asked > 0 ? asked : undefined;
 }

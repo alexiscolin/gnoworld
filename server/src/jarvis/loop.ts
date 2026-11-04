@@ -4,7 +4,7 @@
 // settles the model (model.ts), then each tool call passes the allowlist and the tag's check before it runs, eight a
 // turn at most, its result cut and wrapped. It stops at the answer, the turn cap, max_tokens, a refusal (D81), an
 // error, a stop it never asks for, or the day's budget (D84).
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Tracer } from "@opentelemetry/api";
 import type { Log } from "../log.ts";
@@ -77,8 +77,7 @@ function systemOf(index: Parts["skills"]["index"]): string {
 async function ask(parts: Parts, prompt: { system: string; version: string }, question: Question): Promise<Result> {
   const started = performance.now();
   const trace = traceQuestion(parts.tracer, { model: parts.model, version: prompt.version });
-  const limit = parts.caps.toolResultBytes;
-  const blocks = untrustedBlocks(parts.random === undefined ? { limit } : { limit, random: parts.random });
+  const blocks = untrustedBlocks({ limit: parts.caps.toolResultBytes, random: parts.random ?? randomBytes });
   const run: Run = { parts, blocks, trace, messages: [{ role: "user", content: opening(blocks, question) }], turns: 0 };
   let word = "thrown";
   try {
