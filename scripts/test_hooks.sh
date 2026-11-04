@@ -6775,13 +6775,17 @@ for a in "$@"; do [ "$prev" != --port ] || port=$a; prev=$a; done
 exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$port"
 SH
 cp "$w/server" "$w/root/app/node_modules/.bin/react-router" && cp "$w/server" "$w/root/app/node_modules/.bin/vite"
-# Node: its version, or the backend's entry, which serves the server's port given first.
+# Node: its version, or the backend's entry, which, as workshopBackend.mjs, listens on the server's port given first through a child of its
+# own, stopped with it on TERM; killed hard, it leaves the child listening (F4961).
 cat >"$w/nvm/versions/node/$want/bin/node" <<SH
 #!/bin/sh
 [ "\$1" != -v ] || { echo $want; exit 0; }
 echo "node \$* cwd=\$(pwd -P)" >>"\$W_LOG"
 [ "\${DIE:-}" != backend ] || exit 1
-exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "\$2"
+python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "\$2" &
+child=\$!
+trap 'kill \$child; exit 0' TERM INT HUP
+wait \$child
 SH
 printf '#!/bin/sh\necho ergo >>"$W_LOG"\n[ -z "${ERGO_FAILS:-}" ] || exit 1\n' >"$w/root/scripts/ergo.sh"
 printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exit 1 ;; esac\n' "'{\"BackendState\": \"Running\", \"Self\": {\"DNSName\": \"box.tail.ts.net.\"}}'" >"$w/bin/tailscale"
@@ -6832,7 +6836,8 @@ grep -q "^workshop-app: .*https://box.tail.ts.net:$((app_port + 1000)) " "$w/one
 grep -q "workshop-app is the app's screens" "$w/one.out" && grep -q "workshop-lab is the lab.*realism.html" "$w/one.out" || fail "workshop.sh did not say what each name opens: $(cat "$w/one.out")"
 [ "$(lsof -a -p "$first" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$root" ] || fail "workshop.sh left its checkout's folder"
 app_pid=$(serving "$app_port") && lab_pid=$(serving "$lab_port") && api_pid=$(serving "$api_port") || fail "workshop.sh's processes do not listen on their ports"
-[ "$(cat "$root/.claude/tmp/workshop.pid")" = "$(printf '%s %s %s\n%s %s %s\n%s %s %s' "$first" "$app_pid" "$app_port" "$first" "$lab_pid" "$lab_port" "$first" "$api_pid" "$api_port")" ] ||
+backend=$(lsof -nP -a -p "$api_pid" -d cwd -R -FR 2>/dev/null | sed -n 's/^R//p' | head -n 1) # the backend, whose child serves its port
+[ "$(cat "$root/.claude/tmp/workshop.pid")" = "$(printf '%s %s %s\n%s %s %s\n%s %s %s' "$first" "$app_pid" "$app_port" "$first" "$lab_pid" "$lab_port" "$first" "$backend" "$api_port")" ] ||
 	fail "workshop.sh did not write its pid, each process's and its port: $(cat "$root/.claude/tmp/workshop.pid")"
 # A second run of the checkout stops the first, its servers, its backend and its tailnet names, and serves in its place.
 : >"$w/log.preview" && shop two && second=$shop
@@ -6879,9 +6884,10 @@ done
 # A run killed hard leaves its servers and its tailnet names: the next run stops those servers, from this checkout's app, and takes the
 # names down before it puts them up again.
 : >"$w/log.preview" && shop hard && hard=$shop && up || fail "workshop.sh did not start again: $(cat "$w/hard.out")"
-old_app=$(serving "$app_port") && kill -9 "$hard" && : >"$w/log.preview" && shop after && after=$shop
+old_app=$(serving "$app_port") && old_api=$(serving "$api_port") && kill -9 "$hard" && : >"$w/log.preview" && shop after && after=$shop
 up || fail "workshop.sh did not serve after a run killed hard: $(cat "$w/after.out")"
 kill -0 "$old_app" 2>/dev/null && fail "workshop.sh left the servers of a run killed hard"
+kill -0 "$old_api" 2>/dev/null && fail "workshop.sh left the backend of a run killed hard, its server still on its port (F4961)"
 order
 kill "$after" && ended "$after" || fail "workshop.sh lived through TERM"
 # A pid file the run left, or one naming a process of another folder: nothing of it is stopped but this checkout's own servers.

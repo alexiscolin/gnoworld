@@ -15,7 +15,19 @@ PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin:$PATH"
 app_port=${WORKSHOP_APP_PORT:-5198} lab_port=${WORKSHOP_LAB_PORT:-5199}
 api_port=${WORKSHOP_API_PORT:-5195} irc_port=${WORKSHOP_IRC_PORT:-5196} ws_port=${WORKSHOP_WS_PORT:-5197} # the server's, Ergo's, Ergo's WebSocket
 unset WORKSHOP_APP_PORT WORKSHOP_LAB_PORT WORKSHOP_API_PORT WORKSHOP_IRC_PORT WORKSHOP_WS_PORT # each process is given its own, below
-listens() { lsof -nP -a -p "$1" -iTCP:"$2" -sTCP:LISTEN >/dev/null 2>&1; } # pid $1 serves port $2
+# Process $1 serves port $2 when the listener is it or one of its descendants: the backend's server is a child of the process this starts
+# (F4961). Parents from lsof -R, as ps is refused where the hooks' tests run.
+listens() {
+	lsof -nP -a -p "$1" -iTCP:"$2" -sTCP:LISTEN >/dev/null 2>&1 && return 0
+	for listener in $(lsof -nP -iTCP:"$2" -sTCP:LISTEN -t 2>/dev/null); do
+		up=$listener depth=0
+		while [ -n "$up" ] && [ "$up" != 1 ] && [ "$depth" -lt 8 ]; do
+			[ "$up" = "$1" ] && return 0
+			up=$(lsof -nP -a -p "$up" -d cwd -R -FR 2>/dev/null | sed -n 's/^R//p' | head -n 1) depth=$((depth + 1))
+		done
+	done
+	return 1
+}
 
 # The last run of this checkout, while a process of it still serves: its script stopped (its end stops the rest and the tailnet), then the process.
 if [ -f "$pidfile" ]; then

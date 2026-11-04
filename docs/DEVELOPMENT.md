@@ -122,12 +122,13 @@ fast lane instead: its test seen failing, the gate, the journeys that watch it, 
 
 **Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
 Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
-each started by its one function `serve`: the app's (`react-router dev`) on 127.0.0.1:5198 and the lab's (`vite --config
-lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when the `tailnet-preview`
-skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`; without it, the local
-addresses. It stops only servers it started itself (their pids and ports in `.claude/tmp/workshop.pid`): a port held by anything
-else is said, never taken. Ctrl+C stops both and takes them off the tailnet, and so does either server that stops; a second
-`pnpm workshop` in the same checkout replaces the first, and a run killed hard stays on the tailnet until the next one, or
+each started by its function `start` and put on the tailnet by `share`: the app's (`react-router dev`) on 127.0.0.1:5198 and the
+lab's (`vite --config lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when
+the `tailnet-preview` skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`;
+without it, the local addresses. It stops only processes it started itself (their pids and ports in `.claude/tmp/workshop.pid`):
+a port held by anything else is said, never taken. Ctrl+C stops all three, the servers and the backend (below), and takes them
+off the tailnet, and so does any of them that stops; a second `pnpm workshop` in the same checkout replaces the first, the
+backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
 **The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
