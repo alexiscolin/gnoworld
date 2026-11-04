@@ -307,19 +307,24 @@ function holdTimers() {
   });
 }
 
-// The first screen: what a page asks before any of its timers, frames or idle callbacks runs (the chief, 2026-11-04: a timer's chunk was
-// counted at a load of 50 to 80, not quiet), held until nothing is in flight and an idle period brings no request, twice, which no load
-// moves. What it imports as it runs or mounts counts.
-async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
-  await page.addInitScript(holdTimers);
-  await page.goto(path);
-  await hydrated(page);
+// Until nothing is in flight and an idle period of the browser's own brings no request, twice: what the page's code asks as it runs,
+// mounts or lays out (a fetch's answer, a resize observed) has come, which no load moves; only a timer could ask later.
+async function settled(page: Page, seen: Seen): Promise<void> {
   for (let still = 0; still < 2;) {
     await expect.poll(() => seen.inflight.size, { timeout: 60_000 }).toBe(0);
     const before = seen.requests;
     await page.evaluate(() => (Reflect.get(window, "__idle") as () => Promise<void>)());
     still = seen.inflight.size === 0 && seen.requests === before ? still + 1 : 0;
   }
+}
+
+// The first screen: what a page asks before any of its timers, frames or idle callbacks runs (the chief, 2026-11-04: a timer's chunk was
+// counted at a load of 50 to 80, not quiet), once settled. What it imports as it runs or mounts counts.
+async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
+  await page.addInitScript(holdTimers);
+  await page.goto(path);
+  await hydrated(page);
+  await settled(page, seen);
   const asked = [...seen.scripts];
   await page.evaluate(() => {
     (Reflect.get(window, "__letTimersGo") as () => void)();
@@ -380,10 +385,16 @@ async function namedIn(page: Page, url: string, pattern: RegExp): Promise<string
 }
 
 // The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
-// the door ended.
-async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) {
+// the door ended; open, its rooms read and its screen drawn, and settled, so what it asks once open, as a narrow chat's rooms, has come
+// (F5410: RoomsDrawer asked as the guard read, at a load of 10 to 40).
+async function lateChat(page: Page, path: string, seen: Seen) {
+  const { scripts } = seen;
   if (!holdsDoor(path) || (await page.locator("#chat").count()) === 0) return undefined;
   await expect.poll(() => [...scripts].filter((url) => CHAT.test(url)).length).toBe(1);
+  await expect(page.locator("#chat [role='status']", { hasText: "Loading the chat" })).toHaveCount(0, {
+    timeout: 60_000,
+  });
+  await settled(page, seen);
   expect(await (await page.request.get(path)).text(), "no preload names the chat").not.toContain("ChatPanel");
   const { chunk, loaded, door } = await page.evaluate(
     ([chat, gate]) => {
@@ -421,7 +432,7 @@ for (const path of PAGES) {
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
-    const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
+    const late = [asked[0], await lateChat(page, path, seen)].filter((url) => url !== undefined);
     const firstScreen = await without(page, early, late);
     const lateChunk = late.find((url) => CHAT.test(url));
     const chatOpened = lateChunk === undefined ? [] : openedOf(lateChunk, firstScreen, scripts);

@@ -69,6 +69,8 @@ export class StationNames {
     this.#layer = document.createElement("nav");
     this.#layer.className = `${labelStyles["layer"] ?? ""} ${planStyles["plan"] ?? ""} ${styles["layer"] ?? ""}`;
     this.#layer.setAttribute("aria-label", "The stations round the Earth");
+    // Over the scene for the pointer (overScene.ts): a mouse on a name holds the eye, which would slide it away (F5403).
+    this.#layer.dataset["stations"] = "";
     this.#caption = document.createElement("div");
     this.#caption.className = `${labelStyles["placed"] ?? ""} ${styles["caption"] ?? ""}`;
     const title = Object.assign(document.createElement("p"), { className: "label", textContent: "Stations" });
