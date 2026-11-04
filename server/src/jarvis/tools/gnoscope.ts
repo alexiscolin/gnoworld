@@ -25,17 +25,23 @@ interface Gnoscope {
 }
 
 const MAX_BYTES = 1024 * 1024;
-class TooLarge extends Error {}
+// An answer this client does not read: past 1 MiB, or an event stream.
+class Unread extends Error {}
 
-// A fetch through net.ts, its body cut off once it passes 1 MiB, so a third party's answer holds no more.
+// A fetch through net.ts, its body cut off once it passes 1 MiB, so a third party's answer holds no more. gnoscope
+// answers JSON (read live, 2026-11-04); an event stream is refused, as the client's reader of one ends no call (D108).
 const cappedFetch = (timeoutMs: number) => async (url: string | URL, init?: RequestInit) => {
   const response = await send(String(url), init ?? {}, timeoutMs);
+  if (response.headers.get("content-type")?.startsWith("text/event-stream") === true) {
+    await response.body?.cancel();
+    throw new Unread();
+  }
   if (response.body === null) return response;
   let size = 0;
   const cap = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       size += chunk.byteLength;
-      if (size > MAX_BYTES) controller.error(new TooLarge());
+      if (size > MAX_BYTES) controller.error(new Unread());
       else controller.enqueue(chunk);
     },
   });
@@ -115,11 +121,11 @@ function taken(listed: readonly Tool[], setup: Setup): Gnoscope["definitions"] {
   });
 }
 
-// Why a call gave nothing: an answer too large, no JSON, or no result Zod takes; the client's own failure; else gnoscope
+// Why a call gave nothing: an answer too large or a stream, no JSON, or no result Zod takes; the client's own failure; else gnoscope
 // unreached, or its JSON-RPC error.
 function failureOf(error: unknown): "timeout" | "malformed" | "down" | "error" {
   for (let cause: unknown = error; cause instanceof Error; cause = cause.cause)
-    if (cause instanceof TooLarge || cause instanceof SyntaxError || cause instanceof z.ZodError) return "malformed";
+    if (cause instanceof Unread || cause instanceof SyntaxError || cause instanceof z.ZodError) return "malformed";
   if (error instanceof SdkError) return clientFailure(error.code);
   return error instanceof TypeError ? "down" : "error";
 }

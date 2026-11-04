@@ -29,6 +29,8 @@ interface Scenario {
   raw?: (method: string, id: unknown) => string | undefined;
   /** A JSON-RPC error in place of a result. */
   fail?: (method: string) => { code: number; message: string } | undefined;
+  /** An answer written as an event stream, built from the request's id; the GET's stream when the method is "GET". */
+  stream?: (method: string, id: unknown) => string | undefined;
 }
 
 const freshness = (data: unknown) =>
@@ -70,11 +72,21 @@ function answerOf(message: z.infer<typeof Message>, scenario: Scenario): string 
   return JSON.stringify({ jsonrpc: "2.0", id: message.id, ...body });
 }
 
+// An event stream when the test gives one, else JSON.
+function written(response: ServerResponse, events: string | undefined, json: () => { status: number; body: string }) {
+  if (events !== undefined) {
+    response.writeHead(200, { "content-type": "text/event-stream" }).end(events);
+    return;
+  }
+  const { status, body } = json();
+  response.writeHead(status, { "content-type": "application/json" }).end(body);
+}
+
 export async function fakeGnoscope(scenario: Scenario = {}) {
   const requests: { method: string; params: unknown }[] = [];
   const handle = async (request: IncomingMessage, response: ServerResponse) => {
     if (request.method !== "POST") {
-      response.writeHead(405, { "content-type": "application/json" }).end("{}");
+      written(response, scenario.stream?.("GET", undefined), () => ({ status: 405, body: "{}" }));
       return;
     }
     const message = Message.parse(JSON.parse(await bodyOf(request)));
@@ -90,7 +102,10 @@ export async function fakeGnoscope(scenario: Scenario = {}) {
       response.writeHead(202).end();
       return;
     }
-    response.writeHead(200, { "content-type": "application/json" }).end(answerOf(message, scenario));
+    written(response, scenario.stream?.(message.method, message.id), () => ({
+      status: 200,
+      body: answerOf(message, scenario),
+    }));
   };
   const server = createServer((request, response) => {
     handle(request, response).catch((error: unknown) => {

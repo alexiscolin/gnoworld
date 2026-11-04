@@ -232,6 +232,35 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
     await started.close();
   });
 
+  it.each([
+    [
+      "a good event",
+      (id: unknown) =>
+        `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "x" }] } })}\n\n`,
+    ],
+    ["a bad event", () => "event: message\ndata: {planted\n\n"],
+    [
+      "an event past 1 MiB",
+      (id: unknown) =>
+        `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "x".repeat(1024 * 1024) }] } })}\n\n`,
+    ],
+  ])("refuses an answer written as an event stream, %s, as malformed at once (D108)", async (_case, events) => {
+    const server = await serve({ stream: (method, id) => (method === "tools/call" ? events(id) : undefined) });
+    const started = await start(server.url, { timeoutMs: 3_000 }).gnoscope;
+    const begun = performance.now();
+    expect(await started.call("get_realm_state", state())).toEqual({ ok: false, reason: "malformed" });
+    expect(performance.now() - begun).toBeLessThan(1_000);
+    await started.close();
+  });
+
+  it("opens no stream gnoscope offers on its GET, and still offers its tools", async () => {
+    const server = await serve({ stream: (method) => (method === "GET" ? "event: message\ndata: {}\n\n" : undefined) });
+    const started = await start(server.url).gnoscope;
+    expect(started.definitions).toHaveLength(4);
+    expect(await started.call("get_realm_state", state())).toMatchObject({ ok: true });
+    await started.close();
+  });
+
   it("gives gnoscope's own error as an error, its text kept", async () => {
     const server = await serve({
       answer: () => ({ content: [{ type: "text", text: "no such realm" }], isError: true }),
