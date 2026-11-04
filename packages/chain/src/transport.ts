@@ -72,12 +72,16 @@ async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array 
   return whole;
 }
 
+/** What ends a piece of work early: its time limit, and its caller's signal. */
+export interface Limits {
+  timeoutMs?: number | undefined;
+  signal?: AbortSignal | undefined;
+}
+
 /** What a transport is given: the address's answer is read under the limit and the cap, with the credentials the caller names. */
-export interface Transport {
+export interface Transport extends Limits {
   fetch?: ChainFetch;
-  timeoutMs?: number;
   maxBytes?: number;
-  signal?: AbortSignal;
   /** Whether the request carries cookies: `omit` for a chain, `same-origin` for this site's own file. */
   credentials: NonNullable<RequestInit["credentials"]>;
   cache?: RequestInit["cache"];
@@ -118,41 +122,43 @@ async function attempt({ url, fetcher, signal, credentials, cache, maxBytes }: A
 }
 
 /**
- * The one capped, timed GET of the browser: the bytes of the answer, or a kind. The limit wins the race by itself, so it does
- * not rely on fetch honouring its signal; the caller's signal ends the read too. No timer and no listener is left behind.
+ * Work under one time limit and its caller's signal: the limit and the leaving win the race by themselves, so nothing relies on
+ * a request honouring its signal, and the work's requests end through the signal it is given. No timer and no listener is
+ * left behind.
  */
-export async function fetchBytes(url: string, options: Transport): Promise<Fetched> {
-  const { fetch: fetcher = (address, init) => fetch(address, init), timeoutMs = CHAIN_TIMEOUT_MS } = options;
-  const { maxBytes = CHAIN_MAX_BYTES, signal: outer } = options;
-  if (outer?.aborted === true) return { kind: "down" };
+export async function withinTime<T>(
+  { timeoutMs = CHAIN_TIMEOUT_MS, signal: outer }: Limits,
+  ends: { timeout: T; left: T },
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  if (outer?.aborted === true) return ends.left;
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let leave: (() => void) | undefined;
-  const ended = new Promise<Fetched>((resolve) => {
+  const ended = new Promise<T>((resolve) => {
     timer = setTimeout(() => {
       controller.abort(new DOMException("the answer took too long", "TimeoutError"));
-      resolve({ kind: "timeout" });
+      resolve(ends.timeout);
     }, timeoutMs);
     leave = () => {
       controller.abort(outer?.reason);
-      resolve({ kind: "down" });
+      resolve(ends.left);
     };
     outer?.addEventListener("abort", leave, { once: true });
   });
   try {
-    return await Promise.race([
-      attempt({
-        url,
-        fetcher,
-        signal: controller.signal,
-        credentials: options.credentials,
-        cache: options.cache,
-        maxBytes,
-      }),
-      ended,
-    ]);
+    return await Promise.race([work(controller.signal), ended]);
   } finally {
     clearTimeout(timer);
     if (leave !== undefined) outer?.removeEventListener("abort", leave);
   }
+}
+
+/** The one capped, timed GET of the browser: the bytes of the answer, or a kind. */
+export function fetchBytes(url: string, options: Transport): Promise<Fetched> {
+  const { fetch: fetcher = (address, init) => fetch(address, init), maxBytes = CHAIN_MAX_BYTES } = options;
+  const { credentials, cache } = options;
+  return withinTime(options, { timeout: { kind: "timeout" }, left: { kind: "down" } }, (signal) =>
+    attempt({ url, fetcher, signal, credentials, cache, maxBytes }),
+  );
 }
