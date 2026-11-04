@@ -21,7 +21,7 @@ export function clientLoader({ request }: { request: Request }) {
   return onlyList(new URL(request.url));
 }
 
-// No genre is in the data files yet (the hubs' and stations' rows carry none): each place lists with none.
+// No genre is in the data files yet (the hubs' rows carry none): each place lists with none.
 const placesOf = () => [...site.worlds, ...site.ecosystems].map((place): ListedPlace => ({ ...place, genres: [] }));
 
 export default function List() {

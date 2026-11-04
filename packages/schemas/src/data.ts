@@ -88,7 +88,6 @@ const World = z.strictObject({
 });
 
 export const Hubs = inUniverse(World);
-export const Stations = inUniverse(World);
 export const Ecosystems = inUniverse(
   z.strictObject({ slug: Key, name: text(DATA_CAPS.name), description: text(DATA_CAPS.description), universe: Key }),
 );
@@ -125,9 +124,17 @@ const degrees = (limit: number) => z.number().check(z.gte(-limit), z.lte(limit))
 /** Where the Earth's side rooms stand (ADR-0002 §10): one point of the globe a room, by a reviewed row, so no room's name finds a place by
  * chance. A room with none stays in the list; the main room is the globe itself. */
 /** What turns round the Earth (7v; Alexis, 2026-11-03): a project the team adds by hand, even with no realm, by its name and its own
- * address, and the hub whose page it links to where it has one; a name once. */
+ * address, the hub whose page it links to where it has one, and its station's size, 0 a small satellite (none) to 1 an artificial world,
+ * a sign the team sets (Alexis, 2026-11-04); a name once. */
 export const EarthOrbit = unique(
-  list(z.strictObject({ name: text(DATA_CAPS.name), url: Link, slug: z.optional(Key) })),
+  list(
+    z.strictObject({
+      name: text(DATA_CAPS.name),
+      url: Link,
+      slug: z.optional(Key),
+      size: z.optional(z.number().check(z.gte(0), z.lte(1))),
+    }),
+  ),
   "name",
   (r: { name: string }) => r.name,
 );

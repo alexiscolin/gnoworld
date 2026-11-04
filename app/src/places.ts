@@ -6,7 +6,6 @@ import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
 import hubs from "../data/hubs.json" with { type: "json" };
-import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
 import type { ChatPlace } from "./features/chat/index.ts";
@@ -53,7 +52,6 @@ interface Source {
   universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
   genres: { slug: string; name: string }[];
 }
 
@@ -152,7 +150,7 @@ function build(source: Source) {
       return row === undefined ? [] : [listedFrom(row, testnets.has(universe), { path, canonical })];
     });
   };
-  const worlds = listed("world", [...source.hubs, ...source.stations]);
+  const worlds = listed("world", source.hubs);
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {
@@ -220,7 +218,7 @@ function build(source: Source) {
   };
 }
 
-export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
+export const site = siteOf({ universes, hubs, ecosystems, genres });
 
 /** What the chat's header, its column of worlds and its info panel say of a place in `universe`: `kicker` says where it is. */
 export const chatPlace = (

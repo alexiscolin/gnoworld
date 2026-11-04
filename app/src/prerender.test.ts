@@ -13,7 +13,6 @@ describe("prerenderPaths", () => {
         { slug: "other", universe: "gnoland" },
       ],
       ecosystems: [{ slug: "tokens", universe: "onyx" }],
-      stations: [],
     });
 
   it("is every place's path and canonical address, and the list, each once", () => {

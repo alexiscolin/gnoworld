@@ -2,12 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { placesFrom } from "../../src/dataPlaces.ts";
 import ecosystems from "../../data/ecosystems.json" with { type: "json" };
 import hubs from "../../data/hubs.json" with { type: "json" };
-import stations from "../../data/stations.json" with { type: "json" };
 import universes from "../../data/universes.json" with { type: "json" };
 import { expect, hydrated, test } from "./fixtures.ts";
 
 // Slice 5's 5d: every place of the data has its page, at its path and at its canonical address.
-const places = placesFrom({ universes, hubs, ecosystems, stations });
+const places = placesFrom({ universes, hubs, ecosystems });
 const widths = [390, 1280];
 
 test.describe("every place of the data files", () => {

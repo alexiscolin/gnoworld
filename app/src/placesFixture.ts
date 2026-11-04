@@ -12,9 +12,8 @@ export const FIXTURE = {
     { id: "onyx", name: "Onyx", default: true as const },
     { id: "gnoland", name: "gno.land" },
   ],
-  hubs: [row("bubble", "onyx", "Bubble"), row("other", "gnoland", "Other")],
+  hubs: [row("bubble", "onyx", "Bubble"), row("other", "gnoland", "Other"), row("tokens", "onyx", "Token station")],
   ecosystems: [row("tokens", "onyx", "Tokens"), row("tokens", "gnoland", "Tokens of gno.land")],
-  stations: [row("tokens", "onyx", "Token station")],
   genres: [
     { slug: "game", name: "Game" },
     { slug: "tool", name: "Tool" },
@@ -37,6 +36,5 @@ export const PLANTED = {
   ],
   hubs: [planted("alpha", "main", "Alpha"), planted("beta", "main", "Beta"), planted("gamma", "lab", "Gamma")],
   ecosystems: [],
-  stations: [],
   genres: [],
 };
