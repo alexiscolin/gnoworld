@@ -165,7 +165,10 @@ export class RestEye {
 
   /** The eye `seconds` on, from the scene's `eye`, into `out`: the view at rest's, swayed. */
   place(eye: Point, seconds: number, out: Spot): void {
-    swayAt(this.#sway, seconds);
+    // A journey holds the sway still to read the sun's beat alone (Alexis, 2026-11-04, "Figer le balancement"): in a test build only.
+    const held =
+      import.meta.env.VITE_GNOWORLD_TEST_GPU === "1" && Reflect.get(globalThis, "__gnoworldSwayHeld") === true;
+    swayAt(this.#sway, held ? 0 : seconds);
     const { across, up } = this.#sway;
     // In the lab, the panel's leans (tuning.ts); a site's build reads the landing's, as the line folds.
     const [rest, lean, room] = [

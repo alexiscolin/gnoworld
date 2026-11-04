@@ -996,6 +996,8 @@ test("beats no other sun: a system's own star at its arrival reads the same at t
 }) => {
   await page.clock.setFixedTime(beatRest());
   await cameTo(page, "gnoswap", { still: false });
+  // The sway held still, so only the beat moves between the two frames (Alexis, 2026-11-04, "Figer le balancement").
+  await page.evaluate(() => Reflect.set(globalThis, "__gnoworldSwayHeld", true));
   const top = await haloAt(page, beatTop(), { at: "gnoswap" });
   const rest = await haloAt(page, beatRest(), { at: "gnoswap" });
   expect(Math.abs(top - rest)).toBeLessThanOrEqual(0.01 * rest + 1);
