@@ -76,18 +76,21 @@
   .line {
     /* raw: mock-up 1's line on one row at 1,728 px, on two at most on a laptop's screen */
     max-inline-size: 64rem;
-    /* raw: the hero line's own grey (Hero.module.css) */
-    color: #c8d0de;
     /* raw: mock-up 1's line, 20 px at 1,728 px wide */
     font: 400 clamp(1rem, 1.16vi, 1.25rem) / 1.5 var(--family-sans);
     /* raw: the same shade as the promise's */
     text-shadow: 0 2px 18px color-mix(in oklab, var(--color-ink) 70%, transparent);
   }
 
+  /* The line and its link in the hero line's own grey; the muted grey kept no 4.5:1 over the veil (F4643). */
+  .line,
+  .about {
+    /* raw: the hero line's grey (Hero.module.css) */
+    color: #c8d0de;
+  }
+
   .about {
     pointer-events: auto;
-    /* raw: the line's grey, which keeps 4.5:1 over the veil where the muted grey could not (F4643) */
-    color: #c8d0de;
     font: var(--font-meta);
     /* raw: the underline a little under the words */
     text-underline-offset: 0.2em;
