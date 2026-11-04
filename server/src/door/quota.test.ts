@@ -5,7 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { Address, toAddress } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 
 // 10g: D43's quota per account and UTC day, its allowlist, and both kept in the server's database (D47, D95).

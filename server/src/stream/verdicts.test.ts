@@ -2,8 +2,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { LineVerdicts, VERDICTS_ASKED } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
-import { openDatabase } from "../db.ts";
-import { logger } from "../log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { VERDICTS_PER_MINUTE, verdictRoutes } from "./verdicts.ts";
 

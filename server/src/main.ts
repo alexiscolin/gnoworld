@@ -3,8 +3,8 @@
 // node --disallow-code-generation-from-strings server/src/main.ts
 import { listen, makeApp, stop } from "./app.ts";
 import { loadConfig } from "./config.ts";
-import { openDatabase } from "./db.ts";
-import { logger } from "./log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
 import { adminRoutes } from "./door/admin.ts";
 import { askRoutes } from "./door/ask.ts";
@@ -18,7 +18,7 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { isTeam, loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultRpc } from "./prices/universes.ts";
+import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 
@@ -40,7 +40,7 @@ const prices =
     : startPrices({
         file: config.markets,
         log,
-        ...(config.universes === undefined ? {} : { rpc: defaultRpc(config.universes) }),
+        ...(config.universes === undefined ? {} : { universe: defaultUniverse(config.universes) }),
       });
 let draining = false;
 const app = makeApp(log, () => !draining);
@@ -97,7 +97,7 @@ if (door !== undefined)
       origins: config.origins,
       mayRead: chat.mayRead,
       recent: chat.recent,
-      named: makeNames({ rpc: door.settings.namesRpc, now: Date.now }),
+      named: makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log }),
       quota: door.quota,
       jarvis: door.jarvis,
       on: door.settings.on,

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PINS_MAX } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import type { Fetched, Said } from "../irc/link.ts";
 import { makePins, PIN_TABLES } from "./pins.ts";
 

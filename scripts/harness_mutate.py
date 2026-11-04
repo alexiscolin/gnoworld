@@ -40,22 +40,26 @@ GAPS = {  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 # The lint config and its parts: each rule, selector and restricted name lives in one of them.
-ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts"]
+ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts", "lint/chain.config.ts", "lint/gnoworld.config.ts"]
 REACT = "lint/react.config.ts"
 APP = "lint/app.config.ts"
 SERVER = "lint/server.config.ts"
+CHAIN = "lint/chain.config.ts"
+RULES = "lint/gnoworld.config.ts"
+WORDS = "lint/words.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server", "app/tsconfig.json": "react_tsc",
-    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,bench_files", "lint/core.config.ts": "lint",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
+    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls", "lint/words.config.ts": "chain_words",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
-    "lint/server.config.ts": "server", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
+    "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
-    "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
+    "package.json": {"probe": "react_warn,react_tsc,ui_tsc,jarvis,service,chain", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
-    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
+    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
@@ -210,7 +214,7 @@ def mutants():
         for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
             at = text.find('"error"', m.end())
             yield f"eslint {m.group(1)} ({path}:{text.count(chr(10), 0, m.start()) + 1})", path, text[:at] + '"off"' + text[at + 7:], "probe"
-        if path not in (SERVER, "eslint.config.ts"):  # the server's part bans by name and path; the root config composes the parts
+        if path not in (SERVER, CHAIN, RULES, "eslint.config.ts"):  # the services', the chain's and our rules' parts ban by name, path and words; the root config composes the parts
             yield from selectors(path, "probe")
     for path in ("lint/core.config.ts", REACT, APP):
         yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
@@ -221,11 +225,118 @@ def mutants():
     yield from each(SERVER, 'target: "./server"', 'target: "./nowhere"', "probe", "eslint the server reaches no path out of its folder")
     # Not "./node_modules": this worktree borrows the repository's, outside it, so the zone never sees a
     # package here (F385); in the repository the gate's own lint fails without that exception.
-    for name in ("./server", "./packages/core", "./packages/schemas"):
+    for name in ("./server", "./packages/core", "./packages/schemas", "./packages/service", "./packages/chain"):
         yield from each(SERVER, f'"{name}"', '"./nowhere"', "probe", f"eslint the server imports from {name}")
-    yield from each(SERVER, '"server/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
+    yield from each(SERVER, '"packages/service/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
+    yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")
+    # The walls (decision-isolation.md, D110 to D112): each folder's bans by name, the service package's zone; the zones'
+    # exceptions are the names loop's above.
+    yield from each(SERVER, 'banned("jarvis", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
+    yield from each(SERVER, 'banned("server", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
+    listed = 'banned("server|jarvis|app|chain", SERVICE)'
+    for name in ("server|", "jarvis|", "app|", "|chain"):
+        yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
+    yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
+    # A module in another extension, and a require made by hand (D123): each pattern and each module name.
+    yield from each("eslint.config.ts", '"{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
+    yield from each("eslint.config.ts", '"{server,jarvis,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
+    yield from each(SERVER, '["node:module", "module"]', '["module"]', "probe", "eslint the services refuse createRequire from node:module")
+    yield from each(SERVER, '["node:module", "module"]', '["node:module"]', "probe", "eslint the services refuse createRequire from module")
+    yield from each(CHAIN, 'target: "./packages/chain"', 'target: "./nowhere"', "probe", "eslint the chain package reaches no path out of its folder")
+    for name in ('"./packages/core"', '"./packages/schemas"', '"./packages/chain"'):
+        yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
+    for name in ("server|", "jarvis|", "app|", "|service"):
+        yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
+    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package
+    # (lint/words.config.ts), each word and each way a string is read; a test helper or the expression sender imported by
+    # product code; an import at run time of a computed name; the files each reaches or leaves free.
+    for find, replace, label in (
+        (r"/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
+        (r"/(?<![A-Za-z])vm(?:\/|%2[Ff])q|\b(?:auth\/accounts|bank\/balances)\//", "/(?!)/", "an ABCI path"),
+        (r"|\b(?:auth\/accounts|bank\/balances)\//", "/", "an account's or a balance's ABCI path"),
+        (r"(?:\/|%2[Ff])q", r"\/q", "an ABCI path URL-encoded"),
+        (r"`(?:\\$\\{\\}|://[^/?#\\s]+)/(?:${ROUTES})(?![\\w-])`", "`(?!)`", "a node's RPC route"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:\\$\\{\\})", "a node's RPC route after a full address"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:://[^/?#\\s]+)", "a node's RPC route after an interpolation"),
+        ('"status|block|', '"block|', "the status route"),
+        ("|block|block_results|", "|block_results|", "the block route"),
+        (r'`"method"\\s*:\\s*"(?:${ROUTES})"`', "`(?!)`", "a JSON-RPC method in a text"),
+        (r"/:26657(?!\d)/", "/(?!)/", "the RPC port"),
+        (r"/^\s*(?:(?:query|subscription|mutation)\b[^{]*\{|\{\s*[A-Za-z_]\w*\s*[({])/", "/(?!)/", "a GraphQL operation"),
+        ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
+        (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
+        (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
+        # Each word's every alternative and edge (10h's review, V5): one case of the probe's chain_words block must fail.
+        ("abci_(?:query|info)", "abci_(?:info)", "the abci_query query"),
+        ("abci_(?:query|info)", "abci_(?:query)", "the abci_info query"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:%2[Ff])q", "an ABCI path with its slash"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:\/|%2F)q", "an ABCI path encoded in lower case"),
+        (r"auth\/accounts|bank\/balances", r"bank\/balances", "an account's ABCI path"),
+        (r"auth\/accounts|bank\/balances", r"auth\/accounts", "a balance's ABCI path"),
+        ("(?<![A-Za-z])vm", "vm", "no ABCI path inside a longer word"),
+        (r"(?![\\w-])`", "`", "no route inside a longer word"),
+        ("(?:query|subscription|mutation)", "(?:subscription|mutation)", "a GraphQL query"),
+        ("(?:query|subscription|mutation)", "(?:query|subscription)", "a GraphQL mutation"),
+    ):
+        yield from each(WORDS, find, replace, "probe", f"eslint our rules refuse {label}")
+    for name in ("block_results", "blockchain", "commit", "validators", "genesis", "net_info", "health", "tx", "tx_search",
+                 "unconfirmed_txs", "num_unconfirmed_txs", "consensus_state", "dump_consensus_state"):
+        yield from each(WORDS, f"|{name}|", "|", "probe", f"eslint our rules refuse the {name} route")
+    yield from each(WORDS, '|consensus_params"', '"', "probe", "eslint our rules refuse the consensus_params route")
+    for name in ("async", "sync", "commit"):
+        kept = "|".join(other for other in ("async", "sync", "commit") if other != name)
+        yield from each(WORDS, "broadcast_tx_(?:async|sync|commit)", f"broadcast_tx_(?:{kept})", "probe", f"eslint our rules refuse the broadcast_tx_{name} route")
+    for find, replace, label in (
+        ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
+        ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
+        ('.join("${}")', '.join("")', "a template's interpolation"),
+        ('if (operator !== "+" ||', "if (true ||", "a sum's text"),
+        ('${textOf(left) ?? "${}"}', '${textOf(left) ?? ""}', "a sum's value on its left"),
+        ('if (node.type === "AssignmentExpression" && node.operator === "+=" && ', 'if (node.type === "AssignmentExpression" && ', "a plain assignment as a sum (V4)"),
+        ("return `\\${}${textOf(node.right)", "return `${textOf(node.right)", "a += sum's left side as a value (V4)"),
+        ("      AssignmentExpression: check,\n", "", "the rule's += sums (V4)"),
+        ("      Literal: check,\n", "", "the rule's literals"),
+        ("      TemplateLiteral: check,\n", "", "the rule's templates"),
+        ("      BinaryExpression: check,\n", "", "the rule's sums"),
+        ('keyed("jsonrpc") !== undefined && ', "", "a JSON-RPC call's version key"),
+        ("if (rpcCall(node)) call(node);", "", "a JSON-RPC call to a node"),
+        ('node.callee?.name === "URL" && ', "", "a route given to URL alone"),
+        ("if (routed(node)) url(node);", "", "a route given to URL"),
+        ('"app/src/**/*.{ts,tsx}", "server/**/*.ts"', '"server/**/*.ts"', "the rules' reach in the app"),
+        ('"server/**/*.ts", "jarvis/**/*.ts"', '"jarvis/**/*.ts"', "the rules' reach in the server"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', '"packages/*/src/**/*.{ts,tsx}"', "the rules' reach in Jarvis"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"]', '"jarvis/**/*.ts"]', "the rules' reach in the packages"),
+        ('"packages/chain/src/**", ', "", "the chain package's own words free"),
+        ('"**/testing/**", ', "", "the fakes free"),
+        ("...TESTS, ...BENCHES]", "...BENCHES]", "the tests free"),
+        ("...TESTS, ...BENCHES]", "...TESTS]", "the benches free"),
+        (r"/(?:^|\/)testing(?:\/|$)/", "/(?!)/", "a test helper imported by product code"),
+        ("      ImportDeclaration: check,\n", "", "an import's module"),
+        ("      ExportNamedDeclaration: check,\n", "", "a re-export's module"),
+        ("      ExportAllDeclaration: check,\n", "", "a whole re-export's module"),
+        ("      ImportExpression: check,\n", "", "a run-time import's module"),
+        ('type === "ImportNamespaceSpecifier" || ', "", "a namespace import of the expression sender"),
+        ('(imported ?? local)?.name === "readEvaluated"', "false", "the expression sender by its name"),
+        ('node.type === "ImportExpression" || ', "", "a run-time import of the expression sender's module"),
+        (' || node.type === "ExportAllDeclaration"', "", "a whole re-export of the expression sender's module"),
+        ('"app/src/lib/chain/rpc.ts", ', "", "evalCall's builder free"),
+        ('"server/src/door/names.ts"]', "]", "the door's builder free"),
+        ("text === undefined || ", "", "a computed import"),
+        (' || text.includes("${}")', "", "a templated import"),
+    ):
+        yield from each(RULES, find, replace, "probe", f"eslint our rules refuse {label}")
+    # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
+    for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
+        yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")
+    yield from each(CHAIN, '"^zustand(/|$)"', '"^never_zustand(/|$)"', "probe", "eslint the chain package refuses the store by name")
+    yield from each(CHAIN, '"packages/chain/**/*.ts"', '"packages/chain/**/*.nothing"', "probe", "eslint reaches the chain package's files")
+    yield from each(CHAIN, "ignores: TESTS,", "", "probe", "eslint leaves the chain package's tests free")
     yield from each(SERVER, "...TESTS", "", "probe", "eslint a server test calls the server it started")
     yield from each(SERVER, '"server/**/*.ts"', '"server/**/*.nothing"', "probe", "eslint reaches the server's files")
+    # Jarvis's folder (D110): the same rules, its own zone, the files each block reaches.
+    yield from each(SERVER, 'target: "./jarvis"', 'target: "./nowhere"', "probe", "eslint Jarvis reaches no path out of its folder")
+    yield from each(SERVER, '"./jarvis"', '"./nowhere"', "probe", "eslint Jarvis imports from its own folder")
+    yield from each(SERVER, '"jarvis/**/*.ts"', '"jarvis/**/*.nothing"', "probe", "eslint reaches Jarvis's files")
     # A bench is switched off like a test (security-S1): its files, both extensions, and the selector the block holds.
     yield from each("eslint.config.ts", "files: BENCHES,", 'files: ["**/*.nothing"],', "probe", "eslint a bench is never switched off")
     yield from each("lint/shared.config.ts", '"**/*.bench.ts", ', "", "probe", "eslint a .ts bench is never switched off")
@@ -233,9 +344,10 @@ def mutants():
     yield from each("lint/shared.config.ts", ', "**/*.bench.tsx"', "", "probe", "eslint a .tsx bench is never switched off")
     yield from each("eslint.config.ts", 'CLASS_AT_END, SWITCHED_OFF] },\n  },\n  {\n    files: ["**/*.css"]', 'CLASS_AT_END] },\n  },\n  {\n    files: ["**/*.css"]', "probe", "eslint the bench block holds the switched-off selector")
     # No state at a module's top (F412): the block for every workspace's source, core's and ui's own lists, the selector's parts.
-    both = '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
-    yield from each("eslint.config.ts", both, '"packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
-    yield from each("eslint.config.ts", both, '"server/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
+    both = '"server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
+    yield from each("eslint.config.ts", both, '"jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a Jarvis module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "jarvis/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", ...SWALLOWED, CLASS_AT_END]', "probe", "eslint's workspace block refuses state at a module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", CLASS_AT_END, MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
     yield from each("lint/core.config.ts", "...SWALLOWED, CLASS_AT_END, ", "...SWALLOWED, ", "probe", "eslint core refuses a u class right before $ (F821)")
@@ -255,7 +367,8 @@ def mutants():
     yield from each("scripts/ergo.sh", ' || refuse "building Ergo $tag failed"', " || :", "hooks", "ergo.sh refuses a failed build")
     yield from each("scripts/ergo.sh", "CGO_ENABLED=0 go build -trimpath", "go build", "hooks", "ergo.sh builds static, its paths trimmed")
     yield from each("scripts/ergo.sh", " sqlite\"", "\"", "hooks", "ergo.sh builds with sqlite")
-    yield from each("vitest.config.ts", ', "server/src/**/*.test.ts"', "", "probe", "the server's tests are found")
+    yield from each("vitest.config.ts", '            "server/src/**/*.test.ts",\n', "", "probe", "the server's tests are found")
+    yield from each("vitest.config.ts", '            "jarvis/src/**/*.test.ts",\n', "", "probe", "Jarvis's tests are found")
     # Core's tests again in Chromium (F816), only when asked, so no other Vitest run opens a browser.
     yield from each("vitest.config.ts", '...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),', "CORE_CHROMIUM,", "probe", "core_chromium exists only when CORE_CHROMIUM asks")
     yield from each("vitest.config.ts", 'include: ["packages/core/src/**/*.test.ts"],', 'include: ["packages/core/sr/**/*.test.ts"],', "probe", "core_chromium finds core's tests")
@@ -333,6 +446,9 @@ def mutants():
     yield from each("package.json", "--max-warnings 0 ", "", "probe", "lint fails on a warning")
     yield from each("package.json", " && tsc -p app/tsconfig.json", "", "probe", "typecheck covers the app")
     yield from each("package.json", " && tsc -p packages/ui/tsconfig.json", "", "probe", "typecheck covers ui")
+    yield from each("package.json", " && tsc -p jarvis/tsconfig.json", "", "probe", "typecheck covers Jarvis")
+    yield from each("package.json", " && tsc -p packages/service/tsconfig.json", "", "probe", "typecheck covers the service package")
+    yield from each("package.json", " && tsc -p packages/chain/tsconfig.json", "", "probe", "typecheck covers the chain package")
     # ui: React's lint reaches it, and its tests run in jsdom, all of them, each on an empty page.
     yield from each(REACT, ', "packages/ui/src/**/*.{ts,tsx}"]', "]", "probe", "eslint reads ui as React")
     yield from each("vitest.config.ts", 'environment: "jsdom",', "", "probe", "ui's tests run in jsdom")
@@ -558,6 +674,10 @@ def mutants():
     yield from each("scripts/check.sh", '"$GNO" test ./...', '"$GNO" test ./r/...', "hooks", "check.sh gno scope")
     yield from each("vitest.config.ts", "requireAssertions: true", "requireAssertions: false", "probe", "vitest requires an assertion")
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
+    yield from each("scripts/check_regressions.py", "chr(n) if n <= 0x10FFFF and HIDDEN.fullmatch(chr(n)) else match.group(0)", "match.group(0)", "hooks", "check_regressions reads a hidden character written <U+XXXX> (D117)")
+    yield from each("scripts/check_regressions.py", " and HIDDEN.fullmatch(chr(n))", "", "hooks", "check_regressions reads no other escape (D125, F5280)")
+    yield from each("scripts/check_regressions.py", "n <= 0x10FFFF and ", "", "hooks", "check_regressions reads a number past Unicode as text (D125, F5280)")
+    yield from each("scripts/check_regressions.py", "([0-9A-F]{4,6})>", "([0-9A-F]{2,6})>", "hooks", "check_regressions reads four hex digits at least (D117)")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
     yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
@@ -925,6 +1045,9 @@ def mutants():
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if added >= TIER_ONE:", "hooks", "batch_size says the tier-1 limit past 400, not at it (G8)")
     yield from each("scripts/batch_size.py", "    if not path:", "    if False:", "hooks", "batch_size reads a renamed file at its new path (G8)")
     yield from each("scripts/batch_size.py", "|^server/src/testing/", "", "hooks", "batch_size leaves the server's test helpers out (G8)")
+    yield from each("scripts/batch_size.py", "|^jarvis/src/testing/", "", "hooks", "batch_size leaves Jarvis's test helpers out (D110)")
+    yield from each("scripts/batch_size.py", "|^packages/[^/]+/src/testing/", "", "hooks", "batch_size leaves a package's test helpers out (D112)")
+    yield from each("scripts/batch_size.py", "|jarvis/src|", "|", "hooks", "batch_size counts Jarvis's code as product (D110)")
     rf = "scripts/repo_files.py"
     yield from each(rf, "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit, harness_mutate --changed from the last pass")
     yield from each(rf, "    if not os.path.exists(PASSES):", "    if False:", "hooks", "last_reviewed reads the passes file")
@@ -1025,14 +1148,16 @@ def mutants():
     for find, replace, label in (
         ("\t\t*) all=true ;;", "\t\t*) ;;", "a path of no known area runs everything"),
         ("$all && ts=true app=true gno=true related=false", ":", "no change runs everything"),
-        ("server/src/*) ts=true related=false ;;", "server/src/*) ts=true ;;", "a server change runs every test"),
+        ("server/src/* | jarvis/src/* | packages/service/src/*) ts=true related=false ;;", "server/src/* | jarvis/src/* | packages/service/src/*) ts=true ;;", "a server change runs every test"),
+        (" | jarvis/src/* | packages/service/src/*)", ")", "a change of Jarvis or the service package is the server's kind (D110, D111)"),
+        (" | packages/chain/src/*) ts=true app=true", ") ts=true app=true", "a change of the chain package is core's kind (D112)"),
         ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
         ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
         ("\t\tgno/*) gno=true ;;", "\t\tgno/*) gno=true; break ;;", "two areas at once run both"),
         ("elif ! $full; then", "elif true; then", "--full is never scoped"),
         ("':!node_modules'", "':!nothing'", "a linked node_modules is no change"),
-        ("packages/ui/src/*) ts=true app=true related=false ;;", "packages/ui/src/*) ts=true app=true ;;", "a change outside Vitest's graph runs every test"),
+        ("packages/chain/src/*) ts=true app=true related=false ;;", "packages/chain/src/*) ts=true app=true ;;", "a change outside Vitest's graph runs every test"),
         ('if ! $full && [ -z "$tested" ]; then', 'if ! $full && true; then', "a repository reads its change from git, never GATE_CHANGED"),
         ("changed=${GATE_CHANGED:-} related=false", "changed=${GATE_CHANGED:-}", "outside a repository, every test"),
         ("case $path in docs/* | adr/* | *.md) continue", "case $path in docs/nothing) continue", "prose in pre-commit's list is no change"),

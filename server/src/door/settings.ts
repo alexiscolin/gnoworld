@@ -5,7 +5,7 @@
 // here are first values alone: the database keeps them from the first start (quota.ts).
 import { Address, DOOR_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { isOrigin, list, port, whole } from "../settings.ts";
+import { isOrigin, list, port, whole } from "@gnoworld/service/settings";
 
 export interface DoorConfig {
   // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
@@ -15,8 +15,10 @@ export interface DoorConfig {
   timeoutMs: number;
   questionChars: number;
   first: { quota: number; quotaUnnamed: number; unlimited: Address[] };
-  // The mainnet's RPC, where an account's name is read (names.ts): a bare https origin.
+  // The mainnet's RPC, where an account's name is read (names.ts): a bare https origin; and its chain's id, which the
+  // node's status must name (D120).
   namesRpc: string;
+  namesChain: string;
 }
 
 export interface AdminConfig {
@@ -46,6 +48,11 @@ export function doorSettings() {
       .string()
       .refine((text) => isOrigin(text) && text.startsWith("https:"))
       .default("https://rpc.gno.land"),
+    // A chain's id: 50 characters at most (tm2/pkg/bft/types/genesis.go:18, MaxChainIDLen), letters, digits, `.`, `_`, `-`.
+    JARVIS_NAMES_CHAIN: z
+      .string()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,49}$/)
+      .default("gnoland-1"),
     ADMIN_HOST: z.string().min(1).max(253).default("127.0.0.1"),
     ADMIN_PORT: port().optional(),
     ADMIN_ORIGINS: list(z.string().refine(isOrigin)),
@@ -90,6 +97,7 @@ export function doorOf(env: Env, settings: Settings): DoorConfig | undefined {
     questionChars: JARVIS_QUESTION_CHARS,
     first: { quota: JARVIS_QUOTA, quotaUnnamed: JARVIS_QUOTA_UNNAMED, unlimited: settings.JARVIS_UNLIMITED },
     namesRpc: settings.JARVIS_NAMES_RPC,
+    namesChain: settings.JARVIS_NAMES_CHAIN,
   };
 }
 

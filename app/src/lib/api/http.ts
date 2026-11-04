@@ -1,6 +1,7 @@
 // A call to the server's JSON API, as every client in lib makes it: each answer read through its schema, each
 // failure a reason the page can act on; the cookie to this site alone; a redirect refused, never followed,
 // since it could carry what the call sent elsewhere; a time limit over the answer's body too.
+import { jsonOf } from "@gnoworld/core";
 import { ApiError } from "@gnoworld/schemas";
 import type * as z from "zod/mini";
 
@@ -27,14 +28,6 @@ async function read(response: Response): Promise<{ text: string } | "network"> {
   }
 }
 
-const parse = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
-
 // A refusal: the server's own code, else what its status says.
 function refusal(status: number, body: unknown): Reason {
   const known = ApiError.safeParse(body);
@@ -55,7 +48,7 @@ const requestOf = (body: unknown, signal: AbortSignal): RequestInit => ({
 async function answerOf<T>(response: Response, { schema }: Call<T>): Promise<Result<T>> {
   const got = await read(response);
   if (got === "network") return { ok: false, reason: "network" };
-  const value = got.text === "" ? undefined : parse(got.text);
+  const value = got.text === "" ? undefined : jsonOf(got.text);
   if (response.status !== 200 && response.status !== 204) return { ok: false, reason: refusal(response.status, value) };
   const parsed = schema.safeParse(value);
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, reason: "malformed" };

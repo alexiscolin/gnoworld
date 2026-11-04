@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeRooms, ROOM_STATE } from "./create.ts";
 import { ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 

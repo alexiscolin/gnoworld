@@ -3,6 +3,8 @@
 // The inline scripts React Router 8.4.0 writes in a page, and no other (F475): a script planted in a page fails the build
 // instead of being allowed by its hash. Copied from a build (cspFixture.ts); an upgrade that changes one stops the build until
 // it is read again. What varies (a JSON, a string, a file name) is checked as data.
+import { jsonOf } from "@gnoworld/core";
+
 const SCROLL_RESTORATION =
   '((storageKey, restoreKey) => {\n\t\tif (!window.history.state || !window.history.state.key) {\n\t\t\tlet key = Math.random().toString(32).slice(2);\n\t\t\twindow.history.replaceState({ key }, "");\n\t\t}\n\t\ttry {\n\t\t\tlet storedY = JSON.parse(sessionStorage.getItem(storageKey) || "{}")[restoreKey || window.history.state.key];\n\t\t\tif (typeof storedY === "number") window.scrollTo(0, storedY);\n\t\t} catch (error) {\n\t\t\tconsole.error(error);\n\t\t\tsessionStorage.removeItem(storageKey);\n\t\t}\n\t})("react-router-scroll-positions", null)';
 const STREAM_CLOSE = "window.__reactRouterContext.streamController.close();";
@@ -22,12 +24,8 @@ function isModuleScript(text: string): boolean {
 }
 
 function isJson(text: string, kind: "object" | "string"): boolean {
-  try {
-    const value: unknown = JSON.parse(text);
-    return kind === "string" ? typeof value === "string" : typeof value === "object" && value !== null;
-  } catch {
-    return false;
-  }
+  const value = jsonOf(text);
+  return kind === "string" ? typeof value === "string" : typeof value === "object" && value !== null;
 }
 
 // The loader data: a JSON text in a string literal (JSON.parse takes no raw line break, no code joined to it), handed to the stream.

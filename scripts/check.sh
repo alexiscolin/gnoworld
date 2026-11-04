@@ -187,13 +187,13 @@ if [ -n "$changed" ]; then
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
-		server/src/*) ts=true related=false ;;
+		server/src/* | jarvis/src/* | packages/service/src/*) ts=true related=false ;;
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
 		app/tests/*.ts) ts=true ;; # the journeys and their helpers run in the merge check and --full alone
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
 		packages/ui/src/tokens.css) ts=true app=true tokens=true related=false ;; # the tokens story lists every token (F1190)
 		app/tests/*) ts=true related=false ;;
-		app/src/* | packages/core/src/* | packages/ui/src/*) ts=true app=true related=false ;;
+		app/src/* | packages/core/src/* | packages/ui/src/* | packages/chain/src/*) ts=true app=true related=false ;;
 		gno/*) gno=true ;;
 		*) all=true ;;
 		esac

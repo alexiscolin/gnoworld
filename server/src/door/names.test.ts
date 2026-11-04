@@ -46,34 +46,150 @@ interface Call {
   init: RequestInit;
   ms: number;
 }
-const setup = (answers: (() => Response | Promise<Response>)[], { max }: { max?: number } = {}) => {
+// The mainnet's chain (D120): the node's status names it before any name is read there (D118).
+const MAINNET = "gnoland-1";
+const statusOf = (network: string | null) =>
+  new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: "",
+      result: {
+        ...(network === null ? {} : { node_info: { network } }),
+        sync_info: { latest_block_height: "1204", latest_block_time: "2026-11-04T12:00:00Z" },
+      },
+    }),
+  );
+// `calls` are the names' reads alone; `asked` every address, the node's status first.
+const setup = (
+  answers: (() => Response | Promise<Response>)[],
+  { max, network = MAINNET, status }: { max?: number; network?: string | null; status?: () => Promise<Response> } = {},
+) => {
   const calls: Call[] = [];
+  const asked: string[] = [];
+  const requests: Call[] = [];
+  const lines: unknown[][] = [];
   const clock = { now: T0 };
   const named = makeNames({
     rpc: RPC,
+    chainId: MAINNET,
     now: () => clock.now,
+    log: (...line) => lines.push(line),
     send: (url, init, ms) => {
+      asked.push(url);
+      requests.push({ url, init, ms });
+      if (url === `${RPC}/status`) return status?.() ?? Promise.resolve(statusOf(network));
       calls.push({ url, init, ms });
       const next = answers.shift();
       return next === undefined ? Promise.reject(new Error("no answer left")) : Promise.resolve(next());
     },
     ...(max === undefined ? {} : { max }),
   });
-  return { calls, clock, named };
+  return { calls, asked, requests, lines, clock, named };
 };
 
 describe("a mainnet name", () => {
-  it("asks r/sys/users whether the account's record is missing, by vm/qeval, with a 3 s timeout", async () => {
-    const { calls, named } = setup([NAMED]);
+  it("asks r/sys/users whether the account's record is missing, by vm/qeval through the chain package, with a 3 s timeout", async () => {
+    const { requests, named } = setup([NAMED]);
     expect(await named(ANNA)).toBe(true);
     const expression = `gno.land/r/sys/users.ResolveAddress("${ANNA}").IsDeleted()`;
-    expect(calls).toEqual([
-      {
-        url: `${RPC}/abci_query?path=%22vm/qeval%22&data=0x${Buffer.from(expression).toString("hex")}`,
-        init: { method: "GET", headers: { accept: "application/json" } },
-        ms: 3000,
-      },
+    const url = `${RPC}/abci_query?path=%22vm%2Fqeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
+    // Each request whole (10h's review, V3): a GET with no cookie, no redirect followed, no cache, and no header but accept.
+    const init = {
+      method: "GET",
+      credentials: "omit",
+      redirect: "error",
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    };
+    const whole = requests.map(({ url: asked, init: { signal, ...rest }, ms }) => ({
+      url: asked,
+      init: rest,
+      ms,
+      signal: signal instanceof AbortSignal,
+    }));
+    expect(whole).toEqual([
+      { url: `${RPC}/status`, init, ms: 3000, signal: true },
+      { url, init, ms: 3000, signal: true },
     ]);
+  });
+
+  it.each([
+    ["another chain", "test5"],
+    ["a chain whose id only starts like the mainnet's", "gnoland-10"],
+    ["no network", null],
+  ])("reads no name on a node whose status names %s: none, the lower quota", async (_, network) => {
+    const { calls, asked, named } = setup([NAMED], { network });
+    expect(await named(ANNA)).toBe(false);
+    expect(calls).toEqual([]);
+    expect(asked).toEqual([`${RPC}/status`]);
+  });
+
+  it("keeps another chain's answer a minute, as any failed read, asking its status once", async () => {
+    const { asked, calls, clock, named } = setup([NAMED], { network: "test5" });
+    expect(await named(ANNA)).toBe(false);
+    clock.now += MINUTE - 1;
+    expect(await named(ANNA)).toBe(false);
+    expect(asked).toEqual([`${RPC}/status`]);
+    expect(calls).toEqual([]);
+  });
+
+  it("is none when the node's status cannot be read, and reads it again a minute later", async () => {
+    let up = false;
+    const { calls, clock, named } = setup([NAMED], {
+      status: () => Promise.resolve(up ? statusOf(MAINNET) : new Response("", { status: 503 })),
+    });
+    expect(await named(ANNA)).toBe(false);
+    expect(calls).toEqual([]);
+    up = true;
+    clock.now += MINUTE;
+    expect(await named(ANNA)).toBe(true);
+  });
+
+  it("asks the node's status once a minute, however many accounts it reads (10h's review, V7)", async () => {
+    const { asked, clock, named } = setup([NAMED, NONE, NAMED]);
+    const statuses = () => asked.filter((url) => url === `${RPC}/status`).length;
+    expect(await named(ANNA)).toBe(true);
+    clock.now += MINUTE - 1;
+    expect(await named(BEN)).toBe(false);
+    expect(statuses()).toBe(1);
+    clock.now += 1;
+    expect(await named(Address.parse(addressAt(1)))).toBe(true);
+    expect(statuses()).toBe(2);
+  });
+
+  it("logs a failed read's kind once a minute, never the account (10h's review, V9)", async () => {
+    const { lines, clock, named } = setup([], { network: "test5" });
+    await named(ANNA);
+    await named(BEN);
+    expect(lines).toEqual([["name_failed", { error: "other_chain" }]]);
+    clock.now += MINUTE - 1;
+    await named(Address.parse(addressAt(1)));
+    expect(lines).toHaveLength(1);
+    clock.now += 1;
+    await named(Address.parse(addressAt(2)));
+    expect(lines).toEqual([
+      ["name_failed", { error: "other_chain" }],
+      ["name_failed", { error: "other_chain" }],
+    ]);
+  });
+
+  it.each([
+    ["a node that does not answer", { status: () => Promise.resolve(new Response("", { status: 503 })) }, [], "down"],
+    ["an answer of another value", {}, [() => evaluated("(1 int)")], "wrong_shape"],
+    ["an answer past 64 KiB", {}, [() => sized(64 * 1024 + 1)], "too_big"],
+  ])("logs %s as its kind", async (...[, over, answers, error]) => {
+    const { lines, named } = setup(answers, over);
+    expect(await named(ANNA)).toBe(false);
+    expect(lines).toEqual([["name_failed", { error }]]);
+  });
+
+  it("logs no read that gives a name, or none, only the one that fails", async () => {
+    const { lines, named } = setup([NAMED, NONE, () => evaluated("(1 int)")]);
+    await named(ANNA);
+    await named(BEN);
+    expect(lines).toEqual([]);
+    await named(Address.parse(addressAt(1)));
+    expect(lines).toEqual([["name_failed", { error: "wrong_shape" }]]);
   });
 
   it("is none when the record is missing", async () => {

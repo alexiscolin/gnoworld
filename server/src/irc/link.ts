@@ -5,7 +5,7 @@
 // a time. It reads a room's state for the reconciler (rooms/reconcile.ts).
 import { connect, type Socket } from "node:net";
 import { parseLine, type IrcMessage } from "@gnoworld/core";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
 import type { Fetched } from "./fetch.ts";

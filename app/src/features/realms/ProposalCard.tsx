@@ -5,7 +5,7 @@ import { cutGraphemes } from "@gnoworld/core";
 import { Card } from "@gnoworld/ui";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { tallyOf } from "../../lib/chain/tally.ts";
-import type { Source } from "../../lib/chain/read.ts";
+import type { Source } from "@gnoworld/chain/read";
 import { ReadSource } from "./ReadSource.tsx";
 
 /** The graphemes of a title a card shows, at most. */

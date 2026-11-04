@@ -1853,7 +1853,7 @@ fi
 
 if part migrations; then
 # check_migrations: a migration main has keeps its text and its place, since the server applies them by index
-# (server/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
+# (packages/service/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
 # the gate does; what it cannot read is refused, never passed over.
 mig="$here"/check_migrations.py
 r="$t/migrations"
@@ -2887,6 +2887,18 @@ gate >/dev/null || fail "check.sh failed on a core change"
 scoped "a core change" typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a core change"
 reset
+# Jarvis and the two shared packages in a repository too (D110 to D112): every test, never Vitest's related ones alone, as
+# Jarvis's and the server's own processes are children their graph misses; the app's build for the chain package alone.
+for f in jarvis/src/a.ts packages/service/src/a.ts packages/chain/src/a.ts; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	case $f in
+	packages/chain/*) scoped "a change of $f" typecheck lint test build:app - gno ;;
+	*) scoped "a change of $f" typecheck lint test - build:app gno ;;
+	esac
+	grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change of $f"
+	reset
+done
 # A file of the app that is not TypeScript (a fixture, a stylesheet) sits outside Vitest's graph: every test.
 printf 'x\n' >"$g/app/src/b.json"
 gate >/dev/null || fail "check.sh failed on an app fixture"
@@ -2925,6 +2937,14 @@ outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside
 scoped "pre-commit's list of a change of tokens.css" typecheck test build:app pictures - gno
 outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
 scoped "pre-commit's list of a change of base.css" typecheck test build:app - pictures
+# Jarvis's workspace and the service package are the server's kind (D110, D111): every test, no page loads them; the chain
+# package is core's kind, as the app imports it: every test and the app's build (D112).
+for path in jarvis/src/a.ts packages/service/src/a.ts; do
+	outside "$path" >/dev/null || fail "check.sh failed outside a repository on $path"
+	scoped "pre-commit's list of a change of $path" typecheck lint test - build:app gno
+done
+outside "packages/chain/src/a.ts" >/dev/null || fail "check.sh failed outside a repository on a change of the chain package"
+scoped "pre-commit's list of a change of the chain package" typecheck lint test build:app - gno
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
@@ -4726,7 +4746,7 @@ python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_re
 # ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
 # refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
 rx="$t/regrname" && mkdir -p "$rx/scripts"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
 git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
 mkdir -p "$rx/node_modules/.bin" && printf '#!/bin/sh\necho "[]"\n' >"$rx/node_modules/.bin/vitest" && chmod +x "$rx/node_modules/.bin/vitest" # no test to list
 printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**"] } };\n' >"$rx/vitest.config.ts"
@@ -4859,7 +4879,7 @@ nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
 git -C "$rg" init -q
 printf 'bench("a line [0.2 ms]", f);\nbench("a room [100 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts"
 printf 'bench("a call in a file that is no bench [1 ms]", f);\n' >"$rg/app/src/x.ts" # only a `*.bench.ts(x)` file holds benches
@@ -4902,7 +4922,7 @@ git -C "$rg" reset -q --hard "$base"
 # and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
 # its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
 rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
 cat >"$rq/node_modules/.bin/vitest" <<'EOF'
 #!/usr/bin/env python3
 import json, os, re, sys
@@ -5810,6 +5830,14 @@ printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py d
 # Helpers that only tests use are no product code (G8).
 git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
+# Jarvis's workspace since 10h (D110): its code is product, its test helpers are not.
+git -C "$bs" checkout -q -f -b jarvis "$base" && mkdir -p "$bs/jarvis/src/testing" && lines 700 >"$bs/jarvis/src/testing/kit.ts" && commit "jarvis's test helper"
+out=$(size "$base") || fail "batch_size.py counted jarvis/src/testing, a test helper's folder, as product code: $out"
+lines 610 >"$bs/jarvis/src/loop.ts" && commit "jarvis's code"
+out=$(size "$base") && fail "batch_size.py passed 610 lines of jarvis/src, which is product code: $out"
+# A package's test helpers too, as the chain package's fake node (D112).
+git -C "$bs" checkout -q -f -b package-helpers "$base" && mkdir -p "$bs/packages/chain/src/testing" && lines 700 >"$bs/packages/chain/src/testing/envelopes.ts" && commit "a package's test helper"
+out=$(size "$base") || fail "batch_size.py counted packages/chain/src/testing, a test helper's folder, as product code: $out"
 fi
 
 if part gate_full; then

@@ -3,7 +3,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PINS_MAX } from "@gnoworld/schemas";
 import type { Link, Said } from "../irc/link.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { mayRead, staffOf, type Typed } from "../rooms/types.ts";
 import { makePins, type Pins } from "./pins.ts";
 

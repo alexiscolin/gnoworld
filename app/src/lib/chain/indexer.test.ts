@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
+import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
 import { REALM_FACTS_CAPS, RealmFactsAnswer } from "@gnoworld/schemas/indexer";
 import { readRealmFacts } from "./indexer.ts";
 

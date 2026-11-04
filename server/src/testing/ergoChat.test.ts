@@ -2,7 +2,7 @@ import { join as pathJoin } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Rules } from "../roles/roles.ts";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import type { Raw } from "./rawClient.ts";
 import { cleanUp, guest, join, login, msgid, oper, say, start, stops, sync } from "./ergoKit.ts";
 import { chatFor, RULES, TABLES } from "./ergoChat.ts";

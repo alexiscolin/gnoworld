@@ -130,6 +130,22 @@ describe("StatusAnswer, the node's /status", () => {
     expect(JSON.stringify(parsed)).not.toContain("surprise");
   });
 
+  // The node's network, its chain's id (D118): read when the status names it, which a universe's check needs; a status
+  // that names none is still a status, whose check refuses it.
+  it("takes the node's network when its status names it, and none when it does not", () => {
+    const named = {
+      ...status(SYNC),
+      result: { ...status(SYNC).result, node_info: { network: "onyx-1", moniker: "x" } },
+    };
+    expect(StatusAnswer.parse(named).result.node_info).toEqual({ network: "onyx-1" });
+    expect(StatusAnswer.parse(status(SYNC)).result.node_info).toBeUndefined();
+  });
+
+  it.each([5, null, ["onyx-1"]])("refuses a network that is no text: %j", (network) => {
+    const odd = { ...status(SYNC), result: { ...status(SYNC).result, node_info: { network } } };
+    expect(StatusAnswer.safeParse(odd).success).toBe(false);
+  });
+
   it.each([
     ["a height that is a number", status({ ...SYNC, latest_block_height: 786661 })],
     ["no height", status({ latest_block_time: SYNC.latest_block_time })],

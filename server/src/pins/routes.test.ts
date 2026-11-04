@@ -1,7 +1,7 @@
 import { Address, PinList } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { BODY_LIMIT, makeApp } from "../app.ts";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { pinsRoutes } from "./routes.ts";
 import type { Pins } from "./pins.ts";
 

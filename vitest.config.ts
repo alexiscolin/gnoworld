@@ -56,7 +56,12 @@ export default defineConfig({
         extends: true,
         test: {
           name: "node",
-          include: ["packages/*/src/**/*.test.ts", "app/src/**/*.test.{ts,tsx}", "server/src/**/*.test.ts"],
+          include: [
+            "packages/*/src/**/*.test.ts",
+            "app/src/**/*.test.{ts,tsx}",
+            "server/src/**/*.test.ts",
+            "jarvis/src/**/*.test.ts",
+          ],
           exclude: [
             ...configDefaults.exclude,
             "packages/ui/**",
@@ -91,7 +96,7 @@ export default defineConfig({
       // Every source file counts, tested or not, so an untested file shows as 0%.
       // The app too, but for the document shell and the server entry, which only the build
       // renders, and Storybook's pages, whose handlers do nothing: the Playwright journeys walk them.
-      include: ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts"],
+      include: ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts", "jarvis/src/**/*.ts"],
       exclude: [
         "app/src/root.tsx",
         "app/src/entry.server.tsx",

@@ -10,6 +10,7 @@ import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
@@ -825,4 +826,28 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(run.stderr).not.toMatch(/Error/);
     expect(run.stdout).toBe("loaded");
   });
+});
+
+// The image runs main.ts with the workspaces it imports (deploy/server/Dockerfile): each one's package.json copied before the
+// install and its src after, and each src let through .dockerignore, as the web image's test asks of the app's (csp.test.ts).
+it("the server's image copies each workspace the server imports, its package.json before the install and its src", () => {
+  const manifest = z
+    .object({ dependencies: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")));
+  const workspaces = Object.keys(manifest.dependencies)
+    .filter((name) => name.startsWith("@gnoworld/"))
+    .map((name) => name.slice("@gnoworld/".length));
+  expect(workspaces).toEqual(expect.arrayContaining(["chain", "core", "schemas", "service"]));
+  expect(workspaces).not.toContain("jarvis");
+  const dockerfile = readFileSync(new URL("../../deploy/server/Dockerfile", import.meta.url), "utf8");
+  expect(dockerfile).not.toMatch(/jarvis/i);
+  const ignored = readFileSync(new URL("../../.dockerignore", import.meta.url), "utf8").split("\n");
+  const install = dockerfile.indexOf("RUN pnpm install");
+  for (const name of workspaces) {
+    const copied = dockerfile.indexOf(`COPY packages/${name}/package.json packages/${name}/\n`);
+    expect(copied, `packages/${name}/package.json`).toBeGreaterThan(-1);
+    expect(copied, `packages/${name}/package.json before the install`).toBeLessThan(install);
+    expect(dockerfile, `packages/${name}/src`).toContain(`COPY packages/${name}/src packages/${name}/src\n`);
+    expect(ignored, `.dockerignore lets packages/${name}/src through`).toContain(`!packages/${name}/src`);
+  }
 });

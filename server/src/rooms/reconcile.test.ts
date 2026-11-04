@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { changes, makeReconciler, type RoomState } from "./reconcile.ts";
 import type { Desired } from "./types.ts";
 

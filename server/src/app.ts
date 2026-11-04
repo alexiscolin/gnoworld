@@ -8,7 +8,7 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { routePath } from "hono/route";
 import { secureHeaders } from "hono/secure-headers";
-import type { Log } from "./log.ts";
+import type { Log } from "@gnoworld/service/log";
 
 export const BODY_LIMIT = 16 * 1024;
 // Headers within 5 s, a whole request within 10 s, an idle kept-alive connection closed after 5 s.

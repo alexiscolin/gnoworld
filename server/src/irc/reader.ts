@@ -3,7 +3,7 @@
 // (state.ts), and the refusals that close it.
 import type { Socket } from "node:net";
 import type { IrcMessage } from "@gnoworld/core";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { joined, kicked, listing, refusals, rejoins, sasl } from "./handlers.ts";
 import { answered, histories, replayed } from "./history.ts";
 import { joins, line, said, type Said } from "./lines.ts";

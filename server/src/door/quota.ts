@@ -5,7 +5,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { Address, DOOR_CAPS, type JarvisChange } from "@gnoworld/schemas";
 import { z } from "zod";
-import { transaction } from "../db.ts";
+import { transaction } from "@gnoworld/service/db";
 
 export const QUOTA_TABLES = `
 CREATE TABLE jarvis_settings (name TEXT PRIMARY KEY CHECK (name IN ('quota', 'quota_unnamed')), value INTEGER NOT NULL) STRICT;

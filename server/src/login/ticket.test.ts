@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { Address, toAddress } from "@gnoworld/schemas";
 import fc from "fast-check";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { LOGIN_TABLES } from "./login.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 

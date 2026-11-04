@@ -3,7 +3,7 @@
 // pattern is linear, the page is read to a bound, nothing throws, the Zod schema has the last word.
 import { cutGraphemes } from "@gnoworld/core";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
-import type { ChainRead, ReadOptions } from "./read.ts";
+import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import { readPage } from "./rpc.ts";
 
 export type { Proposal };

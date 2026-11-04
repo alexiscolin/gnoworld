@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node's types: what the server and Jarvis share runs on Node alone, which core must not see.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

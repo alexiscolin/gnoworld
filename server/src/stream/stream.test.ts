@@ -1,7 +1,7 @@
 import { StreamEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { makeStream, type Stream } from "./stream.ts";
 
 const PEER = "203.0.113.7";

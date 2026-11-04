@@ -1,0 +1,14 @@
+{
+  "name": "@gnoworld/chain",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@gnoworld/core": "workspace:*",
+    "@gnoworld/schemas": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

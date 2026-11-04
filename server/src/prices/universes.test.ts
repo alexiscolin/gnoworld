@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc } from "./universes.ts";
+import { defaultUniverse } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -30,14 +30,15 @@ const ONYX = {
 };
 const OTHER = { ...ONYX, id: "other", chainId: "other-1", rpc: "https://rpc.other.example:443", default: undefined };
 
-describe("defaultRpc", () => {
-  it("gives the RPC of the universe marked default, never another's", () => {
-    expect(defaultRpc(planted(JSON.stringify([OTHER, ONYX])))).toBe("https://rpc.default.example:443");
-    expect(defaultRpc(planted(JSON.stringify([ONYX, OTHER])))).toBe("https://rpc.default.example:443");
+describe("defaultUniverse", () => {
+  it("gives the RPC and the chain of the universe marked default, never another's", () => {
+    const chosen = { rpc: "https://rpc.default.example:443", chainId: "onyx-1" };
+    expect(defaultUniverse(planted(JSON.stringify([OTHER, ONYX])))).toEqual(chosen);
+    expect(defaultUniverse(planted(JSON.stringify([ONYX, OTHER])))).toEqual(chosen);
   });
 
-  it("reads the data the app ships: Onyx's RPC, which is the default", () => {
-    expect(defaultRpc(DATA)).toBe("https://rpc.onyx.testnets.gno.land:443");
+  it("reads the data the app ships: Onyx's RPC and chain, which is the default", () => {
+    expect(defaultUniverse(DATA)).toEqual({ rpc: "https://rpc.onyx.testnets.gno.land:443", chainId: "onyx-1" });
   });
 
   it.each([
@@ -48,10 +49,10 @@ describe("defaultRpc", () => {
     ["no list", "{}"],
   ])("refuses %s, naming the file and none of its content", (_, content) => {
     const file = planted(content);
-    expect(() => defaultRpc(file)).toThrow(/universes/);
-    expect(() => defaultRpc(file)).toThrow(file);
+    expect(() => defaultUniverse(file)).toThrow(/universes/);
+    expect(() => defaultUniverse(file)).toThrow(file);
     try {
-      defaultRpc(file);
+      defaultUniverse(file);
     } catch (error) {
       expect(String(error)).not.toMatch(/nope|http:|extra/);
     }
@@ -59,7 +60,16 @@ describe("defaultRpc", () => {
 
   it("refuses a file that is not there, naming it", () => {
     const file = join(dir, "missing.json");
-    expect(() => defaultRpc(file)).toThrow(file);
+    expect(() => defaultUniverse(file)).toThrow(file);
+  });
+
+  it("refuses a file past 1 MiB before reading it, as Jarvis's places and the app's build do (10h's review, V8)", () => {
+    const at = JSON.stringify([ONYX]);
+    const exact = planted(at.replace("[", `[${" ".repeat(1024 * 1024 - at.length)}`));
+    expect(defaultUniverse(exact)).toEqual({ rpc: "https://rpc.default.example:443", chainId: "onyx-1" });
+    const past = planted(at.replace("[", `[${" ".repeat(1024 * 1024 + 1 - at.length)}`));
+    expect(() => defaultUniverse(past)).toThrow(`universes: ${past} cannot be read`);
+    expect(() => defaultUniverse(past)).toThrow(expect.objectContaining({ cause: new RangeError("past 1 MiB") }));
   });
 });
 

@@ -1,5 +1,6 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
+import { jsonOf } from "@gnoworld/core";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -17,7 +18,7 @@ import {
   readWord,
   Secret,
   whole,
-} from "./settings.ts";
+} from "@gnoworld/service/settings";
 
 export interface Config {
   host: string;
@@ -105,12 +106,10 @@ const settingsSchema = () =>
       MODERATION_THRESHOLDS: z
         .string()
         .transform((text, ctx) => {
-          try {
-            return JSON.parse(text) as unknown;
-          } catch {
-            ctx.addIssue({ code: "custom", message: "json" });
-            return z.NEVER;
-          }
+          const value = jsonOf(text);
+          if (value !== undefined) return value;
+          ctx.addIssue({ code: "custom", message: "json" });
+          return z.NEVER;
         })
         .pipe(
           z.strictObject(
