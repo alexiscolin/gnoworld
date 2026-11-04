@@ -181,7 +181,8 @@ async function buttonCard(setup: Setup, args: Args<2>, asked: Asked): Promise<Ra
   if (!sourced.ok) return refused(sourced.why);
   const checked = groundedButton(button, sourcesOf(withQuestion(sourced.read, asked)));
   if (!checked.ok) return refused(whyOf(checked));
-  if (!asked.cards.keep({ kind: "button", button, read: sourced.at })) return refused("its call's time is up.");
+  if (!asked.cards.keep({ kind: "button", button, read: sourced.at }))
+    return refused("its call's time is up, or the answer holds its buttons.");
   return kept(`the button to ${button.action.function}, read at block ${String(sourced.at.height)}.`);
 }
 

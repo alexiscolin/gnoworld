@@ -754,6 +754,12 @@ describe("the cards of one turn's calls at once", () => {
   it.each([
     ["digests", 4, () => give(digest(facts("1,204"))), "its call's time is up, or the answer holds its digests."],
     ["proposals", 2, () => propose(vote()), "its call's time is up, or the answer holds its proposal."],
+    [
+      "action buttons",
+      4,
+      () => button({ type: "action", label: "Vote", action: vote() }),
+      "its call's time is up, or the answer holds its buttons.",
+    ],
   ])("keeps no more %s than an answer holds when %i ask at once", async (...[, count, call, why]) => {
     const { tools } = setup();
     const { asked, cards } = askedOf();
