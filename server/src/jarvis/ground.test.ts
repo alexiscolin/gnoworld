@@ -81,15 +81,20 @@ describe("grounded", () => {
     expect(grounded(digest(text(`1 ${"a".repeat(1001)}`)), sources())).toEqual(shape);
   });
 
-  it("refuses a form's argument a word of which its sources lack: a realm's path, a name, a float in an exponent's form", () => {
+  it("refuses a form's argument its sources do not hold as given, a path, a name, an exponent, a case, an order; holds the realm read, a link with or without its scheme, a word", () => {
     const delegate = (target: string, rate = "1") => digest(form({ function: "Delegate", args: { target, rate } }));
-    expect(grounded(delegate("gno.land/r/evil/drain"), sources())).toEqual(
-      refused({ kind: "word", value: "evil" }, { kind: "word", value: "drain" }),
+    const missing = (value: string) => refused({ kind: "argument", value });
+    expect(grounded(delegate("gno.land/r/evil/drain"), sources())).toEqual(missing("gno.land/r/evil/drain"));
+    expect(grounded(delegate("@evilname"), sources())).toEqual(missing("@evilname"));
+    expect(grounded(delegate(REALM, "9e9"), sources())).toEqual(
+      refused({ kind: "number", value: "9e9" }, { kind: "argument", value: "9e9" }),
     );
-    expect(grounded(delegate("@evilname"), sources())).toEqual(refused({ kind: "word", value: "evilname" }));
-    expect(grounded(delegate("gno.land/r/demo/poll", "9e9"), sources())).toEqual(
-      refused({ kind: "word", value: "9e9" }),
-    );
+    const vault = sources({ page: "See gno.land/r/alice/vault, by Bob's team: a rate of 1, proposal 37." });
+    for (const target of ["gno.land/r/bob/vault", "vault/r/gno.land/alice", "gno.land/r/ALICE/vault", "!!!", "../../"])
+      expect(grounded(delegate(target), vault)).toEqual(missing(target));
+    expect(grounded(delegate("gno.land/r/alice/vault"), vault).ok).toBe(true);
+    for (const target of [REALM, "https://gno.land/r/demo/boards", "gno.land/r/demo/boards", "proposals", "yes"])
+      expect(grounded(delegate(target), sources()).ok).toBe(true);
   });
 
   it("grounds an argument every word of which its sources hold: the page's, or the asker's own, passed among them", () => {
@@ -119,7 +124,7 @@ describe("grounded", () => {
         { kind: "number", value: "1,205" },
         { kind: "address", value: OTHER },
         { kind: "room", value: "@room" },
-        { kind: "word", value: "drain" },
+        { kind: "argument", value: "drain" },
         { kind: "function", value: "Withdraw" },
         { kind: "realm", value: "gno.land/r/demo/other" },
       ),
@@ -178,18 +183,71 @@ describe("grounded", () => {
       refused({ kind: "number", value: "1000" }),
     );
     const keycap = (digit: string) => `${digit}${String.fromCodePoint(0xfe0f, 0x20e3)}`;
+    const shown = ["7", "7", "3"].map((digit) => `${digit}${String.fromCodePoint(0x20e3)}`).join("");
     expect(grounded(digest(facts(`${keycap("7")}${keycap("7")}${keycap("3")} GNOT`)), sources())).toEqual(
-      refused({ kind: "number", value: "773" }),
+      refused({ kind: "number", value: "773" }, { kind: "number", value: shown }),
     );
     const parts = sources({ page: "5 and 250" });
     for (const blank of ["  ", "\t"])
       expect(grounded(digest(facts(`5${blank}250`)), parts)).toEqual(refused({ kind: "number", value: "5 250" }));
   });
 
+  it("refuses an account whose first letter only looks like g, a hair space parts, or a digit leads", () => {
+    const char = (point: number) => String.fromCodePoint(point);
+    for (const first of [0x261, 0x50d, 0x581]) {
+      const word = `${char(first)}${OTHER.slice(1)}`;
+      expect(grounded(digest(text(`Send to ${word}`)), sources())).toEqual(refused({ kind: "address", value: word }));
+    }
+    expect(grounded(digest(facts(`37 to g${char(0x200a)}${OTHER.slice(1)}`)), sources())).toEqual(
+      refused({ kind: "address", value: OTHER }),
+    );
+    expect(grounded(digest(text(`Send to 0${OTHER}`)), sources())).toEqual(
+      refused({ kind: "address", value: `0${OTHER}` }),
+    );
+  });
+
+  it("refuses a figure a letter, a mark or a numeric symbol makes of a number, unless its sources write it so", () => {
+    const char = (...points: number[]) => String.fromCodePoint(...points);
+    expect(grounded(digest(facts("Claim 1OOO GNOT")), sources())).toEqual(refused({ kind: "number", value: "1OOO" }));
+    const marked = `1${char(0xc02, 0xc02, 0xc02)}`;
+    expect(grounded(digest(facts(`Claim ${marked} GNOT`)), sources())).toEqual(
+      refused({ kind: "number", value: marked }),
+    );
+    const dingbats = char(0x278a, 0x24ff, 0x24ff, 0x24ff);
+    expect(grounded(digest(facts(`Claim ${dingbats} GNOT`)), sources())).toEqual(
+      refused({ kind: "number", value: dingbats }),
+    );
+    const price = sources({ page: `Price: 1${char(0xbd)} GNOT, a supply of 10${char(0x2076)}` });
+    expect(grounded(digest(facts("11 GNOT")), price)).toEqual(refused({ kind: "number", value: "11" }));
+    expect(grounded(digest(facts("106 GNOT")), price)).toEqual(refused({ kind: "number", value: "106" }));
+    expect(grounded(digest(facts(`1${char(0xbd)} GNOT`)), price).ok).toBe(true);
+  });
+
+  it("refuses digits a narrow space parts, a sign any dash writes, a separator not the page's", () => {
+    const char = (point: number) => String.fromCodePoint(point);
+    const hair = char(0x200a);
+    expect(grounded(digest(facts(`Claim 1${hair}0${hair}0${hair}0 GNOT`)), sources())).toEqual(
+      refused({ kind: "number", value: "1000" }),
+    );
+    const refund = sources({ page: "Refund: 5 GNOT, then 1 and 000" });
+    expect(grounded(digest(facts(`${char(0x2010)}5 GNOT`)), refund)).toEqual(refused({ kind: "number", value: "-5" }));
+    const dotted = `1${char(0x2027)}000`;
+    expect(grounded(digest(facts(`${dotted} GNOT`)), refund)).toEqual(refused({ kind: "number", value: dotted }));
+  });
+
+  it("holds of a page no number a blank with a glyph's width parts", () => {
+    const voters = sources({ page: `2026${String.fromCodePoint(0x2800)}100 voters` });
+    expect(grounded(digest(facts("2026100 voters")), voters)).toEqual(refused({ kind: "number", value: "2026100" }));
+  });
+
   it("refuses an account in upper case, parted by a character that draws nothing, or holding a look-alike letter", () => {
     const pay = (to: string) => digest(form({ function: "Transfer", args: { to, n4: "37" } }));
-    expect(grounded(pay(OTHER.toUpperCase()), sources())).toEqual(refused({ kind: "address", value: OTHER }));
-    expect(grounded(pay(ADMIN.toUpperCase()), sources()).ok).toBe(true);
+    expect(grounded(pay(OTHER.toUpperCase()), sources())).toEqual(
+      refused({ kind: "address", value: OTHER }, { kind: "argument", value: OTHER.toUpperCase() }),
+    );
+    expect(grounded(pay(ADMIN.toUpperCase()), sources())).toEqual(
+      refused({ kind: "argument", value: ADMIN.toUpperCase() }),
+    );
     const parted = `${OTHER.slice(0, 20)}${String.fromCodePoint(0x200b)}${OTHER.slice(20)}`;
     expect(grounded(digest(text(`Send to ${parted}`)), sources())).toEqual(refused({ kind: "address", value: OTHER }));
     expect(grounded(digest(text(`Send to ${String.fromCodePoint(0x3164)}${OTHER}`)), sources())).toEqual(

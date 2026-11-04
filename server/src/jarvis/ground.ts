@@ -4,7 +4,7 @@
 // stated against m read cost O(n + m); each form proposes a call of the realm read that proposed.ts's check passes.
 import { AnswerButton, Digest } from "@gnoworld/schemas";
 import type { FunctionList } from "@gnoworld/schemas/functions";
-import { digestFacts, sourceFactsOf, type DigestFacts, type SourceFacts } from "./facts.ts";
+import { coreOf, digestFacts, sourceFactsOf, type DigestFacts, type SourceFacts } from "./facts.ts";
 import { checkProposal } from "./proposed.ts";
 
 /** What the server read of a realm: its path, its page's raw Markdown, its state's text (with an answer's button, the
@@ -30,10 +30,10 @@ export function sourcesOf(read: Read): Sources {
   return { realm: read.realm, functions: read.functions, texts };
 }
 
-/** A fact stated that the sources lack; `@room` is never held, a `word` is one of a form's arguments, a `realm` is not
- * the one read, a `function` no call it can make. */
+/** A fact stated that the sources lack: a `number` as written, a figure among them; `@room`, never held; a piece of a form's
+ * `argument`; a `realm` not the one read; a `function` no call it can make. */
 interface Missing {
-  readonly kind: "link" | "number" | "address" | "room" | "word" | "realm" | "function";
+  readonly kind: "link" | "number" | "address" | "room" | "argument" | "realm" | "function";
   readonly value: string;
 }
 
@@ -45,21 +45,28 @@ export type GroundedButton = { ok: true; button: AnswerButton } | Ungrounded;
 const states = (stated: DigestFacts): boolean =>
   stated.room || stated.links.size + stated.numbers.size + stated.addresses.size + stated.actions.length > 0;
 
-// What the sources lack, in order: links, numbers, accounts, the room, arguments' words, then each form.
+// What the sources lack, in order: links, numbers then figures, accounts, the room, arguments' pieces, then each form.
 function missingIn(stated: DigestFacts, sources: Sources): Missing[] {
   const missing: Missing[] = [];
-  const check = (
-    kind: Missing["kind"],
-    values: ReadonlySet<string>,
-    of: (facts: SourceFacts) => ReadonlySet<string>,
-  ) => {
-    for (const value of values) if (!sources.texts.some((facts) => of(facts).has(value))) missing.push({ kind, value });
+  const held = (of: (facts: SourceFacts) => ReadonlySet<string>) => (value: string) =>
+    sources.texts.some((facts) => of(facts).has(value));
+  const link = held((facts) => facts.links);
+  const number = held((facts) => facts.numbers);
+  const word = held((facts) => facts.words);
+  const piece = held((facts) => facts.pieces);
+  const check = (kind: Missing["kind"], values: ReadonlySet<string>, found: (value: string) => boolean) => {
+    for (const value of values) if (!found(value)) missing.push({ kind, value });
   };
-  check("link", stated.links, (facts) => facts.links);
-  check("number", stated.numbers, (facts) => facts.numbers);
-  check("address", stated.addresses, (facts) => facts.words);
+  check("link", stated.links, link);
+  check("number", stated.numbers, number);
+  check("number", stated.figures, piece);
+  check("address", stated.addresses, word);
   if (stated.room) missing.push({ kind: "room", value: "@room" });
-  check("word", stated.words, (facts) => facts.words);
+  check(
+    "argument",
+    stated.pieces,
+    (value) => value === sources.realm || (coreOf(value) !== "" && piece(coreOf(value))),
+  );
   // ponytail: each form looks its function up in the realm's list, 50 forms at most (the schema's blocks).
   for (const action of stated.actions) {
     if (action.realm !== sources.realm) missing.push({ kind: "realm", value: action.realm });

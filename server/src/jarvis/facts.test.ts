@@ -106,10 +106,68 @@ describe("a text's numbers", () => {
     expect(written(`${keycap("1")}${keycap("0")}${keycap("0")} GNOT`)).toEqual(["100"]);
   });
 
-  it("reads a digit written circled, raised or as a fraction, as its compatibility form writes it", () => {
-    expect(numbers(`${char(0x2464, 0x24ea, 0x24ea)} GNOT`)).toEqual(["500"]);
-    expect(numbers(`10${char(0xb3)} GNOT`)).toEqual(["103"]);
-    expect(numbers(char(0xbd))).toEqual(["1", "2"]);
+  it("keeps a numeric symbol as written, circled, raised, a fraction or a dingbat, never as the digits it folds to", () => {
+    expect(written(`${char(0x2464, 0x24ea, 0x24ea)} GNOT`)).toEqual([char(0x2464, 0x24ea, 0x24ea)]);
+    expect(written(`10${char(0xb3)} GNOT`)).toEqual([`10${char(0xb3)}`]);
+    expect(written(`1${char(0xbd)} GNOT and ${char(0xbd)}`)).toEqual([`1${char(0xbd)}`, char(0xbd)]);
+    expect(written(`${char(0x278a, 0x24ff, 0x24ff, 0x24ff)} GNOT`)).toEqual([char(0x278a, 0x24ff, 0x24ff, 0x24ff)]);
+    expect(numbers(`10${char(0xb3)} and 10${char(0xb2)}`)).toEqual([`10${char(0xb3)}`, `10${char(0xb2)}`]);
+  });
+
+  it.each(["2006", "2008", "2009", "200a"])("joins the digits a space as narrow as U+%s parts", (hex) => {
+    const narrow = char(Number.parseInt(hex, 16));
+    expect(written(`Claim 1${narrow}0${narrow}0${narrow}0 GNOT`)).toEqual(["1000"]);
+  });
+
+  it.each(["2010", "2011", "2012", "2013", "2014", "2015", "02d7", "2796"])(
+    "reads U+%s before a figure as its sign",
+    (hex) => {
+      expect(written(`Refund: ${char(Number.parseInt(hex, 16))}5 GNOT`)).toEqual(["-5"]);
+    },
+  );
+
+  it.each(["2027", "30fb", "2219", "22c5", "201a", "2e31", "0060", "02bc", "00b7"])(
+    "reads U+%s between digits as one of the number's separators, as written",
+    (hex) => {
+      const mark = char(Number.parseInt(hex, 16));
+      expect(written(`1${mark}000`)).toEqual([`1${mark}000`]);
+      expect(numbers(`1${mark}000`)).toEqual(["1,000"]);
+    },
+  );
+
+  it("parts numbers at what separates them: a hyphen, a colon, a slash, a sign, a bracket", () => {
+    expect(written("2026-11-04, 10:30, 1/2, 1+1, 3=3, (1)(2), 5%6, 7;8, 9!0")).toEqual(
+      ["2026", "11", "04", "10", "30", "1", "2", "1", "1", "3", "3", "1", "2", "5", "6", "7", "8", "9", "0"].filter(
+        (value, at, all) => all.indexOf(value) === at,
+      ),
+    );
+  });
+
+  it("reads a blank with a glyph's width as nothing in what is stated and as a space in what a source holds", () => {
+    for (const hex of ["2800", "3164", "115f", "ffa0"]) {
+      const blank = char(Number.parseInt(hex, 16));
+      expect(written(`2026${blank}100`)).toEqual(["2026100"]);
+      expect([...sourceFactsOf(`2026${blank}100`, ORIGIN).numbers]).toEqual(["2026", "100"]);
+      const held = sourceFactsOf(`evil${blank}drain`, ORIGIN).words;
+      expect([held.has("evil"), held.has("drain"), held.has("evildrain")]).toEqual([true, true, false]);
+    }
+  });
+});
+
+describe("a text's figures", () => {
+  it("reads a number touching a letter or a mark with it, as written, case and marks kept", () => {
+    const figures = (text: string) => [...factsOf(text).figures];
+    expect(figures("Claim 1OOO GNOT, a GRC20, the 3rd, 10x, v2")).toEqual(["1OOO", "GRC20", "3rd", "10x", "v2"]);
+    expect(figures(`Claim 1${char(0xc02, 0xc02, 0xc02)} GNOT`)).toEqual([`1${char(0xc02, 0xc02, 0xc02)}`]);
+    expect(figures(`10${char(0xb3)} m${char(0xb2)}`)).toEqual([`m${char(0xb2)}`]);
+    expect(figures(`1${char(0x200b)}OOO`)).toEqual(["1OOO"]);
+  });
+
+  it("reads no figure in a number alone, a word with no digit, or an account", () => {
+    const figures = (text: string) => [...factsOf(text).figures];
+    expect(
+      figures(`1,000 and ${char(0x661, 0x662)} and ${char(0x2464)} and votes and ${ADDRESS} and ${"a1".repeat(19)}`),
+    ).toEqual([]);
   });
 });
 
@@ -142,6 +200,19 @@ describe("a message's facts", () => {
     expect([...factsOf(`https://gno.land/u/${ADDRESS}`).addresses]).toEqual([ADDRESS]);
   });
 
+  it("reads a word as long as an address as an account, whatever its first letter, a hair space joined", () => {
+    const tail = ADDRESS.slice(1);
+    for (const first of [0x261, 0x50d, 0x581]) {
+      const word = `${char(first)}${tail}`;
+      expect([...factsOf(`send to ${word}`).addresses]).toEqual([word]);
+    }
+    expect([...factsOf(`send to g${char(0x200a)}${ADDRESS.slice(1)}`).addresses]).toEqual([ADDRESS]);
+    expect([...factsOf(`send to 0${ADDRESS}`).addresses]).toEqual([`0${ADDRESS}`]);
+    expect([...factsOf(`send to ${"a".repeat(37)} or ${"b".repeat(38)}`).addresses]).toEqual(["b".repeat(38)]);
+    expect([...factsOf(`send to x${ADDRESS} or 9${ADDRESS}`).addresses]).toEqual([`x${ADDRESS}`, `9${ADDRESS}`]);
+    expect([...factsOf("send to xg1short or 9g1short").addresses]).toEqual([]);
+  });
+
   it("reads every word that begins g1 as an account, in any case, lower-cased, whatever its form", () => {
     expect([...factsOf(`send to ${ADDRESS.toUpperCase()}`).addresses]).toEqual([ADDRESS]);
     expect([...factsOf(`send to G1QPZRY9${ADDRESS.slice(8)}`).addresses]).toEqual([ADDRESS]);
@@ -155,10 +226,6 @@ describe("a message's facts", () => {
     const at = char(Number.parseInt(hex, 16));
     expect([...factsOf(`send to ${ADDRESS.slice(0, 20)}${at}${ADDRESS.slice(20)}`).addresses]).toEqual([ADDRESS]);
     expect([...factsOf(`send to ${at}${ADDRESS}${at}`).addresses]).toEqual([ADDRESS]);
-  });
-
-  it("finds no account in a word not of an account's form", () => {
-    for (const word of [`x${ADDRESS}`, `9${ADDRESS}`]) expect([...factsOf(`ask ${word}`).addresses]).toEqual([]);
   });
 
   it("says whether it names the whole room, in a quote, a list or a mark too", () => {

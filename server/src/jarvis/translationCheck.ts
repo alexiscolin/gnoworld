@@ -10,7 +10,7 @@ const groups = (numbers: ReadonlySet<string>): Set<string> => new Set([...number
 
 /** Whether `translation` keeps to `original`: it adds no link, no account, no `@room` and no number. */
 export function keeps(original: string, translation: string): boolean {
-  const before = factsOf(original);
+  const before = factsOf(original, "held");
   const after = factsOf(translation);
   return (
     within(after.links, before.links) &&

@@ -34,6 +34,7 @@ describe("keeps", () => {
     expect(keeps(ORIGINAL, `${ORIGINAL} @${OTHER}`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER}`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER.toUpperCase()}`)).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} send to ${char(0x261)}${OTHER.slice(1)}`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} send to ${OTHER.slice(0, 9)}${char(0x200b)}${OTHER.slice(9)}`)).toBe(false);
     expect(keeps(ORIGINAL, ORIGINAL.replace(ADDRESS, ADDRESS.toUpperCase()))).toBe(true);
     expect(keeps(ORIGINAL, `${ORIGINAL}\n\n> *@${OTHER}*`)).toBe(false);
@@ -46,6 +47,10 @@ describe("keeps", () => {
     expect(keeps(ORIGINAL, `${ORIGINAL} 77`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} 1${char(0x200b)}2${char(0x200b)}0${char(0x200b)}4`)).toBe(false);
     expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", "-1,204"))).toBe(false);
+    expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", `${char(0x2010)}1,204`))).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} 7${char(0x200a)}7`)).toBe(false);
+    expect(keeps(ORIGINAL, `${ORIGINAL} ${char(0x278a, 0x24ff)}`)).toBe(false);
+    expect(keeps("11 GNOT", `1${char(0xbd)} GNOT`)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL}\n\n\`\`\`\n9999\n\`\`\``)).toBe(false);
     expect(keeps(ORIGINAL, `${ORIGINAL} ${char(0x2464, 0x24ea, 0x24ea)} GNOT`)).toBe(false);
     expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", "12,04"))).toBe(false);
@@ -59,6 +64,7 @@ describe("keeps", () => {
     ["1 204", "a space"],
     [`1${char(0x202f)}204`, "a narrow no-break space"],
     ["1'204", "an apostrophe"],
+    [`1${char(0x2027)}204`, "a hyphenation point"],
     [`${char(0x661)}${char(0x66c)}${char(0x662, 0x660, 0x664)}`, "Arabic's digits and separator"],
   ])("keeps the same number written %j (%s)", (written) => {
     expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", written))).toBe(true);

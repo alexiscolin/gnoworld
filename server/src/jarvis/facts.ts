@@ -1,15 +1,19 @@
 // What a text states that can be checked (ADR-0002 §4, "Grounded"; §5, points 4 and 5): its links as core's reader finds
-// them, and what a person reads once nothing unseen parts it: its numbers, as written, and its words, each that begins `g1`
-// an account. One extractor for a digest's grounding and a translation's check, both reading a text alike.
+// them, and what a person reads once nothing unseen parts it: its numbers as written, its words, the accounts among them,
+// and its figures, numbers a letter or a mark touches. One extractor for a digest's grounding and a translation's check.
 import { fold, inlines, isBlank, markdown, mentionsRoom, page, type Inline, type PageBlock } from "@gnoworld/core";
 import type { Digest, DigestBlock, ProposedAction } from "@gnoworld/schemas";
 
-/** What a text states: its links, the accounts it names (its words that begin `g1`, lower-cased), its numbers as written,
- * and whether it names the whole room (`@room`). */
+/** How a text is read: as what is stated (a digest, a translation) or as what a source holds, each the stricter way. */
+type Reading = "stated" | "held";
+
+/** What a text states: its links, the accounts it names, its numbers as written, its figures, and whether it names the
+ * whole room (`@room`). An account is a word that begins `g1`, or as long as an address, in any case, lower-cased. */
 export interface Facts {
   readonly links: ReadonlySet<string>;
   readonly addresses: ReadonlySet<string>;
   readonly numbers: ReadonlySet<string>;
+  readonly figures: ReadonlySet<string>;
   readonly room: boolean;
 }
 
@@ -26,35 +30,56 @@ function valueOf(digit: string, values: Map<string, string>): string {
   return value;
 }
 
-// A text as a person reads its figures and names: core's fold (compatibility forms, no mark nor format character, lower
-// case), what else core's isBlank says draws nothing dropped, each digit an ASCII one, a minus sign a hyphen, and each run
-// of blanks on a line one space, as a page draws it.
-function unseen(text: string): string {
+// What a person sees, case and marks kept: what core's isBlank says draws nothing goes, and so do the hair, thin, six-per-em
+// and punctuation spaces; a blank with a glyph's width (a Hangul filler, the braille blank) is nothing in what is stated and
+// a space in what is held, so each reading asks the most of the sources.
+function visible(text: string, reading: Reading): string {
+  const blank = (char: string): string => {
+    if (!isBlank(char) || /\s/u.test(char)) return char;
+    return reading === "held" && /[\p{L}\p{S}]/u.test(char) ? " " : "";
+  };
+  return text.replace(/[\u2006\u2008\u2009\u200A]/gu, "").replace(/\P{ASCII}/gu, blank);
+}
+
+// Its figures and names as a person reads them: core's fold (compatibility forms, no mark, lower case), a numeric symbol
+// kept as written; each digit an ASCII one, each dash a hyphen, each run of blanks on a line one space.
+function unseen(shown: string): string {
   const values = new Map<string, string>();
   const plain = (char: string): string => {
     if (/\p{Nd}/u.test(char)) return valueOf(char, values);
-    if (char === "\u2212") return "-";
-    return isBlank(char) && !/\s/u.test(char) ? "" : char;
+    return /[\u2010-\u2015\u2212\u02D7\u2796]/u.test(char) ? "-" : char;
   };
-  return fold(text)
+  const folded = shown.split(/(\p{No})/u).map((part, at) => (at % 2 === 1 ? part : fold(part)));
+  return folded
+    .join("")
     .replace(/\P{ASCII}/gu, plain)
     .replace(/[^\S\n]+/g, " ");
 }
 
-function numbersIn(shown: string): Set<string> {
-  // A space parts groups of three after a first of three digits at most, as thousands are written (`12 345`, never
-  // `2026 100` nor `1 2`); a mark parts groups of any length; a hyphen after no letter nor digit is a sign.
+function numbersIn(plain: string): Set<string> {
+  // A unit is a digit or a numeric symbol. A space parts groups of three after a first of three units at most, as thousands
+  // are written (`12 345`, never `2026 100`); any one punctuation or symbol parts groups but those that part numbers
+  // (`-:/+=<>()[]{}%#&*|~^@!?;"`); a hyphen after no letter nor digit is a sign.
   const number =
-    /(?:(?<![\p{L}\p{N}])-)?(?:\d{1,3}(?: \d{3}(?!\d))+(?:[.,'_\u2019\u02bc\u00b7\u2032\u066b\u066c]\d+)*|\d+(?:[.,'_\u2019\u02bc\u00b7\u2032\u066b\u066c]\d+)*)/gu;
-  return new Set(shown.match(number));
+    /(?:(?<![\p{L}\p{N}])-)?(?:[\d\p{No}]{1,3}(?: [\d\p{No}]{3}(?![\d\p{No}]))+|[\d\p{No}]+)(?:(?![-:\/+=<>()[\]{}%#&*|~^@!?;"])[\p{P}\p{S}\u02BC][\d\p{No}]+)*/gu;
+  return new Set(plain.match(number));
 }
 
-/** A number's groups of digits, a comma between each, whatever a language writes between them: `1 000` and `1.000` are
- * `1,000`, which a translation may write either way. */
-export const groupsOf = (number: string): string => number.replace(/[^\d-]/g, ",");
+/** A number's groups, a comma between each, whatever a language writes between them: `1 000` and `1.000` are `1,000`,
+ * which a translation may write either way. */
+export const groupsOf = (number: string): string => number.replace(/[^\d\p{No}-]/gu, ",");
 
 // A text's words as a person reads them: runs of letters and digits.
-const wordsOf = (shown: string): string[] => shown.match(/[\p{L}\p{N}]+/gu) ?? [];
+const wordsOf = (plain: string): string[] => plain.match(/[\p{L}\p{N}]+/gu) ?? [];
+const isAccount = (word: string): boolean => word.startsWith("g1") || word.length >= 38;
+
+// A number a letter or a mark touches, as written, case and marks kept (`1OOO`, `GRC20`): a figure no number check reads.
+const figuresIn = (shown: string): Set<string> =>
+  new Set(
+    (shown.match(/[\p{L}\p{M}\p{N}]+/gu) ?? []).filter(
+      (word) => /\p{N}/u.test(word) && /[^\p{Nd}\p{No}]/u.test(word) && !isAccount(word.toLowerCase()),
+    ),
+  );
 
 function linksIn(nodes: Iterable<Inline>): Set<string> {
   const links = new Set<string>();
@@ -62,23 +87,26 @@ function linksIn(nodes: Iterable<Inline>): Set<string> {
   return links;
 }
 
-/** A text's facts, read as the room reads a message. */
-export function factsOf(text: string): Facts {
+/** A text's facts, read as the room reads a message, as what is stated or as what a source holds. */
+export function factsOf(text: string, reading: Reading = "stated"): Facts {
   const blocks = markdown(text);
-  const shown = unseen(text);
+  const shown = visible(text, reading);
+  const plain = unseen(shown);
   return {
     links: linksIn(inlines(blocks)),
-    addresses: new Set(wordsOf(shown).filter((word) => word.startsWith("g1"))),
-    numbers: numbersIn(shown),
+    addresses: new Set(wordsOf(plain).filter(isAccount)),
+    numbers: numbersIn(plain),
+    figures: figuresIn(shown),
     room: mentionsRoom(blocks),
   };
 }
 
-/** What a source can ground: its links, its numbers as written, and its words, every account it names among them. */
+/** What a source can ground: its links, numbers as written, words, and pieces, which a figure or an argument must be. */
 export interface SourceFacts {
   readonly links: ReadonlySet<string>;
   readonly numbers: ReadonlySet<string>;
   readonly words: ReadonlySet<string>;
+  readonly pieces: ReadonlySet<string>;
 }
 
 // A page's inline nodes: core's walk of a message's blocks, and each heading's line.
@@ -90,22 +118,31 @@ function* pageInlines(blocks: readonly PageBlock[]): Generator<Inline> {
   }
 }
 
-/** A source's facts, read as a realm's page, a link to a path resolved against gnoweb's `origin`: no link of one past core's
- * cap, its numbers and words still. */
-export function sourceFactsOf(source: string, origin: string): SourceFacts {
-  const read = page(source, { origin });
-  const shown = unseen(source);
-  return {
-    links: read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>(),
-    numbers: numbersIn(shown),
-    words: new Set(wordsOf(shown)),
-  };
+/** A piece as written, the punctuation that wraps it in prose left out: what a source holds a figure or an argument as. */
+export const coreOf = (piece: string): string => piece.replace(/^["'`*_~.,;:!?]+|["'`*_~.,;:!?]+$/gu, "");
+
+// A source's pieces: each part between blanks and brackets, as written, its wrapping left out; each link with and without
+// its scheme.
+function piecesOf(source: string, links: ReadonlySet<string>): Set<string> {
+  const pieces = new Set(source.match(/[^\s()[\]<>"'`*_~.,;:!?](?:[^\s()[\]<>]*[^\s()[\]<>"'`*_~.,;:!?])?/gu));
+  for (const link of links) pieces.add(link).add(link.slice("https://".length));
+  return pieces;
 }
 
-/** What a digest states, the actions its forms propose, and their arguments' words, which a call carries as given. */
+/** A source's facts, read as a realm's page, a link to a path resolved against gnoweb's `origin`: no link of one past core's
+ * cap, the rest still. */
+export function sourceFactsOf(source: string, origin: string): SourceFacts {
+  const read = page(source, { origin });
+  const links = read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>();
+  const shown = visible(source, "held");
+  const plain = unseen(shown);
+  return { links, numbers: numbersIn(plain), words: new Set(wordsOf(plain)), pieces: piecesOf(source, links) };
+}
+
+/** What a digest states, the actions its forms propose, and their arguments' pieces, which a call carries as given. */
 export interface DigestFacts extends Facts {
   readonly actions: readonly ProposedAction[];
-  readonly words: ReadonlySet<string>;
+  readonly pieces: ReadonlySet<string>;
 }
 
 // A block's parts: texts a reader sees (a chart's points one a line), addresses taken whole, and its action.
@@ -138,7 +175,10 @@ function partsOf(block: DigestBlock): Parts {
 }
 
 // A word that is neither a number nor an account, which have checks of their own.
-const isPlainWord = (word: string): boolean => !/^\d+$/.test(word) && !word.startsWith("g1");
+// An argument's piece, between blanks as given, that no other check reads as it is (a number's and an account's do): an
+// empty one carries nothing.
+const isPiece = (piece: string): boolean =>
+  piece !== "" && !/^-?\d+$/.test(piece) && !(/^[\da-z]+$/.test(piece) && isAccount(piece));
 
 const addAll = (into: Set<string>, from: Iterable<string>): void => {
   for (const value of from) into.add(value);
@@ -146,25 +186,22 @@ const addAll = (into: Set<string>, from: Iterable<string>): void => {
 
 /** A digest's facts, each text read alone, so a fence never closed in one hides nothing of the next. */
 export function digestFacts(digest: Digest): DigestFacts {
-  const [links, addresses, numbers, words] = [
-    new Set<string>(),
-    new Set<string>(),
-    new Set<string>(),
-    new Set<string>(),
-  ];
+  const facts = { links: new Set<string>(), addresses: new Set<string>(), numbers: new Set<string>() };
+  const [figures, pieces] = [new Set<string>(), new Set<string>()];
   const actions: ProposedAction[] = [];
   let room = false;
   for (const block of digest.blocks) {
     const { texts, links: whole, action } = partsOf(block);
-    for (const found of texts.map(factsOf)) {
-      addAll(links, found.links);
-      addAll(addresses, found.addresses);
-      addAll(numbers, found.numbers);
+    for (const found of texts.map((text) => factsOf(text))) {
+      addAll(facts.links, found.links);
+      addAll(facts.addresses, found.addresses);
+      addAll(facts.numbers, found.numbers);
+      addAll(figures, found.figures);
       room ||= found.room;
     }
-    addAll(links, whole);
+    addAll(facts.links, whole);
     if (action !== undefined) actions.push(action);
-    for (const value of Object.values(action?.args ?? {})) addAll(words, wordsOf(unseen(value)).filter(isPlainWord));
+    for (const value of Object.values(action?.args ?? {})) addAll(pieces, value.split(/\s+/u).filter(isPiece));
   }
-  return { links, addresses, numbers, room, actions, words };
+  return { ...facts, figures, room, actions, pieces };
 }
