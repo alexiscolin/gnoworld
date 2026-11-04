@@ -76,7 +76,13 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
    is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a
    dev or watch mode, each logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox
-   cannot write.
+   cannot write. Its one exception is the ping-pong (`pingpong`; Alexis, 2026-11-04): while
+   Alexis's own `pnpm workshop` serves this checkout, the turn ends with no gate (docs/DEVELOPMENT.md,
+   "The workshop"). Its sign is one no sandboxed command plants: a shell running this checkout's
+   `scripts/workshop.sh` from its folder, its parent alive, that macOS's `sandbox_check` finds in no
+   sandbox, read with `/bin/ps`, `/usr/sbin/lsof` and `/usr/bin/python3 -I`; no file of the tree.
+   A workshop left running keeps every turn of that checkout gate-free; pre-commit still gates each
+   commit.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
@@ -173,10 +179,11 @@ a cost that grows with its input and not its square) or through its timeout unde
 (`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast gate leaves those, related, `--tests-all` and a failed file's
 second run alike (`--tags-filter=!timing`); the merge check and `--full` run them in the coverage, as every test. Other gates' load
 failed them for nothing: rest.test.ts's search cost 202 times in the worktrees' unsteady logs, main.test.ts's 3k 139, LineView's
-country 93. It holds 208 tests: rest.test.ts's two search costs, main.test.ts's 3k, LineView's country, Here's two, arrival's
-seven views and same arrival, cosmos.test.ts's close world, space.test.ts's shells, useSpace's three, ladder's two past the cap,
-search.test.ts's square, and the markdown scanner's 192 linear-in-bytes cases, tier 1, which the merge check still runs. Run them
-alone: `pnpm exec vitest run --tags-filter=timing`.
+country 93. It holds 16 tests: rest.test.ts's two search costs, main.test.ts's 3k, LineView's country, Here's two, arrival's
+seven views and same arrival, cosmos.test.ts's close world, space.test.ts's shells, useSpace's three, ladder's two past the cap
+and search.test.ts's square. A guard against overload stays in every commit's related tests though it flakes at a load (the
+markdown scanner's linear-in-bytes cases, tier 1; the guards' property tests), the chief's call. Run them alone:
+`pnpm exec vitest run --tags-filter=timing`.
 
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
 journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
