@@ -11,7 +11,7 @@ const LISTED = [
   ...["list-numbered", "quote", "pause", "play", "pin", "more", "pencil", "link", "comet", "at"],
   ...["mail", "check", "calendar", "spark", "news", "satellite", "planet", "cluster", "bold", "italic"],
   ...["underline", "strikethrough", "slash", "caret", "share", "menu", "people", "star", "chart", "info"],
-  ...["warning", "alert", "lock", "shield", "key"],
+  ...["warning", "alert", "lock", "shield", "key", "sliders"],
 ] as const satisfies readonly IconName[];
 const DIRECTIONAL = new Set<IconName>(["arrow", "arrow-up-right", "reply", "list-bulleted", "list-numbered", "quote"]);
 
@@ -23,8 +23,8 @@ function svgOf(name: IconName, size?: "m" | "l") {
 }
 
 describe("Icon", () => {
-  it("draws exactly the 55 icons the design system lists", () => {
-    expect(new Set(LISTED).size).toBe(55);
+  it("draws exactly the 56 icons the design system lists", () => {
+    expect(new Set(LISTED).size).toBe(56);
     expect([...ICON_NAMES].sort()).toEqual([...LISTED].sort());
   });
 
@@ -36,13 +36,13 @@ describe("Icon", () => {
     expect(svg.querySelectorAll("path, circle, rect").length).toBeGreaterThan(0);
   });
 
-  it("draws 55 different drawings", () => {
+  it("draws 56 different drawings", () => {
     const drawing = (svg: SVGSVGElement) =>
       [...svg.querySelectorAll("*")].map((shape) =>
         [shape.tagName, ...[...shape.attributes].map((a) => `${a.name}=${a.value}`)].join(" "),
       );
     const drawings = LISTED.map((name) => drawing(svgOf(name)).join("; "));
-    expect(new Set(drawings).size).toBe(55);
+    expect(new Set(drawings).size).toBe(56);
   });
 
   it.each(LISTED)("paints %s only in the text's colour", (name) => {
@@ -63,8 +63,8 @@ describe("Icon", () => {
     expect(svgOf(name).hasAttribute("data-mirror")).toBe(DIRECTIONAL.has(name));
   });
 
-  it("has a gallery story that shows all 55", () => {
+  it("has a gallery story that shows all 56", () => {
     const counts = eachStory(stories, (container) => container.querySelectorAll("svg").length);
-    expect(Math.max(...counts)).toBe(55);
+    expect(Math.max(...counts)).toBe(56);
   });
 });
