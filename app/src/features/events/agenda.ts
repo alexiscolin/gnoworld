@@ -22,7 +22,7 @@ const REMIND_WINDOW_MS = 24 * 60 * 60 * 1000;
 const startOf = (event: CalendarEvent) => Date.parse(event.start);
 
 /** Whether the data dates `event`: one waiting for its date has the sentinel. */
-const isDated = (event: CalendarEvent): boolean => startOf(event) < UNDATED_EVENT;
+export const isDated = (event: CalendarEvent): boolean => startOf(event) < UNDATED_EVENT;
 
 /** Whether `event` is live at `now`: begun, and within its hour. */
 export const isLive = (event: CalendarEvent, now: number): boolean =>

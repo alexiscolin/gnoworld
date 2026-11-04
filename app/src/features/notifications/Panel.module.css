@@ -4,6 +4,8 @@
   .place {
     /* raw: under the header's controls, where the dock's panel starts (frame 86: 88 px) */
     inset: calc(var(--space-2xl) + var(--space-l)) var(--space-s) var(--space-s) auto;
+    /* layout: the browser centres a popover; this one stands at the column's top, as tall as its lines, the page's foot at most */
+    margin: 0;
     /* raw: the dock's width in frame 86 (360 px), less on a narrow screen */
     inline-size: min(360px, calc(100% - 2 * var(--space-s)));
     overflow: auto;

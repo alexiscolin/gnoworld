@@ -9,7 +9,7 @@ import { useLocation } from "react-router";
 import { FOLLOWS_KEPT } from "../../lib/keep/fields.ts";
 import { useLeaving } from "../../leaving.tsx";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { agendaOf, isLive, type CalendarEvent } from "./agenda.ts";
+import { agendaOf, isDated, isLive, type CalendarEvent } from "./agenda.ts";
 import { placeOf, universeAt } from "./places.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,15 +47,17 @@ function EventRow({ event, now, leave }: { event: CalendarEvent; now: number; le
   const place = event.world === undefined ? undefined : placeOf(universe, event.world);
   const reminder = useReminder(event.id);
   const live = isLive(event, now);
+  // An event waiting for its date has no time to say, nor a reminder to ask.
+  const dated = isDated(event);
   return (
     <Row
       look="divided"
-      title={`${timeOf(event)} · ${event.title}`}
+      title={dated ? `${timeOf(event)} · ${event.title}` : event.title}
       subtitle={place?.name ?? "Online"}
       {...(live ? { activity: "Live now" } : {})}
       trail={
         <Cluster space="3xs">
-          {live ? null : (
+          {live || !dated ? null : (
             <IconButton
               icon="bell"
               size="s"

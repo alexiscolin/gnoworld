@@ -3,7 +3,7 @@
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import styles from "./QuickActions.module.css";
 
-const Calendar = lazy(async () => ({ default: (await import("../events/index.ts")).Calendar }));
+const Calendar = lazy(async () => (await import("../events/index.ts")).calendar());
 
 export interface QuickActionsProps {
   onWhoIsHere: () => void;
