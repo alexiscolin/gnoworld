@@ -34,7 +34,9 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   (two branches side by side once took the same ones) and Alexis each branch's starting brief, integrates the branches, runs the full gate and the
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
-  `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
+  `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127), in
+  `~/Server/gnoworld-wt/`, where no session's shell writes but its own folder (its file tools still can, F5095), the one root where the script makes or removes a folder
+  (`worktree.sh remove`); it writes no other session's worktree, by any tool (F5058). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
   again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
@@ -75,7 +77,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
-   product with no test and no `No-test:` line, and scans the message for secrets. `pre-commit`
+   product with no test and no `No-test:` line, scans the message for secrets, and, in Claude Code's sandbox only, refuses a hidden
+   character in it with the staged `scripts/hidden.py`, as pre-commit runs the staged scripts there (F5085, D36). `pre-commit`
    scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast gate on a copy
    of what is staged, scoped to the commit's paths (`GATE_CHANGED`), and records the code it
    passed. In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate
@@ -269,11 +272,12 @@ with `/cd`:
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
   rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
-  each such file at `merge.sh`. In his shell the hooks run nothing of the repository but the
-  records the sandboxed gate wrote (F076).
+  each such file at `merge.sh`; a merge into a part's branch that changes the harness is his too,
+  in his terminal, never another session's (F5055, F5058). In his shell the hooks run nothing of
+  the repository but the records the sandboxed gate wrote (F076).
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks`, `.git/config` or `.git/worktrees` (so a stale worktree is pruned
-  by Alexis: `git worktree prune`); they reach only the npm and Go registries and github.com.
+  caches, never in `.git/hooks` or `.git/config`; they reach only the npm and Go registries and
+  github.com.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
@@ -350,7 +354,7 @@ costs context in every session.
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
 | `scripts/check.sh` | the gate |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
-| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
+| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |

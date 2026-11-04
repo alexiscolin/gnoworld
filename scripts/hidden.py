@@ -1,6 +1,8 @@
 """hidden.py: the characters no text of this repository holds raw (F5053), as one rule its readers share: check_docs.py
-reads every file and the branch's commit messages for them."""
+reads every file and the branch's commit messages for them, and commit-msg, in Claude Code's sandbox, each message as it is
+written (F5085). Run, it reads a message on its stdin, names each hidden character, and exits 1 when one is there."""
 import re
+import sys
 import unicodedata
 
 # What shows nothing, or changes how the text around it reads: code that reads otherwise than it runs, words a reader never
@@ -56,3 +58,10 @@ def hidden_in_data(where, data):
     if bad >= 0:
         return [f"{where}: no UTF-8 text, from its byte {bad + 1} (a NUL, or a byte that is no UTF-8)"]
     return hidden_in(where, text)
+
+
+if __name__ == "__main__":
+    found = hidden_in_data("message", sys.stdin.buffer.read())
+    if found:
+        print(*(f"  {line}" for line in found), sep="\n", file=sys.stderr)
+    sys.exit(1 if found else 0)

@@ -26,7 +26,7 @@ var (
 const (
 	t0     = 1800000000 // 2027-01-15 08:00:00 UTC, when every test starts
 	oneDay = 86400
-	p0     = 1000000 // ugnot a day at deploy (D3)
+	p0     = 2000000 // ugnot a day at deploy (D3)
 )
 
 // fresh puts the realm as a deploy by adm leaves it, with renting opened and
@@ -82,10 +82,10 @@ func TestRentNeedsExactlyThePriceInOneUgnotCoin(cur realm, t *testing.T) {
 		{{"uatom", 1}, {"ugnot", p0}},
 	} {
 		offer(sent)
-		uassert.AbortsWithMessage(t, cur, "send exactly 1000000ugnot", func() { Rent(cross(cur), "mars", "hello", 1) }, sent.String())
+		uassert.AbortsWithMessage(t, cur, "send exactly 2000000ugnot", func() { Rent(cross(cur), "mars", "hello", 1) }, sent.String())
 	}
 	offer(chain.Coins{{"ugnot", p0}})
-	uassert.AbortsWithMessage(t, cur, "send exactly 3000000ugnot", func() { Rent(cross(cur), "mars", "hello", 3) })
+	uassert.AbortsWithMessage(t, cur, "send exactly 6000000ugnot", func() { Rent(cross(cur), "mars", "hello", 3) })
 	uassert.Equal(t, 0, rentals.Size())
 	uassert.Equal(t, 0, held)
 

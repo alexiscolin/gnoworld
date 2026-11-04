@@ -25,7 +25,7 @@ const (
 	maxWorld   = 40          // bytes in a world's id (D2)
 	maxReport  = 64          // bytes in a report's id
 	maxText    = 40          // code points in a satellite's text (D7)
-	startPrice = 1000000     // ugnot a day at deploy (D3)
+	startPrice = 2000000     // ugnot a day at deploy (D3)
 	daysText   = "1, 3 or 7" // the days a rental lasts, as Rent checks them
 	blank      = 0x2800      // the Braille blank: a symbol that shows nothing
 )

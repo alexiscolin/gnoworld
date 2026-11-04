@@ -181,15 +181,17 @@ PY
 grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
-# wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
-# guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
-python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
+# wants each declared on main, merge.sh shows each first (F129), worktree.sh checks out none other
+# than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
+# what Claude Code starts, .mcp.json's servers.
+python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, re, sys
 text = lambda n: open(sys.argv[n]).read()
 assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
-assert not [n for n in (1, 2, 3) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
+assert not [n for n in (1, 2, 3, 6) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
 tree = ast.parse(text(5))
@@ -625,6 +627,7 @@ cp "$hooks/commit-msg" "$cm/"
 secrets_into "$cm/"
 # It reads what is staged: it runs in a repository of its own, never the one under test.
 cmr="$t/commit-msg-repo" && git init -q "$cmr"
+mkdir -p "$cmr/scripts" && cp "$here/hidden.py" "$cmr/scripts/" && git -C "$cmr" add scripts/hidden.py # what it reads a message with
 refused() {
 	printf '%s\n' "$1" >"$t/msg"
 	! (cd "$cmr" && "$cm/commit-msg" "$t/msg") 2>"$t/err"
@@ -678,6 +681,11 @@ refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject wa
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
 (cd "$cmr" && LC_ALL=C "$cm/commit-msg" "$t/msg") 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+# A python3 that cannot count is no count (F5080): `[ "" -gt 72 ]` errs, and an 86-character subject passed.
+mkdir -p "$t/badpy" && printf '#!/bin/sh\nexit 1\n' >"$t/badpy/python3" && chmod +x "$t/badpy/python3"
+printf 'feat: %s\n' "$(printf 'a%.0s' $(seq 1 80))" >"$t/msg"
+(cd "$cmr" && env -u SANDBOX_RUNTIME PATH="$t/badpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a long subject python3 could not count (F5080)"
+grep -qF "python3 cannot count the subject's characters" "$t/err" || fail "commit-msg did not say python3 cannot count: $(cat "$t/err")"
 # A fix of the product comes with its test, or a line No-test: <why>, as prove_fix.py wants, refused
 # at the commit rather than 30 minutes later by the full gate (9db841c, slice 3).
 mkdir -p "$cmr/server/src" "$cmr/scripts" && printf 'x\n' >"$cmr/server/src/a.ts" && git -C "$cmr" add server/src/a.ts
@@ -706,8 +714,25 @@ refused "fix(server): x" || fail "a fix whose only test it deletes was accepted"
 git -C "$cmr" reset -q HEAD server/src/b.ts
 refused "fix(server): x" && fail "a fix that only deletes a test was refused, which changes no product code"
 mkdir -p "$t/no-repo" && printf 'fix(server): x\n' >"$t/msg"
-(cd "$t/no-repo" && GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
+(cd "$t/no-repo" && env -u SANDBOX_RUNTIME GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
 grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not say git failed: $(cat "$t/err")"
+# A hidden character in the message (F5085): in the sandbox, the staged scripts/hidden.py reads each message as it is
+# written, a merge's and an amend's too, as pre-commit runs the staged scripts there; an emoji's look selector passes. With
+# no staged rule, or a python3 that fails, nothing proves the message clean: it refuses.
+refused "$(printf 'test: x\n\nRemoved-test: a\342\200\256b - why')" || fail "commit-msg accepted a hidden character in the message (F5085)"
+grep -qxF "  message:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" "$t/err" || fail "commit-msg did not name the message's hidden character: $(cat "$t/err")"
+refused "$(printf 'docs: a heart \342\235\244\357\270\217')" && fail "commit-msg refused an emoji's look selector: $(cat "$t/err")"
+blob=$(printf 'import sys\nsys.exit("the staged copy ran")\n' | git -C "$cmr" hash-object -w --stdin) && git -C "$cmr" update-index --cacheinfo "100644,$blob,scripts/hidden.py"
+refused "docs: x" || fail "commit-msg ran another scripts/hidden.py than the staged one"
+grep -qF "the staged copy ran" "$t/err" || fail "commit-msg did not run the staged scripts/hidden.py: $(cat "$t/err")"
+git -C "$cmr" update-index --force-remove scripts/hidden.py
+refused "docs: x" || fail "commit-msg passed a message with no staged scripts/hidden.py to read it"
+grep -qF "git cannot read the staged scripts/hidden.py" "$t/err" || fail "commit-msg did not say it has no rule to read the message with: $(cat "$t/err")"
+git -C "$cmr" add scripts/hidden.py
+mkdir -p "$t/countpy" && printf '#!/bin/sh\ncase "$*" in *"print(len("*) echo 7 && exit 0 ;; esac\nexit 1\n' >"$t/countpy/python3" && chmod +x "$t/countpy/python3"
+printf 'docs: x\n' >"$t/msg" # a python3 that counts the subject, then fails
+(cd "$cmr" && PATH="$t/countpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a message with a python3 that fails"
+grep -qF "scripts/hidden.py could not read it" "$t/err" || fail "commit-msg did not say the message could not be read: $(cat "$t/err")"
 fi
 
 if part unsigned; then
@@ -2098,7 +2123,7 @@ mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
 cp "$hooks"/* "$here/code_changed.sh" "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
 # What Claude can edit, and a hook could reach, leaves a mark when it runs.
 for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
-for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
+for f in review_pass.py check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
 # Installed as Alexis does, so pre-push finds the hooks of the main it pushes (F129); the section
@@ -2138,8 +2163,11 @@ out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home f
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" && fail "commit-msg outside the sandbox let a home folder's path through"
+# Outside, commit-msg runs no scripts/hidden.py, staged or not: the branch's messages are read at the next gate (F5085).
+printf 'docs: x\n' >"$t/outside-msg"
+out sh .githooks/commit-msg "$t/outside-msg" || fail "commit-msg outside the sandbox refused a clean message"
 git -C "$o" commit -qm two
-untouched "pre-commit, pre-merge-commit"
+untouched "pre-commit, pre-merge-commit, commit-msg"
 # pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
 head=$(git -C "$o" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$head" "$1" "${2:-0000000000000000000000000000000000000000}" | out sh .githooks/pre-push origin url; }
@@ -5000,7 +5028,7 @@ fi
 if part worktree_script; then
 # worktree.sh: a worktree of a new branch, ready for the gate, from the tree it runs in: the packages linked one by
 # one (a whole-folder link hides them from borrow_node_modules.sh), a workspace's @gnoworld links leading into the
-# new tree, Vite's caches its own, StrykerJS's incremental file seeded.
+# new tree, Vite's caches its own.
 ws="$t/ws"
 mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports"
 git -C "$ws/src" init -q
@@ -5009,93 +5037,288 @@ for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
-[ "$(git -C "$ws/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
-[ -d "$ws/new/node_modules" ] && [ ! -L "$ws/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
-[ -L "$ws/new/node_modules/pkg" ] && [ "$(cat "$ws/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
-[ -d "$ws/new/node_modules/.vite" ] && [ ! -L "$ws/new/node_modules/.vite" ] && [ -z "$(ls -A "$ws/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
-[ -d "$ws/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
-[ "$(cd "$ws/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$ws/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
-[ -z "$(git -C "$ws/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$ws/new" status --porcelain)"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
-mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
-[ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+# It runs outside the sandbox, so it makes and removes the folders of one root alone, $HOME/Server/gnoworld-wt, where no session
+# writes but its own folder (Alexis, 2026-11-04). With this user's own home it refuses a folder anywhere else, naming that root,
+# and makes nothing; the other cases give it a home of this run's ($home). The base is no commit, so a fence switched off (a
+# harness mutant) stops there, never making a tree in the real root, and still fails on the message.
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree outside \$HOME/Server/gnoworld-wt: $out"
+printf '%s\n' "$out" | grep -qF "is not $HOME/Server/gnoworld-wt/<name>" || fail "worktree.sh did not name the root it requires: $out"
+[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+wsr=$(cd "$ws" && pwd -P)
+home="$wsr/home" wr="$wsr/home/Server/gnoworld-wt"
+mkdir -p "$wr" "$ws/.githooks" && cp "$hooks/records.sh" "$ws/.githooks/"
+wt() { (cd "$ws/src" && HOME="$home" sh "$here/worktree.sh" "$@"); }
+wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
+[ "$(git -C "$wr/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
+[ -d "$wr/new/node_modules" ] && [ ! -L "$wr/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
+[ -L "$wr/new/node_modules/pkg" ] && [ "$(cat "$wr/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
+[ -d "$wr/new/node_modules/.vite" ] && [ ! -L "$wr/new/node_modules/.vite" ] && [ -z "$(ls -A "$wr/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
+[ -d "$wr/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
+[ "$(cd "$wr/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wr/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
+[ -z "$(git -C "$wr/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wr/new" status --porcelain)"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree outside \$HOME/Server/gnoworld-wt: $out"
+[ -d "$wr/new" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/new" || fail "worktree.sh's refused remove of a tree outside its root touched it"
+wt "$wr/new" other HEAD >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
+mkdir "$wr/empty" && wt "$wr/empty" another HEAD >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
+wt "$wr/x" >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
+[ ! -e "$wr/x" ] || fail "worktree.sh made a folder for a call it refused"
+for args in "$wr/two twobranch" "remove"; do
+	code=0 && out=$(wt $args 2>&1) || code=$?
+	[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" || fail "worktree.sh took $args for a call ($code): $out"
+done
+# Whatever its spelling, a folder that does not resolve to <root>/<name>, <name> in a-z, 0-9 and -, is refused before anything is
+# made: another absolute path, another home's root, a .. out of the root or a lone .., a link out of it on the way, a folder in a
+# worktree, a name with a capital, a dot, an underscore, a space, or an accented letter, which sh's [a-z] takes in a UTF-8 locale
+# (bash 3.2, macOS's sh: U and e-acute; dash, Linux's, reads bytes). The locale is set here, whatever the caller's.
+mkdir -p "$ws/elsewhere" "$wsr/home2/Server/gnoworld-wt" && ln -s "$ws/elsewhere" "$wr/away"
+n=0
+for d in "$ws/elsewhere/a" "$wsr/home2/Server/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
+	"$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
+	n=$((n + 1))
+	out=$(LC_ALL=en_US.UTF-8 && export LC_ALL && wt "$d" "fence$n" HEAD 2>&1) && fail "worktree.sh made a tree at $d, which is not <root>/<name>: $out"
+	printf '%s\n' "$out" | grep -qF "is not $wr/<name>" || fail "worktree.sh refused $d for another reason than its root: $out"
+	! git -C "$ws/src" rev-parse -q --verify "fence$n" >/dev/null || fail "worktree.sh made the branch of $d, which is not <root>/<name>"
+done
+[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/home2/Server/gnoworld-wt")" ] && [ ! -e "$wsr/home/Server/outside" ] && [ ! -e "$wr/new/inner" ] ||
+	fail "worktree.sh made a folder out of its root"
+[ "$(ls -A "$wr" | tr '\n' ' ')" = "away empty new " ] || fail "worktree.sh made a folder for a name it refuses: $(ls -A "$wr")"
+# The root is compared as written, never resolved: through a home that is a link, a folder is refused.
+ln -s "$home" "$ws/homelink"
+out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/Server/gnoworld-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
+[ ! -e "$wr/via" ] || fail "worktree.sh made a folder through a root that is a link"
+# A link named as the folder is refused, what it leads to untouched: git (2.50) makes the branch, then fails on it. So is it
+# with a trailing slash, which leads through the link.
+ln -s "$ws/nothere" "$wr/dangling"
+for d in "$wr/dangling" "$wr/dangling/"; do
+	out=$(wt "$d" dangling HEAD 2>&1) && fail "worktree.sh made a tree at a link ($d): $out"
+	printf '%s\n' "$out" | grep -qF "is a link" || fail "worktree.sh did not say its folder is a link ($d): $out"
+	! git -C "$ws/src" rev-parse -q --verify dangling >/dev/null && [ ! -e "$ws/nothere" ] || fail "worktree.sh made the branch or the folder of a link named as its folder ($d)"
+done
+# The root is this user's home's: with no home, nothing is made.
+out=$(cd "$ws/src" && env -u HOME sh "$here/worktree.sh" "$wr/nohome" nohome HEAD 2>&1) && fail "worktree.sh made a tree with no home: $out"
+[ ! -e "$wr/nohome" ] && ! git -C "$ws/src" rev-parse -q --verify nohome >/dev/null || fail "worktree.sh made a folder or a branch with no home"
+# A relative path, or one whose .. stays in the root, is the folder it resolves to.
+wt "../home/Server/gnoworld-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/rel" || fail "worktree.sh did not make the folder a relative path resolves to"
+# remove <dir>: a clean worktree of this repository under the root, from another tree; its files deleted, ignored ones included,
+# never what a link in it leads to; its branch kept; and no other tree's record touched, not even one whose folder is gone, which
+# git worktree prune would take: a session can point another tree's record at nothing (reviewer, second review, item 4).
+wt remove "$wr/../gnoworld-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
+[ ! -e "$wr/rel" ] || fail "worktree.sh left the folder it removed"
+wt "$wr/stale" stale HEAD >/dev/null 2>&1 && rm -r "$wr/stale" || fail "the stale worktree of this case could not be made"
+wt "$wr/clean" clean HEAD >/dev/null 2>&1 || fail "the clean worktree of this case could not be made"
+mkdir -p "$ws/keep" "$wr/clean/reports" && echo kept >"$ws/keep/f" && ln -s "$ws/keep" "$wr/clean/reports/out" && echo r >"$wr/clean/reports/r"
+wt remove "$wr/clean" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree with ignored files: $(cat "$ws/out")"
+listed=$(git -C "$ws/src" worktree list --porcelain)
+[ ! -e "$wr/clean" ] && ! printf '%s\n' "$listed" | grep -qxF "worktree $wr/clean" || fail "worktree.sh left the tree it removed, or its record"
+printf '%s\n' "$listed" | grep -qxF "worktree $wr/stale" || fail "worktree.sh's remove pruned the record of another tree"
+[ "$(cat "$ws/keep/f")" = kept ] && [ "$(cat "$ws/src/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh's remove deleted what a link in the tree leads to"
+git -C "$ws/src" rev-parse -q --verify clean >/dev/null || fail "worktree.sh's remove deleted the branch"
+# A change, a staged file or a file git does not track refuses it, the tree and its record kept.
+wt "$wr/unclean" unclean HEAD >/dev/null 2>&1 || fail "the unclean worktree of this case could not be made"
+for change in "echo m >>packages/core/a.ts" "echo s >staged.txt && git add staged.txt" "echo u >untracked.txt"; do
+	(cd "$wr/unclean" && eval "$change")
+	out=$(wt remove "$wr/unclean" 2>&1) && fail "worktree.sh removed a tree with a change ($change): $out"
+	[ -d "$wr/unclean" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/unclean" || fail "worktree.sh's refused remove touched the tree ($change)"
+	git -C "$wr/unclean" reset -q --hard && git -C "$wr/unclean" clean -qfd
+done
+# Its clean check enters no nested repository: git's own ran git status in one its index staged at that moment, which the tree's
+# session can flip between git's two reads, so that its fsmonitor ran outside the sandbox (security-reviewer, third review). Here
+# the nested repository's own clean filter, which git status runs to read a file changed at its size, and no setting of the script
+# turns off.
+wt "$wr/subm" subm HEAD >/dev/null 2>&1 || fail "the subm worktree of this case could not be made"
+git init -q "$wr/subm/x" && echo x >"$wr/subm/x/x" && echo 'x filter=planted' >"$wr/subm/x/.gitattributes"
+git -C "$wr/subm/x" add x .gitattributes && git -C "$wr/subm/x" commit -qm x
+git -C "$wr/subm/x" config filter.planted.clean "sh -c 'touch \"$ws/pwned-subm\"; cat'" && echo y >"$wr/subm/x/x"
+git -C "$wr/subm" add x 2>/dev/null
+out=$(wt remove subm 2>&1) || :
+[ ! -e "$ws/pwned-subm" ] || fail "worktree.sh's remove ran git in a nested repository of the tree: its clean filter ran: $out"
+# The tree it runs in is refused, and kept: its removal would leave the run in no folder. Whatever the spelling of either: the
+# folder through a .., the run entered through a link.
+wt "$wr/inside" inside HEAD >/dev/null 2>&1 && ln -s "$wr/inside" "$ws/toinside" || fail "the inside worktree of this case could not be made"
+for at in "$wr/inside/packages:$wr/inside" "$wr/inside:$wr/new/../inside" "$ws/toinside:$wr/inside"; do
+	out=$(cd "${at%%:*}" && HOME="$home" sh "$here/worktree.sh" remove "${at#*:}" 2>&1) && fail "worktree.sh removed the tree it runs in ($at): $out"
+	[ -d "$wr/inside" ] || fail "worktree.sh removed the tree it runs in ($at)"
+done
+# Refused and kept: a folder out of the root, one under it that is no worktree, another repository's worktree, a link to a
+# worktree out of the root (git, 2.50, removes the tree a link leads to), and a name starting with -.
+mkdir "$wr/plain" && echo p >"$wr/plain/p"
+git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m x && git -C "$ws/other" worktree add -q "$wr/foreign"
+git -C "$ws/src" worktree add -q -b far "$ws/far" HEAD && ln -s "$ws/far" "$wr/tofar"
+for d in "$ws/far" "$wr/plain" "$wr/foreign" "$wr/tofar" "$wr/tofar/" -x; do
+	out=$(wt remove "$d" 2>&1) && fail "worktree.sh removed $d: $out"
+done
+for d in "$wr/tofar" "$wr/tofar/"; do
+	printf '%s\n' "$(wt remove "$d" 2>&1)" | grep -qF "is a link" || fail "worktree.sh did not say the folder to remove is a link ($d)"
+done
+code=0 && out=$(wt remove -x 2>&1) || code=$?
+[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not refuse, as a call, a folder to remove that starts with a dash ($code): $out"
+[ -f "$wr/plain/p" ] && [ -d "$wr/foreign" ] && [ -d "$ws/far" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wsr/far" ||
+	fail "worktree.sh's refused remove touched a tree"
+# Three words starting with remove are no call: remove names no tree, as a bare name would make it one.
+code=0 && out=$(wt remove "$wr/rm3" HEAD 2>&1) || code=$?
+[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" && [ ! -e "$wr/remove" ] || fail "worktree.sh took remove and two words for a call ($code): $out"
+# A worktree's commondir, which Claude Code protects only for the trees that stood when the session started, leads git at no
+# other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run (reviewer, F5097).
+wt "$wr/redirected" redirected HEAD >/dev/null 2>&1 || fail "the redirected worktree of this case could not be made"
+admin=$(sed 's/^gitdir: //' "$wr/redirected/.git")
+cp -R "$ws/src/.git" "$ws/evilgit" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/pwned" >"$ws/fsmonitor" && chmod +x "$ws/fsmonitor"
+git --git-dir="$ws/evilgit" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit" >"$admin/commondir"
+wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git with the config a worktree's commondir led to: its fsmonitor ran (F5097): $(cat "$ws/out")"
+[ ! -d "$admin" ] || echo ../.. >"$admin/commondir"
+# Run from a worktree, as a part is cut from the chief's, it makes and removes trees of this repository; and when that worktree's
+# own commondir leads elsewhere, it still reads this repository's config: the common folder comes from the tree's .git, which the
+# settings deny every session, never from the commondir git would read (F5097). So from a worktree made with relative paths.
+git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
+git -C "$ws/src" worktree add -q -b fromrel "$ws/fromrel" HEAD && mkdir "$ws/fromrel/node_modules" && echo "gitdir: ../src/.git/worktrees/fromrel" >"$ws/fromrel/.git"
+admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
+cp -R "$ws/src/.git" "$ws/evilgit2" && git --git-dir="$ws/evilgit2" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit2" >"$admin/commondir"
+out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from a worktree, took its config from the commondir: its fsmonitor ran (F5097): $out"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/fromwt" || fail "worktree.sh, run from a worktree, made no tree of this repository"
+out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
+echo ../.. >"$admin/commondir"
+out=$(cd "$ws/fromrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+# So from the main checkout, whose .git folder holds no commondir unless one was planted there.
+echo "$ws/evilgit2" >"$ws/src/.git/commondir"
+out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
+rm "$ws/src/.git/commondir"
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from the main checkout, took its config from a commondir planted there: its fsmonitor ran (F5097): $out"
+[ -d "$wr/frommain" ] || fail "worktree.sh, run from the main checkout beside a planted commondir, made no tree: $out"
+# Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write (F5095): a
+# post-checkout hook ran when the tree was made, an fsmonitor when the base was compared (security-reviewer, third review).
+printf '#!/bin/sh\ntouch "%s"\n' "$ws/hookran" >"$ws/src/.git/hooks/post-checkout" && chmod +x "$ws/src/.git/hooks/post-checkout"
+git -C "$ws/src" config core.fsmonitor "$ws/fsmonitor"
+out=$(wt hooked hooked HEAD 2>&1) || :
+rm "$ws/src/.git/hooks/post-checkout" && git -C "$ws/src" config --unset core.fsmonitor
+[ ! -e "$ws/hookran" ] && [ ! -e "$ws/pwned" ] || fail "worktree.sh ran a hook or an fsmonitor of the common folder: $out"
+[ -d "$wr/hooked" ] || fail "worktree.sh made no tree beside a planted hook and fsmonitor: $out"
+# A nested repository staged in this tree, under a harness path the base check reads, is never entered when worktree.sh compares
+# a base outside the sandbox: git would run its fsmonitor there (security-reviewer, F5097).
+git init -q "$ws/src/.claude/nested" && echo n >"$ws/src/.claude/nested/n" && git -C "$ws/src/.claude/nested" add n
+git -C "$ws/src/.claude/nested" commit -qm n && git -C "$ws/src/.claude/nested" config core.fsmonitor "$ws/fsmonitor"
+git -C "$ws/src" add .claude/nested 2>/dev/null
+out=$(wt "$wr/nested" nested HEAD 2>&1) || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git in a nested repository of this tree: its fsmonitor ran (F5097): $out"
+[ -d "$wr/nested" ] || fail "worktree.sh made no tree beside a nested repository it need not enter: $out"
+git -C "$ws/src" rm -q -f --cached .claude/nested && rm -r "$ws/src/.claude/nested"
+# A bare name is a folder of the root: no caller writes its user's number.
+wt bare bare HEAD >"$ws/out" 2>&1 && [ -d "$wr/bare" ] || fail "worktree.sh made no tree of a bare name in its root: $(cat "$ws/out")"
+wt remove bare >"$ws/out" 2>&1 && [ ! -e "$wr/bare" ] || fail "worktree.sh removed no tree of a bare name: $(cat "$ws/out")"
+# A folder name holding a newline is a name like another as node_modules are borrowed, outside the sandbox: read line by line it
+# split, and a folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099), under the top or under a
+# folder the borrowing leaves out only at the top (app/.claude, the reviewer's second review). The tree is made, nothing outside.
+n=0
+for at in . app/.claude app/.git app/.stryker-tmp; do
+	n=$((n + 1))
+	mkdir -p "$ws/src/$at/a
+../b/scripts/planted/node_modules" "$ws/src/$at/a" "$wr/b"
+	out=$(wt "nl-$n" "nl-$n" HEAD 2>&1) || fail "worktree.sh refused a tree holding a name with a newline under $at: $out"
+	[ ! -e "$wr/b/scripts" ] || fail "worktree.sh made a folder through a name with a newline under $at: $out"
+	rm -r "$ws/src/$at/a
+.." "$ws/src/$at/a"
+done
+# Outside the sandbox, the borrowing follows no link it did not make: a link the base checks out on the way to a node_modules it
+# copies (reviewer, second review, item 1b; security-reviewer, A), a node_modules the base tracks as a link (item 1c), or a
+# workspace's .bin leading elsewhere than a node_modules/.bin, whose files it would copy where the session reads them (item 1a).
+# Each is refused, its tree undone, what the link leads to untouched.
+mkdir -p "$ws/outside" "$ws/outside2" "$ws/secret" && echo key >"$ws/secret/id"
+installed=$(git -C "$ws/src" rev-parse HEAD)
+ln -s "$ws/outside" "$ws/src/lnk" && git -C "$ws/src" add lnk && git -C "$ws/src" commit -qm "a link" && linked=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q --hard "$installed" && mkdir -p "$ws/src/lnk/node_modules/x"
+out=$(wt "$wr/lnkb" lnkb "$linked" 2>&1) && fail "worktree.sh borrowed through a link its base checks out: $out"
+[ -z "$(ls -A "$ws/outside")" ] && [ ! -e "$wr/lnkb" ] || fail "worktree.sh wrote through a link its base checks out: $(ls -A "$ws/outside")"
+rm -r "$ws/src/lnk"
+nm=$(printf '%s' "$ws/outside2" | git -C "$ws/src" hash-object -w --stdin)
+git -C "$ws/src" update-index --add --cacheinfo "120000,$nm,node_modules" && git -C "$ws/src" commit -qm "node_modules a link" && nmbase=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q "$installed"
+out=$(wt "$wr/nmlink" nmlink "$nmbase" 2>&1) && fail "worktree.sh borrowed into a node_modules its base tracks as a link: $out"
+[ -z "$(ls -A "$ws/outside2")" ] && [ ! -e "$wr/nmlink" ] || fail "worktree.sh wrote through a node_modules its base tracks as a link: $(ls -A "$ws/outside2")"
+mkdir -p "$ws/src/packages/core/node_modules" && ln -s "$ws/secret" "$ws/src/packages/core/node_modules/.bin"
+out=$(wt "$wr/exf" exf HEAD 2>&1) && fail "worktree.sh copied a .bin that leads elsewhere than a node_modules/.bin: $out"
+[ ! -e "$wr/exf" ] || fail "worktree.sh left the tree of a .bin that leads elsewhere"
+rm "$ws/src/packages/core/node_modules/.bin"
 # The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
 # packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
-# It is refused, whichever package file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
-installed=$(git -C "$ws/src" rev-parse HEAD)
-for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+# Its harness (records.sh's list) is this tree's too: worktree.sh may run outside the sandbox, so a base a session wrote by
+# plumbing would check its own settings and hooks out into a tree a session is later started in (F5098).
+# It is refused, whichever such file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
+mkdir -p "$ws/src/.claude" "$ws/src/scripts"
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json .claude/settings.json scripts/guard.py CLAUDE.md; do
 	echo changed >>"$ws/src/$f" && git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "$f moves"
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
+	out=$(wt "$wr/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
 	printf '%s\n' "$out" | grep -qF "$f" || fail "worktree.sh did not name the package file $f that differs: $out"
-	[ ! -e "$ws/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
+	[ ! -e "$wr/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
 	git -C "$ws/src" reset -q --hard "$installed"
 done
 echo changed >>"$ws/src/app/package.json"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
+out=$(wt "$wr/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
 git -C "$ws/src" checkout -q -- app/package.json
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
-[ ! -e "$ws/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
+out=$(wt "$wr/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
+[ ! -e "$wr/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
 # An argument that starts with - is an option for git, never a name: a base `--output=<file>` made git diff truncate a file
 # outside the scratch copy (CR6); a branch or a folder so named is as wrong. Each is refused, and makes nothing.
 echo victim >"$ws/victim"
-for args in "$ws/opt1 optbranch --output=$ws/victim" "$ws/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
+for args in "$wr/opt1 optbranch --output=$ws/victim" "$wr/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
 	set -- $args
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$@" 2>&1) && fail "worktree.sh took an argument that starts with a dash: $args: $out"
+	out=$(wt "$@" 2>&1) && fail "worktree.sh took an argument that starts with a dash: $args: $out"
 	printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not say which argument starts with a dash: $args: $out"
 done
 [ "$(cat "$ws/victim")" = victim ] || fail "worktree.sh let a base of git's options write a file: $(cat "$ws/victim")"
-[ ! -e "$ws/opt1" ] && [ ! -e "$ws/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
+[ ! -e "$wr/opt1" ] && [ ! -e "$wr/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
 for b in optbranch --optbranch optbranch2; do ! git -C "$ws/src" rev-parse -q --verify "refs/heads/$b" >/dev/null || fail "worktree.sh made the branch $b for a refused call"; done
 # A base that is no commit (a blob, a tree) is refused before anything is made; so is a root node_modules that is one link,
 # which the script could not take apart once the tree stood (CR6).
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
+out=$(wt "$wr/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
 printf '%s\n' "$out" | grep -qF "is no commit" || fail "worktree.sh did not say a base is no commit: $out"
-[ ! -e "$ws/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
+[ ! -e "$wr/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
 mv "$ws/src/node_modules" "$ws/src/real_modules" && ln -s real_modules "$ws/src/node_modules"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
+out=$(wt "$wr/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
 printf '%s\n' "$out" | grep -qF "node_modules is a link" || fail "worktree.sh did not say the root node_modules is a link: $out"
-[ ! -e "$ws/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
+[ ! -e "$wr/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
 rm "$ws/src/node_modules" && mv "$ws/src/real_modules" "$ws/src/node_modules"
 # A step that fails once the tree stands undoes the tree and the branch: the next run names the same folder (CR6).
-mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\nexit 1\n' >"$ws/scripts/borrow_node_modules.sh"
-out=$(cd "$ws/src" && sh "$ws/scripts/worktree.sh" "$ws/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
-[ ! -e "$ws/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
+mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/ran-half" >"$ws/scripts/borrow_node_modules.sh"
+out=$(cd "$ws/src" && HOME="$home" sh "$ws/scripts/worktree.sh" "$wr/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
+[ -e "$ws/ran-half" ] || fail "the half-made case never reached the step that fails: $out"
+[ ! -e "$wr/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
 ! git -C "$ws/src" rev-parse -q --verify halfbranch >/dev/null || fail "worktree.sh left the branch of a tree that failed half-made"
-git -C "$ws/src" worktree list | grep -qF "$ws/half" && fail "worktree.sh left $ws/half registered"
+git -C "$ws/src" worktree list | grep -qF "$wr/half" && fail "worktree.sh left $wr/half registered"
 # So does a signal that stops it once the tree stands (R6): the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
 # the EXIT trap runs even when a signal kills the shell, in dash (Linux's sh) only the trap on the signals makes it run: both are tried.
 # SIGINT is ignored by a script started in the background, as this suite's sections are: python resets it to its default first.
 for shell in sh dash; do
 	command -v "$shell" >/dev/null || continue
 	for sig in HUP INT TERM; do
-		tag=$shell$sig
-		printf '#!/bin/sh\nkill -%s "$PPID"\nsleep 1\n' "$sig" >"$ws/scripts/borrow_node_modules.sh"
-		out=$(cd "$ws/src" && python3 -I -c 'import signal, subprocess, sys
+		tag=$shell-$(printf '%s' "$sig" | tr '[:upper:]' '[:lower:]')
+		printf '#!/bin/sh\ntouch "%s"\nkill -%s "$PPID"\nsleep 1\n' "$ws/ran-$tag" "$sig" >"$ws/scripts/borrow_node_modules.sh"
+		out=$(cd "$ws/src" && HOME="$home" python3 -I -c 'import signal, subprocess, sys
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$ws/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
-		[ ! -e "$ws/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
+sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$wr/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
+		[ -e "$ws/ran-$tag" ] || fail "the SIG$sig case in $shell never reached the step it stops: $out"
+		[ ! -e "$wr/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
 		! git -C "$ws/src" rev-parse -q --verify "$tag" >/dev/null || fail "worktree.sh left the branch of a tree stopped by SIG$sig in $shell"
-		git -C "$ws/src" worktree list | grep -qF "$ws/$tag" && fail "worktree.sh left $ws/$tag registered after SIG$sig in $shell"
+		git -C "$ws/src" worktree list | grep -qF "$wr/$tag" && fail "worktree.sh left $wr/$tag registered after SIG$sig in $shell"
 	done
 done
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
-# A workspace's .bin reached through a link (a tree whose packages were linked by hand) is borrowed as a folder of its own:
-# the probe deletes a tool in its copy, which went through the link and deleted the main tree's (F2127).
-mkdir -p "$ws/bins/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/.bin/storybook"
-ln -s "$ws/bins/.bin" "$ws/src/packages/core/node_modules/.bin"
+wt "$wr/same" same HEAD >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
+# A workspace's .bin reached through a link (a tree whose packages were linked by hand, into another tree's node_modules/.bin)
+# is borrowed as a folder of its own: the probe deletes a tool in its copy, which went through the link and deleted the main
+# tree's (F2127).
+mkdir -p "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/node_modules/.bin/storybook"
+ln -s "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules/.bin"
 (cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a linked .bin: $(cat "$ws/out")"
 [ -d "$ws/borrowed/packages/core/node_modules/.bin" ] && [ ! -L "$ws/borrowed/packages/core/node_modules/.bin" ] || fail "borrow_node_modules.sh kept a workspace's .bin a link into the tree it borrows from"
 [ "$(cat "$ws/borrowed/packages/core/node_modules/.bin/storybook")" = tool ] || fail "borrow_node_modules.sh left the linked .bin's tools behind"
 rm "$ws/borrowed/packages/core/node_modules/.bin/storybook"
-[ -f "$ws/bins/.bin/storybook" ] || fail "a tool deleted in the borrowed copy was deleted where its .bin's link led (F2127)"
+[ -f "$ws/bins/node_modules/.bin/storybook" ] || fail "a tool deleted in the borrowed copy was deleted where its .bin's link led (F2127)"
 # A relative link, as a hand-made one into another tree's store would be, borrowed the same way; a real .bin stays as it is.
 mkdir -p "$ws/src/packages/ui/node_modules" "$ws/src/app/node_modules/.bin" "$ws/borrowed2" && echo own >"$ws/src/app/node_modules/.bin/vite"
-ln -s ../../../../bins/.bin "$ws/src/packages/ui/node_modules/.bin"
+ln -s ../../../../bins/node_modules/.bin "$ws/src/packages/ui/node_modules/.bin"
 [ -f "$ws/src/packages/ui/node_modules/.bin/storybook" ] || fail "the relative .bin link of this case leads nowhere"
 (cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed2") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a relative .bin link: $(cat "$ws/out")"
-[ ! -L "$ws/borrowed2/packages/ui/node_modules/.bin" ] && rm "$ws/borrowed2/packages/ui/node_modules/.bin/storybook" && [ -f "$ws/bins/.bin/storybook" ] ||
+[ ! -L "$ws/borrowed2/packages/ui/node_modules/.bin" ] && rm "$ws/borrowed2/packages/ui/node_modules/.bin/storybook" && [ -f "$ws/bins/node_modules/.bin/storybook" ] ||
 	fail "a tool deleted in the borrowed copy of a relative .bin link was deleted where the link led (F2127)"
 [ -d "$ws/borrowed2/app/node_modules/.bin" ] && [ ! -L "$ws/borrowed2/app/node_modules/.bin" ] && [ "$(cat "$ws/borrowed2/app/node_modules/.bin/vite")" = own ] ||
 	fail "borrow_node_modules.sh did not keep a real .bin as it is"

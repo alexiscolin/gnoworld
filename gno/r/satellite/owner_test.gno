@@ -105,7 +105,7 @@ func TestOwnerActionsRefusedToOthers(cur realm, t *testing.T) {
 
 func TestSetPrice(cur realm, t *testing.T) {
 	fresh()
-	uassert.Equal(t, 1000000, Price()) // D3, at deploy
+	uassert.Equal(t, 2000000, Price()) // D3, at deploy
 	testing.SetRealm(testing.NewUserRealm(adm))
 	for _, p := range []int{0, -1, -p0, topPrice + 1} {
 		uassert.AbortsWithMessage(t, cur, "a price is 1 to 1317624576693539401 ugnot a day", func() { SetPrice(cross(cur), p) })
@@ -118,7 +118,7 @@ func TestSetPrice(cur realm, t *testing.T) {
 
 	testing.SetRealm(testing.NewUserRealm(alice))
 	offer(chain.Coins{{"ugnot", p0}})
-	uassert.AbortsWithMessage(t, cur, "send exactly 2000000ugnot", func() { Rent(cross(cur), "mars", "hello", 1) })
+	uassert.AbortsWithMessage(t, cur, "send exactly 4000000ugnot", func() { Rent(cross(cur), "mars", "hello", 1) })
 	pay(14 * p0)
 	Rent(cross(cur), "mars", "hello", 7)
 	uassert.Equal(t, 14*p0, held)
