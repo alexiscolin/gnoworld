@@ -2933,9 +2933,11 @@ grep -q "^coverage --maxWorkers=$half --reporter=default --reporter=json --outpu
 # StrykerJS's incremental file is one cache every tree shares, in the tools' cache: a worktree's own, copied from the main
 # tree's (63 of 142 files, a week old), made each branch mutate again what others had judged (Alexis, 2026-10-29). Each run
 # works on its own copy, taken only if the cache reads as JSON, and puts it back whole only if it reads as JSON in turn: a
-# run cut short, or two at once, never leaves the cache half written for every tree to fail on.
-grep -qE "^mutate --concurrency $half --incrementalFile /[^ ]*/stryker-incremental\.json$" "$log" && ! grep -q "incrementalFile $g.home" "$log" ||
-	fail "check.sh --full let StrykerJS take the whole machine (F777), or work on the shared cache itself: $(grep '^mutate' "$log")"
+# run cut short, or two at once, never leaves the cache half written for every tree to fail on. StrykerJS runs alone, after every other
+# lane, so it takes every core (Alexis, 2026-11-04: "16 cœurs"; section gate_stryker_lines).
+cores=$(node -p "require('os').availableParallelism()")
+grep -qE "^mutate --concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" "$log" && ! grep -q "incrementalFile $g.home" "$log" ||
+	fail "check.sh --full did not give StrykerJS every core, or let it work on the shared cache itself: $(grep '^mutate' "$log")"
 cache="$g.home/.cache/gnoworld-tools/stryker-incremental.json"
 mkdir -p "${cache%/*}" && printf '{"files":{"a":1}}' >"$cache"
 STRYKER_WRITES='{"files":{"b":2}}' gate --full >/dev/null || fail "check.sh --full failed with a cache StrykerJS reads and writes"
@@ -3328,6 +3330,137 @@ AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folde
 rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
 AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
 [ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+if part gate_stryker_lines; then
+full_fixture gate_stryker_lines
+# StrykerJS runs alone, once every other lane of the gate has ended, on every core (Alexis, 2026-11-04: "16 cœurs"): it took half the
+# machine while the coverage and the harness lanes ran beside it, whose load outlasted Ergo's 9 s auth script (F777); nothing runs beside it
+# now. A merge check mutates the code the branch changed since its base alone ("Lignes de la tranche"): scripts/stryker_lines.py writes
+# that config in the run's own folder and StrykerJS is given it; no line to mutate, no StrykerJS; a stryker_lines.py that fails, the
+# whole control. --full mutates the whole, with no such config. Either way the shared cache gets the run's file back.
+cores=$(node -p "require('os').availableParallelism()")
+base=$(git -C "$g" rev-parse HEAD)
+mkdir -p "$g/.claude" && echo '{}' >"$g/.claude/x.json" && echo 'y' >>"$g/app/src/a.tsx" && git -C "$g" add -A && git -C "$g" commit -qm "product and harness"
+mutate() { sed -n 's/^mutate //p' "$log"; }
+cache="$g.home/.cache/gnoworld-tools/stryker-incremental.json"
+out=$(AUDIT_ANSWER=x SLOW_STEP=py:harness_mutate STRYKER_WRITES='{"files":{"lines":1}}' gate --merge) || fail "check.sh --merge failed a run whose every step passes: $out"
+config=$(sed -n "s|^py:stryker_lines $base ||p" "$log")
+case $config in /*/stryker.json) ;; *) fail "check.sh --merge did not ask stryker_lines.py for its base's lines, into a file of its own: $(grep '^py:stryker_lines' "$log")" ;; esac
+[ "$(mutate)" = "$config --concurrency $cores --incrementalFile ${config%/*}/stryker-incremental.json" ] ||
+	fail "check.sh --merge did not give StrykerJS the lines' config and every core, from its own copy of the cache: $(mutate)"
+[ "$(cat "$cache")" = '{"files":{"lines":1}}' ] || fail "check.sh --merge did not put the lines' run's file back in the shared cache: $(cat "$cache" 2>&1)"
+before "done py:harness_mutate" mutate && before "done py:patch_coverage" mutate || fail "check.sh --merge ran StrykerJS beside another lane"
+printf '%s\n' "$out" | grep -qE '^lane stryker [0-9.]+ s: stryker [0-9.]+$' || fail "check.sh --merge did not print StrykerJS's lane apart: $out"
+out=$(AUDIT_ANSWER=x STRYKER_LINES_EXIT=3 gate --merge) || fail "check.sh --merge failed with no line to mutate: $out"
+ran mutate && fail "check.sh --merge ran StrykerJS with no line to mutate: $(mutate)"
+printf '%s\n' "$out" | grep -q "no line StrykerJS mutates changed since $base" || fail "check.sh --merge did not say why StrykerJS did not run: $out"
+for code in 1 2; do
+	out=$(AUDIT_ANSWER=x STRYKER_LINES_EXIT=$code gate --merge) || fail "check.sh --merge failed when stryker_lines.py exited $code: $out"
+	mutate | grep -qE "^--concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" || fail "check.sh --merge did not mutate the whole control when stryker_lines.py exited $code: $(mutate)"
+	printf '%s\n' "$out" | grep -q "stryker_lines.py failed: StrykerJS mutates the whole control" || fail "check.sh --merge did not say stryker_lines.py failed: $out"
+done
+out=$(AUDIT_ANSWER=x FAIL=mutate gate --merge) && fail "check.sh --merge passed with StrykerJS failing: $out"
+printf '%s\n' "$out" | tail -1 | grep -qx "check.sh: FAILED at stryker:stryker" || fail "check.sh --merge did not name StrykerJS's lane last: $(printf '%s\n' "$out" | tail -1)"
+out=$(AUDIT_ANSWER=x SLOW_STEP=py:harness_mutate gate --full) || fail "check.sh --full failed a run whose every step passes: $out"
+ran py:stryker_lines && fail "check.sh --full narrowed StrykerJS to the branch's lines"
+mutate | grep -qE "^--concurrency $cores --incrementalFile /[^ ]*/stryker-incremental\.json$" || fail "check.sh --full did not mutate the whole on every core: $(mutate)"
+before "done py:harness_mutate" mutate || fail "check.sh --full ran StrykerJS beside the harness lane"
+# A patch's coverage under its floor fails --full there, before StrykerJS's half hour; a merge check goes on, and says both.
+out=$(AUDIT_ANSWER=x FAIL=py:patch_coverage gate --full) && fail "check.sh --full passed under the patch's floor: $out"
+ran mutate && fail "check.sh --full ran StrykerJS after the patch's coverage failed"
+out=$(AUDIT_ANSWER=x FAIL=py:patch_coverage gate --merge) && fail "check.sh --merge passed under the patch's floor: $out"
+ran mutate || fail "check.sh --merge stopped before StrykerJS on the patch's coverage"
+printf '%s\n' "$out" | grep -q "every failure above, in the order they came: mutation:patch_coverage" || fail "check.sh --merge did not name the patch's coverage among its failures: $out"
+fi
+
+if part stryker_lines; then
+# stryker_lines.py: the merge check's StrykerJS config, its `mutate` the code the branch changed since its base: each changed line widened
+# to the top-level statements it lies in (StrykerJS 10.0.0 mutates a node only inside one range: an `if (a &&\n b)` whose one line changed
+# keeps its mutants), as `path:from-to`, in the files the config's own `mutate` selects (braces and negations read as git's glob pathspecs,
+# a hidden part left out as minimatch leaves it), a new file whole, committed or not; a deletion or a comment touches no statement. Every
+# other key is kept. No line: exit 3, nothing written; a config it cannot read or an odd pattern: exit 2; any other failure is no 0 nor 3.
+sl="$t/stryker_lines" && mkdir -p "$sl/scripts" "$sl/app/src/.cache" "$sl/server/src/testing" "$sl/docs"
+cp "$here/stryker_lines.py" "$here/repo_files.py" "$sl/scripts/" && ln -s "$(cd "$here/../node_modules" && pwd -P)" "$sl/node_modules"
+cat >"$sl/stryker.config.json" <<'JSON'
+{
+  "testRunner": "vitest",
+  "mutate": ["app/src/**/*.{ts,tsx}", "!app/src/**/*.test.{ts,tsx}", "server/src/**/*.ts", "!server/src/testing/**"],
+  "incremental": true
+}
+JSON
+printf 'node_modules\n' >"$sl/.gitignore"
+for n in one two three four five; do printf 'export const %s = 1;\n' "$n"; done >"$sl/app/src/a.ts"
+printf 'export function f(a: boolean, b: boolean): number {\n  if (\n    a &&\n    b\n  ) {\n    return 1;\n  }\n  return 0;\n}\nexport const apart = 0;\n' >"$sl/app/src/m.ts"
+printf '// a note\nexport const c = 1;\n' >"$sl/app/src/c.ts"
+printf 'export const x = 1;\nexport const y = 2;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
+for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts app/src/gone.ts app/src/r.ts; do printf 'export const v = 1;\n' >"$sl/$f"; done
+git -C "$sl" init -q && git -C "$sl" add -A && git -C "$sl" commit -qm base && base=$(git -C "$sl" rev-parse HEAD)
+lines() { (cd "$sl" && PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin:$PATH" python3 -I scripts/stryker_lines.py "$@"); }
+exits() { # $1: the exit it must give; then stryker_lines.py's arguments. It writes nothing but on 0
+	want=$1 && shift && rm -f "$sl/out.json"
+	code=0 && out=$(lines "$@" 2>&1) || code=$?
+	[ "$code" = "$want" ] && [ ! -e "$sl/out.json" ] || fail "stryker_lines.py $* exited $code, not $want, or wrote its config: $out"
+}
+exits 3 "$base" "$sl/out.json"
+for n in one two three four five six; do case $n in two) echo 'export const two = 22;' ;; three) echo 'export const three = 33;' ;; *) printf 'export const %s = 1;\n' "$n" ;; esac; done >"$sl/app/src/a.ts"
+sed 's/^    b$/    !b/' "$sl/app/src/m.ts" >"$sl/m" && mv "$sl/m" "$sl/app/src/m.ts"
+printf '// another note\nexport const c = 1;\n' >"$sl/app/src/c.ts" && printf 'export const x = 1;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
+for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts; do printf 'export const w = 2;\n' >"$sl/$f"; done
+printf 'export const added = 1;\nexport const more = 2;\n' >"$sl/app/src/added.ts" && git -C "$sl" rm -q app/src/gone.ts && git -C "$sl" mv app/src/r.ts app/src/r2.ts
+git -C "$sl" add -A && git -C "$sl" commit -qm change && printf 'export const n = 1;\nexport const m = 2;\n' >"$sl/app/src/n.tsx"
+out=$(lines "$base" "$sl/out.json") || fail "stryker_lines.py failed on a change: $out"
+printf '%s\n' "$out" | grep -qx "stryker_lines: 18 lines in 6 files changed since $base" || fail "stryker_lines.py did not say what it kept: $out"
+python3 -I - "$sl/out.json" "$sl/stryker.config.json" <<'PY' || fail "stryker_lines.py's config is not the changed statements alone, the rest kept: $(cat "$sl/out.json")"
+import json, sys
+out, config = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+want = ["app/src/a.ts:2-3", "app/src/a.ts:6-6", "app/src/added.ts:1-2", "app/src/m.ts:1-9", "app/src/n.tsx:1-2", "app/src/r2.ts:1-1", "server/src/s.ts:1-1"]
+assert out["mutate"] == want, out["mutate"]
+assert {k: v for k, v in out.items() if k != "mutate"} == {k: v for k, v in config.items() if k != "mutate"}, out
+PY
+# What it cannot read is no green check: an unknown base, an output it cannot write, a config absent, not JSON, or whose mutate is no list.
+exits 1 0000000000000000000000000000000000000000 "$sl/out.json"
+code=0 && lines "$base" "$sl/nowhere/out.json" >/dev/null 2>&1 || code=$?
+[ "$code" != 0 ] && [ "$code" != 3 ] && [ ! -e "$sl/nowhere" ] || fail "stryker_lines.py exited $code with an output it cannot write"
+cp "$sl/stryker.config.json" "$t/stryker.good"
+for bad in none 'not json' '{"mutate": "app/src/**/*.ts"}' '{"mutate": []}' '[]'; do
+	if [ "$bad" = none ]; then rm "$sl/stryker.config.json"; else printf '%s' "$bad" >"$sl/stryker.config.json"; fi
+	exits 2 "$base" "$sl/out.json"
+	cp "$t/stryker.good" "$sl/stryker.config.json"
+done
+# A pattern git's pathspecs do not read as minimatch does refuses, alone or beside good ones: an extglob, a character class, a `?`.
+for odd in 'app/src/**/+(a|b).ts' 'app/src/[ab].ts' 'app/src/?.ts'; do
+	python3 -I - "$sl/stryker.config.json" "$odd" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1]))
+c["mutate"].append(sys.argv[2])
+json.dump(c, open(sys.argv[1], "w"))
+PY
+	exits 2 "$base" "$sl/out.json"
+	cp "$t/stryker.good" "$sl/stryker.config.json"
+done
+# On the repository's own config, git's reading of the patterns and StrykerJS's matcher (minimatch, hidden files left out) pick one set.
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+(cd "$here/.." && git ls-files) >"$t/tracked"
+python3 -I - "$here" "$here/.." <"$t/tracked" >"$t/by_git" <<'PY' || fail "stryker_lines.py's pathspecs could not be read on the repository's config"
+import json, os, subprocess, sys
+sys.path.insert(0, sys.argv[1])
+from stryker_lines import pathspecs
+os.chdir(sys.argv[2])
+specs = pathspecs(json.load(open("stryker.config.json"))["mutate"])
+files = subprocess.run(["git", "ls-files", "--", *specs], capture_output=True, text=True, check=True).stdout.splitlines()
+print("\n".join(sorted(f for f in files if not any(p.startswith(".") for p in f.split("/")))))
+PY
+(cd "$here/.." && PATH="$nodebin:$PATH" node --input-type=module -e 'import { readFileSync } from "node:fs";
+import { FileMatcher } from "./node_modules/@stryker-mutator/core/dist/src/config/file-matcher.js";
+const files = readFileSync(0, "utf8").split("\n").filter(Boolean);
+const chosen = new Map(files.map((f) => [f, false]));
+for (const p of JSON.parse(readFileSync("stryker.config.json", "utf8")).mutate) {
+  const no = p.startsWith("!"), m = new FileMatcher(no ? p.slice(1) : p, false);
+  for (const f of files) if (m.matches(f)) chosen.set(f, !no);
+}
+console.log([...chosen].filter(([, on]) => on).map(([f]) => f).sort().join("\n"));' <"$t/tracked") >"$t/by_stryker" || fail "StrykerJS's matcher could not be read"
+[ -s "$t/by_git" ] && cmp -s "$t/by_git" "$t/by_stryker" || fail "stryker_lines.py's pathspecs and StrykerJS's matcher pick other files: $(diff "$t/by_git" "$t/by_stryker" | head -5)"
 fi
 
 if part lint_scope; then

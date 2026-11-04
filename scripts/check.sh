@@ -664,8 +664,9 @@ EOF
 		STORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
 	# The coverage lane's tools take half the machine each, the harness lane beside them the rest: at the machine's
-	# width, their load outlasted Ergo's 9 s auth script (F777).
-	half=$(($(node -p "require('os').availableParallelism()") / 2))
+	# width, their load outlasted Ergo's 9 s auth script (F777). StrykerJS runs alone, after every other lane, on every core.
+	cores=$(node -p "require('os').availableParallelism()")
+	half=$((cores / 2))
 	[ "$half" -ge 1 ] || half=1
 	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
 	lane_coverage() {
@@ -678,12 +679,12 @@ EOF
 	}
 	lane_mutation() {
 		step patch_coverage # 85% of the lines this branch changed
-		# Its failure, or a coverage run that left no report, never stops StrykerJS beside it: the merge check goes on and says every failure
-		# (round 1, reviewer-1-2); the lane still fails, naming this step.
-		patched=0
-		python3 -I scripts/patch_coverage.py "$base" || patched=$?
-		[ "$patched" = 0 ] || $merge || return "$patched" # --full stops here, as before
-		[ "$speed" = full ] || return "$patched" # a change of interface alone runs no StrykerJS
+		python3 -I scripts/patch_coverage.py "$base"
+	}
+	# StrykerJS, alone once every other lane has ended, on every core (Alexis, 2026-11-04: "16 cœurs"). A merge check mutates the code the
+	# branch changed since its base alone ("Lignes de la tranche": scripts/stryker_lines.py), so a survivor in code it did not touch goes
+	# unseen, as those of the files it did not change do; a stryker_lines.py that fails mutates the whole control. --full mutates the whole.
+	lane_stryker() {
 		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
 		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
@@ -694,10 +695,19 @@ EOF
 		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
 		mkdir -p "${cache%/*}"
 		! parses "$cache" || cp "$cache" "$own"
+		config=
+		if $merge; then
+			lines=0
+			python3 -I scripts/stryker_lines.py "$base" "$logs/stryker.json" || lines=$?
+			case $lines in
+			0) config=$logs/stryker.json ;;
+			3) echo "check.sh --merge: no line StrykerJS mutates changed since $base: it does not run" && return 0 ;;
+			*) echo "check.sh --merge: stryker_lines.py failed: StrykerJS mutates the whole control" ;;
+			esac
+		fi
 		stryker=0
-		run mutate "--concurrency $half --incrementalFile $own" || stryker=$?
+		run mutate "${config:+$config }--concurrency $cores --incrementalFile $own" || stryker=$?
 		! parses "$own" || { cp "$own" "$cache.$$" && mv -f "$cache.$$" "$cache"; }
-		[ "$patched" = 0 ] || { echo patch_coverage >"$logs/$lane.at"; return 1; }
 		[ "$stryker" = 0 ]
 	}
 	lane_history() {
@@ -758,6 +768,10 @@ EOF
 	! $product || start mutation
 	start harness
 	phase $($product && echo mutation) harness
+	if $product && [ "$speed" = full ]; then # a change of interface alone runs no StrykerJS
+		start stryker
+		phase stryker
+	fi
 	[ -z "$carried" ] || {
 		echo "check.sh --merge: every failure above, in the order they came:$all_failed" >&2
 		exit 1
