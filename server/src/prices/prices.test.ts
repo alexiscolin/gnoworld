@@ -775,6 +775,19 @@ describe("the prices timer: the block height", () => {
     expect(lines.join("")).not.toMatch(/secret-detail|x\.test|<html>|12ab/);
   });
 
+  it("keeps the prices and leaves the height out when the node never answers, logged as a timeout (V2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { file, lines } = withRpc({ height: () => new Promise<Response>(() => undefined) });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await wrote(file);
+      expect(Markets.parse(JSON.parse(written(file))).block).toBeUndefined();
+      expect(heightLogged(lines)).toEqual(["timeout"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("takes an answer of exactly the cap and refuses one byte more", async () => {
     const pad = (size: number) => {
       const base = JSON.stringify({ ...status(786661), pad: "" });
