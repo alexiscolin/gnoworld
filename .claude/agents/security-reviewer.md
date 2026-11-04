@@ -24,6 +24,8 @@ Look for:
 - the CSP, `innerHTML`, links and media hosts;
 - for Jarvis, ADR-0002 §5's injection layers and the tool allowlist;
 - for realms, `.claude/rules/gno.md`.
+- the weight: high and medium for what harms people or the system (injection, who may call what, secrets,
+  overload, leaks); a way to game a display's ranking or count is a low, for after the demo (Alexis, 2026-11-04).
 
 An API that does not exist at the pinned version is a finding: check the installed types or
 source. Report only what you can point to, each finding as a row for the ledger: the file and line,
