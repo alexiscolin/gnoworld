@@ -120,10 +120,10 @@ function failureOf(error: unknown): "timeout" | "malformed" | "down" | "error" {
   return error instanceof TypeError ? "down" : "error";
 }
 
-// The client's failure: its time up, a result its schema refuses or cannot read, or gnoscope unreached.
+// The client's failure: its time up, a result its schema refuses, or gnoscope unreached.
 function clientFailure(code: SdkErrorCode): "timeout" | "malformed" | "down" {
   if (code === SdkErrorCode.RequestTimeout) return "timeout";
-  return code === SdkErrorCode.InvalidResult || code === SdkErrorCode.UnsupportedResultType ? "malformed" : "down";
+  return code === SdkErrorCode.InvalidResult ? "malformed" : "down";
 }
 
 function read(result: unknown): Ran {
