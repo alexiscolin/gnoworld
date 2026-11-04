@@ -749,6 +749,22 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
   });
 });
 
+describe("the cards of one turn's calls at once", () => {
+  // A turn's calls run at once (the loop, eight at most): each passes the count before its reads, one alone keeps after.
+  it.each([
+    ["digests", 4, () => give(digest(facts("1,204"))), "its call's time is up, or the answer holds its digests."],
+    ["proposals", 2, () => propose(vote()), "its call's time is up, or the answer holds its proposal."],
+  ])("keeps no more %s than an answer holds when %i ask at once", async (...[, count, call, why]) => {
+    const { tools } = setup();
+    const { asked, cards } = askedOf();
+    const ran = await Promise.all(Array.from({ length: count }, () => tools.run(call(), asked)));
+    const refusals = ran.filter((one) => one.ok && one.isError);
+    expect(refusals).toEqual([{ ok: true, isError: true, text: `Refused, nothing kept: ${why}` }]);
+    const held = cards.cards();
+    expect(held.digests.length + held.proposals.length + held.buttons.length).toBe(count - 1);
+  });
+});
+
 describe("cardTools", () => {
   it("refuses to start with no chain profile", () => {
     const places = loadPlaces(folderOf());

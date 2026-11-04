@@ -75,7 +75,8 @@ function answerOf(message: z.infer<typeof Message>, scenario: Scenario): string 
 // An event stream when the test gives one, else JSON.
 function written(response: ServerResponse, events: string | undefined, json: () => { status: number; body: string }) {
   if (events !== undefined) {
-    response.writeHead(200, { "content-type": "text/event-stream" }).end(events);
+    // With its charset, as many servers write it: the client reads the media type before it.
+    response.writeHead(200, { "content-type": "text/event-stream; charset=utf-8" }).end(events);
     return;
   }
   const { status, body } = json();
