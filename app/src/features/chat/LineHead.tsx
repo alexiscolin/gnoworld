@@ -13,13 +13,22 @@ function Author({ line, mine, me }: { line: Line; mine: boolean; me: string | un
   const name = line.account ?? line.from;
   const guest = line.account === undefined;
   return (
-    <span className={styles["author"]}>
+    <span className={styles["author"]} data-author="">
       <PersonCard name={name} guest={guest} country={line.country} me={me}>
         <Person name={name} guest={guest} />
       </PersonCard>
       {mine ? " you" : null}
     </span>
   );
+}
+
+/** Opens the card of the author of the line the focus is in, the keyboard's way to it (the More menu's View profile): their
+ * name opens it but is no Tab stop (ae87f64b). The name takes the focus, which the card gives back as it closes, the card
+ * the next stop after it. Menu gives More the focus as an item acts. */
+export function openAuthorCard(): void {
+  const name = document.activeElement?.closest("li")?.querySelector<HTMLButtonElement>("[data-author] > button");
+  name?.focus();
+  name?.click();
 }
 
 // "Edited" in the head, before the time, when the author's later edit is what the line shows (4d, U5).

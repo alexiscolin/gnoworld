@@ -233,6 +233,7 @@ test.describe("a line's actions", () => {
     await expect(menu.getByRole("menuitem").filter({ hasNotText: "Open thread" })).toHaveText([
       "Copy text",
       "Copy room link",
+      "View profile",
     ]);
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
@@ -677,6 +678,7 @@ test.describe("deleting a line", () => {
     await expect(await itemsOf(page, 0, "another's line")).toHaveText([
       "Copy text",
       "Copy room link",
+      "View profile",
       "Save message",
       "Mark unread",
     ]);
@@ -684,6 +686,7 @@ test.describe("deleting a line", () => {
     await expect(await itemsOf(page, 1, "my own line")).toHaveText([
       "Copy text",
       "Copy room link",
+      "View profile",
       "Save message",
       "Edit",
       "Delete",
@@ -785,6 +788,7 @@ test.describe("deleting a line", () => {
     await expect(await itemsOf(page, 1, "my own line")).toHaveText([
       "Copy text",
       "Copy room link",
+      "View profile",
       "Save message",
       "Edit",
       "Delete",
@@ -816,7 +820,12 @@ test.describe("deleting a line", () => {
     const dialog = await deleteFrom(page, 1);
     await dialog.getByRole("button", { name: "Delete" }).press("Enter");
     expect(sent.filter((line) => line.startsWith("REDACT "))).toEqual(["REDACT #bubble/games o2"]);
-    await expect(await itemsOf(page, 1, "my own line")).toHaveText(["Copy text", "Copy room link", "Save message"]);
+    await expect(await itemsOf(page, 1, "my own line")).toHaveText([
+      "Copy text",
+      "Copy room link",
+      "View profile",
+      "Save message",
+    ]);
     await page.keyboard.press("Escape");
     await expect(flash(page, "Message deleted.")).toHaveCount(0);
     socket().send(`:${address}!u@h REDACT #bubble/games o2`);

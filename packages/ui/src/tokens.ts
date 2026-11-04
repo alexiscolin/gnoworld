@@ -33,6 +33,7 @@ export function groups() {
         "--avatar-",
         "--chat-",
         "--flash-",
+        "--banner-",
         "--globe-",
       ],
     },

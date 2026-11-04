@@ -1,12 +1,13 @@
 // A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
 // reactions first and a Pin button for a reader who may pin (4d), its More menu holding Copy text, Copy link, Open
-// thread (4d's threads), Save message and Mark unread for an account, Edit (the DM bar's, then the room's: it puts one's
-// own message back in the composer) and, on the reader's own line, Delete, asked first. More reactions come with their
-// merges; Report waits for slice 12's moderation queue.
+// thread (4d's threads), View profile (8j), Save message and Mark unread for an account, Edit (the DM bar's, then the
+// room's: it puts one's own message back in the composer) and, on the reader's own line, Delete, asked first. More
+// reactions come with their merges; Report waits for slice 12's moderation queue.
 import { canEdit, type Line, type Shown } from "@gnoworld/core";
 import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
+import { openAuthorCard } from "./LineHead.tsx";
 import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
 import { menuItems } from "./menuItems.ts";
 import { quoted, roomLabel, shortAddress } from "./names.ts";
@@ -172,6 +173,7 @@ function itemsOf(
       onCopy,
       link: dm === undefined,
       onThread,
+      onCard: openAuthorCard,
       kept: keptItems(line, own, keeping),
       onEdit: asksEdit(onEdit, line, me) && !deleting ? onEdit : undefined,
       onDelete: own && !deleting ? askDelete : undefined,

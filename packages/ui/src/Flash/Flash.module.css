@@ -6,7 +6,8 @@
     /* layout: the top layer places a popover in the middle; the flash goes to the top, centred */
     margin: 0 auto;
     inline-size: fit-content;
-    max-inline-size: 100%;
+    /* The page's gutter on both sides, never edge to edge on a phone (8j). */
+    max-inline-size: calc(100% - var(--space-s) * 2);
     padding-block: var(--space-2xs);
     /* Its Close sits close to the edge, as a pill's last control does. */
     padding-inline: var(--space-m) var(--space-2xs);
@@ -14,15 +15,18 @@
     box-shadow: var(--shadow-float);
   }
 
-  /* An arrival's banner: the top centre's slot under the header, over the scene (DESIGN-SYSTEM.md, Layout; frames 23, 93). */
+  /* An arrival's banner: the top centre's slot (tokens.css, --banner-top), over the scene (frames 23, 93), in the page and not
+     the top layer, so a dialog's layer covers it (8j: the search drawer at 390 px); above the dock and the full chat's 3. */
   .flash[data-banner] {
-    /* raw: the header's 96 px, and a step under it */
-    inset-block-start: calc(96px + var(--space-s));
+    position: fixed;
+    inset-block-start: var(--banner-top);
+    /* raw: over the dock's and the full chat's 3, until the layers' tokens come with the scene */
+    z-index: 4;
   }
 
   /* While a flash shows, what the keyboard reaches scrolls clear of it (F355, WCAG 2.4.11); */
   /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller: measure it then */
-  :root:has(.flash:popover-open) {
+  :root:has(.flash:popover-open, .flash[data-banner]) {
     scroll-padding-block-start: calc(var(--space-m) * 2 + var(--control-l));
   }
 

@@ -108,6 +108,12 @@
     --chat-inset: var(--space-l);
     /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
     --flash-room: 0px;
+    /* The top centre's slot (DESIGN-SYSTEM.md, Layout): the bottom of the header in view, the shell's or a full chat's, which sets
+       it; the arrival's pill a step under it; and the room a page keeps free above its first line so the pill covers none of it
+       and nothing moves when it comes: one row of the pill and a step (8b, 8j). */
+    --banner-under: 96px;
+    --banner-top: calc(var(--banner-under) + var(--space-s));
+    --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
     /* The circle a plate opens for a globe drawn under it, in the window's pixels: none until a page sets it. */
     --globe-x: 0px;
     --globe-y: 0px;
@@ -139,6 +145,13 @@
       --control-m: 44px;
       /* Under 16 px, iOS Safari zooms into a field that takes the focus (F371). */
       --font-field: 400 1rem/1.5 var(--family-sans);
+    }
+  }
+
+  /* The phone layout's breakpoint (DESIGN-SYSTEM.md, Breakpoints), where the pill's actions wrap under its words: two rows. */
+  @media (max-width: 900px) {
+    :root {
+      --banner-room: calc(var(--control-s) * 2 + var(--space-m) + var(--space-2xs) * 2 + var(--space-s));
     }
   }
 
