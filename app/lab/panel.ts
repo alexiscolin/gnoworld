@@ -24,7 +24,7 @@ function section(title: string, controls: readonly (Control | undefined)[], kept
   return set;
 }
 
-// A page that is not secure has no clipboard, and the list stays to select.
+// A page that is not secure has no clipboard, and a browser may refuse one: the list stays to select.
 function copyOut(text: string, said: HTMLElement): void {
   said.textContent = "";
   Promise.resolve()
@@ -34,7 +34,7 @@ function copyOut(text: string, said: HTMLElement): void {
         said.textContent = "Copied.";
       },
       () => {
-        said.textContent = "This page has no clipboard: select the list.";
+        said.textContent = "Not copied: the browser keeps its clipboard here. Select the list.";
       },
     );
 }

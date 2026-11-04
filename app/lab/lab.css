@@ -89,11 +89,14 @@
   }
 
   aside {
-    inset-block-end: var(--space-s);
+    /* raw: over the scene's labels' layer (0), as the site's header is */
+    z-index: 1;
     inset-inline-end: var(--space-s);
     overflow: auto;
     /* raw: a phone's width less its gutters */
     inline-size: min(var(--popover-w), calc(100vi - 2 * var(--space-s)));
+    /* raw: as tall as its controls, and no taller than the window less its gutters, where it scrolls */
+    max-block-size: calc(100vb - 2 * var(--space-s));
   }
 
   aside h2 {

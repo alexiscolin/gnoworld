@@ -48,6 +48,19 @@ async function hidden(page: Page) {
 const DISC_BRIGHTER = 1.4;
 const COSMOS_BRIGHTER = 1.5;
 
+// What the page fixes over the canvas and does not stack under the panel: the scene's labels' layer comes later in the page, and an equal
+// order would put it on top.
+const overThePanel = (page: Page) =>
+  page.evaluate(() => {
+    const aside = document.querySelector("aside");
+    if (aside === null) return ["no panel"];
+    const order = (element: Element) => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0;
+    return Array.from(document.body.querySelectorAll("*"))
+      .filter((element) => !aside.contains(element) && getComputedStyle(element).position === "fixed")
+      .filter((element) => order(element) >= order(aside))
+      .map((element) => `${element.tagName} ${element.className}`);
+  });
+
 const rootStyle = (page: Page) => page.evaluate(() => document.documentElement.style.cssText);
 const rootToken = (page: Page, name: string) =>
   page.evaluate((property) => getComputedStyle(document.documentElement).getPropertyValue(property).trim(), name);
@@ -187,6 +200,8 @@ test.describe("the workshop's tuning panel", () => {
     const [before = 0] = await brightness(page, await picture(page), [whole]);
     const { eye } = await sceneStats(page);
     await shown(page);
+    await expect(page.locator("[data-labels] > *").first()).toBeAttached({ timeout: 60_000 });
+    expect(await overThePanel(page), "fixed over the canvas, not under the panel").toEqual([]);
     const slider = control(page, "Exposure");
     const place = await slider.boundingBox();
     if (place === null) throw new Error("no slider");
