@@ -245,9 +245,14 @@ describe("grounded", () => {
     expect(grounded(digest(facts(`${dotted} GNOT`)), refund)).toEqual(refused({ kind: "number", value: dotted }));
   });
 
-  it("holds of a page no number a blank with a glyph's width parts", () => {
-    const voters = sources({ page: `2026${String.fromCodePoint(0x2800)}100 voters` });
+  it("holds of a page no number a blank with a glyph's width parts, and reads a digest's digits it parts as one", () => {
+    const braille = String.fromCodePoint(0x2800);
+    const voters = sources({ page: `2026${braille}100 voters` });
     expect(grounded(digest(facts("2026100 voters")), voters)).toEqual(refused({ kind: "number", value: "2026100" }));
+    const apart = sources({ page: "2026 and 100 voters" });
+    expect(grounded(digest(facts(`2026${braille}100 voters`)), apart)).toEqual(
+      refused({ kind: "number", value: "2026100" }),
+    );
   });
 
   it("refuses an account in upper case, parted by a character that draws nothing, or holding a look-alike letter", () => {
