@@ -10,9 +10,6 @@ import { isNetwork } from "./tools/gnoscopeTools.ts";
 
 export interface JarvisConfig {
   anthropicKey: Secret;
-  database: string;
-  // A UTC day's caps in nano-dollars, prices.ts's unit: the questions', and the translations' apart (D47).
-  budgets: { ask: number; translate: number };
   caps: {
     questionChars: number;
     turns: number;
@@ -41,7 +38,8 @@ export interface Served {
   // refused (F5288).
   listen: { host: string; port: number; names: string[] };
   database: string;
-  budgets: JarvisConfig["budgets"];
+  // A UTC day's caps in nano-dollars, prices.ts's unit: the questions', and the translations' apart (D47).
+  budgets: { ask: number; translate: number };
   // How long a stop waits for the questions in flight before it cuts them (D178).
   drainMs: number;
 }
@@ -135,8 +133,6 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
   const settings = parseSettings(Env, env);
   return {
     anthropicKey: new Secret(readWord("ANTHROPIC_API_KEY_FILE", settings.ANTHROPIC_API_KEY_FILE)),
-    database: settings.JARVIS_DATABASE,
-    budgets: budgetsOf(settings),
     caps: {
       questionChars: settings.JARVIS_QUESTION_CHARS,
       turns: settings.JARVIS_TURNS,

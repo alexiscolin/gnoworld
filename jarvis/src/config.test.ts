@@ -41,8 +41,6 @@ describe("loadJarvisConfig", () => {
     const { anthropicKey, ...rest } = loadJarvisConfig(ENV);
     expect(anthropicKey.reveal()).toBe(KEY);
     expect(rest).toEqual({
-      database: ENV.JARVIS_DATABASE,
-      budgets: { ask: 45 * DOLLAR, translate: 5 * DOLLAR },
       caps: {
         questionChars: 2_000,
         turns: 8,
