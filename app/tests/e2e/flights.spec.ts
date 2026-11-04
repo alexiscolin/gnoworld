@@ -404,9 +404,9 @@ test("flies from the cosmos to a world's page: the panel names it, and lands as 
   await expect(page.locator("[data-look='plate']")).toBeVisible();
 });
 
-// Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (Playwright's CDP
-// session, slice 7 §9, question 17). Every kind of flight, half of them pages' flights, which copy a frame each, driven through the scene: a
-// world page's own warming (its code compiled, its style sheets) is no flight's (heap snapshots, 2026-11-03). The baseline after one round.
+// Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP; slice 7 §9, Q17).
+// Every kind of flight, half pages' flights, driven through the scene; a world page's own warming is no flight's (heap snapshots, 2026-11-03).
+// The baseline once a round adds nothing: three counts a geometry from its first draw, which a loaded first round can miss (F5404).
 test("leaves the GPU's resources at their baseline and the heap within a tenth after twenty flights there and back", async ({
   page,
 }) => {
@@ -443,7 +443,20 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   };
   await test.step("one round of each kind first", round);
   await steady();
-  const before = { ...(await gpu()), heap: await heap(), flights: (await flightOf(page))?.flights ?? NaN };
+  // A round that adds each time is a leak: three rounds at most before the baseline.
+  let warmed = await gpu();
+  for (let rounds = 2; ; rounds += 1) {
+    await test.step(`round ${String(rounds)}, till one adds nothing`, round);
+    await steady();
+    const now = await gpu();
+    if (JSON.stringify(now) === JSON.stringify(warmed)) break;
+    expect(
+      rounds,
+      `round ${String(rounds)} added: ${JSON.stringify(warmed)}, then ${JSON.stringify(now)}`,
+    ).toBeLessThan(3);
+    warmed = now;
+  }
+  const before = { ...warmed, heap: await heap(), flights: (await flightOf(page))?.flights ?? NaN };
   for (let flight = 0; flight < 20; flight += 4)
     await test.step(`flights ${String(flight + 1)} to ${String(flight + 4)}`, round);
   await steady();
