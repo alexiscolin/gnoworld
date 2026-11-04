@@ -139,6 +139,26 @@ describe("makePresence", () => {
     expect(presence.history("ns/w0000"), "the least busy, first by id").toEqual([]);
   });
 
+  // The second round of 7t3's review: a held world not yet counted this hour looked quiet to a newcomer listed before it in the same sample,
+  // which took its seat and its 14 days; chain worlds come by id, so a flood under ids that sort first wiped every real world's history.
+  it("counts the sample's held worlds before any newcomer, so one listed after a newcomer keeps its seat and its history", () => {
+    const { presence, clock } = make();
+    full(2, presence);
+    clock.at = T0 + HOUR;
+    presence.record(
+      new Map([
+        ["a/new", 3],
+        ["ns/w0000", 9],
+      ]),
+    );
+    expect(presence.history("ns/w0000")).toEqual([
+      { at: T0, people: 2 },
+      { at: T0 + HOUR, people: 9 },
+    ]);
+    expect(presence.history("a/new")).toHaveLength(1);
+    expect(presence.history("ns/w0001"), "the quietest held world").toEqual([]);
+  });
+
   it("lets a world quiet since a flood take back its seat from the flood once the flood is quiet in turn", () => {
     const { presence, clock } = make();
     const real = full(5, presence);

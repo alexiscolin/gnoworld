@@ -113,14 +113,18 @@ export function makePresence(options: { file: string; now: () => number }): Pres
   return {
     record(people) {
       const at = Math.floor(now() / HOUR) * HOUR;
-      const quiets = quietsOf(worlds);
-      // A world nobody was in is not kept.
-      for (const [id, count] of people) {
-        if (!WorldId.safeParse(id).success || !Count.safeParse(count).success) continue;
+      const counted = [...people].filter(
+        ([id, count]) => WorldId.safeParse(id).success && Count.safeParse(count).success,
+      );
+      // The sample's held worlds first, so none looks quiet to a newcomer listed before it; then the newcomers, a world nobody was in left out.
+      for (const [id, count] of counted) {
         const slots = worlds.get(id);
         if (slots !== undefined) slots.set(at, Math.max(slots.get(at) ?? 0, count));
-        else if (count === 0 || !roomFor(count, at, quiets)) continue;
-        else worlds.set(id, new Map([[at, count]]));
+      }
+      const quiets = quietsOf(worlds);
+      for (const [id, count] of counted) {
+        if (worlds.has(id) || count === 0 || !roomFor(count, at, quiets)) continue;
+        worlds.set(id, new Map([[at, count]]));
         quiets.seen(id);
       }
       forget();
