@@ -189,6 +189,17 @@ describe("the recent lines of a room", () => {
     expect(recent.recent("#bubble", ASKER)).toEqual([]);
   });
 
+  it("keeps out a line it kept and then dropped, if it passes again (F5109)", () => {
+    const recent = setup();
+    recent.passed(said("m1", "taken"));
+    recent.taken("#bubble", "m1");
+    recent.passed(said("m1", "taken"));
+    recent.passed(said("m2", "frist"));
+    recent.edited(said("m3", "first", { edits: "m2" }));
+    recent.passed(said("m2", "frist"));
+    expect(recent.recent("#bubble", ASKER)).toEqual([]);
+  });
+
   it("remembers 2,000 taken lines at most, the oldest forgotten first", () => {
     const recent = setup();
     for (let at = 0; at <= 2000; at += 1) recent.taken("#bubble", `t${String(at)}`);
