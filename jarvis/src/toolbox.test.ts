@@ -125,7 +125,7 @@ describe("each allowed call, run by its own runner", () => {
       }[name];
       const call = allowed(tools, name, args);
       expect(await tools.run(call, asked())).toEqual(said(`gnomcp ${name}`));
-      expect(gnomcp.call).toHaveBeenCalledExactlyOnceWith(name, call.args);
+      expect(gnomcp.call.mock.calls.map((made) => made.slice(0, 2))).toEqual([[name, call.args]]);
       expect(cardRun).not.toHaveBeenCalled();
       expect(scope.call).not.toHaveBeenCalled();
     },
@@ -172,7 +172,7 @@ describe("each allowed call, run by its own runner", () => {
       const call = tools.allowlist.check(name, args);
       if (!call.ok) throw new Error(`the allowlist refused ${name}: its test's arguments are wrong`);
       expect(await tools.run(call, asked())).toEqual(said(`gnoscope ${name}`));
-      expect(scope.call).toHaveBeenCalledExactlyOnceWith(name, call.args);
+      expect(scope.call.mock.calls.map((made) => made.slice(0, 2))).toEqual([[name, call.args]]);
       expect(gnomcp.call).not.toHaveBeenCalled();
     },
   );
