@@ -3,6 +3,7 @@
 import { Button, Cluster } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useAfterLoad } from "../../later.ts";
+import { useApp } from "../../storeContext.tsx";
 import type { SharedPlace } from "../share/index.ts";
 
 // As the arrival's pill waits (passport/Later.tsx): past the first screen's measure.
@@ -34,11 +35,21 @@ export interface ActionsProps {
   proposals?: string;
   /** The main action's words, "Say hi in the chat" unless the place names its room. */
   say?: string;
+  /** The place's main room, by its id: once its history came with no message in it, the main action asks to be the first (frame 93). */
+  room?: string;
 }
 
-export function Actions({ place, follow, proposals, say = "Say hi in the chat" }: ActionsProps) {
+// Whether the room's history came and holds nobody's words, only notices: nobody has said hi yet. False while the chat has not shown it.
+const useNobodySpoke = (room: string | undefined) =>
+  useApp(({ chat }) => {
+    const held = room === undefined ? undefined : chat.rooms[room];
+    return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
+  });
+
+export function Actions({ place, follow, proposals, say = "Say hi in the chat", room }: ActionsProps) {
   const reading = proposals !== undefined && isSitePath(proposals);
   const settled = useAfterLoad(SETTLED_MS);
+  const first = useNobodySpoke(room);
   // The focus follows the link to the chat's composer (F2864).
   useEffect(() => {
     document.addEventListener("click", focusComposer);
@@ -56,7 +67,7 @@ export function Actions({ place, follow, proposals, say = "Say hi in the chat" }
       ) : null}
       {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead. */}
       <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
-        {say}
+        {first ? "Be the first to say hi" : say}
       </Button>
       {settled ? (
         <Suspense fallback={null}>

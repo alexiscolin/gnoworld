@@ -90,6 +90,7 @@ export default function World() {
                   <Actions
                     place={{ name: world.name, path: world.canonical }}
                     follow={stampKey(universe.id, hubWorldOf(world))}
+                    room={`#${world.slug}`}
                     {...(realmPath === undefined ? {} : { proposals: realmPath })}
                   />
                 </div>

@@ -81,6 +81,7 @@ export default function Earth() {
                     place={{ name: "Earth", path: universe.earth.canonical }}
                     follow={stampKey(universe.id, EARTH_ID)}
                     say="Say hi in #general"
+                    room="#earth"
                   />
                 </div>
                 {universe.worlds.length === 0 ? (

@@ -1,7 +1,7 @@
 // The bell's panel (frames 86, 87): over the dock's column, from under the header to the page's foot. Its title and "Mark all read", the
 // kinds with what is unread in each (All, Messages, Worlds, News), the worlds to filter by, then the lines, the newest first, each going
 // to its place: a page of the site, or off it through the warning. Esc, a click outside or the bell closes it.
-import { EmptyState, Panel as Surface, Tabs } from "@gnoworld/ui";
+import { ComingSoon, EmptyState, Panel as Surface, Tabs } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useLocation } from "react-router";
 import { createPortal } from "react-dom";
@@ -136,6 +136,8 @@ export function Panel({ onClose }: { onClose: () => void }) {
             ))}
           </ol>
         )}
+        {/* The chain's own lines (a new realm's signal, a proposal opened or closing) come with the indexer's events, slice 9. */}
+        <ComingSoon name="New realms and proposals in the bell">New realms and proposals, from the chain</ComingSoon>
         <p className={styles["note"]}>What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}
