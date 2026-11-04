@@ -159,6 +159,72 @@ describe("loadSkills: what it gives", () => {
   });
 });
 
+// Alexis's choice of 2026-11-04 (D55's stricter one): gnomcp's gno skill teaches an agent that writes, signs and sends
+// coins in five of its references; Jarvis is offered its nine reading ones alone, the folder kept whole.
+describe("loadSkills: the gno skill's references Jarvis is never offered", () => {
+  const WRITING = ["build.md", "debug.md", "gnokey.md", "mcp.md", "toolchain.md"];
+  const WITH_WRITING = () => ({
+    ...TWO(),
+    ...Object.fromEntries(WRITING.map((name) => [`gno/references/${name}`, `# ${name}\ngnokey maketx call -send\n`])),
+  });
+
+  it("offers none of them in load_skill's schema", () => {
+    const { tool } = loadSkills(folder(WITH_WRITING()));
+    expect(z.toJSONSchema(tool.args, { io: "input" })).toMatchObject({
+      properties: { reference: { enum: ["audit.md", "security.md"] } },
+    });
+  });
+
+  it.each(WRITING)("refuses load_skill for %s as any reference off its schema", (name) => {
+    expect(checked(folder(WITH_WRITING())).check("load_skill", { skill: "gno", reference: name })).toEqual({
+      ok: false,
+      reason: "bad_arguments",
+    });
+  });
+
+  it.each(WRITING)("never reads %s, though it loaded it", (name) => {
+    const skills = loadSkills(folder(WITH_WRITING()));
+    expect(() => skills.read({ skill: "gno", reference: name })).toThrow(
+      `skills: gno/references/${name} is not offered`,
+    );
+  });
+
+  it("still checks every file it holds: a hidden character in gnokey.md stops the start", () => {
+    const files = { ...WITH_WRITING(), "gno/references/gnokey.md": `# gnokey${String.fromCodePoint(0x202e)}\n` };
+    expect(failure(folder(files))).toBe(
+      "skills: gno/references/gnokey.md: holds U+202E, a hidden or control character",
+    );
+  });
+
+  it("still covers every file it holds in its digest", () => {
+    const before = loadSkills(folder(WITH_WRITING())).digest;
+    const files = { ...WITH_WRITING(), "gno/references/gnokey.md": "# gnokey, changed\n" };
+    expect(loadSkills(folder(files)).digest).not.toBe(before);
+  });
+
+  it("says in load_skill's description that a reference a skill names and its schema does not list is none", () => {
+    const { tool } = loadSkills(folder(WITH_WRITING()));
+    expect(tool.description).toContain("A reference that a skill names and the schema does not list is none either.");
+  });
+
+  it("ships skills of ours that name none of them, so the model is sent to none", () => {
+    const skills = loadSkills(fileURLToPath(new URL("../../jarvis/skills", import.meta.url)));
+    for (const { name } of skills.index.filter((entry) => entry.name !== "gno")) {
+      const text = skills.read({ skill: name });
+      for (const reference of WRITING) expect(text).not.toContain(reference);
+    }
+  });
+
+  it("keeps the rule to gnomcp's gno skill: a skill of ours may offer a reference of one of those names", () => {
+    const files = { ...WITH_WRITING(), "concierge/references/debug.md": "# Our own notes\n" };
+    const skills = loadSkills(folder(files));
+    expect(skills.read({ skill: "concierge", reference: "debug.md" })).toBe("# Our own notes\n");
+    const tools = checked(folder(files));
+    expect(tools.check("load_skill", { skill: "concierge", reference: "debug.md" }).ok).toBe(true);
+    expect(tools.check("load_skill", { skill: "gno", reference: "debug.md" }).ok).toBe(false);
+  });
+});
+
 describe("loadSkills: on a file system that lists a folder in another order", () => {
   beforeEach(() => {
     listing.reversed = true;
@@ -475,7 +541,7 @@ describe("loadSkills: a planted skill stops the start, naming the file and why",
 describe("loadSkills: the skills folder this repository ships", () => {
   const SHIPPED = fileURLToPath(new URL("../../jarvis/skills", import.meta.url));
 
-  it("loads ours and gnomcp's gno skill, with its fourteen references", () => {
+  it("loads ours and gnomcp's gno skill, and offers nine of its fourteen references, the reading ones", () => {
     const skills = loadSkills(SHIPPED);
     expect(skills.index.map((entry) => entry.name)).toEqual([
       "catch-up",
@@ -484,8 +550,19 @@ describe("loadSkills: the skills folder this repository ships", () => {
       "realm-reader",
       "translation",
     ]);
+    expect(readdirSync(join(SHIPPED, "gno/references"))).toHaveLength(14);
     const schema = z.object({ properties: z.object({ reference: z.object({ enum: z.array(z.string()) }) }) });
-    expect(schema.parse(z.toJSONSchema(skills.tool.args)).properties.reference.enum).toHaveLength(14);
+    expect(schema.parse(z.toJSONSchema(skills.tool.args)).properties.reference.enum).toEqual([
+      "audit.md",
+      "interrealm.md",
+      "memory.md",
+      "networks.md",
+      "patterns.md",
+      "render.md",
+      "security.md",
+      "stdlib.md",
+      "sysrealms.md",
+    ]);
   });
 
   // gnomcp's gno skill names its sibling skills, its write tools and gnokey commands, a signed write past the call card.
