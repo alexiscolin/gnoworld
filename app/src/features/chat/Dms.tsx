@@ -66,6 +66,11 @@ export function conversationOf(
   return { lines: partner === undefined ? [] : (all[partner] ?? []), empty: "No messages since this page opened." };
 }
 
+// Everyone in a room this page follows, as one string the store's selector compares by value: a partner among them is online.
+// ponytail: every member of every room followed, a world's few rooms of a few hundred people each.
+const presentIn = (rooms: AppState["chat"]["rooms"]): string =>
+  [...new Set(Object.values(rooms).flatMap((room) => room.members))].sort().join(" ");
+
 /** An account's direct messages on a world's page, `asked` the address's ?dm=. */
 export function useDms(world: string, session: AppState["login"]["session"], asked: string | null): Dms {
   const all = useApp((app) => app.dms);
@@ -75,6 +80,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
   const reactions = useApp((app) => app.dmReactions);
   const acts = useApp((app) => app.dmActRefused);
   const { setOnlyKnown } = useApp((app) => app.dmActions);
+  const present = useApp((app) => presentIn(app.chat.rooms));
   const account = session.kind === "in" ? session.address : undefined;
   const partner = partnerOf(account, asked);
   const heard = (other: string) => heardFrom(choices, other);
@@ -90,6 +96,7 @@ export function useDms(world: string, session: AppState["login"]["session"], ask
             onlyKnown: choices.onlyKnown,
             onOnlyKnown: setOnlyKnown,
             notKept,
+            present,
           },
     ...conversationOf(all, choices, partner),
     refused: partner === undefined ? undefined : refusals[partner],

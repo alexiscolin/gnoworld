@@ -13,6 +13,7 @@ import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
 import { floating, usePlaced } from "./floating.ts";
+import soon from "../ComingSoon/ComingSoon.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -53,24 +54,45 @@ function useAnchored(kind: "dialog" | "menu") {
   return { open, panelRef, trigger, panel };
 }
 
+// A trigger with none of a button's look: what opens the panel, and the plain class alone.
+const plainOf = ({ ref, popoverTarget, "aria-haspopup": haspopup }: ReturnType<typeof useAnchored>["trigger"]) => ({
+  ref,
+  popoverTarget,
+  "aria-haspopup": haspopup,
+  className: soon["plain"],
+});
+
 export interface PopoverProps {
-  /** The trigger's words. */
-  trigger: string;
+  /** The trigger's words, or what it shows. */
+  trigger: ReactNode;
+  /** A trigger with no button's look: the words it holds as they are (a name in a line, which opens a person's card). */
+  plain?: boolean;
+  /** Its panel drawn only while open: a popover of each of many rows (a person's card on each line) costs nothing closed. */
+  lazy?: boolean;
+  /** Whether the trigger is a Tab stop: a list that is one stop (a room's lines) leaves its rows' controls out until in focus. */
+  tabbable?: boolean;
   /** What the panel is, for assistive technology. */
   label: string;
   children: ReactNode;
 }
 
 /** A panel under its trigger, closed by a click outside or Esc. */
-export function Popover({ trigger: words, label, children }: PopoverProps) {
-  const { trigger, panel } = useAnchored("dialog");
+export function Popover({
+  trigger: words,
+  plain = false,
+  lazy = false,
+  tabbable = true,
+  label,
+  children,
+}: PopoverProps) {
+  const { open, trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <button type="button" {...trigger}>
+      <button type="button" {...(plain ? plainOf(trigger) : trigger)} {...(tabbable ? {} : { tabIndex: -1 })}>
         {words}
       </button>
       <div {...panel} aria-label={label}>
-        {children}
+        {lazy && !open ? null : children}
       </div>
     </>
   );

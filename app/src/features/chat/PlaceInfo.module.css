@@ -39,3 +39,15 @@
     padding-block-start: var(--space-s);
   }
 }
+
+/* The place's links out, as the video's frame 56 sets them: the label's capitals in the text's colour, an arrow after each. */
+@layer components {
+  /* Inside the label's anchor: its words and arrow in the text's colour, which the label's own grey would take. */
+  .link {
+    /* layout: the arrow on the words' line, a step after them */
+    display: inline-flex;
+    /* layout: the arrow on the words' line, a step after them */
+    gap: var(--space-3xs);
+    color: var(--color-text);
+  }
+}

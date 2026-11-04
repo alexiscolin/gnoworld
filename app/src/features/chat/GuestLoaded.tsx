@@ -5,7 +5,7 @@ import type { RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
-import { Dock } from "./QuickActions.tsx";
+import { Dock } from "./Dock.tsx";
 import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { BOT, roomIds, talkingOf } from "./names.ts";
@@ -51,6 +51,18 @@ interface GuestLoadedProps {
   place: ChatPlace;
 }
 
+// Who is here, for a visitor: none to write to, each with the country they declared.
+const peopleOf = (state: GuestLoadedProps["state"], connected: boolean) => (
+  <PeopleHere
+    members={state?.members ?? []}
+    connected={connected}
+    me={undefined}
+    onMessage={undefined}
+    canFollow
+    lines={state?.lines}
+  />
+);
+
 /** The room in view and what a visitor may not do in it: a direct message asked for says the login it needs, the room has
  * no composer but the word to log in. */
 function GuestRoom({
@@ -58,13 +70,13 @@ function GuestRoom({
   shown,
   view,
   onWhoIsHere,
-  world,
+  place,
 }: {
   asksDm: boolean;
   shown: Shown | undefined;
   view: RoomViewOver;
   onWhoIsHere: () => void;
-  world: string;
+  place: ChatPlace;
 }) {
   return (
     <>
@@ -75,7 +87,7 @@ function GuestRoom({
           {...shown.view}
           {...view}
           composer={
-            <Dock onWhoIsHere={onWhoIsHere} world={world}>
+            <Dock onWhoIsHere={onWhoIsHere} place={place} dm={false} writes={false}>
               <p>{LOG_IN_TO_WRITE}</p>
             </Dock>
           }
@@ -103,15 +115,7 @@ export function GuestLoaded({
   const acts = roomActs(link, room ?? "", dismissed);
   const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
-  const people = (
-    <PeopleHere
-      members={state?.members ?? []}
-      connected={chat === "connected"}
-      me={undefined}
-      onMessage={undefined}
-      canFollow
-    />
-  );
+  const people = peopleOf(state, chat === "connected");
   // A visitor reads a thread, whose panel says to log in where an account writes (4d's threads).
   const threads = useThreads({
     shown,
@@ -134,6 +138,7 @@ export function GuestLoaded({
       rail={rail}
       unread={0}
       talking={talkingOf(state?.members, chat === "connected")}
+      here={state}
       people={people}
       threads={threads}
     >
@@ -143,7 +148,7 @@ export function GuestLoaded({
           shown={shown}
           view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
           onWhoIsHere={ask}
-          world={place.slug}
+          place={place}
         />
       )}
     </ChatScreen>

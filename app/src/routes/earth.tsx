@@ -10,7 +10,8 @@ import { PlaceLinks } from "../features/list/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
-import { chatPlace, pageOf, site } from "../places.ts";
+import { chatPlace } from "../chatPlace.ts";
+import { pageOf, site } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";
@@ -34,6 +35,8 @@ const EARTH = {
   name: "Earth",
   description: "Where people speak from. Countries are opt-in.",
   inPage: true,
+  // Its pills are the Earth's (frame 56).
+  earth: true,
 };
 
 export default function Earth() {

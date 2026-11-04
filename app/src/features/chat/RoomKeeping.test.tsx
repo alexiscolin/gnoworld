@@ -111,7 +111,8 @@ describe("the marks of a saved and a pinned line", () => {
   // A line's own words are the sender's: a line that says "Saved" is no saved line.
   it("never mistake a line's own words for the mark", () => {
     const rows = items(view({ state: room({ lines: [line("a", 0, { text: "Saved Pinned" })] }) }));
-    expect(rows[0]).toMatch(/^g10gh7…3y5tv \d{2}:\d{2} Saved Pinned$/);
+    // An account's first words in a room whose history came say "new here" (8d).
+    expect(rows[0]).toMatch(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} Saved Pinned$/);
   });
 });
 

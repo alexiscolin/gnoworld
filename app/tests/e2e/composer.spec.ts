@@ -129,7 +129,8 @@ test.describe("the composer", () => {
   test("completes a command and a room with Tab, from the field alone and at the draft's end", async ({ page }) => {
     await inGames(page);
     await field(page).fill("/");
-    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me.");
+    // /poll is the second command (8d): Tab takes the first.
+    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me; also /poll.");
     await field(page).press("Tab");
     await expect(field(page)).toHaveValue("/me ");
     await expect(field(page)).toBeFocused();

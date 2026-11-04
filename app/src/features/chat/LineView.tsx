@@ -1,7 +1,7 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
 // (4c), its link's player (4g) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
-import { markdown, mentions, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
+import { markdown, mentions, pollOf, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
@@ -9,6 +9,7 @@ import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { Head } from "./LineHead.tsx";
 import { Reactions } from "./Reactions.tsx";
+import { PollView } from "./PollView.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
 import styles from "./RoomView.module.css";
@@ -62,9 +63,20 @@ function NewDivider() {
   );
 }
 
+// A line's words, or a poll's bars in their place (core's poll.ts).
+function Body({
+  line,
+  votes,
+  react,
+  children,
+}: Pick<LineViewProps, "line" | "votes" | "react"> & { children: ReactNode }) {
+  const poll = votes === undefined ? undefined : pollOf(line.text);
+  return poll === undefined ? children : <PollView to={line.id} poll={poll} votes={votes ?? ""} react={react} />;
+}
+
 // A line's reactions under it, when it has any (4d).
 function Chips({ to, chips, react }: { to: string; chips: string | undefined; react: LineViewProps["react"] }) {
-  return chips === undefined ? null : <Reactions to={to} chips={chips} react={react} />;
+  return chips === undefined || chips === "" ? null : <Reactions to={to} chips={chips} react={react} />;
 }
 
 // What the quote of a reply shortens: the mentions of the line answered, as the line shortens its own.
@@ -127,6 +139,10 @@ export interface LineViewProps {
   pinned: boolean;
   /** Its reactions as shown (4d), as chipsOf writes them, and how an account reacts; none for a guest. */
   chips: string | undefined;
+  /** Whether it is its author's first words in the room: the video's "new here". */
+  newHere?: boolean | undefined;
+  /** A poll line's votes, as votesString writes them; none for a line that is no poll. */
+  votes?: string | undefined;
   react: ((reaction: Reacting) => boolean) | undefined;
   /** The line it answers, when the room holds it (4d's replies). */
   answers: Line | undefined;
@@ -140,7 +156,7 @@ export interface LineViewProps {
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread } = props;
+  const { replies, onThread, inThread, votes, newHere } = props;
   const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
@@ -162,10 +178,12 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Head {...{ line, mine, mentioned, saved, pinned }} />
+      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
-      <div data-line-text="">
-        <LineText blocks={blocks} me={me} known={known} stop={row.links} />
+      <div data-line-text="" className={votes === undefined ? undefined : styles["wide"]}>
+        <Body line={line} votes={votes} react={react}>
+          <LineText blocks={blocks} me={me} known={known} stop={row.links} />
+        </Body>
       </div>
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}

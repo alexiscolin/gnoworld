@@ -117,6 +117,18 @@
     translate: 0 1px;
   }
 
+  /* An account's first words in the room: the video's mint "new here" tag after the name (frame 56). */
+  .newHere {
+    /* raw: the frame's tag, a pixel above and under its words */
+    padding: 1px var(--space-2xs);
+    border-radius: var(--radius-s);
+    background: var(--color-mine-soft);
+    color: var(--color-mine);
+    font-family: var(--family-mono);
+    /* raw: the frame's tag, 10 px, under every text token */
+    font-size: 10px;
+  }
+
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
      bar, as the divider's rule does (the bar covers it only while pointed at). */
   .head {
@@ -209,6 +221,12 @@
     /* layout: a step between the word and its rule */
     gap: var(--space-2xs);
     /* layout: the rule runs the line's whole width, over the room kept for its bar, which the row holds none of */
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  /* A poll's bars run the line's whole width, over the room kept for its bar, as the video's frame 73 draws them. */
+  .wide {
+    /* layout: over the room kept for the line's bar */
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
