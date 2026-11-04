@@ -23,8 +23,8 @@ export interface QuotaValues {
 export interface Quota {
   // Counts a question of the account's quota, by its kind; false, counting nothing, once that quota is reached.
   take: (account: Address, named: boolean) => boolean;
-  // Whether the account has a question left today, counting nothing: a digest asks before jarvis makes it (10k-1).
-  left: (account: Address, named: boolean) => boolean;
+  // A question of today given back: a digest jarvis made nothing for costs none (10k-1).
+  giveBack: (account: Address) => void;
   values: () => QuotaValues;
   // A quota, or an account's own taken off or given back; full past the allowlist's cap.
   change: (change: Exclude<JarvisChange, { setting: "budget" }>) => "changed" | "full";
@@ -60,9 +60,7 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
       WHERE EXISTS (SELECT 1 FROM jarvis_unlimited WHERE address = :account)
         OR count < (SELECT value FROM jarvis_settings WHERE name = :kind)
       RETURNING count`),
-    left: db.prepare(`SELECT EXISTS (SELECT 1 FROM jarvis_unlimited WHERE address = :account)
-      OR COALESCE((SELECT count FROM jarvis_asked WHERE account = :account AND day = :day), 0)
-        < (SELECT value FROM jarvis_settings WHERE name = :kind) AS left`),
+    giveBack: db.prepare("UPDATE jarvis_asked SET count = count - 1 WHERE account = ? AND day = ? AND count > 0"),
     // At most 500 past rows a question, by the day's index: a day's turn never holds the event loop.
     purge: db.prepare(
       "DELETE FROM jarvis_asked WHERE rowid IN (SELECT rowid FROM jarvis_asked WHERE day < ? LIMIT 500)",
@@ -81,9 +79,8 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
       sql.purge.run(day);
       return sql.take.get({ account, day, kind: named ? "quota" : "quota_unnamed" }) !== undefined;
     },
-    left(account, named) {
-      const row = sql.left.get({ account, day: dayOf(now()), kind: named ? "quota" : "quota_unnamed" });
-      return z.object({ left: z.number() }).parse(row).left === 1;
+    giveBack(account) {
+      sql.giveBack.run(account, dayOf(now()));
     },
     values() {
       const rows = Rows.parse(sql.settings.all());

@@ -226,4 +226,34 @@ describe("a realm's digest through the door", () => {
     });
     expect((await digest({ token: DOOR.benToken })).status).toBe(200);
   });
+
+  it("has taken the question of a page that left before jarvis answered (the second round's T1)", async () => {
+    const { digest, counted } = setup({ answer: () => Promise.resolve({ ok: false, error: "gone" } as const) });
+    expect((await digest()).status).toBe(503);
+    expect(counted()).toEqual([{ account: DOOR.anna, count: 1 }]);
+  });
+
+  it("lets one of five requests at once reach jarvis when one question is left (the second round's T2)", async () => {
+    const held = Promise.withResolvers<Digested>();
+    const { digest, sent, counted } = setup({ quota: 1, answer: () => held.promise });
+    const asked = Array.from({ length: 5 }, () => digest());
+    await expect.poll(() => sent.length, { timeout: 30_000 }).toBe(1);
+    held.resolve({ ok: true, answer: { ...made(), made: true } });
+    const statuses = await Promise.all(asked.map(async (response) => (await response).status));
+    expect(statuses.toSorted()).toEqual([200, 429, 429, 429, 429]);
+    expect([sent.length, counted()]).toEqual([1, [{ account: DOOR.anna, count: 1 }]]);
+  });
+
+  it("gives the question back when jarvis made nothing: its cache, a spent budget, its refusal", async () => {
+    const answers: Digested[] = [
+      { ok: true, answer: made() },
+      { ok: true, answer: { status: "spent" } },
+      { ok: false, error: "refused" },
+    ];
+    const { digest, counted } = setup({
+      answer: () => Promise.resolve(answers.shift() ?? { ok: false, error: "down" }),
+    });
+    for (let at = 0; at < 3; at += 1) await digest();
+    expect(counted()).toEqual([{ account: DOOR.anna, count: 0 }]);
+  });
 });
