@@ -802,7 +802,8 @@ describe("GET /api/trends", () => {
     };
     const rooms = { now: [chatOf("earth", [3, 3])] };
     const clock = { at: T2 + MINUTE };
-    const routes = trendsRoutes({ chain: () => read, chat: () => rooms.now, now: () => clock.at });
+    const pass = { read };
+    const routes = trendsRoutes({ chain: () => pass.read, chat: () => rooms.now, now: () => clock.at });
     const items = async () => Trends.parse(await (await routes.request("/")).json()).items;
     expect(await items()).toMatchObject([{ kind: "trending", world: "gnoswap/pool" }]);
     const once = reads;
@@ -811,6 +812,9 @@ describe("GET /api/trends", () => {
     rooms.now = [chatOf("earth", [3, 3])];
     await items();
     expect(reads, "a new answer of who is here").toBe(once + 1);
+    pass.read = { newest: [], worlds: [chainOf("alexis/blog", [6, 3], [4, 2])] };
+    expect(await items(), "a new pass, the rooms the same").toMatchObject([{ kind: "trending", world: "alexis/blog" }]);
+    pass.read = read;
     clock.at = T2 + WINDOW_MOST_MS + 1;
     expect(await items(), "the window aged").toEqual([]);
   });
