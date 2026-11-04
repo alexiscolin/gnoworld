@@ -2,7 +2,7 @@
 // answer button, data and never HTML, each string bounded in code points (as Zod counts). A proposal names no coins: a field
 // for them fails here, and the person types any amount in the call card. A realm's path and a link are only bounded: they
 // are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). Since 10g,
-// the door's bodies too: a question, the answer as the client reads it, and an admin's change and the values it changes.
+// the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes.
 import { Address } from "./address.ts";
 import { ChallengeRequest } from "./login.ts";
 import { RoomId } from "./rooms.ts";
@@ -101,6 +101,28 @@ export const JarvisAnswer = z.discriminatedUnion("status", [
   z.strictObject({ status: z.literal("spent") }),
 ]);
 export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
+
+/** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
+export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
+
+/** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
+ * share (D42). */
+export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets" } as const;
+
+/** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
+ * by a number for who said it in this question alone, the asker 0, never an account (D91). */
+export const JarvisAsk = z.extend(JarvisQuestion, {
+  lines: z
+    .array(
+      z.strictObject({
+        speaker: z.int().check(z.gte(0), z.lte(JARVIS_LINES.lines)),
+        text: text(JARVIS_LINES.bytes),
+        time: z.optional(z.iso.datetime()),
+      }),
+    )
+    .check(z.maxLength(JARVIS_LINES.lines)),
+});
+export type JarvisAsk = z.infer<typeof JarvisAsk>;
 
 const count = (max: number) => z.int().check(z.gte(1), z.lte(max));
 

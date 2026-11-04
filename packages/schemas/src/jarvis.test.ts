@@ -4,7 +4,10 @@ import {
   Digest,
   DOOR_CAPS,
   JARVIS_CAPS,
+  JARVIS_LINES,
+  JARVIS_PATHS,
   JarvisAnswer,
+  JarvisAsk,
   JarvisBudget,
   JarvisBudgets,
   JarvisChange,
@@ -367,5 +370,61 @@ describe("JarvisSettings", () => {
     expect(settings({ budgets: { ask: 45, translate: 5 } })).toBe(true);
     expect(settings({ unlimited: Array.from({ length: DOOR_CAPS.unlimited + 1 }, () => ADDRESS) })).toBe(false);
     expect(settings({ unlimited: ["g1nobody"] })).toBe(false);
+  });
+});
+
+// 10g: what the door sends jarvis, each field bounded, as jarvis's entry (10h) parses it.
+const askLine = (over: Record<string, unknown> = {}) => ({
+  speaker: 1,
+  text: "the poll closes today",
+  time: "2026-11-04T12:00:00.000Z",
+  ...over,
+});
+const ask = (over: Record<string, unknown> = {}) => ({
+  question: "What is new?",
+  room: "#bubble",
+  lines: [askLine()],
+  ...over,
+});
+const takes = (value: unknown): boolean => JarvisAsk.safeParse(value).success;
+
+describe("JarvisAsk", () => {
+  it("is posted to /ask, and the budgets read and changed at /budgets", () => {
+    expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets" });
+  });
+
+  it("is a question, its room and the room's lines, with nothing else", () => {
+    expect(takes(ask())).toBe(true);
+    expect(takes(ask({ lines: [] }))).toBe(true);
+    expect(takes(ask({ account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5" }))).toBe(false);
+    expect(takes(ask({ lines: undefined }))).toBe(false);
+  });
+
+  it("are 30 lines, the asker's numbers from 0 to 30, each with a text and an ISO time or none", () => {
+    expect(JARVIS_LINES).toEqual({ lines: 30, bytes: 8192 });
+    const lines = (count: number) => Array.from({ length: count }, () => askLine());
+    expect([takes(ask({ lines: lines(30) })), takes(ask({ lines: lines(31) }))]).toEqual([true, false]);
+    expect([0, 30].map((speaker) => takes(ask({ lines: [askLine({ speaker })] })))).toEqual([true, true]);
+    expect([-1, 31, 1.5, "1"].map((speaker) => takes(ask({ lines: [askLine({ speaker })] })))).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(takes(ask({ lines: [{ speaker: 1, text: "no time" }] }))).toBe(true);
+    expect(takes(ask({ lines: [askLine({ time: "yesterday" })] }))).toBe(false);
+  });
+
+  it("bounds a line's text, never empty, and refuses a field a line does not have", () => {
+    const text = (value: string) => takes(ask({ lines: [askLine({ text: value })] }));
+    expect([text(wide(8192)), text(wide(8193)), text("")]).toEqual([true, false, false]);
+    expect(takes(ask({ lines: [askLine({ account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5" })] }))).toBe(false);
+  });
+
+  it("bounds the question to the door's widest cap, never empty, and takes a room's id alone", () => {
+    expect([takes(ask({ question: wide(8000) })), takes(ask({ question: wide(8001) }))]).toEqual([true, false]);
+    expect(takes(ask({ question: "" }))).toBe(false);
+    expect(takes(ask({ room: `#${"a".repeat(64)}` }))).toBe(false);
+    expect(takes(ask({ room: "#bubble\nNOTICE" }))).toBe(false);
   });
 });
