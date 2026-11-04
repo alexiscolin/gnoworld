@@ -357,8 +357,9 @@ Slice 3, the server's retention (3n):
   keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
   `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of any indexer request (the network, an answer of the
   wrong shape, a page past 4 MiB even at one transaction, more than 500 requests) logs `worlds_indexer_failed` once and every realm
-  keeps its earlier counts (null on a first pass): none is counted from half the chain. A call that names no realm, or an address that
-  is none, is left out and logs `worlds_history_skipped` once. The kinds
+  keeps its earlier counts (null on a first pass): none is counted from half the chain; a read past 32 MiB of answers gives up as
+  `too_many`. A call that names no realm is left out and one whose caller is no address is counted with none; either logs
+  `worlds_history_skipped` once. The kinds
   are `request`, `timeout`, `status`, `rate_limited`, `too_large`, `too_many`, `not_json`, `shape`, `chain_refused`, `empty`,
   `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
   of the realm list's and `vm/qdoc`'s answers in the stack is `deploy/test.sh`, which Alexis runs: it waits for the running job's own
