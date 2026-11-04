@@ -1,7 +1,7 @@
 // The Earth's view (part 7x2): its stations and scenery come in a chunk of their own once the cosmos first shows, so the cosmos's chunk pays
 // only for these calls and a phone loads none of it before "View in space"; the scenery's maps after that.
 import type { Point } from "@gnoworld/core";
-import { Group } from "three";
+import { Group, type Material } from "three";
 import type { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
 
@@ -18,6 +18,8 @@ export class LazyEarthView {
   #asked = false;
   readonly #sight: Sight;
   #wanted = false;
+  // The Earth's ring's covering, which the view keeps off the page's text once it came.
+  #ring: Material | undefined;
 
   /** On `device`, owned by `owner`, over a canvas of `sight`. */
   constructor(device: EarthDevice, owner: Disposer, sight: Sight) {
@@ -39,10 +41,17 @@ export class LazyEarthView {
         const view = siteEarthView(this.#device, this.#sight);
         this.#view = view;
         this.group.add(view.group);
+        if (this.#ring !== undefined) view.keepOff(this.#ring);
         if (this.#wanted) view.stand();
       },
       () => undefined,
     );
+  }
+
+  /** Keeps what `material` draws, the Earth's ring, off the page's text, as the view's own lines, once the view's chunk came. */
+  keepOff(material: Material): void {
+    this.#ring = material;
+    this.#view?.keepOff(material);
   }
 
   /** A frame, as the view's own. */

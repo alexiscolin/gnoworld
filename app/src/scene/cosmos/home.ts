@@ -7,7 +7,7 @@ import { buildGlobe, type Globe } from "../earth/globe.ts";
 import { MOON_FAR, ORBIT_RADIUS } from "../earth/orbit.ts";
 import type { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
-import type { Sight } from "../station/earthView.ts";
+import type { Sight } from "../station/names.ts";
 import { LazyEarthView } from "./lazyEarthView.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 
@@ -94,6 +94,7 @@ export class Home {
     this.#globe = globe;
     this.#parent.add(globe.group);
     this.#line = ringLine();
+    this.#around?.keepOff(this.#line.material);
     globe.stand(EARTH_RADIUS, this.#line);
     this.#device.moved();
     if (!this.#said) this.#device.stood();

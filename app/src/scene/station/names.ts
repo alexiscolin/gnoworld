@@ -10,6 +10,14 @@ import { external, linkable } from "../cosmos/planWords.ts";
 import { watchScene } from "../cosmos/sceneRuns.ts";
 import styles from "./names.module.css";
 
+/** The canvas's size in its CSS pixels, its lens in them, and the box of the page's text, which no name stands under. */
+export interface Sight {
+  readonly width: number;
+  readonly height: number;
+  readonly focal: number;
+  readonly box?: ClearBox | undefined;
+}
+
 /** Where a station stands on the screen this frame, in its pixels, and its reach there; `shown`, false behind the eye or off the screen. */
 export interface Spot {
   x: number;

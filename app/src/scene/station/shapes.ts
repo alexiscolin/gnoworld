@@ -2,10 +2,12 @@
 // one instanced draw however many stations stand. Each part's finish is its instance's colour; a light is drawn unlit.
 import type { Finish, PartKind } from "@gnoworld/core";
 import {
+  AmbientLight,
   BoxGeometry,
   Color,
   CylinderGeometry,
   DataTexture,
+  DirectionalLight,
   DoubleSide,
   LatheGeometry,
   MeshBasicMaterial,
@@ -16,6 +18,7 @@ import {
   TorusGeometry,
   Vector2,
   type BufferGeometry,
+  type Vector3,
   type Material,
 } from "three";
 
@@ -98,4 +101,11 @@ export function coveringsOf(): { materials: Record<PartKind, Material>; grid: Da
       beacon: new MeshBasicMaterial(),
     },
   };
+}
+
+/** The great star's light on the stations, from `toStar` on the stage, and a dim fill so their shade still reads. */
+export function lightsOf(toStar: Vector3) {
+  const sun = new DirectionalLight(0xfff1dc, 3.2);
+  sun.position.copy(toStar);
+  return [sun, sun.target, new AmbientLight(0x8090b0, 0.55)];
 }

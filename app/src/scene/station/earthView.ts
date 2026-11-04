@@ -4,6 +4,7 @@
 // in space"; its maps come after. What leaves the frame leaves it: nothing here hides as the eye moves, the orbits and the caption fade.
 import {
   CENTRE,
+  clearOf,
   EARTH_PLACE,
   earthEye,
   sceneryOf,
@@ -12,15 +13,17 @@ import {
   stationsRound,
   toMap,
   toScene,
-  type ClearBox,
   type Point,
 } from "@gnoworld/core";
-import { AmbientLight, DirectionalLight, Group, Vector3 } from "three";
+import { Group, Vector3, type Material } from "three";
 import projects from "../../../data/earthOrbit.json" with { type: "json" };
 import type { EarthDevice } from "../earth/device.ts";
 import { SMALL_RING } from "../earth/orbit.ts";
 import { beltOf } from "./belt.ts";
-import { StationNames, type Named, type Spot } from "./names.ts";
+import { StationNames, type Named, type Sight, type Spot } from "./names.ts";
+import { lightsOf } from "./shapes.ts";
+import { TextBox } from "./textBox.ts";
+import { offTheBox } from "../offTheBox.ts";
 import { fadeOrbits, orbitsOf } from "./orbits.ts";
 import { SceneryDrawn } from "./scenery.ts";
 import { StationsDrawn } from "./stations.ts";
@@ -39,26 +42,12 @@ type Belt = ReturnType<typeof beltOf>;
 /** A project round the Earth as the team's file gives it (earthOrbit.json): its name, where it leads, its station's size. */
 export type Project = Named & { readonly size?: number | undefined };
 type Device = Pick<EarthDevice, "renderer" | "base" | "moved" | "camera">;
-/** The canvas's size in its CSS pixels, its lens in them, and the box of the page's text, which no name stands under. */
-export interface Sight {
-  readonly width: number;
-  readonly height: number;
-  readonly focal: number;
-  readonly box?: ClearBox | undefined;
-}
 /** What it stands: the team's `projects`, their names in `document` over a canvas of `sight`; the lab may leave the `scenery` out. */
 interface Standing {
   readonly projects: readonly Project[];
   readonly document: Document;
   readonly sight: () => Sight;
   readonly scenery?: boolean;
-}
-
-/** The great star's light on the stations, from `toStar` on the stage, and a dim fill so their shade still reads. */
-export function lightsOf(toStar: Vector3) {
-  const sun = new DirectionalLight(0xfff1dc, 3.2);
-  sun.position.copy(toStar);
-  return [sun, sun.target, new AmbientLight(0x8090b0, 0.55)];
 }
 
 export class EarthView {
@@ -80,6 +69,7 @@ export class EarthView {
   #spots: Spot[] = [];
   #loading = new AbortController();
   readonly #sight: () => Sight;
+  readonly #text = new TextBox();
 
   /** On `device`, through its camera, what `standing` says. */
   constructor(device: Device, { projects, document, sight, scenery = true }: Standing) {
@@ -120,6 +110,7 @@ export class EarthView {
       new Float32Array(round.belt.map(({ radius }) => radius * 0.6)),
     );
     const orbits = orbitsOf(round.close, this.#earth);
+    offTheBox(orbits.material, () => this.#text.of(this.#sight().box));
     const named = new Map(projects.map((project) => [project.name, project]));
     this.#names.name(round.close.flatMap(({ seed }) => named.get(seed) ?? []));
     [this.#stations, this.#belt, this.#orbits] = [stations, belt, orbits];
@@ -175,7 +166,8 @@ export class EarthView {
   // Each close station's name over it on the screen, none behind the eye or off the screen; the caption at `caption` of its strength.
   #placeNames(caption: number): void {
     const { camera } = this.#device;
-    const { width, height, focal, box } = this.#sight();
+    const { width, height, focal, box: given } = this.#sight();
+    const box = this.#text.of(given);
     this.group.updateMatrixWorld();
     for (let index = 0; index < this.#close.length; index += 1) {
       const close = this.#close[index];
@@ -186,10 +178,17 @@ export class EarthView {
       this.#at.applyMatrix4(camera.projectionMatrix);
       spot.x = ((this.#at.x + 1) / 2) * width;
       spot.y = ((1 - this.#at.y) / 2) * height;
-      spot.radius = (NAME_REACH * close.radius * focal) / depth;
+      spot.radius = (close.radius * focal) / Math.max(depth, close.radius);
       spot.shown = depth > 0 && spot.x >= 0 && spot.x <= width && spot.y >= 0 && spot.y <= height;
+      this.#stations?.room(index, box === undefined ? 1 : clearOf(spot, box));
+      spot.radius *= NAME_REACH;
     }
     this.#names.place(this.#spots, caption, { width, box });
+  }
+
+  /** Keeps what `material` draws off the page's text, as its own orbits: the Earth's ring, which the cosmos's Home draws. */
+  keepOff(material: Material): void {
+    offTheBox(material, () => this.#text.of(this.#sight().box));
   }
 
   /** Its names off the page, as the cosmos goes. */
