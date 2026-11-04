@@ -1,0 +1,42 @@
+/* The share sheet's picture: the view at the canvas's own proportions, its caption over its foot, as the prototype's share card. */
+@layer components {
+  .picture {
+    position: relative;
+    /* layout: a figure's own margin, which the sheet's stack spaces instead */
+    margin: 0;
+    overflow: clip;
+    border-radius: var(--radius-m);
+    background: var(--color-surface);
+  }
+
+  /* While the scene draws the picture, its room is kept at a screen's shape. */
+  .picture[data-waiting] {
+    aspect-ratio: 16 / 10;
+  }
+
+  .picture img {
+    display: block;
+    inline-size: 100%;
+  }
+
+  .caption {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    /* layout: the label over the name */
+    display: grid;
+    /* layout: the label's distance from the name */
+    gap: var(--space-3xs);
+    padding: var(--space-s);
+    /* raw: the surface fading in under the caption, so its words read over any planet */
+    background: linear-gradient(transparent, color-mix(in oklab, var(--color-surface) 80%, transparent));
+    font: var(--font-title-s);
+  }
+
+  /* The link as written, to be read, or selected where the device cannot copy. */
+  .link {
+    overflow-wrap: anywhere;
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

@@ -121,10 +121,8 @@
     border-radius: var(--radius-s);
   }
 
-  .count {
-    position: absolute;
-    inset-block-start: calc(var(--space-3xs) * -1);
-    inset-inline-end: calc(var(--space-3xs) * -1);
+  /* A count's badge: mint, round, its figure centred; the icon button's corner and the tabs' counts wear it. */
+  .badge {
     min-inline-size: var(--size-counter);
     padding-inline: var(--space-3xs);
     border-radius: var(--radius-pill);
@@ -133,5 +131,11 @@
     font: var(--font-label);
     line-height: var(--size-counter);
     text-align: center;
+  }
+
+  .count {
+    position: absolute;
+    inset-block-start: calc(var(--space-3xs) * -1);
+    inset-inline-end: calc(var(--space-3xs) * -1);
   }
 }

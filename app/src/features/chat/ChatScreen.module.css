@@ -36,12 +36,4 @@
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
   }
-
-  /* The quick actions and the composer under the lines, set off by a rule across the conversation. */
-  .dock {
-    /* the video's 21 px under the box, from the tokens: 16 and 4 */
-    padding-block-end: calc(var(--space-s) + var(--space-3xs));
-    padding-inline: var(--chat-inset);
-    border-block-start: var(--line-width) solid var(--color-line);
-  }
 }

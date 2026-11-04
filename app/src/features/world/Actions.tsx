@@ -1,17 +1,10 @@
-// A world's actions (frames 26 and 92): the main one, then Share. Follow is never drawn: it needs an account's store, which
-// does not exist. Share is drawn only where the browser can copy the page's address, so none on the server; the build's page
-// has none, and hydration adds it. No dead button.
+// A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
+// (Alexis, 2026-11-04: "Tout de suite, jusqu'à +512 o"); the share sheet's code comes at the first press.
 import { Button, Cluster } from "@gnoworld/ui";
-import { useEffect, useState, useSyncExternalStore } from "react";
-
-// How long the answer to a click stays, in milliseconds.
-const SAID_FOR = 2_500;
-
-const unchanging = () => () => undefined;
-// A browser may have no clipboard at all, or one with no `writeText` (a page that is not secure): it is not typed as absent.
-const clipboard = (): Clipboard | undefined => navigator.clipboard;
-const canCopy = () => typeof clipboard()?.writeText === "function";
-const cannotKnow = () => false;
+import { useEffect } from "react";
+import { useApp } from "../../storeContext.tsx";
+import { FollowButton } from "../follow/index.ts";
+import { sharePlace, type SharedPlace } from "../share/index.ts";
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
 // chat's own textarea: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
@@ -29,21 +22,29 @@ const focusComposer = (event: MouseEvent) => {
 // `/<tab>/host` as another host).
 const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+$/.test(path);
 
-export function Actions({ address, proposals }: { address: string; proposals?: string }) {
+export interface ActionsProps {
+  /** The place, as a share names and links it. */
+  place: SharedPlace;
+  /** The place as the device keys what it follows ("universe:world"). */
+  follow: string;
+  /** The world's proposals' page, which then leads. */
+  proposals?: string;
+  /** The main action's words, "Say hi in the chat" unless the place names its room. */
+  say?: string;
+  /** The place's main room, by its id: once its history came with no message in it, the main action asks to be the first (frame 93). */
+  room?: string;
+}
+
+// Whether the room's history came and holds nobody's words, only notices: nobody has said hi yet. False while the chat has not shown it.
+const useNobodySpoke = (room: string | undefined) =>
+  useApp(({ chat }) => {
+    const held = room === undefined ? undefined : chat.rooms[room];
+    return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
+  });
+
+export function Actions({ place, follow, proposals, say = "Say hi in the chat", room }: ActionsProps) {
   const reading = proposals !== undefined && isSitePath(proposals);
-  // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
-  const copying = useSyncExternalStore(unchanging, canCopy, cannotKnow);
-  // An object, so each answer is a new value: the timer starts again with each click, even when the words are the same.
-  const [said, setSaid] = useState<{ words: string } | null>(null);
-  useEffect(() => {
-    if (said === null) return;
-    const timer = setTimeout(() => {
-      setSaid(null);
-    }, SAID_FOR);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [said]);
+  const first = useNobodySpoke(room);
   // The focus follows the link to the chat's composer (F2864).
   useEffect(() => {
     document.addEventListener("click", focusComposer);
@@ -59,30 +60,22 @@ export function Actions({ address, proposals }: { address: string; proposals?: s
           Read the proposals
         </Button>
       ) : null}
-      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead. */}
-      <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
-        Say hi in the chat
-      </Button>
-      {copying ? (
-        <Button
-          size="l"
-          onClick={() => {
-            navigator.clipboard.writeText(address).then(
-              () => {
-                setSaid({ words: "Copied" });
-              },
-              () => {
-                setSaid({ words: "Could not copy the address" });
-              },
-            );
-          }}
-        >
-          Share
+      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead, when the dock's
+          composer is the way to the chat (frame 31: Read the proposals, Follow, Share, on one line). */}
+      {reading ? null : (
+        <Button href="#chat" emphasis="solid" size="l" icon="arrow">
+          {first ? "Be the first to say hi" : say}
         </Button>
-      ) : null}
-      <span role="status" className="label">
-        {said?.words}
-      </span>
+      )}
+      <FollowButton kind="worlds" id={follow} />
+      <Button
+        size="l"
+        onClick={() => {
+          sharePlace(place);
+        }}
+      >
+        Share
+      </Button>
     </Cluster>
   );
 }

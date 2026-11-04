@@ -4,7 +4,8 @@ import type { RoomList } from "@gnoworld/schemas";
 import type { RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
-import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
+import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
+import { Dock } from "./QuickActions.tsx";
 import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
 import { BOT, roomIds, talkingOf } from "./names.ts";
@@ -57,11 +58,13 @@ function GuestRoom({
   shown,
   view,
   onWhoIsHere,
+  world,
 }: {
   asksDm: boolean;
   shown: Shown | undefined;
   view: RoomViewOver;
   onWhoIsHere: () => void;
+  world: string;
 }) {
   return (
     <>
@@ -72,7 +75,7 @@ function GuestRoom({
           {...shown.view}
           {...view}
           composer={
-            <Dock onWhoIsHere={onWhoIsHere}>
+            <Dock onWhoIsHere={onWhoIsHere} world={world}>
               <p>{LOG_IN_TO_WRITE}</p>
             </Dock>
           }
@@ -101,7 +104,13 @@ export function GuestLoaded({
   const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
   const people = (
-    <PeopleHere members={state?.members ?? []} connected={chat === "connected"} me={undefined} onMessage={undefined} />
+    <PeopleHere
+      members={state?.members ?? []}
+      connected={chat === "connected"}
+      me={undefined}
+      onMessage={undefined}
+      canFollow
+    />
   );
   // A visitor reads a thread, whose panel says to log in where an account writes (4d's threads).
   const threads = useThreads({
@@ -134,6 +143,7 @@ export function GuestLoaded({
           shown={shown}
           view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
           onWhoIsHere={ask}
+          world={place.slug}
         />
       )}
     </ChatScreen>

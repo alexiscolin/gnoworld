@@ -2,9 +2,9 @@
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { lazy, Suspense, useState } from "react";
 import { useLoaderData, useNavigate, useRouteError, useSearchParams, type MetaArgs } from "react-router";
-import { hubWorldOf, REALM_PREFIX } from "@gnoworld/core";
+import { hubWorldOf, REALM_PREFIX, stampKey } from "@gnoworld/core";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
-import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
+import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
@@ -88,7 +88,9 @@ export default function World() {
                 {/* Frame 26 stands the actions 30 px under the words over them (world.module.css). */}
                 <div className={styles["actions"]}>
                   <Actions
-                    address={ORIGIN + world.canonical}
+                    place={{ name: world.name, path: world.canonical }}
+                    follow={stampKey(universe.id, hubWorldOf(world))}
+                    room={`#${world.slug}`}
                     {...(realmPath === undefined ? {} : { proposals: realmPath })}
                   />
                 </div>

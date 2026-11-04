@@ -1,8 +1,9 @@
 // What the scene is told of the default universe's worlds. The fixed places stand at once, and the file joins them when it comes, if it does,
 // read once; the page's text keeps its room at any size, its box measured on the page, as the globe's circle is.
 import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
-import { createStore } from "zustand/vanilla";
+import { createStore, type StoreApi } from "zustand/vanilla";
 import type { Scene } from "../../scene/scene.ts";
+import type { AppState } from "../../store/index.ts";
 import type { RailPlaces } from "./railWorlds.ts";
 import { worldsFile } from "./worldsFile.ts";
 
@@ -14,6 +15,8 @@ const loadSignals = () => import("./signals.ts");
 export interface CosmosPage {
   readonly open: (href: string) => void;
   readonly places: RailPlaces;
+  /** Where the rail reads the worlds the reader follows (slice 8): the page's store, and the universe they are keyed in. */
+  readonly follows?: { readonly store: StoreApi<AppState>; readonly universe: string };
 }
 
 /** The worlds and what is known of them now, once both are: what the rail reads (7i). */

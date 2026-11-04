@@ -8,6 +8,7 @@ import { z } from "../jitless.ts";
 import {
   DEFAULT_SETTINGS,
   DEVICE_EMPTY,
+  FOLLOWS_KEPT,
   type Device,
   type DeviceField,
   type DeviceFields,
@@ -16,8 +17,6 @@ import {
 
 /** The stamps, the worlds charted and the quests kept at most: a person with 5,000 stamps costs what one costs. */
 const STAMPS_KEPT = 10_000;
-/** The worlds followed, the people followed, the reminders and the notifications marked read kept at most, each. */
-const FOLLOWS_KEPT = 500;
 
 // A place as the device names it: its universe and its world's id ("gnoland:memba"), or an event's or a quest's id.
 const Key = z.string().check(z.minLength(1), z.maxLength(256), z.regex(/^[^\s\0-\x1f\x7f]+$/));

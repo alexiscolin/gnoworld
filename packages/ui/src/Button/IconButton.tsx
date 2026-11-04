@@ -45,7 +45,7 @@ export function IconButton({
       >
         <Icon name={icon} size={iconSize(size)} />
         {counted === null ? null : (
-          <span className={styles["count"]} aria-hidden="true">
+          <span className={`${String(styles["badge"])} ${String(styles["count"])}`} aria-hidden="true">
             {counted.badge}
           </span>
         )}

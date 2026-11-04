@@ -1,9 +1,10 @@
 // A universe's Earth: its worlds and its ecosystems; /earth for the default one, /net/<id>/earth for each.
-import { EARTH as EARTH_ID } from "@gnoworld/core";
+import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
 import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
+import { Actions } from "../features/world/Actions.tsx";
 import { Connected } from "../features/world/Connected.tsx";
 import { PlaceLinks } from "../features/list/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
@@ -13,6 +14,7 @@ import { chatPlace, pageOf, site } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";
+import plate from "./world.module.css";
 
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "earth");
@@ -73,6 +75,15 @@ export default function Earth() {
                 />
                 <h1>Earth</h1>
                 <p>{universe.name}</p>
+                {/* Frame 86: the Earth's plate says hi in its general room, and follows and shares as a world's does. */}
+                <div className={plate["actions"]}>
+                  <Actions
+                    place={{ name: "Earth", path: universe.earth.canonical }}
+                    follow={stampKey(universe.id, EARTH_ID)}
+                    say="Say hi in #general"
+                    room="#earth"
+                  />
+                </div>
                 {universe.worlds.length === 0 ? (
                   <>
                     <h2>Worlds</h2>

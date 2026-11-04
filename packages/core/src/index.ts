@@ -170,5 +170,6 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
+export { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "./frame/snapshot.ts";
 export * from "./space/index.ts";
 export * from "./discovery/index.ts";

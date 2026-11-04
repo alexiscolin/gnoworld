@@ -1,7 +1,11 @@
 // A world's rooms as moons (ADR-0002 §1, "Rooms as moons"): four at most, the room you are in always one, steady, each a link to its room
 // placed under its moon by the scene, which hides it where the moon goes behind the world or over the plate. Only the rooms the world lists
-// are moons: a realm of the world has no room, so no moon. A name is text; an address is built by the URL's own encoding.
+// are moons: a realm of the world has no room, so no moon. A name is text; an address is built by the URL's own encoding. A person the
+// reader follows who is in a room says so on its moon ("noor is here", Alexis, slice 8): matched on the account, which Ergo makes the
+// nick (force-nick-equals-account), from the room's people the page already holds; nothing is asked of anyone for it.
 import { moonSize, nextMoons, type Moons, type RoomCount } from "@gnoworld/core";
+import { shortAddress } from "@gnoworld/schemas";
+import { Chip } from "@gnoworld/ui";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
 import { roomIds, roomLabel, roomParams, shownRoom } from "../chat/index.ts";
@@ -91,6 +95,17 @@ function placer(links: ReadonlyMap<string, HTMLAnchorElement>, room: string) {
   };
 }
 
+// A followed person in the room, as a chip after the room's words; nothing for none.
+function FriendHere({ address }: { address: string | undefined }) {
+  if (address === undefined) return null;
+  return (
+    <>
+      {" "}
+      <Chip tone="warm">{`${shortAddress(address)} is here`}</Chip>
+    </>
+  );
+}
+
 export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
   const [keeper] = useState(() => new MoonKeeper(page));
   useEffect(() => {
@@ -100,6 +115,9 @@ export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
   const chat = useSyncExternalStore(page.store.subscribe, () => page.store.getState().chat);
   const linksRef = useRef(new Map<string, HTMLAnchorElement>());
   const peopleOf = (room: string) => chat.rooms[room]?.members.length ?? 0;
+  const followed = useSyncExternalStore(page.store.subscribe, () => page.store.getState().device.follows.people);
+  // The first followed person in the room, by the order followed: the last followed first.
+  const friendIn = (room: string) => followed.find((person) => chat.rooms[room]?.members.includes(person) === true);
   useEffect(() => {
     const busiest = Math.max(0, ...rooms.map((room) => chat.rooms[room]?.members.length ?? 0));
     sky.moons(
@@ -137,6 +155,7 @@ export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
               }}
             >
               {`${roomLabel(room)} · ${String(peopleOf(room))} here`}
+              <FriendHere address={friendIn(room)} />
             </a>
           </li>
         ))}

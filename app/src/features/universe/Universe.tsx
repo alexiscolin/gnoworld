@@ -106,7 +106,7 @@ function OnTheCosmos({ host, page }: { host: SceneHost; page: CosmosPage | undef
       <Credits overTicker />
       {computer && page !== undefined ? (
         <Suspense fallback={null}>
-          <RailPart source={host.feed} places={page.places} open={page.open} />
+          <RailPart source={host.feed} places={page.places} open={page.open} follows={page.follows} />
         </Suspense>
       ) : null}
     </>

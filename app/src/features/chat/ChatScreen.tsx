@@ -8,7 +8,6 @@ import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
 import { PlaceInfo } from "./PlaceInfo.tsx";
-import { QuickActions } from "./QuickActions.tsx";
 import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
@@ -106,16 +105,6 @@ function usePeople({
 /** What the dock draws and the full chat does not (it has its column, a phone its drawer). */
 function Docked({ children }: { children: ReactNode }) {
   return useFull() ? null : children;
-}
-
-/** What goes under a room's lines: the quick actions over what writes (the composer, or a visitor's word). */
-export function Dock({ onWhoIsHere, children }: { onWhoIsHere: () => void; children: ReactNode }) {
-  return (
-    <div className={styles["dock"]}>
-      <QuickActions onWhoIsHere={onWhoIsHere} />
-      {children}
-    </div>
-  );
 }
 
 export interface ChatScreenProps {

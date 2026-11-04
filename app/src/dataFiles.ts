@@ -83,7 +83,7 @@ export function loadData(dir: string): Data {
       ? []
       : [`earthOrbit.json: [${String(index)}].slug: no hub of hubs.json is named "${slug}"`],
   );
-  const faults = [...unknown, ...discoveryFaults(data, universes)];
+  const faults = [...unknown, ...discoveryFaults(data, universes), ...eventsNowhere(data.events, hubs)];
   if (faults.length > 0) throw new Error(faults.join("\n"));
   return data;
 }
@@ -115,6 +115,15 @@ function discoveryFaults(data: Data, universes: ReadonlySet<string>): string[] {
     });
   });
   return faults;
+}
+
+// An event in a world links to that world's page: one no hub holds, and not the Earth, would link to no page.
+function eventsNowhere(events: Data["events"], hubs: ReadonlySet<string>): string[] {
+  return events.flatMap(({ world }, index) =>
+    world === undefined || world === "earth" || hubs.has(world)
+      ? []
+      : [`events.json: [${String(index)}].world: no hub of hubs.json is named "${world}"`],
+  );
 }
 
 function where(path: readonly PropertyKey[]): string {

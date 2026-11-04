@@ -1,6 +1,7 @@
 // The scene's one loop (ADR-0002 §9, rendering). A frame is asked only when one is due, a timer waiting out the slower rates, so at
 // 30 and 10 fps the page wakes at that rate and not at the screen's; at 0 nothing waits at all. Nothing here allocates on a frame.
 import { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState } from "@gnoworld/core";
+import { copyOf } from "./snapshot.ts";
 
 export interface FrameClock {
   now(): number;
@@ -48,6 +49,8 @@ export class FrameLoop {
   #frame = NONE;
   #timer = NONE;
   #stopped = false;
+  // The pictures asked of the next frame (a share's, slice 8): none but while one waits.
+  #pictures: { canvas: HTMLCanvasElement; done: (picture: HTMLCanvasElement | undefined) => void }[] = [];
 
   constructor(clock: FrameClock, draw: (delta: number) => void) {
     this.#clock = clock;
@@ -72,6 +75,14 @@ export class FrameLoop {
   redraw(): void {
     this.#state.owed = true;
     this.#reschedule();
+  }
+
+  /** A copy of `canvas` as the next frame draws it, made in that frame, as WebGL keeps no buffer past it. */
+  picture(canvas: HTMLCanvasElement): Promise<HTMLCanvasElement | undefined> {
+    return new Promise((done) => {
+      this.#pictures.push({ canvas, done });
+      this.redraw();
+    });
   }
 
   /** Stops for good. */
@@ -109,6 +120,12 @@ export class FrameLoop {
     else this.#frame = this.#clock.ask(this.#tick);
   }
 
+  #shoot(): void {
+    const asked = this.#pictures;
+    this.#pictures = [];
+    for (const { canvas, done } of asked) done(copyOf(canvas));
+  }
+
   readonly #wake = (): void => {
     this.#timer = NONE;
     this.#frame = this.#clock.ask(this.#tick);
@@ -125,6 +142,7 @@ export class FrameLoop {
       this.#lastDraw = time;
       this.#state.owed = false;
       this.#draw(delta);
+      if (this.#pictures.length > 0) this.#shoot();
     } else this.#carried += elapsed;
     this.#reschedule();
   };

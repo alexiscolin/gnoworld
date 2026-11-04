@@ -5,10 +5,11 @@ import { RAIL } from "@gnoworld/core";
 import { PlanetThumb } from "@gnoworld/ui";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
 import { followed } from "../../lib/followed.ts";
+import { worldsFollowedIn } from "../follow/index.ts";
 import { nextLine } from "../../lib/nextLine.ts";
 import { dock } from "./railDock.ts";
 import { RailOrder, type RailPlaces } from "./railWorlds.ts";
-import type { Known, Portraits } from "./worldsFeed.ts";
+import type { CosmosPage, Known, Portraits } from "./worldsFeed.ts";
 import styles from "./Rail.module.css";
 
 /** A portrait's side, in the page's pixels: a 64 px planet as the dock magnifies it. */
@@ -69,8 +70,11 @@ function holdWhileOn(rail: HTMLElement, order: RailOrder, signal: AbortSignal): 
 }
 
 // The rail's order and portraits from its source, and while it stands: the page's list stepping aside, the hold, the dock and the cut.
-function useRail(source: RailSource, places: RailPlaces) {
+function useRail(source: RailSource, places: RailPlaces, followed: readonly string[]) {
   const [order] = useState(() => new RailOrder(places));
+  useEffect(() => {
+    order.follow(followed);
+  }, [order, followed]);
   const known = useSyncExternalStore(source.subscribe, source.data);
   const entries = useSyncExternalStore(order.subscribe, order.entries);
   const drawn = useSyncExternalStore(source.portraits.subscribe, source.portraits.drawn);
@@ -109,16 +113,31 @@ function useRail(source: RailSource, places: RailPlaces) {
   return { entries: standing ? entries : [], drawn, railRef, cut };
 }
 
+const NONE: readonly string[] = [];
+const unchanging = () => () => undefined;
+
+// The worlds the reader follows, by their ids, the last followed first, as the page's store holds them; none where the page gives none.
+function useFollowed(follows: CosmosPage["follows"]): readonly string[] {
+  const held = useSyncExternalStore(
+    follows?.store.subscribe ?? unchanging,
+    () => follows?.store.getState().device.follows,
+  );
+  return held === undefined || follows === undefined ? NONE : worldsFollowedIn(held, follows.universe);
+}
+
 export function Rail({
   source,
   places,
   open,
+  follows,
 }: {
   source: RailSource;
   places: RailPlaces;
   open: (href: string) => void;
+  /** Where the worlds the reader follows are read: they come after the Earth. */
+  follows?: CosmosPage["follows"];
 }) {
-  const { entries, drawn, railRef, cut } = useRail(source, places);
+  const { entries, drawn, railRef, cut } = useRail(source, places, useFollowed(follows));
   const [stop, setStop] = useState(0);
   if (entries.length === 0) return null;
   const moved = (event: KeyboardEvent<HTMLUListElement>) => {

@@ -17,6 +17,7 @@ import { PlaceLinks } from "../features/list/index.ts";
 import { useNewcomer, useResting, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
+import { useAppStore } from "../storeContext.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
 // case is checked (F376).
@@ -40,11 +41,13 @@ export default function Home() {
   // whether the scene runs or not (7n), from a few bytes of its own, so a phone asks nothing of the cosmos before View in space (7n2).
   const drawn = useWorldsCount(universe.isDefault);
   // The rail beside the cosmos (7i) links its worlds to their pages, the Earth's and the hubs' as this page lists them, through the router.
+  const store = useAppStore();
   const rail = {
     open: (href: string) => {
       Promise.resolve(navigate(href)).catch(reportError);
     },
     places: { earth: universe.earth.path, worlds: universe.worlds },
+    follows: { store, universe: universe.id },
   };
   useSpace(universe.isDefault ? "cosmos" : undefined, universe.isDefault ? rail : undefined);
   // A system the eye rests at takes the screen, its crumb at the top left (7v): the hero and the list of worlds there give way, and come back

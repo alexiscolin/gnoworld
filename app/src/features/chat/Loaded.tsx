@@ -18,7 +18,8 @@ import { RoomMenu } from "./RoomMenu.tsx";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomChips } from "./RoomChips.tsx";
-import { ChatScreen, Dock, type ChatPlace } from "./ChatScreen.tsx";
+import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
+import { Dock } from "./QuickActions.tsx";
 import { CountryChoice } from "./CountryChoice.tsx";
 import { Saved } from "./Saved.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
@@ -60,7 +61,7 @@ function useWhoIsHere(
     open(other);
     setParams(dmParams(other, full));
   };
-  return <People members={members} connected={connected} me={me} onMessage={onMessage} />;
+  return <People members={members} connected={connected} me={me} onMessage={onMessage} canFollow />;
 }
 
 // A room's notification modes, an account's; a direct message has none of its own (4f-n).
@@ -224,7 +225,11 @@ export function Loaded(props: LoadedProps) {
             ...composing.view,
             ...threads.view,
           }}
-          composer={<Dock onWhoIsHere={ask}>{writer}</Dock>}
+          composer={
+            <Dock onWhoIsHere={ask} world={place.slug}>
+              {writer}
+            </Dock>
+          }
         />
       )}
     </ChatScreen>

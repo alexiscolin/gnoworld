@@ -121,8 +121,9 @@ describe("the Earth's plate", () => {
     for (const image of html.match(/<img\b[^>]*>/g) ?? []) expect(image).toContain('alt=""');
   });
 
-  test("offers neither Follow nor Share: nothing behind them yet", async () => {
+  test("offers Follow and Share in the page the build writes, as frame 86 draws them", async () => {
     const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    expect(html).not.toMatch(/>Follow<|>Share</);
+    expect(html).toMatch(/>Follow</);
+    expect(html).toMatch(/>Share</);
   });
 });
