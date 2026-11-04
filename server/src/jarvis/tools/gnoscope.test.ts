@@ -118,6 +118,15 @@ describe("startGnoscope: its tools listed at start, ours alone taken", () => {
     expect(events()).toContainEqual({ event: "jarvis_gnoscope_down", reason: "start" });
   });
 
+  it("reads 4 pages of its list at most, and starts with none of its tools past them", async () => {
+    const page = recordedTools().slice(0, 1);
+    const server = await serve({ pages: Array.from({ length: 50 }, () => page) });
+    const { gnoscope, events } = start(server.url);
+    expect((await gnoscope).definitions).toEqual([]);
+    expect(server.requests.filter(({ method }) => method === "tools/list")).toHaveLength(4);
+    expect(events()).toContainEqual({ event: "jarvis_gnoscope_down", reason: "start" });
+  });
+
   it("never offers a tool or a field gnoscope gains later", async () => {
     const tools = recordedTools().map((tool) => {
       const { name, inputSchema } = Field.parse(tool);
@@ -236,6 +245,7 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
     ["no content", () => ({ content: [] })],
     ["an image", () => ({ content: [{ type: "image", data: "aGk=", mimeType: "image/png" }] })],
     ["no result's shape", () => ({ planted: "text" })],
+    ["a text with no text", () => ({ content: [{ type: "text" }] })],
   ])("answers a result of %s as malformed", async (_case, answer) => {
     const server = await serve({ answer });
     const started = await start(server.url).gnoscope;

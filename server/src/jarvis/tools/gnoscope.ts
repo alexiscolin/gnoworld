@@ -52,7 +52,8 @@ const none = (): Gnoscope => ({
 /** gnoscope's reads Jarvis takes: none when its switch is off or it does not answer at start; never throws. */
 export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
   if (!setup.on) return none();
-  const client = new Client({ name: "jarvis", version: "1.0.0" });
+  // Four pages of tools at most, each within its time; gnoscope listed seven on one page (2026-11-04).
+  const client = new Client({ name: "jarvis", version: "1.0.0" }, { listMaxPages: 4 });
   const transport = new StreamableHTTPClientTransport(new URL(setup.url), {
     fetch: cappedFetch(setup.timeoutMs),
     reconnectionOptions: {
@@ -110,14 +111,19 @@ function taken(listed: readonly Tool[], setup: Setup): Gnoscope["definitions"] {
   });
 }
 
-// Why a call gave nothing: its time up, its answer too large or no MCP result, gnoscope unreached or failing over HTTP.
+// Why a call gave nothing: an answer too large, no JSON, or no result Zod takes; the client's own failure; else gnoscope
+// unreached, or its JSON-RPC error.
 function failureOf(error: unknown): "timeout" | "malformed" | "down" | "error" {
-  if (error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout) return "timeout";
   for (let cause: unknown = error; cause instanceof Error; cause = cause.cause)
     if (cause instanceof TooLarge || cause instanceof SyntaxError || cause instanceof z.ZodError) return "malformed";
-  return error instanceof TypeError || (error instanceof SdkError && error.code.startsWith("CLIENT_HTTP"))
-    ? "down"
-    : "error";
+  if (error instanceof SdkError) return clientFailure(error.code);
+  return error instanceof TypeError ? "down" : "error";
+}
+
+// The client's failure: its time up, a result its schema refuses or cannot read, or gnoscope unreached.
+function clientFailure(code: SdkErrorCode): "timeout" | "malformed" | "down" {
+  if (code === SdkErrorCode.RequestTimeout) return "timeout";
+  return code === SdkErrorCode.InvalidResult || code === SdkErrorCode.UnsupportedResultType ? "malformed" : "down";
 }
 
 function read(result: unknown): Ran {
