@@ -4,7 +4,7 @@
 // may read and its recent lines, the account's quota by its mainnet name; then jarvis, whose answer is passed on only once
 // it parses with the client's schema. Logs name the account by its HMAC alone (log.ts).
 import { z } from "zod";
-import { JarvisQuestion, type Address, type ApiError, type JarvisAsk } from "@gnoworld/schemas";
+import { JarvisQuestion, type Address, type ApiError, type JarvisAnswer, type JarvisAsk } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { guard, json, type Guarded } from "../guard.ts";
@@ -25,6 +25,8 @@ interface Options {
   named: (account: Address) => Promise<boolean>;
   quota: Pick<Quota, "take">;
   jarvis: Pick<Jarvis, "ask">;
+  // Jarvis switched on (JARVIS=on): off, the route answers off once it knows who asks, and asks nothing of jarvis.
+  on: boolean;
   questionChars: number;
   perMinute?: number;
   log: Log;
@@ -54,7 +56,7 @@ const failures = {
 } as const satisfies Record<string, readonly [ApiError["error"], Status]>;
 
 export function askRoutes(options: Options): Hono<Guarded> {
-  const { session, origins, mayRead, recent, named, quota, jarvis, questionChars, log, now } = options;
+  const { session, origins, mayRead, recent, named, quota, jarvis, on, questionChars, log, now } = options;
   const asked = limiter({ max: options.perMinute ?? 6, windowMs: 60_000, keys: 100_000 });
   const Question = z.string().max(questionChars);
   const route = "/api/jarvis/ask";
@@ -69,6 +71,10 @@ export function askRoutes(options: Options): Hono<Guarded> {
   app.post("/ask", async (c) => {
     const who = session(getCookie(c, "__Host-session"));
     if (who === undefined) return refuse(c, "session");
+    if (!on) {
+      log("jarvis_off", { route, status: 200, account: who });
+      return c.json({ status: "off" } satisfies JarvisAnswer);
+    }
     if (!asked.take(who, now())) return refuse(c, "limit", { account: who });
     const body = JarvisQuestion.safeParse(await json(c));
     if (!body.success || !Question.safeParse(body.data.question).success) return refuse(c, "body", { account: who });

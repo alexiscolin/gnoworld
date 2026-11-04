@@ -1,5 +1,6 @@
 // The door's settings and the admin API's (docs/plans/slice-10.md, 10g; D92 to D96), read with the server's own
-// (config.ts), each none by default: no JARVIS_URL, no door; no ADMIN_PORT, no admin API. A setting of either given
+// (config.ts), each none by default: no JARVIS_URL, no door, and Jarvis off unless JARVIS=on; no ADMIN_PORT, no admin
+// API. A setting of either given
 // without the one that opens it stops the server, as a door meant that would not open. The quotas and the allowlist
 // here are first values alone: the database keeps them from the first start (quota.ts).
 import { Address, DOOR_CAPS } from "@gnoworld/schemas";
@@ -7,6 +8,8 @@ import { z } from "zod";
 import { isOrigin, list, port, whole } from "../settings.ts";
 
 export interface DoorConfig {
+  // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
+  on: boolean;
   // jarvis's address on the network only the two share (D42): a bare origin.
   url: string;
   timeoutMs: number;
@@ -28,6 +31,8 @@ type Env = Record<string, string | undefined>;
 export function doorSettings() {
   const unique = (entries: readonly string[]): boolean => new Set(entries).size === entries.length;
   return {
+    // Any text at all: only `on` switches Jarvis on, and no value stops the server.
+    JARVIS: z.string().optional(),
     JARVIS_URL: z.string().refine(isOrigin).optional(),
     // Longer than the loop's worst: 8 turns of 3 attempts of 60 s, and a minute for its tools (D94).
     JARVIS_TIMEOUT_S: whole(3600, 1500),
@@ -79,6 +84,7 @@ export function doorOf(env: Env, settings: Settings): DoorConfig | undefined {
     return undefined;
   }
   return {
+    on: settings.JARVIS === "on",
     url: JARVIS_URL,
     timeoutMs: JARVIS_TIMEOUT_S * 1000,
     questionChars: JARVIS_QUESTION_CHARS,

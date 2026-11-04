@@ -278,6 +278,11 @@ describe("JarvisQuestion", () => {
 });
 
 describe("JarvisAnswer", () => {
+  it("is off while Jarvis is switched off, with nothing else (Alexis, off by default)", () => {
+    expect(JarvisAnswer.safeParse({ status: "off" }).success).toBe(true);
+    expect(JarvisAnswer.safeParse({ status: "off", markdown: "x" }).success).toBe(false);
+  });
+
   it("is a text with its buttons, or spent", () => {
     expect(JarvisAnswer.safeParse(answered({ buttons: [fly()] })).success).toBe(true);
     expect(JarvisAnswer.safeParse({ status: "spent" }).success).toBe(true);

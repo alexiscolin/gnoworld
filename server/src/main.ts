@@ -100,6 +100,7 @@ if (door !== undefined)
       named: makeNames({ rpc: door.settings.namesRpc, now: Date.now }),
       quota: door.quota,
       jarvis: door.jarvis,
+      on: door.settings.on,
       questionChars: door.settings.questionChars,
       log,
       now: Date.now,

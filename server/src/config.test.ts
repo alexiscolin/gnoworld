@@ -443,12 +443,30 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
 
   it("reads the door's settings once jarvis's address is set, with their defaults", () => {
     expect(loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090" }).jarvis).toEqual({
+      on: false,
       url: "http://jarvis:8090",
       timeoutMs: 1_500_000,
       questionChars: 2000,
       first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
     });
+  });
+
+  it("switches Jarvis on only for JARVIS=on exactly, off for anything else, never stopping the server (Alexis, off by default)", () => {
+    const door = (value: string | undefined) =>
+      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", ...(value === undefined ? {} : { JARVIS: value }) }).jarvis
+        ?.on;
+    expect([undefined, "", "ON", "yes", "1", " on", "on "].map(door)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(door("on")).toBe(true);
+    expect(loadConfig({ ...ENV, JARVIS: "on" }).jarvis).toBeUndefined();
   });
 
   it("reads every door setting it is given, the widest each allows", () => {
@@ -462,7 +480,8 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       JARVIS_UNLIMITED: `${ANNA},${BEN}`,
       JARVIS_NAMES_RPC: "https://rpc.test5.gno.land",
     };
-    expect(loadConfig(env).jarvis).toEqual({
+    expect(loadConfig({ ...env, JARVIS: "on" }).jarvis).toEqual({
+      on: true,
       url: "https://jarvis.internal:8443",
       timeoutMs: 3_600_000,
       questionChars: 8000,

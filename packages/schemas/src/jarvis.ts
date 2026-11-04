@@ -90,8 +90,8 @@ export const DOOR_CAPS = {
 export const JarvisQuestion = z.strictObject({ question: text(DOOR_CAPS.question), room: RoomId });
 export type JarvisQuestion = z.infer<typeof JarvisQuestion>;
 
-/** Jarvis's answer as the client reads it: a text and its buttons, or `spent`, the day's budget gone, when the client
- * shows its form without a model (plan §1). */
+/** Jarvis's answer as the client reads it: a text and its buttons; or `spent`, the day's budget gone, or `off`, Jarvis
+ * switched off, when the client shows its form without a model (plan §1; Alexis, off by default). */
 export const JarvisAnswer = z.discriminatedUnion("status", [
   z.strictObject({
     status: z.literal("answered"),
@@ -99,6 +99,7 @@ export const JarvisAnswer = z.discriminatedUnion("status", [
     buttons: z.array(AnswerButton).check(z.maxLength(DOOR_CAPS.buttons)),
   }),
   z.strictObject({ status: z.literal("spent") }),
+  z.strictObject({ status: z.literal("off") }),
 ]);
 export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
 

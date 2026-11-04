@@ -35,13 +35,14 @@ afterEach(() => {
 });
 
 interface Options {
+  on?: boolean;
   questionChars?: number;
   perMinute?: number;
   named?: boolean;
   answer?: () => Promise<Asked>;
 }
 
-const setup = ({ questionChars = 2000, perMinute = 6, named = true, answer }: Options = {}) => {
+const setup = ({ on = true, questionChars = 2000, perMinute = 6, named = true, answer }: Options = {}) => {
   const db = openDatabase(":memory:", [QUOTA_TABLES]);
   opened.push(db);
   const clock = { now: T0 };
@@ -77,6 +78,7 @@ const setup = ({ questionChars = 2000, perMinute = 6, named = true, answer }: Op
           return answer === undefined ? Promise.resolve({ ok: true, answer: ANSWER() }) : answer();
         },
       },
+      on,
       questionChars,
       perMinute,
       log,
@@ -118,6 +120,19 @@ describe("a question to Jarvis", () => {
     expect(await answerOf(await ask())).toEqual([200, ANSWER()]);
     expect(work).toEqual(["read #bubble", `lines #bubble ${ANNA}`, "named", "jarvis"]);
     expect(sent.map(({ request }) => request)).toEqual([{ question: QUESTION, room: "#bubble", lines: LINES() }]);
+  });
+
+  it("answers off while Jarvis is switched off, after the site, the type and the session, before any other work", async () => {
+    const { ask, work, sent, counted, events } = setup({ on: false });
+    expect((await ask({ origin: "https://evil.test" })).status).toBe(403);
+    expect((await ask({ type: "text/plain" })).status).toBe(415);
+    expect((await ask({ token: null })).status).toBe(401);
+    for (let at = 0; at < 8; at += 1) expect(await answerOf(await ask())).toEqual([200, { status: "off" }]);
+    expect([work, sent, counted()]).toEqual([[], [], []]);
+    const hashed = createHmac("sha256", PEPPER).update(ANNA).digest("hex");
+    expect(events().at(-1)).toBe(
+      `{"event":"jarvis_off","route":"/api/jarvis/ask","status":200,"account":"${hashed}"}\n`,
+    );
   });
 
   it("is refused before any work from another site, in another type than JSON, or with no session", async () => {

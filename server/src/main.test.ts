@@ -758,6 +758,40 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  it("opens the door switched off unless JARVIS is on, and asks jarvis only once it is (Alexis, off by default)", async () => {
+    const origin = "https://gnoworld.test";
+    const ask = async (env: Record<string, string>) => {
+      const port = await listening(
+        start({
+          ...settings(),
+          ORIGINS: origin,
+          JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+          ...env,
+        }),
+      );
+      const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+        fetch(`http://127.0.0.1:${String(port)}${path}`, {
+          method: "POST",
+          headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+          body: JSON.stringify(body),
+        });
+      const who = wallet();
+      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const verified = await posted("/api/login/verify", {
+        nonce: made.nonce,
+        address: who.address,
+        proof: who.sign("onyx-1", made.text),
+      });
+      const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+      const asked = await posted("/api/jarvis/ask", { question: "What is new?", room: "#bubble" }, cookie);
+      return [asked.status, await asked.json()];
+    };
+    expect(await ask({})).toEqual([200, { status: "off" }]);
+    expect(await ask({ JARVIS: "yes" })).toEqual([200, { status: "off" }]);
+    expect(await ask({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
+  });
+
   it("opens no admin listener and no door without their settings", async () => {
     const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });
     const port = await listening(server);
