@@ -111,7 +111,7 @@ export class Orbits {
   // Each world's orbit, its ring of points round the star on the map, from the star on the stage (the map turned, toScene being linear):
   // the lines stand at the star, so a frame moves one place. A segment by a world is left out (7v's design review, F4470): seen 30
   // degrees over its plane, a line through a planet's centre crosses its disc within twice its radius.
-  #ellipses({ rings, system, places, worlds }: Planned): void {
+  #ellipses({ rings, ringOf, system, places, worlds }: Planned): void {
     const none = { x: 0, y: 0, z: 0 };
     const origin = this.#projector.fromEye(none, none, new Vector3());
     const points: number[] = [];
@@ -120,7 +120,7 @@ export class Orbits {
       points.push(this.#at.x, this.#at.y, this.#at.z);
     };
     const { x, y, z } = system.place;
-    // By its own world alone: another's ring passing near a world stays whole (the design review's second pass).
+    // By its own worlds alone: another's ring passing near a world stays whole (the design review's second pass).
     const byWorld = (from: Point, to: Point, index: number) => {
       const at = places[index] ?? from;
       const away = Math.hypot(
@@ -133,7 +133,7 @@ export class Orbits {
     rings.forEach((ring, index) => {
       ring.forEach((at, step) => {
         const next = ring[(step + 1) % ring.length] ?? at;
-        if (byWorld(at, next, index)) return;
+        if (ringOf.some((ring, world) => ring === index && byWorld(at, next, world))) return;
         push(at);
         push(next);
       });

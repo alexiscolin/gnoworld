@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import recorded from "../../../../app/lab/worlds.json" with { type: "json" };
-import { GRAIN, systemsOf, worldSize, type Orbiter, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
+import {
+  GRAIN,
+  systemsOf,
+  WORLD_LEAST,
+  WORLD_MOST,
+  worldSize,
+  type Orbiter,
+  type StarSystem,
+  type WorldHeld,
+} from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { normalOf } from "./depth.ts";
 import { orbitPlace } from "./disc.ts";
@@ -54,6 +63,14 @@ const seenOn = (system: StarSystem) => {
 };
 // A name's room under its world, as the Plan stands it: 30 pixels high, 120 wide at the least.
 const NAME = { high: 30, half: 60 };
+// A world's radius goes as its own size to this power, worldSize's whole span 3.5 times apart (7v2, the mock-up's 26 to 92 px).
+const SIZE_POWER = Math.log(3.5) / Math.log(WORLD_MOST / WORLD_LEAST);
+// A Plan's rings, each one orbit its worlds share, nearest the star first, and the largest world on each.
+const ringsOf = (worlds: readonly Orbiter[]) =>
+  [...new Set(worlds.map(({ orbit }) => orbit))].map((orbit) => ({
+    orbit,
+    radius: Math.max(...worlds.filter((world) => world.orbit === orbit).map(({ radius }) => radius)),
+  }));
 
 describe("a system's Plan", () => {
   it.each(Object.keys(SETS) as SetName[])(
@@ -74,9 +91,10 @@ describe("a system's Plan", () => {
   );
 
   // The twelve largest by their own size, before a crowd's cap (7v's design review, F4470), computed here: every other body no larger than
-  // the least of them.
+  // the least of them. Five rings at the most, the mock-up's, their worlds sharing them in their real order (7v2: twelve rings stood at like
+  // gaps, the planetarium's tell).
   it.each(Object.keys(SETS) as SetName[])(
-    "draws %s's twelve largest worlds of a body's size, on orbits of their own in their real order",
+    "draws %s's twelve largest worlds of a body's size, on five rings at the most in their real order",
     (name) => {
       for (const system of bodied(name)) {
         const { postcard } = planOf(system);
@@ -88,11 +106,11 @@ describe("a system's Plan", () => {
         const drawn = new Set(largest.map(({ id }) => id));
         for (const other of bodies) if (!drawn.has(other.id)) expect(own(other)).toBeLessThanOrEqual(least);
         const real = new Map(system.worlds.map((world) => [world.id, world]));
+        expect(ringsOf(postcard.worlds).length).toBeLessThanOrEqual(5);
         postcard.worlds.forEach((world, at) => {
           const before = postcard.worlds[at - 1];
-          expect(world.phase).toBe(real.get(world.id)?.phase);
           if (before === undefined) return;
-          expect(world.orbit).toBeGreaterThan(before.orbit);
+          expect(world.orbit).toBeGreaterThanOrEqual(before.orbit);
           expect(real.get(world.id)?.orbit ?? NaN).toBeGreaterThanOrEqual(real.get(before.id)?.orbit ?? NaN);
         });
       }
@@ -112,7 +130,7 @@ describe("a system's Plan", () => {
       if (first === undefined) continue;
       const size = (id: string) => worldSize(use.get(id) ?? NaN);
       for (const world of others) {
-        expect(world.radius / first.radius).toBeCloseTo(size(world.id) / size(first.id), 9);
+        expect(world.radius / first.radius).toBeCloseTo((size(world.id) / size(first.id)) ** SIZE_POWER, 9);
         varied ||= Math.abs(world.radius - first.radius) > 1e-9;
       }
     }
@@ -126,7 +144,7 @@ describe("a system's Plan", () => {
     (name) => {
       const alike = (a: number, b: number) => Math.abs(a - b) < 0.05 * Math.max(a, b);
       for (const system of bodied(name)) {
-        const orbits = planOf(system).postcard.worlds.map(({ orbit }) => orbit);
+        const orbits = ringsOf(planOf(system).postcard.worlds).map(({ orbit }) => orbit);
         const gaps = orbits.slice(1).map((orbit, at) => orbit - (orbits[at] ?? NaN));
         if (gaps.length < 3) continue;
         expect(Math.max(...gaps)).toBeGreaterThanOrEqual(1.1 * Math.min(...gaps));
@@ -142,13 +160,11 @@ describe("a system's Plan", () => {
   // px), so which ring a world was on could not be told; gnoswap's two inner rings 14 px apart. A disc's width between neighbours at least.
   it.each(Object.keys(SETS) as SetName[])("keeps each ring of %s a disc's width or more from the next", (name) => {
     for (const system of bodied(name)) {
-      const worlds = planOf(system).postcard.worlds;
-      worlds.slice(1).forEach((world, at) => {
-        const inside = worlds[at];
+      const rings = ringsOf(planOf(system).postcard.worlds);
+      rings.slice(1).forEach((ring, at) => {
+        const inside = rings[at];
         if (inside === undefined) return;
-        expect(world.orbit - inside.orbit).toBeGreaterThanOrEqual(
-          2 * Math.max(world.radius, inside.radius) * (1 - 1e-9),
-        );
+        expect(ring.orbit - inside.orbit).toBeGreaterThanOrEqual(2 * Math.max(ring.radius, inside.radius) * (1 - 1e-9));
       });
     }
   });
@@ -168,8 +184,10 @@ describe("a system's Plan", () => {
       for (const system of bodied(name)) {
         const { postcard } = planOf(system);
         const real = new Map(system.worlds.map((world) => [world.id, world.own ?? world.radius]));
-        const scale = (postcard.worlds[0]?.radius ?? NaN) / (real.get(postcard.worlds[0]?.id ?? "") ?? NaN);
-        for (const world of postcard.worlds) expect(world.radius).toBeCloseTo((real.get(world.id) ?? NaN) * scale, 9);
+        const scale =
+          (postcard.worlds[0]?.radius ?? NaN) / (real.get(postcard.worlds[0]?.id ?? "") ?? NaN) ** SIZE_POWER;
+        for (const world of postcard.worlds)
+          expect(world.radius).toBeCloseTo((real.get(world.id) ?? NaN) ** SIZE_POWER * scale, 9);
         const drawn = new Set(postcard.worlds.map(({ id }) => id));
         expect([...postcard.hidden].sort()).toEqual(
           system.worlds

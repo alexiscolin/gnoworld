@@ -3,7 +3,7 @@
 // spread so each stands clear with room for its name under it, at a size that keeps their order; whole on both screens, none on the star's
 // heart. Its worlds hold still. The address picks the turn the views are tried from, so the same address gives the same Plan. The Earth's
 // top view is its stations' (station/scenery.ts).
-import { GRAIN, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+import { GRAIN, WORLD_LEAST, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { textHash, unitOf } from "../space/cell.ts";
 import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
@@ -25,10 +25,19 @@ const TURNS = 24;
 const SPAN = 0.78;
 const LARGEST = 0.14;
 // The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii: a disc's width and air, so which
-// ring a world is on reads (the design review's second pass, F4470); growing a tenth a ring outward.
+// ring a world is on reads (the design review's second pass, F4470); the gaps growing an eighth a ring outward, the mock-up's 130 to 180 px.
 const INNER = 0.24;
 const GAP = 2.2;
-const GROW = 1.1;
+const GROW = 1.12;
+// At most this many orbits a Plan draws, the mock-up's five: its worlds share them, nearest the star first, so a Plan of any size reads as a
+// few rings, never one ring a world at like gaps (7v's open 6, the planetarium's tell), nor thousands of lines (Alexis, 2026-11-04, scale).
+const RINGS_MOST = 5;
+// A world's radius, its share of the most used world's own size to this power: worldSize's whole span stands 3.5 times apart, the mock-up's 26
+// to 92 px (7v's open 6: gnoswap's twelve stood within 1.4 times of one size); worlds of one use stand one size.
+const SIZE_POWER = Math.log(3.5) / Math.log(WORLD_MOST / WORLD_LEAST);
+// Worlds sharing a ring stand this share of an even share of the turn apart at the least: nudged from their own phases, never laid evenly.
+const APART = 0.6;
+const TURN = 2 * Math.PI;
 // The sizes tried, from the largest down, a tenth smaller each time.
 const LEAST = 0.02;
 const SHRINK = 0.9;
@@ -50,21 +59,63 @@ const planWorlds = (system: StarSystem): Orbiter[] =>
     .slice(0, PLAN_MOST)
     .sort((a, b) => a.orbit - b.orbit);
 
-// The Plan's orbits, outer at 1 or past: each world at its real orbit's share as the area it rounds (a lattice's slots are laid by area), on a
-// scale whose steps grow `GROW` a world outward as the mock-up's; or past the one before by the names' room, `GAP` of their radii growing
-// `GROW` a ring: never evenly (F4470). Each world `size` of the outer orbit at the most used's size, by its own.
+// `worlds` in the order of their orbits as bands, a ring each: `RINGS_MOST` runs at the most, each holding worlds as its ring's length, from
+// the inner orbit's share to the outer's (an inner ring holds fewer, so its worlds' names keep apart), one at the least.
+function bandsOf(worlds: readonly Orbiter[]): Orbiter[][] {
+  const count = Math.min(worlds.length, RINGS_MOST);
+  const length = (at: number) => (count === 1 ? 1 : INNER + ((1 - INNER) * at) / (count - 1));
+  const whole = Array.from({ length: count }, (_, at) => length(at)).reduce((sum, each) => sum + each, 0);
+  const bands: Orbiter[][] = [];
+  let [from, shared] = [0, 0];
+  for (let at = 0; at < count; at += 1) {
+    shared += length(at);
+    const to = Math.max(
+      from + 1,
+      Math.min(worlds.length - (count - at - 1), Math.round((shared / whole) * worlds.length)),
+    );
+    bands.push(worlds.slice(from, to));
+    from = to;
+  }
+  return bands;
+}
+
+// The phases of one ring's worlds, from their own, nudged apart a step at a time till each stands `APART` of an even share from the next.
+function apart(phases: readonly number[]): number[] {
+  const turned = phases.map((phase) => ((phase % TURN) + TURN) % TURN);
+  const least = (APART * TURN) / phases.length;
+  const order = turned.map((_, at) => at).sort((a, b) => (turned[a] ?? 0) - (turned[b] ?? 0));
+  for (let pass = 0; pass < 24 && order.length > 1; pass += 1)
+    order.forEach((at, step) => {
+      const next = order[(step + 1) % order.length] ?? at;
+      const short = least - (((((turned[next] ?? 0) - (turned[at] ?? 0)) % TURN) + TURN) % TURN);
+      if (short <= 0) return;
+      turned[at] = (turned[at] ?? 0) - short / 2;
+      turned[next] = (turned[next] ?? 0) + short / 2;
+    });
+  return turned;
+}
+
+// The Plan's orbits, outer at 1 or past: each band at its worlds' real orbits' share as the area they round (a lattice's slots are laid by
+// area), on a scale whose steps grow `GROW` a ring outward as the mock-up's; or past the one before by the names' room, `GAP` of their radii
+// growing `GROW` a ring: never evenly (F4470). The most used world `size` of the outer orbit, each other by its own size to `SIZE_POWER`.
 function spread(worlds: readonly Orbiter[], size: number): Orbiter[] {
-  const inner = (worlds[0]?.orbit ?? 0) ** 2;
-  const span = Math.max(...worlds.map(({ orbit }) => orbit ** 2 - inner), 1e-9);
-  const scale = GROW ** Math.max(worlds.length - 1, 1);
+  const bands = bandsOf(worlds);
+  const area = (band: readonly Orbiter[]) => band.reduce((sum, { orbit }) => sum + orbit ** 2, 0) / band.length;
+  const inner = area(bands[0] ?? []);
+  const span = Math.max(area(bands.at(-1) ?? []) - inner, 1e-9);
+  const scale = GROW ** Math.max(bands.length - 1, 1);
+  const most = Math.max(...worlds.map(sizeOf));
+  const radiusOf = (world: Orbiter) => size * (sizeOf(world) / most) ** SIZE_POWER;
   const placed: Orbiter[] = [];
-  let least = 0;
-  for (const { id, phase, ...world } of worlds) {
-    const before = placed.at(-1);
-    const radius = (sizeOf({ id, phase, ...world }) / WORLD_MOST) * size;
-    const share = (scale ** ((world.orbit ** 2 - inner) / span) - 1) / (scale - 1);
-    least = before === undefined ? 0 : Math.max(GAP * Math.max(before.radius, radius), GROW * least);
-    placed.push({ id, phase, radius, orbit: Math.max(INNER + share * (1 - INNER), (before?.orbit ?? INNER) + least) });
+  let [least, before] = [0, { orbit: INNER, radius: 0 }];
+  for (const band of bands) {
+    const radius = Math.max(...band.map(radiusOf));
+    const share = (scale ** ((area(band) - inner) / span) - 1) / (scale - 1);
+    least = placed.length === 0 ? 0 : Math.max(GAP * Math.max(before.radius, radius), GROW * least);
+    const orbit = Math.max(INNER + share * (1 - INNER), before.orbit + least);
+    const phases = apart(band.map(({ phase }) => phase));
+    band.forEach((world, at) => placed.push({ id: world.id, phase: phases[at] ?? 0, radius: radiusOf(world), orbit }));
+    before = { orbit, radius };
   }
   return placed;
 }
@@ -162,14 +213,14 @@ export function planOf(system: StarSystem): Arrival {
   };
 }
 
-// What a Plan draws besides its worlds: each world's place, held still, and its orbit round the star as a ring of points, on the map. The
-// chunk that draws them takes them as they are, so it reads no rule of the disc and the cosmos's chunk keeps its own whole.
+// What a Plan draws besides its worlds: each world's place, held still, and each orbit its worlds share round the star as a ring of points, on
+// the map. The chunk that draws them takes them as they are, so it reads no rule of the disc and the cosmos's chunk keeps its own whole.
 // The points an orbit's ellipse is drawn through: a step under a pixel's bend at the Plan's sizes.
 const RING_POINTS = 96;
 const ORIGIN = { x: 0, y: 0, z: 0 };
 
-/** `system`'s Plan as drawn: its `worlds` named and linked as `words` says, each where its orbit puts it at its turn's start, and each orbit a
- * ring of points round the star, in its plane, from the star. */
+/** `system`'s Plan as drawn: its `worlds` named and linked as `words` says, each where its orbit puts it at its turn's start, and each orbit
+ * its worlds share a ring of points round the star, in its plane, from the star, with the ring each world stands on. */
 export function plannedOf(
   { system, worlds }: { system: StarSystem; worlds: readonly Orbiter[] },
   { names, links }: Pick<Planned, "names" | "links">,
@@ -180,7 +231,8 @@ export function plannedOf(
     orbitPlace({ system, world }, 0, out);
     return out;
   });
-  const rings = worlds.map(({ orbit }) =>
+  const orbits = [...new Set(worlds.map(({ orbit }) => orbit))];
+  const rings = orbits.map((orbit) =>
     Array.from({ length: RING_POINTS }, (_, step) => {
       const angle = (2 * Math.PI * step) / RING_POINTS;
       const out = { x: 0, y: 0, z: 0 };
@@ -188,5 +240,5 @@ export function plannedOf(
       return out;
     }),
   );
-  return { system, worlds, names, links, places, rings };
+  return { system, worlds, names, links, places, rings, ringOf: worlds.map(({ orbit }) => orbits.indexOf(orbit)) };
 }

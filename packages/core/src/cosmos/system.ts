@@ -45,7 +45,7 @@ const TILT_LEAST = Math.PI / 12;
 const TILT_SPAN = Math.PI / 6;
 const SALT = 2;
 
-export { WORLD_MOST };
+export { WORLD_LEAST, WORLD_MOST };
 
 /** A world of the file: its id, its namespace, and how much it is used. */
 export interface WorldHeld {
