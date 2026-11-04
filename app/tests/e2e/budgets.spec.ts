@@ -65,10 +65,11 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
-// So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief): 3,311 B.
+// So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads and which brings the realm page's drawing the capture shares.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
-const PREVIEW_JS = 3567;
+// 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B.
+const PREVIEW_JS = 3669;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
