@@ -117,10 +117,11 @@ fast gate                                              full gate (--full, --merg
   types  tsc ─▶ ESLint                                   ─▶ stories   core in Chromium ─▶ the stories' journeys
   tests  Ergo's build ─▶ Vitest                             history   the batch's size ─▶ prove_fix
   gno    gno lint, test ─▶ mutate.py ─▶ Go                            ─▶ regressions ─▶ migrations ─▶ gitleaks ─▶ audit
-  docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage ─▶ StrykerJS
+  docs   check_docs, parse ─▶ test_hooks.sh              ─▶ coverage  coverage ─▶ patch coverage
      (the five lanes at once)                               harness   harness_mutate, in 4 worktrees
+                                                         ─▶ StrykerJS, alone, on every core
                                                          (the benches in --full alone; nginx in --merge alone)
-                                                         (two lanes at once, then two)
+                                                         (two lanes at once, then two, then one)
 ```
 
 A failure in the stories or history lane stops the gate before the coverage and harness lanes,
@@ -138,12 +139,14 @@ gate fails, run the failing lane alone before running the whole gate again.
 | anything else (a config, the lockfile, the harness, `deploy/`), no change at all, or a list pre-commit could not give | everything, every test; `test_hooks.sh` only when the change holds what it tests: the harness, a package file, the lockfile (its cases run the real Prettier and Vitest), a config its cases read (`vitest.config.ts`, `app/vitest.compiled.config.ts`, `lint/shared.config.ts`, `.prettierrc.json`, `.gitignore`, `.node-version`, `pnpm-workspace.yaml`, `deploy/test.sh`, `deploy/web/nginx.conf`), a line it cannot place, or nothing at all (the harness audit, 2026-11-04: 99 to 228 s on each of 17 config commits a slice) | 120 s |
 
 **The radical mode's light gate** (Alexis, 2026-11-04, until the hardening slice; `docs/decisions.md`): while git's own hooks folder
-holds `radical-mode` reading `on`, a fast run whose change holds no tier-1 path (`scripts/speeds.py --light`: docs/REVIEW.md's table, the
-tree's and `origin/main`'s, so a row the change drops still counts) and
+holds `radical-mode` reading `on`, a fast run whose change is the interface's alone (`scripts/speeds.py --light`: every path under a
+tier-3 folder that docs/REVIEW.md's table names both in the tree and on `origin/main`, and none a tier-1 path of either, so a tier-1 row
+the change drops still counts and a tier-3 folder it adds does not yet; the interface alone, F4909's (a)) and
 no harness file (records.sh's list, read by git through an index of the run's own) runs the types, the importers' lint, the build with the
 first screen's cap and jscpd, and says so; no Vitest, no journey, no Prettier, knip, CSS or comments check, no docs lane. pre-commit's
-secrets scan runs on every commit as before. A tier-1 path or a harness file, the file absent or reading anything else, a table it
-cannot read, `--tests-all`, `--merge` and `--full` run the whole gate. Only Alexis switches it, from any checkout: on with
+secrets scan runs on every commit as before. A path of no tier-3 folder (the server, core, lib, the design system's own root, a doc, a
+test outside the folders), a tier-1 path or a harness file, the file absent or reading anything else, a table it cannot read,
+`--tests-all`, `--merge` and `--full` run the whole gate. Only Alexis switches it, from any checkout: on with
 `printf 'on\n' >"$(git rev-parse --git-common-dir)/hooks/radical-mode"`, off with `rm -f "$(git rev-parse --git-common-dir)/hooks/radical-mode"`.
 No sandboxed command writes there, and check.sh refuses to run where one could; pre-commit's staged copy reads the mode of the
 repository whose packages it borrows, and the paths pre-commit lists from the commit's own index. A tree a light gate recorded stays
@@ -254,8 +257,8 @@ UTF-8), and a script that fails or prints anything but the word `interface`, run
 always whole.
 
 **A failing merge check goes on** (the dream of 2026-11-01, 5): a failed lane, or a bench refused for the load, no longer stops the
-coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, which fails
-the mutation lane only after StrykerJS has run beside it (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
+coverage and StrykerJS in `--merge`, the first phase's (lint, types, tests, the build, the budget) too, and the patch's coverage, whose lane
+fails before StrykerJS's own phase runs (a coverage run that failed leaves no report, and says so); it ends on `FAILED at <first failure>` after saying every lane that failed. `--full` still stops at
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
@@ -277,7 +280,7 @@ the coverage lane and `prove_fix` when nothing but docs, the harness and the lin
 | `scripts/patch_coverage.py` | under 85% of the changed lines run by a test |
 | `scripts/batch_size.py` | a merge's own product code past 600 lines (400 with a tier-1 file) with no `Batch-size:` line |
 | `scripts/prove_fix.py` | a fix of the product whose tests did not fail on the commit before it, in any of 3 runs, unless it says why (`No-test: <why>`) or a later commit of the range does (`No-test: <short sha> - <why>`) |
-| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole |
+| StrykerJS | a mutant of the TypeScript that no test kills (`checkers: ["typescript"]` stays); it starts from one cache every tree shares, `~/.cache/gnoworld-tools/stryker-incremental.json`, and puts its file back only whole. It runs alone, once every other lane has ended, on every core (Alexis, 2026-11-04; F777's case at 16 workers passed). A merge check gives it the code the branch changed since its base (`scripts/stryker_lines.py`: each changed line widened to its top-level statements, as StrykerJS mutates a node only inside one range; `path:from-to`), so a survivor in code the branch did not touch goes unseen, as those of the files it did not change do; no such line, no StrykerJS; a `stryker_lines.py` that fails, the whole control. `--full` mutates the whole |
 | `scripts/check_regressions.py` | the safety net shrinking (next section) |
 | `scripts/check_migrations.py` (when `server/src/` or the check changed since the base) | a migration `main` has, edited, moved or removed (F466) |
 | gitleaks | a secret anywhere in the history; a path into a home folder or the demo's host |
@@ -315,20 +318,56 @@ run is no row: `unsteady.log` keeps it.
 
 ## The boundary: what Claude may do
 
-`.claude/settings.json`, read only when Claude Code starts in this folder or moves into it
-with `/cd`:
+`.claude/settings.json`, read when Claude Code starts in this folder or moves into it with `/cd`, and read again
+whenever the file changes: Claude Code reloads a changed settings file in the running session, hooks and permissions
+included (its settings page, "When edits take effect"). A worktree session reads its own checkout's file, and the main
+checkout's local settings (`settings.local.json` in its `.claude/`) when there are some:
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** only `git push` and every gnomcp write (`gno_addpkg`, `gno_call`,
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
 - **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
-  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
+  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads,
+  `scripts/worktree.sh` and `scripts/borrow_node_modules.sh`, which Alexis's terminal runs), an edit of the
+  instructions every session reads (`CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`: Alexis's from 7z on),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
   each such file at `merge.sh`. In his shell the hooks run nothing of the repository but the
   records the sandboxed gate wrote (F076).
-- **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks`, `.git/config` or `.git/worktrees` (so a stale worktree is pruned
-  by Alexis: `git worktree prune`); they reach only the npm and Go registries and github.com.
+- **The sandbox** around shell commands: they write only in the project, the per-user temp folder (`$TMPDIR`, where the
+  worktrees live) and the caches, and in git's shared folder never `.git/hooks`, `.git/config` or a worktree's `commondir`
+  under `.git/worktrees` (so a stale worktree is pruned by Alexis: `git worktree prune`); they reach only the npm and Go
+  registries and github.com.
+- **Every worktree's closed files, to every session** (7z, F4890 to F4892). A relative rule guards the session's own tree alone,
+  and every worktree lives in the temp folder every command may write, so each closed path has twins: each relative `denyWrite`
+  entry again under `/private/tmp/claude-501/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there by both spellings
+  of the temp folder (`//private/tmp/…` and `//tmp/…`, a link the file tools may not follow) and in the main checkout
+  (`~/Server/gnoworld/…`), which the file tools reach from every worktree; and a linked worktree's `.git`, the file that names
+  git's folder (F150's class). `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
+  real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the rules as Claude Code
+  does and, in its sandbox, writes into a sibling to see each write refused. A session carries the twins once its own
+  checkout's `settings.json` does: a branch cut after 7z's merge at once, the chief's session (started in the main checkout,
+  which reads `main`'s) after slice 7 reaches `main`, or sooner if Alexis copies the twins into the main checkout's
+  local settings, which every session of the repository reads.
+- **The instructions at a tree's root and above it** (7z, S4): Claude Code reads `CLAUDE.md` and `CLAUDE.local.md` in every
+  folder above the one it starts in (its memory page), and `.claude`'s own `CLAUDE.md` and `.claude/rules/` there by its source.
+  Closed: to commands in `/private/tmp/claude-501/` and `gnoworld-wt/`, the folders above every worktree a command may write; to
+  the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`. Not closed: those below a tree's root,
+  the memory and the imports (Known limits).
+- **What a session holding the twins no longer writes in another worktree** (7z): everything closed in its own tree,
+  in every worktree under `gnoworld-wt/`. By command: `CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`, `scripts/`,
+  `.githooks/`, `.github/`, the settings, agents, commands, workflows, skills, rules and hooks in `.claude/`, every
+  `package.json`, the lockfile and pnpm's files, the tools' configs (`eslint.config.ts`, `vitest.config.ts`,
+  `stryker.config.json`, `knip.json`, `.jscpd.json`, the `tsconfig`s, Prettier's two), `.gitignore`, `.node-version`, `.npmrc`,
+  `.mcp.json` and the worktree's `.git`. By file tool: the Edit list above (the harness files run outside the sandbox and the
+  instructions) and the secrets' reads, in the main checkout too. So `scripts/worktree.sh` (`git worktree add` writes all of
+  them in the new tree), and any merge or checkout that writes one of them, leave such a session for Alexis's terminal or one
+  of his scripts. What stays: the tree's `docs/` and `adr/` (the ledger, the decisions, the review log), the code,
+  `.claude/tmp/`, the shared folder in the main checkout's `.claude/tmp/`, and git's shared folder (refs, objects, each
+  worktree's index and HEAD).
+- **Alexis's scripts run nothing of a checkout** (7z, R1, S1): a script that writes a closed file for him reads the files it
+  changes and nothing else of the tree, and calls the system's own programs by path (S2-2); the format of what it wrote is the session's gate's to check, in its sandbox, at the
+  commit. Prettier run from a worktree loads a config a session can plant beside the file (a `prettier.config.mjs` in `.claude/`, run
+  with Alexis's rights, reproduced).
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
@@ -370,6 +409,35 @@ costs context in every session.
 - **Claude's sandbox shares Alexis's `.git`** (one repository, Alexis 2026-10-18): it writes
   refs, objects and the index, so it could move or shadow `main` or plant a nested repository
   (F152, F153, F163). The boundary is `main` protected with the CI required.
+- **A glob holds no folder at its `*`, so a command still rewrites a sibling** (F4893, high). The sandbox refuses a rename of a
+  rule's fixed part and of a literal rule's folders, not of the folder a `*` stands for: a command can move a whole worktree out
+  of `gnoworld-wt/`, write its closed files there and move it back (probed on `packages/core`, whose `package.json` only a glob
+  holds; the section `siblings` prints it as a known gap), or plant a whole folder there for herdr's `open.sh`, which opens a
+  session in any folder of the part's name. What closes it is the worktrees out of the temp folder, each session writing only
+  its own, their making and merging out of the sandbox, or a literal rule per worktree written at its making: Alexis's decision.
+- **The file tools still edit another worktree's files that only the sandbox closes** (F4895): `scripts/check.sh`,
+  `scripts/test_hooks.sh`, the tools' configs. The Edit list holds what runs outside the sandbox and the instructions, and no
+  rule tells a session's own tree from another's: one closing a sibling's would close its own. A worktree outside `gnoworld-wt/`
+  has no twin at all (F4897), and every session shares the rest of the temp folder (another session's scratchpad, its test trees,
+  an agent's report before the chief records its message: S5).
+- **Alexis's scripts wait in the main checkout's `.claude/tmp/`, open to every session's file tools** (R2): one can be rewritten
+  before he runs it, or between his check and his run. He copies it into a `mktemp -d` folder, checks the copy against the
+  `shasum -a 256` the chief's message gives, never a file's, and runs the copy (S2-5).
+- **What Alexis runs from a checkout is any session's to rewrite** (7z's round 2, S2-1; F204's class): `deploy/test.sh` and
+  `deploy/`'s compose files are open, in the integration worktree too, so an uncommitted line any session adds there runs with
+  his rights and Docker's socket. Safe only from a tree no session writes: `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha
+  from the chief's message.
+- **In bypass mode the file tools write the programs that run outside the sandbox** (S2-2, claimed, the writes not run):
+  `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then `~/.opencode/bin` and
+  `/opt/homebrew/bin` (the hooks' `python3`); herdr's `open.sh`, the hooks and Alexis's scripts call programs by name; no deny
+  names those folders, nor `~/.claude/skills/` (the two excluded scripts) or `~/Library/LaunchAgents/`. Closing them is Alexis's
+  user settings' to do; `apply-7z.sh` calls only `/usr/bin` and `/bin`.
+- **Instructions below a tree's root and Claude Code's memory stay open** (S2-3, S2-4): a `CLAUDE.md` in any folder of a tree,
+  which Claude Code attaches when it reads a file there (its memory page: subdirectories load on demand), its `.claude/rules/` and
+  skills; the auto memory every worktree session loads (`~/.claude/projects/…/memory/`); `~/.claude/RTK.md`, which
+  `~/.claude/CLAUDE.md` imports. Closing the nested ones needs StrykerJS to leave `CLAUDE.md` out of its copies.
+- **Two commands leave the sandbox** by Alexis's user settings (`sandbox.excludedCommands`): his captures' `fetch.sh` and
+  herdr's `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
   harness is refused at its commit, its files written already: undo it at once
   (`git merge --abort`). A cherry-pick, a rebase or a checkout of Claude's branch runs no such
@@ -421,12 +489,12 @@ costs context in every session.
 | `scripts/check.sh` | the gate |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
-| `scripts/lint_scope.py` | the files a commit's lint reads, from the type check's graph |
+| `scripts/lint_scope.py`, `scripts/stryker_lines.py` | the files a commit's lint reads, from the type check's graph; the code a merge check's StrykerJS mutates |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
-| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of no tier-1 path may take the radical mode's light gate |
+| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of the interface alone, tier-3 folders of main's table and the tree's and no tier-1 path of either, may take the radical mode's light gate |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
@@ -435,7 +503,7 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
-| `scripts/workshop.sh` | `pnpm workshop`: the lab's dev server on the tailnet (DEVELOPMENT.md, "The workshop") |
+| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |
