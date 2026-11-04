@@ -549,6 +549,19 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(failure(env)).not.toContain("https://gnoworld.test");
   });
 
+  it("refuses an admin site on a public site's host with another port, as cookies ignore ports (F5106)", () => {
+    const env = {
+      ...ENV,
+      ADMIN_PORT: "8081",
+      ORIGINS: "https://gnoworld.land",
+      ADMIN_ORIGINS: "https://admin.gnoworld.land,https://gnoworld.land:8443",
+    };
+    expect(failure(env)).toMatch(/setting ADMIN_ORIGINS: custom \(at 1\)/);
+    expect(failure({ ...env, ORIGINS: "http://gnoworld.land", ADMIN_ORIGINS: "https://gnoworld.land" })).toMatch(
+      /setting ADMIN_ORIGINS: custom \(at 0\)/,
+    );
+  });
+
   it("holds 1,000 accounts with no quota, the most", () => {
     const many = Array.from({ length: 1000 }, (_, at) => toAddress(Buffer.from(String(at).padStart(20, "0"))));
     expect(

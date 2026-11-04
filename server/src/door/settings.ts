@@ -49,14 +49,17 @@ export function doorSettings() {
 
 type Settings = z.infer<z.ZodObject<ReturnType<typeof doorSettings>>>;
 
-/** An admin site a public page is served from too, by its place: a flaw in a public page must never reach the console
- * (ADR-0002 §6). */
+/** An admin site on a host a public page is served from, by its place, whatever its scheme or port: cookies ignore both
+ * (RFC 6265 §8.5), and a flaw in a public page must never reach the console (ADR-0002 §6). */
 export function apartFromPublic(
   { ORIGINS, ADMIN_ORIGINS }: { ORIGINS: string[]; ADMIN_ORIGINS: string[] },
   ctx: z.RefinementCtx,
-) {
+): void {
+  // An entry that is no origin has its own issue already: it parts no host here.
+  const hostname = (origin: string): string | undefined => URL.parse(origin)?.hostname;
+  const publicHosts = new Set(ORIGINS.map(hostname));
   for (const [at, origin] of ADMIN_ORIGINS.entries())
-    if (ORIGINS.includes(origin)) ctx.addIssue({ code: "custom", path: ["ADMIN_ORIGINS", at] });
+    if (publicHosts.has(hostname(origin) ?? "")) ctx.addIssue({ code: "custom", path: ["ADMIN_ORIGINS", at] });
 }
 
 // A setting of `names` given without `opener`: the server stops, naming the one missing.
