@@ -93,8 +93,18 @@ describe("grounded", () => {
     for (const target of ["gno.land/r/bob/vault", "vault/r/gno.land/alice", "gno.land/r/ALICE/vault", "!!!", "../../"])
       expect(grounded(delegate(target), vault)).toEqual(missing(target));
     expect(grounded(delegate("gno.land/r/alice/vault"), vault).ok).toBe(true);
-    for (const target of [REALM, "https://gno.land/r/demo/boards", "gno.land/r/demo/boards", "proposals", "yes"])
+    for (const target of [
+      REALM,
+      "https://gno.land/r/demo/boards",
+      "gno.land/r/demo/boards",
+      "proposals",
+      "yes",
+      '**"yes"**.',
+    ])
       expect(grounded(delegate(target), sources()).ok).toBe(true);
+    expect(grounded(delegate("a"), sources({ page: "Pick a or b, 1 for proposal 37." })).ok).toBe(true);
+    const suffixed = digest(form({ function: "Transfer", args: { to: `${ADMIN}#x`, n4: "37" } }));
+    expect(grounded(suffixed, sources())).toEqual(refused({ kind: "argument", value: `${ADMIN}#x` }));
   });
 
   it("grounds an argument every word of which its sources hold: the page's, or the asker's own, passed among them", () => {

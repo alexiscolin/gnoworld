@@ -70,6 +70,12 @@ describe("keeps", () => {
     expect(keeps(ORIGINAL, ORIGINAL.replace("1,204", written))).toBe(true);
   });
 
+  it("reads the original as what a source holds: a blank with a glyph's width parts its digits", () => {
+    const braille = char(0x2800);
+    expect(keeps(`2026${braille}100 voters`, "2026 100 votants")).toBe(true);
+    expect(keeps(`2026${braille}100 voters`, "2026100 votants")).toBe(false);
+  });
+
   it("keeps a translation that drops a link, a mention or a number: it adds none", () => {
     expect(keeps(ORIGINAL, "Le sondage.")).toBe(true);
     expect(keeps("1.5 GNOT", "1,5 GNOT")).toBe(true);

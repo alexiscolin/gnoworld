@@ -168,6 +168,7 @@ describe("a text's figures", () => {
     expect(
       figures(`1,000 and ${char(0x661, 0x662)} and ${char(0x2464)} and votes and ${ADDRESS} and ${"a1".repeat(19)}`),
     ).toEqual([]);
+    expect(figures("pay G1abc5 or g1abc5")).toEqual([]);
   });
 });
 
@@ -211,6 +212,7 @@ describe("a message's facts", () => {
     expect([...factsOf(`send to ${"a".repeat(37)} or ${"b".repeat(38)}`).addresses]).toEqual(["b".repeat(38)]);
     expect([...factsOf(`send to x${ADDRESS} or 9${ADDRESS}`).addresses]).toEqual([`x${ADDRESS}`, `9${ADDRESS}`]);
     expect([...factsOf("send to xg1short or 9g1short").addresses]).toEqual([]);
+    expect([...factsOf("send to g1short, not xg1").addresses]).toEqual(["g1short"]);
   });
 
   it("reads every word that begins g1 as an account, in any case, lower-cased, whatever its form", () => {
