@@ -1,14 +1,10 @@
-// A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them. Follow and Share act on this device
-// alone: never in the page the build writes (no dead button), and their code comes a moment after the first screen, out of its budget.
+// A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
+// (Alexis, 2026-11-04: "Tout de suite, jusqu'à +512 o"); the share sheet's code comes at the first press.
 import { Button, Cluster } from "@gnoworld/ui";
-import { lazy, Suspense, useEffect } from "react";
-import { useAfterLoad } from "../../later.ts";
+import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
-import type { SharedPlace } from "../share/index.ts";
-
-// As the arrival's pill waits (passport/Later.tsx): past the first screen's measure.
-const SETTLED_MS = 1000;
-const PlateActs = lazy(async () => ({ default: (await import("./PlateActs.tsx")).PlateActs }));
+import { FollowButton } from "../follow/index.ts";
+import { sharePlace, type SharedPlace } from "../share/index.ts";
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
 // chat's own textarea: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
@@ -48,7 +44,6 @@ const useNobodySpoke = (room: string | undefined) =>
 
 export function Actions({ place, follow, proposals, say = "Say hi in the chat", room }: ActionsProps) {
   const reading = proposals !== undefined && isSitePath(proposals);
-  const settled = useAfterLoad(SETTLED_MS);
   const first = useNobodySpoke(room);
   // The focus follows the link to the chat's composer (F2864).
   useEffect(() => {
@@ -65,15 +60,22 @@ export function Actions({ place, follow, proposals, say = "Say hi in the chat", 
           Read the proposals
         </Button>
       ) : null}
-      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead. */}
-      <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
-        {first ? "Be the first to say hi" : say}
+      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead, when the dock's
+          composer is the way to the chat (frame 31: Read the proposals, Follow, Share, on one line). */}
+      {reading ? null : (
+        <Button href="#chat" emphasis="solid" size="l" icon="arrow">
+          {first ? "Be the first to say hi" : say}
+        </Button>
+      )}
+      <FollowButton kind="worlds" id={follow} />
+      <Button
+        size="l"
+        onClick={() => {
+          sharePlace(place);
+        }}
+      >
+        Share
       </Button>
-      {settled ? (
-        <Suspense fallback={null}>
-          <PlateActs place={place} follow={follow} />
-        </Suspense>
-      ) : null}
     </Cluster>
   );
 }

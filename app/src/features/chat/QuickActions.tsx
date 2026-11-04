@@ -28,7 +28,7 @@ export function QuickActions({ onWhoIsHere, world }: QuickActionsProps) {
     <div role="toolbar" aria-label="Quick actions" className={styles["bar"]}>
       <Action label="Who's here" onClick={onWhoIsHere} />
       <Action
-        label="Calendar"
+        label="Events"
         onClick={() => {
           setAsked(true);
           setOpen(true);

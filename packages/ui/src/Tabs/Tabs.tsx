@@ -3,6 +3,7 @@ import { pill } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { rove } from "../roving.ts";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
+import badge from "../Button/Button.module.css";
 import styles from "./Tabs.module.css";
 
 export interface Tab {
@@ -20,11 +21,13 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   /** Icons alone, each tab named by its label and wearing it as a tooltip. */
   iconOnly?: boolean;
+  /** Small: tighter tabs, for a narrow panel's row (the bell's kinds, frames 86, 87). */
+  size?: "s" | "m";
 }
 
 /** A tablist with one tab reached by the keyboard, the selected one; the arrows move and select, round
  * the ends and turned round right to left, and Home and End go to the ends (WAI-ARIA's tabs). */
-export function Tabs({ label, tabs, selected, onSelect, iconOnly = false }: TabsProps) {
+export function Tabs({ label, tabs, selected, onSelect, iconOnly = false, size = "m" }: TabsProps) {
   const reached = Math.max(
     0,
     tabs.findIndex((tab) => tab.id === selected),
@@ -37,7 +40,7 @@ export function Tabs({ label, tabs, selected, onSelect, iconOnly = false }: Tabs
     if (tab !== undefined) onSelect(tab.id);
   };
   return (
-    <div role="tablist" aria-label={label} className={styles["tabs"]} onKeyDown={move}>
+    <div role="tablist" aria-label={label} className={styles["tabs"]} data-size={size} onKeyDown={move}>
       {tabs.map((tab, at) => {
         const counted = tab.count !== undefined && tab.count > 0;
         const name = counted ? `${tab.label} ${String(tab.count)}` : tab.label;
@@ -59,7 +62,7 @@ export function Tabs({ label, tabs, selected, onSelect, iconOnly = false }: Tabs
             {counted ? (
               <>
                 {" "}
-                <span className={styles["count"]}>{tab.count}</span>
+                <span className={`${String(badge["badge"])} ${String(styles["count"])}`}>{tab.count}</span>
               </>
             ) : null}
           </button>

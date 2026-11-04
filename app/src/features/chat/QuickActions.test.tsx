@@ -16,6 +16,6 @@ describe("the quick actions", () => {
 
   it("has the calendar, and no Quiz or Poll button before there is something behind them", () => {
     const box = mount(<QuickActions onWhoIsHere={() => undefined} world="bubble" />);
-    expect(all(box, "button").map((each) => each.textContent)).toEqual(["Who's here", "Calendar"]);
+    expect(all(box, "button").map((each) => each.textContent)).toEqual(["Who's here", "Events"]);
   });
 });

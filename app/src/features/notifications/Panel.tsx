@@ -115,6 +115,7 @@ export function Panel({ onClose }: { onClose: () => void }) {
         />
         <Tabs
           label="Kinds"
+          size="s"
           tabs={KINDS.map(({ id, label }) => ({ id, label, count: unread(id) }))}
           selected={kind}
           onSelect={(id) => {

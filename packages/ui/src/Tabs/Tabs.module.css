@@ -22,6 +22,10 @@
       color var(--motion-base) var(--ease-standard);
   }
 
+  .tabs[data-size="s"] .tab {
+    --_pad: var(--space-2xs);
+  }
+
   .tab:hover {
     --_ink: var(--color-text);
   }
@@ -32,7 +36,13 @@
     --_ink: var(--color-ink);
   }
 
+  /* A count in the icon button's badge (frames 86, 87): mint on a tab at rest, ink on the cream of the selected one. */
   .count {
-    font: var(--font-data);
+    display: inline-block;
+  }
+
+  .tab[aria-selected="true"] .count {
+    background: var(--color-ink);
+    color: var(--color-primary);
   }
 }

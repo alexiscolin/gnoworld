@@ -134,7 +134,7 @@ export function Calendar({ world, open, onClose }: { world: string; open: boolea
   const empty = agenda.days.length === 0 && agenda.undated.length === 0;
   return (
     <Dialog
-      title="Calendar"
+      title="Events"
       description={
         everywhere || name === undefined
           ? "Coming up across the worlds, in your time"

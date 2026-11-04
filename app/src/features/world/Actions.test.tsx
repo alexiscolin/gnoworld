@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Actions } from "./Actions.tsx";
 
-// Slice 5j (frames 26 and 92), slice 8 (frames 86, 93): the main action, then Follow and Share, whose code comes a moment after the first
-// screen (PlateActs.tsx). Share opens the share sheet (features/share); the hardening slice writes their tests.
+// Slice 5j (frames 26 and 92), slice 8 (frames 31, 86, 93): the main action, then Follow and Share with the plate's first paint. Share
+// opens the share sheet (features/share); the hardening slice writes their tests.
 const PLACE = { name: "Bubble", path: "/net/onyx/w/bubble" };
 const FOLLOW = "onyx:bubble";
 const PROPOSALS = "/net/onyx/r/gov/dao";
@@ -63,18 +63,18 @@ describe("a world's actions", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("draws neither Follow nor Share with the first screen: they come a moment after it", () => {
-    expect(labels(draw())).toEqual(["Say hi in the chat"]);
+  it("draws Follow and Share after the main action, with the first screen", () => {
+    expect(labels(draw())).toEqual(["Say hi in the chat", "Follow", "Share"]);
   });
 
-  it("draws neither Follow nor Share on the server, where nothing is known of the browser", () => {
+  it("draws Follow and Share in the page the build writes, so they show at the first paint", () => {
     const html = renderToStaticMarkup(
       <StoreProvider>
         <Actions place={PLACE} follow={FOLLOW} />
       </StoreProvider>,
     );
-    expect(html).not.toMatch(/>Share</);
-    expect(html).not.toMatch(/Follow/);
+    expect(html).toMatch(/>Share</);
+    expect(html).toMatch(/>Follow</);
     expect(html).toContain("Say hi in the chat");
   });
 });
@@ -92,20 +92,16 @@ describe("a world's actions, with proposals", () => {
     expect(first?.querySelector("svg[aria-hidden='true']")).not.toBeNull();
   });
 
-  it("leaves Follow and Share to a moment after the first screen, as without proposals", () => {
-    expect(labels(draw(PROPOSALS))).toEqual(["Read the proposals", "Say hi in the chat"]);
+  it("draws Read the proposals, Follow and Share, the three of frame 31", () => {
+    expect(labels(draw(PROPOSALS))).toEqual(["Read the proposals", "Follow", "Share"]);
   });
 
-  // Frames 22 and 27 show the proposals first; the chat stays a click away (it is the world's core, and F2864's focus path). The
-  // decision is mine, not Alexis's: it is named in the report for his review.
-  it("keeps 'Say hi in the chat' after it, as a link to the chat, and makes only the proposals the solid action", () => {
-    const withChat = draw(PROPOSALS);
-    expect(labels(withChat)).toEqual(["Read the proposals", "Say hi in the chat"]);
-    const [proposals, hi] = [...withChat.querySelectorAll("a")];
-    expect(hi?.getAttribute("href")).toBe("#chat");
+  // Frame 31: Read the proposals, Follow and Share on one line; the chat is the dock's, beside the plate (the chief's round of slice 8).
+  it("makes the proposals the one solid action and leaves the chat to the dock, with no 'Say hi' beside them", () => {
+    const withProposals = draw(PROPOSALS);
+    expect(withProposals.querySelector("a[href='#chat']")).toBeNull();
+    expect(withProposals.querySelector("a")?.getAttribute("data-emphasis")).toBe("solid");
     expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");
-    expect(proposals?.getAttribute("data-emphasis")).toBe("solid");
-    expect(hi?.getAttribute("data-emphasis")).toBe("outline");
   });
 
   it("draws no 'Read the proposals' when the world has none, and 'Say hi' stays the solid action", () => {

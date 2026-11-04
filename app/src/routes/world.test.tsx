@@ -213,9 +213,10 @@ describe("a world's plate", () => {
 
   // Share needs the browser's clipboard, unknown to the build: the page it writes has no Share, and never a Follow (no
   // account's store to follow into). The connected worlds and the chart's words follow what the data holds: no link, no block.
-  test("offers no Follow, and no Share in the page the build writes", async () => {
+  test("offers Follow and Share in the page the build writes, at the first paint", async () => {
     const { html } = await plateOf();
-    expect(html).not.toMatch(/>Follow<|>Share</);
+    expect(html).toMatch(/>Follow</);
+    expect(html).toMatch(/>Share</);
   });
 
   test("has no connected worlds block: Bubble links to no world", async () => {
