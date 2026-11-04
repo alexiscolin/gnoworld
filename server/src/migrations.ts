@@ -1,7 +1,7 @@
 // The server's migrations, in the order they ran on every database: a file is at `user_version` N once its
 // first N have run, so an entry is never edited, moved or inserted, only appended (db.ts). migrations.test.ts
 // holds each one's SHA-256 and fails on any of those.
-import { LOGIN_TABLES, NONCE_HOST } from "./login/login.ts";
+import { LOGIN_TABLES, NONCE_ACTION, NONCE_HOST } from "./login/login.ts";
 import { TICKET_TABLES } from "./login/ticket.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
@@ -22,4 +22,5 @@ export const migrations: readonly string[] = [
   STRIKE_TABLES,
   ROOM_STATE,
   PIN_TABLES,
+  NONCE_ACTION,
 ];
