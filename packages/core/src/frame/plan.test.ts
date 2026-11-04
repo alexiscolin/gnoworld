@@ -1,20 +1,11 @@
 import { describe, expect, it } from "vitest";
 import recorded from "../../../../app/lab/worlds.json" with { type: "json" };
-import {
-  EARTH_PLACE,
-  EARTH_RADIUS,
-  GRAIN,
-  systemsOf,
-  worldSize,
-  type Orbiter,
-  type StarSystem,
-  type WorldHeld,
-} from "../cosmos/system.ts";
+import { GRAIN, systemsOf, worldSize, type Orbiter, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { normalOf } from "./depth.ts";
 import { orbitPlace } from "./disc.ts";
 import { arrivalOf, type Arrival } from "./arrival.ts";
-import { earthPlanOf, planOf, plannedOf } from "./plan.ts";
+import { planOf, plannedOf } from "./plan.ts";
 import { cameraTowards, DEGREE, dot, Look, minus, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
 // A system's Plan (7v; Alexis, 2026-11-03, the mock-up he approved at 14:09): seen from above, the only view that draws its orbits, as
@@ -263,66 +254,6 @@ describe("a system's Plan", () => {
   });
 });
 
-// The Earth's Plan (7v; Alexis, 2026-11-03): the Earth from above, each project the team adds by hand on its orbit with its name under it.
-const ONE = [{ name: "gnosh.ai", url: "https://gnosh.ai" }];
-const SIX = ["gnosh.ai", "atlas", "harbor", "beacon", "forge", "loom"].map((name) => ({
-  name,
-  url: `https://${name}.example`,
-}));
-const many = (count: number) =>
-  Array.from({ length: count }, (_, at) => ({ name: `p${String(at)}`, url: "https://p.example" }));
-const idOf = (name: string) => `~earth/${name}`;
-
-it("draws the Earth alone when the file holds no project", () => {
-  const plan = earthPlanOf([]);
-  expect(plan.postcard.worlds).toEqual([]);
-  expect(plan.look).toEqual(EARTH_PLACE);
-});
-
-describe("the Earth's Plan", () => {
-  it.each([
-    ["one project", ONE],
-    ["six", SIX],
-    ["the first twelve of forty", many(40)],
-  ])(
-    "centres the Earth with %s round it, seen 30 degrees over the disc, each whole with its name's room, off the Earth",
-    (_name, projects) => {
-      const plan = earthPlanOf(projects);
-      expect(plan.look).toEqual(EARTH_PLACE);
-      expect(plan.postcard.worlds.map(({ id }) => id)).toEqual(projects.slice(0, 12).map(({ name }) => idOf(name)));
-      expect(plan.postcard.system.spin).toBe(0);
-      const way = minus(plan.eye, EARTH_PLACE);
-      expect(
-        Math.asin(dot(way, normalOf(plan.postcard.system)) / Math.hypot(way.x, way.y, way.z)) / DEGREE,
-      ).toBeCloseTo(30, 6);
-      for (const screen of REST_SCREENS) {
-        const look = new Look(cameraTowards(plan.eye, plan.look, plan.up), screen, plan.lens);
-        const earth = look.seen(EARTH_PLACE, EARTH_RADIUS);
-        expect(earth.x).toBeCloseTo(screen.width / 2, 6);
-        expect(earth.radius).toBeGreaterThanOrEqual(60);
-        expect(earth.radius).toBeLessThanOrEqual(110);
-        const spots = plan.postcard.worlds.map((world) =>
-          look.seen(placeOf(plan.postcard.system, world, 0), world.radius),
-        );
-        for (const spot of spots) {
-          expect(Math.hypot(spot.x - earth.x, spot.y - earth.y)).toBeGreaterThanOrEqual(
-            earth.radius + spot.radius + 30,
-          );
-          expect(spot.left).toBeGreaterThanOrEqual(60);
-          expect(spot.right).toBeLessThanOrEqual(screen.width - 60);
-          expect(spot.top).toBeGreaterThanOrEqual(0.09 * screen.height);
-          expect(spot.bottom + 30).toBeLessThanOrEqual(screen.height);
-          expect(spot.radius).toBeGreaterThanOrEqual(10);
-        }
-        spots.forEach((one, at) => {
-          for (const other of spots.slice(at + 1))
-            expect(Math.hypot(one.x - other.x, one.y - other.y)).toBeGreaterThanOrEqual(one.radius + other.radius + 30);
-        });
-      }
-    },
-  );
-});
-
 // 7v's design review (F4470; the chief: 7 degrees, for Alexis's "une vue à plat"): at the home's 42.5 degree lens perspective put a Plan's
 // outer ellipse's centre 122 px under its star, and its system's own tilt rolled it 13 degrees. A Plan is seen through a lens of its own,
 // its plane level, each orbit round its star; a system's dynamic view keeps the home's.
@@ -368,13 +299,6 @@ describe("a Plan's own lens", () => {
       for (const system of bodied(name)) round(planOf(system));
     },
   );
-
-  it.each([
-    ["one project", ONE],
-    ["the first twelve of forty", many(40)],
-  ])("sits the Earth's outer orbit round it within 20 px, with %s", (_name, projects) => {
-    round(earthPlanOf(projects));
-  });
 
   it("leaves a system's dynamic view the home's lens and the map's up", () => {
     const systems = onyx();

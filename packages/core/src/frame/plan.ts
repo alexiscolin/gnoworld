@@ -1,26 +1,15 @@
 // A system's Plan (part 7v; Alexis, 2026-11-03), seen from above its plane: the only view that draws its orbits, as ellipses, to pick a
 // world more simply. Its star at the screen's centre, each world of a body's size on an orbit of its own, in the order of its real one but
 // spread so each stands clear with room for its name under it, at a size that keeps their order; whole on both screens, none on the star's
-// heart. Its worlds hold still. The address picks the turn the views are tried from, so the same address gives the same Plan. The Earth's,
-// from above, each project round it on an orbit of its own, apart from what stands by the Earth at rest, so the depth's chunk has no Plan.
-import { EARTH_PLACE, EARTH_RADIUS, GRAIN, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
+// heart. Its worlds hold still. The address picks the turn the views are tried from, so the same address gives the same Plan. The Earth's
+// top view is its stations' (station/scenery.ts).
+import { GRAIN, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { textHash, unitOf } from "../space/cell.ts";
 import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import { onPlane, orbitPlace } from "./disc.ts";
-import { earthSystemOf, type Project } from "./earthOrbit.ts";
 import type { Planned } from "../lod/drawn.ts";
-import {
-  along,
-  cameraOf,
-  cameraTowards,
-  DEGREE,
-  focalOf,
-  looksFrom,
-  placeOf,
-  REST_SCREENS,
-  STAR_HEART,
-} from "./restLook.ts";
+import { along, cameraTowards, DEGREE, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
 /** The most worlds a Plan draws, the largest first: past them its others are dust. */
 const PLAN_MOST = 12;
@@ -175,44 +164,6 @@ export function planOf(system: StarSystem): Arrival {
     postcard: { system: still, worlds: placed, depth: placed.map(() => 1), hidden },
     lens: PLAN_LENS,
     up,
-    lean: PLAN_LEAN,
-  };
-}
-
-// The Earth's Plan: 30 degrees over the disc, the Earth 80 pixels in radius on the video's screen; its projects 2.4 to 7.5 Earth radii out,
-// growing gaps, each a quarter of the Earth across, a golden turn apart round it. Out to 9, its outer ellipse stood 26 px off the Earth
-// through the Plan's lens, its offset the square of its reach on screen (7v's design review, F4470).
-const PLAN_EARTH = 80;
-const PLAN_FIRST = 2.4;
-const PLAN_LAST = 7.5;
-const PLAN_SIZE = 0.25;
-const GOLDEN = 2.399963229728653;
-// The Earth's disc and a name's air round it, in pixels, that no project stands in; the whole is turned as a system's is, tried in order.
-const CLEAR = PLAN_EARTH + 30;
-
-/** The Earth's Plan: from the view at rest's side, 30 degrees over the disc, the Earth at the centre; each project, in the file's order, on
- * an orbit of its own, a golden turn from the one before, the whole turned the first of a few ways that stands every name readable; still. */
-export function earthPlanOf(projects: readonly Pick<Project, "name">[]): Arrival {
-  const earth = { ...earthSystemOf(projects), spin: 0 };
-  const last = Math.max(earth.worlds.length - 1, 1);
-  const distance = (focalOf(REST_SCREENS[0].height, PLAN_LENS) * EARTH_RADIUS) / PLAN_EARTH;
-  const camera = cameraOf({ distance, slant: SLANT, turn: 0 });
-  const turned = (turn: number) =>
-    earth.worlds.map((world, at) => ({
-      ...world,
-      radius: PLAN_SIZE * EARTH_RADIUS,
-      orbit: (PLAN_FIRST + (PLAN_LAST - PLAN_FIRST) * (at / last) ** 0.8) * EARTH_RADIUS,
-      phase: at * GOLDEN + (2 * Math.PI * turn) / TURNS,
-    }));
-  const turn = Array.from({ length: TURNS }, (_, at) => at).find((at) =>
-    readable({ system: earth, worlds: turned(at) }, camera, CLEAR),
-  );
-  const worlds = turned(turn ?? 0);
-  return {
-    eye: camera.eye,
-    look: EARTH_PLACE,
-    postcard: { system: earth, worlds, depth: worlds.map(() => 1), hidden: new Set() },
-    lens: PLAN_LENS,
     lean: PLAN_LEAN,
   };
 }

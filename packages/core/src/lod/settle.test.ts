@@ -1,6 +1,5 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { DISTANCES } from "../frame/restLook.ts";
 import { BOXES_MOST, DEPTH, DISCS_MOST, LABEL_SLOTS, LabelLayout, PLACE, settle } from "./settle.ts";
 
 // Where the labels stand on a frame (ADR-0002 §1: labels never overlap; slice 7 §3: off the plate, the rail and each other): beside their
@@ -304,6 +303,9 @@ describe("no overlap", () => {
     expect(reversed.shown[0]).toBe(0);
   });
 });
+
+// The distances the eye looks at the Earth from at rest: the Earth's view at 26 units, a mouse's lean and the sway about it.
+const DISTANCES = [26, 25, 27, 24, 28];
 
 describe("depth", () => {
   it("keeps the Earth's label whole at every distance the rest may look from (24 to 28 units)", () => {

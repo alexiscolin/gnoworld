@@ -1,6 +1,7 @@
 // The belt (part 7x): every station that stands no body round the Earth is a light at its own place, one draw for all of them, its size
-// from the station's and held to a few pixels, so a thousand read as a far ring of lights and none is dropped without a trace.
-import { AdditiveBlending, Points, ShaderMaterial, type BufferGeometry } from "three";
+// from the station's and held to a few pixels, so a thousand read as a far ring of lights and none is dropped without a trace. Its lights
+// fade as the eye goes far from the Earth (`fade`), where a station's body would be under a pixel.
+import { AdditiveBlending, Points, ShaderMaterial, Vector2, type BufferGeometry } from "three";
 import { cloudOf } from "../cosmos/cloud.ts";
 
 const VERTEX = /* glsl */ `
@@ -14,9 +15,10 @@ void main() {
 `;
 
 const FRAGMENT = /* glsl */ `
+uniform float fade;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
-  gl_FragColor = vec4(vec3(1.0, 0.86, 0.66) * 0.75 * (1.0 - smoothstep(0.2, 1.0, d)), 1.0);
+  gl_FragColor = vec4(vec3(1.0, 0.86, 0.66) * 0.75 * fade * (1.0 - smoothstep(0.2, 1.0, d)), 1.0);
   #include <colorspace_fragment>
 }
 `;
@@ -30,12 +32,19 @@ export function beltOf(places: Float32Array, sizes: Float32Array): Points<Buffer
   const material = new ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
-    uniforms: { scale: { value: 1 } },
+    uniforms: { scale: { value: 1 }, fade: { value: 1 } },
     transparent: true,
     depthWrite: false,
     blending: AdditiveBlending,
   });
   const points = new Points(cloud.geometry, material);
   points.frustumCulled = false;
+  // A light's pixels from its width: the drawing buffer's height over the lens's, read as it is drawn (three's Object3D.onBeforeRender).
+  const buffer = new Vector2();
+  const scale = material.uniforms["scale"];
+  points.onBeforeRender = (renderer, _stage, camera) => {
+    if (scale !== undefined)
+      scale.value = (renderer.getDrawingBufferSize(buffer).y * camera.projectionMatrix.elements[5]) / 2;
+  };
   return points;
 }

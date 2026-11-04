@@ -52,6 +52,10 @@ export class RestEye {
   readonly looked = spot();
   /** The arrival it came to, drawn in place of the view at rest; none at rest. */
   landing: Landing | undefined;
+  /** Whether the last move goes between the Earth's view at rest and its top view (7x2), which the eye glides along. */
+  gliding = false;
+  // Whether it stands at one of the Earth's two views: the home opens on its view at rest.
+  #onEarth = true;
   // The map's up, on the stage; from where the scene's eye rests (HOME) to the view at rest's; the axes the eye sways along, across and up.
   readonly #up = spot();
   readonly #rest = spot();
@@ -130,6 +134,9 @@ export class RestEye {
 
   #come(asking: Asking, landing: Landing | undefined, came: (asking: Asking, to: Point) => void): void {
     if (asking !== this.#asked) this.#went = undefined;
+    const onEarth = landing === undefined || landing.view.postcards.length === 0;
+    this.gliding = this.#onEarth && onEarth;
+    this.#onEarth = onEarth;
     this.#asked = asking;
     this.landing = landing;
     this.#arrived = landing?.look ?? EARTH_PLACE;

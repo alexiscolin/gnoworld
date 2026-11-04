@@ -1,10 +1,14 @@
 // The Earth among the worlds (frame 4), a fixed place beside the great star: the very globe of its page, small, its ring a thin line. It
 // stands apart from any file. It turns with the camera, which looks at it, so it shows the same face from any view, lit from its star.
+// What stands round it, its stations and the scenery (7x2), stands, moves and goes with it.
 import { CENTRE, EARTH_PLACE, EARTH_RADIUS, toScene, type Point } from "@gnoworld/core";
 import { BufferGeometry, LineBasicMaterial, LineLoop, Quaternion, Vector3, type Group } from "three";
 import { buildGlobe, type Globe } from "../earth/globe.ts";
 import { MOON_FAR, ORBIT_RADIUS } from "../earth/orbit.ts";
+import type { Disposer } from "../disposer.ts";
 import type { EarthDevice } from "../earth/device.ts";
+import type { Sight } from "../station/names.ts";
+import { LazyEarthView } from "./lazyEarthView.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 
 const MOON_RATE = 0.026;
@@ -27,6 +31,7 @@ function ringLine(): LineLoop<BufferGeometry, LineBasicMaterial> {
 export class Home {
   readonly #device: EarthDevice;
   readonly #parent: Group;
+  readonly #around: LazyEarthView | undefined;
   readonly #stage = { x: 0, y: 0, z: 0 };
   readonly #toward = new Vector3();
   readonly #back = new Quaternion();
@@ -37,9 +42,22 @@ export class Home {
   #said = false;
   #loading = new AbortController();
 
-  constructor(device: EarthDevice, parent: Group) {
+  /** On `device`, in `parent`; with what stands round it, its stations and scenery, where `around` says who owns them and the canvas's size. */
+  constructor(device: EarthDevice, parent: Group, around?: { owner: Disposer; sight: () => Sight }) {
     this.#device = device;
     this.#parent = parent;
+    this.#around = around === undefined ? undefined : new LazyEarthView(device, around.owner, around.sight);
+    if (this.#around !== undefined) parent.add(this.#around.group);
+  }
+
+  /** Whether the cosmos shows: its stations' names leave the page with it. */
+  show(shown: boolean): void {
+    if (!shown) this.#around?.hide();
+  }
+
+  /** Whether it stood, and what stands round it, for the journeys. */
+  stats() {
+    return { earth: this.stood, stations: this.#around?.stats() };
   }
 
   get stood(): boolean {
@@ -54,8 +72,9 @@ export class Home {
     return this.#globe?.group.position;
   }
 
-  /** Brings it, once. A globe that does not come leaves the worlds as they are. */
+  /** Brings it, once, and what stands round it. A globe that does not come leaves the worlds as they are. */
   stand(): void {
+    this.#around?.stand();
     if (this.#globe !== undefined || this.#building) return;
     this.#building = true;
     const loading = this.#loading;
@@ -75,14 +94,16 @@ export class Home {
     this.#globe = globe;
     this.#parent.add(globe.group);
     this.#line = ringLine();
+    this.#around?.keepOff(this.#line.material);
     globe.stand(EARTH_RADIUS, this.#line);
     this.#device.moved();
     if (!this.#said) this.#device.stood();
     this.#said = true;
   }
 
-  /** One frame on, from `eye`, the camera turned `turned`. */
+  /** One frame on, from `eye`, the camera turned `turned`; what stands round it shows as its parent does. */
   tick(eye: Point, seconds: number, turned: Quaternion): void {
+    this.#around?.tick(eye, seconds, this.#parent.visible);
     const globe = this.#globe;
     if (globe === undefined) return;
     toScene(EARTH_PLACE, this.#stage);
@@ -103,8 +124,9 @@ export class Home {
     globe.setMoon(MOON_FAR - MOON_RATE * seconds);
   }
 
-  /** Frees it, and what is on its way. It may stand again. */
+  /** Frees it, what stands round it, and what is on its way. It may stand again. */
   drop(): void {
+    this.#around?.drop();
     this.#loading.abort();
     this.#loading = new AbortController();
     this.#globe?.dispose();

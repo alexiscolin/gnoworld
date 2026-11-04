@@ -11,7 +11,6 @@ export function placesFrom(data: {
   universes: { id: string; default?: boolean | undefined }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
 }): Place[] {
   const chosen = data.universes.find((universe) => universe.default === true);
   return placesOf({ ...data, defaultUniverse: chosen?.id ?? "" });

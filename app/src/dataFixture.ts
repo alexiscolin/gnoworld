@@ -29,7 +29,6 @@ const GOOD: Files = {
   ],
   "hubs.json": [{ slug: "bubble", name: "Bubble", description: "B".repeat(60), universe: "onyx" }],
   "ecosystems.json": [],
-  "stations.json": [],
   "genres.json": [],
   "events.json": [],
   "expedition.json": [],

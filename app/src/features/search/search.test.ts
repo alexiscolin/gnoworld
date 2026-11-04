@@ -182,7 +182,7 @@ describe("searchItemsOf, one name in two universes", () => {
     description: "Tokens, a place of the fixture, described at more than fifty characters, as the schema asks.",
     universe,
   });
-  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")], stations: [] }));
+  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")] }));
 
   it("gives two places of one name, in two universes, two names that tell them apart", () => {
     const found = items.filter((i) => i.kind === "ecosystem");

@@ -26,6 +26,9 @@ export interface CosmosStats {
   sky: { share: number; eye: { x: number; y: number; z: number } };
   /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
   dive: { along: number; veil: number };
+  /** The Earth's view (7x2), once its chunk came: its stations as bodies and as the belt's lights, their parts and draws, the scenery's
+   * planets, and whether the orbits show. */
+  stations?: { close: number; belt: number; parts: number; draws: number; scenery: number; orbits: boolean };
 }
 /** The flights (7g): how many started, one under way or not, how far along, its veil and streaks, where it goes, and the eye's way so far. */
 export interface FlightStats {

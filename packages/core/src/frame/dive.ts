@@ -11,11 +11,11 @@ import { DEGREE, eyeInto } from "./restLook.ts";
 export const DIVE = { fade: 0.8, seconds: 5.5, hold: 1.6, dissolve: 1.2, wait: 4 } as const;
 
 // Where it starts: as near as the whole cosmos still holds the view (680) when its fade-in ends; over the disc; round from where it ends,
-// its turn done half way. On Onyx it opens on no ray of the systems' seats and comes in past no three bodies at like gaps (the design
-// review of 7d7); a few degrees off, one shows: the seats' lattice is 7d1's (7d8).
+// its turn done half way. On Onyx it opens on no ray of the systems' seats (the design review of 7d7): from the Earth's fixed eye (7x2),
+// -59 degrees round, where -55 opened on one; a few degrees off, one shows: the seats' lattice is 7d1's (7d8).
 const FROM = 760;
 const SLANT = 34 * DEGREE;
-const TURN = -55 * DEGREE;
+const TURN = -59 * DEGREE;
 const TURNED = 0.5;
 const terms = { distance: 0, slant: 0, turn: 0 };
 

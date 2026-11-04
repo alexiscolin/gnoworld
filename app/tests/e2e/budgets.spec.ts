@@ -168,23 +168,24 @@ const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
 const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
 const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
-// chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
-// (Alexis, 2026-11-03).
+// chunk to the cosmos's to the view at rest's. 1,518 B, then 2 KiB with the dynamic view (Alexis, 2026-11-03); 2,070 B with the Earth's
+// views (7x2, the margin given ahead), 8 B of it for other chunks' hashed names.
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-// The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
-// program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
-// (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
-const DEEP_NAMED = /\.\/(restDeep-[\w-]+\.js)/;
 const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
 const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
 const ROCKS_MARK = "aRock";
-// A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
-// which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps, each its
-// size once its reviews' fixes landed and about a tenth: 2,248 B (the design review's lens, level and spacing, F4470) and 2,147 B.
+// A system's Plan and the Earth's top view (7v, 7x2): a chunk the view at rest's names, weighed apart from the labels' too, whose names'
+// code it shares; the Plan's orbits and names, a chunk the labels' name. 2,248 B and 2,147 B (F4470); the orbits' 2,459 B once their
+// names' row was shared with the stations' (7x2, the margin given ahead).
 const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
 const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
+// A system's dynamic view's rocks (7v), laid in a chunk the view at rest's names, drawn by one the labels' name, their program in no
+// chunk loaded first (caps in chunks.ts); the depth, the home's far worlds, went with the Earth's view (7x2).
+const LAID_NAMED = /\.\/(restRocks-[\w-]+\.js)/;
+// The Earth's view (7x2): its stations, scenery, belt, names and caption, a chunk the cosmos's names once it shows (cap in chunks.ts).
+const EARTH_VIEW_NAMED = /\.\/(earthView-[\w-]+\.js)/;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const THREE_MARK = "isWebGLRenderer";
 // Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
@@ -509,10 +510,15 @@ test("a system's arrival's chunk stays within its cap, apart from the view at re
   await restLateWithin(page, { named: ARRIVAL_NAMED, chunk: "restArrival" });
 });
 
-test("the view at rest's depth chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
+test("a system's view's rocks' laying chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
   page,
 }) => {
-  await restLateWithin(page, { named: DEEP_NAMED, chunk: "restDeep" });
+  await restLateWithin(page, { named: LAID_NAMED, chunk: "restRocks" });
+});
+
+test("the Earth's view's chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
+  const cosmos = await namedIn(page, await homeScene(page), COSMOS_NAMED);
+  weighed(await namedIn(page, cosmos, EARTH_VIEW_NAMED), "earthView");
 });
 
 test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({

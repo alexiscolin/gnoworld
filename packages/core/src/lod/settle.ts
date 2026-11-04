@@ -12,7 +12,7 @@ export const BOXES_MOST = 8;
 // Every body a look stands (lod/bounds.ts BOUNDS.bodies, 40), the Earth and room to spare.
 export const DISCS_MOST = 48;
 /** Depth: from `near` to `far` world units a label shrinks to `scale` and fades to `fade`. `near` is the farthest the rest's eye stands
- * from the Earth (frame/restLook.ts's DISTANCES, 24 to 28), so the Earth's label is whole; `scale` keeps 12 px figures at 11 px. */
+ * from the Earth (24 to 28 units, the Earth's view at 26), so the Earth's label is whole; `scale` keeps 12 px figures at 11 px. */
 export const DEPTH = { near: 28, far: 80, scale: 0.92, fade: 0.65 } as const;
 const SIDES = 4;
 const SPAN = Math.log(DEPTH.far / DEPTH.near);

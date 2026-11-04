@@ -17,7 +17,6 @@ export {
   News,
   Quests,
   RealmPath,
-  Stations,
   Universes,
 } from "./data.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";

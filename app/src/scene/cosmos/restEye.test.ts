@@ -8,7 +8,7 @@ const ROOM = { right: 0.2, left: 1, up: 0.6, down: 1 };
 vi.mock("./restArrival.ts", () => ({
   landingAt: () => ({
     index: 1,
-    view: { eye: { x: 10, y: 5, z: 3 }, postcards: [1], close: undefined },
+    view: { eye: { x: 10, y: 5, z: 3 }, postcards: [1] },
     look: { x: 12, y: 5, z: 3 },
     postcards: new Map(),
     room: ROOM,
@@ -20,7 +20,7 @@ const PLAN_OWN = 2;
 vi.mock("./restPlan.ts", () => ({
   planAt: () => ({
     index: 1,
-    view: { eye: { x: 10, y: 5, z: 3 }, postcards: [1], close: undefined },
+    view: { eye: { x: 10, y: 5, z: 3 }, postcards: [1] },
     look: { x: 12, y: 5, z: 3 },
     postcards: new Map(),
     room: ROOM,
@@ -31,7 +31,7 @@ vi.mock("./restPlan.ts", () => ({
 describe("a dynamic view's lean, each way as far as its room says", () => {
   it("leans the eye a fifth to the right, all of it to the left, as the view's room says", async () => {
     const eye = new RestEye({});
-    eye.rest({ eye: { x: 0, y: 3, z: 30 }, postcards: [], close: undefined });
+    eye.rest({ eye: { x: 0, y: 3, z: 30 }, postcards: [] });
     const came = vi.fn<(asking: unknown, to: Point) => void>();
     eye.arrive([], { id: "gnoswap", go: vi.fn(), plan: false }, came);
     await vi.waitFor(() => {
@@ -60,7 +60,7 @@ describe("the workshop's share of the lean at a system", () => {
     vi.resetModules();
     const [{ RestEye: Made }, tuning] = await Promise.all([import("./restEye.ts"), import("../tuning.ts")]);
     const eye = new Made({});
-    eye.rest({ eye: { x: 0, y: 3, z: 30 }, postcards: [], close: undefined });
+    eye.rest({ eye: { x: 0, y: 3, z: 30 }, postcards: [] });
     const came = vi.fn<(asking: unknown, to: Point) => void>();
     if (plan !== undefined) {
       eye.arrive([], { id: "gnoswap", go: vi.fn(), plan }, came);
