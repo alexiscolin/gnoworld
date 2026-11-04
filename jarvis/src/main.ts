@@ -32,7 +32,13 @@ const served = loadServed(process.env);
 const log = logger(randomBytes(32).toString("hex"), (line) => process.stdout.write(line));
 const db = openDatabase(served.database, jarvisMigrations);
 const budget = makeBudget(db, { caps: served.budgets, holdMs: HOLD_MS, now: Date.now });
-const running = served.on ? await startModel(log, budget) : undefined;
+// A start refused closes the file too, so nothing is left behind it (F5289).
+const running = served.on
+  ? await startModel(log, budget).catch((error: unknown) => {
+      db.close();
+      throw error;
+    })
+  : undefined;
 let draining = false;
 const jarvis = await serve(jarvisRoutes({ ask: running?.ask, budget, log }), {
   ...served.listen,
@@ -40,42 +46,35 @@ const jarvis = await serve(jarvisRoutes({ ask: running?.ask, budget, log }), {
   ready: () => !draining,
 });
 
-// Switched on: what answers a question, each part checked at its start, and how it closes.
+// Switched on: what answers a question, each part checked at its start, and how it closes. What starts no child comes
+// first; past gnomcp's start, a part refused ends gnomcp before the start fails (F5289).
 async function startModel(log: Log, budget: Budget) {
   const config = loadJarvisConfig(process.env);
+  // The model's one client refuses an environment that would add headers to its requests.
+  const send = connectAnthropic(config.anthropicKey, config.caps.callTimeoutMs);
   const tracing = startTracing(process.env);
   const skills = loadSkills(config.skills);
   const places = loadPlaces(config.places);
   const gnomcp = await startGnomcp({ ...config.gnomcp, profiles: config.profiles, log });
-  let cards: ReturnType<typeof cardTools>;
   try {
-    cards = cardTools({ chains: config.profiles.read, places, read: (name, args) => gnomcp.call(name, args) });
+    const cards = cardTools({ chains: config.profiles.read, places, read: (name, args) => gnomcp.call(name, args) });
+    const gnoscope = await startGnoscope({ on: config.gnoscope, ...config.gnoscopeServer, log });
+    const profiles = { chains: config.profiles.read, indexed: config.profiles.indexed };
+    const tools = toolbox({ profiles, gnomcp, skills, places: placesTool(places), cards, gnoscope, log });
+    const { tracer } = tracing;
+    const loop = makeLoop({ send, budget, log, tracer, model: config.models.main, caps: config.caps, skills, tools });
+    return {
+      ask: loop.ask,
+      close: async (): Promise<void> => {
+        await gnomcp.close();
+        await gnoscope.close();
+        await tracing.shutdown();
+      },
+    };
   } catch (error) {
-    // A start refused ends the child it made.
     await gnomcp.close();
     throw error;
   }
-  const gnoscope = await startGnoscope({ on: config.gnoscope, ...config.gnoscopeServer, log });
-  const profiles = { chains: config.profiles.read, indexed: config.profiles.indexed };
-  const tools = toolbox({ profiles, gnomcp, skills, places: placesTool(places), cards, gnoscope, log });
-  const loop = makeLoop({
-    send: connectAnthropic(config.anthropicKey, config.caps.callTimeoutMs),
-    budget,
-    log,
-    tracer: tracing.tracer,
-    model: config.models.main,
-    caps: config.caps,
-    skills,
-    tools,
-  });
-  return {
-    ask: loop.ask,
-    close: async (): Promise<void> => {
-      await gnomcp.close();
-      await gnoscope.close();
-      await tracing.shutdown();
-    },
-  };
 }
 
 // Once every connection is gone and every question has ended: gnomcp, gnoscope, the spans, then the file.

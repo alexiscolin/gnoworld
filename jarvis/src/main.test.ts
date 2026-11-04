@@ -462,13 +462,23 @@ describe("jarvis's process: a start it refuses", { timeout: 60_000 }, () => {
       () => ({ JARVIS_PROFILES: "betanet", JARVIS_INDEXER_PROFILES: "" }),
       /cards: the chain profile "betanet" is no universe of the data/,
     ],
-  ])("stops at start, never listening, on %s", async (_case, over, fault) => {
-    const { env, model } = await setup();
+    [
+      "an environment that would add headers to every request to the model",
+      () => ({ ANTHROPIC_CUSTOM_HEADERS: "x-planted: 1" }),
+      /model: ANTHROPIC_CUSTOM_HEADERS is set/,
+    ],
+  ])("stops at start, never listening, on %s, leaving no gnomcp and its file closed", async (_case, over, fault) => {
+    const { env, model, gnomcp, dir } = await setup();
     const jarvis = start({ ...env, ...over() });
     expect(await exited(jarvis)).not.toBe(0);
     expect(jarvis.out.stderr).toMatch(fault);
     expect(lines(jarvis).some(({ event }) => event === "listening")).toBe(false);
     expect(model.seen).toEqual([]);
+    // A gnomcp it started is ended, its folder gone; its own file closed, its log removed (F5289).
+    const pids = gnomcp.starts().map(({ pid }) => pid);
+    expect(pids.some(running)).toBe(false);
+    expect(gnomcp.starts().map(({ cwd }) => existsSync(cwd))).toEqual(pids.map(() => false));
+    expect(existsSync(join(dir, "jarvis.db-wal"))).toBe(false);
   });
 
   it("stops at start, never listening, when gnomcp refuses to start", async () => {
