@@ -6,7 +6,7 @@ import {
   BufferGeometry,
   Group,
   LineBasicMaterial,
-  LineLoop,
+  LineSegments,
   type Color,
 } from "three";
 import type { Clump } from "@gnoworld/core";
@@ -28,18 +28,19 @@ export class WebRings {
       blending: AdditiveBlending,
       depthWrite: false,
     });
-    const corners = new Float32Array(SIDES * 3);
-    for (let side = 0; side < SIDES; side += 1) {
-      const angle = (2 * Math.PI * side) / SIDES;
-      corners.set([Math.cos(angle), 0, Math.sin(angle)], side * 3);
-    }
+    // Each ring's sides as segments, its two ends a side each: the three rings one geometry, one draw.
+    const corners = new Float32Array(SHARES.length * SIDES * 6);
+    SHARES.forEach((share, ring) => {
+      for (let side = 0; side < SIDES; side += 1)
+        for (const [end, at] of [side, side + 1].entries()) {
+          const angle = (2 * Math.PI * at) / SIDES;
+          corners.set([share * Math.cos(angle), 0, share * Math.sin(angle)], ((ring * SIDES + side) * 2 + end) * 3);
+        }
+    });
     this.#geometry.setAttribute("position", new BufferAttribute(corners, 3));
-    for (const share of SHARES) {
-      const ring = new LineLoop(this.#geometry, this.#look);
-      ring.scale.setScalar(share);
-      ring.frustumCulled = false;
-      this.group.add(ring);
-    }
+    const lines = new LineSegments(this.#geometry, this.#look);
+    lines.frustumCulled = false;
+    this.group.add(lines);
     this.group.rotation.set(LEAN, 0, LEAN / 2);
     this.group.visible = false;
   }

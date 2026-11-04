@@ -667,8 +667,9 @@ test.describe("the nebulae's light", () => {
 // The whole cosmos (ADR-0002 §10; 7u, Alexis, 2026-11-04 night): past a cluster's distance one mass round the Earth, a small solid sphere
 // for each real world and realm, each namespace a clump with its dust, the liveliest clump lit. One draw of its own, whatever the file.
 const WHOLE_JS = /\/assets\/web-[\w-]+\.js$/;
-// The sky's own, the nebulae's three images and the whole cosmos's two: what a frame draws out there.
-const WHOLE_DRAWS_AT_MOST = 10;
+// The sky's own, the nebulae's three images, kept behind the mass (Alexis, "va pour tes reco"), and the mass's four (its ground, its
+// particles, the chosen clump's rings and its line of light): what a frame draws out there.
+const WHOLE_DRAWS_AT_MOST = 12;
 // The sky's stars and motes, whatever the file: 46,656 drawn on this window. Out there no point of the disc is.
 const SKY_POINTS_AT_MOST = 48 * 1024;
 const linkedFileOf = (count: number) => {
@@ -746,7 +747,7 @@ for (const count of [100, 1_000, 10_000, 20_000])
     expect(points - (web?.particles ?? 0)).toBeLessThanOrEqual(SKY_POINTS_AT_MOST);
   });
 
-test("draws the recorded file whole: 533 worlds in one mass, warm on near-black", async ({ page }) => {
+test("draws the recorded file whole: 533 worlds in one mass, lit on near-black", async ({ page }) => {
   await served(page, RECORDED);
   await arrived(page);
   await standing(page);
@@ -759,9 +760,8 @@ test("draws the recorded file whole: 533 worlds in one mass, warm on near-black"
     [COMPUTER.width / 2 - 60, COMPUTER.height / 2 - 60, COMPUTER.width / 2 + 60, COMPUTER.height / 2 + 60],
     [4, 4, 40, 40],
   ]);
-  // Warm at home, rose and peach, on near-black: the disc's middle in the middle of the view (about (15, 9, 6) on average there).
+  // The mass in the middle of the view, lit, in the design system's palette (Alexis, "Palette du design system"), on near-black.
   const [red = 0, green = 0, blue = 0] = middle ?? [];
-  expect(red).toBeGreaterThan(blue * 1.5);
   expect(red + green + blue).toBeGreaterThan(15);
   expect(Math.max(...(corner ?? [255]))).toBeLessThan(60);
 });
