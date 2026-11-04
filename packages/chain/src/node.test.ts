@@ -245,7 +245,7 @@ describe("a node's answer inside its envelope", () => {
 
   it("asks qfuncs with the realm's path in hex, at the address the read names", async () => {
     const node = fakeNode();
-    await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: node.fetch });
+    await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: node.fetch, chainId: null });
     expect(node.asked).toEqual([
       `${RPC}/abci_query?path=%22vm%2Fqfuncs%22&data=0x676e6f2e6c616e642f722f64656d6f2f706f6c6c`,
     ]);
@@ -253,10 +253,14 @@ describe("a node's answer inside its envelope", () => {
 
   it("gives a page's text, and an empty list for a realm with none", async () => {
     expect(
-      await readRender(RPC, "gno.land/r/demo/poll:", { fetch: answering(queryEnvelope({ data: "# Poll" })) }),
+      await readRender(RPC, "gno.land/r/demo/poll:", {
+        fetch: answering(queryEnvelope({ data: "# Poll" })),
+        chainId: null,
+      }),
     ).toMatchObject({ ok: true, value: "# Poll" });
     const none = await readFunctionList(RPC, "gno.land/r/demo/poll", {
       fetch: answering(queryEnvelope({ data: "null" })),
+      chainId: null,
     });
     expect(none).toMatchObject({ ok: true, value: [] });
   });
@@ -280,15 +284,21 @@ describe("a node's answer inside its envelope", () => {
     ["data that is no base64", based({ Data: "%%%" }), "wrong-shape"],
     ["bytes that are no UTF-8", based({ Data: btoa(String.fromCharCode(0xff, 0xfe)) }), "wrong-shape"],
   ])("gives %s as its kind, never a value", async (_case, body, kind) => {
-    expect(kindOf(await readRender(RPC, "gno.land/r/demo/poll:", { fetch: answering(body) }))).toBe(kind);
+    expect(kindOf(await readRender(RPC, "gno.land/r/demo/poll:", { fetch: answering(body), chainId: null }))).toBe(
+      kind,
+    );
   });
 
   it("refuses a function list that is no list, and keeps a failed request's status", async () => {
     const odd = await readFunctionList(RPC, "gno.land/r/demo/poll", {
       fetch: answering(queryEnvelope({ data: "nope" })),
+      chainId: null,
     });
     expect(kindOf(odd)).toBe("wrong-shape");
-    const down = await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", { fetch: fakeNode({ status: 502 }).fetch });
+    const down = await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", {
+      fetch: fakeNode({ status: 502 }).fetch,
+      chainId: null,
+    });
     expect(down).toMatchObject({ ok: false, failure: { kind: "down", status: 502 } });
   });
 
@@ -298,7 +308,7 @@ describe("a node's answer inside its envelope", () => {
       ...status,
       result: { ...status.result, sync_info: { ...status.result.sync_info, latest_block_height: "9".repeat(20) } },
     };
-    expect(kindOf(await readHeight(RPC, { fetch: answering(huge) }))).toBe("wrong-shape");
+    expect(kindOf(await readHeight(RPC, { fetch: answering(huge), chainId: null }))).toBe("wrong-shape");
   });
 });
 
@@ -310,13 +320,15 @@ describe("the node reads' edges", () => {
 
   it("writes a byte under 0x10 with its two hex digits", async () => {
     const node = fakeNode();
-    await readRender(RPC, "a\n", { fetch: node.fetch });
+    await readRender(RPC, "a\n", { fetch: node.fetch, chainId: null });
     expect(node.asked[0]).toMatch(/&data=0x610a$/);
   });
 
   it("reads a body with no Error key as a good one", async () => {
     const body = { jsonrpc: "2.0", id: "", result: { response: { ResponseBase: { Data: btoa("(12 int)") } } } };
-    expect(await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", { fetch: answering(body) })).toMatchObject({
+    expect(
+      await readEvaluated(RPC, "gno.land/r/demo/poll.Count()", { fetch: answering(body), chainId: null }),
+    ).toMatchObject({
       ok: true,
       value: "(12 int)",
     });
@@ -328,13 +340,15 @@ describe("the node reads' edges", () => {
       id: "",
       result: { response: { ResponseBase: { Error: null, Data: btoa("\xff\xfe") } } },
     };
-    expect(kindOf(await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: answering(body) }))).toBe("wrong-shape");
+    expect(kindOf(await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: answering(body), chainId: null }))).toBe(
+      "wrong-shape",
+    );
   });
 
   it("refuses an http RPC as the address it was given, for every read", async () => {
     const node = fakeNode({ network: "onyx-1" });
     for (const read of [
-      readHeight("http://rpc.onyx.example", { fetch: node.fetch }),
+      readHeight("http://rpc.onyx.example", { fetch: node.fetch, chainId: null }),
       readRender("http://rpc.onyx.example", "x:", { fetch: node.fetch, chainId: "onyx-1" }),
     ])
       expect(await read).toMatchObject({

@@ -73,7 +73,7 @@ describe.each(CHAINS)("the reads on %s", (chain) => {
   describe("readHeight (recorded: the height and time gnomcp gave; read: the /status envelope)", () => {
     it.each(STATUS[chain])("gives block $height at $time, with its source", async ({ height, time }) => {
       const fetcher = answering(statusEnvelope(height, time));
-      const result = await readHeight(rpc, options(fetcher));
+      const result = await readHeight(rpc, { ...options(fetcher), chainId: null });
       expect(result).toEqual({
         ok: true,
         value: { height, time },
@@ -201,7 +201,7 @@ const READS = [
   {
     name: "readHeight",
     good: () => statusEnvelope(10, "2026-10-30T23:43:10Z"),
-    run: (rpc: string, o: ReadOptions) => readHeight(rpc, o),
+    run: (rpc: string, o: ReadOptions) => readHeight(rpc, { ...o, chainId: null }),
     onRpcError: "wrong-shape",
   },
   {
@@ -594,7 +594,7 @@ describe("readHeight, the traps", () => {
   const at = (height: string, time = "2026-10-30T23:43:10Z") => {
     const body = statusEnvelope(1, time);
     body.result.sync_info.latest_block_height = height;
-    return readHeight(RPC_OK, options(answering(body)));
+    return readHeight(RPC_OK, { ...options(answering(body)), chainId: null });
   };
 
   it("gives a height as a number and the block's own time", async () => {
@@ -626,7 +626,7 @@ describe("readHeight, the traps", () => {
 
   it("asks /status, not an abci_query: vm sets no Height, a page's height is its own read", async () => {
     const fetcher = answering(statusEnvelope(1, "2026-10-30T23:43:10Z"));
-    await readHeight(RPC_OK, options(fetcher));
+    await readHeight(RPC_OK, { ...options(fetcher), chainId: null });
     expect(askedOf(fetcher)).toEqual([`${RPC_OK}/status`]);
   });
 });
