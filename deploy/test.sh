@@ -1437,9 +1437,10 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
 	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
 	# The preview job's first real pass (8f), not a planted file: at boot it reads the hubs' realms' home pages (GovDAO's) through the way out,
-	# then asks OpenAI to check each. This stack's key is test.sh's own, which OpenAI refuses: every capture is then unchecked, so the file must
-	# hold none and the log say the page was read, then not checked. A real key lets GovDAO's page through, read from the chain: either way the
-	# read went out through the RPC alone and nothing unchecked was written. A read that failed (the chain, the way out) fails here.
+	# then asks OpenAI to check each. This stack's key is test.sh's own (openssl rand), which OpenAI always refuses: every capture is then
+	# unchecked, so the file must hold none and the log say the page was read, then not checked. The "captured" branch runs only under an
+	# operator's real key: no run of test.sh proves a passed check writes a capture (server/src/previews/job.test.ts does). A read that
+	# failed (the chain, the way out) fails here.
 	previews_real=missing
 	for _ in $(seq 1 30); do
 		previews_real=$(docker exec "$server" /nodejs/bin/node -e "try { const p = JSON.parse(require('fs').readFileSync('/markets/previews.json', 'utf8')); console.log(p.previews.length === 0 ? 'none' : p.previews.every((c) => c.path === 'gno.land/r/gov/dao' && c.text.trim() !== '') ? 'captured' : 'other') } catch { console.log('missing') }" 2>/dev/null || true)
