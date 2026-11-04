@@ -1,5 +1,5 @@
-// A chain and its indexer as the worlds job's tests build them (slice 7, 7c): one `send` that answers the RPC's abci_query reads
-// (vm/qpaths, vm/qdoc, vm/qfile, vm/qeval) and the indexer's GraphQL POST, each from a function the test gives, and records what
+// A chain and its indexer as the worlds and preview jobs' tests build them (7c, 8f): one `send` that answers the RPC's abci_query reads
+// (vm/qpaths, vm/qdoc, vm/qfile, vm/qeval, vm/qrender) and the indexer's GraphQL POST, each from a function the test gives, and records what
 // was asked and how many requests were in flight at once. The envelope of an abci_query is QueryAnswer's (packages/schemas/src/chain.ts).
 import type { Send } from "../net.ts";
 
@@ -7,7 +7,7 @@ import type { Send } from "../net.ts";
 type Given = string | Response | Error;
 
 interface Asked {
-  /** `vm/qpaths`, `vm/qdoc`, `vm/qfile`, `vm/qeval`, or `indexer`. */
+  /** `vm/qpaths`, `vm/qdoc`, `vm/qfile`, `vm/qeval`, `vm/qrender`, or `indexer`. */
   readonly kind: string;
   /** The abci_query's data decoded from hex, or the GraphQL request's parsed JSON body. */
   readonly data: string;
@@ -21,6 +21,8 @@ export interface Routes {
   doc?: ((path: string) => Given) | undefined;
   file?: ((path: string) => Given) | undefined;
   eval?: ((expression: string) => Given) | undefined;
+  /** A realm's page, asked as `<path>:<its render path>`. */
+  render?: ((data: string) => Given) | undefined;
   /** The indexer's answer to one GraphQL request (its `query` and `variables` parsed). */
   indexer?: ((request: { query: string; variables: Record<string, unknown> }) => Given) | undefined;
 }
@@ -104,6 +106,7 @@ export function fakeChain(
       "vm/qdoc": routes.doc,
       "vm/qfile": routes.file,
       "vm/qeval": routes.eval,
+      "vm/qrender": routes.render,
     };
     const given = byKind[kind]?.(data);
     return given === undefined ? abciRefused() : asResponse(given, abci);

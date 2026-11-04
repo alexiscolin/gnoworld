@@ -456,6 +456,17 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed '/worlds-count/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
 	mutant "web follows a link at worlds-count.json" "web does not follow a link planted at worlds-count.json" \
 		nginx awk '/location = \/worlds-count\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
+	# The preview captures (8f) ride the same volume and location.
+	mutant "previews.json is not served" "web serves previews.json from the volume the server writes" \
+		nginx sed '/location = \/previews\.json {/,/}/d'
+	mutant "previews.json open without the password" "web serves previews.json only with the password" \
+		nginx awk '{ print } /location = \/previews\.json \{/ { print "            auth_basic off;" }'
+	mutant "previews.json kept a year" "web serves previews.json with a short cache" \
+		nginx sed '/previews/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
+	mutant "web follows a link at previews.json" "web does not follow a link planted at previews.json" \
+		nginx awk '/location = \/previews\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
+	mutant "the captures written where web serves none" "the running preview job reads the hubs' pages through the way out and writes only the captures the check passed" \
+		compose 'services: { server: { environment: { PREVIEWS_FILE: /markets/elsewhere.json } } }'
 	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
 		nginx sed '/disable_symlinks on/d'
 	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
@@ -1425,6 +1436,23 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# otherwise would leave the hero without its number for good.
 	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
 	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
+	# The preview job's first real pass (8f), not a planted file: at boot it reads the hubs' realms' home pages (GovDAO's) through the way out,
+	# then asks OpenAI to check each. This stack's key is test.sh's own, which OpenAI refuses: every capture is then unchecked, so the file must
+	# hold none and the log say the page was read, then not checked. A real key lets GovDAO's page through, read from the chain: either way the
+	# read went out through the RPC alone and nothing unchecked was written. A read that failed (the chain, the way out) fails here.
+	previews_real=missing
+	for _ in $(seq 1 30); do
+		previews_real=$(docker exec "$server" /nodejs/bin/node -e "try { const p = JSON.parse(require('fs').readFileSync('/markets/previews.json', 'utf8')); console.log(p.previews.length === 0 ? 'none' : p.previews.every((c) => c.path === 'gno.land/r/gov/dao' && c.text.trim() !== '') ? 'captured' : 'other') } catch { console.log('missing') }" 2>/dev/null || true)
+		[ "$previews_real" = missing ] || break
+		sleep 2
+	done
+	previews_said=$(docker logs "$server" 2>&1 | grep -oE '"event":"previews_(skipped|written|failed)"(,"error":"[a-z_]+")?' | tr '\n' ' ' || true)
+	case "$previews_real $previews_said" in
+		"captured "*'"event":"previews_written"'*) previews_ok=yes ;;
+		"none "*'"event":"previews_skipped","error":"unchecked"'*'"event":"previews_written"'*) previews_ok=yes ;;
+		*) previews_ok="no: the file $previews_real, the log $previews_said" ;;
+	esac
+	expect "the running preview job reads the hubs' pages through the way out and writes only the captures the check passed" "$previews_ok" yes
 	# What the job logged, its faults' kinds and each pass's length in ms (a line holds nothing a chain wrote): the stack's logs go with it at
 	# the end, and a first pass's length in Docker is what 7k3 could not measure from its sandbox.
 	printf 'the worlds job logged: %s\n' "$(docker logs "$server" 2>&1 | grep -oE '"event":"worlds_[a-z_]+"(,"error":"[a-z_]+"|,"ms":[0-9]+)?' | tr '\n' ' ' || true)"
@@ -1452,7 +1480,15 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves worlds-count.json only with the password" "$(status /worlds-count.json 203.0.113.3)" 401
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/worlds-count.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/worlds-count.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted at worlds-count.json" "$(status /worlds-count.json 203.0.113.4 -u "$auth")" 404
-	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets/worlds.json', '/markets/worlds-count.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
+	# The preview captures (8f): the same volume, location and cache, planted over the job's own file once its real pass was read.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/previews.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), previews: [] }))" >/dev/null 2>&1 || true
+	expect "web serves previews.json from the volume the server writes" "$(status /previews.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves previews.json with a short cache" "$(header cache-control /previews.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves previews.json as JSON, never sniffed" "$(header content-type /previews.json 203.0.113.1 -u "$auth") $(header x-content-type-options /previews.json 203.0.113.1 -u "$auth")" "application/json nosniff"
+	expect "web serves previews.json only with the password" "$(status /previews.json 203.0.113.3)" 401
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/previews.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/previews.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted at previews.json" "$(status /previews.json 203.0.113.4 -u "$auth")" 404
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets/worlds.json', '/markets/worlds-count.json', '/markets/previews.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
 	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404

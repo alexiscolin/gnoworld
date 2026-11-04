@@ -156,6 +156,25 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads the file the preview job writes: absolute, none by default (8f)", () => {
+    const universes = "/app/app/data/universes.json";
+    expect(loadConfig(ENV).previews).toBeUndefined();
+    expect(loadConfig({ ...ENV, PREVIEWS_FILE: "/markets/previews.json", UNIVERSES_FILE: universes }).previews).toBe(
+      "/markets/previews.json",
+    );
+    for (const value of [
+      "",
+      "previews.json",
+      "./previews.json",
+      "/",
+      "/srv/../previews.json",
+      "/srv//previews.json",
+      "/srv/",
+    ]) {
+      expect(failure({ ...ENV, UNIVERSES_FILE: universes, PREVIEWS_FILE: value })).toMatch(/setting PREVIEWS_FILE: /);
+    }
+  });
+
   // The home's block height (2026-10-31): the universes' data names the RPC the prices timer reads it from.
   it("reads the universes' data file the height's RPC comes from: absolute, none by default", () => {
     expect(loadConfig(ENV).universes).toBeUndefined();

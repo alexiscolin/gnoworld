@@ -367,6 +367,20 @@ Slice 3, the server's retention (3n):
   onyx-1's answered on 2026-11-04 (`server/src/worlds/onyxIndexer.json`); 7c's per-realm filter was refused there (422), so no count
   was read before 7k3. A first pass of onyx-1's 767 realms, measured outside Docker on 2026-11-04: 1,628 calls in 13.2 minutes and no
   count before 7k3; 1,634 calls (7 of them the indexer's) in 7.0 minutes after, every realm counted.
+- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`, 8f): with `UNIVERSES_FILE` and
+  `OPENAI_API_KEY_FILE` (the server refuses to start with the file named and either missing), at start and then every six hours from
+  the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
+  `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
+  time a quarter-second apart, each within 10 s and 64 KiB. It keeps a page's first 4,096 bytes, cut at a line's end, has OpenAI's
+  moderation read exactly that text with `MODERATION_THRESHOLDS`, and writes the captures that passed by renaming a temporary file, 1 MiB
+  at most; each pass that wrote logs `{"event":"previews_written","ms":<its length>}`. A page the check hides, that the chain says is
+  gone, that is too large, empty or no text has no capture; a page whose read failed on the way, whose read the chain refused, or that the
+  check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
+  kind one of `hidden`, `unchecked`, `empty`, `request`, `timeout`, `status`, `rate_limited`, `too_large`, `shape` or `chain_refused`. A
+  pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the last file. No
+  capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
+  a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
+  capture down at once, remove its realm from `hubs.json` and redeploy: the next pass drops it, and so does a restart.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room

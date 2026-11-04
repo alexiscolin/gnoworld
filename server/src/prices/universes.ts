@@ -1,5 +1,5 @@
 // The default universe (its id, RPC and indexer), from the data the app is built from (app/data/universes.json, copied into the server's image): the
-// host the prices timer reads the block height from and the worlds job reads the realm list from.
+// host the prices timer reads the block height from, the worlds job reads the realm list from, and the preview job reads the hubs' pages from.
 // The file goes through the data's own schema, so what the build accepted is what the server reads; a bad file stops the server
 // at boot, naming the file and nothing of what it held (a file that is not there is the system's error, which names it too).
 import { readFileSync } from "node:fs";
@@ -46,4 +46,9 @@ export function hubWorlds(universesFile: string): Map<string, string> {
       hub.realms === undefined ? [] : [[hub.slug, hubWorldOf(hub)] as const],
     ),
   );
+}
+
+/** Every realm the default universe's hubs list, each once, by its path: the pages the preview job captures (8f), the team's own list. */
+export function hubRealms(universesFile: string): string[] {
+  return [...new Set(defaultHubs(universesFile).flatMap((hub) => hub.realms ?? []))].toSorted();
 }

@@ -506,6 +506,83 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
+  // The preview job (8f) reads the default universe's hubs' pages through its RPC alone, and only with the check that reads each capture.
+  it("starts the preview job with PREVIEWS_FILE, UNIVERSES_FILE and OpenAI's key: it asks the default universe's RPC alone, and stops on SIGTERM", async () => {
+    const way = await tunnels();
+    try {
+      const dir = folder("gnoworld-previews-");
+      const base = { name: "U", testnet: true };
+      const universes = join(dir, "universes.json");
+      writeFileSync(
+        universes,
+        JSON.stringify([
+          {
+            ...base,
+            id: "a",
+            chainId: "a-1",
+            rpc: "https://rpc.not-default.example:443",
+            gnoweb: "https://gnoweb.not-default.example",
+            indexer: "https://indexer.not-default.example/graphql",
+          },
+          {
+            ...base,
+            id: "b",
+            chainId: "b-1",
+            rpc: "https://rpc.the-default.example:443",
+            gnoweb: "https://gnoweb.the-default.example",
+            indexer: "https://indexer.the-default.example/graphql",
+            default: true,
+          },
+        ]),
+      );
+      const hub = {
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and its votes, on chain.",
+      };
+      writeFileSync(
+        join(dir, "hubs.json"),
+        JSON.stringify([
+          { ...hub, slug: "govdao", universe: "b", realms: ["gno.land/r/gov/dao"] },
+          { ...hub, slug: "other", universe: "a", realms: ["gno.land/r/else/where"] },
+        ]),
+      );
+      writeFileSync(join(dir, "key"), "sk-a-key-of-at-least-thirty-two-characters");
+      const server = start({
+        ...settings(),
+        PREVIEWS_FILE: join(dir, "previews.json"),
+        UNIVERSES_FILE: universes,
+        OPENAI_API_KEY_FILE: join(dir, "key"),
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => server.out.stdout.includes('"event":"previews_written"'));
+      expect(way.seen).toEqual(["rpc.the-default.example:443"]);
+      expect(server.out.stdout).not.toContain("gov/dao");
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+    } finally {
+      way.close();
+    }
+  });
+
+  it.each([
+    ["no UNIVERSES_FILE", {}, "setting UNIVERSES_FILE: required"],
+    [
+      "no OPENAI_API_KEY_FILE: no check, so no job",
+      { UNIVERSES_FILE: "/nowhere/universes.json" },
+      "setting OPENAI_API_KEY_FILE: required",
+    ],
+  ])("does not start with a PREVIEWS_FILE and %s: it fails closed, naming the setting", async (_, over, said) => {
+    const server = start({
+      ...settings(),
+      PREVIEWS_FILE: join(folder("gnoworld-previews-"), "previews.json"),
+      ...over,
+    });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(said);
+  });
+
   it("does not start with a WORLDS_FILE and no UNIVERSES_FILE: it fails closed, naming the setting", async () => {
     const server = start({ ...settings(), WORLDS_FILE: join(folder("gnoworld-worlds-"), "worlds.json") });
     expect(await exited(server)).not.toBe(0);

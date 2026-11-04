@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc, defaultUniverse, hubWorlds } from "./universes.ts";
+import { defaultRpc, defaultUniverse, hubRealms, hubWorlds } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -141,6 +141,24 @@ describe("hubWorlds", () => {
     const file = planted(JSON.stringify([ONYX]));
     expect(() => hubWorlds(file)).toThrow("hubs.json");
   });
+
+  // The pages the preview job captures (8f): the realms the team's data lists for the default universe, and no other.
+  it("lists every realm of the default universe's hubs for the preview job, each once, by its path; another universe's none", () => {
+    const hubs = [
+      { ...HUB, slug: "bubble", universe: "onyx" },
+      { ...HUB, slug: "govdao", universe: "onyx", realms: ["gno.land/r/gov/dao", "gno.land/r/gov/dao/v3/impl"] },
+      { ...HUB, slug: "again", universe: "onyx", realms: ["gno.land/r/gov/dao"] },
+      { ...HUB, slug: "elsewhere", universe: "other", realms: ["gno.land/r/else/where"] },
+    ];
+    expect(hubRealms(pair(JSON.stringify(hubs)))).toEqual(["gno.land/r/gov/dao", "gno.land/r/gov/dao/v3/impl"]);
+    expect(hubRealms(DATA)).toEqual(["gno.land/r/gov/dao"]);
+  });
+
+  it("refuses a hubs.json that is no good list for the preview job too, naming the file and none of its content", () => {
+    const file = pair(JSON.stringify([{ ...HUB, slug: "bubble", universe: "onyx", realms: ["https://evil.example"] }]));
+    expect(() => hubRealms(file)).toThrow(join(file, "..", "hubs.json"));
+    expect(() => hubRealms(file)).not.toThrow(/evil/);
+  });
 });
 
 // The egress proxy's list gains the default universe's RPC host from the data, and nothing else (decision of 2026-10-31). Docker is
@@ -273,8 +291,35 @@ describe("worlds.json's way to the page", () => {
   });
 });
 
+// The preview job's captures (8f) go the same way: written in that folder, served beside markets.json.
+describe("previews.json's way to the page", () => {
+  it("tells the server to write it in the folder of markets.json, the volume web mounts read-only", () => {
+    const folder = /^\s+MARKETS_FILE: (\/\S+)\/markets\.json\s*$/m.exec(compose)?.[1];
+    expect(folder).toBeDefined();
+    expect(compose).toContain(`PREVIEWS_FILE: ${String(folder)}/previews.json`);
+  });
+
+  it("proves in the stack that the running job reads a page through the way out and writes no capture the check did not pass", () => {
+    expect(script).toContain(
+      'expect "the running preview job reads the hubs\' pages through the way out and writes only the captures the check passed"',
+    );
+    expect(script).toContain(`mutant "previews.json kept a year" "web serves previews.json with a short cache"`);
+    expect(script).toContain(
+      `mutant "web follows a link at previews.json" "web does not follow a link planted at previews.json"`,
+    );
+  });
+
+  it("lets no host out for it: the job reads the chain through the RPC the way out already holds, never gnoweb", () => {
+    const gnowebs = (JSON.parse(read("app/data/universes.json")) as { gnoweb: string }[]).map(
+      ({ gnoweb }) => new URL(gnoweb).hostname,
+    );
+    expect(gnowebs.length).toBeGreaterThan(0);
+    expect(allowed.filter((host) => host !== undefined && gnowebs.includes(host))).toEqual([]);
+  });
+});
+
 // Its count (7n2), written beside it in the same pass, which the home's hero reads, goes the same way.
-describe.each(["worlds.json", "worlds-count.json"])("%s's way to the page", (file) => {
+describe.each(["worlds.json", "worlds-count.json", "previews.json"])("%s's way to the page", (file) => {
   it("serves it from that folder beside markets.json, with no listing and no link followed, under the same password", () => {
     const block = nginx.split(`location = /${file} {`)[1]?.split("}")[0] ?? "";
     expect(block).toMatch(/root \/markets;/);

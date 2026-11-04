@@ -52,3 +52,5 @@ export {
 export { MARKETS_HISTORY_MAX_BYTES, MARKETS_HISTORY_MOST, MarketsHistory } from "./marketsHistory.ts";
 // The ticker's trends (7t) behind it too: only the home reads them, and the store's chunk, on every page, holds none of them.
 export { Trend, Trends, TRENDS_MAX_BYTES, TRENDS_MOST } from "./trends.ts";
+// The preview captures (8f) behind it too: only a page that draws a preview reads them, from a chunk of its own.
+export { Capture, CAPTURE_MAX_BYTES, Previews, PREVIEWS_MAX, PREVIEWS_MAX_BYTES } from "./previews.ts";
