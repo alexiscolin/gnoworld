@@ -3,6 +3,13 @@
    and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
    room for. The one breakpoint of both is here. */
 @layer components {
+  /* The views' bar's height, one source for the bar and the room the page leaves under it on a phone; the two are no parent and child. */
+  .views,
+  .page {
+    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
+    --_bar: 44px;
+  }
+
   .header {
     /* layout: the header's cells on a grid, the account's group out of it on a phone */
     display: grid;
@@ -78,8 +85,7 @@
     inset-block-end: var(--space-s);
     /* raw: above the page's content until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
     z-index: 1;
-    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
-    block-size: 44px;
+    block-size: var(--_bar);
   }
 
   .view {
@@ -131,8 +137,8 @@
   }
 
   .page {
-    /* raw: the bar's 44 px, its 16 px gap under it and 16 px over it */
-    padding-block-end: calc(44px + 2 * var(--space-s));
+    /* The bar, its gap under it and one more over it. */
+    padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
   @media (min-width: 900px) {
