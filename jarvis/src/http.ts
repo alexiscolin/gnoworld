@@ -10,7 +10,7 @@ import { serverOptions } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
 
 /** What a handler answers: a status, and the body written as JSON. */
-interface Reply {
+export interface Reply {
   readonly status: number;
   readonly body: unknown;
 }
@@ -33,7 +33,7 @@ type Made = Reply & { readonly refused?: ApiError["error"]; readonly allow?: str
 const MAX_BYTES = 256 * 1024;
 
 /** A refusal, as an `ApiError` with its status. */
-const refusal = (error: ApiError["error"], status: number): Reply => ({ status, body: { error } });
+export const refusal = (error: ApiError["error"], status: number): Reply => ({ status, body: { error } });
 const refused = (error: ApiError["error"], status: number, more: { allow?: string; close?: boolean } = {}): Made => ({
   ...refusal(error, status),
   refused: error,
