@@ -42,13 +42,10 @@ const cross = (a: Spot, b: Spot, out: Spot) => {
   out.z = z / length;
 };
 
-// The workshop's leans, in the lab alone (tuning.ts): a landing's share of the scene's lean, as the panel moved it since, read at each frame,
-// so a system's view leans as the slider says with no new arrival. The home's own lean is the scene's eye's, so it is divided out here.
-function retuned(lean: number, landing: Landing | undefined): number {
-  if (landing === undefined) return lean;
-  const own = landing.lean === undefined ? tuned("eye.arrivalLean", ARRIVAL_LEAN) / ARRIVAL_LEAN : 1;
-  return (lean * own * LEAN) / tuned("eye.lean", LEAN);
-}
+// The workshop's share of the scene's lean at a system's view, in the lab alone (tuning.ts), read at each frame so a slider moves the view
+// with no new arrival. A share, as the code's ARRIVAL_LEAN = LEAN / 2.2: the home's lean is the scene's eye's (eye.ts). A Plan keeps its own.
+const retuned = (lean: number, landing: Landing | undefined): number =>
+  landing !== undefined && landing.lean === undefined ? tuned("eye.arrivalShare", lean) : lean;
 
 export class RestEye {
   /** What the camera looks at, on the stage: the Earth, or what the arrival looks at. */

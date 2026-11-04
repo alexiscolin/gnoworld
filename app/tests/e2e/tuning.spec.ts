@@ -32,6 +32,15 @@ const copied = async (page: Page) => {
   return list(page).textContent();
 };
 
+// The lab's cosmos, the site's own scene, at the video's size and still: a frame a change.
+async function onTheCosmos(page: Page, more: string) {
+  await page.setViewportSize({ width: 1728, height: 1080 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`${PAGE}?view=cosmos${more}`);
+  await running(page);
+  await landed(page);
+}
+
 async function shown(page: Page) {
   await page.keyboard.press("t");
   await expect(panel(page)).toBeVisible();
@@ -190,11 +199,7 @@ test.describe("the workshop's tuning panel", () => {
     page,
   }) => {
     test.setTimeout(180_000);
-    await page.setViewportSize({ width: 1728, height: 1080 });
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(`${PAGE}?view=cosmos`);
-    await running(page);
-    await landed(page);
+    await onTheCosmos(page, "");
     await expect.poll(async () => (await sceneStats(page)).cosmos?.bodies ?? 0, { timeout: 90_000 }).toBeGreaterThan(2);
     const whole: [number, number, number, number] = [0, 0, 1728, 1080];
     const [before = 0] = await brightness(page, await picture(page), [whole]);
@@ -219,19 +224,17 @@ test.describe("the workshop's tuning panel", () => {
     const [after = 0] = await brightness(page, await picture(page), [whole]);
     expect(after, `the cosmos's light, ${String(before)} before`).toBeGreaterThan(before * COSMOS_BRIGHTER);
   });
-  // A system's view reads its arrival's lean once the arrival's chunk came: T shows what the code has read by then, so it is asked again.
-  test("offers both leans at a system's view, at the code's values, and copies a moved one", async ({ page }) => {
+  // A system's view reads its share of the lean once the arrival's chunk came: T shows what the code has read by then, so it is asked again.
+  test("offers the home's lean and a system's share at a system's view, at the code's values, and copies a moved one", async ({
+    page,
+  }) => {
     test.setTimeout(180_000);
-    await page.setViewportSize({ width: 1728, height: 1080 });
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(`${PAGE}?view=cosmos&arrive=gnoswap`);
-    await running(page);
-    await landed(page);
+    await onTheCosmos(page, "&arrive=gnoswap");
     await expect
       .poll(
         async () => {
           if (await panel(page).isHidden()) await page.keyboard.press("t");
-          const found = await control(page, "Lean at a system").count();
+          const found = await control(page, "Lean share at a system").count();
           if (found === 0) await page.keyboard.press("t");
           return found;
         },
@@ -239,9 +242,9 @@ test.describe("the workshop's tuning panel", () => {
       )
       .toBe(1);
     await expect(control(page, "Lean at home")).toHaveValue(String(LEAN));
-    await control(page, "Lean at a system").fill("2");
+    await control(page, "Lean share at a system").fill("0.6");
     expect(await copied(page)).toBe(
-      `eye.arrivalLean: 2 (was ${String(ARRIVAL_LEAN)}) · packages/core/src/space/drift.ts, ARRIVAL_LEAN`,
+      `eye.arrivalShare: 0.6 (was ${String(ARRIVAL_LEAN / LEAN)}) · packages/core/src/space/drift.ts, ARRIVAL_LEAN = LEAN × the share`,
     );
   });
 });

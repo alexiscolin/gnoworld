@@ -18,12 +18,12 @@ export interface Control {
 const SCENE: Record<Tunable, Span & { readonly label: string; readonly where: string }> = {
   "grade.exposure": { label: "Exposure", min: 0.2, max: 2.5, step: 0.01, where: "app/src/scene/renderer.ts, EXPOSURE" },
   "eye.lean": { label: "Lean at home", min: 0, max: 8, step: 0.05, where: "packages/core/src/space/drift.ts, LEAN" },
-  "eye.arrivalLean": {
-    label: "Lean at a system",
+  "eye.arrivalShare": {
+    label: "Lean share at a system",
     min: 0,
-    max: 4,
-    step: 0.02,
-    where: "packages/core/src/space/drift.ts, ARRIVAL_LEAN",
+    max: 1,
+    step: 0.01,
+    where: "packages/core/src/space/drift.ts, ARRIVAL_LEAN = LEAN × the share",
   },
 };
 const TOKENS = "packages/ui/src/tokens.css";
@@ -55,7 +55,7 @@ export function primitives(rules: CSSRuleList): string[] {
   return found;
 }
 
-// A slider at the code's value. One off the slider's steps (ARRIVAL_LEAN is 3 / 2.2) shows as the code has it, and only a move changes it.
+// A slider at the code's value. One off the slider's steps (a system's share is 1 / 2.2) shows as the code has it; only a move changes it.
 function slider(name: string, { value, ...span }: Span & { readonly value: number }, moved: (value: number) => void) {
   const row = document.createElement("label");
   const input = Object.assign(document.createElement("input"), {
