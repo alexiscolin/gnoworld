@@ -12,7 +12,7 @@ import { gpuCanDraw, showJourneys } from "./gpu.ts";
 import { loadScene } from "./loadScene.ts";
 import { circleOf, markGlobe, tintPage, worldAsk } from "./globe.ts";
 import { Flown } from "./flown.ts";
-import { Heard } from "./heard.ts";
+import { Heard } from "../../lib/heard.ts";
 import { restsAt, tellScene } from "./views.ts";
 import { WorldsFeed, type CosmosPage } from "./worldsFeed.ts";
 

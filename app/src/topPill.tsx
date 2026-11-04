@@ -4,7 +4,7 @@
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useSyncExternalStore } from "react";
 // The listeners' record the scene's host uses: one way to tell what a component reads.
-import { Heard } from "./features/universe/heard.ts";
+import { Heard } from "./lib/heard.ts";
 
 let shown: FlashMessage | null = null;
 const hearing = new Heard();

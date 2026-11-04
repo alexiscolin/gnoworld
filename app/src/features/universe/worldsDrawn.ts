@@ -1,7 +1,7 @@
 // How many worlds the cosmos draws, once a read has said (slice 7d6): the home's count, or the scene's file. Alone in its module, so the
 // header's passport counter (slice 8) reads it with nothing of the reads themselves.
 import { useSyncExternalStore } from "react";
-import { Heard } from "./heard.ts";
+import { Heard } from "../../lib/heard.ts";
 
 let drawnWorlds: number | undefined;
 const counting = new Heard();
