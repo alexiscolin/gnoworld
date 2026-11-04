@@ -15,7 +15,17 @@ import {
   type PlanetLook,
 } from "./look.ts";
 import { labOf, linearOf, paletteOf, turnOf, type Lab } from "./palette.ts";
-import { BARE, CONTINENTS_SEA, ofContinents, planetRecipe, seededRecipe, worldRecipe, type Recipe } from "./recipe.ts";
+import { starWarmth } from "../cosmos/warmth.ts";
+import {
+  BARE,
+  CONTINENTS_SEA,
+  ofContinents,
+  plantsOf,
+  planetRecipe,
+  seededRecipe,
+  worldRecipe,
+  type Recipe,
+} from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { correlation } from "../testing.ts";
@@ -75,8 +85,9 @@ function recipePlaces(
   const place = placer(places);
   for (const name of Object.keys(SURFACE) as SurfaceName[]) place(name, recipe.surface[name], spanOf(anchor, name));
   place("minor share", recipe.minorShare, [0, 0.4]);
-  const blend = word(planetSeed(asciiBytes(`gno.land/r/${id}`)), 6);
-  const [one, other] = ROWS[anchor].palettes;
+  const seed = planetSeed(asciiBytes(`gno.land/r/${id}`));
+  const blend = word(seed, 6);
+  const [one, other] = plantsOf(sha256(seed), anchor, starWarmth(id.split("/")[0] ?? ""));
   const [from, to] = [labOf(one[1]), labOf(other[1])];
   const plain: Lab = [lerp(from[0], to[0], blend), lerp(from[1], to[1], blend), lerp(from[2], to[2], blend)];
   const graded = recipe.palette.lab[1];
@@ -229,7 +240,7 @@ describe("a world's sea", () => {
     for (const anchor of ANCHORS.filter((one) => ROWS[one].sea !== undefined))
       for (const share of [0, 0.3, 1]) {
         const turn = turnOf(share);
-        const { sea } = seededRecipe(planetSeed(asciiBytes(`gno.land/r/${anchor}/home`)), anchor, turn);
+        const { sea } = seededRecipe(planetSeed(asciiBytes(`gno.land/r/${anchor}/home`)), anchor, { turn });
         const row = ROWS[anchor].sea;
         if (sea === null || row === undefined) throw new Error(`${anchor} has a sea`);
         for (const [at, colour] of [row.shallow, row.deep].entries()) {
@@ -244,7 +255,7 @@ describe("a world's sea", () => {
 
   it("keeps a temperate world's teal a glance from the frames' navy at either end of the turn", () => {
     for (const share of [0, 1]) {
-      const sea = seededRecipe(planetSeed(asciiBytes("gno.land/r/sea/home")), "temperate", turnOf(share)).sea;
+      const sea = seededRecipe(planetSeed(asciiBytes("gno.land/r/sea/home")), "temperate", { turn: turnOf(share) }).sea;
       for (const [at, navy] of NAVY.entries()) {
         const drawn = sea?.lab[at] ?? navy;
         expect(
@@ -264,13 +275,16 @@ describe("a world of continents", () => {
   const DEGREE = Math.PI / 180;
   const hueOf = ([, a, b]: Lab) => Math.atan2(b, a) / DEGREE;
   const lights = ([low, mid, high]: readonly [Lab, Lab, Lab]) => [low[0], mid[0], high[0]] as const;
+  // Each world's recipe, and whether it grows the Earth's plants or other ones (its star's, 7b9).
   const temperate = (count: number) =>
-    Array.from({ length: count }, (_, at) =>
-      planetRecipe(asciiBytes(`gno.land/r/t${String(at % 50)}/w${String(at)}`), "temperate"),
-    );
+    Array.from({ length: count }, (_, at) => {
+      const path = asciiBytes(`gno.land/r/t${String(at % 50)}/w${String(at)}`);
+      const plants = plantsOf(sha256(planetSeed(path)), "temperate", starWarmth(`t${String(at % 50)}`));
+      return { ...planetRecipe(path, "temperate"), earth: plants === ROWS.temperate.palettes };
+    });
 
   it("grows the Earth's plants, deep forest to dry grass, never more saturated than the Earth's own greens", () => {
-    for (const { palette } of temperate(500)) {
+    for (const { palette } of temperate(500).filter(({ earth }) => earth)) {
       for (const colour of palette.lab) {
         expect(hueOf(colour)).toBeGreaterThanOrEqual(75 - 12);
         expect(hueOf(colour)).toBeLessThanOrEqual(124 + 12);
@@ -306,7 +320,7 @@ describe("a world of continents", () => {
           chroma: lerp(...CHROMA, (more[29] ?? 0) / 255),
           turn: turnOf(share),
         };
-        const { minorPalette, palette } = seededRecipe(seed, "temperate", grade.turn);
+        const { minorPalette, palette } = seededRecipe(seed, "temperate", { turn: grade.turn });
         expect(minorPalette).toEqual(paletteOf(BARE, grade));
         expect(palette).toEqual(paletteOf(ROWS.temperate.palettes, grade));
       }
