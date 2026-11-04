@@ -59,6 +59,7 @@ const setup = ({ budgets, setBudget, jarvis, nonceCap }: Options = {}) => {
       signed: makeSigned(db, {
         chains: [CHAIN, "gnoland-1"],
         now: () => clock.now,
+        console: true,
         ...(nonceCap === undefined ? {} : { nonceCap }),
       }),
       quota,
@@ -473,6 +474,19 @@ describe("the admin API, a change", () => {
       body: { chainId: CHAIN, change: { setting: "quota", questions: 23 } },
     });
     expect(await answerOf(full)).toEqual([429, { error: "too_many" }]);
+  });
+
+  it("still logs its admin in and makes a change while the public site's nonces are at their cap (Alexis, 10g-6)", async () => {
+    const { db, challenge, prove, change, clock } = setup({ nonceCap: 2 });
+    const now = () => clock.now;
+    const site = makeLogin(db, { chains: [CHAIN], now, nonceCap: 2 });
+    const consoleLogin = makeLogin(db, { chains: [CHAIN], now, nonceCap: 2, console: true });
+    for (let at = 0; at < 2; at += 1) site.challenge(CHAIN, "gnoworld.test");
+    expect(site.challenge(CHAIN, "gnoworld.test")).toBe("full");
+    const signedIn = consoleLogin.challenge(CHAIN, "admin.gnoworld.test");
+    if (typeof signedIn === "string") throw new Error(signedIn);
+    expect(typeof (await consoleLogin.verify(prove(signedIn), () => true, "admin.gnoworld.test"))).toBe("object");
+    expect((await change(prove(await challenge({ setting: "quota", questions: 21 })))).status).toBe(200);
   });
 
   it("takes a proof a millisecond before its five minutes end", async () => {

@@ -109,7 +109,7 @@ if (door !== undefined)
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.
 const adminApp = makeApp(log, () => !draining);
 if (config.admin !== undefined) {
-  adminApp.route("/api/login", loginFrom(db, { ...config, origins: config.admin.origins }, { log }));
+  adminApp.route("/api/login", loginFrom(db, { ...config, origins: config.admin.origins }, { log, console: true }));
   if (door !== undefined)
     adminApp.route(
       "/api/admin/jarvis",
@@ -117,7 +117,7 @@ if (config.admin !== undefined) {
         isTeam: (who) => isTeam(roles, who),
         session,
         origins: config.admin.origins,
-        signed: makeSigned(db, { chains: config.chains, now: Date.now }),
+        signed: makeSigned(db, { chains: config.chains, now: Date.now, console: true }),
         quota: door.quota,
         jarvis: door.jarvis,
         log,

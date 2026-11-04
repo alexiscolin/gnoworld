@@ -109,12 +109,13 @@ export function loginRoutes(
 
 type Settings = Pick<Config, "chains" | "origins" | "trustedProxy" | "newAccountsPerHour">;
 
-// The login as the server mounts it, from its settings and one clock.
+// The login as the server mounts it, from its settings and one clock; the admin console's on its own listener.
 export function loginFrom(
   db: DatabaseSync,
   { chains, origins, trustedProxy: proxy, newAccountsPerHour }: Settings,
-  { log, now = Date.now }: { log: Log; now?: () => number },
+  { log, now = Date.now, console = false }: { log: Log; now?: () => number; console?: boolean },
 ): Hono<Guarded> {
   const tickets = makeTickets(db, { now });
-  return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now, tickets });
+  const login = makeLogin(db, { chains, now, console });
+  return loginRoutes(login, { log, origins, proxy, newAccountsPerHour, now, tickets });
 }

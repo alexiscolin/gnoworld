@@ -82,17 +82,23 @@ interface Options {
   now: () => number;
   verify?: Verify;
   nonceCap?: number;
+  // The admin console's login and changes (ADR-0002 §6): its own host's pending nonces counted alone, so a public flood
+  // never fills its cap (Alexis, 10g-6).
+  console?: boolean;
 }
 
 export function makeSigned(
   db: DatabaseSync,
-  { chains, now, verify = verifyProof, nonceCap = 100_000 }: Options,
+  { chains, now, verify = verifyProof, nonceCap = 100_000, console = false }: Options,
 ): Signed {
   if (chains.length === 0) throw new Error("the login needs at least one chain");
   const ttl = 5 * 60_000;
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
+    // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000, measured by the finding-verifier); the console's
+    // calls are few, and the public path keeps the global count, so a flood costs it nothing more (Alexis, 10g-6).
+    countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ?"),
     addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, action, expires_at) VALUES (?, ?, ?, ?, ?, ?)"),
     spendLogin: db.prepare(
       "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NULL RETURNING chain, text",
@@ -124,7 +130,8 @@ export function makeSigned(
       const at = now();
       sql.purgeNonces.run(at);
       // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
-      if (Count.parse(sql.countNonces.get()).n >= nonceCap) return "full";
+      const pending = console ? sql.countHost.get(host) : sql.countNonces.get();
+      if (Count.parse(pending).n >= nonceCap) return "full";
       const nonce = randomBytes(16).toString("base64url");
       const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
       const text = [

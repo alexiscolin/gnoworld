@@ -932,3 +932,35 @@ describe("a signed action", () => {
     );
   });
 });
+
+// 10g (ADR-0002 §6; Alexis, 10g-6): the admin console's login, on its own listener: its pending nonces counted for its
+// own host alone.
+describe("the admin console's login", () => {
+  const CONSOLE = "admin.gnoworld.test";
+  const consoleSetup = () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    opened.push(db);
+    const clock = { now: T0 };
+    const now = () => clock.now;
+    const site = makeLogin(db, { chains: CHAINS, now, nonceCap: 2 });
+    const admin = makeLogin(db, { chains: CHAINS, now, nonceCap: 2, console: true });
+    const signed = makeSigned(db, { chains: CHAINS, now, nonceCap: 2, console: true });
+    return { db, clock, site, admin, signed };
+  };
+  it("counts its own host's pending nonces alone, so the public site at its cap leaves its login and changes be", () => {
+    const { site, admin, signed } = consoleSetup();
+    for (let at = 0; at < 2; at += 1) site.challenge("onyx-1", DOMAIN);
+    expect(site.challenge("onyx-1", DOMAIN)).toBe("full");
+    expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
+    expect(typeof signed.issue("onyx-1", CONSOLE, { head: ["A change"], action: "{}" })).toBe("object");
+    expect(admin.challenge("onyx-1", CONSOLE)).toBe("full");
+  });
+
+  it("leaves the public site's count the global one, the console's nonces in it, while the console counts its own", () => {
+    const { site, admin } = consoleSetup();
+    site.challenge("onyx-1", DOMAIN);
+    admin.challenge("onyx-1", CONSOLE);
+    expect(site.challenge("onyx-1", DOMAIN)).toBe("full");
+    expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
+  });
+});
