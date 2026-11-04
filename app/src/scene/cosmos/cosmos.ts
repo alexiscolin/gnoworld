@@ -64,7 +64,7 @@ export class Cosmos {
       this.#setShown(this.#wanted);
       this.#device.moved();
     });
-    this.#whole = new Whole(device, this.#owner, this.#mapCame);
+    this.#whole = new Whole(device, this.#owner, { came: this.#mapCame, box: () => this.#box });
     this.seen = { projector: this.#bodies, earth: () => this.#home.at, earthRadius: this.#home.radius };
     this.#setShown(false);
     device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);

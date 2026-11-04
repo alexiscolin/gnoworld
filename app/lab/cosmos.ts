@@ -5,10 +5,14 @@
 // their callers from their own hash, to weigh a system of any size (7v2; Alexis, 2026-11-04: "scalables pour récupérer énormément de
 // mondes"); `tier=low` the weak tier.
 import { HERO_ZONE, HOME } from "@gnoworld/core";
+import { Scene, type Camera, type Object3D, type WebGLRenderer } from "three";
 import { CREDITS } from "../src/scene/planet/credits.ts";
+import { Web } from "../src/scene/cosmos/web.ts";
 import { startScene } from "../src/scene/scene.ts";
 import read from "./imports.json" with { type: "json" };
 import { linked } from "./linked.ts";
+import { paletteNamed } from "./palettes.ts";
+import { frameCost } from "./probes.ts";
 import { tuningPanel } from "./panel.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
@@ -29,6 +33,24 @@ if (footer !== null) footer.textContent = CREDITS.map((credit) => credit.line).j
 const panel = document.querySelector("main");
 if (panel !== null) panel.hidden = true;
 
+// What a frame of the site's scene costs, for the frame budget's measure: the renderer, stage and camera of its last frame, which three
+// hands a stage's onBeforeRender (WebGLRenderer.js:1682), drawn `count` times by the realism page's probe.
+const last: { renderer?: WebGLRenderer; stage?: Scene; camera?: Camera } = {};
+Scene.prototype.onBeforeRender = (renderer: WebGLRenderer, stage: Object3D, camera: Camera) => {
+  if (stage instanceof Scene) Object.assign(last, { renderer, stage, camera });
+};
+Reflect.set(globalThis, "__labCost", (count: number) => {
+  const { renderer, stage, camera } = last;
+  if (renderer === undefined || stage === undefined || camera === undefined) return Number.NaN;
+  return frameCost(
+    renderer,
+    () => {
+      renderer.render(stage, camera);
+    },
+    count,
+  );
+});
+
 const query = new URLSearchParams(location.search);
 const remembered = query.get("tier") === "low" ? "low" : undefined;
 const scene = startScene({ canvas, remembered, remember: () => undefined, onLost: () => undefined });
@@ -40,6 +62,14 @@ const big = Array.from({ length: Number(query.get("big") ?? 0) }, (_, at) => ({
 }));
 scene.cosmos([...file.worlds, ...big], file.updated);
 Reflect.set(globalThis, "__gnoworldScene", scene);
+// The whole cosmos's palette (palettes.ts), painted on its mass once its chunk has come.
+const palette = new URLSearchParams(location.search).get("palette");
+const painting = setInterval(() => {
+  const web: unknown = Reflect.get(globalThis, "__gnoworldWeb");
+  if (!(web instanceof Web)) return;
+  clearInterval(painting);
+  web.paint(paletteNamed(palette, document.documentElement));
+}, 100);
 // A system's name, looked up among the file's systems and nothing else.
 const arriving = query.get("arrive");
 if (arriving !== null) scene.arrive(arriving);

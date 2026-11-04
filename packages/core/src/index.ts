@@ -97,7 +97,7 @@ export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
-export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
+export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { realmRoute, worldRoute } from "./places/route.ts";
 export { GOLDEN } from "./space/golden.ts";

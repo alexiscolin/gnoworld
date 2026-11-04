@@ -23,7 +23,10 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
   // 7x2's loader and text box, 7v2's ratio, bands and a Plan half lit, 7b9's star's warmth (the night's +1 KiB, the chief), measured.
   { chunk: "cosmos", after: ["scene"], cap: 17_345 },
-  { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
+  // 6,834 B with the mass, the hero's box it shares (7u; Alexis, "Oui, 6 706") and its rims' touch; its pills a chunk apart; 6,837
+  // on its merge into slice-7, inside the 256 B margin.
+  { chunk: "web", after: ["scene", "cosmos"], cap: 6837 },
+  { chunk: "webNames", after: ["scene", "cosmos", "web"], cap: 1219 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
   { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
   { chunk: "labelled", after: ["scene", "cosmos"], cap: 6502 },
@@ -35,10 +38,12 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; a new limit at its size (the chief, 2026-11-04), 13,442 B with
-  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md); 7v2's route and bands, 7b9's chunks' names, 7f5's eye held.
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_547 },
+  // the fourteen stations Alexis approved (the night's +1 KiB, night-caps.md); 7v2's route and bands, 7b9's chunks' names, 7f5's eye held;
+  // 13,815 B with 7u's hero box shared with web (7u alone 13,710), measured on its merge (the night's +1 KiB over 13,199, night-caps.md).
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 13_815 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
-  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2408 },
+  // 2,417 B on 7u's merge: labels.module.css split with the pills' chunk (7u alone 2,408), inside the 256 B margin over 2,401.
+  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2417 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
   { chunk: "part", after: ["scene"], cap: 12_066 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the

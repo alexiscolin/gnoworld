@@ -199,12 +199,15 @@ export function nebulaLight(nebula: Nebula, eye: Point): number {
   return light < LEAST ? 0 : light;
 }
 
+// How much of them the whole cosmos takes: 55% stays behind its mass, its warm haze (7u; Alexis, 2026-11-04 night, "va pour tes reco").
+const WHOLE_TAKES = 0.45;
+
 /** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, a third at a system's distance, all at
- * a cluster's, none past it. */
+ * a cluster's, and past it what `WHOLE_TAKES` leaves, behind the whole cosmos. */
 export const nebulaShare = (distance: number): number =>
   smoothstep(WORLD, SYSTEM, distance) *
   (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
-  (1 - wholeShare(distance));
+  (1 - WHOLE_TAKES * wholeShare(distance));
 
 // Frame 16's teal, top right (f0016.jpg, read on 2026-11-02): its mean, sRGB (10, 44, 50), in linear light, its brightest channel at 1.
 const TEAL = { red: 0.09516135842160993, green: 0.7896549257303476, blue: 1 };
