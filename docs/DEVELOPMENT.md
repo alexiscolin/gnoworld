@@ -39,18 +39,19 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 Each branch works in a worktree of its own, made from the root of a checkout whose packages are
 installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
 `sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
-`/private/tmp/claude-<uid>/gnoworld-wt`, which it may also be given in full. Whatever the spelling
-(a `..`, a link, another path) it refuses any other folder, as it may run outside the sandbox and
-must touch no other (F5058), and a base whose harness or package files are not its tree's (F5098).
-It makes the branch, links the main tree's
+`~/Server/gnoworld-wt` (made once, in your shell), where no session writes but its own folder
+(Alexis, 2026-11-04), which it may also be given in full. Whatever the spelling (a `..`, a link, another path) it refuses any other
+folder, as it may run outside the sandbox and must touch no other (F5058), and a base whose harness,
+`CLAUDE.md` or package files are not its tree's (F5098). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
-relative links and a `.bin` of its own; the gate's StrykerJS reads one incremental file every tree
-shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made links
-loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+relative links and a `.bin` of its own, through no link it did not make; the gate's StrykerJS reads
+one incremental file every tree shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made
+links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
 `sh scripts/worktree.sh remove <name>`, from another tree,
 removes a worktree of that root that holds no change, staged file or untracked file (git's own
-check: its ignored files go with it, never what a link in it leads to), keeps its branch, and
-prunes the records of the worktrees gone.
+check: its ignored files go with it, never what a link in it leads to) with its record, and keeps
+its branch. It prunes no other record, which a session can point at nothing: `git worktree prune`
+is run in your shell.
 After a merge that changes the lockfile, install in the main checkout
 (`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
 
