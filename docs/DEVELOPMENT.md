@@ -36,15 +36,27 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 
 ## A branch's worktree
 
-Each branch works in a worktree of its own, made from the main checkout by one script, never by
-hand: `sh scripts/worktree.sh <dir> <branch> <base>`. It makes the branch, links the main tree's
+Each branch works in a worktree of its own, made from the root of a checkout whose packages are
+installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
+`sh scripts/worktree.sh /private/tmp/claude-<uid>/gnoworld-wt/<name> <branch> <base>`. Its folder
+must resolve to that root, `<name>` in a-z, 0-9 and -: whatever its spelling (a `..`, a link,
+another path) it refuses any other, as it may run outside the sandbox and must touch no other
+folder (F5058). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
 relative links and a `.bin` of its own; the gate's StrykerJS reads one incremental file every tree
 shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made links
 loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+`sh scripts/worktree.sh remove /private/tmp/claude-<uid>/gnoworld-wt/<name>`, from another tree,
+removes a worktree of that root that holds no change, staged file or untracked file (git's own
+check: its ignored files go with it, never what a link in it leads to), keeps its branch, and
+prunes the records of the worktrees gone.
 After a merge that changes the lockfile, install in the main checkout
-(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`); the sandbox
-cannot remove a worktree's record in `.git/worktrees`, so `git worktree prune` is run in your shell.
+(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
+
+A session writes its own worktree only: never another session's, by any tool, nor runs a command
+that writes there (F5058). So a merge into a part's branch that changes the harness is Alexis's, in
+his terminal: the part's own sandbox refuses those files (F5055), and the chief writing them for it
+from his session was the hole F5058 names.
 
 ## Toolchain
 
