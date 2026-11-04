@@ -54,8 +54,8 @@ describe("the view at rest's depth chunk", () => {
   });
 });
 
-// Alexis, 2026-11-03 ("il faut le rangement propre"): what the depth's chunk shares with the view at rest's search is written once, read
-// here as text by Vite, never copied to spare a chunk its bytes (7p left a copy, its R5).
+// Alexis, 2026-11-03 ("il faut le rangement propre"): what the depth's chunk shares with the view at rest's search and with the labels'
+// chunk is written once, read here as text by Vite, never copied to spare a chunk its bytes (7p left two copies, its R5 and R12).
 const SOURCES = import.meta.glob<string>(
   [
     "../../**/*.ts",
@@ -74,5 +74,9 @@ const written = (pattern: RegExp) =>
 describe("what the depth's chunk shares", () => {
   it("defines a drawn body's least size, 1.5 times a body's, once", () => {
     expect(written(/\b1\.5\s*\*\s*BODY_PIXELS\b|\bBODY_PIXELS\s*\*\s*1\.5\b/g)).toHaveLength(1);
+  });
+
+  it("writes a label's place by its body, its stem and its gap, once", () => {
+    expect(written(/\b(?:stem|gap)\s*[:=]\s*(?:12|22)\b/g)).toHaveLength(2);
   });
 });
