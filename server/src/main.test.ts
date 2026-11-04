@@ -643,6 +643,85 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(performance.now() - started).toBeLessThan(2000);
   });
 
+  it("serves the admin API and its login on their own listener alone, never on the public one (ADR-0002 §6)", async () => {
+    const server = start({
+      ...settings(),
+      ORIGINS: "https://gnoworld.test",
+      JARVIS_URL: "http://127.0.0.1:9",
+      ADMIN_PORT: "0",
+      ADMIN_ORIGINS: "https://admin.gnoworld.test",
+    });
+    const port = await listening(server);
+    await until(() => server.out.stdout.includes('"event":"admin_listening"'));
+    const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
+    expect(admin).not.toBe(port);
+    const at = (listener: number, path: string, origin?: string): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(listener)}${path}`, {
+        ...(origin === undefined
+          ? {}
+          : { method: "POST", headers: { origin, "content-type": "application/json" }, body: '{"chainId":"onyx-1"}' }),
+      });
+    expect((await at(port, "/api/admin/jarvis")).status).toBe(404);
+    expect((await at(admin, "/api/admin/jarvis")).status).toBe(401);
+    expect((await at(admin, "/api/login/challenge", "https://admin.gnoworld.test")).status).toBe(200);
+    expect((await at(admin, "/api/login/challenge", "https://gnoworld.test")).status).toBe(403);
+    expect((await at(port, "/api/login/challenge", "https://admin.gnoworld.test")).status).toBe(403);
+    expect((await at(admin, "/api/jarvis/ask", "https://admin.gnoworld.test")).status).toBe(404);
+    expect((await at(port, "/api/jarvis/ask", "https://gnoworld.test")).status).toBe(401);
+    const exit = exited(server);
+    server.child.kill("SIGTERM");
+    expect(await exit).toBe(0);
+  });
+
+  it("lets the roles file's team alone read and change Jarvis's settings over the admin listener (ADR-0002 §6)", async () => {
+    const [lead, stranger] = [wallet(), wallet()];
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    writeFileSync(roles, JSON.stringify({ team: [lead.address], trusted: [], worlds: [] }));
+    const site = "https://admin.gnoworld.test";
+    const server = start({
+      ...settings(),
+      ROLES_FILE: roles,
+      JARVIS_URL: "http://127.0.0.1:9",
+      ADMIN_PORT: "0",
+      ADMIN_ORIGINS: site,
+    });
+    await listening(server);
+    await until(() => server.out.stdout.includes('"event":"admin_listening"'));
+    const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
+    const post = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(admin)}${path}`, {
+        method: "POST",
+        headers: { origin: site, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const signIn = async (who: typeof lead): Promise<string> => {
+      const made = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const verified = await post("/api/login/verify", {
+        nonce: made.nonce,
+        address: who.address,
+        proof: who.sign("onyx-1", made.text),
+      });
+      return (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    };
+    const read = async (cookie: string) => {
+      const answer = await fetch(`http://127.0.0.1:${String(admin)}/api/admin/jarvis`, { headers: { cookie } });
+      return [answer.status, await answer.json()];
+    };
+    const [leads, strangers] = [await signIn(lead), await signIn(stranger)];
+    const settled = { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: null };
+    expect(await read(leads)).toEqual([200, settled]);
+    expect(await read(strangers)).toEqual([403, { error: "forbidden" }]);
+    const change = { chainId: "onyx-1", change: { setting: "quota", questions: 30 } };
+    expect((await post("/api/admin/jarvis/challenge", change, strangers)).status).toBe(403);
+    const made = Challenge.parse(await (await post("/api/admin/jarvis/challenge", change, leads)).json());
+    const proof = { nonce: made.nonce, address: lead.address, proof: lead.sign("onyx-1", made.text) };
+    expect((await post("/api/admin/jarvis/change", proof, strangers)).status).toBe(403);
+    expect((await post("/api/admin/jarvis/change", proof, leads)).status).toBe(200);
+    expect(await read(leads)).toEqual([200, { ...settled, quota: 30 }]);
+    const large = await post("/api/admin/jarvis/change", { nonce: "a".repeat(20_000) }, leads);
+    expect(large.status).toBe(413);
+  });
+
   it("opens no admin listener and no door without their settings", async () => {
     const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });
     const port = await listening(server);
