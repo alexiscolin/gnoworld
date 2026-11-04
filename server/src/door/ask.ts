@@ -90,13 +90,7 @@ export function askRoutes(options: Options): Hono<Guarded> {
       log("jarvis_failed", { route, status, error: answer.error, ms, room, account: who });
       return c.json({ error } satisfies ApiError, status);
     }
-    log(answer.answer.status === "spent" ? "jarvis_spent" : "jarvis_answered", {
-      route,
-      status: 200,
-      ms,
-      room,
-      account: who,
-    });
+    log(`jarvis_${answer.answer.status}`, { route, status: 200, ms, room, account: who });
     return c.json(answer.answer);
   });
   return app;

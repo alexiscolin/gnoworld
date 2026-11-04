@@ -257,6 +257,12 @@ describe("a question to Jarvis", () => {
     expect(events().at(-1)).toMatch(/^\{"event":"jarvis_spent","route":"\/api\/jarvis\/ask","status":200,/);
   });
 
+  it("passes on jarvis's own off, and logs it as off", async () => {
+    const { ask, events } = setup({ answer: () => Promise.resolve({ ok: true, answer: { status: "off" } }) });
+    expect(await answerOf(await ask())).toEqual([200, { status: "off" }]);
+    expect(events().at(-1)).toMatch(/^\{"event":"jarvis_off","route":"\/api\/jarvis\/ask","status":200,"ms":0,/);
+  });
+
   it("answers a typed error when jarvis fails, never a hang", async () => {
     const failures: [Asked & { ok: false }, number, string][] = [
       [{ ok: false, error: "shape" }, 502, "internal"],
