@@ -107,6 +107,36 @@ describe("makePresence", () => {
     expect(presence.history("a/known")).toEqual([{ at: T0, people: 3 }]);
   });
 
+  // 7t3: a full store is no door a flood can shut. A world entering takes the place of the stored one whose busiest hour is the smallest,
+  // the first by id among equals, when its own count is larger; never for a count no larger.
+  it("makes room in a full store for a busier world, in place of the one whose busiest hour is the smallest", () => {
+    const { presence, clock } = make();
+    const full = new Map<string, number>();
+    for (let i = 0; i < PRESENCE_WORLDS_MAX; i += 1) full.set(`ns/w${String(i).padStart(4, "0")}`, 2);
+    full.set("ns/w0007", 1);
+    full.set("ns/w0003", 1);
+    full.set("ns/w0005", 9);
+    presence.record(full);
+    clock.at = T0 + HOUR;
+    presence.record(new Map([["ns/w0005", 0]]));
+    presence.record(new Map([["a/even", 1]]));
+    expect(presence.history("a/even"), "a count no larger").toEqual([]);
+    presence.record(new Map([["a/busier", 2]]));
+    expect(presence.history("a/busier")).toEqual([{ at: T0 + HOUR, people: 2 }]);
+    expect(presence.history("ns/w0003"), "the smallest, first by id").toEqual([]);
+    expect(presence.history("ns/w0007")).toHaveLength(1);
+    presence.record(
+      new Map([
+        ["a/first", 3],
+        ["a/second", 5],
+      ]),
+    );
+    expect(presence.history("ns/w0007")).toEqual([]);
+    expect(presence.history("a/second")).toHaveLength(1);
+    expect(presence.history("ns/w0005"), "its busiest hour counts, not its last").toHaveLength(2);
+    expect(presence.size().worlds).toBe(PRESENCE_WORLDS_MAX);
+  });
+
   it.each([
     ["a count that is negative", -1],
     ["a count that is a fraction", 1.5],
