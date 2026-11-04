@@ -199,7 +199,7 @@ grep -qxE '[[:space:]]*python3 -I scripts/harness_mutate\.py' "$gate_file" || fa
 at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
 [ "$(at '. .githooks/records.sh && tested=$(worktree_print)')" -lt "$(at 'run format:check')" ] || fail "check.sh prints its code after a step ran (F133)"
 [ "$(at 'gate_passed "$tested" "$full"')" -gt "$(at 'python3 -I scripts/harness_mutate.py')" ] || fail "check.sh records its code before its last step (F076)"
-[ "$(at 'sh scripts/ergo.sh')" -lt "$(at 'sh -c "$tests --reporter=default')" ] || fail "check.sh runs the tests before it builds the Ergo they start"
+[ "$(at 'sh scripts/ergo.sh')" -lt "$(at 'sh -c "$tests --tags-filter=!timing --reporter=default')" ] || fail "check.sh runs the tests before it builds the Ergo they start"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -n "^[[:space:]]*trap .* EXIT$" "$f" | grep -v '|| status=1; exit "$status"' | grep -q . && fail "$(basename "$f") has an EXIT trap that can hide a failure"
@@ -6246,6 +6246,28 @@ reset
 printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a server change"
 ran playwright && fail "check.sh read the first screen's budget with no build"
+fi
+
+if part gate_timing; then
+gate_fixture gate_timing
+# The tests tagged `timing`, a bound in wall-clock time (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing): a
+# commit's gate leaves them, in its related run, a run of every test and a failed file's second run alike; --full runs them, in its coverage.
+filtered() { # $1: what the run was given; every Vitest run of the fast gate leaves the timing tests
+	grep -q '^test ' "$log" || fail "check.sh ran no Vitest on $1"
+	grep '^test ' "$log" | grep -qvE -- " --tags-filter=!timing( |$)" && fail "check.sh ran the timing tests on $1: $(grep '^test ' "$log")"
+	:
+}
+printf 'x\n' >"$g/app/src/b.tsx"
+out=$(gate) || fail "check.sh failed on a new app file: $out"
+filtered "an app change's related tests"
+out=$(gate --tests-all) || fail "check.sh --tests-all failed: $out"
+filtered "--tests-all"
+out=$(FLAKY=test gate) || fail "check.sh failed a Vitest run that passed the second time: $out"
+[ "$(grep -c '^test ' "$log")" = 2 ] || fail "check.sh did not run a failed Vitest file a second time: $(grep '^test ' "$log")"
+filtered "a failed file's second run"
+out=$(AUDIT_ANSWER=x gate --full) || fail "check.sh --full failed: $out"
+grep -q '^coverage ' "$log" || fail "check.sh --full ran no coverage"
+grep '^coverage ' "$log" | grep -q -- "--tags-filter" && fail "check.sh --full left the timing tests out of its coverage: $(grep '^coverage ' "$log")"
 fi
 
 if part harness_timeout; then

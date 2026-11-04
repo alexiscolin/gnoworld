@@ -43,6 +43,14 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    // A bound in wall-clock time, or a test whose timeout holds one: a commit's gate leaves it, the merge check and --full run it
+    // (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing; check.sh, docs/HARNESS.md).
+    tags: [
+      {
+        name: "timing",
+        description: "a bound in wall-clock time: the merge check and --full run it, a commit's gate does not",
+      },
+    ],
     // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
     // 10 s on a machine at load 50 to 120, where the files' first transforms queue (F3200): a hook gets a minute.
     hookTimeout: 60_000,

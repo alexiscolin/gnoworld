@@ -975,98 +975,102 @@ describe("page: nothing a field holds is left unseen", () => {
   });
 });
 
-describe("page: linear in bytes (a guard against quadratic input; the bench measures the budget)", () => {
-  const fill = (unit: string, bytes = PAGE_MAX_BYTES) => unit.repeat(Math.floor(bytes / unit.length));
-  const STARTS = [
-    "",
-    "#",
-    "# ",
-    "> ",
-    "> [!NOTE]",
-    "- ",
-    "1. ",
-    "```",
-    "``` go",
-    "<gno-form>\n",
-    "<gno-form ",
-    "<gno-input ",
-    "<gno-input name=",
-    "</gno-form",
-    "<gno-columns",
-    "[a](",
-    "![a](",
-    "**",
-    "https://a.test",
-    "https://a.test/",
-  ];
-  const BLANKS_THEN_MARK: [string, (bytes: number) => string][] = STARTS.flatMap((start) =>
-    // Each blank with its bytes in UTF-8: a no-break space is two, an em space three.
-    (
-      [
-        [" ", 1],
-        ["\t", 1],
-        ["\u00a0", 2],
-        ["\u2003", 3],
-      ] as const
-    ).map(([blank, size]): [string, (bytes: number) => string] => [
-      `${JSON.stringify(start)}, ${JSON.stringify(blank)} and a mark (R-F1)`,
-      (n) => start + blank.repeat(Math.floor(n / size) - 16) + "!",
-    ]),
-  );
-  // A page of `bytes` of a shape: how it grows with the size is what a quadratic reader shows.
-  const HOSTILE_PAGES: [string, (bytes: number) => string][] = [
-    ["forms never closed", (n) => fill("<gno-form>\n", n)],
-    ["forms opened and one closer at the end", (n) => fill("<gno-form>\n", n) + "</gno-form>"],
-    ["columns never closed", (n) => fill("<gno-columns>\n", n)],
-    ["separators with no columns", (n) => fill("<gno-columns-sep>\n", n)],
-    ["alerts in a row", (n) => fill("> [!NOTE]\n", n)],
-    ["fences opened in pairs", (n) => fill("```\n", n)],
-    ["a fence longer than any closer after it", (n) => "``````\n" + fill("```\n`\n``\n", n)],
-    ["openers of links", (n) => fill("[a](", n)],
-    ["openers of images", (n) => fill("![a](", n)],
-    ["stars", (n) => fill("*a ", n)],
-    ["headings", (n) => fill("# a\n", n)],
-    ["form lines", (n) => `<gno-form>\n${fill('<gno-input name="a" />\n', n)}</gno-form>`],
-    ["form lines, none a field", (n) => `<gno-form>\n${fill("<gno-input name=\n", n)}</gno-form>`],
-    ["tags with attributes never ending", (n) => `<gno-form>\n<gno-input ${fill("a=b ", n)}`],
-    ["a fence's line of blanks and a mark (R-F1)", (n) => "```" + " ".repeat(n) + "!"],
-    ["a fence's line of tabs and a mark (R-F1)", (n) => "```" + "\t".repeat(n) + "!"],
-    // Every line start a page reads, then blanks and a mark nothing reads: a regex with two `\s*` round an optional
-    // middle is quadratic on this and nothing else (F1711, R-F1).
-    ...BLANKS_THEN_MARK,
-  ];
-
-  // The fastest of seven reads: a pause of the engine's collector, which the largest page draws, is not the reader's time.
-  const timeOf = (source: string): number => {
-    expect(page(source).kind).toBe("page"); // and warms up the engine's tiers on this shape
-    return Math.min(
-      ...Array.from({ length: 7 }, () => {
-        const start = Date.now();
-        page(source);
-        return Date.now() - start;
-      }),
+describe(
+  "page: linear in bytes (a guard against quadratic input; the bench measures the budget)",
+  { tags: ["timing"] },
+  () => {
+    const fill = (unit: string, bytes = PAGE_MAX_BYTES) => unit.repeat(Math.floor(bytes / unit.length));
+    const STARTS = [
+      "",
+      "#",
+      "# ",
+      "> ",
+      "> [!NOTE]",
+      "- ",
+      "1. ",
+      "```",
+      "``` go",
+      "<gno-form>\n",
+      "<gno-form ",
+      "<gno-input ",
+      "<gno-input name=",
+      "</gno-form",
+      "<gno-columns",
+      "[a](",
+      "![a](",
+      "**",
+      "https://a.test",
+      "https://a.test/",
+    ];
+    const BLANKS_THEN_MARK: [string, (bytes: number) => string][] = STARTS.flatMap((start) =>
+      // Each blank with its bytes in UTF-8: a no-break space is two, an em space three.
+      (
+        [
+          [" ", 1],
+          ["\t", 1],
+          ["\u00a0", 2],
+          ["\u2003", 3],
+        ] as const
+      ).map(([blank, size]): [string, (bytes: number) => string] => [
+        `${JSON.stringify(start)}, ${JSON.stringify(blank)} and a mark (R-F1)`,
+        (n) => start + blank.repeat(Math.floor(n / size) - 16) + "!",
+      ]),
     );
-  };
+    // A page of `bytes` of a shape: how it grows with the size is what a quadratic reader shows.
+    const HOSTILE_PAGES: [string, (bytes: number) => string][] = [
+      ["forms never closed", (n) => fill("<gno-form>\n", n)],
+      ["forms opened and one closer at the end", (n) => fill("<gno-form>\n", n) + "</gno-form>"],
+      ["columns never closed", (n) => fill("<gno-columns>\n", n)],
+      ["separators with no columns", (n) => fill("<gno-columns-sep>\n", n)],
+      ["alerts in a row", (n) => fill("> [!NOTE]\n", n)],
+      ["fences opened in pairs", (n) => fill("```\n", n)],
+      ["a fence longer than any closer after it", (n) => "``````\n" + fill("```\n`\n``\n", n)],
+      ["openers of links", (n) => fill("[a](", n)],
+      ["openers of images", (n) => fill("![a](", n)],
+      ["stars", (n) => fill("*a ", n)],
+      ["headings", (n) => fill("# a\n", n)],
+      ["form lines", (n) => `<gno-form>\n${fill('<gno-input name="a" />\n', n)}</gno-form>`],
+      ["form lines, none a field", (n) => `<gno-form>\n${fill("<gno-input name=\n", n)}</gno-form>`],
+      ["tags with attributes never ending", (n) => `<gno-form>\n<gno-input ${fill("a=b ", n)}`],
+      ["a fence's line of blanks and a mark (R-F1)", (n) => "```" + " ".repeat(n) + "!"],
+      ["a fence's line of tabs and a mark (R-F1)", (n) => "```" + "\t".repeat(n) + "!"],
+      // Every line start a page reads, then blanks and a mark nothing reads: a regex with two `\s*` round an optional
+      // middle is quadratic on this and nothing else (F1711, R-F1).
+      ...BLANKS_THEN_MARK,
+    ];
 
-  // StrykerJS's instrumented code (its `__stryker__` global) times nothing of the algorithm: there the comparison gives
-  // way, and runs in the gate and the coverage run, on the code itself (F831, as markdown.test.ts).
-  const instrumented = "__stryker__" in globalThis;
-  // 8 times the bytes may take 32 times as long, for noise and the engine's tiers (coverage's counters double it), never
-  // the 64 times of a quadratic reader; no growth is read under 300 ms, where a quadratic one takes seconds. A noisy
-  // machine can fail one try, never three: a quadratic reader fails each.
-  test.each(HOSTILE_PAGES)("reads %s in time that grows with its size, not its square", (_name, make) => {
-    const small = make(32 * 1024).slice(0, 32 * 1024);
-    const big = make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES);
-    const linear = () => timeOf(big) < Math.max(32 * timeOf(small), 300);
-    expect(instrumented || linear() || linear() || linear()).toBe(true);
-  });
+    // The fastest of seven reads: a pause of the engine's collector, which the largest page draws, is not the reader's time.
+    const timeOf = (source: string): number => {
+      expect(page(source).kind).toBe("page"); // and warms up the engine's tiers on this shape
+      return Math.min(
+        ...Array.from({ length: 7 }, () => {
+          const start = Date.now();
+          page(source);
+          return Date.now() - start;
+        }),
+      );
+    };
 
-  test.each(HOSTILE_PAGES)("reads %s at the cap in seconds, not minutes", (_name, make) => {
-    const start = Date.now();
-    expect(page(make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES)).kind).toBe("page");
-    expect(Date.now() - start).toBeLessThan(5000); // the bench holds the budget; a quadratic regex takes half a minute
-  });
-});
+    // StrykerJS's instrumented code (its `__stryker__` global) times nothing of the algorithm: there the comparison gives
+    // way, and runs in the gate and the coverage run, on the code itself (F831, as markdown.test.ts).
+    const instrumented = "__stryker__" in globalThis;
+    // 8 times the bytes may take 32 times as long, for noise and the engine's tiers (coverage's counters double it), never
+    // the 64 times of a quadratic reader; no growth is read under 300 ms, where a quadratic one takes seconds. A noisy
+    // machine can fail one try, never three: a quadratic reader fails each.
+    test.each(HOSTILE_PAGES)("reads %s in time that grows with its size, not its square", (_name, make) => {
+      const small = make(32 * 1024).slice(0, 32 * 1024);
+      const big = make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES);
+      const linear = () => timeOf(big) < Math.max(32 * timeOf(small), 300);
+      expect(instrumented || linear() || linear() || linear()).toBe(true);
+    });
+
+    test.each(HOSTILE_PAGES)("reads %s at the cap in seconds, not minutes", (_name, make) => {
+      const start = Date.now();
+      expect(page(make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES)).kind).toBe("page");
+      expect(Date.now() - start).toBeLessThan(5000); // the bench holds the budget; a quadratic regex takes half a minute
+    });
+  },
+);
 
 describe("originOf: the origin a page's links resolve against", () => {
   test("keeps https://host[:port] and drops one closing slash", () => {

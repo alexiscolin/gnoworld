@@ -235,7 +235,7 @@ describe("following the eye", () => {
     expect((uniform(sky(pass), "uMood") as { version: number }).version).toBeGreaterThan(mood);
   });
 
-  it("draws what core says a cell holds, shell by shell: each field its own sky", () => {
+  it("draws what core says a cell holds, shell by shell: each field its own sky", { tags: ["timing"] }, () => {
     const { stage, space } = made();
     space.follow(AWAY, 0);
     const shells = [...SHELLS, MOTES];

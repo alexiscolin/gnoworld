@@ -500,8 +500,10 @@ lane_tests() {
 		else
 			python3 -I scripts/related.py --check </dev/null # the map's own test: a read it cannot follow refuses, whatever runs
 		fi
-		sh -c "$tests --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
-			retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+		# The tests tagged `timing`, a bound in wall-clock time, wait for the merge check and --full (Alexis, 2026-11-04, "Oui, les deux":
+		# other gates' load failed them for nothing; vitest.config.ts's tags).
+		sh -c "$tests --tags-filter=!timing --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
+			retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") --tags-filter=!timing \"\$@\"" sh
 	fi
 	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
 	# render counts run here instead, once, beside the coverage lane's work.

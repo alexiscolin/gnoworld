@@ -1198,20 +1198,24 @@ describe("the close world off the rest (7d9)", () => {
     expect(postcards).toHaveLength(2);
   });
 
-  it("keeps it where it holds, at its true size, a body then a point, as the eye steps back, in, aside, up and down, the clock run on", async () => {
-    const scene = await restAt(ONYX);
-    const { system, world } = onyxClose();
-    const seen = await walk(scene, [system, world], waysOff(scene));
-    // From one step to the next its size changes as its true size does, within a tenth.
-    for (const frames of seen)
-      for (const [at, now] of frames.entries()) {
-        const before = frames[at - 1];
-        if (now === undefined || before === undefined) continue;
-        const [drawn, truly] = [Math.log(now.size / before.size), Math.log(now.radius / before.radius)];
-        expect(Math.abs(drawn - truly)).toBeLessThanOrEqual(Math.log(1.1));
-      }
-    expect(new Set(seen.flat().map((frame) => frame?.kind))).toEqual(new Set([undefined, "body", "point"]));
-  });
+  it(
+    "keeps it where it holds, at its true size, a body then a point, as the eye steps back, in, aside, up and down, the clock run on",
+    { tags: ["timing"] },
+    async () => {
+      const scene = await restAt(ONYX);
+      const { system, world } = onyxClose();
+      const seen = await walk(scene, [system, world], waysOff(scene));
+      // From one step to the next its size changes as its true size does, within a tenth.
+      for (const frames of seen)
+        for (const [at, now] of frames.entries()) {
+          const before = frames[at - 1];
+          if (now === undefined || before === undefined) continue;
+          const [drawn, truly] = [Math.log(now.size / before.size), Math.log(now.radius / before.radius)];
+          expect(Math.abs(drawn - truly)).toBeLessThanOrEqual(Math.log(1.1));
+        }
+      expect(new Set(seen.flat().map((frame) => frame?.kind))).toEqual(new Set([undefined, "body", "point"]));
+    },
+  );
 
   // The review of 7p (R1): at rest a postcard draws its bodies at a share of their size, its plane turned; off the rest they held their own,
   // and streak grew 1.58 times in one step as the eye left. Held as drawn, as the close world is, none grows or shrinks by a fifth from one

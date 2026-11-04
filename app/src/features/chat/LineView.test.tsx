@@ -169,13 +169,17 @@ describe("a line's country", () => {
     expect(follows(code, one(head, `[title='${ALICE}']`))).toBe(true);
   });
 
-  it("shows a code when the table of countries holds it, and only then: head, list and Earth agree on what a country is", () => {
-    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-    const wrong = letters
-      .flatMap((first) => letters.map((second) => `${first}${second}`))
-      .filter(
-        (code) => (mark(drawn({ line: line({ country: code }) }).row) !== null) !== (countryName(code) !== undefined),
-      );
-    expect(wrong).toEqual([]);
-  });
+  it(
+    "shows a code when the table of countries holds it, and only then: head, list and Earth agree on what a country is",
+    { tags: ["timing"] },
+    () => {
+      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+      const wrong = letters
+        .flatMap((first) => letters.map((second) => `${first}${second}`))
+        .filter(
+          (code) => (mark(drawn({ line: line({ country: code }) }).row) !== null) !== (countryName(code) !== undefined),
+        );
+      expect(wrong).toEqual([]);
+    },
+  );
 });

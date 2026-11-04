@@ -168,6 +168,16 @@ copy of pre-commit gets the related tests too, from its list (the command, given
 the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test of
 its projects, before its report; the slow project and core's in Chromium wait for the merge check) and in the merge check and `--full`.
 
+**The timing tests** (Alexis, 2026-11-04, "Oui, les deux"): a test whose bound is wall-clock time, outright ("in 100 ms or less",
+a cost that grows with its input and not its square) or through its timeout under a heavy case, carries Vitest's tag `timing`
+(`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast gate leaves those, related, `--tests-all` and a failed file's
+second run alike (`--tags-filter=!timing`); the merge check and `--full` run them in the coverage, as every test. Other gates' load
+failed them for nothing: rest.test.ts's search cost 202 times in the worktrees' unsteady logs, main.test.ts's 3k 139, LineView's
+country 93. It holds 208 tests: rest.test.ts's two search costs, main.test.ts's 3k, LineView's country, Here's two, arrival's
+seven views and same arrival, cosmos.test.ts's close world, space.test.ts's shells, useSpace's three, ladder's two past the cap,
+search.test.ts's square, and the markdown scanner's 192 linear-in-bytes cases, tier 1, which the merge check still runs. Run them
+alone: `pnpm exec vitest run --tags-filter=timing`.
+
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
 journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
 harness-b) still ran 40 of 44 files for 74 % of the app's commits, the app being one import graph. The fast gate now
