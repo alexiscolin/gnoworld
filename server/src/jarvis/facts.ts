@@ -102,9 +102,10 @@ export function sourceFactsOf(source: string, origin: string): SourceFacts {
   };
 }
 
-/** What a digest states, and the actions its forms propose. */
+/** What a digest states, the actions its forms propose, and their arguments' words, which a call carries as given. */
 export interface DigestFacts extends Facts {
   readonly actions: readonly ProposedAction[];
+  readonly words: ReadonlySet<string>;
 }
 
 // A block's parts: texts a reader sees (a chart's points one a line), addresses taken whole, and its action.
@@ -136,13 +137,21 @@ function partsOf(block: DigestBlock): Parts {
   }
 }
 
+// A word that is neither a number nor an account, which have checks of their own.
+const isPlainWord = (word: string): boolean => !/^\d+$/.test(word) && !word.startsWith("g1");
+
 const addAll = (into: Set<string>, from: Iterable<string>): void => {
   for (const value of from) into.add(value);
 };
 
 /** A digest's facts, each text read alone, so a fence never closed in one hides nothing of the next. */
 export function digestFacts(digest: Digest): DigestFacts {
-  const [links, addresses, numbers] = [new Set<string>(), new Set<string>(), new Set<string>()];
+  const [links, addresses, numbers, words] = [
+    new Set<string>(),
+    new Set<string>(),
+    new Set<string>(),
+    new Set<string>(),
+  ];
   const actions: ProposedAction[] = [];
   let room = false;
   for (const block of digest.blocks) {
@@ -155,6 +164,7 @@ export function digestFacts(digest: Digest): DigestFacts {
     }
     addAll(links, whole);
     if (action !== undefined) actions.push(action);
+    for (const value of Object.values(action?.args ?? {})) addAll(words, wordsOf(unseen(value)).filter(isPlainWord));
   }
-  return { links, addresses, numbers, room, actions };
+  return { links, addresses, numbers, room, actions, words };
 }

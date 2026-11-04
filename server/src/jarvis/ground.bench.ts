@@ -3,7 +3,7 @@
 // scripts/bench.py in the full gate.
 import { Digest } from "@gnoworld/schemas";
 import { bench, describe } from "vitest";
-import { grounded, type Sources } from "./ground.ts";
+import { grounded, sourcesOf, type Read } from "./ground.ts";
 
 const REALM = "gno.land/r/demo/poll";
 const CUR = [
@@ -16,7 +16,7 @@ const line = (at: number) =>
   `- Proposal ${String(at)}: [vote](/r/gov/dao:proposal/${String(at)}), 1,${String(at % 1000).padStart(3, "0")} yes, ` +
   `https://gno.land/r/demo/boards:${String(at)} by ${address(at)}`;
 
-function sourcesOf(): Sources {
+function readOf(): Read {
   let page = "# Proposals\n\n";
   for (let at = 0; page.length < 100 * 1024; at += 1) page += `${line(at)}\n`;
   const functions = Array.from({ length: 40 }, (_, at) => ({
@@ -60,7 +60,7 @@ function digestOf(): Digest {
   return { blocks };
 }
 
-let input: { digest: Digest; sources: Sources } | undefined;
+let input: { digest: Digest; read: Read } | undefined;
 
 // Each name a literal, so scripts/bench.py sees a bench switched off.
 describe("grounding", () => {
@@ -68,11 +68,11 @@ describe("grounding", () => {
     "a 50-block digest against a 100 KiB page [5 ms]",
     () => {
       if (input === undefined) throw new Error("the bench's input is not built");
-      if (!grounded(input.digest, input.sources).ok) throw new Error("the bench's digest was refused");
+      if (!grounded(input.digest, sourcesOf(input.read)).ok) throw new Error("the bench's digest was refused");
     },
     {
       setup: () => {
-        input = { digest: Digest.parse(digestOf()), sources: sourcesOf() };
+        input = { digest: Digest.parse(digestOf()), read: readOf() };
       },
     },
   );

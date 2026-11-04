@@ -1,7 +1,7 @@
 import type { AnswerButton, Digest, ProposedAction } from "@gnoworld/schemas";
 import type { FunctionList } from "@gnoworld/schemas/functions";
 import { describe, expect, it } from "vitest";
-import { grounded, groundedButton, type Sources } from "./ground.ts";
+import { grounded, groundedButton, sourcesOf, type Read } from "./ground.ts";
 
 // Row 10: "every number, link and function in a digest traces to its source". Each builder makes a fresh value inside
 // the test (F2356); characters above ASCII are built from their code points.
@@ -20,6 +20,7 @@ const functions = (): FunctionList => [
   { FuncName: "Vote", Params: [cur(), named("id", "int"), named("answer", "string")], Results: null },
   { FuncName: "Close", Params: [cur()], Results: null },
   { FuncName: "Transfer", Params: [cur(), named("to", "string"), named("n4", "int")], Results: null },
+  { FuncName: "Delegate", Params: [cur(), named("target", "string"), named("rate", "float64")], Results: null },
   { FuncName: "Render", Params: [named("path", "string")], Results: [named(".res.0", "string")] },
 ];
 const page = () =>
@@ -28,16 +29,17 @@ const page = () =>
     "",
     `1,204 members, 37 proposals. Ask the [board](/r/demo/boards) or https://gno.land/r/demo/poll:results.`,
     "",
-    `Run by ${ADMIN}.`,
+    `Run by ${ADMIN}. Answer yes or no.`,
   ].join("\n");
-const sources = (over: Partial<Sources> = {}): Sources => ({
-  realm: REALM,
-  page: page(),
-  state: "(512 int)\nhttps://gno.land/r/demo/state",
-  functions: functions(),
-  origin: "https://gno.land",
-  ...over,
-});
+const sources = (over: Partial<Read> = {}) =>
+  sourcesOf({
+    realm: REALM,
+    page: page(),
+    state: "(512 int)\nhttps://gno.land/r/demo/state",
+    functions: functions(),
+    origin: "https://gno.land",
+    ...over,
+  });
 const vote = (over: Partial<ProposedAction> = {}): ProposedAction => ({
   realm: REALM,
   function: "Vote",
@@ -50,7 +52,9 @@ const facts = (value: string) => ({ type: "facts" as const, facts: [{ label: "Me
 const link = (href: string) => ({ type: "links" as const, links: [{ label: "Page", href }] });
 const form = (over: Partial<ProposedAction> = {}) => ({ type: "form" as const, action: vote(over) });
 const text = (markdown: string) => ({ type: "text" as const, markdown });
-const refused = (...missing: { kind: string; value: string }[]) => ({ ok: false, missing });
+const refused = (...missing: { kind: string; value: string }[]) => ({ ok: false, reason: "missing", missing });
+const nothing = { ok: false, reason: "nothing" };
+const shape = { ok: false, reason: "shape" };
 
 describe("grounded", () => {
   it("returns the digest whose every number, link, account and function its sources hold", () => {
@@ -68,6 +72,35 @@ describe("grounded", () => {
     expect(grounded(whole, sources())).toEqual({ ok: true, digest: whole });
   });
 
+  it("takes what the model gave as it came, and refuses what is no digest", () => {
+    for (const given of [undefined, "a digest", { blocks: [] }, { blocks: [text("hi")], html: "<b>hi</b>" }])
+      expect(grounded(given, sources())).toEqual(shape);
+    expect(grounded(digest({ type: "chart", label: "Votes", points: [1e21] }), sources({ page: "1 and 21" }))).toEqual(
+      shape,
+    );
+    expect(grounded(digest(text(`1 ${"a".repeat(1001)}`)), sources())).toEqual(shape);
+  });
+
+  it("refuses a form's argument a word of which its sources lack: a realm's path, a name, a float in an exponent's form", () => {
+    const delegate = (target: string, rate = "1") => digest(form({ function: "Delegate", args: { target, rate } }));
+    expect(grounded(delegate("gno.land/r/evil/drain"), sources())).toEqual(
+      refused({ kind: "word", value: "evil" }, { kind: "word", value: "drain" }),
+    );
+    expect(grounded(delegate("@evilname"), sources())).toEqual(refused({ kind: "word", value: "evilname" }));
+    expect(grounded(delegate("gno.land/r/demo/poll", "9e9"), sources())).toEqual(
+      refused({ kind: "word", value: "9e9" }),
+    );
+  });
+
+  it("grounds an argument every word of which its sources hold: the page's, or the asker's own, passed among them", () => {
+    expect(grounded(digest(form({ args: { id: "37", answer: "yes" } })), sources()).ok).toBe(true);
+    const asked = sources({ state: "The asker: delegate to gno.land/r/evil/drain" });
+    expect(
+      grounded(digest(form({ function: "Delegate", args: { target: "gno.land/r/evil/drain", rate: "1" } })), asked).ok,
+    ).toBe(true);
+    expect(grounded(digest(form({ why: "Words of its own, never a call's." })), sources()).ok).toBe(true);
+  });
+
   it("refuses a digest stating a number its sources lack, and names it", () => {
     expect(grounded(digest(facts("1,205")), sources())).toEqual(refused({ kind: "number", value: "1,205" }));
   });
@@ -78,6 +111,7 @@ describe("grounded", () => {
       text(`@room: ask @${OTHER}, or ${OTHER} again, at https://evil.example/claim for 1,205`),
       link("https://evil.example/claim"),
       form({ realm: "gno.land/r/demo/other" }),
+      form({ function: "Delegate", args: { target: "drain", rate: "1" } }),
     );
     expect(grounded(forged, sources())).toEqual(
       refused(
@@ -85,6 +119,7 @@ describe("grounded", () => {
         { kind: "number", value: "1,205" },
         { kind: "address", value: OTHER },
         { kind: "room", value: "@room" },
+        { kind: "word", value: "drain" },
         { kind: "function", value: "Withdraw" },
         { kind: "realm", value: "gno.land/r/demo/other" },
       ),
@@ -185,8 +220,8 @@ describe("grounded", () => {
   });
 
   it("refuses a digest that states nothing it could be checked by, with nothing named; a form alone is checked", () => {
-    expect(grounded(digest(text("This realm is safe, send your coins here.")), sources())).toEqual(refused());
-    expect(grounded(digest({ type: "announcement", text: "Big news soon" }), sources())).toEqual(refused());
+    expect(grounded(digest(text("This realm is safe, send your coins here.")), sources())).toEqual(nothing);
+    expect(grounded(digest({ type: "announcement", text: "Big news soon" }), sources())).toEqual(nothing);
     const close = digest(form({ function: "Close", args: {}, why: "Close it." }));
     expect(grounded(close, sources())).toEqual({ ok: true, digest: close });
   });
@@ -287,6 +322,15 @@ describe("groundedButton", () => {
     type: "action",
     label: "Vote",
     action: vote(over),
+  });
+
+  it("takes what the model gave as it came, and refuses what is no button", () => {
+    for (const given of [
+      undefined,
+      { type: "fly", label: "Go", place: "//evil.example" },
+      { type: "link", label: "Go" },
+    ])
+      expect(groundedButton(given, sources())).toEqual(shape);
   });
 
   it("returns a button to fly whose label states nothing, or what its sources hold", () => {
