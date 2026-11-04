@@ -333,22 +333,30 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
   });
 
   it.each([
-    ["gnomcp is down", { render: () => Promise.resolve<Ran>({ ok: false, reason: "down" }) }],
+    [
+      "gnomcp is down",
+      { render: () => Promise.resolve<Ran>({ ok: false, reason: "down" }) },
+      "the realm's page could not be read.",
+    ],
     [
       "gnomcp answers an error",
       { render: () => Promise.resolve<Ran>({ ok: true, isError: true, text: "planted words" }) },
+      "the realm's page could not be read.",
     ],
     [
       "the height cannot be read",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: false, text: '{"height_error":"x"}' }) },
+      "its chain's height could not be read.",
     ],
     [
       "the height is no block",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: false, text: status({ height: 0 }) }) },
+      "its chain's height could not be read.",
     ],
     [
       "the node is another chain's",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: false, text: status({ node_chain_id: "test5" }) }) },
+      "its chain's height could not be read.",
     ],
     [
       "gnomcp's profile and its node are both another universe's chain",
@@ -360,27 +368,38 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
             text: status({ chain_id: "gnoland-1", node_chain_id: "gnoland-1" }),
           }),
       },
+      "its chain's height could not be read.",
     ],
     [
       "gnomcp's profile names another chain than its node",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: false, text: status({ chain_id: "test5" }) }) },
+      "its chain's height could not be read.",
     ],
     [
       "the status is gnomcp's error",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: true, text: status() }) },
+      "its chain's height could not be read.",
     ],
     [
       "the status is no JSON",
       { height: () => Promise.resolve<Ran>({ ok: true, isError: false, text: "height 1204" }) },
+      "its chain's height could not be read.",
     ],
-    ["gnomcp cannot give the status", { height: () => Promise.resolve<Ran>({ ok: false, reason: "timeout" }) }],
-    ["the functions cannot be read", { functions: () => Promise.resolve({ ok: false as const }) }],
-  ])("refuses a digest when %s, saying so in its own words, and keeps nothing", async (_case, over) => {
+    [
+      "gnomcp cannot give the status",
+      { height: () => Promise.resolve<Ran>({ ok: false, reason: "timeout" }) },
+      "its chain's height could not be read.",
+    ],
+    [
+      "the functions cannot be read",
+      { functions: () => Promise.resolve({ ok: false as const }) },
+      "the realm's functions could not be read.",
+    ],
+  ])("refuses a digest when %s, saying so in its own words, and keeps nothing", async (_case, over, why) => {
     const { tools } = setup(over);
     const { asked, cards } = askedOf();
     const ran = await tools.run(give(digest(facts("1,204"), form())), asked);
-    expect(ran).toMatchObject({ ok: true, isError: true });
-    expect(ran.ok && ran.text).not.toContain("planted");
+    expect(ran).toEqual({ ok: true, isError: true, text: `Refused, nothing kept: ${why}` });
     expect(cards.cards()).toEqual(none());
   });
 
@@ -400,8 +419,64 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
     const call = new AbortController();
     const { asked, cards } = askedOf(undefined, call.signal);
     call.abort();
-    expect(await tools.run(give(digest(facts("1,204"))), asked)).toMatchObject({ ok: true, isError: true });
+    expect(await tools.run(give(digest(facts("1,204"))), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: its call's time is up, or the answer holds its digests.",
+    });
     expect(cards.cards()).toEqual(none());
+  });
+
+  it("tells the model what it kept: the realm and the block its sources were read at", async () => {
+    const { tools } = setup();
+    expect(await tools.run(give(digest(facts("1,204"))), askedOf().asked)).toEqual({
+      ok: true,
+      isError: false,
+      text: "Kept: the digest of gno.land/r/demo/poll, read at block 1204, shows with the answer.",
+    });
+  });
+
+  it("names everything the reads lack at once, apart", async () => {
+    const { tools } = setup();
+    const body = digest(facts("1,205"), {
+      type: "links",
+      links: [{ label: "Claim", href: "https://evil.example/claim" }],
+    });
+    expect(await tools.run(give(body), askedOf().asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: the chain's reads lack link https://evil.example/claim; number 1,205. State only what they hold.",
+    });
+  });
+
+  it("refuses a digest that states nothing a read can hold", async () => {
+    const { tools } = setup();
+    const { asked, cards } = askedOf();
+    expect(await tools.run(give(digest({ type: "text", markdown: "A fine poll." })), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: it states nothing a read can hold: give a number, a link, an account or a form of the realm's page.",
+    });
+    expect(cards.cards()).toEqual(none());
+  });
+
+  it.each([
+    ["no wrapping at all", (_realm: string, page: string) => page],
+    [
+      "the wrapping's start alone",
+      (realm: string, page: string) => `<untrusted_content kind="render" source="${realm}">\n${page}`,
+    ],
+    ["the wrapping's end alone", (_realm: string, page: string) => `${page}\n</untrusted_content>`],
+  ])("reads a page with %s whole, its first and last lines included", async (_case, written) => {
+    const page = "1,204 members\n\nthe last: 37";
+    const { tools } = setup({
+      render: (realm) => Promise.resolve<Ran>({ ok: true, isError: false, text: written(realm, page) }),
+    });
+    for (const stated of ["1,204", "37"]) {
+      const { asked, cards } = askedOf();
+      await tools.run(give(digest(facts(stated))), asked);
+      expect(cards.cards().digests).toHaveLength(1);
+    }
   });
 });
 
@@ -457,6 +532,24 @@ describe("propose_action: one call the person may sign, its function the realm's
     expect(allowlist(tools.definitions, log).check("propose_action", { profile: "onyx", action })).toEqual({
       ok: false,
       reason: "bad_arguments",
+    });
+    expect(cards.cards()).toEqual(none());
+  });
+
+  it("tells the model what it kept, and keeps nothing once its call's time is up", async () => {
+    const { tools } = setup();
+    expect(await tools.run(propose(vote()), askedOf().asked)).toEqual({
+      ok: true,
+      isError: false,
+      text: "Kept: the proposal of Vote, read at block 1204, shows with the answer.",
+    });
+    const call = new AbortController();
+    const { asked, cards } = askedOf(undefined, call.signal);
+    call.abort();
+    expect(await tools.run(propose(vote()), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: its call's time is up, or the answer holds its proposal.",
     });
     expect(cards.cards()).toEqual(none());
   });
@@ -537,6 +630,49 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
     expect(cards.cards()).toEqual(none());
   });
 
+  it("tells the model which button it kept, and keeps none once its call's time is up", async () => {
+    const { tools } = setup();
+    const act: AnswerButton = { type: "action", label: "Vote", action: vote() };
+    expect(await tools.run(button(fly("/w/bubble"), null), askedOf().asked)).toEqual({
+      ok: true,
+      isError: false,
+      text: "Kept: the button to /w/bubble.",
+    });
+    expect(await tools.run(button(act), askedOf().asked)).toEqual({
+      ok: true,
+      isError: false,
+      text: "Kept: the button to Vote, read at block 1204.",
+    });
+    for (const body of [fly("/w/bubble"), act]) {
+      const call = new AbortController();
+      const { asked, cards } = askedOf(undefined, call.signal);
+      call.abort();
+      expect(await tools.run(button(body), asked)).toEqual({
+        ok: true,
+        isError: true,
+        text: "Refused, nothing kept: its call's time is up.",
+      });
+      expect(cards.cards()).toEqual(none());
+    }
+  });
+
+  it("refuses an action's button with no chain profile, or on a realm gnomcp cannot render, saying which", async () => {
+    const { tools } = setup();
+    const { asked, cards } = askedOf();
+    const act = (realm: string): AnswerButton => ({ type: "action", label: "Do it", action: vote({ realm }) });
+    expect(await tools.run(button(act(REALM), null), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: an action's button names its realm's chain profile.",
+    });
+    expect(await tools.run(button(act("gno.land/r/demo/gone")), asked)).toEqual({
+      ok: true,
+      isError: true,
+      text: "Refused, nothing kept: the realm's page could not be read.",
+    });
+    expect(cards.cards()).toEqual(none());
+  });
+
   it("refuses an action's button with no chain profile, or one its realm's functions cannot make", async () => {
     const { tools } = setup();
     const { asked, cards } = askedOf();
@@ -563,6 +699,34 @@ describe("give_button: a button to fly to a place, or to open a proposal's call 
 });
 
 describe("cardTools", () => {
+  it("refuses to start with no chain profile", () => {
+    const places = loadPlaces(folderOf());
+    const read = () => Promise.resolve<Ran>({ ok: false, reason: "down" });
+    const functions = () => Promise.resolve({ ok: false as const });
+    expect(() => cardTools({ chains: [], places, read, functions })).toThrow(/^cards: no chain profile$/);
+  });
+
+  it("tells the model the server reads the realm itself, and describes our own fields", () => {
+    const { tools } = setup();
+    const [digestTool, proposalTool, buttonTool] = tools.definitions;
+    for (const { description } of tools.definitions)
+      expect(description).toContain(
+        "The server reads the realm itself and keeps it only when its page and functions hold",
+      );
+    // The cards' own bodies are 10d's schemas of packages/schemas, which the tool's words describe.
+    for (const field of [digestTool.args.shape.profile, digestTool.args.shape.realm, proposalTool.args.shape.profile])
+      expect(field.description).toMatch(/\S/);
+    expect(buttonTool.args.shape.profile.unwrap().description).toMatch(/\S/);
+  });
+
+  it("refuses a card's arguments sent under a name of no card's", async () => {
+    const { tools } = setup();
+    const { asked, cards } = askedOf();
+    const args = { button: { type: "fly", label: "Go", place: "/w/bubble" } };
+    expect(await tools.run({ name: "gno_call", args }, asked)).toEqual({ ok: false, reason: "refused" });
+    expect(cards.cards()).toEqual(none());
+  });
+
   it("refuses to start when a chain profile names no universe of the data", () => {
     const places = loadPlaces(folderOf());
     const read = () => Promise.resolve<Ran>({ ok: false, reason: "down" });

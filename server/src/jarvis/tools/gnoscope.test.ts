@@ -46,6 +46,7 @@ describe("startGnoscope: off by default, and then nothing of it", () => {
     const started = await gnoscope;
     expect(started.definitions).toEqual([]);
     expect(await started.call("get_realm_state", state())).toEqual({ ok: false, reason: "refused" });
+    await expect(started.close()).resolves.toBeUndefined();
     expect(server.requests).toEqual([]);
   });
 });
@@ -98,6 +99,23 @@ describe("startGnoscope: its tools listed at start, ours alone taken", () => {
     const { gnoscope, events } = start(server.url);
     expect((await gnoscope).definitions).toEqual([]);
     expect(events()).toEqual([{ event: "jarvis_gnoscope_down", reason: "start" }]);
+  });
+
+  it("names itself jarvis to gnoscope", async () => {
+    const server = await serve();
+    const started = await start(server.url).gnoscope;
+    const Initialize = z.object({ clientInfo: z.object({ name: z.string(), version: z.string() }) });
+    expect(Initialize.parse(server.requests[0]?.params).clientInfo).toEqual({ name: "jarvis", version: "1.0.0" });
+    await started.close();
+  });
+
+  it("starts with none of its tools when its first answer comes past its time, within that time", async () => {
+    const slow = await serve({ delayMs: (method) => (method === "initialize" ? 1_000 : 0) });
+    const begun = performance.now();
+    const { gnoscope, events } = start(slow.url, { timeoutMs: 100 });
+    expect((await gnoscope).definitions).toEqual([]);
+    expect(performance.now() - begun).toBeLessThan(900);
+    expect(events()).toContainEqual({ event: "jarvis_gnoscope_down", reason: "start" });
   });
 
   it("never offers a tool or a field gnoscope gains later", async () => {
@@ -222,6 +240,47 @@ describe("Gnoscope.call: one read, its time bounded, its answer through Zod", ()
     const server = await serve({ answer });
     const started = await start(server.url).gnoscope;
     expect(await started.call("get_realm_state", state())).toEqual({ ok: false, reason: "malformed" });
+    await started.close();
+  });
+
+  it("takes an answer of exactly 1 MiB, and refuses one byte more as malformed", async () => {
+    for (const [extra, ran] of [
+      [0, "kept"],
+      [1, "malformed"],
+    ] as const) {
+      const body = (id: unknown) => {
+        const shell = JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: "" }] } });
+        const text = "x".repeat(1024 * 1024 - Buffer.byteLength(shell) + extra);
+        return JSON.stringify({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text }] } });
+      };
+      const server = await serve({ raw: (method, id) => (method === "tools/call" ? body(id) : undefined) });
+      const started = await start(server.url).gnoscope;
+      const answer = await started.call("get_realm_state", state());
+      expect(answer.ok ? "kept" : answer.reason).toBe(ran);
+      await started.close();
+    }
+  });
+
+  it("answers gnoscope's own JSON-RPC error as an error", async () => {
+    const server = await serve({
+      fail: (method) => (method === "tools/call" ? { code: -32602, message: "planted" } : undefined),
+    });
+    const started = await start(server.url).gnoscope;
+    expect(await started.call("get_realm_state", state())).toEqual({ ok: false, reason: "error" });
+    await started.close();
+  });
+
+  it("gives a result of two texts as one, a line between them", async () => {
+    const server = await serve({
+      answer: () => ({
+        content: [
+          { type: "text", text: "first" },
+          { type: "text", text: "second" },
+        ],
+      }),
+    });
+    const started = await start(server.url).gnoscope;
+    expect(await started.call("get_realm_state", state())).toEqual({ ok: true, isError: false, text: "first\nsecond" });
     await started.close();
   });
 

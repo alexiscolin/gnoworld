@@ -229,6 +229,8 @@ describe("loadJarvisConfig", () => {
     ["JARVIS_GNOSCOPE_URL", "http://gnoscope.com/mcp"],
     ["JARVIS_GNOSCOPE_URL", "wss://gnoscope.com/mcp"],
     ["JARVIS_GNOSCOPE_URL", "https://user:pass@gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://user@gnoscope.com/mcp"],
+    ["JARVIS_GNOSCOPE_URL", "https://:secret@gnoscope.com/mcp"],
     ["JARVIS_GNOSCOPE_URL", "https://gnoscope.com/mcp#tools"],
     ["JARVIS_GNOSCOPE_URL", `https://gnoscope.com/${"m".repeat(2048)}`],
     ["JARVIS_GNOSCOPE_TIMEOUT_S", "0"],

@@ -44,7 +44,8 @@ describe("keepCards: a question's own cards", () => {
     kept.keep({ kind: "proposal", read: read(), action: action() });
     kept.keep({ kind: "button", button: fly() });
     kept.keep({ kind: "button", button: { type: "action", label: "Vote", action: action() }, read: read() });
-    expect(kept.cards()).toEqual({
+    // Strict: a button kept with no read carries no `read` field at all.
+    expect(kept.cards()).toStrictEqual({
       digests: [{ realm: "gno.land/r/demo/poll", read: read(), digest: digest() }],
       proposals: [{ read: read(), action: action() }],
       buttons: [{ button: fly() }, { button: { type: "action", label: "Vote", action: action() }, read: read() }],
@@ -73,6 +74,18 @@ describe("keepCards: a question's own cards", () => {
     expect(view.cards().buttons).toHaveLength(1);
     expect(kept.keep({ kind: "button", button: fly() })).toBe(true);
     expect(kept.cards().buttons).toHaveLength(2);
+  });
+
+  it("keeps nothing through a view of a view once either call's signal is aborted", () => {
+    for (const which of ["outer", "inner"] as const) {
+      const kept = keepCards();
+      const [outer, inner] = [new AbortController(), new AbortController()];
+      const view = kept.within(outer.signal).within(inner.signal);
+      expect(view.keep({ kind: "button", button: fly() })).toBe(true);
+      (which === "outer" ? outer : inner).abort();
+      expect(view.keep({ kind: "button", button: fly() })).toBe(false);
+      expect(kept.cards().buttons).toHaveLength(1);
+    }
   });
 
   it("shares nothing between two questions' cards", () => {

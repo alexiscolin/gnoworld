@@ -57,6 +57,7 @@ describe("gnoscopeTools: four of gnoscope's reads, each with our own schema", ()
     expect(tools.check("explain_tx", { network: "onyx", hash: "a".repeat(128) }).ok).toBe(true);
     expect(tools.check("search_code", { network: "onyx", query: "q".repeat(200) }).ok).toBe(true);
     expect(tools.check("search_code", { network: "onyx", query: "Render", limit: 1 }).ok).toBe(true);
+    expect(tools.check("search_code", { network: "onyx", query: "Render", kind: "package" }).ok).toBe(true);
     expect(tools.check("get_realm_state", { network: "onyx", path: `gno.land/r/${"a".repeat(245)}` }).ok).toBe(true);
   });
 
@@ -69,6 +70,16 @@ describe("gnoscopeTools: four of gnoscope's reads, each with our own schema", ()
     ["an empty hash", "explain_tx", () => ({ network: "onyx", hash: "" })],
     ["a path out of gno.land/r/", "get_realm_state", () => ({ network: "onyx", path: "gno.land/p/demo/avl" })],
     ["a path without its prefix", "get_realm_state", () => ({ network: "onyx", path: "r/gov/dao" })],
+    [
+      "a path with words before gno.land/r/",
+      "get_realm_state",
+      () => ({ network: "onyx", path: "evil/gno.land/r/gov/dao" }),
+    ],
+    [
+      "a path with a character after its last word",
+      "get_realm_state",
+      () => ({ network: "onyx", path: "gno.land/r/gov/dao!" }),
+    ],
     [
       "a path past 256 characters",
       "get_realm_state",
@@ -99,6 +110,19 @@ describe("gnoscopeTools: four of gnoscope's reads, each with our own schema", ()
       );
       expect(description).toContain("If gnoscope is down or slow, say so and answer from gnomcp's reads.");
     }
+  });
+
+  it("tells the model what each read gives", () => {
+    const words = gnoscopeTools(["onyx"]).map(({ name, description }) => [name, description.split(":")[0]]);
+    expect(words).toEqual([
+      ["explain_tx", "One transaction decoded by gnoscope"],
+      [
+        "get_realm_state",
+        "A realm's live state, decoded by gnoscope from a node into a named tree of values; a large realm's comes back partial and says so. gnoscope, a third party, explains",
+      ],
+      ["get_address", "An account on chain described by gnoscope"],
+      ["search_code", "Full-text search by gnoscope over every source file the chain stores"],
+    ]);
   });
 
   it.each([[[]], [["Onyx"]], [["main net"]], [["n".repeat(41)]]])(

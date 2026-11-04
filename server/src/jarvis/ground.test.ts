@@ -551,6 +551,18 @@ describe("grounded: where each source was read (Alexis, 2026-11-04: the node or 
     );
   });
 
+  it("takes readings and functions at height 1, the first block", () => {
+    const at = { list: functions(), height: 1 };
+    const texts = [
+      { from: "node" as const, text: page(), height: 1 },
+      { from: "indexer" as const, text: "(512 int)", height: 1 },
+    ];
+    expect(
+      grounded(digest(facts("1,204")), sourcesOf({ realm: REALM, origin: "https://gno.land", functions: at, texts }))
+        .ok,
+    ).toBe(true);
+  });
+
   it.each([0, -1, 1.5, Number.NaN])("refuses functions read at height %d, which no block has", (height) => {
     const good = [{ from: "indexer" as const, text: page(), height: 1204 }];
     const listAt = { list: functions(), height };

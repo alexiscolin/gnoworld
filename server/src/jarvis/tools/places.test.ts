@@ -55,16 +55,33 @@ describe("loadPlaces: the places' data, read once at start", () => {
   });
 
   it.each([
-    ["a hub its schema refuses", { hubs: [{ ...world("bubble", "Bubble"), slug: "Planted-Secret" }] }, "hubs.json"],
-    ["no default universe", { universes: [universe("onyx"), universe("gnoland")] }, "universes.json"],
-    ["a station in a universe not listed", { stations: [world("tower", "Tower", "planted-mars")] }, "stations.json"],
+    [
+      "a hub its schema refuses",
+      { hubs: [world("bubble", "Bubble"), { ...world("bubble", "Bubble"), slug: "Planted-Secret" }] },
+      "places: hubs.json: [1].slug: invalid_format",
+    ],
+    [
+      "no default universe",
+      { universes: [universe("onyx"), universe("gnoland")] },
+      "places: universes.json: (file): custom",
+    ],
+    [
+      "a station in a universe not listed",
+      { stations: [world("tower", "Tower"), world("tower", "Tower", "planted-mars")] },
+      "places: stations.json: [1].universe: not a universe of universes.json",
+    ],
     [
       "an ecosystem's extra field",
       { ecosystems: [{ slug: "g", name: "G", description: "d", universe: "onyx", x: 1 }] },
-      "ecosystems.json",
+      "places: ecosystems.json: [0]: unrecognized_keys",
     ],
-  ])("stops at start on %s, naming the file", (_case, files, name) => {
-    expect(() => loadPlaces(folderOf(files))).toThrow(new RegExp(`^places: ${name.replace(".", "\\.")}`));
+    [
+      "a list that is an object",
+      { hubs: { bubble: world("bubble", "Bubble") } },
+      "places: hubs.json: (file): invalid_type",
+    ],
+  ])("stops at start on %s, naming the file, the place in it and the fault", (_case, files, message) => {
+    expect(() => loadPlaces(folderOf(files))).toThrow(new Error(message));
   });
 
   it("names a refused file and never a value it holds", () => {
@@ -100,7 +117,26 @@ describe("loadPlaces: the places' data, read once at start", () => {
   ])("stops at start on a file that is %s, naming it", (_case, spoil) => {
     const folder = folderOf();
     spoil(folder);
-    expect(() => loadPlaces(folder)).toThrow(/^places: hubs\.json: /);
+    expect(() => loadPlaces(folder)).toThrow(/^places: hubs\.json: (unreadable|\(file\): invalid_type)$/);
+  });
+
+  it("keeps why a file could not be read as the cause, its size past 1 MiB among them", () => {
+    const folder = folderOf({}, { "hubs.json": `[${" ".repeat(1024 * 1024)}]` });
+    let thrown: unknown;
+    try {
+      loadPlaces(folder);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({ message: "places: hubs.json: unreadable", cause: { message: "past 1 MiB" } });
+    expect(z.object({ cause: z.instanceof(RangeError) }).safeParse(thrown).success).toBe(true);
+  });
+
+  it("puts the default universe's places at the root whichever row of the file it is", () => {
+    const universes = [universe("gnoland"), universe("onyx", { default: true })];
+    const { places } = loadPlaces(folderOf({ universes }));
+    expect(places.find((place) => place.slug === "bubble")?.path).toBe("/w/bubble");
+    expect(places.find((place) => place.slug === "tower")?.path).toBe("/net/gnoland/w/tower");
   });
 
   it("takes a file of exactly 1 MiB", () => {
@@ -168,6 +204,21 @@ describe("find_place: a place's path and address, from the data alone", () => {
       expect(ran).toEqual({ ok: true, isError: false, text: "No place of gnoworld's data matches that query." });
     },
   );
+
+  it.each(["bubbleonyx", "worldbubble", "govdaoonyx"])(
+    "finds no place for %j, which runs across two of its words",
+    async (query) => {
+      const ran = await placesTool(loadPlaces(folderOf())).run({ query });
+      expect(ran).toEqual({ ok: true, isError: false, text: "No place of gnoworld's data matches that query." });
+    },
+  );
+
+  it("answers places found as a result, not an error, and tells the model a place the data lacks does not exist", async () => {
+    const tool = placesTool(loadPlaces(folderOf()));
+    expect(await tool.run({ query: "bubble" })).toMatchObject({ ok: true, isError: false });
+    expect(tool.definition.description).toContain("A place the data lacks does not exist: say so, never guess a path.");
+    expect(tool.definition.args.shape.query.description).toMatch(/\S/);
+  });
 
   it("gives 20 places at most, in the data's order, and how many more match", async () => {
     const hubs = Array.from({ length: 30 }, (_hub, at) => world(`hub-${String(at)}`, `Hub ${String(at)}`));

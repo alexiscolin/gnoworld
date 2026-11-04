@@ -25,6 +25,10 @@ interface Scenario {
   delayMs?: (method: string) => number;
   /** What to write instead of an answer: a status, a redirect, or a body. */
   instead?: (method: string) => { status: number; body?: string; location?: string } | undefined;
+  /** A whole answer's body, written as given, built from the request's id. */
+  raw?: (method: string, id: unknown) => string | undefined;
+  /** A JSON-RPC error in place of a result. */
+  fail?: (method: string) => { code: number; message: string } | undefined;
 }
 
 const freshness = (data: unknown) =>
@@ -57,6 +61,15 @@ function resultOf(message: z.infer<typeof Message>, scenario: Scenario): unknown
   return answer(call.name, call.arguments);
 }
 
+// A request's answer as written: the test's raw body, its JSON-RPC error, or the result.
+function answerOf(message: z.infer<typeof Message>, scenario: Scenario): string {
+  const raw = scenario.raw?.(message.method, message.id);
+  if (raw !== undefined) return raw;
+  const error = scenario.fail?.(message.method);
+  const body = error === undefined ? { result: resultOf(message, scenario) } : { error };
+  return JSON.stringify({ jsonrpc: "2.0", id: message.id, ...body });
+}
+
 export async function fakeGnoscope(scenario: Scenario = {}) {
   const requests: { method: string; params: unknown }[] = [];
   const handle = async (request: IncomingMessage, response: ServerResponse) => {
@@ -77,8 +90,7 @@ export async function fakeGnoscope(scenario: Scenario = {}) {
       response.writeHead(202).end();
       return;
     }
-    const body = { jsonrpc: "2.0", id: message.id, result: resultOf(message, scenario) };
-    response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(body));
+    response.writeHead(200, { "content-type": "application/json" }).end(answerOf(message, scenario));
   };
   const server = createServer((request, response) => {
     handle(request, response).catch((error: unknown) => {
