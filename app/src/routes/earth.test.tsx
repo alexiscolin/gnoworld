@@ -98,7 +98,11 @@ describe("the Earth's plate", () => {
       ["Explorer", "https://gnoscan.io/?chainId=onyx-1"],
       ["Docs", "https://docs.gno.land/"],
     ] as const)
-      expect(html).toContain(`href="${href}" target="_blank" rel="noopener noreferrer">${label}`);
+      expect(html).toMatch(
+        new RegExp(
+          `href="${href.replaceAll(".", "\\.").replaceAll("?", "\\?")}" target="_blank" rel="noopener noreferrer"><div[^>]*>${label}<`,
+        ),
+      );
   });
 
   test("shows the realms deployed in 24 h as coming soon, greyed and said so (slice 9)", async () => {

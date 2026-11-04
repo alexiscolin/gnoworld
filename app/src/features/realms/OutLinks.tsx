@@ -10,8 +10,11 @@ export function OutLinks({ links }: { links: readonly { label: string; href: str
     <Cluster as="ul" space="m">
       {shown.map(({ label, href }) => (
         <li key={label}>
-          <a className={`label nowrap ${String(styles["out"])}`} href={href} target="_blank" rel="noopener noreferrer">
-            {label} <Icon name="arrow-up-right" />
+          <a className={`label ${String(styles["out"])}`} href={href} target="_blank" rel="noopener noreferrer">
+            <Cluster space="3xs">
+              {label}
+              <Icon name="arrow-up-right" />
+            </Cluster>
           </a>
         </li>
       ))}
