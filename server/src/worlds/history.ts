@@ -65,8 +65,8 @@ const Page = z.object({
             z.object({
               value: z.object({
                 __typename: z.string(),
-                pkg_path: z.optional(z.string()),
-                caller: z.optional(z.string()),
+                pkg_path: z.nullish(z.string()),
+                caller: z.nullish(z.string()),
               }),
             }),
           ),
@@ -97,8 +97,9 @@ function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[
     if (height < floor || height > to) throw new Failure("shape");
     floor = height;
     let skipped = 0;
-    const calls = messages.flatMap(({ value: { __typename, pkg_path: path, caller } }) => {
-      if (__typename !== "MsgCall") return [];
+    const calls = messages.flatMap(({ value }) => {
+      if (value.__typename !== "MsgCall") return [];
+      const [path, caller] = [value.pkg_path ?? undefined, value.caller ?? undefined];
       const odd = path === undefined || (caller !== undefined && !isAddress(caller));
       if (odd) skipped += 1;
       return path === undefined ? [] : [{ path, caller: odd ? undefined : caller }];

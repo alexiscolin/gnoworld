@@ -1,7 +1,7 @@
 {
   "source": "onyx-1 indexer, answers to the worlds job queries, recorded by 7k3 from the sandbox through its proxy (gnomcp shows no raw GraphQL)",
   "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
-  "recorded": "2026-11-04T06:46:03.673Z",
+  "recorded": "2026-11-04T07:28:50.196Z",
   "answers": [
     {
       "what": "the per-realm filter 7c wrote",
@@ -69,6 +69,13 @@
       },
       "status": 200,
       "body": "{\"data\":{\"getTransactions\":[{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1z360harzpshhdnlrdgj5ljkx2aeckzavkyl9g0\"}}]},{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt/bazaar/c/bazaargens3\",\"caller\":\"g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt\"}}]}]}}"
+    },
+    {
+      "what": "the call's type",
+      "query": "query { __type(name: \"MsgCall\") { fields { name type { kind name ofType { kind name } } } } }",
+      "variables": {},
+      "status": 200,
+      "body": "{\"data\":{\"__type\":{\"fields\":[{\"name\":\"caller\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"send\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"pkg_path\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"func\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"args\",\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null}}},{\"name\":\"args_at\",\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null}}},{\"name\":\"max_deposit\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}}]}}}"
     }
   ]
 }

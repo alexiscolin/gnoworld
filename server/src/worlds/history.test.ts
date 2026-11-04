@@ -116,17 +116,22 @@ describe("readHistories", () => {
       });
     });
 
-    it("leaves out a call that names no path, for it cannot be tied to a realm, and says so", async () => {
-      const rows = [
-        { block_height: 9, messages: [{ value: { __typename: "MsgCall", caller: CALLER_A } }] },
-        call(10, CALLER_B),
-      ];
-      expect(await reading(pagedCalls(rows), { paths: [PATH] }).read()).toEqual({
-        ok: true,
-        skipped: 1,
-        histories: new Map([[PATH, { calls: 1, callers: 1, lastHeight: 10 }]]),
-      });
-    });
+    // onyx-1 declares a call's path and caller never null (onyxIndexer.json, "the call's type"); a server that sends null or leaves the key
+    // out costs that call alone (the review of 7k3).
+    it.each([
+      ["leaves its key out", { __typename: "MsgCall", caller: CALLER_A }],
+      ["sends it as null", { __typename: "MsgCall", pkg_path: null, caller: CALLER_A }],
+    ])(
+      "leaves out a call whose path an indexer %s, for it cannot be tied to a realm, and says so",
+      async (_name, value) => {
+        const rows = [{ block_height: 9, messages: [{ value }] }, call(10, CALLER_B)];
+        expect(await reading(pagedCalls(rows), { paths: [PATH] }).read()).toEqual({
+          ok: true,
+          skipped: 1,
+          histories: new Map([[PATH, { calls: 1, callers: 1, lastHeight: 10 }]]),
+        });
+      },
+    );
 
     it("says it left nothing out when every call was whole", async () => {
       expect(await reading(pagedCalls([call(1, CALLER_A)]), { paths: [PATH] }).read()).toMatchObject({
@@ -203,8 +208,11 @@ describe("readHistories", () => {
       });
     });
 
-    it("counts a call that names no caller as its transaction, with no address", async () => {
-      const rows = [{ block_height: 101, messages: [msg(PATH)] }, call(102, CALLER_A)];
+    it.each([
+      ["names no caller", msg(PATH).value],
+      ["gives its caller as null", { __typename: "MsgCall", pkg_path: PATH, caller: null }],
+    ])("counts a call that %s as its transaction, with no address", async (_name, value) => {
+      const rows = [{ block_height: 101, messages: [{ value }] }, call(102, CALLER_A)];
       expect(await histories(rows, { paths: [PATH], since: { [PATH]: 100 } })).toMatchObject({
         [PATH]: { calls: 2, callers: 1, recent: { transactions: ["101:", `102:${CALLER_A}`], callers: [CALLER_A] } },
       });
@@ -664,6 +672,16 @@ describe("readHistories against onyx-1's recorded answers", () => {
         [namereg]: { calls: 1, callers: 1, lastHeight: 65_431 },
       },
     );
+  });
+
+  it("is told by onyx-1 that a call's path and caller are never null", () => {
+    const fields = (
+      JSON.parse(named("the call's type").body) as {
+        data: { __type: { fields: { name: string; type: { kind: string; ofType: { name: string } | null } }[] } };
+      }
+    ).data.__type.fields;
+    const kinds = Object.fromEntries(fields.map(({ name, type }) => [name, `${type.kind} ${type.ofType?.name ?? ""}`]));
+    expect([kinds["pkg_path"], kinds["caller"]]).toEqual(["NON_NULL String", "NON_NULL String"]);
   });
 
   it("reads onyx-1's empty page, null, and its answer to a negative bound, null too, as no call", async () => {
