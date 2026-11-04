@@ -46,34 +46,85 @@ interface Call {
   init: RequestInit;
   ms: number;
 }
-const setup = (answers: (() => Response | Promise<Response>)[], { max }: { max?: number } = {}) => {
+// The mainnet's chain (D120): the node's status names it before any name is read there (D118).
+const MAINNET = "gnoland-1";
+const statusOf = (network: string | null) =>
+  new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: "",
+      result: {
+        ...(network === null ? {} : { node_info: { network } }),
+        sync_info: { latest_block_height: "1204", latest_block_time: "2026-11-04T12:00:00Z" },
+      },
+    }),
+  );
+// `calls` are the names' reads alone; `asked` every address, the node's status first.
+const setup = (
+  answers: (() => Response | Promise<Response>)[],
+  { max, network = MAINNET, status }: { max?: number; network?: string | null; status?: () => Promise<Response> } = {},
+) => {
   const calls: Call[] = [];
+  const asked: string[] = [];
   const clock = { now: T0 };
   const named = makeNames({
     rpc: RPC,
+    chainId: MAINNET,
     now: () => clock.now,
     send: (url, init, ms) => {
+      asked.push(url);
+      if (url === `${RPC}/status`) return status?.() ?? Promise.resolve(statusOf(network));
       calls.push({ url, init, ms });
       const next = answers.shift();
       return next === undefined ? Promise.reject(new Error("no answer left")) : Promise.resolve(next());
     },
     ...(max === undefined ? {} : { max }),
   });
-  return { calls, clock, named };
+  return { calls, asked, clock, named };
 };
 
 describe("a mainnet name", () => {
-  it("asks r/sys/users whether the account's record is missing, by vm/qeval, with a 3 s timeout", async () => {
-    const { calls, named } = setup([NAMED]);
+  it("asks r/sys/users whether the account's record is missing, by vm/qeval through the chain package, with a 3 s timeout", async () => {
+    const { calls, asked, named } = setup([NAMED]);
     expect(await named(ANNA)).toBe(true);
     const expression = `gno.land/r/sys/users.ResolveAddress("${ANNA}").IsDeleted()`;
-    expect(calls).toEqual([
-      {
-        url: `${RPC}/abci_query?path=%22vm/qeval%22&data=0x${Buffer.from(expression).toString("hex")}`,
-        init: { method: "GET", headers: { accept: "application/json" } },
-        ms: 3000,
-      },
+    const url = `${RPC}/abci_query?path=%22vm%2Fqeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
+    expect(asked).toEqual([`${RPC}/status`, url]);
+    expect(calls).toMatchObject([
+      { url, init: { method: "GET", redirect: "error", headers: { accept: "application/json" } }, ms: 3000 },
     ]);
+  });
+
+  it.each([
+    ["another chain", "test5"],
+    ["a chain whose id only starts like the mainnet's", "gnoland-10"],
+    ["no network", null],
+  ])("reads no name on a node whose status names %s: none, the lower quota", async (_, network) => {
+    const { calls, asked, named } = setup([NAMED], { network });
+    expect(await named(ANNA)).toBe(false);
+    expect(calls).toEqual([]);
+    expect(asked).toEqual([`${RPC}/status`]);
+  });
+
+  it("keeps another chain's answer a minute, as any failed read, asking its status once", async () => {
+    const { asked, calls, clock, named } = setup([NAMED], { network: "test5" });
+    expect(await named(ANNA)).toBe(false);
+    clock.now += MINUTE - 1;
+    expect(await named(ANNA)).toBe(false);
+    expect(asked).toEqual([`${RPC}/status`]);
+    expect(calls).toEqual([]);
+  });
+
+  it("is none when the node's status cannot be read, and reads it again a minute later", async () => {
+    let up = false;
+    const { calls, clock, named } = setup([NAMED], {
+      status: () => Promise.resolve(up ? statusOf(MAINNET) : new Response("", { status: 503 })),
+    });
+    expect(await named(ANNA)).toBe(false);
+    expect(calls).toEqual([]);
+    up = true;
+    clock.now += MINUTE;
+    expect(await named(ANNA)).toBe(true);
   });
 
   it("is none when the record is missing", async () => {

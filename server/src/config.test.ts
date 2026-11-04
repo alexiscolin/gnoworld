@@ -449,6 +449,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       questionChars: 2000,
       first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
+      namesChain: "gnoland-1",
     });
   });
 
@@ -479,6 +480,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       JARVIS_QUOTA_UNNAMED: "1",
       JARVIS_UNLIMITED: `${ANNA},${BEN}`,
       JARVIS_NAMES_RPC: "https://rpc.test5.gno.land",
+      JARVIS_NAMES_CHAIN: `test5.${"x".repeat(44)}`,
     };
     expect(loadConfig({ ...env, JARVIS: "on" }).jarvis).toEqual({
       on: true,
@@ -487,7 +489,10 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       questionChars: 8000,
       first: { quota: 1000, quotaUnnamed: 1, unlimited: [ANNA, BEN] },
       namesRpc: "https://rpc.test5.gno.land",
+      namesChain: `test5.${"x".repeat(44)}`,
     });
+    const one = loadConfig({ ...env, JARVIS_NAMES_CHAIN: "a" }).jarvis;
+    expect(one?.namesChain).toBe("a");
   });
 
   it.each([
@@ -514,6 +519,11 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     ["JARVIS_QUOTA_UNNAMED", "2.5"],
     ["JARVIS_UNLIMITED", ","],
     ["JARVIS_NAMES_RPC", ""],
+    ["JARVIS_NAMES_CHAIN", ""],
+    ["JARVIS_NAMES_CHAIN", "test 5"],
+    ["JARVIS_NAMES_CHAIN", "test5/"],
+    ["JARVIS_NAMES_CHAIN", "-test5"],
+    ["JARVIS_NAMES_CHAIN", "x".repeat(51)],
   ])("refuses %s=%s, naming the setting", (name, value) => {
     expect(failure({ ...ENV, JARVIS_URL: "http://jarvis:8090", [name]: value })).toMatch(
       new RegExp(`setting ${name}: `),
@@ -534,6 +544,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       expect(failure({ ...ENV, [name]: "5" })).toMatch(/setting JARVIS_URL: required/);
     expect(failure({ ...ENV, JARVIS_UNLIMITED: ANNA })).toMatch(/setting JARVIS_URL: required/);
     expect(failure({ ...ENV, JARVIS_NAMES_RPC: "https://rpc.gno.land" })).toMatch(/setting JARVIS_URL: required/);
+    expect(failure({ ...ENV, JARVIS_NAMES_CHAIN: "gnoland-1" })).toMatch(/setting JARVIS_URL: required/);
   });
 
   it("opens the admin API on its own listener once its port is set, on the loopback by default", () => {

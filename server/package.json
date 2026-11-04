@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "@adena-wallet/sdk": "0.1.1",
+    "@gnoworld/chain": "workspace:*",
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
     "@gnoworld/service": "workspace:*",
