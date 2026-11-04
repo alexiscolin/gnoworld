@@ -13,18 +13,17 @@ const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 test.describe("a world's page at the video's size", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  test("the kicker stands at the text column's left, 137 px down, over the title (frame 26)", async ({ page }) => {
+  // 8g: the kicker is frame 104's crumb, "UNIVERSE › GAMES › DAPP", the universe a link to its cosmos.
+  test("the crumb stands at the text column's left, 137 px down, over the title (frames 26, 104)", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    // The plate's vertical atlas caption is a label too: the kicker is the one that is not vertical.
-    const label = "[data-look='plate'] p.label:not([data-orientation])";
+    const label = "[data-look='plate'] nav[aria-label='You are here']";
     const kicker = await box(page, label);
     const title = await box(page, "[data-look='plate'] h1");
     near(kicker.x, 100, "the kicker's left");
     near(kicker.y + kicker.height / 2, 137, "the kicker's middle");
     expect(kicker.y + kicker.height).toBeLessThanOrEqual(title.y + 0.5);
-    await expect(page.locator(label).first()).toHaveText("Onyx");
-    await expect(page.getByRole("navigation", { name: "You are here" })).toHaveCount(0);
+    await expect(page.locator(`${label} li`)).toHaveText(["Universe", "Games", "dApp"]);
   });
 
   // F2871: the kicker's row (24 px, flex) is the paragraph right before the title, not any first paragraph of a block of the plate: the
@@ -64,7 +63,10 @@ test.describe("a world's page at the video's size", () => {
     near(line.x, 100, "the line's left");
     near(activity.y, 371, "the activity words' top");
     // Frame 26: the actions' top 30 px under the chart's last words' ink (544 to 574); a label's box ends 2 px under its ink.
-    near(main.y - (activity.y + activity.height), 574 - 544 - 2, "the actions under the words");
+    // 8g: the activity holds the chart's room while it has no history, so the actions stand under that room as frame 26's under its chart.
+    const room = await box(page, "[data-look='plate'] div:has(> p:text-is('No activity recorded yet'))");
+    near(room.y, activity.y, "the room's top, the words'");
+    near(main.y - (room.y + room.height), 574 - 544 - 2, "the actions under the activity's room");
     expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
   });
 

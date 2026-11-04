@@ -15,6 +15,8 @@ export interface ActivityChartProps {
   sparkline?: boolean;
   /** How far apart the values are: an hour unless asked. */
   unit?: "hour" | "day";
+  /** Its row of peak and now; false where the page writes them in its own words (a plate's, frames 26 and 40). */
+  figures?: boolean;
 }
 
 // The drawing's own units, stretched to its box: the bars keep the height, the line its stroke.
@@ -144,7 +146,7 @@ function Plot({
 /** Activity over time, in SVG for the eye: past bars muted, the current one in text; the peak and the
  * current value written beside it, and every value in a table for assistive technology. The bars have a
  * tooltip (F304), by the pointer and by the keyboard: the chart is one group whose arrows walk them. */
-export function ActivityChart({ label, values, sparkline = false, unit = "hour" }: ActivityChartProps) {
+export function ActivityChart({ label, values, sparkline = false, unit = "hour", figures = true }: ActivityChartProps) {
   const counts = values.map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
   const peak = Math.max(0, ...counts);
   const last = counts.length - 1;
@@ -158,10 +160,12 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour" 
   return (
     <Stack space="2xs">
       <Plot points={points} sparkline={sparkline} unit={unit} label={label} />
-      <Cluster space="s">
-        <p className={styles["figure"]}>Peak {grouped(peak)}</p>
-        <p className={styles["figure"]}>Now {grouped(counts.at(-1) ?? 0)}</p>
-      </Cluster>
+      {figures ? (
+        <Cluster space="s">
+          <p className={styles["figure"]}>Peak {grouped(peak)}</p>
+          <p className={styles["figure"]}>Now {grouped(counts.at(-1) ?? 0)}</p>
+        </Cluster>
+      ) : null}
       {/* A table is never narrower than its words: the box around it clips it. */}
       <div className="visually-hidden">
         <table>

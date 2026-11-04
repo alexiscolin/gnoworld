@@ -86,6 +86,8 @@ describe("the worlds of the data files", () => {
         testnet: true,
         path: "/w/bubble",
         canonical: "/net/onyx/w/bubble",
+        kind: "dapp",
+        genre: "Games",
       },
       {
         slug: "govdao",
@@ -96,6 +98,7 @@ describe("the worlds of the data files", () => {
         path: "/w/govdao",
         canonical: "/net/onyx/w/govdao",
         realms: ["gno.land/r/gov/dao"],
+        kind: "dao",
       },
     ]);
   });

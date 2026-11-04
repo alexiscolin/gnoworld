@@ -2,6 +2,8 @@
 // roles file's slug, as the server's rooms are; the client keys it as the cosmos holds it. Every count is bounded, and nothing else rides.
 import { PEOPLE_MOST, PER_HOUR_MOST } from "./counts.ts";
 import { HubSlug } from "./slug.ts";
+
+export { HubSlug } from "./slug.ts";
 import { z } from "./zod.ts";
 
 /** The most worlds one answer holds. */

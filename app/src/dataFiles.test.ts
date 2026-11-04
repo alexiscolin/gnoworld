@@ -203,6 +203,8 @@ describe("loadData", () => {
         description:
           "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
         universe: "onyx",
+        genre: "games",
+        kind: "dapp",
       },
       {
         slug: "govdao",
@@ -210,10 +212,13 @@ describe("loadData", () => {
         description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
         universe: "onyx",
         realms: ["gno.land/r/gov/dao"],
+        kind: "dao",
       },
     ]);
+    // The crumbs' one genre (8g, frame 104: "GAMES › DAPP").
+    expect(data.genres).toEqual([{ slug: "games", name: "Games" }]);
     // events and news hold the ticker's placeholders, listed below.
-    for (const empty of ["ecosystems", "stations", "genres"] as const) expect(data[empty]).toEqual([]);
+    for (const empty of ["ecosystems", "stations"] as const) expect(data[empty]).toEqual([]);
   });
 
   it("refuses a list of universes that is empty: no default, so no build", () => {

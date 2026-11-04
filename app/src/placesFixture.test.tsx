@@ -99,24 +99,17 @@ describe("an ecosystem's page", () => {
 });
 
 describe("the Earth of a universe that holds worlds", () => {
-  test("links a world of another universe at that universe's path", async () => {
+  // 8g (frames 37 to 42): the Earth's plate is its general chat's; the List keeps every world and ecosystem.
+  test("lists neither its worlds nor its ecosystems", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
-    expect(html).toContain("Other");
-    expect(html).not.toContain("Bubble");
-    expect(html).not.toMatch(/no world yet/i);
+    expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
+    expect(html).not.toMatch(/<a [^>]*href="\/e\/tokens"/);
   });
 
-  test("lists the ecosystems of its universe, and no other", async () => {
-    const html = await page("earth", "/earth");
-    expect(html).toMatch(/<a [^>]*href="\/e\/tokens"[^>]*>Tokens<\/a>/);
-    expect(html).not.toContain("Tokens of gno.land");
-  });
-
-  test("has a trail to its universe's home, ending on the Earth", async () => {
+  test("has frame 40's crumb: its universe's cosmos, then the home, the general chat", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>gno\.land<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Earth</);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
+    expect(html).toMatch(/aria-current="page"[^>]*>Home · the general chat</);
   });
 
   test("carries the loader's own address in its tags", () => {
@@ -175,10 +168,10 @@ describe("a universe's index", () => {
 });
 
 describe("a world of another universe", () => {
-  test("is at its universe's path, its kicker naming that universe", async () => {
+  test("is at its universe's path, its crumb leading to that universe", async () => {
     const html = await page("world", "/net/gnoland/w/other");
     expect(html).toContain("<h1>Other</h1>");
-    expect(html).toMatch(/<p class="label[^"]*">gno\.land<\/p><h1>Other<\/h1>/);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
   });
 
   test.each(["/net/gnoland/w/bubble", "/w/other", "/net/nowhere/w/other", "/net/onyx/w/other"])(

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "./read.ts";
-import { REALM_FACTS_CAPS, RealmFactsAnswer } from "@gnoworld/schemas/indexer";
+import { REALM_FACTS_CAPS, RealmDeployAnswer } from "@gnoworld/schemas/indexer";
+import recorded from "../../../tests/chain/onyxRealmDeploy.json" with { type: "json" };
 import { readRealmFacts } from "./indexer.ts";
 
-// 5k, the indexer reader's FAULT tests: a fake fetch and a synthetic body, as rpc.test.ts does, so none needs a recording.
-// Parked for a gnomcp session (ledger F2950): the happy path on a real answer and the wire (GET or POST, query text, CORS).
-// The shape `{ data: { realmFacts } }` is OURS and synthetic.
+// 5k, the indexer reader: onyx-1's recorded answers (8g, F4875: `realmFacts` was never defined there) and the faults on a fake fetch, as
+// rpc.test.ts does. The body a fault test builds is the recorded shape: a deploy's transaction, its MsgAddPackage.
 const INDEXER = "https://indexer.onyx.testnets.gno.land/graphql/query";
 const REALM = "gno.land/r/gnoland/wugnot";
 const NOW = new Date("2026-10-31T06:00:00.000Z");
@@ -23,7 +23,38 @@ const options = (fetcher: ChainFetch, extra: ReadOptions = {}): ReadOptions => (
   now: () => NOW,
   ...extra,
 });
-const withFacts = (realmFacts: unknown) => ({ data: { realmFacts } });
+// The recorded answer's shape around `facts`: null for no transaction; a fact left out is a field left out of the message.
+const withFacts = (
+  facts: null | { path?: unknown; deployer?: unknown; firstBlock?: unknown; extra?: unknown } | string,
+) => ({
+  data: {
+    getTransactions:
+      facts === null
+        ? null
+        : typeof facts === "string"
+          ? facts
+          : [
+              {
+                block_height: facts.firstBlock ?? 1,
+                messages: [
+                  {
+                    value: {
+                      __typename: "MsgAddPackage",
+                      ...(facts.deployer === undefined ? {} : { creator: facts.deployer }),
+                      package: { path: facts.path ?? REALM },
+                      ...(facts.extra === undefined ? {} : { extra: facts.extra }),
+                    },
+                  },
+                ],
+              },
+            ],
+  },
+});
+const answerOf = (index: number) => {
+  const answer = recorded.answers[index];
+  if (answer === undefined) throw new Error("no such recording");
+  return answer;
+};
 
 function failureOf(result: ChainRead<unknown>): Failure {
   if (result.ok) throw new Error("expected a failure");
@@ -40,6 +71,37 @@ afterEach(() => {
 });
 
 describe("readRealmFacts", () => {
+  it("reads onyx-1's recorded deploys: the creator and the block, and no-realm for a path none added", async () => {
+    const read = async (index: number) => {
+      const { variables, body, status } = answerOf(index);
+      return readRealmFacts(recorded.indexer, variables.path, options(answering(body, { status })));
+    };
+    const genesis = await read(0);
+    expect(genesis.ok && genesis.value).toEqual({
+      path: "gno.land/r/gov/dao",
+      deployer: "g1g73v2anukg4ej7axwqpthsatzrxjsh0wk797da",
+      firstBlock: 0,
+    });
+    const later = await read(1);
+    expect(later.ok && later.value).toMatchObject({ path: "gno.land/r/samcrew/connect4", firstBlock: 235627 });
+    expect(failureOf(await read(2)).kind).toBe("no-realm");
+  });
+
+  it("asks the recorded query, the path in its variables", async () => {
+    const fetcher = answering(withFacts(FACTS));
+    await readRealmFacts(INDEXER, REALM, options(fetcher));
+    const url = new URL(fetcher.mock.calls[0]?.[0] ?? "");
+    expect(url.searchParams.get("query")).toBe(recorded.query);
+    expect(JSON.parse(url.searchParams.get("variables") ?? "")).toEqual({ path: REALM });
+  });
+
+  it("says wrong-shape when the transaction adds another path or holds no deploy", async () => {
+    const other = readRealmFacts(INDEXER, REALM, options(answering(withFacts({ path: "gno.land/r/other/realm" }))));
+    expect(failureOf(await other).kind).toBe("wrong-shape");
+    const call = { data: { getTransactions: [{ block_height: 3, messages: [{ value: { __typename: "MsgCall" } }] }] } };
+    expect(failureOf(await readRealmFacts(INDEXER, REALM, options(answering(call)))).kind).toBe("wrong-shape");
+  });
+
   it("gives the facts with the source and the time, and asks once, by GET, with nothing of the visitor's", async () => {
     const fetcher = answering(withFacts(FACTS));
     const result = await readRealmFacts(INDEXER, REALM, options(fetcher));
@@ -54,8 +116,12 @@ describe("readRealmFacts", () => {
   });
 
   it("leaves a fact the indexer did not give out of the value, and drops a field it does not know", async () => {
-    const result = await readRealmFacts(INDEXER, REALM, options(answering(withFacts({ path: REALM, extra: "x" }))));
-    expect(result.ok && result.value).toEqual({ path: REALM });
+    const result = await readRealmFacts(
+      INDEXER,
+      REALM,
+      options(answering(withFacts({ path: REALM, firstBlock: 4, extra: "x" }))),
+    );
+    expect(result.ok && result.value).toEqual({ path: REALM, firstBlock: 4 });
   });
 
   it("gives a deployer of hostile text as the same text: reading never interprets it", async () => {
@@ -64,19 +130,7 @@ describe("readRealmFacts", () => {
       REALM,
       options(answering(withFacts({ path: REALM, deployer: HOSTILE }))),
     );
-    expect(result.ok && result.value).toEqual({ path: REALM, deployer: HOSTILE });
-  });
-
-  it("says wrong-shape for facts of another realm than the one asked, and takes facts that name the same one or none", async () => {
-    const other = readRealmFacts(
-      INDEXER,
-      REALM,
-      options(answering(withFacts({ ...FACTS, path: "gno.land/r/other/realm" }))),
-    );
-    expect(failureOf(await other).kind).toBe("wrong-shape");
-    expect(JSON.stringify(await other)).not.toContain("other/realm");
-    expect((await readRealmFacts(INDEXER, REALM, options(answering(withFacts(FACTS))))).ok).toBe(true);
-    expect((await readRealmFacts(INDEXER, REALM, options(answering(withFacts({ firstBlock: 1 }))))).ok).toBe(true);
+    expect(result.ok && result.value).toEqual({ path: REALM, deployer: HOSTILE, firstBlock: 1 });
   });
 
   it("says no-realm for a realm the indexer does not know", async () => {
@@ -86,7 +140,7 @@ describe("readRealmFacts", () => {
 
   it.each([
     ["a GraphQL errors body with no data", { errors: [{ message: "HOSTILE" }], data: null }],
-    ["errors beside data", { errors: [{ message: "HOSTILE" }], data: { realmFacts: FACTS } }],
+    ["errors beside data", { errors: [{ message: "HOSTILE" }], ...withFacts(FACTS) }],
     ["data null", { data: null }],
     ["an empty object", {}],
     ["an array", []],
@@ -96,7 +150,7 @@ describe("readRealmFacts", () => {
     ["a deployer that is no text", withFacts({ deployer: { a: 1 } })],
     ["a first block as text", withFacts({ firstBlock: "7" })],
     ["a negative first block", withFacts({ firstBlock: -1 })],
-    ["facts that are no object", withFacts("x")],
+    ["transactions that are no list", withFacts("x")],
     ["an overlong path", withFacts({ path: `gno.land/r/${"a".repeat(300)}` })],
     ["an overlong deployer", withFacts({ deployer: "g".repeat(200) })],
   ])("says wrong-shape for %s, and none of the answer's words reach the failure", async (_name, body) => {
@@ -108,7 +162,7 @@ describe("readRealmFacts", () => {
   // Each cap at its bound: the last length is read, the next is refused (the answer's two texts, and the path asked).
   it("takes a path and a deployer of exactly their caps, and refuses one character more", async () => {
     const answer = (path: string, deployer: string) =>
-      RealmFactsAnswer.safeParse(withFacts({ path, deployer })).success;
+      RealmDeployAnswer.safeParse(withFacts({ path, deployer })).success;
     expect(answer("p".repeat(REALM_FACTS_CAPS.path), "d")).toBe(true);
     expect(answer("p".repeat(REALM_FACTS_CAPS.path + 1), "d")).toBe(false);
     const read = (deployer: string) =>
@@ -150,7 +204,7 @@ describe("readRealmFacts", () => {
   });
 
   it("says too-big for a body past the cap, declared or streamed", async () => {
-    const big = JSON.stringify(withFacts({ path: "a".repeat(200) }));
+    const big = JSON.stringify(withFacts({ path: `gno.land/r/${"a".repeat(200)}` }));
     const declared = answering(big, { headers: { "content-length": String(big.length) } });
     expect(failureOf(await readRealmFacts(INDEXER, REALM, options(declared, { maxBytes: 64 }))).kind).toBe("too-big");
     const streamed = answering(big);

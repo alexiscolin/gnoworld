@@ -249,12 +249,13 @@ test.describe("at the video's size", () => {
     const rows = await brightness(
       page,
       picture,
-      Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 600 + dy, 340, 601 + dy]),
+      // 8g: the Earth's plate holds its latest post on X at y 600, so the rows are read lower, in a plain stretch under its links.
+      Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 900 + dy, 340, 901 + dy]),
     );
     const peak = (values: number[]) => values.indexOf(Math.max(...values));
-    // The tiles start at 42 px and 600 px: the dot of x 45 is the 4th column, the dot of y 105 + 14 * 36 = 609 the 10th row.
+    // The tiles start at 42 px and 900 px: the dot of x 45 is the 4th column, the dot of y 105 + 14 * 57 = 903 the 4th row.
     near(42 + peak(columns), 45, "the dots' column");
-    near(600 + peak(rows), 609, "the dots' row");
+    near(900 + peak(rows), 903, "the dots' row");
   });
 
   test("the plate's caption stands vertical at the plate's foot, from y 813 to 1001, in the atlas's tracking (frame 20)", async ({

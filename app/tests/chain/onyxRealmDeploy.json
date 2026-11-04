@@ -1,0 +1,32 @@
+{
+  "source": "onyx-1's indexer, a realm's deploy as the browser asks it (8g, F4875), recorded by GET with curl from the sandbox through its proxy",
+  "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
+  "recorded": "2026-11-04T13:40:08.824Z",
+  "query": "query($path: String!) { getTransactions(where: { success: { eq: true }, messages: { typeUrl: { eq: \"add_package\" }, value: { MsgAddPackage: { package: { path: { eq: $path } } } } } }, order: { heightAndIndex: ASC }, limit: 1) { block_height messages { value { __typename ... on MsgAddPackage { creator package { path } } } } } }",
+  "answers": [
+    {
+      "what": "a realm deployed at genesis",
+      "variables": {
+        "path": "gno.land/r/gov/dao"
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":0,\"messages\":[{\"value\":{\"__typename\":\"MsgAddPackage\",\"creator\":\"g1g73v2anukg4ej7axwqpthsatzrxjsh0wk797da\",\"package\":{\"path\":\"gno.land/r/gov/dao\"}}}]}]}}"
+    },
+    {
+      "what": "a realm deployed later",
+      "variables": {
+        "path": "gno.land/r/samcrew/connect4"
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":235627,\"messages\":[{\"value\":{\"__typename\":\"MsgAddPackage\",\"creator\":\"g136j0m08pkm2lwwde9dmlx8uee26llent9s5cpf\",\"package\":{\"path\":\"gno.land/r/samcrew/connect4\"}}}]}]}}"
+    },
+    {
+      "what": "a path no deploy holds",
+      "variables": {
+        "path": "gno.land/r/nobody/nothing"
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":null}}"
+    }
+  ]
+}

@@ -24,6 +24,9 @@ export interface Listed {
   canonical: string;
   /** The realms a world is about, on its universe's chain: the first is the one its page reads proposals from. */
   realms?: readonly string[];
+  /** What a world is and its genre's name, as its plate's crumb says them (8g): "dao", "Games". */
+  kind?: string;
+  genre?: string;
 }
 export type World = Listed;
 export type Ecosystem = Listed;
@@ -49,6 +52,8 @@ interface Row {
   description: string;
   universe: string;
   realms?: readonly string[] | undefined;
+  kind?: string | undefined;
+  genre?: string | undefined;
 }
 interface Source {
   universes: {
@@ -135,7 +140,9 @@ function viewAt(universe: UniverseView, pathname: string): View | undefined {
 // A path as the data spells it: a trailing slash is no part of the address.
 const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname);
 
+// A row of the data as the site lists it; its genre by the name genres.json gives it.
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
+  const { genre } = row;
   return {
     slug: row.slug,
     name: row.name,
@@ -144,6 +151,8 @@ function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: s
     testnet,
     ...at,
     ...(row.realms === undefined ? {} : { realms: row.realms }),
+    ...(row.kind === undefined ? {} : { kind: row.kind }),
+    ...(genre === undefined ? {} : { genre }),
   };
 }
 
@@ -152,11 +161,14 @@ function build(source: Source) {
   const testnets = new Set(
     source.universes.filter((universe) => universe.testnet === true).map((universe) => universe.id),
   );
+  const genres = new Map(source.genres.map(({ slug, name }) => [slug, name]));
   const listed = (kind: PlaceKind, from: Row[]): Listed[] => {
     const rows = new Map(from.map((row) => [`${row.universe}/${row.slug}`, row]));
     return places.flatMap(({ kind: is, universe, slug, path, canonical }) => {
       const row = is === kind && slug !== undefined ? rows.get(`${universe}/${slug}`) : undefined;
-      return row === undefined ? [] : [listedFrom(row, testnets.has(universe), { path, canonical })];
+      return row === undefined
+        ? []
+        : [listedFrom({ ...row, genre: genres.get(row.genre ?? "") }, testnets.has(universe), { path, canonical })];
     });
   };
   const worlds = listed("world", [...source.hubs, ...source.stations]);

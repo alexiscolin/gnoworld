@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache; steps in docs/decisions.md. The first screen: slice 8's three parts, the plate's Follow and Share at the first paint,
-// 183,128 B measured on /earth with 8b and 8c merged; the ceiling is 183,296 B, by Alexis, 2026-11-04 ("Tout de suite, jusqu'à +512 o").
-const FIRST_SCREEN_JS = 183_128;
+// worker's precache; steps in docs/decisions.md. The first screen: 8g's plates, what waits for no read, 185,847 B on /earth when the chat's
+// rooms drawer lands in time, under the +4 KiB over 183,128 B Alexis gave the plates' pages (2026-11-04, "Charger avec leur donnée").
+const FIRST_SCREEN_JS = 185_847;
 const TOTAL = 3_135_286;
 
 // A text's hashed names of other files (`scene-B9x_Qa1z.js`) weigh as one fixed string: a chunk renamed moved another's weight 1 to 3 B
@@ -65,6 +65,11 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+// A plate's blocks that wait for a read (8g, Alexis's "Charger avec leur donnée"): the realm card, the hours and their chart, each asked as its
+// read starts and capped at its size measured on 2026-11-04 and 256 B (the chief's call). The connected worlds wait for the worlds' file,
+// which the journeys' site does not serve: their chunk never loads here.
+const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars)-[\w-]+\.js$/;
+const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336 };
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
 // gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
@@ -198,6 +203,17 @@ async function namedIn(page: Page, url: string, pattern: RegExp): Promise<string
   return new URL(name ?? "", url).href;
 }
 
+// Each of a plate's late chunks, with what it alone brings, within its own cap.
+async function plateWithin(page: Page, late: readonly string[], firstScreen: readonly string[]): Promise<void> {
+  for (const url of late) {
+    const name = PLATE_LATE.exec(url)?.[1] ?? "";
+    expect(
+      await compressed(page, await ownOf(page, url, firstScreen)),
+      `the plate's ${name} stays within its cap`,
+    ).toBeLessThanOrEqual(PLATE_LATE_JS[name] ?? 0);
+  }
+}
+
 // The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
 // the door ended.
 async function lateChat(page: Page, path: string, scripts: ReadonlySet<string>) {
@@ -253,8 +269,13 @@ for (const path of PAGES) {
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
-    const late = [asked[0], await lateChat(page, path, scripts)].filter((url) => url !== undefined);
-    const firstScreen = await without(page, [...scripts], late);
+    const chatLate = await lateChat(page, path, scripts);
+    // One look at the scripts: a plate's late chunk landing meanwhile is named late, never weighed as the first screen's.
+    const seen = [...scripts];
+    const plateLate = seen.filter((url) => PLATE_LATE.test(url));
+    const late = [asked[0], chatLate, ...plateLate].filter((url) => url !== undefined);
+    const firstScreen = await without(page, seen, late);
+    await plateWithin(page, plateLate, firstScreen);
     const lateChunk = late.find((url) => CHAT.test(url));
     if (lateChunk !== undefined)
       expect(
