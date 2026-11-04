@@ -3,8 +3,9 @@
 // tools those recorded that day unless a test gives others or pages of them; each request kept, and what a test
 // asks of each answer.
 import { readFileSync } from "node:fs";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
+import { bodyOf, onLoopback } from "./loopback.ts";
 
 const Recorded = z.object({ tools: z.array(z.record(z.string(), z.unknown())) });
 
@@ -38,12 +39,6 @@ const freshness = (data: unknown) =>
     freshness: [{ network: "onyx", indexed_height: 883153, chain_height: 883221, blocks_behind: 68 }],
     data,
   });
-
-const bodyOf = async (request: IncomingMessage): Promise<string> => {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
-  return Buffer.concat(chunks).toString("utf8");
-};
 
 function resultOf(message: z.infer<typeof Message>, scenario: Scenario): unknown {
   if (message.method === "initialize")
@@ -108,24 +103,11 @@ export async function fakeGnoscope(scenario: Scenario = {}) {
       body: answerOf(message, scenario),
     }));
   };
-  const server = createServer((request, response) => {
-    handle(request, response).catch((error: unknown) => {
-      response.writeHead(500).end(String(error));
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (address === null || typeof address === "string") throw new Error("the fake gnoscope has no port");
+  const { origin, close } = await onLoopback(handle);
   return {
-    url: `http://127.0.0.1:${String(address.port)}/mcp`,
+    url: `${origin}/mcp`,
     requests,
     calls: () => requests.filter(({ method }) => method === "tools/call"),
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.closeAllConnections();
-        server.close(() => {
-          resolve();
-        });
-      }),
+    close,
   };
 }
