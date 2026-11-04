@@ -175,26 +175,4 @@ export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState 
 export { judgeFrames, PROBE_FRAMES, type ProbeVerdict } from "./frame/probe.ts";
 export { isWeakGpu, pixelRatioFor, sceneOffer, type SceneOffer, type Tier } from "./frame/device.ts";
 export { PHONE_QUERY } from "./frame/phone.ts";
-export { distanceOf, textHash, unitOf, type Point } from "./space/cell.ts";
-export { beatAt } from "./space/beat.ts";
-export { ARRIVAL_LEAN, driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./space/drift.ts";
-export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./space/mood.ts";
-export { smoothstep } from "./space/smooth.ts";
-export {
-  NEBULA_IMAGES,
-  NEBULA_LAYERS,
-  NEBULA_REACH,
-  NEBULAE_MOST,
-  NebulaField,
-  nebulaLight,
-  nebulaShare,
-  nebulaTint,
-  sheetOf,
-  windowOf,
-  type Nebula,
-  type NebulaLayer,
-} from "./space/nebulae.ts";
-export { tilingNoise } from "./space/noise.ts";
-export { MOTES, SHELLS, StarCells, type Shell } from "./space/stars.ts";
-export { wrapTo } from "./space/torus.ts";
-export { wholeShare } from "./space/whole.ts";
+export * from "./space/index.ts";
