@@ -52,7 +52,9 @@ links loaded React twice in Storybook and let the probe delete main's own `.bin/
 removes a worktree of that root that holds no change, staged file or untracked file (git's own
 check: its ignored files go with it, never what a link in it leads to) with its record, and keeps
 its branch. It prunes no other record, which a session can point at nothing: `git worktree prune`
-is run in your shell.
+is run in your shell. In Claude Code it runs outside the sandbox: write the call alone, from the
+checkout's root, with plain words (a bare `<name>`); the guard refuses any other form (a `cd`, a
+`$(...)`, a `~`, an assignment, a redirect or another command in the call).
 After a merge that changes the lockfile, install in the main checkout
 (`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
 

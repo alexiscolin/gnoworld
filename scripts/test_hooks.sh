@@ -88,14 +88,22 @@ assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnp
 assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
 assert {".git/hooks", ".git/config", ".git/commondir"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129, F150)"
 assert ".mcp.json" in box["filesystem"]["denyWrite"], "a command can add a server Claude Code starts (F158)"
+# The worktrees sit in ~/Server/gnoworld-wt, outside every other session's writable folders (Alexis, 2026-11-04). A worktree's own
+# .git, which names the folder worktree.sh takes git's config from outside the sandbox, is denied to its own session too (F5095).
+assert "~/Server/gnoworld-wt/*/.git" in box["filesystem"]["denyWrite"], "a session can point its worktree's git at another config (F5095)"
+# worktree.sh alone leaves the sandbox: it writes the trees it makes and removes, in its one root.
+assert box.get("excludedCommands") == ["sh scripts/worktree.sh *"], "a command other than worktree.sh runs outside the sandbox"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
 # run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
 # Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
-# (F087), and git's own hooks folder and config, which bypass mode lets the file tools write
-# otherwise (F129). A dependency is Alexis's to add, and rm -rf no one's.
+# (F087), git's own hooks folder and config, which bypass mode lets the file tools write
+# otherwise (F129), worktree.sh with the scripts it runs, which leave the sandbox, every
+# worktree's .git, which would point the git it runs at another config, and the main checkout's
+# git hooks, config, scripts and .githooks, out of every worktree session's folder (F5058, F5095).
+# A dependency is Alexis's to add, and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
@@ -105,7 +113,9 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
-           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
+           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
+           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
+           "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
 assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
@@ -3892,6 +3902,33 @@ asks "git -C . push origin slice-1a"
 asks "cd gno && git push"
 asks "git -c push.default=current push"
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
+# worktree.sh leaves the sandbox (settings.json's excludedCommands, `sh scripts/worktree.sh *`), so it runs alone, its words plain,
+# from the project's root: from a subfolder those words run a script there, which the session can write, and behind a cd, an
+# assignment, a redirect or another command they would run something else outside the sandbox, whatever Claude Code's matcher
+# makes of them (F5058). No folder is no root.
+root=$(cd "$here/.." && pwd -P)
+at_() { # $1: the folder, $2: a shell command, $3: the exit code expected
+	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$2" "$1")" "$3" "Bash in $1: $2"
+}
+at_ "$root" "sh scripts/worktree.sh slice-11h slice-11h slice-11-realm" 0
+at_ "$root" "sh scripts/worktree.sh remove slice-11h" 0
+at_ "$root" "sh scripts/worktree.sh /srv/a/Server/gnoworld-wt/slice-11h slice-11h 77694b3d" 0
+at_ "$root/docs/.." "sh scripts/worktree.sh remove x_1.b" 0
+at_ "$root/docs" "grep -n root scripts/worktree.sh" 0
+at_ "$root/docs" "sh scripts/check.sh" 0
+for cmd in "sh scripts/worktree.sh x y z" "bash scripts/worktree.sh remove x" "./scripts/worktree.sh x y z" "sh -x scripts/worktree.sh x y z" \
+	"env A=1 sh scripts/worktree.sh x y z" "sh -c 'sh scripts/worktree.sh x y z'"; do
+	at_ "$root/docs" "$cmd" 2
+done
+for cmd in "cd docs && sh scripts/worktree.sh x y z" "pushd docs; sh scripts/worktree.sh x y z" "(cd docs; sh scripts/worktree.sh x y z)" \
+	"sh scripts/worktree.sh x y z; cat /etc/hosts" "sh scripts/worktree.sh x y z > out" "sh scripts/worktree.sh x y z 2>&1" \
+	"sh scripts/worktree.sh x y z | tee out" 'sh scripts/worktree.sh "$(cat f)" y z' "sh scripts/worktree.sh x y z &" \
+	"PATH=/tmp/e:\$PATH sh scripts/worktree.sh x y z" "HOME=/tmp/e sh scripts/worktree.sh x y z" "sh -c 'cd docs && sh scripts/worktree.sh x y z'" \
+	"bash scripts/worktree.sh x y z" "./scripts/worktree.sh x y z" "sh scripts/worktree.sh 'a b' y z" "sh scripts/worktree.sh ~/x y z" "sh scripts/worktree.sh x y z
+sh scripts/worktree.sh u v w; true"; do
+	at_ "$root" "$cmd" 2
+done
+sh_ "sh scripts/worktree.sh x y z" 2
 fi
 
 if part prove_fix; then

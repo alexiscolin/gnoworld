@@ -270,18 +270,27 @@ with `/cd`:
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
 - **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
-  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
+  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads,
+  `scripts/worktree.sh` and the scripts it runs, which leave the sandbox, every worktree's `.git`, and,
+  from any session, the main checkout's `.git/hooks`, `.git/config`, `scripts/` and `.githooks/`),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
   each such file at `merge.sh`; a merge into a part's branch that changes the harness is his too,
   in his terminal, never another session's (F5055, F5058). In his shell the hooks run nothing of
   the repository but the records the sandboxed gate wrote (F076).
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks` or `.git/config`; they reach only the npm and Go registries and
-  github.com.
+  caches, never in `.git/hooks` or `.git/config`, nor in any worktree's `.git` (F5095); another
+  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). They reach
+  only the npm and Go registries and github.com. One command of the project's settings leaves the
+  sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
+  removes, in its one root; the guard lets it run only alone, its words plain, from the project's
+  root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used. It reads through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
+  and gnomcp was used, and no `worktree.sh` run but alone, as `sh scripts/worktree.sh` and plain
+  words, from the project's root: elsewhere those words would run a script the session can write,
+  and behind anything else in the call, something else outside the sandbox (F5058). It reads
+  through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
   the call is blocked.
 
 The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
