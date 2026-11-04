@@ -15,7 +15,8 @@ import { Space } from "./space.ts";
 import { LENS, Viewport } from "./viewport.ts";
 import { Parts } from "./parts.ts";
 import type { MoonMark, WorldAsk, WorldSaid } from "./world/part.ts";
-import { MOTION, watchScene } from "./watch.ts";
+import { chosenTier, tierOf } from "./quality.ts";
+import { motionOf, watchScene } from "./watch.ts";
 
 // The frames' deep black, read off the far corners of f0004, f0005 and f0017. The stage's, for a restored context resets the clear colour.
 const DEEP_BLACK = 0x010101;
@@ -31,7 +32,7 @@ class LiveScene implements Scene {
   readonly #renderer: WebGLRenderer;
   readonly #stage = new Stage();
   readonly #camera = new PerspectiveCamera(LENS.fieldOfView, 1, LENS.near, LENS.far);
-  readonly #motion = matchMedia(MOTION);
+  readonly #motion = motionOf();
   readonly #eye = new Eye();
   readonly #space: Space;
   readonly #loop: FrameLoop;
@@ -56,9 +57,10 @@ class LiveScene implements Scene {
   constructor(options: SceneOptions, clock: FrameClock) {
     const { canvas, remembered } = options;
     this.#options = options;
+    const auto = remembered === undefined && chosenTier() === undefined;
     this.#tier = remembered ?? "high";
-    this.#probe = new Probe(remembered === undefined && !this.#motion.matches, this.#busy, this.#judged);
-    this.#renderer = createRenderer(canvas, !this.#touch && this.#tier === "high");
+    this.#probe = new Probe(auto && !this.#motion.matches, this.#busy, this.#judged);
+    this.#renderer = createRenderer(canvas, !this.#touch && tierOf(this.#tier) === "high");
     this.#renderer.debug.onShaderError = this.#shaderRefused;
     this.#stage.background = new Color(DEEP_BLACK);
     // Last, once every part let go: the loop stops, the renderer goes.
@@ -76,12 +78,12 @@ class LiveScene implements Scene {
       camera: this.#camera,
       eye: this.#eye,
       said: options.onFlight,
-      halved: () => this.#touch || this.#tier === "low",
+      halved: () => this.#touch || tierOf(this.#tier) === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
-        this.#probe.earthStood(remembered === undefined && this.#tier !== "low" && !this.#motion.matches);
+        this.#probe.earthStood(auto && this.#tier !== "low" && !this.#motion.matches);
         this.#parts.flights.part?.ready();
       },
     };
@@ -101,7 +103,7 @@ class LiveScene implements Scene {
       earth: this.#earth,
       parts: this.#parts,
       touch: this.#touch,
-      tier: () => this.#tier,
+      tier: () => tierOf(this.#tier),
       owed: this.#redraw,
     });
     this.#viewport.apply();
@@ -211,7 +213,7 @@ class LiveScene implements Scene {
   stats(): SceneStats {
     return {
       frames: this.#frames,
-      tier: this.#tier,
+      tier: tierOf(this.#tier),
       ratio: this.#renderer.getPixelRatio(),
       probing: this.#probe.running,
       ...rendered(this.#renderer.info),

@@ -2,19 +2,48 @@
 import type { Eye } from "./eye.ts";
 import type { FrameLoop } from "./loop.ts";
 import { OVER_SCENE } from "./overScene.ts";
+import { watchQuality } from "./quality.ts";
 
-export const MOTION = "(prefers-reduced-motion: reduce)";
+const MOTION = "(prefers-reduced-motion: reduce)";
+
+/** Reduced motion, as the reader asks it: the system's word, or this device's setting, which the page marks on the root (slice 8). */
+export interface Motion {
+  readonly matches: boolean;
+  /** Calls `changed` when either changes, until `signal` aborts. */
+  watch: (changed: () => void, signal: AbortSignal) => void;
+}
+
+export function motionOf(): Motion {
+  const system = matchMedia(MOTION);
+  // Read at each use: a scene's parts are made where no page is, in their tests.
+  const root = (): HTMLElement | undefined => ("document" in globalThis ? document.documentElement : undefined);
+  return {
+    get matches() {
+      return system.matches || root()?.dataset["motion"] === "reduce";
+    },
+    watch: (changed, signal) => {
+      system.addEventListener("change", changed, { signal });
+      const page = root();
+      if (page === undefined) return;
+      const marks = new MutationObserver(changed);
+      marks.observe(page, { attributes: true, attributeFilter: ["data-motion"] });
+      signal.addEventListener("abort", () => {
+        marks.disconnect();
+      });
+    },
+  };
+}
 const INPUTS = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"];
 
 /** Feeds the loop from the tab, the window, the reader's motion setting and their inputs. */
 function watchPage(loop: FrameLoop, signal: AbortSignal): void {
-  const motion = matchMedia(MOTION);
+  const motion = motionOf();
   const read = () => {
     loop.set({ hidden: document.hidden, focused: document.hasFocus(), still: motion.matches });
   };
   read();
   document.addEventListener("visibilitychange", read, { signal });
-  motion.addEventListener("change", read, { signal });
+  motion.watch(read, signal);
   // The document's word, not the event's: the focus going into an embed blurs the window that still has it.
   window.addEventListener("focus", read, { signal });
   window.addEventListener("blur", read, { signal });
@@ -94,6 +123,7 @@ export function watchScene(
 ): void {
   watchPage(scene.loop, signal);
   watchScreen(scene.changed, signal);
+  watchQuality(scene.changed, signal);
   watchAim(scene.eye, signal);
   watchCanvas(canvas, scene, signal);
 }

@@ -81,6 +81,8 @@ export interface MenuItem {
   onSelect: () => void;
   /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
   tone?: "danger";
+  /** The act's icon before its words. */
+  icon?: IconName;
 }
 
 export interface MenuProps {
@@ -94,12 +96,31 @@ export interface MenuProps {
   emphasis?: "outline" | "plain";
   /** An icon trigger's size: small in a toolbar (docs/DESIGN-SYSTEM.md, "a toolbar's small controls stay at 32"). */
   size?: "s" | "m";
+  /** Drawn before the words of a trigger with words: the account's face; with it, the words may be for assistive technology alone. */
+  lead?: ReactNode;
+  /** The words of a trigger with a lead, read and not drawn. */
+  wordsHidden?: boolean;
+  /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
+  openAtOnce?: boolean;
 }
 
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
  * items, round the ends, Home and End go to the ends, and an act closes it first (WAI-ARIA's menu). */
-export function Menu({ trigger: words, label, items, icon, emphasis = "outline", size = "m" }: MenuProps) {
+export function Menu({
+  trigger: words,
+  label,
+  items,
+  icon,
+  emphasis = "outline",
+  size = "m",
+  lead,
+  wordsHidden = false,
+  openAtOnce = false,
+}: MenuProps) {
   const { open, panelRef, trigger, panel } = useAnchored("menu");
+  useLayoutEffect(() => {
+    if (openAtOnce) panelRef.current?.showPopover();
+  }, [openAtOnce, panelRef, trigger.ref]);
   // The danger acts come last, apart: a separator before the first.
   const apart = items.findIndex((item) => item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
@@ -117,7 +138,8 @@ export function Menu({ trigger: words, label, items, icon, emphasis = "outline",
     <>
       {icon === undefined ? (
         <button type="button" {...trigger}>
-          {words}
+          {lead}
+          {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
         </button>
       ) : (
         <Tooltip label={words}>
@@ -145,6 +167,7 @@ export function Menu({ trigger: words, label, items, icon, emphasis = "outline",
               }}
             >
               {item.tone === "danger" ? <Icon name="alert" /> : null}
+              {item.icon === undefined ? null : <Icon name={item.icon} />}
               {item.label}
             </button>
           </Fragment>

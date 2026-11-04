@@ -124,8 +124,11 @@
 
   @media (min-width: 900px) {
     .header {
-      /* layout: logo, views, the end: the views in the exact middle */
-      grid-template-columns: 1fr auto 1fr;
+      /* layout: logo, views, the end: the views in the exact middle while the end fits its half; past it, the end keeps its controls whole
+         and the views give way to the left */
+      grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+      /* a control's words stay on one line: the row never grows a second */
+      white-space: nowrap;
       /* raw: 34 px from the top, 32 each side, and 18 under the 44 px row: 96 high in all (DESIGN-SYSTEM.md, Layout) */
       padding: 34px var(--space-l) 18px;
       /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */

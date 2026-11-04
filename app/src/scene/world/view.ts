@@ -6,7 +6,7 @@ import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
 import { broughtTo, projector, standIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
-import { MOTION } from "../watch.ts";
+import { motionOf } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
 import type { WorldReading } from "./reading.ts";
 import { Standing } from "./standing.ts";
@@ -24,13 +24,13 @@ export type WorldSaid = (state: EarthState, colour?: string) => void;
 export interface WorldPlace {
   readonly circle: Circle;
   readonly id: string;
-  /** Keeps this reader's visit, once its appearance starts. */
-  readonly remember: () => void;
+  /** Keeps this reader's visit, once its appearance starts; `fresh` for a new world, an uncharted one, woken by this visit. */
+  readonly remember: (fresh: boolean) => void;
 }
 
 export class WorldView {
   readonly #device: EarthDevice;
-  readonly #motion = matchMedia(MOTION);
+  readonly #motion = motionOf();
   readonly #rest = new Vector3();
   readonly #sun = new Vector3();
   readonly #ringCaster = new Vector4();

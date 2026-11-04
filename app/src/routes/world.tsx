@@ -8,6 +8,7 @@ import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
+import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
 import { useAppStore } from "../storeContext.tsx";
@@ -105,6 +106,7 @@ export default function World() {
           {chatDue ? <Chat world={world.slug} place={chatPlace(world, universe)} /> : LOADING}
         </div>
       </Panel.Layout>
+      <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
   );
 }

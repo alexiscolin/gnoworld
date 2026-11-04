@@ -166,3 +166,29 @@ function device(storage: () => DraftStorage): Device {
 
 /** What this device keeps for whoever uses it, on the page's localStorage, reached at each use (reaching it may itself throw). */
 export const pageDevice = (): Device => device(() => localStorage);
+
+/** The passport's part of the device as a file people keep: its stamps and the worlds charted, with the file's own version. */
+export const passportFile = ({ stamps, charted }: Pick<DeviceFields, "stamps" | "charted">): string =>
+  JSON.stringify({ gnoworld: "passport", version: 1, stamps, charted });
+
+/** The longest passport file read: 10,000 stamps and as many worlds charted, with room to spare. */
+const PASSPORT_FILE_MOST = 2_000_000;
+
+/** A passport file read back, whole or not at all: its stamps and worlds charted replace the device's, never merged entry by entry; none for
+ * a file too long, not JSON, of another kind or version, or holding an entry that is none. */
+export function readPassportFile(text: string): Pick<DeviceFields, "stamps" | "charted"> | undefined {
+  if (text.length > PASSPORT_FILE_MOST) return undefined;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(raw) || raw["gnoworld"] !== "passport" || raw["version"] !== 1) return undefined;
+  const stamps = CODECS.stamps.read(raw["stamps"]);
+  const charted = CODECS.charted.read(raw["charted"]);
+  const whole = (read: { strange: unknown } | undefined) =>
+    read !== undefined && isRecord(read.strange) && Object.keys(read.strange).length === 0;
+  if (stamps === undefined || charted === undefined || !whole(stamps) || !whole(charted)) return undefined;
+  return { stamps: stamps.value, charted: charted.value };
+}

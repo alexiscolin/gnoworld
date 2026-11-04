@@ -148,4 +148,10 @@
       --motion-base: 0s;
     }
   }
+
+  /* The same at the settings' word (slice 8): "Reduce animations" on this device. */
+  :root[data-motion="reduce"] {
+    --motion-fast: 0s;
+    --motion-base: 0s;
+  }
 }

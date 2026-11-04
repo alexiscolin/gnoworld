@@ -12,6 +12,7 @@ import { markCalls } from "./globe.ts";
 import { lazyPart } from "./lazyPart.ts";
 import { SceneHost, type CosmosPage, type EarthPage, type Shown, type WorldPage } from "./host.ts";
 import { firstArrival, HomeOpening } from "./Opening.tsx";
+import { whenPhone3d } from "./phone3d.ts";
 import type { Rail } from "./Rail.tsx";
 import { SystemCrumb } from "./SystemCrumb.tsx";
 import styles from "./Universe.module.css";
@@ -159,6 +160,16 @@ export function Universe({ shown, page }: { shown: Shown; page?: EarthPage | Wor
   useEffect(() => {
     markCalls(status, shown);
   }, [status, shown]);
+  useEffect(() => {
+    if (status !== "offered") return;
+    const leaving = new AbortController();
+    whenPhone3d(() => {
+      host.press(() => undefined);
+    }, leaving.signal);
+    return () => {
+      leaving.abort();
+    };
+  }, [host, status]);
   return (
     <>
       <canvas

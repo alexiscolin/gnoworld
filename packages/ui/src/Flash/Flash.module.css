@@ -14,6 +14,12 @@
     box-shadow: var(--shadow-float);
   }
 
+  /* An arrival's banner: the top centre's slot under the header, over the scene (DESIGN-SYSTEM.md, Layout; frames 23, 93). */
+  .flash[data-banner] {
+    /* raw: the header's 96 px, and a step under it */
+    inset-block-start: calc(96px + var(--space-s));
+  }
+
   /* While a flash shows, what the keyboard reaches scrolls clear of it (F355, WCAG 2.4.11); */
   /* ponytail: a one-line pill's room; one that wraps on a narrow screen is taller: measure it then */
   :root:has(.flash:popover-open) {

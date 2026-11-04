@@ -11,7 +11,8 @@ import { Shell } from "./shell.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
 
 // Slice 5r (O1, O4): the header as the video's frames 1, 20 and 37 show it: the logo, the views Earth, Cosmos and List, the
-// network named, "Testnet" on a testnet, search. A control appears only when it works: no Jarvis, chat, bell or passport yet.
+// network named, "Testnet" on a testnet, search. Slice 8: the middle view says "Universe" (Alexis), Jarvis is coming soon, the chat and
+// the passport's counter are controls.
 const inShell = (Page: () => React.JSX.Element) => () => (
   <Shell>
     <Page />
@@ -67,10 +68,10 @@ describe("the header", () => {
       const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g)].map(
         ([, href, label]) => [href, (label ?? "").replace(/<[^>]*>/g, "")] as const,
       );
-      const views = links.filter(([, label]) => ["Earth", "Cosmos", "List"].includes(label));
+      const views = links.filter(([, label]) => ["Earth", "Universe", "List"].includes(label));
       expect(views).toEqual([
         ["/earth", "Earth"],
-        ["/", "Cosmos"],
+        ["/", "Universe"],
         ["/list", "List"],
       ]);
     },
@@ -100,7 +101,7 @@ describe("the header", () => {
       );
       expect(described).toEqual([
         ["Earth", "where everyone talks"],
-        ["Cosmos", "every world"],
+        ["Universe", "every world"],
         ["List", "every world, as text"],
       ]);
       expect(html.replace(/aria-description="[^"]*"/g, "")).not.toMatch(/where everyone talks|every world/);
@@ -118,13 +119,13 @@ describe("the header", () => {
     expect(earth.match(/aria-current="page"/g)).toHaveLength(1);
     expect(/<a [^>]*aria-current="page"[^>]*>(?:(?!<\/a>)[\s\S])*Earth/.test(earth)).toBe(true);
     const cosmos = await header("/");
-    expect(/<a [^>]*aria-current="page"[^>]*>(?:(?!<\/a>)[\s\S])*Cosmos/.test(cosmos)).toBe(true);
+    expect(/<a [^>]*aria-current="page"[^>]*>(?:(?!<\/a>)[\s\S])*Universe/.test(cosmos)).toBe(true);
   });
 
   // F3270: the addresses `canonical` and `og:url` publish are /net/onyx/ and /net/onyx/earth, and a person can arrive on them.
   test.each([
     ["/net/onyx/earth", "Earth"],
-    ["/net/onyx", "Cosmos"],
+    ["/net/onyx", "Universe"],
   ])("%s, a canonical address, marks %s as the current view", async (path, view) => {
     const html = await header(path);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
@@ -165,9 +166,11 @@ describe("the header", () => {
   });
 
   // No dead control: the video's Jarvis, chat, bell and passport work only once their slices land.
-  test("shows no control that does nothing yet: no Jarvis, Chat, notifications or passport", async () => {
+  test("shows Jarvis greyed as coming soon, and the chat and the passport as controls (slice 8)", async () => {
     const html = await header("/earth");
-    for (const dead of [/Jarvis/, /\bChat\b/, /Notification/i, /Passport/i, /Unread/i]) expect(html).not.toMatch(dead);
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*aria-label="Jarvis, coming soon"/);
+    expect(html).toMatch(/<a [^>]*href="\/earth"[^>]*>(?:(?!<\/a>)[\s\S])*Chat/);
+    expect(html).toContain("Passport, worlds stamped");
   });
 
   // Layout wraps every document, the failed ones too: no loader data is there, and the header still tells the truth.

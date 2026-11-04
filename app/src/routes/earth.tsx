@@ -1,10 +1,12 @@
 // A universe's Earth: its worlds and its ecosystems; /earth for the default one, /net/<id>/earth for each.
+import { EARTH as EARTH_ID } from "@gnoworld/core";
 import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
 import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Connected } from "../features/world/Connected.tsx";
 import { PlaceLinks } from "../features/list/index.ts";
+import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { chatPlace, pageOf, site } from "../places.ts";
@@ -97,6 +99,7 @@ export default function Earth() {
           {chatDue ? <Chat world={EARTH.slug} place={chatPlace(EARTH, universe, "Earth · General chat")} /> : LOADING}
         </div>
       </Panel.Layout>
+      <Arrival universe={universe.id} world={EARTH_ID} name="Earth" path={universe.earth.path} />
     </>
   );
 }

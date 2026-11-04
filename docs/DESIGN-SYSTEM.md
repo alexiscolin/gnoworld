@@ -378,11 +378,11 @@ assembly in its own slice, with its story.
 
 ### Icons
 
-- One set of 55: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
+- One set of 56: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
   spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret,
-  share, menu, people, star, chart, info, warning, alert, lock, shield, key. A new icon joins the
+  share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings, slice 8). A new icon joins the
   list in the slice that needs it. Those that point along the text turn right to left: arrow,
   arrow-up-right, reply, list-bulleted, list-numbered and quote; the chevron and the caret point
   across it and stay.

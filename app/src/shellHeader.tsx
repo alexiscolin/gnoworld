@@ -1,26 +1,36 @@
-// The header as the video's frames 1, 20 and 37 draw it: the logo at the left, the views Earth, Cosmos and List in the middle
-// with search inside their pill, the network the page is in ("Testnet" when it is one) and the login at the right. A control
-// stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land. On the cosmos, the pill's
+// The header as the video's frames 1, 20, 37 and 93 draw it: the logo at the left, the views Earth, Universe and List in the middle
+// with search inside their pill; at the right the network ("Testnet" when it is one), Jarvis (slice 10: coming soon), the chat, the
+// passport's counter, the bell (8c's slot) and the account's menu. On the cosmos, the pill's
 // views say where one looks, two icons after them how, shown while a scene runs (7v; on a phone apart from the bar, F4691), and
 // drawn once the page wakes: a not-found path is served the page written at /, which must hydrate as the path's own (F4692).
-import { Chip, Icon, Logo } from "@gnoworld/ui";
+import { Button, Chip, Cluster, ComingSoon, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
 import { useWoken } from "./features/home/clock.ts";
-import { LoginControl } from "./features/login/index.ts";
+import { useDeviceView } from "./deviceViews.ts";
+import { AccountMenu } from "./features/account/index.ts";
+import { PassportCounter } from "./features/passport/Counter.tsx";
 import { SearchPalette } from "./features/search/index.ts";
 // The switch's own module, not the universe's door: the header is on every page, which loads no scene's door for it.
 import { ViewSwitch } from "./features/universe/ViewSwitch.tsx";
+// The count alone, from its own module: the header reads what the home or the scene read, and asks for nothing.
+import { useWorldsDrawn } from "./features/universe/worldsDrawn.ts";
 import { site, type UniverseView, type View } from "./places.ts";
+import { BellSlot } from "./slots.tsx";
 import styles from "./shellHeader.module.css";
 
 export function ShellHeader({ universe }: { universe: UniverseView }) {
-  const current = site.viewAt(universe, useLocation().pathname);
+  const { pathname } = useLocation();
+  const current = site.viewAt(universe, pathname);
+  // The chat is docked on the Earth's page and a world's: the pill is then cream (frame 23).
+  const [, openView] = useDeviceView();
+  const listed = useWorldsDrawn();
+  const docked = current === "earth" || /\/w\/[^/]+$/.test(pathname);
   const woken = useWoken();
   // The list has no page of its own in a universe: it is the one page of the site. Each view says what it holds to a screen reader alone;
   // nothing is drawn under the tabs (ADR-0003, 2c).
   const views: { view: View; label: string; path: string; holds: string }[] = [
     { view: "earth", label: "Earth", path: universe.earth.path, holds: "where everyone talks" },
-    { view: "cosmos", label: "Cosmos", path: universe.home.path, holds: "every world" },
+    { view: "cosmos", label: "Universe", path: universe.home.path, holds: "every world" },
     { view: "list", label: "List", path: "/list", holds: "every world, as text" },
   ];
   return (
@@ -60,7 +70,22 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             </span>
           ) : null}
         </p>
-        <LoginControl />
+        <Cluster space="2xs">
+          <ComingSoon name="Jarvis" icon="spark" words="Jarvis" />
+          {/* Drawn anew once the page wakes, as the views are: a path served another page's markup keeps its light otherwise (F4880). */}
+          <Button key={String(woken)} href={universe.earth.path} icon="chat" emphasis={docked ? "solid" : "outline"}>
+            Chat
+          </Button>
+          <PassportCounter
+            universe={universe.id}
+            listed={listed}
+            onOpen={() => {
+              openView("passport");
+            }}
+          />
+          <BellSlot />
+        </Cluster>
+        <AccountMenu />
       </div>
     </header>
   );

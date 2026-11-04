@@ -39,6 +39,8 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Combobox: ["Fields", "input[role='combobox']"],
   Select: ["Fields", "select"],
   Stat: ["Stats", "[data-value]"],
+  Progress: ["Stats", "[role='progressbar']"],
+  ComingSoon: ["Stats", "button[aria-disabled='true'][aria-label$='coming soon']"],
   ActivityChart: ["Activity", "svg [data-hour]"],
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],

@@ -23,6 +23,7 @@ import { NavItems } from "./NavItems.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Frames, Kickers, Layout } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
+import { Soon } from "./Soon.tsx";
 
 function Buttons() {
   return (
@@ -174,6 +175,7 @@ export function Overview() {
       </Region>
       <Region name="Stats">
         <Stats />
+        <Soon />
       </Region>
       <Region name="Activity">
         <Activity />
