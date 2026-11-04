@@ -88,7 +88,8 @@ each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
 A commit's gate runs the unit tests related to its change (HARNESS.md, "The related tests"); before a part's report,
-`./scripts/check.sh --tests-all` runs every one, as the merge check does. Design still being tried lives in the workshop
+`./scripts/check.sh --tests-all` runs every test of the commit's projects (node, ui, compiled); the slow ones (the real Ergo,
+the soak) and core's in Chromium run at the merge check and in `--full`. Design still being tried lives in the workshop
 (this file's "The workshop") and lands later, in one tested batch (REVIEW.md, "Keep it cheap").
 `--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves

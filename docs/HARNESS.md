@@ -150,8 +150,8 @@ given): it brings its reader for a change of no code, the graph following the co
 `process.cwd()`, `import.meta.dirname`, `import.meta.url` outside `new URL(...)`, a resolve, `createRequire`) is refused, file and line,
 in a run of the related tests and, as `related.py --check`, in a run of every one: its reads would never bring it back. The staged
 copy of pre-commit gets the related tests too, from its list (the command, given the paths, needs no git). The whole suite runs when
-the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test,
-before its report) and in the merge check and `--full`.
+the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test of
+its projects, before its report; the slow project and core's in Chromium wait for the merge check) and in the merge check and `--full`.
 
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
 journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
@@ -370,9 +370,9 @@ costs context in every session.
 - **A commit's gate trusts Vitest's module graph, `main.test.ts` and the map's grep** (`scripts/related.py`): a test
   that runs code in a child process other than the server's (`app/src/dataFiles.test.ts` builds the app) runs for a change
   of code only when the graph holds it, and a read through a place built from another's (`join(APP, "..", "deploy")`) is seen
-  as its base; a recorded chain page in Markdown under the sources is a fixture to the gate's list, but prose to `code_changed.sh`
-  and to the record's print, so a commit of one alone runs no gate (as before). A part's end
-  (`check.sh --tests-all`), the merge check and `--full` run every test.
+  as its base; a path built at run time from no literal the grep knows is not seen. Markdown is prose outside the sources only,
+  for the gate, `code_changed.sh` and the record's print alike (a recorded chain page under them is a fixture). A part's end
+  (`check.sh --tests-all`) runs every test of the fast projects, the merge check and `--full` every test.
 - **pre-commit trusts the record of a green gate** on the staged code instead of running the gate again (F076's record, which
   the sandbox can forge), and **`--full` trusts the record of its last green run** to skip the probe and the harness mutants;
   the CI keeps neither.
