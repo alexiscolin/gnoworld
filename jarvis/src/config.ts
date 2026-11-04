@@ -1,10 +1,10 @@
-// jarvis's settings (ADR-0002 §5, §7; D44, D45, D47, D65 to D67, D106), from its environment, checked at start as the
-// server's are (settings.ts): Anthropic's key only from its file, the day's budgets, the caps on a question and a
-// call, the models by task, gnoscope's switch and server, the places' and the skills' folders, gnomcp's command and
-// configuration, and the chain profiles it may read. An error names the setting and its fault, never its value.
+// jarvis's settings (ADR-0002 §5, §7; D44, D45, D47, D65 to D67, D106, D171, D172), from its environment, checked at
+// start as the server's are (settings.ts): what it reads on or off (its switch, where it listens, its file, the day's
+// budgets, its stop's wait), then, on alone, Anthropic's key only from its file, the caps on a question and a call,
+// the models, gnoscope's switch and server, the places' and skills' folders, gnomcp and the chain profiles it may read.
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { absolute, databasePath, parseSettings, readWord, Secret, whole } from "@gnoworld/service/settings";
+import { absolute, databasePath, host, parseSettings, port, readWord, Secret, whole } from "@gnoworld/service/settings";
 import { MODELS, type Model } from "./prices.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 
@@ -34,6 +34,47 @@ export interface JarvisConfig {
   profiles: { read: string[]; indexed: string[] };
 }
 
+/** What jarvis reads on or off: off, it reads nothing more (D171). */
+export interface Served {
+  on: boolean;
+  listen: { host: string; port: number };
+  database: string;
+  budgets: JarvisConfig["budgets"];
+  // How long a stop waits for the questions in flight before it cuts them (D178).
+  drainMs: number;
+}
+
+const DOLLAR = 1_000_000_000;
+
+// The settings read on or off; their schemas built at each read (F412).
+const servedShape = () => ({
+  // Exactly `on`, anything else or nothing off, never an error (Alexis, "Coupé par défaut").
+  JARVIS: z.string().optional(),
+  JARVIS_HOST: host(),
+  JARVIS_PORT: port().default(8081),
+  // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
+  JARVIS_DATABASE: databasePath.pipe(absolute),
+  JARVIS_BUDGET_USD: whole(500, 45),
+  JARVIS_TRANSLATION_BUDGET_USD: whole(500, 5),
+  JARVIS_DRAIN_S: whole(600, 20),
+});
+const budgetsOf = (settings: { JARVIS_BUDGET_USD: number; JARVIS_TRANSLATION_BUDGET_USD: number }) => ({
+  ask: settings.JARVIS_BUDGET_USD * DOLLAR,
+  translate: settings.JARVIS_TRANSLATION_BUDGET_USD * DOLLAR,
+});
+
+/** jarvis's switch and what it reads whatever it says; throws naming the first wrong setting, never its value. */
+export function loadServed(env: Record<string, string | undefined>): Served {
+  const settings = parseSettings(z.object(servedShape()), env);
+  return {
+    on: settings.JARVIS === "on",
+    listen: { host: settings.JARVIS_HOST, port: settings.JARVIS_PORT },
+    database: settings.JARVIS_DATABASE,
+    budgets: budgetsOf(settings),
+    drainMs: settings.JARVIS_DRAIN_S * 1000,
+  };
+}
+
 // An https address with no credentials and no fragment, as a request is sent to it.
 function isHttps(text: string): boolean {
   const url = URL.parse(text);
@@ -45,11 +86,8 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
   const profiles = z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]{0,49}$/));
   const Env = z
     .object({
+      ...servedShape(),
       ANTHROPIC_API_KEY_FILE: z.string().min(1),
-      // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
-      JARVIS_DATABASE: databasePath.pipe(absolute),
-      JARVIS_BUDGET_USD: whole(500, 45),
-      JARVIS_TRANSLATION_BUDGET_USD: whole(500, 5),
       JARVIS_QUESTION_CHARS: whole(8_000, 2_000),
       JARVIS_TURNS: whole(20, 8),
       JARVIS_OUTPUT_TOKENS: whole(16_000, 4_096),
@@ -90,11 +128,10 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       }
     });
   const settings = parseSettings(Env, env);
-  const dollar = 1_000_000_000;
   return {
     anthropicKey: new Secret(readWord("ANTHROPIC_API_KEY_FILE", settings.ANTHROPIC_API_KEY_FILE)),
     database: settings.JARVIS_DATABASE,
-    budgets: { ask: settings.JARVIS_BUDGET_USD * dollar, translate: settings.JARVIS_TRANSLATION_BUDGET_USD * dollar },
+    budgets: budgetsOf(settings),
     caps: {
       questionChars: settings.JARVIS_QUESTION_CHARS,
       turns: settings.JARVIS_TURNS,

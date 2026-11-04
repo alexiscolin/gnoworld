@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
-import { loadJarvisConfig } from "./config.ts";
+import { loadJarvisConfig, loadServed } from "./config.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-jarvis-config-"));
 afterAll(() => {
@@ -315,6 +315,88 @@ describe("loadJarvisConfig", () => {
     expect(() => loadJarvisConfig({ ...ENV, JARVIS_MODEL: "claude-sonnet-4-6" })).toThrow(
       /^setting JARVIS_MODEL: \w+$/,
     );
+  });
+});
+
+// What jarvis reads in any case, on or off: its switch, where it listens, its file, its budgets and how long a stop
+// waits for the questions in flight. Off, it reads nothing more: no key file, no gnomcp, no model (Alexis, "Coupé par
+// défaut").
+describe("loadServed", () => {
+  const SERVED = { JARVIS_DATABASE: join(dir, "served.db") };
+
+  it("reads jarvis off, its defaults, and nothing of the key, gnomcp or the profiles", () => {
+    expect(loadServed(SERVED)).toEqual({
+      on: false,
+      listen: { host: "127.0.0.1", port: 8081 },
+      database: SERVED.JARVIS_DATABASE,
+      budgets: { ask: 45 * DOLLAR, translate: 5 * DOLLAR },
+      drainMs: 20_000,
+    });
+  });
+
+  it("turns jarvis on only when JARVIS is exactly on", () => {
+    expect(loadServed({ ...SERVED, JARVIS: "on" }).on).toBe(true);
+  });
+
+  it.each(["", "ON", "On", " on", "on ", "yes", "true", "1", "enabled", "off", String.fromCodePoint(0xff4f, 0xff4e)])(
+    "reads JARVIS set to %j as off, never as an error",
+    (value) => {
+      expect(loadServed({ ...SERVED, JARVIS: value }).on).toBe(false);
+    },
+  );
+
+  it("reads no key file, and needs none, while off: a missing or unreadable one starts nothing", () => {
+    const off = { ...SERVED, ANTHROPIC_API_KEY_FILE: "/nonexistent/gnoworld-anthropic", JARVIS_PROFILES: "Not A Name" };
+    expect(loadServed(off).on).toBe(false);
+  });
+
+  it("reads where it listens, its stop's wait and its budgets at their bounds", () => {
+    const set = {
+      ...SERVED,
+      JARVIS_HOST: "0.0.0.0",
+      JARVIS_PORT: "0",
+      JARVIS_DRAIN_S: "1",
+      JARVIS_BUDGET_USD: "1",
+      JARVIS_TRANSLATION_BUDGET_USD: "500",
+    };
+    expect(loadServed(set)).toMatchObject({
+      listen: { host: "0.0.0.0", port: 0 },
+      drainMs: 1_000,
+      budgets: { ask: DOLLAR, translate: 500 * DOLLAR },
+    });
+    expect(loadServed({ ...SERVED, JARVIS_PORT: "65535", JARVIS_DRAIN_S: "600" })).toMatchObject({
+      listen: { port: 65_535 },
+      drainMs: 600_000,
+    });
+  });
+
+  it.each([
+    ["JARVIS_DATABASE", undefined],
+    ["JARVIS_DATABASE", ":memory:"],
+    ["JARVIS_DATABASE", "jarvis.db"],
+    ["JARVIS_HOST", ""],
+    ["JARVIS_HOST", "h".repeat(254)],
+    ["JARVIS_PORT", "65536"],
+    ["JARVIS_PORT", "-1"],
+    ["JARVIS_PORT", "08081"],
+    ["JARVIS_PORT", "port"],
+    ["JARVIS_DRAIN_S", "0"],
+    ["JARVIS_DRAIN_S", "601"],
+    ["JARVIS_DRAIN_S", "20s"],
+    ["JARVIS_BUDGET_USD", "0"],
+    ["JARVIS_BUDGET_USD", "501"],
+    ["JARVIS_TRANSLATION_BUDGET_USD", "4.5"],
+  ])("stops on %s set to %j, naming the setting, on or off", (key, value) => {
+    for (const on of ["on", undefined]) {
+      expect(() => loadServed({ ...SERVED, JARVIS: on, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
+    }
+  });
+
+  it("reads the same file and budgets as loadJarvisConfig, from the same settings", () => {
+    const env = { ...ENV, JARVIS: "on", JARVIS_BUDGET_USD: "7", JARVIS_TRANSLATION_BUDGET_USD: "2" };
+    const served = loadServed(env);
+    const config = loadJarvisConfig(env);
+    expect([served.database, served.budgets]).toEqual([config.database, config.budgets]);
   });
 });
 
