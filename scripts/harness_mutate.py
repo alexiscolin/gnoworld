@@ -59,14 +59,14 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -812,6 +812,59 @@ def mutants():
     yield from each(".claude/settings.json", f'"{wt}/*/CLAUDE.md"', f'"{wt}/slice-7/CLAUDE.md"', "hooks", "a twin covers a worktree made tomorrow, not one named (F4890)")
     yield from each(".claude/settings.json", f'"{wt}/*/.gitignore"', '"/private/tmp/claude-501/**/.gitignore"', "hooks", "no twin closes a throwaway tree in $TMPDIR (F4890)")
     yield from each(".claude/settings.json", f'"Edit(/{wt}/*/.githooks/**)"', f'"Edit(/{wt}/**)"', "hooks", "no twin closes a sibling's open files (F4890)")
+    # 7w3: the file tools write the session's folders alone; the next parts' folder's twins and the instructions above them; the
+    # instructions below a tree's root (S2-3), and StrykerJS's copies left out of what those close.
+    yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
+                    "settings keep the file tools in the session's folders (7w3)")
+    new = "~/Server/gnoworld-wt"
+    for entry, why in ((".githooks", "a .githooks of the next parts' folder"), (".git", "a .git of the next parts' folder"), ("**/CLAUDE.md", "a nested CLAUDE.md there")):
+        yield from each(".claude/settings.json", f'"{new}/*/{entry}"', f'"{new}/*/{entry}-off"', "hooks", f"the sandbox keeps the chief's commands out of {why} (7w3)")
+    yield from each(".claude/settings.json", f'"{new}/CLAUDE.md"', f'"{new}/CLAUDE.md-off"', "hooks", "the sandbox keeps the chief's commands out of the instructions above the next parts' trees (7w3)")
+    for rule, why in ((f"Edit({new}/*/scripts/stop_gate.sh)", "a Stop hook of the next parts' folder"), (f"Read({new}/*/deploy/secrets/**)", "a sibling's secrets there"),
+                      (f"Edit({new}/*/.git)", "a sibling's .git there"), (f"Edit({new}/.claude/rules/**)", "the rules above the next parts' trees")):
+        yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {why} out of the file tools (7w3)")
+    yield from each(".claude/settings.json", f'"{new}/*/scripts"', f'"{new}/slice-7/scripts"', "hooks", "a twin covers a tree of the next parts' folder made tomorrow (7w3)")
+    for entry in ("**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules", "**/.claude/skills"):
+        yield from each(".claude/settings.json", f'        "{entry}",\n', "", "hooks", f"the sandbox keeps commands out of {entry}, below the root (7w3, S2-3)")
+    for rule in ("Edit(/**/CLAUDE.md)", "Edit(/**/CLAUDE.local.md)", "Edit(/**/AGENTS.md)", "Edit(/**/.claude/rules/**)", "Edit(/**/.claude/skills/**)"):
+        yield from each(".claude/settings.json", f'      "{rule}",\n', "", "hooks", f"settings keep {rule[5:-1]} out of the file tools (7w3, S2-3)")
+    yield from each(".claude/settings.json", '"Edit(/**/AGENTS.md)"', '"Edit(/AGENTS.md)"', "hooks", "settings keep an AGENTS.md below the root out of the file tools, not the root's alone (7w3)")
+    yield from each(".claude/settings.json", f'"Edit(/{wt}/*/**/CLAUDE.md)"', f'"Edit(/{wt}/*/**/CLAUDE.md-off)"', "hooks", "settings keep a sibling's nested CLAUDE.md out of the file tools (7w3)")
+    for name in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"):
+        yield from each("stryker.config.json", f', "{name}"', "", "hooks", f"StrykerJS copies no {name} the sandbox refuses it to write (7w3)")
+    yield from each("stryker.config.json", '".claude", "coverage"', '"coverage"', "hooks", "StrykerJS copies no .claude folder, whose rules and skills the sandbox closes at any depth (7w3)")
+    # No write root reaches the next parts' folder (F5322, the red pass's T2), and AGENTS.md is closed above the trees (T7).
+    yield from each(".claude/settings.json", '        "~/go/pkg/mod"\n', '        "~/go/pkg/mod",\n        "~/Server"\n', "hooks", "no allowWrite gives every part's command the next parts' folder (7w3)")
+    yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true,\n', '"blockWritesOutsideWorkingDirectories": true,\n    "additionalDirectories": ["~/Server/gnoworld-wt/slice-8"],\n', "hooks",
+                    "no additionalDirectories gives every part a sibling of the next parts' folder (7w3)")
+    for entry in (f"{wt}/AGENTS.md", f"{wt}/.claude/AGENTS.md", f"{new}/AGENTS.md"):
+        yield from each(".claude/settings.json", f'"{entry}"', f'"{entry}-off"', "hooks", f"the sandbox keeps commands out of {entry}, read above the trees (7w3)")
+    yield from each(".claude/settings.json", f'"{new}/.claude"', f'"{new}/.claude-off"', "hooks", "the sandbox keeps the chief's commands out of the next parts' folder's .claude, which --add-dir loads (7w3, S2-2)")
+    for rule in ("Edit(~/Server/AGENTS.md)", "Edit(//tmp/claude-501/gnoworld-wt/.claude/AGENTS.md)", f"Edit({new}/.claude/**)"):
+        yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {rule[5:-1]}, read above the trees, out of the file tools (7w3)")
+    # 7w3: check_docs refuses an instruction file below the root at every commit (S2-3), each part of its reading.
+    cd = "scripts/check_docs.py"
+    for find, replace, why in (('if ".claude" in parts[1:]:', "if False:", "a .claude below the root"), ('if ".claude" in parts[1:]:', 'if ".claude" in parts[2:]:', "a .claude one folder below the root"),
+                               ("elif parts[-1] in INSTRUCTIONS and parts not in ROOT_OWN:", "elif False:", "an instruction file by its name"),
+                               ("tuple(part.lower() for part in", "tuple(part for part in", "a name in any letters, as macOS's disk reads it"),
+                               ('INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}', 'INSTRUCTIONS = {"claude.md", "claude.local.md"}', "an AGENTS.md"),
+                               ('INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}', 'INSTRUCTIONS = {"claude.md", "agents.md"}', "a CLAUDE.local.md"),
+                               ('ROOT_OWN = {("claude.md",), (".claude", "claude.md")}', 'ROOT_OWN = {("claude.md",), (".claude", "claude.md"), ("claude.local.md",), ("agents.md",)}', "a CLAUDE.local.md or an AGENTS.md at the root"),
+                               ('ROOT_OWN = {("claude.md",), (".claude", "claude.md")}', 'ROOT_OWN = {("claude.md",)}', "the root's .claude/CLAUDE.md, which it keeps"),
+                               ("    for p in repo_paths(root):", '    for p in listed(root, {".md"}):', "a link by its name, whether it leads anywhere"),
+                               ("if stray:\n    sys.exit(1)", "if stray:\n    pass", "an instruction file below the root, which fails")):
+        yield from each(cd, find, replace, "hooks", f"check_docs refuses {why} (7w3, S2-3)")
+    yield from each("scripts/repo_files.py", '"ls-files", "--cached", "--others"', '"ls-files", "--others"', "hooks", "repo_paths holds what the index holds and the disk lost (7w3)")
+    # 7w3: worktree.sh makes a tree in the worktrees' folder alone, read from the repository's own common folder (F4893's remedy a).
+    ws = "scripts/worktree.sh"
+    for find, replace, why in (('[ "$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P)" = "$folder" ] ||', "true ||", "a tree outside the worktrees' folder"),
+                               ("'' | .* | *[!A-Za-z0-9._-]*)", "'')", "a name with a dot first, a space or a slash"),
+                               ('[ -d "$folder" ] ||', "true ||", "a worktrees' folder that is missing"),
+                               ("unset GIT_DIR GIT_COMMON_DIR ", "unset GIT_COMMON_DIR ", "a caller's GIT_DIR"), ("unset GIT_DIR GIT_COMMON_DIR ", "unset GIT_DIR ", "a caller's GIT_COMMON_DIR"),
+                               (" GIT_WORK_TREE GIT_INDEX_FILE", " GIT_INDEX_FILE", "a caller's GIT_WORK_TREE"), (" GIT_INDEX_FILE GIT_OBJECT_DIRECTORY\n", " GIT_OBJECT_DIRECTORY\n", "a caller's GIT_INDEX_FILE"),
+                               (" GIT_OBJECT_DIRECTORY\n", "\n", "a caller's GIT_OBJECT_DIRECTORY"),
+                               ('folder="$(cd "$common/.." && pwd -P)-wt"', 'folder="$(pwd -P)-wt"', "the folder beside the tree it runs in, not the main checkout's")):
+        yield from each(ws, find, replace, "hooks", f"worktree.sh refuses {why} (7w3)")
     yield from each("scripts/test_hooks.sh", """if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\\n' "$sections" | grep -c .)" ]; then""", "if false; then",
                     "hooks", "the hook suite refuses a section its runner does not list (F160)")
     yield from each(".githooks/commit-msg", '--config "$(dirname "$0")/$config"', '--config "scripts/$config"', "hooks", "commit-msg scans with its own rules, not the working tree's (F129)")

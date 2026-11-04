@@ -37,7 +37,13 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 ## A branch's worktree
 
 Each branch works in a worktree of its own, made from the main checkout by one script, never by
-hand: `sh scripts/worktree.sh <dir> <branch> <base>`. It makes the branch, links the main tree's
+hand: `sh scripts/worktree.sh <dir> <branch> <base>`, `<dir>` a plain name in the folder beside the
+main checkout, `~/Server/gnoworld-wt/` (its name and `-wt`), out of the temp folder every
+command may write: no part's session writes a sibling there, moves one or plants one (7w3, F4893).
+Alexis makes that folder once (`mkdir ~/Server/gnoworld-wt`); the chief's session writes
+it by `--add-dir` (docs/HARNESS.md, "Who does what"). Until `main` holds 7w3, the script that does
+so is the integration worktree's, whose package files are the base's (`main`'s takes any folder).
+It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
 relative links and a `.bin` of its own; the gate's StrykerJS reads one incremental file every tree
 shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made links

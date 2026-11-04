@@ -84,22 +84,39 @@ assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["fil
 assert {".git/hooks", ".git/config", ".git/commondir"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129, F150)"
 assert ".mcp.json" in box["filesystem"]["denyWrite"], "a command can add a server Claude Code starts (F158)"
 assert {"CLAUDE.local.md", ".claude/CLAUDE.md"} <= set(box["filesystem"]["denyWrite"]), "a command can write instructions Claude Code reads beside CLAUDE.md (7z, S4)"
+# And below the root (7w3, S2-3): Claude Code loads a subfolder's CLAUDE.md and CLAUDE.local.md, an AGENTS.md where no CLAUDE.md
+# stands, and its .claude/rules and .claude/skills, once it reads a file there (its memory and skills pages), so one planted there
+# instructs every session that reads that folder, past the root's closed CLAUDE.md. `**/` is any depth, the root's included.
+nested = {"**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules", "**/.claude/skills"}
+assert nested <= set(box["filesystem"]["denyWrite"]), "a command can write instructions Claude Code reads below a tree's root (7w3, S2-3)"
+# StrykerJS copies the tree into .stryker-tmp/sandbox-*/, under the session's own denies: a copy of an instruction file there is a
+# write those refuse, and every mutation run would fail on it, so its ignorePatterns leave out each name a `**/` entry closes, read
+# as StrykerJS 10 reads them (a pattern matches a name at any depth, case folded: its project-reader.js).
+stryker = json.load(open(sys.argv[1].replace(".claude/settings.json", "stryker.config.json")))
+copied = [w for w in box["filesystem"]["denyWrite"] if w.startswith("**/") and w[3:].split("/")[0].lower() not in {p.lower() for p in stryker["ignorePatterns"]}]
+assert not copied, f"StrykerJS copies into its sandboxes what the sandbox refuses it to write there: {copied}"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
+# The file tools write the session's folders alone (7w3, Alexis's "Oui, pour gnoworld"): a deny list names some places, never all
+# (7w2's reviews found thirteen more), and Claude Code's blockWritesOutsideWorkingDirectories refuses Write, Edit and NotebookEdit
+# anywhere else, in every mode, bypass included (its settings reference; the schema of 2.1.318 reads a boolean). True itself: a
+# value the schema rejects drops the whole file (the settings page, "Fix a broken settings file"), and false is no block.
+assert s["permissions"].get("blockWritesOutsideWorkingDirectories") is True, "the file tools can write outside the session's folders (7w3)"
 # Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
 # run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
 # Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
 # (F087), and git's own hooks folder and config, which bypass mode lets the file tools write
 # otherwise (F129); and what Alexis's terminal runs to make a worktree (7z, S3), and the
-# instructions every session reads, Alexis's from 7z on (R4). A dependency is Alexis's to add,
-# and rm -rf no one's.
+# instructions every session reads, Alexis's from 7z on (R4), below the root too (7w3, S2-3).
+# A dependency is Alexis's to add, and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
            "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)", "Edit(/.git/commondir)", "Edit(/.mcp.json)",
            "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(/CLAUDE.md)", "Edit(/CLAUDE.local.md)", "Edit(/.claude/CLAUDE.md)",
+           "Edit(/**/CLAUDE.md)", "Edit(/**/CLAUDE.local.md)", "Edit(/**/AGENTS.md)", "Edit(/**/.claude/rules/**)", "Edit(/**/.claude/skills/**)",
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
@@ -280,12 +297,19 @@ python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "a sibling worktree
 import functools, json, os, re, sys
 
 WT, TMP_WT, MAIN = "/private/tmp/claude-501/gnoworld-wt", "/tmp/claude-501/gnoworld-wt", "~/Server/gnoworld"
+# The next parts' worktrees (7w3, F4893's remedy a): beside the main checkout, out of the temp folder, so no part's command writes
+# there at all; the chief's alone, by --add-dir. Its twins hold the closed files against the chief's commands and every file tool,
+# by one spelling (no link on its way). WT's stay while a part runs there.
+NEW = "~/Server/gnoworld-wt"
 HOME, ROOT = os.path.expanduser("~"), "/own"  # ROOT: the session's own tree, for its relative rules, apart from every sibling
+NEW_HOME = HOME + NEW[1:]
 # The instructions Claude Code reads in every folder above a session's (its memory page: CLAUDE.md and CLAUDE.local.md "from your
 # current working directory and every directory above it"; .claude/CLAUDE.md and .claude/rules by its source), closed in the folders
 # above a worktree, which the sandbox writes from the temp folder down, and above the main checkout, which the file tools reach (S4).
 ABOVE, ABOVE_MAIN = ("/private/tmp", "/private/tmp/claude-501", WT), ("~", "~/Server")
-INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules")
+# AGENTS.md too (7w3, F5323, the red pass's T7): read above a session's folder when no CLAUDE.md stands there, or when the settings ask
+# for both kinds (the memory page).
+INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules", "AGENTS.md", ".claude/AGENTS.md")
 tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
 s = json.load(open(sys.argv[1]))
 writes, deny = s["sandbox"]["filesystem"]["denyWrite"], s["permissions"]["deny"]
@@ -298,15 +322,40 @@ own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith(
 # The twins, derived from the tree's own rules, and the folders above: nothing more is closed, nothing less.
 rule_of = lambda n: f"{n}/**" if n == ".claude/rules" else n
 want_writes = {f"{WT}/*/{w}" for w in own_writes} | {f"{WT}/*/.git"} | {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
+want_writes |= {f"{NEW}/*/{w}" for w in own_writes} | {f"{NEW}/*/.git"} | {f"{NEW}/{n}" for n in INSTRUCTIONS}
+# The next parts' folder's own .claude, whole: the chief's --add-dir of it loads its skills, commands and agents (Claude Code 2.1.318's
+# loaders read an added folder's; lot 2's S2-2), and no tree lives there.
+want_writes |= {f"{NEW}/.claude"}
 want_rules = {f"{k}(/{w}/*{p})" for k, p in own_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
+want_rules |= {f"{k}({NEW}/*{p})" for k, p in own_rules} | {f"Edit({NEW}/*/.git)"}
 want_rules |= {f"Edit(/{w}/*/.git)" for w in (WT, TMP_WT)}
 want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
-want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN for n in INSTRUCTIONS}
+want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN + (NEW,) for n in INSTRUCTIONS} | {f"Edit({NEW}/.claude/**)"}
 got_writes = {w for w in writes if w.startswith(("/", "~"))}
 assert got_writes == want_writes, ("denyWrite's twins", sorted(want_writes - got_writes)[:4], sorted(got_writes - want_writes)[:4])
 credentials = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)"}  # the wiring section's
 got_rules = {f"{k}({p})" for k, p in rules if p.startswith(("//", "~/"))} - credentials
 assert got_rules == want_rules, ("the Read and Edit twins", sorted(want_rules - got_rules)[:4], sorted(got_rules - want_rules)[:4])
+# No part's command writes the next parts' folder (F5322, the red pass's T2): these settings give the sandbox no write root at it, above
+# it or in it, by allowWrite or additionalDirectories, each a write root of every sandboxed command (the sandboxing page). The chief's
+# --add-dir is its own session's, in no file.
+expand = lambda p: HOME + p[1:] if p == "~" or p.startswith("~/") else p if p.startswith("/") else ROOT + "/" + p
+roots = [expand(p.rstrip("/")) for p in s["sandbox"]["filesystem"].get("allowWrite", []) + s["permissions"].get("additionalDirectories", [])]
+wide = [r for r in roots if r in ("", NEW_HOME) or NEW_HOME.startswith(r + "/") or r.startswith(NEW_HOME + "/")]
+assert not wide, f"a write root reaches the next parts' worktrees, to every part's command: {wide}"
+# The main checkout's local settings, which every gnoworld session reads (lot 2's S2-3), when this machine holds them: the folders they
+# add are slices' reports alone (lot 1's S1, R1: the whole .claude/tmp gave every part the chief's gate records and the briefs), none
+# reaches the next parts' folder, and they close the instructions below the main checkout's root and above the next parts' trees.
+local = os.path.join(HOME, "Server/gnoworld/.claude/settings.local.json")
+if os.path.exists(local):
+    lp = json.load(open(local)).get("permissions", {})
+    added = [expand(d.rstrip("/")) for d in lp.get("additionalDirectories", [])]
+    odd = [d for d in added if not re.fullmatch(re.escape(HOME + "/Server/gnoworld/.claude/tmp/") + r"slice-\d+/reports", d)]
+    assert not odd, f"the main checkout's local settings add folders other than a slice's reports, to every session: {odd}"
+    kin = {f"Edit({MAIN}/**/{n})" for n in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", ".claude/rules/**", ".claude/skills/**")} | {f"Edit({NEW}/.claude/**)"}
+    assert kin <= set(lp.get("deny", [])), ("the main checkout's local settings leave instructions open to the sessions without 7w3's rules", sorted(kin - set(lp.get("deny", []))))
+else:
+    print(f"siblings: SKIPPED (no {local}: the local settings every session reads are not judged)")
 
 
 @functools.cache  # each pattern once: rebuilt, it was 0.8 s of the section's 0.9 (R5)
@@ -367,11 +416,11 @@ def denied(kind, path):
 
 one = lambda p: p.replace("**", "x").replace("*", "core")  # a path a rule names, each glob made one name
 # The two the brief names: a file that does not exist yet under a sibling's .githooks/, and an edit of a sibling's scripts/.
-for tree in (f"{WT}/slice-7", f"{TMP_WT}/slice-7", f"{WT}/tomorrow"):
+for tree in (f"{WT}/slice-7", f"{TMP_WT}/slice-7", f"{WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     assert refused(f"{tree}/.githooks/probe"), f"a command can write {tree}/.githooks/probe"
     assert denied("Edit", f"{tree}/scripts/stop_gate.sh"), f"the file tools can edit {tree}/scripts/stop_gate.sh"
 # Every closed path of a sibling, an existing one or one made tomorrow, by both spellings; and the main checkout's, to the file tools.
-for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow"):
+for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     for w in own_writes + [".git"]:
         assert refused(f"{tree}/{one(w)}"), f"a command can write {tree}/{w}"
     for k, p in own_rules + [("Edit", "/.git")]:
@@ -379,29 +428,41 @@ for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow"):
 for k, p in own_rules:
     assert denied(k, f"{HOME}/Server/gnoworld{one(p)}"), f"the file tools can {k.lower()} the main checkout's {p}"
     assert k == "Read" or refused(f"{HOME}/Server/gnoworld{one(p)}"), f"a command can write the main checkout's {p}"
+# An instruction file below a tree's root, at any depth, the session's own tree or a sibling's (7w3, S2-3): to commands and the file
+# tools alike, in the main checkout too. A name that only holds one of theirs stays open.
+for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
+    for p in ("app/CLAUDE.md", "docs/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
+              "server/src/.claude/rules/x.md", "app/.claude/skills/s/SKILL.md", "CLAUDE.md", "AGENTS.md"):
+        assert denied("Edit", f"{tree}/{p}"), f"the file tools can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
+        assert refused(f"{tree}/{p}"), f"a command can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
+    for p in ("docs/notes-CLAUDE.md", "docs/CLAUDE.md.orig", "app/src/agents.ts", "app/claude/rules.ts", "app/.claude-x/skills/a.md"):
+        assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed, and Claude Code reads no instructions there"
+for p in ("skills/s/SKILL.md", "commands/c.md", "agents/a.md", "settings.json"):
+    assert refused(f"{NEW_HOME}/.claude/{p}") and denied("Edit", f"{NEW_HOME}/.claude/{p}"), f"{NEW_HOME}/.claude/{p} is open, which the chief's --add-dir loads (S2-2)"
 # The instructions above every session: to the file tools by both spellings, to commands where the sandbox would let them write.
-for p in ABOVE + tuple(HOME + a[1:] for a in ABOVE_MAIN):
+for p in ABOVE + tuple(HOME + a[1:] for a in ABOVE_MAIN + (NEW,)):
     for n in INSTRUCTIONS:
         path = f"{p}/{n}" + ("/x.md" if n == ".claude/rules" else "")
         for spelt in {path, tmp(path) if path.startswith("/private/tmp") else path}:
             assert denied("Edit", spelt), f"the file tools can write {spelt}, which Claude Code reads above every session in it"
-        assert p not in ABOVE[1:] or refused(path), f"a command can write {path}, which Claude Code reads above every worktree session"
-for p in (f"{WT}/csp.diff", "/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md"):
+        assert p not in ABOVE[1:] + (NEW_HOME,) or refused(path), f"a command can write {path}, which Claude Code reads above every worktree session"
+for p in (f"{WT}/csp.diff", "/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md", f"{NEW_HOME}/csp.diff"):
     assert not refused(p) and not denied("Edit", p), f"{p} is closed, and no session reads it as instructions"
 # What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
 # gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
-for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow"):
+for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/gate-green",
               ".stryker-tmp/sandbox-x/app/package.json", ".stryker-tmp/sandbox-x/packages/core/package.json", "node_modules/.vite/x"):
         assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed"
 # A worktree's own folder stays open, to its making and to a rename: a glob holds no folder at its `*` (F4893, asked).
-assert not refused(f"{WT}/tomorrow"), "a new worktree's folder is closed"
+assert not refused(f"{WT}/tomorrow") and not refused(f"{NEW_HOME}/tomorrow"), "a new worktree's folder is closed"
 for p in (".git/worktrees/tomorrow/index", ".git/worktrees/tomorrow/HEAD", ".git/worktrees/tomorrow/COMMIT_EDITMSG", ".git/worktrees/tomorrow/MERGE_HEAD",
           ".git/worktrees/tomorrow/MERGE_MSG", ".git/worktrees/tomorrow/ORIG_HEAD", ".git/objects/ab/cdef", ".git/refs/heads/slice-9", ".git/packed-refs",
           ".git/info/exclude", ".git/index", ".git/logs/HEAD", ".claude/tmp/slice-7/reports/slice-7z.md"):
     assert not refused(f"{HOME}/Server/gnoworld/{p}") and not denied("Edit", f"{HOME}/Server/gnoworld/{p}"), f"the main checkout's {p} is closed"
 for w in own_writes + ["scripts/guard.py", ".claude/settings.json", ".git"]:
-    for throwaway in ("/tmp/claude-501/tmpab12/tree-tmpab12", "/tmp/claude-501/test_hooks.ab12/r", "/private/tmp/claude-501/gnoworld-wt2/x"):
+    for throwaway in ("/tmp/claude-501/tmpab12/tree-tmpab12", "/tmp/claude-501/test_hooks.ab12/r", "/private/tmp/claude-501/gnoworld-wt2/x",
+                      f"{HOME}/Server/gnoworld-wt2/x", f"{HOME}/Server/gnoworld-wtx"):
         assert not refused(f"{throwaway}/{one(w)}"), f"a twin closes {throwaway}/{w}, a tree outside the worktrees' folder"
 PY
 # The sandbox itself, from this command, when it runs in Claude Code's (SANDBOX_RUNTIME=1) with this tree's own rules: a fresh file
@@ -413,10 +474,12 @@ PY
 # package.json), the folders .claude and app themselves staying open. No read either of the main checkout's secrets or a sibling's,
 # a folder listed or a file opened, nothing of it read (R3); no CLAUDE.md made above the worktrees, and none there already (S4). Only
 # the sandbox's own refusal counts (EPERM), so a probe that cannot run fails. That folder's move out of the worktrees' folder and back
-# is printed, F4893's known gap, never failed on (the red pass, T1, T4 to T6). This half cannot be mutated (the sandbox's rules are
-# the session's): the static half above is what harness_mutate judges.
+# is printed, F4893's known gap, never failed on (the red pass, T1, T4 to T6). In the next parts' folder (7w3) no folder is made
+# but by the chief, a sibling's closed files and nested CLAUDE.md are refused, and in this tree no instruction file is made below
+# its root; a folder carrying one moved in is printed, F5325's known gap. This half cannot be mutated (the sandbox's rules are the
+# session's): the static half above is what harness_mutate judges.
 if [ "$SANDBOX_RUNTIME" = 1 ]; then
-	python3 -I - "$here/.." "$t" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's rules or predate them; restart it once apply-7z.sh has run (F4890)"
+	python3 -I - "$here/.." "$t" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's or 7w3's rules or predate them; restart it once apply-7w3.sh has run (F4890, F5322)"
 import errno, os, sys, tempfile
 
 own, scratch = os.path.realpath(sys.argv[1]), sys.argv[2]
@@ -553,6 +616,94 @@ if fresh:
         os.rename(os.path.join(scratch, "moved"), fresh)
         print("siblings: KNOWN GAP F4893: a worktree's folder moves out of the worktrees' folder and back")
     os.rmdir(fresh)
+# The next parts' folder (7w3): beside the main checkout, which no part's sandbox writes, so a part's command plants no folder there,
+# writes no sibling there and moves none (the sandbox refuses a path under no write root, the folder's own as any other). A session
+# that makes a folder there is the chief's, by its --add-dir: its trees are held by their twins alone, and a move out and back by
+# its own commands stays open, F4893's for it alone. A real sibling is never moved: a running session's folder would go with it.
+NEW = os.path.expanduser("~/Server/gnoworld-wt")
+if not os.path.isdir(NEW):
+    print(f"siblings: SKIPPED (no {NEW}: the next parts' folder is not judged)")
+else:
+    try:
+        planted = tempfile.mkdtemp(prefix="probe-siblings-", dir=NEW)
+    except PermissionError as e:
+        if e.errno != errno.EPERM:
+            raise
+        planted = None
+    # The chief's session is the one whose commands write the main checkout, its own project (a part's write no folder of it but git's
+    # and the shared reports): only it may make a folder in NEW (the red pass's T2).
+    main = os.path.expanduser("~/Server/gnoworld")
+    try:
+        os.close(os.open(os.path.join(main, name), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
+    except PermissionError as e:
+        if e.errno != errno.EPERM:
+            raise
+        chief = False
+    else:
+        os.unlink(os.path.join(main, name))
+        chief = True
+    if planted is None:
+        print(f"siblings: no folder could be made in {NEW}: no tree is planted there but by the chief")
+    elif not chief:
+        wrote.append(f"{planted} (a folder in {NEW}, by a session not the chief's)")
+        os.rmdir(planted)
+    else:
+        print(f"siblings: this session writes {NEW} itself (the chief's --add-dir): its trees are held by their twins alone")
+        for p in (".githooks", "scripts"):
+            closed(os.path.join(planted, p), folder=True)
+        closed(os.path.join(planted, ".git"))
+        try:
+            os.rename(planted, os.path.join(scratch, "moved-new"))
+        except PermissionError as e:
+            if e.errno != errno.EPERM:
+                raise
+            print(f"siblings: a folder of {NEW} could not leave it: F4893 looks closed for the chief too; mend the ledger")
+        else:
+            os.rename(os.path.join(scratch, "moved-new"), planted)
+            print(f"siblings: KNOWN GAP F4893, for this session alone: a folder of {NEW} moves out and back")
+        os.rmdir(planted)
+    near = [os.path.join(NEW, d) for d in sorted(os.listdir(NEW)) if os.path.isdir(os.path.join(NEW, d, ".githooks"))]
+    near = [d for d in near if os.path.realpath(d) != own and not os.path.basename(d).startswith("probe-siblings-")]
+    if near:
+        closed(os.path.join(near[0], ".githooks", name))
+        for p in ("scripts/stop_gate.sh", ".claude/settings.json", "CLAUDE.md"):
+            if os.path.isfile(os.path.join(near[0], p)):
+                closed(os.path.join(near[0], p), append=True)
+        if os.path.isdir(os.path.join(near[0], "app")):
+            closed(os.path.join(near[0], "app", "CLAUDE.md"))
+    else:
+        print(f"siblings: SKIPPED (no other tree with a .githooks in {NEW}: a sibling there is not judged)")
+# An instruction file below this tree's root (7w3, S2-3), in a folder no rule closes, made for the probe: refused by its name, at any
+# depth. A folder holding one, made in the temp folder and moved in, is printed, the known gap of a glob's `**` (F5325), never failed
+# on: the glob holds no folder it stands for; check_docs refuses it at every commit.
+nest = os.path.join(own, f".probe-nested-{os.getpid()}")
+os.mkdir(nest)
+try:
+    for p in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "x/CLAUDE.md", "x/claude.md", "x/Agents.md"):
+        if p.startswith("x/") and not os.path.isdir(os.path.join(nest, "x")):
+            os.mkdir(os.path.join(nest, "x"))
+        closed(os.path.join(nest, p))
+    os.mkdir(os.path.join(nest, ".claude"))
+    for p in ("rules", "skills"):
+        closed(os.path.join(nest, ".claude", p), folder=True)
+    closed(os.path.join(nest, ".claude", "CLAUDE.md"))
+    carried = os.path.join(scratch, "carried")
+    os.mkdir(carried)
+    open(os.path.join(carried, "CLAUDE.md"), "w").close()
+    try:
+        os.rename(carried, os.path.join(nest, "carried"))
+    except PermissionError as e:
+        if e.errno != errno.EPERM:
+            raise
+        print("siblings: a folder holding a CLAUDE.md could not be moved into this tree: F5325 looks closed; mend the ledger")
+    else:
+        os.rename(os.path.join(nest, "carried"), carried)
+        print("siblings: KNOWN GAP F5325: a folder holding a CLAUDE.md moves into the tree from the temp folder")
+finally:
+    for p in (".claude", "x"):
+        if os.path.isdir(os.path.join(nest, p)):
+            os.rmdir(os.path.join(nest, p))
+    os.rmdir(nest)
 if wrote:
     print("siblings: the sandbox let this command write " + ", ".join(wrote))
     sys.exit(1)
@@ -955,6 +1106,82 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
+fi
+
+if part instructions; then
+# No instruction file below a tree's root reaches a commit (7w3, S2-3): Claude Code loads a subfolder's CLAUDE.md and CLAUDE.local.md,
+# an AGENTS.md where no CLAUDE.md stands, and a subfolder's .claude/rules and .claude/skills, once it reads a file there (its memory
+# and skills pages), so one committed there instructs every session reading that folder, past the root's closed CLAUDE.md. check_docs,
+# which every commit runs, refuses each, by its name as macOS's disk reads it (case folded), a link counted by its name whether it
+# leads anywhere or not, and any .claude below the root; at the root a CLAUDE.local.md (a person's own, never committed) and an
+# AGENTS.md (read in place of CLAUDE.md) too. The root's CLAUDE.md, .claude/CLAUDE.md, rules and skills stay, and what git ignores
+# (the gate's state, StrykerJS's copies) is not read.
+docs="$here"/check_docs.py
+# git's global and system excludes are this machine's, not the case's (the red pass's T6): a home of the section's own.
+mkdir -p "$t/nested-home/.config"
+docs_at() { env HOME="$t/nested-home" XDG_CONFIG_HOME="$t/nested-home/.config" GIT_CONFIG_NOSYSTEM=1 python3 -I "$docs" "$1" 2>&1; }
+n="$t/nested" && mkdir -p "$n/.claude/rules" "$n/.claude/skills/s" "$n/.claude/agents" && : >"$n/CLAUDE.md" && good_rules "$n"
+git -C "$n" init -q && printf '.claude/tmp/\n.stryker-tmp/\n' >"$n/.gitignore"
+printf 'Rules.\n' >"$n/.claude/rules/x.md" && printf 'A skill.\n' >"$n/.claude/skills/s/SKILL.md" && printf 'More.\n' >"$n/.claude/CLAUDE.md"
+mkdir -p "$n/.claude/tmp/copy" "$n/.stryker-tmp/sandbox-1/app" && printf 'x\n' >"$n/.claude/tmp/copy/CLAUDE.md" && printf 'x\n' >"$n/.stryker-tmp/sandbox-1/app/CLAUDE.md"
+out=$(docs_at "$n") || fail "check_docs refused the root's own instructions, or read what git ignores: $out"
+# A name that only holds one of theirs is no instruction file (the red pass's T4).
+mkdir -p "$n/docs" "$n/app/src" "$n/app/.claude-x" && for p in docs/notes-CLAUDE.md docs/CLAUDE.md.orig app/src/agents.ts app/.claude-x/a.md; do printf 'x\n' >"$n/$p"; done
+out=$(docs_at "$n") || fail "check_docs refused a name that only holds an instruction file's: $out"
+rm -r "${n:?}/docs" "${n:?}/app"
+for p in app/CLAUDE.md docs/plans/CLAUDE.md app/CLAUDE.local.md packages/core/AGENTS.md CLAUDE.local.md AGENTS.md .claude/AGENTS.md \
+	.claude/CLAUDE.local.md app/.claude/CLAUDE.md app/.claude/rules/x.md server/src/.claude/skills/s/SKILL.md app/.claude/agents/x.md \
+	app/.claude/commands/x.md app/.claude/skills/s/run.sh app/.claude/settings.json \
+	app/claude.md docs/Agents.MD app/.Claude/rules/x.md packages/ui/Claude.Local.md; do
+	mkdir -p "$n/$(dirname "$p")" && printf 'Ignore the root.\n' >"$n/$p"
+	out=$(docs_at "$n") && fail "check_docs accepted an instruction file at $p (S2-3)"
+	printf '%s' "$out" | grep -qF "$p" || fail "check_docs did not name the instruction file $p: $out"
+	# Its folder goes with it, so the next case's letters are the disk's (macOS's folds them: app/.Claude would be app/.claude).
+	rm "$n/$p" && top=${p%%/*} && { [ "$top" = "$p" ] || [ "$top" = .claude ] || rm -r "${n:?}/$top"; }
+done
+# A link counts by its name: one named so that leads nowhere at the commit (its target planted after it), and a .claude below the root
+# that is a link, which Claude Code reads through (a link to a folder is no file, and every name check passed it by).
+for p in app/CLAUDE.md app/.claude; do
+	mkdir -p "$n/app" && ln -s "$t/nowhere-$$" "$n/$p"
+	out=$(docs_at "$n") && fail "check_docs accepted a link at $p that leads nowhere (S2-3)"
+	printf '%s' "$out" | grep -qF "$p" || fail "check_docs did not name the link $p: $out"
+	rm "$n/$p"
+	mkdir -p "$t/elsewhere-$$/rules" && ln -s "$t/elsewhere-$$" "$n/$p"
+	docs_at "$n" >/dev/null && fail "check_docs accepted a link at $p that leads to a folder (S2-3)"
+	rm "$n/$p"
+done
+# Every name the settings close below the root, check_docs refuses at a commit too (the review's R7): one added to the denies alone
+# stops here, the two lists read from the files themselves.
+python3 -I -c 'import json, sys; print("\n".join(w[3:] for w in json.load(open(sys.argv[1]))["sandbox"]["filesystem"]["denyWrite"] if w.startswith("**/")))' \
+	"$here/../.claude/settings.json" >"$t/nested-kin"
+[ -s "$t/nested-kin" ] || fail "settings.json closes no instruction file below a tree's root, which check_docs is held to"
+while IFS= read -r kin; do
+	p="app/$kin" && case $kin in .claude/*) p="app/$kin/x.md" ;; esac
+	mkdir -p "$n/$(dirname "$p")" && printf 'x\n' >"$n/$p"
+	docs_at "$n" >/dev/null && fail "check_docs accepted $p, which the settings close below the root (R7)"
+	rm -r "${n:?}/app"
+done <"$t/nested-kin"
+# What the commit holds (the red pass's T3): one staged and on disk, one committed, one the index holds and the disk lost.
+mkdir -p "$n/app" && printf 'x\n' >"$n/app/CLAUDE.md" && git -C "$n" add app/CLAUDE.md
+out=$(docs_at "$n") && fail "check_docs accepted an instruction file staged"
+printf '%s' "$out" | grep -qF "app/CLAUDE.md" || fail "check_docs did not name the staged app/CLAUDE.md: $out"
+git -C "$n" commit -qm nested && docs_at "$n" >/dev/null && fail "check_docs accepted an instruction file committed"
+rm "$n/app/CLAUDE.md" && docs_at "$n" >/dev/null && fail "check_docs accepted an instruction file the index holds and the disk lost"
+git -C "$n" rm -q --cached app/CLAUDE.md
+out=$(docs_at "$n") || fail "check_docs refused a tree with no instruction file below its root, after one left the index: $out"
+# What git ignores is not read, a CLAUDE.local.md as the repository's .gitignore ignores it at any depth; one added by force is (T6).
+printf 'CLAUDE.local.md\n' >>"$n/.gitignore" && printf 'x\n' >"$n/app/CLAUDE.local.md"
+out=$(docs_at "$n") || fail "check_docs read a CLAUDE.local.md git ignores, which no commit holds: $out"
+git -C "$n" add -f app/CLAUDE.local.md && docs_at "$n" >/dev/null && fail "check_docs accepted a CLAUDE.local.md git ignores, added by force"
+git -C "$n" rm -q --cached app/CLAUDE.local.md
+# Outside a repository (pre-commit's staged copy, which holds the tracked files alone): the same, every file read but node_modules',
+# at any depth, which the copy borrows (an installed package's AGENTS.md is no committed file; T4).
+c="$t/nested-copy" && mkdir -p "$c/node_modules/@cosmjs/math" "$c/app/node_modules/p" "$c/packages/core/node_modules/p" && : >"$c/CLAUDE.md" && good_rules "$c"
+printf 'x\n' >"$c/node_modules/@cosmjs/math/AGENTS.md" && printf 'x\n' >"$c/app/node_modules/p/AGENTS.md" && printf 'x\n' >"$c/packages/core/node_modules/p/CLAUDE.md"
+out=$(docs_at "$c") || fail "check_docs read a package's instruction file in the staged copy's borrowed node_modules: $out"
+printf 'x\n' >"$c/app/CLAUDE.md"
+out=$(docs_at "$c") && fail "check_docs accepted an instruction file below the root of a copy outside a repository"
+printf '%s' "$out" | grep -qF "app/CLAUDE.md" || fail "check_docs did not name app/CLAUDE.md in the staged copy: $out"
 fi
 
 if part harness_mutate; then
@@ -5289,70 +5516,73 @@ fi
 if part worktree_script; then
 # worktree.sh: a worktree of a new branch, ready for the gate, from the tree it runs in: the packages linked one by
 # one (a whole-folder link hides them from borrow_node_modules.sh), a workspace's @gnoworld links leading into the
-# new tree, Vite's caches its own, StrykerJS's incremental file seeded.
+# new tree, Vite's caches its own, StrykerJS's incremental file seeded. A worktree lives in the folder beside the main checkout,
+# under its name and -wt (7w3): here the fixture's own, $ws/src-wt.
 ws="$t/ws"
-mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports"
+wt="$ws/src-wt"
+mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports" "$wt"
+wtr=$(cd "$wt" && pwd -P) # as git names it: the script hands git the folder's own path, no link on its way
 git -C "$ws/src" init -q
 printf 'node_modules/\nreports/\n' >"$ws/src/.gitignore" && echo x >"$ws/src/packages/core/a.ts"
 for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json; do echo "$f" >"$ws/src/$f"; done
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
-[ "$(git -C "$ws/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
-[ -d "$ws/new/node_modules" ] && [ ! -L "$ws/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
-[ -L "$ws/new/node_modules/pkg" ] && [ "$(cat "$ws/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
-[ -d "$ws/new/node_modules/.vite" ] && [ ! -L "$ws/new/node_modules/.vite" ] && [ -z "$(ls -A "$ws/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
-[ -d "$ws/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
-[ "$(cd "$ws/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$ws/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
-[ -z "$(git -C "$ws/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$ws/new" status --porcelain)"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
-mkdir "$ws/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
-[ ! -e "$ws/x" ] || fail "worktree.sh made a folder for a call it refused"
+(cd "$ws/src" && sh "$here/worktree.sh" "$wt/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
+[ "$(git -C "$wt/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
+[ -d "$wt/new/node_modules" ] && [ ! -L "$wt/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
+[ -L "$wt/new/node_modules/pkg" ] && [ "$(cat "$wt/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
+[ -d "$wt/new/node_modules/.vite" ] && [ ! -L "$wt/new/node_modules/.vite" ] && [ -z "$(ls -A "$wt/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
+[ -d "$wt/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
+[ "$(cd "$wt/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wt/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
+[ -z "$(git -C "$wt/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wt/new" status --porcelain)"
+(cd "$ws/src" && sh "$here/worktree.sh" "$wt/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
+mkdir "$wt/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$wt/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
+(cd "$ws/src" && sh "$here/worktree.sh" "$wt/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
+[ ! -e "$wt/x" ] || fail "worktree.sh made a folder for a call it refused"
 # The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
 # packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
 # It is refused, whichever package file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
 installed=$(git -C "$ws/src" rev-parse HEAD)
 for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
 	echo changed >>"$ws/src/$f" && git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "$f moves"
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
+	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
 	printf '%s\n' "$out" | grep -qF "$f" || fail "worktree.sh did not name the package file $f that differs: $out"
-	[ ! -e "$ws/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
+	[ ! -e "$wt/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
 	git -C "$ws/src" reset -q --hard "$installed"
 done
 echo changed >>"$ws/src/app/package.json"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
 git -C "$ws/src" checkout -q -- app/package.json
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
-[ ! -e "$ws/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
+[ ! -e "$wt/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
 # An argument that starts with - is an option for git, never a name: a base `--output=<file>` made git diff truncate a file
 # outside the scratch copy (CR6); a branch or a folder so named is as wrong. Each is refused, and makes nothing.
 echo victim >"$ws/victim"
-for args in "$ws/opt1 optbranch --output=$ws/victim" "$ws/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
+for args in "$wt/opt1 optbranch --output=$ws/victim" "$wt/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
 	set -- $args
 	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$@" 2>&1) && fail "worktree.sh took an argument that starts with a dash: $args: $out"
 	printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not say which argument starts with a dash: $args: $out"
 done
 [ "$(cat "$ws/victim")" = victim ] || fail "worktree.sh let a base of git's options write a file: $(cat "$ws/victim")"
-[ ! -e "$ws/opt1" ] && [ ! -e "$ws/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
+[ ! -e "$wt/opt1" ] && [ ! -e "$wt/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
 for b in optbranch --optbranch optbranch2; do ! git -C "$ws/src" rev-parse -q --verify "refs/heads/$b" >/dev/null || fail "worktree.sh made the branch $b for a refused call"; done
 # A base that is no commit (a blob, a tree) is refused before anything is made; so is a root node_modules that is one link,
 # which the script could not take apart once the tree stood (CR6).
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
 printf '%s\n' "$out" | grep -qF "is no commit" || fail "worktree.sh did not say a base is no commit: $out"
-[ ! -e "$ws/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
+[ ! -e "$wt/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
 mv "$ws/src/node_modules" "$ws/src/real_modules" && ln -s real_modules "$ws/src/node_modules"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
 printf '%s\n' "$out" | grep -qF "node_modules is a link" || fail "worktree.sh did not say the root node_modules is a link: $out"
-[ ! -e "$ws/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
+[ ! -e "$wt/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
 rm "$ws/src/node_modules" && mv "$ws/src/real_modules" "$ws/src/node_modules"
 # A step that fails once the tree stands undoes the tree and the branch: the next run names the same folder (CR6).
 mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\nexit 1\n' >"$ws/scripts/borrow_node_modules.sh"
-out=$(cd "$ws/src" && sh "$ws/scripts/worktree.sh" "$ws/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
-[ ! -e "$ws/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
+out=$(cd "$ws/src" && sh "$ws/scripts/worktree.sh" "$wt/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
+[ ! -e "$wt/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
 ! git -C "$ws/src" rev-parse -q --verify halfbranch >/dev/null || fail "worktree.sh left the branch of a tree that failed half-made"
-git -C "$ws/src" worktree list | grep -qF "$ws/half" && fail "worktree.sh left $ws/half registered"
+git -C "$ws/src" worktree list | grep -qF "$wtr/half" && fail "worktree.sh left $wt/half registered"
 # So does a signal that stops it once the tree stands (R6): the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
 # the EXIT trap runs even when a signal kills the shell, in dash (Linux's sh) only the trap on the signals makes it run: both are tried.
 # SIGINT is ignored by a script started in the background, as this suite's sections are: python resets it to its default first.
@@ -5363,13 +5593,57 @@ for shell in sh dash; do
 		printf '#!/bin/sh\nkill -%s "$PPID"\nsleep 1\n' "$sig" >"$ws/scripts/borrow_node_modules.sh"
 		out=$(cd "$ws/src" && python3 -I -c 'import signal, subprocess, sys
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$ws/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
-		[ ! -e "$ws/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
+sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$wt/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
+		[ ! -e "$wt/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
 		! git -C "$ws/src" rev-parse -q --verify "$tag" >/dev/null || fail "worktree.sh left the branch of a tree stopped by SIG$sig in $shell"
-		git -C "$ws/src" worktree list | grep -qF "$ws/$tag" && fail "worktree.sh left $ws/$tag registered after SIG$sig in $shell"
+		git -C "$ws/src" worktree list | grep -qF "$wtr/$tag" && fail "worktree.sh left $wt/$tag registered after SIG$sig in $shell"
 	done
 done
-(cd "$ws/src" && sh "$here/worktree.sh" "$ws/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
+(cd "$ws/src" && sh "$here/worktree.sh" "$wt/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
+# The worktrees' folder is the one beside the main checkout, under its name and -wt (7w3, F4893's remedy a: out of the temp folder,
+# which every command writes, so no part's command writes a sibling, moves one or plants one there). Anything else is refused and
+# makes nothing: a temp folder, the main checkout or a folder in it, a folder below a worktree's, the -wt folder itself or a sibling of
+# its name, a dot or a slash in the name; and a -wt folder missing or a link. It is read from the repository's own common folder, from
+# a worktree too: git's folders a caller sets are dropped, so it is never another repository's.
+for dir in "$t/tmpwt" "$ws/elsewhere" "$ws/src/inside" "$wt/a/b" "$wt" "$wt/../src-wt2" "$wt/." "$wt/.." "$wt/.hidden" "$wt/fresh/" "$wt/a b"; do
+	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$dir" outbranch HEAD 2>&1) && fail "worktree.sh made a tree outside the worktrees' folder: $dir: $out"
+	printf '%s\n' "$out" | grep -qF "$wtr" || fail "worktree.sh did not name the worktrees' folder when it refused $dir: $out"
+	! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a branch for $dir, a folder it refused"
+done
+[ ! -e "$t/tmpwt" ] && [ ! -e "$ws/elsewhere" ] && [ ! -e "$ws/src/inside" ] && [ ! -e "$wt/a" ] && [ ! -e "$ws/src-wt2" ] && [ ! -e "$wt/.hidden" ] && [ ! -e "$wt/fresh" ] ||
+	fail "worktree.sh made a folder outside the worktrees' folder"
+for name in v1.2 Slice_7-x; do
+	(cd "$ws/src" && sh "$here/worktree.sh" "$wt/$name" "named-$name" HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused the plain name $name: $(cat "$ws/out")"
+done
+(cd "$ws/src" && sh "$here/worktree.sh" ../src-wt/rel relbranch HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused a folder of the worktrees' named from beside it: $(cat "$ws/out")"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wtr/rel" || fail "worktree.sh registered another path than the folder's own: $(git -C "$ws/src" worktree list)"
+ln -s "$wt" "$ws/wtlink" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/wtlink/vialink" vialinkbranch HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused its folder named through a link: $(cat "$ws/out")"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wtr/vialink" || fail "worktree.sh registered a tree by a link's path, which open.sh would not find: $(git -C "$ws/src" worktree list)"
+(cd "$wt/new" && sh "$here/worktree.sh" "$wt/fromwt" fromwt HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused the worktrees' folder when run from a worktree: $(cat "$ws/out")"
+(cd "$wt/new" && sh "$here/worktree.sh" "$wt/new-wt-x" newwt HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a plain name in the worktrees' folder"
+mkdir "$wt/new-wt" && out=$(cd "$wt/new" && sh "$here/worktree.sh" "$wt/new-wt/x" fromwt2 HEAD 2>&1) && fail "worktree.sh took the folder beside the worktree it runs in, not the main checkout's: $out"
+git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m other && mkdir "$ws/other-wt"
+for var in GIT_DIR GIT_COMMON_DIR; do
+	out=$(cd "$ws/src" && env "$var=$ws/other/.git" sh "$here/worktree.sh" "$ws/other-wt/$var" "by$var" HEAD 2>&1) && fail "worktree.sh followed a caller's $var to another repository's folder: $out"
+	! git -C "$ws/other" rev-parse -q --verify "by$var" >/dev/null || fail "worktree.sh made a branch in the repository a caller's $var named"
+	(cd "$ws/src" && env "$var=$ws/other/.git" sh "$here/worktree.sh" "$wt/$var" "by$var" HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused its own folder beside a caller's $var: $(cat "$ws/out")"
+	git -C "$ws/src" rev-parse -q --verify "by$var" >/dev/null || fail "worktree.sh made its branch elsewhere than its own repository beside a caller's $var"
+done
+# The rest of git's folders a caller may set, each dropped (the red pass's T9): an index elsewhere, which git worktree add would write
+# in place of the new tree's own; a work tree elsewhere, which it would fill; an object folder holding nothing, where no commit is found.
+(cd "$ws/src" && env GIT_INDEX_FILE="$ws/stray-index" sh "$here/worktree.sh" "$wt/byindex" byindex HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_INDEX_FILE: $(cat "$ws/out")"
+[ ! -e "$ws/stray-index" ] && [ -f "$(git -C "$wt/byindex" rev-parse --path-format=absolute --git-path index)" ] || fail "worktree.sh wrote the new tree's index where a caller's GIT_INDEX_FILE named"
+mkdir "$ws/stray-tree" && (cd "$ws/src" && env GIT_WORK_TREE="$ws/stray-tree" sh "$here/worktree.sh" "$wt/bytree" bytree HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_WORK_TREE: $(cat "$ws/out")"
+[ -z "$(ls -A "$ws/stray-tree")" ] && [ -f "$wt/bytree/packages/core/a.ts" ] || fail "worktree.sh filled the work tree a caller's GIT_WORK_TREE named, not its own"
+mkdir "$ws/no-objects" && (cd "$ws/src" && env GIT_OBJECT_DIRECTORY="$ws/no-objects" sh "$here/worktree.sh" "$wt/byobjects" byobjects HEAD) >"$ws/out" 2>&1 || fail "worktree.sh followed a caller's GIT_OBJECT_DIRECTORY, where no commit is: $(cat "$ws/out")"
+mv "$wt" "$ws/away" && ln -s away "$wt"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/linkfolder" linkfolder HEAD 2>&1) && fail "worktree.sh made a tree in a worktrees' folder that is a link: $out"
+printf '%s\n' "$out" | grep -qF "by its own path" || fail "worktree.sh refused a worktrees' folder that is a link for another reason than the link: $out"
+! git -C "$ws/src" rev-parse -q --verify linkfolder >/dev/null || fail "worktree.sh made a branch in a worktrees' folder that is a link"
+rm "$wt" && out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/missing" missing HEAD 2>&1) && fail "worktree.sh made a worktrees' folder that was missing: $out"
+printf '%s\n' "$out" | grep -qF "mkdir" || fail "worktree.sh did not say how the worktrees' folder is made: $out"
+[ ! -e "$wt" ] || fail "worktree.sh made the worktrees' folder itself, which is Alexis's to make once"
+mv "$ws/away" "$wt"
 # A workspace's .bin reached through a link (a tree whose packages were linked by hand) is borrowed as a folder of its own:
 # the probe deletes a tool in its copy, which went through the link and deleted the main tree's (F2127).
 mkdir -p "$ws/bins/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/.bin/storybook"
