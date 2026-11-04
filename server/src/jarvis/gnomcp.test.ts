@@ -211,6 +211,16 @@ describe("startGnomcp: gnomcp started read-only", () => {
     await expect(startGnomcp(setup)).rejects.toThrow(/sapphire/);
   });
 
+  it.each([
+    ["another version", { name: "gnomcp", version: "0.12.0" }, "gnomcp 0.12.0"],
+    ["another server", { name: "not-gnomcp", version: "0.11.0" }, "not-gnomcp 0.11.0"],
+  ])(
+    "refuses to start on %s than gnomcp 0.11.0, whose meaning of read-only it checks",
+    async (_case, server, named) => {
+      expect((await refusal({ server })).message).toBe(`gnomcp: it is ${named}, not gnomcp 0.11.0`);
+    },
+  );
+
   it("refuses a gnomcp that stops at start, its last words logged", async () => {
     const { message, events } = await refusal({ exitAtStart: true, stderr: ["load config: bad rpc-url"] });
     expect(message).toBe("gnomcp: it stopped at start");

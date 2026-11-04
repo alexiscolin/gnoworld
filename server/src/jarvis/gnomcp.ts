@@ -148,6 +148,10 @@ async function atStart<T>(request: Promise<T>): Promise<T> {
 const toolsOf = ({ profiles }: Setup) => gnomcpTools({ chains: profiles.read, indexed: profiles.indexed });
 
 async function checked(client: Client, setup: Setup, timeout: number): Promise<void> {
+  // What follows reads gnomcp 0.11.0's words (its tools' fields, its kind "read-only"): another version may mean others.
+  const { name = "?", version = "?" } = client.getServerVersion() ?? {};
+  if (name !== "gnomcp" || version !== "0.11.0")
+    throw new Error(`gnomcp: it is ${visible(`${name} ${version}`, false)}, not gnomcp 0.11.0`);
   // The client parsed the list by MCP's own schema: each tool a name and an input schema of properties.
   const { tools } = await atStart(client.listTools(undefined, { timeout }));
   const fields = new Map(tools.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]));

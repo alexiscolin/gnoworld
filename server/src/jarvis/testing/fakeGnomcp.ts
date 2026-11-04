@@ -34,6 +34,8 @@ export interface Scenario {
   stderrSplit?: boolean;
   stderrBefore?: string;
   exitAtStart?: boolean;
+  // The name and version it gives at initialize, gnomcp 0.11.0 by default.
+  server?: { name: string; version: string };
 }
 
 const fields = (...names: string[]) => Object.fromEntries(names.map((name) => [name, { type: "string" }]));
@@ -105,7 +107,7 @@ const serve = () => createInterface({ input: process.stdin }).on("line", (line) 
   appendFileSync(join(here, "requests.jsonl"), JSON.stringify({ start: started + 1, method: request.method, params: request.params }) + "\\n");
   if (request.id === undefined || (scenario.slow ?? []).includes(request.method)) return;
   if (request.method === "initialize") {
-    const result = { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "gnomcp", version: "0.11.0" } };
+    const result = { protocolVersion: request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: scenario.server ?? { name: "gnomcp", version: "0.11.0" } };
     return send({ id: request.id, result });
   }
   if (request.method === "tools/list") return send({ id: request.id, result: { tools: scenario.tools } });
