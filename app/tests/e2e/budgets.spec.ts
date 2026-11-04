@@ -77,11 +77,12 @@ const PORTRAITS_JS = 1900;
 const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
 // chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
-// (Alexis, 2026-11-03); 2,062 B once the Earth's views went from the view at rest's search (7x2, the margin given ahead).
+// (Alexis, 2026-11-03); 2,070 B once the Earth's views went from the view at rest's search, 8 B of it for other chunks' hashed names (7x2,
+// the margin given ahead).
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const ARRIVAL_JS = 2062;
+const ARRIVAL_JS = 2070;
 // The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
 // program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
 // (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
