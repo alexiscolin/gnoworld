@@ -360,3 +360,98 @@ describe("the budget", () => {
     expect(budget.state("ask")).toEqual({ spent: 0, reserved: 0, cap: CAP });
   });
 });
+
+// The caps live in jarvis's file (Alexis, "simplement modifiable par admin"): the settings give the first values, once,
+// as D95 seeds the door's quotas; an admin's change counts at once, against the day already spent.
+describe("the budget's caps, kept in jarvis's file", () => {
+  it("seeds each cap once, from the first start's values: a later start's are not read", () => {
+    const path = join(dir, "seeded.db");
+    const first = setup(path);
+    expect(first.budget.caps()).toEqual({ ask: CAP, translate: TRANSLATE_CAP });
+    first.db.close();
+    const db = openDatabase(path, jarvisMigrations);
+    opened.push(db);
+    const later = makeBudget(db, { caps: { ask: 3 * PERCENT, translate: 7 }, holdMs: HOLD, now: () => T0 });
+    expect(later.caps()).toEqual({ ask: CAP, translate: TRANSLATE_CAP });
+    expect(later.state("ask")).toEqual({ spent: 0, reserved: 0, cap: CAP });
+  });
+
+  it("counts a cap raised at once, against the day already spent, with no new budget made", () => {
+    const { budget } = setup();
+    spend(budget, "ask", CAP);
+    expect(budget.reserve("ask", 1)).toMatchObject({ ok: false, reason: "spent" });
+    budget.change("ask", 2 * CAP);
+    expect(budget.caps()).toEqual({ ask: 2 * CAP, translate: TRANSLATE_CAP });
+    expect(budget.state("ask")).toEqual({ spent: CAP, reserved: 0, cap: 2 * CAP });
+    expect(budget.reserve("ask", CAP)).toMatchObject({ ok: true });
+    expect(budget.reserve("ask", 1)).toMatchObject({ ok: false, reason: "spent" });
+  });
+
+  it("counts a cap lowered at once: what was spent is kept, and nothing more passes", () => {
+    const { budget } = setup();
+    spend(budget, "ask", 50 * PERCENT);
+    budget.change("ask", 40 * PERCENT);
+    expect(budget.state("ask")).toEqual({ spent: 50 * PERCENT, reserved: 0, cap: 40 * PERCENT });
+    expect(budget.reserve("ask", 1)).toEqual({ ok: false, reason: "spent", alerts: [80, 100] });
+  });
+
+  it("changes one kind's cap alone, and keeps it across a restart", () => {
+    const path = join(dir, "changed.db");
+    const first = setup(path);
+    first.budget.change("translate", 9 * PERCENT);
+    expect(first.budget.caps()).toEqual({ ask: CAP, translate: 9 * PERCENT });
+    first.db.close();
+    expect(setup(path).budget.caps()).toEqual({ ask: CAP, translate: 9 * PERCENT });
+  });
+
+  it("alerts against the cap it reads at that reservation", () => {
+    const { budget } = setup();
+    spend(budget, "ask", 50 * PERCENT);
+    budget.change("ask", 60 * PERCENT);
+    expect(budget.reserve("ask", PERCENT)).toMatchObject({ ok: true, alerts: [80] });
+  });
+
+  it.each([
+    ["0", 0],
+    ["below 0", -1],
+    ["a fraction", 1.5],
+    ["not a number", Number.NaN],
+    ["past the safe integers", 1e300],
+  ])("refuses a cap of %s, a bug in its caller, and keeps the cap it had", (_, cap) => {
+    const { budget } = setup();
+    expect(() => {
+      budget.change("ask", cap);
+    }).toThrow(new RangeError("a cap is a count, from 1"));
+    expect(budget.caps()).toEqual({ ask: CAP, translate: TRANSLATE_CAP });
+  });
+
+  it.each([
+    ["the questions'", { ask: 0, translate: TRANSLATE_CAP }],
+    ["the translations'", { ask: CAP, translate: 0 }],
+    ["a fraction for", { ask: CAP, translate: 0.5 }],
+  ])("refuses %s first cap that is no count, before it writes anything", (_case, caps) => {
+    const db = openDatabase(":memory:", jarvisMigrations);
+    opened.push(db);
+    expect(() => makeBudget(db, { caps, holdMs: HOLD, now: () => T0 })).toThrow(
+      new RangeError("a cap is a count, from 1"),
+    );
+    expect(db.prepare("SELECT COUNT(*) AS caps FROM budget_caps").get()).toEqual({ caps: 0 });
+  });
+
+  it("keeps a day spent in a file of the first migration alone, its caps added by the next", () => {
+    const path = join(dir, "first-migration.db");
+    const [first] = jarvisMigrations;
+    const old = openDatabase(path, first === undefined ? [] : [first]);
+    old.prepare("INSERT INTO budget_days (kind, day, spent) VALUES ('ask', '2026-11-04', 7)").run();
+    old.close();
+    const { budget } = setup(path);
+    expect(budget.state("ask")).toEqual({ spent: 7, reserved: 0, cap: CAP });
+    expect(budget.caps()).toEqual({ ask: CAP, translate: TRANSLATE_CAP });
+  });
+
+  it("holds the caps in a STRICT table whose every cap is a count, whatever writes it", () => {
+    const { db } = setup();
+    expect(() => db.prepare("UPDATE budget_caps SET cap = 0 WHERE kind = 'ask'").run()).toThrow(/CHECK/);
+    expect(() => db.prepare("INSERT INTO budget_caps (kind, cap) VALUES ('other', 1)").run()).toThrow(/CHECK/);
+  });
+});
