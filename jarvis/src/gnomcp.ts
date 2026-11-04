@@ -101,7 +101,7 @@ const timedOut = (error: unknown) => error instanceof SdkError && error.code ===
 
 /** A tool as our own definition hands it to the MCP client, with no output schema: the client compiles and checks
  * none a server listed, which a schema built to backtrack would hold the process with (F5253, F5111). */
-const unchecked = (name: string) => ({ name, inputSchema: { type: "object" as const } });
+export const unchecked = (name: string) => ({ name, inputSchema: { type: "object" as const } });
 
 async function sent(child: Child, params: Parameters<Client["callTool"]>[0], timeout: number): Promise<Ran> {
   try {

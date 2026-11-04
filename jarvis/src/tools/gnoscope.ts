@@ -7,7 +7,7 @@ import { Client, SdkError, SdkErrorCode, StreamableHTTPClientTransport, type Too
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
 import { send } from "@gnoworld/service/net";
-import type { Ran } from "../gnomcp.ts";
+import { unchecked, type Ran } from "../gnomcp.ts";
 import { gnoscopeTools } from "./gnoscopeTools.ts";
 
 interface Setup {
@@ -92,10 +92,8 @@ export async function startGnoscope(setup: Setup): Promise<Gnoscope> {
       if (closed) return { ok: false, reason: "down" };
       try {
         // Our own definition, with no output schema: the client checks none of gnoscope's against a result (S1).
-        const toolDefinition = { name, inputSchema: { type: "object" as const } };
-        return read(
-          await client.callTool({ name, arguments: parsed.data }, { timeout: setup.timeoutMs, toolDefinition }),
-        );
+        const options = { timeout: setup.timeoutMs, toolDefinition: unchecked(name) };
+        return read(await client.callTool({ name, arguments: parsed.data }, options));
       } catch (error) {
         return { ok: false, reason: failureOf(error) };
       }
