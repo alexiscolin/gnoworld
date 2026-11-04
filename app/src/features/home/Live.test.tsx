@@ -36,7 +36,9 @@ function serve(answer: Answer) {
   vi.stubGlobal("fetch", fetcher);
   return fetcher;
 }
-const asked = (fetcher: ReturnType<typeof serve>) => fetcher.mock.calls.map(([url]) => urlOf(url));
+// The live line's own reads: the sparklines' history (8i) is a chunk's read of its own, after the prices, asked when that chunk has come.
+const asked = (fetcher: ReturnType<typeof serve>) =>
+  fetcher.mock.calls.map(([url]) => urlOf(url)).filter((url) => url !== "/api/markets/history");
 const file: Answer = () => json(MARKETS);
 const settle = () => act(() => vi.advanceTimersByTimeAsync(50));
 
@@ -215,7 +217,7 @@ describe("the live line on a phone", () => {
     const fetcher = serve(file);
     const host = mount(<Live withBlock />);
     await settle();
-    expect(fetcher).not.toHaveBeenCalled();
+    expect(asked(fetcher)).toEqual([]);
     await act(async () => {
       window900.widen();
       await vi.advanceTimersByTimeAsync(50);
@@ -229,7 +231,7 @@ describe("the live line on a phone", () => {
     const fetcher = serve(file);
     const planted = plant();
     await settle();
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(asked(fetcher)).toHaveLength(1);
     expect(window900.listeners.size).toBe(1);
     planted.leave();
     expect(window900.listeners.size).toBe(0);

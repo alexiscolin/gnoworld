@@ -27,3 +27,19 @@ export const Presence = z.strictObject({
   ),
 });
 export type Presence = z.infer<typeof Presence>;
+
+/** The most countries a count may name: every pair of capitals a client's country tag can hold (core's `isCountryCode`). */
+export const COUNTRIES_MOST = 26 * 26;
+
+/** The most bytes the people's answer weighs: two counts. */
+export const PRESENCE_PEOPLE_MAX_BYTES = 256;
+
+/** GET /api/presence/people (slice 8, 8i; the home's "671 ONLINE"): the people the relay holds in the rooms a guest may see, each once
+ * whatever its rooms, and how many countries those of them who declare one name (ADR-0001 §7: opt-in, never detected). Counts alone. */
+export const PresencePeople = z.strictObject({
+  online: People,
+  countries: z
+    .number()
+    .check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(0), z.lte(COUNTRIES_MOST)),
+});
+export type PresencePeople = z.infer<typeof PresencePeople>;

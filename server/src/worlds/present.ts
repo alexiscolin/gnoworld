@@ -1,11 +1,12 @@
 // Who is here (slice 7, 7h, the sampler 7c's presence history waits on): the people the reconciler reads in each room a guest may see, a
 // world's counted once across its rooms by nick whatever its case, the bot left out; recorded every five minutes into 7c's history, the
 // busiest sample of each hour, so a world rises against its own 14 days; served as counts alone at GET /api/presence. No name leaves it,
-// and no room a guest cannot see counts.
+// and no room a guest cannot see counts. The home's hero (8i) reads at GET /api/presence/people the people of those rooms, each once whatever
+// its rooms, and the countries those of them name who declare one on their lines: two counts, never who.
 import { riseOf, usualOf } from "@gnoworld/core";
-import { PRESENCE_ANSWER_MAX, type Presence } from "@gnoworld/schemas/indexer";
+import { PRESENCE_ANSWER_MAX, type Presence, type PresencePeople } from "@gnoworld/schemas/indexer";
 import { Hono } from "hono";
-import { NICK } from "../irc/lines.ts";
+import { NICK, type Said } from "../irc/lines.ts";
 import type { Log } from "../log.ts";
 import { besideOf } from "../replaceFile.ts";
 import { makePresence, type Signal } from "./presence.ts";
@@ -19,6 +20,8 @@ const ROOMS_MOST = 10_000;
 // build a second at most.
 const ANSWER_MS = 60_000;
 const CHANGED_MS = 1000;
+// The accounts whose declared country is kept, the last to speak kept: a country is two letters, so 100,000 of them weigh a few MB at most.
+const DECLARED_MOST = 100_000;
 
 interface Options {
   file: string;
@@ -42,6 +45,9 @@ export interface ChatWorld {
 export interface Present {
   /** Who the reconciler found in a room, by nick. */
   seen: (room: string, nicks: readonly string[]) => void;
+  /** The country `account` declared on its last line (ADR-0001 §7), kept in memory alone, for the people's count of countries; an `older`
+   * line (a history page) tells only of an account not yet heard. */
+  declared: (account: string, country: string, older: boolean) => void;
   routes: Hono;
   /** What the route serves, built under the same rule, for the server's own readers (7t's trends). */
   current: () => Presence;
@@ -57,8 +63,9 @@ interface Answer {
   readonly value: Presence;
   readonly body: string;
   readonly chat: readonly ChatWorld[];
+  readonly people: string;
 }
-const UNBUILT: Answer = { at: Number.NEGATIVE_INFINITY, value: { worlds: [] }, body: "", chat: [] };
+const UNBUILT: Answer = { at: Number.NEGATIVE_INFINITY, value: { worlds: [] }, body: "", chat: [], people: "" };
 
 type Hours = ReturnType<typeof makePresence>;
 // What the route serves and the trends read, from each world as read at `at`: its people (none known when none of its rooms was read lately)
@@ -86,11 +93,59 @@ function builtFrom(
   };
 }
 
+// What each route serves of the answer: who is here in each world, and the people online with their countries (8i).
+const SERVED: readonly [string, (built: Answer) => string][] = [
+  ["/", ({ body }) => body],
+  ["/people", ({ people }) => people],
+];
+
+interface Read {
+  readonly at: number;
+  readonly nicks: ReadonlySet<string>;
+}
+
+// A room when it was read lately, else none: an outage counts nobody.
+const freshIn = (room: Read | undefined, at: number): readonly Read[] =>
+  room === undefined || at - room.at > STALE_MS ? [] : [room];
+
+// The people among `nicks`, each once, and the countries those of them who declare one name.
+function peopleOf(nicks: readonly string[], countryOf: (nick: string) => string | undefined): PresencePeople {
+  const people = new Set(nicks);
+  const named = new Set([...people].flatMap((nick) => countryOf(nick) ?? []));
+  return { online: people.size, countries: named.size };
+}
+
+// Each account's declared country by its name in lower case, as a nick is counted (Ergo's force-nick-equals-account): the last to speak
+// kept, the oldest leaving when it is full; an older line (a history page) tells only of an account not yet heard.
+function makeCountries() {
+  const countries = new Map<string, string>();
+  return {
+    of: (nick: string): string | undefined => countries.get(nick),
+    declared: (account: string, country: string, older: boolean): void => {
+      const key = account.toLowerCase();
+      if (older && countries.has(key)) return;
+      countries.delete(key);
+      const [oldest] = countries.size >= DECLARED_MOST ? countries.keys() : [];
+      if (oldest !== undefined) countries.delete(oldest);
+      countries.set(key, country);
+    },
+  };
+}
+
+/** The country a line of a room a guest sees declares, which counts towards the home's countries (8i), the account's last one kept. */
+export const countriesTo =
+  (present: Present | undefined, visible: (room: string, who: undefined) => boolean) =>
+  (said: Said, older: boolean): void => {
+    if (said.country !== undefined && visible(said.room, undefined))
+      present?.declared(said.account, said.country, older);
+  };
+
 export function startPresent({ file, now, open, rooms, rates, log }: Options): Present {
   const presence = makePresence({ file, now });
   // Each world's messages an hour, kept as its people are, in a file beside theirs (7t3).
   const messages = makePresence({ file: besideOf(file, "messages"), now });
-  const read = new Map<string, { at: number; nicks: ReadonlySet<string> }>();
+  const read = new Map<string, Read>();
+  const countries = makeCountries();
   let stopped = false;
   let answer = UNBUILT;
   let changed = true;
@@ -102,15 +157,8 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
   };
   // A world's people, or none known when none of its rooms was read lately: an outage is no empty hour.
   const hereIn = (names: readonly string[], at: number): number | undefined => {
-    const people = new Set<string>();
-    let fresh = false;
-    for (const name of names) {
-      const room = read.get(name);
-      if (room === undefined || at - room.at > STALE_MS) continue;
-      fresh = true;
-      for (const nick of room.nicks) people.add(nick);
-    }
-    return fresh ? people.size : undefined;
+    const rooms = names.flatMap((name) => freshIn(read.get(name), at));
+    return rooms.length === 0 ? undefined : new Set(rooms.flatMap((room) => [...room.nicks])).size;
   };
   // A world's messages an hour now: its open rooms' pace.
   const perHourIn = (names: readonly string[], at: number): number =>
@@ -139,19 +187,22 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
     const at = now();
     if (at - answer.at >= ANSWER_MS || (changed && at - answer.at >= CHANGED_MS)) {
       const { value, chat } = build(at);
-      answer = { at, value, body: JSON.stringify(value), chat };
+      const fresh = worlds()
+        .flatMap(([, names]) => names.flatMap((name) => freshIn(read.get(name), at)))
+        .flatMap((room) => [...room.nicks]);
+      answer = { at, value, body: JSON.stringify(value), chat, people: JSON.stringify(peopleOf(fresh, countries.of)) };
       changed = false;
     }
     return answer;
   };
   const timer = setInterval(record, PRESENT_MS);
   const routes = new Hono();
-  routes.get("/", (c) => {
-    const { body } = current();
-    c.header("cache-control", "public, max-age=60");
-    c.header("content-type", "application/json");
-    return c.body(body);
-  });
+  for (const [path, pick] of SERVED)
+    routes.get(path, (c) => {
+      c.header("cache-control", "public, max-age=60");
+      c.header("content-type", "application/json");
+      return c.body(pick(current()));
+    });
   return {
     seen(room, nicks) {
       if (!read.has(room) && read.size >= ROOMS_MOST) return;
@@ -159,6 +210,7 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
       read.set(room, { at: now(), nicks: people });
       changed = true;
     },
+    declared: countries.declared,
     routes,
     current: () => current().value,
     chat: () => current().chat,

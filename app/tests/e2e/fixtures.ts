@@ -150,6 +150,12 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
           }),
         }),
       );
+      // No count of people online and no prices' history (8i), as a server whose relay and timer have said nothing yet: the hero counts the
+      // worlds and the live line draws no sparkline. A journey that watches them routes its own on its page, which goes first.
+      for (const pattern of ["**/api/presence/people", "**/api/markets/history"])
+        await context.route(pattern, (route) =>
+          route.fulfill({ status: 404, headers: cors, body: JSON.stringify({ error: "not_ready" }) }),
+        );
       if (counted)
         await context.route("**/worlds-count.json", (route) =>
           route.fulfill({

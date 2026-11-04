@@ -60,7 +60,7 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
-const LATE_CHAT_JS = 21_098;
+const LATE_CHAT_JS = 21_102;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.

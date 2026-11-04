@@ -91,7 +91,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the twelve files into their schemas' shapes", () => {
+  it("reads the fourteen files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -108,9 +108,11 @@ describe("loadData", () => {
         "genres",
         "hubs",
         "news",
+        "onAir",
         "quests",
         "stations",
         "universes",
+        "xPosts",
       ]);
     } finally {
       rmSync(dir, { recursive: true });
@@ -823,8 +825,8 @@ describe("react-router build", () => {
   });
 });
 
-// The ticker's placeholders (Alexis, 2026-10-31): named here, so none reaches a public deploy unnoticed; removing them is
-// deleting these ids from the two files and the lines below. No sample world, number or activity.
+// The ticker's placeholders (Alexis, 2026-10-31), and the on-air line's and the post on X's (8i): named here, so none reaches a public deploy
+// unnoticed; removing them is deleting these ids from their files and the lines below. No sample world, number or activity.
 const DIR = new URL("../data/", import.meta.url);
 const read = (file: string): unknown => JSON.parse(readFileSync(new URL(file, DIR), "utf8"));
 
@@ -842,6 +844,9 @@ const events = read("events.json") as Row[];
 /** The placeholders of the ticker, by id: three news and two events. Change this list only with the files. */
 const SAMPLE_NEWS = ["sample-news-bubble-onyx", "sample-news-demo", "sample-news-testnet"];
 const SAMPLE_EVENTS = ["sample-event-community-call", "sample-event-demo-session"];
+/** The on-air line's placeholder and the post on X's (8i), one each, in files of their own. */
+const SAMPLE_OTHERS = ["sample-on-air", "sample-x-latest"];
+const OTHERS = ["onAir.json", "xPosts.json"];
 
 describe("the ticker's placeholders", () => {
   beforeEach(() => {
@@ -853,14 +858,14 @@ describe("the ticker's placeholders", () => {
     expect(events.map((row) => row.id)).toEqual(SAMPLE_EVENTS);
   });
 
-  it("are counted across every data file's text, not only the two lists: five ids, no sixth hidden in another file", () => {
+  it("are counted across every data file's text, not only the two lists: seven ids with the on-air line and the post on X, no eighth", () => {
     const files = readdirSync(DIR.pathname, { recursive: true }).filter(
       (file) => !file.includes("/") && file.endsWith(".json"),
     );
     const found = files.flatMap((file) =>
       [...readFileSync(new URL(file, DIR), "utf8").matchAll(/"id":\s*"(sample-[^"]*)"/g)].map((match) => match[1]),
     );
-    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS].toSorted());
+    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS, ...SAMPLE_OTHERS].toSorted());
   });
 
   it("do not name a session of the product that no document has announced", () => {
@@ -873,7 +878,12 @@ describe("the ticker's placeholders", () => {
 
   it("are the only sample- rows of the data: no sample world, ecosystem, station or number", () => {
     const files = readdirSync(DIR.pathname, { recursive: true }).filter(
-      (file) => !file.includes("/") && file.endsWith(".json") && file !== "news.json" && file !== "events.json",
+      (file) =>
+        !file.includes("/") &&
+        file.endsWith(".json") &&
+        file !== "news.json" &&
+        file !== "events.json" &&
+        !OTHERS.includes(file),
     );
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) expect(readFileSync(new URL(file, DIR), "utf8"), file).not.toMatch(/sample/i);

@@ -8,7 +8,8 @@ import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/sc
 import type { Log } from "../log.ts";
 import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, type Send } from "../net.ts";
 import { repeat } from "../repeat.ts";
-import { replaceFile } from "../replaceFile.ts";
+import { besideOf, replaceFile } from "../replaceFile.ts";
+import { makeHistory, type History } from "./history.ts";
 
 interface Options {
   file: string;
@@ -23,6 +24,8 @@ interface Options {
 
 export interface Prices {
   stop: () => void;
+  /** The day's prices so far (8i), from the file beside markets.json. */
+  history: History["current"];
 }
 
 // CoinGecko asks by id, never by symbol (btc is shared by a dozen tokens).
@@ -72,6 +75,8 @@ const reachedNothing = (error: unknown): boolean => error instanceof Failure && 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const rpc = options.rpc === undefined ? undefined : checkedRpc(options.rpc);
+  // Each token's day of prices beside the file (8i), for the markets row's sparklines.
+  const history = makeHistory(besideOf(file, "history"), now);
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
   async function get(url: string): Promise<unknown> {
@@ -109,14 +114,17 @@ export function startPrices(options: Options): Prices {
       ...(block === undefined ? {} : { block }),
     });
     if (!replaceFile(file, `${JSON.stringify(markets)}\n`)) throw new Failure("write");
+    // The history's file failing keeps markets.json new: the sparklines wait, the prices do not.
+    if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }
 
   // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
-  return repeat({
+  const timer = repeat({
     pass: read,
     failed: (error) => {
       log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
     waitMs: (error) => (reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs),
   });
+  return { stop: timer.stop, history: history.current };
 }

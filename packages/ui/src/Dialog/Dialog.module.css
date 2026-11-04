@@ -23,4 +23,59 @@
   .dialog::backdrop {
     background: var(--color-scrim);
   }
+
+  /* The drawer: the screen's start, its full height, 360 px, on the surface the dock and the plates use, so no word of the page reads
+     through it (frames 98 to 100); Close in its top end corner, the page beside it seen whole. */
+  .dialog[data-side="start"] {
+    /* raw: 360 px, frame 99 */
+    --_w: 360px;
+
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    max-block-size: none;
+    block-size: 100dvb;
+    /* layout: the browser centres a modal dialog with its margins; the drawer stands at the start */
+    margin: 0;
+    padding: 0;
+    border-block: 0;
+    border-inline-start: 0;
+    border-radius: 0;
+  }
+
+  /* Its column fills it with no gap: the title row holds nothing drawn, and what the page gives it lays itself out, a list that scrolls
+     in the room left. */
+  .dialog[data-side="start"] > * {
+    block-size: 100%;
+    /* layout: no room for the title row, which draws nothing here */
+    gap: 0;
+  }
+
+  .dialog[data-side="start"]::backdrop {
+    background: transparent;
+  }
+
+  .dialog[data-side="start"] .close {
+    position: absolute;
+    /* raw: frame 99's Close, 18 px from the drawer's top */
+    inset-block-start: 18px;
+    /* raw: and 18 px from its end */
+    inset-inline-end: 18px;
+    /* raw: over the drawer's first part, which comes after it in the page */
+    z-index: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .dialog[data-side="start"][open] {
+      /* raw: the drawer slides in from the start in 240 ms (frame 98 caught half way) */
+      animation: slide-in 240ms var(--ease-standard);
+    }
+  }
+
+  @keyframes slide-in {
+    from {
+      translate: -100% 0;
+    }
+  }
 }

@@ -1,4 +1,4 @@
-// The palette's search: one pass over the places the page already holds, so typing sends no request.
+// The search drawer's search: one pass over the places the page already holds, so typing sends no request.
 import type { PlaceKind } from "@gnoworld/core";
 import type { siteOf } from "../../places.ts";
 
@@ -14,8 +14,8 @@ export interface SearchGroup {
   items: SearchItem[];
 }
 
-/** The groups' order in the palette: the broadest place first. */
-const ORDER: PlaceKind[] = ["cosmos", "earth", "world", "ecosystem"];
+/** The groups' order in the drawer, as frame 98 lists them: the ecosystems, the hubs, the Earth, then the universes. */
+const ORDER: PlaceKind[] = ["ecosystem", "world", "earth", "cosmos"];
 
 /** The places whose name holds the query, whatever the case, in groups by kind; the names that start with it come first
  * in a group. A query is text, never a pattern; the empty one finds every place. */
@@ -55,9 +55,5 @@ export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
   );
 }
 
-/** ⌘K on a Mac, Ctrl+K elsewhere, with no other modifier: a bare k, or Shift or Alt with it, is for the page. */
-export function opensPalette(
-  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "shiftKey" | "altKey">,
-): boolean {
-  return event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey;
-}
+// The chord, in a module of its own: the header's button reads it on the first screen, the search itself is the drawer's chunk.
+export { opensPalette } from "./chord.ts";

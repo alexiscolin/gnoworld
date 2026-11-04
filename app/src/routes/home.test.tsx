@@ -25,8 +25,8 @@ vi.mock("../../data/events.json", async (original) => {
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
-  // F3267: the kicker says gno.world, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
-  expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
+  // F3267, 8i: the kicker says gno.land · live now as frame 6, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
+  expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land · live now<\/p>/);
   expect(headingOf(html)).toBe("Worlds in Onyx");
   expect(html).toContain('<a href="/w/bubble"');
   expect(html).toContain(">Bubble</a>");

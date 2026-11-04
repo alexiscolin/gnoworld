@@ -2,17 +2,11 @@
 // once a visit, and this reader's visits, which the device keeps.
 import { markFirst, stampKey, utcDay } from "@gnoworld/core";
 import { readWorlds } from "../../lib/chain/realms.ts";
-import { readFlag, writeFlag } from "../../lib/flags.ts";
+import { writeFlag } from "../../lib/flags.ts";
+import { visitedIn, visitKey } from "../../lib/visits.ts";
 import type { Circle, EarthState } from "../../scene/earth/device.ts";
 import type { WorldAsk, WorldPage } from "../../scene/world/part.ts";
 import type { Shown } from "./host.ts";
-
-const VISITED = "gnoworld:visited:";
-
-const visitKey = (universe: string, id: string) => `${VISITED}${universe}:${id}`;
-
-/** Whether this reader has visited world `id` of `universe`: the device keeps it, or nothing does. */
-export const visitedIn = (universe: string) => (id: string) => readFlag(visitKey(universe, id)) !== null;
 
 // The plate where the page fixes it beside the globe: in the flow it scrolls, and the canvas does not. Its fill as sRGB bytes, whatever
 // colour space the browser computes it in, for the scene paints it again behind the globe.

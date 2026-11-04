@@ -37,6 +37,31 @@
     background: var(--color-primary);
   }
 
+  /* The arc: a thin ring's three quarters on the line's grey, the done part in cream, round at its ends (frame 99: about 88 px across). */
+  .arc {
+    display: block;
+    /* raw: 88 px across, frame 99 */
+    inline-size: 88px;
+    /* raw: the same */
+    block-size: 88px;
+  }
+
+  .arcTrack,
+  .arcFill {
+    fill: none;
+    /* raw: a 4 px stroke in the 100 px drawing, about 3.5 px drawn */
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .arcTrack {
+    stroke: var(--color-line-strong);
+  }
+
+  .arcFill {
+    stroke: var(--color-primary);
+  }
+
   .shown {
     color: var(--color-text-muted);
     font: var(--font-label);

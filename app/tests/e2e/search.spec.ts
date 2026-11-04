@@ -116,7 +116,8 @@ test.describe("⌘K", () => {
     await ready(page);
     await control(page).click();
     await field(page).fill("bubb");
-    await expect(page.getByRole("group", { name: /^Worlds\b.*\b1$/ })).toBeVisible();
+    // 8i: frame 98's group heads, "HUBS AND DAOS · 1".
+    await expect(page.getByRole("group", { name: /^Hubs and DAOs · 1$/ })).toBeVisible();
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("option", { name: /Bubble/ })).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("Enter");
@@ -159,9 +160,10 @@ test.describe("⌘K", () => {
       await field(page).fill("b");
       await expect(page.getByRole("option").first()).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-      // The dialog's box and every box inside it keep 16 px from the viewport's sides (the shell's gutter).
+      // Every box the drawer shows keeps 16 px from the viewport's sides (the shell's gutter); the drawer itself stands on the start edge, as
+      // frames 98 to 100 draw it (8i), and its title is for assistive technology alone.
       const outside = await palette(page).evaluate((dialog, gutter) => {
-        const inner = [dialog, ...dialog.querySelectorAll("input, [role='option'], h2, button")];
+        const inner = [...dialog.querySelectorAll("input, [role='option'], button")];
         return inner
           .map((element) => element.getBoundingClientRect())
           .filter((box) => box.width > 0 && (box.left < gutter - 0.5 || box.right > innerWidth - gutter + 0.5)).length;

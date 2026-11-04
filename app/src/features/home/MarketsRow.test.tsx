@@ -39,33 +39,35 @@ describe("the markets row with a file", () => {
     expect(host.querySelector("[data-markets]")?.getAttribute("data-markets")).toBe("row");
   });
 
-  it("writes each price in dollars, grouped, to the cent", () => {
+  // 8i: frame 6 writes a price and "USD" after it, raised: "0.398 USD", "66,601 USD".
+  it("writes each price in dollars, grouped, as frame 6 does: whole from a thousand, to the cent from a dollar, three digits below", () => {
     const host = draw(file());
-    expect(tokenOf(host, "GNOT")?.textContent).toMatch(/\$1\.23\b/);
-    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/\$0\.43\b/);
-    expect(tokenOf(host, "BTC")?.textContent).toMatch(/\$67,123(\.46)?\b/);
+    expect(tokenOf(host, "GNOT")?.textContent).toMatch(/T1\.23 USD/);
+    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/E0\.432 USD/);
+    expect(tokenOf(host, "BTC")?.textContent).toMatch(/C67,123(\.46)? USD/);
   });
 
   it("never rounds a tiny price to zero: a fraction of a cent keeps its first digits", () => {
     const host = draw(file({ tokens: [{ symbol: "ATONE", usd: 0.000123, change24h: null }] }));
-    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/\$0\.0001/);
-    expect(tokenOf(host, "ATONE")?.textContent).not.toMatch(/\$0\.00(?!\d)/);
+    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/E0\.0001/);
+    expect(tokenOf(host, "ATONE")?.textContent).not.toMatch(/E0\.00(?!\d)/);
   });
 
   it.each([
-    ["a cent", 0.01, "$0.01"],
-    ["a hair under a cent", 0.0099, "$0.0099"],
+    ["a cent", 0.01, "0.01 USD"],
+    ["a hair under a cent", 0.0099, "0.0099 USD"],
   ])("writes %s as %s: the cents' threshold", (_what, usd, wanted) => {
     expect(tokenOf(draw(file({ tokens: [{ symbol: "GNOT", usd, change24h: null }] })), "GNOT")?.textContent).toContain(
       wanted,
     );
   });
 
-  it("marks a rise and a fall by their sign and a data attribute, and says nothing of a change the source did not give", () => {
+  // 8i: frame 6's arrows, "▲ 2.4% · 24 h", said as rose or fell.
+  it("marks a rise and a fall by their arrow, their words and a data attribute, and says nothing of a change the source did not give", () => {
     const host = draw(file());
-    expect(tokenOf(host, "GNOT")?.textContent).toMatch(/\+2\.5%/);
+    expect(tokenOf(host, "GNOT")?.textContent).toMatch(/▲ rose 2\.5% · 24 h/);
     expect(tokenOf(host, "GNOT")?.querySelector("[data-delta]")?.getAttribute("data-delta")).toBe("up");
-    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/[−-]1\.2%/);
+    expect(tokenOf(host, "ATONE")?.textContent).toMatch(/▼ fell 1\.2% · 24 h/);
     expect(tokenOf(host, "ATONE")?.querySelector("[data-delta]")?.getAttribute("data-delta")).toBe("down");
     const none = tokenOf(host, "BTC");
     expect(none?.querySelector("[data-delta]")).toBeNull();
@@ -99,8 +101,8 @@ describe("the markets row with a file", () => {
 
   it("shows a price of a billionth of a dollar by its digits, and the largest change the schema allows", () => {
     const host = draw(file({ tokens: [{ symbol: "GNOT", usd: 1.234e-9, change24h: 1_000_000 }] }));
-    expect(tokenOf(host, "GNOT")?.textContent).toContain("$0.00000000123");
-    expect(tokenOf(host, "GNOT")?.textContent).toContain("+1000000.0%");
+    expect(tokenOf(host, "GNOT")?.textContent).toContain("0.00000000123 USD");
+    expect(tokenOf(host, "GNOT")?.textContent).toContain("▲ rose 1000000.0%");
   });
 
   it.each([
@@ -111,12 +113,12 @@ describe("the markets row with a file", () => {
     const cell = tokenOf(draw(file({ tokens: [{ symbol: "GNOT", usd: 1.5, change24h }] })), "GNOT");
     expect(cell?.querySelector("[data-delta]")?.getAttribute("data-delta")).toBe("flat");
     expect(cell?.textContent).toMatch(/0\.0%/);
-    expect(cell?.textContent).not.toMatch(/[+\u2212-]0\.0%/);
+    expect(cell?.textContent).not.toMatch(/[▲▼]|rose|fell/);
   });
 
-  it("writes a change that rounds to a tenth with its sign", () => {
+  it("writes a change that rounds to a tenth with its arrow", () => {
     const cell = tokenOf(draw(file({ tokens: [{ symbol: "GNOT", usd: 1.5, change24h: -0.06 }] })), "GNOT");
-    expect(cell?.textContent).toMatch(/\u22120\.1%/);
+    expect(cell?.textContent).toMatch(/▼ fell 0\.1%/);
     expect(cell?.querySelector("[data-delta]")?.getAttribute("data-delta")).toBe("down");
   });
 

@@ -20,13 +20,13 @@ describe("searchPlaces", () => {
     expect(names(searchPlaces(ITEMS, "ARC"))).toEqual(["Arcade"]);
   });
 
-  it("groups by kind, each group with its count, in the order cosmos, earth, world, ecosystem", () => {
+  it("groups by kind, each group with its count, in frame 98's order: ecosystem, world, earth, cosmos", () => {
     const found = searchPlaces(ITEMS, "");
     expect(found.map((g) => [g.kind, g.count])).toEqual([
-      ["cosmos", 1],
-      ["earth", 1],
-      ["world", 2],
       ["ecosystem", 1],
+      ["world", 2],
+      ["earth", 1],
+      ["cosmos", 1],
     ]);
   });
 

@@ -29,7 +29,7 @@ import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
-import { startPresent, type ChatWorld, type Present } from "./worlds/present.ts";
+import { countriesTo, startPresent, type ChatWorld, type Present } from "./worlds/present.ts";
 
 export interface Chat {
   activity: Hono;
@@ -212,6 +212,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
             kept.onEdit(said);
             // A line of a history page is no activity now, whatever its time.
             if (!replayed) activity.count(said.room, said.account, now());
+            countriesTo(present, visible)(said, replayed);
             progress.heard(said);
             // A line the full queue drops is left unchecked, with the alert.
             if (!queue.push(said)) progress.settled(said);
