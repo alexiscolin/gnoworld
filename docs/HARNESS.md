@@ -428,7 +428,23 @@ costs context in every session.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks it
   matches the tree, not who wrote it.
 - **Product files Claude writes run outside the sandbox** (F204): `deploy/test.sh`, the compose
-  file, and the app's code that `pnpm dev` runs in Alexis's shell.
+  file, and the app's code that `pnpm dev` runs in Alexis's shell. The workshop the same, and at once (lot 2's S1, F4962):
+  while `pnpm workshop` runs, an edit of `app/vite.config.ts` or of a file it imports re-runs in Vite's dev servers, and the
+  backend runs `server/src` through `app/tests/e2e/api.mjs`, all with Alexis's rights, outside the sandbox; any session can write
+  them (another worktree's too, F4900). Since Alexis's "Oui, avant le ping-pong", each of the workshop's processes, and
+  `scripts/ergo.sh`'s check of the Ergo binary a session can write, runs under its own Seatbelt profile (`scripts/workshop.sb`,
+  by `/usr/bin/sandbox-exec`): it writes `$TMPDIR`, the checkout's `.claude/tmp`, Vite's caches and React Router's types alone,
+  never the checkout's code, `~/.claude` or `~/.local`; of the home folder it reads the code alone it runs (the checkout, the one
+  its `node_modules` lead to, Node, the tools' cache), never `deploy/secrets`, `.env`, `~/.ssh`, `~/.config`, `~/.claude.json`,
+  gnokey's or gnomcp's keys; it reaches no keychain daemon, opens and scripts no other app, starts no launchd job, connects to no
+  Unix socket but the system's logs and name resolver (Docker's, an SSH agent's, Claude Code's sessions' among them), and listens
+  on localhost alone. Its limits: outbound network stays open (the backend reads the chain and the prices), and so do TCP services
+  on localhost; outside the home folder it reads everything (`/private/tmp`, Claude Code's scratch folders among them); its
+  processes keep Alexis's environment, and what macOS's privacy settings grant his terminal; the keychain's daemons are denied
+  by name, and the data-protection keychain's is untried. `workshop.sh` itself runs as Alexis does, and so does `pnpm`, which runs
+  what the checkout's `package.json` and `.npmrc` say: a session that edits them is read before he starts it. `sandbox-exec` is
+  deprecated by Apple (its man page, 2017) and still ships on macOS 26.5.2, where Claude Code's own sandbox uses Seatbelt too;
+  were it gone, the workshop's processes would want a container or another user account.
 
 ## Files
 

@@ -6290,25 +6290,32 @@ turned() { # $1: the copy; the tools after it are turned to the stubs, each of w
 }
 turned "$t/stop_gate.sh" ps lsof python3
 turned "$t/stop_gate.real.sh" ps lsof # the real python3 and macOS's own sandbox_check
+# ps answers the form it is asked: the reaper's four fields, or the ping-pong's six, with the process's group and its terminal's foreground
+# group, by the row's last field: fg (the default), its terminal's foreground group; bg, another's; notty, no terminal, so none (0).
 cat >"$t/ppbin/ps" <<SH
 #!/bin/sh
-while IFS='|' read -r pid ppid age cwd box cmd; do printf '%6s %5s %11s %s\n' "\$pid" "\$ppid" "\$age" "\$cmd"; done <"$table"
+case "\$*" in *pgid*) six=1 ;; *) six= ;; esac
+while IFS='|' read -r pid ppid age cwd box cmd fg; do
+	if [ -z "\$six" ]; then printf '%6s %5s %11s %s\n' "\$pid" "\$ppid" "\$age" "\$cmd"; continue; fi
+	case \${fg:-fg} in fg) front=\$pid ;; bg) front=99 ;; *) front=0 ;; esac
+	printf '%6s %5s %5s %5s %11s %s\n' "\$pid" "\$ppid" "\$pid" "\$front" "\$age" "\$cmd"
+done <"$table"
 SH
 cat >"$t/ppbin/lsof" <<SH
 #!/bin/sh
 want= prev=
 for a in "\$@"; do [ "\$prev" != -p ] || want=\$a; prev=\$a; done
-while IFS='|' read -r pid ppid age cwd box cmd; do [ -z "\$want" ] || [ "\$want" = "\$pid" ] || continue; printf 'p%s\nfcwd\nn%s\n' "\$pid" "\$cwd"; done <"$table"
+while IFS='|' read -r pid ppid age cwd box cmd fg; do [ -z "\$want" ] || [ "\$want" = "\$pid" ] || continue; printf 'p%s\nfcwd\nn%s\n' "\$pid" "\$cwd"; done <"$table"
 SH
 cat >"$t/ppbin/python3" <<SH
 #!/bin/sh
 case "\$*" in *sandbox_check*) ;; *) exec "$python" "\$@" ;; esac
 for last; do :; done
-while IFS='|' read -r pid ppid age cwd box cmd; do [ "\$pid" != "\$last" ] || exit "\$box"; done <"$table"
+while IFS='|' read -r pid ppid age cwd box cmd fg; do [ "\$pid" != "\$last" ] || exit "\$box"; done <"$table"
 exit 1
 SH
 chmod +x "$t/ppbin/ps" "$t/ppbin/lsof" "$t/ppbin/python3"
-procs() { printf '%s\n' "$@" >"$table"; } # each: pid|ppid|age|folder|sandbox_check's answer as an exit|command
+procs() { printf '%s\n' "$@" >"$table"; } # each: pid|ppid|age|folder|sandbox_check's answer as an exit|command[|fg, bg or notty]
 hook() { rm -f "$r/.claude/tmp/gate-blocked"; printf '{"stop_hook_active":false}' | HOME="$t/pphome" PATH="$t/ppbin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "${1:-$t/stop_gate.sh}" 2>/dev/null; }
 ends() { code=0; hook "${2:-}" || code=$?; [ "$code" = 0 ] || fail "stop_gate blocked a turn while this checkout's workshop ran outside the sandbox, $1 (exit $code)"; }
 blocks() { code=0; hook "${2:-}" || code=$?; [ "$code" = 2 ] || fail "stop_gate let a turn end without the gate when $1 (exit $code)"; }
@@ -6335,6 +6342,12 @@ procs "4001|4000|05:00|$root|0|sh scripts/workshop.sh --again" && blocks "the wo
 procs "4001|4000|05:00|$root|0|node scripts/workshop.sh" && blocks "another program than a shell ran the workshop's script"
 # F4852: a look-alike that code the workshop runs started, outliving the workshop's Ctrl+C, is launchd's (its parent gone).
 procs "4001|1|05:00|$root|0|$w" && blocks "a workshop.sh whose parent is gone ran"
+# Lot 2's S1 and S2: code the workshop runs, out of the sandbox, can start a workshop.sh of its own under a shell launchd takes, which
+# outlives Ctrl+C: none counts but a shell of its terminal's foreground group (F4962).
+procs "4001|4000|05:00|$root|0|$w|bg" && blocks "a workshop.sh outside its terminal's foreground group ran"
+procs "4001|4000|05:00|$root|0|$w|notty" && blocks "a workshop.sh with no terminal ran"
+procs "150|1|05:00|$root|0|sh -c sh scripts/workshop.sh; :|notty" "200|150|05:00|$root|0|$w|bg" &&
+	blocks "a workshop.sh under a shell whose parent is gone ran"
 printf '4001 4001 5198\n' >"$r/.claude/tmp/workshop.pid" && procs "4001|4000|05:00|$root|0|sleep 600" && blocks "a pid file named a process outside the sandbox"
 rm "$r/.claude/tmp/workshop.pid"
 # Each tool it needs, missing (127) or failing (1).
@@ -6763,9 +6776,30 @@ if part workshop; then
 # dedans et toute l'UI"): the backend, a local Ergo and the server, on ports of their own the app's dev server alone is given to proxy,
 # started once the app's tailnet links are known, as the origins it allows. Here the servers are Python's, the backend's too.
 w="$t/workshop" && want="v$(cat "$here/../.node-version")"
-mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skills/tailnet-preview/scripts" "$w/bin" "$w/nvm/versions/node/$want/bin"
-cp "$here/workshop.sh" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
-root=$(cd "$w/root" && pwd -P)
+mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skills/tailnet-preview/scripts" "$w/bin" "$w/nvm/versions/node/$want/bin" \
+	"$w/main/node_modules/.pnpm" "$w/root/node_modules" "$w/tools"
+# The profile is given real paths, the home folder's, Node's, the tools' cache's and the checkout a worktree's node_modules lead to: each
+# reached here through a link. A json.py planted in the checkout says whether a Python of the script imported it (F4962).
+ln -s "$w/main/node_modules/.pnpm" "$w/root/node_modules/.pnpm" && ln -s home "$w/home-link" && ln -s nvm "$w/nvm-link" && ln -s tools "$w/tools-link"
+w_home=$(cd "$w/home" && pwd -P) w_main=$(cd "$w/main" && pwd -P) w_node=$(cd "$w/nvm/versions/node/$want" && pwd -P) w_tools=$(cd "$w/tools" && pwd -P)
+printf 'import os\nopen(os.environ["W_LOG"] + ".planted", "w").write("ran")\n' >"$w/root/json.py"
+# The script as it is but for the system's sandbox-exec, which cannot nest in Claude Code's sandbox: a stub that says how it was asked and
+# runs the command, refusing as the real one with no profile (the profile itself is proven in Alexis's Terminal: test-7y-seatbelt.sh).
+grep -qF '/usr/bin/sandbox-exec -f "$seatbelt"' "$here/workshop.sh" || fail "workshop.sh starts its processes under no /usr/bin/sandbox-exec (F4962)"
+sed "s|/usr/bin/sandbox-exec |$w/bin/sandbox-exec |" "$here/workshop.sh" >"$w/root/scripts/workshop.sh"
+cp "$here/workshop.sb" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
+cat >"$w/bin/sandbox-exec" <<'SH'
+#!/bin/sh
+[ "$1" = -f ] && [ -f "$2" ] || { echo "sandbox-exec: no profile: $2" >&2; exit 71; }
+params= && shift 2
+while [ "$1" = -D ]; do params="$params $2" && shift 2; done
+program=$1 # the program after an env and its settings
+for word in "$@"; do case $word in env | *=*) ;; *) program=$word && break ;; esac; done
+echo "seatbelt $(basename "$program")$params" >>"$W_LOG.seatbelt"
+exec "$@"
+SH
+chmod +x "$w/bin/sandbox-exec"
+root=$(cd "$w/root" && pwd -P) scratch=$(cd "${TMPDIR:-/tmp}" && pwd -P)
 cat >"$w/server" <<'SH'
 #!/bin/sh
 echo "$(basename "$0") $* hosts=${WORKSHOP_HOSTS-unset} api=${WORKSHOP_API_PORT-unset} ws=${WORKSHOP_WS_PORT-unset} cwd=$(pwd -P)" >>"$W_LOG"
@@ -6790,12 +6824,13 @@ SH
 printf '#!/bin/sh\necho ergo >>"$W_LOG"\n[ -z "${ERGO_FAILS:-}" ] || exit 1\n' >"$w/root/scripts/ergo.sh"
 printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exit 1 ;; esac\n' "'{\"BackendState\": \"Running\", \"Self\": {\"DNSName\": \"box.tail.ts.net.\"}}'" >"$w/bin/tailscale"
 preview="$w/home/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
-printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
+printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview" && pwd -P >>"$W_LOG.preview-cwd"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
 chmod +x "$w/nvm/versions/node/$want/bin/node" "$w/root/app/node_modules/.bin/react-router" "$w/root/app/node_modules/.bin/vite" "$w/bin/tailscale" "$preview"
 eval "$(sed -n '/^free_ports() {/,/^}/p' "$here/check.sh")"
 port=$(free_ports 5) && app_port=$port && lab_port=$((port + 1)) && api_port=$((port + 2)) && irc_port=$((port + 3)) && ws_port=$((port + 4))
-shop() { # $1: the run's name; in the background, its pid in $shop
-	(cd "$t" && W_LOG="$w/log" HOME="$w/home" NVM_DIR="$w/nvm" PATH="$w/bin:$PATH" WORKSHOP_APP_PORT=$app_port WORKSHOP_LAB_PORT=$lab_port \
+shop() { # $1: the run's name; in the background, its pid in $shop; GNOWORLD_TOOLS, $tools_at when set
+	(cd "$t" && unset GNOWORLD_TOOLS && { [ -z "${tools_at-}" ] || export GNOWORLD_TOOLS="$tools_at"; } &&
+		W_LOG="$w/log" HOME="$w/home-link" NVM_DIR="$w/nvm-link" PATH="$w/bin:$PATH" WORKSHOP_APP_PORT=$app_port WORKSHOP_LAB_PORT=$lab_port \
 		WORKSHOP_API_PORT=$api_port WORKSHOP_IRC_PORT=$irc_port WORKSHOP_WS_PORT=$ws_port exec "${under:-sh}" "$root/scripts/workshop.sh") >"$w/$1.out" 2>&1 &
 	shop=$!
 }
@@ -6816,8 +6851,9 @@ grep -q 'WORKSHOP_APP_PORT:-5198' "$here/workshop.sh" && grep -q 'WORKSHOP_LAB_P
 	fail "workshop.sh's default ports are not 5198 for the app and 5199 for the lab, as lab.config.ts's preview"
 grep -q 'WORKSHOP_API_PORT:-5195' "$here/workshop.sh" && grep -q 'WORKSHOP_IRC_PORT:-5196' "$here/workshop.sh" && grep -q 'WORKSHOP_WS_PORT:-5197' "$here/workshop.sh" ||
 	fail "workshop.sh's backend's default ports are not 5195 to 5197"
-shop one && first=$shop
+tools_at="$w/tools-link" && shop one && first=$shop && unset tools_at
 up || fail "workshop.sh did not put both servers on the tailnet and start its backend: $(cat "$w/one.out")"
+[ ! -e "$w/log.planted" ] || fail "workshop.sh's Python imported a json.py a session planted in the checkout (F4962)"
 # The configs hold each server to 127.0.0.1 and its port (app/vite.config.ts's workshopServer); the script gives it its port and its names,
 # and the app's alone the backend's ports to proxy (workshopBackend).
 grep -qxF "react-router dev --port $app_port hosts=box.tail.ts.net,100.64.0.1 api=$api_port ws=$ws_port cwd=$root/app" "$w/log" ||
@@ -6830,6 +6866,13 @@ grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http:
 [ "$(grep -n '^ergo$' "$w/log" | cut -d: -f1)" -lt "$(grep -n '^node tests/e2e/workshopBackend.mjs ' "$w/log" | cut -d: -f1)" ] ||
 	fail "workshop.sh started its backend before scripts/ergo.sh built Ergo: $(cat "$w/log")"
 until_ 'grep -q "the worlds job and the prices. timer do not" "$w/one.out"' || fail "workshop.sh did not say what stays empty without the chain: $(cat "$w/one.out")"
+# Each of its three processes, and ergo.sh's check of the Ergo binary, under the workshop's Seatbelt profile, its folders the profile's
+# parameters, each its real path: the home folder, what of it they read (the checkout, the one node_modules lead to, Node, the tools'
+# cache, GNOWORLD_TOOLS here), and what they write (lot 2's S1, F4962).
+for each in react-router vite node sh; do
+	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router" "$w/log.seatbelt" ||
+		fail "workshop.sh did not start $each under its profile with its folders: $(cat "$w/log.seatbelt" 2>/dev/null)"
+done
 order
 grep -q "^workshop-app: .*https://box.tail.ts.net:$((app_port + 1000)) " "$w/one.out" && grep -q "^workshop-lab: .*https://box.tail.ts.net:$((lab_port + 1000)) " "$w/one.out" ||
 	fail "workshop.sh did not say each tailnet link beside the name it opens: $(cat "$w/one.out")"
@@ -6856,13 +6899,24 @@ for which in app lab api; do
 	grep -qx "down workshop-app" "$w/log.preview" && grep -qx "down workshop-lab" "$w/log.preview" || fail "workshop.sh did not take both off the tailnet at its end: $(cat "$w/log.preview")"
 	[ ! -e "$root/.claude/tmp/workshop.pid" ] || fail "workshop.sh left its pid file at its end"
 done
+# With no profile, sandbox-exec refuses, and the run ends before anything serves.
+mv "$root/scripts/workshop.sb" "$w/profile.away" && : >"$w/log.preview" && shop unboxed && unboxed=$shop
+ended "$unboxed" || fail "workshop.sh lived on, or left a process, with no profile"
+mv "$w/profile.away" "$root/scripts/workshop.sb"
+grep -q "the app's dev server stopped before it listened" "$w/unboxed.out" || fail "workshop.sh did not stop with no profile: $(cat "$w/unboxed.out")"
+# With no node_modules, it says so before anything starts.
+mv "$root/node_modules/.pnpm" "$w/pnpm.away" && shop nomodules && nomodules=$shop
+until_ '! kill -0 "$nomodules" 2>/dev/null' || fail "workshop.sh waited with no node_modules"
+mv "$w/pnpm.away" "$root/node_modules/.pnpm"
+grep -q "no node_modules here: pnpm install first" "$w/nomodules.out" || fail "workshop.sh did not say node_modules are missing: $(cat "$w/nomodules.out")"
+[ -z "$(serving "$app_port")" ] || fail "workshop.sh started a server with no node_modules"
 # A backend that dies before it listens, or an Ergo that does not build, ends the run, saying so, and stops the servers.
 for fault in DIE=backend ERGO_FAILS=1; do
 	: >"$w/log.preview" && export "${fault?}" && shop faulty && faulty=$shop
 	ended "$faulty" || fail "workshop.sh lived on, or left a process, with $fault"
 	unset "${fault%%=*}"
 	wait "$faulty" && fail "workshop.sh exited 0 with $fault"
-	case $fault in DIE=*) said="the backend (the server and Ergo) stopped before it listened" ;; *) said="scripts/ergo.sh could not build the Ergo the chat runs on" ;; esac
+	case $fault in DIE=*) said="the backend (the server and Ergo) stopped before it listened" ;; *) said="no Ergo built for the chat; a gate builds it (scripts/check.sh)" ;; esac
 	grep -qF "$said" "$w/faulty.out" || fail "workshop.sh did not say, with $fault: $said: $(cat "$w/faulty.out")"
 done
 # A server that dies before it listens (a config it cannot load) ends the run, saying which, and puts nothing on the tailnet for it.
@@ -6935,6 +6989,11 @@ until_ '[ -n "$(serving "$api_port")" ]' || fail "workshop.sh with no tailnet di
 grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http://127.0.0.1:$app_port cwd=$root/app" "$w/log" ||
 	fail "workshop.sh with no tailnet allowed its backend other origins than this machine's: $(grep '^node ' "$w/log")"
 kill "$five" && ended "$five" || fail "workshop.sh lived through TERM"
+# With no GNOWORLD_TOOLS, the tools' cache ergo.sh keeps by default, made and given as its real path.
+grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "workshop.sh gave the profile another tools' cache than ergo.sh's: $(tail -n 1 "$w/log.seatbelt")"
+# Every call of the tailnet-preview script, up and down, from /: its python3 -c imports first from the folder it runs from (F4962).
+[ -s "$w/log.preview-cwd" ] && [ -z "$(grep -vx / "$w/log.preview-cwd")" ] ||
+	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"

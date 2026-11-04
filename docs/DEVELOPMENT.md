@@ -134,8 +134,12 @@ backend a run killed hard left included, and that run's names stay on the tailne
 **The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
 a turn of Claude's in it ends without the gate, so each retouch shows live in a couple of minutes; the gate, the tests and the
 review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
-running this checkout's `scripts/workshop.sh` from it, outside every sandbox: a session cannot start one that counts. Stop the
-workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that checkout's turns gate-free.
+running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
+sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its
+own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
+no keychain, no other app and no Unix socket but the system's, and listens on localhost alone; its outbound network stays open
+(HARNESS.md's known limits, F204). Stop the workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that
+checkout's turns gate-free.
 
 Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
 the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,

@@ -8,10 +8,27 @@ set -eu
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$root"
 pidfile="$root/.claude/tmp/workshop.pid" # a line a process: this script's pid, the process's, its port
+# Each process it starts runs under the workshop's own Seatbelt profile, by the system's sandbox-exec: Vite's servers, the backend and
+# ergo.sh's check run code a session writes, Vite's again at each edit (lot 2's S1, F4962). They write their own folders alone, read of
+# the home folder the code alone they run, and listen on this machine alone; the profile is given its folders as their real paths.
+seatbelt="$root/scripts/workshop.sb" scratch=$(cd "${TMPDIR:-/tmp}" && pwd -P)
+home=$(cd "$HOME" && pwd -P)
+# The tailnet-preview skill's script, run from /: its python3 -c, as this script's own would without -I, imports first a module a
+# session planted in the folder it runs from (F4962).
 preview="$HOME/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
 want="v$(cat .node-version)"
 PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin:$PATH"
 [ "$(node -v 2>/dev/null)" = "$want" ] || { echo "workshop: Node $want is needed (.node-version)" >&2; exit 1; }
+node_dir=$(cd -P "$(dirname "$(command -v node)")/.." && pwd -P) # Node's own folder, its binary and its modules
+# The checkout its node_modules lead to, a worktree's the main checkout's; the tools' cache, where ergo.sh keeps the Ergo a gate built.
+main=$(cd -P "$root/node_modules/.pnpm/../.." 2>/dev/null && pwd -P) || { echo "workshop: no node_modules here: pnpm install first" >&2; exit 1; }
+tools=${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools} && mkdir -p "$tools" && tools=$(cd "$tools" && pwd -P)
+# boxed <command...>: the command exec'd under the profile, from a subshell of its caller's.
+boxed() {
+	exec /usr/bin/sandbox-exec -f "$seatbelt" -D HOME="$home" -D ROOT="$root" -D MAIN="$main" -D NODE="$node_dir" -D TOOLS="$tools" \
+		-D TMP="$scratch" -D CHECKOUT_TMP="$root/.claude/tmp" -D VITE_CACHE="$root/app/node_modules/.vite" \
+		-D VITE_TEMP="$root/app/node_modules/.vite-temp" -D ROUTER_TYPES="$root/app/.react-router" "$@"
+}
 app_port=${WORKSHOP_APP_PORT:-5198} lab_port=${WORKSHOP_LAB_PORT:-5199}
 api_port=${WORKSHOP_API_PORT:-5195} irc_port=${WORKSHOP_IRC_PORT:-5196} ws_port=${WORKSHOP_WS_PORT:-5197} # the server's, Ergo's, Ergo's WebSocket
 unset WORKSHOP_APP_PORT WORKSHOP_LAB_PORT WORKSHOP_API_PORT WORKSHOP_IRC_PORT WORKSHOP_WS_PORT # each process is given its own, below
@@ -41,7 +58,7 @@ fi
 
 # The names the servers answer, exactly (app/vite.config.ts's workshopServer): this machine's tailnet name and address, when Tailscale runs here.
 hosts=
-if command -v tailscale >/dev/null 2>&1 && name=$(tailscale status --json 2>/dev/null | python3 -c 'import sys, json
+if command -v tailscale >/dev/null 2>&1 && name=$(tailscale status --json 2>/dev/null | python3 -I -c 'import sys, json
 d = json.load(sys.stdin)
 assert d["BackendState"] == "Running"
 print(d["Self"]["DNSName"].rstrip("."))' 2>/dev/null); then
@@ -52,7 +69,7 @@ shared=$([ -x "$preview" ] && [ -n "$hosts" ] && echo 1 || :)
 servers= names= # what this run started and put on the tailnet, for its end
 what() { case $1 in backend) echo "the backend (the server and Ergo)" ;; *) echo "the $1's dev server" ;; esac; }
 stop() {
-	for name in $names; do "$preview" down "workshop-$name" >/dev/null 2>&1 || :; done
+	for name in $names; do (cd / && "$preview" down "workshop-$name") >/dev/null 2>&1 || :; done
 	for pid in $servers; do kill "${pid%%:*}" 2>/dev/null || :; done
 	[ "$(head -n 1 "$pidfile" 2>/dev/null | cut -d' ' -f1)" != "$$" ] || rm -f "$pidfile" # a later run's file stays
 }
@@ -68,13 +85,13 @@ held() {
 	lsof -nP -iTCP:"$1" -sTCP:LISTEN >&2 || :
 	exit 1
 }
-# start <name> <port> <command...>: <name>'s process, run from this checkout's app, listening on 127.0.0.1:<port>, its pid written, up to a
-# minute to listen (a first run optimizes its dependencies).
+# start <name> <port> <command...>: <name>'s process, run from this checkout's app under the profile, listening on 127.0.0.1:<port>, its
+# pid written, up to a minute to listen (a first run optimizes its dependencies).
 start() {
 	name=$1 port=$2
 	shift 2
 	held "$port"
-	(cd app && WORKSHOP_HOSTS=$hosts exec "$@") &
+	(cd app && export WORKSHOP_HOSTS="$hosts" && boxed "$@") &
 	pid=$!
 	servers="$servers $pid:$name" && echo "$$ $pid $port" >>"$pidfile"
 	tries=0
@@ -90,9 +107,9 @@ share() {
 	echo
 	shown=
 	if [ -n "$shared" ]; then
-		"$preview" down "workshop-$1" >/dev/null 2>&1 || :
+		(cd / && "$preview" down "workshop-$1") >/dev/null 2>&1 || :
 		names="$names $1" # first: an `up` that fails half way leaves entries the end must take down
-		if shown=$("$preview" up "workshop-$1" "$2"); then
+		if shown=$(cd / && "$preview" up "workshop-$1" "$2"); then
 			printf '%s\n' "$shown" | sed "s/^/workshop-$1: /" # each link beside the name it opens
 		else
 			shown=
@@ -111,7 +128,8 @@ origins="http://127.0.0.1:$app_port $(printf '%s\n' "$shown" | grep -oE 'https?:
 start lab "$lab_port" node_modules/.bin/vite --config lab.config.ts --port "$lab_port"
 share lab "$lab_port"
 echo
-sh scripts/ergo.sh >/dev/null || { echo "workshop: scripts/ergo.sh could not build the Ergo the chat runs on" >&2; exit 1; }
+# ergo.sh under the profile too: it runs the Ergo binary of the tools' cache, which a session can write; there it builds none.
+(boxed sh scripts/ergo.sh) >/dev/null || { echo "workshop: no Ergo built for the chat; a gate builds it (scripts/check.sh)" >&2; exit 1; }
 # shellcheck disable=SC2086 # each origin a word
 start backend "$api_port" node tests/e2e/workshopBackend.mjs "$api_port" "$irc_port" "$ws_port" $origins
 echo "the backend: the server on 127.0.0.1:$api_port, Ergo on $irc_port and its WebSocket on $ws_port, behind the app's /api and /ws"

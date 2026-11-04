@@ -1,0 +1,60 @@
+(version 1)
+; The workshop's processes (scripts/workshop.sh): Vite's two dev servers, the chat's backend (the server and Ergo) and ergo.sh's check, which
+; run code a session can write, Vite's again at each edit (lot 2's S1, F4962; Alexis, 2026-11-04, "Oui, avant le ping-pong"). They write
+; their own folders and caches alone, read of the home folder the code alone they run, reach no keychain, no other app, no launchd job and
+; no Unix socket but the system's, and listen on this machine alone. Their outbound network stays open: the backend reads the chain and
+; the prices (docs/HARNESS.md, F204).
+(allow default)
+(deny file-write*)
+(allow file-write*
+  (subpath (param "TMP"))
+  (subpath (param "CHECKOUT_TMP"))
+  (subpath (param "VITE_CACHE"))
+  (subpath (param "VITE_TEMP"))
+  (subpath (param "ROUTER_TYPES"))
+  (literal "/dev/null")
+  (literal "/dev/zero")
+  (literal "/dev/dtracehelper")
+  (regex #"^/dev/tty")
+  (regex #"^/dev/fd/"))
+; The home folder: names and sizes, which a path's walk needs, and the contents of the code alone they run: this checkout, the checkout
+; its node_modules lead to, Node's folder, the tools' cache where a gate builds Ergo. Never a checkout's secrets, nor Tailscale's token.
+(deny file-read* (subpath (param "HOME")))
+(allow file-read-metadata (subpath (param "HOME")))
+(allow file-read* (subpath (param "ROOT")) (subpath (param "MAIN")) (subpath (param "NODE")) (subpath (param "TOOLS")))
+(deny file-read*
+  (subpath (string-append (param "ROOT") "/deploy/secrets"))
+  (literal (string-append (param "ROOT") "/.env"))
+  (literal (string-append (param "ROOT") "/.env.local"))
+  (subpath (string-append (param "MAIN") "/deploy/secrets"))
+  (literal (string-append (param "MAIN") "/.env"))
+  (literal (string-append (param "MAIN") "/.env.local"))
+  (subpath "/Library/Tailscale"))
+; The keychain's daemons, by the names their launchd plists give (securityd, the system keychain's, secd and its helpers), and the
+; pasteboard: a copy of /usr/bin/security reaches none.
+(deny mach-lookup
+  (global-name "com.apple.SecurityServer")
+  (global-name "com.apple.securityd.systemkeychain")
+  (global-name "com.apple.securityd.xpc")
+  (global-name "com.apple.securityd.general")
+  (global-name "com.apple.securityd.ckks")
+  (global-name "com.apple.securityd.sos")
+  (global-name "com.apple.securityd.aps")
+  (global-name "com.apple.security.octagon")
+  (global-name "com.apple.security.kcsharing")
+  (global-name "com.apple.security.escrow-update")
+  (global-name "com.apple.security.KeychainStasher")
+  (global-name "com.apple.security.cloudkeychainproxy3")
+  (global-name "com.apple.pasteboard.1"))
+; No other app opened or scripted, no launchd job: each would run outside the profile.
+(deny lsopen)
+(deny appleevent-send)
+(deny job-creation)
+; No Unix socket but the system's logs and name resolver: never Docker's, an SSH agent's, Claude Code's sessions'.
+(deny network-outbound (remote unix-socket))
+(allow network-outbound
+  (remote unix-socket (path-literal "/private/var/run/syslog"))
+  (remote unix-socket (path-literal "/private/var/run/asl_input"))
+  (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))
+(deny network-bind)
+(allow network-bind (local ip "localhost:*"))
