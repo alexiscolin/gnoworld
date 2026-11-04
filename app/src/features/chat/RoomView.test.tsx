@@ -309,7 +309,8 @@ describe("RoomView", () => {
   // The red pass (M12): a line that is a Markdown list holds list items of its own; the tab stop is the line's alone.
   it("gives a line that is a list one tab stop, its own items none", () => {
     const html = part(view({ state: { ...ROOM, lines: [line({ text: "- one\n- two" })] } }), "Messages");
-    expect(html.match(/tabindex=/g)).toHaveLength(1);
+    // The author's name, which opens their card (8d), is out of the Tab order: tabindex="-1", no stop.
+    expect(html.match(/tabindex="(?!-1")/g)).toHaveLength(1);
   });
 
   // 4c's message menu: Ergo's refusal of a delete, said in the room's flash.

@@ -18,8 +18,6 @@ export interface PersonCardProps {
   country: string | undefined;
   /** The reader's account: none for a guest, who can only read the card. */
   me: string | undefined;
-  /** Whether its name is a Tab stop: a line's controls are, on the list's one stop alone (U1). */
-  tabbable: boolean;
   /** What opens the card: the name as the line draws it. */
   children: ReactNode;
 }
@@ -39,13 +37,14 @@ function MessageButton({ partner }: { partner: string }) {
   );
 }
 
-export function PersonCard({ name, guest, country, me, tabbable, children }: PersonCardProps) {
+export function PersonCard({ name, guest, country, me, children }: PersonCardProps) {
   const account = !guest && isAccount(name);
   const shown = account ? shortAddress(name) : name;
   const where = countryName(country);
   const other = account && me !== undefined && name !== me;
   return (
-    <Popover trigger={children} plain lazy tabbable={tabbable} label={`${shown}'s card`}>
+    // No Tab stop: a line's Tab goes to its bar of actions (messageMenu.spec.ts); the card is the pointer's.
+    <Popover trigger={children} plain lazy tabbable={false} label={`${shown}'s card`}>
       <Stack space="s">
         <Cluster space="s">
           <Avatar address={name} name={name} size="l" decorative />

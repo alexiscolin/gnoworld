@@ -9,12 +9,12 @@ import styles from "./RoomView.module.css";
 const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 // A line's author: its account's address shortened or its guest's nick, which opens their card, then "you" if it is mine.
-function Author({ line, mine, me, stop }: { line: Line; mine: boolean; me: string | undefined; stop: boolean }) {
+function Author({ line, mine, me }: { line: Line; mine: boolean; me: string | undefined }) {
   const name = line.account ?? line.from;
   const guest = line.account === undefined;
   return (
     <span className={styles["author"]}>
-      <PersonCard name={name} guest={guest} country={line.country} me={me} tabbable={stop}>
+      <PersonCard name={name} guest={guest} country={line.country} me={me}>
         <Person name={name} guest={guest} />
       </PersonCard>
       {mine ? " you" : null}
@@ -63,8 +63,6 @@ function Marks({
 interface HeadProps {
   newHere?: boolean | undefined;
   me: string | undefined;
-  /** Whether the line's controls are Tab stops: the name that opens a card is one. */
-  stop?: boolean;
   line: ShownLine;
   mine: boolean;
   mentioned: boolean;
@@ -73,14 +71,14 @@ interface HeadProps {
 }
 
 // The head: the face, the name, what the line is marked, and the time at the far end.
-export function Head({ line, mine, me, stop = false, mentioned, saved, pinned, newHere }: HeadProps) {
+export function Head({ line, mine, me, mentioned, saved, pinned, newHere }: HeadProps) {
   return (
     <div className={styles["head"]} data-line-head="">
       <Cluster space="2xs">
         <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
         <Country code={line.country} />
         {line.kind === "action" ? "* " : null}
-        <Author line={line} mine={mine} me={me} stop={stop} />{" "}
+        <Author line={line} mine={mine} me={me} />{" "}
         {newHere === true ? <span className={styles["newHere"]}>new here</span> : null}
         <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
         <Edited edited={line.edited} />

@@ -178,7 +178,7 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} stop={row.links} />
+      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
       <div data-line-text="">
         <Body line={line} votes={votes} react={react}>
