@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { closureOf as filesOf, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
+import { closureOf as filesOf, DYNAMIC_IMPORT, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
 import type { Request } from "@playwright/test";
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 import { BUILD } from "./sites.ts";
@@ -115,8 +116,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // for Alexis: 7f2's report for the Earth, 7e's for a world.
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12).
-const LATE_CHAT_JS = 21_091;
+// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with
+// what it asks once open: 21,210 B with RoomsDrawer's 762 B (the chief, 2026-11-04, the margin given ahead).
+const LATE_CHAT_JS = 21_210;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
@@ -318,6 +320,21 @@ const closureOf = (url: string) => filesOf(ASSETS, fileOfUrl(url)).map((file) =>
 // carry its code out of every cap (7e's review, B2-1).
 const ownOf = (late: string, there: readonly string[]) => closureOf(late).filter((each) => !there.includes(each));
 
+// What a late chunk brings once it runs: its own, and each chunk its files name in a dynamic import that the page asked, with that one's
+// own, at any depth (the chief, 2026-11-04: the chat's RoomsDrawer, asked once its box is narrow, fell between two cuts).
+function openedOf(late: string, there: readonly string[], asked: ReadonlySet<string>): string[] {
+  const own = ownOf(late, there);
+  // The loop reaches the files pushed as it goes: an array's iterator reads its length at each step.
+  for (const file of own) {
+    const text = readFileSync(join(ASSETS, fileOfUrl(file)), "utf8");
+    for (const [, name = ""] of text.matchAll(new RegExp(DYNAMIC_IMPORT.source, "g"))) {
+      const url = new URL(name, late).href;
+      if (asked.has(url) && !own.includes(url) && !there.includes(url)) own.push(...ownOf(url, [...there, ...own]));
+    }
+  }
+  return own;
+}
+
 // A late chunk the page asked: the very built file chunks.ts weighs by its name, within its cap there.
 function weighed(url: string, chunk: string) {
   const weight = lateWeights(ASSETS).find((each) => each.chunk === chunk);
@@ -381,7 +398,7 @@ for (const path of PAGES) {
     const lateChunk = late.find((url) => CHAT.test(url));
     if (lateChunk !== undefined)
       expect(
-        await compressed(page, ownOf(lateChunk, firstScreen)),
+        await compressed(page, openedOf(lateChunk, firstScreen, scripts)),
         "the late chat stays within its cap",
       ).toBeLessThanOrEqual(LATE_CHAT_JS);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
