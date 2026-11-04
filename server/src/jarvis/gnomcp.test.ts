@@ -468,6 +468,15 @@ describe("startGnomcp: gnomcp's stderr in jarvis's log", () => {
     ]);
   });
 
+  it("logs a line that opens as JSON and is none, as an audit line cut short, with no word of it", async () => {
+    const cut = `{"tool":"gno_eval","args_summary":"{\\"expr\\":\\"an-argument-0123456789${"x".repeat(70_000)}`;
+    const { events, raw } = await start({ stderr: [cut] });
+    await until(() => events().filter((event) => event["event"] === "jarvis_gnomcp_audit").length >= 2);
+    expect(raw()).not.toContain("an-argument-0123456789");
+    expect(events()).toContainEqual({ event: "jarvis_gnomcp_audit", tool: "<malformed>", reason: "<malformed>" });
+    expect(events().filter((event) => event["event"] === "jarvis_gnomcp_stderr")).toEqual([]);
+  });
+
   it("logs an audit line's tool or result that is no name as <malformed>", async () => {
     const line = JSON.stringify({ tool: "gno status\nforged", result: "ok; rm", duration_ms: 1 });
     const { events } = await start({ stderr: [line] });
