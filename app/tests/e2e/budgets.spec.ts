@@ -42,8 +42,9 @@ const SCENE_JS = 158_208;
 // The cosmos, a chunk of its own: only the home that shows worlds asks for it.
 const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
 // 16 KiB again since 7d6 gave the nebulae a chunk of their own (Alexis, 2026-11-02); 16,512 B once the rail's portraits shared the maps'
-// chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04).
-const COSMOS_JS = 17 * 1024;
+// chunks with it, 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge with the night's parts (Alexis, 2026-11-04);
+// 17,587 B with the Earth's view's loader and the glide between its two views (7x2, the margin given ahead).
+const COSMOS_JS = 17_587;
 // A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
 // The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
 const WHOLE = /\/assets\/web-[\w-]+\.js$/;
@@ -75,11 +76,11 @@ const PORTRAITS_JS = 1900;
 const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
 // A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
 // chunk to the cosmos's to the view at rest's. First capped at its size and about a tenth (1,518 B, the chief); 2 KiB with the dynamic view
-// (Alexis, 2026-11-03).
+// (Alexis, 2026-11-03); 2,062 B once the Earth's views went from the view at rest's search (7x2, the margin given ahead).
 const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
 const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
 const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const ARRIVAL_JS = 2 * 1024;
+const ARRIVAL_JS = 2062;
 // The view at rest in depth (7p): its far bodies and rocks in a chunk the view at rest's names, the rocks drawn by one the labels' name, its
 // program in no chunk loaded first. First caps their sizes and a tenth (rocks 1,204 B, depth 2,534 B); the depth 3.5 KiB with 7v's views
 // (Alexis, 2026-11-03), 3,616 B with the labels' place it shares and 8 B for other chunks' hashed names (7p2, the margin given ahead).
@@ -91,11 +92,12 @@ const ROCKS_JS = 1325;
 const ROCKS_MARK = "aRock";
 // A system's Plan and the Earth's (7v): a chunk the view at rest's names, asked the first time a Plan is, weighed apart from the labels' too,
 // which the cosmos asks first and whose names' code it shares; the Plan's orbits and names, a chunk the labels' name. First caps, each its
-// size once its reviews' fixes landed and about a tenth: 2,248 B (the design review's lens, level and spacing, F4470) and 2,147 B.
+// size once its reviews' fixes landed and about a tenth: 2,248 B (the design review's lens, level and spacing, F4470) and 2,147 B; the
+// orbits' 2,459 B once their names' row was shared with the stations' (7x2, the margin given ahead).
 const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
 const PLAN_JS = 2470;
 const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
-const ORBITS_JS = 2360;
+const ORBITS_JS = 2459;
 const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
 const WORLD_JS = 12 * 1024;
 const THREE_MARK = "isWebGLRenderer";
