@@ -1,7 +1,7 @@
 # jarvis's own image (Alexis, 2026-11-04, "Son propre paquet et image"; ADR-0002 §5, §7): its workspace and the packages
 # it imports, with their production dependencies from the lockfile, its skills, the places' data and gnomcp's settings,
 # then Node 24 alone in a distroless image, as 65533, a user no other service runs as. No server code, no script, no test
-# and no test helper (.dockerignore; jarvis/src/image.test.ts holds the list). gnomcp is the binary of its 0.11.0
+# and no test helper (.dockerignore; jarvis/src/main.test.ts holds the list). gnomcp is the binary of its 0.11.0
 # release's image, pinned by digest (GitHub's provenance attestation names that digest); init reaps it (compose.yaml).
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
 WORKDIR /repo

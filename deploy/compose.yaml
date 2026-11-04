@@ -95,13 +95,15 @@ services:
       dockerfile: deploy/server/Dockerfile
     user: "65532:65532"
     networks:
-      inside: {}
+      # A fixed address, which its API binds alone (HOST): jarvis's network reaches no port of the server's (10j's V12).
+      inside:
+        ipv4_address: ${SERVER_ADDRESS:-172.30.89.11}
       jarvis: {}
       # The admin API's listener (10g), on an address of a network nobody else joins: a console joins it to reach it.
       admin:
         ipv4_address: ${ADMIN_ADDRESS:-172.30.92.10}
     environment:
-      HOST: 0.0.0.0
+      HOST: ${SERVER_ADDRESS:-172.30.89.11}
       PORT: "8080"
       DATABASE: /data/gnoworld.db
       ORIGINS: ${ORIGINS:?set ORIGINS in deploy/.env, the app's own https origin}
@@ -145,7 +147,7 @@ services:
           CMD,
           /nodejs/bin/node,
           -e,
-          "fetch('http://127.0.0.1:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+          "fetch('http://' + process.env.HOST + ':8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
         ]
       interval: 30s
       timeout: 3s
@@ -226,9 +228,15 @@ services:
     cap_add: [NET_ADMIN]
     environment:
       XTABLES_LOCKFILE: /tmp/xtables.lock
+      # Its own address on jarvis's way out's network, by which guard.sh finds that network (10j's review, V2).
+      JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
     volumes:
       - ./guard:/guard:ro
-    networks: [inside, outside, jarvis_out]
+    networks:
+      inside: {}
+      outside: {}
+      jarvis_out:
+        ipv4_address: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
     cpus: 0.1
     mem_limit: 32m
     pids_limit: 16
@@ -241,7 +249,6 @@ services:
       start_interval: 1s
     depends_on:
       web: { condition: service_healthy }
-      jarvis: { condition: service_healthy }
 
   # The demo's way out (decision 151): the hosts of deploy/egress/acl.yaml alone, in the guard's network behind its rules.
   egress:
@@ -359,6 +366,10 @@ networks:
     driver_opts:
       com.docker.network.bridge.gateway_mode_ipv4: isolated
       com.docker.network.bridge.gateway_mode_ipv6: isolated
+    # Fixed, so the guard finds it by its own address in it (GUARD_JARVIS_ADDRESS), never by jarvis's name.
+    ipam:
+      config:
+        - subnet: ${JARVIS_OUT_SUBNET:-172.30.95.0/24}
   # The admin API's listener alone: the console joins it (slice 12).
   admin:
     internal: true

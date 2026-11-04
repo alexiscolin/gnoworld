@@ -1,7 +1,7 @@
 # deploy/test-jarvis.sh: jarvis's proofs in the stack (10j; ADR-0002 §5, §7), sourced by deploy/test.sh once the
 # server's way out is proven, with its helpers and the running stack's containers ($jarvis, $egress_jarvis, $server,
 # $guard). jarvis stays off (JARVIS unset): it serves its budgets and answers off, reads no key and starts no gnomcp.
-# jarvis/src/deploy.test.ts and image.test.ts read the same files as text; this proves them on Docker.
+# jarvis/src/config.test.ts and main.test.ts read the same files as text; this proves them on Docker.
 jarvis_net=${project}_jarvis
 jarvis_out=${project}_jarvis_out
 admin_net=${project}_admin
@@ -33,8 +33,18 @@ asked=$(docker exec "$server" /nodejs/bin/node -e "fetch('http://jarvis:8081/ask
 expect "jarvis, off by default, answers a question off" "$asked" '200 {"status":"off"}'
 expect "nothing on the internal network reaches jarvis" "$(answering "$inside" "$JARVIS_ADDRESS:8081" jarvis:8081)" ""
 out_address=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$jarvis_out\").IPAddress}}" "$jarvis")
-expect "the guard's network reaches no listener of jarvis's" "$(answering "container:$guard" "$out_address:8081")" ""
-expect "the admin API answers on its own network alone" "$(answering "$inside" server:8082) $(answering "$jarvis_net" server:8082)" " "
+# From a container on jarvis's way out's network, not the guard's own namespace, whose rules refuse every private address
+# first (10j's review, V9, S5): its proxy answers there (the control), jarvis's port never.
+expect "jarvis's way out's network reaches no listener of jarvis's" "$(answering "$jarvis_out" "$out_address:8081")" ""
+expect "and reaches its proxy (the control)" "$(answering "$jarvis_out" guard:4751)" guard:4751
+expect "the admin API answers on its own network" "$(answering "$admin_net" "$ADMIN_ADDRESS:8082")" "$ADMIN_ADDRESS:8082"
+expect "and on no other" "$(answering "$inside" server:8082) $(answering "$jarvis_net" server:8082)" " "
+expect "jarvis's network reaches no port of the server's" "$(answering "$jarvis_net" server:8080 server:8082)" ""
+# Neither network reaches the host, its LAN or the internet, but jarvis's own port as its control (10j's review, V11).
+expect "jarvis's way out's network reaches no address of the host or the internet" \
+	"$(answering "$jarvis_out" "$hostip:$canary" 1.1.1.1:443 "$(default_gateway):80")" ""
+expect "jarvis reaches no address of the host or the internet but through its way out" \
+	"$(answering "container:$jarvis" "$hostip:$canary" 1.1.1.1:443 "$JARVIS_ADDRESS:8081")" "$JARVIS_ADDRESS:8081"
 expect "jarvis's names: a request naming another host reaches no route" \
 	"$(docker exec "$server" /nodejs/bin/node -e "fetch('http://$JARVIS_ADDRESS:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" 404
 

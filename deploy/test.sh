@@ -474,6 +474,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "jarvis's root writable" "jarvis: read-only root" compose 'services: { jarvis: { read_only: false } }'
 	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
 	mutant "jarvis killed before its drain ends" "jarvis waits 35 s for its drain" compose 'services: { jarvis: { stop_grace_period: 10s } }'
+	mutant "jarvis listening on all its networks" "jarvis's way out's network reaches no listener of jarvis's" compose 'services: { jarvis: { environment: { JARVIS_HOST: 0.0.0.0 } } }'
+	mutant "the admin API on the loopback alone" "the admin API answers on its own network" compose 'services: { server: { environment: { ADMIN_HOST: 127.0.0.1 } } }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
 	mutant "a quiet tunnel kept for good" "the way out's settings say idle_timeout: 60s" proxy_config sed '/^idle_timeout:/d'
@@ -582,6 +584,9 @@ FAKE
 	# jarvis's network and the admin API's, apart from the demo's (172.30.91 and 172.30.92) as the internal one is.
 	export JARVIS_SUBNET="${TEST_JARVIS_SUBNET:-172.30.93.0/24}" JARVIS_ADDRESS="${TEST_JARVIS_ADDRESS:-172.30.93.10}"
 	export ADMIN_SUBNET="${TEST_ADMIN_SUBNET:-172.30.94.0/24}" ADMIN_ADDRESS="${TEST_ADMIN_ADDRESS:-172.30.94.10}"
+	# jarvis's way out's network and the guard's address there, and the server's address inside (10j's review, V2, V12).
+	export JARVIS_OUT_SUBNET="${TEST_JARVIS_OUT_SUBNET:-172.30.96.0/24}" GUARD_JARVIS_ADDRESS="${TEST_GUARD_JARVIS_ADDRESS:-172.30.96.2}"
+	export SERVER_ADDRESS="${TEST_SERVER_ADDRESS:-172.30.90.11}"
 	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
 	# folder it makes that mode (moby/buildkit#5943), which kept Ergo's user out of /ergo. Checked before the
 	# start, which would only call the service unhealthy.
@@ -833,7 +838,7 @@ PY
 	hardened "$jarvis" jarvis
 	hardened "$egress_jarvis" egress_jarvis network
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
-	expect "the server sits on the internal network only" "$(networks_of "$server")" "$inside "
+	expect "the server sits on the internal network, jarvis's and the admin API's" "$(networks_of "$server")" "${project}_admin $inside ${project}_jarvis "
 	expect "the way out holds the guard's network, behind its rules" \
 		"$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$egress")" "container:$(docker inspect --format '{{.Id}}' "$guard")"
 	expect "web holds the address Ergo and the server believe" \
@@ -1420,7 +1425,7 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
 	# whatever its list says. An ad hoc proxy of the same image and the live settings, its list its own, in the
-	# guard's network on 4751, asked from there: the guard's rules let only 4750's replies out to the network.
+	# guard's network on 4752 (4751 is jarvis's), asked from there: the guard's rules let no reply of 4752's out to a network.
 	mkdir "$tmp/egress"
 	docker cp "$egress:/etc/smokescreen/config.yaml" - | tar -xO >"$tmp/egress/config.yaml"
 	# Its tunnels close when quiet, and are capped (F627): read back, as Ergo's settings are.
@@ -1435,8 +1440,8 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 		case " $resolved" in *" ${name#*:} "*) ;; *) missing "${name%%:*} resolves to [$resolved], not ${name#*:}: the resolution check is blind" ;; esac
 	done
 	box=$(docker run -d --rm --network "container:$guard" -v "$tmp/egress:/test:ro" --entrypoint /smokescreen \
-		"$(docker inspect --format '{{.Image}}' "$egress")" --config-file /test/config.yaml --listen-port 4751 --egress-acl-file /test/acl.yaml)
-	ad_hoc() { docker run --rm --network "container:$guard" "$CURL" -s --max-time 15 -x http://127.0.0.1:4751 -w '\n%{http_code}' "$1" || true; }
+		"$(docker inspect --format '{{.Image}}' "$egress")" --config-file /test/config.yaml --listen-port 4752 --egress-acl-file /test/acl.yaml)
+	ad_hoc() { docker run --rm --network "container:$guard" "$CURL" -s --max-time 15 -x http://127.0.0.1:4752 -w '\n%{http_code}' "$1" || true; }
 	for _ in 1 2 3 4 5 6 7 8 9 10; do case $(ad_hoc http://api.openai.com/ | tail -n 1) in 000) sleep 1 ;; *) break ;; esac; done
 	case $(ad_hoc http://api.openai.com/ | tail -n 1) in 000 | 407 | 50[0-9]) fail "the ad hoc way out reaches no allowed host: the check is blind" ;; *) pass "the ad hoc way out reaches an allowed host (its control)" ;; esac
 	for target in http://localtest.me/ http://10.0.0.1.nip.io/; do

@@ -15,10 +15,11 @@ if [ -z "$web" ] || [ -z "$inside" ]; then
 	echo "guard: cannot find web's network" >&2
 	exit 1
 fi
-# jarvis's address, here on the network it shares with the guard alone, names that network (compose.yaml, jarvis_out).
-jarvis=$(getent hosts jarvis | awk '{ print $1 }')
-jarvis_out=$(ip route get "$jarvis" | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
-if [ -z "$jarvis" ] || [ -z "$jarvis_out" ] || [ "$jarvis_out" = "$inside" ]; then
+# jarvis's way out's network, by the guard's own fixed address in it (JARVIS_OUT_ADDRESS, compose.yaml), never by
+# jarvis's name, which may resolve elsewhere or not yet; refused if it is the internal network or the one that lets out.
+jarvis_out=$(ip -4 -o addr show to "$JARVIS_OUT_ADDRESS/32" | awk '{ print $2 }')
+outside=$(ip route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
+if [ -z "$jarvis_out" ] || [ "$jarvis_out" = "$inside" ] || [ "$jarvis_out" = "$outside" ]; then
 	echo "guard: cannot find jarvis's network" >&2
 	exit 1
 fi

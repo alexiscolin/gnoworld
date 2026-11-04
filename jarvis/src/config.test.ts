@@ -639,16 +639,28 @@ describe("the jarvis service", () => {
     expect(setting("jarvis", "JARVIS_GNOSCOPE")).toBe("${JARVIS_GNOSCOPE:-off}");
   });
 
-  it("asks a health check jarvis answers on or off, by the name it takes", () => {
+  it("asks a health check jarvis answers on or off, by the name it takes, failing on any other answer", () => {
     const test = block(block(service("jarvis"), 4, "healthcheck"), 6, "test");
-    expect(test).toContain("path: '/budgets'");
-    expect(test).toContain("headers: { host: 'jarvis' }");
-    expect(test).toContain("host: process.env.JARVIS_HOST");
+    const words = [...test.matchAll(/^ {10}(.+?),?$/gm)].map((match) => match[1] ?? "");
+    expect(words).toEqual([
+      "CMD",
+      "/nodejs/bin/node",
+      "-e",
+      `"require('node:http').get({ host: process.env.JARVIS_HOST, port: 8081, path: '/budgets', headers: { host: 'jarvis' } }, (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"`,
+    ]);
   });
 
   it("leaves the server's names on the node the server's way out lets out", () => {
     expect(setting("server", "JARVIS_NAMES_RPC")).toBeUndefined();
     expect(allowedBy(read("deploy/egress/acl.yaml"))).toContain("rpc.gno.land");
+  });
+});
+
+describe("the operator's settings", () => {
+  it("name every setting compose reads in deploy/.env.example, so a subnet is never changed without its address", () => {
+    const named = new Set([...compose().matchAll(/\$\{([A-Z_]+)(?::[-?])/g)].map((match) => match[1] ?? ""));
+    const example = read("deploy/.env.example");
+    expect([...named].filter((name) => !new RegExp(`^# ${name}=`, "m").test(example))).toEqual([]);
   });
 });
 
@@ -733,6 +745,17 @@ describe("the networks", () => {
     expect(names().filter((name) => service(name).includes("network_mode: service:jarvis"))).toEqual([]);
   });
 
+  it("bind the server's API to its address of the internal network alone, out of jarvis's reach (10j's review, V12)", () => {
+    const address = defaultOf(setting("server", "HOST"), "SERVER_ADDRESS") ?? "";
+    expect(block(service("server"), 4, "networks")).toContain(`ipv4_address: \${SERVER_ADDRESS:-${address}}`);
+    expect(inSubnet(address, defaultOf(subnetOf("inside"), "INSIDE_SUBNET") ?? "")).toBe(true);
+    expect(address).not.toBe(defaultOf(/\$\{WEB_ADDRESS:-[0-9.]+\}/.exec(compose())?.[0], "WEB_ADDRESS"));
+    // Compose reads `${...}` as its own: the address is joined, never templated.
+    expect(block(block(service("server"), 4, "healthcheck"), 6, "test")).toContain(
+      "fetch('http://' + process.env.HOST + ':8080/health')",
+    );
+  });
+
   it("open the admin API on the server's address of its own network, never on the others", () => {
     const address = defaultOf(setting("server", "ADMIN_HOST"), "ADMIN_ADDRESS") ?? "";
     expect(block(service("server"), 4, "networks")).toContain(`ipv4_address: \${ADMIN_ADDRESS:-${address}}`);
@@ -745,7 +768,9 @@ describe("the networks", () => {
       defaultOf(subnetOf("inside"), "INSIDE_SUBNET"),
       defaultOf(subnetOf("jarvis"), "JARVIS_SUBNET"),
       defaultOf(subnetOf("admin"), "ADMIN_SUBNET"),
+      defaultOf(subnetOf("jarvis_out"), "JARVIS_OUT_SUBNET"),
     ].map((one) => one ?? "");
+    expect(subnets.every((one) => one !== "")).toBe(true);
     for (const subnet of subnets) expect(isPrivate(subnet), subnet).toBe(true);
     for (const [at, subnet] of subnets.entries())
       for (const other of subnets.slice(at + 1)) expect(inSubnet(other.split("/")[0] ?? "", subnet)).toBe(false);
@@ -821,8 +846,21 @@ describe("jarvis's way out", () => {
 describe("the guard's rules", () => {
   const rules = () => read("deploy/guard/guard.sh");
   const at = (line: string) => rules().indexOf(line);
+  it("find jarvis's network by the guard's own address there, never by a name, refusing any other interface", () => {
+    // A name could resolve to another network's address, or to a LAN host through the search domain (V2, S4).
+    expect(rules()).toContain(`jarvis_out=$(ip -4 -o addr show to "$JARVIS_OUT_ADDRESS/32" | awk '{ print $2 }')`);
+    expect(rules()).not.toMatch(/getent hosts jarvis/);
+    expect(rules()).toContain(
+      `outside=$(ip route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')`,
+    );
+    expect(rules()).toContain(`[ "$jarvis_out" = "$inside" ] || [ "$jarvis_out" = "$outside" ]`);
+    const address = defaultOf(setting("guard", "JARVIS_OUT_ADDRESS"), "GUARD_JARVIS_ADDRESS") ?? "";
+    expect(block(service("guard"), 4, "networks")).toContain(`ipv4_address: \${GUARD_JARVIS_ADDRESS:-${address}}`);
+    expect(inSubnet(address, defaultOf(subnetOf("jarvis_out"), "JARVIS_OUT_SUBNET") ?? "")).toBe(true);
+    expect(address.endsWith(".1")).toBe(false);
+  });
+
   it("let jarvis's proxy be reached from jarvis's network alone, and the server's from the internal one alone", () => {
-    expect(rules()).toMatch(/^jarvis_out=\$\(ip route get "\$jarvis"/m);
     const accept = at(`echo "-A INPUT -i $jarvis_out -p tcp --dport 4751 -j ACCEPT"`);
     const reject = at(`echo '-A INPUT -p tcp --dport 4751 -j REJECT'`);
     const closed = at(`echo "-A INPUT -i $jarvis_out -j REJECT"`);
@@ -840,8 +878,8 @@ describe("the guard's rules", () => {
     ]);
   });
 
-  it("wait for jarvis, whose address names its network", () => {
-    expect(block(service("guard"), 4, "depends_on")).toMatch(/^ {6}jarvis: \{ condition: service_healthy \}$/m);
+  it("never wait for jarvis: a jarvis that fails to start leaves the demo up (10j's review, V2)", () => {
+    expect(names().filter((name) => /^ {6}jarvis: /m.test(block(service(name), 4, "depends_on")))).toEqual([]);
   });
 });
 
@@ -878,6 +916,28 @@ describe("deploy/test.sh", () => {
       expect(jarvis(), check).toContain(check);
   });
 
+  it("expects the server on its three networks, and runs its ad hoc proxy off jarvis's port (10j's review, V1)", () => {
+    expect(script()).toContain(
+      `expect "the server sits on the internal network, jarvis's and the admin API's" "$(networks_of "$server")" "\${project}_admin $inside \${project}_jarvis "`,
+    );
+    expect(script()).not.toContain(`"the server sits on the internal network only"`);
+    expect(script()).not.toMatch(/--listen-port 4751/);
+    expect(script()).toContain("--listen-port 4752");
+    expect(script()).toContain(`export JARVIS_OUT_SUBNET="\${TEST_JARVIS_OUT_SUBNET:-172.30.96.0/24}"`);
+  });
+
+  it("proves no listener of jarvis's on its way out's network, the admin API answering on its own, each with a control", () => {
+    for (const check of [
+      "jarvis's way out's network reaches no listener of jarvis's",
+      "and reaches its proxy (the control)",
+      "the admin API answers on its own network",
+      "jarvis's way out's network reaches no address of the host or the internet",
+      "jarvis reaches no address of the host or the internet but through its way out",
+    ])
+      expect(jarvis(), check).toContain(check);
+    expect(jarvis()).not.toContain(`answering "container:$guard" "$out_address:8081"`);
+  });
+
   it("plants each of jarvis's faults in `--mutants`, each killed by its own check", () => {
     const faults: [string, string][] = [
       ["a host added to jarvis's way out", "jarvis's way out lets six hosts out"],
@@ -887,6 +947,8 @@ describe("deploy/test.sh", () => {
       ["jarvis's root writable", "jarvis: read-only root"],
       ["jarvis's key given to the server", "the server holds no Anthropic key"],
       ["jarvis killed before its drain ends", "jarvis waits 35 s for its drain"],
+      ["jarvis listening on all its networks", "jarvis's way out's network reaches no listener of jarvis's"],
+      ["the admin API on the loopback alone", "the admin API answers on its own network"],
     ];
     for (const [fault, by] of faults) expect(script()).toContain(`mutant "${fault}" "${by}"`);
   });
