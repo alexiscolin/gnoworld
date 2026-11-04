@@ -363,6 +363,8 @@ describe("the admin API, a change", () => {
     const again = await challenge({ setting: "quota", questions: 50 });
     expect(await answerOf(await change(prove(again), { token: "second" }))).toEqual([400, { error: "refused" }]);
     expect(quota.values().quota).toBe(20);
+    // Refused before its nonce was spent: its own account's proof still makes the change.
+    expect((await change(prove(again))).status).toBe(200);
   });
 
   it("lets one of two proofs of one nonce sent at once pass", async () => {

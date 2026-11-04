@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { afterAll, describe, expect, it } from "vitest";
+import { toAddress } from "@gnoworld/schemas";
 import { loadConfig } from "./config.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-config-"));
@@ -546,6 +547,14 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     };
     expect(failure(env)).toMatch(/setting ADMIN_ORIGINS: custom \(at 1\)/);
     expect(failure(env)).not.toContain("https://gnoworld.test");
+  });
+
+  it("holds 1,000 accounts with no quota, the most", () => {
+    const many = Array.from({ length: 1000 }, (_, at) => toAddress(Buffer.from(String(at).padStart(20, "0"))));
+    expect(
+      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", JARVIS_UNLIMITED: many.join(",") }).jarvis?.first
+        .unlimited,
+    ).toHaveLength(1000);
   });
 
   it.each([

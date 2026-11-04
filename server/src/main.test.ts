@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
-import { wallet } from "./testing/signer.ts";
+import { wallet, type Wallet } from "./testing/signer.ts";
 
 interface Server {
   child: ChildProcessByStdio<null, Readable, Readable>;
@@ -77,6 +77,34 @@ const listening = (server: Server): Promise<number> =>
       reject(new Error(`exited before listening: ${server.out.stderr}`));
     });
   });
+
+// A server whose roles file's team is `lead`, with jarvis at `jarvis` and the admin API on its own listener; its admin
+// port, a POST to it from the admin site, and a sign-in on it that gives the session's cookie.
+const adminFor = async (lead: Wallet, jarvis: string) => {
+  const roles = join(folder("gnoworld-roles-"), "roles.json");
+  writeFileSync(roles, JSON.stringify({ team: [lead.address], trusted: [], worlds: [] }));
+  const site = "https://admin.gnoworld.test";
+  const server = start({ ...settings(), ROLES_FILE: roles, JARVIS_URL: jarvis, ADMIN_PORT: "0", ADMIN_ORIGINS: site });
+  await listening(server);
+  await until(() => server.out.stdout.includes('"event":"admin_listening"'));
+  const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
+  const post = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+    fetch(`http://127.0.0.1:${String(admin)}${path}`, {
+      method: "POST",
+      headers: { origin: site, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+      body: JSON.stringify(body),
+    });
+  const signIn = async (who: Wallet): Promise<string> => {
+    const made = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
+    const verified = await post("/api/login/verify", {
+      nonce: made.nonce,
+      address: who.address,
+      proof: who.sign("onyx-1", made.text),
+    });
+    return (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+  };
+  return { server, admin, post, signIn };
+};
 
 // Each test boots a Node process, which takes seconds when the machine is busy (three gates at once): 30 s, not
 // Vitest's 5, the assertions unchanged.
@@ -675,34 +703,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
 
   it("lets the roles file's team alone read and change Jarvis's settings over the admin listener (ADR-0002 §6)", async () => {
     const [lead, stranger] = [wallet(), wallet()];
-    const roles = join(folder("gnoworld-roles-"), "roles.json");
-    writeFileSync(roles, JSON.stringify({ team: [lead.address], trusted: [], worlds: [] }));
-    const site = "https://admin.gnoworld.test";
-    const server = start({
-      ...settings(),
-      ROLES_FILE: roles,
-      JARVIS_URL: "http://127.0.0.1:9",
-      ADMIN_PORT: "0",
-      ADMIN_ORIGINS: site,
-    });
-    await listening(server);
-    await until(() => server.out.stdout.includes('"event":"admin_listening"'));
-    const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
-    const post = (path: string, body: unknown, cookie = ""): Promise<Response> =>
-      fetch(`http://127.0.0.1:${String(admin)}${path}`, {
-        method: "POST",
-        headers: { origin: site, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
-        body: JSON.stringify(body),
-      });
-    const signIn = async (who: typeof lead): Promise<string> => {
-      const made = Challenge.parse(await (await post("/api/login/challenge", { chainId: "onyx-1" })).json());
-      const verified = await post("/api/login/verify", {
-        nonce: made.nonce,
-        address: who.address,
-        proof: who.sign("onyx-1", made.text),
-      });
-      return (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-    };
+    const { admin, post, signIn } = await adminFor(lead, "http://127.0.0.1:9");
     const read = async (cookie: string) => {
       const answer = await fetch(`http://127.0.0.1:${String(admin)}/api/admin/jarvis`, { headers: { cookie } });
       return [answer.status, await answer.json()];
@@ -720,6 +721,37 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await read(leads)).toEqual([200, { ...settled, quota: 30 }]);
     const large = await post("/api/admin/jarvis/change", { nonce: "a".repeat(20_000) }, leads);
     expect(large.status).toBe(413);
+  });
+
+  it("drains the admin listener on SIGTERM: a call already begun is answered, then the process exits 0 (F5272)", async () => {
+    let asked = false;
+    const jarvis = createHttpServer((_, res) => {
+      asked = true;
+      setTimeout(() => res.writeHead(200, { "content-type": "application/json" }).end('{"ask":45,"translate":5}'), 500);
+    });
+    jarvis.listen(0, "127.0.0.1");
+    await once(jarvis, "listening");
+    try {
+      const lead = wallet();
+      const { server, admin, signIn } = await adminFor(
+        lead,
+        `http://127.0.0.1:${String((jarvis.address() as AddressInfo).port)}`,
+      );
+      const cookie = await signIn(lead);
+      const reading = fetch(`http://127.0.0.1:${String(admin)}/api/admin/jarvis`, { headers: { cookie } });
+      await until(() => asked);
+      const exit = exited(server);
+      server.child.kill("SIGTERM");
+      const answer = await reading;
+      expect([answer.status, await answer.json()]).toEqual([
+        200,
+        { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: { ask: 45, translate: 5 } },
+      ]);
+      expect(await exit).toBe(0);
+    } finally {
+      jarvis.closeAllConnections();
+      jarvis.close();
+    }
   });
 
   it("opens no admin listener and no door without their settings", async () => {

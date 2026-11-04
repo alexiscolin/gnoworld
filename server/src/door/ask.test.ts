@@ -237,8 +237,9 @@ describe("a question to Jarvis", () => {
   });
 
   it("passes on jarvis's spent, so the client shows its form", async () => {
-    const { ask } = setup({ answer: () => Promise.resolve({ ok: true, answer: { status: "spent" } }) });
+    const { ask, events } = setup({ answer: () => Promise.resolve({ ok: true, answer: { status: "spent" } }) });
     expect(await answerOf(await ask())).toEqual([200, { status: "spent" }]);
+    expect(events().at(-1)).toMatch(/^\{"event":"jarvis_spent","route":"\/api\/jarvis\/ask","status":200,/);
   });
 
   it("answers a typed error when jarvis fails, never a hang", async () => {

@@ -46,7 +46,7 @@ describe("the recent lines of a room", () => {
   it("leaves out the time of a line Ergo gave none", () => {
     const recent = setup();
     recent.passed({ room: "#bubble", account: ALICE, msgid: "m1", text: "no time" });
-    expect(recent.recent("#bubble", ASKER)).toEqual([{ speaker: 1, text: "no time" }]);
+    expect(recent.recent("#bubble", ASKER)).toStrictEqual([{ speaker: 1, text: "no time" }]);
   });
 
   it("keeps a room's last 30 lines, the oldest leaving first", () => {
@@ -66,6 +66,21 @@ describe("the recent lines of a room", () => {
     recent.passed(said("m5", "x"));
     expect(recent.recent("#bubble", ASKER)).toHaveLength(4);
     expect(texts(recent.recent("#bubble", ASKER)).at(-1)).toBe("x");
+  });
+
+  it("keeps a line of exactly a room's 8 KiB, alone", () => {
+    const recent = setup();
+    recent.passed(said("m1", "older"));
+    recent.passed(said("m2", "x".repeat(8192)));
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["x".repeat(8192)]);
+  });
+
+  it("gives back a taken line's bytes, so the next line leaves the older ones be", () => {
+    const recent = setup();
+    for (const msgid of ["m1", "m2"]) recent.passed(said(msgid, "y".repeat(4000)));
+    recent.taken("#bubble", "m2");
+    recent.passed(said("m3", "z".repeat(4000)));
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["y".repeat(4000), "z".repeat(4000)]);
   });
 
   it("never keeps a line longer than a room's 8 KiB, and keeps the room's others", () => {
@@ -110,6 +125,25 @@ describe("the recent lines of a room", () => {
     recent.passed(said("m2", "two"));
     recent.taken("#bubble", "m1");
     expect(texts(recent.recent("#bubble", ASKER))).toEqual(["two"]);
+    recent.passed(said("m3", "three"));
+    recent.taken("#bubble", "m3");
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["two"]);
+  });
+
+  it("drops the very line taken, wherever it stands in its room", () => {
+    const recent = setup();
+    for (const msgid of ["m1", "m2", "m3"]) recent.passed(said(msgid, msgid));
+    recent.taken("#bubble", "m2");
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["m1", "m3"]);
+  });
+
+  it("remembers a line taken before it came however many plain lines follow, as a line that is no edit forgets nothing", () => {
+    const recent = setup();
+    recent.taken("#bubble", "early");
+    for (let at = 0; at < 2001; at += 1)
+      recent.edited(said(`plain${String(at)}`, "no edit", { room: `#w${String(at)}` }));
+    recent.passed(said("early", "taken before it came"));
+    expect(recent.recent("#bubble", ASKER)).toEqual([]);
   });
 
   it("drops a line its author edits at once, and keeps the edit once moderation lets it through", () => {

@@ -178,7 +178,9 @@ describe("jarvis's budgets", () => {
     const jarvis = await fakeJarvis([json(BUDGETS())]);
     const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
     expect(await client.budgets()).toEqual({ ok: true, budgets: BUDGETS() });
-    expect(jarvis.heard.map(({ method, path }) => [method, path])).toEqual([["GET", "/budgets"]]);
+    expect(jarvis.heard.map(({ method, path, headers }) => [method, path, headers.accept])).toEqual([
+      ["GET", "/budgets", "application/json"],
+    ]);
   });
 
   it("are changed with POST /budgets, one budget in whole dollars, jarvis answering both", async () => {

@@ -92,6 +92,10 @@ describe("a mainnet name", () => {
       ["text that is not JSON", () => new Response("<html>")],
       ["another shape", () => new Response(JSON.stringify({ result: { nothing: true } }))],
       ["the chain's refusal", () => queried(null, { "@type": "/vm.InvalidPkgPathError", value: "" })],
+      [
+        "the chain's refusal beside a name's data",
+        () => queried(Buffer.from("(false bool)\n").toString("base64"), { "@type": "/std.InternalError", value: "" }),
+      ],
       ["no data", () => queried(null)],
       ["data that is not base64 of text", () => queried(Buffer.from([0xff, 0xfe]).toString("base64"))],
       ["another value", () => evaluated("(1 int)")],
