@@ -458,7 +458,7 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
-| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet (DEVELOPMENT.md, "The workshop") |
+| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

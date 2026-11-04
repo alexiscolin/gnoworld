@@ -140,10 +140,20 @@ Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_
 the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
 which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
 which. On the MacBook or the phone, open the https ones:
-- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route.
-  No server runs behind it: what a page reads from the relay shows as it does when the relay is away.
+- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
+  the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
 - **`workshop-lab`, the lab:** `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for
   the site's own scene (`&arrive=<system>` for a system's view).
+
+**The backend**, started once the app's server is on the tailnet (Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"):
+the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
+by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for Ergo and its WebSocket
+(`WORKSHOP_API_PORT`, `WORKSHOP_IRC_PORT`, `WORKSHOP_WS_PORT`), allowing the app's local address and its tailnet links as
+origins. The app's dev server proxies `^/api/` and `^/ws$` there (`app/vite.config.ts`'s `workshopBackend`), the visitor's
+address set by the proxy, never the browser's; Vite's proxy is a dev server's, so no build holds it, and the lab's server has
+none. The chat, who is here and the rooms run on it; its roles are the journeys' (the shipped file and their test rooms). The
+worlds job and the prices' timer do not run, and nothing serves what they write: the worlds read from the chain
+(`worlds.json`) and the hero's prices and block (`markets.json`) stay empty. A login with Adena is untried here.
 
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.
