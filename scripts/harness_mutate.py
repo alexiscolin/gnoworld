@@ -48,9 +48,9 @@ CHAIN = "lint/chain.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls", "app/tsconfig.json": "react_tsc",
-    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,bench_files", "lint/core.config.ts": "lint",
-    "lint/chain.config.ts": "chain,walls",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
+    "lint/chain.config.ts": "chain,walls,chain_reads",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
@@ -240,6 +240,38 @@ def mutants():
         yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
     for name in ("server|", "jarvis|", "app|", "|service"):
         yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
+    # A read's words outside the chain package (decision-onchain.md, D113): each word, each way a string is read, the files.
+    for find, replace, label in (
+        ("/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
+        ("/\\bvm\\/q|\\b(?:auth\\/accounts|bank\\/balances)\\//", "/(?!)/", "an ABCI path"),
+        ("|\\b(?:auth\\/accounts|bank\\/balances)\\//", "/", "an account's or a balance's ABCI path"),
+        ("/(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)\\/(?:status|", "/(?!)(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)\\/(?:status|", "a node's RPC route"),
+        ("(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)", "(?:\\$\\{\\})", "a node's RPC route after a full address"),
+        ("(?:\\$\\{\\}|:\\/\\/[^/?#\\s]+)", "(?::\\/\\/[^/?#\\s]+)", "a node's RPC route after an interpolation"),
+        ("\\/(?:status|block|", "\\/(?:block|", "the status route"),
+        ("|block|block_results|", "|block_results|", "the block route"),
+        ("/:26657(?!\\d)/", "/(?!)/", "the RPC port"),
+        ("/^\\s*(?:query|subscription|mutation)\\b[^{]*\\{/", "/(?!)/", "a GraphQL operation"),
+        ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
+        ("/^@gnoworld\\/chain\\/testing(?:\\/|$)/", "/(?!)/", "the chain package's fake node"),
+        ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
+        ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
+        ('.join("${}")', '.join("")', "a template's interpolation"),
+        ('if (operator !== "+" ||', "if (true ||", "a sum's text"),
+        ('${textOf(left) ?? "${}"}', '${textOf(left) ?? ""}', "a sum's value on its left"),
+        ("Literal: check, ", "", "the rule's literals"),
+        ("TemplateLiteral: check, ", "", "the rule's templates"),
+        (", BinaryExpression: check", "", "the rule's sums"),
+        ('"app/src/**/*.{ts,tsx}", "server/**/*.ts"', '"server/**/*.ts"', "the rule's reach in the app"),
+        ('"server/**/*.ts", "jarvis/**/*.ts"', '"jarvis/**/*.ts"', "the rule's reach in the server"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', '"packages/*/src/**/*.{ts,tsx}"', "the rule's reach in Jarvis"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"]', '"jarvis/**/*.ts"]', "the rule's reach in the packages"),
+        ('"packages/chain/src/**", ', "", "the chain package's own words free"),
+        ('"**/testing/**", ', "", "the fakes free"),
+        ("...TESTS, ...BENCHES]", "...BENCHES]", "the tests free"),
+        ("...TESTS, ...BENCHES]", "...TESTS]", "the benches free"),
+    ):
+        yield from each(CHAIN, find, replace, "probe", f"eslint chain-read refuses {label} outside the package")
     # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
     for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
         yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")

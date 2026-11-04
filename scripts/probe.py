@@ -869,10 +869,11 @@ try:
             ("indexer.ts", 'export const indexer = "https://indexer.onyx.example/graphql/query";\n', None),
             ("route.ts", 'export const route = "/status";\n', None),
             ("word.ts", 'export const word = "the status of a block";\n', None),
-            # A known gap (D113): an address made by URL from a route alone and a base reads as no read here.
-            ("url.ts", 'export function url(rpc: string): URL {\n  return new URL("/status", rpc);\n}\n', None),
+            # A known gap (D113): an address joined from a route alone and a base, by a call, reads as no read here.
+            ("joined_call.ts", 'export function url(rpc: string): string {\n  return [rpc, "status"].join("/");\n}\n', None),
             ("free.test.ts", 'import { expect, test } from "vitest";\n\ntest("x", () => {\n  expect("vm/qfuncs").toMatch(/qfuncs/);\n});\n', None),
             ("free.spec.ts", 'export const path = "vm/qfuncs";\n', None),
+            ("free.bench.ts", 'export const path = "vm/qfuncs";\n', None),
             ("testing/fake.ts", 'export const path = "vm/qfuncs";\n', None),
         ]
         for where in ("app/src/__probe__", "server/src/__probe__", "jarvis/src/__probe__", "packages/schemas/src/__probe__", "packages/service/src/__probe__"):
@@ -883,7 +884,9 @@ try:
         shutil.rmtree(APP)
         lint_cases([("fake.ts", 'export const path = "vm/qfuncs";\n', None)], "app/tests/__probe__", "chain reads in the journeys")
         shutil.rmtree("app/tests/__probe__")
-        lint_cases([(n, c, None) for n, c, _ in reads if not n.endswith((".test.ts", ".spec.ts"))], "packages/chain/src/__probe__", "chain reads in the package")
+        # The package's own words are free; its disable comment is left out, as inline config's warning names it alone.
+        own = [(n, c, None) for n, c, _ in reads if not n.endswith((".test.ts", ".spec.ts")) and n != "hushed.ts"]
+        lint_cases(own, "packages/chain/src/__probe__", "chain reads in the package")
         shutil.rmtree("packages/chain/src/__probe__")
 
     if part("react_warn"):
