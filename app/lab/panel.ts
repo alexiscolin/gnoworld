@@ -7,7 +7,7 @@ import { colourControl, fontControl, lengthControl, primitives, sceneControl, ty
 // The labels' names and figures, and their padding: the lab's text.
 const FONTS = ["--font-ui", "--font-data"];
 const LENGTHS = ["--space-2xs", "--space-xs"];
-// What a control hears stays with it: the pages' keys, drags and wheels move views.
+// What the panel and its button hear stays with them: the pages' keys, drags and wheels move views.
 const KEPT = ["keydown", "keyup", "pointerdown", "pointermove", "pointerup", "wheel"];
 
 const made = <K extends keyof HTMLElementTagNameMap>(tag: K, text = "") =>
@@ -57,12 +57,16 @@ function readInto({ scene, controls, shown }: SceneRows, drawn: () => void): voi
   }
 }
 
-/** The panel on this page, hidden until T; `drawn` asks the page for a frame after each change. */
+/** The panel on this page, hidden until T or its button (a phone has no keyboard); `drawn` asks the page for a frame after each change. */
 export function tuningPanel(drawn: () => void): void {
-  const aside = Object.assign(made("aside"), { hidden: true });
+  const workshop = Object.assign(made("div"), { className: "workshop" });
+  const aside = Object.assign(made("aside"), { hidden: true, id: "tuning" });
   aside.setAttribute("aria-label", "Tuning");
+  const open = Object.assign(made("button", "Tuning"), { className: "tune" });
+  open.setAttribute("aria-controls", aside.id);
+  open.setAttribute("aria-expanded", "false");
   for (const name of KEPT)
-    aside.addEventListener(name, (event) => {
+    workshop.addEventListener(name, (event) => {
       event.stopPropagation();
     });
   const [scenes, tokens] = [[] as Control[], [] as Control[]];
@@ -101,14 +105,19 @@ export function tuningPanel(drawn: () => void): void {
     said,
   );
   const rows: SceneRows = { scene, controls: scenes, shown: new Set() };
+  const toggle = () => {
+    readInto(rows, drawn);
+    aside.hidden = !aside.hidden;
+    open.setAttribute("aria-expanded", String(!aside.hidden));
+  };
+  open.addEventListener("click", toggle);
   addEventListener(
     "keydown",
     ({ key }) => {
-      if (key !== "t") return;
-      readInto(rows, drawn);
-      aside.hidden = !aside.hidden;
+      if (key === "t") toggle();
     },
     { capture: true },
   );
-  document.body.append(aside);
+  workshop.append(open, aside);
+  document.body.append(workshop);
 }

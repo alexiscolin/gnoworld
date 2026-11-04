@@ -62,10 +62,11 @@ const COSMOS_BRIGHTER = 1.5;
 const overThePanel = (page: Page) =>
   page.evaluate(() => {
     const aside = document.querySelector("aside");
-    if (aside === null) return ["no panel"];
+    const workshop = aside?.parentElement;
+    if (aside === null || workshop === null || workshop === undefined) return ["no panel"];
     const order = (element: Element) => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0;
     return Array.from(document.body.querySelectorAll("*"))
-      .filter((element) => !aside.contains(element) && getComputedStyle(element).position === "fixed")
+      .filter((element) => !workshop.contains(element) && getComputedStyle(element).position === "fixed")
       .filter((element) => order(element) >= order(aside))
       .map((element) => `${element.tagName} ${element.className}`);
   });
@@ -246,5 +247,31 @@ test.describe("the workshop's tuning panel", () => {
     expect(await copied(page)).toBe(
       `eye.arrivalShare: 0.6 (was ${String(ARRIVAL_LEAN / LEAN)}) · packages/core/src/space/drift.ts, ARRIVAL_LEAN = LEAN × the share`,
     );
+  });
+  // A computer has T, and the lab's pictures of the canvas stay whole (realism.spec's Earth at 0 px): no button stands over them.
+  test("shows no button on a computer", async ({ page }) => {
+    await open(page, "?view=close&world=1&maps=flat");
+    await expect(page.getByRole("button", { name: "Tuning" })).toBeHidden();
+  });
+});
+
+// A phone has no keyboard (F4730): on a touch screen its button shows the panel and hides it, as T does, on both pages.
+test.describe("the workshop's tuning panel on a phone", () => {
+  heldQuiet();
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("opens and closes from its button, on both pages", async ({ page }) => {
+    for (const query of ["?view=close&world=1&maps=flat", "?view=cosmos"]) {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.goto(`${PAGE}${query}`);
+      const button = page.getByRole("button", { name: "Tuning" });
+      await expect(button).toHaveAttribute("aria-expanded", "false");
+      await button.tap();
+      await expect(panel(page)).toBeVisible();
+      await expect(button).toHaveAttribute("aria-expanded", "true");
+      await expect(control(page, "--p-amber")).toBeVisible();
+      await button.tap();
+      await expect(panel(page)).toBeHidden();
+    }
   });
 });

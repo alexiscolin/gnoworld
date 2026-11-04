@@ -88,6 +88,17 @@
     text-align: end;
   }
 
+  /* The panel's button, for a touch screen with no T: its corner, the panel under it. A computer has T, and its pictures stay whole. */
+  .tune {
+    display: none;
+    position: fixed;
+    /* raw: over the scene's labels' layer (0), as the site's header is */
+    z-index: 1;
+    inset-block-start: var(--space-s);
+    inset-inline-end: var(--space-s);
+    background: var(--color-surface);
+  }
+
   aside {
     /* raw: over the scene's labels' layer (0), as the site's header is */
     z-index: 1;
@@ -135,5 +146,18 @@
     text-align: start;
     white-space: pre-line;
     overflow-wrap: anywhere;
+  }
+
+  @media (pointer: coarse) {
+    .tune {
+      display: block;
+    }
+
+    aside {
+      /* raw: under the panel's button, a step apart */
+      inset-block-start: calc(var(--space-s) + var(--control-s) + var(--space-2xs));
+      /* raw: no taller than the window below the button, where it scrolls */
+      max-block-size: calc(100vb - 3 * var(--space-s) - var(--control-s));
+    }
   }
 }
