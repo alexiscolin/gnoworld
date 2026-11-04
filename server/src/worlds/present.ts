@@ -2,13 +2,15 @@
 // world's counted once across its rooms by nick whatever its case, the bot left out; recorded every five minutes into 7c's history, the
 // busiest sample of each hour, so a world rises against its own 14 days; served as counts alone at GET /api/presence. No name leaves it,
 // and no room a guest cannot see counts. The home's hero (8i) reads at GET /api/presence/people the people of those rooms, each once whatever
-// its rooms, and the countries those of them name who declare one on their lines: two counts, never who.
+// its rooms, and the countries those of them name who declare one on their lines: two counts, never who. A plate (8g) reads at GET
+// /api/presence/hours?world= a world's messages an hour over the last day, from the same history.
 import { riseOf, usualOf } from "@gnoworld/core";
 import { PRESENCE_ANSWER_MAX, type Presence, type PresencePeople } from "@gnoworld/schemas/indexer";
 import { Hono } from "hono";
 import { NICK, type Said } from "../irc/lines.ts";
 import type { Log } from "../log.ts";
 import { besideOf } from "../replaceFile.ts";
+import { hoursOf, hoursRoute } from "./hours.ts";
 import { makePresence, type Signal } from "./presence.ts";
 
 export const PRESENT_MS = 5 * 60_000;
@@ -197,6 +199,10 @@ export function startPresent({ file, now, open, rooms, rates, log }: Options): P
   };
   const timer = setInterval(record, PRESENT_MS);
   const routes = new Hono();
+  hoursRoute(routes, (world) => {
+    const pace = current().value.worlds.find((each) => each.world === world)?.perHour;
+    return hoursOf(messages.history(world), pace === undefined ? null : Math.round(pace), now());
+  });
   for (const [path, pick] of SERVED)
     routes.get(path, (c) => {
       c.header("cache-control", "public, max-age=60");

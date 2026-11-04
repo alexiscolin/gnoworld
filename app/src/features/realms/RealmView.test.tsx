@@ -38,7 +38,26 @@ function chain(
       return Promise.resolve(
         indexer === "down"
           ? new Response("down", { status: 503 })
-          : new Response(JSON.stringify({ data: { realmFacts: FACTS } })),
+          : new Response(
+              JSON.stringify({
+                data: {
+                  getTransactions: [
+                    {
+                      block_height: FACTS.firstBlock,
+                      messages: [
+                        {
+                          value: {
+                            __typename: "MsgAddPackage",
+                            creator: FACTS.deployer,
+                            package: { path: FACTS.path },
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              }),
+            ),
       );
     }
     const body = url.includes("/status")
