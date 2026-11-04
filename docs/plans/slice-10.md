@@ -42,9 +42,10 @@ Creates `server/src/jarvis/` (the code, one concept a file), `server/jarvis/skil
 - **10d, the checks on what Jarvis returns** (tonight, once 10b or 10c is merged): the digest, proposal and button schemas in `packages/schemas` (sharing `FunctionList`), grounding, the proposal's check, the translation's check.
 - **10e, the loop** (tier 1, after Alexis's install, 10b and 10c, beside 10d, whose modules it never calls, D49): the SDK client, the loop and its spans, gnomcp over stdio; its first commit brings the five server dependencies with the code that imports them all (knip refuses one unused).
 - **10f, the tools** (tier 1, after 10e): ours (the places, the chain's latest blocks and transactions, the digest, the proposal and the buttons through 10d's checks) and gnoscope's behind its switch.
-- **10g, the service** (after 10f): translation and its cache, the digest's cache, jarvis's entry and routes, `server`'s door with the quotas and their allowlist (D42, D43); the budgets, the quotas and the allowlist kept in the databases, the environment giving their first value, changed by an admin call at once, with no restart, each change logged (D47).
-- **10h, evals and deploy** (tier 1, after 10g): `evals/` with its provider and cases, installed apart, the `jarvis` container in `deploy/`.
-The modules of 10b to 10d are reached by their tests until 10e calls them; the slice merges into `main` whole, never before 10h. Two parts at once at most, each in its own session, worktree and herdr pane.
+- **10g, the door** (tier 1, beside 10e, by Alexis on 2026-11-04): `server`'s ask route (a session, the person's rate, the size, the quota and its allowlist, the room's public lines, the call to `jarvis` and the answer's schema, D42, D43), and the admin API on the private network alone, by a team account's session and a fresh signature of each change in words (ADR-0002 §6), that changes the quotas, the allowlist and `jarvis`'s budgets at once, with no restart, each change logged (D47); the environment gives their first value.
+- **10h, the service** (after 10f and 10g): translation and its cache, the digest's cache, `jarvis`'s entry and routes (the question, the budgets' change), its budgets kept in its database.
+- **10i, evals and deploy** (tier 1, after 10h): `evals/` with its provider and cases, installed apart, the `jarvis` container and the admin API's private network in `deploy/`.
+The modules of 10b to 10d are reached by their tests until 10e calls them; the slice merges into `main` whole, never before 10i. Two parts at once at most, each in its own session, worktree and herdr pane.
 
 ## 8. Dependencies
 
