@@ -7,6 +7,7 @@ import { gpuName } from "../src/features/universe/gpu.ts";
 import { CREDITS } from "../src/scene/planet/credits.ts";
 import { createRenderer } from "../src/scene/renderer.ts";
 import { pathOf, type Choice, type Tier, type ViewName } from "./choice.ts";
+import { tuningPanel } from "./panel.ts";
 import { probes } from "./probes.ts";
 import { buildView, type View } from "./views.ts";
 
@@ -227,5 +228,8 @@ if (!still)
   });
 
 Reflect.set(globalThis, "__lab", lab);
+tuningPanel(() => {
+  if (view !== undefined) draw(view);
+});
 
 step({});

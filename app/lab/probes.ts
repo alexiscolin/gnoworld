@@ -30,6 +30,7 @@ function stats({ renderer, gpu, view, choice, frames }: Probed) {
     programs: programs?.length ?? 0,
     calls: render.calls,
     renderer: gpu,
+    exposure: renderer.toneMappingExposure,
   };
 }
 

@@ -7,6 +7,7 @@ import { CREDITS } from "../src/scene/planet/credits.ts";
 import { startScene } from "../src/scene/scene.ts";
 import read from "./imports.json" with { type: "json" };
 import { linked } from "./linked.ts";
+import { tuningPanel } from "./panel.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
 const ZOOM = 0.0022;
@@ -47,6 +48,8 @@ const keepHeroRoom = () => {
 };
 addEventListener("resize", keepHeroRoom);
 keepHeroRoom();
+// The tuning panel's frame after a change: the hero's room kept as it stands, which asks the scene for one.
+tuningPanel(keepHeroRoom);
 
 const go = () => {
   scene.moveTo({ x: HOME.x + aside, y: HOME.y + along, z: HOME.z + (away - 1) * LEFT });
