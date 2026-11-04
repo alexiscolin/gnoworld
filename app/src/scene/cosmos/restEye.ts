@@ -118,6 +118,7 @@ export class RestEye {
   arrive(systems: readonly StarSystem[], asking: Asking, came: (asking: Asking, to: Point) => void): void {
     this.#turn += 1;
     const [turn, { id, plan }] = [this.#turn, asking];
+    const bound = id === undefined ? undefined : this.hand.boundAt(systems, id);
     const landed = (landing: Landing | undefined) => {
       if (turn === this.#turn) this.#come(asking, landing, came);
     };
@@ -130,7 +131,7 @@ export class RestEye {
       );
     else if (id === undefined) this.#come(asking, undefined, came);
     // The arrival a flight is bound for is there already: its eye is handed over in the frame the flight lands (7g2).
-    else if (systems[this.hand.bound?.index ?? -1]?.id === id) this.#come(asking, this.hand.bound, came);
+    else if (bound !== undefined) landed(bound);
     else
       loadArrival().then(
         ({ landingAt }) => {

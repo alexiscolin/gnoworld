@@ -40,9 +40,8 @@ export class Resting {
   view: RestView;
   #systems: readonly StarSystem[] = [];
   #asking: Asking | undefined;
-  // A system's dynamic view's rocks (7v), once the depth's chunk laid them for the landing they stand at.
-  #viewRocks: readonly Rock[] = [];
-  #rocksAt: Landing | undefined;
+  // A system's dynamic view's rocks (7v), once the depth's chunk laid them, by the landing they stand at: the eye's and a flight's.
+  readonly #rocks = new Map<Landing, readonly Rock[]>();
 
   /** `found` is told once a file's view has come, or a system's arrival; `device`'s eye is the one a flight turns (7g). Till then the view is
    * the scene's own, at its home. */
@@ -109,18 +108,19 @@ export class Resting {
     this.#lay(landing);
   };
 
-  // A dynamic view's rocks are laid once the depth's chunk comes, for the arrival the eye rests at or a flight comes to; a Plan has none,
-  // and rocks laid stay.
+  // A dynamic view's rocks are laid once the depth's chunk comes, for the arrival the eye rests at or a flight comes to, and kept while
+  // either is; a Plan has none.
   #lay(landing: Landing | undefined): void {
-    if (landing === this.#rocksAt) return;
-    this.#rocksAt = landing;
-    this.#viewRocks = [];
+    const kept = [this.#eye.landing, this.#eye.hand.bound];
+    for (const at of this.#rocks.keys()) if (!kept.includes(at)) this.#rocks.delete(at);
     const postcard = landing?.postcards.get(landing.index);
-    if (landing === undefined || landing.plan !== undefined || postcard === undefined) return;
+    if (landing === undefined || landing.plan !== undefined || postcard === undefined || this.#rocks.has(landing))
+      return;
+    this.#rocks.set(landing, []);
     loadRocks().then(
       ({ rocksOfView }) => {
-        if (this.#rocksAt !== landing) return;
-        this.#viewRocks = rocksOfView({ eye: landing.view.eye, look: landing.look, postcard }, LENT);
+        if (!this.#rocks.has(landing)) return;
+        this.#rocks.set(landing, rocksOfView({ eye: landing.view.eye, look: landing.look, postcard }, LENT));
         this.#found();
       },
       () => undefined,
@@ -157,7 +157,7 @@ export class Resting {
   drawn(systems: readonly StarSystem[], sight: { eye: Point; focal: number }, drawn: Drawn) {
     toMap(this.#resting, this.#restingMap);
     const [{ landing }, { bound }] = [this.#eye, this.#eye.hand];
-    const shownOf = (at: Landing) => ({ ...at, rocks: at === this.#rocksAt ? this.#viewRocks : [] });
+    const shownOf = (at: Landing) => ({ ...at, rocks: this.#rocks.get(at) ?? [] });
     const shown = landing === undefined ? { view: this.view, postcards: NONE, index: 0 } : shownOf(landing);
     const coming = landing === undefined && bound !== undefined ? shownOf(bound) : undefined;
     return drawnFrom(systems, { shown, drawn, coming }, { ...sight, resting: this.#restingMap });

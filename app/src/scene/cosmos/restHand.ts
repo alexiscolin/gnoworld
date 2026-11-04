@@ -15,6 +15,8 @@ const CARRY = 1;
 export class Hand {
   /** The arrival a flight is bound for, drawn as the eye comes, before it lands there. */
   bound: Landing | undefined;
+  // The systems it was found among: a new file's are looked through again.
+  #boundIn: readonly StarSystem[] = [];
   #binding = 0;
   // Whether the next arrival hands a flight's eye over, and whether it leaves an arrival, the eye kept; whether the next eye placed carries
   // the step from the last.
@@ -40,7 +42,7 @@ export class Hand {
       ({ landingAt }) => {
         const landing = binding === this.#binding ? landingAt(systems, id) : undefined;
         if (landing === undefined) return undefined;
-        this.bound = landing;
+        [this.bound, this.#boundIn] = [landing, systems];
         const [eye, look] = [
           { x: NaN, y: NaN, z: NaN },
           { x: NaN, y: NaN, z: NaN },
@@ -51,6 +53,12 @@ export class Hand {
       },
       () => undefined,
     );
+  }
+
+  /** The arrival bound for the system `id` of `systems`, the same file's; none for another. */
+  boundAt(systems: readonly StarSystem[], id: string): Landing | undefined {
+    const bound = this.bound;
+    return bound !== undefined && systems === this.#boundIn && systems[bound.index]?.id === id ? bound : undefined;
   }
 
   /** The next arrival hands a flight's eye over. */
