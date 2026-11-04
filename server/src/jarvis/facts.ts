@@ -4,9 +4,6 @@
 import { fold, inlines, isBlank, markdown, mentionsRoom, page, type Inline, type PageBlock } from "@gnoworld/core";
 import type { Digest, DigestBlock, ProposedAction } from "@gnoworld/schemas";
 
-/** How a text is read: as what is stated (a digest, a translation) or as what a source holds, each the stricter way. */
-type Reading = "stated" | "held";
-
 /** What a text states: its links, the accounts it names, its numbers as written, its figures, and whether it names the
  * whole room (`@room`). An account is a word that begins `g1`, or as long as an address, in any case, lower-cased. */
 export interface Facts {
@@ -33,10 +30,10 @@ function valueOf(digit: string, values: Map<string, string>): string {
 // What a person sees, case and marks kept: what core's isBlank says draws nothing goes, and so do the hair, thin, six-per-em
 // and punctuation spaces; a blank with a glyph's width (a Hangul filler, the braille blank) is nothing in what is stated and
 // a space in what is held, so each reading asks the most of the sources.
-function visible(text: string, reading: Reading): string {
+function visible(text: string, held: boolean): string {
   const blank = (char: string): string => {
     if (!isBlank(char) || /\s/u.test(char)) return char;
-    return reading === "held" && /[\p{L}\p{S}]/u.test(char) ? " " : "";
+    return held && /[\p{L}\p{S}]/u.test(char) ? " " : "";
   };
   return text.replace(/[\u2006\u2008\u2009\u200A]/gu, "").replace(/\P{ASCII}/gu, blank);
 }
@@ -70,13 +67,13 @@ function numbersIn(plain: string): Set<string> {
 export const groupsOf = (number: string): string => number.replace(/[^\d\p{No}-]/gu, ",");
 
 // A text's words as a person reads them: runs of letters and digits.
-const wordsOf = (plain: string): string[] => plain.match(/[\p{L}\p{N}]+/gu) ?? [];
+const wordsOf = (plain: string): string[] => Array.from(plain.matchAll(/[\p{L}\p{N}]+/gu), ([word]) => word);
 const isAccount = (word: string): boolean => word.startsWith("g1") || word.length >= 38;
 
 // A number a letter or a mark touches, as written, case and marks kept (`1OOO`, `GRC20`): a figure no number check reads.
 const figuresIn = (shown: string): Set<string> =>
   new Set(
-    (shown.match(/[\p{L}\p{M}\p{N}]+/gu) ?? []).filter(
+    Array.from(shown.matchAll(/[\p{L}\p{M}\p{N}]+/gu), ([word]) => word).filter(
       (word) => /\p{N}/u.test(word) && /[^\p{Nd}\p{No}]/u.test(word) && !isAccount(word.toLowerCase()),
     ),
   );
@@ -87,10 +84,11 @@ function linksIn(nodes: Iterable<Inline>): Set<string> {
   return links;
 }
 
-/** A text's facts, read as the room reads a message, as what is stated or as what a source holds. */
-export function factsOf(text: string, reading: Reading = "stated"): Facts {
+/** A text's facts, read as the room reads a message: as what is stated (a digest, a translation), or, `held`, as what a
+ * source holds (a translation's original), each the way that asks the most of the sources. */
+export function factsOf(text: string, held = false): Facts {
   const blocks = markdown(text);
-  const shown = visible(text, reading);
+  const shown = visible(text, held);
   const plain = unseen(shown);
   return {
     links: linksIn(inlines(blocks)),
@@ -134,7 +132,7 @@ function piecesOf(source: string, links: ReadonlySet<string>): Set<string> {
 export function sourceFactsOf(source: string, origin: string): SourceFacts {
   const read = page(source, { origin });
   const links = read.kind === "page" ? linksIn(pageInlines(read.blocks)) : new Set<string>();
-  const shown = visible(source, "held");
+  const shown = visible(source, true);
   const plain = unseen(shown);
   return { links, numbers: numbersIn(plain), words: new Set(wordsOf(plain)), pieces: piecesOf(source, links) };
 }
@@ -174,11 +172,8 @@ function partsOf(block: DigestBlock): Parts {
   }
 }
 
-// A word that is neither a number nor an account, which have checks of their own.
-// An argument's piece, between blanks as given, that no other check reads as it is (a number's and an account's do): an
-// empty one carries nothing.
-const isPiece = (piece: string): boolean =>
-  piece !== "" && !/^-?\d+$/.test(piece) && !(/^[\da-z]+$/.test(piece) && isAccount(piece));
+// An argument's piece, between blanks as given, that no other check reads as it is: a number's and an account's do.
+const isPiece = (piece: string): boolean => !/^-?\d+$/.test(piece) && !(/^[\da-z]+$/.test(piece) && isAccount(piece));
 
 const addAll = (into: Set<string>, from: Iterable<string>): void => {
   for (const value of from) into.add(value);
@@ -201,7 +196,8 @@ export function digestFacts(digest: Digest): DigestFacts {
     }
     addAll(facts.links, whole);
     if (action !== undefined) actions.push(action);
-    for (const value of Object.values(action?.args ?? {})) addAll(pieces, value.split(/\s+/u).filter(isPiece));
+    for (const value of Object.values(action?.args ?? {}))
+      addAll(pieces, Array.from(value.matchAll(/\S+/gu), ([part]) => part).filter(isPiece));
   }
   return { ...facts, figures, room, actions, pieces };
 }

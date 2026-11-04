@@ -62,11 +62,7 @@ function missingIn(stated: DigestFacts, sources: Sources): Missing[] {
   check("number", stated.figures, piece);
   check("address", stated.addresses, word);
   if (stated.room) missing.push({ kind: "room", value: "@room" });
-  check(
-    "argument",
-    stated.pieces,
-    (value) => value === sources.realm || (coreOf(value) !== "" && piece(coreOf(value))),
-  );
+  check("argument", stated.pieces, (value) => value === sources.realm || piece(coreOf(value)));
   // ponytail: each form looks its function up in the realm's list, 50 forms at most (the schema's blocks).
   for (const action of stated.actions) {
     if (action.realm !== sources.realm) missing.push({ kind: "realm", value: action.realm });
