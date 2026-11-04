@@ -6,7 +6,8 @@ whole suite at a part's end and at merges):
 - server/src/main.test.ts runs the server as a child process, which loads core and the schemas outside Vitest's graph: any code
   of the server, core or the schemas adds it. The server loads core's whole index (193 of their 216 files), so a closure of its
   imports would have spared 6 of slice 7's 226 commits that touch them.
-- a file read from disk: every code file under the sources is grepped for the places it names on disk (READ, LITERAL, JOINED);
+- a file read from disk: every code file under the sources is grepped for the places it names on disk (READ, a path written from the
+  repository's root, a root folder's name alone);
   a change at or under a place adds its reader, a test, or a module whose importers Vitest then finds. A place that is a
   workspace's or the repository's root, or a path built at run time, is a base a later argument completes (a copy of the app
   to build, a file a helper is given): it adds its reader for a change outside Vitest's graph only, as a change of code is
@@ -19,7 +20,7 @@ glob not written out, import.meta.url anywhere but in `new URL(<path>, import.me
 reads would never bring it back; so is a link or a special file under the sources, which the walk does not follow.
 
 Usage, from the repository root: the changed paths on stdin, one a line, as check.sh lists them. It prints, shell-quoted on one
-line, the paths for Vitest's `related` command: those under the sources (Vitest follows their imports), and what the maps add.
+line, the paths for Vitest's `related` command: each changed path but prose (Vitest follows what imports it), and what the maps add.
 `--check`: the refusal alone, nothing read or printed (a run of every test)."""
 import os
 import re
@@ -86,7 +87,8 @@ def scan(top_folders):
     """(reads, refused): each read as (reader, path, prefix, text), text when the reader reads code as text (a glob, a query);
     each place the grep cannot follow as `file:line: text`."""
     literal = re.compile(r"""["'`](?:\./)?((?:%s)/[^"'`$\n]*)(\$\{)?""" % "|".join(map(re.escape, top_folders)))
-    joined = re.compile(r"""\b(?:join|resolve)\(\s*["'](%s)["']""" % "|".join(map(re.escape, top_folders)))
+    # A root folder's name alone: a path joined from parts (`join("deploy", ...)`, `["app", "data", f].join("/")`, `${top}/x`).
+    bare = re.compile(r"""["'`](%s)["'`]""" % "|".join(map(re.escape, top_folders)))
     reads, refused = [], []
     for file, plain in sources():
         if not plain:
@@ -94,6 +96,7 @@ def scan(top_folders):
             continue
         with open(file, encoding="utf-8", errors="replace") as f:
             text = f.read()
+        lines = text.splitlines()
         here = os.path.dirname(file)
         spans = []
         for m in READ.finditer(text):
@@ -125,12 +128,12 @@ def scan(top_folders):
             got = place(m.group(1), "", m.group(2) is not None)
             if got:
                 reads.append((file, *got, False))
-        for m in joined.finditer(text):
+        for m in bare.finditer(text):
             reads.append((file, m.group(1), False, False))
         for m in ANCHOR.finditer(text):
             if not any(a <= m.start() < b for a, b in spans):
                 line = text.count("\n", 0, m.start()) + 1
-                refused.append(f"{file}:{line}: {text.splitlines()[line - 1].strip()[:120]}")
+                refused.append(f"{file}:{line}: {lines[line - 1].strip()[:120]}")
     return reads, refused
 
 
@@ -172,8 +175,7 @@ def main():
     for path in sys.stdin.read().split("\n"):
         if not path or prose(path):
             continue
-        if SOURCES.match(path):
-            out.add(path)
+        out.add(path)  # Vitest follows its importers, a JSON or a stylesheet of app/data or app/lab too (F4810)
         if path.startswith(SERVER) and CODE.search(path) and not TEST.search(path):
             out.add(MAIN)
         out.update(read[0] for read in reads if covers(read, path, top_folders))

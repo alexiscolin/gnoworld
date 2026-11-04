@@ -193,7 +193,7 @@ fi
 if [ -n "$changed" ]; then
 	all=false code=false hooks=false
 	while IFS= read -r path; do
-		case $path in docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold
+		case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; docs/* | adr/* | *.md) continue ;; esac # prose, which pre-commit's list may hold; a recorded page under the sources is a fixture (F4812)
 		code=true
 		# A commit that touches a test, a bench or an approved picture runs check_regressions (a renamed test passed the fast gate
 		# in 5b and failed only the merge check); one that changes the lockfile runs the audit (lighthouse's advisories showed only
@@ -214,7 +214,7 @@ if [ -n "$changed" ]; then
 			all=true
 			case $path in
 			lint/shared.config.ts | app/vitest.compiled.config.ts | deploy/test.sh | deploy/web/nginx.conf) hooks=true ;; # its own cases read them
-			pnpm-lock.yaml | knip.json | .jscpd.json | .prettierignore | eslint.config.ts | tsconfig.json | tsconfig.base.json | */tsconfig.json | app/*.config.ts | lint/* | server/roles.json | deploy/*) ;;
+			knip.json | .jscpd.json | .prettierignore | eslint.config.ts | tsconfig.json | tsconfig.base.json | */tsconfig.json | app/*.config.ts | lint/* | server/roles.json | deploy/*) ;;
 			*) hooks=true ;;
 			esac
 			;;
@@ -225,6 +225,7 @@ EOF
 	$code || all=true hooks=true # prose alone is no change of code, as in a repository
 fi
 $all && ts=true app=true gno=true
+! $tests_all || ts=true # every test, whatever the change (F4815)
 related=true
 if $all || $tests_all; then related=false; fi
 # check_regressions reads git, which the staged copy has not (pre-commit runs it in the repository); a merge's full gate follows and
@@ -530,27 +531,30 @@ if $full; then
 	# A merge's own gate judges the product when its change since main holds some (Alexis, 2026-10-29): docs, the harness and
 	# the linters' configs alone have no coverage, mutant or fix of the product to judge, which took 40 of its 47 minutes. --full judges all.
 	# check_nginx.py and check_migrations.py run when what they read changed since the base (the harness audit, 2026-11-04): nginx's,
-	# the image's web files, the build's table and the pages it lists, the check and its pin; the migrations', the server's code.
+	# the image's web files, the app and what it builds from (its table and pages come from the data, the routes, the inline scripts:
+	# app/react-router.config.ts, F4811), the lockfile, the check and its pin; the migrations', the server's code.
 	product=true nginx=false migrations=false
 	! $merge || product=false
 	while IFS= read -r path; do
 		case $path in '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
-		case $path in deploy/web/* | app/react-router.config.ts | app/src/csp.ts | app/src/routes.ts | scripts/check_nginx.py | scripts/nginx.sha256) nginx=true ;; esac
+		case $path in deploy/web/* | app/* | packages/* | pnpm-lock.yaml | scripts/check_nginx.py | scripts/nginx.sha256) nginx=true ;; esac
 		case $path in server/src/* | scripts/check_migrations.py) migrations=true ;; esac
 	done <<EOF
 $changes
 EOF
 	$product || echo "check.sh --merge: no product code since $base: the stories, the coverage lane and prove_fix do not run"
-	# probe.py and harness_mutate.py in --full: skipped when no harness file (records.sh's list) changed since the last green --full,
-	# whose commit .claude/tmp/green-harness names, and nothing is untracked, which git diff does not see (the harness audit, 2026-11-04:
-	# the mutants took 173 s warm, up to 3,766 s). The record must name a commit by its whole id; anything else runs both.
-	harness_judged=false
+	# harness_mutate.py in --full: skipped when no harness file (records.sh's list) changed since the last green --full, whose commit
+	# .claude/tmp/green-harness names, and nothing is untracked, which git diff does not see (the harness audit, 2026-11-04: the mutants
+	# took 173 s warm, up to 3,766 s); probe.py too, when nothing at all changed, as it reads the product's files (tokens.css, F4813).
+	# The record must name a commit by its whole id; anything else runs both.
+	harness_judged=false probe_judged=false
 	if ! $merge && [ -z "$(git ls-files --others --exclude-standard)" ]; then
 		judged=$(cat .claude/tmp/green-harness 2>/dev/null || :)
 		case $judged in *[!0-9a-f]*) judged= ;; esac # a name, an option, a second line, a carriage return: no id
 		if [ "${#judged}" = 40 ] && git rev-parse -q --verify "$judged^{commit}" >/dev/null && harness --quiet "$judged"; then
 			harness_judged=true
-			echo "check.sh --full: no harness file changed since the last green --full ($judged): probe.py and harness_mutate.py do not run"
+			! git diff --quiet "$judged" || probe_judged=true
+			echo "check.sh --full: no harness file changed since the last green --full ($judged): harness_mutate.py does not run$($probe_judged && echo ', nor probe.py (no change at all)')"
 		fi
 	fi
 	# The merge check's two speeds (slice 7, question 21; scripts/speeds.py reads docs/REVIEW.md's tiers): a change of interface alone runs no
@@ -565,7 +569,7 @@ EOF
 	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
 	# check_regressions' list, StrykerJS, the stories' build) would read its files as they come and go.
 	lane_probe() {
-		if ! $harness_judged; then
+		if ! $probe_judged; then
 			step probe # the harness keeps its promises
 			python3 -I scripts/probe.py
 		fi
@@ -691,8 +695,9 @@ fi
 if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
 	# The harness a green --full judged, by its commit, for the next --full to skip the probe and the mutants on (above): only a tree
-	# whose harness is committed, with nothing untracked, and that did not change while the gate ran, is named by one.
-	if $full && ! $merge && [ "$(worktree_print)" = "$tested" ] && harness --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+	# whose harness is committed, with nothing untracked, and that did not change while the gate ran, is named by one; and only from
+	# origin/main, as a run from another base judges no mutant of a harness that base already has (F4814).
+	if $full && ! $merge && [ "$base_ref" = origin/main ] && [ "$(worktree_print)" = "$tested" ] && harness --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
 		git rev-parse HEAD >.claude/tmp/green-harness
 	fi
 	! $merge || full=false # --merge records the fast gate only: main wants --full's record

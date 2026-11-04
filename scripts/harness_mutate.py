@@ -1002,7 +1002,7 @@ def mutants():
         ("elif ! $full; then", "elif true; then", "--full is never scoped"),
         ("':!node_modules'", "':!nothing'", "a linked node_modules is no change"),
         ('if ! $full && [ -z "$tested" ]; then', 'if ! $full && true; then', "a repository reads its change from git, never GATE_CHANGED"),
-        ("case $path in docs/* | adr/* | *.md) continue", "case $path in docs/nothing) continue", "prose in pre-commit's list is no change"),
+        (";; docs/* | adr/* | *.md) continue", ";; docs/nothing) continue", "prose in pre-commit's list is no change"),
         ("\t$code || all=true", "\t:", "prose alone runs everything"),
         ("if ! $full && [ -z \"$tested\" ]; then", "if [ -z \"$tested\" ]; then", "--full in a copy is never scoped"),
         ("$all || $app || budget=30", ":", "a scoped run has the lower budget"),

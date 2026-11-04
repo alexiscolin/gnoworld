@@ -2361,7 +2361,8 @@ package.json" "server/src/a.ts
 
 deploy/a.conf" '"deploy/a\nb"
 server/src/a.ts' " deploy/a.conf
-server/src/a.ts" 'docs-x/a.ts
+server/src/a.ts" 'server/src/a.ts\
+package.json' 'docs-x/a.ts
 server/src/a.ts'; do
 	outside "$list" >/dev/null || fail "check.sh failed outside a repository on the list: $list"
 	everything "pre-commit's list: $list"
@@ -2387,7 +2388,7 @@ fi
 if part gate_triggers; then
 gate_fixture gate_triggers
 # A config, the harness, a package file, or a path of no known area: everything.
-for f in package.json vitest.config.ts scripts/check_css.py .gitignore server/package.json app/package.json; do
+for f in package.json pnpm-lock.yaml vitest.config.ts scripts/check_css.py .gitignore server/package.json app/package.json; do
 	printf '\n' >>"$g/$f"
 	gate >/dev/null || fail "check.sh failed on a change of $f"
 	everything "a change of $f"
