@@ -22,7 +22,7 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "scene", after: ["mountUniverse"], cap: 159_835 },
   // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
   // 17,130 B with the Earth's view's loader, the glide and the ring kept off the text (7x2, the chief, inside the margin given ahead);
-  // 17,322 B with the star's warmth in a chunk the system and the generated worlds share (7b9, inside the margin given ahead).
+  // 17,322 B with the star's warmth in a chunk the system and the generated worlds share (7b9, the night's +1 KiB, the chief).
   { chunk: "cosmos", after: ["scene"], cap: 17_322 },
   { chunk: "web", after: ["scene", "cosmos"], cap: 5044 },
   { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
