@@ -6,7 +6,7 @@ import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { SWAY_CORNERS } from "../space/drift.ts";
 import { onPlane } from "./disc.ts";
-import { HALO_FAR, haloAt } from "./halo.ts";
+import { glowsAt, HALO_FAR } from "./halo.ts";
 import { frames, leaned, LEANS, roomOf, seenOf, type Card, type LeanRoom } from "./framing.ts";
 import { postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
 import {
@@ -53,10 +53,9 @@ const STEEP = Math.sin(60 * DEGREE);
 // A system of grain alone is framed by its star; one no angle holds stands its ball 60% of the screen's height.
 const LEAST_REACH = 2.5;
 const FILL = 0.6;
-// What the view reads of its set: another system's room round the eye, and any star that keeps three quarters of its halo or more, which
-// would read as a second sun; the eye stands within twice a system's room of its star, so nothing past a halo's reach counts.
+// What the view reads of its set: another system's room round the eye, and any star that glows, which would read as a second sun; the eye
+// stands within twice a system's room of its star, so nothing past a halo's reach counts.
 const OUTSIDE = ROOM + 1;
-const SECOND_SUN = 0.75;
 const NEAR = HALO_FAR + 2 * ROOM;
 // The most worlds a dynamic view draws: the mock-up's six (Alexis, 2026-11-03, the views page, 14:09), held still, where the home's
 // postcards keep frame 4's four.
@@ -90,7 +89,7 @@ function alone(look: Look, card: Card, near: readonly StarSystem[]): boolean {
   if (earth.depth > 0 && apart(earth, ball) < earth.radius + ball.radius) return false;
   return near.every((other) => {
     const seen = look.seen(other.place);
-    return seen.depth <= 0 || haloAt(seen.away) < SECOND_SUN || apart(seen, ball) >= ball.radius;
+    return seen.depth <= 0 || !glowsAt(seen.away) || apart(seen, ball) >= ball.radius;
   });
 }
 

@@ -2,6 +2,7 @@
 // field of stars is, not worlds: no name, no click, nothing that claims data. They stand in space from the view's own seed, so the same view
 // sees the same rocks, the nearer larger, and slide with the eye as it moves; never over the Earth, a body or the room of its label. In the
 // depth's chunk: it reads the view through the judge `deep.ts` makes of it.
+import { PLACE } from "../lod/place.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { SWAY, SWAY_CORNERS } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
@@ -19,15 +20,15 @@ const MARGIN = 16;
 const APART = 6;
 // The farthest a pebble stands at the home, its near rock's nearest at a fourth of it.
 const FARTHEST = 16;
-// A label's room round its body, as core's `settle.ts` stands it (PLACE): a pill 200 pixels wide at most and 32 high, its stem 12 in from
-// the end over the body, 22 off its outline, above or below.
-const LABEL = { wide: 200, high: 32, stem: 12, gap: 22 } as const;
+// A label's room round its body, as core's layout stands it (`PLACE`): a pill 200 pixels wide at most and 32 high, its stem in from the end
+// over the body, off its outline above or below.
+const LABEL = { wide: 200, high: 32 } as const;
 
 // Whether a rock there stands on a body, or where its label may stand, `margin` pixels round.
 const onRoom = (rock: Seen, body: Seen, margin = MARGIN) =>
   gap(rock, body) < margin ||
-  (Math.abs(rock.x - body.x) < LABEL.wide - LABEL.stem + rock.radius + margin &&
-    Math.abs(rock.y - body.y) < body.radius + LABEL.gap + LABEL.high + rock.radius + margin);
+  (Math.abs(rock.x - body.x) < LABEL.wide - PLACE.stem + rock.radius + margin &&
+    Math.abs(rock.y - body.y) < body.radius + PLACE.gap + LABEL.high + rock.radius + margin);
 
 // A rock seen on one screen: off the page's text (the hero, or a system's card), the star's heart, the Earth and its label's room, and every
 // one of `rooms` and its label's room, the rock sliding `drift` pixels past them as the eye sways.

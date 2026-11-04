@@ -2,7 +2,7 @@
 // turned about the eye's line, as open as it was, till no two neighbours stand at one height, and each world drawn at a share of its size,
 // the nearer the larger, 1.5 times the next farther or more through its turn, none under a body's least size. Its data stays its own.
 import type { Orbiter, StarSystem } from "../cosmos/system.ts";
-import { BODY_PIXELS } from "../lod/ladder.ts";
+import { DRAWN_LEAST } from "../lod/ladder.ts";
 import { atOneHeight } from "./composition.ts";
 import { dot, focalOf, minus, placeOf, REST_SCREENS, type Camera } from "./restLook.ts";
 import type { Point } from "../space/cell.ts";
@@ -12,10 +12,8 @@ import type { Point } from "../space/cell.ts";
 const TURN = Math.PI / 18;
 const TURNS = 36;
 const APART = 1.5015;
-// A share is judged at the eight instants of its turn a view is judged at; a body stays 1.5 times the ladder's least size, so it is a body
-// still on a screen a third smaller.
+// A share is judged at the eight instants of its turn a view is judged at; a body stays the view's least drawn size or more.
 const INSTANTS = 8;
-const LEAST = 1.5 * BODY_PIXELS;
 const { width: WIDTH, height: HEIGHT } = REST_SCREENS[0];
 
 /** The normal of `system`'s plane, as `onPlane` stands it. */
@@ -91,6 +89,6 @@ export function depthOf(plane: StarSystem, worlds: readonly Orbiter[], camera: C
     shares[far] = rank === 0 ? 1 : Math.min(1, ((shares[near] ?? 1) * room) / APART);
     least = Math.min(least, (shares[far] ?? 1) * Math.min(...(sizes[far] ?? [])));
   });
-  const lift = Math.max(1, LEAST / least);
+  const lift = Math.max(1, DRAWN_LEAST / least);
   return shares.map((share) => share * lift);
 }

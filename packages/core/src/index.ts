@@ -78,7 +78,7 @@ export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
 export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt, rocksOf } from "./frame/rocks.ts";
-export { HALO_FAR, haloAt } from "./frame/halo.ts";
+export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
 export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export {
