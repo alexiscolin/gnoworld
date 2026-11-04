@@ -13,6 +13,30 @@ def git(*args):
     return subprocess.run(["git", "-c", "core.quotePath=false", *args], capture_output=True, text=True, check=True).stdout
 
 
+HUNK = re.compile(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@")
+
+
+def changed_lines(*args, removals=False):
+    """{path: the lines of its new side that changed}, from `git diff -U0 <args>` (its commits, options and pathspecs). A hunk of
+    count 0 only removes: it touches no line, or with `removals` the two beside it, a deleted file then kept by its old name.
+    A file's names are read between its `diff --git` and its first hunk alone: a line removed that reads `-- x` is no name."""
+    changed, old, current, header = {}, None, None, False
+    for line in git("diff", "-U0", "--no-color", "--no-ext-diff", "--text", "--no-textconv", *args).splitlines():
+        if line.startswith("diff --git "):
+            old, current, header = None, None, True
+        elif line.startswith("@@"):  # with -U0 a line of a hunk starts with + or -
+            header, hunk = False, HUNK.match(line)
+            if current and hunk:
+                start, count = int(hunk.group(1)), int(hunk.group(2) or 1)
+                touched = range(start, start + count) if count else (start, start + 1) if removals else ()
+                changed.setdefault(current, set()).update(touched)
+        elif header and line.startswith("--- "):
+            old = None if line == "--- /dev/null" else line[6:]
+        elif header and line.startswith("+++ "):
+            current = (old if removals else None) if line == "+++ /dev/null" else line[6:]
+    return changed
+
+
 # /pre-merge's records (review_pass.py), and the files of the review itself, which a record leaves out.
 PASSES = "docs/review-passes.txt"
 OWN = {"docs/review-log.md", PASSES}

@@ -30,7 +30,7 @@ import types
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import git, last_reviewed, worktree
+from repo_files import changed_lines, git, last_reviewed, worktree
 from suite_parts import code, parts, select
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
@@ -64,9 +64,9 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,gate_speeds", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
 
@@ -414,14 +414,45 @@ def mutants():
     yield from each(hm, 'collections.Counter(m[1]' ' for m in found)', 'collections.Counter(m[0] for m in found)', "hooks", "harness_mutate --changed says which files its mutants come from")
     yield from each(hm, "context = code(" "outside", "context = (outside", "hooks", "a cached verdict does not stand on a suite's blank lines")
     yield from each(hm, "sha256(code(" "mutated)", "sha256((mutated)", "hooks", "a cached verdict does not stand on its file's blank lines")
-    yield from each(hm, '"--no-renames", "--no-color"' ', "--no-ext-diff"', '"--no-renames", "--no-ext-diff"', "hooks", "harness_mutate --changed reads the hunks whatever git's colours")
-    yield from each(hm, '"--no-color", "--no-ext-diff"' ', "--text"', '"--no-color", "--text"', "hooks", "harness_mutate --changed reads the hunks whatever git's external diff")
-    yield from each(hm, '"--no-ext-diff", "--text"' ', "--no-textconv"', '"--no-ext-diff", "--no-textconv"', "hooks", "harness_mutate --changed reads a file marked -diff as text, not as Binary files differ (F2537)")
-    yield from each(hm, '"--text", "--no-textconv"' ", base", '"--text", base', "hooks", "harness_mutate --changed reads the hunks whatever a textconv (F2537)")
-    yield from each(hm, "int(hunk.group(2)" " or 1)", "int(hunk.group(2) or 0)", "hooks", "harness_mutate --changed reads a hunk of one line, which git writes with no count")
-    yield from each(hm, "if count else {start," " start + 1}", "if count else set()", "hooks", "harness_mutate --changed: a removed line touches the two beside it")
-    yield from each(hm, "if count else {start," " start + 1}", "if count else {start}", "hooks", "harness_mutate --changed: a removed line touches the line after it")
-    yield from each(hm, "if count else {start," " start + 1}", "if count else {start + 1}", "hooks", "harness_mutate --changed: a removed line touches the line before it")
+    rf = "scripts/repo_files.py"  # the hunks harness_mutate --changed reads, as patch_coverage and the merge check's StrykerJS do
+    yield from each(rf, '"-U0", "--no-color"' ', "--no-ext-diff"', '"-U0", "--no-ext-diff"', "hooks", "harness_mutate --changed reads the hunks whatever git's colours")
+    yield from each(rf, '"--no-color", "--no-ext-diff"' ', "--text"', '"--no-color", "--text"', "hooks", "harness_mutate --changed reads the hunks whatever git's external diff")
+    yield from each(rf, '"--no-ext-diff", "--text"' ', "--no-textconv"', '"--no-ext-diff", "--no-textconv"', "hooks", "harness_mutate --changed reads a file marked -diff as text, not as Binary files differ (F2537)")
+    yield from each(rf, '"--text", "--no-textconv"' ", *args", '"--text", *args', "hooks", "harness_mutate --changed reads the hunks whatever a textconv (F2537)")
+    yield from each(rf, "int(hunk.group(2)" " or 1)", "int(hunk.group(2) or 0)", "hooks", "harness_mutate --changed reads a hunk of one line, which git writes with no count")
+    yield from each(rf, "(start, start + 1)" " if removals", "() if removals", "hooks", "harness_mutate --changed: a removed line touches the two beside it")
+    yield from each(rf, "(start, start + 1)" " if removals", "(start,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line after it")
+    yield from each(rf, "(start, start + 1)" " if removals", "(start + 1,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line before it")
+    # A commit's lint: its change and the files that import it, from the type check's own graph, in a folder of the run's or the worktree's.
+    ck = "scripts/check.sh"
+    yield from each(ck, "|| TSC_CACHE=$PWD/.claude/tmp/tsc", "|| TSC_CACHE=$logs/tsc", "hooks", "check.sh builds a repository's types from the worktree's own cache")
+    yield from each(ck, '{ $full || [ -z "$tested" ]; } || TSC_CACHE=', "TSC_CACHE=", "hooks", "check.sh's full gate and staged copy read no type cache they keep")
+    yield from each(ck, "\tif ! $related; then\n\t\trun lint\n\t\treturn 0\n\tfi\n", "", "hooks", "check.sh lints the whole repository when every test runs")
+    yield from each(ck, '|| { echo "check.sh: lint_scope.py failed: the whole repository is linted"; scope=.; }', "|| scope=", "hooks", "check.sh lints the whole repository when lint_scope.py fails")
+    yield from each(ck, '\tif [ "$scope" = . ]; then\n', "\tif false; then\n", "hooks", "check.sh lints the whole repository on lint_scope.py's '.'")
+    yield from each(ck, '\t[ -n "$scope" ] || { echo', "\t! false || { echo", "hooks", "check.sh runs no ESLint with no file to read")
+    yield from each(ck, '\tcase $lint in *" .") ;; *)\n', "\tcase $lint in *) ;; *)\n", "hooks", "check.sh names no file to a lint script of another shape")
+    yield from each(ck, '"${lint% .} --no-warn-ignored -- $scope"', '"${lint% .} -- $scope"', "hooks", "check.sh tells ESLint to pass over a file it does not lint")
+    yield from each(ck, '"${lint% .} --no-warn-ignored -- $scope"', '"${lint% .} --no-warn-ignored $scope"', "hooks", "check.sh ends ESLint's options before the files (lot 1, S3)")
+    yield from each(ck, "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "\n: GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "hooks", "check.sh reads git's own folders, never a caller's (lot 1, S5)")
+    yield from each(ck, "*) grep -E '^(check\\.sh|lint_scope|stryker_lines)[ :]' \"$logs/$l.log\" || : ;;", "*) ;;", "hooks", "check.sh says how a lane that passed ran")
+    # Every gate step's time, kept.
+    yield from each(ck, ' >>"$step_log"; } 2>/dev/null || :', ' >/dev/null; } 2>/dev/null || :', "hooks", "check.sh keeps every step's time")
+    yield from each(ck, '"$run_at" "$repository" "$mode"', '"$run_at" "$repository" fast', "hooks", "check.sh's step log says the run's mode")
+    yield from each(ck, '[ -n "$tested" ] || mode=staged\n', "", "hooks", "check.sh's step log tells pre-commit's staged copy from a repository's run")
+    yield from each(ck, "} 2>/dev/null || : # the measure, never the run", "} # the measure, never the run", "hooks", "check.sh passes a run whose step log it cannot write")
+    ls = "scripts/lint_scope.py"
+    yield from each(ls, "            todo.extend(importers.get(file, ()))\n", "", "hooks", "lint_scope.py follows the importers at any depth")
+    yield from each(ls, "    if global_scope.intersection(todo):\n", "    if False:\n", "hooks", "lint_scope.py lints the whole repository on a change of the global scope")
+    yield from each(ls, "importers.setdefault(path[i - 1], set()).add(path[ref[0] - 1])", "importers.setdefault(path[ref[0] - 1], set()).add(path[i - 1])", "hooks", "lint_scope.py follows a file to its importers, not to its imports")
+    yield from each(ls, "1 <= value <= most", "0 <= value <= most", "hooks", "lint_scope.py reads TypeScript's ids from 1")
+    yield from each(ls, '            raise ValueError("a fileIdsList entry of no known form")\n', "            pass\n", "hooks", "lint_scope.py refuses a graph whose lists name no file")
+    yield from each(ls, "            raise ValueError(\"package.json's typecheck names no .tsbuildinfo\")\n", "            pass\n", "hooks", "lint_scope.py lints the whole repository with no graph")
+    yield from each(ls, "infos = [pathlib.Path(sys.argv[1]) / name for name in named()]", 'infos = sorted(pathlib.Path(sys.argv[1]).glob("*.tsbuildinfo"))', "hooks", "lint_scope.py reads the files the type check names alone (lot 1, R2)")
+    yield from each(ls, "{path for path in changed if os.path.isfile(path)}", "set(changed)", "hooks", "lint_scope.py leaves out a changed path that is gone")
+    yield from each(ls, "{real[file] for file in seen if file in real}", "set(seen)", "hooks", "lint_scope.py names each file in its own case")
+    yield from each(ls, "shlex.quote(path) for path", "path for path", "hooks", "lint_scope.py quotes each path for the shell")
+    yield from each(ls, "os.path.abspath(info.parent)", "os.path.realpath(info.parent)", "hooks", "lint_scope.py reads the names from the folder as tsc was told it")
     yield from each(hm, '"probe": "scripts/' 'probe.py"}', '"probe": "scripts/nowhere.py"}', "hooks", "a cached verdict reads probe.py as test_hooks.sh (G5)")
     # The find is split in two, so that this line holds it nowhere itself: a spot of its own would be a mutant of no guard.
     yield from each(hm, 'SUITE_OF = {"hooks": "scripts/test_hooks.sh' '", ', 'SUITE_OF = {', "hooks", "a cached verdict reads both suites (G5)")
@@ -915,8 +946,8 @@ def mutants():
     yield from each("scripts/check.sh", "--outputFile.json=$logs/vitest.json", "--outputFile.jsn=$logs/vitest.json", "hooks", "check.sh asks Vitest for its report")
     yield from each("scripts/check.sh", 'export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"', ":", "hooks", "check.sh asks Playwright for its report")
     yield from each("scripts/check.sh", "--reporter=dot,json", "--reporter=dot", "hooks", "check.sh asks Playwright for its JSON reporter")
-    yield from each("scripts/check.sh", "unsteady_log=.claude/tmp/unsteady.log\n", "unsteady_log=/dev/null\n", "hooks", "check.sh logs an unsteady test in .claude/tmp")
-    yield from each("scripts/check.sh", 'unsteady_log=$(dirname "$(readlink node_modules)")/', "unsteady_log=", "hooks", "check.sh logs a staged copy's unsteady test in the repository")
+    yield from each("scripts/check.sh", "unsteady_log=$repository/.claude/tmp/unsteady.log\n", "unsteady_log=/dev/null\n", "hooks", "check.sh logs an unsteady test in .claude/tmp")
+    yield from each("scripts/check.sh", 'repository=$(cd "$(dirname "$(readlink node_modules)")" && pwd -P)', "repository=$(pwd -P)", "hooks", "check.sh logs a staged copy's unsteady test in the repository")
     yield from each("scripts/check.sh", """grep '^unsteady: ' "$logs/$l.log" || :""", ":", "hooks", "check.sh says an unsteady test it ran again")
     un = "scripts/unsteady.py"
     yield from each(un, ".returncode != 0:", ".returncode == 99:", "hooks", "unsteady: a file that fails twice fails the gate")
@@ -1013,7 +1044,17 @@ def mutants():
         ('\t\tcat "$logs/$l.log" >&2\n', "\n", "a failed lane's output is shown"),
         ('\t[ -z "$failed" ]\n}', "\t:\n}", "finish fails when a lane did"),
         ("\t$ts || return 0\n\tstep typecheck", "\tstep typecheck", "types only for a TypeScript change"),
-        ("\t$ts || return 0\n\tstep ergo", "\tstep ergo", "tests only for a TypeScript change"),
+        ("\t$ts || return 0\n\t! $light || return 0 # no Vitest", "\t! $light || return 0 # no Vitest", "tests only for a TypeScript change"),
+        ("\t! $light || return 0 # no Vitest", "\t: # no Vitest", "no Vitest in the radical mode's light gate"),
+        ("\t! $light || return 0 # no journey", "\t: # no journey", "no tokens' pictures in the radical mode's light gate"),
+        ("\t! $light || return 0 # its checks", "\t: # its checks", "no docs' lane in the radical mode's light gate"),
+        ("\tif ! $light; then # the light gate keeps jscpd", "\tif true; then # the light gate keeps jscpd", "the light gate runs no Prettier nor knip"),
+        ("\tlight=true\n", "\t:\n", "the radical mode's light gate runs"),
+        ('[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ]', "true", "the light gate wants git's hooks folder's radical-mode on"),
+        ('[ "$(printf \'%s\\n\' "$changed" | python3 -I scripts/speeds.py --light "$PWD" "$logs/main-review.md")" = light ]', "true", "the light gate wants no tier-1 path"),
+        ('git -C "$repository" show origin/main:docs/REVIEW.md >"$logs/main-review.md" 2>/dev/null &&', "{ : >\"$logs/main-review.md\"; } &&", "the light gate wants main's own tier-1 table (lot 1, R1)"),
+        ('harnessed=$(harness_of) && [ -z "$harnessed" ]', "true", "the light gate wants no harness file"),
+        ("! $all && ! $tests_all && common=", "! $all && common=", "--tests-all runs the whole gate in the radical mode"),
         ("\t$gno || return 0", "\t:", "gno only for a gno change"),
         ("\t$app || return 0", "\t:", "the journeys only for an app change"),
         ("\t$hooks || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only when what they test changed"),
@@ -1060,7 +1101,7 @@ def mutants():
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
         ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
         ("ts=true app=true tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
-        ("\t$tokens || return 0\n\tstep pictures", "\tstep pictures", "the tokens pictures only for a change of tokens.css (F1190)"),
+        ("\t$tokens || return 0\n\t! $light", "\t! $light", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures ||", "finish ts types tests gno docs ||", "a failed tokens comparison fails the gate (F1190)"),
         ("STORIES_PORT=$port PICTURES_OF=tokens-- node", "PICTURES_OF=tokens-- node", "the tokens pictures get a free port of their own (F1190)"),
@@ -1135,7 +1176,7 @@ def seven_mutants():
     s = "scripts/speeds.py"
     yield from swaps(s, "speeds.py", (
         ("any(path.startswith(i) for i in interface)", "any(path.startswith(i.rstrip(\"/\")) for i in interface)", "reads an interface folder by its letters, not its slash"),
-        ("if not plain(path) or linked(root, path) or", "if linked(root, path) or", "doubts a path it cannot place"),
+        ("return not plain(path) or linked(root, path) or", "return linked(root, path) or", "doubts a path it cannot place"),
         ("not plain(path) or linked(root, path)", "not plain(path) or False", "doubts a link"),
         ("unicodedata.normalize(\"NFC\", path).casefold()", "path.casefold()", "reads a security path in NFC"),
         ("unicodedata.normalize(\"NFC\", path).casefold()", "unicodedata.normalize(\"NFC\", path)", "reads a security path with its case folded (F164)"),
@@ -1145,7 +1186,13 @@ def seven_mutants():
         (" and p.count(\"/\") >= 2", "", "allows no whole top folder as interface"),
         ("p.endswith(\"/\") and plain(", "plain(", "allows only an interface folder written with its slash"),
         (" and plain(p[:-1])", "", "allows only an interface folder spelled as a plain path"),
-        ("if len(argv) != 2:", "if False:", "doubts a call with other than one argument"),
+        ("speed(argv[1], paths) if len(argv) == 2 else FULL", "speed(argv[1], paths) if len(argv) >= 2 else FULL", "doubts a call with other than one argument"),
+        (" or any(secure(root, path, tree + main) for path in paths):", ":", "--light refuses a tier-1 path"),
+        ("if not tree or not main or not paths", "if not main or not paths", "--light doubts a tree's table with no tier-1 path (lot 1, R3)"),
+        ("if not tree or not main or not paths", "if not tree or not paths", "--light doubts main's table with no tier-1 path"),
+        ("secure(root, path, tree + main)", "secure(root, path, tree)", "--light keeps main's tier-1 rows, which the tree may drop (lot 1, R1)"),
+        ("if len(argv) == 4 else FULL", "if len(argv) >= 3 else FULL", "--light wants main's table"),
+        ('if argv[1:2] == ["--light"]', 'if argv[1:2] == ["--nothing"]', "--light answers the light gate's question"),
         ("if line.lstrip().startswith(\"|\") and len(cells)", "if len(cells)", "reads a sentence as a row of the table"),
     ))
     yield from each("scripts/patch_coverage.py", "except OSError as e:", "except ZeroDivisionError as e:", "hooks", "patch_coverage says plainly that the coverage left no report")
@@ -1530,18 +1577,6 @@ def remember(verdicts):
 SELF = os.path.relpath(os.path.abspath(__file__))  # this script, from the repository's root, where it runs
 
 
-HUNK = re.compile(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", re.M)
-
-
-def changed_lines(base, path):
-    """The lines of HEAD's `path` that changed since base; a hunk of count 0, which only removes, touches the two beside it."""
-    lines = set()
-    for hunk in HUNK.finditer(git("diff", "-U0", "--no-renames", "--no-color", "--no-ext-diff", "--text", "--no-textconv", base, "HEAD", "--", path)):
-        start, count = int(hunk.group(1)), int(hunk.group(2) or 1)
-        lines |= set(range(start, start + count)) if count else {start, start + 1}
-    return lines
-
-
 DRY = re.compile(r'^if sys\.argv\[1:\] == \["--dry"\]:$', re.M)  # where this script's definitions end
 
 
@@ -1619,7 +1654,8 @@ with contextlib.ExitStack() as stack:
         print(f"harness_mutate: {SELF} changed since {base}, whose mutants it cannot read: every mutant")
     elif changed is not None:
         total = len(found)
-        lines = {path: changed_lines(base, path) for path in {m[1] for m in found} & changed}
+        # The lines of HEAD's files that changed since base; a hunk that only removes touches the two beside it.
+        lines = {path: changed_lines("--no-renames", base, "HEAD", "--", path, removals=True).get(path, set()) for path in {m[1] for m in found} & changed}
         # The lines a change rewrites ask for their mutants; when this script changed, those it does not define alike too.
         kept = {id(m) for m in select(found, lines, read)} | {id(m) for m in found if SELF in changed and not alike(m, before)}
         found = [m for m in found if id(m) in kept]
