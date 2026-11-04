@@ -4,7 +4,8 @@
 import { Trends, TRENDS_MAX_BYTES, type Trend } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
 import { readSiteFile, type SiteFileRead } from "../../lib/chain/transport.ts";
-import { EARTH, hubWorldOf, pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
+import { hubWorldOf } from "@gnoworld/core";
+import { EARTH, pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
 import { stampOf } from "./stamp.ts";
 import type { TickerItem } from "./ticker.ts";
 

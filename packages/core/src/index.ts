@@ -110,7 +110,7 @@ export { nextVitality, presenceOf, referenceOf, scaleOf, share, useOf, type UseC
 export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
-export { worldIdOf } from "./cosmos/worldId.ts";
+export { hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
 export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
 export { NATURES } from "./planet/choice.ts";

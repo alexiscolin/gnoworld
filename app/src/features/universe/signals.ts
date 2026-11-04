@@ -4,9 +4,9 @@
 // every count.
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
+import { hubWorldOf } from "@gnoworld/core";
 import type { Presence } from "@gnoworld/schemas/indexer";
 import { pagePresenceApi } from "../../lib/api/presence.ts";
-import { hubWorldOf } from "../../lib/hubWorld.ts";
 import type { LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
 import { visitedIn } from "./globe.ts";
 
