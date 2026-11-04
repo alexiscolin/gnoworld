@@ -2887,6 +2887,18 @@ gate >/dev/null || fail "check.sh failed on a core change"
 scoped "a core change" typecheck lint test build:app - gno sh:test_hooks
 grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a core change"
 reset
+# Jarvis and the two shared packages in a repository too (D110 to D112): every test, never Vitest's related ones alone, as
+# Jarvis's and the server's own processes are children their graph misses; the app's build for the chain package alone.
+for f in jarvis/src/a.ts packages/service/src/a.ts packages/chain/src/a.ts; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	case $f in
+	packages/chain/*) scoped "a change of $f" typecheck lint test build:app - gno ;;
+	*) scoped "a change of $f" typecheck lint test - build:app gno ;;
+	esac
+	grep -q '^test .*--changed' "$log" && fail "check.sh ran only Vitest's related tests on a change of $f"
+	reset
+done
 # A file of the app that is not TypeScript (a fixture, a stylesheet) sits outside Vitest's graph: every test.
 printf 'x\n' >"$g/app/src/b.json"
 gate >/dev/null || fail "check.sh failed on an app fixture"
@@ -2925,6 +2937,14 @@ outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside
 scoped "pre-commit's list of a change of tokens.css" typecheck test build:app pictures - gno
 outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
 scoped "pre-commit's list of a change of base.css" typecheck test build:app - pictures
+# Jarvis's workspace and the service package are the server's kind (D110, D111): every test, no page loads them; the chain
+# package is core's kind, as the app imports it: every test and the app's build (D112).
+for path in jarvis/src/a.ts packages/service/src/a.ts; do
+	outside "$path" >/dev/null || fail "check.sh failed outside a repository on $path"
+	scoped "pre-commit's list of a change of $path" typecheck lint test - build:app gno
+done
+outside "packages/chain/src/a.ts" >/dev/null || fail "check.sh failed outside a repository on a change of the chain package"
+scoped "pre-commit's list of a change of the chain package" typecheck lint test build:app - gno
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
@@ -5815,6 +5835,9 @@ git -C "$bs" checkout -q -f -b jarvis "$base" && mkdir -p "$bs/jarvis/src/testin
 out=$(size "$base") || fail "batch_size.py counted jarvis/src/testing, a test helper's folder, as product code: $out"
 lines 610 >"$bs/jarvis/src/loop.ts" && commit "jarvis's code"
 out=$(size "$base") && fail "batch_size.py passed 610 lines of jarvis/src, which is product code: $out"
+# A package's test helpers too, as the chain package's fake node (D112).
+git -C "$bs" checkout -q -f -b package-helpers "$base" && mkdir -p "$bs/packages/chain/src/testing" && lines 700 >"$bs/packages/chain/src/testing/envelopes.ts" && commit "a package's test helper"
+out=$(size "$base") || fail "batch_size.py counted packages/chain/src/testing, a test helper's folder, as product code: $out"
 fi
 
 if part gate_full; then
