@@ -36,8 +36,10 @@ async function readName(rpc: string, account: Address, send: Send): Promise<bool
   const url = `${rpc}/abci_query?path=%22vm/qeval%22&data=0x${Buffer.from(expression).toString("hex")}`;
   let json: unknown;
   try {
-    const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
-    json = response.ok ? await readJson(response, MAX_BYTES) : undefined;
+    json = await readJson(
+      await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS),
+      MAX_BYTES,
+    );
   } catch {
     // A timeout or a refused connection: the read failed, and the quota is the lower one.
     return undefined;

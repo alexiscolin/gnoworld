@@ -132,6 +132,20 @@ describe("readCapped", () => {
 });
 
 describe("readJson", () => {
+  it("reads none of an answer whose status is no success, and cuts its body off unread (F5273)", async () => {
+    const seen = { cancelled: false };
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode('{"error":"internal"}'));
+      },
+      cancel() {
+        seen.cancelled = true;
+      },
+    });
+    expect(await readJson(new Response(body, { status: 500 }), 100)).toBeUndefined();
+    expect(seen.cancelled).toBe(true);
+  });
+
   it("reads a body's JSON up to its cap, and none past it or for text that is no JSON", async () => {
     expect(await readJson(new Response('{"a":[1]}'), 9)).toEqual({ a: [1] });
     expect(await readJson(new Response('{"a":[1]}'), 8)).toBeUndefined();

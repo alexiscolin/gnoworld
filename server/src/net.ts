@@ -34,8 +34,13 @@ export async function readCapped(response: Response, max: number): Promise<strin
   return Buffer.concat(chunks).toString("utf8");
 }
 
-/** The body's JSON, at most `max` bytes of it; undefined for a longer one, or for text that is no JSON. */
+/** The body's JSON, at most `max` bytes of it; undefined for a longer one, for text that is no JSON, and for an answer
+ * whose status is no success, whose body is cut off unread so its connection is free at once (F5273). */
 export async function readJson(response: Response, max: number): Promise<unknown> {
+  if (!response.ok) {
+    await response.body?.cancel();
+    return undefined;
+  }
   const text = await readCapped(response, max);
   try {
     return text === undefined ? undefined : JSON.parse(text);
