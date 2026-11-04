@@ -3,6 +3,7 @@ import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
+import { pixelHash } from "./pixels.ts";
 
 // 5q fix pass, review 1: a world's page is the video's (frames 20 to 35): the plate at the left, the chat a dock at the right
 // inside the one outline, and expanded (frames 56 to 77) the same chat full bleed over the page. The state is in the address.
@@ -60,6 +61,21 @@ test.describe("a world's page: the dock and the full chat", () => {
     const plate = await page.getByRole("region", { name: "Bubble" }).boundingBox();
     if (plate === null) throw new Error("no plate");
     expect(plate.x + plate.width).toBeLessThanOrEqual(dock.x);
+  });
+
+  // The narrow header's name gives way inside its button, which must still draw a glyph's ink past its line box: frame 26's name whole.
+  test("draws the dock's room name whole: its button cuts none of the letters' ink", async ({ page }) => {
+    await open(page, { width: 1728, as: "guest-dockgl", height: 1080, full: false });
+    const name = page.locator("[data-chat-layout] h2:has(> button[aria-haspopup='dialog'])");
+    const box = await name.boundingBox();
+    if (box === null) throw new Error("no room name");
+    const clip = { x: box.x - 8, y: box.y - 8, width: box.width + 16, height: box.height + 16 };
+    const drawn = await page.screenshot({ clip });
+    await name.locator("button").evaluate((button) => {
+      button.style.overflow = "visible";
+    });
+    const whole = await page.screenshot({ clip });
+    expect(await pixelHash(page, drawn), "the button cuts the name's ink").toBe(await pixelHash(page, whole));
   });
 
   test("expands to the full chat at 0,0 over the page, its address keeping it, and shrinks back", async ({ page }) => {
