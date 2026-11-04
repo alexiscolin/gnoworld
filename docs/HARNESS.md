@@ -137,6 +137,18 @@ gate fails, run the failing lane alone before running the whole gate again.
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `deploy/`), no change at all, or a list pre-commit could not give | everything, every test; `test_hooks.sh` only when the change holds what it tests: the harness, a package file, the lockfile (its cases run the real Prettier and Vitest), a config its cases read (`vitest.config.ts`, `app/vitest.compiled.config.ts`, `lint/shared.config.ts`, `.prettierrc.json`, `.gitignore`, `.node-version`, `pnpm-workspace.yaml`, `deploy/test.sh`, `deploy/web/nginx.conf`), a line it cannot place, or nothing at all (the harness audit, 2026-11-04: 99 to 228 s on each of 17 config commits a slice) | 120 s |
 
+**The radical mode's light gate** (Alexis, 2026-11-04, until the hardening slice; `docs/decisions.md`): while git's own hooks folder
+holds `radical-mode` reading `on`, a fast run whose change holds no tier-1 path (`scripts/speeds.py --light`: docs/REVIEW.md's table, the
+tree's and `origin/main`'s, so a row the change drops still counts) and
+no harness file (records.sh's list, read by git through an index of the run's own) runs the types, the importers' lint, the build with the
+first screen's cap and jscpd, and says so; no Vitest, no journey, no Prettier, knip, CSS or comments check, no docs lane. pre-commit's
+secrets scan runs on every commit as before. A tier-1 path or a harness file, the file absent or reading anything else, a table it
+cannot read, `--tests-all`, `--merge` and `--full` run the whole gate. Only Alexis switches it, from any checkout: on with
+`printf 'on\n' >"$(git rev-parse --git-common-dir)/hooks/radical-mode"`, off with `rm -f "$(git rev-parse --git-common-dir)/hooks/radical-mode"`.
+No sandboxed command writes there, and check.sh refuses to run where one could; pre-commit's staged copy reads the mode of the
+repository whose packages it borrows, and the paths pre-commit lists from the commit's own index. A tree a light gate recorded stays
+recorded once the mode is off.
+
 **The related tests** (Alexis, 2026-11-04: 212 fast gates past their budget in two days, a mean of 141 s, the whole Vitest
 suite the slowest step in 210): a commit's Vitest runs only the tests its change asks for, in every area, through Vitest's own
 `related` command (`vitest related --run`, with the projects of package.json's `test` script, which must start with `vitest run`;
@@ -207,10 +219,11 @@ refuses another Node (F816).
 | Step | What it catches |
 |---|---|
 | Prettier | unformatted code |
-| `tsc` | type errors; `core` sees no DOM and no Node, so it cannot reach the network |
+| `tsc` | type errors; `core` sees no DOM and no Node, so it cannot reach the network. It builds incrementally, into `TSC_CACHE`: in a repository's fast gate the worktree's `.claude/tmp/tsc`; in pre-commit's staged copy, `--full` and `--merge` a folder of the run's own, gone at its end |
 | ESLint, with `@eslint/css` | floating promises, swallowed errors, `any`, an incomplete switch, `eval`, import cycles, size and complexity limits, impure `core` (clock, chance, globals), a test switched off (`.skip`, `.only`, `.todo`, `.fails`), invalid or unlayered CSS, physical properties; in the app, React's hooks and compiler rules, a hand-written `memo`, raw HTML into the DOM, a folder's import against ARCHITECTURE.md's table, the network or storage outside `lib` and `sw`, `console`; the config is `eslint.config.ts` and its parts in `lint/` |
 | Vitest, with fast-check | failing tests (the related ones, or every one: above); a test with no assertion; the `compiled` project (`app/vitest.compiled.config.ts`), which counts what a re-render recomputes |
 | `scripts/related.py` | a place on disk named in a form its map cannot follow |
+| `scripts/lint_scope.py` | the files a commit's ESLint reads: those it changed and every file that imports one at any depth, from the type check's own graph (the `.tsbuildinfo` files package.json's `typecheck` names, never another), in place of package.json's `lint`'s `.`; ESLint keeps no cache, which keys a file on its own text while its typed rules read other files' types. A change of the global scope, a graph it cannot read or a run of it that fails lints the whole repository, as a config, `--tests-all`, `--merge` and `--full` do |
 | knip | unused files, exports and dependencies |
 | jscpd | copies, renamed ones and near ones |
 | `scripts/check_css.py` | CUBE CSS: raw values outside tokens, layout outside compositions, unknown or unused tokens and classes, copied rules |
@@ -367,6 +380,11 @@ costs context in every session.
 - **The history scan is defence in depth;** the staged scan is the barrier (F141 to F143).
 - **The fast gate's budget, judged on the load, lets a slow change through on a busy machine;**
   the overrun is printed and logged every time.
+  Every step of every gate keeps its time, the run's mode and the load as its lanes started in
+  `~/.cache/gnoworld-tools/gate-times.log`, a line a step, which nothing prunes (about 3 KB a run).
+- **A commit's lint trusts TypeScript's graph** (`scripts/lint_scope.py`): a file whose lint would read another it neither imports
+  nor reaches through a type (a rule reading the disk) is linted at a part's end (`--tests-all`) and in the merge check, which lint the
+  whole repository. Two gates at once in one worktree share its `.tsbuildinfo`, so one may read the graph the other wrote.
 - **A commit's gate trusts Vitest's module graph, `main.test.ts` and the map's grep** (`scripts/related.py`): a test
   that runs code in a child process other than the server's (`app/src/dataFiles.test.ts` builds the app) runs for a change
   of code only when the graph holds it, and a read through a place built from another's (`join(APP, "..", "deploy")`) is seen
@@ -403,11 +421,12 @@ costs context in every session.
 | `scripts/check.sh` | the gate |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
+| `scripts/lint_scope.py` | the files a commit's lint reads, from the type check's graph |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
-| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole |
+| `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of no tier-1 path may take the radical mode's light gate |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |

@@ -1,0 +1,81 @@
+{
+  "source": "onyx-1 indexer, answers to the worlds job queries, recorded by 7k3 from the sandbox through its proxy (gnomcp shows no raw GraphQL)",
+  "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
+  "recorded": "2026-11-04T07:28:50.196Z",
+  "answers": [
+    {
+      "what": "the per-realm filter 7c wrote",
+      "query": "query($path: String!) { getTransactions(where: { messages: { value: { pkg_path: { eq: $path } } } }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "path": "gno.land/r/samcrew/connect4"
+      },
+      "status": 422,
+      "body": "{\"errors\":[{\"message\":\"Field \\\"pkg_path\\\" is not defined by type \\\"NestedFilterMessageValue\\\".\",\"locations\":[{\"line\":1,\"column\":71}],\"extensions\":{\"code\":\"GRAPHQL_VALIDATION_FAILED\"}}],\"data\":null}"
+    },
+    {
+      "what": "the first page",
+      "query": "query($limit: Int!) { getTransactions(where: { messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "limit": 3
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":0,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/names\",\"caller\":\"g1skl80cuz8zq3lul9pgz5pc35l2pfzgxgfpsqkx\"}}]},{\"block_height\":0,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1edq4dugw0sgat4zxcw9xardvuydqf6cgleuc8p\"}}]},{\"block_height\":19656,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g17xcvw4uvehrywupnhncgpm6llat69syhne8s56\"}}]}]}}"
+    },
+    {
+      "what": "a page with a session message beside a call",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "above": 253604,
+        "limit": 3
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":253605,\"messages\":[{\"value\":{\"__typename\":\"UnexpectedMessage\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/samcrew/connect4\",\"caller\":\"g1cvr48r7l7lkmvp77cr6zg2zhu26jgfwr0y8pew\"}}]},{\"block_height\":253606,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\"}}]},{\"block_height\":253608,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\"}}]}]}}"
+    },
+    {
+      "what": "a page with a transaction calling two realms",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "above": 65430,
+        "limit": 2
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":65431,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/namereg/v0\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}}]},{\"block_height\":65539,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2/tally\",\"caller\":\"g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2\"}}]}]}}"
+    },
+    {
+      "what": "a page above the tip",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "above": 999999999,
+        "limit": 3
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":null}}"
+    },
+    {
+      "what": "a negative bound",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "above": -1,
+        "limit": 3
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":null}}"
+    },
+    {
+      "what": "a block alone",
+      "query": "query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
+      "variables": {
+        "height": 41641
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1z360harzpshhdnlrdgj5ljkx2aeckzavkyl9g0\"}}]},{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt/bazaar/c/bazaargens3\",\"caller\":\"g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt\"}}]}]}}"
+    },
+    {
+      "what": "the call's type",
+      "query": "query { __type(name: \"MsgCall\") { fields { name type { kind name ofType { kind name } } } } }",
+      "variables": {},
+      "status": 200,
+      "body": "{\"data\":{\"__type\":{\"fields\":[{\"name\":\"caller\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"send\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"pkg_path\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"func\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}},{\"name\":\"args\",\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null}}},{\"name\":\"args_at\",\"type\":{\"kind\":\"LIST\",\"name\":null,\"ofType\":{\"kind\":\"NON_NULL\",\"name\":null}}},{\"name\":\"max_deposit\",\"type\":{\"kind\":\"NON_NULL\",\"name\":null,\"ofType\":{\"kind\":\"SCALAR\",\"name\":\"String\"}}}]}}}"
+    }
+  ]
+}

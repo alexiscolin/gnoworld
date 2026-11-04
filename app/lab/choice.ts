@@ -22,8 +22,35 @@ import type { World } from "../src/scene/planet/generated.ts";
 import recorded from "./worlds.json" with { type: "json" };
 
 export type ViewName =
-  "gallery" | "gallery24" | "real24" | "class24" | "variety" | "close" | "eclipse" | "earth" | "stages";
+  | "gallery"
+  | "gallery24"
+  | "real24"
+  | "class24"
+  | "variety"
+  | "close"
+  | "eclipse"
+  | "earth"
+  | "stages"
+  | "stations"
+  | "earthsys"
+  | "earthtop";
 export type Tier = "high" | "low";
+
+/** The views the page knows, by the name its address asks. */
+export const VIEWS: readonly ViewName[] = [
+  "gallery",
+  "gallery24",
+  "real24",
+  "class24",
+  "variety",
+  "close",
+  "eclipse",
+  "earth",
+  "stages",
+  "stations",
+  "earthsys",
+  "earthtop",
+];
 
 export interface Choice {
   readonly view: ViewName;

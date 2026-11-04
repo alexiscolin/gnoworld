@@ -18,6 +18,8 @@ import { loadMap, mapUrl, prepareMap } from "../src/scene/planet/maps.ts";
 import { createWorld } from "../src/scene/planet/generated.ts";
 import { LIMB_LIGHT, type MapSet, type Planet } from "../src/scene/planet/planet.ts";
 import { signsOf, worldsOf, type Choice, type Shown, type ViewName } from "./choice.ts";
+import { earthSystem, type Asked } from "./earthSystem.ts";
+import { stationSheet } from "./stationSheet.ts";
 import { earthView } from "./earthView.ts";
 import { layoutOf, type Layout } from "./layouts.ts";
 import { starField, starSprite } from "./sky.ts";
@@ -133,6 +135,9 @@ const litIn = ({ view, stage }: Choice) => view === "stages" || stage !== "rest"
 /** Builds a view: its maps first, then its worlds. */
 export async function buildView(choice: Choice, device: Device): Promise<View> {
   if (choice.view === "earth") return earthView(device);
+  if (choice.view === "stations") return stationSheet(device);
+  if (choice.view === "earthsys" || choice.view === "earthtop")
+    return earthSystem(device, systemAsked(choice.view === "earthtop"));
   const { renderer, base, ratio } = device;
   const shown = worldsOf(choice);
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), ANISOTROPY);
@@ -182,5 +187,17 @@ export async function buildView(choice: Choice, device: Device): Promise<View> {
       sprite?.geometry.dispose();
       sprite?.material.dispose();
     },
+  };
+}
+
+// The Earth's system's study, as the page's address asks it: how many stations, and gnosh.ai's size.
+function systemAsked(top: boolean): Asked {
+  const query = new URLSearchParams(location.search);
+  const count = Number(query.get("count") ?? "12");
+  const size = Number(query.get("size") ?? "0.5");
+  return {
+    top,
+    count: Number.isInteger(count) && count >= 0 ? Math.min(count, 5000) : 12,
+    size: Number.isFinite(size) ? size : 0.5,
   };
 }

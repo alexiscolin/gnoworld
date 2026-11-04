@@ -91,11 +91,13 @@ export async function abciQuery(
   return envelopeText(json, limits.maxBytes);
 }
 
-/** Waits before each call but the first of a pass, so the chain and the indexers are asked one call at a time and slowly. */
-export function pacer(wait: (ms: number) => Promise<void>, ms: number): () => Promise<void> {
-  let first = true;
+/** Starts each call but the first of a pass `ms` after the last began, on the job's clock, so the chain and the indexers are asked one call
+ * at a time and slowly: it waits what is left of the pause, nothing after a slower call, never more than the pause if the clock steps back. */
+export function pacer(wait: (ms: number) => Promise<void>, ms: number, now: () => number): () => Promise<void> {
+  let last: number | undefined;
   return async () => {
-    if (first) first = false;
-    else await wait(ms);
+    const left = last === undefined ? 0 : Math.min(ms, last + ms - now());
+    if (left > 0) await wait(left);
+    last = now();
   };
 }

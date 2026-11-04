@@ -1,8 +1,8 @@
 // The worlds job (slice 7, 7c; plan §3 "The server's new reads"): every half hour it reads a universe's realm list, groups the realms into
-// worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions, imports), asks the
-// indexer for each realm's calls and the chain for each deployer's name, and writes worlds.json and its count (7n2) beside and renamed over.
-// One call at a time, a pause between calls, every answer capped and parsed. A fault of the list keeps the last files; a silent indexer leaves
-// a world at rest (null counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind. The file keeps every realm.
+// worlds, finds new families and batches by comparing with the last list, reads each package once (deployer, functions, imports), the chain
+// for each deployer's name and its indexer for every call (7k3), and writes worlds.json and its count (7n2) beside and renamed over. One
+// call at a time, each started a pause after the last, every answer capped and parsed. A fault of the list keeps the last files; a silent
+// indexer leaves a world at rest (its last counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind.
 import { worldsDrawn } from "@gnoworld/core";
 import type { WorldsCount } from "@gnoworld/schemas";
 import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
@@ -14,11 +14,11 @@ import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths } from "./group.ts";
-import { HISTORY_MAX_CALLS, readHistory, realmsOfPass, type StampedHistory } from "./history.ts";
+import { readHistories, type StampedHistory } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
-import { Failure, kindOf, pacer, type Kind, type Send } from "./remote.ts";
+import { kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
 import { habitsAt, makeTrends, type ChainRead } from "./chainTrends.ts";
 
@@ -36,11 +36,11 @@ export interface RunOptions {
   now?: () => number;
   /** Waits `ms` between two calls. */
   wait?: (ms: number) => Promise<void>;
-  /** The pause between two calls of a pass. */
+  /** The least time between the starts of two calls of a pass. */
   pauseMs?: number;
   maxBytes?: number;
-  /** The most realms asked of the indexer in one pass. */
-  historyMax?: number;
+  /** The transactions a page of the indexer's read asks, history.ts's unless a test says less. */
+  historyPage?: number;
   isStopped?: () => boolean;
   /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
   trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
@@ -63,7 +63,7 @@ interface Settings {
   readonly wait: (ms: number) => Promise<void>;
   readonly pauseMs: number;
   readonly maxBytes: number;
-  readonly historyMax: number;
+  readonly historyPage?: number;
   readonly isStopped: () => boolean;
   readonly trends?: RunOptions["trends"];
 }
@@ -76,7 +76,6 @@ function settingsOf(options: RunOptions): Settings {
     wait: options.wait ?? sleep,
     pauseMs: options.pauseMs ?? PAUSE_MS,
     maxBytes: options.maxBytes ?? WORLDS_MAX_BYTES,
-    historyMax: options.historyMax ?? HISTORY_MAX_CALLS,
     isStopped: options.isStopped ?? (() => false),
   };
 }
@@ -91,46 +90,31 @@ function loadLast(file: string, universe: string): Worlds | undefined {
   }
 }
 
-/** The answers of the wrong shape in a row that end the asking: the indexer does not speak the schema we ask in. */
-const SHAPE_STRIKES = 3;
-
-// Whether a fault is about one realm's answer (too big, or of the wrong shape) and not about the indexer or the network.
-const aboutRealm = (kind: Kind): boolean => kind === "shape" || kind === "too_large";
-
-// The history of each realm in turn; a network fault, or SHAPE_STRIKES wrong-shape answers in a row, ends the asking. ponytail: one
-// request per realm, at most HISTORY_MAX_CALLS a pass (about 3 minutes at 743 realms, 42 at the cap, past the cycle: repeat.ts waits
-// for the pass); a realm not asked or at fault keeps its earlier counts. A chain-wide read waits for the schema.
-async function readHistories(
-  reader: { send: Send; indexer: string; pace: () => Promise<void> },
-  paths: readonly string[],
-  hooks: { log: Log; isStopped: () => boolean; now: () => number; sinceOf: (path: string) => number | undefined },
-): Promise<Map<string, StampedHistory>> {
-  const histories = new Map<string, StampedHistory>();
-  let skipped: Kind | undefined;
-  let strikes = 0;
-  for (const path of paths) {
-    if (hooks.isStopped()) throw new Failure("stopped");
-    const read = await readHistory(reader, path, hooks.sinceOf(path));
-    if (read.ok) {
-      histories.set(path, { ...read.history, at: hooks.now() });
-      strikes = 0;
-      continue;
-    }
-    strikes = read.kind === "shape" ? strikes + 1 : 0;
-    if (aboutRealm(read.kind)) skipped ??= read.kind;
-    if (!aboutRealm(read.kind) || strikes >= SHAPE_STRIKES) {
-      hooks.log("worlds_indexer_failed", { error: read.kind });
-      break;
-    }
+// Every realm's history from the indexer, each stamped once the read has ended; none when it failed, each realm keeping its last counts.
+async function readCalls(
+  settings: Settings,
+  read: { pace: () => Promise<void>; paths: readonly string[]; sinceOf: (path: string) => number | undefined },
+): Promise<Map<string, StampedHistory> | "stopped"> {
+  const { send, universe, isStopped, log } = settings;
+  const page = settings.historyPage === undefined ? {} : { page: settings.historyPage };
+  const calls = await readHistories({ send, indexer: universe.indexer, pace: read.pace, ...page }, read.paths, {
+    sinceOf: read.sinceOf,
+    isStopped,
+  });
+  if (!calls.ok) {
+    if (calls.kind === "stopped") return "stopped";
+    log("worlds_indexer_failed", { error: calls.kind });
+    return new Map();
   }
-  if (skipped !== undefined) hooks.log("worlds_history_skipped", { error: skipped });
-  return histories;
+  if (calls.skipped > 0) log("worlds_history_skipped", { error: "shape" });
+  const at = settings.now();
+  return new Map([...calls.histories].map(([path, history]) => [path, { ...history, at }]));
 }
 
 // The list, the packages, the names and the histories, in that order, or the kind of fault that ends the pass.
 async function gather(settings: Settings): Promise<Gathered | Kind> {
   const { send, universe, isStopped } = settings;
-  const pace = pacer(settings.wait, settings.pauseMs);
+  const pace = pacer(settings.wait, settings.pauseMs, settings.now);
   const list = await readRealmPaths({ send, rpc: universe.rpc, pace });
   if (!list.ok) return list.kind;
   if (list.partial === true) settings.log("worlds_shed", { error: "list" });
@@ -152,9 +136,8 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
     deployer === null || earlierNames.has(deployer) ? [] : [deployer],
   );
   const names = await readNames({ send, rpc: universe.rpc, pace }, unnamed);
-  const reader = { send, indexer: universe.indexer, pace };
-  const asked = realmsOfPass(paths, Math.floor(settings.now() / EVERY_MS), settings.historyMax);
-  const histories = await readHistories(reader, asked, { ...settings, sinceOf: sinceOf(lastRealms) });
+  const histories = await readCalls(settings, { pace, paths, sinceOf: sinceOf(lastRealms) });
+  if (histories === "stopped") return "stopped";
   const news = compareLists([...lastRealms.keys()], list.paths);
   return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };
 }
@@ -162,6 +145,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */
 export async function runWorlds(options: RunOptions): Promise<Outcome> {
   const settings = settingsOf(options);
+  const start = settings.now();
   const fail = (kind: Kind): Outcome => {
     settings.log("worlds_failed", { error: kind });
     return { wrote: false, kind };
@@ -186,6 +170,7 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
       { file: besideOf(settings.file, "count"), text: `${JSON.stringify(count)}\n` },
     ]);
     if (!written) return fail("write");
+    settings.log("worlds_written", { ms: settings.now() - start });
     settings.trends?.passed(file.data, read.histories);
     return { wrote: true };
   } catch (error) {

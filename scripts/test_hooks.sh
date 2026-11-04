@@ -2072,6 +2072,22 @@ fi
 # The folder a build or a journey run is told to build and serve (F4249): GNOWORLD_BUILD, empty for app/build.
 case "$n" in build:app | playwright) echo "$n build=${GNOWORLD_BUILD-}" >>"$GATE_LOG.build" ;; esac
 [ "$n" != py:audit ] || echo "audit-answer ${AUDIT_ANSWER-unset}" >>"$GATE_LOG"
+# The lint's arguments, one a line: a path with a space or a quote stays whole (the red pass, F4853).
+[ "$n" != lint ] || printf '%s\n' "$@" >"$GATE_LOG.lint-args"
+# The type check's incremental build: the folder it was told, and that folder's state as it ran.
+[ "$n" != typecheck ] || echo "typecheck cache=${TSC_CACHE-unset} $(test -d "${TSC_CACHE:-/nowhere}" && echo there || echo missing)" >>"$GATE_LOG.tsc"
+# The files a commit's lint reads: the changed paths it was given on stdin, and LINT_SCOPE's answer (a lint of the whole repository by
+# default), LINT_SCOPE_EXIT its exit.
+if [ "$n" = py:lint_scope ]; then
+	cat >"$GATE_LOG.scope-in"
+	printf '%s\n' "${LINT_SCOPE-.}"
+	exit "${LINT_SCOPE_EXIT:-0}"
+fi
+# The merge check's lines for StrykerJS: STRYKER_LINES_EXIT its exit (3: no line), the config it writes otherwise.
+if [ "$n" = py:stryker_lines ]; then
+	[ "${STRYKER_LINES_EXIT:-0}" != 0 ] || printf '{"mutate":["app/src/a.tsx:1-1"]}' >"$2"
+	exit "${STRYKER_LINES_EXIT:-0}"
+fi
 # The patch's coverage reads the report of a coverage run that passed (or passed on its retry); a failed one leaves none, and the real script fails.
 [ "$n" != py:patch_coverage ] || grep -qx "done coverage" "$GATE_LOG" || { echo "patch_coverage: no coverage report" >&2; exit 1; }
 [ "$n" != build:app ] || [ -z "${PW_EDIT:-}" ] || printf '\n' >>app/package.json # a build that installs edits a package file
@@ -2141,7 +2157,7 @@ printf '#!/bin/sh\ncase "$*" in *"free ports in 200 tries"*) [ -z "${PORTS_FAIL:
 chmod +x "$g/bin/python3"
 printf '#!/bin/sh\nexec sh "%s" gno "$@"\n' "$step" >"$g/toolchain/gno"
 chmod +x "$g/bin/go" "$g/bin/gofmt" "$g/toolchain/gno"
-for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx; do
+for py in check_css check_docs mutate probe bench batch_size load patch_coverage prove_fix check_regressions check_migrations audit harness_mutate check_nginx lint_scope stryker_lines; do
 	printf 'import os, sys\nos.execvp("sh", ["sh", %s, "py:%s", *sys.argv[1:]])\n' "'$step'" "$py" >"$g/scripts/$py.py"
 done
 for sh in ergo test_hooks scan_secrets; do printf 'exec sh "%s" sh:%s "$@"\n' "$step" "$sh" >"$g/scripts/$sh.sh"; done
@@ -2153,6 +2169,7 @@ import json, sys
 names = ["build:app", "format:check", "typecheck", "lint", "test:compiled", "unused", "copies", "comments", "coverage", "mutate"]
 scripts = {n: f"sh {sys.argv[2]} {n}" for n in names}
 scripts["test"] = "vitest run --project node --project ui --project compiled"  # the related run keeps its projects (check.sh)
+scripts["lint"] += " ."  # the whole repository, as package.json's: a commit's lint names its files in its place (check.sh)
 json.dump({"scripts": scripts}, open(sys.argv[1], "w"))
 PY
 printf '{}\n' >"$g/app/package.json" && printf '{}\n' >"$g/server/package.json" && : >"$g/pnpm-lock.yaml" && : >"$g/gno/r/seal/vectors_test.gno"
@@ -2659,6 +2676,226 @@ sh -c 'set -e; eval "$1"; E2E_PORT=$( (ulimit -n 24 && free_ports 40) 2>/dev/nul
 	fail "an assignment of free_ports went on after it found no free ports: $(cat "$t/ports.out")"
 fi
 
+if part gate_tsc_cache; then
+gate_fixture gate_tsc_cache
+# The type check builds incrementally from the worktree's own .claude/tmp/tsc in a repository's fast gate, --tests-all included (Alexis,
+# 2026-11-04: "Oui, les trois"); pre-commit's staged copy, which does not hold that folder, --full and --merge build from a folder of
+# their own run, there as the check runs and gone at its end: they read no writable cache, as Prettier's. A caller's TSC_CACHE counts for nothing.
+cache() { sed -n 's/^typecheck cache=//p' "$log.tsc"; }
+own="$(cd "$g" && pwd -P)/.claude/tmp/tsc"
+for args in "" --tests-all; do
+	rm -f "$log.tsc" && out=$(TSC_CACHE=/elsewhere gate $args) || fail "check.sh $args failed a run whose every step passes: $out"
+	[ "$(cache)" = "$own there" ] || fail "check.sh $args did not build the types from the worktree's own cache, $own: $(cache)"
+done
+rm -f "$log.tsc" && echo 'y' >>"$g/server/src/a.ts" && out=$(gate) || fail "check.sh failed a change of the server: $out"
+[ "$(cache)" = "$own there" ] || fail "check.sh did not build a change's types from the worktree's own cache: $(cache)"
+reset
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+for run in staged full merge; do
+	rm -f "$log.tsc"
+	case $run in
+	staged) out=$(g=$c TSC_CACHE="$own" gate) || fail "check.sh failed a staged copy whose every step passes: $out" ;;
+	*) out=$(AUDIT_ANSWER=x TSC_CACHE="$own" gate --"$run") || fail "check.sh --$run failed a run whose every step passes: $out" ;;
+	esac
+	set -- $(cache)
+	[ "${2:-}" = there ] && [ -n "$1" ] && [ "$1" != "$own" ] && [ "$1" != "$(cd "$c" && pwd -P)/.claude/tmp/tsc" ] || fail "check.sh's $run run built the types from a cache it keeps: $(cache)"
+	case $1 in "${TMPDIR:-/tmp}"/check.*/tsc | "${TMPDIR%/}"/check.*/tsc) ;; *) fail "check.sh's $run run built the types elsewhere than in its own folder of \$TMPDIR: $1" ;; esac
+	[ ! -e "$1" ] || fail "check.sh's $run run left its own type check's folder behind: $1"
+done
+fi
+
+if part gate_lint_scope; then
+gate_fixture gate_lint_scope
+# A commit's lint reads the files it changed and every file that imports them, at any depth, from the type check's own graph
+# (scripts/lint_scope.py, given the paths on stdin and the type check's folder): ESLint's own cache keys a file on its own text, so a
+# type changed elsewhere would leave the verdict it holds stale (the chief, for Alexis, 2026-11-04, in place of "ESLint with its cache").
+# Its answer `.`, or a run of it that fails, lints the whole repository; nothing to read, no lint. Everything that runs every test, a
+# config, --tests-all and the full gate, lints the whole repository, never asking it. The files go to package.json's lint script in
+# place of its `.`, ESLint told not to warn of a file it ignores; a script of another shape is refused, never run as it is.
+lint() { sed -n 's/^lint //p' "$log"; }
+own="$(cd "$g" && pwd -P)/.claude/tmp/tsc"
+echo 'y' >>"$g/app/src/a.tsx"
+# The files as lint_scope.py quotes them for the shell, each reaching ESLint whole, never run: a space, a quote, a command substitution.
+out=$(LINT_SCOPE="app/src/a.tsx 'app/src/b c.tsx' 'it'\"'\"'s.tsx' 'a\$(touch pwned).tsx' 'b\`touch pwned\`;x.tsx'" gate) || fail "check.sh failed a change whose lint passes: $out"
+[ "$(cat "$log.scope-in")" = app/src/a.tsx ] || fail "check.sh did not give lint_scope.py the changed paths: $(cat "$log.scope-in")"
+grep -qx "py:lint_scope $own" "$log" || fail "check.sh did not give lint_scope.py the type check's folder, $own: $(grep '^py:lint_scope' "$log")"
+before typecheck py:lint_scope || fail "check.sh read the lint's files before the type check had built its graph"
+[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored -- app/src/a.tsx 'app/src/b c.tsx' "it's.tsx" 'a$(touch pwned).tsx' 'b`touch pwned`;x.tsx')" ] ||
+	fail "check.sh did not give ESLint the files lint_scope.py named, alone and whole: $(cat "$log.lint-args")"
+# A name that reads as an option is a file: `--` ends ESLint's options (lot 1's security review, S3: `--suppressions-location=x.md` silenced
+# every error).
+out=$(LINT_SCOPE="'--suppressions-location=sup.md' app/src/a.tsx" gate) || fail "check.sh failed a change whose lint passes: $out"
+[ "$(cat "$log.lint-args")" = "$(printf '%s\n' --no-warn-ignored -- --suppressions-location=sup.md app/src/a.tsx)" ] ||
+	fail "check.sh gave ESLint a file's name where it reads its options: $(cat "$log.lint-args")"
+[ ! -e "$g/pwned" ] && [ ! -e "$g/app/pwned" ] || fail "check.sh ran a command a file's name held"
+nocache "a change of the app"
+for answer in . "fail"; do
+	if [ "$answer" = fail ]; then out=$(LINT_SCOPE= LINT_SCOPE_EXIT=1 gate) || fail "check.sh failed when lint_scope.py failed: $out"; else out=$(LINT_SCOPE=. gate) || fail "check.sh failed on lint_scope.py's '.': $out"; fi
+	[ "$(lint)" = "." ] || fail "check.sh did not lint the whole repository when lint_scope.py answered '$answer': $(lint)"
+done
+printf '%s\n' "$out" | grep -q "lint_scope.py failed" || fail "check.sh did not say lint_scope.py failed: $out"
+out=$(LINT_SCOPE= gate) || fail "check.sh failed a change whose lint reads nothing: $out"
+ran lint && fail "check.sh ran ESLint with no file to read: $(lint)"
+# The staged copy has no repository, the lint's files come from its list; a script of another shape is refused.
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx LINT_SCOPE=app/src/a.tsx gate) || fail "check.sh failed a staged copy whose lint passes: $out"
+[ "$(lint)" = "--no-warn-ignored -- app/src/a.tsx" ] || fail "check.sh did not lint a staged copy's files alone: $(lint)"
+# A lint script of another shape, committed (a change of package.json runs everything): the change of a.tsx alone asks for its files.
+python3 -I - "$g/package.json" <<'PY'
+import json, sys
+p = json.load(open(sys.argv[1]))
+p["scripts"]["lint"] = p["scripts"]["lint"] + " app"
+json.dump(p, open(sys.argv[1], "w"))
+PY
+git -C "$g" commit -qm "a lint script of another shape" package.json
+out=$(LINT_SCOPE=app/src/a.tsx gate) && fail "check.sh named files to a lint script that does not end on its '.': $out"
+printf '%s\n' "$out" | grep -q "package.json's lint script" || fail "check.sh did not say why it refused the lint script: $out"
+ran lint && fail "check.sh ran a lint script of another shape: $(lint)"
+git -C "$g" reset -q --hard HEAD~1
+# Every test, every file: a config, --tests-all, --full and --merge never ask lint_scope.py.
+for run in config --tests-all --full --merge; do
+	case $run in
+	config) echo '{}' >"$g/knip.json" && out=$(LINT_SCOPE=app/src/a.tsx gate) ;;
+	*) out=$(AUDIT_ANSWER=x LINT_SCOPE=app/src/a.tsx gate "$run") ;;
+	esac || fail "check.sh $run failed a run whose every step passes: $out"
+	[ "$(lint)" = "." ] && ! ran py:lint_scope || fail "check.sh $run did not lint the whole repository: $(lint)"
+	reset
+done
+fi
+
+if part gate_step_log; then
+gate_fixture gate_step_log
+# Every step of every gate keeps its time (Alexis, 2026-11-04: "Oui, les trois"; the audit could see only the runs past their budget):
+# one line a step in the tools' cache, which every worktree shares and none removes, tab-separated: the run's start (UTC), the
+# repository, the mode, the lane, the step, its seconds as the run printed them, and the load read as the lanes started. A log it
+# cannot write costs the measure, never the run.
+times=$g.home/.cache/gnoworld-tools/gate-times.log
+repo=$(cd "$g" && pwd -P)
+kept() { # $1: the run's output; $2: its mode. Each step the run printed has its line, and every line is of that run
+	printf '%s\n' "$1" | sed -n 's/^lane \([a-z]*\) [0-9.]* s: \(.*\)$/\1 \2/p' | tr ',' '\n' | awk 'NF == 3 {lane = $1; print lane, $2, $3; next} NF == 2 {print lane, $1, $2}' >"$t/printed"
+	[ -s "$t/printed" ] || fail "the run printed no step's time: $1"
+	while read -r lane name took; do
+		grep -qxF "$(printf '%s\t%s\t%s\t%s\t%s' "$repo" "$2" "$lane" "$name" "$took")" "$t/kept" || fail "check.sh did not keep lane $lane's step $name, $took s, of its $2 run: $(cat "$t/kept")"
+	done <"$t/printed"
+	[ "$(grep -c "" "$t/kept")" = "$(grep -c "" "$t/printed")" ] || fail "check.sh kept $(grep -c "" "$t/kept") lines for the $(grep -c "" "$t/printed") steps its $2 run printed: $(cat "$t/kept")"
+}
+out=$(LOAD_1="23 160" gate) || fail "check.sh failed a run whose every step passes: $out"
+[ -s "$times" ] || fail "check.sh kept no time of its steps"
+awk -F '\t' 'NF != 7 || $1 !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z$/ || $6 !~ /^[0-9]+\.[0-9]$/ || $7 != "load 2.3 on 16 cores" { bad = 1 } END { exit bad }' "$times" ||
+	fail "check.sh's step log lacks the run's start, the seconds or the load as the lanes started: $(cat "$times")"
+[ "$(cut -f1 "$times" | sort -u | grep -c .)" = 1 ] || fail "check.sh stamped the steps of one run with more than one time: $(cut -f1 "$times" | sort -u)"
+cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" fast
+# Kept: a second run adds its own lines after the first's, which stay.
+first=$(cat "$times")
+sleep 1 && out=$(gate) || fail "check.sh failed a second run whose every step passes: $out"
+case $(cat "$times") in "$first"*) ;; *) fail "check.sh's second run did not keep the first's lines: $(cat "$times")" ;; esac
+[ "$(cut -f1 "$times" | sort -u | grep -c .)" = 2 ] || fail "check.sh's two runs share one start: $(cut -f1 "$times" | sort -u)"
+# A run that fails keeps its times too, the failed lane's included: the slow gates of the audit were passes and failures alike.
+rm -f "$times" && out=$(FAIL=lint gate) && fail "check.sh passed with lint failing: $out"
+grep -q "	fast	types	typecheck	" "$times" || fail "check.sh kept no time of a run that failed: $(cat "$times" 2>&1)"
+# The mode is the run's: --tests-all, the staged copy of pre-commit (no repository: the one whose packages it borrows, else its own
+# path), --full and --merge, whose later phases keep theirs.
+rm -f "$times" && out=$(gate --tests-all) || fail "check.sh --tests-all failed a run whose every step passes: $out"
+cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" tests-all
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git"
+out=$(g=$c gate) || fail "check.sh failed a staged copy whose every step passes: $out" # gate() gives it the home $c.home
+cut -f2- "$c.home/.cache/gnoworld-tools/gate-times.log" | cut -f1-5 >"$t/kept" && repo=$(cd "$c" && pwd -P) && kept "$out" staged
+rm -rf "${c:?}/node_modules" "$c.home" && ln -s "$g/node_modules" "$c/node_modules"
+out=$(g=$c gate) || fail "check.sh failed a staged copy that borrows its packages: $out"
+cut -f2- "$c.home/.cache/gnoworld-tools/gate-times.log" | cut -f1-5 >"$t/kept" && repo=$(cd "$g" && pwd -P) && kept "$out" staged
+for mode in full merge; do
+	rm -f "$times" && out=$(AUDIT_ANSWER=x gate --"$mode") || fail "check.sh --$mode failed a run whose every step passes: $out"
+	cut -f2- "$times" | cut -f1-5 >"$t/kept" && kept "$out" "$mode"
+	grep -q "	$mode	history	batch_size	" "$times" || fail "check.sh --$mode kept no time of its later phases: $(cat "$times")"
+done
+# A log it cannot write (a folder in its place) costs the measure alone: the run passes, and records what it passed.
+rm -f "$times" "$g/.claude/tmp/green-fast" && mkdir -p "$times"
+out=$(gate) || fail "check.sh failed a run because its step log cannot be written: $out"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh recorded nothing of a run whose step log cannot be written"
+rmdir "$times"
+fi
+
+if part gate_light; then
+gate_fixture gate_light
+# The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice): while git's own hooks folder holds `radical-mode` reading
+# `on`, a commit's or a turn's change of no tier-1 path (speeds.py --light) and no harness file (records.sh's list) runs the types, the
+# importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey, nothing else. Only Alexis writes there: no
+# sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a file of the worktree in its name, a
+# tier-1 path, a harness file, a doubt, a part's end or the full gate: the whole gate as before. pre-commit's staged copy reads the mode
+# of the repository whose packages it borrows, and its list of paths.
+cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories"
+printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n' >"$g/docs/REVIEW.md"
+printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts"
+git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec" && git -C "$g" update-ref refs/remotes/origin/main HEAD
+mode="$g/.git/hooks/radical-mode"
+light_steps="typecheck lint copies build:app playwright"
+heavy_steps="test format:check unused comments py:check_css sh:ergo py:check_docs"
+light() { # $1: what the run was given; the run's output in $out
+	for s in $light_steps; do ran "$s" || fail "check.sh's light gate skipped $s on $1"; done
+	for s in $heavy_steps; do ran "$s" && fail "check.sh's light gate ran $s on $1"; done
+	printf '%s\n' "$out" | grep -q "^check.sh: the radical mode's light gate" || fail "check.sh did not say it ran the light gate on $1: $out"
+}
+whole() { # $1: what the run was given
+	for s in test format:check unused; do ran "$s" || fail "check.sh skipped $s on $1, which the whole gate runs"; done
+	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh said the light gate on $1: $out"
+	:
+}
+printf 'on\n' >"$mode" && echo y >>"$g/app/src/a.tsx"
+out=$(gate) || fail "check.sh's light gate failed a change whose every step passes: $out"
+light "a change of the app in the radical mode"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh's light gate did not record the code it passed"
+for path in app/src/csp.ts app/tests/stories/pictures.spec.ts; do
+	reset && echo y >>"$g/$path" && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
+	whole "a change of $path in the radical mode"
+done
+reset && git -C "$g" mv app/src/csp.ts app/src/renamed.ts && out=$(gate) || fail "check.sh failed on a tier-1 file renamed: $out"
+whole "a tier-1 file renamed away in the radical mode"
+# The table the change itself rewrites: its tier-1 row dropped in the same change still counts, as main's (lot 1's review, R1); with no
+# main to read it from, the whole gate.
+reset && grep -v csp.ts "$g/docs/REVIEW.md" >"$g/docs/r" && mv "$g/docs/r" "$g/docs/REVIEW.md" && echo y >>"$g/app/src/csp.ts" && out=$(gate) ||
+	fail "check.sh failed on a tier-1 file whose row the change dropped: $out"
+whole "a tier-1 file whose row the same change dropped"
+reset && git -C "$g" update-ref -d refs/remotes/origin/main && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed with no main to read: $out"
+whole "a change of the app with no main's table to read"
+git -C "$g" update-ref refs/remotes/origin/main HEAD
+reset && echo y >>"$g/app/src/a.tsx"
+for state in missing off "on2" folder planted; do
+	rm -rf "${mode:?}" "$g/.githooks/radical-mode" "$g/.claude/tmp/radical-mode"
+	case $state in
+	missing) ;;
+	folder) mkdir "$mode" ;;
+	planted) mkdir -p "$g/.claude/tmp" && printf 'on\n' >"$g/.claude/tmp/radical-mode" ;;
+	*) printf '%s\n' "$state" >"$mode" ;;
+	esac
+	out=$(gate) || fail "check.sh failed with the mode $state: $out"
+	whole "a change of the app with the mode $state"
+done
+# git's own folders, a caller's to name: a common folder of another's holding the mode on is read as no mode (lot 1's security review, S5).
+fake="$t/gate_light.common" && mkdir -p "$fake/hooks" && printf 'on\n' >"$fake/hooks/radical-mode"
+for f in objects refs HEAD config; do ln -s "$g/.git/$f" "$fake/$f"; done
+for hook in commit-msg pre-commit pre-merge-commit pre-push; do ln -s "$g/.git/hooks/$hook" "$fake/hooks/$hook" 2>/dev/null || :; done
+out=$(GIT_COMMON_DIR="$fake" gate) || fail "check.sh failed with a caller's GIT_COMMON_DIR: $out"
+whole "a change of the app with a caller's GIT_COMMON_DIR holding the mode on"
+rm -rf "${mode:?}" "$g/.claude/tmp/radical-mode" && printf 'on\n' >"$mode"
+mv "$g/docs/REVIEW.md" "$g/docs/gone.md" && out=$(gate) || fail "check.sh failed with no tier-1 table: $out"
+whole "a change of the app with no tier-1 table to read"
+mv "$g/docs/gone.md" "$g/docs/REVIEW.md"
+for run in --tests-all --full --merge; do
+	out=$(AUDIT_ANSWER=x gate "$run") || fail "check.sh $run failed in the radical mode: $out"
+	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh $run took the light gate: $out"
+done
+# pre-commit's staged copy: the mode of the repository it borrows its packages from, and the paths pre-commit lists.
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && ln -s "$g/node_modules" "$c/node_modules"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
+light "a staged copy's change of the app"
+out=$(g=$c GATE_CHANGED="$(printf 'app/src/a.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
+whole "a staged copy's change of a tier-1 file"
+rm "$c/node_modules" && cp -R "$g/node_modules" "$c/node_modules"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
+whole "a staged copy with no repository to read the mode of"
+rm -f "$mode"
+fi
+
 full_fixture() { # $1: its folder's name
 	gate_fixture "$1"
 	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
@@ -3091,6 +3328,97 @@ AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with folde
 rm -rf "$g/.stryker-tmp" && mkdir -p "$t/stryker-away" && printf 'x\n' >"$t/stryker-away/a" && ln -s "$t/stryker-away" "$g/.stryker-tmp"
 AUDIT_ANSWER=x gate --full >/dev/null || fail "check.sh --full failed with .stryker-tmp as a link"
 [ -e "$t/stryker-away/a" ] || fail "check.sh --full emptied what a link named .stryker-tmp leads to"
+fi
+
+if part lint_scope; then
+# lint_scope.py on a real type check's graph, TypeScript's own .tsbuildinfo, so that an upgrade that moves its format fails here (the
+# chief, 2026-11-04). A type changed in a.ts turns b.ts red, which imports it and did not change: the scope names a.ts and its importers at
+# any depth, across two programs and through a folder in capitals, in their own case, and nothing apart; ESLint on its files fails on b.ts
+# alone. TypeScript's references count as imports: an ambient module of a .d.ts, an augmentation, a JSON file. A file in no program (a
+# stylesheet) is named itself; a path is quoted for the shell, one gone is left out. A change of the global scope, wherever it comes in
+# the list, a graph it cannot read, or none, is the whole repository (`.`). Its folder is read as TypeScript wrote it, through a link.
+ls_="$t/lint_scope" && mkdir -p "$ls_/src/Deep" "$ls_/other" "$ls_/cache"
+nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
+modules=$(cd "$here/../node_modules" && pwd -P)
+cat >"$ls_/tsconfig.json" <<'JSON'
+{ "compilerOptions": { "strict": true, "target": "es2024", "lib": ["es2024"], "module": "nodenext", "noEmit": true, "allowImportingTsExtensions": true, "resolveJsonModule": true, "types": [] }, "include": ["src"] }
+JSON
+printf '{ "extends": "../tsconfig.json", "include": ["."] }\n' >"$ls_/other/tsconfig.json"
+# The type check names its files, as package.json's typecheck does: the graph is theirs alone (lot 1's review, R2).
+printf '{ "type": "module", "scripts": { "typecheck": "tsc -p tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/root.tsbuildinfo\\" && tsc -p other/tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/other.tsbuildinfo\\"" } }\n' >"$ls_/package.json"
+printf 'import tseslint from "%s/typescript-eslint/dist/index.js";\nexport default [{ files: ["**/*.ts"], languageOptions: { parser: tseslint.parser, parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } }, plugins: { "@typescript-eslint": tseslint.plugin }, rules: { "@typescript-eslint/no-floating-promises": "error" } }];\n' "$modules" >"$ls_/eslint.config.mjs"
+printf 'export interface Shape {\n  x: number;\n}\nexport function later(): void {}\n' >"$ls_/src/a.ts"
+printf 'import { later } from "./a.ts";\nexport function run(): void {\n  later();\n}\n' >"$ls_/src/b.ts"
+printf 'import { run } from "./b.ts";\nexport const user = run;\n' >"$ls_/src/user.ts"
+printf 'import { user } from "./user.ts";\nexport const deep = user;\n' >"$ls_/src/deep.ts"
+printf 'import { later } from "./a.ts";\nexport const uses = later;\n' >"$ls_/src/Uses.ts"
+printf 'import { later } from "../a.ts";\nexport const importer = later;\n' >"$ls_/src/Deep/Importer.ts"
+printf 'import { later } from "../src/a.ts";\nexport const other = later;\n' >"$ls_/other/o.ts"
+printf 'export const apart = 1;\n' >"$ls_/src/apart.ts"
+printf 'import { two } from "./c2.ts";\nexport const one = (): number => two();\n' >"$ls_/src/c1.ts"
+printf 'import { one } from "./c1.ts";\nexport const two = (): number => one();\n' >"$ls_/src/c2.ts"
+printf 'declare module "virtual:planted" {\n  export const planted: number;\n}\n' >"$ls_/src/amb.d.ts"
+printf 'import { planted } from "virtual:planted";\nexport const seen = planted;\n' >"$ls_/src/v.ts"
+printf 'import type { Shape } from "./a.ts";\ndeclare module "./a.ts" {\n  interface Shape {\n    extra?: number;\n  }\n}\nexport type Augmented = Shape;\n' >"$ls_/src/aug.ts"
+printf '{ "n": 1 }\n' >"$ls_/src/data.json" && printf 'import data from "./data.json" with { type: "json" };\nexport const n = data.n;\n' >"$ls_/src/j.ts"
+printf 'declare global {\n  interface Planted {\n    x: number;\n  }\n}\nexport {};\n' >"$ls_/src/global.ts"
+for odd in 'with space' "it's" 'a$(touch pwned)'; do printf 'export const odd = 1;\n' >"$ls_/src/$odd.ts"; done
+printf 'a {\n  color: red;\n}\n' >"$ls_/src/style.css"
+types() { # $1: the folder of the buildinfo files, as tsc is told it
+	for project in root:tsconfig.json other:other/tsconfig.json; do
+		(cd "$ls_" && PATH="$nodebin:$PATH" node "$modules/typescript/bin/tsc" -p "${project#*:}" --incremental --tsBuildInfoFile "${1:-cache}/${project%%:*}.tsbuildinfo") || fail "tsc failed on lint_scope's fixture ($project)"
+	done
+}
+lint() { (cd "$ls_" && PATH="$nodebin:$PATH" node "$modules/eslint/bin/eslint.js" --max-warnings 0 --no-warn-ignored "$@") >"$t/lint_scope.out" 2>&1; }
+scope() { printf '%s\n' "$@" | (cd "$ls_" && python3 -I "$here/lint_scope.py" "${SCOPE_IN:-cache}"); }
+names() { # $1: the scope; then the files it must name, "-", the files it must not
+	words=$(eval "printf '%s\n' $1")
+	shift
+	must=true
+	for f in "$@"; do
+		if [ "$f" = - ]; then must=false; elif $must; then printf '%s\n' "$words" | grep -qxF "$f" || fail "lint_scope.py did not name $f: $words"; else printf '%s\n' "$words" | grep -qxF "$f" && fail "lint_scope.py named $f: $words"; fi
+	done
+	:
+}
+types && lint src/b.ts || fail "ESLint failed on lint_scope's fixture before the change: $(cat "$t/lint_scope.out")"
+printf 'export interface Shape {\n  x: number;\n}\nexport async function later(): Promise<void> {}\n' >"$ls_/src/a.ts" && types
+s=$(scope src/a.ts)
+names "$s" src/a.ts src/b.ts src/user.ts src/deep.ts src/Uses.ts src/Deep/Importer.ts other/o.ts - src/apart.ts src/c1.ts src/j.ts src/v.ts src/global.ts
+lint src/a.ts || fail "ESLint failed on a.ts alone, which is sound: $(cat "$t/lint_scope.out")"
+eval "set -- $s" && lint "$@" && fail "ESLint passed on the files lint_scope.py named, with b.ts's promise floating: $(cat "$t/lint_scope.out")"
+grep -q "no-floating-promises" "$t/lint_scope.out" && grep -q "src/b.ts" "$t/lint_scope.out" || fail "ESLint did not fail b.ts on its floating promise: $(cat "$t/lint_scope.out")"
+names "$(scope src/amb.d.ts)" src/v.ts - src/apart.ts
+names "$(scope src/aug.ts)" src/b.ts - src/apart.ts
+names "$(scope src/data.json)" src/j.ts - src/apart.ts
+names "$(scope src/c1.ts)" src/c1.ts src/c2.ts - src/apart.ts
+[ "$(scope src/style.css)" = src/style.css ] || fail "lint_scope.py did not name a changed file of no program: $(scope src/style.css)"
+eval "set -- $(scope 'src/with space.ts' "src/it's.ts" 'src/a$(touch pwned).ts' src/gone.ts)"
+[ "$*" = 'src/a$(touch pwned).ts src/it'"'"'s.ts src/with space.ts' ] && [ $# = 3 ] || fail "lint_scope.py did not quote each path whole, or named one that is gone: $#: $*"
+[ ! -e "$ls_/pwned" ] && [ ! -e "$t/pwned" ] || fail "lint_scope.py's answer ran a command a file's name held"
+[ -z "$(scope src/gone.ts)" ] || fail "lint_scope.py named a file that is gone: $(scope src/gone.ts)"
+for list in src/global.ts "src/a.ts src/global.ts"; do
+	[ "$(scope $list)" = . ] || fail "lint_scope.py did not lint the whole repository for a change of the global scope in '$list': $(scope $list)"
+done
+# The folder as tsc was told it, here through a link at another depth of the same tree (spelled physically: through /tmp, the names climb
+# to the root and any reading lands): the names are relative to it, never to where it leads.
+phys=$(cd "$t" && pwd -P) && mkdir -p "$phys/at/another" && ln -s "$phys/lint_scope/cache" "$phys/at/another/cache" && types "$phys/at/another/cache"
+names "$(SCOPE_IN="$phys/at/another/cache" scope src/a.ts)" src/b.ts src/deep.ts other/o.ts
+# A graph it cannot read, or none, is the whole repository: never fewer files, one bad among good ones too.
+good=$(cat "$ls_/cache/root.tsbuildinfo")
+for bad in 'not json' '[]' '{"fileNames": 1}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[0, 1]], "fileIdsList": [[1]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[1, 9]], "fileIdsList": [[1]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": ["x"], "referencedMap": [[1, 1]], "fileIdsList": [[7]]}' '{"fileNames": ["../src/a.ts"], "fileInfos": [7]}'; do
+	printf '%s' "$bad" >"$ls_/cache/root.tsbuildinfo"
+	[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph that is not one ($bad): $(scope src/a.ts 2>&1)"
+done
+rm "$ls_/cache/root.tsbuildinfo" "$ls_/cache/other.tsbuildinfo" && [ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read no graph as an empty one: $(scope src/a.ts 2>&1)"
+printf '%s' "$good" >"$ls_/cache/root.tsbuildinfo"
+# Only the files package.json's typecheck names: one of them missing is the whole repository, a file of no name it gives (left by a hand
+# run, never refreshed) is never read, and a typecheck that names none is the whole repository.
+[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph with one of the type check's files missing: $(scope src/a.ts 2>&1)"
+types && printf '{"fileNames": ["../src/apart.ts", "../src/a.ts"], "fileInfos": ["x", "y"], "referencedMap": [[1, 1]], "fileIdsList": [[2]]}' >"$ls_/cache/stale.tsbuildinfo"
+names "$(scope src/a.ts)" src/b.ts - src/apart.ts
+cp "$ls_/package.json" "$t/lint_scope.package" && printf '{ "scripts": { "typecheck": "tsc -p tsconfig.json" } }\n' >"$ls_/package.json"
+[ "$(scope src/a.ts 2>/dev/null)" = . ] || fail "lint_scope.py read a graph the type check names no file of: $(scope src/a.ts 2>&1)"
+cp "$t/lint_scope.package" "$ls_/package.json"
 fi
 
 # Vitest does not bench what a StrykerJS sandbox holds: on a copy of the config, a bench in .stryker-tmp is not measured. Only a
@@ -5501,6 +5829,47 @@ for p in app/src/features/chat/embeds.ts app/src/features/chat/Embed.tsx app/src
 	packages/ui/src/link.tsx packages/ui/src/roving.ts app/src/features/jarvis/toolLoop.ts app/src/features/passport/sign.ts app/src/features/newthing/Panel.tsx packages/ui/src/NewThing/NewThing.tsx; do
 	[ "$(printf '%s\n' "$p" | python3 -I "$sp" "$here/.." 2>&1)" = full ] || fail "speeds.py: the repository's table let $p take the interface speed"
 done
+fi
+
+if part speeds_light; then
+# speeds.py --light <root>: whether a change may take the radical mode's light gate as far as docs/REVIEW.md's tier 1 goes (Alexis,
+# 2026-11-04, until the hardening slice): `light` when no path is a tier-1 path, read as the two speeds read them (case folded, a path it
+# cannot place or one through a link is no light); `full` on a tier-1 path anywhere in the list, a renamed one's old path included, a table
+# it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
+sp="$here"/speeds.py
+r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/login" "$r/app/src/lib" "$r/server/src"
+printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
+ln -s ../features/login "$r/app/src/lib/login"
+cp "$r/docs/REVIEW.md" "$t/main.review" # main's own table, which check.sh gives it beside the tree's (lot 1's review, R1)
+light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" "$t/main.review" 2>/dev/null || echo crashed; }
+for p in app/src/features/chat/Bubble.tsx server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/csp.test.ts; do
+	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, of no tier-1 row, is not light: $(light "$p")"
+done
+[ "$(light app/src/lib/other.ts server/src/a.ts)" = light ] || fail "speeds.py --light: two paths of no tier-1 row are not light"
+for p in app/src/csp.ts app/src/features/login/Form.tsx gno/r/x/realm deploy/web/nginx.conf App/src/CSP.ts "app/src/features/LOGIN/Form.tsx" \
+	app/src/lib/login/Form.tsx /app/src/x.ts "app/src/../src/csp.ts" '"app/src/x.ts"' "app/src/x.ts "; do
+	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p is light"
+	[ "$(light app/src/lib/other.ts "$p")" = full ] || fail "speeds.py --light: $p beside a light path is light"
+done
+# A tier-1 file renamed away: the list holds its old path (check.sh's --no-renames), which is tier 1.
+[ "$(light app/src/csp.ts app/src/lib/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
+[ "$(printf '' | python3 -I "$sp" --light "$r" "$t/main.review")" = full ] || fail "speeds.py --light: an empty change is light"
+# A tier-1 path is one of either table, the tree's or main's: a row the tree drops is still main's (R1), a row it adds counts at once.
+grep -v 'csp.ts' "$t/main.review" >"$r/docs/REVIEW.md" && { [ "$(light app/src/csp.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree dropped made its path light"; }
+cp "$t/main.review" "$r/docs/REVIEW.md" && printf '| 1 | The new guard (`app/src/lib/guard.ts`) | Claude | every line |\n' >>"$r/docs/REVIEW.md"
+[ "$(light app/src/lib/guard.ts)" = full ] || fail "speeds.py --light: a tier-1 row the tree added is light"
+cp "$t/main.review" "$r/docs/REVIEW.md"
+# Either table unreadable, or one it reads with no tier-1 row (a column renamed, R3), is no light; and so is a call with no main's table.
+for broken in tree main; do
+	cp "$t/main.review" "$t/main.saved"
+	if [ "$broken" = tree ]; then grep -v '^| 1 ' "$t/main.saved" >"$r/docs/REVIEW.md"; else grep -v '^| 1 ' "$t/main.saved" >"$t/main.review"; fi
+	[ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: the $broken's table with no tier-1 row is light"
+	cp "$t/main.saved" "$t/main.review" && cp "$t/main.saved" "$r/docs/REVIEW.md"
+done
+[ "$(printf 'app/src/lib/other.ts\n' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: a call with no main's table is light"
+mv "$t/main.review" "$t/main.gone" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no main's table to read is light"; }
+mv "$t/main.gone" "$t/main.review"
+mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no table to read is light"; }
 fi
 
 if part gate_speeds; then

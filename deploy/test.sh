@@ -1425,6 +1425,9 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	# otherwise would leave the hero without its number for good.
 	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
 	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
+	# What the job logged, its faults' kinds and each pass's length in ms (a line holds nothing a chain wrote): the stack's logs go with it at
+	# the end, and a first pass's length in Docker is what 7k3 could not measure from its sandbox.
+	printf 'the worlds job logged: %s\n' "$(docker logs "$server" 2>&1 | grep -oE '"event":"worlds_[a-z_]+"(,"error":"[a-z_]+"|,"ms":[0-9]+)?' | tr '\n' ' ' || true)"
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused

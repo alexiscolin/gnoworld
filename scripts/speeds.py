@@ -1,8 +1,10 @@
-"""speeds.py <root>: the merge check's two speeds (slice 7, question 21).
+"""speeds.py <root>: the merge check's two speeds (slice 7, question 21); speeds.py --light <root>, the radical mode's light gate.
 
 Reads the paths of a change on stdin, one a line (check.sh's own `$changes`), and prints `interface` or `full`; it always exits 0.
 `interface` is for a change of the interface alone: one review and no StrykerJS. Everything else runs the full control, and so does
-any doubt: every path must be on the interface list, or the answer is `full`.
+any doubt: every path must be on the interface list, or the answer is `full`. `speeds.py --light <root> <main's table>` prints `light`
+when no path is a security path of either table, `full` otherwise: the radical mode's light gate (Alexis, 2026-11-04), whose harness
+files check.sh judges itself.
 
 What counts as security, and what counts as interface, is one place: the tables of <root>/docs/REVIEW.md. Tier 1's backticked paths
 are the security paths (keys, the CSP, chain reads, login, roles, the worker, deployment); tier 3's are the interface. A path under
@@ -15,14 +17,14 @@ import re
 import sys
 import unicodedata
 
-FULL, INTERFACE = "full", "interface"
+FULL, INTERFACE, LIGHT = "full", "interface", "light"
 CELLS = re.compile(r"`([^`]+)`")
 
 
-def rows(root):
-    """({tier: [backticked paths of the cell that names what the tier holds]}) of docs/REVIEW.md's table; none when unreadable."""
+def rows(root, table=None):
+    """({tier: [backticked paths of the cell that names what the tier holds]}) of docs/REVIEW.md's table, or of the file `table`."""
     found = {"1": [], "3": []}
-    with open(os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
+    with open(table or os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
         for line in f:
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if line.lstrip().startswith("|") and len(cells) >= 2 and cells[0] in found:
@@ -52,6 +54,12 @@ def linked(root, path):
     return any(os.path.islink(os.path.join(root, *parts[: n + 1])) for n in range(len(parts)))
 
 
+def secure(root, path, security):
+    """Whether a path is a tier-1 path, or one this script cannot place, which counts as one."""
+    n = folded(path)
+    return not plain(path) or linked(root, path) or any(n == s or (s.endswith("/") and n.startswith(s)) for s in security)
+
+
 def speed(root, paths):
     table = rows(root)
     security = [folded(p) for p in table["1"]]
@@ -59,20 +67,27 @@ def speed(root, paths):
     if not security or not interface or not paths:
         return FULL
     for path in paths:
-        if not plain(path) or linked(root, path) or not any(path.startswith(i) for i in interface):
-            return FULL
-        n = folded(path)
-        if any(n == s or (s.endswith("/") and n.startswith(s)) for s in security):
+        if secure(root, path, security) or not any(path.startswith(i) for i in interface):
             return FULL
     return INTERFACE
 
 
+def light(root, main_table, paths):
+    """`light` when no path is a tier-1 path of the tree's table or of main's (the radical mode's light gate, check.sh): a row the change
+    drops from the tree's stays main's. `full` otherwise, or when either table holds no tier-1 row, or with nothing to read."""
+    tree, main = (([folded(p) for p in rows(root, table)["1"]]) for table in (None, main_table))
+    if not tree or not main or not paths or any(secure(root, path, tree + main) for path in paths):
+        return FULL
+    return LIGHT
+
+
 def main(argv):
     try:
-        if len(argv) != 2:
-            return FULL
         text = sys.stdin.buffer.read().decode("utf-8")
-        return speed(argv[1], [p for p in text.split("\n") if p])
+        paths = [p for p in text.split("\n") if p]
+        if argv[1:2] == ["--light"]:
+            return light(argv[2], argv[3], paths) if len(argv) == 4 else FULL
+        return speed(argv[1], paths) if len(argv) == 2 else FULL
     except (OSError, ValueError):  # a table or a name it cannot read, bytes that are not text
         return FULL
 

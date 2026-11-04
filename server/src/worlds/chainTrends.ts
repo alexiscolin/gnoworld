@@ -134,8 +134,8 @@ function newest(worlds: Worlds): NewTrend[] {
 }
 
 /** The chain's part of the trends, each pass against the pass before it, its windows kept in `habits` when given. ponytail: it keeps the paths
- * the last pass read, at most the job's HISTORY_MAX_CALLS; past that cap each pass reads a run of realms that moves on, so a world is known by
- * the realms both passes read, and unknown once the runs no longer meet (from twice the cap). */
+ * the last pass read, every realm of its list (7k3: one read of the chain's calls a pass, at most history.ts's HISTORY_READ_BYTES), or none
+ * after a pass whose read failed. */
 export function makeTrends(options: { habits?: Habits; log?: Log } = {}): TrendKeeper {
   const { habits, log = () => undefined } = options;
   let last: { at: string; read: ReadonlyMap<string, number> } | undefined;
