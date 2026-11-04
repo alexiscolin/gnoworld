@@ -106,7 +106,8 @@ function settled({ budget, log }: Attempts, hold: { readonly id: number }, real:
 // The wait before the next attempt, or none when the SDK would not retry: a dropped or timed-out connection, or the
 // API's x-should-retry, else 408, 409, 429 and 5xx (SDK 1.4.0's shouldRetry); what the API asks, up to 8 s.
 function delayOf(error: AnthropicError, attempt: number): number | undefined {
-  const backoff = Math.min(500 * 2 ** (attempt - 1), 8_000);
+  // Up to a quarter off at random, as the SDK does, so the questions a 429 or a 529 stops do not retry in step.
+  const backoff = Math.min(500 * 2 ** (attempt - 1), 8_000) * (1 - Math.random() * 0.25);
   if (error instanceof APIConnectionError) return backoff;
   const answered = answeredOf(error);
   if (answered === undefined || !retried(answered)) return undefined;

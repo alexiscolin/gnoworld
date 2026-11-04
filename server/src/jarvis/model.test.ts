@@ -407,6 +407,14 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     run.close();
   });
 
+  it("takes up to a quarter off its own wait at random, so questions at once do not retry in step", async () => {
+    const run = attempts(45 * DOLLAR);
+    vi.spyOn(Math, "random").mockReturnValue(1);
+    await callModel({ ...run.parts, send: script(statusError(500), statusError(500), statusError(500)).send }, ask());
+    expect(run.waits).toEqual([375, 750]);
+    run.close();
+  });
+
   it.each([
     ["retry-after: 2", { "retry-after": "2" }, 2_000],
     ["retry-after: 8", { "retry-after": "8" }, 8_000],
