@@ -106,21 +106,24 @@ set to that commit (read it once, right after you reviewed it: a session can mov
 add `--mutants` to the last line when the branch changes `deploy/`:
 
 ```sh
-repo=~/Server/gnoworld sha=$(/usr/bin/git -C ~/Server/gnoworld rev-parse --verify '<the commit you reviewed>^{commit}')
-export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 # no git config of the home folder in what follows
-d=$(mktemp -d) && /usr/bin/git -C "$repo" archive "$sha" | /usr/bin/tar -x -C "$d" &&
+( repo=~/Server/gnoworld sha=$(/usr/bin/git -C ~/Server/gnoworld rev-parse --verify '<the commit you reviewed>^{commit}')
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 PYTHONNOUSERSITE=1 # no git config of the home folder, no python3 user site
+/bin/mkdir -p ~/.local/state && d=$(/usr/bin/mktemp -d ~/.local/state/gnoworld-test.XXXXXX) &&
+	/usr/bin/git -C "$repo" archive "$sha" | /usr/bin/tar -x -C "$d" &&
 	[ "$(/usr/bin/git -C "$repo" cat-file commit "$sha" | /usr/bin/git hash-object -t commit --stdin)" = "$sha" ] &&
 	(cd "$d" && /usr/bin/git init -q && /usr/bin/git add -A -f && [ "$(/usr/bin/git write-tree)" = "$(/usr/bin/git -C "$repo" rev-parse "$sha^{tree}")" ]) &&
-	echo "test.sh runs from $sha, checked, in $d" && (cd "$d" && sh deploy/test.sh)
+	echo "test.sh runs from $sha, checked, in $d" && (cd "$d" && /bin/sh deploy/test.sh)
+status=$?; [ -z "${d:-}" ] || /bin/rm -rf "$d"; exit "$status" )
 ```
 
-It calls the system's git and tar by path, and the copy holds a repository of its own, for
-test.sh's checks of what git ignores. A line that prints nothing and runs no test.sh means the copy
-is not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh; remove
-the copy after (`rm -r "$d"`). It needs Alexis's user settings of 2026-11-04 (7w2's
-`apply-7w2-user.sh`), which keep the sessions' file tools out of the programs it calls (git, tar,
-docker, sh's startup files); without them, anything on `PATH` outside `/usr/bin` and `/bin` is
-theirs to rewrite.
+It runs in a subshell of its own, so nothing it sets stays in the Terminal; it calls the system's
+programs by path, and the copy holds a repository of its own, for test.sh's checks of what git
+ignores, and is removed at the end. A run that prints no "test.sh runs from" line means the copy is
+not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh. The copy
+lives under `~/.local`, which Alexis's user settings of 2026-11-04 (7w2's `apply-7w2-user.sh`) close
+to every session's file tools, as they close the programs test.sh calls (docker and its config,
+python3's user site, sh's startup files); the sandbox closes it to commands. Without those settings,
+anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
 
 ## When something goes wrong: cut the public URL
 
