@@ -506,7 +506,9 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     expect(pids.some(running)).toBe(false);
     expect(gnomcp.starts().map(({ cwd }) => existsSync(cwd))).toEqual([false]);
     expect(collector.received.some(({ body }) => body.includes("jarvis.question"))).toBe(true);
-    // Its file held alone no more: opened again at once, no hold left.
+    // Its file closed: SQLite removes the log of a file whose last connection closed cleanly; opened again at once, no
+    // hold left.
+    expect(existsSync(join(dir, "jarvis.db-wal"))).toBe(false);
     const db = openDatabase(join(dir, "jarvis.db"), jarvisMigrations);
     expect(db.prepare("SELECT COUNT(*) AS holds FROM budget_holds").get()).toEqual({ holds: 0 });
     db.close();
