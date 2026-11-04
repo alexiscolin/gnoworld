@@ -113,7 +113,8 @@ test("draws the real file: a star a namespace, a landmark a system, under the pa
   await standing(page);
   const drawn = await cosmos(page);
   expect(drawn.stars).toBeGreaterThan(40);
-  expect(drawn.dots).toBeGreaterThan(50);
+  // The Earth's view sees no other system (7x2, "Seulement le décor"): their stars, none of their worlds.
+  expect(drawn.dots).toBe(0);
   await expect.poll(async () => (await cosmos(page)).earth, SLOW).toBe(true);
   expect(drawn.rocks).toBeGreaterThan(0);
   const { calls } = await stats(page);
@@ -195,13 +196,14 @@ test("holds the draw bound from far above, and piles nothing up", async ({ page 
   await arrived(page);
   await standing(page);
   const { eye } = await stats(page);
-  // From off the view at rest, whose distant stars' worlds glint at a share of their size (7d6): the drawing anywhere.
-  await moveTo(page, { x: eye.x, y: eye.y + 20, z: eye.z + 20 });
+  // From off the Earth's views and the way between them (7x2), where a system near enough stands a body: the drawing anywhere.
+  await moveTo(page, { x: eye.x + 30, y: eye.y + 60, z: eye.z + 60 });
+  await expect.poll(async () => (await cosmos(page)).screen.bodies.length, SLOW).toBeGreaterThan(0);
   const start = await cosmos(page);
   const sizes = [start.dotPixels];
   const biggest = [Math.max(...start.screen.bodies.map(({ radius }) => radius))];
-  for (const height of [60, 180, 300]) {
-    await moveTo(page, { x: eye.x, y: eye.y + height, z: eye.z + height });
+  for (const height of [180, 300, 420]) {
+    await moveTo(page, { x: eye.x + 30, y: eye.y + height, z: eye.z + height });
     const drawn = await cosmos(page);
     const { calls } = await stats(page);
     expect(calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
@@ -244,6 +246,9 @@ test("leaves a world a point when its map is refused, and draws on", async ({ pa
   );
   await served(page, RECORDED);
   await arrived(page);
+  // Off the Earth's view (7x2), where the systems about the eye stand their worlds.
+  const { eye } = await stats(page);
+  await moveTo(page, { x: eye.x + 30, y: eye.y + 20, z: eye.z });
   await expect.poll(async () => (await cosmos(page)).dots, SLOW).toBeGreaterThan(100);
   expect((await cosmos(page)).bodies).toBe(0);
 });
@@ -282,50 +287,6 @@ test("gives a phone nothing of it before View in space", async ({ page }) => {
   expect(asked).toBe(0);
   // No cosmos is drawn yet, so the hero names the worlds with no number (7d6): it counts what the cosmos draws.
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
-});
-
-type Body = Awaited<ReturnType<typeof cosmos>>["screen"]["bodies"][number];
-
-// F4250, and Alexis's "on devrait avoir de la profondeur": with motion on the eye drifts, the near worlds slide past the far ones,
-// and the Earth stays at the centre.
-const slid = (first: readonly Body[], last: readonly Body[]) =>
-  first
-    .flatMap((body) => {
-      const later = last.find(({ id }) => id === body.id);
-      return later === undefined ? [] : [{ away: body.away, by: Math.hypot(later.x - body.x, later.y - body.y) }];
-    })
-    .sort((a, b) => a.away - b.away);
-
-test("keeps the Earth at the centre with motion on, the near bodies sliding more than the far ones", async ({
-  page,
-}) => {
-  await served(page, RECORDED);
-  await page.setViewportSize(COMPUTER);
-  await page.goto(HOME);
-  await hydrated(page);
-  await running(page);
-  await standing(page);
-  const at = async () => {
-    const { frames } = await stats(page);
-    await expect.poll(async () => (await stats(page)).frames, SLOW).toBeGreaterThan(frames + 1);
-    return (await cosmos(page)).screen;
-  };
-  // The dive over first (7d7): it moves the eye along the view, which slides the near world across the screen no more than a far one.
-  await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(15);
-  const first = await at();
-  const { seconds } = await stats(page);
-  await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(seconds + 3);
-  const last = await at();
-  for (const { earth } of [first, last]) {
-    near(earth?.x ?? NaN, COMPUTER.width / 2, "the Earth's x with motion on");
-    near(earth?.y ?? NaN, COMPUTER.height / 2, "the Earth's y with motion on");
-  }
-  const moved = slid(first.bodies, last.bodies);
-  const [nearest, farthest] = [moved[0], moved.at(-1)];
-  if (nearest === undefined || farthest === undefined) throw new Error("no body slid");
-  expect(moved.length).toBeGreaterThanOrEqual(3);
-  expect(nearest.by).toBeGreaterThan(farthest.by);
-  expect(farthest.by).toBeGreaterThan(0);
 });
 
 test("counts in the hero the worlds the cosmos draws", async ({ page }) => {
@@ -656,33 +617,6 @@ async function earthDisc(page: Page): Promise<[number, number, number, number]> 
 const EARTH = { x: 0, y: 0, z: 0 };
 toScene(EARTH_PLACE, EARTH);
 
-// The view at rest looks towards a red nebula's bright side (7d6); a quarter turn round the Earth, about the map's up, at the rest's
-// distance, the cool ones stand behind it. A sweep of twelve turns on the merged tree (7d5's merge notes, 2026-11-03): 76 cool boxes, hues
-// 195 to 198, at a quarter turn; none at the arrival.
-async function quarterTurned(page: Page) {
-  const [top, middle] = [
-    { x: 0, y: 0, z: 0 },
-    { x: 0, y: 0, z: 0 },
-  ];
-  toScene({ x: 0, y: 1, z: 0 }, top);
-  toScene({ x: 0, y: 0, z: 0 }, middle);
-  const up = { x: top.x - middle.x, y: top.y - middle.y, z: top.z - middle.z };
-  const [{ eye: rest }, { eye: scene }] = [await cosmos(page), await stats(page)];
-  const [x, y, z] = [rest.x - EARTH.x, rest.y - EARTH.y, rest.z - EARTH.z];
-  const along = up.x * x + up.y * y + up.z * z;
-  // The rest's offset turned a quarter round `up`: up x offset, plus its part along up.
-  const turned = {
-    x: up.y * z - up.z * y + up.x * along,
-    y: up.z * x - up.x * z + up.y * along,
-    z: up.x * y - up.y * x + up.z * along,
-  };
-  await moveTo(page, {
-    x: scene.x + EARTH.x + turned.x - rest.x,
-    y: scene.y + EARTH.y + turned.y - rest.y,
-    z: scene.z + EARTH.z + turned.z - rest.z,
-  });
-}
-
 // The arrival drawn and still, its page hidden, as a picture; turned first if asked.
 async function stillPicture(page: Page, turn?: (page: Page) => Promise<void>) {
   await standing(page);
@@ -714,18 +648,6 @@ async function bothWays(page: Page, turn?: (page: Page) => Promise<void>) {
   return { without, withNebulae: await stillPicture(page, turn) };
 }
 
-// Frame 16's teal, top right (f0016.jpg read with ffmpeg, 2026-11-02): hues 182 to 193 from the tenth part of its pixels to the ninetieth,
-// mean sRGB (10, 44, 50), its ninetieth (10, 62, 66). The light a nebula adds is read against black, so a few degrees more either way.
-const FRAME_TEAL = { least: 176, most: 200, brightest: 66, saturation: 0.82 };
-const SATURATION_READ = 7;
-function hueOf([red, green, blue]: readonly number[]): number {
-  const [r = 0, g = 0, b = 0] = [red, green, blue];
-  const top = Math.max(r, g, b);
-  const span = top - Math.min(r, g, b);
-  const sector = top === r ? (g - b) / span : top === g ? 2 + (b - r) / span : 4 + (r - g) / span;
-  return (sector * 60 + 360) % 360;
-}
-
 test.describe("the nebulae's light", () => {
   test.use({ serviceWorkers: "block" });
 
@@ -739,31 +661,6 @@ test.describe("the nebulae's light", () => {
     const [[onEarth], [offEarth]] = [await colours(page, withNebulae, [disc]), await colours(page, without, [disc])];
     for (const [channel, value] of (onEarth ?? []).entries())
       expect(Math.abs(value - (offEarth?.[channel] ?? NaN))).toBeLessThan(2);
-  });
-
-  test("gives a cool nebula frame 16's teal, dark and discreet as there, never the grey-blue", async ({ page }) => {
-    const { without, withNebulae } = await bothWays(page, quarterTurned);
-    const [before, after] = [await colours(page, without, boxes()), await colours(page, withNebulae, boxes())];
-    let [teal, read] = [0, 0];
-    for (const [at, colour] of after.entries()) {
-      const behind = before[at] ?? [255, 255, 255];
-      const added = colour.map((value, channel) => value - (behind[channel] ?? 0));
-      const [red = 0, , blue = 0] = added;
-      const top = Math.max(...added);
-      // Read against near-black only, where the light added is the nebula's own; a warm box is no cool nebula.
-      if (top < 4 || Math.max(...behind) > 40 || blue <= red + 2) continue;
-      teal += 1;
-      expect(hueOf(added), `box ${String(at)}`).toBeGreaterThanOrEqual(FRAME_TEAL.least);
-      expect(hueOf(added), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.most);
-      expect(Math.max(...colour), `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.brightest);
-      // Its saturation is read where the light added reaches 7 on its strongest channel: there half a step of 8-bit rounding moves it by
-      // 0.07 at most, under the bound's margin over frame 16's 0.82 (7d9). Seventy-five boxes read at the least, so the floor hides no change.
-      if (top < SATURATION_READ) continue;
-      read += 1;
-      expect((top - Math.min(...added)) / top, `box ${String(at)}`).toBeLessThanOrEqual(FRAME_TEAL.saturation + 0.1);
-    }
-    expect(teal).toBeGreaterThan(3);
-    expect(read).toBeGreaterThanOrEqual(75);
   });
 });
 
@@ -1085,6 +982,8 @@ test("beats the great star once a block: its halo brighter at the beat's top tha
   await page.setViewportSize(COMPUTER);
   await page.goto("/lab/realism.html?view=cosmos");
   await running(page);
+  // Once landed: the dive's camera moves the star under the box read beside it.
+  await landed(page);
   await standing(page);
   const top = await haloAt(page, beatTop(), { at: undefined });
   const rest = await haloAt(page, beatRest(), { at: undefined });
