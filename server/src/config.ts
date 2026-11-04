@@ -10,6 +10,7 @@ import { CATEGORIES } from "./moderation/provider.ts";
 import {
   absolute,
   databasePath,
+  host,
   isOrigin,
   list,
   parseSettings,
@@ -56,7 +57,7 @@ export interface Config {
 const settingsSchema = () =>
   z
     .object({
-      HOST: z.string().min(1).max(253).default("127.0.0.1"),
+      HOST: host(),
       PORT: port().default(8080),
       DATABASE: databasePath,
       TRUSTED_PROXY: z.optional(z.string().refine((address) => isIP(address) !== 0)),
@@ -86,7 +87,7 @@ const settingsSchema = () =>
         .regex(/^\/./)
         .refine((path) => Buffer.byteLength(path) <= 100)
         .optional(),
-      ERGO_HOST: z.string().min(1).max(253).default("127.0.0.1"),
+      ERGO_HOST: host(),
       ERGO_PORT: z
         .string()
         .regex(/^[1-9]\d{0,4}$/)
