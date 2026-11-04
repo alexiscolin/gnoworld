@@ -28,6 +28,8 @@ export interface Scenario {
   // A tool whose call ends the process, in its first `starts` starts.
   crash?: { tool: string; starts: number };
   stderr?: string[];
+  // Words written with no line end before each audit line, which then ends theirs.
+  stderrBefore?: string;
   exitAtStart?: boolean;
 }
 
@@ -85,7 +87,7 @@ const call = (id, name, args) => {
   const echoed = { content: [{ type: "text", text: name + " " + JSON.stringify(args) }] };
   const result = scenario.answers?.[name] ?? (name === "gno_profile_list" ? listed : echoed);
   const audit = { time: "2026-11-04T00:00:00Z", tool: name, profile: "onyx", args_summary: JSON.stringify(args ?? {}), result: result.isError ? "tool_err" : "ok", duration_ms: 3 };
-  process.stderr.write(JSON.stringify(audit) + "\\n");
+  process.stderr.write((scenario.stderrBefore ?? "") + JSON.stringify(audit) + "\\n");
   send({ id, result });
 };
 createInterface({ input: process.stdin }).on("line", (line) => {

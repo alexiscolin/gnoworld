@@ -205,7 +205,9 @@ function logLines(stream: Stream | null, log: Log): void {
 function logLine(log: Log, line: string): void {
   if (line.trim() === "") return;
   if (!/^\s*[[{]/.test(line)) {
-    log("jarvis_gnomcp_stderr", { error: visible(line.slice(0, 512), false) });
+    // Up to its first brace: an audit line written into an unended line of words is no word of gnomcp's.
+    const end = line.indexOf("{");
+    log("jarvis_gnomcp_stderr", { error: visible(line.slice(0, Math.min(512, end === -1 ? 512 : end)), false) });
     return;
   }
   // What is no JSON reaches the schema as nothing, which it refuses.
