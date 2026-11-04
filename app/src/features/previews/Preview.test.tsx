@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
 // The page's slots filled as the shell fills them: the realm page's drawing comes through one (plugs.ts).
 import "../../plugs.ts";
+import { slot } from "../../slots.tsx";
+import { drawing } from "../chat/index.ts";
 import { Preview } from "./Preview.tsx";
 
 // A page's preview where a page asks for one (8f): the captures' file read, the page's capture found by its path, drawn as its card.
@@ -12,7 +14,7 @@ import { Preview } from "./Preview.tsx";
 const CAPTURE = { path: "gno.land/r/gov/dao", captured: "2026-11-05T10:00:00.000Z", text: "# GovDAO\n" };
 const FILE: Previews = { version: 1, universe: "onyx", updated: "2026-11-05T10:00:01.000Z", previews: [CAPTURE] };
 
-// Drawn with its file, once the file was read and the chat's drawing came: the read resolving is the sync point of an absence.
+// Drawn with its file, once the file was read and both drawings came: the sync point of an absence.
 async function drawn(path: string, file: Previews | undefined) {
   let read = false;
   const box = mount(
@@ -26,9 +28,9 @@ async function drawn(path: string, file: Previews | undefined) {
     />,
   );
   await settled(() => read);
+  // What the card waits on beside the file, awaited through the same promises: the chat's drawing and the realm page's.
   await act(async () => {
-    await import("../chat/Message.tsx");
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await Promise.all([drawing(), slot("pageDrawing")?.()]);
   });
   return box;
 }

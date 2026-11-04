@@ -113,19 +113,20 @@ describe("a page's preview under a line", () => {
   });
 
   it("follows the line's words as they change: an edit's new link waits for its own check, then shows its own page", async () => {
-    const { host, draw } = await drawn([props("https://onyx.testnets.gno.land/r/samcrew/memba")]);
-    await settled(() => previewsAsked() === 1);
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-    expect(cards(host)).toEqual([]);
-    // The correction comes with no verdict, as the stream leaves an edit until its check (F2000).
-    draw([props(GOVDAO, { verdict: undefined })]);
-    expect(cards(host)).toEqual([]);
-    draw([props(GOVDAO, { verdict: "checked" })]);
+    // A line linking GovDAO beside it is the sync point of each absence: its card says the file and the drawings have come.
+    const beside = { ...props(GOVDAO), line: line(GOVDAO, "b") };
+    const first = () => host.querySelectorAll("li")[0]?.querySelector("button[data-preview]") ?? null;
+    const { host, draw } = await drawn([props("https://onyx.testnets.gno.land/r/samcrew/memba"), beside]);
     await settled(() => cards(host).length === 1);
-    draw([props("no link now", { verdict: "checked" })]);
-    expect(cards(host)).toEqual([]);
+    expect(first()).toBeNull();
+    // The correction comes with no verdict, as the stream leaves an edit until its check (F2000).
+    draw([props(GOVDAO, { verdict: undefined }), beside]);
+    expect(first()).toBeNull();
+    draw([props(GOVDAO, { verdict: "checked" }), beside]);
+    await settled(() => cards(host).length === 2);
+    draw([props("no link now", { verdict: "checked" }), beside]);
+    expect(first()).toBeNull();
+    expect(cards(host)).toHaveLength(1);
   });
 
   it("shows none for a page the captures' file does not hold, nor for a link to another chain's gnoweb", async () => {
