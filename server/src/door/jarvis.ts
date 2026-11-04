@@ -16,7 +16,7 @@ import {
 } from "@gnoworld/schemas";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 
-export type Failure = "down" | "slow" | "failed" | "shape" | "gone";
+export type Failure = "down" | "slow" | "failed" | "shape" | "gone" | "refused";
 type Called<T> = { ok: true; value: T } | { ok: false; error: Failure };
 interface Schema<T> {
   safeParse: (value: unknown) => { success: true; data: T } | { success: false };
@@ -37,7 +37,8 @@ const MAX_BYTES = 1024 * 1024;
 // A budget is read or changed by one SQLite statement: ten seconds is a jarvis that does not answer.
 const BUDGETS_MS = 10_000;
 
-// Why a call that threw failed: the request that asked gone, its own time out, or nothing that answered.
+// Why a call that threw failed: the request that asked gone, its own time out, or nothing that answered; a call answered
+// with no success failed, or was refused.
 function failureOf(error: unknown, signal: AbortSignal | undefined): Failure {
   if (signal?.aborted === true) return "gone";
   return error instanceof Error && error.name === "TimeoutError" ? "slow" : "down";
@@ -70,7 +71,9 @@ export function jarvisClient({
     try {
       const response = await send(`${url}${path}`, { ...init, signal: signal ?? null }, ms);
       const json = await readJson(response, MAX_BYTES);
-      return response.ok ? parsed(schema, json) : { ok: false, error: "failed" };
+      if (response.ok) return parsed(schema, json);
+      // jarvis refuses what its schemas refuse (400): the asker's request, never jarvis's failure.
+      return { ok: false, error: response.status === 400 ? "refused" : "failed" };
     } catch (error) {
       return { ok: false, error: failureOf(error, signal) };
     }

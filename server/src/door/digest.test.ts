@@ -166,4 +166,12 @@ describe("a realm's digest through the door", () => {
     for (let at = 0; at < 11; at += 1) statuses.push((await digest()).status);
     expect([statuses.slice(0, 10).every((status) => status === 200), statuses[10]]).toEqual([true, 429]);
   });
+
+  it("answers jarvis's refusal of the realm's universe as refused, logged as such (the review's V3)", async () => {
+    const { digest, events } = setup({ answer: () => Promise.resolve({ ok: false, error: "refused" } as const) });
+    expect(await answerOf(await digest())).toEqual([400, { error: "refused" }]);
+    expect(events().at(-1)).toMatch(
+      /^\{"event":"jarvis_failed","route":"\/api\/jarvis\/digest","status":400,"error":"refused",/,
+    );
+  });
 });

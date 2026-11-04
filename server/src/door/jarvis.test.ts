@@ -275,4 +275,14 @@ describe("a translation and a digest from jarvis (10k)", () => {
       { ok: false, error: "gone" },
     ]);
   });
+
+  it("reads jarvis's refusal of a request as refused, never as its failure (the review's V3)", async () => {
+    const jarvis = await fakeJarvis([json({ error: "refused" }, 400), json({ error: "refused" }, 400)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.digest({ universe: "mars", realm: "gno.land/r/demo/poll" }, live())).toEqual({
+      ok: false,
+      error: "refused",
+    });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "refused" });
+  });
 });

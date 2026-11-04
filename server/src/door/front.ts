@@ -35,13 +35,15 @@ const refusals = {
 } as const satisfies Record<string, readonly [ApiError["error"], Status]>;
 
 // What a call to jarvis that failed answers: an answer of the wrong shape or an error is jarvis's fault, nothing
-// answering or too slow is a jarvis not ready, and a request gone is answered as nothing ready, to nobody.
+// answering or too slow is a jarvis not ready, a request gone is answered as nothing ready, to nobody, and a request
+// jarvis refused is refused.
 const failures = {
   shape: ["internal", 502],
   failed: ["internal", 502],
   down: ["not_ready", 503],
   slow: ["not_ready", 504],
   gone: ["not_ready", 503],
+  refused: ["refused", 400],
 } as const satisfies Record<Failure, readonly [ApiError["error"], Status]>;
 
 type Called<A> = { ok: true; answer: A } | { ok: false; error: Failure };
