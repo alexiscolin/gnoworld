@@ -72,6 +72,10 @@ test(
         'setTimeout(() => import("./timer.js"), 0);',
         'requestAnimationFrame(() => import("./frame.js"));',
         'requestIdleCallback(() => import("./idle.js"));',
+        'const every = setInterval(() => { clearInterval(every); void import("./interval.js"); }, 0);',
+        'clearTimeout(setTimeout(() => import("./cleared.js"), 0));',
+        'cancelAnimationFrame(requestAnimationFrame(() => import("./cleared.js")));',
+        'cancelIdleCallback(requestIdleCallback(() => import("./cleared.js")));',
         "document.__reactContainer$planted = true;",
       ].join("\n"),
       "static.js": "export const at = 1;",
@@ -82,6 +86,8 @@ test(
       "timer.js": "export const at = 4;",
       "frame.js": "export const at = 5;",
       "idle.js": "export const at = 6;",
+      "interval.js": "export const at = 7;",
+      "cleared.js": "export const at = 8;",
     };
     const name = (url: string) => new URL(url).pathname.split("/").pop() ?? "";
     await page.route("**/__first/*", (route) => {
@@ -96,7 +102,7 @@ test(
     const seen = watch(page);
     const early = (await firstScreenOf(page, "/__first/index.html", seen)).map(name).sort();
     expect(early).toEqual(["early.js", "entry.js", "fetched.js", "part.js", "static.js"]);
-    const later = ["frame.js", "idle.js", "timer.js"];
+    const later = ["frame.js", "idle.js", "interval.js", "timer.js"];
     await expect
       .poll(() =>
         [...seen.scripts]
@@ -105,6 +111,8 @@ test(
           .sort(),
       )
       .toEqual(later);
+    // A held call cleared before it ran never runs once the rest goes (R5).
+    expect([...seen.scripts].map(name)).not.toContain("cleared.js");
     // The guard of every page's run names them: asked, and under no cap.
     expect(
       uncounted(
