@@ -232,6 +232,6 @@ export class EarthView {
   }
 }
 
-/** The site's Earth view: the stations of the team's file, app/data/earthOrbit.json, checked when the app builds. */
-export const siteEarthView = (device: Device, document: Document, sight: () => Sight): EarthView =>
+/** The site's Earth view, on the page's document: the stations of the team's file, app/data/earthOrbit.json, checked when the app builds. */
+export const siteEarthView = (device: Device, sight: () => Sight): EarthView =>
   new EarthView(device, { projects, document, sight });

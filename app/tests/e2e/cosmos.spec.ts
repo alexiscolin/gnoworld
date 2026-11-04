@@ -65,7 +65,9 @@ const served = (page: Page, body: string, status = 200) =>
 // The Earth's view standing (7x2): the Earth and its stations, then more than `bodies` bodies held, each on the screen: a body waits off
 // it until its programs are compiled. The view at rest draws none of a system, so it asks none by default.
 async function standing(page: Page, bodies = -1) {
-  await expect.poll(async () => (await cosmos(page)).earth && ((await cosmos(page)).stations?.close ?? 0) > 0, SLOW).toBe(true);
+  await expect
+    .poll(async () => (await cosmos(page)).earth && ((await cosmos(page)).stations?.close ?? 0) > 0, SLOW)
+    .toBe(true);
   await expect.poll(async () => (await cosmos(page)).bodies, SLOW).toBeGreaterThan(bodies);
   await expect
     .poll(async () => {

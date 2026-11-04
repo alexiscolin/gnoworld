@@ -7,7 +7,7 @@ import type { EarthDevice } from "../earth/device.ts";
 
 const loadView = () => import("../station/earthView.ts");
 type View = ReturnType<Awaited<ReturnType<typeof loadView>>["siteEarthView"]>;
-type Sight = Parameters<Awaited<ReturnType<typeof loadView>>["siteEarthView"]>[2];
+type Sight = Parameters<Awaited<ReturnType<typeof loadView>>["siteEarthView"]>[1];
 
 export class LazyEarthView {
   /** Where it stands once it has come: beside the Earth, which holds it among the bodies, so it shows and hides with them. */
@@ -36,7 +36,7 @@ export class LazyEarthView {
     loadView().then(
       ({ siteEarthView }) => {
         if (this.#owner.signal.aborted) return;
-        const view = siteEarthView(this.#device, document, this.#sight);
+        const view = siteEarthView(this.#device, this.#sight);
         this.#view = view;
         this.group.add(view.group);
         if (this.#wanted) view.stand();
