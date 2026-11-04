@@ -61,7 +61,7 @@ SECTIONS = {
     "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
-    ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
+    ".githooks/records.sh": "outside,installed,wiring,worktree_script",".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
@@ -848,8 +848,10 @@ def mutants():
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
     yield from each("scripts/worktree.sh", 'sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"', ":", "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
     yield from each("scripts/worktree.sh", 'rm "${dir:?}/node_modules"\n', "", "hooks", "worktree.sh's root node_modules is a folder of links, not one link")
-    for name in ("pnpm-lock.yaml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs", ".npmrc", "':(glob)**/package.json'"):
-        yield from each("scripts/worktree.sh", f" {name}" if name[0] != "'" else f" {name}", "", "hooks", f"worktree.sh refuses a base whose {name.strip(chr(39))} is not this tree's (security-S5)")
+    yield from each("scripts/worktree.sh", 'differ=$(harness --name-only "$base")', "differ=", "hooks", "worktree.sh compares a base's harness and package files with this tree's (security-S5, F5098)")
+    # Through records.sh's list, the one harness list: each file worktree_script plants is in it.
+    for name in (" pnpm-lock.yaml", " pnpm-workspace.yaml", " .pnpmfile.cjs", " .pnpmfile.mjs", " .npmrc", " app/package.json", " .claude ", " scripts "):
+        yield from each(".githooks/records.sh", name, " " if name.endswith(" ") else "", "hooks", f"the harness list holds {name.strip()}, which worktree.sh compares (security-S5, F5098)")
     yield from each("scripts/worktree.sh", '[ -z "$differ" ] ||', "true ||", "hooks", "worktree.sh refuses a base whose package files are not this tree's (security-S5)")
     # F5058: it may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
     # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.

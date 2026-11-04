@@ -181,15 +181,17 @@ PY
 grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
-# wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
-# guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
-python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
+# wants each declared on main, merge.sh shows each first (F129), worktree.sh checks out none other
+# than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
+# what Claude Code starts, .mcp.json's servers.
+python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, re, sys
 text = lambda n: open(sys.argv[n]).read()
 assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
-assert not [n for n in (1, 2, 3) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+assert 'harness --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
+assert not [n for n in (1, 2, 3, 6) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
 tree = ast.parse(text(5))
@@ -5044,7 +5046,7 @@ printf '%s\n' "$out" | grep -qF "is not /private/tmp/claude-$(id -u)/gnoworld-wt
 [ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
 wsr=$(cd "$ws" && pwd -P)
 wr="$wsr/claude-$(id -u)/gnoworld-wt"
-mkdir -p "$wr" "$ws/fenced"
+mkdir -p "$wr" "$ws/fenced" "$ws/.githooks" && cp "$hooks/records.sh" "$ws/.githooks/"
 sed 's#^root=/private/tmp/claude-#root='"$wsr"'/claude-#' "$here/worktree.sh" >"$ws/fenced/worktree.sh" && cp "$here/borrow_node_modules.sh" "$ws/fenced/"
 grep -qxF "root=$wsr/claude-\$(id -u)/gnoworld-wt" "$ws/fenced/worktree.sh" || fail "worktree.sh's root is not /private/tmp/claude-\$(id -u)/gnoworld-wt"
 wt() { (cd "$ws/src" && sh "$ws/fenced/worktree.sh" "$@"); }
@@ -5154,9 +5156,12 @@ out=$(cd "$ws/src" && PATH="$ws/badgit:$PATH" sh "$ws/fenced/worktree.sh" remove
 case $out in *removed*) fail "worktree.sh said it removed a tree when its prune failed: $out" ;; esac
 # The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
 # packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
-# It is refused, whichever package file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
+# Its harness (records.sh's list) is this tree's too: worktree.sh may run outside the sandbox, so a base a session wrote by
+# plumbing would check its own settings and hooks out into a tree a session is later started in (F5098).
+# It is refused, whichever such file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
 installed=$(git -C "$ws/src" rev-parse HEAD)
-for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+mkdir -p "$ws/src/.claude" "$ws/src/scripts"
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json .claude/settings.json scripts/guard.py; do
 	echo changed >>"$ws/src/$f" && git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "$f moves"
 	out=$(wt "$wr/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
 	printf '%s\n' "$out" | grep -qF "$f" || fail "worktree.sh did not name the package file $f that differs: $out"

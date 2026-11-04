@@ -47,10 +47,13 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.s
 [ -d "$src/node_modules" ] && [ ! -L "$src/node_modules" ] || { echo "worktree.sh: $src/node_modules is a link or missing; it must be the real folder of this tree's installed packages" >&2; exit 1; }
 # The packages linked below are this tree's, whose lockfile and package files its install follows: a base with others would
 # run the gate on packages its own lockfile does not name, and a `pnpm install` in the new tree would write into this tree's
-# install (the links lead there), so a base whose package files differ from this tree's is refused (security-S5).
-differ=$(git diff --name-only "$base" -- pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc ':(glob)**/package.json') # a base git cannot read stops here
+# install (the links lead there), so a base whose package files differ from this tree's is refused (security-S5). So is one
+# whose harness differs (records.sh's list, the package files in it): out of the sandbox, a base a session wrote by plumbing
+# would check its own settings and hooks out into a tree a session is later started in (F5098).
+. "$(dirname "$0")/../.githooks/records.sh"
+differ=$(harness --name-only "$base") # a base git cannot read stops here
 [ -z "$differ" ] || {
-	echo "worktree.sh: $base's package files are not this tree's, whose installed packages the new tree would link; install them here first, or make the tree by hand: $(echo "$differ" | tr '\n' ' ')" >&2
+	echo "worktree.sh: $base's harness or package files are not this tree's, whose installed packages the new tree would link; install them here first, or make the tree by hand: $(echo "$differ" | tr '\n' ' ')" >&2
 	exit 1
 }
 git worktree add -q -b "$branch" "$dir" "$base"
