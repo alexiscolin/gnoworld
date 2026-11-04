@@ -104,7 +104,12 @@ it("names the values the panel tunes, each once, a dotted name a build can be se
 // own `VITE_` prefix, so no env file and no variable of the shell sets it. The lab's servers answer only on this machine, by exact names.
 const LabConfig = z.object({
   define: z.record(z.string(), z.string()),
-  server: z.object({ host: z.literal("127.0.0.1"), allowedHosts: z.array(z.string()) }),
+  optimizeDeps: z.object({ entries: z.array(z.string()) }),
+  server: z.object({
+    host: z.literal("127.0.0.1"),
+    allowedHosts: z.array(z.string()),
+    fs: z.object({ allow: z.array(z.string()) }),
+  }),
   preview: z.object({ host: z.literal("127.0.0.1"), allowedHosts: z.array(z.string()) }),
 });
 const LAB_CONFIG = new URL("../../lab.config.ts", import.meta.url).href;
@@ -121,6 +126,21 @@ it("is defined by the lab's config alone, as the reads compare it", async () => 
     expect(text, site).not.toContain("GNOWORLD_TUNING");
     expect(text, site).not.toContain("envPrefix");
   }
+});
+
+// Over the tailnet, the dev server serves files by path (/@fs/): the lab's own folders and the packages' store, never the repository's root,
+// whose deploy/ holds secrets. A worktree's store is the main checkout's, through a link: its fonts come from there.
+it("serves the app, the packages and their store alone, never deploy/, and scans the lab's own page", async () => {
+  const { server, optimizeDeps } = await labConfig();
+  const repository = new URL("../../../", import.meta.url).pathname;
+  const reaches = (folder: string) => server.fs.allow.some((allowed) => `${folder}/`.startsWith(`${allowed}/`));
+  expect(server.fs.allow).toHaveLength(3);
+  expect(reaches(`${repository}deploy/secrets`), "deploy/").toBe(false);
+  expect(reaches(repository.replace(/\/$/, "")), "the repository's root").toBe(false);
+  expect(server.fs.allow.some((allowed) => allowed.endsWith("/app"))).toBe(true);
+  expect(server.fs.allow.some((allowed) => allowed.endsWith("/packages"))).toBe(true);
+  expect(server.fs.allow.some((allowed) => allowed.endsWith("/node_modules/.pnpm"))).toBe(true);
+  expect(optimizeDeps.entries).toEqual(["realism.html"]);
 });
 
 it("serves the lab on this machine alone, to the exact hosts LAB_HOSTS names", async () => {
