@@ -267,6 +267,25 @@ test.describe("a newcomer", () => {
     await expect(chat(page)).toBeVisible();
   });
 
+  // F4644: on a phone, View in space hands the focus to the page's heading, the hero's, and the hero stood under the opening's words: it gives
+  // way to them still, and comes back as the keyboard reaches it.
+  test("on a phone, gives the hero's place to the opening once View in space is pressed, and back to the keyboard", async ({
+    page,
+  }) => {
+    await served(page);
+    await arrive(page, PHONE);
+    await page.getByRole("button", { name: "View in space" }).click();
+    await expect(opening(page)).toBeVisible(SLOW);
+    await expect.poll(() => page.evaluate(() => document.activeElement?.tagName), SLOW).toBe("H1");
+    const hero = page.locator("[data-yield]");
+    await expect(hero).toHaveAttribute("data-yield", "opening");
+    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("0");
+    await page.keyboard.press("Tab");
+    await expect.poll(() => hero.evaluate((box) => getComputedStyle(box).opacity)).toBe("1");
+    // Still the words' time: the hero came back for the keyboard, not because they left.
+    await expect(hero).toHaveAttribute("data-yield", "opening");
+  });
+
   // F4518: where no cosmos stands, no "Start here" either: the filled call and the way to the chat stay.
   test("keeps the video's pair on a computer whose scene does not run", async ({ page }) => {
     await served(page);

@@ -17,12 +17,12 @@
   }
 
   /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
-     page's reading, and shows again as the keyboard reaches it. */
-  .hero[data-yield="opening"]:not(:focus-within) {
+     page's reading, and shows again as the keyboard reaches it: the keyboard's focus, not the one View in space hands its heading (F4644). */
+  .hero[data-yield="opening"]:not(:has(:focus-visible)) {
     opacity: 0;
   }
 
-  .hero[data-yield="opening"]:not(:focus-within) > * {
+  .hero[data-yield="opening"]:not(:has(:focus-visible)) > * {
     pointer-events: none;
   }
 
