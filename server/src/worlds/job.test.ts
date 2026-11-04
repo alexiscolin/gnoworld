@@ -114,6 +114,11 @@ async function run(
   return { file, logged, chain, outcome, waits };
 }
 const written = (file: string) => Worlds.parse(JSON.parse(readFileSync(file, "utf8")));
+// The variables of each request the pass made of the indexer, in order: a page's bound and size, or a block's height.
+const pagesAsked = (chain: Run["chain"]) =>
+  chain.asked
+    .filter(({ kind }) => kind === "indexer")
+    .map(({ data }) => (JSON.parse(data) as { variables: Record<string, unknown> }).variables);
 
 describe("runWorlds", () => {
   it("writes the worlds of the list, each realm with its deployer, functions, imports, calls and the deployer's name", async () => {
@@ -547,8 +552,8 @@ describe("runWorlds", () => {
       let n = 0;
       const second = callsOf({ [POOL]: 9, [ROUTER]: 9 });
       const failing: Routes["indexer"] = (request) => ((n += 1) === 2 ? new TypeError("down") : second(request));
-      const { logged } = await run(chainRoutes([POOL, ROUTER], { indexer: failing }), { file, historyPage: 2 });
-      expect(n).toBe(2);
+      const { chain, logged } = await run(chainRoutes([POOL, ROUTER], { indexer: failing }), { file, historyPage: 2 });
+      expect(pagesAsked(chain)).toEqual([{ limit: 2 }, { height: 100 }]);
       expect(logged).toContainEqual({ event: "worlds_indexer_failed", error: "request" });
       const calls = Object.fromEntries(written(file).worlds.map((world) => [world.id, world.realms[0]?.calls]));
       expect(calls).toEqual({ "gnoswap/pool": 7, "gnoswap/router": 4 });
@@ -959,12 +964,19 @@ describe("the trends it tells", () => {
       },
     });
     const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    await run(routes, {
+    const { chain } = await run(routes, {
       clock: () => clock.at,
       historyPage: 2,
       trends: { passed: (_worlds, read) => void told.push(read) },
     });
-    expect(answered.length).toBeGreaterThan(2);
+    expect(pagesAsked(chain)).toEqual([
+      { limit: 2 },
+      { height: 100 },
+      { above: 100, limit: 2 },
+      { height: 101 },
+      { above: 101, limit: 2 },
+    ]);
+    expect(answered).toHaveLength(5);
     const last = answered.at(-1);
     expect([told[0]?.get(POOL)?.at, told[0]?.get(ROUTER)?.at]).toEqual([last, last]);
   });
@@ -1240,9 +1252,11 @@ describe("the behaviours the pass states", () => {
       send: chain.send,
       universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
       wait: () => Promise.resolve(),
+      historyPage: 2,
       isStopped: () => stopped(chain.asked),
     });
     expect(outcome).toEqual({ wrote: false, kind: "stopped" });
+    expect(pagesAsked(chain).length).toBeLessThanOrEqual(1);
     expect(existsSync(file)).toBe(false);
     expect(logged).toEqual(["worlds_failed"]);
   });
