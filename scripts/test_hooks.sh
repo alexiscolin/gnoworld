@@ -4352,6 +4352,575 @@ for cmd in "find . -maxdepth 0 -exec git push origin main ';'" 'caffeinate git p
 	asks "$cmd"
 done
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
+# 7w2's fourth lot (7w4; reports/slice-7w2-security-4.md, S4-1 to S4-7): each form the pass found, then one of each class it did not
+# list, the everyday commands of its two lists and the heredocs a session writes, which must pass. A line: the answer (0, 2, or ask:
+# exit 0 and an ask), a tab, the command, `⏎` a newline and `␀` a NUL byte. Every wrong answer is shown, not the first alone.
+cat >"$t/lot4" <<'CASES'
+2	"git" commit -n -m y # '
+2	g''it commit -n -m y # '
+2	'gnokey' list # '
+2	"rm" -rf "$d" # '
+2	\git commit --no-verify -m y # it's
+2	g"i"t commit -n -m y # don't
+ask	"git" push origin main # it's here
+ask	'git' push --dry-run origin main # it's
+2	print -l /(e:'git push --force origin main':)
+2	print -l .(e:'git commit -n -m y':)
+2	print -l ~/(e:'git commit -n -m y':)
+2	x='$(git push --force origin main)'; print ${(e)x}
+2	x='*(e:"git commit -n -m y":)'; print -l ${~x}
+2	x='*(e:"git commit -n -m y":)'; setopt globsubst; print -l $x
+2	print -l $~x
+2	setopt GLOB_SUBST
+2	set -o glob_subst
+2	options[globsubst]=on
+2	emulate sh -c 'print -l $x'
+2	print -l ${^~x}
+2	print -r ${(%%)x}
+2	print -r ${(P)x}
+2	print ${${(e)x}}
+2	print -l -(e:'true':)
+2	print -l @(a|b)
+2	x=git; $x push --force origin main
+2	x=git; $x commit -n -m y
+2	$(echo git) push --force origin main
+2	`echo git` commit -n -m y
+2	k=gnokey; $k list
+2	alias g=git⏎g push --force origin main
+2	hash g=/usr/bin/git; g commit -n -m y
+2	${x}it commit -n -m y
+2	x=git; "$x" commit --no-verify -m y
+2	$(cat f)
+2	"$x"
+2	x='git push --force origin main'; eval "$x"
+2	export k=gnokey
+2	y='a[$(gnokey list)]'; echo $((y))
+2	x=rm; $x -rf "$d"
+2	git status; `cat f`
+2	eval "$(cat f)" x
+2	sh -c "$x"
+2	bash -c "cd $d && make"
+2	eval "cd $d && make"
+2	$x "$y"
+ask	x=git; $x push origin main
+2	f() { git "$@"; }; f push --force origin main
+2	sh -c 'git "$@"' _ commit -n -m y
+2	sh -c '"$0" "$@"' git push --force origin main
+2	printf '%s\n' push --force origin main | xargs git
+2	o=-n; git commit $o -m y
+2	a=(push --force origin main); git "${a[@]}"
+2	h=hooks; git -c "core.${h}Path=/dev/null" commit -m y
+2	g() { git $*; }; g commit -n -m y
+2	bash -c 'exec "$@"' x git commit -n -m y
+2	echo 'git push --force origin main' | xargs -I{} sh -c {}
+2	o=--no-verify; git merge $o main
+2	git $sub -n -m y
+2	git commit -m y $(printf -- -n)
+2	sh -c 'true' git commit -n -m y
+2	git commit -nm"x y"
+2	git -C "$d" commit -m y
+2	git --config-env "$v" commit -m y
+2	git $argv
+2	/usr/bin/xargs -0 git < list
+ask	git push "$remote" main
+2	git commit -n␀ -m y
+2	gno␀key list
+0	python3 -I - <<'PY'⏎import json, sys⏎print(json.dumps({"a": 1}))⏎PY
+0	git commit -F - <<'MSG'⏎feat(app): a thing⏎⏎Body (with parens), the guard's reading.⏎MSG
+0	git commit -m "$(cat <<'EOF'⏎feat(x): the guard's reading⏎⏎Body (with parens).⏎EOF⏎)"
+0	cat > $TMPDIR/msg <<'EOF2'⏎feat(core): x⏎EOF2
+0	node - <<'JS'⏎console.log(1)⏎JS
+0	python3 - <<'PY'⏎import json⏎x = 1⏎PY
+0	git commit -F - <<'MSG'⏎docs: no scope⏎⏎Body, see F123 and f.ts.⏎MSG
+0	git commit -F - <<'MSG'⏎fix: a thing⏎⏎It calls render() now.⏎MSG
+0	cat <<-EOF⏎	feat(x): y⏎	EOF
+0	cat <<"EOF" > out.txt⏎fix(a): b⏎EOF
+0	cat <<EOF⏎docs(review): $HOME (here)⏎EOF⏎git status
+0	python3 - <<'A' && node - <<'B'⏎print(1)⏎A⏎console.log(2)⏎B
+0	git commit -F - <<'MSG'⏎fix(guard): `scan` reads `"$@"` and `$(cat f)` as text⏎⏎`$x` alone, in a quoted body.⏎MSG
+0	node - <<'JS'⏎console.log(`a ${process.version}`)⏎JS
+2	sh <<'E'⏎print -l *(e:'git commit -n -m y':)⏎E
+2	caffeinate zsh <<E⏎print -l .(e:'true':)⏎E
+2	source x <<'E'⏎print -l *(e:'true':)⏎E
+2	cat <<'A'⏎it's⏎A⏎echo '<<E'⏎print -l *(e:'true':)⏎E
+2	echo " <<E "⏎print -l *(e:'true':)⏎E
+2	echo x # <<E⏎print -l *(e:'true':)⏎E
+2	(( z = 1 << E ))⏎print -l *(e:'true':)⏎E
+2	echo $(( 1 << E ))⏎print -l *(e:'true':)⏎E
+2	echo $[1 << E ]⏎print -l *(e:'true':)⏎E
+2	echo ${x:- << E }⏎print -l *(e:'true':)⏎E
+2	cat <<'E'⏎a\⏎E⏎print -l *(e:'true':)⏎E
+2	$x <<'E'⏎print -l *(e:'true':)⏎E
+2	x="$(case a in a) echo " <<E ";; esac)"⏎print -l *(e:'true':)⏎E
+2	cat <<'E'⏎x⏎print -l *(e:'true':)
+2	cat <<E⏎$(git commit -n -m y)⏎E
+2	cat <<E\ F⏎x⏎E F⏎print -l *(e:'true':)⏎E
+2	. x <<'E'⏎print -l *(e:'true':)⏎E
+2	=zsh <<'E'⏎print -l *(e:'true':)⏎E
+0	echo ${x⏎git status
+0	x="$( (true); cat <<'E'⏎feat(x): y⏎E⏎)"
+2	x="`cat <<'E'⏎feat(x): y⏎E⏎`"
+0	x="it's"; cat <<'E'⏎feat(x): y⏎E
+0	echo $'\'' <<'E'⏎feat(x): y⏎E
+0	echo a#b; cat <<'E'⏎feat(x): y⏎E
+0	echo uppercase x; cat <<'E'⏎feat(x): y⏎E
+0	cat <<< x; cat <<'E'⏎feat(x): y⏎E
+0	cat << 'EOF' > f⏎feat(x): y⏎EOF
+0	cat <<\EOF⏎feat(x): y⏎EOF
+0	sh scripts/x.sh; cat <<'E'⏎feat(x): y⏎E
+0	sh <<'A'⏎true⏎A⏎cat <<'E'⏎feat(x): y⏎E
+0	git commit -F - <<'MSG'⏎docs: xargs git and globsubst, emulate⏎MSG
+2	print -r -- ${(e)x}
+2	x=rm; $x -rf build "$d"
+2	git log "${files[@]}"
+2	cat <<'E'⏎a\⏎b\⏎E⏎*(e:'git commit -n -m y':)
+2	echo ${x:- ; cat <<E }⏎print -l *(e:'true':)⏎E
+2	echo $(( 1 << E⏎print -l *(e:'true':)⏎E
+2	cat <<'E'⏎print -l *(e:'true':)⏎x
+2	print -l <->(e:'git commit -n -m y':)
+2	print -l <1-9>(e:'git commit -n -m y':)
+2	print -l a<->(e:'true':)
+2	print ${x:-<->(e:'true':)}
+2	exec -a x zsh -c 'git commit -n -m y'
+2	env -a x zsh -c 'git commit -n -m y'
+2	sudo -g wheel zsh -c 'git commit -n -m y'
+2	arch -arm64 zsh -c 'git commit -n -m y'
+2	caffeinate sh -c 'git commit -n -m y'
+2	find . -exec sh -c 'git commit -n -m y' _ {} +
+2	rtk proxy sh -c 'git commit -n -m y'
+2	pnpm exec sh -c 'git commit -n -m y'
+2	caffeinate bash -c "cd $d"
+2	x=git; echo -n | xargs "$x" commit -m y
+2	echo x | parallel 'git commit -n -m y {}'
+2	echo x | gxargs git commit -m y
+2	echo x | xargs -I % "$x" %
+0	ls | xargs -I{} cp {} "$TMPDIR/"
+2	/usr/bin/gi? commit -n -m y
+2	g{i,}t commit -n -m y
+2	/usr/bin/g[i]t commit -n -m y
+2	/usr/bin/gi* push --force origin main
+2	caffeinate g?t commit -n -m y
+2	/bin/s? <<'E'⏎echo $(git commit -n -m y)⏎E
+2	ash <<'E'⏎echo $(git commit -n -m y)⏎E
+2	busybox ash <<'E'⏎print -l *(e:'true':)⏎E
+2	rzsh <<'E'⏎print -l *(e:'true':)⏎E
+2	cat <<'E' | /bin/s?⏎print -l *(e:'true':)⏎E
+2	cat <<'E' | rzsh⏎print -l *(e:'true':)⏎E
+0	: <<'E'⏎feat(x): y⏎E
+2	echo a\<<E⏎print -l *(e:'true':)⏎E
+2	true;sh <<'E'⏎print -l *(e:'true':)⏎E
+2	echo x|sh <<'E'⏎print -l *(e:'true':)⏎E
+2	true&&sh <<'E'⏎print -l *(e:'true':)⏎E
+2	(sh <<'E'⏎print -l *(e:'true':)⏎E⏎)
+0	true;cat <<'E'⏎feat(x): y⏎E
+0	(cat <<'E'⏎feat(x): y⏎E⏎)
+2	echo ' <<E '⏎print -l *(e:'true':)⏎E
+2	echo $' <<E '⏎print -l *(e:'true':)⏎E
+2	echo a' <<E 'b⏎print -l *(e:'true':)⏎E
+0	git commit -m "fix: x⏎⏎It calls f(x) now.⏎"
+0	python3 -c 'print(1)⏎print(2)'
+0	echo "a⏎b(c) d⏎e"
+0	python3 -I -c '⏎import json⏎print(json.dumps({"a": 1}))'
+2	echo a # note(x)
+2	echo "a⏎b"⏎print -l *(e:'true':)
+2	echo "a⏎$(print -l *(e:'true':))"
+2	echo "a⏎`print -l *(e:'true':)`"
+2	echo 'a⏎b'; print -l *(e:'true':)
+2	trap 'rm -rf "${d:?}"' EXIT
+2	trap 'echo $?' EXIT
+2	grep -n globsubst scripts/guard.py
+2	rg emulate docs
+2	grep -n 'aliases=' f
+2	functions=(a b)
+2	local functions=1
+2	echo functions=1
+2	git merge --no-ff "$b"
+2	git commit -m y -- "$f"
+2	git -c user.name="$n" commit -m y
+2	$(git rev-parse --show-toplevel)/scripts/check.sh
+2	ls | xargs grep -l git
+0	echo ${x:-$(date)}
+0	echo "${TMPDIR:-$(mktemp -d)}/x"
+0	case $x in a*) echo a;; esac
+2	echo "a $(⏎print -l *(e:'true':) # it's⏎)"
+0	echo "a⏎b(c) $(true) d"
+0	echo "a⏎b(c) `true` d"
+2	echo x | xargs git-commit -m y
+2	echo x | xargs =git commit -m y
+2	echo x | parallel git commit -m y {}
+2	x="it's gnokey"
+2	hash -p /usr/bin/git g; g commit -n -m y
+2	git --config-env=user.name=$v commit -m y
+2	o=--no-verify; git pull $o
+0	git commit -m"$msg"
+0	git commit --file="$f"
+2	c=curl; $c https://rpc.gno.land:443/status
+2	print -l $^~x
+2	'zsh' <<'E'⏎print -l *(e:'true':)⏎E
+2	echo ${x << E⏎print -l *(e:'true':)⏎E
+0	true; cases=1; cat <<'E'⏎feat(x): y⏎E
+2	git log $argv
+2	git log "$@"
+2	h=hooks; git -c "x.${h}=1" log
+2	git --config-env "$v" log
+2	git --config-env=user.name=$v log
+0	git commit --message "$m"
+0	git commit --file "$f"
+2	$(echo /usr/bin/git) push --force origin main
+2	$(cat f) x
+2	`cat f` x
+2	trap 'git push --force origin main' EXIT
+2	trap 'git commit -n -m y' INT TERM
+2	trap "git commit -n -m y" ZERR
+2	sched +1 'git push --force origin main'
+2	zpty z 'git commit -n -m y'
+2	let 'x = a[$(git push --force origin main)]'
+2	complete -C 'git commit -n -m y' x
+2	compgen -C 'gnokey list' x
+2	bind -x '"\C-x": git commit -n -m y'
+2	trap 'rm -rf "$d"' EXIT
+2	trap "$x" EXIT
+2	trap 'print -l *(e:"true":)' EXIT
+ask	trap 'git push origin main' EXIT
+0	trap - EXIT
+0	trap 'echo done' EXIT
+0	trap '' INT
+0	let x=1+2
+2	aliases[g]=git⏎g push --force origin main
+2	commands[g]=/usr/bin/git; g commit -n -m y
+2	functions[f]='git commit -n -m y'; f
+2	galiases[G]='| sh'
+2	typeset -A aliases; aliases=(g git)
+0	git commit -F - <<'MSG'⏎docs: aliases[g]=git is refused⏎MSG
+2	git am x.patch
+2	git cherry-pick abc123
+2	git rebase main
+2	git rebase --continue
+2	git revert HEAD
+2	git -C . rebase -i main
+2	git pull --rebase origin main
+2	git pull -r
+2	git pull --rebase=merges
+2	git -c pull.rebase=true pull
+0	git pull --ff-only
+0	git pull --no-rebase origin main
+0	git log --grep rebase --oneline
+0	bash --version
+0	zsh --version
+0	bash --version | head -1
+0	zsh --help
+2	echo x | bash --rcfile --version
+2	echo 'git status' | bash --norc --version
+0	git status
+0	git log --oneline -5
+0	git log --format='%h %s (%cr)'
+0	git diff --stat a..b
+0	git merge --no-ff --no-commit slice-7x2
+0	git commit -F msg.txt
+0	sh scripts/check.sh --tests-all
+0	pnpm -C app build
+0	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts x.spec.ts
+0	grep -rn foo app/src
+0	rg -n "bar(" app
+0	sed -n '1,40p' f
+0	find app -name '*.ts' -exec wc -l {} +
+0	ls app/src/*.tsx
+0	jq '.a' f.json
+0	python3 -I - <<'PY'⏎print(1)⏎PY
+0	node -e "console.log(1)"
+0	cat a | head
+0	uptime
+0	printf '%s\n' x > f
+0	echo "$(date)"
+0	[[ -f x ]] && echo y
+0	git commit -F - <<'EOF2'⏎feat(x): a thing⏎⏎Body line (with parens) and a; semicolon.⏎EOF2
+0	git commit -m "$(cat <<'EOF2'⏎feat(x): a thing⏎⏎Body.⏎EOF2⏎)"
+0	git -C /private/tmp/claude-501/gnoworld-wt/slice-7w2 log --oneline -3
+0	git log --oneline 3c298588..HEAD
+0	git show efe93746 -- scripts/guard.py
+0	git rev-parse HEAD
+0	git diff
+0	git add scripts/guard.py
+0	git worktree list
+0	git branch --show-current
+0	git log -n 3 --oneline
+0	git log --oneline -n5
+0	git commit -m "fix: x"
+0	git commit --amend --no-edit
+0	git stash list
+0	git fetch origin
+ask	git push origin slice-7w2
+0	echo $((1+2))
+0	x=$(( 3 * 2 )); echo $x
+0	for f in a b; do echo $f; done
+0	while read -r l; do echo "$l"; done < f
+0	case $x in a) echo a;; *) echo b;; esac
+0	diff <(sort a) <(sort b)
+0	time (cd app && pnpm build)
+0	(cd app && pnpm vitest run src/x.test.ts)
+0	awk '{print $1}' f | sort | uniq -c | sort -rn | head
+0	sed -E 's/(a)/b/' f
+0	grep -E "foo|bar" -r app/src
+0	cut -d' ' -f1 f
+0	pnpm -C app exec vitest run src/x.test.ts
+0	pnpm -C app exec tsc --noEmit -p .
+0	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --grep "home (desktop)"
+0	git log --oneline --graph --all | head -30
+0	git log -p -n 3 -- scripts/guard.py
+0	git log --grep "fix(harness)" --oneline
+0	git diff 3c298588..HEAD -- scripts/guard.py | head -100
+0	git show --stat HEAD~1
+0	git worktree add /tmp/x -b slice-x main
+0	git branch -d slice-x
+0	git rev-list --count main..HEAD
+0	git commit --amend -m "fix(harness): x"
+0	git merge --no-ff -m "Merge branch 'slice-7x2'" slice-7x2
+0	git cat-file -p HEAD
+0	cd /private/tmp/claude-501/gnoworld-wt/slice-7w2 && git status --short
+0	ls -la app/src/*.tsx 2>/dev/null | wc -l
+0	wc -l app/src/**/*.ts
+0	test -f x && echo yes || echo no
+0	printf '%s\n' "${arr[@]}"
+0	echo "a (b) c"
+0	mkdir -p "$TMPDIR/x" && cp a "$TMPDIR/x/"
+0	rm -f "$TMPDIR/x/a"
+0	rm -rf "${TMPDIR:?}/x"
+0	lsof -i :5173
+0	ps aux | grep -c vite
+0	kill %1
+0	sleep 1 && echo done
+0	tail -n 50 app/test-results/log.txt
+0	rtk gain
+0	scripts/check.sh --tests-all
+0	sh scripts/test_hooks.sh guard
+0	python3 -I scripts/harness_mutate.py --only guard
+0	git -C /private/tmp/claude-501/gnoworld-wt/slice-7w2 diff --stat
+0	pnpm -C app exec eslint 'src/**/*.ts'
+0	echo done # it's fine
+0	ls app # what's here
+0	cp "$a" "$b" && diff "$a" "$b"
+0	find "$d" -name "$p" -prune -o -print
+0	S=/tmp/x; "$S/run.sh" --flag "$S/in"
+0	git commit -F "$TMPDIR/msg.txt"
+0	git commit -m "$msg"
+0	git log "$base"..HEAD -- "$f"
+0	git -C "$d" status --short
+0	x="fix(x): y"; echo "$x"
+0	sh -c 'git status'
+2	echo a # it's⏎echo $(git commit -n -m y)⏎# '
+2	echo a # it's⏎echo `git commit -n -m y`⏎# '
+ask	echo a # it's⏎echo $(git push origin main)⏎# '
+2	cat <<'E'⏎it's⏎E⏎echo $(git commit -n -m y)⏎# '
+2	cat <<E⏎it's $(git commit -n -m y) '⏎E
+2	true # don't⏎x=$(gnokey list)⏎#'
+2	echo `cat <<'E'⏎x` ; print -l *(e:'git commit -n -m y':) ; echo `⏎E⏎`
+2	x=; echo "${x:-'}"⏎print -l *(e:"git commit -n -m y":)⏎echo "'}"
+2	histchars='!^%'⏎echo a %'⏎print -l *(e:"git commit -n -m y":)⏎%'
+2	x=; echo "${x:-'}"⏎alias g=git⏎g commit -n -m y⏎echo "'}"
+2	typeset histchars='!^%'
+0	x="a"; cat <<'E'⏎feat(x): y⏎E
+2	git {commit,-n} -m y
+2	git {commit,--no-verify} -m y
+2	git commit -m y {-n,}
+2	git {push,--force} origin main
+2	git com{mit,} -n -m y
+2	git commit -m y *
+0	git log --oneline -- '*.ts'
+0	git add src/*.ts
+0	git commit -m "fix {a,b}"
+2	: ${aliases[g]::=git}⏎g commit -n -m y
+2	echo ${aliases[g]::=git}⏎g push origin main
+2	set -A aliases g git⏎g commit -n -m y
+2	read -A aliases <<< 'g git'
+2	printf -v 'aliases[g]' git
+2	setopt promptsubst; print -P '$(git commit -n -m y)'
+2	setopt -m 'pr?mptsubst'; print -P x
+2	set -o PROMPT_SUBST
+2	print -P '$(git commit -n -m y)'
+2	print -rP x
+0	print -r -- x; print -l a b
+2	zstyle -e ':a' b 'git commit -n -m y'; zstyle -s ':a' b v
+2	zregexparse p pp a /a/ '-git commit -n -m y'
+2	zstyle -e ':a' b "$x"
+2	a=(1); y=$'a[\x24(git\x20commit\x20-n\x20-m\x20y)]'; echo $((y))
+2	a=(1); y=$'a[\044(git commit -n -m y)]'; echo $((y))
+2	echo $'\u0024(git commit -n -m y)'
+0	printf $'a\tb\n'
+2	printf 'g%s commit -n -m y\n' it | xargs env
+2	printf 'g%s push --force origin main\n' it | xargs nice
+2	printf 'g%s push origin main\n' it | xargs caffeinate
+2	printf -- '-n\n' | xargs env -S'git commit -m y'
+2	printf 'g%s commit -n -m y\n' it | xargs -0 sudo
+0	find . -name '*.log' | xargs rm -f
+0	git ls-files | xargs wc -l
+2	echo 'git commit -n -m y' | /bin/s?
+2	echo 'git push --force origin main' | /bin/[s]h
+2	echo x | z?h
+2	zsh =(echo 'git commit -n -m y')
+2	source =(printf 'g%s push --force origin main\n' it)
+2	. =(echo x)
+0	cat =(echo x)
+2	git filter-branch -f --tree-filter 'true' HEAD
+2	git replay --onto main A..B
+2	git hash-object -t commit -w f
+2	git hash-object -tcommit -w f
+2	git config pull.rebase true
+2	git config branch.main.rebase true
+0	git hash-object -w f
+0	git config --get pull.rebase
+2	sudo "$x"
+2	if true; then eval 'gnokey list'; fi
+2	function f { "$x"; }
+2	cat <("$x"
+2	tee >("$x"
+2	env -uSHELL "$x"
+2	/usr/bin/gi? push origin main
+2	echo $(( cat << E ))⏎print -l *(e:'true':)⏎E
+2	(( cat << E ))⏎print -l *(e:'true':)⏎E
+2	git co?mit -n -m y
+0	ls | xargs -I % cp % "$TMPDIR/"
+2	echo 'git commit -n -m y' | /tmp/x*
+2	print -v 'aliases[g]' git
+2	zparseopts -A aliases g:
+2	typeset -A aliases
+2	git commit -m y x{1..2}
+2	git commit -m {y,-n}
+2	git commit -F {f,-n}
+2	git merge -m {y,--no-verify} main
+2	git tag -m {y,x} v1
+0	git log --format='{"h":"%h","s":"%s"}' -3
+0	git commit -m "fix {a,b}"
+2	o=glob; setopt ${o}subst
+2	s=; options[glob${s}subst]=on
+2	set -o "$opt"
+2	unsetopt $x
+2	HISTCHARS='!^%'⏎echo a %'⏎print -l *(e:"git commit -n -m y":)⏎%'
+2	set -Aaliases g git⏎g commit -n -m y
+2	: ${(AA)=aliases::=g git}⏎g commit -n -m y
+2	d=\$; o=-n; a=(1); y="a[${d}(git commit $o -m y)]"; echo $((y))
+2	n=36; a=(1); y="a[${(#)n}(git commit -n -m y)]"
+2	find . -name git -exec {} commit -n -m y \;
+2	find . -name git -execdir {} push --force origin main +
+0	find . -name '*.ts' -exec wc -l {} +
+2	echo 'git commit -n -m y' | ""{zsh,-s}
+2	echo 'git commit -n -m y' | zsh /dev/./stdin
+2	echo 'git push --force origin main' | source /dev/./stdin
+2	echo x | zsh //dev//stdin
+2	git subtree add --prefix=x ../other main
+2	git subtree split --prefix=x --rejoin
+2	git stash create
+2	git merge --ff-only 'stash@{0}'
+2	git reset --soft refs/stash
+2	git update-ref refs/heads/main HEAD
+0	git stash list
+0	git stash show -p
+2	git pull --reb origin main
+2	git pull --rebase=merges
+2	d=; git config pull$d.rebase true
+2	git config branch.autosetuprebase always
+0	git config --get pull.rebase
+2	g=git; o=-n; caffeinate $g commit $o -m y
+2	exec -a x $g commit $o -m y
+0	cp "$a" "$b"
+0	grep -rn xargs scripts/
+0	rg -n parallel docs
+0	ls | xargs kill
+2	setopt -m 'pr?mpt*'
+2	y=$'\044(true)'; echo $((y))
+2	gi? push origin main
+0	echo "`date⏎`"
+0	print -r -- -P x
+2	g=git; $g commit -m {y,-n}
+2	=git commit -m {y,-n}
+2	git-commit -m {y,-n}
+2	k=pull.rebase; git config $k true
+2	git subtree push --prefix=x origin main --rejoin
+2	print ${(#)n}
+2	git merge --ff-only stash
+0	mkdir -p x/{a,b}
+2	x=/usr/bin/git; printf -- '-n\n' | caffeinate xargs $x commit -m y
+2	printf -- '-n\n' | exec -a z xargs "$x" commit -m y
+2	printf 'g%s commit -n -m y\n' it | caffeinate xargs env
+2	printf x | exec -a z zsh -s
+0	ls | xargs -n1 basename
+0	printf 'a\n' | xargs -I{} echo {}
+2	a='g=git'; alias $a⏎g commit -n -m y
+2	a=g=git; alias -- $a
+2	h=g=/usr/bin/git; hash $h
+2	t=aliases; set -A $t g git
+2	t='aliases[g]'; printf -v $t git
+2	t=aliases; read -A $t <<< "g git"
+0	printf -v x '%s' "$y"
+2	o=glob; zsh -f -o ${o}subst <<'E'⏎x='/(e:git commit -n -m y:)'⏎print -l $x⏎E
+2	zsh +o no${o}subst -c 'true'
+0	zsh -o pipefail -c 'true'
+2	caffeinate /usr/bin/g[i]t commit -m {y,-n}
+2	setopt braceccl; git commit -m y -{n}
+2	setopt extendedglob; git commit -m y -n#
+2	setopt shwordsplit
+2	find . -name git -exec env {} commit -n -m y \;
+2	find . -name git -exec caffeinate {} push --force origin main \;
+0	find . -name '*.ts' -exec grep -l foo {} +
+2	echo x | zsh ~/../../dev/stdin
+2	echo x | zsh /dev/std?n
+2	echo x | source ../../../../../../../../dev/stdin
+2	f=/dev/stdin; echo x | zsh $f
+0	source ~/.nvm/nvm.sh
+0	bash ./scripts/check.sh
+0	S=/tmp/x; sh $S/scripts/test_hooks.sh
+2	g=git; o=-n; caffeinate $g -C . commit $o -m y
+2	g=git; o=-n; caffeinate $g --no-pager commit $o -m y
+2	git config pull.rebase true --unset
+2	git config pull.rebase true -l
+0	cp $f{,.bak}
+0	echo {1..3} $n
+0	mv "$x"{.old,}
+0	git commit -F - <<'EOF'⏎fix: read {a,b} from $HOME⏎EOF
+0	git commit -m "$(cat <<'EOF'⏎fix: the {a,b} pair, $x kept⏎EOF⏎)"
+0	git commit -F - <<'MSG'⏎docs: git {push,pull} notes⏎MSG
+0	cat > n.md <<'EOF'⏎- see {x,y}$z⏎EOF
+0	git show stash@{0}
+0	git diff stash@{0} -- app
+0	git stash show -p stash@{1}
+0	mkdir -p $TMPDIR/x/{a,b}
+0	for f in {a,b}.ts; do echo $f; done
+2	d=\$; y="a[${d}(true)]"
+2	$g -C . commit -m {y,-n}
+2	echo x | zsh ../../../../dev/fd/0
+2	find . -name x -exec {} \;
+2	git merge main*
+2	git pull origin x?
+2	git push origin x*
+2	x='$(gnokey⏎list)'
+2	ls | xargs grep -l git-commit
+2	ls | xargs grep -l =git
+2	ls | xargs grep -l sh
+2	x='$(print -l *(e:"true":)⏎)'
+2	x="$( (true); print -l *(e:'true':) # it's⏎)"
+2	x="$(print -l *(e:'true':) # it's⏎)"
+2	echo "$(print -l *(e:'git commit -n -m y':) # it's⏎)"
+2	find . -name x -execdir {} \;
+2	x="$( (true); cat <<'E'⏎it's⏎E⏎print -l *(e:'true':)⏎)"
+2	echo $'\'' ; print -l *(e:'true':)
+2	let 'x' 'git commit -n -m y'
+2	parallel echo ';git commit -n -m y' ::: a
+2	x="$(case a in a) echo ";cat <<E "⏎print -l *(e:'true':)⏎E⏎;; esac)"
+0	echo ${x:- #}; cat <<'E'⏎feat(x): y⏎E
+CASES
+python3 -I - "$gd" "$t/lot4" <<'PY' || fail "the guard answered 7w4's cases above otherwise"
+import json, subprocess, sys
+guard, wrong = sys.argv[1], []
+for line in open(sys.argv[2], encoding="utf-8"):
+    want, cmd = line.rstrip("\n").split("\t", 1)
+    cmd = cmd.replace("⏎", "\n").replace("␀", "\0")
+    event = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+    p = subprocess.run([sys.executable, "-I", guard], input=json.dumps(event), capture_output=True, text=True)
+    got = "ask" if p.returncode == 0 and '"ask"' in p.stdout else str(p.returncode)
+    if got != want:
+        wrong.append(f"guard gave {got}, not {want}, for: {cmd!r}")
+print("\n".join(wrong), file=sys.stderr)
+sys.exit(1 if wrong else 0)
+PY
 fi
 
 if part prove_fix; then
