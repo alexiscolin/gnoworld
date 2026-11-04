@@ -942,6 +942,38 @@ try:
         lint_cases(own, "packages/chain/src/__probe__", "chain reads in the package")
         shutil.rmtree("packages/chain/src/__probe__")
 
+    if part("chain_words"):
+        # Each of a read's words alone (10h's review, V5), in one folder, as chain_reads proves the rule's reach: every route of
+        # a node's RPC (tm2/pkg/bft/rpc/core/routes.go at c4c72fdd, its two ABCI ones the first word's) after an address, each
+        # ABCI query and path, each GraphQL operation. harness_mutate drops each from lint/words.config.ts: one must fail.
+        rule = "gnoworld/chain-read"
+        routes = ("status", "block", "block_results", "blockchain", "commit", "validators", "genesis", "net_info", "health", "tx",
+                  "tx_search", "broadcast_tx_async", "broadcast_tx_sync", "broadcast_tx_commit", "unconfirmed_txs",
+                  "num_unconfirmed_txs", "consensus_state", "dump_consensus_state", "consensus_params")
+        words = [(f"route_{r}.ts", f"export function url(rpc: string): string {{\n  return `${{rpc}}/{r}`;\n}}\n", rule) for r in routes]
+        words += [
+            ("abci_query.ts", 'export const method = "abci_query";\n', rule),
+            ("abci_info.ts", 'export const method = "abci_info";\n', rule),
+            ("vm_path.ts", 'export const path = "vm/qfuncs";\n', rule),
+            ("vm_upper.ts", 'export const path = "%22vm%2Fqeval%22";\n', rule),
+            ("vm_lower.ts", 'export const path = "%22vm%2fqrender%22";\n', rule),
+            ("accounts.ts", 'export const path = "auth/accounts/g1x";\n', rule),
+            ("balances.ts", 'export const path = "bank/balances/g1x";\n', rule),
+            ("full_route.ts", 'export const url = "https://rpc.onyx.example:443/status";\n', rule),
+            ("rpc_text.ts", 'export const body = \'{"jsonrpc":"2.0","method":"block","params":{}}\';\n', rule),
+            ("port.ts", 'export const node = "http://127.0.0.1:26657";\n', rule),
+            ("query.ts", 'export const ask = "query { blocks { height } }";\n', rule),
+            ("subscription.ts", 'export const ask = "subscription { transactions { hash } }";\n', rule),
+            ("mutation.ts", 'export const ask = "mutation { reset { ok } }";\n', rule),
+            ("shorthand.ts", 'export const ask = "{ getBlocks(where: {}) { height } }";\n', rule),
+            ("helpers.ts", 'import { statusEnvelope } from "@gnoworld/chain/testing/envelopes";\n\nexport const used: unknown = statusEnvelope;\n', rule),
+            # Free: a word inside another, which the words' edges leave out.
+            ("kvm.ts", 'export const host = "the kvm/qemu host";\n', None),
+            ("statuses.ts", "export function url(site: string): string {\n  return `${site}/statuses`;\n}\n", None),
+        ]
+        lint_cases(words, "server/src/__probe__", "a chain read's words")
+        shutil.rmtree("server/src/__probe__")
+
     if part("react_warn"):
         # Several of the app's rules only warn: the lint script must fail on a warning.
         plant({"warned.tsx": 'import { forwardRef } from "react";\n\nexport const Card = forwardRef<HTMLParagraphElement>(function Card(_, r) {\n  return <p ref={r} />;\n});\n'}, where=APP)

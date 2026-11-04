@@ -52,7 +52,7 @@ WORDS = "lint/words.config.ts"
 SECTIONS = {
     "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
     "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
-    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls", "lint/words.config.ts": "chain_reads",
+    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls", "lint/words.config.ts": "chain_words",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
     "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
@@ -266,8 +266,26 @@ def mutants():
         ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
         (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
         (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
+        # Each word's every alternative and edge (10h's review, V5): one case of the probe's chain_words block must fail.
+        ("abci_(?:query|info)", "abci_(?:info)", "the abci_query query"),
+        ("abci_(?:query|info)", "abci_(?:query)", "the abci_info query"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:%2[Ff])q", "an ABCI path with its slash"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:\/|%2F)q", "an ABCI path encoded in lower case"),
+        (r"auth\/accounts|bank\/balances", r"bank\/balances", "an account's ABCI path"),
+        (r"auth\/accounts|bank\/balances", r"auth\/accounts", "a balance's ABCI path"),
+        ("(?<![A-Za-z])vm", "vm", "no ABCI path inside a longer word"),
+        (r"(?![\\w-])`", "`", "no route inside a longer word"),
+        ("(?:query|subscription|mutation)", "(?:subscription|mutation)", "a GraphQL query"),
+        ("(?:query|subscription|mutation)", "(?:query|subscription)", "a GraphQL mutation"),
     ):
         yield from each(WORDS, find, replace, "probe", f"eslint our rules refuse {label}")
+    for name in ("block_results", "blockchain", "commit", "validators", "genesis", "net_info", "health", "tx", "tx_search",
+                 "unconfirmed_txs", "num_unconfirmed_txs", "consensus_state", "dump_consensus_state"):
+        yield from each(WORDS, f"|{name}|", "|", "probe", f"eslint our rules refuse the {name} route")
+    yield from each(WORDS, '|consensus_params"', '"', "probe", "eslint our rules refuse the consensus_params route")
+    for name in ("async", "sync", "commit"):
+        kept = "|".join(other for other in ("async", "sync", "commit") if other != name)
+        yield from each(WORDS, "broadcast_tx_(?:async|sync|commit)", f"broadcast_tx_(?:{kept})", "probe", f"eslint our rules refuse the broadcast_tx_{name} route")
     for find, replace, label in (
         ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
         ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
