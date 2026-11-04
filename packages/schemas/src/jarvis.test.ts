@@ -12,9 +12,16 @@ import {
   JarvisBudgets,
   JarvisChange,
   JarvisChangeRequest,
+  JarvisDigest,
+  JarvisDigestRequest,
+  JARVIS_LANGUAGES,
   JarvisQuestion,
   JarvisSettings,
+  JarvisTranslate,
+  JarvisTranslateRequest,
+  JarvisTranslation,
   ProposedAction,
+  TRANSLATION_CAPS,
 } from "./jarvis.ts";
 
 // 10d: what Jarvis hands the client, as data. Each builder makes a fresh value inside the test (F2356).
@@ -394,10 +401,6 @@ const ask = (over: Record<string, unknown> = {}) => ({
 const takes = (value: unknown): boolean => JarvisAsk.safeParse(value).success;
 
 describe("JarvisAsk", () => {
-  it("is posted to /ask, and the budgets read and changed at /budgets", () => {
-    expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets" });
-  });
-
   it("is a question, its room and the room's lines, with nothing else", () => {
     expect(takes(ask())).toBe(true);
     expect(takes(ask({ lines: [] }))).toBe(true);
@@ -431,5 +434,115 @@ describe("JarvisAsk", () => {
     expect(takes(ask({ question: "" }))).toBe(false);
     expect(takes(ask({ room: `#${"a".repeat(64)}` }))).toBe(false);
     expect(takes(ask({ room: "#bubble\nNOTICE" }))).toBe(false);
+  });
+});
+
+describe("translation's contract (10k)", () => {
+  it("names the translation's and the digest's paths beside the question's and the budgets'", () => {
+    expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" });
+  });
+
+  it("lists the 16 languages decided (D190), and bounds a translation at 16,000 code points", () => {
+    expect([...JARVIS_LANGUAGES]).toEqual([
+      "en",
+      "fr",
+      "es",
+      "de",
+      "it",
+      "pt",
+      "nl",
+      "pl",
+      "ru",
+      "uk",
+      "tr",
+      "ar",
+      "hi",
+      "ja",
+      "ko",
+      "zh",
+    ]);
+    expect(TRANSLATION_CAPS).toEqual({ text: 16_000 });
+  });
+
+  it("takes a language of its bounded list alone, by its code", () => {
+    const asked = (language: unknown) => JarvisTranslate.safeParse({ text: "Bonjour", language }).success;
+    expect(JARVIS_LANGUAGES.length).toBeLessThanOrEqual(20);
+    expect(JARVIS_LANGUAGES.every((code) => /^[a-z]{2}$/.test(code))).toBe(true);
+    expect([asked("fr"), asked("en"), asked("FR"), asked("fr-FR"), asked("xx"), asked("")]).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("asks the server for a room's line by its id, never its text (the text is the server's own record)", () => {
+    const request = (over: Record<string, unknown>) =>
+      JarvisTranslateRequest.safeParse({ room: "#bubble", msgid: "m1", language: "fr", ...over }).success;
+    expect(request({})).toBe(true);
+    expect(request({ text: "forged" })).toBe(false);
+    expect(request({ msgid: "" })).toBe(false);
+    expect(request({ msgid: "a b" })).toBe(false);
+    expect(request({ room: "bubble" })).toBe(false);
+    expect(request({ language: "klingon" })).toBe(false);
+  });
+
+  it("sends jarvis a line's text within a line's bound in code points, never empty, and nothing else", () => {
+    const sent = (text: string, over: Record<string, unknown> = {}) =>
+      JarvisTranslate.safeParse({ text, language: "fr", ...over }).success;
+    expect([sent(wide(JARVIS_LINES.bytes)), sent(wide(JARVIS_LINES.bytes + 1)), sent("")]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(sent("hi", { room: "#bubble" })).toBe(false);
+  });
+
+  it("answers a translation within its bound, the original kept, spent or off, and nothing more", () => {
+    const answer = (value: unknown) => JarvisTranslation.safeParse(value).success;
+    expect(answer({ status: "translated", text: wide(TRANSLATION_CAPS.text) })).toBe(true);
+    expect(answer({ status: "translated", text: wide(TRANSLATION_CAPS.text + 1) })).toBe(false);
+    expect(answer({ status: "translated", text: "" })).toBe(false);
+    expect([answer({ status: "original" }), answer({ status: "spent" }), answer({ status: "off" })]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(answer({ status: "original", text: "x" })).toBe(false);
+    expect(answer({ status: "failed" })).toBe(false);
+  });
+});
+
+describe("the digest's contract (10k)", () => {
+  it("asks for a realm of a universe, both by their data's patterns, and nothing else", () => {
+    const asked = (over: Record<string, unknown>) =>
+      JarvisDigestRequest.safeParse({ universe: "onyx", realm: "gno.land/r/demo/poll", ...over }).success;
+    expect(asked({})).toBe(true);
+    expect(asked({ realm: "gno.land/p/demo/avl" })).toBe(false);
+    expect(asked({ realm: "gno.land/r/demo/poll:page" })).toBe(false);
+    expect(asked({ realm: `gno.land/r/${"a".repeat(120)}` })).toBe(false);
+    expect(asked({ universe: "Onyx" })).toBe(false);
+    expect(asked({ universe: "" })).toBe(false);
+    expect(asked({ page: "# forged" })).toBe(false);
+  });
+
+  it("answers a digest with the height it was read at and at most one proposal, none, spent or off", () => {
+    const answer = (value: unknown) => JarvisDigest.safeParse(value).success;
+    const digest = { blocks: [blocks().facts] };
+    expect(answer({ status: "digest", digest, proposal: null, height: 1204 })).toBe(true);
+    expect(answer({ status: "digest", digest, proposal: action(), height: 1204 })).toBe(true);
+    expect(answer({ status: "digest", digest, proposal: null })).toBe(false);
+    expect(answer({ status: "digest", digest, proposal: null, height: 0 })).toBe(false);
+    expect(answer({ status: "digest", digest, proposal: null, height: 1.5 })).toBe(false);
+    expect(answer({ status: "digest", digest: { blocks: [] }, proposal: null, height: 1 })).toBe(false);
+    expect(answer({ status: "digest", digest, proposal: { ...action(), coins: "5ugnot" }, height: 1 })).toBe(false);
+    expect([answer({ status: "none" }), answer({ status: "spent" }), answer({ status: "off" })]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(answer({ status: "none", digest })).toBe(false);
   });
 });

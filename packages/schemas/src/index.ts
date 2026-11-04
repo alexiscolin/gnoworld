@@ -32,9 +32,16 @@ export {
   JarvisBudgets,
   JarvisChange,
   JarvisChangeRequest,
+  JarvisDigest,
+  JarvisDigestRequest,
+  JARVIS_LANGUAGES,
   JarvisQuestion,
   JarvisSettings,
+  JarvisTranslate,
+  JarvisTranslateRequest,
+  JarvisTranslation,
   ProposedAction,
+  TRANSLATION_CAPS,
 } from "./jarvis.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";

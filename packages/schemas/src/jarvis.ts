@@ -2,9 +2,12 @@
 // answer button, data and never HTML, each string bounded in code points (as Zod counts). A proposal names no coins: a field
 // for them fails here, and the person types any amount in the call card. A realm's path and a link are only bounded: they
 // are good when they are the realm and the links the server read (server/src/jarvis/ground.ts and proposed.ts). Since 10g,
-// the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes.
+// the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
+// since 10k, a line's translation and a realm's digest.
 import { Address } from "./address.ts";
+import { RealmPath, Slug } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
+import { PinId } from "./pins.ts";
 import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
 
@@ -108,7 +111,7 @@ export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
 
 /** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
  * share (D42). */
-export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets" } as const;
+export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" } as const;
 
 /** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
  * by a number for who said it in this question alone, the asker 0, never an account (D91). */
@@ -156,3 +159,64 @@ export const JarvisSettings = z.strictObject({
   budgets: z.nullable(JarvisBudgets),
 });
 export type JarvisSettings = z.infer<typeof JarvisSettings>;
+
+/** The languages a line is translated into, by their ISO 639-1 code (D190): a bounded list, so a line has a bounded
+ * number of translations. */
+export const JARVIS_LANGUAGES = [
+  "en",
+  "fr",
+  "es",
+  "de",
+  "it",
+  "pt",
+  "nl",
+  "pl",
+  "ru",
+  "uk",
+  "tr",
+  "ar",
+  "hi",
+  "ja",
+  "ko",
+  "zh",
+] as const;
+const Language = z.enum(JARVIS_LANGUAGES);
+
+/** The most a translation holds, in code points: twice a line's bound, as a translation runs longer than its original. */
+export const TRANSLATION_CAPS = { text: 16_000 } as const;
+
+/** A room's line to translate, as a page asks the door: the line by its id, never its text, which is the server's. */
+export const JarvisTranslateRequest = z.strictObject({ room: RoomId, msgid: PinId, language: Language });
+export type JarvisTranslateRequest = z.infer<typeof JarvisTranslateRequest>;
+
+/** A line's text and the language to translate it into, as the door sends jarvis. */
+export const JarvisTranslate = z.strictObject({ text: text(JARVIS_LINES.bytes), language: Language });
+export type JarvisTranslate = z.infer<typeof JarvisTranslate>;
+
+/** A line's translation, or its original kept (a translation dropped, ADR-0002 §5 point 5), spent, or off. */
+export const JarvisTranslation = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("translated"), text: text(TRANSLATION_CAPS.text) }),
+  z.strictObject({ status: z.literal("original") }),
+  z.strictObject({ status: z.literal("spent") }),
+  z.strictObject({ status: z.literal("off") }),
+]);
+export type JarvisTranslation = z.infer<typeof JarvisTranslation>;
+
+/** A realm's digest asked for, by the universe whose chain holds it and its path, the same from a page and the door. */
+export const JarvisDigestRequest = z.strictObject({ universe: Slug, realm: RealmPath });
+export type JarvisDigestRequest = z.infer<typeof JarvisDigestRequest>;
+
+/** A realm's digest with the block height its page and functions were read at and the one action it proposes, if any;
+ * none when no digest its reads hold could be made, then the whole page shows (ADR-0002 §4); spent; or off. */
+export const JarvisDigest = z.discriminatedUnion("status", [
+  z.strictObject({
+    status: z.literal("digest"),
+    digest: Digest,
+    proposal: z.nullable(ProposedAction),
+    height: z.int().check(z.gte(1)),
+  }),
+  z.strictObject({ status: z.literal("none") }),
+  z.strictObject({ status: z.literal("spent") }),
+  z.strictObject({ status: z.literal("off") }),
+]);
+export type JarvisDigest = z.infer<typeof JarvisDigest>;

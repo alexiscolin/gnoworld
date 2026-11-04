@@ -12,7 +12,7 @@ import Anthropic, {
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
 import type { Secret } from "@gnoworld/service/settings";
-import type { Budget } from "./budget.ts";
+import type { Budget, Kind } from "./budget.ts";
 import { cost, worstCost, type Model } from "./prices.ts";
 import type { Trace } from "./tracing.ts";
 
@@ -47,6 +47,8 @@ export type Wait = (ms: number, value?: undefined, options?: { signal?: AbortSig
 interface Attempts {
   readonly send: Send;
   readonly budget: Budget;
+  // The budget each attempt reserves from: a question's, unless a translation's (ADR-0002 §5, "its own budget").
+  readonly kind?: Kind | undefined;
   readonly retries: number;
   readonly log: Log;
   readonly trace: Trace;
@@ -57,6 +59,8 @@ interface Attempts {
 type Called = { ok: true; answer: Anthropic.Message } | { ok: false; reason: "spent" | "failed" | "timeout" | "gone" };
 type Tried = Called | { ok: false; reason: "error"; error: AnthropicError };
 
+const kindOf = ({ kind }: Attempts): Kind => kind ?? "ask";
+
 /** One model request: each attempt reserved at its worst before it is sent and settled once it ends. */
 export async function callModel(attempts: Attempts, request: Request & { model: Model }): Promise<Called> {
   const sent = pinned(request);
@@ -65,7 +69,7 @@ export async function callModel(attempts: Attempts, request: Request & { model: 
   const { signal } = attempts;
   for (let attempt = 1; ; attempt += 1) {
     if (signal?.aborted === true) return { ok: false, reason: "gone" };
-    const tried = await tryOnce(attempts, { sent, worst }, attempt);
+    const tried = await tryOnce(attempts, { sent, worst, kind: kindOf(attempts) }, attempt);
     if (tried.ok || tried.reason !== "error") return tried;
     const delay = attempt > attempts.retries ? undefined : delayOf(tried.error, attempt);
     if (delay === undefined) {
@@ -80,11 +84,11 @@ export async function callModel(attempts: Attempts, request: Request & { model: 
 
 async function tryOnce(
   attempts: Attempts,
-  { sent, worst }: { sent: Request; worst: number },
+  { sent, worst, kind }: { sent: Request; worst: number; kind: Kind },
   attempt: number,
 ): Promise<Tried> {
   const { budget, log, trace } = attempts;
-  const held = budget.reserve("ask", worst);
+  const held = budget.reserve(kind, worst);
   for (const level of held.alerts) {
     log("jarvis_budget_alert", { reason: String(level) });
     trace.alert(level);

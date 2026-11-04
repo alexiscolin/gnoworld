@@ -1,26 +1,35 @@
 // jarvis's routes (D42, JARVIS_PATHS), each body through its schema first: POST /ask, a question to the loop, its result
 // as the door's wire reads it (D175), the room's lines as data (D176); GET and POST /budgets, the day's two caps in
 // whole dollars, changed at once and logged (D47). Off, /ask answers off before any work; /budgets serves on or off,
-// so an admin sets them before switching jarvis on (D171). 10k adds its routes to this table.
+// so an admin sets them before switching jarvis on (D171). Since 10k, POST /translate, a line's translation, and POST
+// /digest, a realm's digest, each answering off while jarvis is, once its body passed its schema.
 import {
   DOOR_CAPS,
   JARVIS_PATHS,
   JarvisAsk,
   JarvisBudget,
+  JarvisDigestRequest,
+  JarvisTranslate,
   type JarvisAnswer,
   type JarvisBudgets,
+  type JarvisDigest,
+  type JarvisTranslation,
 } from "@gnoworld/schemas";
 import { isBlank } from "@gnoworld/core";
 import type { Log } from "@gnoworld/service/log";
 import type { Budget } from "./budget.ts";
+import type { Digested } from "./digest.ts";
 import { refusal, type Reply, type Routes } from "./http.ts";
 import type { Question, Result } from "./loop.ts";
 import { DOLLAR } from "./prices.ts";
+import type { Translated } from "./translate.ts";
 
 type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
 interface Parts {
-  // The loop's ask, or none while jarvis is off.
+  // The loop's ask, the translator's and the digests', or none while jarvis is off.
   readonly ask: Ask | undefined;
+  readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
+  readonly digest?: ((asked: JarvisDigestRequest, signal: AbortSignal) => Promise<Digested>) | undefined;
   readonly budget: Pick<Budget, "caps" | "change">;
   readonly log: Log;
 }
@@ -28,7 +37,7 @@ interface Parts {
 const answered = (answer: JarvisAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
-export function jarvisRoutes({ ask, budget, log }: Parts): Routes {
+export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
     return {
@@ -49,6 +58,22 @@ export function jarvisRoutes({ ask, budget, log }: Parts): Routes {
         if (ask === undefined) return answered({ status: "off" });
         const { question, lines } = asked.data;
         return replyOf(await ask({ text: question, room: lines.map(lineOf) }, signal), log);
+      },
+    },
+    [JARVIS_PATHS.translate]: {
+      async POST(body, signal) {
+        const asked = JarvisTranslate.safeParse(body);
+        if (!asked.success) return refused(JARVIS_PATHS.translate);
+        if (translate === undefined) return { status: 200, body: { status: "off" } satisfies JarvisTranslation };
+        return translationOf(await translate(asked.data, signal));
+      },
+    },
+    [JARVIS_PATHS.digest]: {
+      async POST(body, signal) {
+        const asked = JarvisDigestRequest.safeParse(body);
+        if (!asked.success) return refused(JARVIS_PATHS.digest);
+        if (digest === undefined) return { status: 200, body: { status: "off" } satisfies JarvisDigest };
+        return digestOf(await digest(asked.data, signal));
       },
     },
     [JARVIS_PATHS.budgets]: {
@@ -96,4 +121,25 @@ function cut(text: string, log: Log): string {
   const kept = points.slice(0, DOOR_CAPS.answer).join("");
   const lines = kept.slice(0, kept.lastIndexOf("\n") + 1);
   return isBlank(lines) ? kept : lines;
+}
+
+// A failure on the wire, as the door reads it (D175): its reader gone is not_ready, to nobody; any other internal.
+const failed = (kind: "failed" | "gone"): Reply =>
+  kind === "gone" ? refusal("not_ready", 503) : refusal("internal", 502);
+
+function translationOf(result: Translated): Reply {
+  if (result.kind === "failed" || result.kind === "gone") return failed(result.kind);
+  const body: JarvisTranslation =
+    result.kind === "translated" ? { status: "translated", text: result.text } : { status: result.kind };
+  return { status: 200, body };
+}
+
+function digestOf(result: Digested): Reply {
+  if (result.kind === "failed" || result.kind === "gone") return failed(result.kind);
+  if (result.kind === "invalid") return refusal("refused", 400);
+  const body: JarvisDigest =
+    result.kind === "digest"
+      ? { status: "digest", digest: result.digest, proposal: result.proposal, height: result.height }
+      : { status: result.kind };
+  return { status: 200, body };
 }

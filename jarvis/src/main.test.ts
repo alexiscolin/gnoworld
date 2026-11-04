@@ -13,6 +13,8 @@ import {
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisBudgets,
+  JarvisDigest,
+  JarvisTranslation,
   type AnswerButton,
   type JarvisAsk,
 } from "@gnoworld/schemas";
@@ -46,6 +48,8 @@ const GNOSCOPE = "https://gnoscope.test";
 // Onyx's node, as app/data's universes name it (its port, 443, is no part of its origin).
 const ONYX_NODE = "https://rpc.onyx.testnets.gno.land";
 const REALM = "gno.land/r/demo/poll";
+// The poll's page as its node renders it (10k's digest reads it there).
+const POLL_PAGE = "# The poll\n\n37 proposals are open.\n\nAnswer yes or no.";
 
 const started: Jarvis[] = [];
 const folders: string[] = [];
@@ -84,6 +88,7 @@ const setup = async (steps: FakeStep[] = [], over: { gnomcp?: Scenario } = {}) =
   closers.push(gnoscope.close);
   const node = await local((request) => {
     if (request.url === "/status") return { status: 200, body: statusEnvelope(1204, "2026-11-04T03:34:18Z", "onyx-1") };
+    if (request.url?.includes("qrender") === true) return { status: 200, body: queryEnvelope({ data: POLL_PAGE }) };
     return { status: 200, body: queryEnvelope({ data: JSON.stringify(pollFunctions()) }) };
   });
   const gnomcp = fakeGnomcp({ answers: pollReads(), ...over.gnomcp });
@@ -455,7 +460,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     ]);
     expect(await refused(await fetch(`${url}${JARVIS_PATHS.ask}`))).toEqual([405, "unsupported"]);
     expect(await refused(await fetch(`${url}/health`))).toEqual([404, "not_found"]);
-    expect(await refused(await post("/translate", "{}"))).toEqual([404, "not_found"]);
+    expect(await refused(await post("/summarize", "{}"))).toEqual([404, "not_found"]);
     expect(model.seen).toEqual([]);
   });
 });
@@ -591,5 +596,87 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     await listening(jarvis);
     jarvis.child.kill("SIGTERM");
     expect(await exited(jarvis)).toBe(0);
+  });
+});
+
+describe("jarvis's process: a translation and a digest (10k)", { timeout: 60_000 }, () => {
+  const post = (url: string, path: string, body: unknown) =>
+    fetch(`${url}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const LINE = { text: "37 proposals are open.", language: "fr" };
+  const DIGEST = { universe: "onyx", realm: REALM };
+
+  it("answers off to both while off, asking no model and reading no node", async () => {
+    const { env, model, node } = await setup();
+    const url = await listening(start({ ...env, JARVIS: "off" }));
+    expect(JarvisTranslation.parse(await (await post(url, JARVIS_PATHS.translate, LINE)).json())).toEqual({
+      status: "off",
+    });
+    expect(JarvisDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({ status: "off" });
+    expect([model.seen, node.received]).toEqual([[], []]);
+  });
+
+  it("translates a line once with the fast model, its own budget's, then serves it from its file", async () => {
+    const french = "37 propositions sont ouvertes.";
+    const { env, model } = await setup([
+      message({ content: [text(french)], stop: "end_turn", model: "claude-haiku-5-5" }),
+    ]);
+    const url = await listening(start(env));
+    for (let at = 0; at < 2; at += 1)
+      expect(JarvisTranslation.parse(await (await post(url, JARVIS_PATHS.translate, LINE)).json())).toEqual({
+        status: "translated",
+        text: french,
+      });
+    expect(model.seen.map(({ body }) => body["model"])).toEqual(["claude-haiku-5-5"]);
+  });
+
+  it("digests a realm read on its universe's node, offered give_digest and propose_action alone, kept for its readers", async () => {
+    const digest = { blocks: [{ type: "facts", facts: [{ label: "Open", value: "37" }] }] };
+    const steps = [
+      message({
+        content: [toolUse("d1", "give_digest", { profile: "onyx", realm: REALM, digest })],
+        stop: "tool_use",
+        model: "claude-haiku-5-5",
+      }),
+      message({ content: [text("Done.")], stop: "end_turn", model: "claude-haiku-5-5" }),
+    ];
+    const { env, model, node } = await setup(steps);
+    const url = await listening(start(env));
+    for (let at = 0; at < 2; at += 1)
+      expect(JarvisDigest.parse(await (await post(url, JARVIS_PATHS.digest, DIGEST)).json())).toEqual({
+        status: "digest",
+        digest,
+        proposal: null,
+        height: 1204,
+      });
+    expect(model.seen.map(({ body }) => namesOf(body))).toEqual([
+      ["give_digest", "propose_action"],
+      ["give_digest", "propose_action"],
+    ]);
+    expect(node.received.map(({ path }) => path.split("?")[0])).toContain("/abci_query");
+  });
+
+  it("lets a translation in flight end on SIGTERM, keeps it, settles its hold and closes its file (red pass, R14)", async () => {
+    const answer = held();
+    const { env, dir, model } = await setup([answer.step]);
+    const jarvis = start(env);
+    const url = await listening(jarvis);
+    const inFlight = post(url, JARVIS_PATHS.translate, LINE);
+    await model.asked(1);
+    jarvis.child.kill("SIGTERM");
+    await printed(jarvis, () => jarvis.out.stdout.includes('"event":"stopping"'));
+    answer.answer(
+      message({ content: [text("37 propositions sont ouvertes.")], stop: "end_turn", model: "claude-haiku-5-5" }),
+    );
+    expect(JarvisTranslation.parse(await (await inFlight).json())).toMatchObject({ status: "translated" });
+    expect(await exited(jarvis)).toBe(0);
+    expect(existsSync(join(dir, "jarvis.db-wal"))).toBe(false);
+    const db = openDatabase(join(dir, "jarvis.db"), jarvisMigrations);
+    expect(db.prepare("SELECT COUNT(*) AS holds FROM budget_holds").get()).toEqual({ holds: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS kept FROM translations").get()).toEqual({ kept: 1 });
+    db.close();
   });
 });

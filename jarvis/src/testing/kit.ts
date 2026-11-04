@@ -22,7 +22,7 @@ export const capture = () => {
   };
 };
 
-/** A budget on a file of its own in memory, its clock the test's: a cap of `cap` nano-dollars for each kind. */
+/** A budget on a file of its own in memory, its clock the test's: a cap of `cap` nano-dollars for each kind; the file too. */
 export const budgetFor = (cap: number, holdMs = 10 * 60_000) => {
   const clock = { now: Date.parse("2026-11-04T12:00:00.000Z") };
   const db = openDatabase(":memory:", jarvisMigrations);
@@ -30,6 +30,7 @@ export const budgetFor = (cap: number, holdMs = 10 * 60_000) => {
   return {
     budget,
     clock,
+    db,
     close: () => {
       db.close();
     },
