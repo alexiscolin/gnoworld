@@ -2,8 +2,8 @@
 // before any work, in this order: a listed site in JSON, the session, the switch, the account's rate, the body (a room,
 // a line's id, a language of the list), a room the asker may read, the line in the server's own record of that room;
 // then jarvis, given that record's text, never one the page sent, its answer passed on once the client's schema parsed
-// it. No quota of questions: a translation spends its own budget, made once for every reader; an account asks 200 a
-// UTC day at most, so one account alone cannot spend that budget (D194).
+// it. No quota of questions: a translation spends its own budget, made once for every reader; an account asks 200 in
+// the 24 hours from its first, counted in the door's memory, so one account alone cannot spend that budget (D194).
 import { JarvisTranslateRequest } from "@gnoworld/schemas";
 import type { Hono } from "hono";
 import { json, type Guarded } from "../guard.ts";
