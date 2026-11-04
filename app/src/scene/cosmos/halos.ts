@@ -7,12 +7,11 @@ import {
   haloAt,
   mainSizeOf,
   OTHER_SUN,
-  POINT_PIXELS,
+  pointReach,
   sunReach,
   type Drawn,
   type Point,
   type StarSystem,
-  type SunSight,
 } from "@gnoworld/core";
 
 const HALOS = 7;
@@ -43,7 +42,6 @@ export class Halos {
   #lit = true;
   #chart = false;
   #focal = 1;
-  readonly #sight: SunSight = { distance: 0, focal: 1, halo: 0 };
 
   /** Chooses which of `sight`'s drawn stars keep a halo. */
   choose(sight: HaloSight): void {
@@ -60,7 +58,7 @@ export class Halos {
       if (needsHalo(index)) {
         this.#halos[at] = 1;
         kept += 1;
-      } else if (inView(system.place, (POINT_PIXELS * (this.#aways[at] ?? 0)) / focal)) order.push(at);
+      } else if (inView(system.place, pointReach(this.#aways[at] ?? 0, focal))) order.push(at);
     }
     order.sort((a, b) => (this.#aways[a] ?? 0) - (this.#aways[b] ?? 0));
     for (const at of order.slice(0, Math.max(HALOS - kept, 0))) this.#halos[at] = haloAt(this.#aways[at] ?? Infinity);
@@ -81,10 +79,8 @@ export class Halos {
   sunOf(at: number, index: number, system: StarSystem): { reach: number; halo: number } {
     const [distance, halo] = [this.#aways[at] ?? 0, this.#halos[at] ?? 0];
     if (!this.#lit || (this.#chart && index !== this.#main))
-      return { reach: (POINT_PIXELS * distance) / this.#focal, halo: 0 };
-    const sight = this.#sight;
-    [sight.distance, sight.focal, sight.halo] = [distance, this.#focal, halo];
-    sight.most = index === this.#main ? undefined : (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize;
-    return { reach: sunReach(system, sight), halo };
+      return { reach: pointReach(distance, this.#focal), halo: 0 };
+    const most = index === this.#main ? undefined : (this.#main === 0 ? OTHER_SUN : ARRIVAL_SUN) * this.#mainSize;
+    return { reach: sunReach(system, { distance, focal: this.#focal, halo, most }), halo };
   }
 }
