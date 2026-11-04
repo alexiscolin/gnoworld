@@ -64,8 +64,8 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,gate_speeds", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light", "scripts/lint_scope.py": "lint_scope", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,regressions,batch_size,patch_coverage,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -1036,7 +1036,16 @@ def mutants():
         ('\t\tcat "$logs/$l.log" >&2\n', "\n", "a failed lane's output is shown"),
         ('\t[ -z "$failed" ]\n}', "\t:\n}", "finish fails when a lane did"),
         ("\t$ts || return 0\n\tstep typecheck", "\tstep typecheck", "types only for a TypeScript change"),
-        ("\t$ts || return 0\n\tstep ergo", "\tstep ergo", "tests only for a TypeScript change"),
+        ("\t$ts || return 0\n\t! $light || return 0 # no Vitest", "\t! $light || return 0 # no Vitest", "tests only for a TypeScript change"),
+        ("\t! $light || return 0 # no Vitest", "\t: # no Vitest", "no Vitest in the radical mode's light gate"),
+        ("\t! $light || return 0 # no journey", "\t: # no journey", "no tokens' pictures in the radical mode's light gate"),
+        ("\t! $light || return 0 # its checks", "\t: # its checks", "no docs' lane in the radical mode's light gate"),
+        ("\tif ! $light; then # the light gate keeps jscpd", "\tif true; then # the light gate keeps jscpd", "the light gate runs no Prettier nor knip"),
+        ("\tlight=true\n", "\t:\n", "the radical mode's light gate runs"),
+        ('[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ]', "true", "the light gate wants git's hooks folder's radical-mode on"),
+        ('[ "$(printf \'%s\\n\' "$changed" | python3 -I scripts/speeds.py --light "$PWD")" = light ]', "true", "the light gate wants no tier-1 path"),
+        ('harnessed=$(harness_of) && [ -z "$harnessed" ]', "true", "the light gate wants no harness file"),
+        ("! $all && ! $tests_all && common=", "! $all && common=", "--tests-all runs the whole gate in the radical mode"),
         ("\t$gno || return 0", "\t:", "gno only for a gno change"),
         ("\t$app || return 0", "\t:", "the journeys only for an app change"),
         ("\t$hooks || return 0 # the hooks'", "\t: # the hooks'", "the hooks' tests only when what they test changed"),
@@ -1083,7 +1092,7 @@ def mutants():
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
         ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
         ("ts=true app=true tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
-        ("\t$tokens || return 0\n\tstep pictures", "\tstep pictures", "the tokens pictures only for a change of tokens.css (F1190)"),
+        ("\t$tokens || return 0\n\t! $light", "\t! $light", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures ||", "finish ts types tests gno docs ||", "a failed tokens comparison fails the gate (F1190)"),
         ("STORIES_PORT=$port PICTURES_OF=tokens-- node", "PICTURES_OF=tokens-- node", "the tokens pictures get a free port of their own (F1190)"),
@@ -1158,7 +1167,7 @@ def seven_mutants():
     s = "scripts/speeds.py"
     yield from swaps(s, "speeds.py", (
         ("any(path.startswith(i) for i in interface)", "any(path.startswith(i.rstrip(\"/\")) for i in interface)", "reads an interface folder by its letters, not its slash"),
-        ("if not plain(path) or linked(root, path) or", "if linked(root, path) or", "doubts a path it cannot place"),
+        ("return not plain(path) or linked(root, path) or", "return linked(root, path) or", "doubts a path it cannot place"),
         ("not plain(path) or linked(root, path)", "not plain(path) or False", "doubts a link"),
         ("unicodedata.normalize(\"NFC\", path).casefold()", "path.casefold()", "reads a security path in NFC"),
         ("unicodedata.normalize(\"NFC\", path).casefold()", "unicodedata.normalize(\"NFC\", path)", "reads a security path with its case folded (F164)"),
@@ -1168,7 +1177,10 @@ def seven_mutants():
         (" and p.count(\"/\") >= 2", "", "allows no whole top folder as interface"),
         ("p.endswith(\"/\") and plain(", "plain(", "allows only an interface folder written with its slash"),
         (" and plain(p[:-1])", "", "allows only an interface folder spelled as a plain path"),
-        ("if len(argv) != 2:", "if False:", "doubts a call with other than one argument"),
+        ("if len(args) != 1:", "if False:", "doubts a call with other than one argument"),
+        (" or any(secure(root, path, security) for path in paths):", ":", "--light refuses a tier-1 path"),
+        ("if not security or not paths or any(", "if not paths or any(", "--light doubts a table with no tier-1 path"),
+        ('if argv[1:2] == ["--light"]', 'if argv[1:2] == ["--nothing"]', "--light answers the light gate's question"),
         ("if line.lstrip().startswith(\"|\") and len(cells)", "if len(cells)", "reads a sentence as a row of the table"),
     ))
     yield from each("scripts/patch_coverage.py", "except OSError as e:", "except ZeroDivisionError as e:", "hooks", "patch_coverage says plainly that the coverage left no report")

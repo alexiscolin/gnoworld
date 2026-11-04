@@ -261,6 +261,27 @@ unsteady_log=$repository/.claude/tmp/unsteady.log
 TSC_CACHE=$logs/tsc
 { $full || [ -z "$tested" ]; } || TSC_CACHE=$PWD/.claude/tmp/tsc
 mkdir -p "$TSC_CACHE" && export TSC_CACHE
+# The harness files among the change's paths, by records.sh's own list as git reads it: the paths, each with no content, in an index of
+# this run's own, set against the empty tree, in the repository (the one pre-commit's staged copy borrows from). A git that fails, fails.
+harness_of() (
+	. "$PWD/.githooks/records.sh"
+	cd "$repository"
+	GIT_INDEX_FILE=$logs/light.index && export GIT_INDEX_FILE
+	blob=$(git hash-object -w --stdin </dev/null)
+	printf '%s\n' "$changed" | awk -v blob="$blob" 'NF { printf "100644 %s\t%s\n", blob, $0 }' | git update-index --add --index-info
+	harness --cached --name-only 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+)
+# The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice; CLAUDE.md): on while git's own hooks folder holds
+# `radical-mode` reading `on`, which Alexis alone writes (no sandboxed command writes there: the check above refuses a run where one could).
+# A change of no tier-1 path (speeds.py --light) and no harness file then runs the types, the lint, the build with the first screen's cap
+# and jscpd, no Vitest, no journey; anything else, a doubt included, the whole gate. pre-commit's secrets scan runs on every commit.
+light=false
+if ! $all && ! $tests_all && common=$(git -C "$repository" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &&
+	[ "$(cat "$common/hooks/radical-mode" 2>/dev/null)" = on ] && [ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --light "$PWD")" = light ] &&
+	harnessed=$(harness_of) && [ -z "$harnessed" ]; then
+	light=true
+	echo "check.sh: the radical mode's light gate (no tier-1 path, no harness file): the types, the lint, the build with the first screen's cap, jscpd"
+fi
 retry() { # retry <tool> <report> <output> <command...>: <report>'s failed files, given to <command>, run once more; <output>, the first run's console, is shown first
 	tool=$1 report=$2 output=$3
 	shift 3
@@ -318,7 +339,7 @@ finish() {
 	done
 	for l in "$@"; do
 		if [ ! -s "$logs/$l.times" ] && [ ! -e "$logs/$l.at" ]; then
-			echo "lane $l skipped: the change touches nothing it checks"
+			if $light; then echo "lane $l skipped: the light gate"; else echo "lane $l skipped: the change touches nothing it checks"; fi
 			continue
 		fi
 		total=0 parts=
@@ -361,20 +382,24 @@ else:
 }
 
 lane_ts() {
-	step format
-	# Prettier's cache is keyed by a file's path and content: in a repository it lives in the worktree's own .claude/tmp and makes a rerun of
-	# an unchanged tree 0.9 s of 7.5 (speed-audit.md, row 6); pre-commit's staged copy is a new folder each time, so it keeps none, and --full and --merge read no writable cache.
-	format_cache=
-	{ $full || [ -z "$tested" ]; } || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
-	run format:check "$format_cache"
-	step unused
-	run unused
+	if ! $light; then # the light gate keeps jscpd, the build and the first screen's cap alone
+		step format
+		# Prettier's cache is keyed by a file's path and content: in a repository it lives in the worktree's own .claude/tmp and makes a rerun of
+		# an unchanged tree 0.9 s of 7.5 (speed-audit.md, row 6); pre-commit's staged copy is a new folder each time, so it keeps none, and --full and --merge read no writable cache.
+		format_cache=
+		{ $full || [ -z "$tested" ]; } || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
+		run format:check "$format_cache"
+		step unused
+		run unused
+	fi
 	step copies
 	copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
-	step css
-	python3 -I scripts/check_css.py
-	step comments
-	run comments
+	if ! $light; then
+		step css
+		python3 -I scripts/check_css.py
+		step comments
+		run comments
+	fi
 	$app || return 0
 	# After the checks above: pre-commit's staged copy is no repository, so they would read the
 	# build's output, which .gitignore keeps from them only in one.
@@ -440,6 +465,7 @@ lane_types() {
 
 lane_tests() {
 	$ts || return 0
+	! $light || return 0 # no Vitest in the light gate
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
 	if ! $full; then # --full runs the tests once, with coverage
@@ -471,6 +497,7 @@ lane_tests() {
 
 lane_gno() {
 	$gno || return 0
+	! $light || return 0 # the realms are tier 1: a light change holds Go's tools alone, whose tests wait as Vitest's do
 	step gno
 	(cd gno && "$GNO" lint ./... && "$GNO" test ./...)
 	step mutate.py # removing any guard fails a test
@@ -493,12 +520,14 @@ lane_gno() {
 # in this run's own folder: a copy outside a repository would have jscpd and knip read a build left in the tree.
 lane_pictures() {
 	$tokens || return 0
+	! $light || return 0 # no journey in the light gate
 	step pictures
 	port=$(free_ports 1) # a line of its own: in a prefix assignment, its failure would be swallowed and the tool would start with no port (R2)
 	STORIES_OUT="$logs/storybook" STORIES_PORT=$port PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot pictures
 }
 
 lane_docs() {
+	! $light || return 0 # its checks and the hooks' tests wait for the hardening slice
 	step check_docs # harness docs name only files that exist
 	python3 -I scripts/check_docs.py
 	if $regressions; then

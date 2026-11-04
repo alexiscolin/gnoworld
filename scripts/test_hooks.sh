@@ -2758,6 +2758,73 @@ for run in config --tests-all --full --merge; do
 done
 fi
 
+if part gate_light; then
+gate_fixture gate_light
+# The radical mode's light gate (Alexis, 2026-11-04, until the hardening slice): while git's own hooks folder holds `radical-mode` reading
+# `on`, a commit's or a turn's change of no tier-1 path (speeds.py --light) and no harness file (records.sh's list) runs the types, the
+# importers' lint, the build with the first screen's cap and jscpd; no Vitest, no journey, nothing else. Only Alexis writes there: no
+# sandboxed command does (check.sh refuses to run where one could). Absent, anything but `on`, a file of the worktree in its name, a
+# tier-1 path, a harness file, a doubt, a part's end or the full gate: the whole gate as before. pre-commit's staged copy reads the mode
+# of the repository whose packages it borrows, and its list of paths.
+cp "$here/speeds.py" "$g/scripts/" && mkdir -p "$g/docs" "$g/app/tests/stories"
+printf '| Tier | What | Written by | How |\n|---|---|---|---|\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n' >"$g/docs/REVIEW.md"
+printf 'x\n' >"$g/app/src/csp.ts" && printf 'x\n' >"$g/app/tests/stories/pictures.spec.ts"
+git -C "$g" add -A && git -C "$g" commit -qm "a tier-1 file, a picture spec"
+mode="$g/.git/hooks/radical-mode"
+light_steps="typecheck lint copies build:app playwright"
+heavy_steps="test format:check unused comments py:check_css sh:ergo py:check_docs"
+light() { # $1: what the run was given; the run's output in $out
+	for s in $light_steps; do ran "$s" || fail "check.sh's light gate skipped $s on $1"; done
+	for s in $heavy_steps; do ran "$s" && fail "check.sh's light gate ran $s on $1"; done
+	printf '%s\n' "$out" | grep -q "^check.sh: the radical mode's light gate" || fail "check.sh did not say it ran the light gate on $1: $out"
+}
+whole() { # $1: what the run was given
+	for s in test format:check unused; do ran "$s" || fail "check.sh skipped $s on $1, which the whole gate runs"; done
+	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh said the light gate on $1: $out"
+	:
+}
+printf 'on\n' >"$mode" && echo y >>"$g/app/src/a.tsx"
+out=$(gate) || fail "check.sh's light gate failed a change whose every step passes: $out"
+light "a change of the app in the radical mode"
+grep -qxF "$(record)" "$g/.claude/tmp/green-fast" || fail "check.sh's light gate did not record the code it passed"
+for path in app/src/csp.ts app/tests/stories/pictures.spec.ts; do
+	reset && echo y >>"$g/$path" && echo y >>"$g/app/src/a.tsx" && out=$(gate) || fail "check.sh failed beside $path in the radical mode: $out"
+	whole "a change of $path in the radical mode"
+done
+reset && git -C "$g" mv app/src/csp.ts app/src/renamed.ts && out=$(gate) || fail "check.sh failed on a tier-1 file renamed: $out"
+whole "a tier-1 file renamed away in the radical mode"
+reset && echo y >>"$g/app/src/a.tsx"
+for state in missing off "on2" folder planted; do
+	rm -rf "${mode:?}" "$g/.githooks/radical-mode" "$g/.claude/tmp/radical-mode"
+	case $state in
+	missing) ;;
+	folder) mkdir "$mode" ;;
+	planted) mkdir -p "$g/.claude/tmp" && printf 'on\n' >"$g/.claude/tmp/radical-mode" ;;
+	*) printf '%s\n' "$state" >"$mode" ;;
+	esac
+	out=$(gate) || fail "check.sh failed with the mode $state: $out"
+	whole "a change of the app with the mode $state"
+done
+rm -rf "${mode:?}" "$g/.claude/tmp/radical-mode" && printf 'on\n' >"$mode"
+mv "$g/docs/REVIEW.md" "$g/docs/gone.md" && out=$(gate) || fail "check.sh failed with no tier-1 table: $out"
+whole "a change of the app with no tier-1 table to read"
+mv "$g/docs/gone.md" "$g/docs/REVIEW.md"
+for run in --tests-all --full --merge; do
+	out=$(AUDIT_ANSWER=x gate "$run") || fail "check.sh $run failed in the radical mode: $out"
+	printf '%s\n' "$out" | grep -q "light gate" && fail "check.sh $run took the light gate: $out"
+done
+# pre-commit's staged copy: the mode of the repository it borrows its packages from, and the paths pre-commit lists.
+c=$g.copy && rm -rf "${c:?}" && cp -R "$g" "$c" && rm -rf "${c:?}/.git" "${c:?}/node_modules" && ln -s "$g/node_modules" "$c/node_modules"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy in the radical mode: $out"
+light "a staged copy's change of the app"
+out=$(g=$c GATE_CHANGED="$(printf 'app/src/a.tsx\napp/src/csp.ts')" gate) || fail "check.sh failed a staged copy of a tier-1 file: $out"
+whole "a staged copy's change of a tier-1 file"
+rm "$c/node_modules" && cp -R "$g/node_modules" "$c/node_modules"
+out=$(g=$c GATE_CHANGED=app/src/a.tsx gate) || fail "check.sh failed a staged copy that borrows no repository: $out"
+whole "a staged copy with no repository to read the mode of"
+rm -f "$mode"
+fi
+
 full_fixture() { # $1: its folder's name
 	gate_fixture "$1"
 	# Core's Chromium run's stub, here alone: a fixture's node_modules folder would hide gate_triggers' linked one.
@@ -5682,6 +5749,31 @@ for p in app/src/features/chat/embeds.ts app/src/features/chat/Embed.tsx app/src
 	packages/ui/src/link.tsx packages/ui/src/roving.ts app/src/features/jarvis/toolLoop.ts app/src/features/passport/sign.ts app/src/features/newthing/Panel.tsx packages/ui/src/NewThing/NewThing.tsx; do
 	[ "$(printf '%s\n' "$p" | python3 -I "$sp" "$here/.." 2>&1)" = full ] || fail "speeds.py: the repository's table let $p take the interface speed"
 done
+fi
+
+if part speeds_light; then
+# speeds.py --light <root>: whether a change may take the radical mode's light gate as far as docs/REVIEW.md's tier 1 goes (Alexis,
+# 2026-11-04, until the hardening slice): `light` when no path is a tier-1 path, read as the two speeds read them (case folded, a path it
+# cannot place or one through a link is no light); `full` on a tier-1 path anywhere in the list, a renamed one's old path included, a table
+# it cannot read, an empty list. The harness files are check.sh's to judge, by records.sh's own list.
+sp="$here"/speeds.py
+r="$t/speeds_light" && mkdir -p "$r/docs" "$r/app/src/features/login" "$r/app/src/lib" "$r/server/src"
+printf '# Review\n\n| Tier | What | Written by | How it is reviewed |\n|---|---|---|---|\n| 1 | Realms (`gno/r/`, `gno/p/`) | Claude | every line |\n| 1 | The CSP (`app/src/csp.ts`) | Alexis | every line |\n| 1 | The login (`app/src/features/login/`) | Claude | every line |\n| 1 | The deploy folder (`deploy/`) | Claude | every line |\n| 2 | Other TypeScript | Either | tests |\n| 3 | Interface (`app/src/features/`) | Either | Run it |\n' >"$r/docs/REVIEW.md"
+ln -s ../features/login "$r/app/src/lib/login"
+light() { printf '%s\n' "$@" | python3 -I "$sp" --light "$r" 2>/dev/null || echo crashed; }
+for p in app/src/features/chat/Bubble.tsx server/src/a.ts packages/core/src/x.ts app/src/lib/other.ts app/src/csp.test.ts; do
+	[ "$(light "$p")" = light ] || fail "speeds.py --light: $p, of no tier-1 row, is not light: $(light "$p")"
+done
+[ "$(light app/src/lib/other.ts server/src/a.ts)" = light ] || fail "speeds.py --light: two paths of no tier-1 row are not light"
+for p in app/src/csp.ts app/src/features/login/Form.tsx gno/r/x/realm deploy/web/nginx.conf App/src/CSP.ts "app/src/features/LOGIN/Form.tsx" \
+	app/src/lib/login/Form.tsx /app/src/x.ts "app/src/../src/csp.ts" '"app/src/x.ts"' "app/src/x.ts "; do
+	[ "$(light "$p")" = full ] || fail "speeds.py --light: $p is light"
+	[ "$(light app/src/lib/other.ts "$p")" = full ] || fail "speeds.py --light: $p beside a light path is light"
+done
+# A tier-1 file renamed away: the list holds its old path (check.sh's --no-renames), which is tier 1.
+[ "$(light app/src/csp.ts app/src/lib/renamed.ts)" = full ] || fail "speeds.py --light: a tier-1 file renamed away is light"
+[ "$(printf '' | python3 -I "$sp" --light "$r")" = full ] || fail "speeds.py --light: an empty change is light"
+mv "$r/docs/REVIEW.md" "$r/docs/gone.md" && { [ "$(light app/src/lib/other.ts)" = full ] || fail "speeds.py --light: no table to read is light"; }
 fi
 
 if part gate_speeds; then
