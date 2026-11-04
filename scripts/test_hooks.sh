@@ -83,6 +83,7 @@ assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnp
 assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
 assert {".git/hooks", ".git/config", ".git/commondir"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129, F150)"
 assert ".mcp.json" in box["filesystem"]["denyWrite"], "a command can add a server Claude Code starts (F158)"
+assert {"CLAUDE.local.md", ".claude/CLAUDE.md"} <= set(box["filesystem"]["denyWrite"]), "a command can write instructions Claude Code reads beside CLAUDE.md (7z, S4)"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
@@ -90,19 +91,24 @@ ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
 # Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
 # (F087), and git's own hooks folder and config, which bypass mode lets the file tools write
-# otherwise (F129). A dependency is Alexis's to add, and rm -rf no one's.
+# otherwise (F129); and what Alexis's terminal runs to make a worktree (7z, S3), and the
+# instructions every session reads, Alexis's from 7z on (R4). A dependency is Alexis's to add,
+# and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
 outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
            "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)", "Edit(/.git/commondir)", "Edit(/.mcp.json)",
+           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(/CLAUDE.md)", "Edit(/CLAUDE.local.md)", "Edit(/.claude/CLAUDE.md)",
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
-assert edits(deny) == outside, "the edits refused are not exactly the files run outside the sandbox"
+# This tree's own: the twins of every other worktree's and the main checkout's are the section `siblings`' (7z).
+own = lambda rules: {r for r in rules if not r.split("(", 1)[1].startswith(("//", "~/"))}
+assert own(edits(deny)) == outside, "the edits refused are not exactly the files run outside the sandbox and the instructions"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
 # The sandbox turns an Edit deny into a write ban: none may reach what the gate writes itself, its
 # state in .claude/tmp or StrykerJS's copies of the package files (F111).
@@ -248,6 +254,301 @@ printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
 sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
 # Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
+fi
+
+if part siblings; then
+# No session writes another worktree's closed files (7z, F4890). The worktrees live in the per-user temp folder, which the sandbox
+# lets every command write, and a relative entry of settings.json guards the session's own tree alone; hooks run outside the
+# sandbox, and Claude Code reloads a settings file it sees change. So each relative denyWrite entry has its twin under the worktrees'
+# folder, and each relative Read or Edit deny its twins there, by both spellings of the temp folder (macOS's /tmp is a link the
+# file tools may not follow), and in the main checkout, which the file tools reach from every worktree (F4892); a linked worktree's
+# .git, the file that names git's folder, is closed there too (F150's class, F4891). What a session must write stays open: its own
+# docs and ledger, the gate's state, git's shared folder, the throwaway trees in $TMPDIR. The rules are read as Claude Code reads
+# them: a Read or Edit rule as a gitignore pattern (its permissions page: * within one segment, ** across), the sandbox's by
+# Claude Code 2.1.318's own source (* is [^/]*, ** is .*, a deny covers its path and all under it, a link resolved).
+python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "a sibling worktree's closed files are open to this session (F4890, F4891, F4892)"
+import functools, json, os, re, sys
+
+WT, TMP_WT, MAIN = "/private/tmp/claude-501/gnoworld-wt", "/tmp/claude-501/gnoworld-wt", "~/Server/gnoworld"
+HOME, ROOT = os.path.expanduser("~"), "/own"  # ROOT: the session's own tree, for its relative rules, apart from every sibling
+# The instructions Claude Code reads in every folder above a session's (its memory page: CLAUDE.md and CLAUDE.local.md "from your
+# current working directory and every directory above it"; .claude/CLAUDE.md and .claude/rules by its source), closed in the folders
+# above a worktree, which the sandbox writes from the temp folder down, and above the main checkout, which the file tools reach (S4).
+ABOVE, ABOVE_MAIN = ("/private/tmp", "/private/tmp/claude-501", WT), ("~", "~/Server")
+INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules")
+tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
+s = json.load(open(sys.argv[1]))
+writes, deny = s["sandbox"]["filesystem"]["denyWrite"], s["permissions"]["deny"]
+# Each once: a script run twice that added its twins again would pass the sets below (the red pass, T3).
+assert len(writes) == len(set(writes)) and len(deny) == len(set(deny)), "a rule is written twice"
+rules = [(m[1], m[2]) for r in deny if (m := re.fullmatch(r"(Read|Edit)\((.+)\)", r))]
+assert all(p.startswith(("/", "~/")) for k, p in rules), "a Read or Edit deny with no anchor, which no twin follows (R6)"
+own_writes = [w for w in writes if not w.startswith(("/", "~"))]
+own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith("//")]
+# The twins, derived from the tree's own rules, and the folders above: nothing more is closed, nothing less.
+rule_of = lambda n: f"{n}/**" if n == ".claude/rules" else n
+want_writes = {f"{WT}/*/{w}" for w in own_writes} | {f"{WT}/*/.git"} | {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
+want_rules = {f"{k}(/{w}/*{p})" for k, p in own_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
+want_rules |= {f"Edit(/{w}/*/.git)" for w in (WT, TMP_WT)}
+want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
+want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN for n in INSTRUCTIONS}
+got_writes = {w for w in writes if w.startswith(("/", "~"))}
+assert got_writes == want_writes, ("denyWrite's twins", sorted(want_writes - got_writes)[:4], sorted(got_writes - want_writes)[:4])
+credentials = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)"}  # the wiring section's
+got_rules = {f"{k}({p})" for k, p in rules if p.startswith(("//", "~/"))} - credentials
+assert got_rules == want_rules, ("the Read and Edit twins", sorted(want_rules - got_rules)[:4], sorted(got_rules - want_rules)[:4])
+
+
+@functools.cache  # each pattern once: rebuilt, it was 0.8 s of the section's 0.9 (R5)
+def glob_re(pattern):
+    out, i = "", 0
+    while i < len(pattern):
+        for token, rx in (("**/", "(.*/)?"), ("**", ".*"), ("*", "[^/]*"), ("?", "[^/]")):
+            if pattern.startswith(token, i):
+                out, i = out + rx, i + len(token)
+                break
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return out
+
+
+real = lambda p: "/private" + p if p == "/tmp" or p.startswith("/tmp/") else p  # the kernel's path: the sandbox matches it
+
+
+def sandbox_path(entry, rule):
+    """An entry as the sandbox reads it: denyWrite's own prefixes, or an Edit deny's (// absolute, / this tree), merged in."""
+    if rule and entry.startswith("//"):
+        entry = entry[1:]
+    elif rule and entry.startswith("/"):
+        entry = ROOT + entry
+    if entry.startswith("~/"):
+        entry = HOME + entry[1:]
+    elif not entry.startswith("/"):
+        entry = ROOT + "/" + entry
+    return real(entry)
+
+
+boxed = [sandbox_path(w, False) for w in writes] + [sandbox_path(p, True) for k, p in rules if k == "Edit"]
+
+
+def refused(path):
+    """Whether the sandbox refuses a command's write to path."""
+    path = real(path)
+    for e in boxed:
+        if any(c in e for c in "*?["):
+            if re.fullmatch(glob_re(e) + "(/.*)?", path):
+                return True
+        elif path == e or path.startswith(e + "/"):
+            return True
+    return False
+
+
+def denied(kind, path):
+    """Whether the file tools refuse to read or edit path: a rule matches it or a folder holding it; no link is followed, so the
+    /tmp spelling has rules of its own. A Read deny also refuses an edit (the permissions page)."""
+    held = [path[:n] for n in range(len(path), 0, -1) if n == len(path) or path[n] == "/"]
+    for k, p in rules:
+        if k == kind or (kind == "Edit" and k == "Read"):
+            anchored = p[1:] if p.startswith("//") else HOME + p[1:] if p.startswith("~/") else ROOT + p
+            if any(re.fullmatch(glob_re(anchored), h) for h in held):
+                return True
+    return False
+
+
+one = lambda p: p.replace("**", "x").replace("*", "core")  # a path a rule names, each glob made one name
+# The two the brief names: a file that does not exist yet under a sibling's .githooks/, and an edit of a sibling's scripts/.
+for tree in (f"{WT}/slice-7", f"{TMP_WT}/slice-7", f"{WT}/tomorrow"):
+    assert refused(f"{tree}/.githooks/probe"), f"a command can write {tree}/.githooks/probe"
+    assert denied("Edit", f"{tree}/scripts/stop_gate.sh"), f"the file tools can edit {tree}/scripts/stop_gate.sh"
+# Every closed path of a sibling, an existing one or one made tomorrow, by both spellings; and the main checkout's, to the file tools.
+for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow"):
+    for w in own_writes + [".git"]:
+        assert refused(f"{tree}/{one(w)}"), f"a command can write {tree}/{w}"
+    for k, p in own_rules + [("Edit", "/.git")]:
+        assert denied(k, f"{tree}{one(p)}"), f"the file tools can {k.lower()} {tree}{p}"
+for k, p in own_rules:
+    assert denied(k, f"{HOME}/Server/gnoworld{one(p)}"), f"the file tools can {k.lower()} the main checkout's {p}"
+    assert k == "Read" or refused(f"{HOME}/Server/gnoworld{one(p)}"), f"a command can write the main checkout's {p}"
+# The instructions above every session: to the file tools by both spellings, to commands where the sandbox would let them write.
+for p in ABOVE + tuple(HOME + a[1:] for a in ABOVE_MAIN):
+    for n in INSTRUCTIONS:
+        path = f"{p}/{n}" + ("/x.md" if n == ".claude/rules" else "")
+        for spelt in {path, tmp(path) if path.startswith("/private/tmp") else path}:
+            assert denied("Edit", spelt), f"the file tools can write {spelt}, which Claude Code reads above every session in it"
+        assert p not in ABOVE[1:] or refused(path), f"a command can write {path}, which Claude Code reads above every worktree session"
+for p in (f"{WT}/csp.diff", "/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md"):
+    assert not refused(p) and not denied("Edit", p), f"{p} is closed, and no session reads it as instructions"
+# What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
+# gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
+for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow"):
+    for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/gate-green",
+              ".stryker-tmp/sandbox-x/app/package.json", ".stryker-tmp/sandbox-x/packages/core/package.json", "node_modules/.vite/x"):
+        assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed"
+# A worktree's own folder stays open, to its making and to a rename: a glob holds no folder at its `*` (F4893, asked).
+assert not refused(f"{WT}/tomorrow"), "a new worktree's folder is closed"
+for p in (".git/worktrees/tomorrow/index", ".git/worktrees/tomorrow/HEAD", ".git/worktrees/tomorrow/COMMIT_EDITMSG", ".git/worktrees/tomorrow/MERGE_HEAD",
+          ".git/worktrees/tomorrow/MERGE_MSG", ".git/worktrees/tomorrow/ORIG_HEAD", ".git/objects/ab/cdef", ".git/refs/heads/slice-9", ".git/packed-refs",
+          ".git/info/exclude", ".git/index", ".git/logs/HEAD", ".claude/tmp/slice-7/reports/slice-7z.md"):
+    assert not refused(f"{HOME}/Server/gnoworld/{p}") and not denied("Edit", f"{HOME}/Server/gnoworld/{p}"), f"the main checkout's {p} is closed"
+for w in own_writes + ["scripts/guard.py", ".claude/settings.json", ".git"]:
+    for throwaway in ("/tmp/claude-501/tmpab12/tree-tmpab12", "/tmp/claude-501/test_hooks.ab12/r", "/private/tmp/claude-501/gnoworld-wt2/x"):
+        assert not refused(f"{throwaway}/{one(w)}"), f"a twin closes {throwaway}/{w}, a tree outside the worktrees' folder"
+PY
+# The sandbox itself, from this command, when it runs in Claude Code's (SANDBOX_RUNTIME=1) with this tree's own rules: a fresh file
+# under this tree's .githooks is refused, or the session's rules are another folder's (the chief's, whose project is the main
+# checkout; harness_mutate's throwaway tree) and it is SKIPPED, by name, as each part it cannot judge is. Then no write of a sibling
+# may pass: under an existing sibling's .githooks, by /tmp and through a link; its Stop hook's script and its settings.json, which
+# Claude Code reloads, opened to append nothing, and its Stop hook's script hard-linked; in a worktree made after the session
+# started, its .githooks, scripts and .git, and what only an Edit rule closes (.claude's settings, hooks and agents, app's
+# package.json), the folders .claude and app themselves staying open. No read either of the main checkout's secrets or a sibling's,
+# a folder listed or a file opened, nothing of it read (R3); no CLAUDE.md made above the worktrees, and none there already (S4). Only
+# the sandbox's own refusal counts (EPERM), so a probe that cannot run fails. That folder's move out of the worktrees' folder and back
+# is printed, F4893's known gap, never failed on (the red pass, T1, T4 to T6). This half cannot be mutated (the sandbox's rules are
+# the session's): the static half above is what harness_mutate judges.
+if [ "$SANDBOX_RUNTIME" = 1 ]; then
+	python3 -I - "$here/.." "$t" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's rules or predate them; restart it once apply-7z.sh has run (F4890)"
+import errno, os, sys, tempfile
+
+own, scratch = os.path.realpath(sys.argv[1]), sys.argv[2]
+WT, name = "/private/tmp/claude-501/gnoworld-wt", f".probe-siblings-{os.getpid()}"
+
+
+def write(path, folder=False, append=False, link=None):
+    """'refused' when the sandbox refuses it; 'written', and undone, when not; any other failure is the probe's own."""
+    try:
+        if link:
+            os.link(link, path)
+        elif folder:
+            os.mkdir(path)
+        elif append:
+            open(path, "a").close()  # appends nothing: the file is the same
+        else:
+            os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
+    except OSError as e:
+        if e.errno == errno.EPERM:
+            return "refused"
+        raise
+    if folder:
+        os.rmdir(path)
+    elif not append:
+        os.unlink(path)
+    return "written"
+
+
+if write(os.path.join(own, ".githooks", name)) != "refused":
+    print(f"siblings: SKIPPED (this sandbox does not hold {own}'s own rules: a session started in another folder, or no sandbox)")
+    sys.exit(0)
+if not os.path.isdir(WT):
+    print(f"siblings: SKIPPED (no {WT})")
+    sys.exit(0)
+wrote, opened = [], []
+
+
+def closed(path, **how):
+    if write(path, **how) != "refused":
+        wrote.append(path)
+
+
+def folder(path):
+    """A folder no rule closes, made to stay for what goes in it."""
+    try:
+        os.mkdir(path)
+    except PermissionError as e:
+        if e.errno != errno.EPERM:
+            raise
+        wrote.append(f"{path} (an open folder, refused)")
+        return False
+    opened.append(path)
+    return True
+
+
+def unread(path, folder=False):
+    """A read the sandbox must refuse: a folder listed, a file opened and closed; nothing of either is read or shown (R3)."""
+    try:
+        os.listdir(path) if folder else os.close(os.open(path, os.O_RDONLY))
+    except OSError as e:
+        if e.errno != errno.EPERM:
+            raise
+        return
+    wrote.append(f"{path} (read)")
+
+
+def instructions(path):
+    """A file Claude Code reads above every session in it: never there, never made (S4)."""
+    try:
+        if write(path) != "refused":
+            wrote.append(path)
+    except FileExistsError:
+        wrote.append(f"{path} (already there: instructions every session below it reads)")
+
+
+tmp = lambda p: "/tmp" + p[len("/private/tmp"):]
+others = [os.path.join(WT, d) for d in sorted(os.listdir(WT)) if os.path.isdir(os.path.join(WT, d, ".githooks"))]
+others = [d for d in others if os.path.realpath(d) != own and not os.path.basename(d).startswith("probe-siblings-")]  # S7
+secrets = os.path.expanduser("~/Server/gnoworld/deploy/secrets")
+if os.path.isdir(secrets):
+    unread(secrets, folder=True)
+else:
+    print(f"siblings: SKIPPED (no {secrets}: the main checkout's secrets are not judged)")
+for p in (WT, os.path.dirname(WT)):
+    instructions(os.path.join(p, "CLAUDE.md"))
+if others:
+    sibling = others[0]
+    os.symlink(sibling, os.path.join(scratch, "sibling"))
+    for tree in (sibling, tmp(sibling), os.path.join(scratch, "sibling")):
+        closed(os.path.join(tree, ".githooks", name))
+    for p in ("scripts/stop_gate.sh", ".claude/settings.json"):
+        if os.path.isfile(os.path.join(sibling, p)):
+            closed(os.path.join(sibling, p), append=True)
+            closed(tmp(os.path.join(sibling, p)), append=True)
+    if os.path.isfile(os.path.join(sibling, "scripts/stop_gate.sh")):
+        closed(os.path.join(scratch, "linked"), link=os.path.join(sibling, "scripts/stop_gate.sh"))
+    for p in (".env", ".env.local"):
+        if os.path.isfile(os.path.join(sibling, p)):
+            unread(os.path.join(sibling, p))
+    if os.path.isdir(os.path.join(sibling, "deploy/secrets")):
+        unread(os.path.join(sibling, "deploy/secrets"), folder=True)
+else:
+    print(f"siblings: SKIPPED (no other tree with a .githooks in {WT}: an existing sibling, /tmp and a link are not judged)")
+try:
+    fresh = tempfile.mkdtemp(prefix="probe-siblings-", dir=WT)
+except PermissionError as e:
+    if e.errno != errno.EPERM:
+        raise
+    fresh = None
+    print(f"siblings: SKIPPED (no tree can be made in {WT} at all: a worktree made tomorrow is not judged)")
+if fresh:
+    try:
+        for p in (".githooks", "scripts"):
+            closed(os.path.join(fresh, p), folder=True)
+            closed(tmp(os.path.join(fresh, p)), folder=True)
+        closed(os.path.join(fresh, ".git"))
+        if folder(os.path.join(fresh, ".claude")):
+            closed(os.path.join(fresh, ".claude/settings.json"))
+            for p in ("hooks", "agents"):  # closed at the folder, or at what goes in it, as Claude Code turns `/**` into the sandbox's
+                if write(os.path.join(fresh, ".claude", p), folder=True) == "written" and folder(os.path.join(fresh, ".claude", p)):
+                    closed(os.path.join(fresh, ".claude", p, "x.md"))
+        if folder(os.path.join(fresh, "app")):
+            closed(os.path.join(fresh, "app/package.json"))
+    finally:
+        for p in reversed(opened):
+            os.rmdir(p)
+    try:
+        os.rename(fresh, os.path.join(scratch, "moved"))
+    except PermissionError as e:
+        if e.errno != errno.EPERM:
+            raise
+        print("siblings: F4893 looks closed: a worktree's folder could not leave the worktrees' folder; mend the ledger")
+    else:
+        os.rename(os.path.join(scratch, "moved"), fresh)
+        print("siblings: KNOWN GAP F4893: a worktree's folder moves out of the worktrees' folder and back")
+    os.rmdir(fresh)
+if wrote:
+    print("siblings: the sandbox let this command write " + ", ".join(wrote))
+    sys.exit(1)
+print(f"siblings: the sandbox refused every write into {WT}'s other trees")
+PY
+fi
 fi
 
 if part commit_msg; then
