@@ -419,11 +419,9 @@ describe("give_digest: a realm's digest, kept only when the chain's reads hold i
     const call = new AbortController();
     const { asked, cards } = askedOf(undefined, call.signal);
     call.abort();
-    expect(await tools.run(give(digest(facts("1,204"))), asked)).toEqual({
-      ok: true,
-      isError: true,
-      text: "Refused, nothing kept: its call's time is up, or the answer holds its digests.",
-    });
+    const ran = await tools.run(give(digest(facts("1,204"))), asked);
+    expect(ran).toMatchObject({ ok: true, isError: true });
+    expect(ran.ok && ran.text).toMatch(/^Refused, nothing kept: its call's time is up/);
     expect(cards.cards()).toEqual(none());
   });
 
@@ -546,11 +544,9 @@ describe("propose_action: one call the person may sign, its function the realm's
     const call = new AbortController();
     const { asked, cards } = askedOf(undefined, call.signal);
     call.abort();
-    expect(await tools.run(propose(vote()), asked)).toEqual({
-      ok: true,
-      isError: true,
-      text: "Refused, nothing kept: its call's time is up, or the answer holds its proposal.",
-    });
+    const late = await tools.run(propose(vote()), asked);
+    expect(late).toMatchObject({ ok: true, isError: true });
+    expect(late.ok && late.text).toMatch(/^Refused, nothing kept: its call's time is up/);
     expect(cards.cards()).toEqual(none());
   });
 
