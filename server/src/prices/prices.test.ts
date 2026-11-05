@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../log.ts";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
 import { MAX_BYTES, startPrices } from "./prices.ts";
 
 // CoinGecko's /simple/price as it answered on 2026-10-30 (api.coingecko.com, keyless, read in this session) for
@@ -485,6 +486,24 @@ describe("the prices timer: when it runs", () => {
     await vi.waitFor(() => {
       expect(calls).toHaveLength(1);
       expect(delays.filter((ms) => ms >= 1000)).toEqual([15_000]);
+    });
+  });
+
+  it.each([
+    ["the way out's name has no address yet", unresolved, [15_000, 300_000]],
+    ["nothing listens where the way out will be", refused, [15_000, 300_000]],
+    ["the way out refuses CoinGecko's host, which a soon retry would not change", proxyRefused, [300_000]],
+  ])("waits as long as the cause says when %s at the first tick (F4872)", async (_name, fault, wanted) => {
+    const waits = timerWaits();
+    const timer = startPrices({
+      file: join(fresh(), "markets.json"),
+      log: logger("a-pepper-of-forty-characters-0123456789", () => undefined),
+      now: () => NOW,
+      send: failingFirst(fault, json(ANSWER)),
+    });
+    running.push(timer);
+    await vi.waitFor(() => {
+      expect(waits).toEqual(wanted);
     });
   });
 

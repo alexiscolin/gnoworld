@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { abciRefused, fakeChain, INDEXER, pagedCalls, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
+import { proxyRefused, refused, unresolved } from "../testing/wayOut.ts";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 import { makePresence } from "./presence.ts";
 
@@ -470,6 +471,23 @@ describe("runWorlds", () => {
       expect(readFileSync(file, "utf8")).toBe(before);
       expect(logged).toEqual([{ event: "worlds_failed", error: kind }]);
     });
+
+    it.each([
+      ["the way out's name with no address yet", unresolved, "unresolved"],
+      ["nothing listening where the way out will be", refused, "refused"],
+      ["the way out refusing the chain's host", proxyRefused, "proxy"],
+    ])(
+      "says why the list reached nothing on %s, by its cause's kind, and keeps the last file (F4872)",
+      async (_name, given, kind) => {
+        const file = fresh();
+        await run(chainRoutes([POOL]), { file });
+        const before = readFileSync(file, "utf8");
+        const { outcome, logged } = await run(chainRoutes([POOL], { paths: given }), { file, now: NOW + 5 });
+        expect(outcome).toEqual({ wrote: false, kind });
+        expect(readFileSync(file, "utf8")).toBe(before);
+        expect(logged).toEqual([{ event: "worlds_failed", error: kind }]);
+      },
+    );
 
     it("writes no file when there was none, and no temp file is left", async () => {
       const file = fresh();

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { repeat } from "./repeat.ts";
+import { repeat, waitAfter } from "./repeat.ts";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -96,5 +96,18 @@ describe("repeat", () => {
     ends[0]?.finish();
     await vi.advanceTimersByTimeAsync(1000);
     expect(ends).toHaveLength(1);
+  });
+});
+
+describe("waitAfter (F4872)", () => {
+  it("waits 15 s after a pass that reached nothing: the stack starts the server before its way out", () => {
+    for (const kind of ["unresolved", "refused", "request"] as const) expect(waitAfter(kind, 1_800_000)).toBe(15_000);
+  });
+
+  it("never waits past the interval, and waits all of it after a pass that went well or reached someone", () => {
+    expect(waitAfter("refused", 10)).toBe(10);
+    expect(waitAfter(undefined, 1_800_000)).toBe(1_800_000);
+    for (const kind of ["proxy", "timeout", "status", "rate_limited", "shape", "write"] as const)
+      expect(waitAfter(kind, 1_800_000)).toBe(1_800_000);
   });
 });

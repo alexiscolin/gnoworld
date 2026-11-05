@@ -1,4 +1,4 @@
-import type { Kind } from "./net.ts";
+import { reachedNothing, type Kind } from "./net.ts";
 
 /** How soon a pass that reached nothing runs again: Compose starts the server before its way out (deploy/compose.yaml), and a first pass
  * finds none. */
@@ -7,7 +7,7 @@ const RETRY_MS = 15_000;
 /** The wait after a pass that ended with the fault `kind`, none when it went well: RETRY_MS after a call that reached nothing, never past
  * `everyMs`, and the whole interval after anything else. */
 export const waitAfter = (kind: Kind | undefined, everyMs: number): number =>
-  kind === "request" ? Math.min(RETRY_MS, everyMs) : everyMs;
+  kind !== undefined && reachedNothing(kind) ? Math.min(RETRY_MS, everyMs) : everyMs;
 
 /** What a timer gives back: `stop` ends the waiting, and a pass under way is told. */
 export interface Repeating {

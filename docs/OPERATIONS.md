@@ -369,7 +369,10 @@ Slice 3, the server's retention (3n):
   lets that host out by its full name) for GNOT, ATONE and BTC and writes `markets.json` by renaming a temporary file.
   Any failure keeps the last file and logs `{"event":"prices_failed","error":"<kind>"}`, the kind one of `rate_limited`
   (a 429: the free tier's limit is per IP and shared, so a run of them means another user of the address),
-  `status`, `timeout`, `request`, `too_large`, `not_json`, `shape`, `no_price` or `write` (the volume): never the answer.
+  `status`, `timeout`, `unresolved` (no address for a name: the way out's, before it starts), `refused` (nothing listening there yet),
+  `proxy` (the way out refused the host, or could not reach it), `request` (a fault whose cause has no name), `too_large`, `not_json`,
+  `shape`, `no_price` or `write` (the volume): never the answer, nor an error's message. One that reached nothing (`unresolved`,
+  `refused`, `request`) is asked again 15 s later: the stack starts the server before its way out (F4872).
   A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
   With `UNIVERSES_FILE` (`/app/app/data/universes.json`, copied into the image) the same read also asks the default universe's RPC
   for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
@@ -390,8 +393,8 @@ Slice 3, the server's retention (3n):
   keeps its earlier counts (null on a first pass): none is counted from half the chain; a read past 32 MiB of answers gives up as
   `too_many`. A call that names no realm is left out and one whose caller is no address is counted with none; either logs
   `worlds_history_skipped` once. The kinds
-  are `request`, `timeout`, `status`, `rate_limited`, `too_large`, `too_many`, `not_json`, `shape`, `chain_refused`, `empty`,
-  `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
+  are `unresolved`, `refused`, `proxy` and `request` (as the prices'), `timeout`, `status`, `rate_limited`, `too_large`, `too_many`,
+  `not_json`, `shape`, `chain_refused`, `empty`, `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
   of the realm list's and `vm/qdoc`'s answers in the stack is `deploy/test.sh`, which Alexis runs: it waits for the running job's own
   first pass, asks for a realm with a deployer, functions and counts, and prints the job's log lines. The indexer's queries are those
   onyx-1's answered on 2026-11-04 (`server/src/worlds/onyxIndexer.json`); 7c's per-realm filter was refused there (422), so no count
@@ -406,7 +409,8 @@ Slice 3, the server's retention (3n):
   at most; each pass that wrote logs `{"event":"previews_written","ms":<its length>}`. A page the check hides, that the chain says is
   gone, that is too large, empty or no text has no capture; a page whose read failed on the way, whose read the chain refused, or that the
   check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
-  kind one of `hidden`, `unchecked`, `empty`, `request`, `timeout`, `status`, `rate_limited`, `too_large`, `shape` or `chain_refused`. A
+  kind one of `hidden`, `unchecked`, `empty`, `unresolved`, `refused`, `proxy`, `request` (as the prices'), `timeout`, `status`,
+  `rate_limited`, `too_large`, `shape` or `chain_refused`. A
   pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the last file. No
   capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
   a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
