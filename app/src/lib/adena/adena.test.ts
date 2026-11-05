@@ -536,6 +536,36 @@ describe("a wallet that throws or lacks a method ends in one result", () => {
   );
 });
 
+// What commit e0cae601 changed without a test (F5666): a failure of a type nobody knows is read by its code, and a failure
+// typed as another call's success is a plain failed answer; only its own success type as a failure is malformed.
+describe("a failure's type and code, for the login's calls", () => {
+  const failure = (type: string, code: number) =>
+    Promise.resolve({ code, status: "failure", type, message: "", data: {} });
+  const reads = {
+    connect: (over: Record<string, () => unknown>) => connect(new Wallet(over)),
+    signLogin: (over: Record<string, () => unknown>) => signLogin(new Wallet(over), login(TEXT)),
+  };
+  const failing = { connect: "GetAccount", signLogin: "SignArbitrary" } as const;
+
+  describe.each(["connect", "signLogin"] as const)("%s", (call) => {
+    it.each([
+      [2000, "locked"],
+      [4000, "declined"],
+      [3002, "no-account"],
+      [4001, "failed"],
+      [12345, "failed"],
+    ])("an unknown type with the code %i is %s", async (code, reason) => {
+      const result = await reads[call]({ [failing[call]]: () => failure("A_TYPE_NOBODY_KNOWS", code) });
+      expect(result).toStrictEqual({ ok: false, reason });
+    });
+
+    it("a failure typed as another call's success is failed, read by its code like an unknown type", async () => {
+      const result = await reads[call]({ [failing[call]]: () => failure("GET_NETWORK", 4001) });
+      expect(result).toStrictEqual({ ok: false, reason: "failed" });
+    });
+  });
+});
+
 describe("pageAdena", () => {
   it("reads the page's window.adena, as it is, whatever it holds", () => {
     const marker = { AddEstablish: () => undefined };
