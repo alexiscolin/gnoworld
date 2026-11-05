@@ -3,7 +3,7 @@
 // way out; once signed, the wait, the landing in a block and the result. Every state is words with its next step, and the
 // result says done only from the chain's answer, which the course puts in the card (signCall.ts).
 import { callFields } from "@gnoworld/core";
-import { Button, Card, Field, Sidebar, Stack } from "@gnoworld/ui";
+import { Button, Card, Field, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import styles from "./CallCard.module.css";
@@ -26,10 +26,10 @@ const COUNT = new Intl.NumberFormat("en-US");
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <Sidebar space="xs">
-      <span className="label">{label}</span>
-      <span className={styles["value"]}>{children}</span>
-    </Sidebar>
+    <>
+      <dt className="label">{label}</dt>
+      <dd className={styles["value"]}>{children}</dd>
+    </>
   );
 }
 
@@ -155,23 +155,23 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
     <Card>
       <Card.Header kicker="SIGNATURE REQUEST · ADENA" title={card.func} size="large" />
       <Card.Body>
-        <p>A call to {card.realm}. Adena asks you to sign it.</p>
-        <div className={styles["block"]}>
-          <Stack space="xs">
-            <Row label="REALM">{card.realm}</Row>
-            <Row label="FUNCTION">{card.func}</Row>
-            <Row label="ARGUMENTS">
-              <Arguments card={card} onEdit={onEdit} />
-            </Row>
-            <Row label="NETWORK">{`${network.name} (${network.chainId})`}</Row>
-            <Row label="FEE">{fee}</Row>
-          </Stack>
-        </div>
+        <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
+        <dl className={styles["block"]}>
+          <Row label="REALM">{card.realm}</Row>
+          <Row label="FUNCTION">{card.func}</Row>
+          <Row label="ARGUMENTS">
+            <Arguments card={card} onEdit={onEdit} />
+          </Row>
+          <Row label="NETWORK">{`${network.name} (${network.chainId})`}</Row>
+          <Row label="FEE">{fee}</Row>
+        </dl>
         {preview ? <p>gnoworld does not check what this realm does. Read it on gnoweb first.</p> : null}
         <Status card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>
-      <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
+      <div className={styles["tall"]}>
+        <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
+      </div>
     </Card>
   );
 }

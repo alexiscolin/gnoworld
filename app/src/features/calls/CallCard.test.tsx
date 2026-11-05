@@ -362,3 +362,24 @@ describe("CallCard and the message Adena is sent", () => {
     expect(run.failed).toBe(false);
   });
 });
+
+describe("CallCard, the look of the frame (F5731 to F5735)", () => {
+  // Vitest reads the card's stylesheet as empty: the rules are the Mac Studio's pictures, the tests read the parts that wear them.
+  it("lines the block up as one column: a definition list, each label before its value (F5732)", () => {
+    const block = all(view(), "dl")[0] ?? document.body;
+    expect(all(block, "dt").map((dt) => dt.textContent)).toEqual(["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE"]);
+    expect(all(block, "dd")).toHaveLength(5);
+    expect(block.className).toContain("block");
+  });
+
+  it("sets the line under the title in its own class, muted by the stylesheet (F5731)", () => {
+    const line = all(view(), "p").find((p) => said(p).startsWith("A call to"));
+    expect(line).toBeDefined();
+    expect(line?.className).toContain("lede");
+  });
+
+  it("wraps its buttons in the tall control of the frame, 44 px (F5735)", () => {
+    const footer = all(view(), "footer")[0];
+    expect(footer?.parentElement?.className).toContain("tall");
+  });
+});
