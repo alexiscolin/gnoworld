@@ -11,6 +11,8 @@ import { Portraits, WorldsFeed } from "./worldsFeed.ts";
 // shows and never while it is covered or gone.
 const feed = vi.hoisted(() => ({ read: vi.fn(), presence: vi.fn() }));
 vi.mock("../../lib/chain/realms.ts", () => ({ readWorlds: feed.read }));
+// The meteors' chunk the feed asks as the cosmos shows (8p) draws on the page, which these tests do not hold.
+vi.mock("./meteors.ts", () => ({ startMeteors: vi.fn() }));
 vi.mock("../../lib/api/presence.ts", () => ({ pagePresenceApi: () => ({ read: feed.presence }) }));
 
 const FILE = {

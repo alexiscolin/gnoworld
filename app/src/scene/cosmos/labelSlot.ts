@@ -1,4 +1,4 @@
-// One label of the cosmos's pool (7h): a pill made once with its three words, written as text when they change, and moved, faded and turned
+// One label of the cosmos's pool (7h): a pill made once with its words and chips, written as text when they change, and moved, faded and turned
 // on a frame only where a value changed. Nothing here is made on a frame but the one string a moved label's place needs.
 import type { Label, LabelLayout, Point } from "@gnoworld/core";
 import type { Vector3 } from "three";
@@ -23,7 +23,7 @@ const START_HERE = "Start here →";
 
 export interface Slot {
   readonly element: HTMLElement;
-  readonly words: readonly [HTMLElement, HTMLElement, HTMLElement];
+  readonly words: readonly [HTMLElement, HTMLElement, HTMLElement, HTMLElement, HTMLElement];
   chosen: Chosen | undefined;
   /** What was last written: left, top, scale, opacity, stem, below, the words' fade. */
   readonly written: Float64Array;
@@ -37,7 +37,13 @@ export function slotIn(layer: HTMLElement, document: Document): Slot {
     part.className = name ?? "";
     return element.appendChild(part);
   };
-  const words = [word(styles["title"]), word(styles["count"]), word(styles["badge"])] as const;
+  const words = [
+    word(styles["title"]),
+    word(styles["count"]),
+    word(styles["badge"]),
+    word(styles["event"]),
+    word(styles["person"]),
+  ] as const;
   element.className = `${styles["placed"] ?? ""} ${styles["label"] ?? ""}`;
   element.style.setProperty("opacity", "0");
   layer.append(element);
@@ -50,6 +56,8 @@ const same = (before: Chosen | undefined, next: Chosen) =>
   before.label.title === next.label.title &&
   before.label.count === next.label.count &&
   before.label.badge === next.label.badge &&
+  before.label.event === next.label.event &&
+  before.label.person === next.label.person &&
   before.label.uncharted === next.label.uncharted &&
   before.start === next.start;
 
@@ -59,12 +67,14 @@ export function wordsInto(slot: Slot, chosen: Chosen, size: { layout: LabelLayou
   const before = slot.chosen;
   slot.chosen = chosen;
   if (same(before, chosen)) return;
-  const { id, title, count, badge, uncharted } = chosen.label;
+  const { id, title, count, badge, event, person, uncharted } = chosen.label;
   const start = chosen.start === true;
-  const [titled, counted, badged] = slot.words;
+  const [titled, counted, badged, evented, personed] = slot.words;
   titled.textContent = title;
   counted.textContent = count;
   badged.textContent = start ? START_HERE : badge;
+  evented.textContent = event ?? "";
+  personed.textContent = person ?? "";
   slot.element.dataset["world"] = id;
   slot.element.classList.toggle(styles["start"] ?? "start", start);
   slot.element.classList.toggle(styles["uncharted"] ?? "uncharted", uncharted);

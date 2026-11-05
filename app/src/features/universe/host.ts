@@ -168,7 +168,7 @@ export class SceneHost {
   }
 
   #syncWorlds(): void {
-    if (this.#scene !== undefined) this.feed.sync(this.#scene, this.#wantsWorlds);
+    if (this.#scene !== undefined) this.feed.sync(this.#scene, this.#wantsWorlds, this.#page);
   }
 
   /** The canvas is on the page; what this returns takes the scene away with it. */

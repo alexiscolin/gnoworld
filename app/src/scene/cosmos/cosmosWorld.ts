@@ -25,6 +25,9 @@ export interface LabelSignals {
     { readonly here: number; readonly perHour: number; readonly rise: number | null }
   >;
   readonly names: ReadonlyMap<string, string>;
+  /** The chips the worlds' labels wear, by id: their next event within the day, and a person the reader follows in one of their rooms. */
+  readonly events?: ReadonlyMap<string, string>;
+  readonly people?: ReadonlyMap<string, string>;
   readonly visited: (id: string) => boolean;
   /** Whether this reader has entered no place yet, read at each look: the Earth's label says "Start here" (ADR-0003, 2b). Unsaid, they came
    * back. */

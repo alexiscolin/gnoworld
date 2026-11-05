@@ -31,11 +31,19 @@ const heardOf = (here: Heard | undefined): Signals =>
     ? {}
     : { here: here.here, perHour: here.perHour, ...(here.rise === null ? {} : { rise: here.rise }) };
 
-// Who is here in world `id` now, its rise, and whether it is new to this reader.
-function heardIn(world: CosmosWorld | undefined, id: string, { present, visited, now }: LabelSignals): Signals {
+// Who is here in world `id` now, its rise, whether it is new to this reader, and its chips.
+function heardIn(world: CosmosWorld | undefined, id: string, signals: LabelSignals): Signals {
+  const { present, visited, now } = signals;
   // This reader's visits are read only of a world under seven days old: an older one is never uncharted.
   const uncharted = isFresh(daysSince(world?.seen, now), false) && !visited(id);
-  return { ...heardOf(present.get(id)), ...(uncharted ? { uncharted: true } : {}) };
+  const event = signals.events?.get(id);
+  const person = signals.people?.get(id);
+  return {
+    ...heardOf(present.get(id)),
+    ...(uncharted ? { uncharted: true } : {}),
+    ...(event === undefined ? {} : { event }),
+    ...(person === undefined ? {} : { person }),
+  };
 }
 
 /** What the data says of world `id` now: who is here, its rise, its callers, whether it is new to this reader. Its label's and the rail's
