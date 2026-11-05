@@ -22,7 +22,7 @@ import { correlation } from "../../../packages/core/src/testing.ts";
 const COAST = { jagged: [0.6, 1.6], islands: 0.5 } as const;
 // The sea's lift past a coast, in L*, the worlds' mean (coasts.ts's Shore): no wide halo, the Earth's -1.5 (81e07949: 1.9 to 2.5); a thin
 // shelf (held, 1.9 to 2.6 there; the Earth's view -0.1, its shelves under a pixel at this zoom).
-const SEA = { halo: 1, shelf: 0.5 } as const;
+const SEA = { halo: 1, shelf: 0.35 } as const;
 // Shapes on the classes' view without clouds, each world lit from the eye (its whole face; 24 worlds a seed, 94 px of radius): the largest
 // piece's share of the land, 81e07949's median 0.76 and tenth 0.38 (its "one shape"); no longer near it, small on a tenth, whole on another.
 const LARGEST = { median: 0.68, low: 0.33, high: 0.85 } as const;
