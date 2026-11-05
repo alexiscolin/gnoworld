@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
 import * as core from "../index.ts";
-import { callArgs, callFields, isCarried, realmType } from "./args.ts";
+import { callArgs, callFields, HIDDEN, isCarried, realmType, textProblem } from "./args.ts";
 
 // A call's arguments follow its parameters' types (ADR-0002 §4). The rules are gno's own `convert.go`
 // (gnolang/gno 07e44776c261, tag v1.5.1, the version onyx-1 and gnoland-1 run), read as `vm/qfuncs` writes the types
@@ -672,11 +672,35 @@ describe("bytes", () => {
   });
 });
 
+describe("textProblem: what a CallRequest refuses of any text", () => {
+  it.each([
+    ["a" + String.fromCodePoint(0x202e) + "b"],
+    [String.fromCodePoint(0x1b)],
+    ["a" + String.fromCharCode(0xd800)],
+  ])("calls %j malformed: hidden, or ill-formed", (text) => {
+    expect(textProblem(text)).toBe("malformed");
+  });
+
+  it("calls a text of more than 8,192 UTF-8 bytes long, and takes one of exactly 8,192", () => {
+    expect(textProblem("a".repeat(8192))).toBeUndefined();
+    expect(textProblem("a".repeat(8193))).toBe("long");
+    expect(textProblem("é".repeat(4096))).toBeUndefined();
+    expect(textProblem("é".repeat(4097))).toBe("long");
+  });
+
+  it("takes newline and tab, which a real argument may hold, and every visible character", () => {
+    expect(textProblem("a\nb\tc é 日本語 😀")).toBeUndefined();
+    expect(HIDDEN.test("\n\t")).toBe(false);
+  });
+});
+
 describe("the index", () => {
   it("exports callFields, callArgs, realmType and isCarried for the app and jarvis", () => {
     expect(core.callFields).toBe(callFields);
     expect(core.callArgs).toBe(callArgs);
     expect(core.realmType).toBe(realmType);
     expect(core.isCarried).toBe(isCarried);
+    expect(core.textProblem).toBe(textProblem);
+    expect(core.HIDDEN).toBe(HIDDEN);
   });
 });
