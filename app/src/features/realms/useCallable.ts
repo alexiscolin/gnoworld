@@ -2,7 +2,7 @@
 // proposed action are each checked against before a Call shows. Panels of one view that ask in the same moment share one request.
 import { callFields, type CallField } from "@gnoworld/core";
 import type { ReadOptions } from "@gnoworld/chain/read";
-import { useEffect, useState } from "react";
+import { createContext, use, useEffect, useState } from "react";
 import { readCallable } from "../../lib/chain/rpc.ts";
 
 export interface Callable {
@@ -17,17 +17,24 @@ const report = (error: unknown): void => {
   reportError(error);
 };
 
-/** The functions of `realm` on the chain at `rpc`; read again, from nothing, when any of the three changes. */
+/** The listing a realm view already read, for the forms its page holds: they mount after the page is read, when the panels'
+ * shared request has ended, and would ask again. */
+export const ListingContext = createContext<Listing | undefined>(undefined);
+
+/** The functions of `realm` on the chain at `rpc`; read again, from nothing, when any of the three changes. Inside a realm view
+ * (`ListingContext`) the view's own listing, with no read of its own. */
 export function useCallable(rpc: string, realm: string, options: ReadOptions | undefined): Listing {
+  const shared = use(ListingContext);
   const [listing, setListing] = useState<Listing>({ state: "loading" });
   useEffect(() => {
+    if (shared !== undefined) return;
     readCallable(rpc, realm, options)
       .then((read) => {
         setListing(read.ok ? { state: "listed", functions: read.value } : { state: "failed", next: read.failure.next });
       })
       .catch(report);
-  }, [rpc, realm, options]);
-  return listing;
+  }, [rpc, realm, options, shared]);
+  return shared ?? listing;
 }
 
 /** The function `name` as a call carries it (a write, of the types a call carries) with its fields, or none: no such function,

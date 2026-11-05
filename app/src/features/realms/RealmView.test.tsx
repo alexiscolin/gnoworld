@@ -342,4 +342,14 @@ describe("a realm's view, with a form on its page", () => {
     expect(inputs(one(box, "figure")).map((i) => i.value)).toEqual(["hi"]);
     expect(all(box, "article")).toHaveLength(2);
   });
+
+  test("reads the functions' list once for the page's form and the write rows together", async () => {
+    const asked = fetcher(form("SetBio"));
+    const box = await view(asked);
+    await callOf(box);
+    await vi.waitFor(() => {
+      expect(button(box, "Call SetBio")).toBeDefined();
+    });
+    expect(asked.mock.calls.filter(([url]) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
+  });
 });

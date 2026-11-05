@@ -14,6 +14,7 @@ import { RealmFunctions } from "./RealmFunctions.tsx";
 import { RealmWrites } from "./RealmWrites.tsx";
 import styles from "./RealmView.module.css";
 import { isHeight, useRealm, type Height, type Realm } from "./useRealm.ts";
+import { ListingContext, useCallable } from "./useCallable.ts";
 import { useRealmFacts } from "./useRealmFacts.ts";
 
 export interface RealmViewProps {
@@ -105,40 +106,43 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const link = gnowebLink(origin, realm);
   const state = useRealm({ rpc: chain.rpc, realm, origin }, options);
   const place: CallPlace = { realm, chain, ...(options === undefined ? {} : { options }) };
+  const listing = useCallable(chain.rpc, realm, options);
   const navigate = useNavigate();
   const { key } = useLocation();
   return (
-    <section aria-labelledby="realm-title">
-      <Center gutter="all">
-        <Stack space="m">
-          <Cluster space="s">
-            <Button
-              emphasis="quiet"
-              onClick={() => {
-                Promise.resolve(key === "default" ? navigate(home) : navigate(-1)).catch((error: unknown) => {
-                  reportError(error);
-                });
-              }}
-            >
-              Back
-            </Button>
-            <Kicker>{chain.name}</Kicker>
-          </Cluster>
-          <h1 id="realm-title" dir="ltr">
-            {realm}
-          </h1>
-          {link === undefined ? null : (
-            <Cluster>
-              <Button href={link}>Open it on gnoweb</Button>
+    <ListingContext value={listing}>
+      <section aria-labelledby="realm-title">
+        <Center gutter="all">
+          <Stack space="m">
+            <Cluster space="s">
+              <Button
+                emphasis="quiet"
+                onClick={() => {
+                  Promise.resolve(key === "default" ? navigate(home) : navigate(-1)).catch((error: unknown) => {
+                    reportError(error);
+                  });
+                }}
+              >
+                Back
+              </Button>
+              <Kicker>{chain.name}</Kicker>
             </Cluster>
-          )}
-          <Body state={state} origin={origin} link={link} call={place} />
-          {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
-          <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
-          <RealmWrites realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
-          <Facts indexer={chain.indexer} realm={realm} options={options} />
-        </Stack>
-      </Center>
-    </section>
+            <h1 id="realm-title" dir="ltr">
+              {realm}
+            </h1>
+            {link === undefined ? null : (
+              <Cluster>
+                <Button href={link}>Open it on gnoweb</Button>
+              </Cluster>
+            )}
+            <Body state={state} origin={origin} link={link} call={place} />
+            {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
+            <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+            <RealmWrites realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+            <Facts indexer={chain.indexer} realm={realm} options={options} />
+          </Stack>
+        </Center>
+      </section>
+    </ListingContext>
   );
 }
