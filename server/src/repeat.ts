@@ -9,31 +9,40 @@ const RETRY_MS = 15_000;
 export const waitAfter = (kind: Kind | undefined, everyMs: number): number =>
   kind !== undefined && reachedNothing(kind) ? Math.min(RETRY_MS, everyMs) : everyMs;
 
+/** What a job's pass gives back, never throwing: it wrote its file, or the kind of fault that kept the last one. */
+export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
+
+/** `repeat`'s wait for a job whose pass gives an Outcome: waitAfter its fault, and the whole interval after a pass that threw. */
+export const waitAfterOutcome =
+  (everyMs: number) =>
+  (_error?: unknown, outcome?: Outcome): number =>
+    waitAfter(outcome?.wrote === false ? outcome.kind : undefined, everyMs);
+
 /** What a timer gives back: `stop` ends the waiting, and a pass under way is told. */
 export interface Repeating {
   stop: () => void;
 }
 
-interface Loop {
-  pass: (isStopped: () => boolean) => Promise<unknown>;
+interface Loop<T> {
+  pass: (isStopped: () => boolean) => Promise<T>;
   /** A pass that failed, unless the loop was stopped by then. */
   failed: (error: unknown) => void;
-  /** How long to wait from the end of a pass; `error` is its failure, if it failed. */
-  waitMs: (error?: unknown) => number;
+  /** How long to wait from the end of a pass; `error` is its failure, if it failed, else `value` what it gave back. */
+  waitMs: (error?: unknown, value?: T) => number;
 }
 
 /** Runs `pass` at once and again after each one ends and its wait is over: one at a time, so a slow pass never piles up. */
-export function repeat({ pass, failed, waitMs }: Loop): Repeating {
+export function repeat<T>({ pass, failed, waitMs }: Loop<T>): Repeating {
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
   const isStopped = (): boolean => stopped;
-  const next = (error?: unknown): void => {
-    if (!stopped) timer = setTimeout(tick, waitMs(error));
+  const next = (error?: unknown, value?: T): void => {
+    if (!stopped) timer = setTimeout(tick, waitMs(error, value));
   };
   function tick(): void {
     pass(isStopped).then(
-      () => {
-        next();
+      (value) => {
+        next(undefined, value);
       },
       (error: unknown) => {
         if (!stopped) failed(error);

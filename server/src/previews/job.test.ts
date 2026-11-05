@@ -1,11 +1,12 @@
 import { CAPTURE_MAX_BYTES, Previews, PREVIEWS_MAX, PREVIEWS_MAX_BYTES } from "@gnoworld/schemas/indexer";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { dirname, join } from "node:path";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Answer } from "../moderation/provider.ts";
 import type { Send } from "../net.ts";
 import { abciRefused, fakeChain, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
 import {
   capturedOf,
   checkFor,
@@ -316,6 +317,62 @@ describe("a pass of the preview job", () => {
     expect(read(file).previews).toEqual([earlier(GOVDAO)]);
   });
 
+  const fetchFault = () => new TypeError("fetch failed");
+  it.each([
+    ["the way out's name with no address yet", [unresolved, unresolved], ["unresolved", "unresolved"]],
+    ["nothing listening where the way out will be", [refused, refused], ["refused", "refused"]],
+    ["the way out starting between two reads", [unresolved, refused], ["unresolved", "refused"]],
+    ["a fault of no known cause", [fetchFault, fetchFault], ["request", "request"]],
+  ] as const)(
+    "writes nothing on %s, when no read reached anyone, keeps the last file byte for byte, and says the last read's kind (F4872)",
+    async (_name, [govdao, memba], [first, last]) => {
+      const file = fresh();
+      lastFile(file, [earlier(GOVDAO)]);
+      const before = readFileSync(file, "utf8");
+      const { outcome, lines, checked } = await run(renders({ [GOVDAO]: govdao(), [MEMBA]: memba() }), {
+        file,
+        pages: [GOVDAO, MEMBA],
+      });
+      expect(outcome).toEqual({ wrote: false, kind: last });
+      expect(readFileSync(file, "utf8")).toBe(before);
+      expect(checked).toEqual([]);
+      expect(lines).toEqual([
+        JSON.stringify({ event: "previews_skipped", error: first }),
+        JSON.stringify({ event: "previews_skipped", error: last }),
+        JSON.stringify({ event: "previews_failed", error: last }),
+      ]);
+    },
+  );
+
+  it("leaves no file at all after a first pass that reached nothing, as at the stack's start", async () => {
+    const file = fresh();
+    const { outcome } = await run(renders({ [GOVDAO]: unresolved() }), { file });
+    expect(outcome).toEqual({ wrote: false, kind: "unresolved" });
+    expect(readdirSync(dirname(file))).toEqual([]);
+  });
+
+  it("writes as ever once one read of the pass reached the chain, keeping the capture of a page that reached nothing", async () => {
+    const file = fresh();
+    lastFile(file, [earlier(GOVDAO)]);
+    const { outcome } = await run(renders({ [GOVDAO]: refused(), [MEMBA]: page("Memba") }), {
+      file,
+      pages: [GOVDAO, MEMBA],
+    });
+    expect(outcome).toEqual({ wrote: true });
+    expect(paths(file)).toEqual([GOVDAO, MEMBA]);
+    expect(read(file).previews[0]).toEqual(earlier(GOVDAO));
+  });
+
+  it("takes a way out that refused the chain's host as an answer: the file written, the earlier captures kept", async () => {
+    const file = fresh();
+    lastFile(file, [earlier(GOVDAO)]);
+    const { outcome, logged, lines } = await run(renders({ [GOVDAO]: proxyRefused() }), { file });
+    expect(outcome).toEqual({ wrote: true });
+    expect(read(file).previews).toEqual([earlier(GOVDAO)]);
+    expect(lines[0]).toBe(JSON.stringify({ event: "previews_skipped", error: "proxy" }));
+    expect(logged.map(({ event }) => event)).toEqual(["previews_skipped", "previews_written"]);
+  });
+
   it("asks no page that is no realm's home, and each page once", async () => {
     const { chain } = await run(renders({ [GOVDAO]: page("GovDAO") }), {
       pages: [
@@ -483,6 +540,57 @@ describe("startPreviews", () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
   };
+
+  it("reads the pages again 15 s after a pass that reached nothing, not six hours later: Compose starts the server before its way out (F4872)", async () => {
+    const waits = timerWaits();
+    const file = fresh();
+    const logged: unknown[][] = [];
+    const job = startPreviews({
+      file,
+      log: (event, fields) => logged.push([event, fields]),
+      universe: UNIVERSE,
+      pages: [GOVDAO],
+      check: passes,
+      send: failingFirst(unresolved, fakeChain(renders({ [GOVDAO]: page("GovDAO") })).send),
+    });
+    try {
+      await until(() => waits.includes(EVERY_MS));
+    } finally {
+      job.stop();
+      vi.restoreAllMocks();
+    }
+    expect(waits).toEqual([15_000, EVERY_MS]);
+    expect(paths(file)).toEqual([GOVDAO]);
+    expect(logged.slice(0, 2)).toEqual([
+      ["previews_skipped", { error: "unresolved" }],
+      ["previews_failed", { error: "unresolved" }],
+    ]);
+    expect(logged.slice(2).map(([event]) => event)).toEqual(["previews_written"]);
+  });
+
+  it("waits the whole interval after a pass that threw, and says so as internal", async () => {
+    const waits = timerWaits();
+    const logged: unknown[][] = [];
+    const job = startPreviews({
+      file: fresh(),
+      log: (event, fields) => logged.push([event, fields]),
+      universe: UNIVERSE,
+      pages: [GOVDAO],
+      check: passes,
+      send: fakeChain(renders({ [GOVDAO]: page("GovDAO") })).send,
+      now: () => {
+        throw new Error("the clock broke");
+      },
+    });
+    try {
+      await until(() => waits.length > 0);
+    } finally {
+      job.stop();
+      vi.restoreAllMocks();
+    }
+    expect(waits).toEqual([EVERY_MS]);
+    expect(logged).toEqual([["previews_failed", { error: "internal" }]]);
+  });
 
   it("runs a pass at start and again after each one ends, one at a time, and stops", async () => {
     const file = fresh();

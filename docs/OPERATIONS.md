@@ -386,7 +386,9 @@ Slice 3, the server's retention (3n):
   (`/markets/worlds-count.json`, served at `/worlds-count.json`, 7n2): the file's universe and time and the worlds the cosmos draws
   with the Earth, which the home's hero reads, so a phone asks nothing of the cosmos before View in space. Both temporaries are written
   before either is renamed: a failed write keeps both last files and logs `write`. A failed list keeps the last file and logs
-  `{"event":"worlds_failed","error":"<kind>"}`; a list the chain cuts at its limit is read by prefix, up to 2,000 requests. A world
+  `{"event":"worlds_failed","error":"<kind>"}`, and a pass whose list reached nothing (`unresolved`, `refused`, `request`) runs again
+  15 s later, not half an hour (F4872: Compose starts the server before its way out); a list the chain cuts at its limit is read by
+  prefix, up to 2,000 requests. A world
   keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
   `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of any indexer request (the network, an answer of the
   wrong shape, a page past 4 MiB even at one transaction, more than 500 requests) logs `worlds_indexer_failed` once and every realm
@@ -411,7 +413,10 @@ Slice 3, the server's retention (3n):
   check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
   kind one of `hidden`, `unchecked`, `empty`, `unresolved`, `refused`, `proxy`, `request` (as the prices'), `timeout`, `status`,
   `rate_limited`, `too_large`, `shape` or `chain_refused`. A
-  pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the last file. No
+  pass none of whose reads reached anyone (`unresolved`, `refused`, `request`: the way out not there yet) writes nothing, keeps the last
+  file, logs `previews_failed` with that kind and runs again 15 s later, not six hours (F4872); one read that reached the chain is a pass
+  as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
+  last file. No
   capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
   a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
   capture down at once, remove its realm from `hubs.json` and redeploy: the next pass drops it, and so does a restart.

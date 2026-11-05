@@ -97,6 +97,25 @@ describe("repeat", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(ends).toHaveLength(1);
   });
+
+  it("gives `waitMs` what a pass that ended well gave back, so a job that never throws says how it went", async () => {
+    const given: unknown[] = [];
+    let n = 0;
+    const loop = repeat({
+      pass: () => Promise.resolve((n += 1)),
+      failed: () => undefined,
+      waitMs: (error, value) => {
+        given.push([error, value]);
+        return 100;
+      },
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(given).toEqual([
+      [undefined, 1],
+      [undefined, 2],
+    ]);
+    loop.stop();
+  });
 });
 
 describe("waitAfter (F4872)", () => {

@@ -4,9 +4,10 @@ import { WORLD_NATURES, Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/index
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import type { Send } from "../net.ts";
 import { abciRefused, fakeChain, INDEXER, pagedCalls, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
-import { proxyRefused, refused, unresolved } from "../testing/wayOut.ts";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 import { makePresence } from "./presence.ts";
 
@@ -1066,6 +1067,55 @@ describe("startWorlds", () => {
     expect(done()).toBe(true);
   };
   const quick = { pauseMs: 1, wait: () => Promise.resolve() };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["the way out's name has no address yet", unresolved, "unresolved"],
+    ["nothing listens where the way out will be", refused, "refused"],
+  ])(
+    "asks again 15 s after a pass that reached nothing, not half an hour later, when %s: Compose starts the server before it (F4872)",
+    async (_name, first, kind) => {
+      const waits = timerWaits();
+      const logged: unknown[][] = [];
+      const send = failingFirst(first, fakeChain(chainRoutes([POOL])).send);
+      const file = fresh();
+      const job = startWorlds({
+        ...base,
+        ...quick,
+        log: (event, fields) => void logged.push([event, fields]),
+        send,
+        file,
+        universe,
+        everyMs: 1_800_000,
+      });
+      try {
+        await until(() => waits.includes(1_800_000));
+      } finally {
+        job.stop();
+      }
+      expect(waits).toEqual([15_000, 1_800_000]);
+      expect(existsSync(file)).toBe(true);
+      expect(logged[0]).toEqual(["worlds_failed", { error: kind }]);
+    },
+  );
+
+  it("waits the whole interval after the way out refused the chain's host: asking again soon would change nothing", async () => {
+    const waits = timerWaits();
+    const logged: unknown[][] = [];
+    const send: Send = () => Promise.reject(proxyRefused());
+    const log = (event: string, fields?: unknown) => void logged.push([event, fields]);
+    const job = startWorlds({ ...base, ...quick, log, send, file: fresh(), universe, everyMs: 1_800_000 });
+    try {
+      await until(() => waits.length > 0);
+    } finally {
+      job.stop();
+    }
+    expect(waits).toEqual([1_800_000]);
+    expect(logged).toEqual([["worlds_failed", { error: "proxy" }]]);
+  });
 
   it("starts, asks the list once at start, writes the file and stops cleanly", async () => {
     const chain = fakeChain(chainRoutes([POOL]));
