@@ -3,7 +3,7 @@
 // A confirmed one shows its why and a "Call" that opens the call card prefilled, every field editable; anything else shows nothing.
 // In the chat (`viewHref`), a call of more than two fields is only a compact card with its way to the realm view (ADR-0002 section 4).
 import { useId } from "react";
-import type { FormField } from "@gnoworld/core";
+import { HIDDEN, type FormField } from "@gnoworld/core";
 import { Button, Stack } from "@gnoworld/ui";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { callsIn } from "../calls/index.ts";
@@ -39,9 +39,10 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
   return { write, texts, fields: write.fields.map((field, index) => fieldOf(field.name, texts[index] ?? "")) };
 }
 
-// Jarvis's words, set left to right, as text and nothing else.
+// Jarvis's words, set left to right, as text and nothing else: a reason holding a control or format character (a bidi override
+// draws reversed inside an isolate too) is not drawn at all; the card below says the true realm, function and arguments.
 const Why = ({ text }: { text: string | undefined }) =>
-  text === undefined || text === "" ? null : <p dir="ltr">{text}</p>;
+  text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
 
 /** The action for the chain `place` names (its realm is the action's own). */
 export function ActionForm({

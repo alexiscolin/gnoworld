@@ -145,12 +145,20 @@ describe("a checked action as a Form block", () => {
   });
 
   it("draws the why as plain left-to-right text: no element from its markup, no reordering from a bidi override", async () => {
-    const hostile = `<img src=x onerror=y>${String.fromCodePoint(0x202e)}text`;
+    const hostile = "<img src=x onerror=y>text";
     const box = await draw({ ...VOTE, why: hostile });
     await calling(box, "Call MustVoteOnProposalSimple");
     expect(all(box, "img, script")).toHaveLength(0);
     const why = all(box, "p").find((p) => p.textContent === hostile);
     expect(why?.getAttribute("dir")).toBe("ltr");
+  });
+
+  it("draws no why that holds a bidi override or another control character, and still shows the call itself", async () => {
+    const override = String.fromCodePoint(0x202e);
+    const box = await draw({ ...VOTE, why: `vote ${override}ON YES` });
+    await calling(box, "Call MustVoteOnProposalSimple");
+    expect(box.textContent).not.toContain(override);
+    expect(all(box, "p").some((p) => p.textContent.includes("ON YES"))).toBe(false);
   });
 
   it("draws a pinned label as plain text too", async () => {
