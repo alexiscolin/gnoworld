@@ -317,6 +317,22 @@ describe("callModel: one model request, each attempt reserved and settled", () =
     run.close();
   });
 
+  it("charges nothing for an attempt the API answered 429 or 529, which ran nothing, so an overload never empties the day (F5309)", async () => {
+    const run = attempts(45 * DOLLAR);
+    const answer = message({ content: [text("Block 42.")], stop: "end_turn" });
+    const { send } = script(statusError(429), statusError(529), answer);
+    expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: true, answer });
+    expect(run.budget.state("ask")).toEqual({
+      spent: Number(cost(MODEL, answer.usage)),
+      reserved: 0,
+      cap: 45 * DOLLAR,
+    });
+    const overloaded = script(statusError(529), statusError(529), statusError(529));
+    expect(await callModel({ ...run.parts, send: overloaded.send }, ask())).toEqual({ ok: false, reason: "failed" });
+    expect(run.budget.state("ask").spent).toBe(Number(cost(MODEL, answer.usage)));
+    run.close();
+  });
+
   it("sends once with no retry when the setting says none", async () => {
     const run = attempts(45 * DOLLAR, 0);
     const { send, requests } = script(statusError(500));

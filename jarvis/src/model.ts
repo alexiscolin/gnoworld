@@ -100,8 +100,10 @@ async function tryOnce(
     span.answered(answer, settled(attempts, held.hold, cost(answer.model, answer.usage)));
     return { ok: true, answer };
   } catch (error) {
-    // The attempt is over either way: its hold is settled at its worst, for it may have been billed (D69).
-    span.failed(error instanceof Error ? error.constructor.name : "unknown", settled(attempts, held.hold, undefined));
+    span.failed(
+      error instanceof Error ? error.constructor.name : "unknown",
+      settled(attempts, held.hold, failedCost(error)),
+    );
     // The SDK ends a request whose signal fired with its own error: the asker left, no model's fault.
     if (attempts.signal?.aborted === true) return { ok: false, reason: "gone" };
     if (!(error instanceof AnthropicError)) throw error;
@@ -109,6 +111,13 @@ async function tryOnce(
     log("jarvis_model_error", { error: error.constructor.name, ...(status === undefined ? {} : { status }) });
     return { ok: false, reason: "error", error };
   }
+}
+
+// An attempt with no answer: one answered 429 or 529 ran nothing and costs nothing (V2, Alexis); any other is charged its
+// worst (undefined), for it may have been billed (D69).
+function failedCost(error: unknown): 0 | undefined {
+  const status = error instanceof AnthropicError ? answeredOf(error)?.status : undefined;
+  return status === 429 || status === 529 ? 0 : undefined;
 }
 
 // What the budget charged, or nothing it could say for a hold already spent at its deadline.
