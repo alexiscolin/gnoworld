@@ -18,7 +18,7 @@ export interface ChainFeed {
   /** The data of a `chain` event and of a `realms` event, as the stream gave it. */
   chain: (data: unknown) => void;
   realms: (data: unknown) => void;
-  /** Stops: what is held is dropped, the page having left. */
+  /** Stops: the window's timer is cancelled, so what is held is never handed on, the page having left. */
   stop: () => void;
 }
 
@@ -61,7 +61,6 @@ export function chainFeed(
     },
     stop: () => {
       cancel?.();
-      held = [];
     },
   };
 }
