@@ -46,14 +46,15 @@ reap() {
 }
 # The ping-pong, the one exception (Alexis, 2026-11-04; CLAUDE.md, docs/DEVELOPMENT.md, "The workshop"): while Alexis's own `pnpm workshop`
 # serves this checkout, a turn ends without the gate, which pre-commit still runs on every commit. Its sign is one no sandboxed command can
-# plant (the chief): a shell running this checkout's scripts/workshop.sh from this checkout's folder, its parent alive (a look-alike a
-# server left running is launchd's), that macOS's sandbox_check finds in no sandbox. No file of the tree is read for it; its tools are the
+# plant (the chief): a shell running this checkout's scripts/workshop.sh from this checkout's folder, its parent alive and its group its
+# terminal's foreground one (a look-alike that code the workshop runs left behind is launchd's, or in no terminal's foreground: F4962),
+# that macOS's sandbox_check finds in no sandbox. No file of the tree is read for it; its tools are the
 # system's own, by their paths, Python isolated from the folder (F4850); any of them missing or failing is no ping-pong.
 pingpong() {
 	here=$(pwd -P)
-	shells=$(/bin/ps -Ao pid=,ppid=,etime=,command= | /usr/bin/awk -v here="$here" '
-		{ shell = $4; sub(/.*\//, "", shell) }
-		$2 != 1 && NF == 5 && shell ~ /^(sh|bash|dash|zsh)$/ && ($5 == "scripts/workshop.sh" || $5 == "./scripts/workshop.sh" || $5 == here "/scripts/workshop.sh") { print $1 }') || return 1
+	shells=$(/bin/ps -Ao pid=,ppid=,pgid=,tpgid=,etime=,command= | /usr/bin/awk -v here="$here" '
+		{ shell = $6; sub(/.*\//, "", shell) }
+		$2 != 1 && $3 == $4 && NF == 7 && shell ~ /^(sh|bash|dash|zsh)$/ && ($7 == "scripts/workshop.sh" || $7 == "./scripts/workshop.sh" || $7 == here "/scripts/workshop.sh") { print $1 }') || return 1
 	for pid in $shells; do
 		[ "$(/usr/sbin/lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | /usr/bin/sed -n 's/^n//p')" = "$here" ] || continue
 		/usr/bin/python3 -Ic 'import ctypes, sys

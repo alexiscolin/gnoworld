@@ -155,6 +155,7 @@ const TIER1 = [
   "app/src/features/chat/embeds.ts",
   "app/src/features/chat/Embed.tsx",
   "app/src/features/realms/useExternalLinks.tsx",
+  "app/src/leaving.tsx",
   "app/src/pagePath.ts",
   ...(A.tier1 || []),
 ];
