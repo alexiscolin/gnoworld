@@ -339,7 +339,7 @@ elif scenario messages; then
 	echo "moderation backlog alerts: $(docker logs "$server" 2>&1 | grep -c '"moderation_backlog"' || true)"
 	# Every error the server logged, by name: an unchecked line's reason (OpenAI's refusals, the breaker, the queue).
 	docker logs "$server" 2>&1 | grep -o '"error":"[a-z_]*"' | sort | uniq -c | sed 's/^ */errors  /'
-	# The server holds its database alone (server/src/db.ts, EXCLUSIVE): read once it has stopped.
+	# The server holds its database alone (packages/service/src/db.ts, EXCLUSIVE): read once it has stopped.
 	docker stop "$server" >/dev/null
 	docker run --rm --volumes-from "$server" --entrypoint /nodejs/bin/node "$server_image" -e '
 const db = new (require("node:sqlite").DatabaseSync)("/data/gnoworld.db");

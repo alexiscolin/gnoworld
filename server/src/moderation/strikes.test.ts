@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { ensureRooms, ROOM_TABLES } from "../rooms/rooms.ts";
 import { accountKey, VERDICT_TABLES } from "./check.ts";
 import type { Mutes } from "./mute.ts";

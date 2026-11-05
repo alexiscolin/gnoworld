@@ -13,6 +13,8 @@ export interface Said {
   edits?: string;
   /** A message of several lines the link could not read whole: hidden by this id, whatever its text says. */
   unreadable?: true;
+  /** A line to the room's operators or voices alone (@#room, +#room): moderated, never handed to the whole room. */
+  few?: true;
 }
 
 export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";
@@ -97,5 +99,5 @@ export function said(
   const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
   const fields = [text, account, msgid];
   if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
-  return { room, account, msgid, text, ...marks(tags) };
+  return { room, account, msgid, text, ...marks(tags), ...(room === target ? {} : { few: true as const }) };
 }

@@ -6,7 +6,10 @@
   reaches / or the current folder: only ${name:?}, which stops the shell first;
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey, no fetched realm page or RPC node,
   and no .gno file written, by any tool, before the session loaded the gno skill and called a
-  gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list.
+  gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list;
+- worktree.sh, which settings.json lets out of the sandbox, run alone as `sh scripts/worktree.sh` and plain words,
+  from the project's root: from a subfolder those words run a script there, which the session can write, and behind
+  a cd, an assignment, a redirect or another command they would run something else outside the sandbox (F5058).
 Each command is split into its simple commands, looking inside `sh -c`, `eval`, `$(...)` and
 wrappers (env, xargs, timeout...), so none hides a call; a word that only mentions one (grep
 gnokey) is no call. A seatbelt, not a wall: exit 2 blocks, and settings.json blocks on a crash."""
@@ -30,6 +33,8 @@ ASSIGNMENT = re.compile(r"[A-Za-z_]\w*=.*")
 UNGUARDED = re.compile(r"\$(?:\{(?![A-Za-z_]\w*:\?)|[A-Za-z_\d@*#?$!(-]|$)|`")
 # find's options before its paths, BSD's and GNU's: -f names a path, -D takes a word.
 FIND_OPTION = re.compile(r"-[HLPEXdsx]+|-[fD]|-O\d*|--")
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))  # the project whose hook this is
+WORKTREE_CALL = re.compile(r"sh scripts/worktree\.sh( [A-Za-z0-9_./-]+)+")  # the one call settings.json lets out
 
 
 def refuse(why):
@@ -140,6 +145,13 @@ def deletes_unguarded(words):
     return deletes and any(UNGUARDED.search(p) for p in paths)
 
 
+def runs_worktree_sh(words):
+    """Whether a simple command runs a script named worktree.sh, itself or through a shell."""
+    if os.path.basename(words[0]) in SHELLS:
+        words = [w for w in words[1:] if not w.startswith("-")]
+    return bool(words) and os.path.basename(words[0]) == "worktree.sh"
+
+
 def ready_for_gno(transcript):
     """Whether the session loaded the gno skill and called a gnomcp tool; a mention in text counts for neither."""
     found = set()
@@ -184,6 +196,9 @@ elif tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
     refuse("a realm page or an RPC node: read it with gno_render or gno_read")
 elif tool == "Bash":
     text = str(given.get("command", ""))
+    cwd = event.get("cwd")
+    at_root = isinstance(cwd, str) and os.path.realpath(cwd) == ROOT
+    alone = WORKTREE_CALL.fullmatch(text.strip()) is not None
     for words in commands(text):
         program = os.path.basename(words[0])
         if program == "git":
@@ -196,6 +211,10 @@ elif tool == "Bash":
             refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
         if writes_gno(words, text) and not ready_for_gno(event.get("transcript_path", "")):
             refuse(UNREAD)
+        if runs_worktree_sh(words) and not (at_root and alone):
+            refuse("worktree.sh runs alone, from the project's root, as `sh scripts/worktree.sh` and plain words: settings.json lets those "
+                   "words out of the sandbox, and from a subfolder, or behind a cd, an assignment, a redirect or another command, they would "
+                   "run something else outside it (F5058)")
 if push:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
                                              "permissionDecisionReason": "a push leaves this machine: Alexis decides"}}))

@@ -2,8 +2,8 @@
 // 100,000 messages through the queue and the checker, half from accounts never seen again (addresses are
 // free), a fake provider answering at once, and the heap after a collection at each of 10 checkpoints,
 // printed as JSON. LEAK=1 keeps every message, the control that shows the bound can fail.
-import { openDatabase } from "../db.ts";
-import { logger } from "../log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "../login/login.ts";
 import { makeChecker, VERDICT_TABLES } from "../moderation/check.ts";
 import { makeQueue } from "../moderation/queue.ts";

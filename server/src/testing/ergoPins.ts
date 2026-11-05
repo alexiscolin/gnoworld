@@ -2,7 +2,7 @@
 // mounts them, a moderator and an author as the session's accounts, and a check held back until a test lets it go.
 import { Address, PinList } from "@gnoworld/schemas";
 import { makeApp } from "../app.ts";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { pinsRoutes } from "../pins/routes.ts";
 import type { World } from "../rooms/types.ts";
 import { chatFor, RULES } from "./ergoChat.ts";

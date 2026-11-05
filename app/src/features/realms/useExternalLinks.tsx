@@ -3,7 +3,7 @@
 // a dialog that names the host the address really goes to and shows the whole address. Only the dialog's own link leaves.
 import { Button, Dialog, Stack } from "@gnoworld/ui";
 import { useState, type ReactNode } from "react";
-import { hostOf } from "../../lib/chain/read.ts";
+import { hostOf } from "@gnoworld/chain/read";
 import styles from "./RealmBlocks.module.css";
 
 /** Whether an address of a page is on gnoweb's own origin: the same scheme, host and port, never one that only starts alike. */

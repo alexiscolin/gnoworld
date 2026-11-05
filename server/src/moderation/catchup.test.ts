@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { makeProgress, PROGRESS_TABLES } from "./catchup.ts";
 
 const opened: DatabaseSync[] = [];

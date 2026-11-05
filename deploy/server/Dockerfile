@@ -1,4 +1,4 @@
-# The server in the stack (slice 3's plan, 3e): its workspace and the two it imports, with their production
+# The server in the stack (slice 3's plan, 3e): its workspace and the packages it imports, with their production
 # dependencies from the lockfile, then Node 24 alone in a distroless image, as 65532, the user Ergo shares for
 # the auth socket. Node strips the types itself: server/src/main.ts runs as it is, as the tests run it.
 FROM node:24.22.0-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
@@ -7,10 +7,14 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/core/package.json packages/core/
 COPY packages/schemas/package.json packages/schemas/
+COPY packages/service/package.json packages/service/
+COPY packages/chain/package.json packages/chain/
 COPY server/package.json server/
 RUN pnpm install --frozen-lockfile --prod --filter @gnoworld/server...
 COPY packages/core/src packages/core/src
 COPY packages/schemas/src packages/schemas/src
+COPY packages/service/src packages/service/src
+COPY packages/chain/src packages/chain/src
 COPY server/src server/src
 COPY server/roles.json server/
 # The universes the app is built from: the default one's RPC is where the prices timer reads the block height (UNIVERSES_FILE).

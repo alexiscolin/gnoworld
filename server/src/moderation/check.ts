@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Said } from "../irc/link.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import type { Rules } from "../roles/roles.ts";
 import { decide, type Thresholds } from "./decide.ts";
 import { editsOwn, lineKnown } from "./edits.ts";

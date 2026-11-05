@@ -39,7 +39,7 @@ reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | 
 # Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151). $@: git diff's
 # options and commits.
 harness() ( GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
-	'packages/*/package.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
+	jarvis/package.json jarvis/tsconfig.json 'packages/*/package.json' 'packages/*/tsconfig.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
 	tsconfig.base.json app/tsconfig.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore app/tests/stories/pictures.spec.ts deploy/test.sh )
 # Whether the change $@ (git diff's options and commits) holds a path with a non-ASCII byte: the
 # disk folds more letters than git can match (ſ is s on APFS), so no list names them (F164).

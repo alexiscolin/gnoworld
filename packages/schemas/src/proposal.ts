@@ -1,9 +1,9 @@
 // A GovDAO proposal as the browser holds it (slice 5 part 2, 5k): what `proposalOf` builds from a realm's page, and what every
-// view then trusts. The realm's page is text a proposer wrote, so each field is bounded here, in code units, whatever it held:
-// a whole non-negative number, a title and a state of bounded length, a share only from 0 to 100.
+// view then trusts. The realm's page is text a proposer wrote, so each field is bounded here, in code points, whatever
+// it held: a whole non-negative number, a title and a state of bounded length, a share only from 0 to 100.
 import { z } from "./zod.ts";
 
-/** The most code units of a title and of a state. */
+/** The most code points of a title and of a state, as zod 4.6.7 counts a string (`v4/core/checks.js:270`). */
 export const PROPOSAL_CAPS = { title: 200, state: 40 } as const;
 
 const share = z.number().check(z.gte(0), z.lte(100));

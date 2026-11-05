@@ -20,7 +20,7 @@ app/tests
 app/**/*.test.ts
 app/**/*.test.tsx
 !deploy/web/nginx.conf
-# The server's image (deploy/server/Dockerfile): its workspace and the two it imports, without their tests.
+# The server's image (deploy/server/Dockerfile): its workspace and the packages it imports, without their tests.
 !server/package.json
 !server/roles.json
 !server/src
@@ -30,6 +30,12 @@ server/src/testing
 !packages/schemas/src
 packages/core/src/**/*.test.ts
 packages/schemas/src/**/*.test.ts
+!packages/service/src
+packages/service/src/**/*.test.ts
+# And the app's: the chain-read package both import, without its tests and their helpers.
+!packages/chain/src
+packages/chain/src/**/*.test.ts
+packages/chain/src/testing
 # Ergo's image and the way out's (deploy/ergo/Dockerfile, deploy/egress/Dockerfile), and their probe.
 !deploy/ergo/ircd.yaml.tmpl
 !deploy/ergo/render.sh
@@ -37,5 +43,15 @@ packages/schemas/src/**/*.test.ts
 deploy/probe/*_test.go
 !deploy/egress/config.yaml
 !deploy/egress/acl.yaml
+!deploy/egress/jarvis-acl.yaml
+# jarvis's image (deploy/jarvis/Dockerfile): its workspace, its skills and gnomcp's settings, without its tests, its
+# benches and its test helpers (testing/outbound.ts would move Anthropic's traffic); the places' data comes with !app.
+!jarvis/package.json
+!jarvis/src
+jarvis/src/**/*.test.ts
+jarvis/src/**/*.bench.ts
+jarvis/src/testing
+!jarvis/skills
+!deploy/jarvis/gnomcp.toml
 # Named as well, should the list above ever open: the demo's secrets never reach a build.
 deploy/secrets

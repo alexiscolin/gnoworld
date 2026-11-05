@@ -6,7 +6,7 @@
 import { Button, Cluster, Field, Row, Skeleton, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
-import type { ReadOptions } from "../../lib/chain/read.ts";
+import type { ReadOptions } from "@gnoworld/chain/read";
 import edge from "./frame.module.css";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";

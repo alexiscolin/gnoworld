@@ -79,7 +79,8 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    lens, on the diff since the first; after three rounds the review stops and Claude and Alexis
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
-   status and evidence, and a review reads it first: no rejected claim raised again without new
+   status and evidence, numbered in its slice's range from slice 12 (slice N: F N000 to N999, a hundred a
+   part, `CLAUDE.md`), and a review reads it first: no rejected claim raised again without new
    evidence, and a fixed one that comes back filed as a regression. What Alexis caught and missed
    goes into the review log, with each branch's rounds, tokens and hours (measured against slice
    4's). At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the

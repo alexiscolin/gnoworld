@@ -10,8 +10,8 @@ import { startChat, type Chat } from "./chat.ts";
 import { PIN_TABLES } from "./pins/pins.ts";
 import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
-import { openDatabase } from "./db.ts";
-import { logger } from "./log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
@@ -1664,6 +1664,80 @@ describe("the chat, as the server starts it", () => {
       peer.say(`@account=${WRITER} :${WRITER}!u@h JOIN #bubble ${WRITER} :w`);
       await settle(peer);
       expect(peer.lines.filter((l) => /^SAMODE \S+ \+v /.test(l))).toEqual([]);
+    });
+  });
+
+  describe("the recent lines Jarvis's door sends (10g)", () => {
+    const ASKER = "g1asker";
+    const passing = { provider: () => Promise.resolve(OFF_ANSWER) };
+
+    it("keeps a public room's lines moderation let through, and never one it hides", async () => {
+      const { chat, peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1;time=2026-10-22T12:00:00.000Z", "a!u@h", ["#bubble", "hello"]));
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      await expect.poll(verdicts).toEqual([
+        { msgid: "m1", action: "pass", reason: null },
+        { msgid: "m2", action: "hide", reason: "banned_word" },
+      ]);
+      expect(chat.recent("#bubble", ASKER)).toEqual([{ speaker: 1, text: "hello", time: "2026-10-22T12:00:00.000Z" }]);
+    });
+
+    it("keeps none of a line left unchecked, with no key to check it", async () => {
+      const { chat, peer, verdicts } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        { provider: () => Promise.resolve("unchecked") },
+      );
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "unchecked", reason: null }]);
+      expect(chat.recent("#bubble", ASKER)).toEqual([]);
+    });
+
+    it("keeps out a hidden line its catch-up hands again, and drops a line a moderator takes", async () => {
+      const { chat, peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "kept"]));
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(":ergo.test BATCH +h chathistory #bubble");
+      peer.say(message("batch=h;account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      peer.say(":ergo.test BATCH -h");
+      peer.say(message("account=g1a;msgid=m3", "a!u@h", ["#bubble", "after"]));
+      await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["kept", "after"]);
+      peer.say(":mod!u@h REDACT #bubble m1 :off topic");
+      await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["after"]);
+    });
+
+    it("drops a line its author deletes, and one its author edits, at once", async () => {
+      const { chat, peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "first"]));
+      peer.say(message("account=g1a;msgid=m2", "a!u@h", ["#bubble", "secnod"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(":a!u@h REDACT #bubble m1");
+      peer.say(message("account=g1a;msgid=m3;+gnoworld/edit=m2", "a!u@h", ["#bubble", "second"]));
+      await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["second"]);
+    });
+
+    it("never keeps a members room's lines, nor a members-write room's, which stay between their members", async () => {
+      const crew = new Map<string, World>([
+        [
+          "bubble",
+          {
+            rules: RULES,
+            groups: new Map([["crew", new Set(["g1a"])]]),
+            rooms: new Map<string, Room>([
+              ["#bubble/crew", { type: "members", readers: "crew", hidden: false }],
+              ["#bubble/desk", { type: "members-write", readers: "crew", writers: "crew", hidden: false }],
+            ]),
+          },
+        ],
+      ]);
+      const { chat, peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble/crew", "between us"]));
+      peer.say(message("account=g1a;msgid=m2", "a!u@h", ["#bubble/desk", "between writers"]));
+      await expect.poll(verdicts).toEqual([
+        { msgid: "m1", action: "pass", reason: "members_room" },
+        { msgid: "m2", action: "pass", reason: "members_room" },
+      ]);
+      expect([chat.recent("#bubble/crew", "g1a"), chat.recent("#bubble/desk", "g1a")]).toEqual([[], []]);
     });
   });
 });

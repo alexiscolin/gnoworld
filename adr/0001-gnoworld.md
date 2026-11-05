@@ -581,7 +581,9 @@ A third-party realm is opened with explicit warnings:
   forever";
 - every call shows "gnoworld does not check what this realm does".
 
-gnoworld never holds user funds.
+gnoworld never holds user funds, but in one realm: the satellites' slot realm holds a live
+rental's payment until its days are earned, so a takedown can refund the days not begun
+(ADR-0002 §8, row 7; Alexis, 2026-11-04).
 
 ### 12. Client and stack
 
@@ -903,6 +905,19 @@ Gaps found while building this. Each comes with what it costs gnoworld today.
    everyone.
 9. **Session guards cannot be unit-tested.** The `testing` stdlib has no way to fake a
    session, so a realm's "not under a session" check only gets tested on a live chain.
+10. **A deployer-owned realm's events, gas and storage cannot be filetested.** `gno test`
+   at `chain/onyx` deploys an imported realm from the empty address
+   (`gnovm/pkg/test/imports.go:213`), and `testing.SetRealm` skips an empty address, so a
+   filetest can never act as the deployer: the slot realm's owner cannot unpause it there,
+   so no filetest rents, and its `Events:`, `Gas:` and `Storage:` stay unpinned. Unit tests
+   cannot read events at all. Found by slice 11c (F5052, five tries with their errors);
+   until gno lets a filetest deploy as a chosen address, they are checked at deploy.
+11. **What `gno test` cannot see of the slot realm is checked at its deploy, before
+   `Unpause`.** Besides item 10: the chain restricts no `ugnot`, as a restricted one makes
+   every refunding takedown, withdraw and rent revert, and onyx-1's was read from its genesis
+   script only (`misc/deployments/onyx.gno.land/gen-genesis.sh:155`), never live, no realm
+   exposing it (F5043); `Owner()` is the deployer (D26); a wallet's own `Rent` call passes
+   `runtime.AssertOriginCall`, whose frame count `gno test` replaces with its own (F5056).
 
 ## Alternatives considered
 

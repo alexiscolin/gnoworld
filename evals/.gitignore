@@ -1,0 +1,3 @@
+# The answers kept by case (provider.ts) stay on the machine that paid for them; results/ is committed (ADR-0002 §5).
+.cache/
+node_modules/

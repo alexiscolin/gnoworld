@@ -19,6 +19,8 @@
       "Bash(rm -rf *)",
       "Edit(/scripts/guard.py)",
       "Edit(/server/package.json)",
+      "Edit(/jarvis/package.json)",
+      "Edit(/evals/package.json)",
       "Edit(/packages/schemas/package.json)",
       "Edit(/scripts/stop_gate.sh)",
       "Edit(/scripts/code_changed.sh)",
@@ -27,6 +29,13 @@
       "Edit(/scripts/gitleaks-private.toml)",
       "Edit(/scripts/.gitleaksignore)",
       "Edit(/scripts/install_hooks.sh)",
+      "Edit(/scripts/worktree.sh)",
+      "Edit(/scripts/borrow_node_modules.sh)",
+      "Edit(~/Server/gnoworld-wt/*/.git)",
+      "Edit(~/Server/gnoworld/.git/hooks/**)",
+      "Edit(~/Server/gnoworld/.git/config)",
+      "Edit(~/Server/gnoworld/scripts/**)",
+      "Edit(~/Server/gnoworld/.githooks/**)",
       "Edit(/.git/hooks/**)",
       "Edit(/.git/config)",
       "Edit(/.git/commondir)",
@@ -98,6 +107,7 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
+    "excludedCommands": ["sh scripts/worktree.sh *"],
     "network": {
       "allowLocalBinding": true,
       "allowedDomains": ["registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "github.com"]
@@ -136,6 +146,7 @@
         ".git/hooks",
         ".git/config",
         ".git/commondir",
+        "~/Server/gnoworld-wt/*/.git",
         ".mcp.json"
       ],
       "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]

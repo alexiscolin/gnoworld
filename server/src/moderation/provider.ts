@@ -2,8 +2,8 @@
 // with the model's name and nothing that names its author. Every answer goes through Zod against the 13
 // categories OpenAI's API description lists: any other shape counts as not checked, and raises the alert.
 import { z } from "zod";
-import type { Log } from "../log.ts";
-import { send as netSend } from "../net.ts";
+import type { Log } from "@gnoworld/service/log";
+import { send as netSend } from "@gnoworld/service/net";
 
 export const CATEGORIES = [
   "harassment",

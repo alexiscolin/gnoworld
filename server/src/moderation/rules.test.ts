@@ -5,7 +5,7 @@ import type { Rules } from "../roles/roles.ts";
 import { ruleVerdict } from "./rules.ts";
 
 const RULES: Rules = {
-  bannedWords: ["spam", "Scam Coin", "c++", "a.b", "(x", ".*", "́", "​", "Spàm"],
+  bannedWords: ["spam", "Scam Coin", "c++", "a.b", "(x", ".*", "́", "\u200b", "Spàm"],
   linksPerMessage: 3,
   mentionsPerMessage: 5,
   linksForNewAccount: 2,
@@ -23,7 +23,7 @@ describe("the rules' banned words", () => {
     ["in capitals", "this is SPAM"],
     ["in full-width letters", "this is ｓｐａｍ"],
     ["with an accent", "this is spàm"],
-    ["with a zero-width space inside", "sp​am"],
+    ["with a zero-width space inside", "sp\u200bam"],
     ["a banned phrase, its spaces as typed", "buy scam  coin now"],
     ["at the end, before punctuation", "spam!"],
     ["before an apostrophe", "spam's"],

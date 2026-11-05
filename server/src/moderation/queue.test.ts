@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { makeQueue } from "./queue.ts";
 
 interface Item {

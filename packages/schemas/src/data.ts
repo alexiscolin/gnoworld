@@ -18,7 +18,7 @@ export const DATA_CAPS = {
 const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
 
 /** A name in a path, and the id of a universe: lower case, digits, single hyphens. */
-const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(DATA_CAPS.key));
+export const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(DATA_CAPS.key));
 
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
 const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));
@@ -72,7 +72,8 @@ const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
 
 /** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters. */
-const RealmPath = z
+/** A realm's path on gno.land, as the data files and a digest's request name it. */
+export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 

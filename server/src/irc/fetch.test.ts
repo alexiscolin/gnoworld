@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { fakeErgo, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { lineFetches } from "./fetch.ts";
 import { ircLink, type Fetched, type Link, type Said } from "./link.ts";

@@ -8,11 +8,10 @@ import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { routePath } from "hono/route";
 import { secureHeaders } from "hono/secure-headers";
-import type { Log } from "./log.ts";
+import { serverOptions, TIMEOUTS } from "@gnoworld/service/http";
+import type { Log } from "@gnoworld/service/log";
 
 export const BODY_LIMIT = 16 * 1024;
-// Headers within 5 s, a whole request within 10 s, an idle kept-alive connection closed after 5 s.
-const TIMEOUTS = { headers: 5_000, request: 10_000, keepAlive: 5_000, check: 1_000 };
 
 const refuse = (c: Context, error: ApiError["error"], status: 404 | 413 | 500 | 503): Response =>
   c.json({ error } satisfies ApiError, status);
@@ -49,27 +48,10 @@ async function named(_: Context, next: () => Promise<void>): Promise<void> {
 }
 
 export async function listen(app: Hono, at: { port: number; host: string }, timeouts = TIMEOUTS): Promise<Server> {
-  const server = createAdaptorServer({
-    fetch: app.fetch,
-    serverOptions: {
-      headersTimeout: timeouts.headers,
-      requestTimeout: timeouts.request,
-      keepAliveTimeout: timeouts.keepAlive,
-      connectionsCheckingInterval: timeouts.check,
-    },
-  });
+  const server = createAdaptorServer({ fetch: app.fetch, serverOptions: serverOptions(timeouts) });
   // HTTP/1.1 options give Node's own HTTP server; the check lets the type say so.
   if (!(server instanceof Server)) throw new TypeError("not an HTTP/1.1 server");
   server.listen(at.port, at.host);
   await once(server, "listening");
   return server;
-}
-
-// close() also stops the checks that cut a slow client, so a client stalled in its headers would hold
-// the drain for ever: whatever is still open once a request's time is up is cut.
-export function stop(server: Server, done: () => void, ms = TIMEOUTS.request): void {
-  server.close(done);
-  setTimeout(() => {
-    server.closeAllConnections();
-  }, ms).unref();
 }

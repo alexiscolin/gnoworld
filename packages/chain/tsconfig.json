@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The browser's fetch, which the server and Jarvis compile against Node's types too: only what both declare is used.
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": []
+  },
+  "include": ["src"]
+}

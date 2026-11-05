@@ -37,9 +37,10 @@ total = run = 0
 # Tests and configs are never measured (Storybook's config and the tests' setup are of those); nor
 # what vitest.config.ts leaves out of coverage: the app's document shell and server entry, which only
 # the build renders, and Storybook's pages, whose handlers do nothing; the Playwright journeys walk
-# them (docs/decisions.md, F247); and the server's entry, run in child processes by main.test.ts.
-# Matched inside the repository only (F098).
-UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|(^|/)\.storybook/|(^|/)testSetup\.ts$|^packages/ui/src/.*\.stories\.tsx$|^packages/ui/src/Overview/Overview\.tsx$|^app/src/(root|entry\.server)\.tsx$|^server/src/main\.ts$"
+# them (docs/decisions.md, F247); the server's and jarvis's entries, run in child processes by their
+# main.test.ts; and evals/, installed apart, whose own Node tests run in evals/run.sh. Matched inside
+# the repository only (F098).
+UNMEASURED = r"\.(test|config)\.tsx?$|\.d\.ts$|(^|/)tests/|(^|/)\.storybook/|(^|/)testSetup\.ts$|^packages/ui/src/.*\.stories\.tsx$|^packages/ui/src/Overview/Overview\.tsx$|^app/src/(root|entry\.server)\.tsx$|^(server|jarvis)/src/main\.ts$|^evals/"
 unmeasured = [p for p in changed if p not in report and not re.search(UNMEASURED, os.path.relpath(p))]
 for path in sorted(unmeasured):
     print(f"{os.path.relpath(path)}: changed, but no coverage measures it: add it to vitest.config.ts's coverage include")

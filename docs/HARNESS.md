@@ -34,7 +34,9 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   (two branches side by side once took the same ones) and Alexis each branch's starting brief, integrates the branches, runs the full gate and the
   slice's last `/pre-merge`, then the dream.
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
-  `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
+  `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127), in
+  `~/Server/gnoworld-wt/`, where no session's shell writes but its own folder (its file tools still can, F5095), the one root where the script makes or removes a folder
+  (`worktree.sh remove`); it writes no other session's worktree, by any tool (F5058). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
   again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
@@ -75,7 +77,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
-   product with no test and no `No-test:` line, and scans the message for secrets. `pre-commit`
+   product with no test and no `No-test:` line, scans the message for secrets, and, in Claude Code's sandbox only, refuses a hidden
+   character in it with the staged `scripts/hidden.py`, as pre-commit runs the staged scripts there (F5085, D36). `pre-commit`
    scans what is staged for secrets, then, in Claude Code's sandbox, runs the fast gate on a copy
    of what is staged, scoped to the commit's paths (`GATE_CHANGED`), and records the code it
    passed. In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate
@@ -122,10 +125,10 @@ gate fails, run the failing lane alone before running the whole gate again.
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
-| `server/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
+| `server/src`, `jarvis/src`, `packages/service/src` | tsc, ESLint, every Vitest test (`main.test.ts` runs the server as a child process, outside Vitest's module graph) | 30 s |
 | the TypeScript of `app/src`, `packages/ui/src` | tsc, ESLint, Vitest's tests related to the change (`--changed`), the app's build (below) | 120 s |
 | a test of the app (`app/src/*.test.ts(x)`), a journey or its helper (`app/tests/`) | tsc, ESLint, Vitest's tests related to the change; no build | 30 s |
-| `packages/core/src`, or any other file of `app/src` and `packages/ui/src` (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's build | 120 s |
+| `packages/core/src`, `packages/chain/src`, or any other file of `app/src` and `packages/ui/src` (a fixture, a stylesheet) | tsc, ESLint, every Vitest test, the app's build | 120 s |
 | `packages/ui/src/tokens.css` | as above, and the tokens story's pictures at their three widths (F1190) | 120 s |
 | `gno/` | the gno lane | 30 s |
 | anything else (a config, the lockfile, the harness, `packages/schemas`, `deploy/`), no change at all, or pre-commit's staged copy | everything | 120 s |
@@ -194,9 +197,9 @@ refuses another Node (F816).
 | the app's build, at a commit | a route or an import the types do not see; it walks no page |
 | the app, in Playwright (the merge check and `--full`) | a page that fails to build, pre-render or hydrate, with the wrong tags, or with an accessibility violation (axe) |
 | `gno lint`, `gno test` on `gno/...` | every realm and package |
-| `scripts/mutate.py` | a realm guard no test notices when removed |
+| `scripts/mutate.py` | a realm guard no test notices when removed, or an operator flipped (`>=` and `>`, `<=` and `<`, `==` and `!=`, `&&` and `||`, `+` and `-`) or an integer shifted by one that none notices, on every line of code; one `gno test` run judges a package's guards and flips together, its time limit 1.5 s a copy and 60 s at least, so a busy machine slows a big package's run without failing it (F5051, D30), and a run still going 60 s past it, where gno's timer, which starts once the copies are loaded, never fired, stopped and failed by name (F5084); a `+`, `-` or number flip that does not compile is dropped and counted, any other mutant that does not compile fails; a `GAPS` key names its file and one mutant; a flip that loops forever fails by name, as no gap can hold it; in that run a filetest runs against the untouched copy, the first of its module in the workspace, so a survivor `GAPS` does not list is judged again alone, in a workspace of its own copy, where its filetests see it, and a gap is not (F5050); gno's output that is no UTF-8 reads as U+FFFD, never as a traceback (F5062) |
 | `gofmt`, `go vet`, the seal vectors | Go tools; `gno/r/seal/vectors_test.gno` equals what `go run ./tools/sealvec` prints |
-| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad ledger row or one citing a missing commit; a known limit the runbook no longer says; a review agent's file missing or without its sentence `Never run a git command that writes the index or the work tree`; CLAUDE.md without the review card's item 8 |
+| `scripts/check_docs.py` | a harness doc naming a file that does not exist; a bad ledger row or one citing a missing commit; a known limit the runbook no longer says; a review agent's file missing or without its sentence `Never run a git command that writes the index or the work tree`; CLAUDE.md without the review card's item 8; a hidden character (`scripts/hidden.py`'s table, held to the pinned Node's Unicode: what shows nothing, the zero-width ones, the variation selectors and the tags; the format characters, the bidi controls and the BOM; the line and paragraph separators; an emoji's look selector right after it passes) in any file git tracks or would but an image (a `.png` or `.jpg` that starts with its format's bytes), read as the index holds it, what a commit takes, and as the work tree does where it differs, in a name or a link's target, or in a commit message since the branch left `origin/main`, named by its file, name or commit, line, column and code point, which a file that needs one writes as an escape; a file that is no UTF-8 text (a NUL, UTF-16, a binary of a format `IMAGES` does not name), refused whole from its first such byte (F5053, F5079, F5082, F5083, F5086 to F5089, D31 to D35) |
 | `scripts/test_hooks.sh` | the hooks, the guard, the settings' boundary, the CI's promises, the scripts; a harness mutant that no longer finds its text (`harness_mutate.py --dry`) |
 
 **One merge check at a time.** `check.sh --merge` takes the lock `~/.cache/gnoworld-tools/merge.lock`, a folder holding `pid`,
@@ -267,17 +270,27 @@ with `/cd`:
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
 - **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
-  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads),
+  rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads,
+  `scripts/worktree.sh` and the scripts it runs, which leave the sandbox, every worktree's `.git`, and,
+  from any session, the main checkout's `.git/hooks`, `.git/config`, `scripts/` and `.githooks/`),
   `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
-  each such file at `merge.sh`. In his shell the hooks run nothing of the repository but the
-  records the sandboxed gate wrote (F076).
+  each such file at `merge.sh`; a merge into a part's branch that changes the harness is his too,
+  in his terminal, never another session's (F5055, F5058). In his shell the hooks run nothing of
+  the repository but the records the sandboxed gate wrote (F076).
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks`, `.git/config` or `.git/worktrees` (so a stale worktree is pruned
-  by Alexis: `git worktree prune`); they reach only the npm and Go registries and github.com.
+  caches, never in `.git/hooks` or `.git/config`, nor in any worktree's `.git` (F5095); another
+  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). They reach
+  only the npm and Go registries and github.com. One command of the project's settings leaves the
+  sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
+  removes, in its one root; the guard lets it run only alone, its words plain, from the project's
+  root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
   forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used. It reads through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
+  and gnomcp was used, and no `worktree.sh` run but alone, as `sh scripts/worktree.sh` and plain
+  words, from the project's root: elsewhere those words would run a script the session can write,
+  and behind anything else in the call, something else outside the sandbox (F5058). It reads
+  through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
   the call is blocked.
 
 The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
@@ -350,13 +363,14 @@ costs context in every session.
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
 | `scripts/check.sh` | the gate |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
-| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
+| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
 | `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
+| `scripts/hidden.py` | the characters no text holds raw: check_docs's rule, in a file of its own to be shared |
 | `scripts/mutate.py` | the realms' mutation check |
 | `scripts/patch_coverage.py`, `scripts/prove_fix.py`, `scripts/check_regressions.py`, `scripts/batch_size.py` | the no-regression net |
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |

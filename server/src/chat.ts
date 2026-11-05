@@ -6,18 +6,19 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
+import { makeRecentLines, type RecentLines } from "./door/lines.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
 import { ircLink, type Link, type Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
-import type { Log } from "./log.ts";
-import { act } from "./moderation/act.ts";
-import { makeProgress, type Progress } from "./moderation/catchup.ts";
-import { checkAgain, makeChecker, type Verdict } from "./moderation/check.ts";
+import type { Log } from "@gnoworld/service/log";
+import { makeProgress } from "./moderation/catchup.ts";
+import { makeChecker } from "./moderation/check.ts";
 import { makeMutes } from "./moderation/mute.ts";
 import { moderationClient, type Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { makeStrike } from "./moderation/strikes.ts";
+import { moderate, type Steps } from "./moderation/way.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
 import { ensureNamed, ensureRooms, listRooms, roomWorld, worldRooms } from "./rooms/rooms.ts";
@@ -25,7 +26,7 @@ import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { makeStream, stateOf, type Stream } from "./stream/stream.ts";
+import { makeStream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
@@ -45,6 +46,9 @@ export interface Chat {
   mayPin: (room: string, who: string) => boolean;
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
+  // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
+  recent: RecentLines["recent"];
+  line: RecentLines["line"];
   stop: () => Promise<void>;
 }
 
@@ -75,40 +79,9 @@ interface Options {
   redactRetryMs?: number;
 }
 
-interface Steps {
-  db: DatabaseSync;
-  check: (said: Said) => Promise<Verdict | "seen" | "busy">;
-  send: (command: Command, params: readonly string[]) => boolean;
-  stream: Stream;
-  progress: Progress;
-  strike: (said: Said) => void;
-}
-
-// A line's way once heard: checked, acted on, streamed and struck, then settled in its room's mark.
-function moderate({ db, check, send, stream, progress, strike }: Steps): (said: Said) => Promise<void> {
-  return async (said) => {
-    let done = true;
-    try {
-      const verdict = await check(said);
-      if (verdict === "seen") return;
-      // Another run checks it now and settles it: settled here, the mark would pass a line not yet done.
-      if (verdict === "busy") {
-        done = false;
-        return;
-      }
-      // A hide the link could not send: checked again when the catch-up brings the line back.
-      done = act(said, verdict, { send });
-      if (!done) checkAgain(db, said.msgid);
-      // An unchecked line has no event: its previews wait.
-      else {
-        const state = stateOf(verdict.action);
-        if (state !== undefined) stream.publish({ msgid: said.msgid, room: said.room, state });
-        if (verdict.action === "hide") strike(said);
-      }
-    } finally {
-      if (done) progress.settled(said);
-    }
-  };
+interface Stamps {
+  pepper: string;
+  now: () => number;
 }
 
 // A world's rooms at most, its main room aside (3l).
@@ -157,8 +130,16 @@ function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => und
   });
 }
 
+// The mutes a world's rooms carry, and the strikes toward one (3k), sparing whom the settings say.
+function strikesFor(db: DatabaseSync, settings: Settings, { send, pepper, now }: Pick<Steps, "send"> & Stamps) {
+  const { mute } = settings.moderation;
+  const roomsOf = (world: string): string[] => worldRooms(db, world);
+  const mutes = makeMutes({ db, send, roomsOf, now, forMs: mute.minutes * 60_000, max: mute.max });
+  return { mutes, strike: makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) }) };
+}
+
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo, moderation } = settings;
+  const { worlds, ergo } = settings;
   const { log, pepper, now = Date.now } = options;
   ensureRooms(db, [...worlds.keys()], now());
   ensureNamed(db, typedRooms(worlds), now());
@@ -166,17 +147,10 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const stream = makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
-  const { mute } = moderation;
-  const mutes = makeMutes({
-    db,
-    send,
-    roomsOf: (world) => worldRooms(db, world),
-    now,
-    forMs: mute.minutes * 60_000,
-    max: mute.max,
-  });
-  const strike = makeStrike(db, { pepper, now, mute, mutes, spared: settings.spared ?? (() => false) });
-  const queue = makeQueue<Said>({ run: moderate({ db, check, send, stream, progress, strike }), log, now });
+  const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
+  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room) });
+  const run = moderate({ db, check, send, stream, progress, strike, passed: recent.passed });
+  const queue = makeQueue<Said>({ run, log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
   const reconciler = reconcilerFor(db, settings, {
@@ -205,9 +179,14 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
           },
           onJoin: reconciler.joined,
           ...kept.hooks,
+          onRedact: (room, msgid) => {
+            kept.hooks.onRedact(room, msgid);
+            recent.taken(room, msgid);
+          },
           onChannels: unknownChannels(db, log),
           onMessage: (said, replayed) => {
             kept.onEdit(said);
+            recent.edited(said);
             // A line of a history page is no activity now, whatever its time.
             if (!replayed) activity.count(said.room, said.account, now());
             progress.heard(said);
@@ -228,6 +207,8 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     verdicts: verdictsFor(db, settings, options),
     rooms: keeping(keeper, { mutes, reconciler }),
     ...kept.api,
+    recent: recent.recent,
+    line: recent.line,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

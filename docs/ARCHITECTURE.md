@@ -15,7 +15,7 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live
   ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)
   ├─ server (TypeScript on Node) ......... login for Ergo, moderation and the activity API, signals, prices, the admin API
-  └─ jarvis (same image) .................. Jarvis, gnomcp as a child process, translation
+  └─ jarvis (its own image) ............... Jarvis, gnomcp as a child process, translation; reached through the server alone
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
@@ -26,8 +26,9 @@ for Jarvis from phase 1 (ADR-0002 §5, §7).
 
 **One monorepo.** The client, the admin console, the server, the shared packages, the realms
 and the deployment live in one repository, with one lockfile and one gate:
-- each of `app/`, `admin/`, `server/`, `packages/core`, `packages/ui` and `packages/schemas` is
-  a workspace: the applications at the root, the libraries they import under `packages/`;
+- each of `app/`, `admin/`, `server/`, `jarvis/`, `packages/core`, `packages/ui`, `packages/schemas`,
+  `packages/service` and `packages/chain` is a workspace: the applications at the root, the libraries
+  they import under `packages/`;
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
   `@gnoworld/schemas`), never by a relative path across folders;
 - no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
@@ -49,8 +50,9 @@ app/                         the web client
     routes/                  one module per URL: meta, build-time loader, the screen
     meta.ts                  each page's title, description, canonical and Open Graph tags
     worlds.ts                the worlds slice 1 pre-renders, until data/ holds them (slice 5)
-    lib/                     the boundaries: Ergo client, chain reads, indexer, Adena (`lib/adena`), IndexedDB;
-                             they parse with `@gnoworld/schemas` and apply `@gnoworld/core`
+    lib/                     the boundaries: Ergo client, the realm reads around `@gnoworld/chain` (`lib/chain`,
+                             with evalCall's checks), Adena (`lib/adena`), IndexedDB; they parse with
+                             `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature, kept here: the store imports
                              no feature (`store/login.ts`); React reads it through `storeContext.tsx`
     scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
@@ -63,12 +65,20 @@ packages/core/               pure rules, shared by app, admin and server: no DOM
 packages/ui/                 the design system: tokens, layers, compositions, components, Storybook
                              (docs/DESIGN-SYSTEM.md); shared by app and admin
 packages/schemas/            Zod schemas for every boundary, shared the same way
+packages/service/            what the server and Jarvis share, on Node (10h): settings, db, log, net (the one way out)
+packages/chain/              every read of a chain's node or the indexer, for app, server and Jarvis (10h): the capped
+                             GET, the read through a schema, the node's reads with its universe check, the indexer's
 server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file (3g)
-  src/                       `main`, `app`, `config`, `log`, `db`, `limit`, `visitor`, `net` (slice 3's 3a),
-                             then one folder per role, from the merge that needs it: login/ ergo/ irc/ roles/ rooms/
-                             activity/ moderation/ stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), admin/ (12)
-  jarvis/                    the harness, its skills (SKILL.md folders) and its evals
-deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example
+  src/                       `main`, `app`, `config`, `limit`, `visitor` (slice 3's 3a), then one folder per role,
+                             from the merge that needs it: login/ ergo/ irc/ roles/ rooms/ activity/ moderation/
+                             stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), door/ (10, Jarvis's), admin/ (12)
+jarvis/                      Jarvis (slice 10, its own workspace and image since 10h): it imports nothing of server/
+  src/                       the loop, its locks, limits, checks and tools; testing/, its fakes
+  skills/                    Jarvis's skills, one SKILL.md folder each, read by its loader only (ADR-0002 §5)
+evals/                       Jarvis's evals (10j): promptfoo apart from the workspace, its own lockfile; cases/ plain JSON,
+                             chains/ the recorded realms, provider.ts through jarvis's real entry; never in an image
+deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example; jarvis/ its image
+                             and gnomcp's read-only profiles, egress/ the server's and jarvis's lists
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
@@ -88,7 +98,8 @@ features/chat/
 
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` and `ui`
 since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`), `lib` and `store` since
-slice 4 (4a); `scene` gets its own with the slice that makes the folder.
+slice 4 (4a), `jarvis`, `service` and `chain` since 10h (`lint/server.config.ts`, `lint/chain.config.ts`,
+each wall proven by `scripts/probe.py`'s `walls` block); `scene` gets its own with the slice that makes the folder.
 
 | Folder | May import | Never imports |
 |---|---|---|
@@ -99,7 +110,10 @@ slice 4 (4a); `scene` gets its own with the slice that makes the folder.
 | `ui` | `ui` | `features`, `scene`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
 | `sw` | `sw` | Anything else: the worker runs alone, before the page |
-| `server` | `core`, `schemas`, Node's built-ins, its framework | React, `scene`, `ui`, `features` |
+| `server` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its framework | React, `scene`, `ui`, `features`, `jarvis` |
+| `jarvis` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its dependencies | `server`, React, `scene`, `ui`, `features` |
+| `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
+| `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else (D113) |
 | `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `scene` directly: the canvas is mounted by the universe feature |
 
 This is ADR-0001 §12's split, kept: a bug is either in the scene or in the interface, and
@@ -126,7 +140,8 @@ import boundaries above; no import cycles (`eslint-plugin-import-x`). **Copies:*
 option compares syntax trees). **One way to
 do each thing,** enforced per folder by `no-restricted-globals` and `no-restricted-syntax`:
 `fetch` and storage only in `lib`, and in `sw` only `fetch` and the cache (the worker fetches and caches;
-its page side asks whether the host answers, F351), `Intl` formatting only in `core`'s formatters, no clock
+its page side asks whether the host answers, F351), a read of a chain's node or the indexer only in
+`packages/chain`, however it is written (`gnoworld/chain-read`, D113), `Intl` formatting only in `core`'s formatters, no clock
 in `core`, `console` only through the logger, no `Map`, `WeakMap` or `Set` at a module's top in `server/src` or a
 package's `src` (F412). **A map for agents:** the gate regenerates
 `docs/generated/exports.md`, every exported function and type with its signature, from the

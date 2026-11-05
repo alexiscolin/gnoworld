@@ -1,0 +1,11 @@
+# evals/ is a project of its own, apart from the repository's workspace (Alexis, the plan's question 6: promptfoo's
+# 615 packages stay out of the main checkout's install), with its own lockfile. pnpm takes the nearest
+# pnpm-workspace.yaml as the root, so this file keeps the workspace's supply-chain rules for it: no package younger
+# than a day, no version whose trust evidence dropped, no pnpmfile, no build script but those listed.
+packages: []
+minimumReleaseAge: 1440
+trustPolicy: no-downgrade
+ignorePnpmfile: true
+engineStrict: true
+allowBuilds:
+  esbuild: false # tsx's, under promptfoo: its postinstall only re-fetches the binary optionalDependencies already install
