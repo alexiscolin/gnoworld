@@ -295,6 +295,11 @@ describe("the passport's file", () => {
     expect(Object.keys(read?.stamps ?? {})).toEqual(["__proto__"]);
   });
 
+  it("reads nothing from a file whose stamps hold a hostile __proto__ value: whole or not at all", () => {
+    const file = '{"gnoworld":"passport","version":1,"stamps":{"__proto__":{"polluted":1}},"charted":{}}';
+    expect(readPassportFile(file)).toBeUndefined();
+  });
+
   it("reads nothing from a file over 2,000,000 characters, and reads one at the bound", () => {
     const base = passportFile({ stamps: {}, charted: {} });
     const pad = (length: number) => base.replace("{", `{${" ".repeat(length - base.length)}`);

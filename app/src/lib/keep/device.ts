@@ -186,8 +186,10 @@ export function readPassportFile(text: string): Pick<DeviceFields, "stamps" | "c
   if (!isRecord(raw) || raw["gnoworld"] !== "passport" || raw["version"] !== 1) return undefined;
   const stamps = CODECS.stamps.read(raw["stamps"]);
   const charted = CODECS.charted.read(raw["charted"]);
-  const whole = (read: { strange: unknown } | undefined) =>
-    read !== undefined && isRecord(read.strange) && Object.keys(read.strange).length === 0;
-  if (stamps === undefined || charted === undefined || !whole(stamps) || !whole(charted)) return undefined;
+  // Whole when every key of the file was read: an entry set aside under "__proto__" would leave no key to count (8h).
+  const whole = (read: { value: object } | undefined, held: unknown) =>
+    read !== undefined && isRecord(held) && Object.keys(read.value).length === Object.keys(held).length;
+  if (stamps === undefined || charted === undefined || !whole(stamps, raw["stamps"]) || !whole(charted, raw["charted"]))
+    return undefined;
   return { stamps: stamps.value, charted: charted.value };
 }
