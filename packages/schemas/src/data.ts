@@ -111,6 +111,8 @@ export const Events = byId(
     link: Link,
     /** The world it happens in, by its hub's slug or the Earth's ("earth"), for the calendar and the bell by world (Alexis, slice 8). */
     world: z.optional(Key),
+    /** What it is, in a word, as the ticker and a world's label say it ("AMA", frames 4 and 6); unsaid, an event (Alexis, 8p). */
+    kind: z.optional(z.string().check(z.regex(/^[A-Za-z][A-Za-z ]{0,11}$/))),
   }),
 );
 export { BubbleRules } from "./bubbleRules.ts";
