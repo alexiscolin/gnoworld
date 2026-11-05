@@ -141,6 +141,16 @@ describe.each(CHAINS)("the reads on %s", (chain) => {
     });
   });
 
+  describe("readCallable, a function with no parameters", () => {
+    it("gives an empty list for it, as the chain writes it with none", async () => {
+      const fetcher = answering(
+        queryEnvelope({ data: JSON.stringify([{ FuncName: "Ping", Params: null, Results: null }]) }),
+      );
+      const result = await readCallable(rpc, WUGNOT, options(fetcher));
+      expect(result.ok ? result.value : undefined).toEqual([{ name: "Ping", params: [] }]);
+    });
+  });
+
   describe("two panels of one view asking for a realm's functions in the same moment", () => {
     it("share one request when they ask with the same options, and a read that has ended is asked again", async () => {
       const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
