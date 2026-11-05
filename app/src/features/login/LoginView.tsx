@@ -2,6 +2,7 @@
 // logged in and a way out, and why the last login stopped. A phone cannot log in: it is told to use a
 // computer for that, and that it writes once logged in (U6).
 import { Button, Cluster } from "@gnoworld/ui";
+import { lazy, Suspense } from "react";
 import type { LoginSlice } from "../../store/login.ts";
 import styles from "./LoginView.module.css";
 import { sayProblem } from "./problem.ts";
@@ -13,20 +14,31 @@ export interface LoginViewProps {
   problem: Login["problem"];
   onLogIn: () => void;
   onLogOut: () => void;
+  /** The id of the universe the page is in: the chain a name is registered on. */
+  universe?: string | undefined;
 }
+
+// The account's name is read after the first screen: its own chunk, the short address standing in until it is there.
+const AccountName = lazy(() => import("../names/index.ts"));
 
 const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…", verifying: "Checking your signature…" };
 // An address's first six and last five characters: enough to know one's own.
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
 
-export function LoginView({ session, step, problem, onLogIn, onLogOut }: LoginViewProps) {
+export function LoginView({ session, step, problem, onLogIn, onLogOut, universe }: LoginViewProps) {
   return (
     <Cluster>
       {session.kind === "in" ? (
         <>
-          <span className={styles["account"]} title={session.address}>
-            {short(session.address)}
-          </span>
+          <Suspense
+            fallback={
+              <span className={styles["account"]} title={session.address}>
+                {short(session.address)}
+              </span>
+            }
+          >
+            <AccountName account={session.address} universe={universe} pill={styles["account"] ?? ""} />
+          </Suspense>
           <Button size="s" emphasis="quiet" onClick={onLogOut}>
             Log out
           </Button>

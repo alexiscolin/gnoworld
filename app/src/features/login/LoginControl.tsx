@@ -18,7 +18,7 @@ async function logInWithAdena(deps: SessionDeps): Promise<void> {
   await logIn(pageAdena(), { ...deps, connect, sign: signLogin });
 }
 
-export function LoginControl() {
+export function LoginControl({ universe }: { universe?: string | undefined }) {
   const store = useAppStore();
   const [deps] = useState<SessionDeps>(() => ({ api: pageLoginApi(), store }));
   const login = useApp((state) => state.login);
@@ -40,6 +40,7 @@ export function LoginControl() {
   }, [deps]);
   return (
     <LoginView
+      universe={universe}
       session={login.session}
       step={login.step}
       problem={login.problem}

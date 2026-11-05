@@ -4,6 +4,7 @@
 // The app names no universe's chain to its reads yet (D118): each states null.
 import { readEvaluated, readFunctionList, readRender } from "@gnoworld/chain/node";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
+import { Address } from "@gnoworld/schemas";
 import { evalCall, isExportedName, isRealmPath } from "./evalCall.ts";
 
 const badName = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
@@ -28,6 +29,22 @@ export function readEval(
   const call = evalCall(realm, name);
   if (call === null) return badName(rpc, options);
   return readEvaluated(rpc, call, { ...options, chainId: null });
+}
+
+/** The typed text of one of the two calls on r/sys/users's record of `account`, a fixed expression over an address the schema proved
+ * (D92; evalCall.ts builds only `<realm>.<Name>()` and stays as it is). `IsDeleted` answers for a missing record, which `Name` would
+ * panic on. Nothing is asked for what is no address. */
+export function readUser(
+  rpc: string,
+  { account, call }: { account: string; call: "IsDeleted" | "Name" },
+  options: ReadOptions = {},
+): Promise<ChainRead<string>> {
+  const proved = Address.safeParse(account);
+  if (!proved.success) return badName(rpc, options);
+  return readEvaluated(rpc, `gno.land/r/sys/users.ResolveAddress("${proved.data}").${call}()`, {
+    ...options,
+    chainId: null,
+  });
 }
 
 type Listing = (Awaited<ReturnType<typeof readFunctionList>> & { ok: true })["value"][number];

@@ -1,5 +1,7 @@
 // The call card (9d): what another feature draws a call with. A realm's write functions open it under their rows.
 export { CallCard } from "./CallCard.tsx";
 export { feeText } from "./fee.ts";
-export { signInPage } from "./signPage.ts";
+export { pageParts, signInPage, signWith, type Parts } from "./signPage.ts";
+export { sayFailure } from "./say.ts";
+export type { SignDeps } from "./signCall.ts";
 export { callsIn, ensureCalls } from "./slice.ts";
