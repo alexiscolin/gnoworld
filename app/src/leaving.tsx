@@ -3,7 +3,7 @@
 // to and shows the whole address. Only the dialog's own link leaves. A realm's page, the calendar and the bell share it.
 import { Button, Dialog, Stack } from "@gnoworld/ui";
 import { useState } from "react";
-import { hostOf } from "./lib/chain/read.ts";
+import { hostOf } from "@gnoworld/chain/read";
 
 /** The way to ask before leaving: `ask` opens the warning for an address; `dialog` is the one warning, drawn once in the page. */
 export function useLeaving() {

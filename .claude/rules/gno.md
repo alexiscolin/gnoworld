@@ -21,8 +21,11 @@ before reviewing one. From gno's AGENTS.md (gnolang/gno at 90cebca0d, 2026-10-15
   guard on `cur` (always true); `IsCurrent()` belongs on a `rlm` passed as an argument;
 - never `unsafe.PreviousRealm()` in a crossing function, nor a `PreviousRealm().PkgPath()`
   check in a non-crossing one;
-- a payment through `banker.OriginSend()` is guarded by `cur.Previous().IsUserCall()`, never
-  `IsUser()`: a `maketx run` realm can spend the envelope first;
+- a payment through `unsafe.OriginSend()` (`chain/runtime/unsafe` at `chain/onyx`, where
+  AGENTS.md's `banker.OriginSend()` does not exist, F5049) is guarded by
+  `cur.Previous().IsUserCall()`, never `IsUser()`: a `maketx run` realm can spend the envelope first;
+  and by `runtime.AssertOriginCall()` in the paid function's own body, as `OriginSend`'s doc asks,
+  so a realm holding that function in a variable never gets its coins (F5056);
 - one balance is `banker.GetCoin(addr, denom)`, never `GetCoins(addr).AmountOf(denom)`, whose
   cost a third party sets; validate the denom first, since `GetCoin` panics on a bad one;
 - never return a pointer to a `/p/` value held in realm state whose type has exported

@@ -122,7 +122,6 @@ export {
 } from "./planet/signs.ts";
 export { between, seedShare } from "./planet/shares.ts";
 export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
-export { abciQueryOf } from "./chain/abci.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
 export { evalNameOf, isAddress } from "./chain/evalName.ts";
@@ -169,3 +168,4 @@ export { PHONE_QUERY } from "./frame/phone.ts";
 export { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "./frame/snapshot.ts";
 export * from "./space/index.ts";
 export * from "./discovery/index.ts";
+export { jsonOf, placeIn } from "./json/json.ts";

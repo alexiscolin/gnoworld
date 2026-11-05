@@ -4,7 +4,7 @@
 // a UTF-16 unit is at least a byte, so a head of as many units holds any line: a megabyte costs what the head costs.
 import { firstGraphemes } from "../markdown/graphemes.ts";
 
-const JOINER = "‍";
+const JOINER = "\u200d";
 /** The relay's `MULTILINE_BYTES` (a test holds them equal): the import would split the module off the chat's chunk, for each world's first screen. */
 const LINE_UNITS = 4096;
 /** The longest cluster that stays, in UTF-16 units (a family of four with skin tones is 19): a bubble is never longer

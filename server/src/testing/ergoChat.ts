@@ -3,8 +3,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { startChat } from "../chat.ts";
-import { openDatabase } from "../db.ts";
-import { logger } from "../log.ts";
+import { openDatabase } from "@gnoworld/service/db";
+import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "../login/login.ts";
 import { TICKET_TABLES } from "../login/ticket.ts";
 import { PROGRESS_TABLES } from "../moderation/catchup.ts";

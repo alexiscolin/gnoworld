@@ -4,7 +4,7 @@
 // channel comes back, and a member taken off the file is put out. Read whole in review: a wrong command
 // here opens a room or hands out power.
 import { NICK, type Command } from "../irc/lines.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import type { Desired } from "./types.ts";
 
 /** A room in Ergo: its flags, its invite list by account, and who is in it with their prefixes. */

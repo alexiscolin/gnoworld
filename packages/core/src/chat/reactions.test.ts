@@ -61,7 +61,19 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
 
   // Emoji are sequences: a selector, a skin tone, a ZWJ family or couple, a flag's letters, a subdivision's tags, a
   // keycap (R9).
-  test.each(["❤️", "☺️", "👍🏽", "🏳️‍🌈", "👩‍👩‍👧‍👦", "👩🏻‍❤️‍💋‍👨🏿", "🧑‍🦰", "🇫🇷", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "1️⃣", "😂"])("reads the emoji %s whole", (emoji) => {
+  test.each([
+    "❤️",
+    "☺️",
+    "👍🏽",
+    "🏳️\u200d🌈",
+    "👩\u200d👩\u200d👧\u200d👦",
+    "👩🏻\u200d❤️\u200d💋\u200d👨🏿",
+    "🧑\u200d🦰",
+    "🇫🇷",
+    "🏴\u{e0067}\u{e0062}\u{e0065}\u{e006e}\u{e0067}\u{e007f}",
+    "1️⃣",
+    "😂",
+  ])("reads the emoji %s whole", (emoji) => {
     expect(reactionOf(tagmsg(`+draft/react=${escapeTagValue(emoji)};+reply=m1`), "#bubble")?.emoji).toBe(emoji);
   });
 
@@ -74,7 +86,7 @@ describe("reactionOf: a reaction from Ergo's TAGMSG", () => {
     ["a flag's lone letter", "🇦"],
     ["a heart in its text form, which RGI's set lists only with its emoji selector", "❤"],
     ["a smile in its text form, its text selector", "☺︎"],
-    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍‍😂"],
+    ["two emoji joined by a ZWJ into no sequence of RGI's", "👍\u200d😂"],
     ["a skin tone on an emoji that takes none", "🙂🏽"],
     ["an emoji under a combining accent", "👍́"],
     ["a digit", "1"],

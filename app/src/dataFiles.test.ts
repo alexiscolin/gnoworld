@@ -157,6 +157,19 @@ describe("loadData", () => {
     }
   });
 
+  // D122: the build names every fault of a file, one a line, where Jarvis's places name the first.
+  it("names every fault of a file, one a line", () => {
+    const dir = plant((files) => {
+      const [hub] = files["hubs.json"] as Record<string, unknown>[];
+      if (hub !== undefined) Object.assign(hub, { name: 7, description: 7 });
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^hubs\.json: \[0\]\.name: [^\n]+\nhubs\.json: \[0\]\.description: [^\n]+$/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
   it("takes a file of the largest size, and refuses one byte more, naming it", () => {
     const pad = (n: number) => (f: Record<string, unknown>) => void (f["quests.json"] = `[]${" ".repeat(n)}`);
     const exact = plant(pad(MAX_FILE_BYTES - 2));

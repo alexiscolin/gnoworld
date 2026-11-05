@@ -4,7 +4,7 @@
 // never zero; a world with no name or page is passed over.
 import { EARTH, labelName, usualOf } from "@gnoworld/core";
 import type { Trend, Worlds } from "@gnoworld/schemas/indexer";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import type { Recent } from "./history.ts";
 import { makePresence, type Presence as Hours } from "./presence.ts";
 import { chainClears, type ChainSignal, type ChainWorld, type Place } from "./score.ts";

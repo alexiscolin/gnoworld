@@ -20,9 +20,11 @@ export const QueryAnswer = z.object({
 });
 export type QueryAnswer = z.infer<typeof QueryAnswer>;
 
-/** The node's `/status`: the latest block's height (an int64 is a string) and its own time. */
+/** The node's `/status`: the latest block's height (an int64 is a string) and its own time; its network, the chain's id, when
+ * it names one (D118: a read given its universe's chain checks it). */
 export const StatusAnswer = z.object({
   result: z.object({
+    node_info: z.optional(z.object({ network: z.optional(z.string()) })),
     sync_info: z.object({
       latest_block_height: z.string().check(z.regex(/^[0-9]+$/)),
       latest_block_time: z.iso.datetime(),

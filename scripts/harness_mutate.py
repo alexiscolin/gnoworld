@@ -41,31 +41,35 @@ GAPS = {  # label -> why no test can notice it yet
 
 TESTS = {"probe": [sys.executable, "-I", "scripts/probe.py"], "hooks": ["sh", "scripts/test_hooks.sh"]}
 # The lint config and its parts: each rule, selector and restricted name lives in one of them.
-ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts"]
+ESLINT = ["eslint.config.ts", "lint/shared.config.ts", "lint/core.config.ts", "lint/react.config.ts", "lint/app.config.ts", "lint/server.config.ts", "lint/chain.config.ts", "lint/gnoworld.config.ts"]
 REACT = "lint/react.config.ts"
 APP = "lint/app.config.ts"
 SERVER = "lint/server.config.ts"
+CHAIN = "lint/chain.config.ts"
+RULES = "lint/gnoworld.config.ts"
+WORDS = "lint/words.config.ts"
 # Each guard's file, and the sections of its test that must notice the guard gone (their ONLY=):
 # a mutant runs those alone, not the whole suite. A guard file missing here stops the run.
 SECTIONS = {
-    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server", "app/tsconfig.json": "react_tsc",
-    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,bench_files", "lint/core.config.ts": "lint",
+    "eslint.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads", "app/tsconfig.json": "react_tsc",
+    "lint/shared.config.ts": "lint,outside_core,react,ui_lint,app_folders,server,jarvis,service,chain,walls,chain_reads,bench_files", "lint/core.config.ts": "lint",
+    "lint/chain.config.ts": "chain,walls", "lint/gnoworld.config.ts": "chain_reads,walls", "lint/words.config.ts": "chain_words",
     "lint/react.config.ts": "react,ui_lint,app_folders", "lint/app.config.ts": "app_folders,react",
-    "lint/server.config.ts": "server", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
+    "lint/server.config.ts": "server,jarvis,service,walls", "server/tsconfig.json": "server", "scripts/ergo.sh": "ergo",
     # A file both suites guard names each one's sections: a section of the other suite would
     # fail the run as unknown, and count a mutant killed that no test saw.
-    "package.json": {"probe": "react_warn,react_tsc,ui_tsc", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
+    "package.json": {"probe": "react_warn,react_tsc,ui_tsc,jarvis,service,chain", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
-    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
+    ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "app/tests/stories/pictures.spec.ts": "tokens_pictures", "app/playwright.stories.config.ts": "tokens_pictures",
     "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
-    "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
-    ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
+    ".githooks/records.sh": "outside,installed,wiring,worktree_script",".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring",
-    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
+    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
+    "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
 
@@ -218,7 +222,7 @@ def mutants():
         for m in re.finditer(r'^\s+"?([\w@/-]+)"?:\s*(?=\[?\s*"error"|\[\s*$)', text, re.M):
             at = text.find('"error"', m.end())
             yield f"eslint {m.group(1)} ({path}:{text.count(chr(10), 0, m.start()) + 1})", path, text[:at] + '"off"' + text[at + 7:], "probe"
-        if path not in (SERVER, "eslint.config.ts"):  # the server's part bans by name and path; the root config composes the parts
+        if path not in (SERVER, CHAIN, RULES, "eslint.config.ts"):  # the services', the chain's and our rules' parts ban by name, path and words; the root config composes the parts
             yield from selectors(path, "probe")
     for path in ("lint/core.config.ts", REACT, APP):
         yield from each(path, 'property: "', 'property: "never_', "probe", "eslint restricted property")
@@ -229,11 +233,118 @@ def mutants():
     yield from each(SERVER, 'target: "./server"', 'target: "./nowhere"', "probe", "eslint the server reaches no path out of its folder")
     # Not "./node_modules": this worktree borrows the repository's, outside it, so the zone never sees a
     # package here (F385); in the repository the gate's own lint fails without that exception.
-    for name in ("./server", "./packages/core", "./packages/schemas"):
+    for name in ("./server", "./packages/core", "./packages/schemas", "./packages/service", "./packages/chain"):
         yield from each(SERVER, f'"{name}"', '"./nowhere"', "probe", f"eslint the server imports from {name}")
-    yield from each(SERVER, '"server/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
+    yield from each(SERVER, '"packages/service/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
+    yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")
+    # The walls (decision-isolation.md, D110 to D112): each folder's bans by name, the service package's zone; the zones'
+    # exceptions are the names loop's above.
+    yield from each(SERVER, 'banned("jarvis", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
+    yield from each(SERVER, 'banned("server", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
+    listed = 'banned("server|jarvis|app|chain", SERVICE)'
+    for name in ("server|", "jarvis|", "app|", "|chain"):
+        yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
+    yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
+    # A module in another extension, and a require made by hand (D123): each pattern and each module name.
+    yield from each("eslint.config.ts", '"{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
+    yield from each("eslint.config.ts", '"{server,jarvis,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
+    yield from each(SERVER, '["node:module", "module"]', '["module"]', "probe", "eslint the services refuse createRequire from node:module")
+    yield from each(SERVER, '["node:module", "module"]', '["node:module"]', "probe", "eslint the services refuse createRequire from module")
+    yield from each(CHAIN, 'target: "./packages/chain"', 'target: "./nowhere"', "probe", "eslint the chain package reaches no path out of its folder")
+    for name in ('"./packages/core"', '"./packages/schemas"', '"./packages/chain"'):
+        yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
+    for name in ("server|", "jarvis|", "app|", "|service"):
+        yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
+    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package
+    # (lint/words.config.ts), each word and each way a string is read; a test helper or the expression sender imported by
+    # product code; an import at run time of a computed name; the files each reaches or leaves free.
+    for find, replace, label in (
+        (r"/abci_(?:query|info)/", "/(?!)/", "an ABCI query"),
+        (r"/(?<![A-Za-z])vm(?:\/|%2[Ff])q|\b(?:auth\/accounts|bank\/balances)\//", "/(?!)/", "an ABCI path"),
+        (r"|\b(?:auth\/accounts|bank\/balances)\//", "/", "an account's or a balance's ABCI path"),
+        (r"(?:\/|%2[Ff])q", r"\/q", "an ABCI path URL-encoded"),
+        (r"`(?:\\$\\{\\}|://[^/?#\\s]+)/(?:${ROUTES})(?![\\w-])`", "`(?!)`", "a node's RPC route"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:\\$\\{\\})", "a node's RPC route after a full address"),
+        (r"(?:\\$\\{\\}|://[^/?#\\s]+)", r"(?:://[^/?#\\s]+)", "a node's RPC route after an interpolation"),
+        ('"status|block|', '"block|', "the status route"),
+        ("|block|block_results|", "|block_results|", "the block route"),
+        (r'`"method"\\s*:\\s*"(?:${ROUTES})"`', "`(?!)`", "a JSON-RPC method in a text"),
+        (r"/:26657(?!\d)/", "/(?!)/", "the RPC port"),
+        (r"/^\s*(?:(?:query|subscription|mutation)\b[^{]*\{|\{\s*[A-Za-z_]\w*\s*[({])/", "/(?!)/", "a GraphQL operation"),
+        ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
+        (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
+        (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
+        # Each word's every alternative and edge (10h's review, V5): one case of the probe's chain_words block must fail.
+        ("abci_(?:query|info)", "abci_(?:info)", "the abci_query query"),
+        ("abci_(?:query|info)", "abci_(?:query)", "the abci_info query"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:%2[Ff])q", "an ABCI path with its slash"),
+        (r"vm(?:\/|%2[Ff])q", r"vm(?:\/|%2F)q", "an ABCI path encoded in lower case"),
+        (r"auth\/accounts|bank\/balances", r"bank\/balances", "an account's ABCI path"),
+        (r"auth\/accounts|bank\/balances", r"auth\/accounts", "a balance's ABCI path"),
+        ("(?<![A-Za-z])vm", "vm", "no ABCI path inside a longer word"),
+        (r"(?![\\w-])`", "`", "no route inside a longer word"),
+        ("(?:query|subscription|mutation)", "(?:subscription|mutation)", "a GraphQL query"),
+        ("(?:query|subscription|mutation)", "(?:query|subscription)", "a GraphQL mutation"),
+    ):
+        yield from each(WORDS, find, replace, "probe", f"eslint our rules refuse {label}")
+    for name in ("block_results", "blockchain", "commit", "validators", "genesis", "net_info", "health", "tx", "tx_search",
+                 "unconfirmed_txs", "num_unconfirmed_txs", "consensus_state", "dump_consensus_state"):
+        yield from each(WORDS, f"|{name}|", "|", "probe", f"eslint our rules refuse the {name} route")
+    yield from each(WORDS, '|consensus_params"', '"', "probe", "eslint our rules refuse the consensus_params route")
+    for name in ("async", "sync", "commit"):
+        kept = "|".join(other for other in ("async", "sync", "commit") if other != name)
+        yield from each(WORDS, "broadcast_tx_(?:async|sync|commit)", f"broadcast_tx_(?:{kept})", "probe", f"eslint our rules refuse the broadcast_tx_{name} route")
+    for find, replace, label in (
+        ('typeof node.value === "string" ? node.value : undefined', "undefined", "a literal's text"),
+        ('if (node.type === "TemplateLiteral")', "if (false)", "a template's text"),
+        ('.join("${}")', '.join("")', "a template's interpolation"),
+        ('if (operator !== "+" ||', "if (true ||", "a sum's text"),
+        ('${textOf(left) ?? "${}"}', '${textOf(left) ?? ""}', "a sum's value on its left"),
+        ('if (node.type === "AssignmentExpression" && node.operator === "+=" && ', 'if (node.type === "AssignmentExpression" && ', "a plain assignment as a sum (V4)"),
+        ("return `\\${}${textOf(node.right)", "return `${textOf(node.right)", "a += sum's left side as a value (V4)"),
+        ("      AssignmentExpression: check,\n", "", "the rule's += sums (V4)"),
+        ("      Literal: check,\n", "", "the rule's literals"),
+        ("      TemplateLiteral: check,\n", "", "the rule's templates"),
+        ("      BinaryExpression: check,\n", "", "the rule's sums"),
+        ('keyed("jsonrpc") !== undefined && ', "", "a JSON-RPC call's version key"),
+        ("if (rpcCall(node)) call(node);", "", "a JSON-RPC call to a node"),
+        ('node.callee?.name === "URL" && ', "", "a route given to URL alone"),
+        ("if (routed(node)) url(node);", "", "a route given to URL"),
+        ('"app/src/**/*.{ts,tsx}", "server/**/*.ts"', '"server/**/*.ts"', "the rules' reach in the app"),
+        ('"server/**/*.ts", "jarvis/**/*.ts"', '"jarvis/**/*.ts"', "the rules' reach in the server"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', '"packages/*/src/**/*.{ts,tsx}"', "the rules' reach in Jarvis"),
+        ('"jarvis/**/*.ts", "packages/*/src/**/*.{ts,tsx}"]', '"jarvis/**/*.ts"]', "the rules' reach in the packages"),
+        ('"packages/chain/src/**", ', "", "the chain package's own words free"),
+        ('"**/testing/**", ', "", "the fakes free"),
+        ("...TESTS, ...BENCHES]", "...BENCHES]", "the tests free"),
+        ("...TESTS, ...BENCHES]", "...TESTS]", "the benches free"),
+        (r"/(?:^|\/)testing(?:\/|$)/", "/(?!)/", "a test helper imported by product code"),
+        ("      ImportDeclaration: check,\n", "", "an import's module"),
+        ("      ExportNamedDeclaration: check,\n", "", "a re-export's module"),
+        ("      ExportAllDeclaration: check,\n", "", "a whole re-export's module"),
+        ("      ImportExpression: check,\n", "", "a run-time import's module"),
+        ('type === "ImportNamespaceSpecifier" || ', "", "a namespace import of the expression sender"),
+        ('(imported ?? local)?.name === "readEvaluated"', "false", "the expression sender by its name"),
+        ('node.type === "ImportExpression" || ', "", "a run-time import of the expression sender's module"),
+        (' || node.type === "ExportAllDeclaration"', "", "a whole re-export of the expression sender's module"),
+        ('"app/src/lib/chain/rpc.ts", ', "", "evalCall's builder free"),
+        ('"server/src/door/names.ts"]', "]", "the door's builder free"),
+        ("text === undefined || ", "", "a computed import"),
+        (' || text.includes("${}")', "", "a templated import"),
+    ):
+        yield from each(RULES, find, replace, "probe", f"eslint our rules refuse {label}")
+    # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
+    for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
+        yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")
+    yield from each(CHAIN, '"^zustand(/|$)"', '"^never_zustand(/|$)"', "probe", "eslint the chain package refuses the store by name")
+    yield from each(CHAIN, '"packages/chain/**/*.ts"', '"packages/chain/**/*.nothing"', "probe", "eslint reaches the chain package's files")
+    yield from each(CHAIN, "ignores: TESTS,", "", "probe", "eslint leaves the chain package's tests free")
     yield from each(SERVER, "...TESTS", "", "probe", "eslint a server test calls the server it started")
     yield from each(SERVER, '"server/**/*.ts"', '"server/**/*.nothing"', "probe", "eslint reaches the server's files")
+    # Jarvis's folder (D110): the same rules, its own zone, the files each block reaches.
+    yield from each(SERVER, 'target: "./jarvis"', 'target: "./nowhere"', "probe", "eslint Jarvis reaches no path out of its folder")
+    yield from each(SERVER, '"./jarvis"', '"./nowhere"', "probe", "eslint Jarvis imports from its own folder")
+    yield from each(SERVER, '"jarvis/**/*.ts"', '"jarvis/**/*.nothing"', "probe", "eslint reaches Jarvis's files")
     # A bench is switched off like a test (security-S1): its files, both extensions, and the selector the block holds.
     yield from each("eslint.config.ts", "files: BENCHES,", 'files: ["**/*.nothing"],', "probe", "eslint a bench is never switched off")
     yield from each("lint/shared.config.ts", '"**/*.bench.ts", ', "", "probe", "eslint a .ts bench is never switched off")
@@ -241,9 +352,10 @@ def mutants():
     yield from each("lint/shared.config.ts", ', "**/*.bench.tsx"', "", "probe", "eslint a .tsx bench is never switched off")
     yield from each("eslint.config.ts", 'CLASS_AT_END, SWITCHED_OFF] },\n  },\n  {\n    files: ["**/*.css"]', 'CLASS_AT_END] },\n  },\n  {\n    files: ["**/*.css"]', "probe", "eslint the bench block holds the switched-off selector")
     # No state at a module's top (F412): the block for every workspace's source, core's and ui's own lists, the selector's parts.
-    both = '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
-    yield from each("eslint.config.ts", both, '"packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
-    yield from each("eslint.config.ts", both, '"server/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
+    both = '"server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
+    yield from each("eslint.config.ts", both, '"jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a Jarvis module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "jarvis/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", ...SWALLOWED, CLASS_AT_END]', "probe", "eslint's workspace block refuses state at a module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", CLASS_AT_END, MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
     yield from each("lint/core.config.ts", "...SWALLOWED, CLASS_AT_END, ", "...SWALLOWED, ", "probe", "eslint core refuses a u class right before $ (F821)")
@@ -287,7 +399,8 @@ def mutants():
     yield from each("scripts/ergo.sh", ' || refuse "building Ergo $tag failed"', " || :", "hooks", "ergo.sh refuses a failed build")
     yield from each("scripts/ergo.sh", "CGO_ENABLED=0 go build -trimpath", "go build", "hooks", "ergo.sh builds static, its paths trimmed")
     yield from each("scripts/ergo.sh", " sqlite\"", "\"", "hooks", "ergo.sh builds with sqlite")
-    yield from each("vitest.config.ts", ', "server/src/**/*.test.ts"', "", "probe", "the server's tests are found")
+    yield from each("vitest.config.ts", '            "server/src/**/*.test.ts",\n', "", "probe", "the server's tests are found")
+    yield from each("vitest.config.ts", '            "jarvis/src/**/*.test.ts",\n', "", "probe", "Jarvis's tests are found")
     # Core's tests again in Chromium (F816), only when asked, so no other Vitest run opens a browser.
     yield from each("vitest.config.ts", '...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),', "CORE_CHROMIUM,", "probe", "core_chromium exists only when CORE_CHROMIUM asks")
     yield from each("vitest.config.ts", 'include: ["packages/core/src/**/*.test.ts"],', 'include: ["packages/core/sr/**/*.test.ts"],', "probe", "core_chromium finds core's tests")
@@ -366,6 +479,9 @@ def mutants():
     yield from each("package.json", " && tsc -p app/tsconfig.json", "", "probe", "typecheck covers the app")
     yield from each("package.json", " && tsc -p packages/ui/tsconfig.json", "", "probe", "typecheck covers ui")
     yield from each("package.json", 'app/tsconfig.json --incremental --tsBuildInfoFile \\"${TSC_CACHE:-.claude/tmp/tsc}/app.tsbuildinfo\\"', "app/tsconfig.json", "hooks", "typecheck builds the app incrementally into its own file of TSC_CACHE")
+    yield from each("package.json", " && tsc -p jarvis/tsconfig.json", "", "probe", "typecheck covers Jarvis")
+    yield from each("package.json", " && tsc -p packages/service/tsconfig.json", "", "probe", "typecheck covers the service package")
+    yield from each("package.json", " && tsc -p packages/chain/tsconfig.json", "", "probe", "typecheck covers the chain package")
     # ui: React's lint reaches it, and its tests run in jsdom, all of them, each on an empty page.
     yield from each(REACT, ', "packages/ui/src/**/*.{ts,tsx}"]', "]", "probe", "eslint reads ui as React")
     yield from each("vitest.config.ts", 'environment: "jsdom",', "", "probe", "ui's tests run in jsdom")
@@ -582,7 +698,7 @@ def mutants():
     yield from each("deploy/test.sh", ' && [ "$(cat "$lock/pid" 2>/dev/null || true)" = "$$" ]', "", "hooks", "deploy/test.sh releases only a lock that holds its own pid")
     yield from each("deploy/test.sh", 'if [ -z "$holder" ]; then sleep 1;', 'if false; then sleep 1;', "hooks", "deploy/test.sh waits for the run that made a lock to write its pid")
     yield from each("deploy/test.sh", 'mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"', 'mkdir "$lock" 2>/dev/null || true', "hooks", "deploy/test.sh refuses when another run takes the lock it removed")
-    yield from each("scripts/borrow_node_modules.sh", '[ -L "$1/$m/.bin" ]', "false", "hooks", "a borrowed workspace's linked .bin becomes a folder of its own (F2127)")
+    yield from each("scripts/borrow_node_modules.sh", '[ -L "$copy/$m/.bin" ]', "false", "hooks", "a borrowed workspace's linked .bin becomes a folder of its own (F2127)")
     yield from each(hm, "        if rel not in (path, suite," " SELF):", "        if False:", "hooks", "a cached verdict stands on the files its sections name")
     yield from each(hm, "for n in names if n" ' != ".git"]', "for n in names]", "hooks", "a cached verdict never stands on a worktree's .git file")
     yield from each(hm, "remember({keys[id(m)]: " '"killed" if killed else "survives"})', "pass", "hooks", "a verdict is kept as soon as it is judged, for a run cut short")
@@ -931,7 +1047,9 @@ def mutants():
     yield from each("scripts/patch_coverage.py", "    sys.exit(1)", "    pass", "hooks", "patch_coverage floor")
     yield from each("scripts/patch_coverage.py", "|(^|/)tests/", "", "hooks", "patch_coverage leaves Playwright's tests out")
     yield from each("scripts/patch_coverage.py", "|^app/src/(root|entry\\.server)\\.tsx$", "", "hooks", "patch_coverage leaves the shell and server entry to the journeys")
-    yield from each("scripts/patch_coverage.py", "|^server/src/main\\.ts$", "", "hooks", "patch_coverage leaves the server's entry to its child-process tests")
+    yield from each("scripts/patch_coverage.py", "|^(server|jarvis)/src/main\\.ts$", "", "hooks", "patch_coverage leaves the server's and jarvis's entries to their child-process tests")
+    yield from each("scripts/patch_coverage.py", "(server|jarvis)/src/main", "server/src/main", "hooks", "patch_coverage leaves jarvis's entry to its child-process tests (10i)")
+    yield from each("scripts/patch_coverage.py", "|^evals/", "", "hooks", "patch_coverage leaves evals/, installed and tested apart (10j)")
     yield from each("scripts/patch_coverage.py", "|(^|/)\\.storybook/", "", "hooks", "patch_coverage leaves Storybook's config out")
     yield from each("scripts/patch_coverage.py", "|(^|/)testSetup\\.ts$", "", "hooks", "patch_coverage leaves the tests' setup out")
     yield from each("scripts/patch_coverage.py", "|^packages/ui/src/.*\\.stories\\.tsx$", "", "hooks", "patch_coverage leaves the stories out (F247)")
@@ -982,9 +1100,17 @@ def mutants():
     yield from each("scripts/check.sh", '"$GNO" test ./...', '"$GNO" test ./r/...', "hooks", "check.sh gno scope")
     yield from each("vitest.config.ts", "requireAssertions: true", "requireAssertions: false", "probe", "vitest requires an assertion")
     yield from each("scripts/check_regressions.py", "before - after", "set()", "hooks", "check_regressions tests")
+    yield from each("scripts/check_regressions.py", "chr(n) if n <= 0x10FFFF and HIDDEN.fullmatch(chr(n)) else match.group(0)", "match.group(0)", "hooks", "check_regressions reads a hidden character written <U+XXXX> (D117)")
+    yield from each("scripts/check_regressions.py", " and HIDDEN.fullmatch(chr(n))", "", "hooks", "check_regressions reads no other escape (D125, F5280)")
+    yield from each("scripts/check_regressions.py", "n <= 0x10FFFF and ", "", "hooks", "check_regressions reads a number past Unicode as text (D125, F5280)")
+    yield from each("scripts/check_regressions.py", "([0-9A-F]{4,6})>", "([0-9A-F]{2,6})>", "hooks", "check_regressions reads four hex digits at least (D117)")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
-    yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+?) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
+    yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
+    yield from each("scripts/check_regressions.py", 'rf"{key}: (.+) - \\S.*"', 'rf"{key}: (.+?) - \\S.*"', "hooks", "check_regressions reads an item holding ' - ' (F5000)")
+    yield from each("scripts/check_regressions.py", '{m.group(1).strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+) - \\S.*", line.strip()))}',
+                    '{m.group(1)[: cut.start()].strip() for line in lines if (m := re.fullmatch(rf"{key}: (.+)", line.strip())) for cut in re.finditer(r" - (?=\\S)", m.group(1)) if cut.start()}',
+                    "hooks", "check_regressions names one item a line (F5023)")
     yield from each("scripts/check_regressions.py", "e for e in after - before if", "e for e in set() if", "hooks", "check_regressions gaps and ignores")
     yield from each("scripts/check_regressions.py", ".strip() in gone.get(current, set())", ".strip() in set()", "hooks", "check_regressions switched to fails")
     yield from each("scripts/check_regressions.py", 'elif path.endswith(("_test.gno", "_test.go")):', "elif False:", "hooks", "check_regressions gno and Go tests")
@@ -1027,6 +1153,10 @@ def mutants():
     yield from each(cmsg, '|| { echo "commit-msg: git cannot list what is staged" >&2; exit 1; }', "|| :", "hooks", "commit-msg refuses a fix git cannot compare")
     yield from each(cmsg, "grep -qE '^fix(\\(.+\\))?!?:'; then", "grep -qE '^fix(\\(.+\\))?:'; then", "hooks", "commit-msg reads a breaking fix")
     yield from each(".githooks/commit-msg", "command -v gitleaks >/dev/null ||", "true ||", "hooks", "commit-msg names a missing gitleaks (F125)")
+    yield from each(".githooks/commit-msg", "print(len(sys.stdin.buffer.read().decode()))') || {", "print(len(sys.stdin.buffer.read().decode()))') || true || {", "hooks", "commit-msg refuses a subject python3 cannot count (F5080)")
+    yield from each(".githooks/commit-msg", 'if ! printf \'%s\\n\' "$msg" | python3 -I -c "$rule"; then', "if false; then", "hooks", "commit-msg refuses a hidden character in the message (F5085)")
+    yield from each(".githooks/commit-msg", 'rule=$(git show :scripts/hidden.py 2>/dev/null) && [ -n "$rule" ] ||', "rule=$(cat scripts/hidden.py) ||", "hooks", "commit-msg reads the message with the staged scripts/hidden.py (F5085)")
+    yield from each(".githooks/commit-msg", 'if [ -n "${SANDBOX_RUNTIME:-}" ]; then\n\trule=', "if true; then\n\trule=", "hooks", "commit-msg runs nothing of the repository outside the sandbox (F076, F5085)")
     yield from each("scripts/gitleaks-private.toml", r"'''(?i)\b[a-z]:\\{1,2}users", r"'''(?i)\bnever:\\{1,2}users", "hooks", "the private scan sees Windows home folders")
     yield from each("scripts/gitleaks-private.toml", "|file://)", ")", "hooks", "the private scan sees a file URL into a home folder")
     yield from each("scripts/gitleaks-private.toml", r"(?:^|[^\w./~]|file://)(", "(", "hooks", "the private scan lets a users folder inside a path pass (F117)")
@@ -1150,8 +1280,8 @@ def mutants():
     yield from each(".claude/settings.json", '"Edit(/**/AGENTS.md)"', '"Edit(/AGENTS.md)"', "hooks", "settings keep an AGENTS.md below the root out of the file tools, not the root's alone (7w3)")
     yield from each(".claude/settings.json", f'"Edit(/{wt}/*/**/CLAUDE.md)"', f'"Edit(/{wt}/*/**/CLAUDE.md-off)"', "hooks", "settings keep a sibling's nested CLAUDE.md out of the file tools (7w3)")
     for name in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"):
-        yield from each("stryker.config.json", f', "{name}"', "", "hooks", f"StrykerJS copies no {name} the sandbox refuses it to write (7w3)")
-    yield from each("stryker.config.json", '".claude", "coverage"', '"coverage"', "hooks", "StrykerJS copies no .claude folder, whose rules and skills the sandbox closes at any depth (7w3)")
+        yield from each("stryker.config.json", f',\n    "{name}"', "", "hooks", f"StrykerJS copies no {name} the sandbox refuses it to write (7w3)")
+    yield from each("stryker.config.json", '".claude",\n    "coverage"', '"coverage"', "hooks", "StrykerJS copies no .claude folder, whose rules and skills the sandbox closes at any depth (7w3)")
     # No write root reaches the next parts' folder (F5322, the red pass's T2), and AGENTS.md is closed above the trees (T7).
     yield from each(".claude/settings.json", '        "~/go/pkg/mod"\n', '        "~/go/pkg/mod",\n        "~/Server"\n', "hooks", "no allowWrite gives every part's command the next parts' folder (7w3)")
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true,\n', '"blockWritesOutsideWorkingDirectories": true,\n    "additionalDirectories": ["~/Server/gnoworld-wt/slice-8"],\n', "hooks",
@@ -1170,22 +1300,21 @@ def mutants():
                                ('INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}', 'INSTRUCTIONS = {"claude.md", "agents.md"}', "a CLAUDE.local.md"),
                                ('ROOT_OWN = {("claude.md",), (".claude", "claude.md")}', 'ROOT_OWN = {("claude.md",), (".claude", "claude.md"), ("claude.local.md",), ("agents.md",)}', "a CLAUDE.local.md or an AGENTS.md at the root"),
                                ('ROOT_OWN = {("claude.md",), (".claude", "claude.md")}', 'ROOT_OWN = {("claude.md",)}', "the root's .claude/CLAUDE.md, which it keeps"),
-                               ("    for p in repo_paths(root):", '    for p in listed(root, {".md"}):', "a link by its name, whether it leads anywhere"),
+                               ("    for p in listing(root):", '    for p in listed(root, {".md"}):', "a link by its name, whether it leads anywhere"),
                                ("if stray:\n    sys.exit(1)", "if stray:\n    pass", "an instruction file below the root, which fails")):
         yield from each(cd, find, replace, "hooks", f"check_docs refuses {why} (7w3, S2-3)")
-    yield from each("scripts/repo_files.py", '"ls-files", "--cached", "--others"', '"ls-files", "--others"', "hooks", "repo_paths holds what the index holds and the disk lost (7w3)")
-    # 7w3: worktree.sh makes a tree in the worktrees' folder alone, read from the repository's own common folder (F4893's remedy a).
-    ws = "scripts/worktree.sh"
-    for find, replace, why in (('[ "$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P)" = "$folder" ] ||', "true ||", "a tree outside the worktrees' folder"),
-                               ("'' | .* | *[!A-Za-z0-9._-]*)", "'')", "a name with a dot first, a space or a slash"),
-                               ('[ -d "$folder" ] ||', "true ||", "a worktrees' folder that is missing"),
-                               ("unset GIT_DIR GIT_COMMON_DIR ", "unset GIT_COMMON_DIR ", "a caller's GIT_DIR"), ("unset GIT_DIR GIT_COMMON_DIR ", "unset GIT_DIR ", "a caller's GIT_COMMON_DIR"),
-                               (" GIT_WORK_TREE GIT_INDEX_FILE", " GIT_INDEX_FILE", "a caller's GIT_WORK_TREE"), (" GIT_INDEX_FILE GIT_OBJECT_DIRECTORY\n", " GIT_OBJECT_DIRECTORY\n", "a caller's GIT_INDEX_FILE"),
-                               (" GIT_OBJECT_DIRECTORY\n", "\n", "a caller's GIT_OBJECT_DIRECTORY"),
-                               ('folder="$(cd "$common/.." && pwd -P)-wt"', 'folder="$(pwd -P)-wt"', "the folder beside the tree it runs in, not the main checkout's")):
-        yield from each(ws, find, replace, "hooks", f"worktree.sh refuses {why} (7w3)")
+    yield from each("scripts/repo_files.py", '"ls-files", "-z", "--cached", "--others"', '"ls-files", "-z", "--others"', "hooks", "listing holds what the index holds and the disk lost (7w3)")
     yield from each("scripts/test_hooks.sh", """if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\\n' "$sections" | grep -c .)" ]; then""", "if false; then",
                     "hooks", "the hook suite refuses a section its runner does not list (F160)")
+    for find, replace, way in (("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_SYSTEM=/dev/null\n", "a global file"),
+                               ("export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "export GIT_CONFIG_GLOBAL=/dev/null\n", "a system file"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's parameters"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG GIT_TEMPLATE_DIR\n", "git -c's count"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_TEMPLATE_DIR\n", "GIT_CONFIG's file (F5022)"),
+                               ("unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR\n", "unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG\n", "a template folder (F5022)")):
+        yield from each("scripts/test_hooks.sh", find, replace, "hooks", f"the hook suite's throwaway repositories ignore the git config of {way} (F5012)")
+    yield from each("scripts/test_hooks.sh", "export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n",
+                    "hooks", "the hook suite exports its git config files to git, which a plain assignment never reaches (F5021)")
     yield from each(".githooks/commit-msg", '--config "$(dirname "$0")/$config"', '--config "scripts/$config"', "hooks", "commit-msg scans with its own rules, not the working tree's (F129)")
     yield from each(".githooks/pre-push", 'sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" ||', "true ||", "hooks", "pre-push wants the hooks of the main it pushes installed (F129)")
     yield from each(ck, 'if [ "$runs_from" != "$git_dir/hooks" ]; then', "if false; then", "hooks", "check.sh refuses hooks taken from elsewhere (F129)")
@@ -1265,11 +1394,18 @@ def mutants():
     yield from each(".githooks/pre-commit", "diff --cached --no-renames --name-only HEAD", "diff --no-renames --name-only HEAD", "hooks", "pre-commit lists what is staged only")
     yield from each(".githooks/pre-commit", 'sh "$s/scan_secrets.sh" --staged', ":", "hooks", "pre-commit secret scan")
     yield from each(".githooks/pre-commit", 'sh "$s/borrow_node_modules.sh" "$staged"', 'sh scripts/borrow_node_modules.sh "$staged"', "hooks", "pre-commit runs the staged helpers")
-    yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$1/$m"; fi', 'else ln -s "$PWD/$m" "$1/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
+    yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$copy/$m"; fi', 'else ln -s "$PWD/$m" "$copy/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
     yield from each(".githooks/pre-commit", 'if [ -n "$differ" ]; then', "if false; then", "hooks", "pre-commit refuses a staged harness unlike the working tree")
     yield from each(".githooks/pre-commit", "--name-only -z --", "--name-only --", "hooks", "pre-commit keeps a harness file's name whole")
     yield from each("scripts/guard.py", 'if sub in ("send-pack", "http-push", "receive-pack") or', "if False or", "hooks", "guard refuses send-pack")
     yield from each("scripts/guard.py", 'w.lower().startswith("alias.") or', "False or", "hooks", "guard refuses git aliases")
+    yield from each("scripts/guard.py", "not (at_root and alone):", "not at_root:", "hooks", "guard runs worktree.sh alone, its words plain (F5058)")
+    yield from each("scripts/guard.py", "not (at_root and alone):", "not alone:", "hooks", "guard runs worktree.sh from the project's root (F5058)")
+    yield from each("scripts/guard.py", "( [A-Za-z0-9_./-]+)+", "( [^ ]+)+", "hooks", "guard takes worktree.sh's words plain (F5058)")
+    yield from each("scripts/guard.py", "os.path.realpath(cwd) == ROOT", "os.path.realpath(cwd).startswith(ROOT)", "hooks", "guard takes no subfolder of the root for it (F5058)")
+    yield from each("scripts/guard.py", "isinstance(cwd, str) and ", "", "hooks", "guard reads an event with no folder (F5058)")
+    yield from each("scripts/guard.py", 'return bool(words) and os.path.basename(words[0]) == "worktree.sh"', "return False", "hooks", "guard sees a run of worktree.sh (F5058)")
+    yield from each("scripts/guard.py", 'words = [w for w in words[1:] if not w.startswith("-")]', "words = words[1:]", "hooks", "guard sees worktree.sh past a shell's options (F5058)")
     yield from each("scripts/check.sh", "unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
@@ -1311,6 +1447,12 @@ def mutants():
     yield from each(".claude/settings.json", '"Edit(/.claude/settings.json)"', '"Edit(/.claude/**)"', "hooks", "settings: no deny bans the gate's state")
     yield from each(".claude/settings.json", '"Bash(git push *)",\n', '"Bash(git push *)",\n      "Edit(/app/**)",\n', "hooks", "settings: no edit asks")
     yield from each(".claude/settings.json", '"repo": "gnoverse/gno-mcp"', '"repo": "nowhere/nothing"', "hooks", "settings: gnomcp's marketplace")
+    yield from each(".claude/settings.json", '        "~/Server/gnoworld-wt/*/.git",\n', "", "hooks", "settings: no command points a worktree's git at another config (F5095)")
+    yield from each(".claude/settings.json", '"excludedCommands": ["sh scripts/worktree.sh *"]', '"excludedCommands": ["sh *"]', "hooks", "settings: worktree.sh alone leaves the sandbox (F5058)")
+    yield from each(".claude/settings.json", '"Edit(/scripts/worktree.sh)"', '"Edit(/nothing)"', "hooks", "settings: an edit of worktree.sh, which leaves the sandbox, is refused (F5058)")
+    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld-wt/*/.git)"', '"Edit(/nothing)"', "hooks", "settings: no file tool points a worktree's git at another config (F5095)")
+    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld/.git/hooks/**)"', '"Edit(/nothing)"', "hooks", "settings: no file tool writes the main checkout's git hooks (F5095)")
+    yield from each(".claude/settings.json", '"Edit(~/Server/gnoworld/scripts/**)"', '"Edit(/nothing)"', "hooks", "settings: no file tool writes the main checkout's scripts (F5095)")
     for path in ("scripts/test_hooks.sh", ".githooks/pre-commit"):
         yield from each(path, "|| status=1; exit \"$status\"' EXIT", "exit \"$status\"' EXIT", "hooks", f"{path} keeps a failure through its EXIT trap")
     yield from each("scripts/repo_files.py", "    clear_dead()\n", "\n", "hooks", "a copy clears the ones dead runs left")
@@ -1334,9 +1476,43 @@ def mutants():
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
     yield from each("scripts/worktree.sh", 'sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"', ":", "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
     yield from each("scripts/worktree.sh", 'rm "${dir:?}/node_modules"\n', "", "hooks", "worktree.sh's root node_modules is a folder of links, not one link")
-    for name in ("pnpm-lock.yaml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs", ".npmrc", "':(glob)**/package.json'"):
-        yield from each("scripts/worktree.sh", f" {name}" if name[0] != "'" else f" {name}", "", "hooks", f"worktree.sh refuses a base whose {name.strip(chr(39))} is not this tree's (security-S5)")
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"):  # 7w3's T9, kept over 10a's worktree.sh
+        yield from each("scripts/worktree.sh", "unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY\n", "unset " + " ".join(v for v in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY") if v != var) + "\n", "hooks", f"worktree.sh refuses a caller's {var} (7w3)")
+    yield from each("scripts/worktree.sh", 'harness --ignore-submodules=all --name-only "$base" && ', "", "hooks", "worktree.sh compares a base's harness and package files with this tree's (security-S5, F5098)")
+    yield from each("scripts/worktree.sh", "--ignore-submodules=all ", "", "hooks", "worktree.sh enters no nested repository, whose config would run outside the sandbox (F5097)")
+    # Through records.sh's list, the one harness list: each file worktree_script plants is in it.
+    for name in (" pnpm-lock.yaml", " pnpm-workspace.yaml", " .pnpmfile.cjs", " .pnpmfile.mjs", " .npmrc", " app/package.json", " .claude ", " scripts "):
+        yield from each(".githooks/records.sh", name, " " if name.endswith(" ") else "", "hooks", f"the harness list holds {name.strip()}, which worktree.sh compares (security-S5, F5098)")
     yield from each("scripts/worktree.sh", '[ -z "$differ" ] ||', "true ||", "hooks", "worktree.sh refuses a base whose package files are not this tree's (security-S5)")
+    yield from each("scripts/worktree.sh", "export GIT_COMMON_DIR\n", "\n", "hooks", "worktree.sh's git reads this tree's config, never the one a worktree's commondir names (F5097)")
+    yield from each("scripts/worktree.sh", 'cd "$gitdir/../.."', 'cd "$gitdir/.."', "hooks", "worktree.sh finds a worktree's common folder two folders above its record (F5097)")
+    yield from each("scripts/worktree.sh", '[ -d "$src/.git" ]', '[ -e "$src/.git" ]', "hooks", "worktree.sh tells the main checkout's .git folder from a worktree's .git file (F5097)")
+    rev_parse = "$(git rev-parse --path-format=absolute --git-common-dir)"
+    yield from each("scripts/worktree.sh", 'GIT_COMMON_DIR=$(cd "$src" && cd "$gitdir/../.." && pwd -P)', f"GIT_COMMON_DIR={rev_parse}", "hooks", "worktree.sh finds a worktree's common folder from its .git, never its commondir (F5097)")
+    yield from each("scripts/worktree.sh", "\tGIT_COMMON_DIR=$src/.git\n", f"\tGIT_COMMON_DIR={rev_parse}\n", "hooks", "worktree.sh takes the main checkout's .git folder, never a commondir in it (F5097)")
+    yield from each("scripts/worktree.sh", "case $dir in */*) ;; *) dir=$root/$dir ;; esac", ":", "hooks", "worktree.sh takes a bare name for a folder of its root (F5096)")
+    yield from each("scripts/worktree.sh", "3:remove) action= ;;\n", "", "hooks", "worktree.sh takes remove and two words for no call")
+    yield from each("scripts/borrow_node_modules.sh", 'unlinked "$m" ||', "true ||", "hooks", "borrow_node_modules.sh writes through no link of the copy's tree (F5099)")
+    yield from each("scripts/borrow_node_modules.sh", "in */node_modules/.bin) ;;", "in *) ;;", "hooks", "borrow_node_modules.sh copies a linked .bin from a node_modules/.bin alone (F5099)")
+    yield from each("scripts/worktree.sh", ' && git diff --name-only "$base" -- CLAUDE.md', "", "hooks", "worktree.sh refuses a base whose CLAUDE.md is not this tree's (F5098)")
+    yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -P)", "hooks", "worktree.sh says why it refuses a folder whose parent does not exist")
+    # F5058: it may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
+    # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.
+    yield from each("scripts/worktree.sh", '[ "$parent" = "$root" ] ||', "true ||", "hooks", "worktree.sh makes and removes the folders of its root alone (F5058)")
+    yield from each("scripts/worktree.sh", "root=$HOME/Server/gnoworld-wt", "root=$HOME/Server", "hooks", "worktree.sh's root is $HOME/Server/gnoworld-wt (F5058)")
+    yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -L) || parent=", "hooks", "worktree.sh resolves the folder's parent, never through a link (F5058)")
+    for char in "._":
+        yield from each("scripts/worktree.sh", "*[!abcdefghijklmnopqrstuvwxyz0123456789-]*)", f"*[!{char}abcdefghijklmnopqrstuvwxyz0123456789-]*)", "hooks", f"worktree.sh refuses a {char} in its folder's name (F5058)")
+    yield from each("scripts/worktree.sh", "dir=$root/$name\n", "\n", "hooks", "worktree.sh names the folder by its resolved path, so no slash or .. hides a link (F5058)")
+    yield from each("scripts/worktree.sh", '[ ! -L "$dir" ] ||', "true ||", "hooks", "worktree.sh refuses a link named as its folder (F5058)")
+    yield from each("scripts/worktree.sh", "2:remove) action=remove", "2:*) action=remove", "hooks", "worktree.sh removes on the word remove alone")
+    yield from each("scripts/worktree.sh", "src=$(pwd -P)\n", "src=$PWD\n", "hooks", "worktree.sh sees the tree it runs in, entered through a link")
+    yield from each("scripts/worktree.sh", 'case $src/ in "$dir"/*)', "case $src/ in -none-)", "hooks", "worktree.sh never removes the tree it runs in")
+    yield from each("scripts/worktree.sh", '[ -z "$changes" ] ||', "true ||", "hooks", "worktree.sh removes a clean worktree alone")
+    yield from each("scripts/worktree.sh", "status --porcelain --ignore-submodules=all)", "status --porcelain)", "hooks", "worktree.sh's clean check enters no nested repository (security-reviewer, third review)")
+    yield from each("scripts/worktree.sh", "GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_KEY_0=core.nothing", "hooks", "worktree.sh runs no hook of the common folder (F5095)")
+    yield from each("scripts/worktree.sh", "GIT_CONFIG_KEY_1=core.fsmonitor", "GIT_CONFIG_KEY_1=core.nothing", "hooks", "worktree.sh runs no fsmonitor of the common folder (F5095)")
+    yield from each("scripts/worktree.sh", "-, which git would read as an option\" >&2; exit 2", "-, which git would read as an option\" >&2; exit 1", "hooks", "worktree.sh refuses a leading dash as a wrong call")
     yield from each("scripts/bench.py", "    if mean > budget:", "    if False:", "hooks", "bench.py fails a bench over its budget")
     yield from each("scripts/bench.py", "    if found is None:", "    if False:", "hooks", "bench.py fails a bench with no budget")
     yield from each("scripts/bench.py", "    if mean is None:", "    if False:", "hooks", "bench.py fails a bench that took no sample (F1213)")
@@ -1366,6 +1542,9 @@ def mutants():
     yield from each("scripts/batch_size.py", "if added > TIER_ONE:", "if added >= TIER_ONE:", "hooks", "batch_size says the tier-1 limit past 400, not at it (G8)")
     yield from each("scripts/batch_size.py", "    if not path:", "    if False:", "hooks", "batch_size reads a renamed file at its new path (G8)")
     yield from each("scripts/batch_size.py", "|^server/src/testing/", "", "hooks", "batch_size leaves the server's test helpers out (G8)")
+    yield from each("scripts/batch_size.py", "|^jarvis/src/testing/", "", "hooks", "batch_size leaves Jarvis's test helpers out (D110)")
+    yield from each("scripts/batch_size.py", "|^packages/[^/]+/src/testing/", "", "hooks", "batch_size leaves a package's test helpers out (D112)")
+    yield from each("scripts/batch_size.py", "|jarvis/src|", "|", "hooks", "batch_size counts Jarvis's code as product (D110)")
     rf = "scripts/repo_files.py"
     yield from each(rf, "if fingerprint(commit) in reviewed", "if False", "hooks", "batch_size counts from the last reviewed commit, harness_mutate --changed from the last pass")
     yield from each(rf, "    if not os.path.exists(PASSES):", "    if False:", "hooks", "last_reviewed reads the passes file")
@@ -1466,6 +1645,8 @@ def mutants():
     for find, replace, label in (
         ("\t\t\tall=true\n\t\t\tcase $path in\n", "\t\t\t:\n\t\t\tcase $path in\n", "a path of no known area runs everything"),
         ("$all && ts=true app=true gno=true\n", ":\n", "no change runs everything"),
+        (" | jarvis/src/* | packages/service/src/*)", ")", "a change of Jarvis or the service package is the server's kind (D110, D111)"),
+        (" | packages/chain/src/*", "", "a change of the chain package is core's kind (D112)"),
         ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
         ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
@@ -1587,6 +1768,8 @@ def mutants():
     yield from regressions_name_mutants()
     yield from design_mutants()
     yield from seven_mutants()
+    yield from mutate_mutants()
+    yield from hidden_mutants()
 
 
 def seven_mutants():
@@ -1824,6 +2007,125 @@ def design_mutants():
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /all checks passed/;", "wants the pass line as the last line, with its time"),
         ("const PASS_LINE = /^all checks passed in \\d+ s/;", "const PASS_LINE = /^all checks passed in \\d+ s/m;", "reads only the last line"),
         ("    passed: false,\n    failingLane: g.failingLane", "    passed: true,\n    failingLane: g.failingLane", "fails a merge check whose last line is no pass line"),
+    ))
+
+
+def mutate_mutants():
+    """The realms' mutation check flips operators and numbers (backlog row 11, slice-11a): each flip, each step over what is
+    not code, each rule on a flip that does not compile, and the verdicts guards and flips share."""
+    pairs = ((">=", ">"), (">", ">="), ("<=", "<"), ("<", "<="), ("==", "!="), ("!=", "=="), ("&&", "||"), ("||", "&&"), ("+", "-"), ("-", "+"))
+    yield from swaps("scripts/mutate.py", "mutate.py", [(f'"{a}": "{b}"', f'"{a}": "{a}"', f"flips {a} into {b}") for a, b in pairs])
+    yield from swaps("scripts/mutate.py", "mutate.py", (
+        ("[shifted(text, 1), shifted(text, -1)]", "[shifted(text, 1)]", "shifts a number down"),
+        ("[shifted(text, 1), shifted(text, -1)]", "[shifted(text, -1)]", "shifts a number up"),
+        ('        if src.startswith("//", i):\n', "        if False:\n", "steps over a line comment"),
+        ('        elif src.startswith("/*", i):\n', "        elif False:\n", "steps over a block comment"),
+        ("        elif c in \"\\\"'`\":\n", "        elif c == '\"':\n", "steps over runes and raw strings"),
+        ('j += 2 if src[j] == "\\\\" and c != "`" else 1', "j += 1", "reads a string's escapes"),
+        ("op = next((o for o in OPERATORS if src.startswith(o, i)), c)", "op = c", "flips whole operators only"),
+        ("            if INTEGER.fullmatch(src[i:j]):\n", "            if True:\n", "shifts integers only"),
+        ('(src[j] in "+-" and src[j - 1] in exponent)', "False", "reads an exponent's sign as the number's"),
+        ('        return f"({value})"\n', "        return str(value)\n", "writes a negative number in parentheses"),
+        ('    return prefix + {16: f"{value:x}", 2: f"{value:b}", 8: f"{value:o}", 10: str(value)}[base]\n', "    return str(value)\n", "writes a number in its own base"),
+        ("{f' #{k}' if seen[line, text, new] > 1 else ''}", "", "numbers the same flip of the same text"),
+        ('        yield f"{path}: {line} [', '        yield f"{line} [', "names the file in a flip's key"),
+        ('cases = [(f"{f}: {label}", f, src, False)', "cases = [(label, f, src, False)", "names the file in a guard's key (F5018)"),
+        ('text not in FLIP or text in ("+", "-")', "True", "drops no comparison or logic flip"),
+        ('text not in FLIP or text in ("+", "-")', "text not in FLIP", "drops a + or - flip that does not compile"),
+        ("        cases += flipped\n", "", "runs the flips"),
+        ('            if got == "does not compile" and droppable and label not in GAPS:\n', '            if got == "does not compile" and droppable:\n', "never drops a flip GAPS lists"),
+        ("        if dropped:\n", "        if False:\n", "counts the flips it drops"),
+        ('        if "test timed out after" in out:\n', "        if False:\n", "says gno timed out on a mutant that loops"),
+        ("            seen[label] = seen.get(label, 0) + 1\n", "", "sees the mutants GAPS names"),
+        ("    for stale in GAPS.keys() - seen.keys():\n", "    for stale in []:\n", "fails a stale GAPS key"),
+        ("if seen.get(key, 0) > 1", "if False", "fails a GAPS key that names two mutants"),
+        ('j += 2 if src[j] == "\\\\" and c != "`" else 1', 'j += 2 if src[j] == "\\\\" else 1', "reads no escape in a raw string"),
+        ('"pP" if src[i : i + 2].lower() == "0x" else "eE"', '"eEpP"', "reads a hex number's e as a digit"),
+        ("len(src) if stop < 0 else stop", "stop", "keys a last line without its newline"),
+        ("i = n if i < 0 else i", "i = i if i < 0 else i", "ends a last comment without its newline"),
+        ('elif c.isalpha() or c == "_":', "elif c.isalpha():", "reads a name that starts with _"),
+        ('(c == "." and src[i + 1 : i + 2].isdigit())', "False", "reads a number that starts with a dot"),
+        ('rf"^m{i}/\\S+:', 'rf"^m{i}\\S+:', "tells m1's compile errors from m10's"),
+        ('rf"^ok\\s+\\./m{i}\\s"', 'rf"^ok\\s+\\./m{i}"', "tells m1's pass from m10's"),
+        ('rf"^FAIL\\s+\\./m{i}\\s"', 'rf"^FAIL\\s+\\./m{i}"', "tells m1's failure from m10's"),
+        ("            ok = got == want\n", "            ok = True\n", "fails a survivor or a killed gap"),
+        ('if not f.endswith(("_test.gno", "_filetest.gno"))', "if True", "mutates no test"),
+        ('    if re.search(rf"^m{i}/\\S+:\\d+:\\d+: .*\\(code=", out, re.M):\n', "    if False:\n", "tells a mutant that does not compile"),
+        ('        if verdict(out, 0) != "survives":\n', "        if False:\n", "fails an untouched copy that fails"),
+        ("SECONDS_A_COPY = 1.5", "SECONDS_A_COPY = 1.4", "gives a copy 1.5 s of its run's time (F5051)"),
+        ("LEAST = 60", "LEAST = 0", "gives a run 60 s at least"),
+        ("        except subprocess.TimeoutExpired:\n", "        except ZeroDivisionError:\n", "fails by name a gno that does not end (F5084)"),
+        ("            print(stopped)\n", "            pass\n", "says which package's gno did not end"),
+        ("            failed = True\n            continue\n", "            continue\n", "fails a package whose gno did not end"),
+        ("math.ceil(SECONDS_A_COPY * len(dirs))", "int(SECONDS_A_COPY * len(dirs))", "rounds a run's time up"),
+        ('"-timeout", f"{limit}s"', '"-timeout", "60s"', "grows a run's time with its copies (F5051)"),
+        ('            if got == "survives" and label not in GAPS:  #', "            if False:  #", "judges a survivor again alone, where its filetests see it (F5050)"),
+        ('            if got == "survives" and label not in GAPS:  #', '            if got == "survives":  #', "judges no gap again alone (F5050)"),
+        ("                except Stopped:\n", "                except ZeroDivisionError:\n", "names a survivor whose run alone never ends"),
+        ('                    got = "stopped"\n', "                    pass\n", "says a survivor's run alone stopped, not that it survived"),
+        ('errors="replace", timeout=limit + GRACE', "timeout=limit + GRACE", "reads gno's output that is no UTF-8 (F5062)"),
+    ))
+
+
+def hidden_mutants():
+    """check_docs refuses a hidden character (hidden.py's rule) in every file git tracks or would (F5053), and the listing
+    it reads."""
+    yield from swaps("scripts/hidden.py", "hidden", (
+        ("for m in HIDDEN.finditer(text):", "for m in []:", "refuses a hidden character"),
+        ("(0x2028, 0x202E)", "(0x202A, 0x202E)", "refuses the line and paragraph separators (F5086)"),
+        ("(0xE0000, 0xE0FFF)", "(0xE0001, 0xE007F)", "refuses the tags' whole block, its unassigned code points too (F5083)"),
+        ('UNICODE = "17.0"', 'UNICODE = "16.0"', "names the Unicode its table is"),
+        ('f"{chr(a)}-{chr(b)}"', 'f"{chr(a)}"', "refuses every code point of a range"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if ord(c) in LOOKS:", "refuses a selector that picks no look (F5086)"),
+        ("if ord(c) in LOOKS and picks_a_look(text, m.start()):", "if False:", "keeps a selector that picks an emoji's look"),
+        ("return i > 0 and (", "return (", "refuses a selector that starts a text"),
+        ("not text[i - 1].isascii() and ", "", "refuses a selector after an ASCII character"),
+        (" and not HIDDEN.match(text[i - 1])", "", "refuses a second selector in a row"),
+        ("or KEYCAP.match(text, i - 1) is not None", "or False", "keeps a keycap's selector"),
+        ('"[0-9#*]"', '"[0-9]"', "keeps a # or * keycap's selector"),
+        ("out, line, seen = [], 1, 0", "out, line, seen = [], 0, 0", "counts lines from 1"),
+        ("        seen = m.start()\n", "", "counts the lines before each hidden character once"),
+        ('column = m.start() - text.rfind("\\n", 0, m.start())', 'column = m.start() - text.rfind("\\n", 0, m.start()) - 1', "counts columns from 1"),
+        ('name = unicodedata.name(c, "")', 'name = ""', "names the hidden character"),
+        ('bad = data.find(b"\\0")', "bad = -1", "refuses a text holding a NUL (F5088)"),
+        ("bad = e.start if bad < 0 else min(bad, e.start)", 'bad, text = -1, data.decode("utf-8", "replace")', "refuses a text with a byte that is no UTF-8 (F5088)"),
+        ("min(bad, e.start)", "bad", "names a text's first byte that is no UTF-8"),
+        ('        return [f"{where}: no UTF-8 text', '        return hidden_in(where, data.decode("utf-8", "surrogateescape")) + [f"{where}: no UTF-8 text', "reads no character of what is no UTF-8 text (F5082)"),
+        ("{bad + 1}", "{bad}", "counts bytes from 1"),
+    ))
+    yield from swaps("scripts/check_docs.py", "check_docs", (
+        ('".png": b"\\x89PNG\\r\\n\\x1a\\n", ', "", "reads no .png"),
+        ('".jpg": b"\\xff\\xd8\\xff"', '".jpeg": b"\\xff\\xd8\\xff"', "reads no .jpg"),
+        ("if suffix in IMAGES and data.startswith(IMAGES[suffix])", "if suffix in IMAGES", "reads a text named as an image"),
+        ("path, link = p.relative_to(root).as_posix(), p.is_symlink()", "path, link = p.name, p.is_symlink()", "names the file by its path"),
+        ('    if not (root / ".git").exists():\n        return {}', "    if True:\n        return {}", "reads the index's copy, what a commit takes (F5087)"),
+        ("    for path, (data, link) in held.items():\n", "    for path, (data, link) in []:\n", "reads each blob the index holds"),
+        ('if not info.startswith("160000 ")', "if True", "reads no gitlink as a file"),
+        ('(batch[start:end], mode == "120000")', "(batch[start:end], False)", "names a staged link as one"),
+        ('" (link)" * link + " (work tree)" * (path in held)', '" (link)" * link', "names the work tree's copy as one"),
+        ("        if held.get(path) != (data, link):\n", "        if True:\n", "reads the work tree's copy only where it differs"),
+        ("        if held.get(path) != (data, link):\n", "        if False:\n", "reads the work tree's copy where it differs"),
+        ("os.fsencode(os.readlink(p)) if link else p.read_bytes()", "p.read_bytes()", "reads a link's target, not what it points to (F5089)"),
+        ("        names.add(path)\n", "", "reads the name of each path git would track"),
+        ('        out += hidden_in(f"the name {ascii(path)}", path)\n', "        pass\n", "reads every name (F5089)"),
+        ("{ascii(path)}", "{path}", "writes a name's hidden character as its escape"),
+        ('        held = {}\n        out.append(f"git cannot read the index', '        held = {}\n        (f"git cannot read the index', "fails when git cannot read the index"),
+        ("if hidden_chars:\n    print(", "if False:\n    print(", "says why it refuses a hidden character"),
+        ("if hidden_chars or missing", "if missing", "fails on a hidden character"),
+        ('    if not (root / ".git").exists():\n        return []', "    if True:\n        return []", "reads the branch's commit messages (F5079)"),
+        ('"refs/remotes/origin/main..HEAD"', '"HEAD"', "reads no message main holds already"),
+        ('"refs/remotes/origin/main..HEAD"', '"-1", "refs/remotes/origin/main..HEAD"', "reads each message of the branch, not its newest only (F5081)"),
+        ('"refs/remotes/origin/main"):\n        return []', '"refs/remotes/origin/main") and False:\n        return []', "reads no message with no origin/main"),
+        ('if not git("-C", str(root), "for-each-ref", "--format=%(objectname)", "refs/remotes/origin/main"):',
+         'if subprocess.run(["git", "-C", str(root), "rev-parse", "-q", "--verify", "origin/main^{commit}"]).returncode:',
+         "takes no failing git for a branch with no origin/main"),
+        ("subprocess.CalledProcessError) as e:\n        out.append(", "subprocess.CalledProcessError) as e:\n        (", "fails when git cannot read the messages"),
+    ))
+    yield from swaps("scripts/repo_files.py", "repo_files", (
+        ('"ls-files", "-z", "--cached"', '"ls-files", "--cached"', "lists names git quotes none of (-z)"),
+        ('{"node_modules", ".git"}', '{"node_modules"}', "walks none of git's own folder"),
+        ('{"node_modules", ".git"}', '{".git"}', "walks no installed package"),
+        ("    return [p for p in listing(root) if p.is_file()]\n", "    return listing(root)\n", "lists no file deleted from the work tree"),
     ))
 
 

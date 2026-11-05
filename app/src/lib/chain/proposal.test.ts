@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { describe, expect, it, vi } from "vitest";
-import { queryEnvelope } from "../../../tests/chain/chainEnvelopes.ts";
-import type { ChainFetch, ReadOptions } from "./read.ts";
+import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
+import type { ChainFetch, ReadOptions } from "@gnoworld/chain/read";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
 import { proposalsOf, readProposals, votesOf } from "./proposal.ts";
 

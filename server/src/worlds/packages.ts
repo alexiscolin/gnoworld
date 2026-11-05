@@ -3,6 +3,7 @@
 // `[addpkg]` creator the chain stamps into gnomod.toml (keeper.go:637-639), read with `vm/qfile`. Code does not change, so a
 // package already known is never asked again. Every answer is capped, parsed and filtered; a name that does not fit the
 // file's schema is left out.
+import { docAsk, fileAsk } from "@gnoworld/chain/asks";
 import { isAddress } from "@gnoworld/core";
 import { ExportedName, ImportPath, WORLDS_CAPS } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
@@ -74,17 +75,13 @@ async function readOne(
   path: string,
 ): Promise<PackageFacts | null> {
   await reader.pace?.();
-  const text = await abciQuery(reader, { path: "vm/qdoc", data: path }, { ms: CALL_MS, maxBytes: DOC_MAX_BYTES });
+  const text = await abciQuery(reader, docAsk(path), { ms: CALL_MS, maxBytes: DOC_MAX_BYTES });
   const doc = factsOf(text, path);
   if (doc === null) return null;
   let deployer: string | null = null;
   await reader.pace?.();
   try {
-    const file = await abciQuery(
-      reader,
-      { path: "vm/qfile", data: `${path}/gnomod.toml` },
-      { ms: CALL_MS, maxBytes: FILE_MAX_BYTES },
-    );
+    const file = await abciQuery(reader, fileAsk(`${path}/gnomod.toml`), { ms: CALL_MS, maxBytes: FILE_MAX_BYTES });
     deployer = creatorOf(file);
   } catch (error) {
     // Only the chain's word that the file is not there is a fact; any other fault leaves the package out to be asked again.

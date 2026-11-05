@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
-import { queryEnvelope, statusEnvelope } from "../chain/chainEnvelopes.ts";
+import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { opened, stats } from "./sceneStage.ts";

@@ -2,10 +2,11 @@
 // it names: calls, callers and the last height of a call. The queries are those onyx-1's indexer answered on 2026-11-04 (onyxIndexer.json):
 // it refused 7c's per-realm filter, and took 1.2 to 1.5 s for each realm's. History holds DIRECT calls only, and a line may be a failed
 // transaction: a count is a count of attempts, and a realm with none is not dead. No file body is asked (a deploy carries its whole source).
+import { callsAbove, callsFirst, callsInBlock, type IndexerAsk } from "@gnoworld/chain/asks";
 import { isAddress } from "@gnoworld/core";
 import { ChainCount } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
-import { jsonOf } from "../net.ts";
+import { jsonOrFail } from "@gnoworld/service/net";
 import { fetchText, Failure, kindOf, type Kind, type Send } from "./remote.ts";
 
 /** The most bytes of one answer: ten pages' worth at onyx-1's 194 bytes a transaction (387 KB for 2,000, 2026-11-04). */
@@ -19,16 +20,6 @@ export const HISTORY_MAX_PAGES = 500;
  * callers. */
 export const HISTORY_READ_BYTES = 32 * 1024 * 1024;
 const HISTORY_MS = 20_000;
-
-// A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
-// transactions are chosen by a call's type and a message that is no call is left out here. A negative bound answers nothing: the first page
-// has none.
-const FIELDS = "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
-const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
-const ORDER = "order: { heightAndIndex: ASC }";
-const FIRST = `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`;
-const ABOVE = `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`;
-const BLOCK = `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${FIELDS} } }`;
 
 /** What a realm drew above a height (7t3's window): a mark for each transaction with a call to it, its height and its senders, so a
  * transaction is one however many calls it bundles, to one realm or several of a world; and the different addresses that sent them. Both
@@ -123,7 +114,7 @@ interface Reading {
 }
 
 // One request of the read, if its pages are not spent and the pass goes on: the JSON it answers.
-async function request(reading: Reading, body: { query: string; variables: object }): Promise<unknown> {
+async function request(reading: Reading, body: IndexerAsk): Promise<unknown> {
   const { reader } = reading;
   if (reading.asked >= HISTORY_MAX_PAGES) throw new Failure("too_many");
   if (reading.isStopped()) throw new Failure("stopped");
@@ -141,16 +132,13 @@ async function request(reading: Reading, body: { query: string; variables: objec
   );
   reading.taken += text.length;
   if (reading.taken > HISTORY_READ_BYTES) throw new Failure("too_many");
-  return jsonOf(text);
+  return jsonOrFail(text);
 }
 
 // The page above `above`: one past the byte cap is asked again with half its rows, down to one.
 async function pageOf(reading: Reading, above: number | undefined): Promise<Row[]> {
   for (let size = reading.limit; ; size = Math.ceil(size / 2)) {
-    const body =
-      above === undefined
-        ? { query: FIRST, variables: { limit: size } }
-        : { query: ABOVE, variables: { above, limit: size } };
+    const body = above === undefined ? callsFirst(size) : callsAbove(above, size);
     try {
       return rowsOf(await request(reading, body), above === undefined ? 0 : above + 1);
     } catch (error) {
@@ -240,7 +228,7 @@ export async function readHistories(
         above = last - 1;
         continue;
       }
-      counted(rowsOf(await request(reading, { query: BLOCK, variables: { height: last } }), last, last));
+      counted(rowsOf(await request(reading, callsInBlock(last)), last, last));
       above = last;
     }
   } catch (error) {

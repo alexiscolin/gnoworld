@@ -1,12 +1,23 @@
 // The prices timer (slice 5 part 2, 5l; decision 151): every five minutes, the price and 24 hour change of GNOT, ATONE and
 // BTC from CoinGecko's keyless /simple/price, through the server's one way out (net.ts, then the egress proxy), written
-// to markets.json for the home page's markets row. With an RPC it also reads the default universe's latest block height
-// there, the same way out and the same five minutes, so no visitor's browser asks a chain (decision of 2026-10-31). What
-// comes back is data: capped, parsed, checked field by field, and only the fields the file holds are written. Any failure keeps the last file and is logged by its kind, never by what
-// the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
-import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
-import type { Log } from "../log.ts";
-import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, reachedNothing, type Send } from "../net.ts";
+// to markets.json for the home page's markets row; with the default universe, its latest block height through the chain
+// package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
+// comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
+// logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
+import { readHeight } from "@gnoworld/chain/node";
+import type { Failure as ReadFailure, FailureKind } from "@gnoworld/chain/read";
+import { Markets, MARKET_SYMBOLS, MarketBlock } from "@gnoworld/schemas";
+import type { Log } from "@gnoworld/service/log";
+import {
+  Failure,
+  fetchCapped,
+  jsonOrFail,
+  publicUrl,
+  reachedNothing,
+  send as netSend,
+  type Kind,
+  type Send,
+} from "@gnoworld/service/net";
 import { repeat, waits } from "../repeat.ts";
 import { besideOf, replaceFile } from "../replaceFile.ts";
 import { makeHistory, type History } from "./history.ts";
@@ -15,8 +26,9 @@ interface Options {
   file: string;
   log: Log;
   send?: Send;
-  /** The default universe's RPC (its data's `rpc`): where the latest block's height is read each tick; none, no height. */
-  rpc?: string;
+  /** The default universe (its data's `rpc` and `chainId`): its node, checked to be its chain, gives the latest block's height
+   * each tick; none, no height. */
+  universe?: { rpc: string; chainId: string };
   now?: () => number;
   // The wait after a read ends, whatever came of it; five minutes.
   everyMs?: number;
@@ -68,9 +80,38 @@ function checkedRpc(rpc: string): URL {
   return url;
 }
 
+// A failed height read, the chain package's kind in this timer's words: a request that reached nothing, a status, a 429.
+function failureOf({ kind, status }: ReadFailure): Failure {
+  if (kind === "down")
+    return new Failure(status === undefined ? "request" : status === 429 ? "rate_limited" : "status");
+  const words: Partial<Record<FailureKind, Kind>> = {
+    timeout: "timeout",
+    "too-big": "too_large",
+    "not-json": "not_json",
+    "other-chain": "other_chain",
+  };
+  return new Failure(words[kind] ?? "shape");
+}
+
+// The default universe's latest block through the chain package, its node checked to be that universe's chain, the way
+// out its transport; then the file's own bounds.
+async function readBlock({ url: from, chainId }: { url: URL; chainId: string }, send: Send): Promise<MarketBlock> {
+  const read = await readHeight(from.origin, {
+    chainId,
+    timeoutMs: TIMEOUT_MS,
+    maxBytes: MAX_BYTES,
+    fetch: (url, init) => send(url, init ?? {}, TIMEOUT_MS),
+  });
+  if (!read.ok) throw failureOf(read.failure);
+  const block = MarketBlock.safeParse({ ...read.value, host: from.hostname });
+  if (!block.success) throw new Failure("shape");
+  return block.data;
+}
+
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
-  const rpc = options.rpc === undefined ? undefined : checkedRpc(options.rpc);
+  const { universe } = options;
+  const node = universe === undefined ? undefined : { url: checkedRpc(universe.rpc), chainId: universe.chainId };
   // Each token's day of prices beside the file (8i), for the markets row's sparklines.
   const history = makeHistory(besideOf(file, "history"), now);
 
@@ -78,24 +119,14 @@ export function startPrices(options: Options): Prices {
   async function get(url: string): Promise<unknown> {
     const init = { method: "GET", headers: { accept: "application/json" } };
     const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes: MAX_BYTES });
-    return jsonOf(Buffer.from(bytes).toString("utf8"));
-  }
-
-  // The default universe's latest block through its RPC's /status: through Zod, then the file's own bounds.
-  async function readBlock(from: URL): Promise<MarketBlock> {
-    const status = StatusAnswer.safeParse(await get(`${from.origin}/status`));
-    if (!status.success) throw new Failure("shape");
-    const { latest_block_height: height, latest_block_time: time } = status.data.result.sync_info;
-    const block = MarketBlock.safeParse({ height: Number(height), time, host: from.hostname });
-    if (!block.success) throw new Failure("shape");
-    return block.data;
+    return jsonOrFail(Buffer.from(bytes).toString("utf8"));
   }
 
   async function read(isStopped: () => boolean): Promise<void> {
     // Both asked at once, each its own failure: the prices' ends the read (the last file stays), the height's only leaves it out.
     const [priced, blocked] = await Promise.allSettled([
       get(URL_ASKED),
-      rpc === undefined ? Promise.resolve(undefined) : readBlock(rpc),
+      node === undefined ? Promise.resolve(undefined) : readBlock(node, send),
     ]);
     if (isStopped()) return;
     if (priced.status === "rejected") throw priced.reason;

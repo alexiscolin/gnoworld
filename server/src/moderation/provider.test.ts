@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { logger } from "../log.ts";
+import { logger } from "@gnoworld/service/log";
 import { moderationClient } from "./provider.ts";
 
 // The answers OpenAI's own API description shows for POST /v1/moderations, byte for byte

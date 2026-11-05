@@ -8,7 +8,10 @@
   reaches / or the current folder: only ${name:?}, which stops the shell first;
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey, no fetched realm page or RPC node,
   and no .gno file written, by any tool, before the session loaded the gno skill and called a
-  gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list.
+  gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list;
+- worktree.sh, which settings.json lets out of the sandbox, run alone as `sh scripts/worktree.sh` and plain words,
+  from the project's root: from a subfolder those words run a script there, which the session can write, and behind
+  a cd, an assignment, a redirect or another command they would run something else outside the sandbox (F5058).
 Each command is split into its simple commands, looking inside `sh -c`, `eval`, `$(...)` and
 wrappers (env, xargs, timeout...), so none hides a call; a word that only mentions one (grep
 gnokey) is no call. What it cannot read it refuses (7w4): a program, git's subcommand or a commit's
@@ -72,6 +75,8 @@ ASSIGNERS = {"set", "read", "print", "printf", "zparseopts"} | SETTERS
 TABLE_GIVEN = ("zsh's aliases, commands or functions table, or histchars, given a value: a name the guard does not read runs a "
                "program, or a comment hides one; write it out, and to search for the word, use the Grep tool")
 bare = lambda word: re.sub(r"[\\'\"]", "", word)  # a raw word as the shell gives it, its quotes and escapes removed
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))  # the project whose hook this is
+WORKTREE_CALL = re.compile(r"sh scripts/worktree\.sh( [A-Za-z0-9_./-]+)+")  # the one call settings.json lets out
 
 
 def refuse(why):
@@ -610,6 +615,13 @@ def deletes_unguarded(words):
     return deletes and any(UNGUARDED.search(p) for p in paths)
 
 
+def runs_worktree_sh(words):
+    """Whether a simple command runs a script named worktree.sh, itself or through a shell."""
+    if os.path.basename(words[0]) in SHELLS:
+        words = [w for w in words[1:] if not w.startswith("-")]
+    return bool(words) and os.path.basename(words[0]) == "worktree.sh"
+
+
 def ready_for_gno(transcript):
     """Whether the session loaded the gno skill and called a gnomcp tool; a mention in text counts for neither."""
     found = set()
@@ -660,6 +672,9 @@ elif tool == "Bash":
         refuse("zsh's $~, which runs a value's globs, qualifiers included: write the files out")
     if re.search(r"\$'(?:[^'\\]|\\[^xuUcEe0-7])*\\[xuUcEe0-7]", text):  # `$'\x24(cmd)'` is a `$(` no reading sees (S5-7)
         refuse("a $'...' escape that writes a character by its code, a `$(` the guard cannot see among them: write it out")
+    cwd = event.get("cwd")
+    at_root = isinstance(cwd, str) and os.path.realpath(cwd) == ROOT
+    alone = WORKTREE_CALL.fullmatch(text.strip()) is not None
     for words in commands(text):
         # Every word may be the program a wrapper runs (7w2's third lot, S3-1, S3-2): each check reads the command from each word on,
         # that word's name as a program's (=git, $'git' and a path give it), git-core's dashed programs as git and their name. So the
@@ -694,6 +709,10 @@ elif tool == "Bash":
                 refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
             if writes_gno(tail, text) and not ready_for_gno(event.get("transcript_path", "")):
                 refuse(UNREAD)
+        if runs_worktree_sh(words) and not (at_root and alone):
+            refuse("worktree.sh runs alone, from the project's root, as `sh scripts/worktree.sh` and plain words: settings.json lets those "
+                   "words out of the sandbox, and from a subfolder, or behind a cd, an assignment, a redirect or another command, they would "
+                   "run something else outside it (F5058)")
 if push:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask",
                                              "permissionDecisionReason": "a push leaves this machine: Alexis decides"}}))

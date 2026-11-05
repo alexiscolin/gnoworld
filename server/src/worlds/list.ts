@@ -3,6 +3,7 @@
 // not refused, so an answer of exactly the limit may be cut: the prefix is then split on the next character and each part asked
 // on its own (F3517; the chain pages by prefix only, handler.go:196, pagination not implemented there). What comes back is data: capped,
 // and each line kept only if it is a realm path. ponytail: at most LIST_MAX_QUERIES requests; then the list is returned, marked partial.
+import { pathsAsk } from "@gnoworld/chain/asks";
 import { REALM_PREFIX } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas/indexer";
 import { abciQuery, kindOf, type Kind, type Send } from "./remote.ts";
@@ -87,11 +88,7 @@ export async function readRealmPaths(reader: {
       }
       const prefix = prefixes.shift() ?? REALM_PREFIX;
       await reader.pace?.();
-      const text = await abciQuery(
-        reader,
-        { path: `vm/qpaths?limit=${String(limit)}`, data: prefix },
-        { ms: LIST_MS, maxBytes: LIST_MAX_BYTES },
-      );
+      const text = await abciQuery(reader, pathsAsk(prefix, limit), { ms: LIST_MS, maxBytes: LIST_MAX_BYTES });
       const lines = text.split("\n").filter((line) => line !== "");
       const cut = lines.length >= limit;
       if (cut) prefixes.push(...NEXT.map((next) => `${prefix}${next}`));

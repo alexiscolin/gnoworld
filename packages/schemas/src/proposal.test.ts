@@ -24,8 +24,10 @@ describe("Proposal", () => {
     expect(valid({ title: "" })).toBe(false);
   });
 
-  it("accepts a state of exactly the cap and refuses one past it, counted in code units", () => {
+  it("accepts a state of exactly the cap and refuses one past it, counted in code points", () => {
     expect(valid({ state: "a".repeat(PROPOSAL_CAPS.state) })).toBe(true);
+    expect(valid({ state: String.fromCodePoint(0x1f5f3).repeat(PROPOSAL_CAPS.state) })).toBe(true);
+    expect(valid({ state: String.fromCodePoint(0x1f5f3).repeat(PROPOSAL_CAPS.state + 1) })).toBe(false);
     expect(valid({ state: "a".repeat(PROPOSAL_CAPS.state + 1) })).toBe(false);
     expect(valid({ state: `a${"́".repeat(PROPOSAL_CAPS.state)}` })).toBe(false);
   });

@@ -125,9 +125,9 @@ describe("a bubble", () => {
 
   it("cleans a name as it cleans words: no direction override turns the head around", async () => {
     const { box, say } = await shown();
-    say("m1", { from: "ines‮gnp.exe" });
+    say("m1", { from: "ines\u202egnp.exe" });
     const bubble = signOf(box, "hello");
-    expect(bubble.textContent).not.toContain("‮");
+    expect(bubble.textContent).not.toContain("\u202e");
     expect(bubble.textContent).toContain("inesgnp.exe · Japan");
   });
 

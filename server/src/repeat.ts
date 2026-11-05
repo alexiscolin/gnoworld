@@ -1,4 +1,4 @@
-import { reachedNothing, type Kind } from "./net.ts";
+import { reachedNothing, type Kind } from "@gnoworld/service/net";
 
 /** How soon a pass that reached nothing runs again: Compose starts the server before its way out (deploy/compose.yaml), and a first pass
  * finds none. */

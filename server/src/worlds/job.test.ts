@@ -5,9 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import type { Send } from "../net.ts";
+import type { Send } from "@gnoworld/service/net";
 import { abciRefused, fakeChain, INDEXER, pagedCalls, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
-import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 import { makePresence } from "./presence.ts";
 

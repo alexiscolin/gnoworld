@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChainRead } from "../../lib/chain/read.ts";
+import type { ChainRead } from "@gnoworld/chain/read";
 import { mount } from "../../../tests/mount.tsx";
 import { FAILURE_KINDS } from "../../../tests/chain/failureKinds.ts";
 import { RealmFacts, type RealmFactsValue } from "./RealmFacts.tsx";
@@ -77,7 +77,7 @@ describe("a realm's facts", () => {
   });
 
   it("draws a hostile path or deployer as text, each in its own left-to-right element, and creates no element from it", () => {
-    const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script>‮";
+    const hostile = "<img src=x onerror=alert(1)><script>alert(2)</script>\u202e";
     const el = draw(ok({ ...FACTS, path: hostile, deployer: hostile }));
     expect(el.querySelector("img, script")).toBeNull();
     for (const label of ["Path", "Deployer"]) {

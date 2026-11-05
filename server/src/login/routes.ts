@@ -10,7 +10,7 @@ import { routePath } from "hono/route";
 import type { Config } from "../config.ts";
 import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { visitor } from "../visitor.ts";
 import { makeLogin, type Login } from "./login.ts";
 import { makeTickets, type Tickets } from "./ticket.ts";
@@ -109,12 +109,13 @@ export function loginRoutes(
 
 type Settings = Pick<Config, "chains" | "origins" | "trustedProxy" | "newAccountsPerHour">;
 
-// The login as the server mounts it, from its settings and one clock.
+// The login as the server mounts it, from its settings and one clock; the admin console's on its own listener.
 export function loginFrom(
   db: DatabaseSync,
   { chains, origins, trustedProxy: proxy, newAccountsPerHour }: Settings,
-  { log, now = Date.now }: { log: Log; now?: () => number },
+  { log, now = Date.now, console = false }: { log: Log; now?: () => number; console?: boolean },
 ): Hono<Guarded> {
   const tickets = makeTickets(db, { now });
-  return loginRoutes(makeLogin(db, { chains, now }), { log, origins, proxy, newAccountsPerHour, now, tickets });
+  const login = makeLogin(db, { chains, now, console });
+  return loginRoutes(login, { log, origins, proxy, newAccountsPerHour, now, tickets });
 }

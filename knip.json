@@ -3,7 +3,7 @@
   "ignoreFiles": ["docs/**", ".claude/workflows/**"],
   "treatConfigHintsAsErrors": true,
   "workspaces": {
-    ".": {},
+    ".": { "entry": ["!evals/**"], "project": ["**/*.{js,mjs,cjs,ts,tsx}", "!evals/**"] },
     "app": {
       "entry": ["src/**/*.test.{ts,tsx}", "lab/main.ts", "tests/e2e/workshopBackend.mjs"],
       "react-router": { "config": ["react-router.config.ts"] },

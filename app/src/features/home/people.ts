@@ -2,7 +2,7 @@
 // guest may see (server/src/worlds/present.ts), read once the page runs. A chunk of its own, asked by peopleCount.ts: the first screen
 // holds neither the schema nor the read.
 import { PresencePeople, PRESENCE_PEOPLE_MAX_BYTES } from "@gnoworld/schemas/indexer";
-import { readSiteFile, type SiteFileRead } from "../../lib/chain/transport.ts";
+import { readSiteFile, type SiteFileRead } from "@gnoworld/chain/transport";
 
 /** The server's people online, at this site's root. */
 export const PEOPLE_URL = "/api/presence/people";

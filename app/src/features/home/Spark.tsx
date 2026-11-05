@@ -5,7 +5,7 @@ import { MARKETS_HISTORY_MAX_BYTES, MarketsHistory } from "@gnoworld/schemas/ind
 import type { MarketToken } from "@gnoworld/schemas";
 import { Sparkline, type SparklineProps } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
-import { readSiteFile } from "../../lib/chain/transport.ts";
+import { readSiteFile } from "@gnoworld/chain/transport";
 
 /** The server's history of the prices, at this site's root. */
 const HISTORY_URL = "/api/markets/history";

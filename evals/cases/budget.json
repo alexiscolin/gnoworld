@@ -1,0 +1,45 @@
+{
+  "suite": "budget",
+  "cases": [
+    {
+      "id": "ask-spent",
+      "about": "A question at 100% of the day's budget",
+      "ask": {
+        "question": "What block is onyx at?",
+        "room": "#gnoworld",
+        "lines": []
+      },
+      "expect": {
+        "status": ["spent"]
+      },
+      "spent": true
+    },
+    {
+      "id": "translate-spent",
+      "about": "A translation at 100% of its budget",
+      "translate": {
+        "text": "Good morning.",
+        "language": "fr"
+      },
+      "expect": {
+        "status": ["spent"]
+      },
+      "spent": true
+    },
+    {
+      "id": "digest-spent",
+      "about": "A digest at 100% of the questions' budget",
+      "digest": {
+        "universe": "onyx",
+        "realm": "gno.land/r/demo/poll3"
+      },
+      "chain": {
+        "recorded": "poll"
+      },
+      "expect": {
+        "status": ["spent"]
+      },
+      "spent": true
+    }
+  ]
+}

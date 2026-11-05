@@ -878,7 +878,7 @@ describe("page: the allowlist, for any input", () => {
     "word",
     "é",
     "😀",
-    "‮",
+    "\u202e",
     "\0",
   ];
   const source = fc

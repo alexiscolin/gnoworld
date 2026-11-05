@@ -3,7 +3,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Config } from "../config.ts";
 import type { Command } from "../irc/lines.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { roomWorld, worldRooms } from "../rooms/rooms.ts";
 import { publicRoom, type World } from "../rooms/types.ts";
 import { makeChecker } from "./check.ts";

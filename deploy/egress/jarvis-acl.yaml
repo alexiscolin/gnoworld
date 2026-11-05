@@ -1,0 +1,16 @@
+# The hosts jarvis may reach (ADR-0002 §5: "its network reaches only the Anthropic API, the chain's nodes, the public
+# indexer and gnoscope"), through its own proxy (egress_jarvis, on 4751): Anthropic's API, each universe's node and
+# indexer of app/data/universes.json, and gnoscope, each by its full name, never its domain; jarvis/src/config.test.ts
+# holds the list to the data. A host is matched as the request names it, then resolved and refused if private.
+version: v1
+services: []
+default:
+  project: gnoworld-jarvis
+  action: enforce
+  allowed_domains:
+    - api.anthropic.com
+    - rpc.onyx.testnets.gno.land
+    - indexer.onyx.testnets.gno.land
+    - rpc.gno.land
+    - indexer.gno.land
+    - gnoscope.com

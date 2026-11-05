@@ -5,13 +5,22 @@
 # here on 4750, and only that network may reach it); the DNS servers Docker forwards to from this
 # network; then every private, local, carrier and reserved address refused, so the host, its LAN and
 # any tailnet stay out of reach; then public TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is
-# closed. deploy/test.sh proves each line.
+# closed. jarvis's way out listens here too, on 4751, reached from jarvis's own network alone, which gets nothing
+# else in and nothing out but its replies (10j). deploy/test.sh proves each line.
 set -eu
 
 web=$(getent hosts web | awk '{ print $1 }')
 inside=$(ip route get "$web" | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
 if [ -z "$web" ] || [ -z "$inside" ]; then
 	echo "guard: cannot find web's network" >&2
+	exit 1
+fi
+# jarvis's way out's network, by the guard's own fixed address in it (JARVIS_OUT_ADDRESS, compose.yaml), never by
+# jarvis's name, which may resolve elsewhere or not yet; refused if it is the internal network or the one that lets out.
+jarvis_out=$(ip -4 -o addr show to "$JARVIS_OUT_ADDRESS/32" | awk '{ print $2 }')
+outside=$(ip route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
+if [ -z "$jarvis_out" ] || [ "$jarvis_out" = "$inside" ] || [ "$jarvis_out" = "$outside" ]; then
+	echo "guard: cannot find jarvis's network" >&2
 	exit 1
 fi
 
@@ -28,9 +37,13 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 	echo '-A INPUT -i lo -j ACCEPT'
 	echo "-A INPUT -i $inside -p tcp --dport 4750 -j ACCEPT"
 	echo '-A INPUT -p tcp --dport 4750 -j REJECT'
+	echo "-A INPUT -i $jarvis_out -p tcp --dport 4751 -j ACCEPT"
+	echo "-A INPUT -i $jarvis_out -j REJECT"
+	echo '-A INPUT -p tcp --dport 4751 -j REJECT'
 	echo '-A OUTPUT -o lo -j ACCEPT'
 	echo "-A OUTPUT -o $inside -d $web -p tcp --dport 8080 -j ACCEPT"
 	echo "-A OUTPUT -o $inside -p tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+	echo "-A OUTPUT -o $jarvis_out -p tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	for server in $dns; do
 		echo "-A OUTPUT -d $server -p udp --dport 53 -j ACCEPT"
 		echo "-A OUTPUT -d $server -p tcp --dport 53 -j ACCEPT"

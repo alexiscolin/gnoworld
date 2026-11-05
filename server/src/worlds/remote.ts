@@ -1,8 +1,9 @@
 // The worlds job's reads of a chain and its indexer (slice 7, 7c), shared by its readers, on top of the server's one way out
 // (net.ts): an answer's text, UTF-8 checked, and an abci_query through the envelope QueryAnswer describes, base64 checked.
-import { abciQueryOf } from "@gnoworld/core";
+import { abciQueryOf } from "@gnoworld/chain/abci";
+import type { AbciAsk } from "@gnoworld/chain/asks";
 import { QueryAnswer } from "@gnoworld/schemas";
-import { Failure, fetchCapped, kindOf, reachedNothing, type Kind, type Limits, type Send } from "../net.ts";
+import { Failure, fetchCapped, kindOf, reachedNothing, type Kind, type Limits, type Send } from "@gnoworld/service/net";
 
 export { Failure, kindOf, type Kind, type Send };
 
@@ -77,7 +78,7 @@ function envelopeText(json: unknown, maxBytes: number): string {
  */
 export async function abciQuery(
   chain: { readonly send: Send; readonly rpc: string },
-  query: { readonly path: string; readonly data: string },
+  query: AbciAsk,
   limits: Limits,
 ): Promise<string> {
   const url = `${new URL(chain.rpc).origin}${abciQueryOf(query.path, new TextEncoder().encode(query.data))}`;

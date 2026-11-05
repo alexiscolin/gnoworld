@@ -36,21 +36,37 @@ claude plugin install gnomcp@gnoverse --scope project   # its marketplace is dec
 
 ## A branch's worktree
 
-Each branch works in a worktree of its own, made from the main checkout by one script, never by
-hand: `sh scripts/worktree.sh <dir> <branch> <base>`, `<dir>` a plain name in the folder beside the
-main checkout, `~/Server/gnoworld-wt/` (its name and `-wt`), out of the temp folder every
-command may write: no part's session writes a sibling there, moves one or plants one (7w3, F4893).
-Alexis makes that folder once (`mkdir ~/Server/gnoworld-wt`); the chief's session writes
-it by `--add-dir` (docs/HARNESS.md, "Who does what"). Until `main` holds 7w3, the script that does
-so is the integration worktree's, whose package files are the base's (`main`'s takes any folder).
-It makes the branch, links the main tree's
+Each branch works in a worktree of its own, made from the root of a checkout whose packages are
+installed (the main checkout, or the worktree a part is cut from) by one script, never by hand:
+`sh scripts/worktree.sh <name> <branch> <base>`, `<name>` (a-z, 0-9 and -) a folder of
+`~/Server/gnoworld-wt` (made once, in your shell), where no session's shell writes but its own
+folder (Alexis, 2026-11-04; its file tools still can, F5095), which it may also be given in full.
+Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
+outside the sandbox and must touch no other (F5058), and a base whose harness,
+`CLAUDE.md` or package files are not its tree's (F5098). No part's session writes a sibling there, moves
+one or plants one (7w3, F4893); the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
+what"). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
-relative links and a `.bin` of its own; the gate's StrykerJS reads one incremental file every tree
-shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made links
-loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+relative links and a `.bin` of its own, through no link it did not make; the gate's StrykerJS reads
+one incremental file every tree shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made
+links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
+`sh scripts/worktree.sh remove <name>`, from another tree,
+removes a worktree of that root that holds no change, staged file or untracked file (git's own
+check: its ignored files go with it, never what a link in it leads to) with its record, and keeps
+its branch. It prunes no other record, which a session can point at nothing: `git worktree prune`
+is run in your shell. In Claude Code it runs outside the sandbox: write the call alone, from the
+checkout's root, with plain words (a bare `<name>`); the guard refuses any other form (a `cd`, a
+`$(...)`, a `~`, an assignment, a redirect or another command in the call).
+A branch with an upstream is deleted in your shell: in a session `git branch -D` cannot write
+`.git/config`, so it deletes the branch but keeps its `branch.<name>` section, which a new branch
+of that name would inherit (F5113). A branch `worktree.sh` made has no such section.
 After a merge that changes the lockfile, install in the main checkout
-(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`); the sandbox
-cannot remove a worktree's record in `.git/worktrees`, so `git worktree prune` is run in your shell.
+(`PATH=$HOME/.nvm/versions/node/v24.22.0/bin:$PATH pnpm install --frozen-lockfile`).
+
+A session writes its own worktree only: never another session's, by any tool, nor runs a command
+that writes there (F5058). So a merge into a part's branch that changes the harness is Alexis's, in
+his terminal: the part's own sandbox refuses those files (F5055), and the chief writing them for it
+from his session was the hole F5058 names.
 
 ## Toolchain
 
@@ -193,6 +209,19 @@ minifier keeps. Then build the site before and after and compare every file (`tu
 build, and the budgets hold the bytes).
 
 **Landing a batch:** paste Copy's list to Claude. The values land in code as one part, test first.
+
+## Jarvis's evals
+
+`evals/` is installed apart from the workspace (its own `pnpm-workspace.yaml`, with the workspace's supply-chain
+rules, and its own lockfile): `cd evals && pnpm install --frozen-lockfile --ignore-scripts`, once, in your shell, so
+no package's script runs there (F5317). They need Anthropic's key in a file
+and gnomcp 0.11.0, and cost money for each case not kept in `evals/.cache`:
+`ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh`. `run.sh` checks the evals' own types
+and Node tests first (`evals/test-*.ts`), then runs promptfoo's `eval` script, its results in `evals/results/`.
+The gate lints `evals/` (its tsconfig takes zod's and Node's types from jarvis's install, which every tree has); knip
+leaves it out, as promptfoo's binary resolves only where `evals/` is installed; `jarvis/src/routes.test.ts` holds the
+cases to jarvis's wire. `run.sh` runs the branch's own code with the key, in your shell: run it on a commit you have
+read (10j's security review, S1; question 10j-5).
 
 ## Slices
 

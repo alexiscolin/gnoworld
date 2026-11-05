@@ -64,7 +64,7 @@ describe("excerpt: a message's words cut to a length", () => {
 
   test.each([
     ["a skin-toned emoji", "👍🏽"],
-    ["a family joined by ZWJs", "👩‍👩‍👧‍👦"],
+    ["a family joined by ZWJs", "👩\u200d👩\u200d👧\u200d👦"],
     ["a flag", "🇫🇷"],
     ["a letter beyond the BMP", "𝒜"],
     ["a letter and its accent", "é"],
@@ -121,7 +121,7 @@ describe("firstGraphemes: the first graphemes of a text, the rest never segmente
       [...new Intl.Segmenter().segment(text)].slice(0, count).map(({ segment }) => segment);
     for (const text of [
       "x".repeat(9000),
-      "👩‍👩‍👧‍👦é🇫🇷a".repeat(300),
+      "👩\u200d👩\u200d👧\u200d👦é🇫🇷a".repeat(300),
       `${"a\u0301".repeat(400)}z`,
       "é".repeat(20) + "\u0301",
     ]) {
@@ -139,7 +139,7 @@ describe("cutGraphemes: a text cut to a length", () => {
 
   test("never cuts a grapheme in two, a flag and a family included", () => {
     expect(cutGraphemes("🇫🇷🇫🇷🇫🇷🇫🇷", 3)).toBe("🇫🇷🇫🇷…");
-    expect(cutGraphemes("a👨‍👩‍👧b", 2)).toBe("a…");
+    expect(cutGraphemes("a👨\u200d👩\u200d👧b", 2)).toBe("a…");
   });
 
   test("refuses a length that is not a whole number of 2 or more", () => {

@@ -1,0 +1,22 @@
+This folder is the `gno` skill of gnomcp 0.11.0 (https://github.com/gnoverse/gno-mcp, its `skills/gno/`),
+copied unchanged into gnoworld for Jarvis on 2026-11-04, with gnomcp's LICENSE, the Apache License 2.0, beside it.
+gnoworld's own files here are this NOTICE alone.
+
+Each file's SHA-256 as gnomcp 0.11.0 ships it:
+
+c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4  LICENSE
+311aa0cee9dbd448c3b9324eb230d464aad92b2eda90886224f1ef38e8b0ef9b  SKILL.md
+3770406566a37bf058d067ba3aa04963cbb26185c2fdc98c41e7f85426b6e76c  references/audit.md
+3ba3a010be820fc8a66ff77b67d3c8d4ba9af81f7dd5d9849b4143f2999ffcac  references/build.md
+59ca09021b9e4344e63811be286f3125ca5391a53e2c00141555a4d37f8f25f3  references/debug.md
+9cbd560d661d7abe659cc07d146136f1ebc750ec88961c816498ed1db56959ee  references/gnokey.md
+225e24239ccd880b8fe1a5043332f2966dc2a770bf0220ccd9598e9c333f0213  references/interrealm.md
+14c20db0b10748f84e4214d6091ebfd3709dc2c60b74b18807955459fcd8689e  references/mcp.md
+0c5bf7d3edd5958f730149e9d15b8dff006ae142d9cd8381640d24efa4df4115  references/memory.md
+44915705ac388ab9d8f1279b1810a2e7f23283e338f43febd18e44a77e10cc43  references/networks.md
+ecd82e15b4cb7be22e9127cee12c9dc658340709078c500a9431db9157e64b16  references/patterns.md
+951a9ffcd3d50cde9b97051038fc51a5effc2da3d1a48c0e315bd432b5d0bf90  references/render.md
+e290b2914cb7a51776490b045b82f5fcb89c00ef53ca7c37b0c1f6d6f7b294a1  references/security.md
+447ea197adc80e5b1167c88c48892471aa0fbce214d79cca7161678c82bac795  references/stdlib.md
+7a24ce7c4fe26f5b2b0089b6869490b6be8e74c39bb9b66b7cedc2c3bbc12c20  references/sysrealms.md
+96937add02140595ed2553dfd6040bb5e82a12ee7f0134e4189df7937a5cfbfd  references/toolchain.md

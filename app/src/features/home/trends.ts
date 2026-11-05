@@ -3,7 +3,7 @@
 // title and its first realm's view, the Earth by its own; one the page cannot place is left out. Each says when its data was read.
 import { Trends, TRENDS_MAX_BYTES, type Trend } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
-import { readSiteFile, type SiteFileRead } from "../../lib/chain/transport.ts";
+import { readSiteFile, type SiteFileRead } from "@gnoworld/chain/transport";
 import { EARTH, hubWorldOf } from "@gnoworld/core";
 import { pagesOf, type WorldPlaces } from "../../lib/hubWorld.ts";
 import { stampOf } from "./stamp.ts";

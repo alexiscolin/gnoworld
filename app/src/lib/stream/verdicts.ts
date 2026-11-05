@@ -4,6 +4,7 @@
 // of a shape or state this page does not know is dropped, said once (F675, slice 4's plan §1). After its replay, the
 // stream says when it began following, on the server's clock (F890). An answer not 200 (a 429, a restart's 502)
 // ends it for good, which the page is told (F888).
+import { jsonOf } from "@gnoworld/core";
 import { StreamEvent, StreamSince } from "@gnoworld/schemas";
 
 /** What the page's EventSource offers, so a test hands its own. */
@@ -31,12 +32,8 @@ function read<T>(
   schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } },
 ): T | undefined {
   if (typeof data !== "string") return undefined;
-  try {
-    const parsed = schema.safeParse(JSON.parse(data));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
+  const parsed = schema.safeParse(jsonOf(data));
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** Follows the rooms' verdicts, handing each on; stops when called. */

@@ -91,7 +91,8 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    lens, on the diff since the first; after three rounds the review stops and Claude and Alexis
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
-   status and evidence. An agent greps it for its diff's paths and the ids it is given and reads those
+   status and evidence, numbered in its slice's range from slice 12 (slice N: F N000 to N999, a hundred a
+   part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
    evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
    second run is no ledger row: `.claude/tmp/unsteady.log` keeps it. What Alexis caught and missed

@@ -1,0 +1,28 @@
+# gnomcp 0.11.0's profiles for jarvis (JARVIS_GNOMCP_CONFIG, D86): each universe of app/data/universes.json on its own
+# node and indexer, and gnomcp's three built-ins redefined on the mainnet's chain, which gnomcp never writes to (it writes
+# to dev and testnet chains alone: internal/profiles/validate.go, testnetChainNames). jarvis refuses to start unless
+# gnomcp lists every profile read-only; the model may name jarvis's own profiles alone (JARVIS_PROFILES). Checked on
+# 2026-11-05 with gnomcp 0.11.0's gno_profile_list: five profiles, each "read-only". No key, no master address, no faucet.
+[onyx]
+rpc-url = "https://rpc.onyx.testnets.gno.land:443"
+chain-id = "onyx-1"
+gnoweb-url = "https://onyx.testnets.gno.land"
+tx-indexer-url = "https://indexer.onyx.testnets.gno.land/graphql/query"
+
+[gnoland]
+rpc-url = "https://rpc.gno.land:443"
+chain-id = "gnoland-1"
+gnoweb-url = "https://gno.land"
+tx-indexer-url = "https://indexer.gno.land/graphql/query"
+
+[local]
+rpc-url = "https://rpc.gno.land:443"
+chain-id = "gnoland-1"
+
+[testnet]
+rpc-url = "https://rpc.gno.land:443"
+chain-id = "gnoland-1"
+
+[sapphire]
+rpc-url = "https://rpc.gno.land:443"
+chain-id = "gnoland-1"

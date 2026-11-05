@@ -1,0 +1,17 @@
+{
+  "name": "gnoworld-evals",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "24.22.0"
+  },
+  "scripts": {
+    "eval": "promptfoo eval -c promptfooconfig.yaml --no-share"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "promptfoo": "0.125.1",
+    "zod": "4.6.7"
+  }
+}

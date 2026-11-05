@@ -83,11 +83,11 @@ describe("a name the data gives", () => {
     expect(titleOf("")).toBe("dao");
     expect(titleOf("   ")).toBe("dao");
     expect(titleOf("Gov\nDAO\t hub")).toBe("Gov DAO hub");
-    expect(titleOf("‮OAD voG‏")).toBe("OAD voG");
+    expect(titleOf("\u202eOAD voG\u200f")).toBe("OAD voG");
   });
 
   it("is cleaned as a bubble's text: a family kept whole, a lone half of a pair dropped, a heap of accents dropped", () => {
-    expect(titleOf("Club 👨‍👩‍👧")).toBe("Club 👨‍👩‍👧");
+    expect(titleOf("Club 👨\u200d👩\u200d👧")).toBe("Club 👨\u200d👩\u200d👧");
     expect(titleOf("abc\uD800def")).toBe("abcdef");
     expect(titleOf(`a${"\u0301".repeat(2000)}bc`)).toBe("bc");
   });

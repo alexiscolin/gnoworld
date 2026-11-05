@@ -7,9 +7,18 @@ import { MAX_ARBITRARY_MESSAGE_BYTES } from "@adena-wallet/sdk";
 import { Address, type Proof } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { openDatabase } from "../db.ts";
+import { openDatabase } from "@gnoworld/service/db";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin, NONCE_HOST, verifyProof, type Login, type Verify } from "./login.ts";
+import {
+  LOGIN_TABLES,
+  makeLogin,
+  makeSigned,
+  NONCE_ACTION,
+  NONCE_HOST,
+  verifyProof,
+  type Login,
+  type Verify,
+} from "./login.ts";
 import { TICKET_TABLES } from "./ticket.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -26,7 +35,7 @@ afterEach(() => {
 });
 
 const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
   opened.push(db);
   const clock = { now: T0 };
   const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -48,7 +57,7 @@ describe("the nonces' table", () => {
       const file = join(folder, "gnoworld.sqlite");
       // As 3c and 3d made it: their migrations, in their order.
       openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
-      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST]);
+      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
       try {
         const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
         expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
@@ -768,3 +777,224 @@ function highS(signature: Buffer): Buffer {
   const s = BigInt(`0x${signature.subarray(32).toString("hex")}`);
   return Buffer.concat([signature.subarray(0, 32), Buffer.from((order - s).toString(16).padStart(64, "0"), "hex")]);
 }
+
+// 10g (ADR-0002 §6): a change an admin signs afresh, through the login's own nonce and verifier, never a login's.
+describe("a signed action", () => {
+  const HEAD = ["Change gnoworld's settings (admin, version 1)", "", "Jarvis: the daily quota is 20 questions"];
+  const ACTION = '{"setting":"quota","questions":20}';
+  const signedSetup = (options: { verify?: Verify } = {}) => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    opened.push(db);
+    const clock = { now: T0 };
+    const signed = makeSigned(db, { chains: CHAINS, now: () => clock.now, ...options });
+    const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
+    const issue = (chainId = "onyx-1") => {
+      const made = signed.issue(chainId, DOMAIN, { head: HEAD, action: ACTION });
+      if (typeof made === "string") throw new Error(`no challenge: ${made}`);
+      return made;
+    };
+    return { db, clock, signed, login, issue };
+  };
+
+  it("takes the action column at the next start of a file made before it, a login's nonce holding none", () => {
+    const folder = mkdtempSync(join(tmpdir(), "gnoworld-actions-"));
+    try {
+      const file = join(folder, "gnoworld.sqlite");
+      openDatabase(file, [LOGIN_TABLES, NONCE_HOST]).close();
+      const db = openDatabase(file, [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+      try {
+        const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
+        challenge(login);
+        expect(db.prepare("SELECT action FROM nonces").all()).toEqual([{ action: null }]);
+      } finally {
+        db.close();
+      }
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it("writes the head's lines, then the login's own: the domain, the nonce and the times", () => {
+    const { issue } = signedSetup();
+    const made = issue();
+    expect(made.text).toBe(
+      [
+        ...HEAD,
+        "",
+        `Domain: ${DOMAIN}`,
+        `Nonce: ${made.nonce}`,
+        "Issued: 2026-10-22T12:00:00.000Z",
+        "Expires: 2026-10-22T12:05:00.000Z",
+      ].join("\n"),
+    );
+  });
+
+  it("hands back the action its nonce was issued with, once the proof of its text passes", async () => {
+    const { signed, issue } = signedSetup();
+    const me = wallet();
+    const made = issue("gnoland-1");
+    const proved = await signed.proveAction(
+      { nonce: made.nonce, address: me.address, proof: me.sign("gnoland-1", made.text) },
+      DOMAIN,
+    );
+    expect(proved).toEqual({ action: ACTION });
+  });
+
+  it("hands the verifier the signer named, the stored chain and the stored text, never the client's", async () => {
+    const seen: Parameters<Verify>[1][] = [];
+    const { signed, issue } = signedSetup({
+      verify: (_, expected) => {
+        seen.push(expected);
+        return Promise.resolve(true);
+      },
+    });
+    const me = wallet();
+    const made = issue("gnoland-1");
+    await signed.proveAction(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", "another text") },
+      DOMAIN,
+    );
+    expect(seen).toEqual([{ signer: me.address, chainId: "gnoland-1", data: made.text }]);
+  });
+
+  it("spends an action's nonce before verifying, so a refused proof buys no second try", async () => {
+    let answer = false;
+    const { signed, issue } = signedSetup({ verify: () => Promise.resolve(answer) });
+    const me = wallet();
+    const made = issue();
+    const request = { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) };
+    expect(await signed.proveAction(request, DOMAIN)).toBe("proof");
+    answer = true;
+    expect(await signed.proveAction(request, DOMAIN)).toBe("nonce");
+  });
+
+  it("proves an action once, verifying once, when the same proof arrives twice at once", async () => {
+    let calls = 0;
+    const { signed, issue } = signedSetup({
+      verify: () => {
+        calls += 1;
+        return new Promise((resolve) =>
+          setImmediate(() => {
+            resolve(true);
+          }),
+        );
+      },
+    });
+    const me = wallet();
+    const made = issue();
+    const request = { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) };
+    const results = await Promise.all([signed.proveAction(request, DOMAIN), signed.proveAction(request, DOMAIN)]);
+    expect(results).toContainEqual({ action: ACTION });
+    expect(results).toContain("nonce");
+    expect(calls).toBe(1);
+  });
+
+  it("refuses an action's nonce from another host, or past its five minutes", async () => {
+    const { clock, signed, issue } = signedSetup();
+    const me = wallet();
+    const elsewhere = issue();
+    const request = { nonce: elsewhere.nonce, address: me.address, proof: me.sign("onyx-1", elsewhere.text) };
+    expect(await signed.proveAction(request, "gnoworld.test.evil")).toBe("nonce");
+    const late = issue();
+    clock.now += TTL;
+    const after = { nonce: late.nonce, address: me.address, proof: me.sign("onyx-1", late.text) };
+    expect(await signed.proveAction(after, DOMAIN)).toBe("nonce");
+  });
+
+  it("never logs in with an action's nonce, which stays for its action", async () => {
+    const { signed, login, issue } = signedSetup();
+    const me = wallet();
+    const made = issue();
+    const request = { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) };
+    expect(await login.verify(request, anyone, DOMAIN)).toBe("nonce");
+    expect(await signed.proveAction(request, DOMAIN)).toEqual({ action: ACTION });
+  });
+
+  it("never proves an action with a login's nonce, which stays for its login", async () => {
+    const { signed, login } = signedSetup();
+    const me = wallet();
+    const made = challenge(login);
+    const request = { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) };
+    expect(await signed.proveAction(request, DOMAIN)).toBe("nonce");
+    expect(typeof (await login.verify(request, anyone, DOMAIN))).toBe("object");
+  });
+
+  it("issues an action's nonce for the chains the login takes alone, under the same cap", () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    opened.push(db);
+    const signed = makeSigned(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
+    const login = makeLogin(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
+    expect(signed.issue("another-1", DOMAIN, { head: HEAD, action: ACTION })).toBe("chain");
+    expect(typeof signed.issue("onyx-1", DOMAIN, { head: HEAD, action: ACTION })).toBe("object");
+    expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
+    expect([signed.issue("onyx-1", DOMAIN, { head: HEAD, action: ACTION }), login.challenge("onyx-1", DOMAIN)]).toEqual(
+      ["full", "full"],
+    );
+  });
+});
+
+// 10g (ADR-0002 §6; Alexis, 10g-6 and 10g-7): the admin console's login, on its own listener: its pending nonces counted
+// for its own host alone, and a session of one hour from its signature.
+describe("the admin console's login", () => {
+  const CONSOLE = "admin.gnoworld.test";
+  const consoleSetup = () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    opened.push(db);
+    const clock = { now: T0 };
+    const now = () => clock.now;
+    const site = makeLogin(db, { chains: CHAINS, now, nonceCap: 2 });
+    const admin = makeLogin(db, { chains: CHAINS, now, nonceCap: 2, console: true });
+    const signed = makeSigned(db, { chains: CHAINS, now, nonceCap: 2, console: true });
+    return { db, clock, site, admin, signed };
+  };
+  const signIn = async (login: Login, host: string) => {
+    const me = wallet();
+    const made = login.challenge("onyx-1", host);
+    if (typeof made === "string") throw new Error(made);
+    const result = await login.verify(
+      { nonce: made.nonce, address: me.address, proof: me.sign("onyx-1", made.text) },
+      anyone,
+      host,
+    );
+    if (typeof result === "string") throw new Error(result);
+    return { ...result, address: me.address };
+  };
+
+  it("counts its own host's pending nonces alone, so the public site at its cap leaves its login and changes be", () => {
+    const { site, admin, signed } = consoleSetup();
+    for (let at = 0; at < 2; at += 1) site.challenge("onyx-1", DOMAIN);
+    expect(site.challenge("onyx-1", DOMAIN)).toBe("full");
+    expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
+    expect(typeof signed.issue("onyx-1", CONSOLE, { head: ["A change"], action: "{}" })).toBe("object");
+    expect(admin.challenge("onyx-1", CONSOLE)).toBe("full");
+  });
+
+  it("leaves the public site's count the global one, the console's nonces in it, while the console counts its own", () => {
+    const { site, admin } = consoleSetup();
+    site.challenge("onyx-1", DOMAIN);
+    admin.challenge("onyx-1", CONSOLE);
+    expect(site.challenge("onyx-1", DOMAIN)).toBe("full");
+    expect(typeof admin.challenge("onyx-1", CONSOLE)).toBe("object");
+  });
+
+  it("gives a session of one hour from its signature, its cookie too, renewed by no use", async () => {
+    const { clock, admin } = consoleSetup();
+    const made = await signIn(admin, CONSOLE);
+    expect(made.maxAge).toBe(60 * 60);
+    clock.now = T0 + 30 * MINUTE;
+    expect(admin.session(made.token)).toBe(made.address);
+    clock.now = T0 + 60 * MINUTE - 1;
+    expect(admin.session(made.token)).toBe(made.address);
+    clock.now = T0 + 60 * MINUTE;
+    expect(admin.session(made.token)).toBeUndefined();
+  });
+
+  it("refuses a public session signed more than an hour ago, presented by hand", async () => {
+    const { clock, site, admin } = consoleSetup();
+    const made = await signIn(site, DOMAIN);
+    clock.now = T0 + 60 * MINUTE - 1;
+    expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, made.address]);
+    clock.now = T0 + 60 * MINUTE;
+    expect([site.session(made.token), admin.session(made.token)]).toEqual([made.address, undefined]);
+  });
+});

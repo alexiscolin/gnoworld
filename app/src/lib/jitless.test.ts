@@ -6,7 +6,7 @@ import { z } from "./jitless.ts";
 const SOURCES = import.meta.glob<string>(
   [
     "../**/*.{ts,tsx,mts,cts,js,jsx}",
-    "../../../packages/{core,ui,schemas}/src/**/*.{ts,tsx,mts,cts,js,jsx}",
+    "../../../packages/{core,ui,schemas,chain}/src/**/*.{ts,tsx,mts,cts,js,jsx}",
     "!../**/*.{test,stories}.*",
     "!../../../packages/*/src/**/*.{test,stories}.*",
     "!./jitless.ts",

@@ -2,7 +2,7 @@
 // it with a single-use nonce; one verified proof makes one token, of which only the SHA-256 is stored.
 // The token renews on use for 30 days and ends 90 days after its login whatever the use (decision 143).
 import { createHash, randomBytes } from "node:crypto";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { verifyArbitrarySignature } from "@adena-wallet/sdk";
 import { Address, type Challenge, type Proof, type VerifyRequest } from "@gnoworld/schemas";
 import { z } from "zod";
@@ -27,6 +27,12 @@ export const NONCE_HOST = `
 ALTER TABLE nonces ADD COLUMN host TEXT NOT NULL DEFAULT '';
 `;
 
+// The change an admin signs with a nonce (10g, ADR-0002 §6), none for a login's: a login spends a nonce with none alone,
+// a change one with its own, so neither signature ever stands for the other (Alexis, 10g-3).
+export const NONCE_ACTION = `
+ALTER TABLE nonces ADD COLUMN action TEXT;
+`;
+
 interface Expected {
   signer: Address;
   chainId: string;
@@ -37,6 +43,21 @@ export type Verify = (proof: Proof, expected: Expected) => Promise<boolean>;
 // The SDK's verifier says yes when told nothing to check (ADR-0002 §4): here all three are required.
 export const verifyProof: Verify = async (proof, { signer, chainId, data }) =>
   verifyArbitrarySignature(proof, { signer, chainId, data });
+
+/** A text signed once: a nonce kept with the whole text the wallet signs, and with the action it stands for when it is
+ * an admin's change, then the proof that spends it. */
+export interface Signed {
+  // `head`'s lines, then the domain, the nonce and the times, for a chain the settings name; kept five minutes.
+  issue: (
+    chainId: string,
+    host: string,
+    text: { head: readonly string[]; action?: string },
+  ) => Challenge | "chain" | "full";
+  // A login's nonce spent first, by one statement, then the proof checked against the signer, the chain and the text.
+  prove: (request: VerifyRequest, host: string) => Promise<"proved" | "nonce" | "proof">;
+  // The same for a change's nonce, giving back its action once the proof passes.
+  proveAction: (request: VerifyRequest, host: string) => Promise<{ action: string } | "nonce" | "proof">;
+}
 
 export interface Login {
   challenge: (chainId: string, domain: string) => Challenge | "chain" | "full";
@@ -51,6 +72,7 @@ export interface Login {
 }
 
 const Spent = z.object({ chain: z.string(), text: z.string() });
+const SpentAction = Spent.extend({ action: z.string() });
 const Live = z.object({ address: Address, signed_at: z.number(), expires_at: z.number() });
 const Count = z.object({ n: z.number() });
 const sha256 = (token: string): Buffer => createHash("sha256").update(token).digest();
@@ -60,19 +82,90 @@ interface Options {
   now: () => number;
   verify?: Verify;
   nonceCap?: number;
+  // The admin console's login and changes (ADR-0002 §6): its own host's pending nonces counted alone, so a public flood
+  // never fills its cap (Alexis, 10g-6), and a session of one hour from its signature (10g-7).
+  console?: boolean;
 }
 
-export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof, nonceCap = 100_000 }: Options): Login {
+export function makeSigned(
+  db: DatabaseSync,
+  { chains, now, verify = verifyProof, nonceCap = 100_000, console = false }: Options,
+): Signed {
   if (chains.length === 0) throw new Error("the login needs at least one chain");
   const ttl = 5 * 60_000;
-  const day = 24 * 60 * 60_000;
-  const [sliding, cap] = [30 * day, 90 * day];
-  const tokensPerAccount = 10;
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
     countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
-    addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, expires_at) VALUES (?, ?, ?, ?, ?)"),
-    spend: db.prepare("DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? RETURNING chain, text"),
+    // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000, measured by the finding-verifier); the console's
+    // calls are few, and the public path keeps the global count, so a flood costs it nothing more (Alexis, 10g-6).
+    countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ?"),
+    addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, action, expires_at) VALUES (?, ?, ?, ?, ?, ?)"),
+    spendLogin: db.prepare(
+      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NULL RETURNING chain, text",
+    ),
+    spendAction: db.prepare(
+      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NOT NULL RETURNING chain, text, action",
+    ),
+  };
+  // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one success.
+  const spendThenVerify = async <T extends z.infer<typeof Spent>>(
+    [spend, Row]: [StatementSync, z.ZodType<T>],
+    { nonce, address, proof }: VerifyRequest,
+    host: string,
+  ): Promise<T | "nonce" | "proof"> => {
+    const spent = spend.get(nonce, host, now());
+    if (spent === undefined) return "nonce";
+    const row = Row.parse(spent);
+    let valid = false;
+    try {
+      valid = await verify(proof, { signer: address, chainId: row.chain, data: row.text });
+    } catch {
+      // A verifier that fails refuses; the SDK's never throws, but the login must not depend on it.
+    }
+    return valid ? row : "proof";
+  };
+  return {
+    issue(chainId, host, { head, action }) {
+      if (!chains.includes(chainId)) return "chain";
+      const at = now();
+      sql.purgeNonces.run(at);
+      // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
+      const pending = console ? sql.countHost.get(host) : sql.countNonces.get();
+      if (Count.parse(pending).n >= nonceCap) return "full";
+      const nonce = randomBytes(16).toString("base64url");
+      const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
+      const text = [
+        ...head,
+        "",
+        `Domain: ${host}`,
+        `Nonce: ${nonce}`,
+        `Issued: ${issued}`,
+        `Expires: ${expiresAt}`,
+      ].join("\n");
+      sql.addNonce.run(nonce, chainId, host, text, action ?? null, at + ttl);
+      return { nonce, text, expiresAt };
+    },
+
+    async prove(request, host) {
+      const proved = await spendThenVerify([sql.spendLogin, Spent], request, host);
+      return typeof proved === "string" ? proved : "proved";
+    },
+
+    async proveAction(request, host) {
+      const proved = await spendThenVerify([sql.spendAction, SpentAction], request, host);
+      return typeof proved === "string" ? proved : { action: proved.action };
+    },
+  };
+}
+
+export function makeLogin(db: DatabaseSync, options: Options): Login {
+  const { now } = options;
+  const signed = makeSigned(db, options);
+  const day = 24 * 60 * 60_000;
+  // The console's session ends an hour after its signature, whatever the use.
+  const [sliding, cap] = options.console === true ? [60 * 60_000, 60 * 60_000] : [30 * day, 90 * day];
+  const tokensPerAccount = 10;
+  const sql = {
     known: db.prepare("SELECT 1 FROM accounts WHERE address = ?"),
     addAccount: db.prepare("INSERT INTO accounts (address, first_seen) VALUES (?, ?)"),
     purgeTokens: db.prepare("DELETE FROM tokens WHERE expires_at <= ?"),
@@ -88,38 +181,12 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
   };
 
   return {
-    challenge(chainId, domain) {
-      if (!chains.includes(chainId)) return "chain";
-      const at = now();
-      sql.purgeNonces.run(at);
-      // ponytail: count(*) is O(n), n ≤ nonceCap (0.01 ms at 100,000); a counter kept with the rows if the cap rises.
-      if (Count.parse(sql.countNonces.get()).n >= nonceCap) return "full";
-      const nonce = randomBytes(16).toString("base64url");
-      const [issued, expiresAt] = [new Date(at).toISOString(), new Date(at + ttl).toISOString()];
-      const text = [
-        "Sign in to gnoworld (login, version 1)",
-        "",
-        `Domain: ${domain}`,
-        `Nonce: ${nonce}`,
-        `Issued: ${issued}`,
-        `Expires: ${expiresAt}`,
-      ].join("\n");
-      sql.addNonce.run(nonce, chainId, domain, text, at + ttl);
-      return { nonce, text, expiresAt };
-    },
+    challenge: (chainId, domain) => signed.issue(chainId, domain, { head: ["Sign in to gnoworld (login, version 1)"] }),
 
-    async verify({ nonce, address, proof }, mayCreate, host) {
-      // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one login.
-      const spent = sql.spend.get(nonce, host, now());
-      if (spent === undefined) return "nonce";
-      const { chain, text } = Spent.parse(spent);
-      let valid = false;
-      try {
-        valid = await verify(proof, { signer: address, chainId: chain, data: text });
-      } catch {
-        // A verifier that fails refuses; the SDK's never throws, but the login must not depend on it.
-      }
-      if (!valid) return "proof";
+    async verify(request, mayCreate, host) {
+      const proved = await signed.prove(request, host);
+      if (proved !== "proved") return proved;
+      const { address } = request;
       const at = now();
       if (sql.known.get(address) === undefined) {
         if (!mayCreate()) return "new_account";
@@ -138,6 +205,8 @@ export function makeLogin(db: DatabaseSync, { chains, now, verify = verifyProof,
       const row = sql.live.get(hash, at);
       if (row === undefined) return undefined;
       const { address, signed_at: signed, expires_at: expires } = Live.parse(row);
+      // A token another login made lives longer: the console takes none signed more than its hour ago.
+      if (signed + cap <= at) return undefined;
       // One write a minute at most per token: a stream of uses, a ticket per reconnect, costs one.
       const renewed = Math.min(at + sliding, signed + cap);
       if (renewed - expires >= 60_000) sql.renew.run(renewed, hash);

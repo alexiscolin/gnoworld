@@ -12,10 +12,11 @@ import {
   RealmPath,
 } from "@gnoworld/schemas/indexer";
 import { readFileSync, statSync } from "node:fs";
-import type { Log } from "../log.ts";
+import { renderAsk } from "@gnoworld/chain/asks";
+import type { Log } from "@gnoworld/service/log";
 import { decide, type Thresholds } from "../moderation/decide.ts";
 import { moderationClient, type Answer } from "../moderation/provider.ts";
-import { publicUrl, reachedNothing, send as netSend } from "../net.ts";
+import { publicUrl, reachedNothing, send as netSend } from "@gnoworld/service/net";
 import { repeat, waitsAfterOutcome, type Outcome, type Repeating } from "../repeat.ts";
 import { replaceFile } from "../replaceFile.ts";
 import { abciQuery, Absent, isDown, kindOf, pacer, type Kind, type Send } from "../worlds/remote.ts";
@@ -128,11 +129,10 @@ interface Pass {
 async function readPage(pass: Pass, path: string): Promise<string | { kind: Kind; gone: boolean }> {
   const { options } = pass;
   try {
-    const page = await abciQuery(
-      { send: options.send, rpc: options.universe.rpc },
-      { path: "vm/qrender", data: `${path}:` },
-      { ms: READ_MS, maxBytes: PAGE_READ_MAX_BYTES },
-    );
+    const page = await abciQuery({ send: options.send, rpc: options.universe.rpc }, renderAsk(path), {
+      ms: READ_MS,
+      maxBytes: PAGE_READ_MAX_BYTES,
+    });
     pass.reached = true;
     return page;
   } catch (error) {

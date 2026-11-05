@@ -1,0 +1,38 @@
+{
+  "height": 812345,
+  "page": "# The poll\n\n1,204 members, 37 proposals.\n\nProposal 37 is open: should the hub get a garden? Answer yes or no.\n\n[The rules](https://gno.land/r/demo/poll:rules)\n\n<gno-form exec=\"Vote\"><gno-input name=\"id\" type=\"number\"></gno-input><gno-input name=\"answer\"></gno-input></gno-form>",
+  "functions": [
+    {
+      "FuncName": "Vote",
+      "Params": [
+        {
+          "Name": "cur",
+          "Type": "interface {.seal func(); Address func() .uverse.address; IsCode func() bool; IsCurrent func() bool; IsEphemeral func() bool; IsUser func() bool; IsUserCall func() bool; IsUserRun func() bool; PkgPath func() string; Previous func() .uverse.realm; String func() string; Sub func(string) .uverse.realm; Subpath func() string}"
+        },
+        {
+          "Name": "id",
+          "Type": "int"
+        },
+        {
+          "Name": "answer",
+          "Type": "string"
+        }
+      ]
+    },
+    {
+      "FuncName": "Results",
+      "Params": [
+        {
+          "Name": "id",
+          "Type": "int"
+        }
+      ],
+      "Results": [
+        {
+          "Name": ".res.0",
+          "Type": "string"
+        }
+      ]
+    }
+  ]
+}

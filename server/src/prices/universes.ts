@@ -1,37 +1,38 @@
-// The default universe (its id, RPC and indexer), from the data the app is built from (app/data/universes.json, copied into the server's image): the
-// host the prices timer reads the block height from, the worlds job reads the realm list from, and the preview job reads the hubs' pages from.
-// The file goes through the data's own schema, so what the build accepted is what the server reads; a bad file stops the server
-// at boot, naming the file and nothing of what it held (a file that is not there is the system's error, which names it too).
-import { readFileSync } from "node:fs";
+// The default universe, from the data the app is built from (app/data/universes.json, copied into the server's image): its id,
+// its RPC (the host the prices timer reads the block height from and the egress proxy lets out besides CoinGecko's and
+// OpenAI's) and its chain's id, which that node's status must name (D120), its indexer (the worlds job reads the realm list
+// from it), and its hubs' pages (the preview job). A file goes through the data's own schema, so what the build accepted is
+// what the server reads; a bad file stops the server at boot, naming the file and nothing of what it held, a file it cannot
+// read (missing, or past 1 MiB as every data file) with its reason as the cause.
 import { dirname, join } from "node:path";
-import { hubWorldOf } from "@gnoworld/core";
+import { hubWorldOf, jsonOf } from "@gnoworld/core";
 import { Hubs, Universes } from "@gnoworld/schemas";
+import { readDataFile } from "@gnoworld/service/files";
 
-// A data file's rows as JSON, or undefined for a file that is no JSON: a parse error quotes the text, so it stays out of any message, and a
-// file that is not there says its path in its own.
-function dataOf(file: string): unknown {
+// A data file's rows as JSON, or undefined for a text that is no JSON (a parse error would quote the text, so it stays out of
+// any message); a file it cannot read is an error naming the file, its reason the cause.
+function dataOf(file: string, what: string): unknown {
+  let text: string;
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    if (error instanceof SyntaxError) return undefined;
-    throw error;
+    text = readDataFile(file);
+  } catch (cause) {
+    throw new Error(`${what}: ${file} cannot be read`, { cause });
   }
+  return jsonOf(text);
 }
 
-/** The id, RPC and indexer of the universe marked default. */
-export function defaultUniverse(file: string): { id: string; rpc: string; indexer: string } {
-  const parsed = Universes.safeParse(dataOf(file));
+/** The id, RPC, chain and indexer of the universe marked default. */
+export function defaultUniverse(file: string): { id: string; rpc: string; chainId: string; indexer: string } {
+  const parsed = Universes.safeParse(dataOf(file, "universes"));
   const chosen = parsed.success ? parsed.data.find((universe) => universe.default === true) : undefined;
   if (chosen === undefined) throw new Error(`universes: ${file} does not hold a good list with a default universe`);
-  return { id: chosen.id, rpc: chosen.rpc, indexer: chosen.indexer };
+  return { id: chosen.id, rpc: chosen.rpc, chainId: chosen.chainId, indexer: chosen.indexer };
 }
-
-export const defaultRpc = (file: string): string => defaultUniverse(file).rpc;
 
 // The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone.
 function defaultHubs(universesFile: string) {
   const file = join(dirname(universesFile), "hubs.json");
-  const parsed = Hubs.safeParse(dataOf(file));
+  const parsed = Hubs.safeParse(dataOf(file, "hubs"));
   if (!parsed.success) throw new Error(`hubs: ${file} does not hold a good list of hubs`);
   const universe = defaultUniverse(universesFile).id;
   return parsed.data.filter((hub) => hub.universe === universe);

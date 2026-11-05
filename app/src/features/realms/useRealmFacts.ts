@@ -4,7 +4,7 @@
 import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
 import { readRealmFacts } from "../../lib/chain/indexer.ts";
-import type { ChainRead, ReadOptions } from "../../lib/chain/read.ts";
+import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 
 const NO_OPTIONS: ReadOptions = {};
 

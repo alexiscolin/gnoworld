@@ -2,7 +2,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { defaultRpc, defaultUniverse, hubRealms, hubWorlds } from "./universes.ts";
+import { z } from "zod";
+import { doorSettings } from "../door/settings.ts";
+import { defaultUniverse, hubRealms, hubWorlds } from "./universes.ts";
 
 // The default universe's RPC, read from the data the app is built from (app/data/universes.json, which the server's image holds):
 // the one host the way out lets the server reach besides CoinGecko's and OpenAI's.
@@ -30,14 +32,25 @@ const ONYX = {
 };
 const OTHER = { ...ONYX, id: "other", chainId: "other-1", rpc: "https://rpc.other.example:443", default: undefined };
 
-describe("defaultRpc", () => {
-  it("gives the RPC of the universe marked default, never another's", () => {
-    expect(defaultRpc(planted(JSON.stringify([OTHER, ONYX])))).toBe("https://rpc.default.example:443");
-    expect(defaultRpc(planted(JSON.stringify([ONYX, OTHER])))).toBe("https://rpc.default.example:443");
+describe("defaultUniverse", () => {
+  it("gives the RPC and the chain of the universe marked default, never another's", () => {
+    const chosen = {
+      id: "onyx",
+      rpc: "https://rpc.default.example:443",
+      chainId: "onyx-1",
+      indexer: "https://indexer.default.example/graphql/query",
+    };
+    expect(defaultUniverse(planted(JSON.stringify([OTHER, ONYX])))).toEqual(chosen);
+    expect(defaultUniverse(planted(JSON.stringify([ONYX, OTHER])))).toEqual(chosen);
   });
 
-  it("reads the data the app ships: Onyx's RPC, which is the default", () => {
-    expect(defaultRpc(DATA)).toBe("https://rpc.onyx.testnets.gno.land:443");
+  it("reads the data the app ships: Onyx's RPC and chain, which is the default", () => {
+    expect(defaultUniverse(DATA)).toEqual({
+      id: "onyx",
+      rpc: "https://rpc.onyx.testnets.gno.land:443",
+      chainId: "onyx-1",
+      indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
+    });
   });
 
   it.each([
@@ -48,10 +61,10 @@ describe("defaultRpc", () => {
     ["no list", "{}"],
   ])("refuses %s, naming the file and none of its content", (_, content) => {
     const file = planted(content);
-    expect(() => defaultRpc(file)).toThrow(/universes/);
-    expect(() => defaultRpc(file)).toThrow(file);
+    expect(() => defaultUniverse(file)).toThrow(/universes/);
+    expect(() => defaultUniverse(file)).toThrow(file);
     try {
-      defaultRpc(file);
+      defaultUniverse(file);
     } catch (error) {
       expect(String(error)).not.toMatch(/nope|http:|extra/);
     }
@@ -59,15 +72,30 @@ describe("defaultRpc", () => {
 
   it("refuses a file that is not there, naming it", () => {
     const file = join(dir, "missing.json");
-    expect(() => defaultRpc(file)).toThrow(file);
+    expect(() => defaultUniverse(file)).toThrow(file);
+  });
+
+  it("refuses a file past 1 MiB before reading it, as Jarvis's places and the app's build do (10h's review, V8)", () => {
+    const at = JSON.stringify([ONYX]);
+    const exact = planted(at.replace("[", `[${" ".repeat(1024 * 1024 - at.length)}`));
+    expect(defaultUniverse(exact)).toEqual({
+      id: "onyx",
+      rpc: "https://rpc.default.example:443",
+      chainId: "onyx-1",
+      indexer: "https://indexer.default.example/graphql/query",
+    });
+    const past = planted(at.replace("[", `[${" ".repeat(1024 * 1024 + 1 - at.length)}`));
+    expect(() => defaultUniverse(past)).toThrow(`universes: ${past} cannot be read`);
+    expect(() => defaultUniverse(past)).toThrow(expect.objectContaining({ cause: new RangeError("past 1 MiB") }));
   });
 });
 
 describe("defaultUniverse", () => {
-  it("gives the id, RPC and indexer of the universe marked default, never another's", () => {
+  it("gives the id, RPC, chain and indexer of the universe marked default, never another's", () => {
     const expected = {
       id: "onyx",
       rpc: "https://rpc.default.example:443",
+      chainId: "onyx-1",
       indexer: "https://indexer.default.example/graphql/query",
     };
     expect(defaultUniverse(planted(JSON.stringify([OTHER, ONYX])))).toEqual(expected);
@@ -78,6 +106,7 @@ describe("defaultUniverse", () => {
     expect(defaultUniverse(DATA)).toEqual({
       id: "onyx",
       rpc: "https://rpc.onyx.testnets.gno.land:443",
+      chainId: "onyx-1",
       indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
     });
   });
@@ -177,14 +206,18 @@ const OTHER_HOSTS = data.filter((universe) => universe.default !== true).map((un
 /** The hosts the list allows, as test.sh reads them: each `- name` line, quotes dropped. */
 const allowed = [...acl.matchAll(/^\s+-\s*"?([^"\s#]+)"?\s*$/gm)].map((match) => match[1]);
 
+// The node the door reads a mainnet name on (JARVIS_NAMES_RPC, D120), by the door's own default, never a copy of it.
+const namesHost = () => new URL(z.object(doorSettings()).parse({}).JARVIS_NAMES_RPC).hostname;
+
 describe("the way out's list", () => {
-  it("names CoinGecko's, OpenAI's, the default RPC host and the two indexers, each by its full name, and nothing else", () => {
+  it("names CoinGecko's, OpenAI's, the default RPC host, the names' node and the two indexers, each by its full name, and nothing else", () => {
     expect(DEFAULT_HOST).not.toBe("");
     expect([...allowed].sort()).toEqual(
       [
         "api.coingecko.com",
         "api.openai.com",
         DEFAULT_HOST,
+        namesHost(),
         ...data.map((universe) => new URL(universe.indexer).hostname),
       ].sort(),
     );
@@ -193,11 +226,17 @@ describe("the way out's list", () => {
   it("names the host the data's default universe has now, not a copy that drifts from it", () => {
     expect(allowed).toContain(DEFAULT_HOST);
     expect(DEFAULT_HOST).toBe("rpc.onyx.testnets.gno.land");
+    expect(namesHost()).toBe("rpc.gno.land");
   });
 
-  it("lets no other universe's RPC out, nor a domain by a wildcard", () => {
+  // The indexers are let out, each by its full name (the worlds job, 7c): the describe below holds them, so only the gnoweb pages stay out here.
+  it("lets no other universe's RPC out but the names' node, no gnoweb, nor a domain by a wildcard", () => {
     expect(OTHER_HOSTS.length).toBeGreaterThan(0);
-    for (const host of OTHER_HOSTS) expect(allowed).not.toContain(host);
+    for (const host of OTHER_HOSTS.filter((other) => other !== namesHost())) expect(allowed).not.toContain(host);
+    const pages = z
+      .array(z.object({ indexer: z.url(), gnoweb: z.url() }))
+      .parse(JSON.parse(read("app/data/universes.json")));
+    for (const { gnoweb } of pages) expect(allowed).not.toContain(hostOf(gnoweb));
     expect(acl).not.toMatch(/\*/);
   });
 });
@@ -211,15 +250,17 @@ describe("the server's data", () => {
 });
 
 describe("deploy/test.sh", () => {
-  it("expects the list's hosts from the data, five of them, and no other host reached through the way out", () => {
-    expect(script).toMatch(/the way out lets five hosts out/);
-    expect(script).not.toMatch(/the way out lets three hosts out/);
+  it("expects the list's hosts from the data and the door, six of them, and no other host reached through the way out", () => {
+    expect(script).toMatch(/the way out lets six hosts out/);
+    expect(script).not.toMatch(/the way out lets (two|three|four|five) hosts out/);
     expect(script).toContain("app/data/universes.json");
   });
 
-  it("proves the server reaches the default RPC through the way out, and a universe's other RPC stays refused", () => {
+  it("proves the server reaches the default RPC and the names' node through the way out, and refuses Anthropic's API", () => {
     expect(script).toMatch(/the server reaches the default universe's RPC through the way out/);
-    expect(script).toMatch(/"https:\/\/\$other_rpc\/"/);
+    expect(script).toMatch(/the server reaches the names' node through the way out/);
+    expect(script).toMatch(/https:\/\/api\.anthropic\.com\//);
+    expect(script).not.toMatch(/"https:\/\/\$other_rpc\/"/);
   });
 
   it("refuses a look-alike of the default RPC's host and its sibling gnoweb host, as CoinGecko's have, and sees the timer write a block", () => {
@@ -232,8 +273,11 @@ describe("deploy/test.sh", () => {
     expect(script).toMatch(
       /mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC"/,
     );
-    expect(script).toMatch(/mutant "another universe's RPC let out" "the way out lets five hosts out"/);
-    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets five hosts out"/);
+    expect(script).toMatch(/mutant "another chain's node let out" "the way out lets six hosts out"/);
+    expect(script).toMatch(/mutant "the default RPC's whole domain let out" "the way out lets six hosts out"/);
+    expect(script).toMatch(
+      /mutant "the names' node dropped from the way out" "the server does not reach the names' node"/,
+    );
   });
 });
 
@@ -264,8 +308,8 @@ describe("the way out for the indexers", () => {
       "gno.land's indexer dropped from the way out",
       "the server does not reach the universe's indexer indexer.gno.land",
     ],
-    ["Onyx's indexer's whole domain let out", "the way out lets five hosts out"],
-    ["gno.land's indexer's whole domain let out", "the way out lets five hosts out"],
+    ["Onyx's indexer's whole domain let out", "the way out lets six hosts out"],
+    ["gno.land's indexer's whole domain let out", "the way out lets six hosts out"],
   ])("has the mutant %j, killed by %j, which the stack's check also says", (label, wanted) => {
     expect(script).toContain(`mutant "${label}" "${wanted}"`);
     // Once in the mutant, once in the check itself (F695).

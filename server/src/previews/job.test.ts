@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import type { Answer } from "../moderation/provider.ts";
-import type { Send } from "../net.ts";
+import type { Send } from "@gnoworld/service/net";
 import { abciRefused, fakeChain, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
-import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import {
   capturedOf,
   checkFor,

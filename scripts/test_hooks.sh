@@ -11,6 +11,11 @@ unset GIT_NO_REPLACE_OBJECTS
 # `outside` and `installed` run them as in Alexis's shell (F076, F129).
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
+# No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
+# one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
+# could as well, and GIT_CONFIG would send `git config` out of the repository.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
 rp="$here"/review_pass.py # review_pass and pre_push both use it
@@ -95,6 +100,11 @@ assert nested <= set(box["filesystem"]["denyWrite"]), "a command can write instr
 stryker = json.load(open(sys.argv[1].replace(".claude/settings.json", "stryker.config.json")))
 copied = [w for w in box["filesystem"]["denyWrite"] if w.startswith("**/") and w[3:].split("/")[0].lower() not in {p.lower() for p in stryker["ignorePatterns"]}]
 assert not copied, f"StrykerJS copies into its sandboxes what the sandbox refuses it to write there: {copied}"
+# The worktrees sit in ~/Server/gnoworld-wt, outside every other session's writable folders (Alexis, 2026-11-04). A worktree's own
+# .git, which names the folder worktree.sh takes git's config from outside the sandbox, is denied to its own session too (F5095).
+assert "~/Server/gnoworld-wt/*/.git" in box["filesystem"]["denyWrite"], "a session can point its worktree's git at another config (F5095)"
+# worktree.sh alone leaves the sandbox: it writes the trees it makes and removes, in its one root.
+assert box.get("excludedCommands") == ["sh scripts/worktree.sh *"], "a command other than worktree.sh runs outside the sandbox"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
@@ -106,9 +116,11 @@ assert s["permissions"].get("blockWritesOutsideWorkingDirectories") is True, "th
 # Claude works alone and asks only before a push or a chain write (Alexis, 2026-10-18). The files
 # run outside the sandbox themselves cannot be edited at all: the hooks and their scripts,
 # Claude Code's own settings, skills and agents (F068), what pnpm loads at Alexis's install
-# (F087), and git's own hooks folder and config, which bypass mode lets the file tools write
-# otherwise (F129); and what Alexis's terminal runs to make a worktree (7z, S3), and the
-# instructions every session reads, Alexis's from 7z on (R4), below the root too (7w3, S2-3).
+# (F087), git's own hooks folder and config, which bypass mode lets the file tools write
+# otherwise (F129), worktree.sh with the scripts it runs, which leave the sandbox, every
+# worktree's .git, which would point the git it runs at another config, and the main checkout's
+# git hooks, config, scripts and .githooks, out of every worktree session's folder (F5058, F5095).
+# and the instructions every session reads, Alexis's from 7z on (R4), below the root too (7w3, S2-3).
 # A dependency is Alexis's to add, and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
@@ -120,11 +132,13 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
-           "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
-           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)"}
+           "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)", "Edit(/jarvis/package.json)", "Edit(/evals/package.json)",
+           "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
+           "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
+           "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
 edits = lambda rules: {r for r in rules if r.split("(")[0] in {"Edit", "Write", "MultiEdit", "NotebookEdit"}}
-# This tree's own: the twins of every other worktree's and the main checkout's are the section `siblings`' (7z).
-own = lambda rules: {r for r in rules if not r.split("(", 1)[1].startswith(("//", "~/"))}
+# This tree's own, and the main checkout's few that 10a names (F5058, F5095): the other twins of every other worktree's and the main checkout's are the section `siblings`' (7z).
+own = lambda rules: {r for r in rules if r in outside or not r.split("(", 1)[1].startswith(("//", "~/"))}
 assert own(edits(deny)) == outside, "the edits refused are not exactly the files run outside the sandbox and the instructions"
 assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files run outside the sandbox are refused"
 # The sandbox turns an Edit deny into a write ban: none may reach what the gate writes itself, its
@@ -147,7 +161,8 @@ grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may
 python3 -I - "$here/.." <<'PY' || fail "pnpm install runs a package.json script (F087, F129)"
 import glob, json, os, sys
 root = sys.argv[1]
-for p in [os.path.join(root, "package.json"), os.path.join(root, "app/package.json"), *glob.glob(os.path.join(root, "packages/*/package.json"))]:
+# Every project pnpm installs, the next one too: the root, each folder's and each package's, evals/ apart (F5316).
+for p in [os.path.join(root, "package.json"), *glob.glob(os.path.join(root, "*/package.json")), *glob.glob(os.path.join(root, "packages/*/package.json"))]:
     scripts = json.load(open(p)).get("scripts", {})
     run = {"preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare"} & set(scripts)
     assert not run, (p, run)
@@ -164,14 +179,14 @@ assert scripts["test:compiled"] == "vitest run --project compiled", scripts["tes
 assert "--project compiled" in scripts["test"], scripts["test"]
 PY
 # The type check builds incrementally, each project into its own .tsbuildinfo of TSC_CACHE (check.sh's; .claude/tmp/tsc when unset): the
-# graph a commit's lint reads (scripts/lint_scope.py). Four projects, four names, the cache's folder in each.
+# graph a commit's lint reads (scripts/lint_scope.py). Seven projects, seven names, the cache's folder in each.
 python3 -I - "$here/.." <<'PY' || fail "package.json's typecheck does not build each project incrementally into a file of its own in TSC_CACHE"
 import json, os, sys
 scripts = json.load(open(os.path.join(sys.argv[1], "package.json")))["scripts"]
 projects = [c.split() for c in scripts["typecheck"].split(" && ")]
-assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json")], scripts["typecheck"]
+assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json", "packages/service/tsconfig.json", "packages/chain/tsconfig.json", "jarvis/tsconfig.json")], scripts["typecheck"]
 assert all(len(c) == 6 and c[3:5] == ["--incremental", "--tsBuildInfoFile"] and c[5].startswith('"${TSC_CACHE:-.claude/tmp/tsc}/') for c in projects), scripts["typecheck"]
-assert len({c[5] for c in projects}) == 4, scripts["typecheck"]
+assert len({c[5] for c in projects}) == 7, scripts["typecheck"]
 PY
 # Alexis's install command, wherever it is given, reads the script itself, whatever a replace ref
 # shows (F132's class).
@@ -209,15 +224,17 @@ PY
 grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$port )?node app/node_modules/@playwright/test/cli\.js test -c app/playwright\.stories\.config\.ts( --[a-z]+(=[a-z]+)?)*$' ||
 	fail "check.sh no longer walks the design system's stories in a browser"
 # One harness list, records.sh's: --full runs harness_mutate when a file of it changes, pre-push
-# wants each declared on main, merge.sh shows each first (F129); every file harness_mutate
-# guards is in it (F112, F114, F124), and what Claude Code starts, .mcp.json's servers.
-python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
+# wants each declared on main, merge.sh shows each first (F129), worktree.sh checks out none other
+# than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
+# what Claude Code starts, .mcp.json's servers.
+python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, re, sys
 text = lambda n: open(sys.argv[n]).read()
 assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
-assert not [n for n in (1, 2, 3) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
+assert not [n for n in (1, 2, 3, 6) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
 tree = ast.parse(text(5))
@@ -328,6 +345,7 @@ want_writes |= {f"{NEW}/*/{w}" for w in own_writes} | {f"{NEW}/*/.git"} | {f"{NE
 want_writes |= {f"{NEW}/.claude"}
 want_rules = {f"{k}(/{w}/*{p})" for k, p in own_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
 want_rules |= {f"{k}({NEW}/*{p})" for k, p in own_rules} | {f"Edit({NEW}/*/.git)"}
+want_rules |= {f"Edit({MAIN}/scripts/**)"}  # 10a (F5058): the main checkout's scripts, out of every worktree session's file tools
 want_rules |= {f"Edit(/{w}/*/.git)" for w in (WT, TMP_WT)}
 want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
 want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN + (NEW,) for n in INSTRUCTIONS} | {f"Edit({NEW}/.claude/**)"}
@@ -712,6 +730,367 @@ PY
 fi
 fi
 
+if part mutate; then
+# mutate.py, the realms' mutation check (ADR-0001 §14, backlog row 11): every guard removed and every operator or number
+# flipped must fail a test. First its flips, read and never compiled: comments, strings and runes stay as they are, only whole
+# operators flip (never a part of `++`, `+=` or `<<`), integers shift by one and other numbers never; a key names its line and
+# its flip, and the occurrence when the same flip of the same text comes more than once, so a line moved elsewhere keeps it.
+[ -x "${GNO:-}" ] || fail "the mutate section runs the gno check.sh exports as GNO: ${GNO:-unset}"
+mu="$t/mutate" && mkdir -p "$mu/read" "$mu/moved"
+cat >"$mu/read/listing.gno" <<'EOF'
+package listing
+
+// a < b in a comment, and 1 + 2
+/* a block
+comment: x == y, 3 - 4 */
+func f(a, b int, s string) {
+	_ = "a < b, 5 + 6" + s + `raw: c >= d,
+7 - 8`
+	_ = "a \"<\" b" + s
+	_ = "http://x/*y" + s
+	_ = '+' - b // a rune, and a comment that switches no flip off: a || b
+	_ = '"' + '\'' - b
+	_ = a /* c <= d */ <= b
+	_ = a /* don't " */ - b
+	// don't stop at this quote: "
+	n >>= 1
+	n <<= 1
+	n &^= 1
+	n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9
+	n++
+	n += 2
+	n--
+	n -= 3
+	_ = n<<1 | n>>2 &^ 1
+	_ = a >= b == true
+	_ = a != b && a > b || a < b
+	_ = n + n
+	_ = n + n
+	_ = -n
+	var arr [32]byte
+	_ = arr[0]
+	_ = `\` + s
+	_ = x[0x1E+1]
+	_ = _1 + é1 + .5
+}
+EOF
+printf 'package last\n\nvar x = 1 + 2' >"$mu/read/last.gno" # a last line without its newline
+printf 'package end\n\nvar x = 1 // a last comment without its newline' >"$mu/read/end.gno"
+sed 's|^package listing$|package listing\
+\
+// a line above moves every other|' "$mu/read/listing.gno" >"$mu/moved/listing.gno"
+# mutate.py runs its check only as a script (`if __name__ == "__main__"`): imported, it gives its flips and runs nothing.
+python3 -I - "$here" "$mu" <<'PY' || fail "mutate.py flipped what it should not, missed a flip, or never ended reading (above)"
+import os, signal, sys
+signal.alarm(20)  # a reader that loops (a last comment without its newline) fails here, not hangs the gate
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+import mutate
+def read(folder):
+    os.chdir(os.path.join(sys.argv[2], folder))
+    src = open("listing.gno").read()
+    return src, {label: (new, drop) for label, new, drop in mutate.flips("listing.gno")}
+src, got = read("read")
+lines = {
+    '_ = "a < b, 5 + 6" + s + `raw: c >= d,': ["+ -> - #1", "+ -> - #2"],
+    '_ = "a \\"<\\" b" + s': ["+ -> -"],
+    '_ = "http://x/*y" + s': ["+ -> -"],
+    "_ = '+' - b // a rune, and a comment that switches no flip off: a || b": ["- -> +"],
+    "_ = '\"' + '\\'' - b": ["+ -> -", "- -> +"],
+    "_ = a /* c <= d */ <= b": ["<= -> <"],
+    "_ = a /* don't \" */ - b": ["- -> +"],
+    "n >>= 1": ["1 -> 2", "1 -> 0"],
+    "n <<= 1": ["1 -> 2", "1 -> 0"],
+    "n &^= 1": ["1 -> 2", "1 -> 0"],
+    "n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9": [f"+ -> - #{k}" for k in range(1, 10)]
+    + ["0x1F -> 0x20", "0x1F -> 0x1e", "0b101 -> 0b110", "0b101 -> 0b100", "0o17 -> 0o20", "0o17 -> 0o16", "017 -> 020", "017 -> 016", "1_000 -> 1001", "1_000 -> 999"],
+    "n += 2": ["2 -> 3", "2 -> 1"],
+    "n -= 3": ["3 -> 4", "3 -> 2"],
+    "_ = n<<1 | n>>2 &^ 1": ["1 -> 2 #1", "1 -> 0 #1", "1 -> 2 #2", "1 -> 0 #2", "2 -> 3", "2 -> 1"],
+    "_ = a >= b == true": [">= -> >", "== -> !="],
+    "_ = a != b && a > b || a < b": ["!= -> ==", "&& -> ||", "> -> >=", "|| -> &&", "< -> <="],
+    "_ = n + n": ["+ -> - #1", "+ -> - #2"],
+    "_ = -n": ["- -> +"],
+    "var arr [32]byte": ["32 -> 33", "32 -> 31"],
+    "_ = arr[0]": ["0 -> 1", "0 -> (-1)"],
+    "_ = `\\` + s": ["+ -> -"],
+    "_ = x[0x1E+1]": ["0x1E -> 0x1f", "0x1E -> 0x1d", "+ -> -", "1 -> 2", "1 -> 0"],
+    "_ = _1 + é1 + .5": ["+ -> - #1", "+ -> - #2"],
+}
+want = {f"listing.gno: {line} [{flip}]" for line, flips in lines.items() for flip in flips}
+assert set(got) == want, f"flips missing: {sorted(want - set(got))}; flips that should not be: {sorted(set(got) - want)}"
+# Each mutant changes its own line only, and only that token; a comparison or a logic operator changes no type, so its
+# flip always compiles, while a `+`, a `-` or a number may not (a string's `+`, an array's size).
+def changed(label):
+    old, new = src.split("\n"), got[label][0].split("\n")
+    assert len(old) == len(new), label
+    diff = [(a, b) for a, b in zip(old, new) if a != b]
+    assert len(diff) == 1, f"{label}: {diff}"
+    return diff[0][1]
+for label in got:
+    changed(label)
+    flipped = label[label.rindex(" [") + 2 : label.rindex(" -> ")]
+    assert got[label][1] == (flipped in ("+", "-") or flipped[0].isdigit()), f"{label}: may it be dropped? {got[label][1]}"
+assert changed("listing.gno: _ = a /* c <= d */ <= b [<= -> <]") == "\t_ = a /* c <= d */ < b"
+assert changed("listing.gno: _ = arr[0] [0 -> (-1)]") == "\t_ = arr[(-1)]"
+assert changed("listing.gno: n := 0x1F + 0b101 + 0o17 + 017 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9 [017 -> 020]") == "\tn := 0x1F + 0b101 + 0o17 + 020 + 1_000 + 1.5 + 2e3 + 0x1p-2 + 3i + x9"
+assert changed("listing.gno: _ = n<<1 | n>>2 &^ 1 [1 -> 0 #2]") == "\t_ = n<<1 | n>>2 &^ 0"
+first, second = (i for i, line in enumerate(src.split("\n")) if line == "\t_ = n + n")
+assert got["listing.gno: _ = n + n [+ -> - #2]"][0].split("\n")[second] == "\t_ = n - n", "#2 is the second line of that text"
+assert got["listing.gno: _ = n + n [+ -> - #1]"][0].split("\n")[first] == "\t_ = n - n", "#1 is the first line of that text"
+assert set(read("moved")[1]) == want, "a line moved changed a flip's key"
+os.chdir(os.path.join(sys.argv[2], "read"))
+last = {label for label, _, _ in mutate.flips("last.gno")}
+assert last == {f"last.gno: var x = 1 + 2 [{flip}]" for flip in ("+ -> -", "1 -> 2", "1 -> 0", "2 -> 3", "2 -> 1")}, f"a last line without its newline: {sorted(last)}"
+end = {label for label, _, _ in mutate.flips("end.gno")}
+assert end == {f"end.gno: var x = 1 // a last comment without its newline [{flip}]" for flip in ("1 -> 2", "1 -> 0")}, sorted(end)
+# A verdict reads its own mutant's lines, never m10's for m1: a flip m1 that survives beside an m10 that does not compile
+# must not be dropped as one that does not compile, nor a mutant with no result read as m10's.
+out = "m10/x.gno:1:1: e (code=gnoTypeCheckError)\nok      ./m1 \t0.10s\nFAIL    ./m10 \t0.00s\n"
+assert (mutate.verdict(out, 1), mutate.verdict(out, 10)) == ("survives", "does not compile"), (mutate.verdict(out, 1), mutate.verdict(out, 10))
+assert mutate.verdict("ok      ./m10 \t0.10s\n", 1) == "no result", "m10's pass read as m1's"
+assert mutate.verdict("FAIL    ./m10 \t0.10s\n", 1) == "no result", "m10's failure read as m1's"
+assert mutate.verdict("m1/x.gno:1:1: e (code=gnoTypeCheckError)\nFAIL    ./m1 \t0.00s\n", 1) == "does not compile"
+assert mutate.verdict("FAIL    ./m1 \t0.00s\n", 1) == "killed"
+PY
+# Then the check, on a planted workspace and the real gno: a package whose every mutant is killed or a known gap passes,
+# printing each verdict and the flips that do not compile; a guard's printed line and verdicts stay what they were before the
+# flips, and its key is that line, which names its file as a flip's does (F5018).
+for w in a b; do
+	mkdir -p "$mu/$w/r/planted" && : >"$mu/$w/gnowork.toml"
+	printf 'module = "gno.land/r/test/planted"\ngno = "0.9"\n' >"$mu/$w/r/planted/gnomod.toml"
+	cat >"$mu/$w/r/planted/planted.gno" <<'EOF'
+package planted
+
+import "strconv"
+
+func Max(a, b int) int {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
+func Label(n int) string { return "n" + strconv.Itoa(n-1) }
+
+func Pick(n int) int {
+	mustPositive(n)
+	if n > 3 || n == 2 {
+		panic("out of range")
+	}
+	return n
+}
+
+func mustPositive(n int) {
+	if n < 1 {
+		panic("not positive")
+	}
+}
+
+func Do(bad bool) int {
+	if bad {
+		panic("bad")
+	}
+	return 1
+}
+EOF
+	cat >"$mu/$w/r/planted/planted_test.gno" <<'EOF'
+package planted
+
+import "testing"
+
+func panics(f func()) (yes bool) {
+	defer func() { yes = recover() != nil }()
+	f()
+	return
+}
+
+func TestPlanted(t *testing.T) {
+	if Max(2, 1) != 2 || Max(1, 2) != 2 || Label(3) != "n2" || Do(false) != 1 {
+		t.Fatal("a value")
+	}
+	if Pick(1) != 1 || Pick(3) != 3 {
+		t.Fatal("Pick refused a good n")
+	}
+	if !panics(func() { Pick(0) }) || !panics(func() { Pick(2) }) || !panics(func() { Pick(4) }) {
+		t.Fatal("Pick took a bad n")
+	}
+}
+EOF
+done
+# b adds a package whose guard, removed, leaves a variable unused: a guard that does not compile is still an error; and an
+# untested sum, whose `+` and number flips compile and survive: never dropped, so they fail.
+mkdir -p "$mu/b/r/broken" && printf 'module = "gno.land/r/test/broken"\ngno = "0.9"\n' >"$mu/b/r/broken/gnomod.toml"
+printf 'package broken\n\nfunc Check(n int) int {\n\tk := n\n\tmustSmall(k)\n\treturn n\n}\n\nfunc mustSmall(k int) {\n\tif k > 9 {\n\t\tpanic("big")\n\t}\n}\n\nfunc Spare(n int) int { return n + 5 }\n' >"$mu/b/r/broken/broken.gno"
+printf 'package broken\n\nimport "testing"\n\nfunc panics(f func()) (yes bool) {\n\tdefer func() { yes = recover() != nil }()\n\tf()\n\treturn\n}\n\nfunc TestCheck(t *testing.T) {\n\tif Check(9) != 9 || !panics(func() { Check(10) }) {\n\t\tt.Fatal("check")\n\t}\n}\n' >"$mu/b/r/broken/broken_test.gno"
+gapped() { # $1: the copy of mutate.py to write, $2: its GAPS as JSON, $3: its EXTRA as JSON, none (not seal's) when absent
+	python3 -I - "$here/mutate.py" "$1" "$2" "${3:-[]}" <<'PY' || fail "the planted copy of mutate.py could not be written: GAPS or EXTRA is gone"
+import ast, json, sys
+src = open(sys.argv[1]).read()
+lines = src.split("\n")
+spans = {t.id: (n.lineno, n.end_lineno) for n in ast.parse(src).body if isinstance(n, ast.Assign) for t in n.targets if isinstance(t, ast.Name)}
+new = {"GAPS": f"GAPS = {json.loads(sys.argv[3])!r}", "EXTRA": f"EXTRA = {json.loads(sys.argv[4])!r}"}
+for name in sorted(new, key=lambda name: -spans[name][0]):
+    lines[spans[name][0] - 1 : spans[name][1]] = [new[name]]
+open(sys.argv[2], "w").write("\n".join(lines))
+PY
+}
+checked() { (cd "$mu/$1" && shift && env "$@" python3 -I "$mu/check.py" 2>&1); } # $1: the workspace; then the environment
+P=r/planted/planted.gno
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+out=$(checked a GNO="$GNO") || fail "mutate.py failed a package whose every mutant is killed or a known gap: $out"
+cat >"$mu/a.want" <<EOF
+ok    killed: $P: mustPositive(n)
+ok    killed: $P: n > 3
+ok    killed: $P: n == 2
+ok    killed: $P: if n < 1 {
+ok    survives: $P: if bad {  (known gap: planted guard gap)
+ok    survives: $P: if a >= b { [>= -> >]  (known gap: equivalent: a equals b)
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [- -> +]
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [1 -> 2]
+ok    killed: $P: func Label(n int) string { return "n" + strconv.Itoa(n-1) } [1 -> 0]
+ok    killed: $P: if n > 3 || n == 2 { [> -> >=]
+ok    killed: $P: if n > 3 || n == 2 { [3 -> 4]
+ok    killed: $P: if n > 3 || n == 2 { [3 -> 2]
+ok    killed: $P: if n > 3 || n == 2 { [|| -> &&]
+ok    killed: $P: if n > 3 || n == 2 { [== -> !=]
+ok    killed: $P: if n > 3 || n == 2 { [2 -> 3]
+ok    killed: $P: if n > 3 || n == 2 { [2 -> 1]
+ok    killed: $P: if n < 1 { [< -> <=]
+ok    killed: $P: if n < 1 { [1 -> 2]
+ok    killed: $P: if n < 1 { [1 -> 0]
+ok    killed: $P: return 1 [1 -> 2]
+ok    killed: $P: return 1 [1 -> 0]
+ok    1 of 17 flips do not compile, dropped: r/planted
+EOF
+sort "$mu/a.want" >"$mu/a.want.sorted" && printf '%s\n' "$out" | sort >"$mu/a.got.sorted"
+diff "$mu/a.want.sorted" "$mu/a.got.sorted" >"$mu/a.diff" || fail "mutate.py's verdicts on the planted package, against the wanted ones (<):
+$(cat "$mu/a.diff")"
+# A survivor outside GAPS fails, guard or flip, a `+` or a number's as well; so does a gap a test now kills, guard or flip, a
+# gap that does not compile, a key that names no mutant left, and a guard or an EXTRA line that does not compile. A flip in
+# GAPS is never dropped: it must keep surviving.
+gapped "$mu/check.py" '{"r/planted/planted.gno: gone(x)": "stale guard", "r/planted/planted.gno: gone [< -> <=]": "stale flip", "r/planted/planted.gno: mustPositive(n)": "now killed", "r/planted/planted.gno: if n < 1 { [< -> <=]": "now killed", "r/planted/planted.gno: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -]": "does not compile"}' \
+	'[["r/planted/planted.gno", "return \"n\" + strconv", "return \"n\" - strconv"]]'
+out=$(checked b GNO="$GNO") && fail "mutate.py passed survivors, stale keys and a guard that does not compile: $out"
+B=r/broken/broken.gno
+for line in "FAIL  survives: $P: if bad { (expected killed)" "FAIL  survives: $P: if a >= b { [>= -> >] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [+ -> -] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [5 -> 6] (expected killed)" \
+	"FAIL  survives: $B: func Spare(n int) int { return n + 5 } [5 -> 4] (expected killed)" \
+	"FAIL  killed: $P: mustPositive(n) (expected survives)" "FAIL  killed: $P: if n < 1 { [< -> <=] (expected survives)" \
+	"FAIL  does not compile: $P: func Label(n int) string { return \"n\" + strconv.Itoa(n-1) } [+ -> -] (expected survives)" \
+	"FAIL  does not compile: $B: mustSmall(k) (expected killed)" "FAIL  does not compile: $P: return \"n\" + strconv (expected killed)" \
+	"FAIL  GAPS lists a mutant that no longer exists: $P: gone(x)" "FAIL  GAPS lists a mutant that no longer exists: $P: gone [< -> <=]"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
+$out"
+done
+# No count is printed for a package that drops no flip (r/broken's all compile; planted's one is in GAPS).
+printf '%s\n' "$out" | grep -q "flips do not compile" && fail "mutate.py dropped a flip GAPS lists: $out"
+# The command it runs failing (F116): a gno whose every mutant fails to compile cannot pass the check by dropping them all,
+# as a comparison or a logic flip always compiles; a gno that stops before a mutant's result, fails the untouched copy, or
+# times out on a mutant that loops forever (gno's -timeout ends the whole run, and no GAPS entry can hold such a flip),
+# fails it. Like gno, the fake exits 1 when a package fails, which each of its modes has.
+cat >"$mu/fakegno" <<'EOF'
+#!/bin/sh
+echo "$*" >>"$(dirname "$0")/fakegno.runs"
+[ "$FAKE:$#" = "hangalone:4" ] && exec sleep 30 # a run of one copy never ends
+[ "$FAKE" = binary ] && printf 'a failing test printed \377\n' >&2 # bytes that are no UTF-8
+for d in "$@"; do
+	case $FAKE:$d in
+	control:./m0) printf 'FAIL    ./m0 \t0.01s\n' ;;
+	*:./m0) printf 'ok      ./m0 \t0.01s\n' ;;
+	compile:./m*) printf '%s/planted.gno:1:1: planted (code=gnoTypeCheckError)\nFAIL    %s \t0.00s\n' "${d#./}" "$d" ;;
+	timeout:./m22) printf 'panic: test timed out after 60s\n' >&2 && exit 2 ;;
+	timeout:./m*) printf 'FAIL    %s \t0.00s\n' "$d" ;;
+	survive:./m* | hangalone:./m* | binary:./m*) printf 'ok      %s \t0.00s\n' "$d" ;;
+	esac
+done
+exit 1
+EOF
+chmod +x "$mu/fakegno"
+gapped "$mu/check.py" '{"r/planted/planted.gno: if bad {": "planted guard gap", "r/planted/planted.gno: if a >= b { [>= -> >]": "equivalent: a equals b"}'
+out=$(checked a GNO="$mu/fakegno" FAKE=compile) && fail "mutate.py passed when no mutant compiled: $out"
+# One gno run judges a package's guards and flips together: the untouched copy and its 5 guards and 17 flips, each once.
+[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] || fail "mutate.py ran gno other than once for one package: $(cat "$mu/fakegno.runs")"
+[ "$(tr ' ' '\n' <"$mu/fakegno.runs" | grep '^\./m' | sort)" = "$(i=0; while [ $i -le 22 ]; do echo "./m$i"; i=$((i + 1)); done | sort)" ] ||
+	fail "mutate.py's one gno run did not judge the control and its 22 mutants each once: $(cat "$mu/fakegno.runs")"
+[ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout 60s" ] || fail "mutate.py's run of 23 copies has not 60 s, the least (34.5 rounded up is less): $(cat "$mu/fakegno.runs")"
+for line in "FAIL  does not compile: $P: if n > 3 || n == 2 { [> -> >=] (expected killed)" "FAIL  does not compile: $P: mustPositive(n) (expected killed)" \
+	"FAIL  does not compile: $P: if a >= b { [>= -> >] (expected survives)" "ok    12 of 17 flips do not compile, dropped: r/planted"; do
+	printf '%s\n' "$out" | grep -qxF -- "$line" || fail "mutate.py did not print: $line
+$out"
+done
+out=$(checked a GNO="$mu/fakegno" FAKE=crash) && fail "mutate.py passed when gno gave no mutant's result: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 2] (expected killed)" || fail "mutate.py did not fail a flip with no result: $out"
+out=$(checked a GNO="$mu/fakegno" FAKE=control) && fail "mutate.py passed when the untouched copy failed: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  control: r/planted's untouched copy does not pass" || fail "mutate.py did not name the failed control: $out"
+out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when gno timed out: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
+printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
+# A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
+# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale (F5084).
+# The constants are made small so it is stopped in 2 s.
+printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
+out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
+[ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
+	fail "mutate.py did not fail by name, alone, a gno that never ended (F5084): $out"
+# The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
+# one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
+# rounded up), 80 have 120, each package in one run.
+mkdir -p "$mu/d/r/many" && : >"$mu/d/gnowork.toml" && printf 'module = "gno.land/r/test/many"\ngno = "0.9"\n' >"$mu/d/r/many/gnomod.toml"
+gapped "$mu/check.py" '{}'
+for copies in 40:60 41:62 80:120; do
+	i=1 && printf 'package many\n' >"$mu/d/r/many/many.gno"
+	while [ $i -lt "${copies%:*}" ]; do printf '\nfunc F%s(bad bool) {\n\tif bad {\n\t\tpanic("bad")\n\t}\n}\n' "$i" >>"$mu/d/r/many/many.gno" && i=$((i + 1)); done
+	: >"$mu/fakegno.runs"
+	checked d GNO="$mu/fakegno" FAKE=compile >/dev/null || : # no mutant compiles in the fake: only its one run is read
+	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
+		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
+done
+# One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
+# line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
+for p in one two; do
+	mkdir -p "$mu/c/r/$p" && printf 'module = "gno.land/r/test/%s"\ngno = "0.9"\n' "$p" >"$mu/c/r/$p/gnomod.toml"
+	printf 'package %s\n\nfunc Do(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' "$p" >"$mu/c/r/$p/$p.gno"
+done
+printf '\nfunc Again(bad bool) bool {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn bad\n}\n' >>"$mu/c/r/two/two.gno"
+: >"$mu/c/gnowork.toml"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one"}'
+: >"$mu/fakegno.runs"
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let a gap given for r/one excuse the same guard in r/two: $out"
+printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (known gap: one gap, given for r/one)" || fail "mutate.py did not keep r/one's gap: $out"
+[ "$(printf '%s\n' "$out" | grep -cxF "FAIL  survives: r/two/two.gno: if bad { (expected killed)")" = 2 ] || fail "mutate.py did not fail r/two's two untested guards: $out"
+# A survivor GAPS does not list is judged again alone (F5050, below): r/two's two, each in a run of its own, never r/one's gap.
+[ "$(grep -c '' "$mu/fakegno.runs")" = 4 ] && [ "$(grep -c ' \./m0$' "$mu/fakegno.runs")" = 2 ] ||
+	fail "mutate.py did not judge again alone each survivor GAPS does not list, and only those: $(cat "$mu/fakegno.runs")"
+gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
+out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
+printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
+# In the run of every copy, a test in the package runs against its own copy, but a filetest against the first copy of its
+# module in the workspace, the untouched m0 (F5050). So a mutant that run lets survive, GAPS not listing it, is judged again
+# alone, in a workspace of its own copy: the guard of a package with no unit test, which only its filetest catches, is
+# killed. A gap is not judged again, and a run alone that never ends is said by name.
+mkdir -p "$mu/f/r/only" && : >"$mu/f/gnowork.toml" && printf 'module = "gno.land/r/test/only"\ngno = "0.9"\n' >"$mu/f/r/only/gnomod.toml"
+printf 'package only\n\nfunc Do(bad bool) string {\n\tif bad {\n\t\tpanic("bad")\n\t}\n\treturn "done"\n}\n' >"$mu/f/r/only/only.gno"
+printf 'package main\n\nimport "gno.land/r/test/only"\n\nfunc main() {\n\tprintln(only.Do(true))\n}\n\n// Error:\n// bad\n' >"$mu/f/r/only/z_only_filetest.gno"
+gapped "$mu/check.py" '{}'
+out=$(checked f GNO="$GNO") || fail "mutate.py let survive a guard only a filetest catches (F5050): $out"
+[ "$out" = "ok    killed: r/only/only.gno: if bad {" ] || fail "mutate.py did not kill, alone, the guard only a filetest catches (F5050): $out"
+gapped "$mu/check.py" '{"r/only/only.gno: if bad {": "a gap"}'
+out=$(checked f GNO="$GNO") || fail "mutate.py judged a gap again alone: $out"
+[ "$out" = "ok    survives: r/only/only.gno: if bad {  (known gap: a gap)" ] || fail "mutate.py did not keep a gap as a gap: $out"
+gapped "$mu/check.py" '{}'
+out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
+[ "$out" = "FAIL  stopped: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not name the survivor whose run alone never ended: $out"
+# gno's output may hold bytes that are no UTF-8, a failing test printing them: mutate.py reads them as U+FFFD and judges on,
+# never stopping on a traceback (F5062).
+out=$(checked f GNO="$mu/fakegno" FAKE=binary) && fail "mutate.py passed the survivor of a run whose output is no UTF-8: $out"
+[ "$out" = "FAIL  survives: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not read gno's output that is no UTF-8 (F5062): $out"
+# The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
+out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
+out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"
+fi
+
 if part commit_msg; then
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
 # subjects; no attribution line. It runs as installed, beside its rule files (F129).
@@ -721,6 +1100,7 @@ cp "$hooks/commit-msg" "$cm/"
 secrets_into "$cm/"
 # It reads what is staged: it runs in a repository of its own, never the one under test.
 cmr="$t/commit-msg-repo" && git init -q "$cmr"
+mkdir -p "$cmr/scripts" && cp "$here/hidden.py" "$cmr/scripts/" && git -C "$cmr" add scripts/hidden.py # what it reads a message with
 refused() {
 	printf '%s\n' "$1" >"$t/msg"
 	! (cd "$cmr" && "$cm/commit-msg" "$t/msg") 2>"$t/err"
@@ -774,6 +1154,11 @@ refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject wa
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
 (cd "$cmr" && LC_ALL=C "$cm/commit-msg" "$t/msg") 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
+# A python3 that cannot count is no count (F5080): `[ "" -gt 72 ]` errs, and an 86-character subject passed.
+mkdir -p "$t/badpy" && printf '#!/bin/sh\nexit 1\n' >"$t/badpy/python3" && chmod +x "$t/badpy/python3"
+printf 'feat: %s\n' "$(printf 'a%.0s' $(seq 1 80))" >"$t/msg"
+(cd "$cmr" && env -u SANDBOX_RUNTIME PATH="$t/badpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a long subject python3 could not count (F5080)"
+grep -qF "python3 cannot count the subject's characters" "$t/err" || fail "commit-msg did not say python3 cannot count: $(cat "$t/err")"
 # A fix of the product comes with its test, or a line No-test: <why>, as prove_fix.py wants, refused
 # at the commit rather than 30 minutes later by the full gate (9db841c, slice 3).
 mkdir -p "$cmr/server/src" "$cmr/scripts" && printf 'x\n' >"$cmr/server/src/a.ts" && git -C "$cmr" add server/src/a.ts
@@ -802,8 +1187,71 @@ refused "fix(server): x" || fail "a fix whose only test it deletes was accepted"
 git -C "$cmr" reset -q HEAD server/src/b.ts
 refused "fix(server): x" && fail "a fix that only deletes a test was refused, which changes no product code"
 mkdir -p "$t/no-repo" && printf 'fix(server): x\n' >"$t/msg"
-(cd "$t/no-repo" && GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
+(cd "$t/no-repo" && env -u SANDBOX_RUNTIME GIT_CEILING_DIRECTORIES="$t" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a fix it could not compare with what is staged"
 grep -q "git cannot list what is staged" "$t/err" || fail "commit-msg did not say git failed: $(cat "$t/err")"
+# A hidden character in the message (F5085): in the sandbox, the staged scripts/hidden.py reads each message as it is
+# written, a merge's and an amend's too, as pre-commit runs the staged scripts there; an emoji's look selector passes. With
+# no staged rule, or a python3 that fails, nothing proves the message clean: it refuses.
+refused "$(printf 'test: x\n\nRemoved-test: a\342\200\256b - why')" || fail "commit-msg accepted a hidden character in the message (F5085)"
+grep -qxF "  message:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" "$t/err" || fail "commit-msg did not name the message's hidden character: $(cat "$t/err")"
+refused "$(printf 'docs: a heart \342\235\244\357\270\217')" && fail "commit-msg refused an emoji's look selector: $(cat "$t/err")"
+blob=$(printf 'import sys\nsys.exit("the staged copy ran")\n' | git -C "$cmr" hash-object -w --stdin) && git -C "$cmr" update-index --cacheinfo "100644,$blob,scripts/hidden.py"
+refused "docs: x" || fail "commit-msg ran another scripts/hidden.py than the staged one"
+grep -qF "the staged copy ran" "$t/err" || fail "commit-msg did not run the staged scripts/hidden.py: $(cat "$t/err")"
+git -C "$cmr" update-index --force-remove scripts/hidden.py
+refused "docs: x" || fail "commit-msg passed a message with no staged scripts/hidden.py to read it"
+grep -qF "git cannot read the staged scripts/hidden.py" "$t/err" || fail "commit-msg did not say it has no rule to read the message with: $(cat "$t/err")"
+git -C "$cmr" add scripts/hidden.py
+mkdir -p "$t/countpy" && printf '#!/bin/sh\ncase "$*" in *"print(len("*) echo 7 && exit 0 ;; esac\nexit 1\n' >"$t/countpy/python3" && chmod +x "$t/countpy/python3"
+printf 'docs: x\n' >"$t/msg" # a python3 that counts the subject, then fails
+(cd "$cmr" && PATH="$t/countpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a message with a python3 that fails"
+grep -qF "scripts/hidden.py could not read it" "$t/err" || fail "commit-msg did not say the message could not be read: $(cat "$t/err")"
+fi
+
+if part unsigned; then
+# No git config from around this file reaches its throwaway repositories (F5012, F5022): Alexis's global one signs every
+# commit with a key Claude Code's sandbox cannot read, which failed 36 sections there. Planted: one config whose signer always
+# fails, reaching git by each way there is: a global or a system file, a HOME's or an XDG folder's, what `git -c` hands a hook
+# in either of its forms, and a template folder, which `git init` copies into each repository; and GIT_CONFIG, which sends
+# `git config` to a file outside the repository.
+us="$t/unsigned" && mkdir -p "$us/home" "$us/xdg/git" "$us/template" "$us/repos" "$us/scripts" "$us/.githooks"
+printf '#!/bin/sh\necho "$*" >>"%s/signed"\nexit 1\n' "$us" >"$us/signer" && chmod +x "$us/signer"
+printf '[commit]\n\tgpgsign = true\n[gpg]\n\tformat = openpgp\n\tprogram = %s\n' "$us/signer" >"$us/signs"
+cp "$us/signs" "$us/home/.gitconfig" && cp "$us/signs" "$us/xdg/git/config" && cp "$us/signs" "$us/template/config"
+# Each way alone makes a commit in a new repository call the signer, and fail: the plant proves something.
+signs() { # $1: the way; then env's arguments for it, where no other way reaches git
+	way=$1 && shift && rm -f "$us/signed"
+	env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null HOME="$us/nohome" XDG_CONFIG_HOME="$us/noxdg" env "$@" \
+		sh -c 'git init -q "$1" && git -C "$1" commit -q --allow-empty -m x' - "$us/repos/$way" 2>/dev/null &&
+		fail "a commit passed though $way signs: the plant proves nothing"
+	[ -s "$us/signed" ] || fail "git did not call the signer $way names: the plant proves nothing"
+}
+signs "a global file" GIT_CONFIG_GLOBAL="$us/signs"
+signs "a system file" GIT_CONFIG_SYSTEM="$us/signs"
+signs "HOME's .gitconfig" -u GIT_CONFIG_GLOBAL HOME="$us/home"
+signs "XDG's git/config" -u GIT_CONFIG_GLOBAL XDG_CONFIG_HOME="$us/xdg"
+signs "git -c's parameters" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'"
+signs "git -c's count" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs"
+signs "a template folder" GIT_TEMPLATE_DIR="$us/template"
+git init -q "$us/repos/file" && GIT_CONFIG="$us/elsewhere-alone" git -C "$us/repos/file" config planted.key yes
+[ -s "$us/elsewhere-alone" ] || fail "GIT_CONFIG did not send git config to its file: the plant proves nothing"
+# All at once around a copy of this file, whose one planted section sets a config and commits in a throwaway repository: it
+# passes, unsigned, the setting in the repository. The section also wants the two file variables exported as /dev/null, which a
+# system file it cannot plant needs.
+printf 'if part commits; then\n[ "$(printenv GIT_CONFIG_GLOBAL):$(printenv GIT_CONFIG_SYSTEM)" = /dev/null:/dev/null ] || fail "git does not get the config files this file sets"\ngit init -q "$t/c" && git -C "$t/c" config planted.key yes && git -C "$t/c" commit -q --allow-empty -m x || fail "a throwaway repository could not commit"\n[ "$(git config --file "$t/c/.git/config" planted.key)" = yes ] || fail "git config wrote outside the throwaway repository"\nfi\n' >"$us/planted"
+sed "/^part() {/r $us/planted" "$0" >"$us/scripts/test_hooks.sh"
+grep -qx 'if part commits; then' "$us/scripts/test_hooks.sh" || fail "the planted section is not in the copy of test_hooks.sh"
+rm -f "$us/signed"
+out=$(env HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" GIT_CONFIG_GLOBAL="$us/signs" GIT_CONFIG_SYSTEM="$us/signs" GIT_CONFIG_PARAMETERS="'include.path'='$us/signs'" \
+	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=include.path GIT_CONFIG_VALUE_0="$us/signs" GIT_TEMPLATE_DIR="$us/template" GIT_CONFIG="$us/elsewhere" \
+	ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) || fail "a throwaway repository took the git config around test_hooks.sh (F5012, F5022): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012, F5022)"
+[ ! -e "$us/elsewhere" ] || fail "a throwaway repository's git config went to the GIT_CONFIG file around test_hooks.sh (F5022)"
+# Then with neither file variable around it, as in Alexis's shell: a value this file sets but does not export would never reach
+# git, and HOME's .gitconfig would sign again (F5021).
+out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
+	fail "a throwaway repository took the git config of HOME around test_hooks.sh, which signs (F5021): $out"
+[ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of HOME's git config (F5021)"
 fi
 
 if part pre_commit; then
@@ -1135,6 +1583,178 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
+# A hidden character (F5053), a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
+# file git tracks or would, prose and the prototype's docs included, fails, named by its file, line, column and code point;
+# no comment allows it. Written as an escape it passes, as an accent or an emoji does; an image is no text, and what git
+# ignores is not read. printf writes each from its UTF-8 bytes, so this file holds none.
+h="$t/hidden" && mkdir -p "$h/src" "$h/r/x" "$h/docs/prototype" "$h/.claude/rules" "$h/ignored" "$h/node_modules/x" "$h/app/node_modules" && good_rules "$h"
+git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
+hidden() { python3 -I "$docs" "$h" 2>&1; }
+printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
+printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
+# An image is known by its suffix and its format's first bytes, as each real one starts (F5082).
+printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
+# A file deleted from the work tree but still in the index is not read.
+printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
+# So is a source the alerts check reads (listed(), which lists only what is there).
+mkdir -p "$h/server/src" && printf 'gone\n' >"$h/server/src/gone.ts" && git -C "$h" add server/src/gone.ts && git -C "$h" commit -qm gone2 && rm "$h/server/src/gone.ts"
+hidden >/dev/null || fail "check_docs refused a root whose characters all show (an accent, an emoji, an escape, an image), or a file deleted from the work tree"
+# A file it cannot read fails, never passes unread.
+: >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
+hidden >/dev/null && fail "check_docs passed a file it cannot read"
+chmod 644 "$h/src/locked.ts"
+# What is hidden is a table, not the Python's Unicode (F5083): Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
+# Node's ICU gives them, range by range, and the version hidden.py names.
+node -e '
+const set = /^[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]$/u;
+const out = [process.versions.unicode];
+for (let c = 0, start = -1; c <= 0x110000; c++) {
+  const hit = c <= 0x10ffff && set.test(String.fromCodePoint(c));
+  if (hit && start < 0) start = c;
+  if (!hit && start >= 0) { out.push(start.toString(16) + " " + (c - 1).toString(16)); start = -1; }
+}
+console.log(out.join("\n"));' >"$h/table.node" || fail "node could not list Unicode's hidden characters"
+python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import hidden; print(hidden.UNICODE); print("\n".join(f"{a:x} {b:x}" for a, b in hidden.TABLE))' "$here" >"$h/table.py"
+diff "$h/table.node" "$h/table.py" >"$h/diff" || fail "hidden.py's TABLE is not Unicode's hidden characters as the pinned Node gives them (<):
+$(cat "$h/diff")"
+rm "$h/table.node" "$h/table.py"
+# Each end of the table's ranges and a point inside some (an unassigned tag, a variation selector) after a letter, and none
+# of their neighbours. U+FE0E and U+FE0F, which pick an emoji's look, pass right after a character that shows and is no
+# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits (F5086).
+python3 -I - "$h/table.txt" "$h/sel.txt" "$h/table.want" "$here" <<'PY'
+import sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[4])
+from hidden import TABLE
+inside = lambda p: any(a <= p <= b for a, b in TABLE)
+refused = sorted({p for a, b in TABLE for p in (a, b)} | {0x2065, 0xFE05, 0xE0080, 0xE0100})
+shown = sorted({p for a, b in TABLE for p in (a - 1, b + 1) if not inside(p)} | {0x00A0, 0x200A, 0x2010})
+points = refused + shown
+open(sys.argv[1], "w", encoding="utf-8").write("".join(f"x{chr(p)}\n" for p in points))
+heart, emoji, cap = chr(0x2764), chr(0x1F600), chr(0xFE0F) + chr(0x20E3)
+lines = [  # (line, the columns it refuses)
+    (heart + chr(0xFE0F) + " ok", []), (emoji + chr(0xFE0E), []), ("1" + cap + " #" + cap + " *" + cap, []),
+    ("a" + chr(0xFE0F), [2]), (heart + chr(0xFE0F) + chr(0xFE0F), [3]), (chr(0xFE0F) + "x", [1]), ("1" + chr(0xFE0F) + "x", [2]),
+    (heart + chr(0xFE00), [2]), (chr(0x4E00) + chr(0xE0100), [2]), (chr(0x200D) + chr(0xFE0F), [1, 2]),
+]
+open(sys.argv[2], "w", encoding="utf-8").write("".join(text + "\n" for text, _ in lines))
+# One that starts a text follows nothing, whatever the text ends with.
+open(sys.argv[2].replace("sel.txt", "start.txt"), "w", encoding="utf-8").write(chr(0xFE0F) + "a" + chr(0xE9))
+want = [f"  table.txt:{n}:2: U+{p:04X}" for n, p in enumerate(points, 1) if p in refused] + ["  start.txt:1:1: U+FE0F"]
+want += [f"  sel.txt:{n}:{col}: U+{ord(text[col - 1]):04X}" for n, (text, cols) in enumerate(lines, 1) for col in cols]
+open(sys.argv[3], "w").write("".join(f"{w}\n" for w in sorted(want)))
+PY
+printf '// a header\nconst x = "ab\342\200\256cd"; // gitleaks:allow noqa eslint-disable-line prettier-ignore @ts-ignore nolint\n' >"$h/src/a.ts"
+printf 'package x\n\nvar s = "\342\201\246"\n' >"$h/r/x/x.gno"
+printf 'ab\342\200\213c\n' >"$h/docs/prototype/notes.md"
+printf '\357\273\277# a file with a BOM\n' >"$h/README"
+printf 'x\342\200\215y\n' >"$h/src/joined.ts"
+printf '\330\234 a mark\n' >"$h/notes.txt"
+printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
+printf '# co\302\255de\n' >"$h/a.py"
+# What is no UTF-8 text is refused whole, from its first byte that is a NUL or no UTF-8: its characters cannot be read, as
+# UTF-16 writes U+202E as `2E 20` (F5088), and a binary cannot write one as an escape (F5082). So is a text named as an
+# image, which Vite's `?raw` reads.
+printf '\000\342\200\256\n' >"$h/blob.txt"
+printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
+printf '\377\376a\000\056\040b\000\n\000' >"$h/u16.md" && printf 'a\000\056\040b\000\n\000' >"$h/u16raw.md"
+python3 -I -c 'import os, sys; open(sys.argv[1], "wb").write(os.urandom(65536))' "$h/font.woff2"
+printf 'a\342\200\256\n' >"$h/text.png"
+printf 'a\014b\342\200\256\nc\342\200\213d\342\200\215\n\303\251\360\237\230\200\342\200\256\n' >"$h/multi.txt"
+printf '\342\200\256\n' >"$h/$(printf 'caf\303\251 notes.md')" && printf '\342\200\256\n' >"$h/q\"uote.md"
+for f in ignored/x.ts node_modules/x/y.js app/node_modules/z.js; do printf 'const x = "\342\200\256";\n' >"$h/$f"; done
+git -C "$h" add README && git -C "$h" commit -qm base
+cat >"$h/want" <<'EOF'
+  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE
+  r/x/x.gno:3:10: U+2066 LEFT-TO-RIGHT ISOLATE
+  docs/prototype/notes.md:1:3: U+200B ZERO WIDTH SPACE
+  README:1:1: U+FEFF ZERO WIDTH NO-BREAK SPACE
+  src/joined.ts:1:2: U+200D ZERO WIDTH JOINER
+  notes.txt:1:1: U+061C ARABIC LETTER MARK
+  .claude/rules/x.md:1:11: U+E0041 TAG LATIN CAPITAL LETTER A
+  a.py:1:5: U+00AD SOFT HYPHEN
+  text.png:1:2: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:1:4: U+202E RIGHT-TO-LEFT OVERRIDE
+  multi.txt:2:2: U+200B ZERO WIDTH SPACE
+  multi.txt:2:4: U+200D ZERO WIDTH JOINER
+  multi.txt:3:3: U+202E RIGHT-TO-LEFT OVERRIDE
+  café notes.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+  q"uote.md:1:1: U+202E RIGHT-TO-LEFT OVERRIDE
+EOF
+out=$(hidden) && fail "check_docs accepted hidden characters: $out"
+printf '%s\n' "$out" | grep -qF "check_docs: these files hold a hidden character" || fail "check_docs did not say why it refused hidden characters: $out"
+printf '%s\n' "$out" | grep ': U+' | grep -Ev '^  (table|sel|start)\.txt:' | sort >"$h/got" && sort "$h/want" >"$h/want.sorted"
+diff "$h/want.sorted" "$h/got" >"$h/diff" || fail "check_docs's hidden characters, against the wanted ones (<):
+$(cat "$h/diff")"
+for no in blob.txt:1 latin.txt:4 u16.md:1 u16raw.md:2; do
+	printf '%s\n' "$out" | grep -qxF "  ${no%:*}: no UTF-8 text, from its byte ${no#*:} (a NUL, or a byte that is no UTF-8)" || fail "check_docs did not refuse ${no%:*} as no UTF-8 text from its byte ${no#*:}: $out"
+done
+printf '%s\n' "$out" | grep -q '^  font\.woff2: no UTF-8 text, from its byte [0-9]* ' || fail "check_docs did not refuse a binary it knows no format of: $out"
+[ "$(printf '%s\n' "$out" | grep -c '^  font\.woff2:')" = 1 ] || fail "check_docs named a binary's bytes as characters: $out"
+printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
+diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
+$(cat "$h/diff")"
+# The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
+# file of the folder but git's own and the installed packages', and still refuses.
+mkdir -p "$t/nogit" "$t/badgit" && printf '#!/bin/sh\nexit 1\n' >"$t/badgit/git" && chmod +x "$t/badgit/git"
+printf '\342\200\256\n' >"$h/.git/planted"
+py=$(command -v python3)
+for path in "$t/nogit" "$t/badgit:$PATH"; do
+	out=$(PATH=$path "$py" -I "$docs" "$h" 2>&1) && fail "check_docs accepted a hidden character with PATH=$path: $out"
+	printf '%s\n' "$out" | grep -qxF "  src/a.ts:2:14: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs, with PATH=$path, did not name the hidden character: $out"
+	printf '%s\n' "$out" | grep -qF "  .git/" && fail "check_docs, with PATH=$path, read git's own folder: $out"
+	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
+done
+# A commit message is text the repository keeps too, which scripts parse (a `Removed-test:` line shown as one name, read as
+# another): each message since the branch left origin/main is read, named by its commit (F5079); a message main holds
+# already is not, nor any with no origin/main to compare with. With no git, or a git that fails, nothing proves the messages
+# clean: it fails, never takes the failure for a branch with no origin/main.
+m="$t/messages" && mkdir -p "$m" && good_rules "$m" && git -C "$m" init -q && git -C "$m" add -A
+git -C "$m" commit -qm "$(printf 'docs: on main\n\nzero\342\200\213width')" && git -C "$m" update-ref refs/remotes/origin/main HEAD
+messages() { python3 -I "$docs" "$m" 2>&1; }
+messages >/dev/null || fail "check_docs read a message main holds already"
+git -C "$m" commit -q --allow-empty -m "$(printf 'test: the branch\n\nRemoved-test: a\342\200\256b - why')"
+out=$(messages) && fail "check_docs accepted a commit message holding a hidden character: $out"
+printf '%s\n' "$out" | grep -qxF "  commit $(git -C "$m" rev-parse --short HEAD):3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the message's hidden character: $out"
+# Every message of the branch, not its newest only (F5081): a clean commit on top hides nothing.
+older=$(git -C "$m" rev-parse --short HEAD) && git -C "$m" commit -q --allow-empty -m "test: a clean top"
+out=$(messages) && fail "check_docs accepted a hidden character in a message under a clean one (F5081): $out"
+printf '%s\n' "$out" | grep -qxF "  commit $older:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the older message's hidden character: $out"
+out=$(PATH="$t/nogit" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with no git to read them: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say git cannot read the messages: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs passed the messages with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
+git -C "$m" update-ref -d refs/remotes/origin/main
+messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
+# What a commit takes is the index's copy (F5087): a hidden character staged under a clean work tree's copy is named, and
+# one in the work tree's copy under a clean staged one, as `(work tree)`. A `.gitattributes` encoding keeps the work tree in
+# another text than the one git stores (F5088): UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
+# text too, a link deleted or pointing nowhere included (F5089); a gitlink (a submodule) holds none.
+x="$t/staged" && mkdir -p "$x/docs" && good_rules "$x" && git -C "$x" init -q
+staged() { python3 -I "$docs" "$x" 2>&1; }
+printf 'a\342\200\256b\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'ab\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character staged under a clean work tree (F5087): $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the staged copy's hidden character: $out"
+printf '%s\n' "$out" | grep -qF "(work tree)" && fail "check_docs named a work tree's copy that holds none: $out"
+printf 'ab\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'a\342\200\256b\n' >"$x/docs/s.md"
+out=$(staged) && fail "check_docs passed a hidden character in the work tree under a clean staged copy: $out"
+printf '%s\n' "$out" | grep -qxF "  docs/s.md (work tree):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the work tree's hidden character: $out"
+printf 'ab\n' >"$x/docs/s.md"
+staged >/dev/null || fail "check_docs refused a staged and a work tree copy that hold none"
+printf '*.txt working-tree-encoding=UTF-7\n' >"$x/.gitattributes" && printf 'a+IC4-b\n' >"$x/e.txt" && git -C "$x" add .gitattributes e.txt
+out=$(staged) && fail "check_docs passed U+202E that git stores while the work tree writes it in UTF-7 (F5088): $out"
+printf '%s\n' "$out" | grep -qxF "  e.txt:1:2: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name what git stores under UTF-7: $out"
+git -C "$x" rm -qf e.txt .gitattributes
+printf 'x\n' >"$x/$(printf 'a\342\200\256b.md')" && printf 'x\n' >"$x/$(printf 'c\342\200\256d.md')"
+ln -s "$(printf 'c\342\200\256d.md')" "$x/link.md" && ln -s "$(printf 'e\342\200\256f')" "$x/staged-link" && git -C "$x" add staged-link && rm "$x/staged-link"
+git -C "$x" update-index --add --cacheinfo "160000,$(printf '%040d' 1),sub"
+out=$(staged) && fail "check_docs passed a hidden character in a name or a link's target (F5089): $out"
+for line in "the name 'a\\u202eb.md':1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "link.md (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE" "staged-link (link):1:2: U+202E RIGHT-TO-LEFT OVERRIDE"; do
+	printf '%s\n' "$out" | grep -qxF "  $line" || fail "check_docs did not say $line: $out"
+done
+printf '%s\n' "$out" | grep -q '^  sub' && fail "check_docs read a gitlink as a file: $out"
+out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$x" 2>&1) && fail "check_docs passed the index with a git that fails: $out"
+printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs did not say git cannot read the index: $out"
 fi
 
 if part instructions; then
@@ -1830,7 +2450,7 @@ fi
 
 if part migrations; then
 # check_migrations: a migration main has keeps its text and its place, since the server applies them by index
-# (server/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
+# (packages/service/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
 # the gate does; what it cannot read is refused, never passed over.
 mig="$here"/check_migrations.py
 r="$t/migrations"
@@ -1931,6 +2551,17 @@ cover 1 || fail "patch_coverage asked coverage of the server's entry, which runs
 git -C "$c" rm -rq --cached server && rm "$c/server/src/main.ts"
 unmeasured server/src/app.ts
 rm -r "$c/server"
+# jarvis's entry runs in child processes as the server's (10i), and evals/ is installed and tested apart (10j); jarvis's
+# other files are measured.
+mkdir -p "$c/jarvis/src" "$c/evals"
+printf 'x\n' >"$c/jarvis/src/main.ts" && git -C "$c" add jarvis
+cover 1 || fail "patch_coverage asked coverage of jarvis's entry, which runs in child processes"
+git -C "$c" rm -rq --cached jarvis && rm "$c/jarvis/src/main.ts"
+printf 'x\n' >"$c/evals/provider.ts" && git -C "$c" add evals
+cover 1 || fail "patch_coverage asked coverage of evals/, which is installed and tested apart"
+git -C "$c" rm -rq --cached evals && rm -r "$c/evals"
+unmeasured jarvis/src/app.ts
+rm -r "$c/jarvis"
 # Storybook's config is a config and a test setup a test's, and its pages (the stories, the
 # overview) the journeys shoot, so none is measured; code named alike is.
 mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src/Overview"
@@ -2028,7 +2659,7 @@ if part pre_commit; then
 c2="$t/precommit"
 precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
 mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
+printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$here/speeds.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 [ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
@@ -2040,6 +2671,13 @@ mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && 
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
 git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
+# A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
+printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
+precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
+# What it reads is what the commit takes, the staged copy, not the work tree's (F5087).
+printf 'ab\n' >"$c2/docs/hidden.md"
+precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
+git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
 # The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
@@ -2132,7 +2770,7 @@ mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
 cp "$hooks"/* "$here/code_changed.sh" "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
 # What Claude can edit, and a hook could reach, leaves a mark when it runs.
 for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
-for f in review_pass.py check_docs.py repo_files.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
+for f in review_pass.py check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
 printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
 # Installed as Alexis does, so pre-push finds the hooks of the main it pushes (F129); the section
@@ -2172,8 +2810,11 @@ out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home f
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" && fail "commit-msg outside the sandbox let a home folder's path through"
+# Outside, commit-msg runs no scripts/hidden.py, staged or not: the branch's messages are read at the next gate (F5085).
+printf 'docs: x\n' >"$t/outside-msg"
+out sh .githooks/commit-msg "$t/outside-msg" || fail "commit-msg outside the sandbox refused a clean message"
 git -C "$o" commit -qm two
-untouched "pre-commit, pre-merge-commit"
+untouched "pre-commit, pre-merge-commit, commit-msg"
 # pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
 head=$(git -C "$o" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$head" "$1" "${2:-0000000000000000000000000000000000000000}" | out sh .githooks/pre-push origin url; }
@@ -2321,9 +2962,9 @@ for h in $hook_names; do
 	git -C "$i" commit -qm "no $h"
 done
 git -C "$i" checkout -q main
-# As in Alexis's shell, with no mark of merge.sh and no hooks path of his own: from the root, or
-# from a folder below it.
-alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_CONFIG_GLOBAL=/dev/null GIT_MERGE_AUTOEDIT=no "$@"; }
+# As in Alexis's shell, with no mark of merge.sh and, as everywhere in this file, no git config of
+# his own (no hooks path): from the root, or from a folder below it.
+alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_MERGE_AUTOEDIT=no "$@"; }
 in_i() { (cd "$i" && alexis "$@"); }
 in_docs() { (cd "$i/docs" && alexis "$@"); }
 mark_i() { (cd "$i" && . .git/hooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); }
@@ -2920,6 +3561,17 @@ printf 'y\n' >>"$g/packages/core/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a core change"
 scoped "a core change" typecheck lint test build:app - gno sh:test_hooks
 reset
+# Jarvis and the two shared packages in a repository too (D110 to D112): the server's kind, their related tests; the app's build
+# for the chain package alone.
+for f in jarvis/src/a.ts packages/service/src/a.ts packages/chain/src/a.ts; do
+	mkdir -p "$g/$(dirname "$f")" && printf 'y\n' >>"$g/$f"
+	gate >/dev/null || fail "check.sh failed on a change of $f"
+	case $f in
+	packages/chain/*) scoped "a change of $f" typecheck lint test build:app - gno ;;
+	*) scoped "a change of $f" typecheck lint test - build:app gno ;;
+	esac
+	reset
+done
 # A file of the app that is not TypeScript (a fixture, a stylesheet): the related tests, which the map gives what reads it from disk.
 printf 'x\n' >"$g/app/src/b.json"
 gate >/dev/null || fail "check.sh failed on an app fixture"
@@ -2955,6 +3607,14 @@ outside "packages/ui/src/tokens.css" >/dev/null || fail "check.sh failed outside
 scoped "pre-commit's list of a change of tokens.css" typecheck test build:app pictures - gno
 outside "packages/ui/src/base.css" >/dev/null || fail "check.sh failed outside a repository on a change of base.css"
 scoped "pre-commit's list of a change of base.css" typecheck test build:app - pictures
+# Jarvis's workspace and the service package are the server's kind (D110, D111): every test, no page loads them; the chain
+# package is core's kind, as the app imports it: every test and the app's build (D112).
+for path in jarvis/src/a.ts packages/service/src/a.ts; do
+	outside "$path" >/dev/null || fail "check.sh failed outside a repository on $path"
+	scoped "pre-commit's list of a change of $path" typecheck lint test - build:app gno
+done
+outside "packages/chain/src/a.ts" >/dev/null || fail "check.sh failed outside a repository on a change of the chain package"
+scoped "pre-commit's list of a change of the chain package" typecheck lint test build:app - gno
 # Prose is prose anywhere, and nothing else is: beside a server change, the run stays the server's.
 for prose in adr/0001.txt docs/x.ts server/src/x.md; do
 	outside "server/src/a.ts
@@ -3856,7 +4516,7 @@ regr_fixture() { # $1: a folder
 	mkdir -p "$1/scripts" "$1/server/src" && git -C "$1" init -q && good_rules "$1"
 	printf '#!/bin/sh\nexit 0\n' >"$1/scripts/check.sh"
 	printf 'import os, sys\nopen(os.environ["REG_LOG"], "a").write(os.getcwd() + " " + " ".join(sys.argv[1:]) + "\\n")\nsys.exit(int(os.environ["REG_EXIT"]))\n' >"$1/scripts/check_regressions.py"
-	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$1/scripts/" && secrets_into "$1/scripts/"
+	cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$here/speeds.py" "$1/scripts/" && secrets_into "$1/scripts/"
 	printf 'test("a", () => {});\n' >"$1/server/src/a.test.ts" && printf 'x\n' >"$1/server/src/a.ts"
 }
 logged() { grep -qx "$(cd "$c3" && pwd -P) $1" "$t/reg.log" 2>/dev/null || grep -qx "$c3 $1" "$t/reg.log" 2>/dev/null; }
@@ -5148,6 +5808,33 @@ for line in open(sys.argv[2], encoding="utf-8"):
 print("\n".join(wrong), file=sys.stderr)
 sys.exit(1 if wrong else 0)
 PY
+# worktree.sh leaves the sandbox (settings.json's excludedCommands, `sh scripts/worktree.sh *`), so it runs alone, its words plain,
+# from the project's root: from a subfolder those words run a script there, which the session can write, and behind a cd, an
+# assignment, a redirect or another command they would run something else outside the sandbox, whatever Claude Code's matcher
+# makes of them (F5058). No folder is no root.
+root=$(cd "$here/.." && pwd -P)
+at_() { # $1: the folder, $2: a shell command, $3: the exit code expected
+	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$2" "$1")" "$3" "Bash in $1: $2"
+}
+at_ "$root" "sh scripts/worktree.sh slice-11h slice-11h slice-11-realm" 0
+at_ "$root" "sh scripts/worktree.sh remove slice-11h" 0
+at_ "$root" "sh scripts/worktree.sh /srv/a/Server/gnoworld-wt/slice-11h slice-11h 77694b3d" 0
+at_ "$root/docs/.." "sh scripts/worktree.sh remove x_1.b" 0
+at_ "$root/docs" "grep -n root scripts/worktree.sh" 0
+at_ "$root/docs" "sh scripts/check.sh" 0
+for cmd in "sh scripts/worktree.sh x y z" "bash scripts/worktree.sh remove x" "./scripts/worktree.sh x y z" "sh -x scripts/worktree.sh x y z" \
+	"env A=1 sh scripts/worktree.sh x y z" "sh -c 'sh scripts/worktree.sh x y z'"; do
+	at_ "$root/docs" "$cmd" 2
+done
+for cmd in "cd docs && sh scripts/worktree.sh x y z" "pushd docs; sh scripts/worktree.sh x y z" "(cd docs; sh scripts/worktree.sh x y z)" \
+	"sh scripts/worktree.sh x y z; cat /etc/hosts" "sh scripts/worktree.sh x y z > out" "sh scripts/worktree.sh x y z 2>&1" \
+	"sh scripts/worktree.sh x y z | tee out" 'sh scripts/worktree.sh "$(cat f)" y z' "sh scripts/worktree.sh x y z &" \
+	"PATH=/tmp/e:\$PATH sh scripts/worktree.sh x y z" "HOME=/tmp/e sh scripts/worktree.sh x y z" "sh -c 'cd docs && sh scripts/worktree.sh x y z'" \
+	"bash scripts/worktree.sh x y z" "./scripts/worktree.sh x y z" "sh scripts/worktree.sh 'a b' y z" "sh scripts/worktree.sh ~/x y z" "sh scripts/worktree.sh x y z
+sh scripts/worktree.sh u v w; true"; do
+	at_ "$root" "$cmd" 2
+done
+sh_ "sh scripts/worktree.sh x y z" 2
 fi
 
 if part prove_fix; then
@@ -5984,7 +6671,7 @@ python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_re
 # ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
 # refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
 rx="$t/regrname" && mkdir -p "$rx/scripts"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
 git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
 mkdir -p "$rx/node_modules/.bin" && printf '#!/bin/sh\necho "[]"\n' >"$rx/node_modules/.bin/vitest" && chmod +x "$rx/node_modules/.bin/vitest" # no test to list
 printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nexport default { test: { exclude: ["a/**"] } };\n' >"$rx/vitest.config.ts"
@@ -6117,7 +6804,7 @@ nameback
 # The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
 git -C "$rg" init -q
 printf 'bench("a line [0.2 ms]", f);\nbench("a room [100 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts"
 printf 'bench("a call in a file that is no bench [1 ms]", f);\n' >"$rg/app/src/x.ts" # only a `*.bench.ts(x)` file holds benches
@@ -6133,6 +6820,13 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
+# A gap whose key holds ` - ` (a flip of `a - b`) is named by its line all the same (F5000): every cut before a ` - ` that a
+# reason follows is read as an item, not the first alone.
+git -C "$rg" reset -q --hard "$base" && printf 'GAPS = {\n    "r/x.gno: d := a - b [- -> +]": "equivalent",\n}\n' >"$rg/scripts/mutate.py"
+git -C "$rg" add scripts/mutate.py && git -C "$rg" commit -qm "a gap on a - b"
+out=$(reg) && fail "check_regressions passed a gap no commit names: $out"
+git -C "$rg" commit -q --allow-empty -m "says why" -m "Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - d is never read"
+out=$(reg) || fail "check_regressions refused a gap holding ' - ' that a commit names (F5000): $out"
 # An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
 # gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
 git -C "$rg" reset -q --hard "$base"
@@ -6153,7 +6847,7 @@ git -C "$rg" reset -q --hard "$base"
 # and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
 # its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
 rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
-cp "$here/check_regressions.py" "$here/repo_files.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
+cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
 cat >"$rq/node_modules/.bin/vitest" <<'EOF'
 #!/usr/bin/env python3
 import json, os, re, sys
@@ -6316,8 +7010,7 @@ fi
 if part worktree_script; then
 # worktree.sh: a worktree of a new branch, ready for the gate, from the tree it runs in: the packages linked one by
 # one (a whole-folder link hides them from borrow_node_modules.sh), a workspace's @gnoworld links leading into the
-# new tree, Vite's caches its own, StrykerJS's incremental file seeded. A worktree lives in the folder beside the main checkout,
-# under its name and -wt (7w3): here the fixture's own, $ws/src-wt.
+# new tree, Vite's caches its own.
 ws="$t/ws"
 wt="$ws/src-wt"
 mkdir -p "$ws/src/node_modules/pkg" "$ws/src/node_modules/.vite/deps" "$ws/src/app/node_modules/@gnoworld" "$ws/src/packages/core" "$ws/src/reports" "$wt"
@@ -6328,137 +7021,302 @@ for f in pnpm-lock.yaml package.json app/package.json packages/core/package.json
 git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
-(cd "$ws/src" && sh "$here/worktree.sh" "$wt/new" feature HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
-[ "$(git -C "$wt/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
-[ -d "$wt/new/node_modules" ] && [ ! -L "$wt/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
-[ -L "$wt/new/node_modules/pkg" ] && [ "$(cat "$wt/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
-[ -d "$wt/new/node_modules/.vite" ] && [ ! -L "$wt/new/node_modules/.vite" ] && [ -z "$(ls -A "$wt/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
-[ -d "$wt/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
-[ "$(cd "$wt/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wt/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
-[ -z "$(git -C "$wt/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wt/new" status --porcelain)"
-(cd "$ws/src" && sh "$here/worktree.sh" "$wt/new" other HEAD) >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
-mkdir "$wt/empty" && (cd "$ws/src" && sh "$here/worktree.sh" "$wt/empty" another HEAD) >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
-(cd "$ws/src" && sh "$here/worktree.sh" "$wt/x") >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
-[ ! -e "$wt/x" ] || fail "worktree.sh made a folder for a call it refused"
+# It runs outside the sandbox, so it makes and removes the folders of one root alone, $HOME/Server/gnoworld-wt, where no session
+# writes but its own folder (Alexis, 2026-11-04). With this user's own home it refuses a folder anywhere else, naming that root,
+# and makes nothing; the other cases give it a home of this run's ($home). The base is no commit, so a fence switched off (a
+# harness mutant) stops there, never making a tree in the real root, and still fails on the message.
+out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree outside \$HOME/Server/gnoworld-wt: $out"
+printf '%s\n' "$out" | grep -qF "is not $HOME/Server/gnoworld-wt/<name>" || fail "worktree.sh did not name the root it requires: $out"
+[ ! -e "$ws/th-out-$$" ] && ! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a folder or a branch outside its root"
+wsr=$(cd "$ws" && pwd -P)
+home="$wsr/home" wr="$wsr/home/Server/gnoworld-wt"
+mkdir -p "$wr" "$ws/.githooks" && cp "$hooks/records.sh" "$ws/.githooks/"
+wt() { (cd "$ws/src" && HOME="$home" sh "$here/worktree.sh" "$@"); }
+wt "$wr/new" feature HEAD >"$ws/out" 2>&1 || fail "worktree.sh failed: $(cat "$ws/out")"
+[ "$(git -C "$wr/new" rev-parse --abbrev-ref HEAD)" = feature ] || fail "worktree.sh made no branch feature"
+[ -d "$wr/new/node_modules" ] && [ ! -L "$wr/new/node_modules" ] || fail "worktree.sh linked node_modules whole, which borrow_node_modules.sh cannot see into"
+[ -L "$wr/new/node_modules/pkg" ] && [ "$(cat "$wr/new/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh did not link the packages"
+[ -d "$wr/new/node_modules/.vite" ] && [ ! -L "$wr/new/node_modules/.vite" ] && [ -z "$(ls -A "$wr/new/node_modules/.vite")" ] || fail "worktree.sh shared Vite's cache, which each tree writes"
+[ -d "$wr/new/node_modules/.vite-temp" ] || fail "worktree.sh gave Vite no temp folder of its own"
+[ "$(cd "$wr/new/app/node_modules/@gnoworld/core" && pwd -P)" = "$(cd "$wr/new/packages/core" && pwd -P)" ] || fail "worktree.sh's @gnoworld/core leads out of the new tree"
+[ -z "$(git -C "$wr/new" status --porcelain)" ] || fail "worktree.sh left the new tree dirty: $(git -C "$wr/new" status --porcelain)"
+out=$(cd "$ws/src" && sh "$here/worktree.sh" remove "$wr/new" 2>&1) && fail "worktree.sh removed a tree outside \$HOME/Server/gnoworld-wt: $out"
+[ -d "$wr/new" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/new" || fail "worktree.sh's refused remove of a tree outside its root touched it"
+wt "$wr/new" other HEAD >/dev/null 2>&1 && fail "worktree.sh wrote over a folder that exists"
+mkdir "$wr/empty" && wt "$wr/empty" another HEAD >/dev/null 2>&1 && fail "worktree.sh took an empty folder that exists, which git would fill"
+wt "$wr/x" >/dev/null 2>&1 && fail "worktree.sh ran with no branch named"
+[ ! -e "$wr/x" ] || fail "worktree.sh made a folder for a call it refused"
+for args in "$wr/two twobranch" "remove"; do
+	code=0 && out=$(wt $args 2>&1) || code=$?
+	[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" || fail "worktree.sh took $args for a call ($code): $out"
+done
+# Whatever its spelling, a folder that does not resolve to <root>/<name>, <name> in a-z, 0-9 and -, is refused before anything is
+# made: another absolute path, another home's root, a .. out of the root or a lone .., a link out of it on the way, a folder in a
+# worktree, a name with a capital, a dot, an underscore, a space, or an accented letter, which sh's [a-z] takes in a UTF-8 locale
+# (bash 3.2, macOS's sh: U and e-acute; dash, Linux's, reads bytes). The locale is set here, whatever the caller's.
+mkdir -p "$ws/elsewhere" "$wsr/home2/Server/gnoworld-wt" && ln -s "$ws/elsewhere" "$wr/away"
+n=0
+for d in "$ws/elsewhere/a" "$wsr/home2/Server/gnoworld-wt/other" "$wr/../outside" "$wr/.." "$wr/away/b" "$wr/new/inner" "$wr/nosuch/x" "$ws/nosuch/x" \
+	"$wr/Upper" "$wr/a.b" "$wr/a_b" "$wr/a b" "$wr/caf$(printf '\303\251')"; do
+	n=$((n + 1))
+	out=$(LC_ALL=en_US.UTF-8 && export LC_ALL && wt "$d" "fence$n" HEAD 2>&1) && fail "worktree.sh made a tree at $d, which is not <root>/<name>: $out"
+	printf '%s\n' "$out" | grep -qF "is not $wr/<name>" || fail "worktree.sh refused $d for another reason than its root: $out"
+	! git -C "$ws/src" rev-parse -q --verify "fence$n" >/dev/null || fail "worktree.sh made the branch of $d, which is not <root>/<name>"
+done
+[ -z "$(ls -A "$ws/elsewhere")" ] && [ -z "$(ls -A "$wsr/home2/Server/gnoworld-wt")" ] && [ ! -e "$wsr/home/Server/outside" ] && [ ! -e "$wr/new/inner" ] ||
+	fail "worktree.sh made a folder out of its root"
+[ "$(ls -A "$wr" | tr '\n' ' ')" = "away empty new " ] || fail "worktree.sh made a folder for a name it refuses: $(ls -A "$wr")"
+# The root is compared as written, never resolved: through a home that is a link, a folder is refused.
+ln -s "$home" "$ws/homelink"
+out=$(cd "$ws/src" && HOME="$ws/homelink" sh "$here/worktree.sh" "$ws/homelink/Server/gnoworld-wt/via" via HEAD 2>&1) && fail "worktree.sh took a root that is a link: $out"
+[ ! -e "$wr/via" ] || fail "worktree.sh made a folder through a root that is a link"
+# A link named as the folder is refused, what it leads to untouched: git (2.50) makes the branch, then fails on it. So is it
+# with a trailing slash, which leads through the link.
+ln -s "$ws/nothere" "$wr/dangling"
+for d in "$wr/dangling" "$wr/dangling/"; do
+	out=$(wt "$d" dangling HEAD 2>&1) && fail "worktree.sh made a tree at a link ($d): $out"
+	printf '%s\n' "$out" | grep -qF "is a link" || fail "worktree.sh did not say its folder is a link ($d): $out"
+	! git -C "$ws/src" rev-parse -q --verify dangling >/dev/null && [ ! -e "$ws/nothere" ] || fail "worktree.sh made the branch or the folder of a link named as its folder ($d)"
+done
+# The root is this user's home's: with no home, nothing is made.
+out=$(cd "$ws/src" && env -u HOME sh "$here/worktree.sh" "$wr/nohome" nohome HEAD 2>&1) && fail "worktree.sh made a tree with no home: $out"
+[ ! -e "$wr/nohome" ] && ! git -C "$ws/src" rev-parse -q --verify nohome >/dev/null || fail "worktree.sh made a folder or a branch with no home"
+# A relative path, or one whose .. stays in the root, is the folder it resolves to.
+wt "../home/Server/gnoworld-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.sh refused a relative folder in its root: $(cat "$ws/out")"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/rel" || fail "worktree.sh did not make the folder a relative path resolves to"
+# remove <dir>: a clean worktree of this repository under the root, from another tree; its files deleted, ignored ones included,
+# never what a link in it leads to; its branch kept; and no other tree's record touched, not even one whose folder is gone, which
+# git worktree prune would take: a session can point another tree's record at nothing (reviewer, second review, item 4).
+wt remove "$wr/../gnoworld-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
+[ ! -e "$wr/rel" ] || fail "worktree.sh left the folder it removed"
+wt "$wr/stale" stale HEAD >/dev/null 2>&1 && rm -r "$wr/stale" || fail "the stale worktree of this case could not be made"
+wt "$wr/clean" clean HEAD >/dev/null 2>&1 || fail "the clean worktree of this case could not be made"
+mkdir -p "$ws/keep" "$wr/clean/reports" && echo kept >"$ws/keep/f" && ln -s "$ws/keep" "$wr/clean/reports/out" && echo r >"$wr/clean/reports/r"
+wt remove "$wr/clean" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree with ignored files: $(cat "$ws/out")"
+listed=$(git -C "$ws/src" worktree list --porcelain)
+[ ! -e "$wr/clean" ] && ! printf '%s\n' "$listed" | grep -qxF "worktree $wr/clean" || fail "worktree.sh left the tree it removed, or its record"
+printf '%s\n' "$listed" | grep -qxF "worktree $wr/stale" || fail "worktree.sh's remove pruned the record of another tree"
+[ "$(cat "$ws/keep/f")" = kept ] && [ "$(cat "$ws/src/node_modules/pkg/index.js")" = pkg ] || fail "worktree.sh's remove deleted what a link in the tree leads to"
+git -C "$ws/src" rev-parse -q --verify clean >/dev/null || fail "worktree.sh's remove deleted the branch"
+# A change, a staged file or a file git does not track refuses it, the tree and its record kept.
+wt "$wr/unclean" unclean HEAD >/dev/null 2>&1 || fail "the unclean worktree of this case could not be made"
+for change in "echo m >>packages/core/a.ts" "echo s >staged.txt && git add staged.txt" "echo u >untracked.txt"; do
+	(cd "$wr/unclean" && eval "$change")
+	out=$(wt remove "$wr/unclean" 2>&1) && fail "worktree.sh removed a tree with a change ($change): $out"
+	[ -d "$wr/unclean" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/unclean" || fail "worktree.sh's refused remove touched the tree ($change)"
+	git -C "$wr/unclean" reset -q --hard && git -C "$wr/unclean" clean -qfd
+done
+# Its clean check enters no nested repository: git's own ran git status in one its index staged at that moment, which the tree's
+# session can flip between git's two reads, so that its fsmonitor ran outside the sandbox (security-reviewer, third review). Here
+# the nested repository's own clean filter, which git status runs to read a file changed at its size, and no setting of the script
+# turns off.
+wt "$wr/subm" subm HEAD >/dev/null 2>&1 || fail "the subm worktree of this case could not be made"
+git init -q "$wr/subm/x" && echo x >"$wr/subm/x/x" && echo 'x filter=planted' >"$wr/subm/x/.gitattributes"
+git -C "$wr/subm/x" add x .gitattributes && git -C "$wr/subm/x" commit -qm x
+git -C "$wr/subm/x" config filter.planted.clean "sh -c 'touch \"$ws/pwned-subm\"; cat'" && echo y >"$wr/subm/x/x"
+git -C "$wr/subm" add x 2>/dev/null
+out=$(wt remove subm 2>&1) || :
+[ ! -e "$ws/pwned-subm" ] || fail "worktree.sh's remove ran git in a nested repository of the tree: its clean filter ran: $out"
+# The tree it runs in is refused, and kept: its removal would leave the run in no folder. Whatever the spelling of either: the
+# folder through a .., the run entered through a link.
+wt "$wr/inside" inside HEAD >/dev/null 2>&1 && ln -s "$wr/inside" "$ws/toinside" || fail "the inside worktree of this case could not be made"
+for at in "$wr/inside/packages:$wr/inside" "$wr/inside:$wr/new/../inside" "$ws/toinside:$wr/inside"; do
+	out=$(cd "${at%%:*}" && HOME="$home" sh "$here/worktree.sh" remove "${at#*:}" 2>&1) && fail "worktree.sh removed the tree it runs in ($at): $out"
+	[ -d "$wr/inside" ] || fail "worktree.sh removed the tree it runs in ($at)"
+done
+# Refused and kept: a folder out of the root, one under it that is no worktree, another repository's worktree, a link to a
+# worktree out of the root (git, 2.50, removes the tree a link leads to), and a name starting with -.
+mkdir "$wr/plain" && echo p >"$wr/plain/p"
+git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m x && git -C "$ws/other" worktree add -q "$wr/foreign"
+git -C "$ws/src" worktree add -q -b far "$ws/far" HEAD && ln -s "$ws/far" "$wr/tofar"
+for d in "$ws/far" "$wr/plain" "$wr/foreign" "$wr/tofar" "$wr/tofar/" -x; do
+	out=$(wt remove "$d" 2>&1) && fail "worktree.sh removed $d: $out"
+done
+for d in "$wr/tofar" "$wr/tofar/"; do
+	printf '%s\n' "$(wt remove "$d" 2>&1)" | grep -qF "is a link" || fail "worktree.sh did not say the folder to remove is a link ($d)"
+done
+code=0 && out=$(wt remove -x 2>&1) || code=$?
+[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not refuse, as a call, a folder to remove that starts with a dash ($code): $out"
+[ -f "$wr/plain/p" ] && [ -d "$wr/foreign" ] && [ -d "$ws/far" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wsr/far" ||
+	fail "worktree.sh's refused remove touched a tree"
+# Three words starting with remove are no call: remove names no tree, as a bare name would make it one.
+code=0 && out=$(wt remove "$wr/rm3" HEAD 2>&1) || code=$?
+[ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" && [ ! -e "$wr/remove" ] || fail "worktree.sh took remove and two words for a call ($code): $out"
+# A worktree's commondir, which Claude Code protects only for the trees that stood when the session started, leads git at no
+# other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run (reviewer, F5097).
+wt "$wr/redirected" redirected HEAD >/dev/null 2>&1 || fail "the redirected worktree of this case could not be made"
+admin=$(sed 's/^gitdir: //' "$wr/redirected/.git")
+cp -R "$ws/src/.git" "$ws/evilgit" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/pwned" >"$ws/fsmonitor" && chmod +x "$ws/fsmonitor"
+git --git-dir="$ws/evilgit" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit" >"$admin/commondir"
+wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git with the config a worktree's commondir led to: its fsmonitor ran (F5097): $(cat "$ws/out")"
+[ ! -d "$admin" ] || echo ../.. >"$admin/commondir"
+# Run from a worktree, as a part is cut from the chief's, it makes and removes trees of this repository; and when that worktree's
+# own commondir leads elsewhere, it still reads this repository's config: the common folder comes from the tree's .git, which the
+# settings deny every session, never from the commondir git would read (F5097). So from a worktree made with relative paths.
+git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
+git -C "$ws/src" worktree add -q -b fromrel "$ws/fromrel" HEAD && mkdir "$ws/fromrel/node_modules" && echo "gitdir: ../src/.git/worktrees/fromrel" >"$ws/fromrel/.git"
+admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
+cp -R "$ws/src/.git" "$ws/evilgit2" && git --git-dir="$ws/evilgit2" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/evilgit2" >"$admin/commondir"
+out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" fromwt fromwt2 HEAD 2>&1) || fail "worktree.sh could not make a tree from a worktree: $out"
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from a worktree, took its config from the commondir: its fsmonitor ran (F5097): $out"
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/fromwt" || fail "worktree.sh, run from a worktree, made no tree of this repository"
+out=$(cd "$ws/fromwt" && HOME="$home" sh "$here/worktree.sh" remove fromwt 2>&1) && [ ! -e "$wr/fromwt" ] || fail "worktree.sh could not remove a tree from a worktree: $out"
+echo ../.. >"$admin/commondir"
+out=$(cd "$ws/fromrel" && HOME="$home" sh "$here/worktree.sh" fromrel fromrel2 HEAD 2>&1) && [ -d "$wr/fromrel" ] || fail "worktree.sh could not make a tree from a worktree of relative paths: $out"
+# So from the main checkout, whose .git folder holds no commondir unless one was planted there.
+echo "$ws/evilgit2" >"$ws/src/.git/commondir"
+out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
+rm "$ws/src/.git/commondir"
+[ ! -e "$ws/pwned" ] || fail "worktree.sh, run from the main checkout, took its config from a commondir planted there: its fsmonitor ran (F5097): $out"
+[ -d "$wr/frommain" ] || fail "worktree.sh, run from the main checkout beside a planted commondir, made no tree: $out"
+# Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write (F5095): a
+# post-checkout hook ran when the tree was made, an fsmonitor when the base was compared (security-reviewer, third review).
+printf '#!/bin/sh\ntouch "%s"\n' "$ws/hookran" >"$ws/src/.git/hooks/post-checkout" && chmod +x "$ws/src/.git/hooks/post-checkout"
+git -C "$ws/src" config core.fsmonitor "$ws/fsmonitor"
+out=$(wt hooked hooked HEAD 2>&1) || :
+rm "$ws/src/.git/hooks/post-checkout" && git -C "$ws/src" config --unset core.fsmonitor
+[ ! -e "$ws/hookran" ] && [ ! -e "$ws/pwned" ] || fail "worktree.sh ran a hook or an fsmonitor of the common folder: $out"
+[ -d "$wr/hooked" ] || fail "worktree.sh made no tree beside a planted hook and fsmonitor: $out"
+# A nested repository staged in this tree, under a harness path the base check reads, is never entered when worktree.sh compares
+# a base outside the sandbox: git would run its fsmonitor there (security-reviewer, F5097).
+git init -q "$ws/src/.claude/nested" && echo n >"$ws/src/.claude/nested/n" && git -C "$ws/src/.claude/nested" add n
+git -C "$ws/src/.claude/nested" commit -qm n && git -C "$ws/src/.claude/nested" config core.fsmonitor "$ws/fsmonitor"
+git -C "$ws/src" add .claude/nested 2>/dev/null
+out=$(wt "$wr/nested" nested HEAD 2>&1) || :
+[ ! -e "$ws/pwned" ] || fail "worktree.sh ran git in a nested repository of this tree: its fsmonitor ran (F5097): $out"
+[ -d "$wr/nested" ] || fail "worktree.sh made no tree beside a nested repository it need not enter: $out"
+git -C "$ws/src" rm -q -f --cached .claude/nested && rm -r "$ws/src/.claude/nested"
+# A bare name is a folder of the root: no caller writes its user's number.
+wt bare bare HEAD >"$ws/out" 2>&1 && [ -d "$wr/bare" ] || fail "worktree.sh made no tree of a bare name in its root: $(cat "$ws/out")"
+wt remove bare >"$ws/out" 2>&1 && [ ! -e "$wr/bare" ] || fail "worktree.sh removed no tree of a bare name: $(cat "$ws/out")"
+# A folder name holding a newline is a name like another as node_modules are borrowed, outside the sandbox: read line by line it
+# split, and a folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099), under the top or under a
+# folder the borrowing leaves out only at the top (app/.claude, the reviewer's second review). The tree is made, nothing outside.
+n=0
+for at in . app/.claude app/.git app/.stryker-tmp; do
+	n=$((n + 1))
+	mkdir -p "$ws/src/$at/a
+../b/scripts/planted/node_modules" "$ws/src/$at/a" "$wr/b"
+	out=$(wt "nl-$n" "nl-$n" HEAD 2>&1) || fail "worktree.sh refused a tree holding a name with a newline under $at: $out"
+	[ ! -e "$wr/b/scripts" ] || fail "worktree.sh made a folder through a name with a newline under $at: $out"
+	rm -r "$ws/src/$at/a
+.." "$ws/src/$at/a"
+done
+# Outside the sandbox, the borrowing follows no link it did not make: a link the base checks out on the way to a node_modules it
+# copies (reviewer, second review, item 1b; security-reviewer, A), a node_modules the base tracks as a link (item 1c), or a
+# workspace's .bin leading elsewhere than a node_modules/.bin, whose files it would copy where the session reads them (item 1a).
+# Each is refused, its tree undone, what the link leads to untouched.
+mkdir -p "$ws/outside" "$ws/outside2" "$ws/secret" && echo key >"$ws/secret/id"
+installed=$(git -C "$ws/src" rev-parse HEAD)
+ln -s "$ws/outside" "$ws/src/lnk" && git -C "$ws/src" add lnk && git -C "$ws/src" commit -qm "a link" && linked=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q --hard "$installed" && mkdir -p "$ws/src/lnk/node_modules/x"
+out=$(wt "$wr/lnkb" lnkb "$linked" 2>&1) && fail "worktree.sh borrowed through a link its base checks out: $out"
+[ -z "$(ls -A "$ws/outside")" ] && [ ! -e "$wr/lnkb" ] || fail "worktree.sh wrote through a link its base checks out: $(ls -A "$ws/outside")"
+rm -r "$ws/src/lnk"
+nm=$(printf '%s' "$ws/outside2" | git -C "$ws/src" hash-object -w --stdin)
+git -C "$ws/src" update-index --add --cacheinfo "120000,$nm,node_modules" && git -C "$ws/src" commit -qm "node_modules a link" && nmbase=$(git -C "$ws/src" rev-parse HEAD)
+git -C "$ws/src" reset -q "$installed"
+out=$(wt "$wr/nmlink" nmlink "$nmbase" 2>&1) && fail "worktree.sh borrowed into a node_modules its base tracks as a link: $out"
+[ -z "$(ls -A "$ws/outside2")" ] && [ ! -e "$wr/nmlink" ] || fail "worktree.sh wrote through a node_modules its base tracks as a link: $(ls -A "$ws/outside2")"
+mkdir -p "$ws/src/packages/core/node_modules" && ln -s "$ws/secret" "$ws/src/packages/core/node_modules/.bin"
+out=$(wt "$wr/exf" exf HEAD 2>&1) && fail "worktree.sh copied a .bin that leads elsewhere than a node_modules/.bin: $out"
+[ ! -e "$wr/exf" ] || fail "worktree.sh left the tree of a .bin that leads elsewhere"
+rm "$ws/src/packages/core/node_modules/.bin"
 # The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
 # packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
-# It is refused, whichever package file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
-installed=$(git -C "$ws/src" rev-parse HEAD)
-for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json; do
+# Its harness (records.sh's list) is this tree's too: worktree.sh may run outside the sandbox, so a base a session wrote by
+# plumbing would check its own settings and hooks out into a tree a session is later started in (F5098).
+# It is refused, whichever such file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
+mkdir -p "$ws/src/.claude" "$ws/src/scripts"
+for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json .claude/settings.json scripts/guard.py CLAUDE.md; do
 	echo changed >>"$ws/src/$f" && git -C "$ws/src" add -A && git -C "$ws/src" commit -qm "$f moves"
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
+	out=$(wt "$wr/old" "old-${f##*/}" "$installed" 2>&1) && fail "worktree.sh made a tree of a base whose $f is not this tree's: $out"
 	printf '%s\n' "$out" | grep -qF "$f" || fail "worktree.sh did not name the package file $f that differs: $out"
-	[ ! -e "$wt/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
+	[ ! -e "$wr/old" ] && ! git -C "$ws/src" rev-parse -q --verify "old-${f##*/}" >/dev/null || fail "worktree.sh made a folder or a branch for a base whose $f differs"
 	git -C "$ws/src" reset -q --hard "$installed"
 done
 echo changed >>"$ws/src/app/package.json"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
+out=$(wt "$wr/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a package file of this one changed and not committed: $out"
 git -C "$ws/src" checkout -q -- app/package.json
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
-[ ! -e "$wt/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
+out=$(wt "$wr/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
+[ ! -e "$wr/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
 # An argument that starts with - is an option for git, never a name: a base `--output=<file>` made git diff truncate a file
 # outside the scratch copy (CR6); a branch or a folder so named is as wrong. Each is refused, and makes nothing.
 echo victim >"$ws/victim"
-for args in "$wt/opt1 optbranch --output=$ws/victim" "$wt/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
+for args in "$wr/opt1 optbranch --output=$ws/victim" "$wr/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
 	set -- $args
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$@" 2>&1) && fail "worktree.sh took an argument that starts with a dash: $args: $out"
+	out=$(wt "$@" 2>&1) && fail "worktree.sh took an argument that starts with a dash: $args: $out"
 	printf '%s\n' "$out" | grep -qF "starts with -" || fail "worktree.sh did not say which argument starts with a dash: $args: $out"
 done
 [ "$(cat "$ws/victim")" = victim ] || fail "worktree.sh let a base of git's options write a file: $(cat "$ws/victim")"
-[ ! -e "$wt/opt1" ] && [ ! -e "$wt/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
+[ ! -e "$wr/opt1" ] && [ ! -e "$wr/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
 for b in optbranch --optbranch optbranch2; do ! git -C "$ws/src" rev-parse -q --verify "refs/heads/$b" >/dev/null || fail "worktree.sh made the branch $b for a refused call"; done
 # A base that is no commit (a blob, a tree) is refused before anything is made; so is a root node_modules that is one link,
 # which the script could not take apart once the tree stood (CR6).
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
+out=$(wt "$wr/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
 printf '%s\n' "$out" | grep -qF "is no commit" || fail "worktree.sh did not say a base is no commit: $out"
-[ ! -e "$wt/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
+[ ! -e "$wr/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
 mv "$ws/src/node_modules" "$ws/src/real_modules" && ln -s real_modules "$ws/src/node_modules"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
+out=$(wt "$wr/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree of a root node_modules that is one link: $out"
 printf '%s\n' "$out" | grep -qF "node_modules is a link" || fail "worktree.sh did not say the root node_modules is a link: $out"
-[ ! -e "$wt/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
+[ ! -e "$wr/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
 rm "$ws/src/node_modules" && mv "$ws/src/real_modules" "$ws/src/node_modules"
 # A step that fails once the tree stands undoes the tree and the branch: the next run names the same folder (CR6).
-mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\nexit 1\n' >"$ws/scripts/borrow_node_modules.sh"
-out=$(cd "$ws/src" && sh "$ws/scripts/worktree.sh" "$wt/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
-[ ! -e "$wt/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
+mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/ran-half" >"$ws/scripts/borrow_node_modules.sh"
+out=$(cd "$ws/src" && HOME="$home" sh "$ws/scripts/worktree.sh" "$wr/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
+[ -e "$ws/ran-half" ] || fail "the half-made case never reached the step that fails: $out"
+[ ! -e "$wr/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
 ! git -C "$ws/src" rev-parse -q --verify halfbranch >/dev/null || fail "worktree.sh left the branch of a tree that failed half-made"
-git -C "$ws/src" worktree list | grep -qF "$wtr/half" && fail "worktree.sh left $wt/half registered"
+git -C "$ws/src" worktree list | grep -qF "$wr/half" && fail "worktree.sh left $wr/half registered"
 # So does a signal that stops it once the tree stands (R6): the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
 # the EXIT trap runs even when a signal kills the shell, in dash (Linux's sh) only the trap on the signals makes it run: both are tried.
 # SIGINT is ignored by a script started in the background, as this suite's sections are: python resets it to its default first.
 for shell in sh dash; do
 	command -v "$shell" >/dev/null || continue
 	for sig in HUP INT TERM; do
-		tag=$shell$sig
-		printf '#!/bin/sh\nkill -%s "$PPID"\nsleep 1\n' "$sig" >"$ws/scripts/borrow_node_modules.sh"
-		out=$(cd "$ws/src" && python3 -I -c 'import signal, subprocess, sys
+		tag=$shell-$(printf '%s' "$sig" | tr '[:upper:]' '[:lower:]')
+		printf '#!/bin/sh\ntouch "%s"\nkill -%s "$PPID"\nsleep 1\n' "$ws/ran-$tag" "$sig" >"$ws/scripts/borrow_node_modules.sh"
+		out=$(cd "$ws/src" && HOME="$home" python3 -I -c 'import signal, subprocess, sys
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$wt/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
-		[ ! -e "$wt/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
+sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktree.sh" "$wr/$tag" "$tag" HEAD 2>&1) && fail "worktree.sh finished a run that got SIG$sig in $shell: $out"
+		[ -e "$ws/ran-$tag" ] || fail "the SIG$sig case in $shell never reached the step it stops: $out"
+		[ ! -e "$wr/$tag" ] || fail "worktree.sh left the folder of a tree stopped by SIG$sig in $shell"
 		! git -C "$ws/src" rev-parse -q --verify "$tag" >/dev/null || fail "worktree.sh left the branch of a tree stopped by SIG$sig in $shell"
-		git -C "$ws/src" worktree list | grep -qF "$wtr/$tag" && fail "worktree.sh left $wt/$tag registered after SIG$sig in $shell"
+		git -C "$ws/src" worktree list | grep -qF "$wr/$tag" && fail "worktree.sh left $wr/$tag registered after SIG$sig in $shell"
 	done
 done
-(cd "$ws/src" && sh "$here/worktree.sh" "$wt/same" same HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
-# The worktrees' folder is the one beside the main checkout, under its name and -wt (7w3, F4893's remedy a: out of the temp folder,
-# which every command writes, so no part's command writes a sibling, moves one or plants one there). Anything else is refused and
-# makes nothing: a temp folder, the main checkout or a folder in it, a folder below a worktree's, the -wt folder itself or a sibling of
-# its name, a dot or a slash in the name; and a -wt folder missing or a link. It is read from the repository's own common folder, from
-# a worktree too: git's folders a caller sets are dropped, so it is never another repository's.
-for dir in "$t/tmpwt" "$ws/elsewhere" "$ws/src/inside" "$wt/a/b" "$wt" "$wt/../src-wt2" "$wt/." "$wt/.." "$wt/.hidden" "$wt/fresh/" "$wt/a b"; do
-	out=$(cd "$ws/src" && sh "$here/worktree.sh" "$dir" outbranch HEAD 2>&1) && fail "worktree.sh made a tree outside the worktrees' folder: $dir: $out"
-	printf '%s\n' "$out" | grep -qF "$wtr" || fail "worktree.sh did not name the worktrees' folder when it refused $dir: $out"
-	! git -C "$ws/src" rev-parse -q --verify outbranch >/dev/null || fail "worktree.sh made a branch for $dir, a folder it refused"
-done
-[ ! -e "$t/tmpwt" ] && [ ! -e "$ws/elsewhere" ] && [ ! -e "$ws/src/inside" ] && [ ! -e "$wt/a" ] && [ ! -e "$ws/src-wt2" ] && [ ! -e "$wt/.hidden" ] && [ ! -e "$wt/fresh" ] ||
-	fail "worktree.sh made a folder outside the worktrees' folder"
-for name in v1.2 Slice_7-x; do
-	(cd "$ws/src" && sh "$here/worktree.sh" "$wt/$name" "named-$name" HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused the plain name $name: $(cat "$ws/out")"
-done
-(cd "$ws/src" && sh "$here/worktree.sh" ../src-wt/rel relbranch HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused a folder of the worktrees' named from beside it: $(cat "$ws/out")"
-git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wtr/rel" || fail "worktree.sh registered another path than the folder's own: $(git -C "$ws/src" worktree list)"
-ln -s "$wt" "$ws/wtlink" && (cd "$ws/src" && sh "$here/worktree.sh" "$ws/wtlink/vialink" vialinkbranch HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused its folder named through a link: $(cat "$ws/out")"
-git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wtr/vialink" || fail "worktree.sh registered a tree by a link's path, which open.sh would not find: $(git -C "$ws/src" worktree list)"
-(cd "$wt/new" && sh "$here/worktree.sh" "$wt/fromwt" fromwt HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused the worktrees' folder when run from a worktree: $(cat "$ws/out")"
-(cd "$wt/new" && sh "$here/worktree.sh" "$wt/new-wt-x" newwt HEAD) >/dev/null 2>&1 || fail "worktree.sh refused a plain name in the worktrees' folder"
-mkdir "$wt/new-wt" && out=$(cd "$wt/new" && sh "$here/worktree.sh" "$wt/new-wt/x" fromwt2 HEAD 2>&1) && fail "worktree.sh took the folder beside the worktree it runs in, not the main checkout's: $out"
-git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m other && mkdir "$ws/other-wt"
+wt "$wr/same" same HEAD >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
+# The rest of git's folders a caller may set, each dropped (7w3's red pass, T9): a git dir or a work tree, an index or an object folder
+# elsewhere would send `git worktree add` to another repository, fill another folder or find no commit. The tree is made in this one.
+git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m other
 for var in GIT_DIR GIT_COMMON_DIR; do
-	out=$(cd "$ws/src" && env "$var=$ws/other/.git" sh "$here/worktree.sh" "$ws/other-wt/$var" "by$var" HEAD 2>&1) && fail "worktree.sh followed a caller's $var to another repository's folder: $out"
+	dir=by-$(printf '%s' "$var" | tr 'A-Z_' 'a-z-') # a name is a-z, 0-9 and - alone
+	(cd "$ws/src" && env HOME="$home" "$var=$ws/other/.git" sh "$here/worktree.sh" "$wr/$dir" "by$var" HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's $var: $(cat "$ws/out")"
 	! git -C "$ws/other" rev-parse -q --verify "by$var" >/dev/null || fail "worktree.sh made a branch in the repository a caller's $var named"
-	(cd "$ws/src" && env "$var=$ws/other/.git" sh "$here/worktree.sh" "$wt/$var" "by$var" HEAD) >"$ws/out" 2>&1 || fail "worktree.sh refused its own folder beside a caller's $var: $(cat "$ws/out")"
 	git -C "$ws/src" rev-parse -q --verify "by$var" >/dev/null || fail "worktree.sh made its branch elsewhere than its own repository beside a caller's $var"
 done
-# The rest of git's folders a caller may set, each dropped (the red pass's T9): an index elsewhere, which git worktree add would write
-# in place of the new tree's own; a work tree elsewhere, which it would fill; an object folder holding nothing, where no commit is found.
-(cd "$ws/src" && env GIT_INDEX_FILE="$ws/stray-index" sh "$here/worktree.sh" "$wt/byindex" byindex HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_INDEX_FILE: $(cat "$ws/out")"
-[ ! -e "$ws/stray-index" ] && [ -f "$(git -C "$wt/byindex" rev-parse --path-format=absolute --git-path index)" ] || fail "worktree.sh wrote the new tree's index where a caller's GIT_INDEX_FILE named"
-mkdir "$ws/stray-tree" && (cd "$ws/src" && env GIT_WORK_TREE="$ws/stray-tree" sh "$here/worktree.sh" "$wt/bytree" bytree HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_WORK_TREE: $(cat "$ws/out")"
-[ -z "$(ls -A "$ws/stray-tree")" ] && [ -f "$wt/bytree/packages/core/a.ts" ] || fail "worktree.sh filled the work tree a caller's GIT_WORK_TREE named, not its own"
-mkdir "$ws/no-objects" && (cd "$ws/src" && env GIT_OBJECT_DIRECTORY="$ws/no-objects" sh "$here/worktree.sh" "$wt/byobjects" byobjects HEAD) >"$ws/out" 2>&1 || fail "worktree.sh followed a caller's GIT_OBJECT_DIRECTORY, where no commit is: $(cat "$ws/out")"
-mv "$wt" "$ws/away" && ln -s away "$wt"
-out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/linkfolder" linkfolder HEAD 2>&1) && fail "worktree.sh made a tree in a worktrees' folder that is a link: $out"
-printf '%s\n' "$out" | grep -qF "by its own path" || fail "worktree.sh refused a worktrees' folder that is a link for another reason than the link: $out"
-! git -C "$ws/src" rev-parse -q --verify linkfolder >/dev/null || fail "worktree.sh made a branch in a worktrees' folder that is a link"
-rm "$wt" && out=$(cd "$ws/src" && sh "$here/worktree.sh" "$wt/missing" missing HEAD 2>&1) && fail "worktree.sh made a worktrees' folder that was missing: $out"
-printf '%s\n' "$out" | grep -qF "mkdir" || fail "worktree.sh did not say how the worktrees' folder is made: $out"
-[ ! -e "$wt" ] || fail "worktree.sh made the worktrees' folder itself, which is Alexis's to make once"
-mv "$ws/away" "$wt"
-# A workspace's .bin reached through a link (a tree whose packages were linked by hand) is borrowed as a folder of its own:
-# the probe deletes a tool in its copy, which went through the link and deleted the main tree's (F2127).
-mkdir -p "$ws/bins/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/.bin/storybook"
-ln -s "$ws/bins/.bin" "$ws/src/packages/core/node_modules/.bin"
+(cd "$ws/src" && env HOME="$home" GIT_INDEX_FILE="$ws/stray-index" sh "$here/worktree.sh" "$wr/byindex" byindex HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_INDEX_FILE: $(cat "$ws/out")"
+[ ! -e "$ws/stray-index" ] && [ -f "$(git -C "$wr/byindex" rev-parse --path-format=absolute --git-path index)" ] || fail "worktree.sh wrote the new tree's index where a caller's GIT_INDEX_FILE named"
+mkdir "$ws/stray-tree" && (cd "$ws/src" && env HOME="$home" GIT_WORK_TREE="$ws/stray-tree" sh "$here/worktree.sh" "$wr/bytree" bytree HEAD) >"$ws/out" 2>&1 || fail "worktree.sh failed beside a caller's GIT_WORK_TREE: $(cat "$ws/out")"
+[ -z "$(ls -A "$ws/stray-tree")" ] && [ -f "$wr/bytree/packages/core/a.ts" ] || fail "worktree.sh filled the work tree a caller's GIT_WORK_TREE named, not its own"
+mkdir "$ws/no-objects" && (cd "$ws/src" && env HOME="$home" GIT_OBJECT_DIRECTORY="$ws/no-objects" sh "$here/worktree.sh" "$wr/byobjects" byobjects HEAD) >"$ws/out" 2>&1 || fail "worktree.sh followed a caller's GIT_OBJECT_DIRECTORY, where no commit is: $(cat "$ws/out")"
+# A workspace's .bin reached through a link (a tree whose packages were linked by hand, into another tree's node_modules/.bin)
+# is borrowed as a folder of its own: the probe deletes a tool in its copy, which went through the link and deleted the main
+# tree's (F2127).
+mkdir -p "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/node_modules/.bin/storybook"
+ln -s "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules/.bin"
 (cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a linked .bin: $(cat "$ws/out")"
 [ -d "$ws/borrowed/packages/core/node_modules/.bin" ] && [ ! -L "$ws/borrowed/packages/core/node_modules/.bin" ] || fail "borrow_node_modules.sh kept a workspace's .bin a link into the tree it borrows from"
 [ "$(cat "$ws/borrowed/packages/core/node_modules/.bin/storybook")" = tool ] || fail "borrow_node_modules.sh left the linked .bin's tools behind"
 rm "$ws/borrowed/packages/core/node_modules/.bin/storybook"
-[ -f "$ws/bins/.bin/storybook" ] || fail "a tool deleted in the borrowed copy was deleted where its .bin's link led (F2127)"
+[ -f "$ws/bins/node_modules/.bin/storybook" ] || fail "a tool deleted in the borrowed copy was deleted where its .bin's link led (F2127)"
 # A relative link, as a hand-made one into another tree's store would be, borrowed the same way; a real .bin stays as it is.
 mkdir -p "$ws/src/packages/ui/node_modules" "$ws/src/app/node_modules/.bin" "$ws/borrowed2" && echo own >"$ws/src/app/node_modules/.bin/vite"
-ln -s ../../../../bins/.bin "$ws/src/packages/ui/node_modules/.bin"
+ln -s ../../../../bins/node_modules/.bin "$ws/src/packages/ui/node_modules/.bin"
 [ -f "$ws/src/packages/ui/node_modules/.bin/storybook" ] || fail "the relative .bin link of this case leads nowhere"
 (cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed2") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a relative .bin link: $(cat "$ws/out")"
-[ ! -L "$ws/borrowed2/packages/ui/node_modules/.bin" ] && rm "$ws/borrowed2/packages/ui/node_modules/.bin/storybook" && [ -f "$ws/bins/.bin/storybook" ] ||
+[ ! -L "$ws/borrowed2/packages/ui/node_modules/.bin" ] && rm "$ws/borrowed2/packages/ui/node_modules/.bin/storybook" && [ -f "$ws/bins/node_modules/.bin/storybook" ] ||
 	fail "a tool deleted in the borrowed copy of a relative .bin link was deleted where the link led (F2127)"
 [ -d "$ws/borrowed2/app/node_modules/.bin" ] && [ ! -L "$ws/borrowed2/app/node_modules/.bin" ] && [ "$(cat "$ws/borrowed2/app/node_modules/.bin/vite")" = own ] ||
 	fail "borrow_node_modules.sh did not keep a real .bin as it is"
@@ -6898,6 +7756,14 @@ printf '%s\n' "$out" | grep -q "^batch_size: 650 lines" || fail "batch_size.py d
 # Helpers that only tests use are no product code (G8).
 git -C "$bs" checkout -q -f -b helpers "$base" && mkdir -p "$bs/server/src/testing" && lines 700 >"$bs/server/src/testing/kit.ts" && commit "a test helper"
 out=$(size "$base") || fail "batch_size.py counted server/src/testing, a test helper's folder, as product code: $out"
+# Jarvis's workspace since 10h (D110): its code is product, its test helpers are not.
+git -C "$bs" checkout -q -f -b jarvis "$base" && mkdir -p "$bs/jarvis/src/testing" && lines 700 >"$bs/jarvis/src/testing/kit.ts" && commit "jarvis's test helper"
+out=$(size "$base") || fail "batch_size.py counted jarvis/src/testing, a test helper's folder, as product code: $out"
+lines 610 >"$bs/jarvis/src/loop.ts" && commit "jarvis's code"
+out=$(size "$base") && fail "batch_size.py passed 610 lines of jarvis/src, which is product code: $out"
+# A package's test helpers too, as the chain package's fake node (D112).
+git -C "$bs" checkout -q -f -b package-helpers "$base" && mkdir -p "$bs/packages/chain/src/testing" && lines 700 >"$bs/packages/chain/src/testing/envelopes.ts" && commit "a package's test helper"
+out=$(size "$base") || fail "batch_size.py counted packages/chain/src/testing, a test helper's folder, as product code: $out"
 fi
 
 if part gate_full; then

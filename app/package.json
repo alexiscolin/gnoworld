@@ -6,6 +6,7 @@
     "dev": "react-router dev"
   },
   "dependencies": {
+    "@gnoworld/chain": "workspace:*",
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
     "@gnoworld/ui": "workspace:*",

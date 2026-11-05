@@ -5,7 +5,7 @@
 import { Button, Center, Cluster, Kicker, Skeleton, Stack } from "@gnoworld/ui";
 import { useLocation, useNavigate } from "react-router";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
-import { hostOf, type Failure, type ReadOptions } from "../../lib/chain/read.ts";
+import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import { RealmFacts } from "./RealmFacts.tsx";

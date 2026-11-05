@@ -2,7 +2,7 @@
 import { shortAddress } from "@gnoworld/schemas";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChainRead } from "../../lib/chain/read.ts";
+import type { ChainRead } from "@gnoworld/chain/read";
 import { explorerLink } from "../../lib/chain/explorer.ts";
 import { all, mount, noMedia, settled } from "../../../tests/mount.tsx";
 import FromExplorer from "./FromExplorer.tsx";

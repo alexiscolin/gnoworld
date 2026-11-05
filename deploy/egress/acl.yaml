@@ -1,9 +1,10 @@
-# The hosts the stack may reach (decision 151): OpenAI's API, which the server's check asks (3i), CoinGecko's, which
+# The hosts the server may reach (decision 151): OpenAI's API, which the server's check asks (3i), CoinGecko's, which
 # the prices timer asks (5l), the RPC of the default universe, where the same timer reads the block height (decision of
-# 2026-10-31), and each universe's indexer, which the worlds job reads (slice 7, 7c), each by its full name, never its
-# domain. The RPC's host is the one of app/data/universes.json's default universe, and only that, the indexers' the ones of
-# every universe there: server/src/prices/universes.test.ts fails when the two differ. One file,
-# read by the proxy and by deploy/test.sh. A host is matched as the request names it, then resolved and
+# 2026-10-31), the mainnet's node, where the door reads a name (JARVIS_NAMES_RPC, D120), and each universe's indexer, which
+# the worlds job reads (slice 7, 7c), each by its full name, never its domain. The RPC's host is the one of
+# app/data/universes.json's default universe, the names' node the door's default, and the indexers' the ones of every
+# universe there: server/src/prices/universes.test.ts fails when they differ. jarvis has a list of its own
+# (jarvis-acl.yaml). Read by the proxy and by deploy/test.sh. A host is matched as the request names it, then resolved and
 # refused if its address is private (config.yaml).
 version: v1
 services: []
@@ -14,5 +15,6 @@ default:
     - api.coingecko.com
     - api.openai.com
     - rpc.onyx.testnets.gno.land
+    - rpc.gno.land
     - indexer.onyx.testnets.gno.land
     - indexer.gno.land

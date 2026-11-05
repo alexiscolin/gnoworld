@@ -12,8 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { logger } from "../log.ts";
-import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "../testing/wayOut.ts";
+import { logger } from "@gnoworld/service/log";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import { MAX_BYTES, startPrices } from "./prices.ts";
 
 // CoinGecko's /simple/price as it answered on 2026-10-30 (api.coingecko.com, keyless, read in this session) for
@@ -616,14 +616,16 @@ describe("the prices timer: when it runs", () => {
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("the egress proxy's list", () => {
-  // The block height (decision of 2026-10-31) adds the default RPC, the worlds job (7c) the indexers; universes.test.ts ties them to the data.
-  it("lets out CoinGecko's, OpenAI's, the default universe's RPC and the indexers, and no other host", () => {
+  // The block height (decision of 2026-10-31) adds the default universe's RPC, the door's names (D120) the mainnet's node, the
+  // worlds job (7c) the indexers; universes.test.ts ties them to their sources.
+  it("lets out CoinGecko's, OpenAI's, the default universe's RPC, the names' node and the indexers, and no other host", () => {
     const acl = read("../../../deploy/egress/acl.yaml");
     const hosts = [...acl.matchAll(/^\s+-\s+(\S+)\s*$/gm)].map((match) => match[1]);
     expect(hosts).toEqual([
       "api.coingecko.com",
       "api.openai.com",
       "rpc.onyx.testnets.gno.land",
+      "rpc.gno.land",
       "indexer.onyx.testnets.gno.land",
       "indexer.gno.land",
     ]);
@@ -668,8 +670,8 @@ describe("the stack", () => {
 describe("deploy/test.sh", () => {
   const script = read("../../../deploy/test.sh");
 
-  it("expects the way out's list to be exactly CoinGecko's API, OpenAI's and the default universe's RPC", () => {
-    expect(script).toMatch(/printf '%s\\n' api\.coingecko\.com api\.openai\.com "\$rpc_host"/);
+  it("expects the way out's list to be exactly CoinGecko's API, OpenAI's, the default universe's RPC and the names' node", () => {
+    expect(script).toMatch(/printf '%s\\n' api\.coingecko\.com api\.openai\.com "\$rpc_host" "\$names_host"/);
   });
 
   it("checks the server may write in the folder of markets.json, on its read-only root", () => {
@@ -678,7 +680,7 @@ describe("deploy/test.sh", () => {
 
   it("names its mutants by checks that exist: the renamed one cannot be orphaned (F695)", () => {
     expect(script).not.toContain("lets one host out");
-    for (const wanted of ["the way out lets five hosts out", "the server does not reach CoinGecko"]) {
+    for (const wanted of ["the way out lets six hosts out", "the server does not reach CoinGecko"]) {
       // Once in a mutant that must be killed by the check, once in the check itself.
       expect(script.split(wanted).length - 1, wanted).toBeGreaterThanOrEqual(2);
     }
@@ -700,15 +702,17 @@ describe("deploy/test.sh", () => {
 
 // The home's block height (decision of 2026-10-31, "je valide tes reco"; morning.md, point 17): the same timer reads the default
 // universe's height from its RPC through the server's one way out, and writes it with the prices, so no visitor's browser asks an
-// RPC. The envelope is the one app/tests/chain/chainEnvelopes.ts writes from gno's source (`statusEnvelope`).
+// RPC. The envelope is the one packages/chain/src/testing/envelopes.ts writes from gno's source (`statusEnvelope`).
 const RPC = "https://rpc.onyx.testnets.gno.land:443";
 // The default port is dropped from the address asked: the origin as a URL writes it.
 const STATUS_URL = "https://rpc.onyx.testnets.gno.land/status";
 const BLOCK_TIME = "2026-10-31T11:59:10.123456789Z";
-const status = (height: string | number, time: string = BLOCK_TIME) => ({
+// Its node names the default universe's chain (D118), unless a test names another or none (null).
+const status = (height: string | number, time: string = BLOCK_TIME, network: string | null = "onyx-1") => ({
   jsonrpc: "2.0",
   id: "",
   result: {
+    ...(network === null ? {} : { node_info: { network } }),
     sync_info: {
       latest_block_hash: "",
       latest_app_hash: "",
@@ -727,7 +731,7 @@ function withRpc(
     prices = json(ANSWER),
     height = json(status(786661)),
   }: { prices?: () => Promise<Response>; height?: () => Promise<Response> },
-  options: { everyMs?: number; folder?: string; rpc?: string } = {},
+  options: { everyMs?: number; folder?: string; rpc?: string; chainId?: string } = {},
 ) {
   const folder = options.folder ?? fresh();
   const file = join(folder, "markets.json");
@@ -735,7 +739,7 @@ function withRpc(
   const lines: string[] = [];
   const timer = startPrices({
     file,
-    rpc: options.rpc ?? RPC,
+    universe: { rpc: options.rpc ?? RPC, chainId: options.chainId ?? "onyx-1" },
     log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
     now: () => NOW,
     everyMs: options.everyMs ?? 60_000,
@@ -811,6 +815,7 @@ describe("the prices timer: the block height", () => {
   // A failed height keeps the prices and leaves the height out, logged by its kind.
   it.each([
     ["a 503", () => Promise.resolve(new Response("down", { status: 503 })), "status"],
+    ["a 429", () => Promise.resolve(new Response("slow down", { status: 429 })), "rate_limited"],
     ["a request that fails", () => Promise.reject(new Error("secret-detail-https://x.test")), "request"],
     ["a body that is no JSON", text("<html>"), "not_json"],
     ["a body of another shape", json({ result: {} }), "shape"],
@@ -827,6 +832,19 @@ describe("the prices timer: the block height", () => {
     expect(markets.block).toBeUndefined();
     expect(heightLogged(lines)).toEqual([kind]);
     expect(lines.join("")).not.toMatch(/secret-detail|x\.test|<html>|12ab/);
+  });
+
+  it("keeps the prices and leaves the height out when the node never answers, logged as a timeout (V2)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { file, lines } = withRpc({ height: () => new Promise<Response>(() => undefined) });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await wrote(file);
+      expect(Markets.parse(JSON.parse(written(file))).block).toBeUndefined();
+      expect(heightLogged(lines)).toEqual(["timeout"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("takes an answer of exactly the cap and refuses one byte more", async () => {
@@ -861,6 +879,41 @@ describe("the prices timer: the block height", () => {
     await failed(lines);
     expect(readFileSync(join(folder, "markets.json"), "utf8")).toBe(KEPT);
   });
+
+  it("hands the way out the chain package's request whole: a GET, no redirect, no cookie, its signal and the time limit", async () => {
+    const { calls, file } = withRpc({});
+    await wrote(file);
+    const call = calls.find(({ url }) => url === STATUS_URL);
+    expect(call?.init).toMatchObject({ method: "GET", redirect: "error", credentials: "omit" });
+    expect(call?.init.signal).toBeInstanceOf(AbortSignal);
+    expect(call?.ms).toBe(10_000);
+  });
+
+  // The default universe's chain (D118): its node's status must name it, or the height is no height of that universe.
+  it("writes the height of a node whose status names the default universe's chain", async () => {
+    const { calls, file } = withRpc({ height: json(status(786661, BLOCK_TIME, "onyx-1")) }, { chainId: "onyx-1" });
+    await wrote(file);
+    expect(Markets.parse(JSON.parse(written(file))).block).toEqual(BLOCK);
+    expect(calls.filter(({ url }) => url === STATUS_URL)).toHaveLength(1);
+  });
+
+  it.each([
+    ["another chain", json(status(786661, BLOCK_TIME, "test5"))],
+    ["a chain whose id only starts like it", json(status(786661, BLOCK_TIME, "onyx-10"))],
+    ["no network", json(status(786661, BLOCK_TIME, null))],
+  ])(
+    "keeps the prices and leaves out the height of a node whose status names %s, logged other_chain",
+    async (_, height) => {
+      const { calls, file, lines } = withRpc({ height }, { chainId: "onyx-1" });
+      await wrote(file);
+      const markets = Markets.parse(JSON.parse(written(file)));
+      expect(markets.tokens).toEqual(TOKENS);
+      expect(markets.block).toBeUndefined();
+      expect(heightLogged(lines)).toEqual(["other_chain"]);
+      expect(lines.join("")).not.toMatch(/test5|onyx-10/);
+      expect(calls.filter(({ url }) => url === STATUS_URL)).toHaveLength(1);
+    },
+  );
 
   it("goes out only to the RPC it was given and to CoinGecko: any other host is never asked", async () => {
     const { calls, file } = withRpc({}, { rpc: "https://rpc.other.example:8443/" });
@@ -898,7 +951,7 @@ describe("the prices timer: the block height", () => {
     expect(() =>
       startPrices({
         file: join(fresh(), "markets.json"),
-        rpc,
+        universe: { rpc, chainId: "onyx-1" },
         log: () => undefined,
         send: () => new Promise(() => undefined),
       }),

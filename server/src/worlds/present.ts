@@ -8,7 +8,7 @@ import { riseOf, usualOf } from "@gnoworld/core";
 import { PRESENCE_ANSWER_MAX, type Presence, type PresencePeople } from "@gnoworld/schemas/indexer";
 import { Hono } from "hono";
 import { NICK, type Said } from "../irc/lines.ts";
-import type { Log } from "../log.ts";
+import type { Log } from "@gnoworld/service/log";
 import { besideOf } from "../replaceFile.ts";
 import { hoursOf, hoursRoute } from "./hours.ts";
 import { makePresence, type Signal } from "./presence.ts";

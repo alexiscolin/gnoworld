@@ -206,12 +206,12 @@ if [ -n "$changed" ]; then
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
-		server/src/*) ts=true ;;
+		server/src/* | jarvis/src/* | packages/service/src/*) ts=true ;;
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
 		app/tests/*) ts=true ;; # the journeys, their helpers and recordings: the merge check and --full walk them
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
 		packages/ui/src/tokens.css) ts=true app=true tokens=true ;; # the tokens story lists every token (F1190)
-		app/src/* | app/data/* | app/lab/* | app/public/* | packages/core/src/* | packages/schemas/src/* | packages/ui/src/*) ts=true app=true ;;
+		app/src/* | app/data/* | app/lab/* | app/public/* | packages/core/src/* | packages/chain/src/* | packages/schemas/src/* | packages/ui/src/*) ts=true app=true ;;
 		gno/*) gno=true ;;
 		*)
 			all=true

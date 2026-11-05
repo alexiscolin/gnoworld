@@ -22,6 +22,32 @@ export { Expedition, Quests } from "./discovery.ts";
 export { OnAir, XPosts } from "./feeds.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
+export {
+  AnswerButton,
+  Digest,
+  DigestBlock,
+  DOOR_CAPS,
+  JARVIS_CAPS,
+  JARVIS_LINES,
+  JARVIS_PATHS,
+  JarvisAnswer,
+  JarvisAsk,
+  JarvisBudget,
+  JarvisBudgets,
+  JarvisChange,
+  JarvisChangeRequest,
+  JarvisDigest,
+  JarvisDigestRequest,
+  JARVIS_LANGUAGES,
+  JarvisMadeDigest,
+  JarvisQuestion,
+  JarvisSettings,
+  JarvisTranslate,
+  JarvisTranslateRequest,
+  JarvisTranslation,
+  ProposedAction,
+  TRANSLATION_CAPS,
+} from "./jarvis.ts";
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";

@@ -7,7 +7,7 @@ const draw = (chips: string, react?: () => boolean) =>
 
 describe("Reactions", () => {
   it("draws what chipsOf wrote: each emoji, its count of any length, and whether it is mine", () => {
-    const family = "👨‍👩‍👧";
+    const family = "👨\u200d👩\u200d👧";
     const html = draw(
       chipsOf([
         { emoji: "👍", count: 12, mine: true },
