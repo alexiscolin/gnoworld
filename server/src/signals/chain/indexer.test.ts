@@ -303,3 +303,25 @@ describe("the 24 h history", () => {
     ).rejects.toThrow();
   });
 });
+
+// Survivors of StrykerJS: each failure says what it is, and the subscription's texts keep their ids.
+describe("what the readers say and give", () => {
+  it("fails a catch-up with the reason: no answer, rows of no shape, blocks of no shape", async () => {
+    const errors = setup(() => new Response(JSON.stringify({ data: {}, errors: [{ message: "no" }] })));
+    await expect(errors.readers.catchUp(1)).rejects.toThrow("the indexer gave no answer");
+    const shapeless = setup(() => answer({ getTransactions: "rows" }));
+    await expect(shapeless.readers.catchUp(1)).rejects.toThrow("no rows of that shape");
+    const noBlocks = setup((query) =>
+      query.includes("getBlocks") ? answer({ getBlocks: "none" }) : rowsOf([withHash(101, "a")]),
+    );
+    await expect(noBlocks.readers.catchUp(101)).rejects.toThrow("no such shape");
+  });
+
+  it("gives a block as the subscription's `blocks` and a transaction as its `tx`", async () => {
+    const { readers } = setup((query) =>
+      query.includes("getBlocks") ? times([101], () => "2026-11-06T00:00:00.000Z") : rowsOf([withHash(101, "a")]),
+    );
+    const ids = (await readers.catchUp(101)).map((text) => (JSON.parse(text) as { id: string }).id);
+    expect(ids).toEqual(["blocks", "tx"]);
+  });
+});
