@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { adena, changeAccount } from "./adena.ts";
 import {
   callAndSign,
@@ -8,9 +7,11 @@ import {
   done,
   HASH,
   openRealm,
+  phoneOf,
   REALM,
   setNetwork,
   writeChain,
+  violations,
   type Wallet,
 } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -18,17 +19,6 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 // 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
 // recording, the hash followed to its block. Nothing shows as done before the chain's answer.
 const card = (page: Page) => calls(page).getByRole("article");
-// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
-// transitions running end first (a cancelled one too); the spinner's endless animation is no transition.
-async function violations(page: Page) {
-  await page.evaluate(async () => {
-    const settled = () => undefined;
-    const running = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
-    await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
-  });
-  return (await new AxeBuilder({ page }).analyze()).violations;
-}
-
 interface World {
   landing?: "now" | "never" | "later";
   wallet?: Wallet;
@@ -190,16 +180,7 @@ test.describe("a write function's call card", () => {
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    const session = await page.context().storageState();
-    const touch = await playwright.chromium.launch(launchOptions);
-    const phone = await (
-      await touch.newContext({
-        baseURL: new URL(page.url()).origin,
-        storageState: session,
-        hasTouch: true,
-        viewport: { width: 390, height: 844 },
-      })
-    ).newPage();
+    const { phone, browser: touch } = await phoneOf(page, { playwright, launchOptions });
     await adena(phone);
     await callWallet(phone);
     await writeChain(phone);

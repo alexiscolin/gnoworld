@@ -45,7 +45,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             </span>
           ) : null}
         </p>
-        <LoginControl />
+        <LoginControl universe={universe.id} />
       </div>
     </header>
   );

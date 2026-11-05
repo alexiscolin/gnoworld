@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import styles from "./CallCard.module.css";
 import { problemsOf } from "./problems.ts";
-import { sayFailure, sayProblem, shown } from "./say.ts";
+import { NOT_CHECKED, networkOf, publicForever, sayFailure, sayProblem, shown } from "./say.ts";
 import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
@@ -21,6 +21,8 @@ export interface CallCardProps {
   onSign: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  /** The title's level under the page's headings: 3 unless the page says. */
+  level?: 2 | 3 | 4 | undefined;
 }
 
 const COUNT = new Intl.NumberFormat("en-US");
@@ -129,7 +131,7 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
             onChange={(next) => {
               onEdit(index, next);
             }}
-            {...(field.freeText ? { help: `This text goes to ${card.realm} on gno.land, publicly and forever.` } : {})}
+            {...(field.freeText ? { help: publicForever(card.realm) } : {})}
             {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
           />
         );
@@ -181,11 +183,16 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
   );
 }
 
-export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry }: CallCardProps) {
+export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level }: CallCardProps) {
   const preview = card.state.kind === "preview";
   return (
     <Card>
-      <Card.Header kicker="SIGNATURE REQUEST · ADENA" title={card.func} size="large" />
+      <Card.Header
+        kicker="SIGNATURE REQUEST · ADENA"
+        title={card.func}
+        size="large"
+        {...(level === undefined ? {} : { level })}
+      />
       <Card.Body>
         <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
         <dl className={styles["block"]}>
@@ -194,12 +201,10 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
           <Row label="ARGUMENTS">
             <Arguments card={card} onEdit={onEdit} />
           </Row>
-          <Row label="NETWORK">{`${network.name} (${network.chainId})`}</Row>
+          <Row label="NETWORK">{networkOf(network)}</Row>
           <Row label="FEE">{fee}</Row>
         </dl>
-        {preview ? (
-          <p className={styles["note"]}>gnoworld does not check what this realm does. Read it on gnoweb first.</p>
-        ) : null}
+        {preview ? <p className={styles["note"]}>{NOT_CHECKED}</p> : null}
         <Status card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>

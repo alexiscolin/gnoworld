@@ -473,3 +473,49 @@ describe("signCall: the account watch (F5651)", () => {
     expect(calls).not.toHaveBeenCalled();
   });
 });
+
+// 9e: a write with no field (D254) and a card opened prefilled sign exactly what their fields hold.
+describe("signCall: the cards 9e opens", () => {
+  const open = (store: CallsStore, params: { Name: string; Type: string }[], func: string) => {
+    store.getState().callsActions.open({ id: func, chainId: "onyx-1", realm: NEW.realm, func, params });
+  };
+  const sent = (wallet: ReturnType<typeof setup>["wallet"]) =>
+    (wallet.asked.find((a) => a.call === "DoContract")?.arg as { messages: { value: Record<string, unknown> }[] })
+      .messages[0]?.value;
+
+  it("signs a write with no field with no argument, and is done only from the chain's answer", async () => {
+    const pending = Promise.withResolvers<ChainRead<typeof LANDED>>();
+    const read = vi.fn(() => pending.promise);
+    const { store, deps, wallet } = setup({ read });
+    open(store, [{ Name: "cur", Type: realmType() }], "Deposit");
+    const running = signCall("Deposit", deps);
+    await vi.waitFor(() => {
+      expect(read).toHaveBeenCalled();
+    });
+    expect(sent(wallet)).toMatchObject({ func: "Deposit", args: [] });
+    expect(store.getState().calls["Deposit"]?.state.kind).toBe("landing");
+    pending.resolve(found(LANDED));
+    await running;
+    expect(store.getState().calls["Deposit"]?.state.kind).toBe("done");
+  });
+
+  it("signs a card of three fields with the texts of its fields, in order, whether prefilled or typed", async () => {
+    const { store, deps, wallet } = setup();
+    open(
+      store,
+      [
+        { Name: "cur", Type: realmType() },
+        { Name: "a", Type: "string" },
+        { Name: "b", Type: "int64" },
+        { Name: "c", Type: "string" },
+      ],
+      "SetThree",
+    );
+    const { edit } = store.getState().callsActions;
+    edit("SetThree", 0, "one");
+    edit("SetThree", 1, "2");
+    edit("SetThree", 2, "three");
+    await signCall("SetThree", deps);
+    expect(sent(wallet)).toMatchObject({ func: "SetThree", args: ["one", "2", "three"] });
+  });
+});

@@ -1,10 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
-import { evalCall, isRealmPath } from "./evalCall.ts";
+import { evalCall, isRealmPath, userCall } from "./evalCall.ts";
 
-// 5g-reads, tier 1: the one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent (ANY_EXPRESSION_RUNS,
-// recorded on onyx-1), so the only defence is that this builder gives one `<realm>.<Name>()` or nothing.
+// 5g-reads, tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
+// (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
+// two calls on a proved address (D283), or nothing.
 
 // A port of gno's parseQueryEvalData (gno.land/pkg/sdk/vm/handler.go:289 at v1.5.0): the first dot AFTER the first slash cuts the
 // realm from the expression. A realm path with a dot past its first slash would change what is asked.
@@ -230,6 +231,57 @@ describe("evalCall, for any strings", () => {
         const call = evalCall(realm, name);
         expect(call).toBe(`${realm}.${name}()`);
         expect(parseQueryEvalData(call ?? "")).toEqual({ pkgPath: realm, expr: `${name}()` });
+      }),
+      { numRuns: 1000 },
+    );
+  });
+});
+
+// D283, by Alexis: the name reader's two expressions are built here too, from an address the schema proved and nothing else.
+describe("userCall, the two expressions on r/sys/users's record of an address", () => {
+  const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+
+  it.each([
+    ["IsDeleted", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").IsDeleted()`],
+    ["Name", `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").Name()`],
+  ] as const)("builds %s as one fixed expression, which gno's parser cuts at r/sys/users", (call, expression) => {
+    expect(userCall(ADDRESS, call)).toBe(expression);
+    expect(parseQueryEvalData(expression)).toEqual({
+      pkgPath: "gno.land/r/sys/users",
+      expr: `ResolveAddress("${ADDRESS}").${call}()`,
+    });
+  });
+
+  it.each([
+    'g1x"); os.Exit(1); ("',
+    `${ADDRESS}")`,
+    `${ADDRESS})`,
+    `${ADDRESS}"`,
+    `${ADDRESS}\n`,
+    `${ADDRESS}\n.Name()`,
+    `${ADDRESS}x`,
+    ` ${ADDRESS}`,
+    ADDRESS.toUpperCase(),
+    `${ADDRESS.slice(0, -1)}6`,
+    "",
+  ])("builds nothing for %j: no expression holds what the schema did not prove an address", (account) => {
+    expect(userCall(account, "Name")).toBeNull();
+    expect(userCall(account, "IsDeleted")).toBeNull();
+  });
+
+  it("builds the IsDeleted expression for a call a cast smuggled in, never the text it holds", () => {
+    expect(userCall(ADDRESS, "Name(); os.Exit(1)" as "Name")).toBe(
+      `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").IsDeleted()`,
+    );
+  });
+
+  it("gives, for any text around an address, nothing or one of the two whole expressions of that very address", () => {
+    const around = fc.tuple(fc.string(), fc.string()).map(([a, b]) => `${a}${ADDRESS}${b}`);
+    fc.assert(
+      fc.property(fc.oneof(fc.string(), around, fc.constant(ADDRESS)), (account) => {
+        const built = userCall(account, "Name");
+        expect(built === null || built === `gno.land/r/sys/users.ResolveAddress("${ADDRESS}").Name()`).toBe(true);
+        expect(built !== null).toBe(account === ADDRESS);
       }),
       { numRuns: 1000 },
     );

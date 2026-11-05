@@ -1,0 +1,17 @@
+/* The account's pill (9f): the face before the name, and the pill a button when it offers a name. */
+@layer components {
+  .row {
+    /* layout: the face before the name */
+    display: inline-flex;
+    /* layout: centred on the name's line */
+    align-items: center;
+    /* layout: the gap between the face and the name */
+    column-gap: var(--space-2xs);
+  }
+
+  .opener {
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+}
