@@ -7,7 +7,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 // Mac Studio (decision 4238523f), never here.
 const SIZES = [
   ["phone", 390, 844],
-  ["computer", 1280, 900],
+  ["computer", 1728, 1080],
 ] as const;
 
 async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Promise<void> {
@@ -51,4 +51,35 @@ test.describe("the arrival banners, as they look", () => {
       await expect(banner).toHaveScreenshot(`arrival-words-${size}.png`);
     });
   }
+});
+
+// The review's F5627: from 1400 px the banner floats over the scene and the page makes no room for it, but another flash
+// that stays (the update notice) still pushes the page down while a banner shows (F2165), and a narrower page makes room for
+// the banner as for any flash.
+test.describe("the banner beside another flash", () => {
+  test.use({ timezoneId: "UTC", locale: "en-GB" });
+  const room = (page: Page) => page.evaluate(() => getComputedStyle(document.body).paddingBlockStart);
+
+  test("makes no room for itself at 1728 px, and room for another flash that stays", async ({ page }) => {
+    await page.setViewportSize({ width: 1728, height: 1080 });
+    await arriveWith(page, ["chart"]);
+    const banner = page.locator("[data-look='arrival']");
+    await expect(banner).toContainText("First to chart · Bubble");
+    expect(await room(page)).toBe("0px");
+    await banner.evaluate((pill) => {
+      const other = pill.cloneNode(true);
+      if (!(other instanceof HTMLElement)) return;
+      other.removeAttribute("data-look");
+      document.body.append(other);
+      other.showPopover();
+    });
+    expect(await room(page)).not.toBe("0px");
+  });
+
+  test("makes room for itself under 1400 px, as any flash that stays", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await arriveWith(page, ["chart"]);
+    await expect(page.locator("[data-look='arrival']")).toContainText("First to chart · Bubble");
+    expect(await room(page)).not.toBe("0px");
+  });
 });

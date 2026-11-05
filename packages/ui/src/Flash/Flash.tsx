@@ -86,7 +86,7 @@ function Pill({ message, onClose, look }: FlashProps & { message: FlashMessage }
       <Cluster space="m">
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
-          {line === undefined ? null : <p className={styles["line"]}>{line}</p>}
+          {line === undefined ? null : <p className={look === "arrival" ? "label" : styles["line"]}>{line}</p>}
         </Stack>
         <Cluster space="2xs">
           {action === undefined ? null : (

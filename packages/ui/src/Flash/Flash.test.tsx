@@ -90,6 +90,8 @@ describe("Flash", () => {
     expect(document.querySelector("[popover]")?.hasAttribute("data-look")).toBe(false);
     rerender(<Flash message={saved} onClose={vi.fn()} look="arrival" />);
     expect(document.querySelector("[popover]")?.getAttribute("data-look")).toBe("arrival");
+    // Its line is the label's capitals (frames 91 and 96), the design system's one label style.
+    expect(screen.getByText(saved.line).classList.contains("label")).toBe(true);
   });
 
   it("is a status region on the page from the start, empty while it has nothing to say: no text, no button", () => {
