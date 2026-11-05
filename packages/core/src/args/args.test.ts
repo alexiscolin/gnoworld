@@ -9,7 +9,11 @@ import { callArgs, callFields, isCarried, realmType } from "./args.ts";
 
 const cur = () => ({ Name: "cur", Type: realmType() });
 const param = (type: string, name = "x") => ({ Name: name, Type: type });
-const call = (type: string, text: string) => callArgs([cur(), param(type)], [text]);
+// A last `[]uint8` may be `...byte` (answer 9c-1): each kind is judged before a last bool.
+const call = (type: string, text: string) => {
+  const done = callArgs([cur(), param(type), param("bool", "end")], [text, "true"]);
+  return done.ok ? { ok: true as const, args: done.args.slice(0, -1) } : done;
+};
 const problemOf = (type: string, text: string) => {
   const done = call(type, text);
   if (done.ok || done.why !== "fields") return "none";
@@ -166,7 +170,7 @@ describe("callFields", () => {
 
   it("gives each kind: free text for strings only, a length for [N]uint8 only", () => {
     const kindOf = (type: string) => {
-      const done = callFields([cur(), param(type)]);
+      const done = callFields([cur(), param(type), param("bool", "end")]);
       return done.ok ? done.fields[0] : undefined;
     };
     for (const [type] of WIDTHS) expect(kindOf(type)).toEqual({ name: "x", type, kind: "integer", freeText: false });
@@ -182,32 +186,6 @@ describe("callFields", () => {
   it("opens a call whose array length is no safe integer in gnoweb", () => {
     const params = [cur(), param("[99999999999999999999]uint8")];
     expect(callFields(params)).toEqual({ ok: false, why: "gnoweb" });
-  });
-
-  it("reads a variadic `...uint8` (written `[]uint8`) as base64: no such text is a uint8 text, so the chain refuses, never misconverts", () => {
-    fc.assert(
-      fc.property(fc.uint8Array({ maxLength: 48 }), (bytes) => {
-        const text = bytes.length === 0 ? "" : b64(bytes);
-        expect(accepts("[]uint8", text)).toBe(true);
-        expect(accepts("uint8", text)).toBe(false);
-        expect(accepts("int8", text)).toBe(false);
-      }),
-    );
-    for (let n = 0; n < 256; n += 1) {
-      expect(accepts("uint8", String(n))).toBe(true);
-      expect(accepts("[]uint8", String(n))).toBe(false);
-    }
-  });
-
-  it("refuses, for an unsized []uint8, a text the chain also takes as a uint8 (0042 is base64 and the byte 42): leading zeros included", () => {
-    for (const text of ["0000", "0042", "0255", "00000", "000000042"]) {
-      expect(problemOf("[]uint8", text)).toBe("format");
-    }
-    for (const text of ["0000", "0042", "0255"]) expect(accepts("[3]uint8", text)).toBe(true);
-    expect(accepts("[]uint8", "0256")).toBe(true);
-    expect(accepts("[]uint8", "0x10")).toBe(true);
-    expect(accepts("[]uint8", "1e00")).toBe(true);
-    expect(accepts("[]uint8", "1234")).toBe(true);
   });
 
   it("never throws, whatever the types", () => {

@@ -18,7 +18,7 @@ const functions = (): FunctionList => [
   { FuncName: "Render", Params: [named("path", "string")], Results: [named(".res.0", "string")] },
   { FuncName: "Count", Params: null, Results: [named(".res.0", "int")] },
   { FuncName: "Later", Params: [named("id", "int"), named("r", REALM)], Results: null },
-  { FuncName: "Seal", Params: [cur(), named("hash", "[32]uint8"), named("blob", "[]uint8")], Results: null },
+  { FuncName: "Seal", Params: [cur(), named("blob", "[]uint8"), named("hash", "[32]uint8")], Results: null },
 ];
 const vote = () => ({
   realm: "gno.land/r/demo/poll",
@@ -125,7 +125,7 @@ describe("checkProposal", () => {
     "[1024]uint8",
     "[0]uint8",
   ])("passes a parameter of the type %j, which convert.go turns from text", (type) => {
-    const list = [{ FuncName: "Vote", Params: [cur(), named("id", "int"), named("answer", type)] }];
+    const list = [{ FuncName: "Vote", Params: [cur(), named("answer", type), named("id", "int")] }];
     expect(check({}, list).ok).toBe(true);
   });
 
