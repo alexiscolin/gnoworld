@@ -2,14 +2,20 @@
 // done before the chain has answered (ADR-0002 section 4). It joins the page's store when a realm view draws its first card, and is
 // kept out of store/, whose files vite.config.ts puts in the first screen's chunk: the first screen's budget has no room for it.
 import type { StoreApi } from "zustand/vanilla";
-import type { CallCard, CardState } from "../../lib/calls.ts";
+import type { CallCard, CallsSlice, CardState } from "../../lib/calls.ts";
 import type { AppState } from "../../store/index.ts";
 import { without } from "../../store/record.ts";
 
-/** Adds the slice to the page's store, once: a store that has it is left as it is. */
-export function ensureCalls(store: StoreApi<AppState>): void {
-  if (Object.hasOwn(store.getState(), "callsActions")) return;
-  const { setState: set, getState: get } = store;
+/** A store that has the calls' slice. */
+export type CallsStore = StoreApi<AppState & CallsSlice>;
+
+/** The state with the calls' slice, or nothing before a card was drawn: the one way to read it (F5726). */
+export function callsIn(state: AppState): (AppState & CallsSlice) | undefined {
+  return Object.hasOwn(state, "callsActions") ? (state as AppState & CallsSlice) : undefined;
+}
+
+// Puts the slice in the store; `store` is its type only until this has run.
+function addCalls({ setState: set, getState: get }: CallsStore): void {
   // A card changed when it is in one of the states `from`, and `change` gives a change.
   const go = (
     id: string,
@@ -67,4 +73,12 @@ export function ensureCalls(store: StoreApi<AppState>): void {
       },
     },
   });
+}
+
+/** Adds the slice to the page's store, once (a store that has it is left as it is), and gives the store as one that has it. */
+export function ensureCalls(store: StoreApi<AppState>): CallsStore {
+  // The slice is added right here, so this is the one place that holds the store as having it.
+  const calls = store as CallsStore;
+  if (callsIn(store.getState()) === undefined) addCalls(calls);
+  return calls;
 }

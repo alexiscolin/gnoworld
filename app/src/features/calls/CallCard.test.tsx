@@ -333,8 +333,7 @@ const NOTHING = {
 
 // What the card drew for these texts, and what DoContract was sent for the same card.
 async function drawnAndSent(texts: string[]) {
-  const store = createAppStore();
-  ensureCalls(store);
+  const store = ensureCalls(createAppStore());
   store.getState().loginActions.signedIn(CALLER);
   const { open, edit } = store.getState().callsActions;
   open({ id: "a", chainId: ONYX.chainId, realm: REALM, func: "SetBio", params: PARAMS });

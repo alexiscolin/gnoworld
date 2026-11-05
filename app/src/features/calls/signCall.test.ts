@@ -6,7 +6,7 @@ import { callContract } from "../../lib/adena/call.ts";
 import { createAppStore } from "../../store/index.ts";
 import { recordedAdena, SIGNED_HASH } from "../../../tests/recordedAdena.ts";
 import { signCall, type SignDeps } from "./signCall.ts";
-import { ensureCalls } from "./slice.ts";
+import { ensureCalls, type CallsStore } from "./slice.ts";
 
 // 9d: the card's course, through the real callContract and a stand-in for Adena built from the recording
 // (app/tests/recordedAdena.ts): preview, "Sign in Adena", landing in a block, the result. Done only from the chain's answer.
@@ -34,8 +34,7 @@ interface Setup {
   call?: SignDeps["call"];
 }
 function setup({ text = "hello", session = "in", adena, read, call }: Setup = {}) {
-  const store = createAppStore();
-  ensureCalls(store);
+  const store = ensureCalls(createAppStore());
   if (session === "in") store.getState().loginActions.signedIn(CALLER);
   else store.getState().loginActions.signedOut();
   store.getState().callsActions.open(NEW);
@@ -59,7 +58,7 @@ function setup({ text = "hello", session = "in", adena, read, call }: Setup = {}
   };
   return { store, deps, wallet, log, waits };
 }
-const stateOf = (store: ReturnType<typeof createAppStore>) => store.getState().calls["SetBio"]?.state;
+const stateOf = (store: CallsStore) => store.getState().calls["SetBio"]?.state;
 
 describe("signCall: the card's course", () => {
   it("signs through Adena as the logged-in account on the universe's chain, follows the hash to its block, and is done with the chain's height and value", async () => {
@@ -77,6 +76,11 @@ describe("signCall: the card's course", () => {
       func: "SetBio",
       args: ["hello"],
     });
+  });
+
+  it("rises, as a bug and not a state, when it is asked in a store that has no calls' slice (F5726)", async () => {
+    const { deps } = setup();
+    await expect(signCall("SetBio", { ...deps, store: createAppStore() })).rejects.toThrow(/no calls' slice/);
   });
 
   it("is landing, not done, while the chain has not answered: Adena's word alone never ends it", async () => {

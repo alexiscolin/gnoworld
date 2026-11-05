@@ -1,7 +1,6 @@
 // The one store (docs/ARCHITECTURE.md, "State"): a slice per feature, here so the store imports no feature.
 // React reads it through zustand's useStore in the features; the scene through subscribe.
-import { createStore, type StoreApi } from "zustand/vanilla";
-import type { CallsSlice } from "../lib/calls.ts";
+import { createStore } from "zustand/vanilla";
 import { chatSlice, type ChatSlice } from "./chat.ts";
 import { dmSlice, type DmSlice } from "./dms.ts";
 import { keepSlice, type KeepSlice } from "./keep.ts";
@@ -11,13 +10,23 @@ import { pinsSlice, type PinsSlice } from "./pins.ts";
 import { signalsSlice, type SignalsSlice } from "./signals.ts";
 import { verdictsSlice, type VerdictsSlice } from "./verdicts.ts";
 
-type BaseState = LoginSlice & ChatSlice & DmSlice & NoticeSlice & VerdictsSlice & KeepSlice & PinsSlice & SignalsSlice;
-// The calls' slice (lib/calls.ts) is added when a realm view draws its first card: its part of the state is absent until then.
-export type AppState = BaseState & CallsSlice;
+export type AppState = LoginSlice &
+  ChatSlice &
+  DmSlice &
+  NoticeSlice &
+  VerdictsSlice &
+  KeepSlice &
+  PinsSlice &
+  SignalsSlice & {
+    /** The page's Adena, set by a call card's first gesture so the login follows its account (F5651). Absent until then. */
+    wallet?: unknown;
+  };
+// The calls' slice (lib/calls.ts) is added when a realm view draws its first card, so it is not in this type: features/calls/slice.ts
+// reads it through `callsIn`, which says when it is absent.
 
 /** A store of its own: the page makes one, each test another. */
 export const createAppStore = () => {
-  const made = createStore<BaseState>()((...args) => ({
+  const store = createStore<AppState>()((...args) => ({
     ...loginSlice(...args),
     ...chatSlice(...args),
     ...dmSlice(...args),
@@ -27,8 +36,6 @@ export const createAppStore = () => {
     ...pinsSlice(...args),
     ...signalsSlice(...args),
   }));
-  // The calls' part is typed present and added by `ensureCalls`; no reader asks for it before.
-  const store = made as StoreApi<AppState>;
   // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines or pins,
   // whether or not the chat is open to begin the new one (the link then reads its account's device). The first session,
   // from none, has none to leave. This is the one place that ends a session's state (F2091).

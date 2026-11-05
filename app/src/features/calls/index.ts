@@ -2,4 +2,4 @@
 export { CallCard } from "./CallCard.tsx";
 export { feeText } from "./fee.ts";
 export { signInPage } from "./signPage.ts";
-export { ensureCalls } from "./slice.ts";
+export { callsIn, ensureCalls } from "./slice.ts";

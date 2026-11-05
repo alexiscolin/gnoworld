@@ -6,6 +6,7 @@ import type { ChainRead, FailureKind } from "@gnoworld/chain/read";
 import type { callContract, Universe } from "../../lib/adena/call.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { callRequest } from "./request.ts";
+import { callsIn } from "./slice.ts";
 
 export interface SignDeps {
   store: ReturnType<typeof createAppStore>;
@@ -21,6 +22,13 @@ export interface SignDeps {
   now?: () => number;
 }
 
+// The calls' actions of the store the card is in; a card there means the slice is, so its absence is a bug and rises.
+function actionsOf({ store }: SignDeps) {
+  const calls = callsIn(store.getState());
+  if (calls === undefined) throw new Error("A call card was signed in a store with no calls' slice");
+  return calls.callsActions;
+}
+
 /** The pause between two reads: a block takes about three seconds. */
 const EVERY_MS = 3000;
 /** The reads and the time after which a call not seen in a block is said unseen: about two minutes. */
@@ -31,7 +39,7 @@ const AGAIN: readonly FailureKind[] = ["not-landed", "down", "timeout", "chain-r
 
 // Reads the hash until it is in a block, or the bound; the card's state is the chain's answer.
 async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
-  const { done, failed } = deps.store.getState().callsActions;
+  const { done, failed } = actionsOf(deps);
   const { read, wait, now = Date.now } = deps;
   const started = now();
   for (let tries = 1; tries <= READS; tries += 1) {
@@ -56,7 +64,7 @@ async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
 // Adena's answer to the card's call: a hash is followed to its block, a failure without one is the card's state. A call that may
 // have been sent, with a hash, is followed as a sent one: the chain says what became of it (F5728).
 async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>, deps: SignDeps): Promise<void> {
-  const { landing, failed } = deps.store.getState().callsActions;
+  const { landing, failed } = actionsOf(deps);
   const hash = signed.ok || signed.reason === "maybe-sent" ? signed.hash : undefined;
   if (hash !== undefined) {
     landing(id, hash);
@@ -69,8 +77,8 @@ async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>,
 /** Signs the card's call as the logged-in account and follows it to its block; a card that is not in preview does nothing. */
 export async function signCall(id: string, deps: SignDeps): Promise<void> {
   const { store, adena, universe, call, watch } = deps;
-  const { signing, failed } = store.getState().callsActions;
-  const card = store.getState().calls[id];
+  const { signing, failed } = actionsOf(deps);
+  const card = callsIn(store.getState())?.calls[id];
   if (card?.state.kind !== "preview" || card.chainId !== universe.chainId) return;
   const { session } = store.getState().login;
   if (session.kind !== "in") {

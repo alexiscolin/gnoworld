@@ -7,7 +7,7 @@ import { readCallFees, type CallFees } from "@gnoworld/chain/fees";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import { Stack } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
-import { CallCard, ensureCalls, feeText, signInPage } from "../calls/index.ts";
+import { CallCard, callsIn, ensureCalls, feeText, signInPage } from "../calls/index.ts";
 import { readCallable } from "../../lib/chain/rpc.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
@@ -64,7 +64,7 @@ function Card({
   options?: ReadOptions | undefined;
 }) {
   const store = useAppStore();
-  const card = useApp((state) => state.calls[id]);
+  const card = useApp((state) => callsIn(state)?.calls[id]);
   const [fees, setFees] = useState<CallFees | undefined>(undefined);
   const { realm, func } = card ?? { realm: "", func: "" };
   useEffect(() => {
@@ -74,8 +74,8 @@ function Card({
       })
       .catch(report);
   }, [chain.indexer, realm, func, options]);
-  if (card === undefined) return null;
-  const { callsActions } = store.getState();
+  const callsActions = callsIn(store.getState())?.callsActions;
+  if (card === undefined || callsActions === undefined) return null;
   const { name, chainId, rpc } = chain;
   return (
     <CallCard
@@ -100,15 +100,21 @@ function Card({
 
 // One function: its Call button, and its card under it once opened.
 function WriteRow({ write, realm, chain, options }: RealmWritesProps & { write: Write }) {
-  const { open } = useAppStore().getState().callsActions;
+  const store = useAppStore();
   const id = `${chain.chainId} ${realm}.${write.name}`;
-  const opened = useApp((state) => state.calls[id] !== undefined);
+  const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
   return (
     <FunctionRow
       name={write.name}
       verb="Call"
       onClick={() => {
-        open({ id, chainId: chain.chainId, realm, func: write.name, params: write.params });
+        callsIn(store.getState())?.callsActions.open({
+          id,
+          chainId: chain.chainId,
+          realm,
+          func: write.name,
+          params: write.params,
+        });
       }}
     >
       {opened ? <Card id={id} chain={chain} options={options} /> : null}

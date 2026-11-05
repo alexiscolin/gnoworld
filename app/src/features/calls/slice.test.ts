@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
-import { ensureCalls } from "./slice.ts";
+import { callsIn, ensureCalls, type CallsStore } from "./slice.ts";
 
 // 9d: the call cards' slice. A card is one call being prepared, signed and followed to its block; its state moves
 // only along the course, so nothing shows as done before the chain's answer (ADR-0002 section 4).
@@ -9,11 +9,7 @@ const PARAMS = [
   { Name: "cur", Type: "gno.land/p/nt/ufmt/v0.realm" },
   { Name: "bio", Type: "string" },
 ];
-const made = () => {
-  const store = createAppStore();
-  ensureCalls(store);
-  return store;
-};
+const made = () => ensureCalls(createAppStore());
 const NEW = { id: "SetBio", chainId: "onyx-1", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
 
 function opened() {
@@ -21,8 +17,8 @@ function opened() {
   store.getState().callsActions.open(NEW);
   return store;
 }
-const card = (store: ReturnType<typeof createAppStore>, id = "SetBio") => store.getState().calls[id];
-const state = (store: ReturnType<typeof createAppStore>, id = "SetBio") => card(store, id)?.state.kind;
+const card = (store: CallsStore, id = "SetBio") => store.getState().calls[id];
+const state = (store: CallsStore, id = "SetBio") => card(store, id)?.state.kind;
 
 describe("ensureCalls: the slice joins the page's store when a card is first drawn", () => {
   it("is not in the store before: the first screen's store carries no card", () => {
@@ -35,6 +31,15 @@ describe("ensureCalls: the slice joins the page's store when a card is first dra
     const store = opened();
     ensureCalls(store);
     expect(store.getState().calls["SetBio"]?.state.kind).toBe("preview");
+  });
+});
+
+describe("callsIn: the one way to read the slice, which is absent until a card is drawn (F5726)", () => {
+  it("gives nothing for a store that has not got the slice, and the slice once it has", () => {
+    const store = createAppStore();
+    expect(callsIn(store.getState())).toBeUndefined();
+    ensureCalls(store);
+    expect(callsIn(store.getState())?.calls).toEqual({});
   });
 });
 

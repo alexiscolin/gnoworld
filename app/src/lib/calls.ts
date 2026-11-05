@@ -38,8 +38,6 @@ interface NewCard {
 
 export interface CallsSlice {
   calls: Readonly<Record<string, CallCard>>;
-  /** The page's Adena, set by a card's first gesture: the login follows its account (F5651). Absent until then. */
-  wallet: unknown;
   callsActions: {
     open: (card: NewCard) => void;
     edit: (id: string, index: number, text: string) => void;
