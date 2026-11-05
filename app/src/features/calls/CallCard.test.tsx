@@ -18,6 +18,7 @@ const PARAMS = [
 ];
 const preview: Card = {
   id: "SetBio",
+  chainId: "onyx-1",
   realm: REALM,
   func: "SetBio",
   params: PARAMS,

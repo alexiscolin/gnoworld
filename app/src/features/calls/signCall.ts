@@ -53,7 +53,7 @@ export async function signCall(id: string, deps: SignDeps): Promise<void> {
   const { store, adena, universe, call, watch } = deps;
   const { signing, landing, failed } = store.getState().callsActions;
   const card = store.getState().calls[id];
-  if (card?.state.kind !== "preview") return;
+  if (card?.state.kind !== "preview" || card.chainId !== universe.chainId) return;
   const { session } = store.getState().login;
   if (session.kind !== "in") {
     failed(id, { reason: "logged-out" });

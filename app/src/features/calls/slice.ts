@@ -26,10 +26,12 @@ export function ensureCalls(store: StoreApi<AppState>): void {
   set({
     calls: {},
     callsActions: {
-      open: ({ id, realm, func, params }) => {
+      open: ({ id, chainId, realm, func, params }) => {
         const texts = params.slice(1).map(() => "");
         if (get().calls[id] === undefined)
-          set({ calls: { ...get().calls, [id]: { id, realm, func, params, texts, state: { kind: "preview" } } } });
+          set({
+            calls: { ...get().calls, [id]: { id, chainId, realm, func, params, texts, state: { kind: "preview" } } },
+          });
       },
       edit: (id, index, text) => {
         go(id, ["preview"], ({ texts }) =>

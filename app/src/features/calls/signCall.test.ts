@@ -16,7 +16,7 @@ const PARAMS = [
   { Name: "cur", Type: realmType() },
   { Name: "bio", Type: "string" },
 ];
-const NEW = { id: "SetBio", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
+const NEW = { id: "SetBio", chainId: "onyx-1", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
 const source = { url: ONYX.rpc, at: "2026-11-05T05:00:00.000Z" };
 const LANDED = { height: 55414, failed: false, data: "(42 int)", log: "ok" };
 const found = (value: typeof LANDED): ChainRead<typeof LANDED> => ({ ok: true, value, source });
@@ -266,6 +266,16 @@ describe("signCall: what stops it before Adena signs", () => {
     await signCall("SetBio", deps);
     expect(stateOf(store)).toEqual({ kind: "failed", reason: "wrong-account" });
     expect(wallet.asked.map((a) => a.call)).not.toContain("DoContract");
+  });
+
+  it("does not sign a card opened for another chain than the universe's: it stays in preview and Adena is asked nothing (F5722)", async () => {
+    const { store, deps, wallet } = setup();
+    store.getState().callsActions.close("SetBio");
+    store.getState().callsActions.open({ ...NEW, chainId: "gnoland-1" });
+    store.getState().callsActions.edit("SetBio", 0, "hello");
+    await signCall("SetBio", deps);
+    expect(stateOf(store)).toEqual({ kind: "preview" });
+    expect(wallet.asked).toEqual([]);
   });
 
   it("is failed 'missing' with no wallet in the page, and nothing is thrown", async () => {

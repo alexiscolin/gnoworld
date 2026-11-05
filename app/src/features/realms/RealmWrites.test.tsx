@@ -187,4 +187,26 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(listed(box)).toEqual([]);
     expect(all(box, '[role="status"]').some((e) => e.textContent.trim() !== "")).toBe(true);
   });
+
+  it("keeps a card on its own chain: the Onyx card does not appear under the same realm's row on gno.land, which has its own function (F5722)", async () => {
+    const GNOLAND = { ...CHAIN, name: "gno.land", chainId: "gnoland-1", rpc: "https://rpc.gno.land:443" };
+    const longer = [{ ...FUNCTIONS[0], Params: [CUR, field("bio", "string"), field("times", "int64")] }];
+    const box = mount(
+      <StoreProvider>
+        <RealmWrites realm={REALM} chain={CHAIN} options={{ fetch: chain(FUNCTIONS) }} />
+        <RealmWrites realm={REALM} chain={GNOLAND} options={{ fetch: chain(longer) }} />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(box.querySelector("[aria-busy]")).toBeNull();
+    });
+    const [onyx = box, gno = box] = all(box, '[aria-label="Write functions"]');
+    click(button(onyx, "Call SetBio"));
+    expect(all(onyx, "article")).toHaveLength(1);
+    expect(all(gno, "article")).toHaveLength(0);
+    click(button(gno, "Call SetBio"));
+    expect(all(gno, "article")).toHaveLength(1);
+    expect(all(gno, "article input")).toHaveLength(2);
+    expect(all(onyx, "article input")).toHaveLength(1);
+  });
 });

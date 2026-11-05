@@ -101,14 +101,14 @@ function Card({
 // One function: its Call button, and its card under it once opened.
 function WriteRow({ write, realm, chain, options }: RealmWritesProps & { write: Write }) {
   const { open } = useAppStore().getState().callsActions;
-  const id = `${realm}.${write.name}`;
+  const id = `${chain.chainId} ${realm}.${write.name}`;
   const opened = useApp((state) => state.calls[id] !== undefined);
   return (
     <FunctionRow
       name={write.name}
       verb="Call"
       onClick={() => {
-        open({ id, realm, func: write.name, params: write.params });
+        open({ id, chainId: chain.chainId, realm, func: write.name, params: write.params });
       }}
     >
       {opened ? <Card id={id} chain={chain} options={options} /> : null}

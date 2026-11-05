@@ -14,7 +14,7 @@ const made = () => {
   ensureCalls(store);
   return store;
 };
-const NEW = { id: "SetBio", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
+const NEW = { id: "SetBio", chainId: "onyx-1", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
 
 function opened() {
   const store = made();

@@ -16,8 +16,10 @@ export type CardState =
   | { kind: "failed"; reason: CardFailure; log?: string | undefined; hash?: string | undefined };
 
 export interface CallCard {
-  /** One card a row: the function's name. */
+  /** One card a row of a chain: the chain and the function's name. */
   id: string;
+  /** The chain the card was opened for: a card signs only on it. */
+  chainId: string;
   realm: string;
   func: string;
   params: readonly Param[];
@@ -28,6 +30,7 @@ export interface CallCard {
 
 interface NewCard {
   id: string;
+  chainId: string;
   realm: string;
   func: string;
   params: readonly Param[];
