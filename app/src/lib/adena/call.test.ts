@@ -38,11 +38,18 @@ const CODES: Record<string, number> = {
 const no = (type: string, message = "") =>
   Promise.resolve({ code: CODES[type] ?? 4001, status: "failure", type, message, data: {} });
 
-// A BroadcastTxCommitResult as tm2-js-client types it (provider/types/common.d.mts:168), what DoContract answers.
-const base = { Error: null, Data: null, Events: null, Log: "", Info: "", GasWanted: "10000000", GasUsed: "42000" };
+// A BroadcastTxCommitResult as tm2-js-client 3.3.0 types it (provider/types/common.d.mts:146-150, 168-173) and the
+// Adena SDK 0.1.1 too (bin/index.d.ts:207-220): Error, Data, Events, Log and Info nest under ResponseBase, beside
+// GasWanted and GasUsed. `part` builds one such DeliverTx; `base` is its ResponseBase.
+const base = { Error: null, Data: null, Events: null, Log: "", Info: "" };
+const part = (response: Record<string, unknown> = {}) => ({
+  ResponseBase: { ...base, ...response },
+  GasWanted: "10000000",
+  GasUsed: "42000",
+});
 const SENT = {
-  check_tx: { ...base },
-  deliver_tx: { ...base, Log: "counter is 1" },
+  check_tx: part(),
+  deliver_tx: part({ Log: "counter is 1" }),
   hash: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=", // 32 bytes, as a transaction hash is
   height: "1234",
 };
@@ -329,7 +336,7 @@ describe("callContract: every failure is a state with its next step", () => {
   it("is a failure, with its log, when the chain ran the transaction and the realm failed it", async () => {
     const data = {
       ...SENT,
-      deliver_tx: { ...base, Error: { "@type": "/vm.m_call_error" }, Log: "panic: not allowed" },
+      deliver_tx: part({ Error: { "@type": "/vm.m_call_error" }, Log: "panic: not allowed" }),
     };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({
@@ -342,7 +349,7 @@ describe("callContract: every failure is a state with its next step", () => {
   it("is a failure, with its log, when the node refused the transaction at check", async () => {
     const data = {
       ...SENT,
-      check_tx: { ...base, Error: { "@type": "/std.InsufficientFundsError" }, Log: "insufficient" },
+      check_tx: part({ Error: { "@type": "/std.InsufficientFundsError" }, Log: "insufficient" }),
     };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: "insufficient" });
@@ -439,13 +446,13 @@ describe("callContract: every failure is a state with its next step", () => {
     expect(await callContract(failed(at), REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: at });
     expect(await callContract(failed(past), REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: at });
     const sentLog = (Log: string) =>
-      new Fake({ DoContract: () => ok("TRANSACTION_SENT", { ...SENT, deliver_tx: { ...base, Log } }) });
+      new Fake({ DoContract: () => ok("TRANSACTION_SENT", { ...SENT, deliver_tx: part({ Log }) }) });
     expect(await callContract(sentLog(at), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
     expect(await callContract(sentLog(past), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
   });
 
   it("returns the log and not the chain's returned value: the card reads the result from the hash (D205)", async () => {
-    const data = { ...SENT, deliver_tx: { ...base, Data: "aGVsbG8=", Log: "counter is 1" } };
+    const data = { ...SENT, deliver_tx: part({ Data: "aGVsbG8=", Log: "counter is 1" }) };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({
       ok: true,
@@ -488,8 +495,9 @@ describe("callContract: Adena's answers that fail their schema become an error s
     ["a height with a leading zero", sentWith({ height: "012" })],
     ["a height that is a number", sentWith({ height: 12 })],
     ["no deliver_tx", sentWith({ deliver_tx: undefined })],
-    ["a deliver_tx with no log", sentWith({ deliver_tx: { ...base, Log: undefined } })],
+    ["a deliver_tx with no log", sentWith({ deliver_tx: part({ Log: undefined }) })],
     ["no check_tx", sentWith({ check_tx: undefined })],
+    ["a deliver_tx with its fields flat, not under ResponseBase", sentWith({ deliver_tx: { ...base, Log: "x" } })],
   ])("%s", async (_, doContract) => {
     expect(await callContract(new Fake({ DoContract: doContract }), REQUEST, ONYX)).toEqual({
       ok: false,

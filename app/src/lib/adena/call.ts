@@ -25,7 +25,8 @@ const Network = z.object({ chainId: z.string().check(z.minLength(1)) });
 // A transaction's hash is 32 bytes in base64; a block's height a whole number from 1.
 const Hash = z.string().check(z.regex(/^[A-Za-z0-9+/]{43}=$/));
 const Height = z.string().check(z.regex(/^[1-9][0-9]{0,15}$/));
-const Part = z.object({ Error: z.unknown(), Log: z.string() });
+// Error and Log sit under ResponseBase (tm2-js-client 3.3.0 common.d.mts:146-150; the Adena SDK 0.1.1 bin/index.d.ts:207-220).
+const Part = z.object({ ResponseBase: z.object({ Error: z.unknown(), Log: z.string() }) });
 const Sent = z.object({ check_tx: Part, deliver_tx: Part, hash: Hash, height: Height });
 
 type Need = (name: string, ...args: unknown[]) => Promise<Answered>;
@@ -138,9 +139,11 @@ async function send(
   if (!done.ok) return done;
   const { check_tx, deliver_tx, hash, height } = done.value;
   // The node refused it at check, or the realm failed it: no hash is a success then.
-  const failed = [check_tx, deliver_tx].find((part) => part.Error !== null && part.Error !== undefined);
-  if (failed !== undefined) return refusal("failed", "", failed.Log);
-  return { ok: true, hash, height, log: capped(deliver_tx.Log) };
+  const failed = [check_tx, deliver_tx].find(
+    ({ ResponseBase }) => ResponseBase.Error !== null && ResponseBase.Error !== undefined,
+  );
+  if (failed !== undefined) return refusal("failed", "", failed.ResponseBase.Log);
+  return { ok: true, hash, height, log: capped(deliver_tx.ResponseBase.Log) };
 }
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
