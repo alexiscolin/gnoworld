@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Account, ask, Network, read, SITE, SUCCESSES } from "./answers.ts";
+import { Account, ask, Network, read, SUCCESSES } from "./answers.ts";
 
 // Adena's answers as the SDK's table writes them (@adena-wallet/sdk 0.1.1, bin/index.js:785-990).
 const answer = (status: string, type: string, rest: { code?: number; data?: unknown } = {}) => ({
@@ -105,10 +105,6 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
 });
 
 describe("the account and the network as both callers read them", () => {
-  it("names the site gnoworld", () => {
-    expect(SITE).toBe("gnoworld");
-  });
-
   it.each(["", " ", "\t"])("takes no chain id of %j, in an account or a network", (chainId) => {
     expect(Network.safeParse({ chainId }).success).toBe(false);
     expect(Account.safeParse({ address: "g1x", chainId }).success).toBe(false);
