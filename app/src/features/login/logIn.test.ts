@@ -249,7 +249,7 @@ describe("endForAccount", () => {
     store.getState().loginActions.chat("connected");
     await endForAccount(parts, OTHER);
     expect(asked.filter((line) => line === "logout")).toHaveLength(1);
-    expect(store.getState().login).toMatchObject({ session: { kind: "out" }, chat: "off" });
+    expect(store.getState().login).toEqual({ session: { kind: "out" }, step: "idle", problem: undefined, chat: "off" });
   });
 
   it("says why when the server cannot be told: the person is out here, and sees that the cookie still lives", async () => {
@@ -327,7 +327,7 @@ describe("watchAccount", () => {
     await logIn("x", parts);
     wallet.emit("changedAccount", "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
     await logoutAsked;
-    expect(store.getState().login.session).toEqual({ kind: "out" });
+    expect(store.getState().login).toEqual({ session: { kind: "out" }, step: "idle", problem: undefined, chat: "off" });
   });
 
   it("does nothing when Adena says the same account", async () => {

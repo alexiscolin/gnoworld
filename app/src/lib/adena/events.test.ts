@@ -59,6 +59,15 @@ describe("listen", () => {
 
   it.each([
     ["nothing", undefined],
+    ["null", null],
+    [
+      "an On getter that throws",
+      {
+        get On(): never {
+          throw new Error("extension gone");
+        },
+      },
+    ],
     ["an object with no On", {}],
     ["an On that is no function", { On: 1 }],
     [
